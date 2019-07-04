@@ -3114,6 +3114,135 @@ static INT set_promiscuous_mode(void)
 	return Y_SUCCESS;
 }
 
+static INT write_phy_regs_uc45(INT phy_id, INT phy_reg, INT phy_reg_data)
+{
+	ULONG retryCount = 1000;
+	ULONG vy_count;
+	volatile ULONG varMAC_GMIIAR;
+	INT dev_addr = ((phy_reg >> 16) & 0x1f);
+
+	/* wait for any previous MII read/write operation to complete */
+
+	/*Poll Until Poll Condition */
+	vy_count = 0;
+	while (1) {
+		MAC_GMIIAR_RGRD(varMAC_GMIIAR);
+		if (GET_VALUE(varMAC_GMIIAR, MAC_GMIIAR_GB_LPOS, MAC_GMIIAR_GB_HPOS) == 0) {
+			break;
+		}
+
+		if (vy_count > retryCount) {
+			return -Y_FAILURE;
+		} else {
+			vy_count++;
+			usleep_range(10, 11);
+		}
+
+	}
+	/* write the data (RA & GD) */
+	phy_reg_data = ((phy_reg & 0xffff) << 16) | (phy_reg_data & 0xffff);
+	MAC_GMIIDR_RGWR(phy_reg_data);
+	/* initiate the MII write operation by updating desired */
+	/* phy address/id (0 - 31) */
+	/* phy register offset */
+	/* CSR Clock Range (20 - 35MHz) */
+	/* Select write operation */
+	/* Set C45E bit */
+	/* set busy bit */
+	//MAC_GMIIAR_RGRD(varMAC_GMIIAR);
+	varMAC_GMIIAR = 0;
+	varMAC_GMIIAR =
+	    varMAC_GMIIAR | ((phy_id) << 21) | ((dev_addr) << 16) | MAC_GMIIAR_CR_CLK_2035 | MAC_GMIIAR_GOC_WR | MAC_GMIIAR_C45E_EN | MAC_GMIIAR_GB_EN;
+	MAC_GMIIAR_RGWR(varMAC_GMIIAR);
+
+	/*DELAY IMPLEMENTATION USING udelay() */
+	udelay(30);
+	/* wait for MII write operation to complete */
+
+	/*Poll Until Poll Condition */
+	vy_count = 0;
+	while (1) {
+		MAC_GMIIAR_RGRD(varMAC_GMIIAR);
+		if (GET_VALUE(varMAC_GMIIAR, MAC_GMIIAR_GB_LPOS, MAC_GMIIAR_GB_HPOS) == 0) {
+			break;
+		}
+		if (vy_count > retryCount) {
+			return -Y_FAILURE;
+		} else {
+			vy_count++;
+			usleep_range(10, 11);
+		}
+	}
+
+	return Y_SUCCESS;
+}
+
+static INT read_phy_regs_uc45(INT phy_id, INT phy_reg, INT *phy_reg_data)
+{
+	ULONG retryCount = 1000;
+	ULONG vy_count;
+	volatile ULONG varMAC_GMIIAR;
+	ULONG varMAC_GMIIDR;
+	INT dev_addr = ((phy_reg >> 16) & 0x1f);
+
+	/* wait for any previous MII read/write operation to complete */
+
+	/*Poll Until Poll Condition */
+	vy_count = 0;
+	while (1) {
+		MAC_GMIIAR_RGRD(varMAC_GMIIAR);
+		if (GET_VALUE(varMAC_GMIIAR, MAC_GMIIAR_GB_LPOS, MAC_GMIIAR_GB_HPOS) == 0) {
+			break;
+		}
+
+		if (vy_count > retryCount) {
+			return -Y_FAILURE;
+		} else {
+			vy_count++;
+			usleep_range(10, 11);
+		}
+	}
+	/* write the RA data */
+	MAC_GMIIDR_RA_UDFWR(phy_reg);
+	/* initiate the MII read operation by updating desired */
+	/* phy address/id (0 - 31) */
+	/* phy register offset */
+	/* CSR Clock Range (20 - 35MHz) */
+	/* Select read operation */
+	/* Set C45E bit */
+	/* set busy bit */
+	//MAC_GMIIAR_RGRD(varMAC_GMIIAR);
+	varMAC_GMIIAR = 0;
+	varMAC_GMIIAR =
+	    varMAC_GMIIAR | ((phy_id) << 21) | ((dev_addr) << 16) | MAC_GMIIAR_CR_CLK_2035 | MAC_GMIIAR_GOC_RD | MAC_GMIIAR_C45E_EN | MAC_GMIIAR_GB_EN ;
+	MAC_GMIIAR_RGWR(varMAC_GMIIAR);
+
+	/*DELAY IMPLEMENTATION USING udelay() */
+	udelay(30);
+	/* wait for MII write operation to complete */
+
+	/*Poll Until Poll Condition */
+	vy_count = 0;
+	while (1) {
+		MAC_GMIIAR_RGRD(varMAC_GMIIAR);
+		if (GET_VALUE(varMAC_GMIIAR, MAC_GMIIAR_GB_LPOS, MAC_GMIIAR_GB_HPOS) == 0) {
+			break;
+		}
+		if (vy_count > retryCount) {
+			return -Y_FAILURE;
+		} else {
+			vy_count++;
+			usleep_range(10, 11);
+		}
+	}
+	/* read the data */
+	MAC_GMIIDR_RGRD(varMAC_GMIIDR);
+	*phy_reg_data =
+	    GET_VALUE(varMAC_GMIIDR, MAC_GMIIDR_GD_LPOS, MAC_GMIIDR_GD_HPOS);
+
+	return Y_SUCCESS;
+}
+
 /*!
  * \brief This sequence is used to write into phy registers
  * \param[in] phy_id
@@ -5037,6 +5166,8 @@ void DWC_ETH_QOS_init_function_ptrs_dev(struct hw_if_struct *hw_if)
 
 	hw_if->write_phy_regs = write_phy_regs;
 	hw_if->read_phy_regs = read_phy_regs;
+	hw_if->write_phy_regs_uc45 = write_phy_regs_uc45;
+	hw_if->read_phy_regs_uc45 = read_phy_regs_uc45;
 	hw_if->set_full_duplex = set_full_duplex;
 	hw_if->set_half_duplex = set_half_duplex;
 	hw_if->set_mii_speed_100 = set_mii_speed_100;

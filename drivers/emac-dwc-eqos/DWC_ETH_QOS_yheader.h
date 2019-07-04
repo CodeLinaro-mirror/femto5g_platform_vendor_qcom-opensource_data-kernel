@@ -886,6 +886,9 @@ struct hw_if_struct {
 
 	INT(*read_phy_regs) (INT, INT, INT *);
 	INT(*write_phy_regs) (INT, INT, INT);
+	INT(*read_phy_regs_uc45) (INT, INT, INT *);
+	INT(*write_phy_regs_uc45) (INT, INT, INT);
+
 	INT(*set_full_duplex) (VOID);
 	INT(*set_half_duplex) (VOID);
 	INT(*set_mii_speed_100) (VOID);
@@ -1680,6 +1683,7 @@ struct DWC_ETH_QOS_prv_data {
 	bool enable_phy_intr;
 	bool en_ptp_pps_avb_class_a_irq;
 	bool en_ptp_pps_avb_class_b_irq;
+	bool use_clause_45;
 	struct msm_bus_scale_pdata *bus_scale_vec;
 	uint32_t bus_hdl;
 	u32 rgmii_clk_rate;

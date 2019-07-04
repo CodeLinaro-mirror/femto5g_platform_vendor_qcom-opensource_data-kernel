@@ -37526,6 +37526,13 @@
 #define MAC_ISR_PHYIS_LPOS 3
 #define MAC_ISR_PHYIS_HPOS 3
 
+#define MAC_GMIIAR_CR_CLK_2035  ((0x2) << 8)
+#define MAC_GMIIAR_SKAP_EN      ((0x1) << 4)
+#define MAC_GMIIAR_GOC_RD       ((0x3) << 2)
+#define MAC_GMIIAR_GOC_WR       ((0x1) << 2)
+#define MAC_GMIIAR_C45E_EN      ((0x1) << 1)
+#define MAC_GMIIAR_GB_EN        ((0x1) << 0)
+
 #define GET_VALUE(data, lbit, hbit) ((data >> lbit) & (~(~0 << (hbit - lbit + 1))))
 
 #define GET_INDEXED_VALUE(data, lbit, hbit, index)\

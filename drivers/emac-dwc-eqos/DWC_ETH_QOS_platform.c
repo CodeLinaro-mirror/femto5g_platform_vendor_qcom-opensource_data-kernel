@@ -118,6 +118,11 @@ module_param(phy_interrupt_en, int, S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP);
 MODULE_PARM_DESC(phy_interrupt_en,
 		"Enable PHY interrupt [0-DISABLE, 1-ENABLE]");
 
+static int use_clause_45 = 0;
+module_param(use_clause_45, int, S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP);
+MODULE_PARM_DESC(use_clause_45,
+		 "Determines clause [0-clause 22, 1-clause 45");
+
 struct ip_params pparams = {0};
 #ifdef DWC_ETH_QOS_BUILTIN
 static int __init set_early_ethernet_ipv4(char *ipv4_addr_in)
@@ -2693,6 +2698,7 @@ static int DWC_ETH_QOS_configure_netdevice(struct platform_device *pdev)
 	pdata->interface = DWC_ETH_QOS_get_io_macro_phy_interface(pdata);
 
 	pdata->enable_phy_intr = phy_interrupt_en;
+	pdata->use_clause_45 = use_clause_45;
 
 	DWC_ETH_QOS_mac_rec_init(pdata);
 	/* Bypass PHYLIB for TBI, RTBI and SGMII interface */
