@@ -2895,7 +2895,7 @@ static int DWC_ETH_QOS_start_xmit(struct sk_buff *skb, struct net_device *dev)
 	if (desc_data->free_desc_cnt < desc_count) {
 		desc_data->queue_stopped = 1;
 		netif_stop_subqueue(dev, qinx);
-		DBGPR("stopped TX queue(%d) since there are no sufficient descriptor available for the current transfer\n",
+		EMACINFO("stopped TX queue(%d), no sufficient descriptors available\n",
 		      qinx);
 
 		DWC_ETH_QOS_handle_mac_err(pdata, TDU_ERR, qinx);
@@ -3376,6 +3376,7 @@ void DWC_ETH_QOS_tx_interrupt(struct net_device *dev,
 
 	if ((desc_data->queue_stopped == 1) && (desc_data->free_desc_cnt > 0)) {
 		desc_data->queue_stopped = 0;
+		EMACINFO("Wake up stopped TX queue(%d)\n", qinx);
 		netif_wake_subqueue(dev, qinx);
 	}
 #ifdef DWC_ETH_QOS_CERTIFICATION_PKTBURSTCNT

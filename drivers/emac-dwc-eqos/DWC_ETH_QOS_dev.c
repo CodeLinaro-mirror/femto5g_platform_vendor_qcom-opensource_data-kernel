@@ -3639,6 +3639,7 @@ static void pre_transmit(struct DWC_ETH_QOS_prv_data *pdata,
 	UINT vartcp_udp_hdr_len = 0;
 	UINT varptp_enable = 0;
 	INT total_len = 0;
+	bool set_ioc = false;
 
 	DBGPR("-->pre_transmit: QINX = %u\n", QINX);
 
@@ -3671,6 +3672,7 @@ static void pre_transmit(struct DWC_ETH_QOS_prv_data *pdata,
 		TX_CONTEXT_DESC_TDES3_OWN_MLF_WR(TX_CONTEXT_DESC->TDES3, 0x1);
 
 		original_start_index = tx_desc_data->cur_tx;
+		set_ioc = set_ioc ?  set_ioc : (!(tx_desc_data->cur_tx % int_mod));
 		INCR_TX_DESC_INDEX(tx_desc_data->cur_tx, 1, pdata->tx_queue[QINX].desc_cnt);
 		start_index = tx_desc_data->cur_tx;
 		TX_NORMAL_DESC =
@@ -3706,6 +3708,7 @@ static void pre_transmit(struct DWC_ETH_QOS_prv_data *pdata,
 		TX_CONTEXT_DESC_TDES3_OWN_MLF_WR(TX_CONTEXT_DESC->TDES3, 0x1);
 
 		original_start_index = tx_desc_data->cur_tx;
+		set_ioc = set_ioc ?  set_ioc : (!(tx_desc_data->cur_tx % int_mod));
 		INCR_TX_DESC_INDEX(tx_desc_data->cur_tx, 1, pdata->tx_queue[QINX].desc_cnt);
 		start_index = tx_desc_data->cur_tx;
 		TX_NORMAL_DESC = GET_TX_DESC_PTR(QINX, tx_desc_data->cur_tx);
@@ -3738,6 +3741,7 @@ static void pre_transmit(struct DWC_ETH_QOS_prv_data *pdata,
 		tx_desc_data->default_mss = tx_pkt_features->mss;
 
 		original_start_index = tx_desc_data->cur_tx;
+		set_ioc = set_ioc ?  set_ioc : (!(tx_desc_data->cur_tx % int_mod));
 		INCR_TX_DESC_INDEX(tx_desc_data->cur_tx, 1, pdata->tx_queue[QINX].desc_cnt);
 		start_index = tx_desc_data->cur_tx;
 		TX_NORMAL_DESC = GET_TX_DESC_PTR(QINX, tx_desc_data->cur_tx);
@@ -3832,6 +3836,7 @@ static void pre_transmit(struct DWC_ETH_QOS_prv_data *pdata,
 	if (varptp_enable)
 		TX_NORMAL_DESC_TDES2_TTSE_MLF_WR(TX_NORMAL_DESC->TDES2, 0x1);
 
+	set_ioc = set_ioc ?  set_ioc : (!(tx_desc_data->cur_tx % int_mod));
 	INCR_TX_DESC_INDEX(tx_desc_data->cur_tx, 1, pdata->tx_queue[QINX].desc_cnt);
 	TX_NORMAL_DESC = GET_TX_DESC_PTR(QINX, tx_desc_data->cur_tx);
 	buffer = GET_TX_BUF_PTR(QINX, tx_desc_data->cur_tx);
@@ -3853,7 +3858,7 @@ static void pre_transmit(struct DWC_ETH_QOS_prv_data *pdata,
 		TX_NORMAL_DESC_TDES3_OWN_MLF_WR(TX_NORMAL_DESC->TDES3, 0x1);
 		/* Mark it as NORMAL descriptor */
 		TX_NORMAL_DESC_TDES3_CTXT_MLF_WR(TX_NORMAL_DESC->TDES3, 0);
-
+		set_ioc = set_ioc ?  set_ioc : (!(tx_desc_data->cur_tx % int_mod));
 		INCR_TX_DESC_INDEX(tx_desc_data->cur_tx, 1, pdata->tx_queue[QINX].desc_cnt);
 		TX_NORMAL_DESC = GET_TX_DESC_PTR(QINX, tx_desc_data->cur_tx);
 		buffer = GET_TX_BUF_PTR(QINX, tx_desc_data->cur_tx);
@@ -3870,7 +3875,7 @@ static void pre_transmit(struct DWC_ETH_QOS_prv_data *pdata,
 		TX_NORMAL_DESC_TDES2_IC_MLF_WR(TX_NORMAL_DESC->TDES2, 0x1);
 #else
 	TX_NORMAL_DESC_TDES2_IC_MLF_WR(TX_NORMAL_DESC->TDES2,
-			(!(tx_desc_data->cur_tx % int_mod)));
+			set_ioc ? 1 : 0);
 #endif
 
 	/* set OWN bit of FIRST descriptor at end to avoid race condition */
