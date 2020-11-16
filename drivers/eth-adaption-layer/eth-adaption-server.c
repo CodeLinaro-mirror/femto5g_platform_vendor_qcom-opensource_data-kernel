@@ -245,7 +245,16 @@ static void eth_adaption_server_start(struct kthread_work *work)
 	if (client == NULL)
 		goto release;
 
-	cb_info_server =(struct qrtr_ethernet_cb_info *) kmalloc(sizeof(struct qrtr_ethernet_cb_info),GFP_KERNEL);
+	mutex_lock(&eam_lock);
+	if (qrtr_init == QRTR_DEINIT || qrtr_init == QRTR_INPROGRESS)
+	{
+		mutex_unlock(&eam_lock);
+		cb_info_server =(struct qrtr_ethernet_cb_info *) kmalloc(sizeof(struct qrtr_ethernet_cb_info),GFP_KERNEL);
+	}
+	else
+	{
+		mutex_unlock(&eam_lock);
+	}
 
 	if(!cb_info_server)
 	{
@@ -309,17 +318,38 @@ static void eth_adaption_server_start(struct kthread_work *work)
 			ETHADPTERR(KERN_ALERT "Can`t set a socket option TCP_NODELAY %d\n", error);
 			return;
 		}
-		// Call qrtr to initialize endpoint and pass the eth_adapt_send fn ptr to qrtr
-		cb_info_server->eth_send = eth_adaption_send;
-		qcom_ethernet_init_cb(cb_info_server);
-
-		/* Critical section */
 		mutex_lock(&eam_lock);
-		qrtr_init = QRTR_INIT;
-		mutex_unlock(&eam_lock);
+		if (qrtr_init == QRTR_DEINIT || qrtr_init == QRTR_INPROGRESS)
+		{
+			mutex_unlock(&eam_lock);
+
+			if(!cb_info_server)
+			{
+				ETHADPTERR("kmalloc failed ");
+				goto release;
+			}
+			// Call qrtr to initialize endpoint and pass the eth_adapt_send fn ptr to qrtr
+			cb_info_server->eth_send = eth_adaption_send;
+			qcom_ethernet_init_cb(cb_info_server);
+
+			/* Critical section */
+			mutex_lock(&eam_lock);
+			qrtr_init = QRTR_INIT;
+			mutex_unlock(&eam_lock);
+		}
+		else
+		{
+			mutex_unlock(&eam_lock);
+		}
 
 		kthread_init_work(&serv_sk.read_data, eth_adaption_server_receive);
 		serv_sk.newsocket->sk->sk_data_ready = eth_adaption_server_data_ready;
+
+		/* Critical section */
+		mutex_lock(&power_state_lock);
+		power_state = EAM_POWER_STATE_RUNNING;
+		mutex_unlock(&power_state_lock);
+
 #ifdef CONFIG_MSM_BOOT_TIME_MARKER
 			place_marker("M - eth-adaption-layer server_start connected");
 #endif
@@ -348,13 +378,17 @@ release:
 * @port: port
 * @iptype: ip protocol
 * @retry_count retry count required.
+* if called as part of resume
 * Return: Length of the buffer sent.
 */
-int eth_adaption_server_connect(int port,int iptype,int connect_retry_cnt)
+int eth_adaption_server_connect(int port,int iptype,int connect_retry_cnt,int is_resume)
 {
 	/*First thing you need to do is MUTEX init*/
 	/*Do not add any code above this comment*/
-	mutex_init(&eam_lock);
+	if (!is_resume)
+	{
+		mutex_init(&eam_lock);
+	}
 	serv_sk.server_port = port;
 	serv_sk.iptype = iptype;
 	serv_sk.connect_retry_cnt = connect_retry_cnt;
@@ -364,8 +398,16 @@ int eth_adaption_server_connect(int port,int iptype,int connect_retry_cnt)
 
 	/* Critical section */
 	mutex_lock(&eam_lock);
-	qrtr_init = QRTR_INPROGRESS;
-	mutex_unlock(&eam_lock);
+	ETHADPTINFO("%s: Server connect, qrtr state %d\n", __func__,qrtr_init);
+	if (qrtr_init == QRTR_DEINIT)
+	{
+		qrtr_init = QRTR_INPROGRESS;
+		mutex_unlock(&eam_lock);
+	}
+	else
+	{
+		mutex_unlock(&eam_lock);
+	}
 
 	kthread_init_work(&serv_sk.init_server, eth_adaption_server_start);
 	kthread_init_worker(&serv_sk.kworker);
@@ -387,15 +429,18 @@ int eth_adaption_server_connect(int port,int iptype,int connect_retry_cnt)
 * @void: void.
 * Return: void.
 */
-void eth_adaption_server_cleanup(void)
+void eth_adaption_server_cleanup(bool clean_up)
 {
 	ETHADPTINFO("server_cleanup entry \n");
-	serv_sk.rmmod = true;
 
-	/* Critical section */
-	mutex_lock(&eam_lock);
-	qrtr_init = QRTR_DEINIT;
-	mutex_unlock(&eam_lock);
+	if (clean_up)
+	{
+		serv_sk.rmmod = true;
+		/* Critical section */
+		mutex_lock(&eam_lock);
+		qrtr_init = QRTR_DEINIT;
+		mutex_unlock(&eam_lock);
+	}
 
 	/*reset packet stats*/
 	send_data = 0;
@@ -431,7 +476,7 @@ void eth_adaption_server_cleanup(void)
 		serv_sk.newsocket  = NULL;
 	}
 
-	if (serv_sk.cb_info_server)
+	if (clean_up && serv_sk.cb_info_server)
 	{
 		kfree(serv_sk.cb_info_server);
 		serv_sk.cb_info_server = NULL;
@@ -449,6 +494,9 @@ void eth_adaption_server_cleanup(void)
 		serv_sk.serverv6 = NULL;
 	}
 	ETHADPTINFO("server_cleanup exit \n");
-	mutex_destroy(&eam_lock);
+	if (clean_up)
+	{
+		mutex_destroy(&eam_lock);
+	}
 }
 

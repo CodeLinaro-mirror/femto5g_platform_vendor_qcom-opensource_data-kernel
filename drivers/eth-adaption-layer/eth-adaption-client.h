@@ -38,9 +38,10 @@
 * @iptype:
 * @port:
 * @connect_retry_cnt:
+* @is_resume
 * Return: Error code in failure case.
 */
-int eth_adaption_client_connect(unsigned char *destip, int iptype, int port,int connect_retry_cnt);
+int eth_adaption_client_connect(unsigned char *destip, int iptype, int port,int connect_retry_cnt,int is_resume);
 
 /**
 * eth_adaption_client_send() - this will be called from qrtr context.
@@ -54,4 +55,4 @@ int eth_adaption_client_send(const char *buf, const size_t length);
 * eth_adaption_client_cleanup() - this will be called eal context to cleanup module.
 * Return: void
 */
-void eth_adaption_client_cleanup(void);
+void eth_adaption_client_cleanup(bool cleanup_lock);

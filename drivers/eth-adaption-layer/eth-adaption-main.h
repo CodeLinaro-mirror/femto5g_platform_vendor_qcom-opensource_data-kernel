@@ -49,6 +49,8 @@
 #include <soc/qcom/boot_stats.h>
 #endif
 
+#include <linux/cdev.h>
+
 #define DRV_NAME "eth-adaption-layer"
 #define MAX_SIZE 8192
 
@@ -69,6 +71,21 @@ do {\
 do {\
 	pr_info(DRV_NAME " %s:%d " fmt, __func__, __LINE__, ## args);\
 } while (0)
+
+enum eam_power_management_state
+{
+	EAM_POWER_STATE_SUSPEND,
+	EAM_POWER_STATE_RUNNING
+};
+/* power management state*/
+extern enum eam_power_management_state power_state;
+/* Power state lock */
+extern struct mutex power_state_lock;
+
+/* Variable to indicate if peer has toggle wake up GPIO*/
+extern bool peer_gpio_toggled;
+/* Power state lock */
+extern struct mutex gpio_toggle_lock;
 
 /**
 * eth_adaption_send() - Function to send QMI packet from IPCRTR over TCP socket.
@@ -92,3 +109,24 @@ void eth_adaption_notifier_soft_reset(struct kthread_work *work);
 * Return: void
 */
 void eth_adaption_notifier_soft_set(struct kthread_work *work);
+
+/**
+* Power management IOCTL declarations
+*/
+static unsigned int dev_num = 1;
+static struct cdev eth_adaption_power_management_ioctl_cdev;
+static dev_t device;
+static char eth_adaption_drv_name[] = "eth-adaption";
+static struct class *eth_adaption_class;
+
+/**
+* eth_adaption_handle_suspend_ioctl() - handler for suspend case
+* scenario Return:int
+*/
+int eth_adaption_handle_suspend_ioctl(void);
+
+/**
+* eth_adaption_handle_resume_ioctl() - handler for resume case
+* scenario Return:int
+*/
+int eth_adaption_handle_resume_ioctl(void);

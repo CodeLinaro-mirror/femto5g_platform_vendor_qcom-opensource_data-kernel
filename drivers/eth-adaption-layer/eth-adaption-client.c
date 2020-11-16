@@ -205,7 +205,6 @@ static void eth_adaption_client_start(struct kthread_work *work)
 		server_v6 = (struct sockaddr_in6*) kmalloc(sizeof(struct sockaddr_in6),GFP_KERNEL);
 		acc=sock_create(AF_INET6, SOCK_STREAM, IPPROTO_TCP, &sockt);
 	}
-	cb_info_client =(struct qrtr_ethernet_cb_info *) kmalloc(sizeof(struct qrtr_ethernet_cb_info),GFP_KERNEL);
 
 	ETHADPTDBG("client sock %d\n");
 	if(acc < 0)
@@ -287,16 +286,33 @@ connect:
 		client_sk.server_v6 = server_v6;
 		client_sk.kpi_receive_data = true;
 		client_sk.kpi_send_data  = true;
-		cb_info_client->eth_send = eth_adaption_send;
-		qcom_ethernet_init_cb(cb_info_client);
-
-		/* Critical section */
 		mutex_lock(&eam_lock);
-		qrtr_init = QRTR_INIT;
-		mutex_unlock(&eam_lock);
+		if (qrtr_init == QRTR_DEINIT || qrtr_init == QRTR_INPROGRESS)
+		{
+			cb_info_client =(struct qrtr_ethernet_cb_info *) kmalloc(sizeof(struct qrtr_ethernet_cb_info),GFP_KERNEL);
+
+			mutex_unlock(&eam_lock);
+
+			cb_info_client->eth_send = eth_adaption_send;
+			qcom_ethernet_init_cb(cb_info_client);
+
+			/* Critical section */
+			mutex_lock(&eam_lock);
+			qrtr_init = QRTR_INIT;
+			mutex_unlock(&eam_lock);
+		}
+		else
+		{
+			mutex_unlock(&eam_lock);
+		}
 
 		kthread_init_work(&client_sk.read_data, eth_adaption_client_receive);
 		client_sk.conn_socket->sk->sk_data_ready = eth_adaption_client_data_ready;
+
+		/* Critical section */
+		mutex_lock(&power_state_lock);
+		power_state = EAM_POWER_STATE_RUNNING;
+		mutex_unlock(&power_state_lock);
 #ifdef CONFIG_MSM_BOOT_TIME_MARKER
 		place_marker("M - eth-adaption-layer client_connect connected");
 #endif
@@ -343,15 +359,19 @@ release:
 * @iptype:
 * @port:
 * @connect_retry_cnt:
+* @is_resume
 * Return: Error code in failure case.
 */
-int eth_adaption_client_connect(unsigned char *destip, int iptype, int port,int connect_retry_cnt)
+int eth_adaption_client_connect(unsigned char *destip, int iptype, int port,int connect_retry_cnt,int is_resume)
 {
 	unsigned int ipaddr_len;
 
 	/*First thing you need to do is MUTEX init*/
 	/*Do not add any code above this comment*/
-	mutex_init(&eam_lock);
+	if (!is_resume)
+	{
+		mutex_init(&eam_lock);
+	}
 
 	if (iptype == 0)
 		ipaddr_len = IPV4_ADDR_LEN;
@@ -363,10 +383,18 @@ int eth_adaption_client_connect(unsigned char *destip, int iptype, int port,int 
 	client_sk.port = port;
 	client_sk.connect_retry_cnt = connect_retry_cnt;
 
-	/* Critical section */
 	mutex_lock(&eam_lock);
-	qrtr_init = QRTR_INPROGRESS;
-	mutex_unlock(&eam_lock);
+	ETHADPTINFO("%s: client connect, qrtr state %d\n", __func__,qrtr_init);
+	if (qrtr_init == QRTR_DEINIT || qrtr_init == QRTR_INPROGRESS)
+	{
+		/* Critical section */
+		qrtr_init = QRTR_INPROGRESS;
+		mutex_unlock(&eam_lock);
+	}
+	else
+	{
+		mutex_unlock(&eam_lock);
+	}
 
 	kthread_init_work(&client_sk.init_client, eth_adaption_client_start);
 	kthread_init_worker(&client_sk.kworker);
@@ -389,13 +417,17 @@ int eth_adaption_client_connect(unsigned char *destip, int iptype, int port,int 
 * eth_adaption_client_cleanup() - this will be called eal context to cleanup module.
 * Return: void
 */
-void eth_adaption_client_cleanup(void)
+void eth_adaption_client_cleanup(bool cleanup_lock)
 {
 	ETHADPTINFO(KERN_ALERT"client_cleanup entry\n");
-	/* Critical section */
-	mutex_lock(&eam_lock);
-	qrtr_init = QRTR_DEINIT;
-	mutex_unlock(&eam_lock);
+
+	if (cleanup_lock)
+	{
+		/* Critical section */
+		mutex_lock(&eam_lock);
+		qrtr_init = QRTR_DEINIT;
+		mutex_unlock(&eam_lock);
+	}
 
 	/*reset packet stats*/
 	send_data = 0;
@@ -426,7 +458,7 @@ void eth_adaption_client_cleanup(void)
 		client_sk.conn_socket = NULL;
 	}
 
-	if(cb_info_client)
+	if(cleanup_lock && cb_info_client)
 	{
 		kfree(cb_info_client);
 		cb_info_client = NULL;
@@ -444,5 +476,8 @@ void eth_adaption_client_cleanup(void)
 		client_sk.server_v6 = NULL;
 	}
 	ETHADPTINFO(KERN_ALERT"client_cleanup exit\n");
-	mutex_destroy(&eam_lock);
+	if(cleanup_lock)
+	{
+		mutex_destroy(&eam_lock);
+	}
 }

@@ -20,6 +20,8 @@
 #include <eth-adaption-client.h>
 #include <soc/qcom/qrtr_ethernet.h>
 #include <soc/qcom/sb_notification.h>
+#include <linux/msm_eth.h>
+#include <linux/ioctl.h>
 
 /* Mutex lock */
 struct mutex eam_lock;
@@ -55,6 +57,21 @@ int link_state;
 
 /* SSR notifier block for SSR event handling */
 struct notifier_block qrtr_nb;
+
+/* GPIO notifier and variables for suspend or resume*/
+struct notifier_block gpio_notifier;
+int gpio_link_state;
+int gpio_init;
+
+/* power management state*/
+enum eam_power_management_state power_state;
+/* Power state lock */
+struct mutex power_state_lock;
+
+/* Variable to indicate if peer has toggle wake up GPIO*/
+bool peer_gpio_toggled = 0;
+/* Power state lock */
+struct mutex gpio_toggle_lock;
 
 /* insmod parameters, currently hard coded. */
 int server = 1;
@@ -376,6 +393,24 @@ int eth_adaption_send(struct sk_buff *skb)
 	if (skb == NULL)
 	return -1;
 
+	/**
+	* Check and block on power susupend state and wait until running
+	* This enables the queue mechanism of incoming packets from QRTR
+	*/
+check_suspend:
+	mutex_lock(&power_state_lock);
+	if(power_state == EAM_POWER_STATE_SUSPEND)
+	{
+		mutex_unlock(&power_state_lock);
+		DECLARE_WAIT_QUEUE_HEAD(suspend_wait);
+		wait_event_timeout(suspend_wait, 0 ,5*HZ);
+		goto check_suspend;
+	}
+	else
+	{
+		mutex_unlock(&power_state_lock);
+	}
+
 	if (server)
 	{
 		ret = eth_adaption_server_send(skb->data,skb->len);
@@ -387,6 +422,74 @@ int eth_adaption_send(struct sk_buff *skb)
 	return 0;
 }
 EXPORT_SYMBOL(eth_adaption_send);
+
+/**
+* eth_adaption_handle_resume_ioctl() - handler for mdm resume case scenario
+* Return:int
+*/
+int eth_adaption_handle_resume_ioctl()
+{
+	ETHADPTINFO("eth_adapt handle resume ioctl\n");
+	mutex_init(&power_state_lock);
+	int ret = 0;
+
+	mutex_lock(&gpio_toggle_lock);
+	if(peer_gpio_toggled == false)
+	{
+		mutex_unlock(&gpio_toggle_lock);
+		sb_notifier_call_chain(EVENT_REQUEST_WAKE_UP, NULL);
+	}
+	else
+	{
+		mutex_unlock(&gpio_toggle_lock);
+	}
+
+	if(server)
+	{
+	// start server
+		ret=eth_adaption_server_connect(dest_port,iptype,connect_retry_cnt,true);
+	}
+	else
+	{
+		if (iptype == 0)
+		{
+			ret = eth_adaption_client_connect(destipv4,iptype,dest_port,connect_retry_cnt,true);
+		}
+		else
+		{
+			ret = eth_adaption_client_connect(destipv6,iptype,dest_port,connect_retry_cnt,true);
+		}
+	}
+
+	return ret;
+}
+
+/**
+* eth_adaption_handle_suspend_ioctl() - handler for eap suspend case scenario
+* Return:int
+*/
+int eth_adaption_handle_suspend_ioctl()
+{
+	mutex_init(&power_state_lock);
+	int ret = 0;
+
+	/* Critical section. Set state to suspend for blocking TX data*/
+	mutex_lock(&power_state_lock);
+	power_state = EAM_POWER_STATE_SUSPEND;
+	mutex_unlock(&power_state_lock);
+
+	/*Clean up TCP sockets for susepnd handling*/
+	if(server)
+	{
+		eth_adaption_server_cleanup(false);
+	}
+	else
+	{
+		eth_adaption_client_cleanup(false);
+	}
+
+	return ret;
+}
 
 /**
 * eth_adapt_register_netdevice_notifier() - register for link up and down evts.
@@ -413,6 +516,179 @@ static inline void eth_adaption_unregister_netdevice_notifier(void)
 }
 
 /**
+* eth_adaption_power_management_ioctl() - handler for ioctl
+* scenarios Return:int
+*/
+static int eth_adaption_power_management_ioctl(struct file *filp,
+					 unsigned int cmd,unsigned long arg)
+{
+	int ret = 0;
+	if (server == 0)
+	{
+		switch (cmd)
+		{
+			case IOC_MDM_ETH_SUSPEND:
+				ret = eth_adaption_handle_suspend_ioctl();
+				break;
+			case IOC_MDM_ETH_RESUME:
+				ret = eth_adaption_handle_resume_ioctl();
+				break;
+			default:
+				ETHADPTERR("%s unsupported ioctl for client %d\n", __func__,cmd);
+				break;
+		}
+	}
+	else
+	{
+		switch (cmd)
+		{
+			case IOC_EAP_ETH_SUSPEND:
+				ret = eth_adaption_handle_suspend_ioctl();
+				break;
+			case IOC_EAP_ETH_RESUME:
+				ret = eth_adaption_handle_resume_ioctl();
+				break;
+			default:
+				ETHADPTERR("%s unsupported ioctl for server %d\n", __func__,cmd);
+				break;
+		}
+	}
+	module_put(THIS_MODULE);
+	return ret;
+}
+
+/* File operations for power management */
+const struct file_operations eth_adaption_power_management_ioctl_fops = {
+	.owner = THIS_MODULE,
+	.unlocked_ioctl = (long)eth_adaption_power_management_ioctl,
+};
+
+/**
+* eth_adaption_power_management_ioctl_init(): initializes ioctl for power management
+* @void
+* Return:int
+*/
+static int eth_adaption_power_management_ioctl_init(void)
+{
+	int ret;
+	struct device *dev;
+
+	ret = alloc_chrdev_region(&device, 0, dev_num, eth_adaption_drv_name);
+	if (ret)
+	{
+		ETHADPTERR("device_alloc err\n");
+		goto dev_alloc_err;
+	}
+
+	eth_adaption_class = class_create(THIS_MODULE, eth_adaption_drv_name);
+	if (IS_ERR(eth_adaption_class))
+	{
+		ETHADPTERR("class_create err\n");
+		goto class_err;
+	}
+
+	dev = device_create(eth_adaption_class, NULL, device,
+						NULL, eth_adaption_drv_name);
+	if (IS_ERR(dev))
+	{
+		ETHADPTERR("device_create err\n");
+		goto device_err;
+	}
+
+	cdev_init(&eth_adaption_power_management_ioctl_cdev, &eth_adaption_power_management_ioctl_fops);
+	ret = cdev_add(&eth_adaption_power_management_ioctl_cdev, device, dev_num);
+	if (ret)
+	{
+		ETHADPTERR("cdev_add err\n");
+		goto cdev_add_err;
+	}
+
+	ETHADPTDBG("ioctl init OK!!\n");
+	return 0;
+
+cdev_add_err:
+	device_destroy(eth_adaption_class, device);
+device_err:
+	class_destroy(eth_adaption_class);
+class_err:
+	unregister_chrdev_region(device, dev_num);
+dev_alloc_err:
+	return -ENODEV;
+}
+
+/**
+* eth_adaption_power_management_ioctl_deinit(): deinitializes ioctl for power management
+* @void
+* Return:void
+*/
+static void eth_adaption_power_management_ioctl_deinit(void)
+{
+	cdev_del(&eth_adaption_power_management_ioctl_cdev);
+	unregister_chrdev_region(device, dev_num);
+}
+
+/**
+* eth_adaption_gpio_notifier_device_event(): handler function for gpio events
+* @notifier_block:
+* @event:
+* @ptr:
+* Return:int
+*/
+static int eth_adaption_gpio_notifier_device_event
+(
+	struct notifier_block *unused,
+	unsigned long event,
+	void *ptr
+)
+{
+	switch(event)
+	{
+		case EVENT_REMOTE_WOKEN_UP:
+			mutex_init(&gpio_toggle_lock);
+			ETHADPTINFO("eth_adaption_gpio_notifier_device_event %d, %d, %d\n",event,gpio_init,gpio_link_state);
+			/* Critical section */
+			mutex_lock(&gpio_toggle_lock);
+			peer_gpio_toggled = true;
+			mutex_unlock(&gpio_toggle_lock);
+			break;
+	}
+	return NOTIFY_DONE;
+}
+
+/**
+* eth_adaption_gpio_register_listener(): handler function to register for gpio events
+* @void
+* Return: void
+*/
+static void eth_adaption_gpio_register_listener(void)
+{
+	int ret;
+	gpio_notifier.notifier_call = eth_adaption_gpio_notifier_device_event;
+	ret = sb_register_evt_listener(&gpio_notifier);
+	if (ret)
+	{
+		ETHADPTERR("failed at: %s\n", __func__);
+	}
+	return;
+}
+
+/**
+* eth_adaption_gpio_unregister_listener(): handler function to unregister for gpio events
+* @void
+* Return:void
+*/
+static void eth_adaption_gpio_unregister_listener(void)
+{
+	int ret;
+	ret =  sb_unregister_evt_listener(&gpio_notifier);
+	if (ret)
+	{
+		ETHADPTERR("failed at: %s\n", __func__);
+	}
+	return;
+}
+
+/**
 * eth_adapt_init() - Initialize Ethernet adaptation module.
 * Wait till file system comes up.
 * Read .ini file for destination mac address, vlan id.
@@ -433,23 +709,25 @@ static int __init eth_adaption_init(void)
 	if(server)
 	{
 	// start server
-		ret=eth_adaption_server_connect(dest_port,iptype,connect_retry_cnt);
+		ret=eth_adaption_server_connect(dest_port,iptype,connect_retry_cnt,false);
 	}
 	else
 	{
 		if (iptype == 0)
 		{
-			ret = eth_adaption_client_connect(destipv4,iptype,dest_port,connect_retry_cnt);
+			ret = eth_adaption_client_connect(destipv4,iptype,dest_port,connect_retry_cnt,false);
 		}
 		else
 		{
-			ret = eth_adaption_client_connect(destipv6,iptype,dest_port,connect_retry_cnt);
+			ret = eth_adaption_client_connect(destipv6,iptype,dest_port,connect_retry_cnt,false);
 		}
 	}
 	eth_adaption_init_notifier_thread();
 	eth_adaption_register_netdevice_notifier();
 	eth_adaption_sb_register_listener();
 	eth_adaption_create_debugfs();
+	eth_adaption_gpio_register_listener();
+	eth_adaption_power_management_ioctl_init();
 #ifdef CONFIG_MSM_BOOT_TIME_MARKER
 		place_marker("M - eth-adaption-layer init");
 #endif
@@ -477,11 +755,12 @@ static void __exit eth_adaption_exit(void)
 
 	eth_adaption_unregister_netdevice_notifier();
 	eth_adaption_sb_unregister_listener();
-
+	eth_adaption_gpio_unregister_listener();
+	eth_adaption_power_management_ioctl_deinit();
 	if(server)
-		eth_adaption_server_cleanup();
+		eth_adaption_server_cleanup(true);
 	else
-		eth_adaption_client_cleanup();
+		eth_adaption_client_cleanup(true);
 
 #ifdef CONFIG_MSM_BOOT_TIME_MARKER
 	place_marker("M - eth-adaption-layer eth_adapt_exit");
@@ -504,11 +783,11 @@ void eth_adaption_notifier_soft_reset(struct kthread_work *work)
 
 	if(server)
 	{
-		eth_adaption_server_cleanup();
+		eth_adaption_server_cleanup(true);
 	}
 	else
 	{
-		eth_adaption_client_cleanup();
+		eth_adaption_client_cleanup(true);
 	}
 	ETHADPTDBG("eth_adaption_notifier_soft_reset exit \n");
 }
@@ -527,22 +806,21 @@ void eth_adaption_notifier_soft_set(struct kthread_work *work)
 
 	if(server)
 	{
-		eth_adaption_server_connect(dest_port,iptype,connect_retry_cnt);
+		eth_adaption_server_connect(dest_port,iptype,connect_retry_cnt,false);
 	}
 	else
 	{
 		if (iptype == 0)
 		{
-			eth_adaption_client_connect(destipv4,iptype,dest_port,connect_retry_cnt);
+			eth_adaption_client_connect(destipv4,iptype,dest_port,connect_retry_cnt,false);
 		}
 		else
 		{
-			eth_adaption_client_connect(destipv6,iptype,dest_port,connect_retry_cnt);
+			eth_adaption_client_connect(destipv6,iptype,dest_port,connect_retry_cnt,false);
 		}
 	}
 	ETHADPTDBG("eth_adaption_notifier_soft_set exit \n");
 }
-
 
 module_init(eth_adaption_init)
 module_exit(eth_adaption_exit)

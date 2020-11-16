@@ -36,9 +36,10 @@
 * @port: port
 * @iptype: ip protocol
 * @retry_count retry count required.
+* @is_resume if called as part of resume
 * Return: Length of the buffer sent.
 */
-int eth_adaption_server_connect(int port,int iptype,int connect_retry_cnt);
+int eth_adaption_server_connect(int port,int iptype,int connect_retry_cnt,int is_resume);
 
 /**
 * eth_adaption_server_send() - Function to send QMI packet from IPCRTR over
@@ -56,4 +57,4 @@ int eth_adaption_server_send(const char *buf, const size_t length);
 * @void: void.
 * Return: void.
 */
-void eth_adaption_server_cleanup(void);
+void eth_adaption_server_cleanup(bool clean_up);
