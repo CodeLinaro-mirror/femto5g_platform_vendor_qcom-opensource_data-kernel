@@ -101,6 +101,106 @@ module_param(phy_interrupt_en, int, S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP);
 MODULE_PARM_DESC(phy_interrupt_en,
 		"Enable PHY interrupt [0-DISABLE, 1-ENABLE]");
 
+/*!
+ * \brief API to read the phy registers
+ *
+ * \param[in] phy register address (0x01-0x1f)
+ * \param[in] variable to store the read value
+ *
+ * \return int read_status
+ * \retval  0 - successfully read data on the register
+ * \retval -1 - error occurred
+ * \retval  1 - if the feature is not defined.
+ */
+int read_phy_reg_from_extern_mod(int phyreg, int *r_phydata)
+{
+        int phy_reg_read_status = -1;
+        struct DWC_ETH_QOS_prv_data *pdata;
+        pdata = gDWC_ETH_QOS_prv_data;
+	struct net_device *net_dev = pdata->dev;
+
+	if (!pdata || !pdata->phydev) {
+		return phy_reg_read_status;
+	}
+
+	if (phyreg==NULL || (phyreg<0x00 || phyreg>0x1f)) {
+		return -EINVAL;
+	}
+
+	if (!net_dev || !netif_running(net_dev)) {
+		return phy_reg_read_status;
+	}
+
+        int phyaddr = pdata->phyaddr;
+
+	phy_reg_read_status =
+	DWC_ETH_QOS_mdio_read_direct(pdata, phyaddr, phyreg,
+				     r_phydata);
+
+	if (phy_reg_read_status == 0) {
+
+		if ( (*r_phydata) == 0x0000 || (*r_phydata) == 0xffff) {
+                pr_alert
+                         ("Invalid value read from PHY register\n");
+            }
+        } else {
+		if (phy_reg_read_status < 0) {
+		pr_alert(
+                         "%s: Error reading the phy register %d for phy ID/ADDR %d\n",
+                         DEV_NAME, phyreg, phyaddr);
+		}
+        }
+
+        return phy_reg_read_status;
+}
+EXPORT_SYMBOL(read_phy_reg_from_extern_mod);
+
+/*!
+ * \brief API to write in the phy registers
+ *
+ * \param[in] phy register address (0x01-0x1f)
+ * \param[in] value to write
+ *
+ * \return int write_status
+ * \retval  0 - successfully written data on the register
+ * \retval -1 - error occurred
+ * \retval  1 - if the feature is not defined.
+ */
+int write_phy_reg_from_extern_mod(int phyreg, int w_phydata)
+{
+        int phy_reg_write_status = -1;
+        struct DWC_ETH_QOS_prv_data *pdata;
+        pdata = gDWC_ETH_QOS_prv_data;
+	struct net_device *net_dev = pdata->dev;
+
+	if (!pdata || !pdata->phydev) {
+		return phy_reg_read_status;
+	}
+
+	if (phyreg==NULL || (phyreg<0x00 || phyreg>0x1f) ) {
+		return -EINVAL;
+	}
+
+	if (!net_dev || !netif_running(net_dev)) {
+		return phy_reg_read_status;
+	}
+
+	int phyaddr = pdata->phyaddr;
+
+	phy_reg_write_status =
+	DWC_ETH_QOS_mdio_write_direct(pdata, phyaddr, phyreg,
+			 	      w_phydata);
+
+	if (phy_reg_write_status < 0) {
+		pr_alert(
+                         "%s: Error writing the phy register %d for phy ID/ADDR %d\n",
+                         DEV_NAME, phyreg, phyaddr);
+        }
+
+        return phy_reg_write_status;
+}
+EXPORT_SYMBOL(write_phy_reg_from_extern_mod);
+
 struct ip_params pparams = {0};
 #ifdef DWC_ETH_QOS_BUILTIN
 /*!
