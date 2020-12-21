@@ -116,7 +116,7 @@ void eth_adaption_notifier_soft_set(struct kthread_work *work);
 static unsigned int dev_num = 1;
 static struct cdev eth_adaption_power_management_ioctl_cdev;
 static dev_t device;
-static char eth_adaption_drv_name[] = "eth-adaption";
+static char eth_adaption_drv_name[] = "eth-pwr";
 static struct class *eth_adaption_class;
 
 /**
