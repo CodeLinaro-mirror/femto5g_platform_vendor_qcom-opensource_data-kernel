@@ -5361,7 +5361,7 @@ int ETH_PPSOUT_Config(struct DWC_ETH_QOS_prv_data *pdata, struct ETH_PPS_Config 
 				eth_pps_cfg->ppsout_ch,
 				eth_pps_cfg->ppsout_duty);
 	}
-	EMACDBG(" PPS: with PTP Clock freq=%dHz\n", pdata->ptpclk_freq);
+	EMACINFO(" PPS: with PTP Clock freq=%dHz\n", eth_pps_cfg->ptpclk_freq);
 	EMACDBG("PPS: PPSOut_Config: interval=%d, width=%d\n", interval, width);
 
 	if (eth_pps_cfg->ppsout_align == 1) {
