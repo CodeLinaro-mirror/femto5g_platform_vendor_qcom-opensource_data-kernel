@@ -1,4 +1,4 @@
-/* Copyright (c) 2020, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2021, The Linux Foundation. All rights reserved.
 
 * This program is free software; you can redistribute it and/or modify
 * it under the terms of the GNU General Public License version 2 and
@@ -20,7 +20,7 @@
 #include <eth-adaption-client.h>
 #include <soc/qcom/qrtr_ethernet.h>
 #include <soc/qcom/sb_notification.h>
-#include <linux/msm_eth.h>
+#include <linux/eth_adapt_power.h>
 #include <linux/ioctl.h>
 
 /* Mutex lock */
@@ -115,7 +115,6 @@ static void eth_adaption_set_link_state(int event)
 	link_state = event;
 	mutex_unlock(&eam_lock);
 }
-
 
 /**
 * eth_adaption_notifier_device_event()handler function for link up and down evts.
@@ -527,10 +526,10 @@ static int eth_adaption_power_management_ioctl(struct file *filp,
 	{
 		switch (cmd)
 		{
-			case IOC_MDM_ETH_SUSPEND:
+			case ETH_ADAPTION_IOC_MDM_SUSPEND:
 				ret = eth_adaption_handle_suspend_ioctl();
 				break;
-			case IOC_MDM_ETH_RESUME:
+			case ETH_ADAPTION_IOC_MDM_RESUME:
 				ret = eth_adaption_handle_resume_ioctl();
 				break;
 			default:
@@ -542,10 +541,10 @@ static int eth_adaption_power_management_ioctl(struct file *filp,
 	{
 		switch (cmd)
 		{
-			case IOC_EAP_ETH_SUSPEND:
+			case ETH_ADAPTION_IOC_EAP_SUSPEND:
 				ret = eth_adaption_handle_suspend_ioctl();
 				break;
-			case IOC_EAP_ETH_RESUME:
+			case ETH_ADAPTION_IOC_EAP_RESUME:
 				ret = eth_adaption_handle_resume_ioctl();
 				break;
 			default:
