@@ -1575,6 +1575,34 @@ fail_clk:
 	return ret;
 }
 
+static int DWC_ETH_QOS_init_panic_notifier(struct DWC_ETH_QOS_prv_data *pdata)
+{
+	u32 size_iomacro_regs;
+	int ret = 1;
+
+	if (gDWC_ETH_QOS_prv_data) {
+
+		size_iomacro_regs =
+		DWC_ETH_QOS_rgmii_io_macro_num_of_regs(gDWC_ETH_QOS_prv_data->emac_hw_version_type) * 4;
+
+		gDWC_ETH_QOS_prv_data->emac_reg_base_address =
+			(unsigned int *)kzalloc(dwc_eth_qos_res_data.emac_mem_size,GFP_KERNEL);
+
+		if (!gDWC_ETH_QOS_prv_data->emac_reg_base_address)
+			ret = 0;
+
+		if (size_iomacro_regs > 0) {
+			gDWC_ETH_QOS_prv_data->rgmii_reg_base_address =
+				(unsigned int *)kzalloc(size_iomacro_regs, GFP_KERNEL);
+		}
+
+		if (!(gDWC_ETH_QOS_prv_data->rgmii_reg_base_address))
+			ret = 0;
+	}
+
+	return ret;
+}
+
 static int DWC_ETH_QOS_panic_notifier(struct notifier_block *this,
 		unsigned long event, void *ptr)
 {
@@ -1583,24 +1611,20 @@ static int DWC_ETH_QOS_panic_notifier(struct notifier_block *this,
 	if (gDWC_ETH_QOS_prv_data) {
 		size_iomacro_regs = DWC_ETH_QOS_rgmii_io_macro_num_of_regs(gDWC_ETH_QOS_prv_data->emac_hw_version_type)*4;
 
-                EMACINFO("gDWC_ETH_QOS_prv_data 0x%p\n", gDWC_ETH_QOS_prv_data);
+                EMACINFO("gDWC_ETH_QOS_prv_data 0x%px\n", gDWC_ETH_QOS_prv_data);
 		DWC_ETH_QOS_ipa_stats_read(gDWC_ETH_QOS_prv_data);
 		DWC_ETH_QOS_dma_desc_stats_read(gDWC_ETH_QOS_prv_data);
 
 		gDWC_ETH_QOS_prv_data->iommu_domain = emac_emb_smmu_ctx.iommu_domain;
-		EMACINFO("emac iommu domain 0x%p\n", gDWC_ETH_QOS_prv_data->iommu_domain);
+		EMACINFO("emac iommu domain 0x%px\n", gDWC_ETH_QOS_prv_data->iommu_domain);
 
-		gDWC_ETH_QOS_prv_data->emac_reg_base_address =
-			(unsigned int *)kzalloc(dwc_eth_qos_res_data.emac_mem_size, GFP_KERNEL);
-		EMACINFO("emac register mem 0x%p\n", gDWC_ETH_QOS_prv_data->emac_reg_base_address);
+		EMACINFO("emac register mem 0x%px\n", gDWC_ETH_QOS_prv_data->emac_reg_base_address);
 		if (gDWC_ETH_QOS_prv_data->emac_reg_base_address != NULL)
 			memcpy(gDWC_ETH_QOS_prv_data->emac_reg_base_address, dwc_eth_qos_base_addr,
 				dwc_eth_qos_res_data.emac_mem_size);
 
 		if(size_iomacro_regs > 0) {
-			gDWC_ETH_QOS_prv_data->rgmii_reg_base_address =
-				(unsigned int *)kzalloc(size_iomacro_regs, GFP_KERNEL);
-			EMACINFO("rgmii register mem 0x%p\n", gDWC_ETH_QOS_prv_data->rgmii_reg_base_address);
+			EMACINFO("rgmii register mem 0x%px\n", gDWC_ETH_QOS_prv_data->rgmii_reg_base_address);
 			if (gDWC_ETH_QOS_prv_data->rgmii_reg_base_address != NULL)
 				memcpy(gDWC_ETH_QOS_prv_data->rgmii_reg_base_address, dwc_rgmii_io_csr_base_addr,
 					size_iomacro_regs);
@@ -2546,8 +2570,6 @@ static int DWC_ETH_QOS_configure_netdevice(struct platform_device *pdev)
 	SET_NETDEV_DEV(dev, &pdev->dev);
 	pdata = netdev_priv(dev);
 	gDWC_ETH_QOS_prv_data = pdata;
-	atomic_notifier_chain_register(&panic_notifier_list,
-			&DWC_ETH_QOS_panic_blk);
 
 	EMACDBG("gDWC_ETH_QOS_prv_data 0x%pK \n", gDWC_ETH_QOS_prv_data);
 	DWC_ETH_QOS_init_all_fptrs(pdata);
@@ -2845,7 +2867,9 @@ static int DWC_ETH_QOS_configure_netdevice(struct platform_device *pdev)
 						&pdata->emac_rec_class,
 						"emac_rec");
 
-
+	if (DWC_ETH_QOS_init_panic_notifier(pdata))
+                atomic_notifier_chain_register(&panic_notifier_list,
+                                               &DWC_ETH_QOS_panic_blk);
 	EMACDBG("<-- DWC_ETH_QOS_configure_netdevice\n");
 
 	return 0;
