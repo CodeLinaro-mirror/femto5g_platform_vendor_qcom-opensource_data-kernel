@@ -281,6 +281,11 @@ connect:
 
 	if(cn == 0)
 	{
+		/* Critical section */
+		mutex_lock(&power_state_lock);
+		power_state = EAM_POWER_STATE_RUNNING;
+		ETHADPTDBG("%s EAM_POWER_STATE_RUNNING server:%d\n", __func__,server);
+		mutex_unlock(&power_state_lock);
 		client_sk.conn_socket = sockt;
 		client_sk.server = server;
 		client_sk.server_v6 = server_v6;
@@ -309,10 +314,7 @@ connect:
 		kthread_init_work(&client_sk.read_data, eth_adaption_client_receive);
 		client_sk.conn_socket->sk->sk_data_ready = eth_adaption_client_data_ready;
 
-		/* Critical section */
-		mutex_lock(&power_state_lock);
-		power_state = EAM_POWER_STATE_RUNNING;
-		mutex_unlock(&power_state_lock);
+
 #ifdef CONFIG_MSM_BOOT_TIME_MARKER
 		place_marker("M - eth-adaption-layer client_connect connected");
 #endif
@@ -396,15 +398,17 @@ int eth_adaption_client_connect(unsigned char *destip, int iptype, int port,int 
 		mutex_unlock(&eam_lock);
 	}
 
-	kthread_init_work(&client_sk.init_client, eth_adaption_client_start);
-	kthread_init_worker(&client_sk.kworker);
-	client_sk.task = kthread_run(kthread_worker_fn, &client_sk.kworker, "eth_adapt_rx");
-	if (IS_ERR(client_sk.task))
+	if(!is_resume)
 	{
-		ETHADPTERR("%s: Error allocating wq\n", __func__);
-		return;
+		kthread_init_work(&client_sk.init_client, eth_adaption_client_start);
+		kthread_init_worker(&client_sk.kworker);
+		client_sk.task = kthread_run(kthread_worker_fn, &client_sk.kworker, "eth_adapt_rx");
+		if (IS_ERR(client_sk.task))
+		{
+			ETHADPTERR("%s: Error allocating wq\n", __func__);
+			return;
+		}
 	}
-
 	kthread_queue_work(&client_sk.kworker, &client_sk.init_client);
 #ifdef CONFIG_MSM_BOOT_TIME_MARKER
 	place_marker("M - eth-adaption-layer client_connect init");
@@ -435,7 +439,7 @@ void eth_adaption_client_cleanup(bool cleanup_lock)
 	receive_allocfree_stat = 0;
 	error_stat = 0;
 
-	if(client_sk.task)
+	if(cleanup_lock && client_sk.task)
 	{
 		kthread_cancel_work_sync(&client_sk.read_data);
 		kthread_cancel_work_sync(&client_sk.init_client);

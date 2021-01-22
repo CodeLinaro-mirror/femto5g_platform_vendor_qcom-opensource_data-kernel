@@ -74,8 +74,10 @@ do {\
 
 enum eam_power_management_state
 {
-	EAM_POWER_STATE_SUSPEND,
-	EAM_POWER_STATE_RUNNING
+	EAM_POWER_STATE_SUSPENDED,
+	EAM_POWER_STATE_RUNNING,
+	EAM_POWER_STATE_SUSPENDING,
+	EAM_POWER_STATE_RESUMING,
 };
 /* power management state*/
 extern enum eam_power_management_state power_state;
