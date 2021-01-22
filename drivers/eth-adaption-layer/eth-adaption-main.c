@@ -398,18 +398,30 @@ int eth_adaption_send(struct sk_buff *skb)
 	*/
 check_suspend:
 	mutex_lock(&power_state_lock);
-	if(power_state == EAM_POWER_STATE_SUSPEND)
+	if(power_state == EAM_POWER_STATE_SUSPENDING || power_state == EAM_POWER_STATE_RESUMING)
 	{
 		mutex_unlock(&power_state_lock);
 		DECLARE_WAIT_QUEUE_HEAD(suspend_wait);
 		wait_event_timeout(suspend_wait, 0 ,5*HZ);
 		goto check_suspend;
 	}
-	else
+
+	/**
+	* We are not expecting any QMI message on VT after suspend
+	* On VT resume should happen only via IOCTL
+	*/
+	if(power_state == EAM_POWER_STATE_SUSPENDED)
 	{
 		mutex_unlock(&power_state_lock);
+		ETHADPTDBG("%s state suspended, starting resume, peer_gpio_toggled: %d\n",
+					__func__, peer_gpio_toggled);
+		eth_adaption_handle_resume_ioctl();
+		goto check_suspend;
 	}
+	else
+		mutex_unlock(&power_state_lock);
 
+	ETHADPTDBG("%s state running sending\n", __func__);
 	if (server)
 	{
 		ret = eth_adaption_server_send(skb->data,skb->len);
@@ -428,14 +440,19 @@ EXPORT_SYMBOL(eth_adaption_send);
 */
 int eth_adaption_handle_resume_ioctl()
 {
-	ETHADPTINFO("eth_adapt handle resume ioctl\n");
-	mutex_init(&power_state_lock);
+	ETHADPTDBG("eth_adapt handle resume ioctl\n");
 	int ret = 0;
+
+	mutex_lock(&power_state_lock);
+	power_state = EAM_POWER_STATE_RESUMING;
+	ETHADPTDBG("%s EAM_POWER_STATE_RESUMING\n", __func__);
+	mutex_unlock(&power_state_lock);
 
 	mutex_lock(&gpio_toggle_lock);
 	if(peer_gpio_toggled == false)
 	{
 		mutex_unlock(&gpio_toggle_lock);
+		ETHADPTDBG("%s gpio resume toggle\n", __func__);
 		sb_notifier_call_chain(EVENT_REQUEST_WAKE_UP, NULL);
 	}
 	else
@@ -469,13 +486,17 @@ int eth_adaption_handle_resume_ioctl()
 */
 int eth_adaption_handle_suspend_ioctl()
 {
-	mutex_init(&power_state_lock);
 	int ret = 0;
 
 	/* Critical section. Set state to suspend for blocking TX data*/
 	mutex_lock(&power_state_lock);
-	power_state = EAM_POWER_STATE_SUSPEND;
+	power_state = EAM_POWER_STATE_SUSPENDING;
+	ETHADPTDBG("%s EAM_POWER_STATE_SUSPENDING\n", __func__);
 	mutex_unlock(&power_state_lock);
+
+	mutex_lock(&gpio_toggle_lock);
+	peer_gpio_toggled = false;
+	mutex_unlock(&gpio_toggle_lock);
 
 	/*Clean up TCP sockets for susepnd handling*/
 	if(server)
@@ -486,6 +507,11 @@ int eth_adaption_handle_suspend_ioctl()
 	{
 		eth_adaption_client_cleanup(false);
 	}
+
+	mutex_lock(&power_state_lock);
+	power_state = EAM_POWER_STATE_SUSPENDED;
+	ETHADPTDBG("%s EAM_POWER_STATE_SUSPENDED\n", __func__);
+	mutex_unlock(&power_state_lock);
 
 	return ret;
 }
@@ -530,7 +556,11 @@ static int eth_adaption_power_management_ioctl(struct file *filp,
 				ret = eth_adaption_handle_suspend_ioctl();
 				break;
 			case ETH_ADAPTION_IOC_MDM_RESUME:
-				ret = eth_adaption_handle_resume_ioctl();
+				/* No mutiple resumes back to back */
+				if(power_state != EAM_POWER_STATE_RESUMING && power_state != EAM_POWER_STATE_RUNNING)
+					ret = eth_adaption_handle_resume_ioctl();
+				else
+					ETHADPTERR("%s multiple resumes %d\n", __func__,cmd);
 				break;
 			default:
 				ETHADPTERR("%s unsupported ioctl for client %d\n", __func__,cmd);
@@ -545,7 +575,11 @@ static int eth_adaption_power_management_ioctl(struct file *filp,
 				ret = eth_adaption_handle_suspend_ioctl();
 				break;
 			case ETH_ADAPTION_IOC_EAP_RESUME:
-				ret = eth_adaption_handle_resume_ioctl();
+				/* No mutiple resumes back to back */
+				if(power_state != EAM_POWER_STATE_RESUMING && power_state != EAM_POWER_STATE_RUNNING)
+					ret = eth_adaption_handle_resume_ioctl();
+				else
+					ETHADPTERR("%s multiple resumes %d\n", __func__,cmd);
 				break;
 			default:
 				ETHADPTERR("%s unsupported ioctl for server %d\n", __func__,cmd);
@@ -643,8 +677,7 @@ static int eth_adaption_gpio_notifier_device_event
 	switch(event)
 	{
 		case EVENT_REMOTE_WOKEN_UP:
-			mutex_init(&gpio_toggle_lock);
-			ETHADPTINFO("eth_adaption_gpio_notifier_device_event %d, %d, %d\n",event,gpio_init,gpio_link_state);
+			ETHADPTDBG("eth_adaption_gpio_notifier_device_event %d, %d, %d\n",event,gpio_init,gpio_link_state);
 			/* Critical section */
 			mutex_lock(&gpio_toggle_lock);
 			peer_gpio_toggled = true;
@@ -727,6 +760,8 @@ static int __init eth_adaption_init(void)
 	eth_adaption_create_debugfs();
 	eth_adaption_gpio_register_listener();
 	eth_adaption_power_management_ioctl_init();
+	mutex_init(&power_state_lock);
+	mutex_init(&gpio_toggle_lock);
 #ifdef CONFIG_MSM_BOOT_TIME_MARKER
 		place_marker("M - eth-adaption-layer init");
 #endif
@@ -760,7 +795,8 @@ static void __exit eth_adaption_exit(void)
 		eth_adaption_server_cleanup(true);
 	else
 		eth_adaption_client_cleanup(true);
-
+	mutex_destroy(&power_state_lock);
+	mutex_destroy(&gpio_toggle_lock);
 #ifdef CONFIG_MSM_BOOT_TIME_MARKER
 	place_marker("M - eth-adaption-layer eth_adapt_exit");
 #endif

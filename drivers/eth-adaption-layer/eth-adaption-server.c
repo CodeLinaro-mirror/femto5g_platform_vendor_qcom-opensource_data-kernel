@@ -300,6 +300,12 @@ static void eth_adaption_server_start(struct kthread_work *work)
 
 	if(cn == 0)
 	{
+		/* Critical section */
+		mutex_lock(&power_state_lock);
+		power_state = EAM_POWER_STATE_RUNNING;
+		ETHADPTDBG("%s EAM_POWER_STATE_RUNNING server:%d\n", __func__,server);
+		mutex_unlock(&power_state_lock);
+
 		serv_sk.sock = sock;
 		serv_sk.newsocket = client;
 		serv_sk.cb_info_server = cb_info_server;
@@ -345,10 +351,7 @@ static void eth_adaption_server_start(struct kthread_work *work)
 		kthread_init_work(&serv_sk.read_data, eth_adaption_server_receive);
 		serv_sk.newsocket->sk->sk_data_ready = eth_adaption_server_data_ready;
 
-		/* Critical section */
-		mutex_lock(&power_state_lock);
-		power_state = EAM_POWER_STATE_RUNNING;
-		mutex_unlock(&power_state_lock);
+
 
 #ifdef CONFIG_MSM_BOOT_TIME_MARKER
 			place_marker("M - eth-adaption-layer server_start connected");
@@ -409,13 +412,16 @@ int eth_adaption_server_connect(int port,int iptype,int connect_retry_cnt,int is
 		mutex_unlock(&eam_lock);
 	}
 
-	kthread_init_work(&serv_sk.init_server, eth_adaption_server_start);
-	kthread_init_worker(&serv_sk.kworker);
-	serv_sk.task = kthread_run(kthread_worker_fn, &serv_sk.kworker, "eth_adapt_rx");
-	if (IS_ERR(serv_sk.task))
+	if(!is_resume)
 	{
-		ETHADPTERR("%s: Error allocating wq\n", __func__);
-		return -1;
+		kthread_init_work(&serv_sk.init_server, eth_adaption_server_start);
+		kthread_init_worker(&serv_sk.kworker);
+		serv_sk.task = kthread_run(kthread_worker_fn, &serv_sk.kworker, "eth_adapt_rx");
+		if (IS_ERR(serv_sk.task))
+		{
+			ETHADPTERR("%s: Error allocating wq\n", __func__);
+			return -1;
+		}
 	}
 	kthread_queue_work(&serv_sk.kworker, &serv_sk.init_server);
 #ifdef CONFIG_MSM_BOOT_TIME_MARKER
@@ -447,7 +453,7 @@ void eth_adaption_server_cleanup(bool clean_up)
 	recevied_data = 0;
 	receive_allocfree_stat = 0;
 	error_stat = 0;
-	if (serv_sk.task)
+	if (clean_up && serv_sk.task)
 	{
 		kthread_cancel_work_sync(&serv_sk.read_data);
 		kthread_cancel_work_sync(&serv_sk.init_server);
