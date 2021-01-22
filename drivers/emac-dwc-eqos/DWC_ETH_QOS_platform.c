@@ -174,7 +174,7 @@ int write_phy_reg_from_extern_mod(int phyreg, int w_phydata)
 	struct net_device *net_dev = pdata->dev;
 
 	if (!pdata || !pdata->phydev) {
-		return phy_reg_read_status;
+		return phy_reg_write_status;
 	}
 
 	if (phyreg==NULL || (phyreg<0x00 || phyreg>0x1f) ) {
@@ -182,7 +182,7 @@ int write_phy_reg_from_extern_mod(int phyreg, int w_phydata)
 	}
 
 	if (!net_dev || !netif_running(net_dev)) {
-		return phy_reg_read_status;
+		return phy_reg_write_status;
 	}
 
 	int phyaddr = pdata->phyaddr;
