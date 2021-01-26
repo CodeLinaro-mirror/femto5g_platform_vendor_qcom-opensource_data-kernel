@@ -82,6 +82,23 @@ extern int create_pps_interrupt_info_device_node(dev_t *pps_dev_t,
 	char *pps_dev_node_name);
 extern int remove_pps_interrupt_info_device_node(struct DWC_ETH_QOS_prv_data *pdata);
 
+
+static char err_names[10][14] = {"PHY_RW_ERR",
+	"PHY_DET_ERR",
+	"CRC_ERR",
+	"RECEIVE_ERR",
+	"OVERFLOW_ERR",
+	"FBE_ERR",
+	"RBU_ERR",
+	"TDU_ERR",
+	"DRIBBLE_ERR",
+	"WDT_ERR",
+};
+
+
+static DECLARE_WAIT_QUEUE_HEAD(mac_rec_wq);
+static bool mac_rec_wq_flag;
+
 int ipa_offload_en = 1;
 module_param(ipa_offload_en, int, S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP);
 MODULE_PARM_DESC(ipa_offload_en,
@@ -306,10 +323,98 @@ static const struct file_operations fops_ipc_emac_log_ctxt_low = {
 	.llseek = default_llseek,
 };
 
+static ssize_t read_mac_recovery_enable(struct file *file, char __user *usr_buf,
+					size_t count, loff_t *f_pos)
+{
+	char *buf;
+	unsigned int len = 0, buf_len = 6000;
+	ssize_t ret_cnt;
+
+	buf = kzalloc(buf_len, GFP_KERNEL);
+	if (!buf)
+			return -ENOMEM;
+
+	if (!gDWC_ETH_QOS_prv_data) {
+		EMACERR(" %s NULL Pointer \n",__func__);
+		return -EINVAL;
+	}
+
+	len += scnprintf(buf + len, buf_len - len, "%s  =  %d\n",
+			"PHY_RW_rec", gDWC_ETH_QOS_prv_data->mac_rec_en[PHY_RW_ERR]);
+	len += scnprintf(buf + len, buf_len - len, "%s  =  %d\n",
+			"PHY_DET_rec", gDWC_ETH_QOS_prv_data->mac_rec_en[PHY_DET_ERR]);
+	len += scnprintf(buf + len, buf_len - len, "%s  =  %d\n",
+			"CRC_rec", gDWC_ETH_QOS_prv_data->mac_rec_en[CRC_ERR]);
+	len += scnprintf(buf + len, buf_len - len, "%s  =  %d\n",
+			"RECEIVE_rec", gDWC_ETH_QOS_prv_data->mac_rec_en[RECEIVE_ERR]);
+	len += scnprintf(buf + len, buf_len - len, "%s  =  %d\n",
+			"OVERFLOW_rec", gDWC_ETH_QOS_prv_data->mac_rec_en[OVERFLOW_ERR]);
+	len += scnprintf(buf + len, buf_len - len, "%s  =  %d\n",
+			"FBE_rec", gDWC_ETH_QOS_prv_data->mac_rec_en[FBE_ERR]);
+	len += scnprintf(buf + len, buf_len - len, "%s  =  %d\n",
+			"RBU_rec", gDWC_ETH_QOS_prv_data->mac_rec_en[RBU_ERR]);
+	len += scnprintf(buf + len, buf_len - len, "%s  =  %d\n",
+			"TDU_rec", gDWC_ETH_QOS_prv_data->mac_rec_en[TDU_ERR]);
+	len += scnprintf(buf + len, buf_len - len, "%s  =  %d\n",
+			"DRIBBLE_rec", gDWC_ETH_QOS_prv_data->mac_rec_en[DRIBBLE_ERR]);
+	len += scnprintf(buf + len, buf_len - len, "%s  =  %d\n",
+			"WDT_rec", gDWC_ETH_QOS_prv_data->mac_rec_en[WDT_ERR]);
+
+	if (len > buf_len)
+		len = buf_len;
+
+	EMACDBG("%s", buf);
+	ret_cnt = simple_read_from_buffer(usr_buf, count, f_pos, buf, len);
+	kfree(buf);
+	return ret_cnt;
+}
+
+
+
+static ssize_t DWC_ETH_QOS_test_mac_recovery(struct file *file,
+					const char __user *user_buf,
+					size_t count, loff_t *ppos)
+{
+	unsigned char in_buf[4] = {0};
+	int ret, err, chan;
+
+	if (!gDWC_ETH_QOS_prv_data) {
+		EMACERR(" %s NULL Pointer \n",__func__);
+		return -EINVAL;
+	}
+
+	if (sizeof(in_buf) < count) {
+		EMACERR("emac string is too long - count=%u\n", count);
+		return -EFAULT;
+	}
+
+	memset(in_buf, 0,  sizeof(in_buf));
+	ret = copy_from_user(in_buf, user_buf, count);
+
+	err = in_buf[0] - '0';
+
+	chan = in_buf[2] - '0';
+
+	DWC_ETH_QOS_handle_mac_err(gDWC_ETH_QOS_prv_data, err, chan);
+
+	return count;
+}
+
+
+static const struct file_operations fops_mac_rec = {
+	.read = read_mac_recovery_enable,
+	.write= DWC_ETH_QOS_test_mac_recovery,
+	.open = simple_open,
+	.owner = THIS_MODULE,
+	.llseek = default_llseek,
+};
+
+
 int DWC_ETH_QOS_create_debugfs(struct DWC_ETH_QOS_prv_data *pdata)
 {
 	static struct dentry *node = NULL;
 	static struct dentry *ipc_emac_log_low= NULL;
+	static struct dentry *mac_rec;
 
 	if(!pdata) {
 		EMACERR( "Null Param %s \n", __func__);
@@ -341,6 +446,14 @@ int DWC_ETH_QOS_create_debugfs(struct DWC_ETH_QOS_prv_data *pdata)
 				pdata, &fops_ipc_emac_log_ctxt_low);
 	if (!ipc_emac_log_low || IS_ERR(ipc_emac_log_low)) {
 		EMACERR( "Cannot create debugfs ipc_emac_log_low %d \n", (int)ipc_emac_log_low);
+		goto fail;
+	}
+
+	mac_rec = debugfs_create_file("test_mac_recovery", 0400,
+					 pdata->debugfs_dir, pdata, &fops_mac_rec);
+
+	if (!mac_rec || IS_ERR(mac_rec)) {
+		EMACERR("Can't create mac_rec directory\n");
 		goto fail;
 	}
 
@@ -1627,6 +1740,33 @@ reg_error:
 	return ret;
 }
 
+
+int DWC_ETH_QOS_phy_power_on(struct DWC_ETH_QOS_prv_data *pdata)
+{
+	int ret = 0;
+	if(pdata->res_data->reg_emac_phy) {
+		ret = regulator_enable(pdata->res_data->reg_emac_phy);
+		if (ret) {
+			EMACERR("Can not enable <%s>\n", EMAC_VREG_EMAC_PHY_NAME);
+			return ret;
+		}
+	}
+	else {
+		EMACERR("reg_emac_phy is NULL\n");
+	}
+	return ret;
+}
+
+void DWC_ETH_QOS_phy_power_off(struct DWC_ETH_QOS_prv_data *pdata)
+{
+	if(pdata->res_data->reg_emac_phy) {
+		regulator_disable(pdata->res_data->reg_emac_phy);
+	}
+	else {
+		EMACERR("reg_emac_phy is NULL\n");
+	}
+}
+
 static int setup_gpio_input_common
 	(struct device *dev, const char *name, int *gpio)
 {
@@ -1916,6 +2056,449 @@ ret:
 	return;
 }
 
+static unsigned int DWC_ETH_QOS_poll_rec_dev_emac(struct file *file,
+						poll_table *wait)
+{
+	int mask = 0;
+
+	EMACDBG("\n");
+
+	poll_wait(file, &mac_rec_wq, wait);
+
+	if (mac_rec_wq_flag) {
+		mask = POLLIN | POLLRDNORM;
+		mac_rec_wq_flag = false;
+	}
+
+	EMACDBG("mask %d\n", mask);
+
+	return mask;
+}
+
+static ssize_t DWC_ETH_QOS_mac_recovery_enable(struct file *file,
+					const char __user *user_buf,
+					size_t count, loff_t *ppos)
+{
+	unsigned char in_buf[15] = {0};
+	int i, ret;
+
+	if (!gDWC_ETH_QOS_prv_data) {
+		EMACERR(" %s NULL Pointer \n",__func__);
+		return -EINVAL;
+	}
+
+	if (sizeof(in_buf) < count) {
+		EMACERR("emac string is too long - count=%u\n", count);
+		return -EFAULT;
+	}
+
+	memset(in_buf, 0,  sizeof(in_buf));
+	ret = copy_from_user(in_buf, user_buf, count);
+
+	for (i = 0; i < MAC_ERR_CNT; i++) {
+		if (in_buf[i] == '1')
+			gDWC_ETH_QOS_prv_data->mac_rec_en[i] = true;
+		else
+			gDWC_ETH_QOS_prv_data->mac_rec_en[i] = false;
+	}
+	return count;
+}
+
+
+static ssize_t DWC_ETH_QOS_read_rec_dev_emac(struct file *file, char __user *usr_buf,
+					size_t count, loff_t *f_pos)
+{
+	char *buf;
+	unsigned int len = 0, buf_len = 6000;
+	ssize_t ret_cnt;
+
+
+	if (!gDWC_ETH_QOS_prv_data) {
+		EMACERR(" %s NULL Pointer \n",__func__);
+		return -EINVAL;
+	}
+
+	buf = kzalloc(buf_len, GFP_KERNEL);
+	if (!buf)
+		return -ENOMEM;
+
+	len += scnprintf(buf + len, buf_len - len, "%s  =  %d\n",
+			"PHY_RW_ERR", gDWC_ETH_QOS_prv_data->mac_err_cnt[PHY_RW_ERR]);
+	len += scnprintf(buf + len, buf_len - len, "%s  =  %d\n",
+			"PHY_DET_ERR", gDWC_ETH_QOS_prv_data->mac_err_cnt[PHY_DET_ERR]);
+	len += scnprintf(buf + len, buf_len - len, "%s  =  %d\n",
+			"CRC_ERR", gDWC_ETH_QOS_prv_data->mac_err_cnt[CRC_ERR]);
+	len += scnprintf(buf + len, buf_len - len, "%s  =  %d\n",
+			"RECEIVE_ERR", gDWC_ETH_QOS_prv_data->mac_err_cnt[RECEIVE_ERR]);
+	len += scnprintf(buf + len, buf_len - len, "%s  =  %d\n",
+			"OVERFLOW_ERR", gDWC_ETH_QOS_prv_data->mac_err_cnt[OVERFLOW_ERR]);
+	len += scnprintf(buf + len, buf_len - len, "%s  =  %d\n",
+			"FBE_ERR", gDWC_ETH_QOS_prv_data->mac_err_cnt[FBE_ERR]);
+	len += scnprintf(buf + len, buf_len - len, "%s  =  %d\n",
+			"RBU_ERR", gDWC_ETH_QOS_prv_data->mac_err_cnt[RBU_ERR]);
+	len += scnprintf(buf + len, buf_len - len, "%s  =  %d\n",
+			"TDU_ERR", gDWC_ETH_QOS_prv_data->mac_err_cnt[TDU_ERR]);
+	len += scnprintf(buf + len, buf_len - len, "%s  =  %d\n",
+			"DRIBBLE_ERR", gDWC_ETH_QOS_prv_data->mac_err_cnt[DRIBBLE_ERR]);
+	len += scnprintf(buf + len, buf_len - len, "%s  =  %d\n",
+			"WDT_ERR", gDWC_ETH_QOS_prv_data->mac_err_cnt[WDT_ERR]);
+
+	len += scnprintf(buf + len, buf_len - len, "\n\n%s  =  %d\n",
+			"PHY_RW_rec", gDWC_ETH_QOS_prv_data->mac_rec_en[PHY_RW_ERR]);
+	len += scnprintf(buf + len, buf_len - len, "%s  =  %d\n",
+			"PHY_DET_rec", gDWC_ETH_QOS_prv_data->mac_rec_en[PHY_DET_ERR]);
+	len += scnprintf(buf + len, buf_len - len, "%s  =  %d\n",
+			"CRC_rec", gDWC_ETH_QOS_prv_data->mac_rec_en[CRC_ERR]);
+	len += scnprintf(buf + len, buf_len - len, "%s  =  %d\n",
+			"RECEIVE_rec", gDWC_ETH_QOS_prv_data->mac_rec_en[RECEIVE_ERR]);
+	len += scnprintf(buf + len, buf_len - len, "%s  =  %d\n",
+			"OVERFLOW_rec", gDWC_ETH_QOS_prv_data->mac_rec_en[OVERFLOW_ERR]);
+	len += scnprintf(buf + len, buf_len - len, "%s  =  %d\n",
+			"FBE_rec", gDWC_ETH_QOS_prv_data->mac_rec_en[FBE_ERR]);
+	len += scnprintf(buf + len, buf_len - len, "%s  =  %d\n",
+			"RBU_rec", gDWC_ETH_QOS_prv_data->mac_rec_en[RBU_ERR]);
+	len += scnprintf(buf + len, buf_len - len, "%s  =  %d\n",
+			"TDU_rec", gDWC_ETH_QOS_prv_data->mac_rec_en[TDU_ERR]);
+	len += scnprintf(buf + len, buf_len - len, "%s  =  %d\n",
+			"DRIBBLE_rec", gDWC_ETH_QOS_prv_data->mac_rec_en[DRIBBLE_ERR]);
+	len += scnprintf(buf + len, buf_len - len, "%s  =  %d\n",
+			"WDT_rec", gDWC_ETH_QOS_prv_data->mac_rec_en[WDT_ERR]);
+
+	len += scnprintf(buf + len, buf_len - len, "\n\n%s  =  %d\n",
+			"PHY_RW_ERR", gDWC_ETH_QOS_prv_data->mac_rec_cnt[PHY_RW_ERR]);
+	len += scnprintf(buf + len, buf_len - len, "%s  =  %d\n",
+			"PHY_DET_ERR", gDWC_ETH_QOS_prv_data->mac_rec_cnt[PHY_DET_ERR]);
+	len += scnprintf(buf + len, buf_len - len, "%s  =  %d\n",
+			"CRC_ERR", gDWC_ETH_QOS_prv_data->mac_rec_cnt[CRC_ERR]);
+	len += scnprintf(buf + len, buf_len - len, "%s  =  %d\n",
+			"RECEIVE_ERR", gDWC_ETH_QOS_prv_data->mac_rec_cnt[RECEIVE_ERR]);
+	len += scnprintf(buf + len, buf_len - len, "%s  =  %d\n",
+			"OVERFLOW_ERR", gDWC_ETH_QOS_prv_data->mac_rec_cnt[OVERFLOW_ERR]);
+	len += scnprintf(buf + len, buf_len - len, "%s  =  %d\n",
+			"FBE_ERR", gDWC_ETH_QOS_prv_data->mac_rec_cnt[FBE_ERR]);
+	len += scnprintf(buf + len, buf_len - len, "%s  =  %d\n",
+			"RBU_ERR", gDWC_ETH_QOS_prv_data->mac_rec_cnt[RBU_ERR]);
+	len += scnprintf(buf + len, buf_len - len, "%s  =  %d\n",
+			"TDU_ERR", gDWC_ETH_QOS_prv_data->mac_rec_cnt[TDU_ERR]);
+	len += scnprintf(buf + len, buf_len - len, "%s  =  %d\n",
+			"DRIBBLE_ERR", gDWC_ETH_QOS_prv_data->mac_rec_cnt[DRIBBLE_ERR]);
+	len += scnprintf(buf + len, buf_len - len, "%s  =  %d\n",
+			"WDT_ERR", gDWC_ETH_QOS_prv_data->mac_rec_cnt[WDT_ERR]);
+
+	if (len > buf_len)
+		len = buf_len;
+
+	EMACDBG("%s", buf);
+	ret_cnt = simple_read_from_buffer(usr_buf, count, f_pos, buf, len);
+	kfree(buf);
+	return ret_cnt;
+}
+
+static const struct file_operations emac_rec_fops = {
+	.owner = THIS_MODULE,
+	.open = simple_open,
+	.read = DWC_ETH_QOS_read_rec_dev_emac,
+	.write = DWC_ETH_QOS_mac_recovery_enable,
+	.poll = DWC_ETH_QOS_poll_rec_dev_emac,
+};
+
+static int DWC_ETH_QOS_create_emac_rec_device_node(dev_t *emac_dev_t,
+						struct cdev **emac_cdev,
+						struct class **emac_class,
+						char *emac_dev_node_name)
+{
+	int ret;
+
+	ret = alloc_chrdev_region(emac_dev_t, 0, 1,
+							  emac_dev_node_name);
+	if (ret) {
+		EMACERR("alloc_chrdev_region error for node %s\n",
+				emac_dev_node_name);
+		goto alloc_chrdev1_region_fail;
+	}
+
+	*emac_cdev = cdev_alloc();
+	if (!*emac_cdev) {
+		ret = -ENOMEM;
+		EMACERR("failed to alloc cdev\n");
+		goto fail_alloc_cdev;
+	}
+	cdev_init(*emac_cdev, &emac_rec_fops);
+
+	ret = cdev_add(*emac_cdev, *emac_dev_t, 1);
+	if (ret < 0) {
+		EMACERR(":cdev_add err=%d\n", -ret);
+		goto cdev1_add_fail;
+	}
+
+	*emac_class = class_create(THIS_MODULE, emac_dev_node_name);
+	if (!*emac_class) {
+		ret = -ENODEV;
+		EMACERR("failed to create class\n");
+		goto fail_create_class;
+	}
+
+	if (!device_create(*emac_class, NULL,
+						*emac_dev_t, NULL, emac_dev_node_name)) {
+		ret = -EINVAL;
+		EMACERR("failed to create device_create\n");
+		goto fail_create_device;
+	}
+
+	EMACERR(" mac recovery node opened");
+	return 0;
+
+fail_create_device:
+	class_destroy(*emac_class);
+fail_create_class:
+	cdev_del(*emac_cdev);
+cdev1_add_fail:
+fail_alloc_cdev:
+	unregister_chrdev_region(*emac_dev_t, 1);
+alloc_chrdev1_region_fail:
+	return ret;
+}
+
+static int DWC_ETH_QOS_reset_phy(struct DWC_ETH_QOS_prv_data *pdata)
+{
+	int ret = 0;
+	if (pdata->phy_intr_en) {
+		pdata->phydev->irq = PHY_IGNORE_INTERRUPT;
+		pdata->phydev->interrupts =  PHY_INTERRUPT_ENABLED;
+
+		if (pdata->phydev->drv->config_intr &&
+			!pdata->phydev->drv->config_intr(pdata->phydev)){
+			DWC_ETH_QOS_request_phy_wol(pdata);
+		} else {
+			EMACERR("Failed to configure PHY interrupts");
+			BUG();
+		}
+	}
+}
+
+static int DWC_ETH_QOS_writeback_desc_rec(struct DWC_ETH_QOS_prv_data *pdata, int chan)
+{
+	return -EOPNOTSUPP;
+}
+
+static int DWC_ETH_QOS_reset_phy_rec(struct  DWC_ETH_QOS_prv_data *pdata, int int_en)
+{
+	int ret = 1;
+	int backup_autoneg, read_status;
+	u32 backup_bmcr;
+
+	if (int_en && (pdata->phydev &&
+		pdata->phydev->autoneg == AUTONEG_DISABLE)) {
+		backup_autoneg = pdata->phydev->autoneg;
+		read_status = DWC_ETH_QOS_mdio_read_direct(pdata,
+							pdata->phyaddr,
+							MII_BMCR, &backup_bmcr);
+	} else {
+			backup_autoneg = AUTONEG_ENABLE;
+	}
+
+	DWC_ETH_QOS_phy_power_off(pdata);
+
+	DWC_ETH_QOS_phy_power_on(pdata);
+
+	if (int_en) {
+		DWC_ETH_QOS_reset_phy(pdata);
+		if (backup_autoneg == AUTONEG_DISABLE && pdata->phydev) {
+			pdata->phydev->autoneg = backup_autoneg;
+			phy_write(pdata->phydev, MII_BMCR, backup_bmcr);
+		}
+	}
+	return ret;
+}
+
+static int DWC_ETH_QOS_tx_clean_rec(struct DWC_ETH_QOS_prv_data *pdata, int chan)
+{
+	int ret = 1;
+
+	if(!(pdata->ipa_enabled && chan == IPA_DMA_TX_CH)) {
+		DWC_ETH_QOS_tx_interrupt(pdata->dev, pdata, chan);
+	}
+
+	return ret;
+}
+
+static int DWC_ETH_QOS_reset_tx_dma_rec(struct DWC_ETH_QOS_prv_data *pdata, int chan)
+{
+	int ret = 1;
+	struct desc_if_struct *desc_if = &pdata->desc_if;
+	struct hw_if_struct *hw_if = &pdata->hw_if;
+
+	if((pdata->ipa_enabled && chan == IPA_DMA_TX_CH)) {
+		return;
+	}
+
+	netif_stop_subqueue(pdata->dev, chan);
+
+	/* stop DMA TX */
+	hw_if->stop_dma_tx(chan);
+
+	/* free tx skb's */
+	desc_if->tx_skb_free_mem_single_q(pdata, chan);
+
+	/* reinit Tx descriptor */
+	desc_if->wrapper_tx_desc_init_single_q(pdata, chan);
+
+	/* start DMA TX */
+	hw_if->start_dma_tx(chan);
+	netif_wake_subqueue(pdata->dev, chan);
+	return ret;
+
+}
+
+static int DWC_ETH_QOS_schedule_poll(struct DWC_ETH_QOS_prv_data *pdata, int chan)
+{
+	struct DWC_ETH_QOS_rx_queue *rx_q = &pdata->rx_queue[chan];
+	int ret = 1;
+
+	if(!(pdata->ipa_enabled && chan == IPA_DMA_RX_CH))
+		if (likely(napi_schedule_prep(&rx_q->napi))) {
+			DWC_ETH_QOS_disable_all_ch_rx_interrpt(pdata);
+			__napi_schedule(&rx_q->napi);
+		}
+	return ret;
+}
+
+static void DWC_ETH_QOS_tdu_rec_wq(struct work_struct *work)
+{
+	struct delayed_work *dwork;
+
+	int ret;
+
+	dwork = container_of(work, struct delayed_work, work);
+
+	struct DWC_ETH_QOS_prv_data *pdata;
+
+	pdata = container_of(dwork, struct DWC_ETH_QOS_prv_data, tdu_rec);
+
+	if (!pdata)
+		return;
+
+	ret = DWC_ETH_QOS_tx_clean_rec(pdata, pdata->tdu_chan);
+
+	if (!ret)
+		return;
+
+	pdata->tdu_scheduled = false;
+}
+
+int DWC_ETH_QOS_handle_mac_err(struct DWC_ETH_QOS_prv_data *pdata, int type, int chan)
+{
+	int ret = 1;
+
+	if (!pdata)
+		return -EINVAL;
+
+	pdata->mac_err_cnt[type]++;
+
+	if (pdata->mac_rec_en[type]) {
+		if (pdata->mac_rec_cnt[type] >
+			pdata->mac_rec_threshold[type]) {
+			EMACERR("exceeded recovery threshold for %s",
+					err_names[type]);
+			pdata->mac_rec_en[type] = false;
+			ret = 0;
+		} else {
+		pdata->mac_rec_cnt[type]++;
+		switch (type) {
+		case PHY_RW_ERR:
+		{
+			ret = DWC_ETH_QOS_reset_phy_rec(pdata, true);
+			if (!ret) {
+				EMACERR("recovery failed for %s",
+						err_names[type]);
+				pdata->mac_rec_fail[type] = true;
+			}
+		}
+		break;
+		case PHY_DET_ERR:
+		{
+
+			ret = DWC_ETH_QOS_reset_phy_rec(pdata, false);
+			if (!ret) {
+				EMACERR("recovery failed for %s",
+						err_names[type]);
+				pdata->mac_rec_fail[type] = true;
+			}
+		}
+		break;
+		case FBE_ERR:
+		{
+			ret = DWC_ETH_QOS_reset_tx_dma_rec(pdata, chan);
+			if (!ret) {
+				EMACERR("recovery failed for %s",
+						err_names[type]);
+				pdata->mac_rec_fail[type] = true;
+			}
+		}
+			break;
+			case RBU_ERR:
+			{
+				ret = DWC_ETH_QOS_schedule_poll(pdata, chan);
+				if (!ret) {
+					EMACERR("recovery failed for %s",
+							err_names[type]);
+					pdata->mac_rec_fail[type] = true;
+				}
+			}
+			break;
+			case TDU_ERR:
+			{
+				if (!pdata->tdu_scheduled) {
+					pdata->tdu_chan = chan;
+					schedule_delayed_work
+					(&pdata->tdu_rec,
+					 msecs_to_jiffies(3000));
+					pdata->tdu_scheduled = true;
+				}
+			}
+			break;
+			case CRC_ERR:
+			case RECEIVE_ERR:
+			case OVERFLOW_ERR:
+			case DRIBBLE_ERR:
+			case WDT_ERR:
+			{
+				ret = DWC_ETH_QOS_writeback_desc_rec(pdata, chan);
+				if (!ret) {
+					EMACERR("recovery failed for %s",
+							err_names[type]);
+					pdata->mac_rec_fail[type] = true;
+				}
+			}
+			break;
+			default:
+			break;
+			}
+			}
+	}
+	mac_rec_wq_flag = true;
+	wake_up_interruptible(&mac_rec_wq);
+
+	return ret;
+}
+
+
+static void DWC_ETH_QOS_mac_rec_init(struct DWC_ETH_QOS_prv_data *pdata)
+{
+	int threshold[] = {10, 10, 10, 10, 10, 10, 10, 10, 10, 10};
+	int en[] = {0, 1, 0, 0, 0, 0, 0, 0, 0, 0};
+	int i;
+
+	for (i = 0; i < MAC_ERR_CNT; i++) {
+		pdata->mac_rec_threshold[i] = threshold[i];
+		pdata->mac_rec_en[i] = en[i];
+		pdata->mac_err_cnt[i] = 0;
+		pdata->mac_rec_cnt[i] = 0;
+	}
+	INIT_DELAYED_WORK(&pdata->tdu_rec,
+					DWC_ETH_QOS_tdu_rec_wq);
+}
+
 static int DWC_ETH_QOS_configure_netdevice(struct platform_device *pdev)
 {
 	struct DWC_ETH_QOS_prv_data *pdata = NULL;
@@ -2089,9 +2672,15 @@ static int DWC_ETH_QOS_configure_netdevice(struct platform_device *pdev)
 
 	pdata->enable_phy_intr = phy_interrupt_en;
 
+	DWC_ETH_QOS_mac_rec_init(pdata);
 	/* Bypass PHYLIB for TBI, RTBI and SGMII interface */
 	if (pdata->hw_feat.sma_sel == 1) {
+		do {
 		ret = DWC_ETH_QOS_mdio_register(dev);
+			if (ret < 0)
+				DWC_ETH_QOS_handle_mac_err(pdata, PHY_DET_ERR, 0);
+			i++;
+		} while (i < 10 && ret < 0);
 		if (ret < 0) {
 			dev_alert(&pdev->dev, "MDIO bus (id %d) registration failed\n",
 					  pdata->bus_id);
@@ -2250,6 +2839,12 @@ static int DWC_ETH_QOS_configure_netdevice(struct platform_device *pdev)
 		}
 
 	}
+
+	DWC_ETH_QOS_create_emac_rec_device_node(&pdata->emac_rec_dev_t,
+						&pdata->emac_rec_cdev,
+						&pdata->emac_rec_class,
+						"emac_rec");
+
 
 	EMACDBG("<-- DWC_ETH_QOS_configure_netdevice\n");
 
