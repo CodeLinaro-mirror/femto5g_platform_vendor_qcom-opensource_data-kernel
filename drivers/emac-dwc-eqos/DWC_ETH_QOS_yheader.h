@@ -1614,6 +1614,20 @@ struct DWC_ETH_QOS_res_data {
 	bool pps_lpass_conn_en;
 };
 
+enum mac_err_type {
+	PHY_RW_ERR = 0,
+	PHY_DET_ERR,
+	CRC_ERR,
+	RECEIVE_ERR,
+	OVERFLOW_ERR,
+	FBE_ERR,
+	RBU_ERR,
+	TDU_ERR,
+	DRIBBLE_ERR,
+	WDT_ERR,
+	MAC_ERR_CNT,
+};
+
 struct DWC_ETH_QOS_prv_ipa_data {
 	phys_addr_t uc_db_rx_addr;
 	phys_addr_t uc_db_tx_addr;
@@ -1913,6 +1927,23 @@ struct DWC_ETH_QOS_prv_data {
 	struct delayed_work ipv6_addr_assign_wq;
 	bool print_kpi;
 	unsigned long default_ptp_clock;
+
+	/* Mac recovery dev node variables*/
+
+	dev_t emac_rec_dev_t;
+	struct cdev *emac_rec_cdev;
+	struct class *emac_rec_class;
+
+
+	/* Mac recovery parameters */
+	int mac_err_cnt[MAC_ERR_CNT];
+	bool mac_rec_en[MAC_ERR_CNT];
+	bool mac_rec_fail[MAC_ERR_CNT];
+	int mac_rec_cnt[MAC_ERR_CNT];
+	int mac_rec_threshold[MAC_ERR_CNT];
+	struct delayed_work tdu_rec;
+	bool tdu_scheduled;
+	int tdu_chan;
 };
 
 struct ip_params {
@@ -2095,6 +2126,10 @@ int DWC_ETH_QOS_add_ipaddr(struct DWC_ETH_QOS_prv_data *);
 int DWC_ETH_QOS_add_ipv6addr(struct DWC_ETH_QOS_prv_data *);
 int setup_gpio_output_common
 	(struct device *dev, const char *name, int *gpio, int value);
+int DWC_ETH_QOS_handle_mac_err(struct DWC_ETH_QOS_prv_data *pdata, int type, int chan);
+void DWC_ETH_QOS_tx_interrupt(struct net_device *dev, struct DWC_ETH_QOS_prv_data *pdata, UINT qinx);
+void DWC_ETH_QOS_request_phy_wol(struct DWC_ETH_QOS_prv_data *pdata);
+
 /* For debug prints*/
 #define DRV_NAME "qcom-emac-dwc-eqos"
 #define dev_name_ipa_rx "IPA_RX"

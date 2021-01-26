@@ -693,7 +693,11 @@ void DWC_ETH_QOS_handle_DMA_Int(struct DWC_ETH_QOS_prv_data *pdata, int chinx, b
 			}
 
 			if ((GET_VALUE(VARDMA_SR, DMA_SR_RI_LPOS, DMA_SR_RI_HPOS) & 1)) pdata->xstats.rx_normal_irq_n[qinx]++;
-			else pdata->xstats.rx_buf_unavailable_irq_n[qinx]++;
+			else {
+				DWC_ETH_QOS_handle_mac_err(priv, RBU_ERR, chan);
+
+				pdata->xstats.rx_buf_unavailable_irq_n[qinx]++;
+			}
 		}
 	}
 	if (GET_VALUE(VARDMA_SR, DMA_SR_TI_LPOS, DMA_SR_TI_HPOS) & 1) {
@@ -722,6 +726,8 @@ void DWC_ETH_QOS_handle_DMA_Int(struct DWC_ETH_QOS_prv_data *pdata, int chinx, b
 		pdata->xstats.fatal_bus_error_irq_n++;
 		DWC_ETH_QOS_GSTATUS = -E_DMA_SR_FBE;
 		DWC_ETH_QOS_restart_dev(pdata, qinx);
+		DWC_ETH_QOS_handle_mac_err(priv, FBE_ERR, chan);
+
 
 	}
 }
@@ -931,8 +937,10 @@ irqreturn_t DWC_ETH_QOS_ISR_SW_DWC_ETH_QOS(int irq, void *dev_data)
 
 				if ((GET_VALUE(VARDMA_SR, DMA_SR_RI_LPOS, DMA_SR_RI_HPOS) & 1))
 					pdata->xstats.rx_normal_irq_n[qinx]++;
-				else
+				else {
+					DWC_ETH_QOS_handle_mac_err(pdata, RBU_ERR, qinx);
 					pdata->xstats.rx_buf_unavailable_irq_n[qinx]++;
+				}
 			}
 		}
 		if (GET_VALUE(VARDMA_SR, DMA_SR_TI_LPOS, DMA_SR_TI_HPOS) & 1) {
@@ -965,6 +973,7 @@ irqreturn_t DWC_ETH_QOS_ISR_SW_DWC_ETH_QOS(int irq, void *dev_data)
 			pdata->xstats.fatal_bus_error_irq_n++;
 			DWC_ETH_QOS_GSTATUS = -E_DMA_SR_FBE;
 			DWC_ETH_QOS_restart_dev(pdata, qinx);
+			DWC_ETH_QOS_handle_mac_err(pdata, FBE_ERR, qinx);
 		}
 	}
 #endif
@@ -2563,6 +2572,8 @@ static int DWC_ETH_QOS_start_xmit(struct sk_buff *skb, struct net_device *dev)
 		netif_stop_subqueue(dev, qinx);
 		DBGPR("stopped TX queue(%d) since there are no sufficient descriptor available for the current transfer\n",
 		      qinx);
+
+		DWC_ETH_QOS_handle_mac_err(pdata, TDU_ERR, qinx);
 		retval = NETDEV_TX_BUSY;
 		goto tx_netdev_return;
 	}
@@ -2897,7 +2908,7 @@ static unsigned int DWC_ETH_QOS_get_tx_hwtstamp(
  * \return void
  */
 
-static void DWC_ETH_QOS_tx_interrupt(struct net_device *dev,
+void DWC_ETH_QOS_tx_interrupt(struct net_device *dev,
 				     struct DWC_ETH_QOS_prv_data *pdata,
 				     UINT qinx)
 {
@@ -3954,19 +3965,28 @@ static int DWC_ETH_QOS_clean_rx_irq(struct DWC_ETH_QOS_prv_data *pdata,
 				if (!(RX_NORMAL_DESC->RDES3 &
 					  DWC_ETH_QOS_RDESC3_LD))
 					DBGPR("Received oversized pkt, spanned across multiple desc\n");
-
-				if (RX_NORMAL_DESC->RDES3 & DWC_ETH_QOS_RDESC3_DRIBBLE_ERR)
+				if (RX_NORMAL_DESC->RDES3 & DWC_ETH_QOS_RDESC3_DRIBBLE_ERR) {
+					DWC_ETH_QOS_handle_mac_err(pdata, DRIBBLE_ERR, qinx);
 					EMACERR("Received Dribble Error(19)\n");
-				if (RX_NORMAL_DESC->RDES3 & DWC_ETH_QOS_RDESC3_RECEIVE_ERR)
+				}
+				if (RX_NORMAL_DESC->RDES3 & DWC_ETH_QOS_RDESC3_RECEIVE_ERR) {
+					DWC_ETH_QOS_handle_mac_err(pdata, RECEIVE_ERR, qinx);
 					EMACERR("Received Receive Error(20)\n");
-				if (RX_NORMAL_DESC->RDES3 & DWC_ETH_QOS_RDESC3_OVERFLOW_ERR)
+				}
+				if (RX_NORMAL_DESC->RDES3 & DWC_ETH_QOS_RDESC3_OVERFLOW_ERR) {
+					DWC_ETH_QOS_handle_mac_err(pdata, OVERFLOW_ERR, qinx);
 					EMACERR("Received Overflow Error(21)\n");
-				if (RX_NORMAL_DESC->RDES3 & DWC_ETH_QOS_RDESC3_WTO_ERR)
+				}
+				if (RX_NORMAL_DESC->RDES3 & DWC_ETH_QOS_RDESC3_WTO_ERR) {
+					DWC_ETH_QOS_handle_mac_err(pdata, WDT_ERR, qinx);
 					EMACERR("Received Watchdog Timeout Error(22)\n");
+				}
 				if (RX_NORMAL_DESC->RDES3 & DWC_ETH_QOS_RDESC3_GAINT_PKT_ERR)
 					EMACERR("Received Gaint Packet Error(23)\n");
-				if (RX_NORMAL_DESC->RDES3 & DWC_ETH_QOS_RDESC3_CRC_ERR)
+				if (RX_NORMAL_DESC->RDES3 & DWC_ETH_QOS_RDESC3_CRC_ERR) {
+					DWC_ETH_QOS_handle_mac_err(pdata, CRC_ERR, qinx);
 					EMACERR("Received CRC Error(24)\n");
+				}
 
 				/* recycle skb */
 				buffer->skb = skb;

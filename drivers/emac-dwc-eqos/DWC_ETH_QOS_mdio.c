@@ -85,6 +85,9 @@ INT DWC_ETH_QOS_mdio_read_direct(struct DWC_ETH_QOS_prv_data *pdata,
 		pr_alert("%s: hw_if->read_phy_regs not defined", DEV_NAME);
 	}
 
+	if(phy_reg_read_status < 0)
+		DWC_ETH_QOS_handle_mac_err(pdata, PHY_RW_ERR, 0);
+
 	DBGPR_MDIO("<-- DWC_ETH_QOS_mdio_read_direct\n");
 
 	return phy_reg_read_status;
@@ -123,6 +126,9 @@ INT DWC_ETH_QOS_mdio_write_direct(struct DWC_ETH_QOS_prv_data *pdata,
 		phy_reg_write_status = 1;
 		pr_alert("%s: hw_if->write_phy_regs not defined", DEV_NAME);
 	}
+
+	if(phy_reg_write_status < 0)
+		DWC_ETH_QOS_handle_mac_err(pdata, PHY_RW_ERR, 0);
 
 	DBGPR_MDIO("<-- DWC_ETH_QOS_mdio_write_direct\n");
 
@@ -1014,7 +1020,7 @@ void DWC_ETH_QOS_adjust_link(struct net_device *dev)
 	DBGPR_MDIO("<--DWC_ETH_QOS_adjust_link\n");
 }
 
-static void DWC_ETH_QOS_request_phy_wol(struct DWC_ETH_QOS_prv_data *pdata)
+void DWC_ETH_QOS_request_phy_wol(struct DWC_ETH_QOS_prv_data *pdata)
 {
 	pdata->phy_wol_supported = 0;
 	pdata->phy_wol_wolopts = 0;

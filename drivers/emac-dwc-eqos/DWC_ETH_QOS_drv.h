@@ -56,9 +56,6 @@ static void DWC_ETH_QOS_set_rx_mode(struct net_device *);
 
 static int DWC_ETH_QOS_start_xmit(struct sk_buff *, struct net_device *);
 
-static void DWC_ETH_QOS_tx_interrupt(struct net_device *,
-				     struct DWC_ETH_QOS_prv_data *, UINT);
-
 static struct net_device_stats *DWC_ETH_QOS_get_stats(struct net_device *);
 
 #ifdef CONFIG_NET_POLL_CONTROLLER
