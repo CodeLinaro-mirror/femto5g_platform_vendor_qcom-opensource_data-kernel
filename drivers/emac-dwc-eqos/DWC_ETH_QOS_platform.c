@@ -108,6 +108,107 @@ module_param(phy_interrupt_en, int, S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP);
 MODULE_PARM_DESC(phy_interrupt_en,
 		"Enable PHY interrupt [0-DISABLE, 1-ENABLE]");
 
+
+/*
+ * \brief API to read the phy registers
+ *
+ * \param[in] phy register address (0x01-0x1f)
+ * \param[in] variable to store the read value
+ *
+ * \return int read_status
+ * \retval  0 - successfully read data on the register
+ * \retval -1 - error occurred
+ * \retval  1 - if the feature is not defined.
+ */
+int read_phy_reg_from_extern_mod(int phyreg, int *r_phydata)
+{
+        int phy_reg_read_status = -1;
+        struct DWC_ETH_QOS_prv_data *pdata;
+        pdata = gDWC_ETH_QOS_prv_data;
+        struct net_device *net_dev = pdata->dev;
+
+        if (!pdata || !pdata->phydev) {
+                return phy_reg_read_status;
+        }
+
+        if (phyreg==NULL || (phyreg<0x00 || phyreg>0x1f)) {
+                return -EINVAL;
+        }
+
+        if (!net_dev || !netif_running(net_dev)) {
+                return phy_reg_read_status;
+        }
+
+        int phyaddr = pdata->phyaddr;
+
+        phy_reg_read_status =
+        DWC_ETH_QOS_mdio_read_direct(pdata, phyaddr, phyreg,
+                                     r_phydata);
+
+        if (phy_reg_read_status == 0) {
+
+                if ( (*r_phydata) == 0x0000 || (*r_phydata) == 0xffff) {
+                pr_alert
+                         ("Invalid value read from PHY register\n");
+            }
+        } else {
+                if (phy_reg_read_status < 0) {
+                pr_alert(
+                         "%s: Error reading the phy register %d for phy ID/ADDR %d\n",
+                         DEV_NAME, phyreg, phyaddr);
+                }
+        }
+
+        return phy_reg_read_status;
+}
+EXPORT_SYMBOL(read_phy_reg_from_extern_mod);
+
+/*
+ * \brief API to write in the phy registers
+ *
+ * \param[in] phy register address (0x01-0x1f)
+ * \param[in] value to write
+ *
+ * \return int write_status
+ * \retval  0 - successfully written data on the register
+ * \retval -1 - error occurred
+ * \retval  1 - if the feature is not defined.
+ */
+int write_phy_reg_from_extern_mod(int phyreg, int w_phydata)
+{
+        int phy_reg_write_status = -1;
+        struct DWC_ETH_QOS_prv_data *pdata;
+        pdata = gDWC_ETH_QOS_prv_data;
+        struct net_device *net_dev = pdata->dev;
+
+        if (!pdata || !pdata->phydev) {
+                return phy_reg_write_status;
+        }
+
+        if (phyreg==NULL || (phyreg<0x00 || phyreg>0x1f) ) {
+                return -EINVAL;
+        }
+
+        if (!net_dev || !netif_running(net_dev)) {
+                return phy_reg_write_status;
+        }
+
+        int phyaddr = pdata->phyaddr;
+
+        phy_reg_write_status =
+        DWC_ETH_QOS_mdio_write_direct(pdata, phyaddr, phyreg,
+                                      w_phydata);
+
+        if (phy_reg_write_status < 0) {
+                pr_alert(
+                         "%s: Error writing the phy register %d for phy ID/ADDR %d\n",
+                         DEV_NAME, phyreg, phyaddr);
+        }
+
+        return phy_reg_write_status;
+}
+EXPORT_SYMBOL(write_phy_reg_from_extern_mod);
+
 struct ip_params pparams = {0};
 #ifdef DWC_ETH_QOS_BUILTIN
 static int __init set_early_ethernet_ipv4(char *ipv4_addr_in)
@@ -1482,16 +1583,16 @@ static int DWC_ETH_QOS_panic_notifier(struct notifier_block *this,
 	if (gDWC_ETH_QOS_prv_data) {
 		size_iomacro_regs = DWC_ETH_QOS_rgmii_io_macro_num_of_regs(gDWC_ETH_QOS_prv_data->emac_hw_version_type)*4;
 
-                EMACINFO("gDWC_ETH_QOS_prv_data 0x%p\n", gDWC_ETH_QOS_prv_data);
+                EMACINFO("gDWC_ETH_QOS_prv_data 0x%px\n", gDWC_ETH_QOS_prv_data);
 		DWC_ETH_QOS_ipa_stats_read(gDWC_ETH_QOS_prv_data);
 		DWC_ETH_QOS_dma_desc_stats_read(gDWC_ETH_QOS_prv_data);
 
 		gDWC_ETH_QOS_prv_data->iommu_domain = emac_emb_smmu_ctx.iommu_domain;
-		EMACINFO("emac iommu domain 0x%p\n", gDWC_ETH_QOS_prv_data->iommu_domain);
+		EMACINFO("emac iommu domain 0x%px\n", gDWC_ETH_QOS_prv_data->iommu_domain);
 
 		gDWC_ETH_QOS_prv_data->emac_reg_base_address =
 			(unsigned int *)kzalloc(dwc_eth_qos_res_data.emac_mem_size, GFP_KERNEL);
-		EMACINFO("emac register mem 0x%p\n", gDWC_ETH_QOS_prv_data->emac_reg_base_address);
+		EMACINFO("emac register mem 0x%px\n", gDWC_ETH_QOS_prv_data->emac_reg_base_address);
 		if (gDWC_ETH_QOS_prv_data->emac_reg_base_address != NULL)
 			memcpy(gDWC_ETH_QOS_prv_data->emac_reg_base_address, dwc_eth_qos_base_addr,
 				dwc_eth_qos_res_data.emac_mem_size);
@@ -1499,7 +1600,7 @@ static int DWC_ETH_QOS_panic_notifier(struct notifier_block *this,
 		if(size_iomacro_regs > 0) {
 			gDWC_ETH_QOS_prv_data->rgmii_reg_base_address =
 				(unsigned int *)kzalloc(size_iomacro_regs, GFP_KERNEL);
-			EMACINFO("rgmii register mem 0x%p\n", gDWC_ETH_QOS_prv_data->rgmii_reg_base_address);
+			EMACINFO("rgmii register mem 0x%px\n", gDWC_ETH_QOS_prv_data->rgmii_reg_base_address);
 			if (gDWC_ETH_QOS_prv_data->rgmii_reg_base_address != NULL)
 				memcpy(gDWC_ETH_QOS_prv_data->rgmii_reg_base_address, dwc_rgmii_io_csr_base_addr,
 					size_iomacro_regs);
