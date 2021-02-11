@@ -5236,7 +5236,7 @@ static void configure_target_time_reg(u32 ch)
 	} while (data == 0x1); // Wait until bit is clear
 }
 
-void DWC_ETH_QOS_pps_timer_init(struct ifr_data_struct *req)
+void DWC_ETH_QOS_pps_timer_init(void)
 {
 	u32 data = 0x0;
 
@@ -5333,6 +5333,10 @@ int ETH_PPSOUT_Config(struct DWC_ETH_QOS_prv_data *pdata, struct ETH_PPS_Config 
 	if (pdata->res_data->pps_lpass_conn_en ) {
 		eth_pps_cfg->ptpclk_freq = pdata->default_ptp_clock;
 		EMACDBG("using default ptp clock \n");
+	} else {
+		MAC_TCR_TSCTRLSSR_UDFWR(1);
+		DWC_ETH_QOS_pps_timer_init();
+		EMACDBG("using user ptp clock\n");
 	}
 
 	if ((eth_pps_cfg->ppsout_ch < 0) ||
@@ -6133,10 +6137,10 @@ static int DWC_ETH_QOS_handle_hwtstamp_ioctl(struct DWC_ETH_QOS_prv_data *pdata,
 		hw_if->config_hw_time_stamping(VARMAC_TCR);
 
 		/* program default addend */
-		hw_if->config_default_addend(pdata, pdata->default_ptp_clock);
+		hw_if->config_default_addend(pdata, pdata->ptpclk_freq);
 
 		/* program Sub Second Increment Reg */
-		hw_if->config_sub_second_increment(pdata->default_ptp_clock);
+		hw_if->config_sub_second_increment(pdata->ptpclk_freq);
 
 		/* initialize system time */
 		getnstimeofday(&now);

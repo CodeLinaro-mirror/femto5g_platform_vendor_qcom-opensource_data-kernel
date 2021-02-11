@@ -51,7 +51,7 @@
 #include "DWC_ETH_QOS_yapphdr.h"
 
 #ifdef CONFIG_PPS_OUTPUT
-extern void DWC_ETH_QOS_pps_timer_init(struct ifr_data_struct* req);
+extern void DWC_ETH_QOS_pps_timer_init(void);
 #endif
 
 /*!
@@ -282,7 +282,6 @@ static struct ptp_clock_info DWC_ETH_QOS_ptp_clock_ops = {
 int DWC_ETH_QOS_ptp_init(struct DWC_ETH_QOS_prv_data *pdata)
 {
 	int ret = 0;
-	struct ifr_data_struct req = {0};
 #ifdef CONFIG_PPS_OUTPUT
 	struct ETH_PPS_Config eth_pps_cfg = {0};
 #endif
@@ -320,9 +319,8 @@ int DWC_ETH_QOS_ptp_init(struct DWC_ETH_QOS_prv_data *pdata)
 		eth_pps_cfg.ppsout_freq = DWC_ETH_QOS_DEFAULT_LPASS_PPS_FREQUENCY;
 		eth_pps_cfg.ppsout_start = 1;
 		eth_pps_cfg.ppsout_duty = 50;
-		req.ptr = (void*)&eth_pps_cfg;
 
-		DWC_ETH_QOS_pps_timer_init(&req);
+		DWC_ETH_QOS_pps_timer_init();
 		ret = ETH_PPSOUT_Config(pdata, &eth_pps_cfg);
 	}
 #endif
