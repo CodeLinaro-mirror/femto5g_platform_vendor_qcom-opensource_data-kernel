@@ -2497,10 +2497,6 @@ static INT DWC_ETH_QOS_suspend(struct device *dev)
 	if (pdata->hw_feat.mgk_sel && (pdata->wolopts & WAKE_MAGIC))
 		pmt_flags |= DWC_ETH_QOS_MAGIC_WAKEUP;
 
-	ret = DWC_ETH_QOS_powerdown(net_dev, pmt_flags, DWC_ETH_QOS_DRIVER_CONTEXT);
-
-	DWC_ETH_QOS_suspend_clks(pdata);
-
 	if(dwc_eth_qos_res_data.emac_hw_version_type == EMAC_HW_v2_3_1) {
 		/* Suspend the PHY RXC clock. */
 		if (dwc_eth_qos_res_data.is_pinctrl_names &&
@@ -2514,6 +2510,10 @@ static INT DWC_ETH_QOS_suspend(struct device *dev)
 				EMACDBG("Set rgmii_rxc_suspend_state succeed\n");
 		}
 	}
+
+	ret = DWC_ETH_QOS_powerdown(net_dev, pmt_flags, DWC_ETH_QOS_DRIVER_CONTEXT);
+
+	DWC_ETH_QOS_suspend_clks(pdata);
 
 	EMACDBG("<--DWC_ETH_QOS_suspend ret = %d\n", ret);
 #ifdef CONFIG_MSM_BOOT_TIME_MARKER
