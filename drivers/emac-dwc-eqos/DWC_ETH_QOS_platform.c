@@ -2503,7 +2503,7 @@ static int DWC_ETH_QOS_configure_netdevice(struct platform_device *pdev)
 {
 	struct DWC_ETH_QOS_prv_data *pdata = NULL;
 	struct net_device *dev = NULL;
-	int ret = 0, i;
+	int ret = 0, i = 0;
 	struct hw_if_struct *hw_if = NULL;
 	struct desc_if_struct *desc_if = NULL;
 	UCHAR tx_q_count = 0, rx_q_count = 0;
