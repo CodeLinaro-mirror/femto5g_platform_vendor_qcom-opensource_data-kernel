@@ -11,9 +11,20 @@
 #GNU General Public License for more details.
 #
 #
+plateform_hana=1
+plateform_talos=2
 irq_num=`cat /proc/interrupts | grep -i DWC_ETH_QOS| grep -i gic | awk {'print $1'} | awk -F :  {'print $1'}`;
 echo irqnum=$irq_num;
-# Here 08 is forcing ISR to CPU 3
-echo 08 > /proc/irq/$irq_num/smp_affinity;
-# Here 34 forcing RX CPU as 2,4,5
-echo 34 > /sys/class/net/eth0/queues/rx-0/rps_cpus;
+case $1 in
+	$plateform_hana)
+		echo $2 > /sys/class/net/eth0/queues/rx-0/rps_cpus;
+		;;
+	$plateform_talos)
+		# Here 08 is forcing ISR to CPU 3
+		echo 08 > /proc/irq/$irq_num/smp_affinity;
+		echo $2 > /sys/class/net/eth0/queues/rx-0/rps_cpus;
+		;;
+	*)
+		echo "Invalid plateform $1";
+		;;
+esac
