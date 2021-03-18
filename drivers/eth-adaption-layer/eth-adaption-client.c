@@ -125,7 +125,14 @@ static void eth_adaption_client_receive(struct kthread_work *work)
 
 	buf = kzalloc(max_size, GFP_ATOMIC);
 	if (!buf)
+	{
+		if (atomic_read(&acquire_wakelock) == 1)
+		{
+			atomic_set(&acquire_wakelock, 0);
+			__pm_relax(eth_ws);
+		}
 		return;
+	}
 	if(!client_sk.conn_socket)
 		goto release;
 
@@ -163,6 +170,11 @@ static void eth_adaption_client_receive(struct kthread_work *work)
 	receive_allocfree_stat--;
 
 release:
+	if (atomic_read(&acquire_wakelock) == 1)
+	{
+		atomic_set(&acquire_wakelock, 0);
+		__pm_relax(eth_ws);
+	}
 	kfree(buf);
 	return;
 } /* client_receive */
@@ -348,6 +360,11 @@ release:
 		kfree(server);
 	if(server_v6)
 		kfree(server_v6);
+	if (atomic_read(&acquire_wakelock) == 1)
+	{
+		atomic_set(&acquire_wakelock, 0);
+		__pm_relax(eth_ws);
+	}
 	return cn;
 }
 

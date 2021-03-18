@@ -32,7 +32,7 @@
 #include<linux/platform_device.h>
 #include<linux/phy.h>
 #include<linux/debugfs.h>
-
+#include <linux/pm_wakeup.h>
 
 
 #include<net/protocol.h>
@@ -89,6 +89,8 @@ extern bool peer_gpio_toggled;
 /* Power state lock */
 extern struct mutex gpio_toggle_lock;
 
+extern atomic_t acquire_wakelock;
+extern struct wakeup_source *eth_ws;
 /**
 * eth_adaption_send() - Function to send QMI packet from IPCRTR over TCP socket.
 *
@@ -113,22 +115,13 @@ void eth_adaption_notifier_soft_reset(struct kthread_work *work);
 void eth_adaption_notifier_soft_set(struct kthread_work *work);
 
 /**
-* Power management IOCTL declarations
-*/
-static unsigned int dev_num = 1;
-static struct cdev eth_adaption_power_management_ioctl_cdev;
-static dev_t device;
-static char eth_adaption_drv_name[] = "eth-pwr";
-static struct class *eth_adaption_class;
-
-/**
-* eth_adaption_handle_suspend_ioctl() - handler for suspend case
+* eth_adaption_handle_suspend() - handler for suspend case
 * scenario Return:int
 */
-int eth_adaption_handle_suspend_ioctl(void);
+int eth_adaption_handle_suspend(void);
 
 /**
-* eth_adaption_handle_resume_ioctl() - handler for resume case
+* eth_adaption_handle_resume() - handler for resume case
 * scenario Return:int
 */
-int eth_adaption_handle_resume_ioctl(void);
+int eth_adaption_handle_resume(void);
