@@ -1,4 +1,4 @@
-/* Copyright (c) 2017-2018, The Linux Foundation. All rights
+/* Copyright (c) 2017-2018, 2021 The Linux Foundation. All rights
  * reserved.
  *
  * This program is free software; you can redistribute it and/or modify
@@ -33680,39 +33680,70 @@
 
 /*#define  MAC_L3L4CR_Mask_22 (ULONG)(~(~0<<(10)))*/
 
-#define  MAC_L3L4CR_MASK_22 (ULONG)(0x3ff)
+#define  MAC_L3L4CR_MASK_29 (ULONG)(0x7)
 
-/*#define MAC_L3L4CR_RES_Wr_Mask_22 (ULONG)(~((~(~0<<(10)))<<(22)))*/
+#define MAC_L3L4CR_RES_WR_MASK_29 (ULONG)(0x1fffffff)
 
-#define MAC_L3L4CR_RES_WR_MASK_22 (ULONG)(0x3fffff)
+#define  MAC_L3L4CR_MASK_26 (ULONG)(0x3)
 
-/*#define  MAC_L3L4CR_Mask_17 (ULONG)(~(~0<<(1)))*/
+#define MAC_L3L4CR_RES_WR_MASK_26 (ULONG)(0xf3ffffff)
+
+#define  MAC_L3L4CR_MASK_22 (ULONG)(0x3)
+
+#define MAC_L3L4CR_RES_WR_MASK_22 (ULONG)(0xff3fffff)
 
 #define  MAC_L3L4CR_MASK_17 (ULONG)(0x1)
 
-/*#define MAC_L3L4CR_RES_Wr_Mask_17 (ULONG)(~((~(~0<<(1)))<<(17)))*/
-
 #define MAC_L3L4CR_RES_WR_MASK_17 (ULONG)(0xfffdffff)
-
-/*#define  MAC_L3L4CR_Mask_1 (ULONG)(~(~0<<(1)))*/
 
 #define  MAC_L3L4CR_MASK_1 (ULONG)(0x1)
 
-/*#define MAC_L3L4CR_RES_Wr_Mask_1 (ULONG)(~((~(~0<<(1)))<<(1)))*/
-
 #define MAC_L3L4CR_RES_WR_MASK_1 (ULONG)(0xfffffffd)
 
-/*#define MAC_L3L4CR_L4DPIM0_Mask (ULONG)(~(~0<<(1)))*/
+
+
+#define MAC_L3L4CR_DMCHEN_MASK (ULONG)(0x1)
+
+#define MAC_L3L4CR_DMCHEN_WR_MASK (ULONG)(0xefffffff)
+
+#define MAC_L3L4CR_DMCHEN_UDFWR(i, data) do {\
+		ULONG v;\
+		MAC_L3L4CR_RGRD(i, v);\
+		v = (v & (MAC_L3L4CR_RES_WR_MASK_29)) | (((0) & (MAC_L3L4CR_MASK_29)) << 29); \
+		v = (v & (MAC_L3L4CR_RES_WR_MASK_26)) | (((0) & (MAC_L3L4CR_MASK_26)) << 26); \
+		v = (v & (MAC_L3L4CR_RES_WR_MASK_22)) | (((0) & (MAC_L3L4CR_MASK_22)) << 22);\
+		v = (v & (MAC_L3L4CR_RES_WR_MASK_17)) | (((0) & (MAC_L3L4CR_MASK_17)) << 17);\
+		v = (v & (MAC_L3L4CR_RES_WR_MASK_1)) | (((0) & (MAC_L3L4CR_MASK_1)) << 1);\
+		v = ((v & MAC_L3L4CR_DMCHEN_WR_MASK) | ((data & MAC_L3L4CR_DMCHEN_MASK) << 28));\
+		MAC_L3L4CR_RGWR(i, v);\
+} while (0)
+
+
+#define MAC_L3L4CR_DMCHN_MASK (ULONG)(0x3)
+
+#define MAC_L3L4CR_DMCHN_WR_MASK (ULONG)(0xfcffffff)
+
+#define MAC_L3L4CR_DMCHN_UDFWR(i, data) do {\
+		ULONG v;\
+		MAC_L3L4CR_RGRD(i, v);\
+		v = (v & (MAC_L3L4CR_RES_WR_MASK_29)) | (((0) & (MAC_L3L4CR_MASK_29)) << 29); \
+		v = (v & (MAC_L3L4CR_RES_WR_MASK_26)) | (((0) & (MAC_L3L4CR_MASK_26)) << 26); \
+		v = (v & (MAC_L3L4CR_RES_WR_MASK_22)) | (((0) & (MAC_L3L4CR_MASK_22)) << 22);\
+		v = (v & (MAC_L3L4CR_RES_WR_MASK_17)) | (((0) & (MAC_L3L4CR_MASK_17)) << 17);\
+		v = (v & (MAC_L3L4CR_RES_WR_MASK_1)) | (((0) & (MAC_L3L4CR_MASK_1)) << 1);\
+		v = ((v & MAC_L3L4CR_DMCHN_WR_MASK) | ((data & MAC_L3L4CR_DMCHN_MASK) << 24));\
+		MAC_L3L4CR_RGWR(i, v);\
+} while (0)
 
 #define MAC_L3L4CR_L4DPIM0_MASK (ULONG)(0x1)
-
-/*#define MAC_L3L4CR_L4DPIM0_Wr_Mask (ULONG)(~((~(~0 << (1))) << (21)))*/
 
 #define MAC_L3L4CR_L4DPIM0_WR_MASK (ULONG)(0xffdfffff)
 
 #define MAC_L3L4CR_L4DPIM0_UDFWR(i, data) do {\
 		ULONG v;\
 		MAC_L3L4CR_RGRD(i, v);\
+		v = (v & (MAC_L3L4CR_RES_WR_MASK_29)) | (((0) & (MAC_L3L4CR_MASK_29)) << 29); \
+		v = (v & (MAC_L3L4CR_RES_WR_MASK_26)) | (((0) & (MAC_L3L4CR_MASK_26)) << 26); \
 		v = (v & (MAC_L3L4CR_RES_WR_MASK_22)) | (((0) & (MAC_L3L4CR_MASK_22)) << 22);\
 		v = (v & (MAC_L3L4CR_RES_WR_MASK_17)) | (((0) & (MAC_L3L4CR_MASK_17)) << 17);\
 		v = (v & (MAC_L3L4CR_RES_WR_MASK_1)) | (((0) & (MAC_L3L4CR_MASK_1)) << 1);\
@@ -33736,6 +33767,8 @@
 #define MAC_L3L4CR_L4DPM0_UDFWR(i, data) do {\
 		ULONG v;\
 		MAC_L3L4CR_RGRD(i, v);\
+		v = (v & (MAC_L3L4CR_RES_WR_MASK_29)) | (((0) & (MAC_L3L4CR_MASK_29)) << 29); \
+		v = (v & (MAC_L3L4CR_RES_WR_MASK_26)) | (((0) & (MAC_L3L4CR_MASK_26)) << 26); \
 		v = (v & (MAC_L3L4CR_RES_WR_MASK_22)) | (((0) & (MAC_L3L4CR_MASK_22)) << 22);\
 		v = (v & (MAC_L3L4CR_RES_WR_MASK_17)) | (((0) & (MAC_L3L4CR_MASK_17)) << 17);\
 		v = (v & (MAC_L3L4CR_RES_WR_MASK_1)) | (((0) & (MAC_L3L4CR_MASK_1)) << 1);\
@@ -33759,6 +33792,8 @@
 #define MAC_L3L4CR_L4SPIM0_UDFWR(i, data) do {\
 		ULONG v;\
 		MAC_L3L4CR_RGRD(i, v);\
+		v = (v & (MAC_L3L4CR_RES_WR_MASK_29)) | (((0) & (MAC_L3L4CR_MASK_29)) << 29); \
+		v = (v & (MAC_L3L4CR_RES_WR_MASK_26)) | (((0) & (MAC_L3L4CR_MASK_26)) << 26); \
 		v = (v & (MAC_L3L4CR_RES_WR_MASK_22)) | (((0) & (MAC_L3L4CR_MASK_22)) << 22);\
 		v = (v & (MAC_L3L4CR_RES_WR_MASK_17)) | (((0) & (MAC_L3L4CR_MASK_17)) << 17);\
 		v = (v & (MAC_L3L4CR_RES_WR_MASK_1)) | (((0) & (MAC_L3L4CR_MASK_1)) << 1);\
@@ -33782,6 +33817,8 @@
 #define MAC_L3L4CR_L4SPM0_UDFWR(i, data) do {\
 		ULONG v;\
 		MAC_L3L4CR_RGRD(i, v);\
+		v = (v & (MAC_L3L4CR_RES_WR_MASK_29)) | (((0) & (MAC_L3L4CR_MASK_29)) << 29); \
+		v = (v & (MAC_L3L4CR_RES_WR_MASK_26)) | (((0) & (MAC_L3L4CR_MASK_26)) << 26); \
 		v = (v & (MAC_L3L4CR_RES_WR_MASK_22)) | (((0) & (MAC_L3L4CR_MASK_22)) << 22);\
 		v = (v & (MAC_L3L4CR_RES_WR_MASK_17)) | (((0) & (MAC_L3L4CR_MASK_17)) << 17);\
 		v = (v & (MAC_L3L4CR_RES_WR_MASK_1)) | (((0) & (MAC_L3L4CR_MASK_1)) << 1);\
@@ -33805,6 +33842,8 @@
 #define MAC_L3L4CR_L4PEN0_UDFWR(i, data) do {\
 		ULONG v;\
 		MAC_L3L4CR_RGRD(i, v);\
+		v = (v & (MAC_L3L4CR_RES_WR_MASK_29)) | (((0) & (MAC_L3L4CR_MASK_29)) << 29); \
+		v = (v & (MAC_L3L4CR_RES_WR_MASK_26)) | (((0) & (MAC_L3L4CR_MASK_26)) << 26); \
 		v = (v & (MAC_L3L4CR_RES_WR_MASK_22)) | (((0) & (MAC_L3L4CR_MASK_22)) << 22);\
 		v = (v & (MAC_L3L4CR_RES_WR_MASK_17)) | (((0) & (MAC_L3L4CR_MASK_17)) << 17);\
 		v = (v & (MAC_L3L4CR_RES_WR_MASK_1)) | (((0) & (MAC_L3L4CR_MASK_1)) << 1);\
@@ -33827,7 +33866,9 @@
 
 #define MAC_L3L4CR_L3HDBM0_UDFWR(i, data) do {\
 		ULONG v;\
-		MAC_L3L4CR_RGRD(i, v);\
+		MAC_L3L4CR_RGRD(i, v);					\
+		v = (v & (MAC_L3L4CR_RES_WR_MASK_29)) | (((0) & (MAC_L3L4CR_MASK_29)) << 29); \
+		v = (v & (MAC_L3L4CR_RES_WR_MASK_26)) | (((0) & (MAC_L3L4CR_MASK_26)) << 26); \
 		v = (v & (MAC_L3L4CR_RES_WR_MASK_22)) | (((0) & (MAC_L3L4CR_MASK_22)) << 22);\
 		v = (v & (MAC_L3L4CR_RES_WR_MASK_17)) | (((0) & (MAC_L3L4CR_MASK_17)) << 17);\
 		v = (v & (MAC_L3L4CR_RES_WR_MASK_1)) | (((0) & (MAC_L3L4CR_MASK_1)) << 1);\
@@ -33851,6 +33892,8 @@
 #define MAC_L3L4CR_L3HSBM0_UDFWR(i, data) do {\
 		ULONG v;\
 		MAC_L3L4CR_RGRD(i, v);\
+		v = (v & (MAC_L3L4CR_RES_WR_MASK_29)) | (((0) & (MAC_L3L4CR_MASK_29)) << 29); \
+		v = (v & (MAC_L3L4CR_RES_WR_MASK_26)) | (((0) & (MAC_L3L4CR_MASK_26)) << 26); \
 		v = (v & (MAC_L3L4CR_RES_WR_MASK_22)) | (((0) & (MAC_L3L4CR_MASK_22)) << 22);\
 		v = (v & (MAC_L3L4CR_RES_WR_MASK_17)) | (((0) & (MAC_L3L4CR_MASK_17)) << 17);\
 		v = (v & (MAC_L3L4CR_RES_WR_MASK_1)) | (((0) & (MAC_L3L4CR_MASK_1)) << 1);\
@@ -33874,6 +33917,8 @@
 #define MAC_L3L4CR_L3DAIM0_UDFWR(i, data) do {\
 		ULONG v;\
 		MAC_L3L4CR_RGRD(i, v);\
+		v = (v & (MAC_L3L4CR_RES_WR_MASK_29)) | (((0) & (MAC_L3L4CR_MASK_29)) << 29); \
+		v = (v & (MAC_L3L4CR_RES_WR_MASK_26)) | (((0) & (MAC_L3L4CR_MASK_26)) << 26); \
 		v = (v & (MAC_L3L4CR_RES_WR_MASK_22)) | (((0) & (MAC_L3L4CR_MASK_22)) << 22);\
 		v = (v & (MAC_L3L4CR_RES_WR_MASK_17)) | (((0) & (MAC_L3L4CR_MASK_17)) << 17);\
 		v = (v & (MAC_L3L4CR_RES_WR_MASK_1)) | (((0) & (MAC_L3L4CR_MASK_1)) << 1);\
@@ -33897,6 +33942,8 @@
 #define MAC_L3L4CR_L3DAM0_UDFWR(i, data) do {\
 		ULONG v;\
 		MAC_L3L4CR_RGRD(i, v);\
+		v = (v & (MAC_L3L4CR_RES_WR_MASK_29)) | (((0) & (MAC_L3L4CR_MASK_29)) << 29); \
+		v = (v & (MAC_L3L4CR_RES_WR_MASK_26)) | (((0) & (MAC_L3L4CR_MASK_26)) << 26); \
 		v = (v & (MAC_L3L4CR_RES_WR_MASK_22)) | (((0) & (MAC_L3L4CR_MASK_22)) << 22);\
 		v = (v & (MAC_L3L4CR_RES_WR_MASK_17)) | (((0) & (MAC_L3L4CR_MASK_17)) << 17);\
 		v = (v & (MAC_L3L4CR_RES_WR_MASK_1)) | (((0) & (MAC_L3L4CR_MASK_1)) << 1);\
@@ -33920,6 +33967,8 @@
 #define MAC_L3L4CR_L3SAIM0_UDFWR(i, data) do {\
 		ULONG v;\
 		MAC_L3L4CR_RGRD(i, v);\
+		v = (v & (MAC_L3L4CR_RES_WR_MASK_29)) | (((0) & (MAC_L3L4CR_MASK_29)) << 29); \
+		v = (v & (MAC_L3L4CR_RES_WR_MASK_26)) | (((0) & (MAC_L3L4CR_MASK_26)) << 26); \
 		v = (v & (MAC_L3L4CR_RES_WR_MASK_22)) | (((0) & (MAC_L3L4CR_MASK_22)) << 22);\
 		v = (v & (MAC_L3L4CR_RES_WR_MASK_17)) | (((0) & (MAC_L3L4CR_MASK_17)) << 17);\
 		v = (v & (MAC_L3L4CR_RES_WR_MASK_1)) | (((0) & (MAC_L3L4CR_MASK_1)) << 1);\
@@ -33943,6 +33992,8 @@
 #define MAC_L3L4CR_L3SAM0_UDFWR(i, data) do {\
 		ULONG v;\
 		MAC_L3L4CR_RGRD(i, v);\
+		v = (v & (MAC_L3L4CR_RES_WR_MASK_29)) | (((0) & (MAC_L3L4CR_MASK_29)) << 29); \
+		v = (v & (MAC_L3L4CR_RES_WR_MASK_26)) | (((0) & (MAC_L3L4CR_MASK_26)) << 26); \
 		v = (v & (MAC_L3L4CR_RES_WR_MASK_22)) | (((0) & (MAC_L3L4CR_MASK_22)) << 22);\
 		v = (v & (MAC_L3L4CR_RES_WR_MASK_17)) | (((0) & (MAC_L3L4CR_MASK_17)) << 17);\
 		v = (v & (MAC_L3L4CR_RES_WR_MASK_1)) | (((0) & (MAC_L3L4CR_MASK_1)) << 1);\
@@ -33966,6 +34017,8 @@
 #define MAC_L3L4CR_L3PEN0_UDFWR(i, data) do {\
 		ULONG v;\
 		MAC_L3L4CR_RGRD(i, v);\
+		v = (v & (MAC_L3L4CR_RES_WR_MASK_29)) | (((0) & (MAC_L3L4CR_MASK_29)) << 29); \
+		v = (v & (MAC_L3L4CR_RES_WR_MASK_26)) | (((0) & (MAC_L3L4CR_MASK_26)) << 26); \
 		v = (v & (MAC_L3L4CR_RES_WR_MASK_22)) | (((0) & (MAC_L3L4CR_MASK_22)) << 22);\
 		v = (v & (MAC_L3L4CR_RES_WR_MASK_17)) | (((0) & (MAC_L3L4CR_MASK_17)) << 17);\
 		v = (v & (MAC_L3L4CR_RES_WR_MASK_1)) | (((0) & (MAC_L3L4CR_MASK_1)) << 1);\
