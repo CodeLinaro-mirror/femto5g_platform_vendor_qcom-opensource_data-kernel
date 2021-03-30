@@ -58,8 +58,8 @@ static void DWC_ETH_QOS_ipa_ready_cb(void *user_data);
 static int DWC_ETH_QOS_ipa_uc_ready(struct DWC_ETH_QOS_prv_data *pdata);
 static void DWC_ETH_QOS_ipa_uc_ready_cb(void *user_data);
 
-static int DWC_ETH_QOS_ipa_offload_resume(struct DWC_ETH_QOS_prv_data *pdata);
-static int DWC_ETH_QOS_ipa_offload_suspend(struct DWC_ETH_QOS_prv_data *pdata);
+static int DWC_ETH_QOS_ipa_offload_resume(struct DWC_ETH_QOS_prv_data *pdata, bool user_resume);
+static int DWC_ETH_QOS_ipa_offload_suspend(struct DWC_ETH_QOS_prv_data *pdata, bool user_suspend);
 static int DWC_ETH_QOS_enable_ipa_offload(struct DWC_ETH_QOS_prv_data *pdata);
 static int DWC_ETH_QOS_disable_ipa_offload(struct DWC_ETH_QOS_prv_data *pdata);
 
@@ -134,7 +134,7 @@ void DWC_ETH_QOS_ipa_offload_event_handler(
 					|| !pdata->prv_ipa.ipa_offload_conn)
 				break;
 
-			if (!DWC_ETH_QOS_ipa_offload_suspend(pdata))
+			if (!DWC_ETH_QOS_ipa_offload_suspend(pdata, false))
 				pdata->prv_ipa.ipa_offload_link_down = true;
 		}
 		break;
@@ -147,7 +147,7 @@ void DWC_ETH_QOS_ipa_offload_event_handler(
 
 			/* Link up event is expected only after link down */
 			if (pdata->prv_ipa.ipa_offload_link_down) {
-				DWC_ETH_QOS_ipa_offload_resume(pdata);
+				DWC_ETH_QOS_ipa_offload_resume(pdata, false);
 			}
 			/* This link up is expected only after boot up with cable disconnected */
 			/* FIX ME for back to back link up events */
@@ -219,7 +219,7 @@ void DWC_ETH_QOS_ipa_offload_event_handler(
 	case EV_USR_SUSPEND:
 		{
 			if(!pdata->prv_ipa.ipa_offload_susp && !pdata->prv_ipa.ipa_offload_link_down)
-				if(!DWC_ETH_QOS_ipa_offload_suspend(pdata))
+				if(!DWC_ETH_QOS_ipa_offload_suspend(pdata, true))
 					pdata->prv_ipa.ipa_offload_susp = true;
 		}
 		break;
@@ -227,7 +227,7 @@ void DWC_ETH_QOS_ipa_offload_event_handler(
 		{
 			if(pdata->prv_ipa.ipa_offload_susp) {
 				if (DWC_ETH_QOS_is_phy_link_up(pdata)) {
-					if(!DWC_ETH_QOS_ipa_offload_resume(pdata))
+					if(!DWC_ETH_QOS_ipa_offload_resume(pdata, false))
 						pdata->prv_ipa.ipa_offload_susp = false;
 				} else {
 					/* Reset flag here to allow connection of pipes on next PHY link up */
@@ -242,7 +242,7 @@ void DWC_ETH_QOS_ipa_offload_event_handler(
 	case EV_USR_RESUME:
 		{
 			if(pdata->prv_ipa.ipa_offload_susp) {
-				if(!DWC_ETH_QOS_ipa_offload_resume(pdata))
+				if(!DWC_ETH_QOS_ipa_offload_resume(pdata, true))
 					pdata->prv_ipa.ipa_offload_susp = false;
 			}
 		}
@@ -333,7 +333,7 @@ int DWC_ETH_QOS_disable_ipa_offload(struct DWC_ETH_QOS_prv_data *pdata)
 	/* De-configure IPA Related Stuff */
 	/* Not user requested suspend, do not set ipa_offload_susp */
 	if (!pdata->prv_ipa.ipa_offload_susp && pdata->prv_ipa.ipa_offload_conn) {
-		ret = DWC_ETH_QOS_ipa_offload_suspend(pdata);
+		ret = DWC_ETH_QOS_ipa_offload_suspend(pdata, false);
 		if (ret) {
 			EMACERR("IPA Suspend Failed, err:%d\n", ret);
 			return ret;
@@ -416,7 +416,7 @@ int DWC_ETH_QOS_disable_enable_ipa_offload(struct DWC_ETH_QOS_prv_data *pdata, i
  * IN: @pdata: NTN dirver private structure.
  * OUT: 0 on success and -1 on failure
  */
-static int DWC_ETH_QOS_ipa_offload_suspend(struct DWC_ETH_QOS_prv_data *pdata)
+static int DWC_ETH_QOS_ipa_offload_suspend(struct DWC_ETH_QOS_prv_data *pdata, bool user_suspend)
 {
 	int ret = Y_SUCCESS;
 	struct hw_if_struct *hw_if = &(pdata->hw_if);
@@ -457,7 +457,7 @@ static int DWC_ETH_QOS_ipa_offload_suspend(struct DWC_ETH_QOS_prv_data *pdata)
 					ret);
 	}
 
-	if (pdata->prv_ipa.ipa_offload_init) {
+	if (pdata->prv_ipa.ipa_offload_init  && !user_suspend) {
 		ret = DWC_ETH_QOS_ipa_offload_cleanup(pdata);
 		if (ret) {
 			EMACERR("IPA Offload Cleanup Failed, err: %d\n", ret);
@@ -477,7 +477,7 @@ static int DWC_ETH_QOS_ipa_offload_suspend(struct DWC_ETH_QOS_prv_data *pdata)
  * IN: @pdata: NTN dirver private structure.
  * OUT: 0 on success and -1 on failure
  */
-static int DWC_ETH_QOS_ipa_offload_resume(struct DWC_ETH_QOS_prv_data *pdata)
+static int DWC_ETH_QOS_ipa_offload_resume(struct DWC_ETH_QOS_prv_data *pdata, bool user_resume)
 {
 	struct hw_if_struct *hw_if = &(pdata->hw_if);
 	int ret = Y_SUCCESS;
@@ -501,11 +501,13 @@ static int DWC_ETH_QOS_ipa_offload_resume(struct DWC_ETH_QOS_prv_data *pdata)
 	hw_if->rx_desc_init(pdata, IPA_DMA_RX_CH);
 
 	EMACDBG("DWC_ETH_QOS_ipa_offload_connect\n");
-	ret = DWC_ETH_QOS_ipa_offload_connect(pdata);
-	if (ret != Y_SUCCESS)
-		return ret;
-	else
-		pdata->prv_ipa.ipa_offload_conn = true;
+	if (!user_resume) {
+		ret = DWC_ETH_QOS_ipa_offload_connect(pdata);
+		if (ret != Y_SUCCESS)
+			return ret;
+		else
+			pdata->prv_ipa.ipa_offload_conn = true;
+	}
 
 	profile.max_supported_bw_mbps = pdata->speed;
 	profile.client = IPA_CLIENT_ETHERNET_CONS;
