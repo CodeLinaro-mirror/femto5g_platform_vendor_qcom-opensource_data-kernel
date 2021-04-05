@@ -1491,51 +1491,64 @@ static ssize_t read_ntn_dma_stats(struct file *file,
 	return ret_cnt;
 }
 
-static ssize_t read_ipa_offload_status(struct file *file,
-	char __user *user_buf, size_t count, loff_t *ppos)
+static ssize_t read_ipa_offload_status(struct device *dev,
+				       struct device_attribute *attr,
+				       char *user_buf)
 {
-	unsigned int len = 0, buf_len = NTN_IPA_DBG_MAX_MSG_LEN;
-	struct DWC_ETH_QOS_prv_data *pdata = file->private_data;
+	#define BUFF_SZ 256
+	struct net_device *netdev = to_net_dev(dev);
+
+	if (!netdev)
+		return -EINVAL;
+
+	struct DWC_ETH_QOS_prv_data *pdata = netdev_priv(netdev);
+
+	if (!pdata) {
+		EMACERR("netdev: 0x%p pdata: 0x%p\n");
+		return -EINVAL;
+	}
 
 	if (DWC_ETH_QOS_is_phy_link_up(pdata)) {
 		if (pdata->prv_ipa.ipa_offload_susp)
-			len += scnprintf(buf + len, buf_len - len, "IPA Offload suspended\n");
+			return snprintf(user_buf, BUFF_SZ, "IPA Offload suspended");
 		else
-			len += scnprintf(buf + len, buf_len - len, "IPA Offload enabled\n");
-	} else {
-		len += scnprintf(buf + len, buf_len - len, "Cannot read status, No PHY link\n");
+			return snprintf(user_buf, BUFF_SZ, "IPA Offload enabled");
 	}
 
-	if (len > buf_len)
-		len = buf_len;
-
-	return simple_read_from_buffer(user_buf, count, ppos, buf, len);
+	return snprintf(user_buf, BUFF_SZ, "Cannot read status, No PHY link");
 }
 
-static ssize_t suspend_resume_ipa_offload(struct file *file,
-	const char __user *user_buf, size_t count, loff_t *ppos)
+#define SUSPEND_ETH_IPA_OFFLOAD 1
+#define RESUME_ETH_IPA_OFFLOAD 0
+
+static ssize_t suspend_resume_ipa_offload(struct device *dev,
+					  struct device_attribute *attr,
+					  const char *user_buf, size_t count)
 {
-	s8 option = 0;
-	char in_buf[2];
-	unsigned long ret;
-	struct DWC_ETH_QOS_prv_data *pdata = file->private_data;
+	struct net_device *netdev = to_net_dev(dev);
 
-	if (sizeof(in_buf) < 2)
-		return -EFAULT;
+	if (!netdev)
+	    return -EINVAL;
 
-	ret = copy_from_user(in_buf, user_buf, 1);
-	if (ret)
-		return -EFAULT;
+	struct DWC_ETH_QOS_prv_data *pdata = netdev_priv(netdev);
+	s8 input = 0;
 
-	in_buf[1] = '\0';
-	if (kstrtos8(in_buf, 0, &option))
+	if (!pdata) {
+		EMACERR("netdev: 0x%p pdata: 0x%p\n");
+		return -EINVAL;
+	}
+
+	if (kstrtos8(user_buf, 0, &input))
 		return -EFAULT;
 
 	if (DWC_ETH_QOS_is_phy_link_up(pdata)) {
-		if (option == 1) DWC_ETH_QOS_ipa_offload_event_handler(pdata, EV_USR_SUSPEND);
-		else if (option == 0) DWC_ETH_QOS_ipa_offload_event_handler(pdata, EV_USR_RESUME);
+		if (input == SUSPEND_ETH_IPA_OFFLOAD)
+			DWC_ETH_QOS_ipa_offload_event_handler(pdata, EV_USR_SUSPEND);
+		else if (input == RESUME_ETH_IPA_OFFLOAD)
+			DWC_ETH_QOS_ipa_offload_event_handler(pdata, EV_USR_RESUME);
 	} else {
 		EMACERR("Operation not permitted, No PHY link");
+		return -EINVAL;
 	}
 
 	return count;
@@ -1556,13 +1569,9 @@ static const struct file_operations fops_ntn_dma_stats = {
 	.llseek = default_llseek,
 };
 
-static const struct file_operations fops_ntn_ipa_offload_en = {
-	.read = read_ipa_offload_status,
-	.write = suspend_resume_ipa_offload,
-	.open = simple_open,
-	.owner = THIS_MODULE,
-	.llseek = default_llseek,
-};
+static DEVICE_ATTR(suspend_ipa_offload, S_IWUSR | S_IRUGO,
+		   read_ipa_offload_status, suspend_resume_ipa_offload);
+
 /**
  * DWC_ETH_QOS_ipa_create_debugfs() - Called from NTN driver to create debugfs node
  * for offload data path debugging.
@@ -1573,6 +1582,15 @@ static const struct file_operations fops_ntn_ipa_offload_en = {
 int DWC_ETH_QOS_ipa_create_debugfs(struct DWC_ETH_QOS_prv_data *pdata)
 {
 	struct DWC_ETH_QOS_prv_ipa_data *ntn_ipa = &pdata->prv_ipa;
+	struct net_device *netdev = platform_get_drvdata(pdata->pdev);
+	int ret;
+
+	ret = sysfs_create_file(&netdev->dev.kobj,
+				&dev_attr_suspend_ipa_offload.attr);
+	if (ret) {
+		EMACERR("unable to create suspend_ipa_offload sysfs node\n");
+		goto fail;
+	}
 
 	if(!pdata || !pdata->debugfs_dir) {
 		EMACERR( "Null Param %s \n", __func__);
@@ -1597,15 +1615,7 @@ int DWC_ETH_QOS_ipa_create_debugfs(struct DWC_ETH_QOS_prv_data *pdata)
 		goto fail;
 	}
 
-	ntn_ipa->debugfs_suspend_ipa_offload =
-		debugfs_create_file("suspend_ipa_offload", (S_IRUSR|S_IWUSR),
-				pdata->debugfs_dir, pdata, &fops_ntn_ipa_offload_en);
-	if (!ntn_ipa->debugfs_suspend_ipa_offload
-		|| IS_ERR(ntn_ipa->debugfs_suspend_ipa_offload)) {
-		EMACERR( "Cannot create debugfs ipa_offload_en %d \n",
-				 (int)ntn_ipa->debugfs_suspend_ipa_offload);
-		goto fail;
-	}
+
 	return 0;
 
 fail:
@@ -1622,7 +1632,11 @@ fail:
  */
 int DWC_ETH_QOS_ipa_cleanup_debugfs(struct DWC_ETH_QOS_prv_data *pdata)
 {
-	struct DWC_ETH_QOS_prv_ipa_data *ntn_ipa= &pdata->prv_ipa;
+	struct DWC_ETH_QOS_prv_ipa_data *ntn_ipa = &pdata->prv_ipa;
+	struct net_device *netdev = platform_get_drvdata(pdata->pdev);
+
+	sysfs_remove_file(&netdev->dev.kobj,
+			  &dev_attr_suspend_ipa_offload.attr);
 
 	if(!pdata || !ntn_ipa) {
 		EMACERR("Null Param %s \n", __func__);
@@ -1639,11 +1653,6 @@ int DWC_ETH_QOS_ipa_cleanup_debugfs(struct DWC_ETH_QOS_prv_data *pdata)
 			debugfs_remove(ntn_ipa->debugfs_dma_stats);
 			ntn_ipa->debugfs_dma_stats = NULL;
 
-		}
-
-		if (ntn_ipa->debugfs_suspend_ipa_offload) {
-			debugfs_remove(ntn_ipa->debugfs_suspend_ipa_offload);
-			ntn_ipa->debugfs_suspend_ipa_offload = NULL;
 		}
 	}
 
