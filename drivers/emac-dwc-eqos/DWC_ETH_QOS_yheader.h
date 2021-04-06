@@ -1,4 +1,4 @@
-/* Copyright (c) 2017-2020, The Linux Foundation. All rights
+/* Copyright (c) 2017-2021, The Linux Foundation. All rights
  * reserved.
  *
  * This program is free software; you can redistribute it and/or modify
@@ -1667,6 +1667,28 @@ struct DWC_ETH_QOS_prv_ipa_data {
 	struct dentry *debugfs_suspend_ipa_offload;
 };
 
+struct l4_filter_info {
+	uint8_t l4_proto_number;
+	u16 src_port;
+	u16 dest_port;
+};
+
+struct l3_l4_ipv4_filter {
+	u32 src_addr;
+	uint8_t src_addr_mask;
+	u32 dest_addr;
+	uint8_t dest_addr_mask;
+	struct l4_filter_info l4_filter;
+};
+
+struct l3_l4_ipv6_filter {
+	bool src_or_dest_ip;
+	unsigned char src_or_dest_addr[16];
+	unsigned char src_or_dest_addr_mask;
+	struct l4_filter_info l4_filter;
+};
+
+
 struct DWC_ETH_QOS_prv_data {
 	struct net_device *dev;
 	struct platform_device *pdev;
@@ -1944,6 +1966,10 @@ struct DWC_ETH_QOS_prv_data {
 	struct delayed_work tdu_rec;
 	bool tdu_scheduled;
 	int tdu_chan;
+
+	/* L3/L4 filter parameters */
+	int num_l3_l4_filters;
+	int l3_l4_filters_limit;
 };
 
 struct ip_params {

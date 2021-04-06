@@ -1,4 +1,4 @@
-/* Copyright (c) 2017-2019, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2017-2019, 2021 The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -62,6 +62,8 @@ extern wait_queue_head_t avb_class_b_msg_wq;
 
 #include "DWC_ETH_QOS_yregacc.h"
 #define DEFAULT_START_TIME 0x1900
+
+#define L3_L4_Rx_Filter_Chan_Num 2
 
 static INT DWC_ETH_QOS_GSTATUS;
 
@@ -1079,6 +1081,7 @@ void DWC_ETH_QOS_get_all_hw_features(struct DWC_ETH_QOS_prv_data *pdata)
 	unsigned int VARMAC_HFR0;
 	unsigned int VARMAC_HFR1;
 	unsigned int VARMAC_HFR2;
+	unsigned int max_filters;
 
 	DBGPR("-->DWC_ETH_QOS_get_all_hw_features\n");
 
@@ -1150,6 +1153,11 @@ void DWC_ETH_QOS_get_all_hw_features(struct DWC_ETH_QOS_prv_data *pdata)
 	    ((VARMAC_HFR2 >> 24) & MAC_HFR2_PPSOUTNUM_MASK);
 	pdata->hw_feat.aux_snap_num =
 	    ((VARMAC_HFR2 >> 28) & MAC_HFR2_AUXSNAPNUM_MASK);
+
+	pdata->num_l3_l4_filters = 0;
+
+	MAC_HFR1_L3L4FILTERNUM_UDFRD(max_filters);
+	pdata->l3_l4_filters_limit = max_filters;
 
 	DBGPR("<--DWC_ETH_QOS_get_all_hw_features\n");
 }
@@ -3933,7 +3941,7 @@ static int DWC_ETH_QOS_clean_rx_irq(struct DWC_ETH_QOS_prv_data *pdata,
 						   buffer = GET_RX_BUF_PTR(qinx, desc_data->cur_rx);
 						   dma_unmap_single(GET_MEM_PDEV_DEV, buffer->dma, pdata->rx_buffer_len, DMA_FROM_DEVICE);
 						   buffer->dma = 0;
-						}
+					}
 					}
 				}
 
@@ -6218,6 +6226,288 @@ static int DWC_ETH_QOS_handle_prv_ioctl_ipa(struct DWC_ETH_QOS_prv_data *pdata,
 		return ret;
 }
 
+
+check_l4_proto_info(struct l4_filter_info  *l4_filter)
+{
+	if (l4_filter->l4_proto_number != IPPROTO_UDP &&
+	    (l4_filter->l4_proto_number != IPPROTO_TCP))
+		return false;
+
+	if (l4_filter->src_port != 0)
+		return true;
+
+	if (l4_filter->dest_port != 0)
+		return true;
+
+	return false;
+}
+
+bool is_ipv4_filter_valid(struct l3_l4_ipv4_filter *filter)
+{
+	if ((filter->src_addr != 0) && (filter->src_addr_mask >= 32))
+		return false;
+
+	if ((filter->dest_addr != 0) && (filter->dest_addr_mask >= 32))
+		return false;
+
+	return
+		check_l4_proto_info(&filter->l4_filter);
+
+}
+
+
+bool is_ipv6_addr_valid(struct l3_l4_ipv6_filter *filter)
+{
+	bool check = false;
+	int i;
+
+	for (i = 0; i < 16; i++) {
+		if (filter->src_or_dest_addr != 0)
+			check = true;
+	}
+
+	if ((check) && (filter->src_or_dest_addr_mask < 128))
+		return true;
+
+	return false;
+}
+
+bool is_ipv6_filter_valid(struct l3_l4_ipv6_filter *filter)
+{
+	bool check;
+
+	check = is_ipv6_addr_valid(filter);
+
+	if (!check)
+		return check_l4_proto_info(&filter->l4_filter);
+
+	return check;
+}
+
+
+void program_l4_filter(struct l4_filter_info *filter, int cur_filter_num)
+{
+
+	if ((filter->src_port) || (filter->dest_port)) {
+
+		/* program L4 protocol */
+		if (filter->l4_proto_number == IPPROTO_TCP)
+			MAC_L3L4CR_L4PEN0_UDFWR(cur_filter_num, 0x0);
+		else if (filter->l4_proto_number == IPPROTO_UDP)
+			MAC_L3L4CR_L4PEN0_UDFWR(cur_filter_num, 0x1);
+	}
+
+	if (filter->src_port) {
+
+		/* enable L4 src port */
+		MAC_L3L4CR_L4SPM0_UDFWR(cur_filter_num, true);
+
+		/* write L4 src port */
+		MAC_L4AR_L4SP0_UDFWR(cur_filter_num, filter->src_port);
+	}
+
+	if (filter->dest_port) {
+
+		/* enable L4 dest port */
+		MAC_L3L4CR_L4DPM0_UDFWR(cur_filter_num, true);
+
+		/* write L4 dest port */
+		MAC_L4AR_L4DP0_UDFWR(cur_filter_num, filter->dest_port);
+	}
+
+}
+
+static int DWC_ETH_QOS_handle_prv_ioctl_filter_ipv4(struct DWC_ETH_QOS_prv_data *pdata,
+						    struct ifreq *ifr)
+{
+	struct l3_l4_ipv4_filter *filter;
+	int ret = 0;
+	unsigned long missing;
+	int cur_filter_num;
+
+	DBGPR("-->DWC_ETH_QOS_handle_prv_ioctl_filter_ipv4\n");
+
+	if ( !ifr || !ifr->ifr_ifru.ifru_data  )
+		return -EINVAL;
+
+	if (pdata->num_l3_l4_filters == pdata->l3_l4_filters_limit) {
+		EMACERR("no more L3/L4 filters can be added \n");
+		return -EOPNOTSUPP;
+	}
+
+	filter = kzalloc(sizeof(struct l3_l4_ipv4_filter), GFP_KERNEL);
+	if (!filter)
+		return -ENOMEM;
+
+	missing = copy_from_user(filter, ifr->ifr_ifru.ifru_data,
+				 sizeof(struct l3_l4_ipv4_filter));
+	if (missing)
+		return -EFAULT;
+
+	if (!is_ipv4_filter_valid(filter))
+		return -EOPNOTSUPP;
+
+	if (!pdata->num_l3_l4_filters) {
+
+		/* installing first filter */
+
+		/* enable dynamic mapping */
+		MTL_RQDCM0R_RXQ0DADMACH_UDFWR(0x1);
+
+		/* Enable L3/L4 filtering */
+		MAC_MPFR_IPFE_UDFWR(0x1);
+		MAC_MPFR_RA_UDFWR(0x1);
+	}
+
+	pdata->num_l3_l4_filters++;
+	cur_filter_num = pdata->num_l3_l4_filters - 1;
+
+	/* Enable DMA channel mapping */
+	MAC_L3L4CR_DMCHEN_UDFWR(cur_filter_num, true);
+
+	/* Write DMA channel number for matched filter */
+	MAC_L3L4CR_DMCHN_UDFWR(cur_filter_num, L3_L4_Rx_Filter_Chan_Num);
+
+	if ((filter->src_addr) || (filter->dest_addr))
+		/* enable L3 protocol */
+		MAC_L3L4CR_L3PEN0_UDFWR(cur_filter_num, 0x0);
+
+	if (filter->src_addr) {
+
+		/* enable L3 src addr */
+		MAC_L3L4CR_L3SAM0_UDFWR(cur_filter_num, true);
+
+		/* write L3 src mask */
+		MAC_L3L4CR_L3HSBM0_UDFWR(cur_filter_num, filter->src_addr_mask);
+
+		/* write L3 src addr */
+		MAC_L3A0R_L3A00_UDFWR(cur_filter_num, filter->src_addr);
+	}
+
+	if (filter->dest_addr) {
+
+                /* enable L3 dest addr */
+		MAC_L3L4CR_L3DAM0_UDFWR(cur_filter_num, true);
+
+		/* write L3 dest mask */
+		MAC_L3L4CR_L3HDBM0_UDFWR(cur_filter_num,
+					 filter->dest_addr_mask);
+
+		/* write L3 dest addr */
+		MAC_L3A1R_L3A10_UDFWR(cur_filter_num,
+				      filter->dest_addr);
+	}
+
+	program_l4_filter(&filter->l4_filter, cur_filter_num);
+
+	return ret;
+
+}
+
+
+static int DWC_ETH_QOS_handle_prv_ioctl_filter_ipv6(struct DWC_ETH_QOS_prv_data *pdata,
+						    struct ifreq *ifr)
+{
+	struct l3_l4_ipv6_filter *filter;
+	int ret = 0;
+	unsigned long missing;
+	int cur_filter_num;
+	int dma_chan_num;
+
+	DBGPR("-->DWC_ETH_QOS_handle_prv_ioctl_filter_ipv6\n");
+
+	if (!ifr || !ifr->ifr_ifru.ifru_data)
+		return -EINVAL;
+
+	if (pdata->num_l3_l4_filters == pdata->l3_l4_filters_limit) {
+		EMACERR("no more L3/L4 filters can be added \n");
+		return -EOPNOTSUPP;
+	}
+
+	filter = kzalloc(sizeof(struct l3_l4_ipv6_filter), GFP_KERNEL);
+	if (!filter)
+		return -ENOMEM;
+
+
+	missing = copy_from_user(filter, ifr->ifr_ifru.ifru_data,
+				 sizeof(struct l3_l4_ipv6_filter));
+	if (missing)
+		return -EFAULT;
+
+	if (!is_ipv6_filter_valid(filter))
+		return -EOPNOTSUPP;
+
+	if (!pdata->num_l3_l4_filters) {
+
+		/* installing first filter */
+
+		/* enable dynamic mapping */
+		MTL_RQDCM0R_RXQ0DADMACH_UDFWR(0x1);
+
+		/* Enable L3/L4 filtering */
+		MAC_MPFR_IPFE_UDFWR(0x1);
+		MAC_MPFR_RA_UDFWR(0x1);
+	}
+
+	pdata->num_l3_l4_filters++;
+	cur_filter_num = pdata->num_l3_l4_filters - 1;
+
+	/* Enable DMA channel mapping */
+	MAC_L3L4CR_DMCHEN_UDFWR(cur_filter_num, true);
+
+	dma_chan_num = 2;
+	/* Write DMA channel number for matched filter */
+	MAC_L3L4CR_DMCHN_UDFWR(cur_filter_num, dma_chan_num);
+
+	if (is_ipv6_addr_valid(filter)) {
+
+		/* enable L3 protocol */
+		MAC_L3L4CR_L3PEN0_UDFWR(cur_filter_num, 0x1);
+
+		if (filter->src_or_dest_ip)
+			/* enable L3 src addr */
+			MAC_L3L4CR_L3SAM0_UDFWR(cur_filter_num, true);
+		else
+			/* enable L3 dest addr */
+			MAC_L3L4CR_L3DAM0_UDFWR(cur_filter_num, true);
+
+		/* write L3 mask */
+		MAC_L3L4CR_L3HSBM0_UDFWR(cur_filter_num, filter->src_or_dest_addr_mask & 0x1f);
+
+		/* continue writing L3 mask */
+		MAC_L3L4CR_L3HDBM0_UDFWR(cur_filter_num, (filter->src_or_dest_addr_mask & 0x60) >> 5);
+
+		/* write L3 addr */
+		MAC_L3A3R_L3A30_UDFWR(cur_filter_num,
+				      filter->src_or_dest_addr[0] << 24 |
+				      filter->src_or_dest_addr[1] << 16 |
+				      filter->src_or_dest_addr[2] << 8 |
+				      filter->src_or_dest_addr[3]);
+		MAC_L3A2R_L3A20_UDFWR(cur_filter_num,
+				      filter->src_or_dest_addr[4] << 24 |
+				      filter->src_or_dest_addr[5] << 16 |
+				      filter->src_or_dest_addr[6] << 8 |
+				      filter->src_or_dest_addr[7]);
+		MAC_L3A1R_L3A10_UDFWR(cur_filter_num,
+				      filter->src_or_dest_addr[8] << 24 |
+				      filter->src_or_dest_addr[9] << 16 |
+				      filter->src_or_dest_addr[10] << 8 |
+				      filter->src_or_dest_addr[11]);
+
+		MAC_L3A0R_L3A00_UDFWR(cur_filter_num,
+				      filter->src_or_dest_addr[12] << 24 |
+				      filter->src_or_dest_addr[13] << 16 |
+				      filter->src_or_dest_addr[14] << 8 |
+				      filter->src_or_dest_addr[15]);
+
+	}
+
+	program_l4_filter(&filter->l4_filter, cur_filter_num);
+
+	return ret;
+}
+
+
 /*!
  * \brief Driver IOCTL routine
  *
@@ -6301,6 +6591,16 @@ static int DWC_ETH_QOS_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 		}
 		ret = DWC_ETH_QOS_handle_prv_ioctl_ipa(pdata, ifr);
         break;
+
+	case DWC_ETH_QOS_PRV_IOCTL_L3_FILTER_IPv4:
+
+		ret = DWC_ETH_QOS_handle_prv_ioctl_filter_ipv4(pdata, ifr);
+		break;
+
+	case DWC_ETH_QOS_PRV_IOCTL_L3_FILTER_IPv6:
+
+		ret = DWC_ETH_QOS_handle_prv_ioctl_filter_ipv6(pdata, ifr);
+		break;
 
 	case SIOCSHWTSTAMP:
 		ret = DWC_ETH_QOS_handle_hwtstamp_ioctl(pdata, ifr);
