@@ -1,4 +1,4 @@
-/* Copyright (c) 2017-2019, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2017-2019, 2021, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -55,6 +55,9 @@
 /* Private IOCTL for handling device specific task */
 #define DWC_ETH_QOS_PRV_IOCTL	SIOCDEVPRIVATE
 #define DWC_ETH_QOS_PRV_IOCTL_IPA	SIOCDEVPRIVATE+1
+#define DWC_ETH_QOS_PRV_IOCTL_L3_FILTER_IPv4	SIOCDEVPRIVATE+2
+#define DWC_ETH_QOS_PRV_IOCTL_L3_FILTER_IPv6	SIOCDEVPRIVATE+3
+
 /* IOCTL cmd to eMAC to register the RX/TX properties with VLAN hdr*/
 enum{
  DWC_ETH_QOS_IPA_VLAN_DISABLE_CMD= 0,
