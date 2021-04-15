@@ -2392,11 +2392,13 @@ static void __exit gsb_exit_module(void)
 
 	if (pgsb_ctx->is_wake_src_acquired)
 	{
-		__pm_relax(&pgsb_ctx->gsb_wake_src);
-	}
 #ifdef ISKERNEL5_4
-	wakeup_source_destroy(&pgsb_ctx->gsb_wake_src);
+		wakeup_source_destroy(&pgsb_ctx->gsb_wake_src);
 #else
+		__pm_relax(&pgsb_ctx->gsb_wake_src);
+#endif
+	}
+#ifndef ISKERNEL5_4
 	wakeup_source_trash(&pgsb_ctx->gsb_wake_src);
 #endif
 
