@@ -1664,7 +1664,6 @@ struct DWC_ETH_QOS_prv_ipa_data {
 
 	struct dentry *debugfs_ipa_stats;
 	struct dentry *debugfs_dma_stats;
-	struct dentry *debugfs_suspend_ipa_offload;
 };
 
 struct l4_filter_info {
