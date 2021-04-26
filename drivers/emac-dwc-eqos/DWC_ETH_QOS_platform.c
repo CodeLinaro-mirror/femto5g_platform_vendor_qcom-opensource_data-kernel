@@ -2131,16 +2131,14 @@ static int emac_emb_smmu_cb_probe(struct platform_device *pdev)
 			goto err_smmu_probe;
 		}
 		EMACDBG("SMMU atomic set\n");
-		if (dwc_eth_qos_res_data.emac_hw_version_type != EMAC_HW_v2_3_1) {
-			if (iommu_domain_set_attr(emac_emb_smmu_ctx.mapping->domain,
+		if (iommu_domain_set_attr(emac_emb_smmu_ctx.mapping->domain,
 					DOMAIN_ATTR_FAST,
 					&fast)) {
-				EMACERR("Couldn't set FAST SMMU\n");
-				result = -EIO;
-				goto err_smmu_probe;
-			}
-			EMACDBG("SMMU fast map set\n");
+			EMACERR("Couldn't set FAST SMMU\n");
+			result = -EIO;
+			goto err_smmu_probe;
 		}
+		EMACDBG("SMMU fast map set\n");
 	}
 
 	result = arm_iommu_attach_device(&emac_emb_smmu_ctx.smmu_pdev->dev,
