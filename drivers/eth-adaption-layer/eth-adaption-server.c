@@ -132,7 +132,14 @@ static void eth_adaption_server_receive(struct kthread_work *work)
 	ETHADPTDBG(KERN_ALERT "kernel server_receive called\n");
 	buf = kzalloc(max_size, GFP_ATOMIC);
 	if (!buf)
+	{
+		if (atomic_read(&acquire_wakelock) == 1)
+		{
+			atomic_set(&acquire_wakelock, 0);
+			__pm_relax(eth_ws);
+		}
 		return;
+	}
 	if(!serv_sk.newsocket)
 		goto release;
 
@@ -172,6 +179,11 @@ static void eth_adaption_server_receive(struct kthread_work *work)
 	receive_allocfree_stat--;
 	recevied_data+=len;
 release:
+	if (atomic_read(&acquire_wakelock) == 1)
+	{
+		atomic_set(&acquire_wakelock, 0);
+		__pm_relax(eth_ws);
+	}
 kfree(buf);
 }
 
@@ -370,6 +382,12 @@ release:
 		kfree(server);
 	if(serverv6)
 		kfree(serverv6);
+
+	if (atomic_read(&acquire_wakelock) == 1)
+	{
+		atomic_set(&acquire_wakelock, 0);
+		__pm_relax(eth_ws);
+	}
 	return cn;
 }
 

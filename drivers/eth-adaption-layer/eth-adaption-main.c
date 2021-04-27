@@ -21,7 +21,8 @@
 #include <soc/qcom/qrtr_ethernet.h>
 #include <soc/qcom/sb_notification.h>
 #include <linux/eth_adapt_power.h>
-#include <linux/ioctl.h>
+#include <linux/suspend.h>
+#include <linux/pm_wakeup.h>
 
 /* Mutex lock */
 struct mutex eam_lock;
@@ -72,6 +73,10 @@ struct mutex power_state_lock;
 bool peer_gpio_toggled = 0;
 /* Power state lock */
 struct mutex gpio_toggle_lock;
+
+/* Wakelock for holding state till connection resumes*/
+struct wakeup_source *eth_ws;
+atomic_t acquire_wakelock;
 
 /* insmod parameters, currently hard coded. */
 int server = 1;
@@ -406,16 +411,16 @@ check_suspend:
 		goto check_suspend;
 	}
 
-	/**
-	* We are not expecting any QMI message on VT after suspend
-	* On VT resume should happen only via IOCTL
-	*/
 	if(power_state == EAM_POWER_STATE_SUSPENDED)
 	{
 		mutex_unlock(&power_state_lock);
 		ETHADPTDBG("%s state suspended, starting resume, peer_gpio_toggled: %d\n",
 					__func__, peer_gpio_toggled);
-		eth_adaption_handle_resume_ioctl();
+		if (atomic_read(&acquire_wakelock) == 1)
+		{
+			__pm_stay_awake(eth_ws);
+		}
+		eth_adaption_handle_resume();
 		goto check_suspend;
 	}
 	else
@@ -435,12 +440,12 @@ check_suspend:
 EXPORT_SYMBOL(eth_adaption_send);
 
 /**
-* eth_adaption_handle_resume_ioctl() - handler for mdm resume case scenario
+* eth_adaption_handle_resume() - handler for mdm resume case scenario
 * Return:int
 */
-int eth_adaption_handle_resume_ioctl()
+int eth_adaption_handle_resume()
 {
-	ETHADPTDBG("eth_adapt handle resume ioctl\n");
+	ETHADPTDBG("eth_adapt handle resume\n");
 	int ret = 0;
 
 	mutex_lock(&power_state_lock);
@@ -481,10 +486,10 @@ int eth_adaption_handle_resume_ioctl()
 }
 
 /**
-* eth_adaption_handle_suspend_ioctl() - handler for eap suspend case scenario
+* eth_adaption_handle_suspend() - handler for eap suspend case scenario
 * Return:int
 */
-int eth_adaption_handle_suspend_ioctl()
+int eth_adaption_handle_suspend()
 {
 	int ret = 0;
 
@@ -541,124 +546,39 @@ static inline void eth_adaption_unregister_netdevice_notifier(void)
 }
 
 /**
-* eth_adaption_power_management_ioctl() - handler for ioctl
-* scenarios Return:int
-*/
-static int eth_adaption_power_management_ioctl(struct file *filp,
-					 unsigned int cmd,unsigned long arg)
-{
-	int ret = 0;
-	if (server == 0)
-	{
-		switch (cmd)
-		{
-			case ETH_ADAPTION_IOC_MDM_SUSPEND:
-				ret = eth_adaption_handle_suspend_ioctl();
-				break;
-			case ETH_ADAPTION_IOC_MDM_RESUME:
-				/* No mutiple resumes back to back */
-				if(power_state != EAM_POWER_STATE_RESUMING && power_state != EAM_POWER_STATE_RUNNING)
-					ret = eth_adaption_handle_resume_ioctl();
-				else
-					ETHADPTERR("%s multiple resumes %d\n", __func__,cmd);
-				break;
-			default:
-				ETHADPTERR("%s unsupported ioctl for client %d\n", __func__,cmd);
-				break;
-		}
-	}
-	else
-	{
-		switch (cmd)
-		{
-			case ETH_ADAPTION_IOC_EAP_SUSPEND:
-				ret = eth_adaption_handle_suspend_ioctl();
-				break;
-			case ETH_ADAPTION_IOC_EAP_RESUME:
-				/* No mutiple resumes back to back */
-				if(power_state != EAM_POWER_STATE_RESUMING && power_state != EAM_POWER_STATE_RUNNING)
-					ret = eth_adaption_handle_resume_ioctl();
-				else
-					ETHADPTERR("%s multiple resumes %d\n", __func__,cmd);
-				break;
-			default:
-				ETHADPTERR("%s unsupported ioctl for server %d\n", __func__,cmd);
-				break;
-		}
-	}
-	module_put(THIS_MODULE);
-	return ret;
-}
-
-/* File operations for power management */
-const struct file_operations eth_adaption_power_management_ioctl_fops = {
-	.owner = THIS_MODULE,
-	.unlocked_ioctl = (long)eth_adaption_power_management_ioctl,
-};
-
-/**
-* eth_adaption_power_management_ioctl_init(): initializes ioctl for power management
-* @void
-* Return:int
-*/
-static int eth_adaption_power_management_ioctl_init(void)
-{
-	int ret;
-	struct device *dev;
-
-	ret = alloc_chrdev_region(&device, 0, dev_num, eth_adaption_drv_name);
-	if (ret)
-	{
-		ETHADPTERR("device_alloc err\n");
-		goto dev_alloc_err;
-	}
-
-	eth_adaption_class = class_create(THIS_MODULE, eth_adaption_drv_name);
-	if (IS_ERR(eth_adaption_class))
-	{
-		ETHADPTERR("class_create err\n");
-		goto class_err;
-	}
-
-	dev = device_create(eth_adaption_class, NULL, device,
-						NULL, eth_adaption_drv_name);
-	if (IS_ERR(dev))
-	{
-		ETHADPTERR("device_create err\n");
-		goto device_err;
-	}
-
-	cdev_init(&eth_adaption_power_management_ioctl_cdev, &eth_adaption_power_management_ioctl_fops);
-	ret = cdev_add(&eth_adaption_power_management_ioctl_cdev, device, dev_num);
-	if (ret)
-	{
-		ETHADPTERR("cdev_add err\n");
-		goto cdev_add_err;
-	}
-
-	ETHADPTDBG("ioctl init OK!!\n");
-	return 0;
-
-cdev_add_err:
-	device_destroy(eth_adaption_class, device);
-device_err:
-	class_destroy(eth_adaption_class);
-class_err:
-	unregister_chrdev_region(device, dev_num);
-dev_alloc_err:
-	return -ENODEV;
-}
-
-/**
-* eth_adaption_power_management_ioctl_deinit(): deinitializes ioctl for power management
-* @void
+* eth_adaption_pm_notifier() - register for local link up and down evts.
+*
+* @void:
+*
 * Return:void
 */
-static void eth_adaption_power_management_ioctl_deinit(void)
+static int eth_adaption_pm_notifier(struct notifier_block *nb,
+					unsigned long event, void *unused)
 {
-	cdev_del(&eth_adaption_power_management_ioctl_cdev);
-	unregister_chrdev_region(device, dev_num);
+	switch (event)
+	{
+		case PM_SUSPEND_PREPARE:
+				mutex_lock(&power_state_lock);
+				if(power_state == EAM_POWER_STATE_RUNNING || power_state == EAM_POWER_STATE_RESUMING)
+				{
+					mutex_unlock(&power_state_lock);
+					eth_adaption_handle_suspend();
+					atomic_set(&acquire_wakelock, 1);
+				}
+				else
+				{
+					mutex_unlock(&power_state_lock);
+					ETHADPTERR("%s Ignoring system suspend \n", __func__);
+				}
+				break;
+	}
+	return NOTIFY_DONE;
 }
+
+static struct notifier_block eth_adaption_pm_nb = {
+	.notifier_call = eth_adaption_pm_notifier,
+	.priority = INT_MAX,
+};
 
 /**
 * eth_adaption_gpio_notifier_device_event(): handler function for gpio events
@@ -682,6 +602,20 @@ static int eth_adaption_gpio_notifier_device_event
 			mutex_lock(&gpio_toggle_lock);
 			peer_gpio_toggled = true;
 			mutex_unlock(&gpio_toggle_lock);
+			mutex_lock(&power_state_lock);
+			if(power_state == EAM_POWER_STATE_SUSPENDED)
+			{
+				mutex_unlock(&power_state_lock);
+				if (atomic_read(&acquire_wakelock) == 1)
+				{
+					__pm_stay_awake(eth_ws);
+				}
+				eth_adaption_handle_resume();
+			}
+			else
+			{
+				mutex_unlock(&power_state_lock);
+			}
 			break;
 	}
 	return NOTIFY_DONE;
@@ -759,7 +693,19 @@ static int __init eth_adaption_init(void)
 	eth_adaption_sb_register_listener();
 	eth_adaption_create_debugfs();
 	eth_adaption_gpio_register_listener();
-	eth_adaption_power_management_ioctl_init();
+
+	ret = register_pm_notifier(&eth_adaption_pm_nb);
+	if (ret)
+	{
+		ETHADPTERR(" %s register_pm_notifier failed %s\n",__func__,ret);
+	}
+
+	eth_ws = wakeup_source_register(NULL, "eth_ws");
+	if (!eth_ws)
+	{
+		ETHADPTERR(" %s wakeup_source_register failed \n",__func__);
+	}
+
 	mutex_init(&power_state_lock);
 	mutex_init(&gpio_toggle_lock);
 #ifdef CONFIG_MSM_BOOT_TIME_MARKER
@@ -790,13 +736,14 @@ static void __exit eth_adaption_exit(void)
 	eth_adaption_unregister_netdevice_notifier();
 	eth_adaption_sb_unregister_listener();
 	eth_adaption_gpio_unregister_listener();
-	eth_adaption_power_management_ioctl_deinit();
 	if(server)
 		eth_adaption_server_cleanup(true);
 	else
 		eth_adaption_client_cleanup(true);
 	mutex_destroy(&power_state_lock);
 	mutex_destroy(&gpio_toggle_lock);
+	wakeup_source_unregister(eth_ws);
+	unregister_pm_notifier(&eth_adaption_pm_nb);
 #ifdef CONFIG_MSM_BOOT_TIME_MARKER
 	place_marker("M - eth-adaption-layer eth_adapt_exit");
 #endif
