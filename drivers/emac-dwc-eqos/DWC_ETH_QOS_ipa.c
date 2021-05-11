@@ -70,7 +70,7 @@ static int DWC_ETH_QOS_ipa_offload_init(struct DWC_ETH_QOS_prv_data *pdata);
 static int DWC_ETH_QOS_ipa_offload_cleanup(struct DWC_ETH_QOS_prv_data *pdata);
 
 /* Connect Offload Data path */
-static int DWC_ETH_QOS_ipa_offload_connect(struct DWC_ETH_QOS_prv_data *pdata);
+static int DWC_ETH_QOS_ipa_offload_connect(struct DWC_ETH_QOS_prv_data *pdata, bool user_resume);
 
 /* Disconnect Offload Data path */
 static int DWC_ETH_QOS_ipa_offload_disconnect(struct DWC_ETH_QOS_prv_data *pdata);
@@ -276,7 +276,7 @@ int DWC_ETH_QOS_enable_ipa_offload(struct DWC_ETH_QOS_prv_data *pdata)
 	}
 
 	if (!pdata->prv_ipa.ipa_offload_conn && !pdata->prv_ipa.ipa_offload_susp) {
-		ret = DWC_ETH_QOS_ipa_offload_connect(pdata);
+		ret = DWC_ETH_QOS_ipa_offload_connect(pdata, false);
 		if (ret) {
 			EMACERR("IPA Offload Connect Failed \n");
 			pdata->prv_ipa.ipa_offload_conn = false;
@@ -485,7 +485,7 @@ static int DWC_ETH_QOS_ipa_offload_resume(struct DWC_ETH_QOS_prv_data *pdata, bo
 
 	EMACDBG("Enter\n");
 
-	if (!pdata->prv_ipa.ipa_offload_init) {
+	if (!pdata->prv_ipa.ipa_offload_init && !user_resume) {
 		ret = DWC_ETH_QOS_ipa_offload_init(pdata);
 		if (ret) {
 			pdata->prv_ipa.ipa_offload_init = false;
@@ -501,13 +501,11 @@ static int DWC_ETH_QOS_ipa_offload_resume(struct DWC_ETH_QOS_prv_data *pdata, bo
 	hw_if->rx_desc_init(pdata, IPA_DMA_RX_CH);
 
 	EMACDBG("DWC_ETH_QOS_ipa_offload_connect\n");
-	if (!user_resume) {
-		ret = DWC_ETH_QOS_ipa_offload_connect(pdata);
+	ret = DWC_ETH_QOS_ipa_offload_connect(pdata, user_resume);
 		if (ret != Y_SUCCESS)
 			return ret;
 		else
 			pdata->prv_ipa.ipa_offload_conn = true;
-	}
 
 	profile.max_supported_bw_mbps = pdata->speed;
 	profile.client = IPA_CLIENT_ETHERNET_CONS;
@@ -1001,7 +999,7 @@ int DWC_ETH_QOS_set_ul_dl_smmu_ipa_params(struct DWC_ETH_QOS_prv_data *pdata,
  * IN: @pdata: NTN private structure handle that will be passed by IPA.
  * OUT: 0 on success and -1 on failure
  */
-static int DWC_ETH_QOS_ipa_offload_connect(struct DWC_ETH_QOS_prv_data *pdata)
+static int DWC_ETH_QOS_ipa_offload_connect(struct DWC_ETH_QOS_prv_data *pdata, bool user_resume)
 {
 	struct DWC_ETH_QOS_prv_ipa_data *ntn_ipa = &pdata->prv_ipa;
 	struct ipa_uc_offload_conn_in_params in;
@@ -1160,8 +1158,12 @@ static int DWC_ETH_QOS_ipa_offload_connect(struct DWC_ETH_QOS_prv_data *pdata)
 		goto mem_free;
 	}
 
+	if (!user_resume) {
 	eth_ipa_send_msg(pdata, IPA_PERIPHERAL_CONNECT);
 	EMACDBG("IPA offload connect event sent\n");
+	}
+	else
+		EMACDBG("IPA offload connect event can't be sent due to user triggered event\n");
 
 mem_free:
 	if (rx_setup_info.data_buff_list) {
