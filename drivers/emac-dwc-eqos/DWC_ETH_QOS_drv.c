@@ -6230,19 +6230,26 @@ static int DWC_ETH_QOS_handle_prv_ioctl_ipa(struct DWC_ETH_QOS_prv_data *pdata,
 bool check_l4_proto_info(struct l4_filter_info  *l4_filter)
 {
 	if (l4_filter->l4_proto_number != IPPROTO_UDP &&
-	    l4_filter->l4_proto_number != IPPROTO_TCP)
+	    l4_filter->l4_proto_number != IPPROTO_TCP) {
+		EMACERR( "L4 protocol is neither UDP nor TCP\n");
 		return false;
+	}
 
+	EMACDBG("L4 protocol check passed\n");
 	return true;
 }
 
 bool is_ipv4_filter_valid(struct l3_l4_ipv4_filter *filter)
 {
-	if ((filter->src_addr != 0) && (filter->src_addr_mask >= 32))
+	if ((filter->src_addr != 0) && (filter->src_addr_mask >= 32)) {
+		EMACERR("ipv4 src addr mask is not correct\n");
 		return false;
+	}
 
-	if ((filter->dest_addr != 0) && (filter->dest_addr_mask >= 32))
+	if ((filter->dest_addr != 0) && (filter->dest_addr_mask >= 32)) {
+		EMACERR("ipv4 dest addr mask is not correct\n");
 		return false;
+	}
 
 	return
 		check_l4_proto_info(&filter->l4_filter);
@@ -6286,6 +6293,7 @@ void program_l4_filter(struct l4_filter_info *filter, int cur_filter_num)
 {
 
 	if ((filter->src_port) || (filter->dest_port)) {
+		EMACDBG("program L4 filter\n");
 
 		/* program L4 protocol */
 		if (filter->l4_proto_number == IPPROTO_TCP)
@@ -6295,6 +6303,7 @@ void program_l4_filter(struct l4_filter_info *filter, int cur_filter_num)
 	}
 
 	if (filter->src_port) {
+		EMACDBG("program L4 src port info\n");
 
 		/* enable L4 src port */
 		MAC_L3L4CR_L4SPM0_UDFWR(cur_filter_num, true);
@@ -6304,6 +6313,7 @@ void program_l4_filter(struct l4_filter_info *filter, int cur_filter_num)
 	}
 
 	if (filter->dest_port) {
+		EMACDBG("program L4 dest port info\n");
 
 		/* enable L4 dest port */
 		MAC_L3L4CR_L4DPM0_UDFWR(cur_filter_num, true);
@@ -6321,6 +6331,10 @@ static int DWC_ETH_QOS_handle_prv_ioctl_filter_ipv4(struct DWC_ETH_QOS_prv_data 
 	int ret = 0;
 	unsigned long missing;
 	int cur_filter_num;
+	char ipv4_src_str[24];
+	char ipv4_dest_str[24];
+
+	EMACDBG("entering ipv4 filter handler\n");
 
 	DBGPR("-->DWC_ETH_QOS_handle_prv_ioctl_filter_ipv4\n");
 
@@ -6328,25 +6342,43 @@ static int DWC_ETH_QOS_handle_prv_ioctl_filter_ipv4(struct DWC_ETH_QOS_prv_data 
 		return -EINVAL;
 
 	if (pdata->num_l3_l4_filters == pdata->l3_l4_filters_limit) {
-		EMACERR("no more L3/L4 filters can be added \n");
+		EMACERR("no more L3/L4 filters can be added\n");
 		return -EOPNOTSUPP;
 	}
 
 	filter = kzalloc(sizeof(struct l3_l4_ipv4_filter), GFP_KERNEL);
-	if (!filter)
+	if (!filter) {
+		EMACERR("cannot allocate ipv4 filter\n");
 		return -ENOMEM;
+	}
 
 	missing = copy_from_user(filter, ifr->ifr_ifru.ifru_data,
 				 sizeof(struct l3_l4_ipv4_filter));
-	if (missing)
+	if (missing) {
+		EMACERR("cannot copy ipv4 filter\n");
 		return -EFAULT;
+	}
 
-	if (!is_ipv4_filter_valid(filter))
+	snprintf(ipv4_src_str, sizeof(ipv4_src_str), "%pI4", &filter->src_addr);
+	snprintf(ipv4_dest_str, sizeof(ipv4_dest_str), "%pI4", &filter->dest_addr);
+
+	EMACDBG("ipv4 src address = %s\n", ipv4_src_str);
+	EMACDBG("ipv4 src addr mask = %d\n", filter->src_addr_mask);
+	EMACDBG("ipv4 dest address = %s\n", ipv4_dest_str);
+	EMACDBG("ipv4 dest addr mask = %d\n", filter->dest_addr_mask);
+	EMACDBG("ipv4 L4 protocol = %d\n", filter->l4_filter.l4_proto_number);
+	EMACDBG("ipv4 L4 src port = %d\n", filter->l4_filter.src_port);
+	EMACDBG("ipv4 L4 dest port = %d\n", filter->l4_filter.dest_port);
+
+	if (!is_ipv4_filter_valid(filter)) {
+		EMACERR("ipv4 filter is not valid\n");
 		return -EOPNOTSUPP;
+	}
 
 	if (!pdata->num_l3_l4_filters) {
 
 		/* installing first filter */
+		EMACDBG("installing first filter\n");
 
 		/* enable dynamic mapping */
 		MTL_RQDCM0R_RXQ0DADMACH_UDFWR(0x1);
@@ -6370,8 +6402,9 @@ static int DWC_ETH_QOS_handle_prv_ioctl_filter_ipv4(struct DWC_ETH_QOS_prv_data 
 		MAC_L3L4CR_L3PEN0_UDFWR(cur_filter_num, 0x0);
 
 	if (filter->src_addr) {
+		EMACDBG("programming ipv4 src addr\n");
 
-		/* enable L3 src addr */
+                /* enable L3 src addr */
 		MAC_L3L4CR_L3SAM0_UDFWR(cur_filter_num, true);
 
 		/* write L3 src mask */
@@ -6382,6 +6415,7 @@ static int DWC_ETH_QOS_handle_prv_ioctl_filter_ipv4(struct DWC_ETH_QOS_prv_data 
 	}
 
 	if (filter->dest_addr) {
+		EMACDBG("programming ipv4 dest addr\n");
 
                 /* enable L3 dest addr */
 		MAC_L3L4CR_L3DAM0_UDFWR(cur_filter_num, true);
@@ -6410,6 +6444,9 @@ static int DWC_ETH_QOS_handle_prv_ioctl_filter_ipv6(struct DWC_ETH_QOS_prv_data 
 	unsigned long missing;
 	int cur_filter_num;
 	int dma_chan_num;
+	char ipv6_str[64];
+
+	EMACDBG("entering ipv6 filter handler\n");
 
 	DBGPR("-->DWC_ETH_QOS_handle_prv_ioctl_filter_ipv6\n");
 
@@ -6422,21 +6459,28 @@ static int DWC_ETH_QOS_handle_prv_ioctl_filter_ipv6(struct DWC_ETH_QOS_prv_data 
 	}
 
 	filter = kzalloc(sizeof(struct l3_l4_ipv6_filter), GFP_KERNEL);
-	if (!filter)
+	if (!filter) {
+		EMACERR("cannot allocate ipv6 filter\n");
 		return -ENOMEM;
+	}
 
 
 	missing = copy_from_user(filter, ifr->ifr_ifru.ifru_data,
 				 sizeof(struct l3_l4_ipv6_filter));
-	if (missing)
+	if (missing) {
+		EMACERR("could not copy filter from user-space\n");
 		return -EFAULT;
+	}
 
-	if (!is_ipv6_filter_valid(filter))
+	if (!is_ipv6_filter_valid(filter)) {
+		EMACERR("ipv6 filter is not valid\n");
 		return -EOPNOTSUPP;
+	}
 
 	if (!pdata->num_l3_l4_filters) {
 
 		/* installing first filter */
+		EMACDBG("installing first filter\n");
 
 		/* enable dynamic mapping */
 		MTL_RQDCM0R_RXQ0DADMACH_UDFWR(0x1);
@@ -6455,7 +6499,18 @@ static int DWC_ETH_QOS_handle_prv_ioctl_filter_ipv6(struct DWC_ETH_QOS_prv_data 
 	/* Write DMA channel number for matched filter */
 	MAC_L3L4CR_DMCHN_UDFWR(cur_filter_num, L3_L4_Rx_Filter_Chan_Num);
 
+	snprintf(ipv6_str, sizeof(ipv6_str), "%pI6", filter->src_or_dest_addr);
+
+	EMACDBG("is src address = %d\n", filter->src_or_dest_ip);
+	EMACDBG("ipv6 ip addr = %s\n", ipv6_str);
+	EMACDBG("ipv6 mask = %d\n", filter->src_or_dest_addr_mask);
+	EMACDBG("ipv6 L4 protocol = %d\n", filter->l4_filter.l4_proto_number);
+	EMACDBG("ipv6 L4 src port = %d\n", filter->l4_filter.src_port);
+	EMACDBG("ipv6 L4 dest port = %d\n", filter->l4_filter.dest_port);
+
+
 	if (is_ipv6_addr_valid(filter)) {
+		EMACDBG("programming ipv6 address\n");
 
 		/* enable L3 protocol */
 		MAC_L3L4CR_L3PEN0_UDFWR(cur_filter_num, 0x1);
