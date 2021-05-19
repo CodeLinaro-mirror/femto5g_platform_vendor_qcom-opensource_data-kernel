@@ -6227,19 +6227,13 @@ static int DWC_ETH_QOS_handle_prv_ioctl_ipa(struct DWC_ETH_QOS_prv_data *pdata,
 }
 
 
-check_l4_proto_info(struct l4_filter_info  *l4_filter)
+bool check_l4_proto_info(struct l4_filter_info  *l4_filter)
 {
 	if (l4_filter->l4_proto_number != IPPROTO_UDP &&
-	    (l4_filter->l4_proto_number != IPPROTO_TCP))
+	    l4_filter->l4_proto_number != IPPROTO_TCP)
 		return false;
 
-	if (l4_filter->src_port != 0)
-		return true;
-
-	if (l4_filter->dest_port != 0)
-		return true;
-
-	return false;
+	return true;
 }
 
 bool is_ipv4_filter_valid(struct l3_l4_ipv4_filter *filter)
@@ -6262,14 +6256,17 @@ bool is_ipv6_addr_valid(struct l3_l4_ipv6_filter *filter)
 	int i;
 
 	for (i = 0; i < 16; i++) {
-		if (filter->src_or_dest_addr != 0)
+		if (filter->src_or_dest_addr[i] != 0) {
 			check = true;
+			break;
+		}
 	}
 
-	if ((check) && (filter->src_or_dest_addr_mask < 128))
-		return true;
+	if (check && filter->src_or_dest_addr_mask >= 128) {
+		return false;
+	}
 
-	return false;
+	return true;
 }
 
 bool is_ipv6_filter_valid(struct l3_l4_ipv6_filter *filter)
@@ -6278,7 +6275,7 @@ bool is_ipv6_filter_valid(struct l3_l4_ipv6_filter *filter)
 
 	check = is_ipv6_addr_valid(filter);
 
-	if (!check)
+	if (check)
 		return check_l4_proto_info(&filter->l4_filter);
 
 	return check;
@@ -6455,9 +6452,8 @@ static int DWC_ETH_QOS_handle_prv_ioctl_filter_ipv6(struct DWC_ETH_QOS_prv_data 
 	/* Enable DMA channel mapping */
 	MAC_L3L4CR_DMCHEN_UDFWR(cur_filter_num, true);
 
-	dma_chan_num = 2;
 	/* Write DMA channel number for matched filter */
-	MAC_L3L4CR_DMCHN_UDFWR(cur_filter_num, dma_chan_num);
+	MAC_L3L4CR_DMCHN_UDFWR(cur_filter_num, L3_L4_Rx_Filter_Chan_Num);
 
 	if (is_ipv6_addr_valid(filter)) {
 
