@@ -6227,7 +6227,7 @@ static int DWC_ETH_QOS_handle_prv_ioctl_ipa(struct DWC_ETH_QOS_prv_data *pdata,
 }
 
 
-bool check_l4_proto_info(struct l4_filter_info  *l4_filter)
+bool is_l4_proto_valid(struct l4_filter_info  *l4_filter, bool *no_port)
 {
 	if (l4_filter->l4_proto_number != IPPROTO_UDP &&
 	    l4_filter->l4_proto_number != IPPROTO_TCP) {
@@ -6235,57 +6235,85 @@ bool check_l4_proto_info(struct l4_filter_info  *l4_filter)
 		return false;
 	}
 
+	if (l4_filter->src_port == 0  && l4_filter->dest_port == 0)
+		*no_port = true;
+
 	EMACDBG("L4 protocol check passed\n");
 	return true;
 }
 
 bool is_ipv4_filter_valid(struct l3_l4_ipv4_filter *filter)
 {
-	if ((filter->src_addr != 0) && (filter->src_addr_mask >= 32)) {
+	bool no_l4_port = false;
+	bool no_ipv4_addr = false;
+	bool valid_filter;
+
+	valid_filter = is_l4_proto_valid(&filter->l4_filter, &no_l4_port);
+
+	if (!valid_filter)
+		return false;
+
+	if (filter->src_addr == 0 && filter->dest_addr == 0)
+		no_ipv4_addr = true;
+
+	if (no_l4_port && no_ipv4_addr) {
+		EMACERR("NULL filter is not allowed\n");
+		return false;
+	}
+
+	if (filter->src_addr != 0 && filter->src_addr_mask >= 32) {
 		EMACERR("ipv4 src addr mask is not correct\n");
 		return false;
 	}
 
-	if ((filter->dest_addr != 0) && (filter->dest_addr_mask >= 32)) {
+	if (filter->dest_addr != 0 && filter->dest_addr_mask >= 32) {
 		EMACERR("ipv4 dest addr mask is not correct\n");
-		return false;
-	}
-
-	return
-		check_l4_proto_info(&filter->l4_filter);
-
-}
-
-
-bool is_ipv6_addr_valid(struct l3_l4_ipv6_filter *filter)
-{
-	bool check = false;
-	int i;
-
-	for (i = 0; i < 16; i++) {
-		if (filter->src_or_dest_addr[i] != 0) {
-			check = true;
-			break;
-		}
-	}
-
-	if (check && filter->src_or_dest_addr_mask >= 128) {
 		return false;
 	}
 
 	return true;
 }
 
+
+bool is_ipv6_addr_valid(struct l3_l4_ipv6_filter *filter, bool *no_ipv6_addr)
+{
+	int i;
+
+	for (i = 0; i < 16; i++) {
+		if (filter->src_or_dest_addr[i] != 0) {
+			*no_ipv6_addr = false;
+			break;
+		}
+	}
+
+	if (*no_ipv6_addr == false && filter->src_or_dest_addr_mask >= 128)
+		return false;
+
+	return true;
+}
+
 bool is_ipv6_filter_valid(struct l3_l4_ipv6_filter *filter)
 {
-	bool check;
+	bool valid;
+	bool no_ipv6_addr = true;
+	bool no_l4_port = false;
 
-	check = is_ipv6_addr_valid(filter);
+	valid = is_ipv6_addr_valid(filter, &no_ipv6_addr);
 
-	if (check)
-		return check_l4_proto_info(&filter->l4_filter);
+	if (!valid)
+		return false;
 
-	return check;
+	valid = is_l4_proto_valid(&filter->l4_filter, &no_l4_port);
+
+	if (!valid)
+		return false;
+
+	if (no_ipv6_addr && no_l4_port) {
+		EMACERR("NULL filter is not allowed\n");
+		return false;
+	}
+
+	return true;
 }
 
 
@@ -6376,7 +6404,6 @@ static int DWC_ETH_QOS_handle_prv_ioctl_filter_ipv4(struct DWC_ETH_QOS_prv_data 
 	}
 
 	if (!pdata->num_l3_l4_filters) {
-
 		/* installing first filter */
 		EMACDBG("installing first filter\n");
 
@@ -6443,8 +6470,8 @@ static int DWC_ETH_QOS_handle_prv_ioctl_filter_ipv6(struct DWC_ETH_QOS_prv_data 
 	int ret = 0;
 	unsigned long missing;
 	int cur_filter_num;
-	int dma_chan_num;
 	char ipv6_str[64];
+	bool no_ipv6_addr = true;
 
 	EMACDBG("entering ipv6 filter handler\n");
 
@@ -6508,12 +6535,12 @@ static int DWC_ETH_QOS_handle_prv_ioctl_filter_ipv6(struct DWC_ETH_QOS_prv_data 
 	EMACDBG("ipv6 L4 src port = %d\n", filter->l4_filter.src_port);
 	EMACDBG("ipv6 L4 dest port = %d\n", filter->l4_filter.dest_port);
 
+	/* enable L3 protocol */
+	MAC_L3L4CR_L3PEN0_UDFWR(cur_filter_num, 0x1);
 
-	if (is_ipv6_addr_valid(filter)) {
+	is_ipv6_addr_valid(filter, &no_ipv6_addr);
+	if (!no_ipv6_addr) {
 		EMACDBG("programming ipv6 address\n");
-
-		/* enable L3 protocol */
-		MAC_L3L4CR_L3PEN0_UDFWR(cur_filter_num, 0x1);
 
 		if (filter->src_or_dest_ip)
 			/* enable L3 src addr */
