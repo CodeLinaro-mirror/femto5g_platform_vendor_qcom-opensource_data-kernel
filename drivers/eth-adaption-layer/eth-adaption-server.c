@@ -103,7 +103,7 @@ repeat_send:
 	if(serv_sk.kpi_send_data)
 	{
 #ifdef CONFIG_MSM_BOOT_TIME_MARKER
-	place_marker("M - eth-adaption-layer server_send first packets");
+	update_marker("M - eth-adaption-layer server_send first packets");
 #endif
 		serv_sk.kpi_send_data =false;
 	}
@@ -172,7 +172,7 @@ static void eth_adaption_server_receive(struct kthread_work *work)
 	if(serv_sk.kpi_receive_data)
 	{
 #ifdef CONFIG_MSM_BOOT_TIME_MARKER
-		place_marker("M - eth-adaption-layer server_receive first packets");
+		update_marker("M - eth-adaption-layer server_receive first packets");
 #endif
 		serv_sk.kpi_receive_data =false;
 	}
@@ -362,11 +362,11 @@ static void eth_adaption_server_start(struct kthread_work *work)
 
 		kthread_init_work(&serv_sk.read_data, eth_adaption_server_receive);
 		serv_sk.newsocket->sk->sk_data_ready = eth_adaption_server_data_ready;
-
+		eth_adaption_wake_up();
 
 
 #ifdef CONFIG_MSM_BOOT_TIME_MARKER
-			place_marker("M - eth-adaption-layer server_start connected");
+			update_marker("M - eth-adaption-layer server_start connected");
 #endif
 	}
 
@@ -443,7 +443,7 @@ int eth_adaption_server_connect(int port,int iptype,int connect_retry_cnt,int is
 	}
 	kthread_queue_work(&serv_sk.kworker, &serv_sk.init_server);
 #ifdef CONFIG_MSM_BOOT_TIME_MARKER
-		place_marker("M - eth-adaption-layer server_init");
+		update_marker("M - eth-adaption-layer server_init");
 #endif
 	return 0;
 }

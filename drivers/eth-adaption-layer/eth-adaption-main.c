@@ -78,6 +78,8 @@ struct mutex gpio_toggle_lock;
 struct wakeup_source *eth_ws;
 atomic_t acquire_wakelock;
 
+DECLARE_WAIT_QUEUE_HEAD(suspend_wait);
+
 /* insmod parameters, currently hard coded. */
 int server = 1;
 module_param(server, int, S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP);
@@ -383,6 +385,17 @@ fail:
 
 
 /**
+* eth_adaption_wake_up() - Function to wake up waiting thread.
+* Return: 0 on success, non-zero otherwise
+*/
+int eth_adaption_wake_up(void)
+{
+	wake_up(&suspend_wait);
+	return 0;
+}
+
+
+/**
 * eth_adaption_send() - Function to send QMI packet from IPCRTR over TCP socket.
 *
 * @skb: buffer holding QMI message.
@@ -406,8 +419,9 @@ check_suspend:
 	if(power_state == EAM_POWER_STATE_SUSPENDING || power_state == EAM_POWER_STATE_RESUMING)
 	{
 		mutex_unlock(&power_state_lock);
-		DECLARE_WAIT_QUEUE_HEAD(suspend_wait);
-		wait_event_timeout(suspend_wait, 0 ,5*HZ);
+		wait_event_timeout(suspend_wait,
+					(power_state != EAM_POWER_STATE_SUSPENDING && power_state != EAM_POWER_STATE_RESUMING),
+					1*HZ);
 		goto check_suspend;
 	}
 
@@ -517,7 +531,7 @@ int eth_adaption_handle_suspend()
 	power_state = EAM_POWER_STATE_SUSPENDED;
 	ETHADPTDBG("%s EAM_POWER_STATE_SUSPENDED\n", __func__);
 	mutex_unlock(&power_state_lock);
-
+	eth_adaption_wake_up();
 	return ret;
 }
 
@@ -708,6 +722,7 @@ static int __init eth_adaption_init(void)
 
 	mutex_init(&power_state_lock);
 	mutex_init(&gpio_toggle_lock);
+
 #ifdef CONFIG_MSM_BOOT_TIME_MARKER
 		place_marker("M - eth-adaption-layer init");
 #endif
