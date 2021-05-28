@@ -102,7 +102,7 @@ set_fs(oldmm);
 	if(client_sk.kpi_send_data)
 	{
 #ifdef CONFIG_MSM_BOOT_TIME_MARKER
-	place_marker("M - eth-adaption-layer client_send first packets");
+	update_marker("M - eth-adaption-layer client_send first packets");
 #endif
 		client_sk.kpi_send_data =false;
 	}
@@ -162,7 +162,7 @@ static void eth_adaption_client_receive(struct kthread_work *work)
 	if(client_sk.kpi_receive_data)
 	{
 #ifdef CONFIG_MSM_BOOT_TIME_MARKER
-	place_marker("M - eth-adaption-layer client_receive first packets");
+	update_marker("M - eth-adaption-layer client_receive first packets");
 #endif
 	client_sk.kpi_receive_data =false;
 	}
@@ -325,10 +325,10 @@ connect:
 
 		kthread_init_work(&client_sk.read_data, eth_adaption_client_receive);
 		client_sk.conn_socket->sk->sk_data_ready = eth_adaption_client_data_ready;
-
+		eth_adaption_wake_up();
 
 #ifdef CONFIG_MSM_BOOT_TIME_MARKER
-		place_marker("M - eth-adaption-layer client_connect connected");
+		update_marker("M - eth-adaption-layer client_connect connected");
 #endif
 	}
 	else
@@ -342,7 +342,7 @@ connect:
 		}
 		ETHADPTERR("kernel connection client failed code::%d\n",cn);
 #ifdef CONFIG_MSM_BOOT_TIME_MARKER
-				place_marker("M - eth-adaption-layer client_connect failed");
+				update_marker("M - eth-adaption-layer client_connect failed");
 #endif
 		goto release;
 	}
@@ -428,7 +428,7 @@ int eth_adaption_client_connect(unsigned char *destip, int iptype, int port,int 
 	}
 	kthread_queue_work(&client_sk.kworker, &client_sk.init_client);
 #ifdef CONFIG_MSM_BOOT_TIME_MARKER
-	place_marker("M - eth-adaption-layer client_connect init");
+	update_marker("M - eth-adaption-layer client_connect init");
 #endif
 
 	return 0;

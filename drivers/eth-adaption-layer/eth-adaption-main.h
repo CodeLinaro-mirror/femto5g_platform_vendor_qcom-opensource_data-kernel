@@ -91,6 +91,7 @@ extern struct mutex gpio_toggle_lock;
 
 extern atomic_t acquire_wakelock;
 extern struct wakeup_source *eth_ws;
+
 /**
 * eth_adaption_send() - Function to send QMI packet from IPCRTR over TCP socket.
 *
@@ -125,3 +126,9 @@ int eth_adaption_handle_suspend(void);
 * scenario Return:int
 */
 int eth_adaption_handle_resume(void);
+
+/**
+* eth_adaption_wake_up() - Function to wake up waiting thread.
+* Return: 0 on success, non-zero otherwise
+*/
+int eth_adaption_wake_up(void);
