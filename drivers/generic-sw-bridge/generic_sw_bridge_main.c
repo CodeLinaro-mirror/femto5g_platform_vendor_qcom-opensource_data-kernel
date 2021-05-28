@@ -1837,6 +1837,7 @@ static int gsb_device_event(struct notifier_block *this, unsigned long event, vo
 			{
 				DEBUG_ERROR("ERROR in IPA_BRIDGE_CONNECT for if %s",
 						if_info->if_name);
+				break;
 			}
 		}
 		spin_unlock_bh(&pgsb_ctx->gsb_lock);
