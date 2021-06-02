@@ -97,6 +97,7 @@ repeat_send:
 		if( client_send_retry >10)
 			return -1;
 		client_send_retry++;
+		ETHADPTDBGIPC("%s client send fail message len: %d\n", __func__,len);
 		goto repeat_send;
 	}
 	if(len > 0)
@@ -154,9 +155,10 @@ static void eth_adaption_client_receive(struct kthread_work *work)
 
 	receive_allocfree_stat++;
 	len = kernel_recvmsg(client_sk.conn_socket, &msg, &vec, max_size, max_size, msg.msg_flags);
+
 	if(len<=0)
 	{
-		ETHADPTDBG("Failure to read QRTR packets kernel error code %d\n",len);
+		ETHADPTDBGIPC("Failure to read QRTR packets kernel error code %d\n",len);
 		error_stat+=len;
 		goto release;
 	}
@@ -165,7 +167,7 @@ static void eth_adaption_client_receive(struct kthread_work *work)
 	eth_res.bytes_xferd = len;
 	// send this message to qrtr.
 	qcom_ethernet_qrtr_dl_cb(&eth_res);
-	ETHADPTDBG("the server says: %x %d| client_receive\n", buf,len);
+	ETHADPTDBG("the server says: %x %d| client_receive PASS\n", buf,len);
 	if(client_sk.kpi_receive_data)
 	{
 #ifdef CONFIG_MSM_BOOT_TIME_MARKER
@@ -244,7 +246,7 @@ void eth_adaption_client_start(struct kthread_work *work)
 		ETHADPTDBG("cb_info_client NULL \n");
 		goto release;
 	}
-	ETHADPTDBG("client sock %d\n");
+	ETHADPTDBG("client sock %d\n", acc);
 	if(acc < 0)
 	{
 		printk(KERN_ALERT "socket failed %d\n",acc);
@@ -255,7 +257,7 @@ void eth_adaption_client_start(struct kthread_work *work)
 
 	if (acc < 0)
 	{
-		ETHADPTDBG("Can`t set a socket option TCP_NODELAY %d\n", acc);
+		ETHADPTERRIPC("Can`t set a socket option TCP_NODELAY %d\n", acc);
 		goto release;
 	}
 
@@ -270,7 +272,7 @@ void eth_adaption_client_start(struct kthread_work *work)
 
 		if (ret != 1 || pparams.ipv4_addr.s_addr == 0)
 		{
-			ETHADPTERR("Invalid ipv4 address programmed: %s\n",
+			ETHADPTERRIPC("Invalid ipv4 address programmed: %s\n",
 				  client_sk.destip);
 			goto release;
 		}
@@ -293,7 +295,7 @@ void eth_adaption_client_start(struct kthread_work *work)
 
 		if (ret != 1 || !pparams.ipv6_addr.ifr6_addr.s6_addr32)
 		{
-			ETHADPTERR("Invalid ipv6 address programmed: %s\n",
+			ETHADPTERRIPC("Invalid ipv6 address programmed: %s\n",
 				  client_sk.destip);
 			goto release;
 		}
@@ -316,7 +318,7 @@ connect:
 	{
 		cn=kernel_connect(sockt, (struct sockaddr*) server_v6,sizeof(struct sockaddr_in6),O_RDWR);
 	}
-	ETHADPTINFO("kernel connection client code::%d\n",cn);
+	ETHADPTINFOIPC("kernel connection client code::%d\n",cn);
 
 	if(cn == 0)
 	{
@@ -391,7 +393,7 @@ connect:
 			 --client_sk.connect_retry_cnt;
 			 goto connect;
 		}
-		ETHADPTERR("kernel connection client failed code::%d\n",cn);
+		ETHADPTERRIPC("kernel connection client failed code::%d\n",cn);
 #ifdef CONFIG_MSM_BOOT_TIME_MARKER
 				update_marker("M - eth-adaption-layer client_connect failed");
 #endif
@@ -450,7 +452,7 @@ int eth_adaption_client_connect(unsigned char *destip, int iptype, int port,int 
 	client_sk.connect_retry_cnt = connect_retry_cnt;
 
 	mutex_lock(&eam_lock);
-	ETHADPTINFO("%s: client connect, qrtr state %d\n", __func__,qrtr_init);
+	ETHADPTINFOIPC("%s: client connect, qrtr state %d\n", __func__,qrtr_init);
 	if (qrtr_init == QRTR_DEINIT || qrtr_init == QRTR_INPROGRESS)
 	{
 		/* Critical section */
@@ -469,7 +471,7 @@ int eth_adaption_client_connect(unsigned char *destip, int iptype, int port,int 
 		client_sk.task = kthread_run(kthread_worker_fn, &client_sk.kworker, "eth_adapt_rx");
 		if (IS_ERR(client_sk.task))
 		{
-			ETHADPTERR("%s: Error allocating wq\n", __func__);
+			ETHADPTERRIPC("%s: Error allocating wq\n", __func__);
 			return -1;
 		}
 	}
@@ -487,7 +489,7 @@ int eth_adaption_client_connect(unsigned char *destip, int iptype, int port,int 
 */
 void eth_adaption_client_cleanup(bool cleanup_lock)
 {
-	ETHADPTINFO(KERN_ALERT"client_cleanup entry\n");
+	ETHADPTINFOIPC("client_cleanup entry\n");
 
 	if (cleanup_lock)
 	{
@@ -542,17 +544,16 @@ void eth_adaption_client_cleanup(bool cleanup_lock)
 		client_sk.server_v6 = NULL;
 	}
 
-
 	send_data = 0;
 	recevied_data = 0;
 
-	ETHADPTINFO("client_cleanup exit\n");
+	ETHADPTINFOIPC("client_cleanup exit\n");
 
 }
 
 void eth_adaption_client_sock_cleanup(void) {
 
-	ETHADPTINFO(KERN_ALERT"eth_adaption_client_sock_cleanup entry\n");
+	ETHADPTINFOIPC("eth_adaption_client_sock_cleanup entry\n");
 
 	/*reset packet stats*/
 	receive_allocfree_stat = 0;
@@ -590,5 +591,5 @@ void eth_adaption_client_sock_cleanup(void) {
 	send_data = 0;
 	recevied_data = 0;
 
-	ETHADPTINFO("eth_adaption_client_sock_cleanup exit\n");
+	ETHADPTINFOIPC("eth_adaption_client_sock_cleanup exit\n");
 }

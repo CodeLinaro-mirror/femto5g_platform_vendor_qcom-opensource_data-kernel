@@ -83,6 +83,10 @@ struct mutex gpio_toggle_lock;
 struct wakeup_source *eth_ws;
 atomic_t acquire_wakelock;
 
+
+void *ipc_eth_adapt_log_ctxt;
+
+
 DECLARE_WAIT_QUEUE_HEAD(suspend_wait);
 
 /* insmod parameters, currently hard coded. */
@@ -521,11 +525,9 @@ int eth_adaption_handle_suspend()
 #ifdef CONFIG_MSM_BOOT_TIME_MARKER
 	update_marker("M - eth-adaption-layer start Suspend: start");
 #endif
-
 	mutex_lock(&gpio_toggle_lock);
 	peer_gpio_toggled = false;
 	mutex_unlock(&gpio_toggle_lock);
-
 
 #ifdef CONFIG_MSM_BOOT_TIME_MARKER
 	update_marker("M - eth-adaption-layer Suspended");
@@ -665,6 +667,11 @@ static int __init eth_adaption_init(void)
 	ETHADPTDBG("eth_adapt_init dest_port %d\n",dest_port);
 	ETHADPTDBG("eth_adapt_init iptype %d\n",iptype);
 	ETHADPTDBG("eth_adapt_init server %d\n",server);
+	ipc_eth_adapt_log_ctxt = ipc_log_context_create(IPCLOG_STATE_PAGES, "eth_adapt", 0);
+	if (!ipc_eth_adapt_log_ctxt)
+		pr_err("error creating logging context for eth_adapt\n");
+	else
+		pr_info("IPC logging has been enabled for eth_adapt\n");
 
         mutex_init(&eam_lock);
         mutex_init(&gpio_toggle_lock);
@@ -745,6 +752,13 @@ static void __exit eth_adaption_exit(void)
 	mutex_destroy(&eam_lock);
 	wakeup_source_unregister(eth_ws);
 	unregister_pm_notifier(&eth_adaption_pm_nb);
+
+	if (!ipc_eth_adapt_log_ctxt)
+		ipc_log_context_destroy(ipc_eth_adapt_log_ctxt);
+
+	ipc_eth_adapt_log_ctxt = NULL;
+
+
 #ifdef CONFIG_MSM_BOOT_TIME_MARKER
 	place_marker("M - eth-adaption-layer eth_adapt_exit");
 #endif

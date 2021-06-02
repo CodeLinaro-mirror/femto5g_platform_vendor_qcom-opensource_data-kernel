@@ -50,6 +50,7 @@
 #endif
 
 #include <linux/cdev.h>
+#include <linux/ipc_logging.h>
 
 #define DRV_NAME "eth-adaption-layer"
 #define MAX_SIZE 8192
@@ -75,6 +76,42 @@ do {\
 static int keepidle=30000;
 static int keepintvl=30000;
 static int keepcnt=120;
+
+
+//ipc logging for eth adaption
+extern void *ipc_eth_adapt_log_ctxt;
+#define __FILENAME__ (strrchr(__FILE__, '/') ? \
+		strrchr(__FILE__, '/') + 1 : __FILE__)
+#define IPCLOG_STATE_PAGES 50
+
+
+#define ETHADPTDBGIPC(fmt, args...) \
+do {\
+	pr_debug(DRV_NAME " %s:%d " fmt, __func__, __LINE__, ## args);\
+	if (ipc_eth_adapt_log_ctxt) { \
+		ipc_log_string(ipc_eth_adapt_log_ctxt, \
+		"%s: %s[%u]:[eth_adapt] DEBUG:" fmt, __FILENAME__,\
+		__func__, __LINE__, ## args); \
+	} \
+} while (0)
+#define ETHADPTERRIPC(fmt, args...) \
+do {\
+	pr_err(DRV_NAME " %s:%d " fmt, __func__, __LINE__, ## args);\
+	if (ipc_eth_adapt_log_ctxt) { \
+		ipc_log_string(ipc_eth_adapt_log_ctxt, \
+		"%s: %s[%u]:[eth_adapt] ERROR:" fmt, __FILENAME__,\
+		__func__, __LINE__, ## args); \
+	} \
+} while (0)
+#define ETHADPTINFOIPC(fmt, args...) \
+do {\
+	pr_info(DRV_NAME " %s:%d " fmt, __func__, __LINE__, ## args);\
+	if (ipc_eth_adapt_log_ctxt) { \
+		ipc_log_string(ipc_eth_adapt_log_ctxt, \
+		"%s: %s[%u]:[eth_adapt] INFO:" fmt, __FILENAME__,\
+		__func__, __LINE__, ## args); \
+	} \
+} while (0)
 
 
 /* Variable to indicate if peer has toggle wake up GPIO*/

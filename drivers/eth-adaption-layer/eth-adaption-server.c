@@ -94,6 +94,7 @@ repeat_send:
 		if(server_send_retry >10)
 			return -1;
 		server_send_retry++;
+		ETHADPTDBGIPC("%s server send fail message len: %d\n", __func__,len);
 		goto repeat_send;
 	}
 
@@ -160,9 +161,10 @@ static void eth_adaption_server_receive(struct kthread_work *work)
 	vec.iov_base = buf;
 
 	len = kernel_recvmsg(serv_sk.newsocket, &msg, &vec, max_size, max_size, MSG_DONTWAIT);
+
 	if(len<=0)
 	{
-		ETHADPTDBG("Failure to read QRTR packets kernel error code %d\n",len);
+		ETHADPTDBGIPC("Failure to read QRTR packets kernel error code %d\n",len);
 		error_stat+=len;
 		goto release;
 	}
@@ -315,7 +317,8 @@ static void eth_adaption_server_start(struct kthread_work *work)
 		{
 			msleep(500);
 		}
-		ETHADPTINFO("kernel accept succeeded %d cn %d\n",serv_sk.rmmod,cn);
+
+		ETHADPTINFOIPC("kernel accept succeeded %d cn %d\n",serv_sk.rmmod,cn);
 
 		if(cn == 0)
 		{
@@ -447,7 +450,7 @@ int eth_adaption_server_connect(int port,int iptype,int connect_retry_cnt,int is
 
 	/* Critical section */
 	mutex_lock(&eam_lock);
-	ETHADPTINFO("%s: Server connect, qrtr state %d\n", __func__,qrtr_init);
+	ETHADPTINFOIPC("%s: Server connect, qrtr state %d\n", __func__,qrtr_init);
 	if (qrtr_init == QRTR_DEINIT)
 	{
 		qrtr_init = QRTR_INPROGRESS;
@@ -491,7 +494,7 @@ int eth_adaption_server_connect(int port,int iptype,int connect_retry_cnt,int is
 */
 void eth_adaption_server_cleanup(bool clean_up)
 {
-	ETHADPTINFO("server_cleanup entry \n");
+	ETHADPTINFOIPC("server_cleanup entry \n");
 
 	if (clean_up)
 	{
@@ -556,13 +559,13 @@ void eth_adaption_server_cleanup(bool clean_up)
 	}
 	send_data = 0;
 	recevied_data = 0;
-	ETHADPTINFO("server_cleanup exit \n");
+	ETHADPTINFOIPC("server_cleanup exit \n");
 }
 
 
 void eth_adaption_server_sock_cleanup (void)
 {
-	ETHADPTINFO("eth_adaption_server_sock_cleanup entry \n");
+	ETHADPTINFOIPC("eth_adaption_server_sock_cleanup entry\n");
 
 	kthread_cancel_work_sync(&serv_sk.read_data);
 	kthread_flush_work(&serv_sk.read_data);
@@ -587,7 +590,7 @@ void eth_adaption_server_sock_cleanup (void)
 		serv_sk.newsocket  = NULL;
 	}
 
-	ETHADPTINFO("eth_adaption_server_sock_cleanup \n");
+	ETHADPTINFOIPC("eth_adaption_server_sock_cleanup exit\n");
 
 }
 
