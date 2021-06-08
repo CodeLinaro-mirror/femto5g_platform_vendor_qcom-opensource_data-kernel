@@ -423,8 +423,8 @@ This is free software, and you are welcome to redistribute it under certain cond
 #define RTL8168_LINK_TIMEOUT    (1 * HZ)
 #define RTL8168_ESD_TIMEOUT (2 * HZ)
 
-#define NUM_TX_DESC 1024    /* Number of Tx descriptor registers */
-#define NUM_RX_DESC 1024    /* Number of Rx descriptor registers */
+#define NUM_TX_DESC 256    /* Number of Tx descriptor registers */
+#define NUM_RX_DESC 256    /* Number of Rx descriptor registers */
 
 #define RX_BUF_SIZE 0x05F3  /* 0x05F3 = 1522bye + 1 */
 #define R8168_TX_RING_BYTES (NUM_TX_DESC * sizeof(struct TxDesc))
