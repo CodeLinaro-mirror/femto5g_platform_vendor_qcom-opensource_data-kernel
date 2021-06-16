@@ -307,8 +307,8 @@ do { \
 #define true  1
 #endif
 
-//Hardware will continue interrupt 10 times after interrupt finished.
-#define RTK_KEEP_INTERRUPT_COUNT (10)
+//Hardware will continue interrupt 4 times after interrupt finished.
+#define RTK_KEEP_INTERRUPT_COUNT (4)
 
 //Due to the hardware design of RTL8111B, the low 32 bit address of receive
 //buffer must be 8-byte alignment.
