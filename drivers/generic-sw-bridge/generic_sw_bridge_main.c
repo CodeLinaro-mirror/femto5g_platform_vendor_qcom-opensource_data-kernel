@@ -2271,8 +2271,8 @@ static int __init gsb_init_module(void)
 	ws_gsb = wakeup_source_create("gsb_wake_source");
 	if (ws_gsb != NULL)
 	{
-		memcpy(&pgsb_ctx->gsb_wake_src, 
-			wakeup_source_create("gsb_wake_source"), 
+		memcpy(&pgsb_ctx->gsb_wake_src,
+			ws_gsb,
 			sizeof(&pgsb_ctx->gsb_wake_src));
 	}
 	else
