@@ -1837,6 +1837,7 @@ static int gsb_device_event(struct notifier_block *this, unsigned long event, vo
 			{
 				DEBUG_ERROR("ERROR in IPA_BRIDGE_CONNECT for if %s",
 						if_info->if_name);
+				break;
 			}
 		}
 		spin_unlock_bh(&pgsb_ctx->gsb_lock);
@@ -2200,6 +2201,7 @@ static int __init gsb_init_module(void)
 {
 	int retval = -1;
 	struct gsb_ctx *pgsb_ctx = NULL;
+	struct wakeup_source *ws_gsb = NULL;
 	DEBUG_INFO("gsb enter %s\n", DRV_VERSION);
 
 	if (__gc)
@@ -2266,7 +2268,17 @@ static int __init gsb_init_module(void)
 	pgsb_ctx->gsb_lock_acquired = false;
 
 #ifdef ISKERNEL5_4
-	memcpy(&pgsb_ctx->gsb_wake_src, wakeup_source_create("gsb_wake_source"), sizeof(&pgsb_ctx->gsb_wake_src));
+	ws_gsb = wakeup_source_create("gsb_wake_source");
+	if (ws_gsb != NULL)
+	{
+		memcpy(&pgsb_ctx->gsb_wake_src, 
+			wakeup_source_create("gsb_wake_source"), 
+			sizeof(&pgsb_ctx->gsb_wake_src));
+	}
+	else
+	{
+		DEBUG_ERROR("wakeup_source_create return NULL\n");
+	}
 #else
 	wakeup_source_init(&pgsb_ctx->gsb_wake_src, "gsb_wake_source");
 #endif
