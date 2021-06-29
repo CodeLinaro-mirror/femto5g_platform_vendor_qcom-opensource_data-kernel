@@ -20,7 +20,6 @@
 #include <eth-adaption-client.h>
 #include <soc/qcom/qrtr_ethernet.h>
 #include <soc/qcom/sb_notification.h>
-#include <linux/eth_adapt_power.h>
 #include <linux/suspend.h>
 #include <linux/pm_wakeup.h>
 
