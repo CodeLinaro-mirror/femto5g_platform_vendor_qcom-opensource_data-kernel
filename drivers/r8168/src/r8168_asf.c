@@ -60,7 +60,7 @@ int rtl8168_asf_ioctl(struct net_device *dev,
         struct rtl8168_private *tp = netdev_priv(dev);
         void *user_data = ifr->ifr_data;
         struct asf_ioctl_struct asf_usrdata;
-        unsigned long flags;
+        unsigned long flags = 0;
 
         if (tp->mcfg != CFG_METHOD_7 && tp->mcfg != CFG_METHOD_8)
                 return -EOPNOTSUPP;
