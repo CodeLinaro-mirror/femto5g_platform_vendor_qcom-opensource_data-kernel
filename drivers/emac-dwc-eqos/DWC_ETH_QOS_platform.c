@@ -2064,6 +2064,10 @@ static int DWC_ETH_QOS_configure_netdevice(struct platform_device *pdev)
 	}
 	EMACDBG("EMAC Bit mask is %d\n", dma_bit_mask);
 
+	/* Get WOL status from device tree */
+	pdata->en_wol = of_property_read_bool(pdev->dev.of_node,
+					      "enable-wol");
+
 	ret = desc_if->alloc_queue_struct(pdata);
 	if (ret < 0) {
 		dev_alert(&pdev->dev, "ERROR: Unable to alloc Tx/Rx queue\n");

@@ -853,15 +853,15 @@ static int DWC_ETH_QOS_set_wol(struct net_device *dev,
 			       struct ethtool_wolinfo *wol)
 {
 	struct DWC_ETH_QOS_prv_data *pdata = netdev_priv(dev);
-	u32 emac_wol_support = 0;
+	u32 emac_wol_support = WAKE_MAGIC | WAKE_UCAST;
 	int ret = 0;
 
-	if (pdata->hw_feat.mgk_sel == 1)
-			emac_wol_support |= WAKE_MAGIC;
-	if (pdata->hw_feat.rwk_sel == 1)
-			emac_wol_support |= WAKE_UCAST;
+	if (!pdata->phydev) {
+		pr_err("%s: Phy is not registered\n", dev->name);
+		return -ENODEV;
+	}
 
-	if (wol->wolopts & ~(emac_wol_support | pdata->phy_wol_supported))
+	if (wol->wolopts & ~emac_wol_support)
 		return -EOPNOTSUPP;
 
 	if (!device_can_wakeup(&pdata->pdev->dev))
@@ -873,45 +873,26 @@ static int DWC_ETH_QOS_set_wol(struct net_device *dev,
 	 * magic frame but we can disable it if the HW capability
 	 * register shows no support for pmt_magic_frame.
 	 */
-	spin_lock_irq(&pdata->lock);
 
-	if (pdata->hw_feat.mgk_sel == 1)
-		pdata->wolopts |= WAKE_MAGIC;
-	if (pdata->hw_feat.rwk_sel == 1)
-		pdata->wolopts |= WAKE_UCAST;
+	if (pdata->phy_intr_en) {
+		ret = phy_ethtool_set_wol(pdata->phydev, wol);
 
-	spin_unlock_irq(&pdata->lock);
-
-	if (emac_wol_support && (pdata->wolopts != wol->wolopts)) {
-		if (pdata->wolopts)
-			enable_irq_wake(pdata->irq_number);
-		else
-			disable_irq_wake(pdata->irq_number);
-
-		device_set_wakeup_enable(&pdata->pdev->dev, pdata->wolopts ? 1 : 0);
-	}
-
-	if (pdata->phy_wol_wolopts != wol->wolopts) {
-		if (pdata->phy_intr_en && pdata->phy_wol_supported){
-
-			pdata->phy_wol_wolopts = 0;
-
-			ret = phy_ethtool_set_wol(pdata->phydev, wol);
-
-			if (ret) {
-				EMACERR("set wol in PHY failed\n");
-				return ret;
-			}
-
-			pdata->phy_wol_wolopts = wol->wolopts;
-
-			if (pdata->phy_wol_wolopts)
-				enable_irq_wake(pdata->phy_irq);
-			else
-				disable_irq_wake(pdata->phy_irq);
-
-			device_set_wakeup_enable(&pdata->pdev->dev, pdata->phy_wol_wolopts ? 1 : 0);
+		if (ret) {
+			EMACERR("set wol in PHY failed\n");
+			return ret;
 		}
+
+		device_set_wakeup_capable(&pdata->pdev->dev, 1);
+
+		if (wol->wolopts) {
+			enable_irq_wake(pdata->phy_irq);
+			pdata->en_wol = true;
+		} else {
+			disable_irq_wake(pdata->phy_irq);
+			pdata->en_wol = false;
+		}
+
+		device_set_wakeup_enable(&pdata->pdev->dev, wol->wolopts ? 1 : 0);
 	}
 
 	DBGPR("<--DWC_ETH_QOS_set_wol\n");

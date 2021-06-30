@@ -1016,37 +1016,38 @@ void DWC_ETH_QOS_adjust_link(struct net_device *dev)
 
 static void DWC_ETH_QOS_request_phy_wol(struct DWC_ETH_QOS_prv_data *pdata)
 {
-	pdata->phy_wol_supported = 0;
-	pdata->phy_wol_wolopts = 0;
+	int ret = 0;
+
+	if (!pdata->en_wol)
+		return;
 
 	/* Check if phydev is valid*/
 	/* Check and enable Wake-on-LAN functionality in PHY*/
 	if (pdata->phydev) {
 		struct ethtool_wolinfo wol = {.cmd = ETHTOOL_GWOL};
-		wol.supported = 0;
-		wol.wolopts= 0;
-
 		phy_ethtool_get_wol(pdata->phydev, &wol);
-		pdata->phy_wol_supported = wol.supported;
 
-		/* Try to enable supported Wake-on-LAN features in PHY*/
-		if (wol.supported) {
+		wol.cmd = ETHTOOL_SWOL;
+		wol.wolopts = wol.supported;
 
-			device_set_wakeup_capable(&pdata->pdev->dev, 1);
+		ret = phy_ethtool_set_wol(pdata->phydev, &wol);
 
-			wol.cmd = ETHTOOL_SWOL;
-			wol.wolopts = wol.supported;
-
-			if (!phy_ethtool_set_wol(pdata->phydev, &wol)){
-				pdata->phy_wol_wolopts = wol.wolopts;
-
-				enable_irq_wake(pdata->phy_irq);
-
-				device_set_wakeup_enable(&pdata->pdev->dev, 1);
-				EMACDBG("Enabled WoL[0x%x] in %s\n", wol.wolopts,
-						 pdata->phydev->drv->name);
-			}
+		if (ret) {
+			EMACERR("set WOL in phy failed\n");
+			return;
 		}
+
+		if (ret == EOPNOTSUPP) {
+			EMACERR("WOL not supported\n");
+			return;
+		}
+
+		device_set_wakeup_capable(&pdata->pdev->dev, 1);
+
+		enable_irq_wake(pdata->phy_irq);
+		device_set_wakeup_enable(&pdata->pdev->dev, 1);
+		EMACDBG("Enabled WoL[0x%x] in %s\n", wol.wolopts,
+			pdata->phydev->drv->name);
 	}
 }
 
