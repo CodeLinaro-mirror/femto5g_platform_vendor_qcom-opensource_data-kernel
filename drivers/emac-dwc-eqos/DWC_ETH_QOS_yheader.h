@@ -1728,6 +1728,8 @@ struct DWC_ETH_QOS_prv_data {
 	u32 dev_state;
 	u32 interface;
 
+	/* state of wol */
+	bool en_wol;
 	/* saving state for Wake-on-LAN */
 	int wolopts;
 	/* state of enabled wol options in PHY*/
