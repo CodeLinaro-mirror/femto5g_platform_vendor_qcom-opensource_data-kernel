@@ -2672,6 +2672,10 @@ static int DWC_ETH_QOS_configure_netdevice(struct platform_device *pdev)
 	}
 	EMACDBG("EMAC Bit mask is %d\n", dma_bit_mask);
 
+	/* Get WOL status from device tree */
+	pdata->en_wol = of_property_read_bool(pdev->dev.of_node,
+					      "enable-wol");
+
 	ret = of_property_read_u32(pdev->dev.of_node, "ipa-dma-rx-desc-cnt",
 		&pdata->prv_ipa.ipa_dma_rx_desc_cnt);
 	if (ret < 0) {
