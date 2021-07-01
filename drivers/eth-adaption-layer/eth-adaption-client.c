@@ -27,6 +27,8 @@ extern unsigned long send_data;
 extern unsigned long recevied_data;
 extern unsigned long error_stat;
 
+bool pending_data;
+
 struct client_socket
 {
 	struct socket *conn_socket;
@@ -196,6 +198,17 @@ static void eth_adaption_client_data_ready(struct sock *sk)
 }
 
 /**
+* eth_adaption_client_data_ready() - this functions handles pending packets in Q
+* @sk: client socket
+* Return:void.
+*/
+static void eth_adaption_client_data_recieved(struct sock *sk)
+{
+	ETHADPTDBG("data recieved before assigning sk_data_ready\n");
+	pending_data = true;
+}
+
+/**
 * eth_adaption_client_start() - Connect to the server on other Processor.
 * Notify QRTR with link up status callback if
 * connection success.
@@ -224,6 +237,13 @@ void eth_adaption_client_start(struct kthread_work *work)
 		acc=sock_create(AF_INET6, SOCK_STREAM, IPPROTO_TCP, &sockt);
 	}
 
+	cb_info_client =(struct qrtr_ethernet_cb_info *) kmalloc(sizeof(struct qrtr_ethernet_cb_info),GFP_KERNEL);
+
+	if(cb_info_client == NULL)
+	{
+		ETHADPTDBG("cb_info_client NULL \n");
+		goto release;
+	}
 	ETHADPTDBG("client sock %d\n");
 	if(acc < 0)
 	{
@@ -285,6 +305,7 @@ void eth_adaption_client_start(struct kthread_work *work)
 		server_v6->sin6_port = htons(client_sk.port);
 	}
 
+	sockt->sk->sk_data_ready = eth_adaption_client_data_recieved;
 connect:
 
 	if (client_sk.iptype == 0)
@@ -334,8 +355,6 @@ connect:
 		mutex_lock(&eam_lock);
 		if (qrtr_init == QRTR_DEINIT || qrtr_init == QRTR_INPROGRESS)
 		{
-			cb_info_client =(struct qrtr_ethernet_cb_info *) kmalloc(sizeof(struct qrtr_ethernet_cb_info),GFP_KERNEL);
-
 			mutex_unlock(&eam_lock);
 
 			cb_info_client->eth_send = eth_adaption_send;
@@ -353,6 +372,11 @@ connect:
 
 		kthread_init_work(&client_sk.read_data, eth_adaption_client_receive);
 		client_sk.conn_socket->sk->sk_data_ready = eth_adaption_client_data_ready;
+		/* Race condition when thread is preempted and sk->sk_data_ready is not
+		intialized if pending data in the queue then process the data so QRTR is
+		not stuck forever */
+		if(pending_data)
+			eth_adaption_client_data_ready(sockt->sk);
 
 #ifdef CONFIG_MSM_BOOT_TIME_MARKER
 		update_marker("M - eth-adaption-layer client_connect connected");

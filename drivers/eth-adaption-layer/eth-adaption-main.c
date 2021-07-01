@@ -133,6 +133,29 @@ static void eth_adaption_set_link_state(int event)
 }
 
 /**
+* eth_adaption_check_qrtr_state()handler function checks qrtr state.
+* @event:
+* @ptr:
+* Return:void
+*/
+static bool checkstate(int state)
+{
+	/* Critical section */
+	mutex_lock(&eam_lock);
+	if(qrtr_init == state)
+	{
+		mutex_unlock(&eam_lock);
+		return true;
+	}
+	else
+	{
+		mutex_unlock(&eam_lock);
+		return false;
+	}
+
+}
+
+/**
 * eth_adaption_notifier_device_event()handler function for link up and down evts.
 *
 * @notifier_block:
@@ -156,26 +179,26 @@ static int eth_adaption_notifier_device_event
 		ETHADPTINFO("eth_adaption_notifier_device_event %d, %d, %d\n",event,qrtr_init,link_state);
 		switch (event) {
 		case NETDEV_DOWN:
-			if(qrtr_init == QRTR_DEINIT || qrtr_init == QRTR_INPROGRESS || qrtr_init == QRTR_CONNFAILED)
+			if(checkstate(QRTR_DEINIT) || checkstate(QRTR_INPROGRESS) || checkstate(QRTR_CONNFAILED))
 				return NOTIFY_DONE;
 			eth_adaption_set_link_state(NETDEV_DOWN);
 			qcom_ethernet_qrtr_status_cb(NETDEV_DOWN);
 			break;
 		case NETDEV_UP:
 			eth_adaption_set_link_state(NETDEV_UP);
-			if(qrtr_init == QRTR_INIT)
+			if(checkstate(QRTR_INIT))
 			{
 				qcom_ethernet_qrtr_status_cb(NETDEV_UP);
 			}
-			else if(qrtr_init == QRTR_INPROGRESS)
+			else if(checkstate(QRTR_INPROGRESS))
 			{
 				ETHADPTINFO("Wait until connection retry ends.");
 			}
-			else if(qrtr_init == QRTR_DEINIT)
+			else if(checkstate(QRTR_DEINIT))
 			{
 				kthread_queue_work(&sb_kworker, &sb_link_up);
 			}
-			else if(qrtr_init == QRTR_CONNFAILED)
+			else if(checkstate(QRTR_CONNFAILED))
 			{
 				kthread_queue_work(&sb_kworker, &sb_link_down);
 				kthread_queue_work(&sb_kworker, &sb_link_up);
@@ -187,7 +210,7 @@ static int eth_adaption_notifier_device_event
 				kthread_queue_work(&sb_kworker, &sb_link_down);
 				}
 			else if (dev->operstate == IF_OPER_UP) {
-				if(qrtr_init == QRTR_CONNFAILED)
+				if(checkstate(QRTR_CONNFAILED))
 					kthread_queue_work(&sb_kworker, &sb_link_down);
 				kthread_queue_work(&sb_kworker, &sb_link_up);
 			}
@@ -225,7 +248,7 @@ static int eth_adaption_sb_notifier_device_event
 			break;
 		case EVENT_REMOTE_STATUS_UP:
 			ETHADPTINFO("eth_adaption_sb_notifier_device_event %d, %d, %d\n",event,qrtr_init,link_state);
-			if(qrtr_init == QRTR_CONNFAILED)
+			if(checkstate(QRTR_CONNFAILED))
 				kthread_queue_work(&sb_kworker, &sb_link_down);
 			kthread_queue_work(&sb_kworker, &sb_link_up);
 			break;
@@ -671,7 +694,7 @@ static void __exit eth_adaption_exit(void)
 {
 	ETHADPTDBG("eth_adapt_exit\n");
 
-	if(qrtr_init == QRTR_INIT && link_state != NETDEV_DOWN)
+	if(checkstate(QRTR_INIT) && link_state != NETDEV_DOWN)
 		qcom_ethernet_qrtr_status_cb(NETDEV_DOWN);
 
 	/* Critical section */
@@ -702,11 +725,11 @@ static void __exit eth_adaption_exit(void)
 void eth_adaption_notifier_soft_reset(struct kthread_work *work)
 {
 	ETHADPTDBG("eth_adaption_notifier_soft_reset entry \n");
-	if(qrtr_init == QRTR_DEINIT || qrtr_init == QRTR_INPROGRESS)
+	if(checkstate(QRTR_DEINIT) || checkstate(QRTR_INPROGRESS))
 		return;
 
 	/* If link is already down do not call QRTR status cb with down */
-	if(qrtr_init == QRTR_INIT && link_state != NETDEV_DOWN)
+	if(checkstate(QRTR_INIT) && link_state != NETDEV_DOWN)
 		qcom_ethernet_qrtr_status_cb(NETDEV_DOWN);
 
 	if(server)
@@ -729,7 +752,7 @@ void eth_adaption_notifier_soft_set(struct kthread_work *work)
 	ETHADPTDBG("eth_adaption_notifier_soft_set entry \n");
 
 	/*to avoid duplicate client connects if we receive two simultanoues UP events*/
-	if(qrtr_init == QRTR_INIT || qrtr_init == QRTR_INPROGRESS)
+	if(checkstate(QRTR_INIT) || checkstate(QRTR_INPROGRESS))
 		return;
 
 	if(server)
