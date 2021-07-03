@@ -1,10 +1,11 @@
+// SPDX-License-Identifier: GPL-2.0-only
 /*
 ################################################################################
 #
 # r8168 is the Linux device driver released for Realtek Gigabit Ethernet
 # controllers with PCI-Express interface.
 #
-# Copyright(c) 2020 Realtek Semiconductor Corp. All rights reserved.
+# Copyright(c) 2021 Realtek Semiconductor Corp. All rights reserved.
 #
 # This program is free software; you can redistribute it and/or modify it
 # under the terms of the GNU General Public License as published by the Free
@@ -87,15 +88,77 @@
 #include "r8168_asf.h"
 #include "rtl_eeprom.h"
 #include "rtltool.h"
+#include "r8168_firmware.h"
 
 #ifdef ENABLE_R8168_PROCFS
 #include <linux/proc_fs.h>
 #include <linux/seq_file.h>
 #endif
 
+#define FIRMWARE_8168D_1    "rtl_nic/rtl8168d-1.fw"
+#define FIRMWARE_8168D_2    "rtl_nic/rtl8168d-2.fw"
+#define FIRMWARE_8168E_1    "rtl_nic/rtl8168e-1.fw"
+#define FIRMWARE_8168E_2    "rtl_nic/rtl8168e-2.fw"
+#define FIRMWARE_8168E_3    "rtl_nic/rtl8168e-3.fw"
+#define FIRMWARE_8168E_4    "rtl_nic/rtl8168e-4.fw"
+#define FIRMWARE_8168F_1    "rtl_nic/rtl8168f-1.fw"
+#define FIRMWARE_8168F_2    "rtl_nic/rtl8168f-2.fw"
+#define FIRMWARE_8411_1     "rtl_nic/rtl8411-1.fw"
+#define FIRMWARE_8411_2     "rtl_nic/rtl8411-2.fw"
+#define FIRMWARE_8168G_2    "rtl_nic/rtl8168g-2.fw"
+#define FIRMWARE_8168G_3    "rtl_nic/rtl8168g-3.fw"
+#define FIRMWARE_8168EP_1   "rtl_nic/rtl8168ep-1.fw"
+#define FIRMWARE_8168EP_2   "rtl_nic/rtl8168ep-2.fw"
+#define FIRMWARE_8168EP_3   "rtl_nic/rtl8168ep-3.fw"
+#define FIRMWARE_8168H_1    "rtl_nic/rtl8168h-1.fw"
+#define FIRMWARE_8168H_2    "rtl_nic/rtl8168h-2.fw"
+#define FIRMWARE_8168FP_3   "rtl_nic/rtl8168fp-3.fw"
+#define FIRMWARE_8168FP_4   "rtl_nic/rtl8168fp-4.fw"
+
 /* Maximum number of multicast addresses to filter (vs. Rx-all-multicast).
    The RTL chips use a 64 element hash table based on the Ethernet CRC. */
 static const int multicast_filter_limit = 32;
+
+static const struct {
+        const char *name;
+        const char *fw_name;
+} rtl_chip_fw_infos[] = {
+        /* PCI-E devices. */
+        [CFG_METHOD_1] = {"RTL8168B/8111",          },
+        [CFG_METHOD_2] = {"RTL8168B/8111",          },
+        [CFG_METHOD_3] = {"RTL8168B/8111",          },
+        [CFG_METHOD_4] = {"RTL8168C/8111C",         },
+        [CFG_METHOD_5] = {"RTL8168C/8111C",         },
+        [CFG_METHOD_6] = {"RTL8168C/8111C",         },
+        [CFG_METHOD_7] = {"RTL8168CP/8111CP",       },
+        [CFG_METHOD_8] = {"RTL8168CP/8111CP",       },
+        [CFG_METHOD_9] = {"RTL8168D/8111D",         FIRMWARE_8168D_1},
+        [CFG_METHOD_10] = {"RTL8168D/8111D",        FIRMWARE_8168D_2},
+        [CFG_METHOD_11] = {"RTL8168DP/8111DP",      },
+        [CFG_METHOD_12] = {"RTL8168DP/8111DP",      },
+        [CFG_METHOD_13] = {"RTL8168DP/8111DP",      },
+        [CFG_METHOD_14] = {"RTL8168E/8111E",        FIRMWARE_8168E_1},
+        [CFG_METHOD_15] = {"RTL8168E/8111E",        FIRMWARE_8168E_2},
+        [CFG_METHOD_16] = {"RTL8168E-VL/8111E-VL",  FIRMWARE_8168E_3},
+        [CFG_METHOD_17] = {"RTL8168E-VL/8111E-VL",  FIRMWARE_8168E_4},
+        [CFG_METHOD_18] = {"RTL8168F/8111F",        FIRMWARE_8168F_1},
+        [CFG_METHOD_19] = {"RTL8168F/8111F",        FIRMWARE_8168F_2},
+        [CFG_METHOD_20] = {"RTL8411",               FIRMWARE_8411_1},
+        [CFG_METHOD_21] = {"RTL8168G/8111G",        FIRMWARE_8168G_2},
+        [CFG_METHOD_22] = {"RTL8168G/8111G",        },
+        [CFG_METHOD_23] = {"RTL8168EP/8111EP",      FIRMWARE_8168EP_1},
+        [CFG_METHOD_24] = {"RTL8168GU/8111GU",      },
+        [CFG_METHOD_25] = {"RTL8168GU/8111GU",      FIRMWARE_8168G_3},
+        [CFG_METHOD_26] = {"8411B",                 FIRMWARE_8411_2},
+        [CFG_METHOD_27] = {"RTL8168EP/8111EP",      FIRMWARE_8168EP_2},
+        [CFG_METHOD_28] = {"RTL8168EP/8111EP",      FIRMWARE_8168EP_3},
+        [CFG_METHOD_29] = {"RTL8168H/8111H",        FIRMWARE_8168H_1},
+        [CFG_METHOD_30] = {"RTL8168H/8111H",        FIRMWARE_8168H_2},
+        [CFG_METHOD_31] = {"RTL8168FP/8111FP",      },
+        [CFG_METHOD_32] = {"RTL8168FP/8111FP",      FIRMWARE_8168FP_3},
+        [CFG_METHOD_33] = {"RTL8168FP/8111FP",      FIRMWARE_8168FP_4},
+        [CFG_METHOD_DEFAULT] = {"Unknown",          },
+};
 
 #define _R(NAME,MAC,RCR,MASK, JumFrameSz) \
     { .name = NAME, .mcfg = MAC, .RCR_Cfg = RCR, .RxConfigMask = MASK, .jumbo_frame_sz = JumFrameSz }
@@ -317,16 +380,12 @@ static const struct {
 #define PCI_VENDOR_ID_DLINK 0x1186
 #endif
 
-//  { PCI_VENDOR_ID_DLINK, 0x4300, 0x1186, 0x4b10,},
-
 static struct pci_device_id rtl8168_pci_tbl[] = {
         { PCI_DEVICE(PCI_VENDOR_ID_REALTEK, 0x8168), },
         { PCI_DEVICE(PCI_VENDOR_ID_REALTEK, 0x8161), },
         { PCI_DEVICE(PCI_VENDOR_ID_REALTEK, 0x2502), },
         { PCI_DEVICE(PCI_VENDOR_ID_REALTEK, 0x2600), },
-        { PCI_DEVICE(PCI_VENDOR_ID_DLINK, 0x4300),   },
-		{ PCI_DEVICE(PCI_VENDOR_ID_DLINK, 0x1186),   },
-		{ PCI_DEVICE(PCI_VENDOR_ID_DLINK, 0x4b10),   },
+        { PCI_VENDOR_ID_DLINK, 0x4300, 0x1186, 0x4b10,},
         {0,},
 };
 
@@ -335,6 +394,7 @@ MODULE_DEVICE_TABLE(pci, rtl8168_pci_tbl);
 static int rx_copybreak = 0;
 static int use_dac = 1;
 static int timer_count = 0x2600;
+static int dynamic_aspm_packet_threshold = 10;
 
 static struct {
         u32 msg_enable;
@@ -353,6 +413,11 @@ static unsigned int advertising_mode =  ADVERTISED_10baseT_Half |
 static int aspm = 1;
 #else
 static int aspm = 0;
+#endif
+#ifdef CONFIG_DYNAMIC_ASPM
+static int dynamic_aspm = 1;
+#else
+static int dynamic_aspm = 0;
 #endif
 #ifdef ENABLE_S5WOL
 static int s5wol = 1;
@@ -398,6 +463,9 @@ MODULE_PARM_DESC(advertising_mode, "force phy operation. Deprecated by ethtool (
 module_param(aspm, int, 0);
 MODULE_PARM_DESC(aspm, "Enable ASPM.");
 
+module_param(dynamic_aspm, int, 0);
+MODULE_PARM_DESC(aspm, "Enable Software Dynamic ASPM.");
+
 module_param(s5wol, int, 0);
 MODULE_PARM_DESC(s5wol, "Enable Shutdown Wake On Lan.");
 
@@ -422,12 +490,36 @@ MODULE_PARM_DESC(hwoptimize, "Enable HW optimization function.");
 module_param(s0_magic_packet, int, 0);
 MODULE_PARM_DESC(s0_magic_packet, "Enable S0 Magic Packet.");
 
+module_param(dynamic_aspm_packet_threshold, int, 0);
+MODULE_PARM_DESC(dynamic_aspm_packet_threshold, "Dynamic ASPM packet threshold.");
+
 #if LINUX_VERSION_CODE > KERNEL_VERSION(2,6,0)
 module_param_named(debug, debug.msg_enable, int, 0);
 MODULE_PARM_DESC(debug, "Debug verbosity level (0=none, ..., 16=all)");
 #endif//LINUX_VERSION_CODE > KERNEL_VERSION(2,6,0)
 
 MODULE_LICENSE("GPL");
+#ifdef ENABLE_USE_FIRMWARE_FILE
+MODULE_FIRMWARE(FIRMWARE_8168D_1);
+MODULE_FIRMWARE(FIRMWARE_8168D_2);
+MODULE_FIRMWARE(FIRMWARE_8168E_1);
+MODULE_FIRMWARE(FIRMWARE_8168E_2);
+MODULE_FIRMWARE(FIRMWARE_8168E_3);
+MODULE_FIRMWARE(FIRMWARE_8168E_4);
+MODULE_FIRMWARE(FIRMWARE_8168F_1);
+MODULE_FIRMWARE(FIRMWARE_8168F_2);
+MODULE_FIRMWARE(FIRMWARE_8411_1);
+MODULE_FIRMWARE(FIRMWARE_8411_2);
+MODULE_FIRMWARE(FIRMWARE_8168G_2);
+MODULE_FIRMWARE(FIRMWARE_8168G_3);
+MODULE_FIRMWARE(FIRMWARE_8168EP_1);
+MODULE_FIRMWARE(FIRMWARE_8168EP_2);
+MODULE_FIRMWARE(FIRMWARE_8168EP_3);
+MODULE_FIRMWARE(FIRMWARE_8168H_1);
+MODULE_FIRMWARE(FIRMWARE_8168H_2);
+MODULE_FIRMWARE(FIRMWARE_8168FP_3);
+MODULE_FIRMWARE(FIRMWARE_8168FP_4);
+#endif
 
 MODULE_VERSION(RTL8168_VERSION);
 
@@ -448,7 +540,7 @@ static void rtl8168_tx_clear(struct rtl8168_private *tp);
 static void rtl8168_rx_clear(struct rtl8168_private *tp);
 
 static int rtl8168_open(struct net_device *dev);
-static int rtl8168_start_xmit(struct sk_buff *skb, struct net_device *dev);
+static netdev_tx_t rtl8168_start_xmit(struct sk_buff *skb, struct net_device *dev);
 #if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,19)
 static irqreturn_t rtl8168_interrupt(int irq, void *dev_instance, struct pt_regs *regs);
 #else
@@ -476,6 +568,8 @@ static void rtl8168_desc_addr_fill(struct rtl8168_private *);
 static void rtl8168_tx_desc_init(struct rtl8168_private *tp);
 static void rtl8168_rx_desc_init(struct rtl8168_private *tp);
 
+static u16 rtl8168_get_hw_phy_mcu_code_ver(struct rtl8168_private *tp);
+
 static void rtl8168_hw_reset(struct net_device *dev);
 
 static void rtl8168_phy_power_up(struct net_device *dev);
@@ -488,6 +582,17 @@ static int rtl8168_clear_phy_mcu_patch_request(struct rtl8168_private *tp);
 #ifdef CONFIG_R8168_NAPI
 static int rtl8168_poll(napi_ptr napi, napi_budget budget);
 #endif
+
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,20)
+static void rtl8168_reset_task(void *_data);
+#else
+static void rtl8168_reset_task(struct work_struct *work);
+#endif
+
+static inline struct device *tp_to_dev(struct rtl8168_private *tp)
+{
+        return &tp->pci_dev->dev;
+}
 
 #if ((LINUX_VERSION_CODE < KERNEL_VERSION(4,7,0) && \
      LINUX_VERSION_CODE >= KERNEL_VERSION(4,6,00)))
@@ -908,9 +1013,10 @@ static int proc_get_driver_variable(struct seq_file *m, void *v)
         seq_printf(m, "proc_init_num\t0x%x\n", proc_init_num);
         seq_printf(m, "s0_magic_packet\t0x%x\n", s0_magic_packet);
         seq_printf(m, "HwSuppMagicPktVer\t0x%x\n", tp->HwSuppMagicPktVer);
+        seq_printf(m, "HwSuppUpsVer\t0x%x\n", tp->HwSuppUpsVer);
+        seq_printf(m, "HwSuppEsdVer\t0x%x\n", tp->HwSuppEsdVer);
         seq_printf(m, "HwSuppCheckPhyDisableModeVer\t0x%x\n", tp->HwSuppCheckPhyDisableModeVer);
         seq_printf(m, "HwPkgDet\t0x%x\n", tp->HwPkgDet);
-        seq_printf(m, "HwSuppGigaForceMode\t0x%x\n", tp->HwSuppGigaForceMode);
         seq_printf(m, "random_mac\t0x%x\n", tp->random_mac);
         seq_printf(m, "org_mac_addr\t%pM\n", tp->org_mac_addr);
 #if LINUX_VERSION_CODE > KERNEL_VERSION(2,6,13)
@@ -1218,9 +1324,10 @@ static int proc_get_driver_variable(char *page, char **start,
                         "proc_init_num\t0x%x\n"
                         "s0_magic_packet\t0x%x\n"
                         "HwSuppMagicPktVer\t0x%x\n"
+                        "HwSuppUpsVer\t0x%x\n"
+                        "HwSuppEsdVer\t0x%x\n"
                         "HwSuppCheckPhyDisableModeVer\t0x%x\n"
                         "HwPkgDet\t0x%x\n"
-                        "HwSuppGigaForceMode\t0x%x\n"
                         "random_mac\t0x%x\n"
                         "org_mac_addr\t%pM\n"
 #if LINUX_VERSION_CODE > KERNEL_VERSION(2,6,13)
@@ -1299,9 +1406,10 @@ static int proc_get_driver_variable(char *page, char **start,
                         proc_init_num,
                         s0_magic_packet,
                         tp->HwSuppMagicPktVer,
+                        tp->HwSuppUpsVer,
+                        tp->HwSuppEsdVer,
                         tp->HwSuppCheckPhyDisableModeVer,
                         tp->HwPkgDet,
-                        tp->HwSuppGigaForceMode,
                         tp->random_mac,
                         tp->org_mac_addr,
 #if LINUX_VERSION_CODE > KERNEL_VERSION(2,6,13)
@@ -1665,7 +1773,7 @@ static const struct rtl8168_proc_file rtl8168_proc_files[] = {
         { "eth_phy", &proc_get_eth_phy },
         { "ext_regs", &proc_get_extended_registers },
         { "pci_regs", &proc_get_pci_registers },
-//        { "" }
+        { "" }
 };
 
 static void rtl8168_proc_init(struct net_device *dev)
@@ -1888,8 +1996,8 @@ static void mdio_real_write(struct rtl8168_private *tp,
 }
 
 void rtl8168_mdio_write(struct rtl8168_private *tp,
-                        u32 RegAddr,
-                        u32 value)
+                        u16 RegAddr,
+                        u16 value)
 {
         if (tp->rtk_enable_diag) return;
 
@@ -2027,7 +2135,7 @@ u32 mdio_real_read(struct rtl8168_private *tp,
 }
 
 u32 rtl8168_mdio_read(struct rtl8168_private *tp,
-                      u32 RegAddr)
+                      u16 RegAddr)
 {
         if (tp->rtk_enable_diag) return 0xffffffff;
 
@@ -2108,6 +2216,23 @@ u16 rtl8168_mac_ocp_read(struct rtl8168_private *tp, u16 reg_addr)
 
         return data16;
 }
+
+#ifdef ENABLE_USE_FIRMWARE_FILE
+static void mac_mcu_write(struct rtl8168_private *tp, u16 reg, u16 value)
+{
+        if (reg == 0x1f) {
+                tp->ocp_base = value << 4;
+                return;
+        }
+
+        rtl8168_mac_ocp_write(tp, tp->ocp_base + reg, value);
+}
+
+static u32 mac_mcu_read(struct rtl8168_private *tp, u16 reg)
+{
+        return rtl8168_mac_ocp_read(tp, tp->ocp_base + reg);
+}
+#endif
 
 static void
 rtl8168_clear_and_set_mcu_ocp_bit(
@@ -2738,52 +2863,51 @@ rtl8168_other_fun_dev_pci_setting(struct rtl8168_private *tp,
         u8 i;
         u8 FunBit;
 
-        switch(tp->mcfg) {
-        case CFG_METHOD_23:
-        case CFG_METHOD_27:
-        case CFG_METHOD_28:
-                FunBit = 1;
-                //0: UMAC, 1: TCR1, 2: TCR2, 3: KCS, 4: EHCI(Control by EHCI Driver)
-                for (i = 0; i < 8; i++) {
-                        if (FunBit & multi_fun_sel_bit)
-                                rtl8168_clear_and_set_other_fun_pci_bit(tp, i, addr, clearmask, setmask);
+        for (i = 0; i < 8; i++) {
+                FunBit = (1 << i);
+                if (FunBit & multi_fun_sel_bit) {
+                        u8 set_other_fun = TRUE;
 
-                        FunBit <<= 1;
-                }
-                break;
-        case CFG_METHOD_31:
-        case CFG_METHOD_32:
-        case CFG_METHOD_33:
-                FunBit = 1;
-                for (i = 0; i < 8; i++) {
-                        if (FunBit & multi_fun_sel_bit) {
-                                u8 set_other_fun = TRUE;
-
-                                if (i == 3 || i == 4) {
+                        switch(tp->mcfg) {
+                        case CFG_METHOD_23:
+                        case CFG_METHOD_27:
+                        case CFG_METHOD_28:
+                                //0: UMAC, 1: TCR1, 2: TCR2, 3: KCS, 4: EHCI(Control by EHCI Driver)
+                                if (i < 5) {
                                         TmpUlong = rtl8168_csi_other_fun_read(tp, i, 0x00);
-
                                         if (TmpUlong == 0xFFFFFFFF)
                                                 set_other_fun = TRUE;
                                         else
                                                 set_other_fun = FALSE;
-                                } else if (i == 5 || i == 6) {
+                                }
+                                break;
+                        case CFG_METHOD_31:
+                        case CFG_METHOD_32:
+                        case CFG_METHOD_33:
+                                //0: BMC, 1: NIC, 2: TCR, 3: VGA/PCIE_TO_USB, 4: EHCI, 5: WIFI, 6: WIFI, 7: KCS
+                                if (i == 5 || i == 6) {
                                         if (tp->DASH) {
                                                 TmpUlong = rtl8168_ocp_read(tp, 0x184, 4);
-
                                                 if (TmpUlong & BIT_26)
                                                         set_other_fun = FALSE;
                                                 else
                                                         set_other_fun = TRUE;
                                         }
+                                } else { //function 0/1/2/3/4/7
+                                        TmpUlong = rtl8168_csi_other_fun_read(tp, i, 0x00);
+                                        if (TmpUlong == 0xFFFFFFFF)
+                                                set_other_fun = TRUE;
+                                        else
+                                                set_other_fun = FALSE;
                                 }
-
-                                if (set_other_fun)
-                                        rtl8168_clear_and_set_other_fun_pci_bit(tp, i, addr, clearmask, setmask);
+                                break;
+                        default:
+                                return;
                         }
 
-                        FunBit <<= 1;
+                        if (set_other_fun)
+                                rtl8168_clear_and_set_other_fun_pci_bit(tp, i, addr, clearmask, setmask);
                 }
-                break;
         }
 }
 
@@ -2832,6 +2956,7 @@ rtl8168_set_dash_other_fun_dev_aspm_clkreq(struct rtl8168_private *tp,
         rtl8168_other_fun_dev_pci_setting(tp, 0x80, clearmask, setmask, multi_fun_sel_bit);
 }
 
+/*
 static void
 rtl8168_set_dash_other_fun_dev_pci_cmd_register(struct rtl8168_private *tp,
                 u8 pci_cmd_reg,
@@ -2847,6 +2972,7 @@ rtl8168_set_dash_other_fun_dev_pci_cmd_register(struct rtl8168_private *tp,
 
         rtl8168_other_fun_dev_pci_setting(tp, 0x04, clearmask, setmask, multi_fun_sel_bit);
 }
+*/
 
 u32 rtl8168_eri_read_with_oob_base_address(struct rtl8168_private *tp, int addr, int len, int type, const u32 base_address)
 {
@@ -3090,44 +3216,6 @@ rtl8168_is_in_phy_disable_mode(struct net_device *dev)
         return in_phy_disable_mode;
 }
 
-static void
-rtl8168_enable_phy_disable_mode(struct net_device *dev)
-{
-        struct rtl8168_private *tp = netdev_priv(dev);
-
-        switch (tp->HwSuppCheckPhyDisableModeVer) {
-        case 1:
-                rtl8168_mac_ocp_write(tp, 0xDC20, rtl8168_mac_ocp_read(tp, 0xDC20) | BIT_1);
-                break;
-        case 2:
-        case 3:
-                RTL_W8(tp, 0xF2, RTL_R8(tp, 0xF2) | BIT_5);
-                break;
-        }
-
-        dprintk("enable phy disable mode.\n");
-}
-
-static void
-rtl8168_disable_phy_disable_mode(struct net_device *dev)
-{
-        struct rtl8168_private *tp = netdev_priv(dev);
-
-        switch (tp->HwSuppCheckPhyDisableModeVer) {
-        case 1:
-                rtl8168_mac_ocp_write(tp, 0xDC20, rtl8168_mac_ocp_read(tp, 0xDC20) & ~BIT_1);
-                break;
-        case 2:
-        case 3:
-                RTL_W8(tp, 0xF2, RTL_R8(tp, 0xF2) & ~BIT_5);
-                break;
-        }
-
-        mdelay(1);
-
-        dprintk("disable phy disable mode.\n");
-}
-
 void
 rtl8168_wait_txrx_fifo_empty(struct net_device *dev)
 {
@@ -3171,21 +3259,14 @@ static void rtl8168_driver_start(struct rtl8168_private *tp)
         case CFG_METHOD_23:
         case CFG_METHOD_27:
         case CFG_METHOD_28:
-                rtl8168_set_dash_other_fun_dev_pci_cmd_register(tp, 0x07, 0x0E);
-                rtl8168_set_dash_other_fun_dev_aspm_clkreq(tp, 3, 1, 0x0E);
-                rtl8168_set_dash_other_fun_dev_state_change(tp, 0, 0x0E);
+                rtl8168_set_dash_other_fun_dev_aspm_clkreq(tp, 3, 1, 0x1E);
+                rtl8168_set_dash_other_fun_dev_state_change(tp, 3, 0x1E);
                 break;
         case CFG_METHOD_31:
         case CFG_METHOD_32:
         case CFG_METHOD_33:
-                rtl8168_set_dash_other_fun_dev_aspm_clkreq(tp, 2, 1, 0xED);
-                rtl8168_set_dash_other_fun_dev_state_change(tp, 3, 0x78);
-                if (tp->DASH) {
-                        rtl8168_set_dash_other_fun_dev_state_change(tp, 0, 0x85);
-                        rtl8168_set_dash_other_fun_dev_pci_cmd_register(tp, 0x07, 0x85);
-                } else {
-                        rtl8168_set_dash_other_fun_dev_state_change(tp, 3, 0x85);
-                }
+                rtl8168_set_dash_other_fun_dev_aspm_clkreq(tp, 3, 1, 0xFC);
+                rtl8168_set_dash_other_fun_dev_state_change(tp, 3, 0xFC);
                 break;
         }
 
@@ -3560,7 +3641,7 @@ static void rtl8168_mac_loopback_test(struct rtl8168_private *tp)
         do {
                 skb = dev_alloc_skb(len + RTK_RX_ALIGN);
                 if (unlikely(!skb))
-                        dev_printk(KERN_NOTICE, &tp->pci_dev->dev, "-ENOMEM;\n");
+                        dev_printk(KERN_NOTICE, tp_to_dev(tp), "-ENOMEM;\n");
         } while (unlikely(skb == NULL));
         skb_reserve(skb, RTK_RX_ALIGN);
 
@@ -3569,8 +3650,8 @@ static void rtl8168_mac_loopback_test(struct rtl8168_private *tp)
         memcpy(skb_put(skb, sizeof(type)), &type, sizeof(type));
         tmpAddr = skb_put(skb, len - 14);
 
-        mapping = dma_map_single(&tp->pci_dev->dev, skb->data, len, DMA_TO_DEVICE);
-        dma_sync_single_for_cpu(&tp->pci_dev->dev, le64_to_cpu(mapping),
+        mapping = dma_map_single(tp_to_dev(tp), skb->data, len, DMA_TO_DEVICE);
+        dma_sync_single_for_cpu(tp_to_dev(tp), le64_to_cpu(mapping),
                                 len, DMA_TO_DEVICE);
         txd->addr = cpu_to_le64(mapping);
         txd->opts2 = 0;
@@ -3599,14 +3680,14 @@ static void rtl8168_mac_loopback_test(struct rtl8168_private *tp)
                 rx_len -= 4;
                 rxd->opts1 = cpu_to_le32(DescOwn | tp->rx_buf_sz);
 
-                dma_sync_single_for_cpu(&tp->pci_dev->dev, le64_to_cpu(mapping), len, DMA_TO_DEVICE);
+                dma_sync_single_for_cpu(tp_to_dev(tp), le64_to_cpu(mapping), len, DMA_TO_DEVICE);
 
                 if (rx_len == len) {
-                        dma_sync_single_for_cpu(&tp->pci_dev->dev, le64_to_cpu(rxd->addr), tp->rx_buf_sz, DMA_FROM_DEVICE);
+                        dma_sync_single_for_cpu(tp_to_dev(tp), le64_to_cpu(rxd->addr), tp->rx_buf_sz, DMA_FROM_DEVICE);
                         i = memcmp(skb->data, rx_skb->data, rx_len);
                         pci_dma_sync_single_for_device(tp->pci_dev, le64_to_cpu(rxd->addr), tp->rx_buf_sz, DMA_FROM_DEVICE);
                         if (i == 0) {
-//              dev_printk(KERN_INFO, &tp->pci_dev->dev, "loopback test finished\n",rx_len,len);
+//              dev_printk(KERN_INFO, tp_to_dev(tp), "loopback test finished\n",rx_len,len);
                                 break;
                         }
                 }
@@ -3649,11 +3730,26 @@ rtl8168_xmii_link_ok(struct net_device *dev)
         return retval;
 }
 
+static int
+rtl8168_wait_phy_reset_complete(struct rtl8168_private *tp)
+{
+        int i, val;
+
+        for (i = 0; i < 2500; i++) {
+                val = rtl8168_mdio_read(tp, MII_BMCR) & BMCR_RESET;
+                if (!val)
+                        return 0;
+
+                mdelay(1);
+        }
+
+        return -1;
+}
+
 static void
 rtl8168_xmii_reset_enable(struct net_device *dev)
 {
         struct rtl8168_private *tp = netdev_priv(dev);
-        int i, val = 0;
 
         if (rtl8168_is_in_phy_disable_mode(dev))
                 return;
@@ -3666,15 +3762,7 @@ rtl8168_xmii_reset_enable(struct net_device *dev)
                            ~(ADVERTISE_1000HALF | ADVERTISE_1000FULL));
         rtl8168_mdio_write(tp, MII_BMCR, BMCR_RESET | BMCR_ANENABLE);
 
-        for (i = 0; i < 2500; i++) {
-                val = rtl8168_mdio_read(tp, MII_BMCR) & BMCR_RESET;
-
-                if (!val) {
-                        return;
-                }
-
-                mdelay(1);
-        }
+        if (rtl8168_wait_phy_reset_complete(tp) == 0) return;
 
         if (netif_msg_link(tp))
                 printk(KERN_ERR "%s: PHY reset failed.\n", dev->name);
@@ -3736,6 +3824,88 @@ rtl8168_issue_offset_99_event(struct rtl8168_private *tp)
                 rtl8168_eri_write(tp, 0x1EA, 1, csi_tmp, ERIAR_ExGMAC);
                 break;
         }
+}
+
+static void
+rtl8168_enable_cfg9346_write(struct rtl8168_private *tp)
+{
+        RTL_W8(tp, Cfg9346, RTL_R8(tp, Cfg9346) | Cfg9346_Unlock);
+}
+
+static void
+rtl8168_disable_cfg9346_write(struct rtl8168_private *tp)
+{
+        RTL_W8(tp, Cfg9346, RTL_R8(tp, Cfg9346) & ~Cfg9346_Unlock);
+}
+
+static void
+rtl8168_enable_exit_l1_mask(struct rtl8168_private *tp)
+{
+        u32 csi_tmp;
+
+        switch (tp->mcfg) {
+        case CFG_METHOD_16:
+        case CFG_METHOD_17:
+        case CFG_METHOD_18:
+        case CFG_METHOD_19:
+                csi_tmp = rtl8168_eri_read(tp, 0xD4, 4, ERIAR_ExGMAC);
+                csi_tmp |= (BIT_8 | BIT_9 | BIT_10 | BIT_11 | BIT_12);
+                rtl8168_eri_write(tp, 0xD4, 4, csi_tmp, ERIAR_ExGMAC);
+                break;
+        case CFG_METHOD_20:
+                csi_tmp = rtl8168_eri_read(tp, 0xD4, 4, ERIAR_ExGMAC);
+                csi_tmp |= (BIT_10 | BIT_11);
+                rtl8168_eri_write(tp, 0xD4, 4, csi_tmp, ERIAR_ExGMAC);
+                break;
+        case CFG_METHOD_21 ... CFG_METHOD_33:
+                csi_tmp = rtl8168_eri_read(tp, 0xD4, 4, ERIAR_ExGMAC);
+                csi_tmp |= (BIT_7 | BIT_8 | BIT_9 | BIT_10 | BIT_11 | BIT_12);
+                rtl8168_eri_write(tp, 0xD4, 4, csi_tmp, ERIAR_ExGMAC);
+                break;
+        }
+}
+
+static void
+rtl8168_disable_exit_l1_mask(struct rtl8168_private *tp)
+{
+        u32 csi_tmp;
+
+        switch (tp->mcfg) {
+        case CFG_METHOD_16:
+        case CFG_METHOD_17:
+        case CFG_METHOD_18:
+        case CFG_METHOD_19:
+                csi_tmp = rtl8168_eri_read(tp, 0xD4, 4, ERIAR_ExGMAC);
+                csi_tmp &= ~(BIT_8 | BIT_9 | BIT_10 | BIT_11 | BIT_12);
+                rtl8168_eri_write(tp, 0xD4, 4, csi_tmp, ERIAR_ExGMAC);
+                break;
+        case CFG_METHOD_20:
+                csi_tmp = rtl8168_eri_read(tp, 0xD4, 4, ERIAR_ExGMAC);
+                csi_tmp &= ~(BIT_10 | BIT_11);
+                rtl8168_eri_write(tp, 0xD4, 4, csi_tmp, ERIAR_ExGMAC);
+                break;
+        case CFG_METHOD_21 ... CFG_METHOD_33:
+                csi_tmp = rtl8168_eri_read(tp, 0xD4, 4, ERIAR_ExGMAC);
+                csi_tmp &= ~(BIT_7 | BIT_8 | BIT_9 | BIT_10 | BIT_11 | BIT_12);
+                rtl8168_eri_write(tp, 0xD4, 4, csi_tmp, ERIAR_ExGMAC);
+                break;
+        }
+}
+
+static void
+rtl8168_hw_aspm_clkreq_enable(struct rtl8168_private *tp, bool enable)
+{
+        if (!tp->HwSuppAspmClkIntrLock) return;
+
+        if (enable && aspm) {
+                RTL_W8(tp, Config5, RTL_R8(tp, Config5) | ASPM_en);
+                RTL_W8(tp, Config2, RTL_R8(tp, Config2) | ClkReqEn);
+        } else {
+                RTL_W8(tp, Config2, RTL_R8(tp, Config2) & ~ClkReqEn);
+                RTL_W8(tp, Config5, RTL_R8(tp, Config5) & ~ASPM_en);
+        }
+
+        udelay(10);
 }
 
 #ifdef ENABLE_DASH_SUPPORT
@@ -3879,6 +4049,12 @@ rtl8168_check_link_status(struct net_device *dev)
 
                         rtl8168_init_ring(dev);
 
+                        if (dynamic_aspm) {
+                                rtl8168_enable_cfg9346_write(tp);
+                                rtl8168_hw_aspm_clkreq_enable(tp, true);
+                                rtl8168_disable_cfg9346_write(tp);
+                        }
+
                         rtl8168_set_speed(dev, tp->autoneg, tp->speed, tp->duplex, tp->advertising);
 
                         switch (tp->mcfg) {
@@ -3919,6 +4095,17 @@ rtl8168_check_link_status(struct net_device *dev)
                         }
                         break;
                 }
+        } else {
+                if (dynamic_aspm) {
+                        bool enable_hw_aspm_clkreq = true;
+                        if (tp->dynamic_aspm_packet_count > dynamic_aspm_packet_threshold)
+                                enable_hw_aspm_clkreq = false;
+
+                        rtl8168_enable_cfg9346_write(tp);
+                        rtl8168_hw_aspm_clkreq_enable(tp, enable_hw_aspm_clkreq);
+                        rtl8168_disable_cfg9346_write(tp);
+                }
+                tp->dynamic_aspm_packet_count = 0;
         }
 }
 
@@ -4358,52 +4545,20 @@ rtl8168_set_pci_99_180_exit_driver_para(struct net_device *dev)
 }
 
 static void
-rtl8168_enable_cfg9346_write(struct rtl8168_private *tp)
-{
-        RTL_W8(tp, Cfg9346, RTL_R8(tp, Cfg9346) | Cfg9346_Unlock);
-}
-
-static void
-rtl8168_disable_cfg9346_write(struct rtl8168_private *tp)
-{
-        RTL_W8(tp, Cfg9346, RTL_R8(tp, Cfg9346) & ~Cfg9346_Unlock);
-}
-
-static void
 rtl8168_hw_d3_para(struct net_device *dev)
 {
         struct rtl8168_private *tp = netdev_priv(dev);
 
         RTL_W16(tp, RxMaxSize, RX_BUF_SIZE);
 
-        switch (tp->mcfg) {
-        case CFG_METHOD_14:
-        case CFG_METHOD_15:
-        case CFG_METHOD_16:
-        case CFG_METHOD_17:
-        case CFG_METHOD_18:
-        case CFG_METHOD_19:
-        case CFG_METHOD_20:
-        case CFG_METHOD_21:
-        case CFG_METHOD_22:
-        case CFG_METHOD_23:
-        case CFG_METHOD_24:
-        case CFG_METHOD_25:
-        case CFG_METHOD_26:
-        case CFG_METHOD_27:
-        case CFG_METHOD_28:
-        case CFG_METHOD_29:
-        case CFG_METHOD_30:
-        case CFG_METHOD_31:
-        case CFG_METHOD_32:
-        case CFG_METHOD_33:
+        if (tp->HwSuppAspmClkIntrLock) {
                 RTL_W8(tp, 0xF1, RTL_R8(tp, 0xF1) & ~BIT_7);
                 rtl8168_enable_cfg9346_write(tp);
-                RTL_W8(tp, Config2, RTL_R8(tp, Config2) & ~BIT_7);
-                RTL_W8(tp, Config5, RTL_R8(tp, Config5) & ~BIT_0);
+                rtl8168_hw_aspm_clkreq_enable(tp, false);
                 rtl8168_disable_cfg9346_write(tp);
-                break;
         }
+
+        rtl8168_disable_exit_l1_mask(tp);
 
 #ifdef ENABLE_REALWOW_SUPPORT
         rtl8168_set_realwow_d3_para(dev);
@@ -4625,9 +4780,6 @@ rtl8168_phy_setup_force_mode(struct net_device *dev, u32 speed, u8 duplex)
                 bmcr_true_force = BMCR_SPEED100;
         } else if ((speed == SPEED_100) && (duplex == DUPLEX_FULL)) {
                 bmcr_true_force = BMCR_SPEED100 | BMCR_FULLDPLX;
-        } else if ((speed == SPEED_1000) && (duplex == DUPLEX_FULL) &&
-                   tp->HwSuppGigaForceMode) {
-                bmcr_true_force = BMCR_SPEED1000 | BMCR_FULLDPLX;
         } else {
                 netif_err(tp, drv, dev, "Failed to set phy force mode!\n");
                 return;
@@ -4713,31 +4865,33 @@ rtl8168_powerdown_pll(struct net_device *dev)
 
         rtl8168_phy_power_down(dev);
 
-        switch (tp->mcfg) {
-        case CFG_METHOD_9:
-        case CFG_METHOD_10:
-        case CFG_METHOD_11:
-        case CFG_METHOD_12:
-        case CFG_METHOD_13:
-        case CFG_METHOD_14:
-        case CFG_METHOD_15:
-        case CFG_METHOD_17:
-        case CFG_METHOD_18:
-        case CFG_METHOD_19:
-        case CFG_METHOD_21:
-        case CFG_METHOD_22:
-        case CFG_METHOD_24:
-        case CFG_METHOD_25:
-        case CFG_METHOD_26:
-        case CFG_METHOD_27:
-        case CFG_METHOD_28:
-        case CFG_METHOD_29:
-        case CFG_METHOD_30:
-        case CFG_METHOD_31:
-        case CFG_METHOD_32:
-        case CFG_METHOD_33:
-                RTL_W8(tp, PMCH, RTL_R8(tp, PMCH) & ~BIT_7);
-                break;
+        if (!tp->HwIcVerUnknown) {
+                switch (tp->mcfg) {
+                case CFG_METHOD_9:
+                case CFG_METHOD_10:
+                //case CFG_METHOD_11:
+                case CFG_METHOD_12:
+                case CFG_METHOD_13:
+                case CFG_METHOD_14:
+                case CFG_METHOD_15:
+                case CFG_METHOD_17:
+                case CFG_METHOD_18:
+                case CFG_METHOD_19:
+                case CFG_METHOD_21:
+                case CFG_METHOD_22:
+                case CFG_METHOD_24:
+                case CFG_METHOD_25:
+                case CFG_METHOD_26:
+                case CFG_METHOD_27:
+                case CFG_METHOD_28:
+                case CFG_METHOD_29:
+                case CFG_METHOD_30:
+                case CFG_METHOD_31:
+                case CFG_METHOD_32:
+                case CFG_METHOD_33:
+                        RTL_W8(tp, PMCH, RTL_R8(tp, PMCH) & ~BIT_7);
+                        break;
+                }
         }
 
         switch (tp->mcfg) {
@@ -4833,7 +4987,7 @@ rtl8168_set_wol(struct net_device *dev,
 
         spin_unlock_irqrestore(&tp->lock, flags);
 
-        device_set_wakeup_enable(&tp->pci_dev->dev, tp->wol_enabled);
+        device_set_wakeup_enable(tp_to_dev(tp), tp->wol_enabled);
 
         return 0;
 }
@@ -4843,12 +4997,17 @@ rtl8168_get_drvinfo(struct net_device *dev,
                     struct ethtool_drvinfo *info)
 {
         struct rtl8168_private *tp = netdev_priv(dev);
+        struct rtl8168_fw *rtl_fw = tp->rtl_fw;
 
         strlcpy(info->driver, MODULENAME, sizeof(info->driver));
         strlcpy(info->version, RTL8168_VERSION, sizeof(info->version));
         strlcpy(info->bus_info, pci_name(tp->pci_dev), sizeof(info->bus_info));
         info->regdump_len = R8168_REGS_DUMP_SIZE;
         info->eedump_len = tp->eeprom_len;
+        BUILD_BUG_ON(sizeof(info->fw_version) < sizeof(rtl_fw->version));
+        if (rtl_fw)
+                strlcpy(info->fw_version, rtl_fw->version,
+                        sizeof(info->fw_version));
 }
 
 static int
@@ -4927,11 +5086,9 @@ rtl8168_set_speed_xmii(struct net_device *dev,
                 mdelay(20);
         } else {
                 /*true force*/
-                if (speed == SPEED_10 || speed == SPEED_100 ||
-                    (speed == SPEED_1000 && duplex == DUPLEX_FULL &&
-                     tp->HwSuppGigaForceMode)) {
+                if (speed == SPEED_10 || speed == SPEED_100)
                         rtl8168_phy_setup_force_mode(dev, speed, duplex);
-                } else
+                else
                         goto out;
         }
 
@@ -5586,10 +5743,10 @@ static int rtl_get_eeprom(struct net_device *dev, struct ethtool_eeprom *eeprom,
         u16 tmp;
 
         if (tp->eeprom_type == EEPROM_TYPE_NONE) {
-                dev_printk(KERN_DEBUG, &tp->pci_dev->dev, "Detect none EEPROM\n");
+                dev_printk(KERN_DEBUG, tp_to_dev(tp), "Detect none EEPROM\n");
                 return -EOPNOTSUPP;
         } else if (eeprom->len == 0 || (eeprom->offset+eeprom->len) > tp->eeprom_len) {
-                dev_printk(KERN_DEBUG, &tp->pci_dev->dev, "Invalid parameter\n");
+                dev_printk(KERN_DEBUG, tp_to_dev(tp), "Invalid parameter\n");
                 return -EINVAL;
         }
 
@@ -5797,7 +5954,7 @@ static int rtl8168_enable_EEE(struct rtl8168_private *tp)
                 break;
 
         default:
-//      dev_printk(KERN_DEBUG, &tp->pci_dev->dev, "Not Support EEE\n");
+//      dev_printk(KERN_DEBUG, tp_to_dev(tp), "Not Support EEE\n");
                 ret = -EOPNOTSUPP;
                 break;
         }
@@ -5897,7 +6054,7 @@ static int rtl8168_enable_EEE(struct rtl8168_private *tp)
         case CFG_METHOD_29:
         case CFG_METHOD_30:
                 data = rtl8168_mac_ocp_read(tp, 0xE052);
-                data |= BIT_0;
+                data &= ~(BIT_0);
                 rtl8168_mac_ocp_write(tp, 0xE052, data);
 
                 rtl8168_mdio_write(tp, 0x1F, 0x0A43);
@@ -5913,9 +6070,11 @@ static int rtl8168_enable_EEE(struct rtl8168_private *tp)
         case CFG_METHOD_31:
         case CFG_METHOD_32:
         case CFG_METHOD_33:
+                /*
                 data = rtl8168_mac_ocp_read(tp, 0xE052);
                 data |= BIT_0;
                 rtl8168_mac_ocp_write(tp, 0xE052, data);
+                */
 
                 rtl8168_mdio_write(tp, 0x1F, 0x0A43);
                 data = rtl8168_mdio_read(tp, 0x10) | BIT_15;
@@ -6066,7 +6225,7 @@ static int rtl8168_disable_EEE(struct rtl8168_private *tp)
                 break;
 
         default:
-//      dev_printk(KERN_DEBUG, &tp->pci_dev->dev, "Not Support EEE\n");
+//      dev_printk(KERN_DEBUG, tp_to_dev(tp), "Not Support EEE\n");
                 ret = -EOPNOTSUPP;
                 break;
         }
@@ -6274,7 +6433,9 @@ rtl_ethtool_set_eee(struct net_device *net, struct ethtool_eee *eee)
                 return -EOPNOTSUPP;
         }
 
-        if (HW_SUPP_SERDES_PHY(tp) || !HW_HAS_WRITE_PHY_MCU_RAM_CODE(tp))
+        if (HW_SUPP_SERDES_PHY(tp) ||
+            !HW_HAS_WRITE_PHY_MCU_RAM_CODE(tp) ||
+            tp->DASH)
                 return -EOPNOTSUPP;
 
         spin_lock_irqsave(&tp->lock, flags);
@@ -6428,7 +6589,7 @@ static int rtl8168_enable_green_feature(struct rtl8168_private *tp)
                 rtl8168_mdio_write(tp, 0x00, 0x9200);
                 break;
         default:
-                dev_printk(KERN_DEBUG, &tp->pci_dev->dev, "Not Support Green Feature\n");
+                dev_printk(KERN_DEBUG, tp_to_dev(tp), "Not Support Green Feature\n");
                 break;
         }
 
@@ -6506,7 +6667,7 @@ static int rtl8168_disable_green_feature(struct rtl8168_private *tp)
                 rtl8168_mdio_write(tp, 0x00, 0x9200);
                 break;
         default:
-                dev_printk(KERN_DEBUG, &tp->pci_dev->dev, "Not Support Green Feature\n");
+                dev_printk(KERN_DEBUG, tp_to_dev(tp), "Not Support Green Feature\n");
                 break;
         }
 
@@ -6881,6 +7042,133 @@ rtl8168_tally_counter_clear(struct rtl8168_private *tp)
         RTL_W32(tp, CounterAddrLow, ((u64)tp->tally_paddr & (DMA_BIT_MASK(32))) | CounterReset);
 }
 
+static
+u16
+rtl8168_get_phy_state(struct rtl8168_private *tp)
+{
+        u16 PhyState = 0xFF;
+
+        if (HW_SUPPORT_UPS_MODE(tp) == FALSE) goto exit;
+
+        switch (tp->HwSuppUpsVer) {
+        case 1:
+                PhyState = rtl8168_mdio_read_phy_ocp(tp, 0x0A42, 0x10);
+                PhyState &= 0x7;  //bit[2:0]
+                break;
+        }
+
+exit:
+        return PhyState;
+}
+
+static
+bool
+rtl8168_wait_phy_state_ready(struct rtl8168_private *tp,
+                             u16 PhyState,
+                             u32 MicroSecondTimeout
+                            )
+{
+        u16 TmpPhyState;
+        u32 WaitCount;
+        u32 i = 0;
+        bool PhyStateReady = TRUE;
+
+        if (HW_SUPPORT_UPS_MODE(tp) == FALSE) goto exit;
+
+        WaitCount = MicroSecondTimeout / 1000;
+        if (WaitCount == 0) WaitCount = 100;
+
+        do {
+                TmpPhyState = rtl8168_get_phy_state(tp);
+                mdelay(1);
+                i++;
+        } while ((i < WaitCount) && (TmpPhyState != PhyState));
+
+        PhyStateReady = (i == WaitCount && TmpPhyState != PhyState) ? FALSE : TRUE;
+
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,18)
+        WARN_ON_ONCE(i == WaitCount);
+#endif
+
+exit:
+        return PhyStateReady;
+}
+
+static
+bool
+rtl8168_test_phy_ocp(struct rtl8168_private *tp)
+{
+        bool RestorePhyOcpReg = FALSE;
+
+        if (tp->TestPhyOcpReg == FALSE) goto exit;
+
+        if (tp->HwSuppEsdVer == 2) {
+                u16 PhyRegValue;
+                u8 ResetPhyType = 0;
+
+                if (HW_PHY_STATUS_INI == rtl8168_get_phy_state(tp)) {
+                        ResetPhyType = 1;
+                } else {
+                        rtl8168_mdio_write(tp, 0x1F, 0x0C40);
+                        PhyRegValue = rtl8168_mdio_read(tp, 0x12);
+                        rtl8168_mdio_write(tp, 0x1F, 0x0000);
+                        if ((PhyRegValue & 0x03) != 0x00) {
+                                ResetPhyType = 2;
+                        }
+                }
+
+                if (ResetPhyType > 0) {
+                        u32 WaitCnt;
+                        struct net_device *dev = tp->dev;
+
+                        printk(KERN_ERR "%s: test_phy_ocp ResetPhyType = 0x%02x\n.\n", dev->name, ResetPhyType);
+
+                        rtl8168_mdio_write(tp, 0x1F, 0x0C41);
+                        rtl8168_set_eth_phy_bit(tp, 0x14, BIT_0);
+                        rtl8168_mdio_write(tp, 0x1F, 0x0000);
+                        mdelay(24); //24ms
+
+                        rtl8168_mdio_write(tp, 0x1F, 0x0C40);
+                        PhyRegValue = rtl8168_mdio_read(tp, 0x12);
+                        if ((PhyRegValue & 0x03) != 0x00) {
+                                WaitCnt = 0;
+                                while ((PhyRegValue & 0x03) != 0x00 && WaitCnt < 5) {
+                                        rtl8168_mdio_write(tp, 0x1F, 0x0C40);
+                                        rtl8168_set_eth_phy_bit(tp, 0x11, (BIT_15 | BIT_14));
+                                        rtl8168_clear_eth_phy_bit(tp, 0x11, (BIT_15 | BIT_14));
+                                        mdelay(100);
+                                        rtl8168_mdio_write(tp, 0x1F, 0x0C40);
+                                        PhyRegValue = rtl8168_mdio_read(tp, 0x12);
+                                        WaitCnt++;
+                                }
+                        }
+
+                        rtl8168_mdio_write(tp, 0x1F, 0x0000);
+
+                        rtl8168_mdio_write(tp, 0x1F, 0x0A46);
+                        rtl8168_mdio_write(tp, 0x10, tp->BackupPhyFuseDout_15_0);
+                        rtl8168_mdio_write(tp, 0x12, tp->BackupPhyFuseDout_47_32);
+                        rtl8168_mdio_write(tp, 0x13, tp->BackupPhyFuseDout_63_48);
+                        rtl8168_mdio_write(tp, 0x1F, 0x0000);
+
+                        rtl8168_wait_phy_state_ready(tp, HW_PHY_STATUS_INI, 5000000);
+                        rtl8168_mdio_write(tp, 0x1F, 0x0A46);
+                        rtl8168_set_eth_phy_bit(tp, 0x14, BIT_0);
+                        rtl8168_mdio_write(tp, 0x1F, 0x0000);
+                        rtl8168_wait_phy_state_ready(tp, HW_PHY_STATUS_LAN_ON, 500000);
+
+                        tp->HwHasWrRamCodeToMicroP = FALSE;
+
+                        RestorePhyOcpReg = TRUE;
+                }
+
+                rtl8168_mdio_write(tp, 0x1F, 0x0000);
+        }
+
+exit:
+        return RestorePhyOcpReg;
+}
+
 static int
 rtl8168_is_ups_resume(struct net_device *dev)
 {
@@ -6902,7 +7190,7 @@ rtl8168_wait_phy_ups_resume(struct net_device *dev, u16 PhyState)
 {
         struct rtl8168_private *tp = netdev_priv(dev);
         u16 TmpPhyState;
-        int i=0;
+        int i = 0;
 
         do {
                 TmpPhyState = rtl8168_mdio_read_phy_ocp(tp, 0x0A42, 0x10);
@@ -6961,19 +7249,9 @@ rtl8168_exit_oob(struct net_device *dev)
                 }
         }
 
-        switch (tp->mcfg) {
-        case CFG_METHOD_23:
-        case CFG_METHOD_27:
-        case CFG_METHOD_28:
-        case CFG_METHOD_31:
-        case CFG_METHOD_32:
-        case CFG_METHOD_33:
-                rtl8168_dash2_disable_txrx(dev);
-                break;
-        }
-
         if (HW_DASH_SUPPORT_DASH(tp)) {
                 rtl8168_driver_start(tp);
+                rtl8168_dash2_disable_txrx(dev);
 #ifdef ENABLE_DASH_SUPPORT
                 DashHwInit(dev);
 #endif
@@ -7075,18 +7353,11 @@ rtl8168_exit_oob(struct net_device *dev)
         }
 
         //wait ups resume (phy state 2)
-        switch (tp->mcfg) {
-        case CFG_METHOD_29:
-        case CFG_METHOD_30:
-        case CFG_METHOD_31:
-        case CFG_METHOD_32:
-        case CFG_METHOD_33:
+        if (HW_SUPPORT_UPS_MODE(tp))
                 if (rtl8168_is_ups_resume(dev)) {
-                        rtl8168_wait_phy_ups_resume(dev, 2);
+                        rtl8168_wait_phy_ups_resume(dev, HW_PHY_STATUS_EXT_INI);
                         rtl8168_clear_ups_resume_bit(dev);
                 }
-                break;
-        };
 
 #ifdef ENABLE_FIBER_SUPPORT
         if (HW_FIBER_MODE_ENABLED(tp))
@@ -7101,25 +7372,10 @@ rtl8168_hw_disable_mac_mcu_bps(struct net_device *dev)
 {
         struct rtl8168_private *tp = netdev_priv(dev);
 
-        switch (tp->mcfg) {
-        case CFG_METHOD_21:
-        case CFG_METHOD_22:
-        case CFG_METHOD_23:
-        case CFG_METHOD_24:
-        case CFG_METHOD_25:
-        case CFG_METHOD_26:
-        case CFG_METHOD_27:
-        case CFG_METHOD_28:
-        case CFG_METHOD_29:
-        case CFG_METHOD_30:
-        case CFG_METHOD_31:
-        case CFG_METHOD_32:
-        case CFG_METHOD_33:
+        if (tp->HwSuppAspmClkIntrLock) {
                 rtl8168_enable_cfg9346_write(tp);
-                RTL_W8(tp, Config5, RTL_R8(tp, Config5) & ~BIT_0);
-                RTL_W8(tp, Config2, RTL_R8(tp, Config2) & ~BIT_7);
+                rtl8168_hw_aspm_clkreq_enable(tp, false);
                 rtl8168_disable_cfg9346_write(tp);
-                break;
         }
 
         switch (tp->mcfg) {
@@ -7160,2209 +7416,36 @@ rtl8168_hw_disable_mac_mcu_bps(struct net_device *dev)
         }
 }
 
-static void
-rtl8168_set_mac_mcu_8168g_1(struct net_device *dev)
+#ifdef ENABLE_USE_FIRMWARE_FILE
+static void rtl8168_release_firmware(struct rtl8168_private *tp)
 {
-        struct rtl8168_private *tp = netdev_priv(dev);
-
-        rtl8168_mac_ocp_write(tp, 0xE43C, 0x0000);
-        rtl8168_mac_ocp_write(tp, 0xE43E, 0x0000);
-
-        rtl8168_mac_ocp_write(tp, 0xE434, 0x0004);
-        rtl8168_mac_ocp_write(tp, 0xE43C, 0x0004);
-
-        rtl8168_hw_disable_mac_mcu_bps(dev);
-
-        rtl8168_mac_ocp_write( tp, 0xF800, 0xE008 );
-        rtl8168_mac_ocp_write( tp, 0xF802, 0xE01B );
-        rtl8168_mac_ocp_write( tp, 0xF804, 0xE022 );
-        rtl8168_mac_ocp_write( tp, 0xF806, 0xE094 );
-        rtl8168_mac_ocp_write( tp, 0xF808, 0xE097 );
-        rtl8168_mac_ocp_write( tp, 0xF80A, 0xE09A );
-        rtl8168_mac_ocp_write( tp, 0xF80C, 0xE0B3 );
-        rtl8168_mac_ocp_write( tp, 0xF80E, 0xE0BA );
-        rtl8168_mac_ocp_write( tp, 0xF810, 0x49D2 );
-        rtl8168_mac_ocp_write( tp, 0xF812, 0xF10D );
-        rtl8168_mac_ocp_write( tp, 0xF814, 0x766C );
-        rtl8168_mac_ocp_write( tp, 0xF816, 0x49E2 );
-        rtl8168_mac_ocp_write( tp, 0xF818, 0xF00A );
-        rtl8168_mac_ocp_write( tp, 0xF81A, 0x1EC0 );
-        rtl8168_mac_ocp_write( tp, 0xF81C, 0x8EE1 );
-        rtl8168_mac_ocp_write( tp, 0xF81E, 0xC60A );
-        rtl8168_mac_ocp_write( tp, 0xF820, 0x77C0 );
-        rtl8168_mac_ocp_write( tp, 0xF822, 0x4870 );
-        rtl8168_mac_ocp_write( tp, 0xF824, 0x9FC0 );
-        rtl8168_mac_ocp_write( tp, 0xF826, 0x1EA0 );
-        rtl8168_mac_ocp_write( tp, 0xF828, 0xC707 );
-        rtl8168_mac_ocp_write( tp, 0xF82A, 0x8EE1 );
-        rtl8168_mac_ocp_write( tp, 0xF82C, 0x9D6C );
-        rtl8168_mac_ocp_write( tp, 0xF82E, 0xC603 );
-        rtl8168_mac_ocp_write( tp, 0xF830, 0xBE00 );
-        rtl8168_mac_ocp_write( tp, 0xF832, 0xB416 );
-        rtl8168_mac_ocp_write( tp, 0xF834, 0x0076 );
-        rtl8168_mac_ocp_write( tp, 0xF836, 0xE86C );
-        rtl8168_mac_ocp_write( tp, 0xF838, 0xC406 );
-        rtl8168_mac_ocp_write( tp, 0xF83A, 0x7580 );
-        rtl8168_mac_ocp_write( tp, 0xF83C, 0x4852 );
-        rtl8168_mac_ocp_write( tp, 0xF83E, 0x8D80 );
-        rtl8168_mac_ocp_write( tp, 0xF840, 0xC403 );
-        rtl8168_mac_ocp_write( tp, 0xF842, 0xBC00 );
-        rtl8168_mac_ocp_write( tp, 0xF844, 0xD3E0 );
-        rtl8168_mac_ocp_write( tp, 0xF846, 0x02C8 );
-        rtl8168_mac_ocp_write( tp, 0xF848, 0x8918 );
-        rtl8168_mac_ocp_write( tp, 0xF84A, 0xE815 );
-        rtl8168_mac_ocp_write( tp, 0xF84C, 0x1100 );
-        rtl8168_mac_ocp_write( tp, 0xF84E, 0xF011 );
-        rtl8168_mac_ocp_write( tp, 0xF850, 0xE812 );
-        rtl8168_mac_ocp_write( tp, 0xF852, 0x4990 );
-        rtl8168_mac_ocp_write( tp, 0xF854, 0xF002 );
-        rtl8168_mac_ocp_write( tp, 0xF856, 0xE817 );
-        rtl8168_mac_ocp_write( tp, 0xF858, 0xE80E );
-        rtl8168_mac_ocp_write( tp, 0xF85A, 0x4992 );
-        rtl8168_mac_ocp_write( tp, 0xF85C, 0xF002 );
-        rtl8168_mac_ocp_write( tp, 0xF85E, 0xE80E );
-        rtl8168_mac_ocp_write( tp, 0xF860, 0xE80A );
-        rtl8168_mac_ocp_write( tp, 0xF862, 0x4993 );
-        rtl8168_mac_ocp_write( tp, 0xF864, 0xF002 );
-        rtl8168_mac_ocp_write( tp, 0xF866, 0xE818 );
-        rtl8168_mac_ocp_write( tp, 0xF868, 0xE806 );
-        rtl8168_mac_ocp_write( tp, 0xF86A, 0x4991 );
-        rtl8168_mac_ocp_write( tp, 0xF86C, 0xF002 );
-        rtl8168_mac_ocp_write( tp, 0xF86E, 0xE838 );
-        rtl8168_mac_ocp_write( tp, 0xF870, 0xC25E );
-        rtl8168_mac_ocp_write( tp, 0xF872, 0xBA00 );
-        rtl8168_mac_ocp_write( tp, 0xF874, 0xC056 );
-        rtl8168_mac_ocp_write( tp, 0xF876, 0x7100 );
-        rtl8168_mac_ocp_write( tp, 0xF878, 0xFF80 );
-        rtl8168_mac_ocp_write( tp, 0xF87A, 0x7100 );
-        rtl8168_mac_ocp_write( tp, 0xF87C, 0x4892 );
-        rtl8168_mac_ocp_write( tp, 0xF87E, 0x4813 );
-        rtl8168_mac_ocp_write( tp, 0xF880, 0x8900 );
-        rtl8168_mac_ocp_write( tp, 0xF882, 0xE00A );
-        rtl8168_mac_ocp_write( tp, 0xF884, 0x7100 );
-        rtl8168_mac_ocp_write( tp, 0xF886, 0x4890 );
-        rtl8168_mac_ocp_write( tp, 0xF888, 0x4813 );
-        rtl8168_mac_ocp_write( tp, 0xF88A, 0x8900 );
-        rtl8168_mac_ocp_write( tp, 0xF88C, 0xC74B );
-        rtl8168_mac_ocp_write( tp, 0xF88E, 0x74F8 );
-        rtl8168_mac_ocp_write( tp, 0xF890, 0x48C2 );
-        rtl8168_mac_ocp_write( tp, 0xF892, 0x4841 );
-        rtl8168_mac_ocp_write( tp, 0xF894, 0x8CF8 );
-        rtl8168_mac_ocp_write( tp, 0xF896, 0xC746 );
-        rtl8168_mac_ocp_write( tp, 0xF898, 0x74FC );
-        rtl8168_mac_ocp_write( tp, 0xF89A, 0x49C0 );
-        rtl8168_mac_ocp_write( tp, 0xF89C, 0xF120 );
-        rtl8168_mac_ocp_write( tp, 0xF89E, 0x49C1 );
-        rtl8168_mac_ocp_write( tp, 0xF8A0, 0xF11E );
-        rtl8168_mac_ocp_write( tp, 0xF8A2, 0x74F8 );
-        rtl8168_mac_ocp_write( tp, 0xF8A4, 0x49C0 );
-        rtl8168_mac_ocp_write( tp, 0xF8A6, 0xF01B );
-        rtl8168_mac_ocp_write( tp, 0xF8A8, 0x49C6 );
-        rtl8168_mac_ocp_write( tp, 0xF8AA, 0xF119 );
-        rtl8168_mac_ocp_write( tp, 0xF8AC, 0x74F8 );
-        rtl8168_mac_ocp_write( tp, 0xF8AE, 0x49C4 );
-        rtl8168_mac_ocp_write( tp, 0xF8B0, 0xF013 );
-        rtl8168_mac_ocp_write( tp, 0xF8B2, 0xC536 );
-        rtl8168_mac_ocp_write( tp, 0xF8B4, 0x74B0 );
-        rtl8168_mac_ocp_write( tp, 0xF8B6, 0x49C1 );
-        rtl8168_mac_ocp_write( tp, 0xF8B8, 0xF1FD );
-        rtl8168_mac_ocp_write( tp, 0xF8BA, 0xC537 );
-        rtl8168_mac_ocp_write( tp, 0xF8BC, 0xC434 );
-        rtl8168_mac_ocp_write( tp, 0xF8BE, 0x9CA0 );
-        rtl8168_mac_ocp_write( tp, 0xF8C0, 0xC435 );
-        rtl8168_mac_ocp_write( tp, 0xF8C2, 0x1C13 );
-        rtl8168_mac_ocp_write( tp, 0xF8C4, 0x484F );
-        rtl8168_mac_ocp_write( tp, 0xF8C6, 0x9CA2 );
-        rtl8168_mac_ocp_write( tp, 0xF8C8, 0xC52B );
-        rtl8168_mac_ocp_write( tp, 0xF8CA, 0x74B0 );
-        rtl8168_mac_ocp_write( tp, 0xF8CC, 0x49C1 );
-        rtl8168_mac_ocp_write( tp, 0xF8CE, 0xF1FD );
-        rtl8168_mac_ocp_write( tp, 0xF8D0, 0x74F8 );
-        rtl8168_mac_ocp_write( tp, 0xF8D2, 0x48C4 );
-        rtl8168_mac_ocp_write( tp, 0xF8D4, 0x8CF8 );
-        rtl8168_mac_ocp_write( tp, 0xF8D6, 0x7100 );
-        rtl8168_mac_ocp_write( tp, 0xF8D8, 0x4893 );
-        rtl8168_mac_ocp_write( tp, 0xF8DA, 0x8900 );
-        rtl8168_mac_ocp_write( tp, 0xF8DC, 0xFF80 );
-        rtl8168_mac_ocp_write( tp, 0xF8DE, 0xC520 );
-        rtl8168_mac_ocp_write( tp, 0xF8E0, 0x74B0 );
-        rtl8168_mac_ocp_write( tp, 0xF8E2, 0x49C1 );
-        rtl8168_mac_ocp_write( tp, 0xF8E4, 0xF11C );
-        rtl8168_mac_ocp_write( tp, 0xF8E6, 0xC71E );
-        rtl8168_mac_ocp_write( tp, 0xF8E8, 0x74FC );
-        rtl8168_mac_ocp_write( tp, 0xF8EA, 0x49C1 );
-        rtl8168_mac_ocp_write( tp, 0xF8EC, 0xF118 );
-        rtl8168_mac_ocp_write( tp, 0xF8EE, 0x49C0 );
-        rtl8168_mac_ocp_write( tp, 0xF8F0, 0xF116 );
-        rtl8168_mac_ocp_write( tp, 0xF8F2, 0x74F8 );
-        rtl8168_mac_ocp_write( tp, 0xF8F4, 0x49C0 );
-        rtl8168_mac_ocp_write( tp, 0xF8F6, 0xF013 );
-        rtl8168_mac_ocp_write( tp, 0xF8F8, 0x48C3 );
-        rtl8168_mac_ocp_write( tp, 0xF8FA, 0x8CF8 );
-        rtl8168_mac_ocp_write( tp, 0xF8FC, 0xC516 );
-        rtl8168_mac_ocp_write( tp, 0xF8FE, 0x74A2 );
-        rtl8168_mac_ocp_write( tp, 0xF900, 0x49CE );
-        rtl8168_mac_ocp_write( tp, 0xF902, 0xF1FE );
-        rtl8168_mac_ocp_write( tp, 0xF904, 0xC411 );
-        rtl8168_mac_ocp_write( tp, 0xF906, 0x9CA0 );
-        rtl8168_mac_ocp_write( tp, 0xF908, 0xC411 );
-        rtl8168_mac_ocp_write( tp, 0xF90A, 0x1C13 );
-        rtl8168_mac_ocp_write( tp, 0xF90C, 0x484F );
-        rtl8168_mac_ocp_write( tp, 0xF90E, 0x9CA2 );
-        rtl8168_mac_ocp_write( tp, 0xF910, 0x74A2 );
-        rtl8168_mac_ocp_write( tp, 0xF912, 0x49CF );
-        rtl8168_mac_ocp_write( tp, 0xF914, 0xF1FE );
-        rtl8168_mac_ocp_write( tp, 0xF916, 0x7100 );
-        rtl8168_mac_ocp_write( tp, 0xF918, 0x4891 );
-        rtl8168_mac_ocp_write( tp, 0xF91A, 0x8900 );
-        rtl8168_mac_ocp_write( tp, 0xF91C, 0xFF80 );
-        rtl8168_mac_ocp_write( tp, 0xF91E, 0xE400 );
-        rtl8168_mac_ocp_write( tp, 0xF920, 0xD3E0 );
-        rtl8168_mac_ocp_write( tp, 0xF922, 0xE000 );
-        rtl8168_mac_ocp_write( tp, 0xF924, 0x0481 );
-        rtl8168_mac_ocp_write( tp, 0xF926, 0x0C81 );
-        rtl8168_mac_ocp_write( tp, 0xF928, 0xDE20 );
-        rtl8168_mac_ocp_write( tp, 0xF92A, 0x0000 );
-        rtl8168_mac_ocp_write( tp, 0xF92C, 0x0992 );
-        rtl8168_mac_ocp_write( tp, 0xF92E, 0x1B76 );
-        rtl8168_mac_ocp_write( tp, 0xF930, 0xC602 );
-        rtl8168_mac_ocp_write( tp, 0xF932, 0xBE00 );
-        rtl8168_mac_ocp_write( tp, 0xF934, 0x059C );
-        rtl8168_mac_ocp_write( tp, 0xF936, 0x1B76 );
-        rtl8168_mac_ocp_write( tp, 0xF938, 0xC602 );
-        rtl8168_mac_ocp_write( tp, 0xF93A, 0xBE00 );
-        rtl8168_mac_ocp_write( tp, 0xF93C, 0x065A );
-        rtl8168_mac_ocp_write( tp, 0xF93E, 0xB400 );
-        rtl8168_mac_ocp_write( tp, 0xF940, 0x18DE );
-        rtl8168_mac_ocp_write( tp, 0xF942, 0x2008 );
-        rtl8168_mac_ocp_write( tp, 0xF944, 0x4001 );
-        rtl8168_mac_ocp_write( tp, 0xF946, 0xF10F );
-        rtl8168_mac_ocp_write( tp, 0xF948, 0x7342 );
-        rtl8168_mac_ocp_write( tp, 0xF94A, 0x1880 );
-        rtl8168_mac_ocp_write( tp, 0xF94C, 0x2008 );
-        rtl8168_mac_ocp_write( tp, 0xF94E, 0x0009 );
-        rtl8168_mac_ocp_write( tp, 0xF950, 0x4018 );
-        rtl8168_mac_ocp_write( tp, 0xF952, 0xF109 );
-        rtl8168_mac_ocp_write( tp, 0xF954, 0x7340 );
-        rtl8168_mac_ocp_write( tp, 0xF956, 0x25BC );
-        rtl8168_mac_ocp_write( tp, 0xF958, 0x130F );
-        rtl8168_mac_ocp_write( tp, 0xF95A, 0xF105 );
-        rtl8168_mac_ocp_write( tp, 0xF95C, 0xC00A );
-        rtl8168_mac_ocp_write( tp, 0xF95E, 0x7300 );
-        rtl8168_mac_ocp_write( tp, 0xF960, 0x4831 );
-        rtl8168_mac_ocp_write( tp, 0xF962, 0x9B00 );
-        rtl8168_mac_ocp_write( tp, 0xF964, 0xB000 );
-        rtl8168_mac_ocp_write( tp, 0xF966, 0x7340 );
-        rtl8168_mac_ocp_write( tp, 0xF968, 0x8320 );
-        rtl8168_mac_ocp_write( tp, 0xF96A, 0xC302 );
-        rtl8168_mac_ocp_write( tp, 0xF96C, 0xBB00 );
-        rtl8168_mac_ocp_write( tp, 0xF96E, 0x0C12 );
-        rtl8168_mac_ocp_write( tp, 0xF970, 0xE860 );
-        rtl8168_mac_ocp_write( tp, 0xF972, 0xC406 );
-        rtl8168_mac_ocp_write( tp, 0xF974, 0x7580 );
-        rtl8168_mac_ocp_write( tp, 0xF976, 0x4851 );
-        rtl8168_mac_ocp_write( tp, 0xF978, 0x8D80 );
-        rtl8168_mac_ocp_write( tp, 0xF97A, 0xC403 );
-        rtl8168_mac_ocp_write( tp, 0xF97C, 0xBC00 );
-        rtl8168_mac_ocp_write( tp, 0xF97E, 0xD3E0 );
-        rtl8168_mac_ocp_write( tp, 0xF980, 0x02C8 );
-        rtl8168_mac_ocp_write( tp, 0xF982, 0xC406 );
-        rtl8168_mac_ocp_write( tp, 0xF984, 0x7580 );
-        rtl8168_mac_ocp_write( tp, 0xF986, 0x4850 );
-        rtl8168_mac_ocp_write( tp, 0xF988, 0x8D80 );
-        rtl8168_mac_ocp_write( tp, 0xF98A, 0xC403 );
-        rtl8168_mac_ocp_write( tp, 0xF98C, 0xBC00 );
-        rtl8168_mac_ocp_write( tp, 0xF98E, 0xD3E0 );
-        rtl8168_mac_ocp_write( tp, 0xF990, 0x0298 );
-
-        rtl8168_mac_ocp_write( tp, 0xDE30, 0x0080 );
-
-        rtl8168_mac_ocp_write( tp, 0xFC26, 0x8000 );
-
-        rtl8168_mac_ocp_write( tp, 0xFC28, 0x0075 );
-        rtl8168_mac_ocp_write( tp, 0xFC2A, 0x02B1 );
-        rtl8168_mac_ocp_write( tp, 0xFC2C, 0x0991 );
-        rtl8168_mac_ocp_write( tp, 0xFC2E, 0x059B );
-        rtl8168_mac_ocp_write( tp, 0xFC30, 0x0659 );
-        rtl8168_mac_ocp_write( tp, 0xFC32, 0x0000 );
-        rtl8168_mac_ocp_write( tp, 0xFC34, 0x02C7 );
-        rtl8168_mac_ocp_write( tp, 0xFC36, 0x0279 );
-}
-
-static void
-rtl8168_set_mac_mcu_8168gu_1(struct net_device *dev)
-{
-        struct rtl8168_private *tp = netdev_priv(dev);
-
-        rtl8168_hw_disable_mac_mcu_bps(dev);
-
-        rtl8168_mac_ocp_write( tp, 0xF800, 0xE008 );
-        rtl8168_mac_ocp_write( tp, 0xF802, 0xE011 );
-        rtl8168_mac_ocp_write( tp, 0xF804, 0xE015 );
-        rtl8168_mac_ocp_write( tp, 0xF806, 0xE018 );
-        rtl8168_mac_ocp_write( tp, 0xF808, 0xE01B );
-        rtl8168_mac_ocp_write( tp, 0xF80A, 0xE027 );
-        rtl8168_mac_ocp_write( tp, 0xF80C, 0xE043 );
-        rtl8168_mac_ocp_write( tp, 0xF80E, 0xE065 );
-        rtl8168_mac_ocp_write( tp, 0xF810, 0x49E2 );
-        rtl8168_mac_ocp_write( tp, 0xF812, 0xF005 );
-        rtl8168_mac_ocp_write( tp, 0xF814, 0x49EA );
-        rtl8168_mac_ocp_write( tp, 0xF816, 0xF003 );
-        rtl8168_mac_ocp_write( tp, 0xF818, 0xC404 );
-        rtl8168_mac_ocp_write( tp, 0xF81A, 0xBC00 );
-        rtl8168_mac_ocp_write( tp, 0xF81C, 0xC403 );
-        rtl8168_mac_ocp_write( tp, 0xF81E, 0xBC00 );
-        rtl8168_mac_ocp_write( tp, 0xF820, 0x0496 );
-        rtl8168_mac_ocp_write( tp, 0xF822, 0x051A );
-        rtl8168_mac_ocp_write( tp, 0xF824, 0x1D01 );
-        rtl8168_mac_ocp_write( tp, 0xF826, 0x8DE8 );
-        rtl8168_mac_ocp_write( tp, 0xF828, 0xC602 );
-        rtl8168_mac_ocp_write( tp, 0xF82A, 0xBE00 );
-        rtl8168_mac_ocp_write( tp, 0xF82C, 0x0206 );
-        rtl8168_mac_ocp_write( tp, 0xF82E, 0x1B76 );
-        rtl8168_mac_ocp_write( tp, 0xF830, 0xC202 );
-        rtl8168_mac_ocp_write( tp, 0xF832, 0xBA00 );
-        rtl8168_mac_ocp_write( tp, 0xF834, 0x058A );
-        rtl8168_mac_ocp_write( tp, 0xF836, 0x1B76 );
-        rtl8168_mac_ocp_write( tp, 0xF838, 0xC602 );
-        rtl8168_mac_ocp_write( tp, 0xF83A, 0xBE00 );
-        rtl8168_mac_ocp_write( tp, 0xF83C, 0x0648 );
-        rtl8168_mac_ocp_write( tp, 0xF83E, 0x74E6 );
-        rtl8168_mac_ocp_write( tp, 0xF840, 0x1B78 );
-        rtl8168_mac_ocp_write( tp, 0xF842, 0x46DC );
-        rtl8168_mac_ocp_write( tp, 0xF844, 0x1300 );
-        rtl8168_mac_ocp_write( tp, 0xF846, 0xF005 );
-        rtl8168_mac_ocp_write( tp, 0xF848, 0x74F8 );
-        rtl8168_mac_ocp_write( tp, 0xF84A, 0x48C3 );
-        rtl8168_mac_ocp_write( tp, 0xF84C, 0x48C4 );
-        rtl8168_mac_ocp_write( tp, 0xF84E, 0x8CF8 );
-        rtl8168_mac_ocp_write( tp, 0xF850, 0x64E7 );
-        rtl8168_mac_ocp_write( tp, 0xF852, 0xC302 );
-        rtl8168_mac_ocp_write( tp, 0xF854, 0xBB00 );
-        rtl8168_mac_ocp_write( tp, 0xF856, 0x068E );
-        rtl8168_mac_ocp_write( tp, 0xF858, 0x74E4 );
-        rtl8168_mac_ocp_write( tp, 0xF85A, 0x49C5 );
-        rtl8168_mac_ocp_write( tp, 0xF85C, 0xF106 );
-        rtl8168_mac_ocp_write( tp, 0xF85E, 0x49C6 );
-        rtl8168_mac_ocp_write( tp, 0xF860, 0xF107 );
-        rtl8168_mac_ocp_write( tp, 0xF862, 0x48C8 );
-        rtl8168_mac_ocp_write( tp, 0xF864, 0x48C9 );
-        rtl8168_mac_ocp_write( tp, 0xF866, 0xE011 );
-        rtl8168_mac_ocp_write( tp, 0xF868, 0x48C9 );
-        rtl8168_mac_ocp_write( tp, 0xF86A, 0x4848 );
-        rtl8168_mac_ocp_write( tp, 0xF86C, 0xE00E );
-        rtl8168_mac_ocp_write( tp, 0xF86E, 0x4848 );
-        rtl8168_mac_ocp_write( tp, 0xF870, 0x49C7 );
-        rtl8168_mac_ocp_write( tp, 0xF872, 0xF00A );
-        rtl8168_mac_ocp_write( tp, 0xF874, 0x48C9 );
-        rtl8168_mac_ocp_write( tp, 0xF876, 0xC60D );
-        rtl8168_mac_ocp_write( tp, 0xF878, 0x1D1F );
-        rtl8168_mac_ocp_write( tp, 0xF87A, 0x8DC2 );
-        rtl8168_mac_ocp_write( tp, 0xF87C, 0x1D00 );
-        rtl8168_mac_ocp_write( tp, 0xF87E, 0x8DC3 );
-        rtl8168_mac_ocp_write( tp, 0xF880, 0x1D11 );
-        rtl8168_mac_ocp_write( tp, 0xF882, 0x8DC0 );
-        rtl8168_mac_ocp_write( tp, 0xF884, 0xE002 );
-        rtl8168_mac_ocp_write( tp, 0xF886, 0x4849 );
-        rtl8168_mac_ocp_write( tp, 0xF888, 0x94E5 );
-        rtl8168_mac_ocp_write( tp, 0xF88A, 0xC602 );
-        rtl8168_mac_ocp_write( tp, 0xF88C, 0xBE00 );
-        rtl8168_mac_ocp_write( tp, 0xF88E, 0x0238 );
-        rtl8168_mac_ocp_write( tp, 0xF890, 0xE434 );
-        rtl8168_mac_ocp_write( tp, 0xF892, 0x49D9 );
-        rtl8168_mac_ocp_write( tp, 0xF894, 0xF01B );
-        rtl8168_mac_ocp_write( tp, 0xF896, 0xC31E );
-        rtl8168_mac_ocp_write( tp, 0xF898, 0x7464 );
-        rtl8168_mac_ocp_write( tp, 0xF89A, 0x49C4 );
-        rtl8168_mac_ocp_write( tp, 0xF89C, 0xF114 );
-        rtl8168_mac_ocp_write( tp, 0xF89E, 0xC31B );
-        rtl8168_mac_ocp_write( tp, 0xF8A0, 0x6460 );
-        rtl8168_mac_ocp_write( tp, 0xF8A2, 0x14FA );
-        rtl8168_mac_ocp_write( tp, 0xF8A4, 0xFA02 );
-        rtl8168_mac_ocp_write( tp, 0xF8A6, 0xE00F );
-        rtl8168_mac_ocp_write( tp, 0xF8A8, 0xC317 );
-        rtl8168_mac_ocp_write( tp, 0xF8AA, 0x7460 );
-        rtl8168_mac_ocp_write( tp, 0xF8AC, 0x49C0 );
-        rtl8168_mac_ocp_write( tp, 0xF8AE, 0xF10B );
-        rtl8168_mac_ocp_write( tp, 0xF8B0, 0xC311 );
-        rtl8168_mac_ocp_write( tp, 0xF8B2, 0x7462 );
-        rtl8168_mac_ocp_write( tp, 0xF8B4, 0x48C1 );
-        rtl8168_mac_ocp_write( tp, 0xF8B6, 0x9C62 );
-        rtl8168_mac_ocp_write( tp, 0xF8B8, 0x4841 );
-        rtl8168_mac_ocp_write( tp, 0xF8BA, 0x9C62 );
-        rtl8168_mac_ocp_write( tp, 0xF8BC, 0xC30A );
-        rtl8168_mac_ocp_write( tp, 0xF8BE, 0x1C04 );
-        rtl8168_mac_ocp_write( tp, 0xF8C0, 0x8C60 );
-        rtl8168_mac_ocp_write( tp, 0xF8C2, 0xE004 );
-        rtl8168_mac_ocp_write( tp, 0xF8C4, 0x1C15 );
-        rtl8168_mac_ocp_write( tp, 0xF8C6, 0xC305 );
-        rtl8168_mac_ocp_write( tp, 0xF8C8, 0x8C60 );
-        rtl8168_mac_ocp_write( tp, 0xF8CA, 0xC602 );
-        rtl8168_mac_ocp_write( tp, 0xF8CC, 0xBE00 );
-        rtl8168_mac_ocp_write( tp, 0xF8CE, 0x0374 );
-        rtl8168_mac_ocp_write( tp, 0xF8D0, 0xE434 );
-        rtl8168_mac_ocp_write( tp, 0xF8D2, 0xE030 );
-        rtl8168_mac_ocp_write( tp, 0xF8D4, 0xE61C );
-        rtl8168_mac_ocp_write( tp, 0xF8D6, 0xE906 );
-        rtl8168_mac_ocp_write( tp, 0xF8D8, 0xC602 );
-        rtl8168_mac_ocp_write( tp, 0xF8DA, 0xBE00 );
-        rtl8168_mac_ocp_write( tp, 0xF8DC, 0x0000 );
-
-        rtl8168_mac_ocp_write( tp, 0xFC26, 0x8000 );
-
-        rtl8168_mac_ocp_write( tp, 0xFC28, 0x0493 );
-        rtl8168_mac_ocp_write( tp, 0xFC2A, 0x0205 );
-        rtl8168_mac_ocp_write( tp, 0xFC2C, 0x0589 );
-        rtl8168_mac_ocp_write( tp, 0xFC2E, 0x0647 );
-        rtl8168_mac_ocp_write( tp, 0xFC30, 0x0000 );
-        rtl8168_mac_ocp_write( tp, 0xFC32, 0x0215 );
-        rtl8168_mac_ocp_write( tp, 0xFC34, 0x0285 );
-}
-
-static void
-rtl8168_set_mac_mcu_8168gu_2(struct net_device *dev)
-{
-        struct rtl8168_private *tp = netdev_priv(dev);
-
-        rtl8168_hw_disable_mac_mcu_bps(dev);
-
-        rtl8168_mac_ocp_write( tp, 0xF800, 0xE008 );
-        rtl8168_mac_ocp_write( tp, 0xF802, 0xE00A );
-        rtl8168_mac_ocp_write( tp, 0xF804, 0xE00D );
-        rtl8168_mac_ocp_write( tp, 0xF806, 0xE02F );
-        rtl8168_mac_ocp_write( tp, 0xF808, 0xE031 );
-        rtl8168_mac_ocp_write( tp, 0xF80A, 0xE038 );
-        rtl8168_mac_ocp_write( tp, 0xF80C, 0xE03A );
-        rtl8168_mac_ocp_write( tp, 0xF80E, 0xE051 );
-        rtl8168_mac_ocp_write( tp, 0xF810, 0xC202 );
-        rtl8168_mac_ocp_write( tp, 0xF812, 0xBA00 );
-        rtl8168_mac_ocp_write( tp, 0xF814, 0x0DFC );
-        rtl8168_mac_ocp_write( tp, 0xF816, 0x7444 );
-        rtl8168_mac_ocp_write( tp, 0xF818, 0xC502 );
-        rtl8168_mac_ocp_write( tp, 0xF81A, 0xBD00 );
-        rtl8168_mac_ocp_write( tp, 0xF81C, 0x0A30 );
-        rtl8168_mac_ocp_write( tp, 0xF81E, 0x49D9 );
-        rtl8168_mac_ocp_write( tp, 0xF820, 0xF019 );
-        rtl8168_mac_ocp_write( tp, 0xF822, 0xC520 );
-        rtl8168_mac_ocp_write( tp, 0xF824, 0x64A5 );
-        rtl8168_mac_ocp_write( tp, 0xF826, 0x1400 );
-        rtl8168_mac_ocp_write( tp, 0xF828, 0xF007 );
-        rtl8168_mac_ocp_write( tp, 0xF82A, 0x0C01 );
-        rtl8168_mac_ocp_write( tp, 0xF82C, 0x8CA5 );
-        rtl8168_mac_ocp_write( tp, 0xF82E, 0x1C15 );
-        rtl8168_mac_ocp_write( tp, 0xF830, 0xC515 );
-        rtl8168_mac_ocp_write( tp, 0xF832, 0x9CA0 );
-        rtl8168_mac_ocp_write( tp, 0xF834, 0xE00F );
-        rtl8168_mac_ocp_write( tp, 0xF836, 0xC513 );
-        rtl8168_mac_ocp_write( tp, 0xF838, 0x74A0 );
-        rtl8168_mac_ocp_write( tp, 0xF83A, 0x48C8 );
-        rtl8168_mac_ocp_write( tp, 0xF83C, 0x48CA );
-        rtl8168_mac_ocp_write( tp, 0xF83E, 0x9CA0 );
-        rtl8168_mac_ocp_write( tp, 0xF840, 0xC510 );
-        rtl8168_mac_ocp_write( tp, 0xF842, 0x1B00 );
-        rtl8168_mac_ocp_write( tp, 0xF844, 0x9BA0 );
-        rtl8168_mac_ocp_write( tp, 0xF846, 0x1B1C );
-        rtl8168_mac_ocp_write( tp, 0xF848, 0x483F );
-        rtl8168_mac_ocp_write( tp, 0xF84A, 0x9BA2 );
-        rtl8168_mac_ocp_write( tp, 0xF84C, 0x1B04 );
-        rtl8168_mac_ocp_write( tp, 0xF84E, 0xC506 );
-        rtl8168_mac_ocp_write( tp, 0xF850, 0x9BA0 );
-        rtl8168_mac_ocp_write( tp, 0xF852, 0xC603 );
-        rtl8168_mac_ocp_write( tp, 0xF854, 0xBE00 );
-        rtl8168_mac_ocp_write( tp, 0xF856, 0x0298 );
-        rtl8168_mac_ocp_write( tp, 0xF858, 0x03DE );
-        rtl8168_mac_ocp_write( tp, 0xF85A, 0xE434 );
-        rtl8168_mac_ocp_write( tp, 0xF85C, 0xE096 );
-        rtl8168_mac_ocp_write( tp, 0xF85E, 0xE860 );
-        rtl8168_mac_ocp_write( tp, 0xF860, 0xDE20 );
-        rtl8168_mac_ocp_write( tp, 0xF862, 0xD3C0 );
-        rtl8168_mac_ocp_write( tp, 0xF864, 0xC602 );
-        rtl8168_mac_ocp_write( tp, 0xF866, 0xBE00 );
-        rtl8168_mac_ocp_write( tp, 0xF868, 0x0A64 );
-        rtl8168_mac_ocp_write( tp, 0xF86A, 0xC707 );
-        rtl8168_mac_ocp_write( tp, 0xF86C, 0x1D00 );
-        rtl8168_mac_ocp_write( tp, 0xF86E, 0x8DE2 );
-        rtl8168_mac_ocp_write( tp, 0xF870, 0x48C1 );
-        rtl8168_mac_ocp_write( tp, 0xF872, 0xC502 );
-        rtl8168_mac_ocp_write( tp, 0xF874, 0xBD00 );
-        rtl8168_mac_ocp_write( tp, 0xF876, 0x00AA );
-        rtl8168_mac_ocp_write( tp, 0xF878, 0xE0C0 );
-        rtl8168_mac_ocp_write( tp, 0xF87A, 0xC502 );
-        rtl8168_mac_ocp_write( tp, 0xF87C, 0xBD00 );
-        rtl8168_mac_ocp_write( tp, 0xF87E, 0x0132 );
-        rtl8168_mac_ocp_write( tp, 0xF880, 0xC50C );
-        rtl8168_mac_ocp_write( tp, 0xF882, 0x74A2 );
-        rtl8168_mac_ocp_write( tp, 0xF884, 0x49CE );
-        rtl8168_mac_ocp_write( tp, 0xF886, 0xF1FE );
-        rtl8168_mac_ocp_write( tp, 0xF888, 0x1C00 );
-        rtl8168_mac_ocp_write( tp, 0xF88A, 0x9EA0 );
-        rtl8168_mac_ocp_write( tp, 0xF88C, 0x1C1C );
-        rtl8168_mac_ocp_write( tp, 0xF88E, 0x484F );
-        rtl8168_mac_ocp_write( tp, 0xF890, 0x9CA2 );
-        rtl8168_mac_ocp_write( tp, 0xF892, 0xC402 );
-        rtl8168_mac_ocp_write( tp, 0xF894, 0xBC00 );
-        rtl8168_mac_ocp_write( tp, 0xF896, 0x0AFA );
-        rtl8168_mac_ocp_write( tp, 0xF898, 0xDE20 );
-        rtl8168_mac_ocp_write( tp, 0xF89A, 0xE000 );
-        rtl8168_mac_ocp_write( tp, 0xF89C, 0xE092 );
-        rtl8168_mac_ocp_write( tp, 0xF89E, 0xE430 );
-        rtl8168_mac_ocp_write( tp, 0xF8A0, 0xDE20 );
-        rtl8168_mac_ocp_write( tp, 0xF8A2, 0xE0C0 );
-        rtl8168_mac_ocp_write( tp, 0xF8A4, 0xE860 );
-        rtl8168_mac_ocp_write( tp, 0xF8A6, 0xE84C );
-        rtl8168_mac_ocp_write( tp, 0xF8A8, 0xB400 );
-        rtl8168_mac_ocp_write( tp, 0xF8AA, 0xB430 );
-        rtl8168_mac_ocp_write( tp, 0xF8AC, 0xE410 );
-        rtl8168_mac_ocp_write( tp, 0xF8AE, 0xC0AE );
-        rtl8168_mac_ocp_write( tp, 0xF8B0, 0xB407 );
-        rtl8168_mac_ocp_write( tp, 0xF8B2, 0xB406 );
-        rtl8168_mac_ocp_write( tp, 0xF8B4, 0xB405 );
-        rtl8168_mac_ocp_write( tp, 0xF8B6, 0xB404 );
-        rtl8168_mac_ocp_write( tp, 0xF8B8, 0xB403 );
-        rtl8168_mac_ocp_write( tp, 0xF8BA, 0xB402 );
-        rtl8168_mac_ocp_write( tp, 0xF8BC, 0xB401 );
-        rtl8168_mac_ocp_write( tp, 0xF8BE, 0xC7EE );
-        rtl8168_mac_ocp_write( tp, 0xF8C0, 0x76F4 );
-        rtl8168_mac_ocp_write( tp, 0xF8C2, 0xC2ED );
-        rtl8168_mac_ocp_write( tp, 0xF8C4, 0xC3ED );
-        rtl8168_mac_ocp_write( tp, 0xF8C6, 0xC1EF );
-        rtl8168_mac_ocp_write( tp, 0xF8C8, 0xC5F3 );
-        rtl8168_mac_ocp_write( tp, 0xF8CA, 0x74A0 );
-        rtl8168_mac_ocp_write( tp, 0xF8CC, 0x49CD );
-        rtl8168_mac_ocp_write( tp, 0xF8CE, 0xF001 );
-        rtl8168_mac_ocp_write( tp, 0xF8D0, 0xC5EE );
-        rtl8168_mac_ocp_write( tp, 0xF8D2, 0x74A0 );
-        rtl8168_mac_ocp_write( tp, 0xF8D4, 0x49C1 );
-        rtl8168_mac_ocp_write( tp, 0xF8D6, 0xF105 );
-        rtl8168_mac_ocp_write( tp, 0xF8D8, 0xC5E4 );
-        rtl8168_mac_ocp_write( tp, 0xF8DA, 0x74A2 );
-        rtl8168_mac_ocp_write( tp, 0xF8DC, 0x49CE );
-        rtl8168_mac_ocp_write( tp, 0xF8DE, 0xF00B );
-        rtl8168_mac_ocp_write( tp, 0xF8E0, 0x7444 );
-        rtl8168_mac_ocp_write( tp, 0xF8E2, 0x484B );
-        rtl8168_mac_ocp_write( tp, 0xF8E4, 0x9C44 );
-        rtl8168_mac_ocp_write( tp, 0xF8E6, 0x1C10 );
-        rtl8168_mac_ocp_write( tp, 0xF8E8, 0x9C62 );
-        rtl8168_mac_ocp_write( tp, 0xF8EA, 0x1C11 );
-        rtl8168_mac_ocp_write( tp, 0xF8EC, 0x8C60 );
-        rtl8168_mac_ocp_write( tp, 0xF8EE, 0x1C00 );
-        rtl8168_mac_ocp_write( tp, 0xF8F0, 0x9CF6 );
-        rtl8168_mac_ocp_write( tp, 0xF8F2, 0xE0EC );
-        rtl8168_mac_ocp_write( tp, 0xF8F4, 0x49E7 );
-        rtl8168_mac_ocp_write( tp, 0xF8F6, 0xF016 );
-        rtl8168_mac_ocp_write( tp, 0xF8F8, 0x1D80 );
-        rtl8168_mac_ocp_write( tp, 0xF8FA, 0x8DF4 );
-        rtl8168_mac_ocp_write( tp, 0xF8FC, 0x74F8 );
-        rtl8168_mac_ocp_write( tp, 0xF8FE, 0x4843 );
-        rtl8168_mac_ocp_write( tp, 0xF900, 0x8CF8 );
-        rtl8168_mac_ocp_write( tp, 0xF902, 0x74F8 );
-        rtl8168_mac_ocp_write( tp, 0xF904, 0x74F8 );
-        rtl8168_mac_ocp_write( tp, 0xF906, 0x7444 );
-        rtl8168_mac_ocp_write( tp, 0xF908, 0x48C8 );
-        rtl8168_mac_ocp_write( tp, 0xF90A, 0x48C9 );
-        rtl8168_mac_ocp_write( tp, 0xF90C, 0x48CA );
-        rtl8168_mac_ocp_write( tp, 0xF90E, 0x9C44 );
-        rtl8168_mac_ocp_write( tp, 0xF910, 0x74F8 );
-        rtl8168_mac_ocp_write( tp, 0xF912, 0x4844 );
-        rtl8168_mac_ocp_write( tp, 0xF914, 0x8CF8 );
-        rtl8168_mac_ocp_write( tp, 0xF916, 0x1E01 );
-        rtl8168_mac_ocp_write( tp, 0xF918, 0xE8DB );
-        rtl8168_mac_ocp_write( tp, 0xF91A, 0x7420 );
-        rtl8168_mac_ocp_write( tp, 0xF91C, 0x48C1 );
-        rtl8168_mac_ocp_write( tp, 0xF91E, 0x9C20 );
-        rtl8168_mac_ocp_write( tp, 0xF920, 0xE0D5 );
-        rtl8168_mac_ocp_write( tp, 0xF922, 0x49E6 );
-        rtl8168_mac_ocp_write( tp, 0xF924, 0xF02A );
-        rtl8168_mac_ocp_write( tp, 0xF926, 0x1D40 );
-        rtl8168_mac_ocp_write( tp, 0xF928, 0x8DF4 );
-        rtl8168_mac_ocp_write( tp, 0xF92A, 0x74FC );
-        rtl8168_mac_ocp_write( tp, 0xF92C, 0x49C0 );
-        rtl8168_mac_ocp_write( tp, 0xF92E, 0xF124 );
-        rtl8168_mac_ocp_write( tp, 0xF930, 0x49C1 );
-        rtl8168_mac_ocp_write( tp, 0xF932, 0xF122 );
-        rtl8168_mac_ocp_write( tp, 0xF934, 0x74F8 );
-        rtl8168_mac_ocp_write( tp, 0xF936, 0x49C0 );
-        rtl8168_mac_ocp_write( tp, 0xF938, 0xF01F );
-        rtl8168_mac_ocp_write( tp, 0xF93A, 0xE8D3 );
-        rtl8168_mac_ocp_write( tp, 0xF93C, 0x48C4 );
-        rtl8168_mac_ocp_write( tp, 0xF93E, 0x8CF8 );
-        rtl8168_mac_ocp_write( tp, 0xF940, 0x1E00 );
-        rtl8168_mac_ocp_write( tp, 0xF942, 0xE8C6 );
-        rtl8168_mac_ocp_write( tp, 0xF944, 0xC5B1 );
-        rtl8168_mac_ocp_write( tp, 0xF946, 0x74A0 );
-        rtl8168_mac_ocp_write( tp, 0xF948, 0x49C3 );
-        rtl8168_mac_ocp_write( tp, 0xF94A, 0xF016 );
-        rtl8168_mac_ocp_write( tp, 0xF94C, 0xC5AF );
-        rtl8168_mac_ocp_write( tp, 0xF94E, 0x74A4 );
-        rtl8168_mac_ocp_write( tp, 0xF950, 0x49C2 );
-        rtl8168_mac_ocp_write( tp, 0xF952, 0xF005 );
-        rtl8168_mac_ocp_write( tp, 0xF954, 0xC5AA );
-        rtl8168_mac_ocp_write( tp, 0xF956, 0x74B2 );
-        rtl8168_mac_ocp_write( tp, 0xF958, 0x49C9 );
-        rtl8168_mac_ocp_write( tp, 0xF95A, 0xF10E );
-        rtl8168_mac_ocp_write( tp, 0xF95C, 0xC5A6 );
-        rtl8168_mac_ocp_write( tp, 0xF95E, 0x74A8 );
-        rtl8168_mac_ocp_write( tp, 0xF960, 0x4845 );
-        rtl8168_mac_ocp_write( tp, 0xF962, 0x4846 );
-        rtl8168_mac_ocp_write( tp, 0xF964, 0x4847 );
-        rtl8168_mac_ocp_write( tp, 0xF966, 0x4848 );
-        rtl8168_mac_ocp_write( tp, 0xF968, 0x9CA8 );
-        rtl8168_mac_ocp_write( tp, 0xF96A, 0x74B2 );
-        rtl8168_mac_ocp_write( tp, 0xF96C, 0x4849 );
-        rtl8168_mac_ocp_write( tp, 0xF96E, 0x9CB2 );
-        rtl8168_mac_ocp_write( tp, 0xF970, 0x74A0 );
-        rtl8168_mac_ocp_write( tp, 0xF972, 0x484F );
-        rtl8168_mac_ocp_write( tp, 0xF974, 0x9CA0 );
-        rtl8168_mac_ocp_write( tp, 0xF976, 0xE0AA );
-        rtl8168_mac_ocp_write( tp, 0xF978, 0x49E4 );
-        rtl8168_mac_ocp_write( tp, 0xF97A, 0xF018 );
-        rtl8168_mac_ocp_write( tp, 0xF97C, 0x1D10 );
-        rtl8168_mac_ocp_write( tp, 0xF97E, 0x8DF4 );
-        rtl8168_mac_ocp_write( tp, 0xF980, 0x74F8 );
-        rtl8168_mac_ocp_write( tp, 0xF982, 0x74F8 );
-        rtl8168_mac_ocp_write( tp, 0xF984, 0x74F8 );
-        rtl8168_mac_ocp_write( tp, 0xF986, 0x4843 );
-        rtl8168_mac_ocp_write( tp, 0xF988, 0x8CF8 );
-        rtl8168_mac_ocp_write( tp, 0xF98A, 0x74F8 );
-        rtl8168_mac_ocp_write( tp, 0xF98C, 0x74F8 );
-        rtl8168_mac_ocp_write( tp, 0xF98E, 0x74F8 );
-        rtl8168_mac_ocp_write( tp, 0xF990, 0x4844 );
-        rtl8168_mac_ocp_write( tp, 0xF992, 0x4842 );
-        rtl8168_mac_ocp_write( tp, 0xF994, 0x4841 );
-        rtl8168_mac_ocp_write( tp, 0xF996, 0x8CF8 );
-        rtl8168_mac_ocp_write( tp, 0xF998, 0x1E01 );
-        rtl8168_mac_ocp_write( tp, 0xF99A, 0xE89A );
-        rtl8168_mac_ocp_write( tp, 0xF99C, 0x7420 );
-        rtl8168_mac_ocp_write( tp, 0xF99E, 0x4841 );
-        rtl8168_mac_ocp_write( tp, 0xF9A0, 0x9C20 );
-        rtl8168_mac_ocp_write( tp, 0xF9A2, 0x7444 );
-        rtl8168_mac_ocp_write( tp, 0xF9A4, 0x4848 );
-        rtl8168_mac_ocp_write( tp, 0xF9A6, 0x9C44 );
-        rtl8168_mac_ocp_write( tp, 0xF9A8, 0xE091 );
-        rtl8168_mac_ocp_write( tp, 0xF9AA, 0x49E5 );
-        rtl8168_mac_ocp_write( tp, 0xF9AC, 0xF03E );
-        rtl8168_mac_ocp_write( tp, 0xF9AE, 0x1D20 );
-        rtl8168_mac_ocp_write( tp, 0xF9B0, 0x8DF4 );
-        rtl8168_mac_ocp_write( tp, 0xF9B2, 0x74F8 );
-        rtl8168_mac_ocp_write( tp, 0xF9B4, 0x48C2 );
-        rtl8168_mac_ocp_write( tp, 0xF9B6, 0x4841 );
-        rtl8168_mac_ocp_write( tp, 0xF9B8, 0x8CF8 );
-        rtl8168_mac_ocp_write( tp, 0xF9BA, 0x1E01 );
-        rtl8168_mac_ocp_write( tp, 0xF9BC, 0x7444 );
-        rtl8168_mac_ocp_write( tp, 0xF9BE, 0x49CA );
-        rtl8168_mac_ocp_write( tp, 0xF9C0, 0xF103 );
-        rtl8168_mac_ocp_write( tp, 0xF9C2, 0x49C2 );
-        rtl8168_mac_ocp_write( tp, 0xF9C4, 0xF00C );
-        rtl8168_mac_ocp_write( tp, 0xF9C6, 0x49C1 );
-        rtl8168_mac_ocp_write( tp, 0xF9C8, 0xF004 );
-        rtl8168_mac_ocp_write( tp, 0xF9CA, 0x6447 );
-        rtl8168_mac_ocp_write( tp, 0xF9CC, 0x2244 );
-        rtl8168_mac_ocp_write( tp, 0xF9CE, 0xE002 );
-        rtl8168_mac_ocp_write( tp, 0xF9D0, 0x1C01 );
-        rtl8168_mac_ocp_write( tp, 0xF9D2, 0x9C62 );
-        rtl8168_mac_ocp_write( tp, 0xF9D4, 0x1C11 );
-        rtl8168_mac_ocp_write( tp, 0xF9D6, 0x8C60 );
-        rtl8168_mac_ocp_write( tp, 0xF9D8, 0x1C00 );
-        rtl8168_mac_ocp_write( tp, 0xF9DA, 0x9CF6 );
-        rtl8168_mac_ocp_write( tp, 0xF9DC, 0x7444 );
-        rtl8168_mac_ocp_write( tp, 0xF9DE, 0x49C8 );
-        rtl8168_mac_ocp_write( tp, 0xF9E0, 0xF01D );
-        rtl8168_mac_ocp_write( tp, 0xF9E2, 0x74FC );
-        rtl8168_mac_ocp_write( tp, 0xF9E4, 0x49C0 );
-        rtl8168_mac_ocp_write( tp, 0xF9E6, 0xF11A );
-        rtl8168_mac_ocp_write( tp, 0xF9E8, 0x49C1 );
-        rtl8168_mac_ocp_write( tp, 0xF9EA, 0xF118 );
-        rtl8168_mac_ocp_write( tp, 0xF9EC, 0x74F8 );
-        rtl8168_mac_ocp_write( tp, 0xF9EE, 0x49C0 );
-        rtl8168_mac_ocp_write( tp, 0xF9F0, 0xF015 );
-        rtl8168_mac_ocp_write( tp, 0xF9F2, 0x49C6 );
-        rtl8168_mac_ocp_write( tp, 0xF9F4, 0xF113 );
-        rtl8168_mac_ocp_write( tp, 0xF9F6, 0xE875 );
-        rtl8168_mac_ocp_write( tp, 0xF9F8, 0x48C4 );
-        rtl8168_mac_ocp_write( tp, 0xF9FA, 0x8CF8 );
-        rtl8168_mac_ocp_write( tp, 0xF9FC, 0x7420 );
-        rtl8168_mac_ocp_write( tp, 0xF9FE, 0x48C1 );
-        rtl8168_mac_ocp_write( tp, 0xFA00, 0x9C20 );
-        rtl8168_mac_ocp_write( tp, 0xFA02, 0xC50A );
-        rtl8168_mac_ocp_write( tp, 0xFA04, 0x74A2 );
-        rtl8168_mac_ocp_write( tp, 0xFA06, 0x8CA5 );
-        rtl8168_mac_ocp_write( tp, 0xFA08, 0x74A0 );
-        rtl8168_mac_ocp_write( tp, 0xFA0A, 0xC505 );
-        rtl8168_mac_ocp_write( tp, 0xFA0C, 0x9CA2 );
-        rtl8168_mac_ocp_write( tp, 0xFA0E, 0x1C11 );
-        rtl8168_mac_ocp_write( tp, 0xFA10, 0x9CA0 );
-        rtl8168_mac_ocp_write( tp, 0xFA12, 0xE00A );
-        rtl8168_mac_ocp_write( tp, 0xFA14, 0xE434 );
-        rtl8168_mac_ocp_write( tp, 0xFA16, 0xD3C0 );
-        rtl8168_mac_ocp_write( tp, 0xFA18, 0xDC00 );
-        rtl8168_mac_ocp_write( tp, 0xFA1A, 0x7444 );
-        rtl8168_mac_ocp_write( tp, 0xFA1C, 0x49CA );
-        rtl8168_mac_ocp_write( tp, 0xFA1E, 0xF004 );
-        rtl8168_mac_ocp_write( tp, 0xFA20, 0x48CA );
-        rtl8168_mac_ocp_write( tp, 0xFA22, 0x9C44 );
-        rtl8168_mac_ocp_write( tp, 0xFA24, 0xE855 );
-        rtl8168_mac_ocp_write( tp, 0xFA26, 0xE052 );
-        rtl8168_mac_ocp_write( tp, 0xFA28, 0x49E8 );
-        rtl8168_mac_ocp_write( tp, 0xFA2A, 0xF024 );
-        rtl8168_mac_ocp_write( tp, 0xFA2C, 0x1D01 );
-        rtl8168_mac_ocp_write( tp, 0xFA2E, 0x8DF5 );
-        rtl8168_mac_ocp_write( tp, 0xFA30, 0x7440 );
-        rtl8168_mac_ocp_write( tp, 0xFA32, 0x49C0 );
-        rtl8168_mac_ocp_write( tp, 0xFA34, 0xF11E );
-        rtl8168_mac_ocp_write( tp, 0xFA36, 0x7444 );
-        rtl8168_mac_ocp_write( tp, 0xFA38, 0x49C8 );
-        rtl8168_mac_ocp_write( tp, 0xFA3A, 0xF01B );
-        rtl8168_mac_ocp_write( tp, 0xFA3C, 0x49CA );
-        rtl8168_mac_ocp_write( tp, 0xFA3E, 0xF119 );
-        rtl8168_mac_ocp_write( tp, 0xFA40, 0xC5EC );
-        rtl8168_mac_ocp_write( tp, 0xFA42, 0x76A4 );
-        rtl8168_mac_ocp_write( tp, 0xFA44, 0x49E3 );
-        rtl8168_mac_ocp_write( tp, 0xFA46, 0xF015 );
-        rtl8168_mac_ocp_write( tp, 0xFA48, 0x49C0 );
-        rtl8168_mac_ocp_write( tp, 0xFA4A, 0xF103 );
-        rtl8168_mac_ocp_write( tp, 0xFA4C, 0x49C1 );
-        rtl8168_mac_ocp_write( tp, 0xFA4E, 0xF011 );
-        rtl8168_mac_ocp_write( tp, 0xFA50, 0x4849 );
-        rtl8168_mac_ocp_write( tp, 0xFA52, 0x9C44 );
-        rtl8168_mac_ocp_write( tp, 0xFA54, 0x1C00 );
-        rtl8168_mac_ocp_write( tp, 0xFA56, 0x9CF6 );
-        rtl8168_mac_ocp_write( tp, 0xFA58, 0x7444 );
-        rtl8168_mac_ocp_write( tp, 0xFA5A, 0x49C1 );
-        rtl8168_mac_ocp_write( tp, 0xFA5C, 0xF004 );
-        rtl8168_mac_ocp_write( tp, 0xFA5E, 0x6446 );
-        rtl8168_mac_ocp_write( tp, 0xFA60, 0x1E07 );
-        rtl8168_mac_ocp_write( tp, 0xFA62, 0xE003 );
-        rtl8168_mac_ocp_write( tp, 0xFA64, 0x1C01 );
-        rtl8168_mac_ocp_write( tp, 0xFA66, 0x1E03 );
-        rtl8168_mac_ocp_write( tp, 0xFA68, 0x9C62 );
-        rtl8168_mac_ocp_write( tp, 0xFA6A, 0x1C11 );
-        rtl8168_mac_ocp_write( tp, 0xFA6C, 0x8C60 );
-        rtl8168_mac_ocp_write( tp, 0xFA6E, 0xE830 );
-        rtl8168_mac_ocp_write( tp, 0xFA70, 0xE02D );
-        rtl8168_mac_ocp_write( tp, 0xFA72, 0x49E9 );
-        rtl8168_mac_ocp_write( tp, 0xFA74, 0xF004 );
-        rtl8168_mac_ocp_write( tp, 0xFA76, 0x1D02 );
-        rtl8168_mac_ocp_write( tp, 0xFA78, 0x8DF5 );
-        rtl8168_mac_ocp_write( tp, 0xFA7A, 0xE79C );
-        rtl8168_mac_ocp_write( tp, 0xFA7C, 0x49E3 );
-        rtl8168_mac_ocp_write( tp, 0xFA7E, 0xF006 );
-        rtl8168_mac_ocp_write( tp, 0xFA80, 0x1D08 );
-        rtl8168_mac_ocp_write( tp, 0xFA82, 0x8DF4 );
-        rtl8168_mac_ocp_write( tp, 0xFA84, 0x74F8 );
-        rtl8168_mac_ocp_write( tp, 0xFA86, 0x74F8 );
-        rtl8168_mac_ocp_write( tp, 0xFA88, 0xE73A );
-        rtl8168_mac_ocp_write( tp, 0xFA8A, 0x49E1 );
-        rtl8168_mac_ocp_write( tp, 0xFA8C, 0xF007 );
-        rtl8168_mac_ocp_write( tp, 0xFA8E, 0x1D02 );
-        rtl8168_mac_ocp_write( tp, 0xFA90, 0x8DF4 );
-        rtl8168_mac_ocp_write( tp, 0xFA92, 0x1E01 );
-        rtl8168_mac_ocp_write( tp, 0xFA94, 0xE7A7 );
-        rtl8168_mac_ocp_write( tp, 0xFA96, 0xDE20 );
-        rtl8168_mac_ocp_write( tp, 0xFA98, 0xE410 );
-        rtl8168_mac_ocp_write( tp, 0xFA9A, 0x49E0 );
-        rtl8168_mac_ocp_write( tp, 0xFA9C, 0xF017 );
-        rtl8168_mac_ocp_write( tp, 0xFA9E, 0x1D01 );
-        rtl8168_mac_ocp_write( tp, 0xFAA0, 0x8DF4 );
-        rtl8168_mac_ocp_write( tp, 0xFAA2, 0xC5FA );
-        rtl8168_mac_ocp_write( tp, 0xFAA4, 0x1C00 );
-        rtl8168_mac_ocp_write( tp, 0xFAA6, 0x8CA0 );
-        rtl8168_mac_ocp_write( tp, 0xFAA8, 0x1C1B );
-        rtl8168_mac_ocp_write( tp, 0xFAAA, 0x9CA2 );
-        rtl8168_mac_ocp_write( tp, 0xFAAC, 0x74A2 );
-        rtl8168_mac_ocp_write( tp, 0xFAAE, 0x49CF );
-        rtl8168_mac_ocp_write( tp, 0xFAB0, 0xF0FE );
-        rtl8168_mac_ocp_write( tp, 0xFAB2, 0xC5F3 );
-        rtl8168_mac_ocp_write( tp, 0xFAB4, 0x74A0 );
-        rtl8168_mac_ocp_write( tp, 0xFAB6, 0x4849 );
-        rtl8168_mac_ocp_write( tp, 0xFAB8, 0x9CA0 );
-        rtl8168_mac_ocp_write( tp, 0xFABA, 0x74F8 );
-        rtl8168_mac_ocp_write( tp, 0xFABC, 0x49C0 );
-        rtl8168_mac_ocp_write( tp, 0xFABE, 0xF006 );
-        rtl8168_mac_ocp_write( tp, 0xFAC0, 0x48C3 );
-        rtl8168_mac_ocp_write( tp, 0xFAC2, 0x8CF8 );
-        rtl8168_mac_ocp_write( tp, 0xFAC4, 0xE820 );
-        rtl8168_mac_ocp_write( tp, 0xFAC6, 0x74F8 );
-        rtl8168_mac_ocp_write( tp, 0xFAC8, 0x74F8 );
-        rtl8168_mac_ocp_write( tp, 0xFACA, 0xC432 );
-        rtl8168_mac_ocp_write( tp, 0xFACC, 0xBC00 );
-        rtl8168_mac_ocp_write( tp, 0xFACE, 0xC5E4 );
-        rtl8168_mac_ocp_write( tp, 0xFAD0, 0x74A2 );
-        rtl8168_mac_ocp_write( tp, 0xFAD2, 0x49CE );
-        rtl8168_mac_ocp_write( tp, 0xFAD4, 0xF1FE );
-        rtl8168_mac_ocp_write( tp, 0xFAD6, 0x9EA0 );
-        rtl8168_mac_ocp_write( tp, 0xFAD8, 0x1C1C );
-        rtl8168_mac_ocp_write( tp, 0xFADA, 0x484F );
-        rtl8168_mac_ocp_write( tp, 0xFADC, 0x9CA2 );
-        rtl8168_mac_ocp_write( tp, 0xFADE, 0xFF80 );
-        rtl8168_mac_ocp_write( tp, 0xFAE0, 0xB404 );
-        rtl8168_mac_ocp_write( tp, 0xFAE2, 0xB405 );
-        rtl8168_mac_ocp_write( tp, 0xFAE4, 0xC5D9 );
-        rtl8168_mac_ocp_write( tp, 0xFAE6, 0x74A2 );
-        rtl8168_mac_ocp_write( tp, 0xFAE8, 0x49CE );
-        rtl8168_mac_ocp_write( tp, 0xFAEA, 0xF1FE );
-        rtl8168_mac_ocp_write( tp, 0xFAEC, 0xC41F );
-        rtl8168_mac_ocp_write( tp, 0xFAEE, 0x9CA0 );
-        rtl8168_mac_ocp_write( tp, 0xFAF0, 0xC41C );
-        rtl8168_mac_ocp_write( tp, 0xFAF2, 0x1C13 );
-        rtl8168_mac_ocp_write( tp, 0xFAF4, 0x484F );
-        rtl8168_mac_ocp_write( tp, 0xFAF6, 0x9CA2 );
-        rtl8168_mac_ocp_write( tp, 0xFAF8, 0x74A2 );
-        rtl8168_mac_ocp_write( tp, 0xFAFA, 0x49CF );
-        rtl8168_mac_ocp_write( tp, 0xFAFC, 0xF1FE );
-        rtl8168_mac_ocp_write( tp, 0xFAFE, 0xB005 );
-        rtl8168_mac_ocp_write( tp, 0xFB00, 0xB004 );
-        rtl8168_mac_ocp_write( tp, 0xFB02, 0xFF80 );
-        rtl8168_mac_ocp_write( tp, 0xFB04, 0xB404 );
-        rtl8168_mac_ocp_write( tp, 0xFB06, 0xB405 );
-        rtl8168_mac_ocp_write( tp, 0xFB08, 0xC5C7 );
-        rtl8168_mac_ocp_write( tp, 0xFB0A, 0x74A2 );
-        rtl8168_mac_ocp_write( tp, 0xFB0C, 0x49CE );
-        rtl8168_mac_ocp_write( tp, 0xFB0E, 0xF1FE );
-        rtl8168_mac_ocp_write( tp, 0xFB10, 0xC40E );
-        rtl8168_mac_ocp_write( tp, 0xFB12, 0x9CA0 );
-        rtl8168_mac_ocp_write( tp, 0xFB14, 0xC40A );
-        rtl8168_mac_ocp_write( tp, 0xFB16, 0x1C13 );
-        rtl8168_mac_ocp_write( tp, 0xFB18, 0x484F );
-        rtl8168_mac_ocp_write( tp, 0xFB1A, 0x9CA2 );
-        rtl8168_mac_ocp_write( tp, 0xFB1C, 0x74A2 );
-        rtl8168_mac_ocp_write( tp, 0xFB1E, 0x49CF );
-        rtl8168_mac_ocp_write( tp, 0xFB20, 0xF1FE );
-        rtl8168_mac_ocp_write( tp, 0xFB22, 0xB005 );
-        rtl8168_mac_ocp_write( tp, 0xFB24, 0xB004 );
-        rtl8168_mac_ocp_write( tp, 0xFB26, 0xFF80 );
-        rtl8168_mac_ocp_write( tp, 0xFB28, 0x0000 );
-        rtl8168_mac_ocp_write( tp, 0xFB2A, 0x0481 );
-        rtl8168_mac_ocp_write( tp, 0xFB2C, 0x0C81 );
-        rtl8168_mac_ocp_write( tp, 0xFB2E, 0x0AE0 );
-
-
-        rtl8168_mac_ocp_write( tp, 0xFC26, 0x8000 );
-
-        rtl8168_mac_ocp_write( tp, 0xFC28, 0x0000 );
-        rtl8168_mac_ocp_write( tp, 0xFC2A, 0x0000 );
-        rtl8168_mac_ocp_write( tp, 0xFC2C, 0x0297 );
-        rtl8168_mac_ocp_write( tp, 0xFC2E, 0x0000 );
-        rtl8168_mac_ocp_write( tp, 0xFC30, 0x00A9 );
-        rtl8168_mac_ocp_write( tp, 0xFC32, 0x012D );
-        rtl8168_mac_ocp_write( tp, 0xFC34, 0x0000 );
-        rtl8168_mac_ocp_write( tp, 0xFC36, 0x08DF );
-}
-
-static void
-rtl8168_set_mac_mcu_8411b_1(struct net_device *dev)
-{
-        struct rtl8168_private *tp = netdev_priv(dev);
-
-        rtl8168_hw_disable_mac_mcu_bps(dev);
-
-        rtl8168_mac_ocp_write( tp, 0xF800, 0xE008 );
-        rtl8168_mac_ocp_write( tp, 0xF802, 0xE00A );
-        rtl8168_mac_ocp_write( tp, 0xF804, 0xE00C );
-        rtl8168_mac_ocp_write( tp, 0xF806, 0xE00E );
-        rtl8168_mac_ocp_write( tp, 0xF808, 0xE027 );
-        rtl8168_mac_ocp_write( tp, 0xF80A, 0xE04F );
-        rtl8168_mac_ocp_write( tp, 0xF80C, 0xE05E );
-        rtl8168_mac_ocp_write( tp, 0xF80E, 0xE065 );
-        rtl8168_mac_ocp_write( tp, 0xF810, 0xC602 );
-        rtl8168_mac_ocp_write( tp, 0xF812, 0xBE00 );
-        rtl8168_mac_ocp_write( tp, 0xF814, 0x0000 );
-        rtl8168_mac_ocp_write( tp, 0xF816, 0xC502 );
-        rtl8168_mac_ocp_write( tp, 0xF818, 0xBD00 );
-        rtl8168_mac_ocp_write( tp, 0xF81A, 0x074C );
-        rtl8168_mac_ocp_write( tp, 0xF81C, 0xC302 );
-        rtl8168_mac_ocp_write( tp, 0xF81E, 0xBB00 );
-        rtl8168_mac_ocp_write( tp, 0xF820, 0x080A );
-        rtl8168_mac_ocp_write( tp, 0xF822, 0x6420 );
-        rtl8168_mac_ocp_write( tp, 0xF824, 0x48C2 );
-        rtl8168_mac_ocp_write( tp, 0xF826, 0x8C20 );
-        rtl8168_mac_ocp_write( tp, 0xF828, 0xC516 );
-        rtl8168_mac_ocp_write( tp, 0xF82A, 0x64A4 );
-        rtl8168_mac_ocp_write( tp, 0xF82C, 0x49C0 );
-        rtl8168_mac_ocp_write( tp, 0xF82E, 0xF009 );
-        rtl8168_mac_ocp_write( tp, 0xF830, 0x74A2 );
-        rtl8168_mac_ocp_write( tp, 0xF832, 0x8CA5 );
-        rtl8168_mac_ocp_write( tp, 0xF834, 0x74A0 );
-        rtl8168_mac_ocp_write( tp, 0xF836, 0xC50E );
-        rtl8168_mac_ocp_write( tp, 0xF838, 0x9CA2 );
-        rtl8168_mac_ocp_write( tp, 0xF83A, 0x1C11 );
-        rtl8168_mac_ocp_write( tp, 0xF83C, 0x9CA0 );
-        rtl8168_mac_ocp_write( tp, 0xF83E, 0xE006 );
-        rtl8168_mac_ocp_write( tp, 0xF840, 0x74F8 );
-        rtl8168_mac_ocp_write( tp, 0xF842, 0x48C4 );
-        rtl8168_mac_ocp_write( tp, 0xF844, 0x8CF8 );
-        rtl8168_mac_ocp_write( tp, 0xF846, 0xC404 );
-        rtl8168_mac_ocp_write( tp, 0xF848, 0xBC00 );
-        rtl8168_mac_ocp_write( tp, 0xF84A, 0xC403 );
-        rtl8168_mac_ocp_write( tp, 0xF84C, 0xBC00 );
-        rtl8168_mac_ocp_write( tp, 0xF84E, 0x0BF2 );
-        rtl8168_mac_ocp_write( tp, 0xF850, 0x0C0A );
-        rtl8168_mac_ocp_write( tp, 0xF852, 0xE434 );
-        rtl8168_mac_ocp_write( tp, 0xF854, 0xD3C0 );
-        rtl8168_mac_ocp_write( tp, 0xF856, 0x49D9 );
-        rtl8168_mac_ocp_write( tp, 0xF858, 0xF01F );
-        rtl8168_mac_ocp_write( tp, 0xF85A, 0xC526 );
-        rtl8168_mac_ocp_write( tp, 0xF85C, 0x64A5 );
-        rtl8168_mac_ocp_write( tp, 0xF85E, 0x1400 );
-        rtl8168_mac_ocp_write( tp, 0xF860, 0xF007 );
-        rtl8168_mac_ocp_write( tp, 0xF862, 0x0C01 );
-        rtl8168_mac_ocp_write( tp, 0xF864, 0x8CA5 );
-        rtl8168_mac_ocp_write( tp, 0xF866, 0x1C15 );
-        rtl8168_mac_ocp_write( tp, 0xF868, 0xC51B );
-        rtl8168_mac_ocp_write( tp, 0xF86A, 0x9CA0 );
-        rtl8168_mac_ocp_write( tp, 0xF86C, 0xE013 );
-        rtl8168_mac_ocp_write( tp, 0xF86E, 0xC519 );
-        rtl8168_mac_ocp_write( tp, 0xF870, 0x74A0 );
-        rtl8168_mac_ocp_write( tp, 0xF872, 0x48C4 );
-        rtl8168_mac_ocp_write( tp, 0xF874, 0x8CA0 );
-        rtl8168_mac_ocp_write( tp, 0xF876, 0xC516 );
-        rtl8168_mac_ocp_write( tp, 0xF878, 0x74A4 );
-        rtl8168_mac_ocp_write( tp, 0xF87A, 0x48C8 );
-        rtl8168_mac_ocp_write( tp, 0xF87C, 0x48CA );
-        rtl8168_mac_ocp_write( tp, 0xF87E, 0x9CA4 );
-        rtl8168_mac_ocp_write( tp, 0xF880, 0xC512 );
-        rtl8168_mac_ocp_write( tp, 0xF882, 0x1B00 );
-        rtl8168_mac_ocp_write( tp, 0xF884, 0x9BA0 );
-        rtl8168_mac_ocp_write( tp, 0xF886, 0x1B1C );
-        rtl8168_mac_ocp_write( tp, 0xF888, 0x483F );
-        rtl8168_mac_ocp_write( tp, 0xF88A, 0x9BA2 );
-        rtl8168_mac_ocp_write( tp, 0xF88C, 0x1B04 );
-        rtl8168_mac_ocp_write( tp, 0xF88E, 0xC508 );
-        rtl8168_mac_ocp_write( tp, 0xF890, 0x9BA0 );
-        rtl8168_mac_ocp_write( tp, 0xF892, 0xC505 );
-        rtl8168_mac_ocp_write( tp, 0xF894, 0xBD00 );
-        rtl8168_mac_ocp_write( tp, 0xF896, 0xC502 );
-        rtl8168_mac_ocp_write( tp, 0xF898, 0xBD00 );
-        rtl8168_mac_ocp_write( tp, 0xF89A, 0x0300 );
-        rtl8168_mac_ocp_write( tp, 0xF89C, 0x051E );
-        rtl8168_mac_ocp_write( tp, 0xF89E, 0xE434 );
-        rtl8168_mac_ocp_write( tp, 0xF8A0, 0xE018 );
-        rtl8168_mac_ocp_write( tp, 0xF8A2, 0xE092 );
-        rtl8168_mac_ocp_write( tp, 0xF8A4, 0xDE20 );
-        rtl8168_mac_ocp_write( tp, 0xF8A6, 0xD3C0 );
-        rtl8168_mac_ocp_write( tp, 0xF8A8, 0xC50F );
-        rtl8168_mac_ocp_write( tp, 0xF8AA, 0x76A4 );
-        rtl8168_mac_ocp_write( tp, 0xF8AC, 0x49E3 );
-        rtl8168_mac_ocp_write( tp, 0xF8AE, 0xF007 );
-        rtl8168_mac_ocp_write( tp, 0xF8B0, 0x49C0 );
-        rtl8168_mac_ocp_write( tp, 0xF8B2, 0xF103 );
-        rtl8168_mac_ocp_write( tp, 0xF8B4, 0xC607 );
-        rtl8168_mac_ocp_write( tp, 0xF8B6, 0xBE00 );
-        rtl8168_mac_ocp_write( tp, 0xF8B8, 0xC606 );
-        rtl8168_mac_ocp_write( tp, 0xF8BA, 0xBE00 );
-        rtl8168_mac_ocp_write( tp, 0xF8BC, 0xC602 );
-        rtl8168_mac_ocp_write( tp, 0xF8BE, 0xBE00 );
-        rtl8168_mac_ocp_write( tp, 0xF8C0, 0x0C4C );
-        rtl8168_mac_ocp_write( tp, 0xF8C2, 0x0C28 );
-        rtl8168_mac_ocp_write( tp, 0xF8C4, 0x0C2C );
-        rtl8168_mac_ocp_write( tp, 0xF8C6, 0xDC00 );
-        rtl8168_mac_ocp_write( tp, 0xF8C8, 0xC707 );
-        rtl8168_mac_ocp_write( tp, 0xF8CA, 0x1D00 );
-        rtl8168_mac_ocp_write( tp, 0xF8CC, 0x8DE2 );
-        rtl8168_mac_ocp_write( tp, 0xF8CE, 0x48C1 );
-        rtl8168_mac_ocp_write( tp, 0xF8D0, 0xC502 );
-        rtl8168_mac_ocp_write( tp, 0xF8D2, 0xBD00 );
-        rtl8168_mac_ocp_write( tp, 0xF8D4, 0x00AA );
-        rtl8168_mac_ocp_write( tp, 0xF8D6, 0xE0C0 );
-        rtl8168_mac_ocp_write( tp, 0xF8D8, 0xC502 );
-        rtl8168_mac_ocp_write( tp, 0xF8DA, 0xBD00 );
-        rtl8168_mac_ocp_write( tp, 0xF8DC, 0x0132 );
-
-        rtl8168_mac_ocp_write( tp, 0xFC26, 0x8000 );
-
-        rtl8168_mac_ocp_write( tp, 0xFC2A, 0x0743 );
-        rtl8168_mac_ocp_write( tp, 0xFC2C, 0x0801 );
-        rtl8168_mac_ocp_write( tp, 0xFC2E, 0x0BE9 );
-        rtl8168_mac_ocp_write( tp, 0xFC30, 0x02FD );
-        rtl8168_mac_ocp_write( tp, 0xFC32, 0x0C25 );
-        rtl8168_mac_ocp_write( tp, 0xFC34, 0x00A9 );
-        rtl8168_mac_ocp_write( tp, 0xFC36, 0x012D );
-}
-
-static void
-rtl8168_set_mac_mcu_8168ep_1(struct net_device *dev)
-{
-        struct rtl8168_private *tp = netdev_priv(dev);
-
-        rtl8168_hw_disable_mac_mcu_bps(dev);
-
-        rtl8168_mac_ocp_write( tp, 0xF800, 0xE008 );
-        rtl8168_mac_ocp_write( tp, 0xF802, 0xE0D3 );
-        rtl8168_mac_ocp_write( tp, 0xF804, 0xE0D6 );
-        rtl8168_mac_ocp_write( tp, 0xF806, 0xE0D9 );
-        rtl8168_mac_ocp_write( tp, 0xF808, 0xE0DB );
-        rtl8168_mac_ocp_write( tp, 0xF80A, 0xE0DD );
-        rtl8168_mac_ocp_write( tp, 0xF80C, 0xE0DF );
-        rtl8168_mac_ocp_write( tp, 0xF80E, 0xE0E1 );
-        rtl8168_mac_ocp_write( tp, 0xF810, 0xC251 );
-        rtl8168_mac_ocp_write( tp, 0xF812, 0x7340 );
-        rtl8168_mac_ocp_write( tp, 0xF814, 0x49B1 );
-        rtl8168_mac_ocp_write( tp, 0xF816, 0xF010 );
-        rtl8168_mac_ocp_write( tp, 0xF818, 0x1D02 );
-        rtl8168_mac_ocp_write( tp, 0xF81A, 0x8D40 );
-        rtl8168_mac_ocp_write( tp, 0xF81C, 0xC202 );
-        rtl8168_mac_ocp_write( tp, 0xF81E, 0xBA00 );
-        rtl8168_mac_ocp_write( tp, 0xF820, 0x2C3A );
-        rtl8168_mac_ocp_write( tp, 0xF822, 0xC0F0 );
-        rtl8168_mac_ocp_write( tp, 0xF824, 0xE8DE );
-        rtl8168_mac_ocp_write( tp, 0xF826, 0x2000 );
-        rtl8168_mac_ocp_write( tp, 0xF828, 0x8000 );
-        rtl8168_mac_ocp_write( tp, 0xF82A, 0xC0B6 );
-        rtl8168_mac_ocp_write( tp, 0xF82C, 0x268C );
-        rtl8168_mac_ocp_write( tp, 0xF82E, 0x752C );
-        rtl8168_mac_ocp_write( tp, 0xF830, 0x49D4 );
-        rtl8168_mac_ocp_write( tp, 0xF832, 0xF112 );
-        rtl8168_mac_ocp_write( tp, 0xF834, 0xE025 );
-        rtl8168_mac_ocp_write( tp, 0xF836, 0xC2F6 );
-        rtl8168_mac_ocp_write( tp, 0xF838, 0x7146 );
-        rtl8168_mac_ocp_write( tp, 0xF83A, 0xC2F5 );
-        rtl8168_mac_ocp_write( tp, 0xF83C, 0x7340 );
-        rtl8168_mac_ocp_write( tp, 0xF83E, 0x49BE );
-        rtl8168_mac_ocp_write( tp, 0xF840, 0xF103 );
-        rtl8168_mac_ocp_write( tp, 0xF842, 0xC7F2 );
-        rtl8168_mac_ocp_write( tp, 0xF844, 0xE002 );
-        rtl8168_mac_ocp_write( tp, 0xF846, 0xC7F1 );
-        rtl8168_mac_ocp_write( tp, 0xF848, 0x304F );
-        rtl8168_mac_ocp_write( tp, 0xF84A, 0x6226 );
-        rtl8168_mac_ocp_write( tp, 0xF84C, 0x49A1 );
-        rtl8168_mac_ocp_write( tp, 0xF84E, 0xF1F0 );
-        rtl8168_mac_ocp_write( tp, 0xF850, 0x7222 );
-        rtl8168_mac_ocp_write( tp, 0xF852, 0x49A0 );
-        rtl8168_mac_ocp_write( tp, 0xF854, 0xF1ED );
-        rtl8168_mac_ocp_write( tp, 0xF856, 0x2525 );
-        rtl8168_mac_ocp_write( tp, 0xF858, 0x1F28 );
-        rtl8168_mac_ocp_write( tp, 0xF85A, 0x3097 );
-        rtl8168_mac_ocp_write( tp, 0xF85C, 0x3091 );
-        rtl8168_mac_ocp_write( tp, 0xF85E, 0x9A36 );
-        rtl8168_mac_ocp_write( tp, 0xF860, 0x752C );
-        rtl8168_mac_ocp_write( tp, 0xF862, 0x21DC );
-        rtl8168_mac_ocp_write( tp, 0xF864, 0x25BC );
-        rtl8168_mac_ocp_write( tp, 0xF866, 0xC6E2 );
-        rtl8168_mac_ocp_write( tp, 0xF868, 0x77C0 );
-        rtl8168_mac_ocp_write( tp, 0xF86A, 0x1304 );
-        rtl8168_mac_ocp_write( tp, 0xF86C, 0xF014 );
-        rtl8168_mac_ocp_write( tp, 0xF86E, 0x1303 );
-        rtl8168_mac_ocp_write( tp, 0xF870, 0xF014 );
-        rtl8168_mac_ocp_write( tp, 0xF872, 0x1302 );
-        rtl8168_mac_ocp_write( tp, 0xF874, 0xF014 );
-        rtl8168_mac_ocp_write( tp, 0xF876, 0x1301 );
-        rtl8168_mac_ocp_write( tp, 0xF878, 0xF014 );
-        rtl8168_mac_ocp_write( tp, 0xF87A, 0x49D4 );
-        rtl8168_mac_ocp_write( tp, 0xF87C, 0xF103 );
-        rtl8168_mac_ocp_write( tp, 0xF87E, 0xC3D7 );
-        rtl8168_mac_ocp_write( tp, 0xF880, 0xBB00 );
-        rtl8168_mac_ocp_write( tp, 0xF882, 0xC618 );
-        rtl8168_mac_ocp_write( tp, 0xF884, 0x67C6 );
-        rtl8168_mac_ocp_write( tp, 0xF886, 0x752E );
-        rtl8168_mac_ocp_write( tp, 0xF888, 0x22D7 );
-        rtl8168_mac_ocp_write( tp, 0xF88A, 0x26DD );
-        rtl8168_mac_ocp_write( tp, 0xF88C, 0x1505 );
-        rtl8168_mac_ocp_write( tp, 0xF88E, 0xF013 );
-        rtl8168_mac_ocp_write( tp, 0xF890, 0xC60A );
-        rtl8168_mac_ocp_write( tp, 0xF892, 0xBE00 );
-        rtl8168_mac_ocp_write( tp, 0xF894, 0xC309 );
-        rtl8168_mac_ocp_write( tp, 0xF896, 0xBB00 );
-        rtl8168_mac_ocp_write( tp, 0xF898, 0xC308 );
-        rtl8168_mac_ocp_write( tp, 0xF89A, 0xBB00 );
-        rtl8168_mac_ocp_write( tp, 0xF89C, 0xC307 );
-        rtl8168_mac_ocp_write( tp, 0xF89E, 0xBB00 );
-        rtl8168_mac_ocp_write( tp, 0xF8A0, 0xC306 );
-        rtl8168_mac_ocp_write( tp, 0xF8A2, 0xBB00 );
-        rtl8168_mac_ocp_write( tp, 0xF8A4, 0x25C8 );
-        rtl8168_mac_ocp_write( tp, 0xF8A6, 0x25A6 );
-        rtl8168_mac_ocp_write( tp, 0xF8A8, 0x25AC );
-        rtl8168_mac_ocp_write( tp, 0xF8AA, 0x25B2 );
-        rtl8168_mac_ocp_write( tp, 0xF8AC, 0x25B8 );
-        rtl8168_mac_ocp_write( tp, 0xF8AE, 0xCD08 );
-        rtl8168_mac_ocp_write( tp, 0xF8B0, 0x0000 );
-        rtl8168_mac_ocp_write( tp, 0xF8B2, 0xC0BC );
-        rtl8168_mac_ocp_write( tp, 0xF8B4, 0xC2FF );
-        rtl8168_mac_ocp_write( tp, 0xF8B6, 0x7340 );
-        rtl8168_mac_ocp_write( tp, 0xF8B8, 0x49B0 );
-        rtl8168_mac_ocp_write( tp, 0xF8BA, 0xF04E );
-        rtl8168_mac_ocp_write( tp, 0xF8BC, 0x1F46 );
-        rtl8168_mac_ocp_write( tp, 0xF8BE, 0x308F );
-        rtl8168_mac_ocp_write( tp, 0xF8C0, 0xC3F7 );
-        rtl8168_mac_ocp_write( tp, 0xF8C2, 0x1C04 );
-        rtl8168_mac_ocp_write( tp, 0xF8C4, 0xE84D );
-        rtl8168_mac_ocp_write( tp, 0xF8C6, 0x1401 );
-        rtl8168_mac_ocp_write( tp, 0xF8C8, 0xF147 );
-        rtl8168_mac_ocp_write( tp, 0xF8CA, 0x7226 );
-        rtl8168_mac_ocp_write( tp, 0xF8CC, 0x49A7 );
-        rtl8168_mac_ocp_write( tp, 0xF8CE, 0xF044 );
-        rtl8168_mac_ocp_write( tp, 0xF8D0, 0x7222 );
-        rtl8168_mac_ocp_write( tp, 0xF8D2, 0x2525 );
-        rtl8168_mac_ocp_write( tp, 0xF8D4, 0x1F30 );
-        rtl8168_mac_ocp_write( tp, 0xF8D6, 0x3097 );
-        rtl8168_mac_ocp_write( tp, 0xF8D8, 0x3091 );
-        rtl8168_mac_ocp_write( tp, 0xF8DA, 0x7340 );
-        rtl8168_mac_ocp_write( tp, 0xF8DC, 0xC4EA );
-        rtl8168_mac_ocp_write( tp, 0xF8DE, 0x401C );
-        rtl8168_mac_ocp_write( tp, 0xF8E0, 0xF006 );
-        rtl8168_mac_ocp_write( tp, 0xF8E2, 0xC6E8 );
-        rtl8168_mac_ocp_write( tp, 0xF8E4, 0x75C0 );
-        rtl8168_mac_ocp_write( tp, 0xF8E6, 0x49D7 );
-        rtl8168_mac_ocp_write( tp, 0xF8E8, 0xF105 );
-        rtl8168_mac_ocp_write( tp, 0xF8EA, 0xE036 );
-        rtl8168_mac_ocp_write( tp, 0xF8EC, 0x1D08 );
-        rtl8168_mac_ocp_write( tp, 0xF8EE, 0x8DC1 );
-        rtl8168_mac_ocp_write( tp, 0xF8F0, 0x0208 );
-        rtl8168_mac_ocp_write( tp, 0xF8F2, 0x6640 );
-        rtl8168_mac_ocp_write( tp, 0xF8F4, 0x2764 );
-        rtl8168_mac_ocp_write( tp, 0xF8F6, 0x1606 );
-        rtl8168_mac_ocp_write( tp, 0xF8F8, 0xF12F );
-        rtl8168_mac_ocp_write( tp, 0xF8FA, 0x6346 );
-        rtl8168_mac_ocp_write( tp, 0xF8FC, 0x133B );
-        rtl8168_mac_ocp_write( tp, 0xF8FE, 0xF12C );
-        rtl8168_mac_ocp_write( tp, 0xF900, 0x9B34 );
-        rtl8168_mac_ocp_write( tp, 0xF902, 0x1B18 );
-        rtl8168_mac_ocp_write( tp, 0xF904, 0x3093 );
-        rtl8168_mac_ocp_write( tp, 0xF906, 0xC32A );
-        rtl8168_mac_ocp_write( tp, 0xF908, 0x1C10 );
-        rtl8168_mac_ocp_write( tp, 0xF90A, 0xE82A );
-        rtl8168_mac_ocp_write( tp, 0xF90C, 0x1401 );
-        rtl8168_mac_ocp_write( tp, 0xF90E, 0xF124 );
-        rtl8168_mac_ocp_write( tp, 0xF910, 0x1A36 );
-        rtl8168_mac_ocp_write( tp, 0xF912, 0x308A );
-        rtl8168_mac_ocp_write( tp, 0xF914, 0x7322 );
-        rtl8168_mac_ocp_write( tp, 0xF916, 0x25B5 );
-        rtl8168_mac_ocp_write( tp, 0xF918, 0x0B0E );
-        rtl8168_mac_ocp_write( tp, 0xF91A, 0x1C00 );
-        rtl8168_mac_ocp_write( tp, 0xF91C, 0xE82C );
-        rtl8168_mac_ocp_write( tp, 0xF91E, 0xC71F );
-        rtl8168_mac_ocp_write( tp, 0xF920, 0x4027 );
-        rtl8168_mac_ocp_write( tp, 0xF922, 0xF11A );
-        rtl8168_mac_ocp_write( tp, 0xF924, 0xE838 );
-        rtl8168_mac_ocp_write( tp, 0xF926, 0x1F42 );
-        rtl8168_mac_ocp_write( tp, 0xF928, 0x308F );
-        rtl8168_mac_ocp_write( tp, 0xF92A, 0x1B08 );
-        rtl8168_mac_ocp_write( tp, 0xF92C, 0xE824 );
-        rtl8168_mac_ocp_write( tp, 0xF92E, 0x7236 );
-        rtl8168_mac_ocp_write( tp, 0xF930, 0x7746 );
-        rtl8168_mac_ocp_write( tp, 0xF932, 0x1700 );
-        rtl8168_mac_ocp_write( tp, 0xF934, 0xF00D );
-        rtl8168_mac_ocp_write( tp, 0xF936, 0xC313 );
-        rtl8168_mac_ocp_write( tp, 0xF938, 0x401F );
-        rtl8168_mac_ocp_write( tp, 0xF93A, 0xF103 );
-        rtl8168_mac_ocp_write( tp, 0xF93C, 0x1F00 );
-        rtl8168_mac_ocp_write( tp, 0xF93E, 0x9F46 );
-        rtl8168_mac_ocp_write( tp, 0xF940, 0x7744 );
-        rtl8168_mac_ocp_write( tp, 0xF942, 0x449F );
-        rtl8168_mac_ocp_write( tp, 0xF944, 0x445F );
-        rtl8168_mac_ocp_write( tp, 0xF946, 0xE817 );
-        rtl8168_mac_ocp_write( tp, 0xF948, 0xC70A );
-        rtl8168_mac_ocp_write( tp, 0xF94A, 0x4027 );
-        rtl8168_mac_ocp_write( tp, 0xF94C, 0xF105 );
-        rtl8168_mac_ocp_write( tp, 0xF94E, 0xC302 );
-        rtl8168_mac_ocp_write( tp, 0xF950, 0xBB00 );
-        rtl8168_mac_ocp_write( tp, 0xF952, 0x2E08 );
-        rtl8168_mac_ocp_write( tp, 0xF954, 0x2DC2 );
-        rtl8168_mac_ocp_write( tp, 0xF956, 0xC7FF );
-        rtl8168_mac_ocp_write( tp, 0xF958, 0xBF00 );
-        rtl8168_mac_ocp_write( tp, 0xF95A, 0xCDB8 );
-        rtl8168_mac_ocp_write( tp, 0xF95C, 0xFFFF );
-        rtl8168_mac_ocp_write( tp, 0xF95E, 0x0C02 );
-        rtl8168_mac_ocp_write( tp, 0xF960, 0xA554 );
-        rtl8168_mac_ocp_write( tp, 0xF962, 0xA5DC );
-        rtl8168_mac_ocp_write( tp, 0xF964, 0x402F );
-        rtl8168_mac_ocp_write( tp, 0xF966, 0xF105 );
-        rtl8168_mac_ocp_write( tp, 0xF968, 0x1400 );
-        rtl8168_mac_ocp_write( tp, 0xF96A, 0xF1FA );
-        rtl8168_mac_ocp_write( tp, 0xF96C, 0x1C01 );
-        rtl8168_mac_ocp_write( tp, 0xF96E, 0xE002 );
-        rtl8168_mac_ocp_write( tp, 0xF970, 0x1C00 );
-        rtl8168_mac_ocp_write( tp, 0xF972, 0xFF80 );
-        rtl8168_mac_ocp_write( tp, 0xF974, 0x49B0 );
-        rtl8168_mac_ocp_write( tp, 0xF976, 0xF004 );
-        rtl8168_mac_ocp_write( tp, 0xF978, 0x0B01 );
-        rtl8168_mac_ocp_write( tp, 0xF97A, 0xA1D3 );
-        rtl8168_mac_ocp_write( tp, 0xF97C, 0xE003 );
-        rtl8168_mac_ocp_write( tp, 0xF97E, 0x0B02 );
-        rtl8168_mac_ocp_write( tp, 0xF980, 0xA5D3 );
-        rtl8168_mac_ocp_write( tp, 0xF982, 0x3127 );
-        rtl8168_mac_ocp_write( tp, 0xF984, 0x3720 );
-        rtl8168_mac_ocp_write( tp, 0xF986, 0x0B02 );
-        rtl8168_mac_ocp_write( tp, 0xF988, 0xA5D3 );
-        rtl8168_mac_ocp_write( tp, 0xF98A, 0x3127 );
-        rtl8168_mac_ocp_write( tp, 0xF98C, 0x3720 );
-        rtl8168_mac_ocp_write( tp, 0xF98E, 0x1300 );
-        rtl8168_mac_ocp_write( tp, 0xF990, 0xF1FB );
-        rtl8168_mac_ocp_write( tp, 0xF992, 0xFF80 );
-        rtl8168_mac_ocp_write( tp, 0xF994, 0x7322 );
-        rtl8168_mac_ocp_write( tp, 0xF996, 0x25B5 );
-        rtl8168_mac_ocp_write( tp, 0xF998, 0x1E28 );
-        rtl8168_mac_ocp_write( tp, 0xF99A, 0x30DE );
-        rtl8168_mac_ocp_write( tp, 0xF99C, 0x30D9 );
-        rtl8168_mac_ocp_write( tp, 0xF99E, 0x7264 );
-        rtl8168_mac_ocp_write( tp, 0xF9A0, 0x1E11 );
-        rtl8168_mac_ocp_write( tp, 0xF9A2, 0x2368 );
-        rtl8168_mac_ocp_write( tp, 0xF9A4, 0x3116 );
-        rtl8168_mac_ocp_write( tp, 0xF9A6, 0xFF80 );
-        rtl8168_mac_ocp_write( tp, 0xF9A8, 0x1B7E );
-        rtl8168_mac_ocp_write( tp, 0xF9AA, 0xC602 );
-        rtl8168_mac_ocp_write( tp, 0xF9AC, 0xBE00 );
-        rtl8168_mac_ocp_write( tp, 0xF9AE, 0x06A6 );
-        rtl8168_mac_ocp_write( tp, 0xF9B0, 0x1B7E );
-        rtl8168_mac_ocp_write( tp, 0xF9B2, 0xC602 );
-        rtl8168_mac_ocp_write( tp, 0xF9B4, 0xBE00 );
-        rtl8168_mac_ocp_write( tp, 0xF9B6, 0x0764 );
-        rtl8168_mac_ocp_write( tp, 0xF9B8, 0xC602 );
-        rtl8168_mac_ocp_write( tp, 0xF9BA, 0xBE00 );
-        rtl8168_mac_ocp_write( tp, 0xF9BC, 0x0000 );
-        rtl8168_mac_ocp_write( tp, 0xF9BE, 0xC602 );
-        rtl8168_mac_ocp_write( tp, 0xF9C0, 0xBE00 );
-        rtl8168_mac_ocp_write( tp, 0xF9C2, 0x0000 );
-        rtl8168_mac_ocp_write( tp, 0xF9C4, 0xC602 );
-        rtl8168_mac_ocp_write( tp, 0xF9C6, 0xBE00 );
-        rtl8168_mac_ocp_write( tp, 0xF9C8, 0x0000 );
-        rtl8168_mac_ocp_write( tp, 0xF9CA, 0xC602 );
-        rtl8168_mac_ocp_write( tp, 0xF9CC, 0xBE00 );
-        rtl8168_mac_ocp_write( tp, 0xF9CE, 0x0000 );
-        rtl8168_mac_ocp_write( tp, 0xF9D0, 0xC602 );
-        rtl8168_mac_ocp_write( tp, 0xF9D2, 0xBE00 );
-        rtl8168_mac_ocp_write( tp, 0xF9D4, 0x0000 );
-
-        rtl8168_mac_ocp_write( tp, 0xFC26, 0x8000 );
-
-        rtl8168_mac_ocp_write( tp, 0xFC28, 0x2549 );
-        rtl8168_mac_ocp_write( tp, 0xFC2A, 0x06A5 );
-        rtl8168_mac_ocp_write( tp, 0xFC2C, 0x0763 );
-}
-
-static void
-rtl8168_set_mac_mcu_8168ep_2(struct net_device *dev)
-{
-        struct rtl8168_private *tp = netdev_priv(dev);
-
-        rtl8168_hw_disable_mac_mcu_bps(dev);
-
-        rtl8168_mac_ocp_write( tp, 0xF800, 0xE008 );
-        rtl8168_mac_ocp_write( tp, 0xF802, 0xE017 );
-        rtl8168_mac_ocp_write( tp, 0xF804, 0xE019 );
-        rtl8168_mac_ocp_write( tp, 0xF806, 0xE01B );
-        rtl8168_mac_ocp_write( tp, 0xF808, 0xE01D );
-        rtl8168_mac_ocp_write( tp, 0xF80A, 0xE01F );
-        rtl8168_mac_ocp_write( tp, 0xF80C, 0xE021 );
-        rtl8168_mac_ocp_write( tp, 0xF80E, 0xE023 );
-        rtl8168_mac_ocp_write( tp, 0xF810, 0xC50F );
-        rtl8168_mac_ocp_write( tp, 0xF812, 0x76A4 );
-        rtl8168_mac_ocp_write( tp, 0xF814, 0x49E3 );
-        rtl8168_mac_ocp_write( tp, 0xF816, 0xF007 );
-        rtl8168_mac_ocp_write( tp, 0xF818, 0x49C0 );
-        rtl8168_mac_ocp_write( tp, 0xF81A, 0xF103 );
-        rtl8168_mac_ocp_write( tp, 0xF81C, 0xC607 );
-        rtl8168_mac_ocp_write( tp, 0xF81E, 0xBE00 );
-        rtl8168_mac_ocp_write( tp, 0xF820, 0xC606 );
-        rtl8168_mac_ocp_write( tp, 0xF822, 0xBE00 );
-        rtl8168_mac_ocp_write( tp, 0xF824, 0xC602 );
-        rtl8168_mac_ocp_write( tp, 0xF826, 0xBE00 );
-        rtl8168_mac_ocp_write( tp, 0xF828, 0x0BDA );
-        rtl8168_mac_ocp_write( tp, 0xF82A, 0x0BB0 );
-        rtl8168_mac_ocp_write( tp, 0xF82C, 0x0BBA );
-        rtl8168_mac_ocp_write( tp, 0xF82E, 0xDC00 );
-        rtl8168_mac_ocp_write( tp, 0xF830, 0xC602 );
-        rtl8168_mac_ocp_write( tp, 0xF832, 0xBE00 );
-        rtl8168_mac_ocp_write( tp, 0xF834, 0x0000 );
-        rtl8168_mac_ocp_write( tp, 0xF836, 0xC602 );
-        rtl8168_mac_ocp_write( tp, 0xF838, 0xBE00 );
-        rtl8168_mac_ocp_write( tp, 0xF83A, 0x0000 );
-        rtl8168_mac_ocp_write( tp, 0xF83C, 0xC602 );
-        rtl8168_mac_ocp_write( tp, 0xF83E, 0xBE00 );
-        rtl8168_mac_ocp_write( tp, 0xF840, 0x0000 );
-        rtl8168_mac_ocp_write( tp, 0xF842, 0xC602 );
-        rtl8168_mac_ocp_write( tp, 0xF844, 0xBE00 );
-        rtl8168_mac_ocp_write( tp, 0xF846, 0x0000 );
-        rtl8168_mac_ocp_write( tp, 0xF848, 0xC602 );
-        rtl8168_mac_ocp_write( tp, 0xF84A, 0xBE00 );
-        rtl8168_mac_ocp_write( tp, 0xF84C, 0x0000 );
-        rtl8168_mac_ocp_write( tp, 0xF84E, 0xC602 );
-        rtl8168_mac_ocp_write( tp, 0xF850, 0xBE00 );
-        rtl8168_mac_ocp_write( tp, 0xF852, 0x0000 );
-        rtl8168_mac_ocp_write( tp, 0xF854, 0xC602 );
-        rtl8168_mac_ocp_write( tp, 0xF856, 0xBE00 );
-        rtl8168_mac_ocp_write( tp, 0xF858, 0x0000 );
-
-        rtl8168_mac_ocp_write( tp, 0xFC26, 0x8000 );
-
-        rtl8168_mac_ocp_write( tp, 0xFC28, 0x0BB3 );
-}
-
-static void
-rtl8168_set_mac_mcu_8168h_1(struct net_device *dev)
-{
-        struct rtl8168_private *tp = netdev_priv(dev);
-
-        rtl8168_hw_disable_mac_mcu_bps(dev);
-
-        rtl8168_mac_ocp_write(tp, 0xF800, 0xE008);
-        rtl8168_mac_ocp_write(tp, 0xF802, 0xE00F);
-        rtl8168_mac_ocp_write(tp, 0xF804, 0xE011);
-        rtl8168_mac_ocp_write(tp, 0xF806, 0xE047);
-        rtl8168_mac_ocp_write(tp, 0xF808, 0xE049);
-        rtl8168_mac_ocp_write(tp, 0xF80A, 0xE073);
-        rtl8168_mac_ocp_write(tp, 0xF80C, 0xE075);
-        rtl8168_mac_ocp_write(tp, 0xF80E, 0xE077);
-        rtl8168_mac_ocp_write(tp, 0xF810, 0xC707);
-        rtl8168_mac_ocp_write(tp, 0xF812, 0x1D00);
-        rtl8168_mac_ocp_write(tp, 0xF814, 0x8DE2);
-        rtl8168_mac_ocp_write(tp, 0xF816, 0x48C1);
-        rtl8168_mac_ocp_write(tp, 0xF818, 0xC502);
-        rtl8168_mac_ocp_write(tp, 0xF81A, 0xBD00);
-        rtl8168_mac_ocp_write(tp, 0xF81C, 0x00E4);
-        rtl8168_mac_ocp_write(tp, 0xF81E, 0xE0C0);
-        rtl8168_mac_ocp_write(tp, 0xF820, 0xC502);
-        rtl8168_mac_ocp_write(tp, 0xF822, 0xBD00);
-        rtl8168_mac_ocp_write(tp, 0xF824, 0x0216);
-        rtl8168_mac_ocp_write(tp, 0xF826, 0xC634);
-        rtl8168_mac_ocp_write(tp, 0xF828, 0x75C0);
-        rtl8168_mac_ocp_write(tp, 0xF82A, 0x49D3);
-        rtl8168_mac_ocp_write(tp, 0xF82C, 0xF027);
-        rtl8168_mac_ocp_write(tp, 0xF82E, 0xC631);
-        rtl8168_mac_ocp_write(tp, 0xF830, 0x75C0);
-        rtl8168_mac_ocp_write(tp, 0xF832, 0x49D3);
-        rtl8168_mac_ocp_write(tp, 0xF834, 0xF123);
-        rtl8168_mac_ocp_write(tp, 0xF836, 0xC627);
-        rtl8168_mac_ocp_write(tp, 0xF838, 0x75C0);
-        rtl8168_mac_ocp_write(tp, 0xF83A, 0xB405);
-        rtl8168_mac_ocp_write(tp, 0xF83C, 0xC525);
-        rtl8168_mac_ocp_write(tp, 0xF83E, 0x9DC0);
-        rtl8168_mac_ocp_write(tp, 0xF840, 0xC621);
-        rtl8168_mac_ocp_write(tp, 0xF842, 0x75C8);
-        rtl8168_mac_ocp_write(tp, 0xF844, 0x49D5);
-        rtl8168_mac_ocp_write(tp, 0xF846, 0xF00A);
-        rtl8168_mac_ocp_write(tp, 0xF848, 0x49D6);
-        rtl8168_mac_ocp_write(tp, 0xF84A, 0xF008);
-        rtl8168_mac_ocp_write(tp, 0xF84C, 0x49D7);
-        rtl8168_mac_ocp_write(tp, 0xF84E, 0xF006);
-        rtl8168_mac_ocp_write(tp, 0xF850, 0x49D8);
-        rtl8168_mac_ocp_write(tp, 0xF852, 0xF004);
-        rtl8168_mac_ocp_write(tp, 0xF854, 0x75D2);
-        rtl8168_mac_ocp_write(tp, 0xF856, 0x49D9);
-        rtl8168_mac_ocp_write(tp, 0xF858, 0xF111);
-        rtl8168_mac_ocp_write(tp, 0xF85A, 0xC517);
-        rtl8168_mac_ocp_write(tp, 0xF85C, 0x9DC8);
-        rtl8168_mac_ocp_write(tp, 0xF85E, 0xC516);
-        rtl8168_mac_ocp_write(tp, 0xF860, 0x9DD2);
-        rtl8168_mac_ocp_write(tp, 0xF862, 0xC618);
-        rtl8168_mac_ocp_write(tp, 0xF864, 0x75C0);
-        rtl8168_mac_ocp_write(tp, 0xF866, 0x49D4);
-        rtl8168_mac_ocp_write(tp, 0xF868, 0xF003);
-        rtl8168_mac_ocp_write(tp, 0xF86A, 0x49D0);
-        rtl8168_mac_ocp_write(tp, 0xF86C, 0xF104);
-        rtl8168_mac_ocp_write(tp, 0xF86E, 0xC60A);
-        rtl8168_mac_ocp_write(tp, 0xF870, 0xC50E);
-        rtl8168_mac_ocp_write(tp, 0xF872, 0x9DC0);
-        rtl8168_mac_ocp_write(tp, 0xF874, 0xB005);
-        rtl8168_mac_ocp_write(tp, 0xF876, 0xC607);
-        rtl8168_mac_ocp_write(tp, 0xF878, 0x9DC0);
-        rtl8168_mac_ocp_write(tp, 0xF87A, 0xB007);
-        rtl8168_mac_ocp_write(tp, 0xF87C, 0xC602);
-        rtl8168_mac_ocp_write(tp, 0xF87E, 0xBE00);
-        rtl8168_mac_ocp_write(tp, 0xF880, 0x1A06);
-        rtl8168_mac_ocp_write(tp, 0xF882, 0xB400);
-        rtl8168_mac_ocp_write(tp, 0xF884, 0xE86C);
-        rtl8168_mac_ocp_write(tp, 0xF886, 0xA000);
-        rtl8168_mac_ocp_write(tp, 0xF888, 0x01E1);
-        rtl8168_mac_ocp_write(tp, 0xF88A, 0x0200);
-        rtl8168_mac_ocp_write(tp, 0xF88C, 0x9200);
-        rtl8168_mac_ocp_write(tp, 0xF88E, 0xE84C);
-        rtl8168_mac_ocp_write(tp, 0xF890, 0xE004);
-        rtl8168_mac_ocp_write(tp, 0xF892, 0xE908);
-        rtl8168_mac_ocp_write(tp, 0xF894, 0xC502);
-        rtl8168_mac_ocp_write(tp, 0xF896, 0xBD00);
-        rtl8168_mac_ocp_write(tp, 0xF898, 0x0B58);
-        rtl8168_mac_ocp_write(tp, 0xF89A, 0xB407);
-        rtl8168_mac_ocp_write(tp, 0xF89C, 0xB404);
-        rtl8168_mac_ocp_write(tp, 0xF89E, 0x2195);
-        rtl8168_mac_ocp_write(tp, 0xF8A0, 0x25BD);
-        rtl8168_mac_ocp_write(tp, 0xF8A2, 0x9BE0);
-        rtl8168_mac_ocp_write(tp, 0xF8A4, 0x1C1C);
-        rtl8168_mac_ocp_write(tp, 0xF8A6, 0x484F);
-        rtl8168_mac_ocp_write(tp, 0xF8A8, 0x9CE2);
-        rtl8168_mac_ocp_write(tp, 0xF8AA, 0x72E2);
-        rtl8168_mac_ocp_write(tp, 0xF8AC, 0x49AE);
-        rtl8168_mac_ocp_write(tp, 0xF8AE, 0xF1FE);
-        rtl8168_mac_ocp_write(tp, 0xF8B0, 0x0B00);
-        rtl8168_mac_ocp_write(tp, 0xF8B2, 0xF116);
-        rtl8168_mac_ocp_write(tp, 0xF8B4, 0xC71C);
-        rtl8168_mac_ocp_write(tp, 0xF8B6, 0xC419);
-        rtl8168_mac_ocp_write(tp, 0xF8B8, 0x9CE0);
-        rtl8168_mac_ocp_write(tp, 0xF8BA, 0x1C13);
-        rtl8168_mac_ocp_write(tp, 0xF8BC, 0x484F);
-        rtl8168_mac_ocp_write(tp, 0xF8BE, 0x9CE2);
-        rtl8168_mac_ocp_write(tp, 0xF8C0, 0x74E2);
-        rtl8168_mac_ocp_write(tp, 0xF8C2, 0x49CE);
-        rtl8168_mac_ocp_write(tp, 0xF8C4, 0xF1FE);
-        rtl8168_mac_ocp_write(tp, 0xF8C6, 0xC412);
-        rtl8168_mac_ocp_write(tp, 0xF8C8, 0x9CE0);
-        rtl8168_mac_ocp_write(tp, 0xF8CA, 0x1C13);
-        rtl8168_mac_ocp_write(tp, 0xF8CC, 0x484F);
-        rtl8168_mac_ocp_write(tp, 0xF8CE, 0x9CE2);
-        rtl8168_mac_ocp_write(tp, 0xF8D0, 0x74E2);
-        rtl8168_mac_ocp_write(tp, 0xF8D2, 0x49CE);
-        rtl8168_mac_ocp_write(tp, 0xF8D4, 0xF1FE);
-        rtl8168_mac_ocp_write(tp, 0xF8D6, 0xC70C);
-        rtl8168_mac_ocp_write(tp, 0xF8D8, 0x74F8);
-        rtl8168_mac_ocp_write(tp, 0xF8DA, 0x48C3);
-        rtl8168_mac_ocp_write(tp, 0xF8DC, 0x8CF8);
-        rtl8168_mac_ocp_write(tp, 0xF8DE, 0xB004);
-        rtl8168_mac_ocp_write(tp, 0xF8E0, 0xB007);
-        rtl8168_mac_ocp_write(tp, 0xF8E2, 0xC502);
-        rtl8168_mac_ocp_write(tp, 0xF8E4, 0xBD00);
-        rtl8168_mac_ocp_write(tp, 0xF8E6, 0x0F24);
-        rtl8168_mac_ocp_write(tp, 0xF8E8, 0x0481);
-        rtl8168_mac_ocp_write(tp, 0xF8EA, 0x0C81);
-        rtl8168_mac_ocp_write(tp, 0xF8EC, 0xDE24);
-        rtl8168_mac_ocp_write(tp, 0xF8EE, 0xE000);
-        rtl8168_mac_ocp_write(tp, 0xF8F0, 0xC602);
-        rtl8168_mac_ocp_write(tp, 0xF8F2, 0xBE00);
-        rtl8168_mac_ocp_write(tp, 0xF8F4, 0x0CA4);
-        rtl8168_mac_ocp_write(tp, 0xF8F6, 0xC502);
-        rtl8168_mac_ocp_write(tp, 0xF8F8, 0xBD00);
-        rtl8168_mac_ocp_write(tp, 0xF8FA, 0x0000);
-        rtl8168_mac_ocp_write(tp, 0xF8FC, 0xC602);
-        rtl8168_mac_ocp_write(tp, 0xF8FE, 0xBE00);
-        rtl8168_mac_ocp_write(tp, 0xF900, 0x0000);
-
-        rtl8168_mac_ocp_write(tp, 0xFC26, 0x8000);
-
-        rtl8168_mac_ocp_write(tp, 0xFC28, 0x00E2);
-        rtl8168_mac_ocp_write(tp, 0xFC2A, 0x0210);
-        rtl8168_mac_ocp_write(tp, 0xFC2C, 0x1A04);
-        rtl8168_mac_ocp_write(tp, 0xFC2E, 0x0B26);
-        rtl8168_mac_ocp_write(tp, 0xFC30, 0x0F02);
-        rtl8168_mac_ocp_write(tp, 0xFC32, 0x0CA0);
-
-        rtl8168_mac_ocp_write(tp, 0xFC38, 0x003F);
-}
-
-static void
-rtl8168_set_mac_mcu_8168fp_1(struct net_device *dev)
-{
-        struct rtl8168_private *tp = netdev_priv(dev);
-
-        rtl8168_hw_disable_mac_mcu_bps(dev);
-
-        rtl8168_mac_ocp_write(tp, 0xF800, 0xE00A);
-        rtl8168_mac_ocp_write(tp, 0xF802, 0xE0C1);
-        rtl8168_mac_ocp_write(tp, 0xF804, 0xE104);
-        rtl8168_mac_ocp_write(tp, 0xF806, 0xE108);
-        rtl8168_mac_ocp_write(tp, 0xF808, 0xE10D);
-        rtl8168_mac_ocp_write(tp, 0xF80A, 0xE112);
-        rtl8168_mac_ocp_write(tp, 0xF80C, 0xE11C);
-        rtl8168_mac_ocp_write(tp, 0xF80E, 0xE121);
-        rtl8168_mac_ocp_write(tp, 0xF810, 0xE000);
-        rtl8168_mac_ocp_write(tp, 0xF812, 0xE0C8);
-        rtl8168_mac_ocp_write(tp, 0xF814, 0xB400);
-        rtl8168_mac_ocp_write(tp, 0xF816, 0xC1FE);
-        rtl8168_mac_ocp_write(tp, 0xF818, 0x49E2);
-        rtl8168_mac_ocp_write(tp, 0xF81A, 0xF04C);
-        rtl8168_mac_ocp_write(tp, 0xF81C, 0x49EA);
-        rtl8168_mac_ocp_write(tp, 0xF81E, 0xF04A);
-        rtl8168_mac_ocp_write(tp, 0xF820, 0x74E6);
-        rtl8168_mac_ocp_write(tp, 0xF822, 0xC246);
-        rtl8168_mac_ocp_write(tp, 0xF824, 0x7542);
-        rtl8168_mac_ocp_write(tp, 0xF826, 0x73EC);
-        rtl8168_mac_ocp_write(tp, 0xF828, 0x1800);
-        rtl8168_mac_ocp_write(tp, 0xF82A, 0x49C0);
-        rtl8168_mac_ocp_write(tp, 0xF82C, 0xF10D);
-        rtl8168_mac_ocp_write(tp, 0xF82E, 0x49C1);
-        rtl8168_mac_ocp_write(tp, 0xF830, 0xF10B);
-        rtl8168_mac_ocp_write(tp, 0xF832, 0x49C2);
-        rtl8168_mac_ocp_write(tp, 0xF834, 0xF109);
-        rtl8168_mac_ocp_write(tp, 0xF836, 0x49B0);
-        rtl8168_mac_ocp_write(tp, 0xF838, 0xF107);
-        rtl8168_mac_ocp_write(tp, 0xF83A, 0x49B1);
-        rtl8168_mac_ocp_write(tp, 0xF83C, 0xF105);
-        rtl8168_mac_ocp_write(tp, 0xF83E, 0x7220);
-        rtl8168_mac_ocp_write(tp, 0xF840, 0x49A2);
-        rtl8168_mac_ocp_write(tp, 0xF842, 0xF102);
-        rtl8168_mac_ocp_write(tp, 0xF844, 0xE002);
-        rtl8168_mac_ocp_write(tp, 0xF846, 0x4800);
-        rtl8168_mac_ocp_write(tp, 0xF848, 0x49D0);
-        rtl8168_mac_ocp_write(tp, 0xF84A, 0xF10A);
-        rtl8168_mac_ocp_write(tp, 0xF84C, 0x49D1);
-        rtl8168_mac_ocp_write(tp, 0xF84E, 0xF108);
-        rtl8168_mac_ocp_write(tp, 0xF850, 0x49D2);
-        rtl8168_mac_ocp_write(tp, 0xF852, 0xF106);
-        rtl8168_mac_ocp_write(tp, 0xF854, 0x49D3);
-        rtl8168_mac_ocp_write(tp, 0xF856, 0xF104);
-        rtl8168_mac_ocp_write(tp, 0xF858, 0x49DF);
-        rtl8168_mac_ocp_write(tp, 0xF85A, 0xF102);
-        rtl8168_mac_ocp_write(tp, 0xF85C, 0xE00C);
-        rtl8168_mac_ocp_write(tp, 0xF85E, 0x4801);
-        rtl8168_mac_ocp_write(tp, 0xF860, 0x72E4);
-        rtl8168_mac_ocp_write(tp, 0xF862, 0x49AD);
-        rtl8168_mac_ocp_write(tp, 0xF864, 0xF108);
-        rtl8168_mac_ocp_write(tp, 0xF866, 0xC225);
-        rtl8168_mac_ocp_write(tp, 0xF868, 0x6741);
-        rtl8168_mac_ocp_write(tp, 0xF86A, 0x48F0);
-        rtl8168_mac_ocp_write(tp, 0xF86C, 0x8F41);
-        rtl8168_mac_ocp_write(tp, 0xF86E, 0x4870);
-        rtl8168_mac_ocp_write(tp, 0xF870, 0x8F41);
-        rtl8168_mac_ocp_write(tp, 0xF872, 0xC7CF);
-        rtl8168_mac_ocp_write(tp, 0xF874, 0x49B5);
-        rtl8168_mac_ocp_write(tp, 0xF876, 0xF01F);
-        rtl8168_mac_ocp_write(tp, 0xF878, 0x49B2);
-        rtl8168_mac_ocp_write(tp, 0xF87A, 0xF00B);
-        rtl8168_mac_ocp_write(tp, 0xF87C, 0x4980);
-        rtl8168_mac_ocp_write(tp, 0xF87E, 0xF003);
-        rtl8168_mac_ocp_write(tp, 0xF880, 0x484E);
-        rtl8168_mac_ocp_write(tp, 0xF882, 0x94E7);
-        rtl8168_mac_ocp_write(tp, 0xF884, 0x4981);
-        rtl8168_mac_ocp_write(tp, 0xF886, 0xF004);
-        rtl8168_mac_ocp_write(tp, 0xF888, 0x485E);
-        rtl8168_mac_ocp_write(tp, 0xF88A, 0xC212);
-        rtl8168_mac_ocp_write(tp, 0xF88C, 0x9543);
-        rtl8168_mac_ocp_write(tp, 0xF88E, 0xE071);
-        rtl8168_mac_ocp_write(tp, 0xF890, 0x49B6);
-        rtl8168_mac_ocp_write(tp, 0xF892, 0xF003);
-        rtl8168_mac_ocp_write(tp, 0xF894, 0x49B3);
-        rtl8168_mac_ocp_write(tp, 0xF896, 0xF10F);
-        rtl8168_mac_ocp_write(tp, 0xF898, 0x4980);
-        rtl8168_mac_ocp_write(tp, 0xF89A, 0xF003);
-        rtl8168_mac_ocp_write(tp, 0xF89C, 0x484E);
-        rtl8168_mac_ocp_write(tp, 0xF89E, 0x94E7);
-        rtl8168_mac_ocp_write(tp, 0xF8A0, 0x4981);
-        rtl8168_mac_ocp_write(tp, 0xF8A2, 0xF004);
-        rtl8168_mac_ocp_write(tp, 0xF8A4, 0x485E);
-        rtl8168_mac_ocp_write(tp, 0xF8A6, 0xC204);
-        rtl8168_mac_ocp_write(tp, 0xF8A8, 0x9543);
-        rtl8168_mac_ocp_write(tp, 0xF8AA, 0xE005);
-        rtl8168_mac_ocp_write(tp, 0xF8AC, 0xE000);
-        rtl8168_mac_ocp_write(tp, 0xF8AE, 0xE0FC);
-        rtl8168_mac_ocp_write(tp, 0xF8B0, 0xE0FA);
-        rtl8168_mac_ocp_write(tp, 0xF8B2, 0xE065);
-        rtl8168_mac_ocp_write(tp, 0xF8B4, 0x49B7);
-        rtl8168_mac_ocp_write(tp, 0xF8B6, 0xF007);
-        rtl8168_mac_ocp_write(tp, 0xF8B8, 0x4980);
-        rtl8168_mac_ocp_write(tp, 0xF8BA, 0xF005);
-        rtl8168_mac_ocp_write(tp, 0xF8BC, 0x1A38);
-        rtl8168_mac_ocp_write(tp, 0xF8BE, 0x46D4);
-        rtl8168_mac_ocp_write(tp, 0xF8C0, 0x1200);
-        rtl8168_mac_ocp_write(tp, 0xF8C2, 0xF109);
-        rtl8168_mac_ocp_write(tp, 0xF8C4, 0x4981);
-        rtl8168_mac_ocp_write(tp, 0xF8C6, 0xF055);
-        rtl8168_mac_ocp_write(tp, 0xF8C8, 0x49C3);
-        rtl8168_mac_ocp_write(tp, 0xF8CA, 0xF105);
-        rtl8168_mac_ocp_write(tp, 0xF8CC, 0x1A30);
-        rtl8168_mac_ocp_write(tp, 0xF8CE, 0x46D5);
-        rtl8168_mac_ocp_write(tp, 0xF8D0, 0x1200);
-        rtl8168_mac_ocp_write(tp, 0xF8D2, 0xF04F);
-        rtl8168_mac_ocp_write(tp, 0xF8D4, 0x7220);
-        rtl8168_mac_ocp_write(tp, 0xF8D6, 0x49A2);
-        rtl8168_mac_ocp_write(tp, 0xF8D8, 0xF130);
-        rtl8168_mac_ocp_write(tp, 0xF8DA, 0x49C1);
-        rtl8168_mac_ocp_write(tp, 0xF8DC, 0xF12E);
-        rtl8168_mac_ocp_write(tp, 0xF8DE, 0x49B0);
-        rtl8168_mac_ocp_write(tp, 0xF8E0, 0xF12C);
-        rtl8168_mac_ocp_write(tp, 0xF8E2, 0xC2E6);
-        rtl8168_mac_ocp_write(tp, 0xF8E4, 0x7240);
-        rtl8168_mac_ocp_write(tp, 0xF8E6, 0x49A8);
-        rtl8168_mac_ocp_write(tp, 0xF8E8, 0xF003);
-        rtl8168_mac_ocp_write(tp, 0xF8EA, 0x49D0);
-        rtl8168_mac_ocp_write(tp, 0xF8EC, 0xF126);
-        rtl8168_mac_ocp_write(tp, 0xF8EE, 0x49A9);
-        rtl8168_mac_ocp_write(tp, 0xF8F0, 0xF003);
-        rtl8168_mac_ocp_write(tp, 0xF8F2, 0x49D1);
-        rtl8168_mac_ocp_write(tp, 0xF8F4, 0xF122);
-        rtl8168_mac_ocp_write(tp, 0xF8F6, 0x49AA);
-        rtl8168_mac_ocp_write(tp, 0xF8F8, 0xF003);
-        rtl8168_mac_ocp_write(tp, 0xF8FA, 0x49D2);
-        rtl8168_mac_ocp_write(tp, 0xF8FC, 0xF11E);
-        rtl8168_mac_ocp_write(tp, 0xF8FE, 0x49AB);
-        rtl8168_mac_ocp_write(tp, 0xF900, 0xF003);
-        rtl8168_mac_ocp_write(tp, 0xF902, 0x49DF);
-        rtl8168_mac_ocp_write(tp, 0xF904, 0xF11A);
-        rtl8168_mac_ocp_write(tp, 0xF906, 0x49AC);
-        rtl8168_mac_ocp_write(tp, 0xF908, 0xF003);
-        rtl8168_mac_ocp_write(tp, 0xF90A, 0x49D3);
-        rtl8168_mac_ocp_write(tp, 0xF90C, 0xF116);
-        rtl8168_mac_ocp_write(tp, 0xF90E, 0x4980);
-        rtl8168_mac_ocp_write(tp, 0xF910, 0xF003);
-        rtl8168_mac_ocp_write(tp, 0xF912, 0x49C7);
-        rtl8168_mac_ocp_write(tp, 0xF914, 0xF105);
-        rtl8168_mac_ocp_write(tp, 0xF916, 0x4981);
-        rtl8168_mac_ocp_write(tp, 0xF918, 0xF02C);
-        rtl8168_mac_ocp_write(tp, 0xF91A, 0x49D7);
-        rtl8168_mac_ocp_write(tp, 0xF91C, 0xF02A);
-        rtl8168_mac_ocp_write(tp, 0xF91E, 0x49C0);
-        rtl8168_mac_ocp_write(tp, 0xF920, 0xF00C);
-        rtl8168_mac_ocp_write(tp, 0xF922, 0xC721);
-        rtl8168_mac_ocp_write(tp, 0xF924, 0x62F4);
-        rtl8168_mac_ocp_write(tp, 0xF926, 0x49A0);
-        rtl8168_mac_ocp_write(tp, 0xF928, 0xF008);
-        rtl8168_mac_ocp_write(tp, 0xF92A, 0x49A4);
-        rtl8168_mac_ocp_write(tp, 0xF92C, 0xF106);
-        rtl8168_mac_ocp_write(tp, 0xF92E, 0x4824);
-        rtl8168_mac_ocp_write(tp, 0xF930, 0x8AF4);
-        rtl8168_mac_ocp_write(tp, 0xF932, 0xC71A);
-        rtl8168_mac_ocp_write(tp, 0xF934, 0x1A40);
-        rtl8168_mac_ocp_write(tp, 0xF936, 0x9AE0);
-        rtl8168_mac_ocp_write(tp, 0xF938, 0x49B6);
-        rtl8168_mac_ocp_write(tp, 0xF93A, 0xF017);
-        rtl8168_mac_ocp_write(tp, 0xF93C, 0x200E);
-        rtl8168_mac_ocp_write(tp, 0xF93E, 0xC7B8);
-        rtl8168_mac_ocp_write(tp, 0xF940, 0x72E0);
-        rtl8168_mac_ocp_write(tp, 0xF942, 0x4710);
-        rtl8168_mac_ocp_write(tp, 0xF944, 0x92E1);
-        rtl8168_mac_ocp_write(tp, 0xF946, 0xC70E);
-        rtl8168_mac_ocp_write(tp, 0xF948, 0x77E0);
-        rtl8168_mac_ocp_write(tp, 0xF94A, 0x49F0);
-        rtl8168_mac_ocp_write(tp, 0xF94C, 0xF112);
-        rtl8168_mac_ocp_write(tp, 0xF94E, 0xC70B);
-        rtl8168_mac_ocp_write(tp, 0xF950, 0x77E0);
-        rtl8168_mac_ocp_write(tp, 0xF952, 0x27FE);
-        rtl8168_mac_ocp_write(tp, 0xF954, 0x1AFA);
-        rtl8168_mac_ocp_write(tp, 0xF956, 0x4317);
-        rtl8168_mac_ocp_write(tp, 0xF958, 0xC705);
-        rtl8168_mac_ocp_write(tp, 0xF95A, 0x9AE2);
-        rtl8168_mac_ocp_write(tp, 0xF95C, 0x1A11);
-        rtl8168_mac_ocp_write(tp, 0xF95E, 0x8AE0);
-        rtl8168_mac_ocp_write(tp, 0xF960, 0xE008);
-        rtl8168_mac_ocp_write(tp, 0xF962, 0xE41C);
-        rtl8168_mac_ocp_write(tp, 0xF964, 0xC0AE);
-        rtl8168_mac_ocp_write(tp, 0xF966, 0xD23A);
-        rtl8168_mac_ocp_write(tp, 0xF968, 0xC7A2);
-        rtl8168_mac_ocp_write(tp, 0xF96A, 0x74E6);
-        rtl8168_mac_ocp_write(tp, 0xF96C, 0x484F);
-        rtl8168_mac_ocp_write(tp, 0xF96E, 0x94E7);
-        rtl8168_mac_ocp_write(tp, 0xF970, 0xC79E);
-        rtl8168_mac_ocp_write(tp, 0xF972, 0x8CE6);
-        rtl8168_mac_ocp_write(tp, 0xF974, 0x8BEC);
-        rtl8168_mac_ocp_write(tp, 0xF976, 0xC29C);
-        rtl8168_mac_ocp_write(tp, 0xF978, 0x8D42);
-        rtl8168_mac_ocp_write(tp, 0xF97A, 0x7220);
-        rtl8168_mac_ocp_write(tp, 0xF97C, 0xB000);
-        rtl8168_mac_ocp_write(tp, 0xF97E, 0xC502);
-        rtl8168_mac_ocp_write(tp, 0xF980, 0xBD00);
-        rtl8168_mac_ocp_write(tp, 0xF982, 0x0932);
-        rtl8168_mac_ocp_write(tp, 0xF984, 0xB400);
-        rtl8168_mac_ocp_write(tp, 0xF986, 0xC240);
-        rtl8168_mac_ocp_write(tp, 0xF988, 0xC340);
-        rtl8168_mac_ocp_write(tp, 0xF98A, 0x7060);
-        rtl8168_mac_ocp_write(tp, 0xF98C, 0x498F);
-        rtl8168_mac_ocp_write(tp, 0xF98E, 0xF014);
-        rtl8168_mac_ocp_write(tp, 0xF990, 0x488F);
-        rtl8168_mac_ocp_write(tp, 0xF992, 0x9061);
-        rtl8168_mac_ocp_write(tp, 0xF994, 0x744C);
-        rtl8168_mac_ocp_write(tp, 0xF996, 0x49C3);
-        rtl8168_mac_ocp_write(tp, 0xF998, 0xF004);
-        rtl8168_mac_ocp_write(tp, 0xF99A, 0x7562);
-        rtl8168_mac_ocp_write(tp, 0xF99C, 0x485E);
-        rtl8168_mac_ocp_write(tp, 0xF99E, 0x9563);
-        rtl8168_mac_ocp_write(tp, 0xF9A0, 0x7446);
-        rtl8168_mac_ocp_write(tp, 0xF9A2, 0x49C3);
-        rtl8168_mac_ocp_write(tp, 0xF9A4, 0xF106);
-        rtl8168_mac_ocp_write(tp, 0xF9A6, 0x7562);
-        rtl8168_mac_ocp_write(tp, 0xF9A8, 0x1C30);
-        rtl8168_mac_ocp_write(tp, 0xF9AA, 0x46E5);
-        rtl8168_mac_ocp_write(tp, 0xF9AC, 0x1200);
-        rtl8168_mac_ocp_write(tp, 0xF9AE, 0xF004);
-        rtl8168_mac_ocp_write(tp, 0xF9B0, 0x7446);
-        rtl8168_mac_ocp_write(tp, 0xF9B2, 0x484F);
-        rtl8168_mac_ocp_write(tp, 0xF9B4, 0x9447);
-        rtl8168_mac_ocp_write(tp, 0xF9B6, 0xC32A);
-        rtl8168_mac_ocp_write(tp, 0xF9B8, 0x7466);
-        rtl8168_mac_ocp_write(tp, 0xF9BA, 0x49C0);
-        rtl8168_mac_ocp_write(tp, 0xF9BC, 0xF00F);
-        rtl8168_mac_ocp_write(tp, 0xF9BE, 0x48C0);
-        rtl8168_mac_ocp_write(tp, 0xF9C0, 0x9C66);
-        rtl8168_mac_ocp_write(tp, 0xF9C2, 0x7446);
-        rtl8168_mac_ocp_write(tp, 0xF9C4, 0x4840);
-        rtl8168_mac_ocp_write(tp, 0xF9C6, 0x4841);
-        rtl8168_mac_ocp_write(tp, 0xF9C8, 0x4842);
-        rtl8168_mac_ocp_write(tp, 0xF9CA, 0x9C46);
-        rtl8168_mac_ocp_write(tp, 0xF9CC, 0x744C);
-        rtl8168_mac_ocp_write(tp, 0xF9CE, 0x4840);
-        rtl8168_mac_ocp_write(tp, 0xF9D0, 0x9C4C);
-        rtl8168_mac_ocp_write(tp, 0xF9D2, 0x744A);
-        rtl8168_mac_ocp_write(tp, 0xF9D4, 0x484A);
-        rtl8168_mac_ocp_write(tp, 0xF9D6, 0x9C4A);
-        rtl8168_mac_ocp_write(tp, 0xF9D8, 0xE013);
-        rtl8168_mac_ocp_write(tp, 0xF9DA, 0x498E);
-        rtl8168_mac_ocp_write(tp, 0xF9DC, 0xF011);
-        rtl8168_mac_ocp_write(tp, 0xF9DE, 0x488E);
-        rtl8168_mac_ocp_write(tp, 0xF9E0, 0x9061);
-        rtl8168_mac_ocp_write(tp, 0xF9E2, 0x744C);
-        rtl8168_mac_ocp_write(tp, 0xF9E4, 0x49C3);
-        rtl8168_mac_ocp_write(tp, 0xF9E6, 0xF004);
-        rtl8168_mac_ocp_write(tp, 0xF9E8, 0x7446);
-        rtl8168_mac_ocp_write(tp, 0xF9EA, 0x484E);
-        rtl8168_mac_ocp_write(tp, 0xF9EC, 0x9447);
-        rtl8168_mac_ocp_write(tp, 0xF9EE, 0x7446);
-        rtl8168_mac_ocp_write(tp, 0xF9F0, 0x1D38);
-        rtl8168_mac_ocp_write(tp, 0xF9F2, 0x46EC);
-        rtl8168_mac_ocp_write(tp, 0xF9F4, 0x1500);
-        rtl8168_mac_ocp_write(tp, 0xF9F6, 0xF004);
-        rtl8168_mac_ocp_write(tp, 0xF9F8, 0x7446);
-        rtl8168_mac_ocp_write(tp, 0xF9FA, 0x484F);
-        rtl8168_mac_ocp_write(tp, 0xF9FC, 0x9447);
-        rtl8168_mac_ocp_write(tp, 0xF9FE, 0xB000);
-        rtl8168_mac_ocp_write(tp, 0xFA00, 0xC502);
-        rtl8168_mac_ocp_write(tp, 0xFA02, 0xBD00);
-        rtl8168_mac_ocp_write(tp, 0xFA04, 0x074C);
-        rtl8168_mac_ocp_write(tp, 0xFA06, 0xE000);
-        rtl8168_mac_ocp_write(tp, 0xFA08, 0xE0FC);
-        rtl8168_mac_ocp_write(tp, 0xFA0A, 0xE0C0);
-        rtl8168_mac_ocp_write(tp, 0xFA0C, 0x4830);
-        rtl8168_mac_ocp_write(tp, 0xFA0E, 0x4837);
-        rtl8168_mac_ocp_write(tp, 0xFA10, 0xC502);
-        rtl8168_mac_ocp_write(tp, 0xFA12, 0xBD00);
-        rtl8168_mac_ocp_write(tp, 0xFA14, 0x0978);
-        rtl8168_mac_ocp_write(tp, 0xFA16, 0x63E2);
-        rtl8168_mac_ocp_write(tp, 0xFA18, 0x4830);
-        rtl8168_mac_ocp_write(tp, 0xFA1A, 0x4837);
-        rtl8168_mac_ocp_write(tp, 0xFA1C, 0xC502);
-        rtl8168_mac_ocp_write(tp, 0xFA1E, 0xBD00);
-        rtl8168_mac_ocp_write(tp, 0xFA20, 0x09FE);
-        rtl8168_mac_ocp_write(tp, 0xFA22, 0x73E2);
-        rtl8168_mac_ocp_write(tp, 0xFA24, 0x4830);
-        rtl8168_mac_ocp_write(tp, 0xFA26, 0x8BE2);
-        rtl8168_mac_ocp_write(tp, 0xFA28, 0xC302);
-        rtl8168_mac_ocp_write(tp, 0xFA2A, 0xBB00);
-        rtl8168_mac_ocp_write(tp, 0xFA2C, 0x0A12);
-        rtl8168_mac_ocp_write(tp, 0xFA2E, 0x73E2);
-        rtl8168_mac_ocp_write(tp, 0xFA30, 0x48B0);
-        rtl8168_mac_ocp_write(tp, 0xFA32, 0x48B3);
-        rtl8168_mac_ocp_write(tp, 0xFA34, 0x48B4);
-        rtl8168_mac_ocp_write(tp, 0xFA36, 0x48B5);
-        rtl8168_mac_ocp_write(tp, 0xFA38, 0x48B6);
-        rtl8168_mac_ocp_write(tp, 0xFA3A, 0x48B7);
-        rtl8168_mac_ocp_write(tp, 0xFA3C, 0x8BE2);
-        rtl8168_mac_ocp_write(tp, 0xFA3E, 0xC302);
-        rtl8168_mac_ocp_write(tp, 0xFA40, 0xBB00);
-        rtl8168_mac_ocp_write(tp, 0xFA42, 0x0A5A);
-        rtl8168_mac_ocp_write(tp, 0xFA44, 0x73E2);
-        rtl8168_mac_ocp_write(tp, 0xFA46, 0x4830);
-        rtl8168_mac_ocp_write(tp, 0xFA48, 0x8BE2);
-        rtl8168_mac_ocp_write(tp, 0xFA4A, 0xC302);
-        rtl8168_mac_ocp_write(tp, 0xFA4C, 0xBB00);
-        rtl8168_mac_ocp_write(tp, 0xFA4E, 0x0A6C);
-        rtl8168_mac_ocp_write(tp, 0xFA50, 0x73E2);
-        rtl8168_mac_ocp_write(tp, 0xFA52, 0x4830);
-        rtl8168_mac_ocp_write(tp, 0xFA54, 0x4837);
-        rtl8168_mac_ocp_write(tp, 0xFA56, 0xC502);
-        rtl8168_mac_ocp_write(tp, 0xFA58, 0xBD00);
-        rtl8168_mac_ocp_write(tp, 0xFA5A, 0x0A86);
-
-        rtl8168_mac_ocp_write(tp, 0xFC26, 0x8000);
-
-        rtl8168_mac_ocp_write(tp, 0xFC28, 0x0890);
-        rtl8168_mac_ocp_write(tp, 0xFC2A, 0x0712);
-        rtl8168_mac_ocp_write(tp, 0xFC2C, 0x0974);
-        rtl8168_mac_ocp_write(tp, 0xFC2E, 0x09FC);
-        rtl8168_mac_ocp_write(tp, 0xFC30, 0x0A0E);
-        rtl8168_mac_ocp_write(tp, 0xFC32, 0x0A56);
-        rtl8168_mac_ocp_write(tp, 0xFC34, 0x0A68);
-        rtl8168_mac_ocp_write(tp, 0xFC36, 0x0A84);
-
-        if (tp->HwPkgDet == 0x0)
-                rtl8168_mac_ocp_write(tp, 0xFC38, 0x00FC);
-        else if(tp->HwPkgDet == 0xF)
-                rtl8168_mac_ocp_write(tp, 0xFC38, 0x00FF);
-}
-
-static void
-rtl8168_set_mac_mcu_8168fp_2(struct net_device *dev)
-{
-        struct rtl8168_private *tp = netdev_priv(dev);
-
-        rtl8168_hw_disable_mac_mcu_bps(dev);
-
-        rtl8168_mac_ocp_write(tp, 0xF800, 0xE008);
-        rtl8168_mac_ocp_write(tp, 0xF802, 0xE00A);
-        rtl8168_mac_ocp_write(tp, 0xF804, 0xE031);
-        rtl8168_mac_ocp_write(tp, 0xF806, 0xE033);
-        rtl8168_mac_ocp_write(tp, 0xF808, 0xE035);
-        rtl8168_mac_ocp_write(tp, 0xF80A, 0xE144);
-        rtl8168_mac_ocp_write(tp, 0xF80C, 0xE166);
-        rtl8168_mac_ocp_write(tp, 0xF80E, 0xE168);
-        rtl8168_mac_ocp_write(tp, 0xF810, 0xC502);
-        rtl8168_mac_ocp_write(tp, 0xF812, 0xBD00);
-        rtl8168_mac_ocp_write(tp, 0xF814, 0x0000);
-        rtl8168_mac_ocp_write(tp, 0xF816, 0xC725);
-        rtl8168_mac_ocp_write(tp, 0xF818, 0x75E0);
-        rtl8168_mac_ocp_write(tp, 0xF81A, 0x48D0);
-        rtl8168_mac_ocp_write(tp, 0xF81C, 0x9DE0);
-        rtl8168_mac_ocp_write(tp, 0xF81E, 0xC722);
-        rtl8168_mac_ocp_write(tp, 0xF820, 0x75E0);
-        rtl8168_mac_ocp_write(tp, 0xF822, 0x1C78);
-        rtl8168_mac_ocp_write(tp, 0xF824, 0x416C);
-        rtl8168_mac_ocp_write(tp, 0xF826, 0x1530);
-        rtl8168_mac_ocp_write(tp, 0xF828, 0xF111);
-        rtl8168_mac_ocp_write(tp, 0xF82A, 0xC71D);
-        rtl8168_mac_ocp_write(tp, 0xF82C, 0x75F6);
-        rtl8168_mac_ocp_write(tp, 0xF82E, 0x49D1);
-        rtl8168_mac_ocp_write(tp, 0xF830, 0xF00D);
-        rtl8168_mac_ocp_write(tp, 0xF832, 0x75E0);
-        rtl8168_mac_ocp_write(tp, 0xF834, 0x1C1F);
-        rtl8168_mac_ocp_write(tp, 0xF836, 0x416C);
-        rtl8168_mac_ocp_write(tp, 0xF838, 0x1502);
-        rtl8168_mac_ocp_write(tp, 0xF83A, 0xF108);
-        rtl8168_mac_ocp_write(tp, 0xF83C, 0x75FA);
-        rtl8168_mac_ocp_write(tp, 0xF83E, 0x49D3);
-        rtl8168_mac_ocp_write(tp, 0xF840, 0xF005);
-        rtl8168_mac_ocp_write(tp, 0xF842, 0x75EC);
-        rtl8168_mac_ocp_write(tp, 0xF844, 0x9DE4);
-        rtl8168_mac_ocp_write(tp, 0xF846, 0x4853);
-        rtl8168_mac_ocp_write(tp, 0xF848, 0x9DFA);
-        rtl8168_mac_ocp_write(tp, 0xF84A, 0xC70B);
-        rtl8168_mac_ocp_write(tp, 0xF84C, 0x75E0);
-        rtl8168_mac_ocp_write(tp, 0xF84E, 0x4852);
-        rtl8168_mac_ocp_write(tp, 0xF850, 0x4850);
-        rtl8168_mac_ocp_write(tp, 0xF852, 0x9DE0);
-        rtl8168_mac_ocp_write(tp, 0xF854, 0xC602);
-        rtl8168_mac_ocp_write(tp, 0xF856, 0xBE00);
-        rtl8168_mac_ocp_write(tp, 0xF858, 0x04B8);
-        rtl8168_mac_ocp_write(tp, 0xF85A, 0xE420);
-        rtl8168_mac_ocp_write(tp, 0xF85C, 0xE000);
-        rtl8168_mac_ocp_write(tp, 0xF85E, 0xE0FC);
-        rtl8168_mac_ocp_write(tp, 0xF860, 0xE43C);
-        rtl8168_mac_ocp_write(tp, 0xF862, 0xDC00);
-        rtl8168_mac_ocp_write(tp, 0xF864, 0xEB00);
-        rtl8168_mac_ocp_write(tp, 0xF866, 0xC202);
-        rtl8168_mac_ocp_write(tp, 0xF868, 0xBA00);
-        rtl8168_mac_ocp_write(tp, 0xF86A, 0x0000);
-        rtl8168_mac_ocp_write(tp, 0xF86C, 0xC002);
-        rtl8168_mac_ocp_write(tp, 0xF86E, 0xB800);
-        rtl8168_mac_ocp_write(tp, 0xF870, 0x0000);
-        rtl8168_mac_ocp_write(tp, 0xF872, 0xB401);
-        rtl8168_mac_ocp_write(tp, 0xF874, 0xB402);
-        rtl8168_mac_ocp_write(tp, 0xF876, 0xB403);
-        rtl8168_mac_ocp_write(tp, 0xF878, 0xB404);
-        rtl8168_mac_ocp_write(tp, 0xF87A, 0xB405);
-        rtl8168_mac_ocp_write(tp, 0xF87C, 0xB406);
-        rtl8168_mac_ocp_write(tp, 0xF87E, 0xC44D);
-        rtl8168_mac_ocp_write(tp, 0xF880, 0xC54D);
-        rtl8168_mac_ocp_write(tp, 0xF882, 0x1867);
-        rtl8168_mac_ocp_write(tp, 0xF884, 0xE8A2);
-        rtl8168_mac_ocp_write(tp, 0xF886, 0x2318);
-        rtl8168_mac_ocp_write(tp, 0xF888, 0x276E);
-        rtl8168_mac_ocp_write(tp, 0xF88A, 0x1601);
-        rtl8168_mac_ocp_write(tp, 0xF88C, 0xF106);
-        rtl8168_mac_ocp_write(tp, 0xF88E, 0x1A07);
-        rtl8168_mac_ocp_write(tp, 0xF890, 0xE861);
-        rtl8168_mac_ocp_write(tp, 0xF892, 0xE86B);
-        rtl8168_mac_ocp_write(tp, 0xF894, 0xE873);
-        rtl8168_mac_ocp_write(tp, 0xF896, 0xE037);
-        rtl8168_mac_ocp_write(tp, 0xF898, 0x231E);
-        rtl8168_mac_ocp_write(tp, 0xF89A, 0x276E);
-        rtl8168_mac_ocp_write(tp, 0xF89C, 0x1602);
-        rtl8168_mac_ocp_write(tp, 0xF89E, 0xF10B);
-        rtl8168_mac_ocp_write(tp, 0xF8A0, 0x1A07);
-        rtl8168_mac_ocp_write(tp, 0xF8A2, 0xE858);
-        rtl8168_mac_ocp_write(tp, 0xF8A4, 0xE862);
-        rtl8168_mac_ocp_write(tp, 0xF8A6, 0xC247);
-        rtl8168_mac_ocp_write(tp, 0xF8A8, 0xC344);
-        rtl8168_mac_ocp_write(tp, 0xF8AA, 0xE8E3);
-        rtl8168_mac_ocp_write(tp, 0xF8AC, 0xC73B);
-        rtl8168_mac_ocp_write(tp, 0xF8AE, 0x66E0);
-        rtl8168_mac_ocp_write(tp, 0xF8B0, 0xE8B5);
-        rtl8168_mac_ocp_write(tp, 0xF8B2, 0xE029);
-        rtl8168_mac_ocp_write(tp, 0xF8B4, 0x231A);
-        rtl8168_mac_ocp_write(tp, 0xF8B6, 0x276C);
-        rtl8168_mac_ocp_write(tp, 0xF8B8, 0xC733);
-        rtl8168_mac_ocp_write(tp, 0xF8BA, 0x9EE0);
-        rtl8168_mac_ocp_write(tp, 0xF8BC, 0x1866);
-        rtl8168_mac_ocp_write(tp, 0xF8BE, 0xE885);
-        rtl8168_mac_ocp_write(tp, 0xF8C0, 0x251C);
-        rtl8168_mac_ocp_write(tp, 0xF8C2, 0x120F);
-        rtl8168_mac_ocp_write(tp, 0xF8C4, 0xF011);
-        rtl8168_mac_ocp_write(tp, 0xF8C6, 0x1209);
-        rtl8168_mac_ocp_write(tp, 0xF8C8, 0xF011);
-        rtl8168_mac_ocp_write(tp, 0xF8CA, 0x2014);
-        rtl8168_mac_ocp_write(tp, 0xF8CC, 0x240E);
-        rtl8168_mac_ocp_write(tp, 0xF8CE, 0x1000);
-        rtl8168_mac_ocp_write(tp, 0xF8D0, 0xF007);
-        rtl8168_mac_ocp_write(tp, 0xF8D2, 0x120C);
-        rtl8168_mac_ocp_write(tp, 0xF8D4, 0xF00D);
-        rtl8168_mac_ocp_write(tp, 0xF8D6, 0x1203);
-        rtl8168_mac_ocp_write(tp, 0xF8D8, 0xF00D);
-        rtl8168_mac_ocp_write(tp, 0xF8DA, 0x1200);
-        rtl8168_mac_ocp_write(tp, 0xF8DC, 0xF00D);
-        rtl8168_mac_ocp_write(tp, 0xF8DE, 0x120C);
-        rtl8168_mac_ocp_write(tp, 0xF8E0, 0xF00D);
-        rtl8168_mac_ocp_write(tp, 0xF8E2, 0x1203);
-        rtl8168_mac_ocp_write(tp, 0xF8E4, 0xF00D);
-        rtl8168_mac_ocp_write(tp, 0xF8E6, 0x1A03);
-        rtl8168_mac_ocp_write(tp, 0xF8E8, 0xE00C);
-        rtl8168_mac_ocp_write(tp, 0xF8EA, 0x1A07);
-        rtl8168_mac_ocp_write(tp, 0xF8EC, 0xE00A);
-        rtl8168_mac_ocp_write(tp, 0xF8EE, 0x1A00);
-        rtl8168_mac_ocp_write(tp, 0xF8F0, 0xE008);
-        rtl8168_mac_ocp_write(tp, 0xF8F2, 0x1A01);
-        rtl8168_mac_ocp_write(tp, 0xF8F4, 0xE006);
-        rtl8168_mac_ocp_write(tp, 0xF8F6, 0x1A02);
-        rtl8168_mac_ocp_write(tp, 0xF8F8, 0xE004);
-        rtl8168_mac_ocp_write(tp, 0xF8FA, 0x1A04);
-        rtl8168_mac_ocp_write(tp, 0xF8FC, 0xE002);
-        rtl8168_mac_ocp_write(tp, 0xF8FE, 0x1A05);
-        rtl8168_mac_ocp_write(tp, 0xF900, 0xE829);
-        rtl8168_mac_ocp_write(tp, 0xF902, 0xE833);
-        rtl8168_mac_ocp_write(tp, 0xF904, 0xB006);
-        rtl8168_mac_ocp_write(tp, 0xF906, 0xB005);
-        rtl8168_mac_ocp_write(tp, 0xF908, 0xB004);
-        rtl8168_mac_ocp_write(tp, 0xF90A, 0xB003);
-        rtl8168_mac_ocp_write(tp, 0xF90C, 0xB002);
-        rtl8168_mac_ocp_write(tp, 0xF90E, 0xB001);
-        rtl8168_mac_ocp_write(tp, 0xF910, 0x60C4);
-        rtl8168_mac_ocp_write(tp, 0xF912, 0xC702);
-        rtl8168_mac_ocp_write(tp, 0xF914, 0xBF00);
-        rtl8168_mac_ocp_write(tp, 0xF916, 0x2786);
-        rtl8168_mac_ocp_write(tp, 0xF918, 0xDD00);
-        rtl8168_mac_ocp_write(tp, 0xF91A, 0xD030);
-        rtl8168_mac_ocp_write(tp, 0xF91C, 0xE0C4);
-        rtl8168_mac_ocp_write(tp, 0xF91E, 0xE0F8);
-        rtl8168_mac_ocp_write(tp, 0xF920, 0xDC42);
-        rtl8168_mac_ocp_write(tp, 0xF922, 0xD3F0);
-        rtl8168_mac_ocp_write(tp, 0xF924, 0x0000);
-        rtl8168_mac_ocp_write(tp, 0xF926, 0x0004);
-        rtl8168_mac_ocp_write(tp, 0xF928, 0x0007);
-        rtl8168_mac_ocp_write(tp, 0xF92A, 0x0014);
-        rtl8168_mac_ocp_write(tp, 0xF92C, 0x0090);
-        rtl8168_mac_ocp_write(tp, 0xF92E, 0x1000);
-        rtl8168_mac_ocp_write(tp, 0xF930, 0x0F00);
-        rtl8168_mac_ocp_write(tp, 0xF932, 0x1004);
-        rtl8168_mac_ocp_write(tp, 0xF934, 0x1008);
-        rtl8168_mac_ocp_write(tp, 0xF936, 0x3000);
-        rtl8168_mac_ocp_write(tp, 0xF938, 0x3004);
-        rtl8168_mac_ocp_write(tp, 0xF93A, 0x3008);
-        rtl8168_mac_ocp_write(tp, 0xF93C, 0x4000);
-        rtl8168_mac_ocp_write(tp, 0xF93E, 0x7777);
-        rtl8168_mac_ocp_write(tp, 0xF940, 0x8000);
-        rtl8168_mac_ocp_write(tp, 0xF942, 0x8001);
-        rtl8168_mac_ocp_write(tp, 0xF944, 0x8008);
-        rtl8168_mac_ocp_write(tp, 0xF946, 0x8003);
-        rtl8168_mac_ocp_write(tp, 0xF948, 0x8004);
-        rtl8168_mac_ocp_write(tp, 0xF94A, 0xC000);
-        rtl8168_mac_ocp_write(tp, 0xF94C, 0xC004);
-        rtl8168_mac_ocp_write(tp, 0xF94E, 0xF004);
-        rtl8168_mac_ocp_write(tp, 0xF950, 0xFFFF);
-        rtl8168_mac_ocp_write(tp, 0xF952, 0xB406);
-        rtl8168_mac_ocp_write(tp, 0xF954, 0xB407);
-        rtl8168_mac_ocp_write(tp, 0xF956, 0xC6E5);
-        rtl8168_mac_ocp_write(tp, 0xF958, 0x77C0);
-        rtl8168_mac_ocp_write(tp, 0xF95A, 0x27F3);
-        rtl8168_mac_ocp_write(tp, 0xF95C, 0x23F3);
-        rtl8168_mac_ocp_write(tp, 0xF95E, 0x47FA);
-        rtl8168_mac_ocp_write(tp, 0xF960, 0x9FC0);
-        rtl8168_mac_ocp_write(tp, 0xF962, 0xB007);
-        rtl8168_mac_ocp_write(tp, 0xF964, 0xB006);
-        rtl8168_mac_ocp_write(tp, 0xF966, 0xFF80);
-        rtl8168_mac_ocp_write(tp, 0xF968, 0xB405);
-        rtl8168_mac_ocp_write(tp, 0xF96A, 0xB407);
-        rtl8168_mac_ocp_write(tp, 0xF96C, 0xC7D8);
-        rtl8168_mac_ocp_write(tp, 0xF96E, 0x75E0);
-        rtl8168_mac_ocp_write(tp, 0xF970, 0x48D0);
-        rtl8168_mac_ocp_write(tp, 0xF972, 0x9DE0);
-        rtl8168_mac_ocp_write(tp, 0xF974, 0xB007);
-        rtl8168_mac_ocp_write(tp, 0xF976, 0xB005);
-        rtl8168_mac_ocp_write(tp, 0xF978, 0xFF80);
-        rtl8168_mac_ocp_write(tp, 0xF97A, 0xB401);
-        rtl8168_mac_ocp_write(tp, 0xF97C, 0xC0EA);
-        rtl8168_mac_ocp_write(tp, 0xF97E, 0xC2DC);
-        rtl8168_mac_ocp_write(tp, 0xF980, 0xC3D8);
-        rtl8168_mac_ocp_write(tp, 0xF982, 0xE865);
-        rtl8168_mac_ocp_write(tp, 0xF984, 0xC0D3);
-        rtl8168_mac_ocp_write(tp, 0xF986, 0xC1E0);
-        rtl8168_mac_ocp_write(tp, 0xF988, 0xC2E3);
-        rtl8168_mac_ocp_write(tp, 0xF98A, 0xE861);
-        rtl8168_mac_ocp_write(tp, 0xF98C, 0xE817);
-        rtl8168_mac_ocp_write(tp, 0xF98E, 0xC0CD);
-        rtl8168_mac_ocp_write(tp, 0xF990, 0xC2CF);
-        rtl8168_mac_ocp_write(tp, 0xF992, 0xE85D);
-        rtl8168_mac_ocp_write(tp, 0xF994, 0xC0C9);
-        rtl8168_mac_ocp_write(tp, 0xF996, 0xC1D6);
-        rtl8168_mac_ocp_write(tp, 0xF998, 0xC2DB);
-        rtl8168_mac_ocp_write(tp, 0xF99A, 0xE859);
-        rtl8168_mac_ocp_write(tp, 0xF99C, 0xE80F);
-        rtl8168_mac_ocp_write(tp, 0xF99E, 0xC1C7);
-        rtl8168_mac_ocp_write(tp, 0xF9A0, 0xC2CE);
-        rtl8168_mac_ocp_write(tp, 0xF9A2, 0xE855);
-        rtl8168_mac_ocp_write(tp, 0xF9A4, 0xC0C0);
-        rtl8168_mac_ocp_write(tp, 0xF9A6, 0xC1D1);
-        rtl8168_mac_ocp_write(tp, 0xF9A8, 0xC2D3);
-        rtl8168_mac_ocp_write(tp, 0xF9AA, 0xE851);
-        rtl8168_mac_ocp_write(tp, 0xF9AC, 0xE807);
-        rtl8168_mac_ocp_write(tp, 0xF9AE, 0xC0BE);
-        rtl8168_mac_ocp_write(tp, 0xF9B0, 0xC2C2);
-        rtl8168_mac_ocp_write(tp, 0xF9B2, 0xE84D);
-        rtl8168_mac_ocp_write(tp, 0xF9B4, 0xE803);
-        rtl8168_mac_ocp_write(tp, 0xF9B6, 0xB001);
-        rtl8168_mac_ocp_write(tp, 0xF9B8, 0xFF80);
-        rtl8168_mac_ocp_write(tp, 0xF9BA, 0xB402);
-        rtl8168_mac_ocp_write(tp, 0xF9BC, 0xC2C6);
-        rtl8168_mac_ocp_write(tp, 0xF9BE, 0xE859);
-        rtl8168_mac_ocp_write(tp, 0xF9C0, 0x499F);
-        rtl8168_mac_ocp_write(tp, 0xF9C2, 0xF1FE);
-        rtl8168_mac_ocp_write(tp, 0xF9C4, 0xB002);
-        rtl8168_mac_ocp_write(tp, 0xF9C6, 0xFF80);
-        rtl8168_mac_ocp_write(tp, 0xF9C8, 0xB402);
-        rtl8168_mac_ocp_write(tp, 0xF9CA, 0xB403);
-        rtl8168_mac_ocp_write(tp, 0xF9CC, 0xB407);
-        rtl8168_mac_ocp_write(tp, 0xF9CE, 0xE821);
-        rtl8168_mac_ocp_write(tp, 0xF9D0, 0x8882);
-        rtl8168_mac_ocp_write(tp, 0xF9D2, 0x1980);
-        rtl8168_mac_ocp_write(tp, 0xF9D4, 0x8983);
-        rtl8168_mac_ocp_write(tp, 0xF9D6, 0xE81D);
-        rtl8168_mac_ocp_write(tp, 0xF9D8, 0x7180);
-        rtl8168_mac_ocp_write(tp, 0xF9DA, 0x218B);
-        rtl8168_mac_ocp_write(tp, 0xF9DC, 0x25BB);
-        rtl8168_mac_ocp_write(tp, 0xF9DE, 0x1310);
-        rtl8168_mac_ocp_write(tp, 0xF9E0, 0xF014);
-        rtl8168_mac_ocp_write(tp, 0xF9E2, 0x1310);
-        rtl8168_mac_ocp_write(tp, 0xF9E4, 0xFB03);
-        rtl8168_mac_ocp_write(tp, 0xF9E6, 0x1F20);
-        rtl8168_mac_ocp_write(tp, 0xF9E8, 0x38FB);
-        rtl8168_mac_ocp_write(tp, 0xF9EA, 0x3288);
-        rtl8168_mac_ocp_write(tp, 0xF9EC, 0x434B);
-        rtl8168_mac_ocp_write(tp, 0xF9EE, 0x2491);
-        rtl8168_mac_ocp_write(tp, 0xF9F0, 0x430B);
-        rtl8168_mac_ocp_write(tp, 0xF9F2, 0x1F0F);
-        rtl8168_mac_ocp_write(tp, 0xF9F4, 0x38FB);
-        rtl8168_mac_ocp_write(tp, 0xF9F6, 0x4313);
-        rtl8168_mac_ocp_write(tp, 0xF9F8, 0x2121);
-        rtl8168_mac_ocp_write(tp, 0xF9FA, 0x4353);
-        rtl8168_mac_ocp_write(tp, 0xF9FC, 0x2521);
-        rtl8168_mac_ocp_write(tp, 0xF9FE, 0x418A);
-        rtl8168_mac_ocp_write(tp, 0xFA00, 0x6282);
-        rtl8168_mac_ocp_write(tp, 0xFA02, 0x2527);
-        rtl8168_mac_ocp_write(tp, 0xFA04, 0x212F);
-        rtl8168_mac_ocp_write(tp, 0xFA06, 0x418A);
-        rtl8168_mac_ocp_write(tp, 0xFA08, 0xB007);
-        rtl8168_mac_ocp_write(tp, 0xFA0A, 0xB003);
-        rtl8168_mac_ocp_write(tp, 0xFA0C, 0xB002);
-        rtl8168_mac_ocp_write(tp, 0xFA0E, 0xFF80);
-        rtl8168_mac_ocp_write(tp, 0xFA10, 0x6183);
-        rtl8168_mac_ocp_write(tp, 0xFA12, 0x2496);
-        rtl8168_mac_ocp_write(tp, 0xFA14, 0x1100);
-        rtl8168_mac_ocp_write(tp, 0xFA16, 0xF1FD);
-        rtl8168_mac_ocp_write(tp, 0xFA18, 0xFF80);
-        rtl8168_mac_ocp_write(tp, 0xFA1A, 0x4800);
-        rtl8168_mac_ocp_write(tp, 0xFA1C, 0x4801);
-        rtl8168_mac_ocp_write(tp, 0xFA1E, 0xC213);
-        rtl8168_mac_ocp_write(tp, 0xFA20, 0xC313);
-        rtl8168_mac_ocp_write(tp, 0xFA22, 0xE815);
-        rtl8168_mac_ocp_write(tp, 0xFA24, 0x4860);
-        rtl8168_mac_ocp_write(tp, 0xFA26, 0x8EE0);
-        rtl8168_mac_ocp_write(tp, 0xFA28, 0xC210);
-        rtl8168_mac_ocp_write(tp, 0xFA2A, 0xC310);
-        rtl8168_mac_ocp_write(tp, 0xFA2C, 0xE822);
-        rtl8168_mac_ocp_write(tp, 0xFA2E, 0x481E);
-        rtl8168_mac_ocp_write(tp, 0xFA30, 0xC20C);
-        rtl8168_mac_ocp_write(tp, 0xFA32, 0xC30C);
-        rtl8168_mac_ocp_write(tp, 0xFA34, 0xE80C);
-        rtl8168_mac_ocp_write(tp, 0xFA36, 0xC206);
-        rtl8168_mac_ocp_write(tp, 0xFA38, 0x7358);
-        rtl8168_mac_ocp_write(tp, 0xFA3A, 0x483A);
-        rtl8168_mac_ocp_write(tp, 0xFA3C, 0x9B58);
-        rtl8168_mac_ocp_write(tp, 0xFA3E, 0xFF80);
-        rtl8168_mac_ocp_write(tp, 0xFA40, 0xE8E0);
-        rtl8168_mac_ocp_write(tp, 0xFA42, 0xE000);
-        rtl8168_mac_ocp_write(tp, 0xFA44, 0x1008);
-        rtl8168_mac_ocp_write(tp, 0xFA46, 0x0F00);
-        rtl8168_mac_ocp_write(tp, 0xFA48, 0x800C);
-        rtl8168_mac_ocp_write(tp, 0xFA4A, 0x0F00);
-        rtl8168_mac_ocp_write(tp, 0xFA4C, 0xB407);
-        rtl8168_mac_ocp_write(tp, 0xFA4E, 0xB406);
-        rtl8168_mac_ocp_write(tp, 0xFA50, 0xB403);
-        rtl8168_mac_ocp_write(tp, 0xFA52, 0xC7F7);
-        rtl8168_mac_ocp_write(tp, 0xFA54, 0x98E0);
-        rtl8168_mac_ocp_write(tp, 0xFA56, 0x99E2);
-        rtl8168_mac_ocp_write(tp, 0xFA58, 0x9AE4);
-        rtl8168_mac_ocp_write(tp, 0xFA5A, 0x21B2);
-        rtl8168_mac_ocp_write(tp, 0xFA5C, 0x4831);
-        rtl8168_mac_ocp_write(tp, 0xFA5E, 0x483F);
-        rtl8168_mac_ocp_write(tp, 0xFA60, 0x9BE6);
-        rtl8168_mac_ocp_write(tp, 0xFA62, 0x66E7);
-        rtl8168_mac_ocp_write(tp, 0xFA64, 0x49E6);
-        rtl8168_mac_ocp_write(tp, 0xFA66, 0xF1FE);
-        rtl8168_mac_ocp_write(tp, 0xFA68, 0xB003);
-        rtl8168_mac_ocp_write(tp, 0xFA6A, 0xB006);
-        rtl8168_mac_ocp_write(tp, 0xFA6C, 0xB007);
-        rtl8168_mac_ocp_write(tp, 0xFA6E, 0xFF80);
-        rtl8168_mac_ocp_write(tp, 0xFA70, 0xB407);
-        rtl8168_mac_ocp_write(tp, 0xFA72, 0xB406);
-        rtl8168_mac_ocp_write(tp, 0xFA74, 0xB403);
-        rtl8168_mac_ocp_write(tp, 0xFA76, 0xC7E5);
-        rtl8168_mac_ocp_write(tp, 0xFA78, 0x9AE4);
-        rtl8168_mac_ocp_write(tp, 0xFA7A, 0x21B2);
-        rtl8168_mac_ocp_write(tp, 0xFA7C, 0x4831);
-        rtl8168_mac_ocp_write(tp, 0xFA7E, 0x9BE6);
-        rtl8168_mac_ocp_write(tp, 0xFA80, 0x66E7);
-        rtl8168_mac_ocp_write(tp, 0xFA82, 0x49E6);
-        rtl8168_mac_ocp_write(tp, 0xFA84, 0xF1FE);
-        rtl8168_mac_ocp_write(tp, 0xFA86, 0x70E0);
-        rtl8168_mac_ocp_write(tp, 0xFA88, 0x71E2);
-        rtl8168_mac_ocp_write(tp, 0xFA8A, 0xB003);
-        rtl8168_mac_ocp_write(tp, 0xFA8C, 0xB006);
-        rtl8168_mac_ocp_write(tp, 0xFA8E, 0xB007);
-        rtl8168_mac_ocp_write(tp, 0xFA90, 0xFF80);
-        rtl8168_mac_ocp_write(tp, 0xFA92, 0x4882);
-        rtl8168_mac_ocp_write(tp, 0xFA94, 0xB406);
-        rtl8168_mac_ocp_write(tp, 0xFA96, 0xB405);
-        rtl8168_mac_ocp_write(tp, 0xFA98, 0xC71E);
-        rtl8168_mac_ocp_write(tp, 0xFA9A, 0x76E0);
-        rtl8168_mac_ocp_write(tp, 0xFA9C, 0x1D78);
-        rtl8168_mac_ocp_write(tp, 0xFA9E, 0x4175);
-        rtl8168_mac_ocp_write(tp, 0xFAA0, 0x1630);
-        rtl8168_mac_ocp_write(tp, 0xFAA2, 0xF10C);
-        rtl8168_mac_ocp_write(tp, 0xFAA4, 0xC715);
-        rtl8168_mac_ocp_write(tp, 0xFAA6, 0x76E0);
-        rtl8168_mac_ocp_write(tp, 0xFAA8, 0x4861);
-        rtl8168_mac_ocp_write(tp, 0xFAAA, 0x9EE0);
-        rtl8168_mac_ocp_write(tp, 0xFAAC, 0xC713);
-        rtl8168_mac_ocp_write(tp, 0xFAAE, 0x1EFF);
-        rtl8168_mac_ocp_write(tp, 0xFAB0, 0x9EE2);
-        rtl8168_mac_ocp_write(tp, 0xFAB2, 0x75E0);
-        rtl8168_mac_ocp_write(tp, 0xFAB4, 0x4850);
-        rtl8168_mac_ocp_write(tp, 0xFAB6, 0x9DE0);
-        rtl8168_mac_ocp_write(tp, 0xFAB8, 0xE005);
-        rtl8168_mac_ocp_write(tp, 0xFABA, 0xC70B);
-        rtl8168_mac_ocp_write(tp, 0xFABC, 0x76E0);
-        rtl8168_mac_ocp_write(tp, 0xFABE, 0x4865);
-        rtl8168_mac_ocp_write(tp, 0xFAC0, 0x9EE0);
-        rtl8168_mac_ocp_write(tp, 0xFAC2, 0xB005);
-        rtl8168_mac_ocp_write(tp, 0xFAC4, 0xB006);
-        rtl8168_mac_ocp_write(tp, 0xFAC6, 0xC708);
-        rtl8168_mac_ocp_write(tp, 0xFAC8, 0xC102);
-        rtl8168_mac_ocp_write(tp, 0xFACA, 0xB900);
-        rtl8168_mac_ocp_write(tp, 0xFACC, 0x279E);
-        rtl8168_mac_ocp_write(tp, 0xFACE, 0xEB16);
-        rtl8168_mac_ocp_write(tp, 0xFAD0, 0xEB00);
-        rtl8168_mac_ocp_write(tp, 0xFAD2, 0xE43C);
-        rtl8168_mac_ocp_write(tp, 0xFAD4, 0xDC00);
-        rtl8168_mac_ocp_write(tp, 0xFAD6, 0xD3EC);
-        rtl8168_mac_ocp_write(tp, 0xFAD8, 0xC602);
-        rtl8168_mac_ocp_write(tp, 0xFADA, 0xBE00);
-        rtl8168_mac_ocp_write(tp, 0xFADC, 0x0000);
-        rtl8168_mac_ocp_write(tp, 0xFADE, 0xC602);
-        rtl8168_mac_ocp_write(tp, 0xFAE0, 0xBE00);
-        rtl8168_mac_ocp_write(tp, 0xFAE2, 0x0000);
-
-        rtl8168_mac_ocp_write(tp, 0xFC26, 0x8000);
-
-        rtl8168_mac_ocp_write(tp, 0xFC28, 0x0000);
-        rtl8168_mac_ocp_write(tp, 0xFC2A, 0x04B4);
-        rtl8168_mac_ocp_write(tp, 0xFC2C, 0x0000);
-        rtl8168_mac_ocp_write(tp, 0xFC2E, 0x0000);
-        rtl8168_mac_ocp_write(tp, 0xFC30, 0x0000);
-        rtl8168_mac_ocp_write(tp, 0xFC32, 0x279C);
-        rtl8168_mac_ocp_write(tp, 0xFC34, 0x0000);
-        rtl8168_mac_ocp_write(tp, 0xFC36, 0x0000);
-
-        rtl8168_mac_ocp_write(tp, 0xFC38, 0x0022);
-}
-
-static void
-rtl8168_set_mac_mcu_8168fp_3(struct net_device *dev)
-{
-        struct rtl8168_private *tp = netdev_priv(dev);
-
-        rtl8168_hw_disable_mac_mcu_bps(dev);
-
-        rtl8168_mac_ocp_write(tp, 0xF800, 0xE008);
-        rtl8168_mac_ocp_write(tp, 0xF802, 0xE00A);
-        rtl8168_mac_ocp_write(tp, 0xF804, 0xE00F);
-        rtl8168_mac_ocp_write(tp, 0xF806, 0xE014);
-        rtl8168_mac_ocp_write(tp, 0xF808, 0xE016);
-        rtl8168_mac_ocp_write(tp, 0xF80A, 0xE018);
-        rtl8168_mac_ocp_write(tp, 0xF80C, 0xE01A);
-        rtl8168_mac_ocp_write(tp, 0xF80E, 0xE01C);
-        rtl8168_mac_ocp_write(tp, 0xF810, 0xC602);
-        rtl8168_mac_ocp_write(tp, 0xF812, 0xBE00);
-        rtl8168_mac_ocp_write(tp, 0xF814, 0x2AB2);
-        rtl8168_mac_ocp_write(tp, 0xF816, 0x1BC0);
-        rtl8168_mac_ocp_write(tp, 0xF818, 0x46EB);
-        rtl8168_mac_ocp_write(tp, 0xF81A, 0x1BFE);
-        rtl8168_mac_ocp_write(tp, 0xF81C, 0xC102);
-        rtl8168_mac_ocp_write(tp, 0xF81E, 0xB900);
-        rtl8168_mac_ocp_write(tp, 0xF820, 0x0B1A);
-        rtl8168_mac_ocp_write(tp, 0xF822, 0x1BC0);
-        rtl8168_mac_ocp_write(tp, 0xF824, 0x46EB);
-        rtl8168_mac_ocp_write(tp, 0xF826, 0x1B7E);
-        rtl8168_mac_ocp_write(tp, 0xF828, 0xC102);
-        rtl8168_mac_ocp_write(tp, 0xF82A, 0xB900);
-        rtl8168_mac_ocp_write(tp, 0xF82C, 0x0BEA);
-        rtl8168_mac_ocp_write(tp, 0xF82E, 0xC602);
-        rtl8168_mac_ocp_write(tp, 0xF830, 0xBE00);
-        rtl8168_mac_ocp_write(tp, 0xF832, 0x0000);
-        rtl8168_mac_ocp_write(tp, 0xF834, 0xC602);
-        rtl8168_mac_ocp_write(tp, 0xF836, 0xBE00);
-        rtl8168_mac_ocp_write(tp, 0xF838, 0x0000);
-        rtl8168_mac_ocp_write(tp, 0xF83A, 0xC602);
-        rtl8168_mac_ocp_write(tp, 0xF83C, 0xBE00);
-        rtl8168_mac_ocp_write(tp, 0xF83E, 0x0000);
-        rtl8168_mac_ocp_write(tp, 0xF840, 0xC602);
-        rtl8168_mac_ocp_write(tp, 0xF842, 0xBE00);
-        rtl8168_mac_ocp_write(tp, 0xF844, 0x0000);
-        rtl8168_mac_ocp_write(tp, 0xF846, 0xC602);
-        rtl8168_mac_ocp_write(tp, 0xF848, 0xBE00);
-        rtl8168_mac_ocp_write(tp, 0xF84A, 0x0000);
-
-        rtl8168_mac_ocp_write(tp, 0xFC26, 0x8000);
-
-        rtl8168_mac_ocp_write(tp, 0xFC28, 0x2AAC);
-        rtl8168_mac_ocp_write(tp, 0xFC2A, 0x0B14);
-        rtl8168_mac_ocp_write(tp, 0xFC2C, 0x0BE4);
-
-        if (tp->HwSuppSerDesPhyVer == 1) {
-                rtl8168_mac_ocp_write(tp, 0xFC38, 0x0007);
-        } else {
-                rtl8168_mac_ocp_write(tp, 0xFC38, 0x0006);
+        if (tp->rtl_fw) {
+                rtl8168_fw_release_firmware(tp->rtl_fw);
+                kfree(tp->rtl_fw);
+                tp->rtl_fw = NULL;
         }
 }
 
-static void
-rtl8168_set_mac_mcu_8168fp_4(struct net_device *dev)
+void rtl8168_apply_firmware(struct rtl8168_private *tp)
 {
-        rtl8168_hw_disable_mac_mcu_bps(dev);
-}
+        /* TODO: release firmware if rtl_fw_write_firmware signals failure. */
+        if (tp->rtl_fw) {
+                rtl8168_fw_write_firmware(tp, tp->rtl_fw);
+                /* At least one firmware doesn't reset tp->ocp_base. */
+                tp->ocp_base = OCP_STD_PHY_BASE;
 
-static void
-rtl8168_hw_mac_mcu_config(struct net_device *dev)
-{
-        struct rtl8168_private *tp = netdev_priv(dev);
+                /* PHY soft reset may still be in progress */
+                //phy_read_poll_timeout(tp->phydev, MII_BMCR, val,
+                //		      !(val & BMCR_RESET),
+                //		      50000, 600000, true);
+                rtl8168_wait_phy_reset_complete(tp);
 
-        if (tp->NotWrMcuPatchCode == TRUE) return;
-
-        switch (tp->mcfg) {
-        case CFG_METHOD_21:
-                rtl8168_set_mac_mcu_8168g_1(dev);
-                break;
-        case CFG_METHOD_24:
-                rtl8168_set_mac_mcu_8168gu_1(dev);
-                break;
-        case CFG_METHOD_25:
-                rtl8168_set_mac_mcu_8168gu_2(dev);
-                break;
-        case CFG_METHOD_26:
-                rtl8168_set_mac_mcu_8411b_1(dev);
-                break;
-        case CFG_METHOD_27:
-                rtl8168_set_mac_mcu_8168ep_1(dev);
-                break;
-        case CFG_METHOD_28:
-                rtl8168_set_mac_mcu_8168ep_2(dev);
-                break;
-        case CFG_METHOD_29:
-        case CFG_METHOD_30:
-                rtl8168_set_mac_mcu_8168h_1(dev);
-                break;
-        case CFG_METHOD_31:
-                if (tp->HwPkgDet == 0x00 || tp->HwPkgDet == 0x0F)
-                        rtl8168_set_mac_mcu_8168fp_1(dev);
-                else if (tp->HwPkgDet == 0x06)
-                        rtl8168_set_mac_mcu_8168fp_2(dev);
-                break;
-        case CFG_METHOD_32:
-                rtl8168_set_mac_mcu_8168fp_3(dev);
-                break;
-        case CFG_METHOD_33:
-                rtl8168_set_mac_mcu_8168fp_4(dev);
-                break;
+                tp->hw_ram_code_ver = rtl8168_get_hw_phy_mcu_code_ver(tp);
+                tp->sw_ram_code_ver = tp->hw_ram_code_ver;
+                tp->HwHasWrRamCodeToMicroP = TRUE;
         }
 }
+#endif
 
 static void
 rtl8168_hw_init(struct net_device *dev)
@@ -9370,45 +7453,16 @@ rtl8168_hw_init(struct net_device *dev)
         struct rtl8168_private *tp = netdev_priv(dev);
         u32 csi_tmp;
 
-        switch (tp->mcfg) {
-        case CFG_METHOD_14:
-        case CFG_METHOD_15:
-        case CFG_METHOD_16:
-        case CFG_METHOD_17:
-        case CFG_METHOD_18:
-        case CFG_METHOD_19:
-        case CFG_METHOD_20:
-        case CFG_METHOD_21:
-        case CFG_METHOD_22:
-        case CFG_METHOD_23:
-        case CFG_METHOD_24:
-        case CFG_METHOD_25:
-        case CFG_METHOD_26:
-        case CFG_METHOD_27:
-        case CFG_METHOD_28:
-        case CFG_METHOD_29:
-        case CFG_METHOD_30:
-        case CFG_METHOD_31:
-        case CFG_METHOD_32:
-        case CFG_METHOD_33:
-                rtl8168_enable_cfg9346_write(tp);
-                RTL_W8(tp, Config5, RTL_R8(tp, Config5) & ~BIT_0);
-                RTL_W8(tp, Config2, RTL_R8(tp, Config2) & ~BIT_7);
-                rtl8168_disable_cfg9346_write(tp);
+        if (tp->HwSuppAspmClkIntrLock) {
                 RTL_W8(tp, 0xF1, RTL_R8(tp, 0xF1) & ~BIT_7);
-                break;
+                rtl8168_enable_cfg9346_write(tp);
+                rtl8168_hw_aspm_clkreq_enable(tp, false);
+                rtl8168_disable_cfg9346_write(tp);
         }
 
         //Disable UPS
-        switch (tp->mcfg) {
-        case CFG_METHOD_29:
-        case CFG_METHOD_30:
-        case CFG_METHOD_31:
-        case CFG_METHOD_32:
-        case CFG_METHOD_33:
+        if (HW_SUPPORT_UPS_MODE(tp))
                 rtl8168_mac_ocp_write(tp, 0xD400, rtl8168_mac_ocp_read( tp, 0xD400) & ~(BIT_0));
-                break;
-        }
 
         //Disable DMA Aggregation
         switch (tp->mcfg) {
@@ -9470,8 +7524,6 @@ rtl8168_hw_init(struct net_device *dev)
         if (tp->mcfg == CFG_METHOD_10 || tp->mcfg == CFG_METHOD_14 || tp->mcfg == CFG_METHOD_15)
                 RTL_W8(tp, 0xF3, RTL_R8(tp, 0xF3) | BIT_2);
 
-        rtl8168_hw_mac_mcu_config(dev);
-
         /*disable ocp phy power saving*/
         if (tp->mcfg == CFG_METHOD_25 || tp->mcfg == CFG_METHOD_26 ||
             tp->mcfg == CFG_METHOD_27 || tp->mcfg == CFG_METHOD_28 ||
@@ -9499,6 +7551,13 @@ rtl8168_hw_init(struct net_device *dev)
 
         if (s0_magic_packet == 1)
                 rtl8168_enable_magic_packet(dev);
+
+#ifdef ENABLE_USE_FIRMWARE_FILE
+        if (tp->rtl_fw &&
+            !(HW_DASH_SUPPORT_TYPE_3(tp) &&
+              tp->HwPkgDet == 0x06))
+                rtl8168_apply_firmware(tp);
+#endif
 }
 
 static void
@@ -9806,12 +7865,17 @@ rtl8168_hw_ephy_config(struct net_device *dev)
 
                 break;
         case CFG_METHOD_28:
-                rtl8168_ephy_write(tp, 0x00, 0x10A3);
-                rtl8168_ephy_write(tp, 0x19, 0x7C00);
+                rtl8168_ephy_write(tp, 0x00, 0x10AB);
+                rtl8168_ephy_write(tp, 0x19, 0xFC00);
                 rtl8168_ephy_write(tp, 0x1E, 0x20EB);
                 rtl8168_ephy_write(tp, 0x0D, 0x1666);
                 ClearPCIePhyBit(tp, 0x0B, BIT_0);
                 SetPCIePhyBit(tp, 0x1D, BIT_14);
+                ClearAndSetPCIePhyBit(tp,
+                                      0x0C,
+                                      BIT_13 | BIT_12 | BIT_11 | BIT_10 | BIT_8 | BIT_7 | BIT_6 | BIT_5,
+                                      BIT_9 | BIT_4
+                                     );
 
                 break;
         case CFG_METHOD_29:
@@ -9869,9 +7933,9 @@ rtl8168_set_phy_mcu_patch_request(struct rtl8168_private *tp)
                         PhyRegValue &= 0x0040;
                         udelay(100);
                         WaitCnt++;
-                } while(PhyRegValue != 0x0040 && WaitCnt <1000);
+                } while(PhyRegValue != 0x0040 && WaitCnt < 1000);
 
-                if (WaitCnt == 1000) {
+                if (PhyRegValue != 0x0040 && WaitCnt == 1000) {
                         retval = FALSE;
                 }
 
@@ -9894,16 +7958,16 @@ rtl8168_clear_phy_mcu_patch_request(struct rtl8168_private *tp)
                 rtl8168_mdio_write(tp, 0x1f, 0x0B82);
                 rtl8168_clear_eth_phy_bit(tp, 0x10, BIT_4);
 
-                rtl8168_mdio_write(tp,0x1f, 0x0A22);
+                rtl8168_mdio_write(tp,0x1f, 0x0B80);
                 WaitCnt = 0;
                 do {
-                        PhyRegValue = rtl8168_mdio_read(tp, 0x12);
-                        PhyRegValue &= 0x0010;
+                        PhyRegValue = rtl8168_mdio_read(tp, 0x10);
+                        PhyRegValue &= 0x0040;
                         udelay(100);
                         WaitCnt++;
-                } while(PhyRegValue != 0x0010 && WaitCnt <1000);
+                } while(PhyRegValue != 0x0040 && WaitCnt < 1000);
 
-                if (WaitCnt == 1000) {
+                if (PhyRegValue != 0x0040 && WaitCnt == 1000) {
                         retval = FALSE;
                 }
 
@@ -9914,18 +7978,17 @@ rtl8168_clear_phy_mcu_patch_request(struct rtl8168_private *tp)
         return retval;
 }
 
-static int
-rtl8168_check_hw_phy_mcu_code_ver(struct net_device *dev)
+static u16
+rtl8168_get_hw_phy_mcu_code_ver(struct rtl8168_private *tp)
 {
-        struct rtl8168_private *tp = netdev_priv(dev);
-        int ram_code_ver_match = 0;
+        u16 hw_ram_code_ver = ~0;
 
         switch (tp->mcfg) {
         case CFG_METHOD_14:
         case CFG_METHOD_15:
                 rtl8168_mdio_write(tp, 0x1F, 0x0005);
                 rtl8168_mdio_write(tp, 0x05, 0x8B60);
-                tp->hw_ram_code_ver = rtl8168_mdio_read(tp, 0x06);
+                hw_ram_code_ver = rtl8168_mdio_read(tp, 0x06);
                 rtl8168_mdio_write(tp, 0x1F, 0x0000);
                 break;
         case CFG_METHOD_16:
@@ -9935,7 +7998,7 @@ rtl8168_check_hw_phy_mcu_code_ver(struct net_device *dev)
         case CFG_METHOD_20:
                 rtl8168_mdio_write(tp, 0x1F, 0x0005);
                 rtl8168_mdio_write(tp, 0x05, 0x8B30);
-                tp->hw_ram_code_ver = rtl8168_mdio_read(tp, 0x06);
+                hw_ram_code_ver = rtl8168_mdio_read(tp, 0x06);
                 rtl8168_mdio_write(tp, 0x1F, 0x0000);
                 break;
         case CFG_METHOD_21:
@@ -9953,7 +8016,7 @@ rtl8168_check_hw_phy_mcu_code_ver(struct net_device *dev)
         case CFG_METHOD_33:
                 rtl8168_mdio_write(tp, 0x1F, 0x0A43);
                 rtl8168_mdio_write(tp, 0x13, 0x801E);
-                tp->hw_ram_code_ver = rtl8168_mdio_read(tp, 0x14);
+                hw_ram_code_ver = rtl8168_mdio_read(tp, 0x14);
                 rtl8168_mdio_write(tp, 0x1F, 0x0000);
                 break;
         default:
@@ -9961,11375 +8024,7 @@ rtl8168_check_hw_phy_mcu_code_ver(struct net_device *dev)
                 break;
         }
 
-        if ( tp->hw_ram_code_ver == tp->sw_ram_code_ver) {
-                ram_code_ver_match = 1;
-                tp->HwHasWrRamCodeToMicroP = TRUE;
-        }
-
-        return ram_code_ver_match;
-}
-
-static void
-rtl8168_write_hw_phy_mcu_code_ver(struct net_device *dev)
-{
-        struct rtl8168_private *tp = netdev_priv(dev);
-
-        switch (tp->mcfg) {
-        case CFG_METHOD_14:
-        case CFG_METHOD_15:
-                rtl8168_mdio_write(tp, 0x1F, 0x0005);
-                rtl8168_mdio_write(tp, 0x05, 0x8B60);
-                rtl8168_mdio_write(tp, 0x06, tp->sw_ram_code_ver);
-                rtl8168_mdio_write(tp, 0x1F, 0x0000);
-                tp->hw_ram_code_ver = tp->sw_ram_code_ver;
-                break;
-        case CFG_METHOD_16:
-        case CFG_METHOD_17:
-        case CFG_METHOD_18:
-        case CFG_METHOD_19:
-        case CFG_METHOD_20:
-                rtl8168_mdio_write(tp, 0x1F, 0x0005);
-                rtl8168_mdio_write(tp, 0x05, 0x8B30);
-                rtl8168_mdio_write(tp, 0x06, tp->sw_ram_code_ver);
-                rtl8168_mdio_write(tp, 0x1F, 0x0000);
-                tp->hw_ram_code_ver = tp->sw_ram_code_ver;
-                break;
-        case CFG_METHOD_21:
-        case CFG_METHOD_22:
-        case CFG_METHOD_23:
-        case CFG_METHOD_27:
-        case CFG_METHOD_28:
-        case CFG_METHOD_24:
-        case CFG_METHOD_25:
-        case CFG_METHOD_26:
-        case CFG_METHOD_29:
-        case CFG_METHOD_30:
-        case CFG_METHOD_31:
-        case CFG_METHOD_32:
-        case CFG_METHOD_33:
-                rtl8168_mdio_write(tp, 0x1F, 0x0A43);
-                rtl8168_mdio_write(tp, 0x13, 0x801E);
-                rtl8168_mdio_write(tp, 0x14, tp->sw_ram_code_ver);
-                rtl8168_mdio_write(tp, 0x1F, 0x0000);
-                tp->hw_ram_code_ver = tp->sw_ram_code_ver;
-                break;
-        }
-}
-static int
-rtl8168_phy_ram_code_check(struct net_device *dev)
-{
-        struct rtl8168_private *tp = netdev_priv(dev);
-        u16 PhyRegValue;
-        int retval = TRUE;
-
-        switch(tp->mcfg) {
-        case CFG_METHOD_21:
-                rtl8168_mdio_write(tp, 0x1f, 0x0A40);
-                PhyRegValue = rtl8168_mdio_read(tp, 0x10);
-                PhyRegValue &= ~(BIT_11);
-                rtl8168_mdio_write(tp, 0x10, PhyRegValue);
-
-
-                rtl8168_mdio_write(tp, 0x1f, 0x0A00);
-                PhyRegValue = rtl8168_mdio_read(tp, 0x10);
-                PhyRegValue &= ~(BIT_12 | BIT_13 | BIT_14 | BIT_15);
-                rtl8168_mdio_write(tp, 0x10, PhyRegValue);
-
-                rtl8168_mdio_write(tp, 0x1f, 0x0A43);
-                rtl8168_mdio_write(tp, 0x13, 0x8010);
-                PhyRegValue = rtl8168_mdio_read(tp, 0x14);
-                PhyRegValue &= ~(BIT_11);
-                rtl8168_mdio_write(tp, 0x14, PhyRegValue);
-
-                retval = rtl8168_set_phy_mcu_patch_request(tp);
-
-                rtl8168_mdio_write(tp, 0x1f, 0x0A40);
-                rtl8168_mdio_write(tp, 0x10, 0x0140);
-
-                rtl8168_mdio_write(tp, 0x1f, 0x0A4A);
-                PhyRegValue = rtl8168_mdio_read(tp, 0x13);
-                PhyRegValue &= ~(BIT_6);
-                PhyRegValue |= (BIT_7);
-                rtl8168_mdio_write(tp, 0x13, PhyRegValue);
-
-                rtl8168_mdio_write(tp, 0x1f, 0x0A44);
-                PhyRegValue = rtl8168_mdio_read(tp, 0x14);
-                PhyRegValue |= (BIT_2);
-                rtl8168_mdio_write(tp, 0x14, PhyRegValue);
-
-                rtl8168_mdio_write(tp, 0x1f, 0x0A50);
-                PhyRegValue = rtl8168_mdio_read(tp, 0x11);
-                PhyRegValue |= (BIT_11|BIT_12);
-                rtl8168_mdio_write(tp, 0x11, PhyRegValue);
-
-                retval = rtl8168_clear_phy_mcu_patch_request(tp);
-
-                rtl8168_mdio_write(tp, 0x1f, 0x0A40);
-                rtl8168_mdio_write(tp, 0x10, 0x1040);
-
-                rtl8168_mdio_write(tp, 0x1f, 0x0A4A);
-                PhyRegValue = rtl8168_mdio_read(tp, 0x13);
-                PhyRegValue &= ~(BIT_6|BIT_7);
-                rtl8168_mdio_write(tp, 0x13, PhyRegValue);
-
-                rtl8168_mdio_write(tp, 0x1f, 0x0A44);
-                PhyRegValue = rtl8168_mdio_read(tp, 0x14);
-                PhyRegValue &= ~(BIT_2);
-                rtl8168_mdio_write(tp, 0x14, PhyRegValue);
-
-                rtl8168_mdio_write(tp, 0x1f, 0x0A50);
-                PhyRegValue = rtl8168_mdio_read(tp, 0x11);
-                PhyRegValue &= ~(BIT_11|BIT_12);
-                rtl8168_mdio_write(tp, 0x11, PhyRegValue);
-
-                rtl8168_mdio_write(tp, 0x1f, 0x0A43);
-                rtl8168_mdio_write(tp, 0x13, 0x8010);
-                PhyRegValue = rtl8168_mdio_read(tp, 0x14);
-                PhyRegValue |= (BIT_11);
-                rtl8168_mdio_write(tp, 0x14, PhyRegValue);
-
-                retval = rtl8168_set_phy_mcu_patch_request(tp);
-
-                rtl8168_mdio_write(tp, 0x1f, 0x0A20);
-                PhyRegValue = rtl8168_mdio_read(tp, 0x13);
-                if (PhyRegValue & BIT_11) {
-                        if (PhyRegValue & BIT_10) {
-                                retval = FALSE;
-                        }
-                }
-
-                retval = rtl8168_clear_phy_mcu_patch_request(tp);
-
-                mdelay(2);
-                break;
-        default:
-                break;
-        }
-
-        rtl8168_mdio_write(tp, 0x1F, 0x0000);
-
-        return retval;
-}
-
-static void
-rtl8168_set_phy_ram_code_check_fail_flag(struct net_device *dev)
-{
-        struct rtl8168_private *tp = netdev_priv(dev);
-        u16 TmpUshort;
-
-        switch(tp->mcfg) {
-        case CFG_METHOD_21:
-                TmpUshort = rtl8168_mac_ocp_read(tp, 0xD3C0);
-                TmpUshort |= BIT_0;
-                rtl8168_mac_ocp_write(tp, 0xD3C0, TmpUshort);
-                break;
-        }
-}
-
-static void
-rtl8168_set_phy_mcu_8168e_1(struct net_device *dev)
-{
-        struct rtl8168_private *tp = netdev_priv(dev);
-        unsigned int gphy_val,i;
-
-        rtl8168_mdio_write(tp, 0x1f, 0x0000);
-        rtl8168_mdio_write(tp, 0x00, 0x1800);
-        rtl8168_mdio_write(tp, 0x1f, 0x0007);
-        rtl8168_mdio_write(tp, 0x1e, 0x0023);
-        rtl8168_mdio_write(tp, 0x17, 0x0117);
-        rtl8168_mdio_write(tp, 0x1f, 0x0007);
-        rtl8168_mdio_write(tp, 0x1E, 0x002C);
-        rtl8168_mdio_write(tp, 0x1B, 0x5000);
-        rtl8168_mdio_write(tp, 0x1f, 0x0000);
-        rtl8168_mdio_write(tp, 0x16, 0x4104);
-        for (i = 0; i < 200; i++) {
-                udelay(100);
-                gphy_val = rtl8168_mdio_read(tp, 0x1E);
-                gphy_val &= 0x03FF;
-                if (gphy_val == 0x000C)
-                        break;
-        }
-        rtl8168_mdio_write(tp, 0x1f, 0x0005);
-        for (i = 0; i < 200; i++) {
-                udelay(100);
-                gphy_val = rtl8168_mdio_read(tp, 0x07);
-                if ((gphy_val & BIT_5) == 0)
-                        break;
-        }
-        gphy_val = rtl8168_mdio_read(tp, 0x07);
-        if (gphy_val & BIT_5) {
-                rtl8168_mdio_write(tp, 0x1f, 0x0007);
-                rtl8168_mdio_write(tp, 0x1e, 0x00a1);
-                rtl8168_mdio_write(tp, 0x17, 0x1000);
-                rtl8168_mdio_write(tp, 0x17, 0x0000);
-                rtl8168_mdio_write(tp, 0x17, 0x2000);
-                rtl8168_mdio_write(tp, 0x1e, 0x002f);
-                rtl8168_mdio_write(tp, 0x18, 0x9bfb);
-                rtl8168_mdio_write(tp, 0x1f, 0x0005);
-                rtl8168_mdio_write(tp, 0x07, 0x0000);
-                rtl8168_mdio_write(tp, 0x1f, 0x0000);
-        }
-        rtl8168_mdio_write(tp, 0x1f, 0x0005);
-        rtl8168_mdio_write(tp, 0x05, 0xfff6);
-        rtl8168_mdio_write(tp, 0x06, 0x0080);
-        gphy_val = rtl8168_mdio_read(tp, 0x00);
-        gphy_val &= ~(BIT_7);
-        rtl8168_mdio_write(tp, 0x00, gphy_val);
-        rtl8168_mdio_write(tp, 0x1f, 0x0002);
-        gphy_val = rtl8168_mdio_read(tp, 0x08);
-        gphy_val &= ~(BIT_7);
-        rtl8168_mdio_write(tp, 0x08, gphy_val);
-        rtl8168_mdio_write(tp, 0x1f, 0x0000);
-        rtl8168_mdio_write(tp, 0x1f, 0x0007);
-        rtl8168_mdio_write(tp, 0x1e, 0x0023);
-        rtl8168_mdio_write(tp, 0x16, 0x0306);
-        rtl8168_mdio_write(tp, 0x16, 0x0307);
-        rtl8168_mdio_write(tp, 0x15, 0x000e);
-        rtl8168_mdio_write(tp, 0x19, 0x000a);
-        rtl8168_mdio_write(tp, 0x15, 0x0010);
-        rtl8168_mdio_write(tp, 0x19, 0x0008);
-        rtl8168_mdio_write(tp, 0x15, 0x0018);
-        rtl8168_mdio_write(tp, 0x19, 0x4801);
-        rtl8168_mdio_write(tp, 0x15, 0x0019);
-        rtl8168_mdio_write(tp, 0x19, 0x6801);
-        rtl8168_mdio_write(tp, 0x15, 0x001a);
-        rtl8168_mdio_write(tp, 0x19, 0x66a1);
-        rtl8168_mdio_write(tp, 0x15, 0x001f);
-        rtl8168_mdio_write(tp, 0x19, 0x0000);
-        rtl8168_mdio_write(tp, 0x15, 0x0020);
-        rtl8168_mdio_write(tp, 0x19, 0x0000);
-        rtl8168_mdio_write(tp, 0x15, 0x0021);
-        rtl8168_mdio_write(tp, 0x19, 0x0000);
-        rtl8168_mdio_write(tp, 0x15, 0x0022);
-        rtl8168_mdio_write(tp, 0x19, 0x0000);
-        rtl8168_mdio_write(tp, 0x15, 0x0023);
-        rtl8168_mdio_write(tp, 0x19, 0x0000);
-        rtl8168_mdio_write(tp, 0x15, 0x0024);
-        rtl8168_mdio_write(tp, 0x19, 0x0000);
-        rtl8168_mdio_write(tp, 0x15, 0x0025);
-        rtl8168_mdio_write(tp, 0x19, 0x64a1);
-        rtl8168_mdio_write(tp, 0x15, 0x0026);
-        rtl8168_mdio_write(tp, 0x19, 0x40ea);
-        rtl8168_mdio_write(tp, 0x15, 0x0027);
-        rtl8168_mdio_write(tp, 0x19, 0x4503);
-        rtl8168_mdio_write(tp, 0x15, 0x0028);
-        rtl8168_mdio_write(tp, 0x19, 0x9f00);
-        rtl8168_mdio_write(tp, 0x15, 0x0029);
-        rtl8168_mdio_write(tp, 0x19, 0xa631);
-        rtl8168_mdio_write(tp, 0x15, 0x002a);
-        rtl8168_mdio_write(tp, 0x19, 0x9717);
-        rtl8168_mdio_write(tp, 0x15, 0x002b);
-        rtl8168_mdio_write(tp, 0x19, 0x302c);
-        rtl8168_mdio_write(tp, 0x15, 0x002c);
-        rtl8168_mdio_write(tp, 0x19, 0x4802);
-        rtl8168_mdio_write(tp, 0x15, 0x002d);
-        rtl8168_mdio_write(tp, 0x19, 0x58da);
-        rtl8168_mdio_write(tp, 0x15, 0x002e);
-        rtl8168_mdio_write(tp, 0x19, 0x400d);
-        rtl8168_mdio_write(tp, 0x15, 0x002f);
-        rtl8168_mdio_write(tp, 0x19, 0x4488);
-        rtl8168_mdio_write(tp, 0x15, 0x0030);
-        rtl8168_mdio_write(tp, 0x19, 0x9e00);
-        rtl8168_mdio_write(tp, 0x15, 0x0031);
-        rtl8168_mdio_write(tp, 0x19, 0x63c8);
-        rtl8168_mdio_write(tp, 0x15, 0x0032);
-        rtl8168_mdio_write(tp, 0x19, 0x6481);
-        rtl8168_mdio_write(tp, 0x15, 0x0033);
-        rtl8168_mdio_write(tp, 0x19, 0x0000);
-        rtl8168_mdio_write(tp, 0x15, 0x0034);
-        rtl8168_mdio_write(tp, 0x19, 0x0000);
-        rtl8168_mdio_write(tp, 0x15, 0x0035);
-        rtl8168_mdio_write(tp, 0x19, 0x0000);
-        rtl8168_mdio_write(tp, 0x15, 0x0036);
-        rtl8168_mdio_write(tp, 0x19, 0x0000);
-        rtl8168_mdio_write(tp, 0x15, 0x0037);
-        rtl8168_mdio_write(tp, 0x19, 0x0000);
-        rtl8168_mdio_write(tp, 0x15, 0x0038);
-        rtl8168_mdio_write(tp, 0x19, 0x0000);
-        rtl8168_mdio_write(tp, 0x15, 0x0039);
-        rtl8168_mdio_write(tp, 0x19, 0x0000);
-        rtl8168_mdio_write(tp, 0x15, 0x003a);
-        rtl8168_mdio_write(tp, 0x19, 0x0000);
-        rtl8168_mdio_write(tp, 0x15, 0x003b);
-        rtl8168_mdio_write(tp, 0x19, 0x63e8);
-        rtl8168_mdio_write(tp, 0x15, 0x003c);
-        rtl8168_mdio_write(tp, 0x19, 0x7d00);
-        rtl8168_mdio_write(tp, 0x15, 0x003d);
-        rtl8168_mdio_write(tp, 0x19, 0x59d4);
-        rtl8168_mdio_write(tp, 0x15, 0x003e);
-        rtl8168_mdio_write(tp, 0x19, 0x63f8);
-        rtl8168_mdio_write(tp, 0x15, 0x0040);
-        rtl8168_mdio_write(tp, 0x19, 0x64a1);
-        rtl8168_mdio_write(tp, 0x15, 0x0041);
-        rtl8168_mdio_write(tp, 0x19, 0x30de);
-        rtl8168_mdio_write(tp, 0x15, 0x0044);
-        rtl8168_mdio_write(tp, 0x19, 0x480f);
-        rtl8168_mdio_write(tp, 0x15, 0x0045);
-        rtl8168_mdio_write(tp, 0x19, 0x6800);
-        rtl8168_mdio_write(tp, 0x15, 0x0046);
-        rtl8168_mdio_write(tp, 0x19, 0x6680);
-        rtl8168_mdio_write(tp, 0x15, 0x0047);
-        rtl8168_mdio_write(tp, 0x19, 0x7c10);
-        rtl8168_mdio_write(tp, 0x15, 0x0048);
-        rtl8168_mdio_write(tp, 0x19, 0x63c8);
-        rtl8168_mdio_write(tp, 0x15, 0x0049);
-        rtl8168_mdio_write(tp, 0x19, 0x0000);
-        rtl8168_mdio_write(tp, 0x15, 0x004a);
-        rtl8168_mdio_write(tp, 0x19, 0x0000);
-        rtl8168_mdio_write(tp, 0x15, 0x004b);
-        rtl8168_mdio_write(tp, 0x19, 0x0000);
-        rtl8168_mdio_write(tp, 0x15, 0x004c);
-        rtl8168_mdio_write(tp, 0x19, 0x0000);
-        rtl8168_mdio_write(tp, 0x15, 0x004d);
-        rtl8168_mdio_write(tp, 0x19, 0x0000);
-        rtl8168_mdio_write(tp, 0x15, 0x004e);
-        rtl8168_mdio_write(tp, 0x19, 0x0000);
-        rtl8168_mdio_write(tp, 0x15, 0x004f);
-        rtl8168_mdio_write(tp, 0x19, 0x40ea);
-        rtl8168_mdio_write(tp, 0x15, 0x0050);
-        rtl8168_mdio_write(tp, 0x19, 0x4503);
-        rtl8168_mdio_write(tp, 0x15, 0x0051);
-        rtl8168_mdio_write(tp, 0x19, 0x58ca);
-        rtl8168_mdio_write(tp, 0x15, 0x0052);
-        rtl8168_mdio_write(tp, 0x19, 0x63c8);
-        rtl8168_mdio_write(tp, 0x15, 0x0053);
-        rtl8168_mdio_write(tp, 0x19, 0x63d8);
-        rtl8168_mdio_write(tp, 0x15, 0x0054);
-        rtl8168_mdio_write(tp, 0x19, 0x66a0);
-        rtl8168_mdio_write(tp, 0x15, 0x0055);
-        rtl8168_mdio_write(tp, 0x19, 0x9f00);
-        rtl8168_mdio_write(tp, 0x15, 0x0056);
-        rtl8168_mdio_write(tp, 0x19, 0x3000);
-        rtl8168_mdio_write(tp, 0x15, 0x006E);
-        rtl8168_mdio_write(tp, 0x19, 0x9afa);
-        rtl8168_mdio_write(tp, 0x15, 0x00a1);
-        rtl8168_mdio_write(tp, 0x19, 0x3044);
-        rtl8168_mdio_write(tp, 0x15, 0x00ab);
-        rtl8168_mdio_write(tp, 0x19, 0x5820);
-        rtl8168_mdio_write(tp, 0x15, 0x00ac);
-        rtl8168_mdio_write(tp, 0x19, 0x5e04);
-        rtl8168_mdio_write(tp, 0x15, 0x00ad);
-        rtl8168_mdio_write(tp, 0x19, 0xb60c);
-        rtl8168_mdio_write(tp, 0x15, 0x00af);
-        rtl8168_mdio_write(tp, 0x19, 0x000a);
-        rtl8168_mdio_write(tp, 0x15, 0x00b2);
-        rtl8168_mdio_write(tp, 0x19, 0x30b9);
-        rtl8168_mdio_write(tp, 0x15, 0x00b9);
-        rtl8168_mdio_write(tp, 0x19, 0x4408);
-        rtl8168_mdio_write(tp, 0x15, 0x00ba);
-        rtl8168_mdio_write(tp, 0x19, 0x480b);
-        rtl8168_mdio_write(tp, 0x15, 0x00bb);
-        rtl8168_mdio_write(tp, 0x19, 0x5e00);
-        rtl8168_mdio_write(tp, 0x15, 0x00bc);
-        rtl8168_mdio_write(tp, 0x19, 0x405f);
-        rtl8168_mdio_write(tp, 0x15, 0x00bd);
-        rtl8168_mdio_write(tp, 0x19, 0x4448);
-        rtl8168_mdio_write(tp, 0x15, 0x00be);
-        rtl8168_mdio_write(tp, 0x19, 0x4020);
-        rtl8168_mdio_write(tp, 0x15, 0x00bf);
-        rtl8168_mdio_write(tp, 0x19, 0x4468);
-        rtl8168_mdio_write(tp, 0x15, 0x00c0);
-        rtl8168_mdio_write(tp, 0x19, 0x9c02);
-        rtl8168_mdio_write(tp, 0x15, 0x00c1);
-        rtl8168_mdio_write(tp, 0x19, 0x58a0);
-        rtl8168_mdio_write(tp, 0x15, 0x00c2);
-        rtl8168_mdio_write(tp, 0x19, 0xb605);
-        rtl8168_mdio_write(tp, 0x15, 0x00c3);
-        rtl8168_mdio_write(tp, 0x19, 0xc0d3);
-        rtl8168_mdio_write(tp, 0x15, 0x00c4);
-        rtl8168_mdio_write(tp, 0x19, 0x00e6);
-        rtl8168_mdio_write(tp, 0x15, 0x00c5);
-        rtl8168_mdio_write(tp, 0x19, 0xdaec);
-        rtl8168_mdio_write(tp, 0x15, 0x00c6);
-        rtl8168_mdio_write(tp, 0x19, 0x00fa);
-        rtl8168_mdio_write(tp, 0x15, 0x00c7);
-        rtl8168_mdio_write(tp, 0x19, 0x9df9);
-        rtl8168_mdio_write(tp, 0x15, 0x00c8);
-        rtl8168_mdio_write(tp, 0x19, 0x307a);
-        rtl8168_mdio_write(tp, 0x15, 0x0112);
-        rtl8168_mdio_write(tp, 0x19, 0x6421);
-        rtl8168_mdio_write(tp, 0x15, 0x0113);
-        rtl8168_mdio_write(tp, 0x19, 0x7c08);
-        rtl8168_mdio_write(tp, 0x15, 0x0114);
-        rtl8168_mdio_write(tp, 0x19, 0x63f0);
-        rtl8168_mdio_write(tp, 0x15, 0x0115);
-        rtl8168_mdio_write(tp, 0x19, 0x4003);
-        rtl8168_mdio_write(tp, 0x15, 0x0116);
-        rtl8168_mdio_write(tp, 0x19, 0x4418);
-        rtl8168_mdio_write(tp, 0x15, 0x0117);
-        rtl8168_mdio_write(tp, 0x19, 0x9b00);
-        rtl8168_mdio_write(tp, 0x15, 0x0118);
-        rtl8168_mdio_write(tp, 0x19, 0x6461);
-        rtl8168_mdio_write(tp, 0x15, 0x0119);
-        rtl8168_mdio_write(tp, 0x19, 0x64e1);
-        rtl8168_mdio_write(tp, 0x15, 0x011a);
-        rtl8168_mdio_write(tp, 0x19, 0x0000);
-        rtl8168_mdio_write(tp, 0x15, 0x0150);
-        rtl8168_mdio_write(tp, 0x19, 0x7c80);
-        rtl8168_mdio_write(tp, 0x15, 0x0151);
-        rtl8168_mdio_write(tp, 0x19, 0x6461);
-        rtl8168_mdio_write(tp, 0x15, 0x0152);
-        rtl8168_mdio_write(tp, 0x19, 0x4003);
-        rtl8168_mdio_write(tp, 0x15, 0x0153);
-        rtl8168_mdio_write(tp, 0x19, 0x4540);
-        rtl8168_mdio_write(tp, 0x15, 0x0154);
-        rtl8168_mdio_write(tp, 0x19, 0x9f00);
-        rtl8168_mdio_write(tp, 0x15, 0x0155);
-        rtl8168_mdio_write(tp, 0x19, 0x9d00);
-        rtl8168_mdio_write(tp, 0x15, 0x0156);
-        rtl8168_mdio_write(tp, 0x19, 0x7c40);
-        rtl8168_mdio_write(tp, 0x15, 0x0157);
-        rtl8168_mdio_write(tp, 0x19, 0x6421);
-        rtl8168_mdio_write(tp, 0x15, 0x0158);
-        rtl8168_mdio_write(tp, 0x19, 0x7c80);
-        rtl8168_mdio_write(tp, 0x15, 0x0159);
-        rtl8168_mdio_write(tp, 0x19, 0x64a1);
-        rtl8168_mdio_write(tp, 0x15, 0x015a);
-        rtl8168_mdio_write(tp, 0x19, 0x30fe);
-        rtl8168_mdio_write(tp, 0x15, 0x021e);
-        rtl8168_mdio_write(tp, 0x19, 0x5410);
-        rtl8168_mdio_write(tp, 0x15, 0x0225);
-        rtl8168_mdio_write(tp, 0x19, 0x5400);
-        rtl8168_mdio_write(tp, 0x15, 0x023D);
-        rtl8168_mdio_write(tp, 0x19, 0x4050);
-        rtl8168_mdio_write(tp, 0x15, 0x0295);
-        rtl8168_mdio_write(tp, 0x19, 0x6c08);
-        rtl8168_mdio_write(tp, 0x15, 0x02bd);
-        rtl8168_mdio_write(tp, 0x19, 0xa523);
-        rtl8168_mdio_write(tp, 0x15, 0x02be);
-        rtl8168_mdio_write(tp, 0x19, 0x32ca);
-        rtl8168_mdio_write(tp, 0x15, 0x02ca);
-        rtl8168_mdio_write(tp, 0x19, 0x48b3);
-        rtl8168_mdio_write(tp, 0x15, 0x02cb);
-        rtl8168_mdio_write(tp, 0x19, 0x4020);
-        rtl8168_mdio_write(tp, 0x15, 0x02cc);
-        rtl8168_mdio_write(tp, 0x19, 0x4823);
-        rtl8168_mdio_write(tp, 0x15, 0x02cd);
-        rtl8168_mdio_write(tp, 0x19, 0x4510);
-        rtl8168_mdio_write(tp, 0x15, 0x02ce);
-        rtl8168_mdio_write(tp, 0x19, 0xb63a);
-        rtl8168_mdio_write(tp, 0x15, 0x02cf);
-        rtl8168_mdio_write(tp, 0x19, 0x7dc8);
-        rtl8168_mdio_write(tp, 0x15, 0x02d6);
-        rtl8168_mdio_write(tp, 0x19, 0x9bf8);
-        rtl8168_mdio_write(tp, 0x15, 0x02d8);
-        rtl8168_mdio_write(tp, 0x19, 0x85f6);
-        rtl8168_mdio_write(tp, 0x15, 0x02d9);
-        rtl8168_mdio_write(tp, 0x19, 0x32e0);
-        rtl8168_mdio_write(tp, 0x15, 0x02e0);
-        rtl8168_mdio_write(tp, 0x19, 0x4834);
-        rtl8168_mdio_write(tp, 0x15, 0x02e1);
-        rtl8168_mdio_write(tp, 0x19, 0x6c08);
-        rtl8168_mdio_write(tp, 0x15, 0x02e2);
-        rtl8168_mdio_write(tp, 0x19, 0x4020);
-        rtl8168_mdio_write(tp, 0x15, 0x02e3);
-        rtl8168_mdio_write(tp, 0x19, 0x4824);
-        rtl8168_mdio_write(tp, 0x15, 0x02e4);
-        rtl8168_mdio_write(tp, 0x19, 0x4520);
-        rtl8168_mdio_write(tp, 0x15, 0x02e5);
-        rtl8168_mdio_write(tp, 0x19, 0x4008);
-        rtl8168_mdio_write(tp, 0x15, 0x02e6);
-        rtl8168_mdio_write(tp, 0x19, 0x4560);
-        rtl8168_mdio_write(tp, 0x15, 0x02e7);
-        rtl8168_mdio_write(tp, 0x19, 0x9d04);
-        rtl8168_mdio_write(tp, 0x15, 0x02e8);
-        rtl8168_mdio_write(tp, 0x19, 0x48c4);
-        rtl8168_mdio_write(tp, 0x15, 0x02e9);
-        rtl8168_mdio_write(tp, 0x19, 0x0000);
-        rtl8168_mdio_write(tp, 0x15, 0x02ea);
-        rtl8168_mdio_write(tp, 0x19, 0x4844);
-        rtl8168_mdio_write(tp, 0x15, 0x02eb);
-        rtl8168_mdio_write(tp, 0x19, 0x7dc8);
-        rtl8168_mdio_write(tp, 0x15, 0x02f0);
-        rtl8168_mdio_write(tp, 0x19, 0x9cf7);
-        rtl8168_mdio_write(tp, 0x15, 0x02f1);
-        rtl8168_mdio_write(tp, 0x19, 0xdf94);
-        rtl8168_mdio_write(tp, 0x15, 0x02f2);
-        rtl8168_mdio_write(tp, 0x19, 0x0002);
-        rtl8168_mdio_write(tp, 0x15, 0x02f3);
-        rtl8168_mdio_write(tp, 0x19, 0x6810);
-        rtl8168_mdio_write(tp, 0x15, 0x02f4);
-        rtl8168_mdio_write(tp, 0x19, 0xb614);
-        rtl8168_mdio_write(tp, 0x15, 0x02f5);
-        rtl8168_mdio_write(tp, 0x19, 0xc42b);
-        rtl8168_mdio_write(tp, 0x15, 0x02f6);
-        rtl8168_mdio_write(tp, 0x19, 0x00d4);
-        rtl8168_mdio_write(tp, 0x15, 0x02f7);
-        rtl8168_mdio_write(tp, 0x19, 0xc455);
-        rtl8168_mdio_write(tp, 0x15, 0x02f8);
-        rtl8168_mdio_write(tp, 0x19, 0x0093);
-        rtl8168_mdio_write(tp, 0x15, 0x02f9);
-        rtl8168_mdio_write(tp, 0x19, 0x92ee);
-        rtl8168_mdio_write(tp, 0x15, 0x02fa);
-        rtl8168_mdio_write(tp, 0x19, 0xefed);
-        rtl8168_mdio_write(tp, 0x15, 0x02fb);
-        rtl8168_mdio_write(tp, 0x19, 0x3312);
-        rtl8168_mdio_write(tp, 0x15, 0x0312);
-        rtl8168_mdio_write(tp, 0x19, 0x49b5);
-        rtl8168_mdio_write(tp, 0x15, 0x0313);
-        rtl8168_mdio_write(tp, 0x19, 0x7d00);
-        rtl8168_mdio_write(tp, 0x15, 0x0314);
-        rtl8168_mdio_write(tp, 0x19, 0x4d00);
-        rtl8168_mdio_write(tp, 0x15, 0x0315);
-        rtl8168_mdio_write(tp, 0x19, 0x6810);
-        rtl8168_mdio_write(tp, 0x15, 0x031e);
-        rtl8168_mdio_write(tp, 0x19, 0x404f);
-        rtl8168_mdio_write(tp, 0x15, 0x031f);
-        rtl8168_mdio_write(tp, 0x19, 0x44c8);
-        rtl8168_mdio_write(tp, 0x15, 0x0320);
-        rtl8168_mdio_write(tp, 0x19, 0xd64f);
-        rtl8168_mdio_write(tp, 0x15, 0x0321);
-        rtl8168_mdio_write(tp, 0x19, 0x00e7);
-        rtl8168_mdio_write(tp, 0x15, 0x0322);
-        rtl8168_mdio_write(tp, 0x19, 0x7c08);
-        rtl8168_mdio_write(tp, 0x15, 0x0323);
-        rtl8168_mdio_write(tp, 0x19, 0x8203);
-        rtl8168_mdio_write(tp, 0x15, 0x0324);
-        rtl8168_mdio_write(tp, 0x19, 0x4d48);
-        rtl8168_mdio_write(tp, 0x15, 0x0325);
-        rtl8168_mdio_write(tp, 0x19, 0x3327);
-        rtl8168_mdio_write(tp, 0x15, 0x0326);
-        rtl8168_mdio_write(tp, 0x19, 0x4d40);
-        rtl8168_mdio_write(tp, 0x15, 0x0327);
-        rtl8168_mdio_write(tp, 0x19, 0xc8d7);
-        rtl8168_mdio_write(tp, 0x15, 0x0328);
-        rtl8168_mdio_write(tp, 0x19, 0x0003);
-        rtl8168_mdio_write(tp, 0x15, 0x0329);
-        rtl8168_mdio_write(tp, 0x19, 0x7c20);
-        rtl8168_mdio_write(tp, 0x15, 0x032a);
-        rtl8168_mdio_write(tp, 0x19, 0x4c20);
-        rtl8168_mdio_write(tp, 0x15, 0x032b);
-        rtl8168_mdio_write(tp, 0x19, 0xc8ed);
-        rtl8168_mdio_write(tp, 0x15, 0x032c);
-        rtl8168_mdio_write(tp, 0x19, 0x00f4);
-        rtl8168_mdio_write(tp, 0x15, 0x032d);
-        rtl8168_mdio_write(tp, 0x19, 0x82b3);
-        rtl8168_mdio_write(tp, 0x15, 0x032e);
-        rtl8168_mdio_write(tp, 0x19, 0xd11d);
-        rtl8168_mdio_write(tp, 0x15, 0x032f);
-        rtl8168_mdio_write(tp, 0x19, 0x00b1);
-        rtl8168_mdio_write(tp, 0x15, 0x0330);
-        rtl8168_mdio_write(tp, 0x19, 0xde18);
-        rtl8168_mdio_write(tp, 0x15, 0x0331);
-        rtl8168_mdio_write(tp, 0x19, 0x0008);
-        rtl8168_mdio_write(tp, 0x15, 0x0332);
-        rtl8168_mdio_write(tp, 0x19, 0x91ee);
-        rtl8168_mdio_write(tp, 0x15, 0x0333);
-        rtl8168_mdio_write(tp, 0x19, 0x3339);
-        rtl8168_mdio_write(tp, 0x15, 0x033a);
-        rtl8168_mdio_write(tp, 0x19, 0x4064);
-        rtl8168_mdio_write(tp, 0x15, 0x0340);
-        rtl8168_mdio_write(tp, 0x19, 0x9e06);
-        rtl8168_mdio_write(tp, 0x15, 0x0341);
-        rtl8168_mdio_write(tp, 0x19, 0x7c08);
-        rtl8168_mdio_write(tp, 0x15, 0x0342);
-        rtl8168_mdio_write(tp, 0x19, 0x8203);
-        rtl8168_mdio_write(tp, 0x15, 0x0343);
-        rtl8168_mdio_write(tp, 0x19, 0x4d48);
-        rtl8168_mdio_write(tp, 0x15, 0x0344);
-        rtl8168_mdio_write(tp, 0x19, 0x3346);
-        rtl8168_mdio_write(tp, 0x15, 0x0345);
-        rtl8168_mdio_write(tp, 0x19, 0x4d40);
-        rtl8168_mdio_write(tp, 0x15, 0x0346);
-        rtl8168_mdio_write(tp, 0x19, 0xd11d);
-        rtl8168_mdio_write(tp, 0x15, 0x0347);
-        rtl8168_mdio_write(tp, 0x19, 0x0099);
-        rtl8168_mdio_write(tp, 0x15, 0x0348);
-        rtl8168_mdio_write(tp, 0x19, 0xbb17);
-        rtl8168_mdio_write(tp, 0x15, 0x0349);
-        rtl8168_mdio_write(tp, 0x19, 0x8102);
-        rtl8168_mdio_write(tp, 0x15, 0x034a);
-        rtl8168_mdio_write(tp, 0x19, 0x334d);
-        rtl8168_mdio_write(tp, 0x15, 0x034b);
-        rtl8168_mdio_write(tp, 0x19, 0xa22c);
-        rtl8168_mdio_write(tp, 0x15, 0x034c);
-        rtl8168_mdio_write(tp, 0x19, 0x3397);
-        rtl8168_mdio_write(tp, 0x15, 0x034d);
-        rtl8168_mdio_write(tp, 0x19, 0x91f2);
-        rtl8168_mdio_write(tp, 0x15, 0x034e);
-        rtl8168_mdio_write(tp, 0x19, 0xc218);
-        rtl8168_mdio_write(tp, 0x15, 0x034f);
-        rtl8168_mdio_write(tp, 0x19, 0x00f0);
-        rtl8168_mdio_write(tp, 0x15, 0x0350);
-        rtl8168_mdio_write(tp, 0x19, 0x3397);
-        rtl8168_mdio_write(tp, 0x15, 0x0351);
-        rtl8168_mdio_write(tp, 0x19, 0x0000);
-        rtl8168_mdio_write(tp, 0x15, 0x0364);
-        rtl8168_mdio_write(tp, 0x19, 0xbc05);
-        rtl8168_mdio_write(tp, 0x15, 0x0367);
-        rtl8168_mdio_write(tp, 0x19, 0xa1fc);
-        rtl8168_mdio_write(tp, 0x15, 0x0368);
-        rtl8168_mdio_write(tp, 0x19, 0x3377);
-        rtl8168_mdio_write(tp, 0x15, 0x0369);
-        rtl8168_mdio_write(tp, 0x19, 0x328b);
-        rtl8168_mdio_write(tp, 0x15, 0x036a);
-        rtl8168_mdio_write(tp, 0x19, 0x0000);
-        rtl8168_mdio_write(tp, 0x15, 0x0377);
-        rtl8168_mdio_write(tp, 0x19, 0x4b97);
-        rtl8168_mdio_write(tp, 0x15, 0x0378);
-        rtl8168_mdio_write(tp, 0x19, 0x6818);
-        rtl8168_mdio_write(tp, 0x15, 0x0379);
-        rtl8168_mdio_write(tp, 0x19, 0x4b07);
-        rtl8168_mdio_write(tp, 0x15, 0x037a);
-        rtl8168_mdio_write(tp, 0x19, 0x40ac);
-        rtl8168_mdio_write(tp, 0x15, 0x037b);
-        rtl8168_mdio_write(tp, 0x19, 0x4445);
-        rtl8168_mdio_write(tp, 0x15, 0x037c);
-        rtl8168_mdio_write(tp, 0x19, 0x404e);
-        rtl8168_mdio_write(tp, 0x15, 0x037d);
-        rtl8168_mdio_write(tp, 0x19, 0x4461);
-        rtl8168_mdio_write(tp, 0x15, 0x037e);
-        rtl8168_mdio_write(tp, 0x19, 0x9c09);
-        rtl8168_mdio_write(tp, 0x15, 0x037f);
-        rtl8168_mdio_write(tp, 0x19, 0x63da);
-        rtl8168_mdio_write(tp, 0x15, 0x0380);
-        rtl8168_mdio_write(tp, 0x19, 0x5440);
-        rtl8168_mdio_write(tp, 0x15, 0x0381);
-        rtl8168_mdio_write(tp, 0x19, 0x4b98);
-        rtl8168_mdio_write(tp, 0x15, 0x0382);
-        rtl8168_mdio_write(tp, 0x19, 0x7c60);
-        rtl8168_mdio_write(tp, 0x15, 0x0383);
-        rtl8168_mdio_write(tp, 0x19, 0x4c00);
-        rtl8168_mdio_write(tp, 0x15, 0x0384);
-        rtl8168_mdio_write(tp, 0x19, 0x4b08);
-        rtl8168_mdio_write(tp, 0x15, 0x0385);
-        rtl8168_mdio_write(tp, 0x19, 0x63d8);
-        rtl8168_mdio_write(tp, 0x15, 0x0386);
-        rtl8168_mdio_write(tp, 0x19, 0x338d);
-        rtl8168_mdio_write(tp, 0x15, 0x0387);
-        rtl8168_mdio_write(tp, 0x19, 0xd64f);
-        rtl8168_mdio_write(tp, 0x15, 0x0388);
-        rtl8168_mdio_write(tp, 0x19, 0x0080);
-        rtl8168_mdio_write(tp, 0x15, 0x0389);
-        rtl8168_mdio_write(tp, 0x19, 0x820c);
-        rtl8168_mdio_write(tp, 0x15, 0x038a);
-        rtl8168_mdio_write(tp, 0x19, 0xa10b);
-        rtl8168_mdio_write(tp, 0x15, 0x038b);
-        rtl8168_mdio_write(tp, 0x19, 0x9df3);
-        rtl8168_mdio_write(tp, 0x15, 0x038c);
-        rtl8168_mdio_write(tp, 0x19, 0x3395);
-        rtl8168_mdio_write(tp, 0x15, 0x038d);
-        rtl8168_mdio_write(tp, 0x19, 0xd64f);
-        rtl8168_mdio_write(tp, 0x15, 0x038e);
-        rtl8168_mdio_write(tp, 0x19, 0x00f9);
-        rtl8168_mdio_write(tp, 0x15, 0x038f);
-        rtl8168_mdio_write(tp, 0x19, 0xc017);
-        rtl8168_mdio_write(tp, 0x15, 0x0390);
-        rtl8168_mdio_write(tp, 0x19, 0x0005);
-        rtl8168_mdio_write(tp, 0x15, 0x0391);
-        rtl8168_mdio_write(tp, 0x19, 0x6c0b);
-        rtl8168_mdio_write(tp, 0x15, 0x0392);
-        rtl8168_mdio_write(tp, 0x19, 0xa103);
-        rtl8168_mdio_write(tp, 0x15, 0x0393);
-        rtl8168_mdio_write(tp, 0x19, 0x6c08);
-        rtl8168_mdio_write(tp, 0x15, 0x0394);
-        rtl8168_mdio_write(tp, 0x19, 0x9df9);
-        rtl8168_mdio_write(tp, 0x15, 0x0395);
-        rtl8168_mdio_write(tp, 0x19, 0x6c08);
-        rtl8168_mdio_write(tp, 0x15, 0x0396);
-        rtl8168_mdio_write(tp, 0x19, 0x3397);
-        rtl8168_mdio_write(tp, 0x15, 0x0399);
-        rtl8168_mdio_write(tp, 0x19, 0x6810);
-        rtl8168_mdio_write(tp, 0x15, 0x03a4);
-        rtl8168_mdio_write(tp, 0x19, 0x7c08);
-        rtl8168_mdio_write(tp, 0x15, 0x03a5);
-        rtl8168_mdio_write(tp, 0x19, 0x8203);
-        rtl8168_mdio_write(tp, 0x15, 0x03a6);
-        rtl8168_mdio_write(tp, 0x19, 0x4d08);
-        rtl8168_mdio_write(tp, 0x15, 0x03a7);
-        rtl8168_mdio_write(tp, 0x19, 0x33a9);
-        rtl8168_mdio_write(tp, 0x15, 0x03a8);
-        rtl8168_mdio_write(tp, 0x19, 0x4d00);
-        rtl8168_mdio_write(tp, 0x15, 0x03a9);
-        rtl8168_mdio_write(tp, 0x19, 0x9bfa);
-        rtl8168_mdio_write(tp, 0x15, 0x03aa);
-        rtl8168_mdio_write(tp, 0x19, 0x33b6);
-        rtl8168_mdio_write(tp, 0x15, 0x03bb);
-        rtl8168_mdio_write(tp, 0x19, 0x4056);
-        rtl8168_mdio_write(tp, 0x15, 0x03bc);
-        rtl8168_mdio_write(tp, 0x19, 0x44e9);
-        rtl8168_mdio_write(tp, 0x15, 0x03bd);
-        rtl8168_mdio_write(tp, 0x19, 0x405e);
-        rtl8168_mdio_write(tp, 0x15, 0x03be);
-        rtl8168_mdio_write(tp, 0x19, 0x44f8);
-        rtl8168_mdio_write(tp, 0x15, 0x03bf);
-        rtl8168_mdio_write(tp, 0x19, 0xd64f);
-        rtl8168_mdio_write(tp, 0x15, 0x03c0);
-        rtl8168_mdio_write(tp, 0x19, 0x0037);
-        rtl8168_mdio_write(tp, 0x15, 0x03c1);
-        rtl8168_mdio_write(tp, 0x19, 0xbd37);
-        rtl8168_mdio_write(tp, 0x15, 0x03c2);
-        rtl8168_mdio_write(tp, 0x19, 0x9cfd);
-        rtl8168_mdio_write(tp, 0x15, 0x03c3);
-        rtl8168_mdio_write(tp, 0x19, 0xc639);
-        rtl8168_mdio_write(tp, 0x15, 0x03c4);
-        rtl8168_mdio_write(tp, 0x19, 0x0011);
-        rtl8168_mdio_write(tp, 0x15, 0x03c5);
-        rtl8168_mdio_write(tp, 0x19, 0x9b03);
-        rtl8168_mdio_write(tp, 0x15, 0x03c6);
-        rtl8168_mdio_write(tp, 0x19, 0x7c01);
-        rtl8168_mdio_write(tp, 0x15, 0x03c7);
-        rtl8168_mdio_write(tp, 0x19, 0x4c01);
-        rtl8168_mdio_write(tp, 0x15, 0x03c8);
-        rtl8168_mdio_write(tp, 0x19, 0x9e03);
-        rtl8168_mdio_write(tp, 0x15, 0x03c9);
-        rtl8168_mdio_write(tp, 0x19, 0x7c20);
-        rtl8168_mdio_write(tp, 0x15, 0x03ca);
-        rtl8168_mdio_write(tp, 0x19, 0x4c20);
-        rtl8168_mdio_write(tp, 0x15, 0x03cb);
-        rtl8168_mdio_write(tp, 0x19, 0x9af4);
-        rtl8168_mdio_write(tp, 0x15, 0x03cc);
-        rtl8168_mdio_write(tp, 0x19, 0x7c12);
-        rtl8168_mdio_write(tp, 0x15, 0x03cd);
-        rtl8168_mdio_write(tp, 0x19, 0x4c52);
-        rtl8168_mdio_write(tp, 0x15, 0x03ce);
-        rtl8168_mdio_write(tp, 0x19, 0x4470);
-        rtl8168_mdio_write(tp, 0x15, 0x03cf);
-        rtl8168_mdio_write(tp, 0x19, 0x7c12);
-        rtl8168_mdio_write(tp, 0x15, 0x03d0);
-        rtl8168_mdio_write(tp, 0x19, 0x4c40);
-        rtl8168_mdio_write(tp, 0x15, 0x03d1);
-        rtl8168_mdio_write(tp, 0x19, 0x33bf);
-        rtl8168_mdio_write(tp, 0x15, 0x03d6);
-        rtl8168_mdio_write(tp, 0x19, 0x4047);
-        rtl8168_mdio_write(tp, 0x15, 0x03d7);
-        rtl8168_mdio_write(tp, 0x19, 0x4469);
-        rtl8168_mdio_write(tp, 0x15, 0x03d8);
-        rtl8168_mdio_write(tp, 0x19, 0x492b);
-        rtl8168_mdio_write(tp, 0x15, 0x03d9);
-        rtl8168_mdio_write(tp, 0x19, 0x4479);
-        rtl8168_mdio_write(tp, 0x15, 0x03da);
-        rtl8168_mdio_write(tp, 0x19, 0x7c09);
-        rtl8168_mdio_write(tp, 0x15, 0x03db);
-        rtl8168_mdio_write(tp, 0x19, 0x8203);
-        rtl8168_mdio_write(tp, 0x15, 0x03dc);
-        rtl8168_mdio_write(tp, 0x19, 0x4d48);
-        rtl8168_mdio_write(tp, 0x15, 0x03dd);
-        rtl8168_mdio_write(tp, 0x19, 0x33df);
-        rtl8168_mdio_write(tp, 0x15, 0x03de);
-        rtl8168_mdio_write(tp, 0x19, 0x4d40);
-        rtl8168_mdio_write(tp, 0x15, 0x03df);
-        rtl8168_mdio_write(tp, 0x19, 0xd64f);
-        rtl8168_mdio_write(tp, 0x15, 0x03e0);
-        rtl8168_mdio_write(tp, 0x19, 0x0017);
-        rtl8168_mdio_write(tp, 0x15, 0x03e1);
-        rtl8168_mdio_write(tp, 0x19, 0xbd17);
-        rtl8168_mdio_write(tp, 0x15, 0x03e2);
-        rtl8168_mdio_write(tp, 0x19, 0x9b03);
-        rtl8168_mdio_write(tp, 0x15, 0x03e3);
-        rtl8168_mdio_write(tp, 0x19, 0x7c20);
-        rtl8168_mdio_write(tp, 0x15, 0x03e4);
-        rtl8168_mdio_write(tp, 0x19, 0x4c20);
-        rtl8168_mdio_write(tp, 0x15, 0x03e5);
-        rtl8168_mdio_write(tp, 0x19, 0x88f5);
-        rtl8168_mdio_write(tp, 0x15, 0x03e6);
-        rtl8168_mdio_write(tp, 0x19, 0xc428);
-        rtl8168_mdio_write(tp, 0x15, 0x03e7);
-        rtl8168_mdio_write(tp, 0x19, 0x0008);
-        rtl8168_mdio_write(tp, 0x15, 0x03e8);
-        rtl8168_mdio_write(tp, 0x19, 0x9af2);
-        rtl8168_mdio_write(tp, 0x15, 0x03e9);
-        rtl8168_mdio_write(tp, 0x19, 0x7c12);
-        rtl8168_mdio_write(tp, 0x15, 0x03ea);
-        rtl8168_mdio_write(tp, 0x19, 0x4c52);
-        rtl8168_mdio_write(tp, 0x15, 0x03eb);
-        rtl8168_mdio_write(tp, 0x19, 0x4470);
-        rtl8168_mdio_write(tp, 0x15, 0x03ec);
-        rtl8168_mdio_write(tp, 0x19, 0x7c12);
-        rtl8168_mdio_write(tp, 0x15, 0x03ed);
-        rtl8168_mdio_write(tp, 0x19, 0x4c40);
-        rtl8168_mdio_write(tp, 0x15, 0x03ee);
-        rtl8168_mdio_write(tp, 0x19, 0x33da);
-        rtl8168_mdio_write(tp, 0x15, 0x03ef);
-        rtl8168_mdio_write(tp, 0x19, 0x3312);
-        rtl8168_mdio_write(tp, 0x16, 0x0306);
-        rtl8168_mdio_write(tp, 0x16, 0x0300);
-        rtl8168_mdio_write(tp, 0x1f, 0x0000);
-        rtl8168_mdio_write(tp, 0x17, 0x2179);
-        rtl8168_mdio_write(tp, 0x1f, 0x0007);
-        rtl8168_mdio_write(tp, 0x1e, 0x0040);
-        rtl8168_mdio_write(tp, 0x18, 0x0645);
-        rtl8168_mdio_write(tp, 0x19, 0xe200);
-        rtl8168_mdio_write(tp, 0x18, 0x0655);
-        rtl8168_mdio_write(tp, 0x19, 0x9000);
-        rtl8168_mdio_write(tp, 0x18, 0x0d05);
-        rtl8168_mdio_write(tp, 0x19, 0xbe00);
-        rtl8168_mdio_write(tp, 0x18, 0x0d15);
-        rtl8168_mdio_write(tp, 0x19, 0xd300);
-        rtl8168_mdio_write(tp, 0x18, 0x0d25);
-        rtl8168_mdio_write(tp, 0x19, 0xfe00);
-        rtl8168_mdio_write(tp, 0x18, 0x0d35);
-        rtl8168_mdio_write(tp, 0x19, 0x4000);
-        rtl8168_mdio_write(tp, 0x18, 0x0d45);
-        rtl8168_mdio_write(tp, 0x19, 0x7f00);
-        rtl8168_mdio_write(tp, 0x18, 0x0d55);
-        rtl8168_mdio_write(tp, 0x19, 0x1000);
-        rtl8168_mdio_write(tp, 0x18, 0x0d65);
-        rtl8168_mdio_write(tp, 0x19, 0x0000);
-        rtl8168_mdio_write(tp, 0x18, 0x0d75);
-        rtl8168_mdio_write(tp, 0x19, 0x8200);
-        rtl8168_mdio_write(tp, 0x18, 0x0d85);
-        rtl8168_mdio_write(tp, 0x19, 0x0000);
-        rtl8168_mdio_write(tp, 0x18, 0x0d95);
-        rtl8168_mdio_write(tp, 0x19, 0x7000);
-        rtl8168_mdio_write(tp, 0x18, 0x0da5);
-        rtl8168_mdio_write(tp, 0x19, 0x0f00);
-        rtl8168_mdio_write(tp, 0x18, 0x0db5);
-        rtl8168_mdio_write(tp, 0x19, 0x0100);
-        rtl8168_mdio_write(tp, 0x18, 0x0dc5);
-        rtl8168_mdio_write(tp, 0x19, 0x9b00);
-        rtl8168_mdio_write(tp, 0x18, 0x0dd5);
-        rtl8168_mdio_write(tp, 0x19, 0x7f00);
-        rtl8168_mdio_write(tp, 0x18, 0x0de5);
-        rtl8168_mdio_write(tp, 0x19, 0xe000);
-        rtl8168_mdio_write(tp, 0x18, 0x0df5);
-        rtl8168_mdio_write(tp, 0x19, 0xef00);
-        rtl8168_mdio_write(tp, 0x18, 0x16d5);
-        rtl8168_mdio_write(tp, 0x19, 0xe200);
-        rtl8168_mdio_write(tp, 0x18, 0x16e5);
-        rtl8168_mdio_write(tp, 0x19, 0xab00);
-        rtl8168_mdio_write(tp, 0x18, 0x2904);
-        rtl8168_mdio_write(tp, 0x19, 0x4000);
-        rtl8168_mdio_write(tp, 0x18, 0x2914);
-        rtl8168_mdio_write(tp, 0x19, 0x7f00);
-        rtl8168_mdio_write(tp, 0x18, 0x2924);
-        rtl8168_mdio_write(tp, 0x19, 0x0100);
-        rtl8168_mdio_write(tp, 0x18, 0x2934);
-        rtl8168_mdio_write(tp, 0x19, 0x2000);
-        rtl8168_mdio_write(tp, 0x18, 0x2944);
-        rtl8168_mdio_write(tp, 0x19, 0x0000);
-        rtl8168_mdio_write(tp, 0x18, 0x2954);
-        rtl8168_mdio_write(tp, 0x19, 0x4600);
-        rtl8168_mdio_write(tp, 0x18, 0x2964);
-        rtl8168_mdio_write(tp, 0x19, 0xfc00);
-        rtl8168_mdio_write(tp, 0x18, 0x2974);
-        rtl8168_mdio_write(tp, 0x19, 0x0000);
-        rtl8168_mdio_write(tp, 0x18, 0x2984);
-        rtl8168_mdio_write(tp, 0x19, 0x5000);
-        rtl8168_mdio_write(tp, 0x18, 0x2994);
-        rtl8168_mdio_write(tp, 0x19, 0x9d00);
-        rtl8168_mdio_write(tp, 0x18, 0x29a4);
-        rtl8168_mdio_write(tp, 0x19, 0xff00);
-        rtl8168_mdio_write(tp, 0x18, 0x29b4);
-        rtl8168_mdio_write(tp, 0x19, 0x4000);
-        rtl8168_mdio_write(tp, 0x18, 0x29c4);
-        rtl8168_mdio_write(tp, 0x19, 0x7f00);
-        rtl8168_mdio_write(tp, 0x18, 0x29d4);
-        rtl8168_mdio_write(tp, 0x19, 0x0000);
-        rtl8168_mdio_write(tp, 0x18, 0x29e4);
-        rtl8168_mdio_write(tp, 0x19, 0x2000);
-        rtl8168_mdio_write(tp, 0x18, 0x29f4);
-        rtl8168_mdio_write(tp, 0x19, 0x0000);
-        rtl8168_mdio_write(tp, 0x18, 0x2a04);
-        rtl8168_mdio_write(tp, 0x19, 0xe600);
-        rtl8168_mdio_write(tp, 0x18, 0x2a14);
-        rtl8168_mdio_write(tp, 0x19, 0xff00);
-        rtl8168_mdio_write(tp, 0x18, 0x2a24);
-        rtl8168_mdio_write(tp, 0x19, 0x0000);
-        rtl8168_mdio_write(tp, 0x18, 0x2a34);
-        rtl8168_mdio_write(tp, 0x19, 0x5000);
-        rtl8168_mdio_write(tp, 0x18, 0x2a44);
-        rtl8168_mdio_write(tp, 0x19, 0x8500);
-        rtl8168_mdio_write(tp, 0x18, 0x2a54);
-        rtl8168_mdio_write(tp, 0x19, 0x7f00);
-        rtl8168_mdio_write(tp, 0x18, 0x2a64);
-        rtl8168_mdio_write(tp, 0x19, 0xac00);
-        rtl8168_mdio_write(tp, 0x18, 0x2a74);
-        rtl8168_mdio_write(tp, 0x19, 0x0800);
-        rtl8168_mdio_write(tp, 0x18, 0x2a84);
-        rtl8168_mdio_write(tp, 0x19, 0xfc00);
-        rtl8168_mdio_write(tp, 0x18, 0x2a94);
-        rtl8168_mdio_write(tp, 0x19, 0xe000);
-        rtl8168_mdio_write(tp, 0x18, 0x2aa4);
-        rtl8168_mdio_write(tp, 0x19, 0x7400);
-        rtl8168_mdio_write(tp, 0x18, 0x2ab4);
-        rtl8168_mdio_write(tp, 0x19, 0x4000);
-        rtl8168_mdio_write(tp, 0x18, 0x2ac4);
-        rtl8168_mdio_write(tp, 0x19, 0x7f00);
-        rtl8168_mdio_write(tp, 0x18, 0x2ad4);
-        rtl8168_mdio_write(tp, 0x19, 0x0100);
-        rtl8168_mdio_write(tp, 0x18, 0x2ae4);
-        rtl8168_mdio_write(tp, 0x19, 0xff00);
-        rtl8168_mdio_write(tp, 0x18, 0x2af4);
-        rtl8168_mdio_write(tp, 0x19, 0x0000);
-        rtl8168_mdio_write(tp, 0x18, 0x2b04);
-        rtl8168_mdio_write(tp, 0x19, 0x4400);
-        rtl8168_mdio_write(tp, 0x18, 0x2b14);
-        rtl8168_mdio_write(tp, 0x19, 0xfc00);
-        rtl8168_mdio_write(tp, 0x18, 0x2b24);
-        rtl8168_mdio_write(tp, 0x19, 0x0000);
-        rtl8168_mdio_write(tp, 0x18, 0x2b34);
-        rtl8168_mdio_write(tp, 0x19, 0x4000);
-        rtl8168_mdio_write(tp, 0x18, 0x2b44);
-        rtl8168_mdio_write(tp, 0x19, 0x9d00);
-        rtl8168_mdio_write(tp, 0x18, 0x2b54);
-        rtl8168_mdio_write(tp, 0x19, 0xff00);
-        rtl8168_mdio_write(tp, 0x18, 0x2b64);
-        rtl8168_mdio_write(tp, 0x19, 0x4000);
-        rtl8168_mdio_write(tp, 0x18, 0x2b74);
-        rtl8168_mdio_write(tp, 0x19, 0x7f00);
-        rtl8168_mdio_write(tp, 0x18, 0x2b84);
-        rtl8168_mdio_write(tp, 0x19, 0x0000);
-        rtl8168_mdio_write(tp, 0x18, 0x2b94);
-        rtl8168_mdio_write(tp, 0x19, 0xff00);
-        rtl8168_mdio_write(tp, 0x18, 0x2ba4);
-        rtl8168_mdio_write(tp, 0x19, 0x0000);
-        rtl8168_mdio_write(tp, 0x18, 0x2bb4);
-        rtl8168_mdio_write(tp, 0x19, 0xfc00);
-        rtl8168_mdio_write(tp, 0x18, 0x2bc4);
-        rtl8168_mdio_write(tp, 0x19, 0xff00);
-        rtl8168_mdio_write(tp, 0x18, 0x2bd4);
-        rtl8168_mdio_write(tp, 0x19, 0x0000);
-        rtl8168_mdio_write(tp, 0x18, 0x2be4);
-        rtl8168_mdio_write(tp, 0x19, 0x4000);
-        rtl8168_mdio_write(tp, 0x18, 0x2bf4);
-        rtl8168_mdio_write(tp, 0x19, 0x8900);
-        rtl8168_mdio_write(tp, 0x18, 0x2c04);
-        rtl8168_mdio_write(tp, 0x19, 0x8300);
-        rtl8168_mdio_write(tp, 0x18, 0x2c14);
-        rtl8168_mdio_write(tp, 0x19, 0xe000);
-        rtl8168_mdio_write(tp, 0x18, 0x2c24);
-        rtl8168_mdio_write(tp, 0x19, 0x0000);
-        rtl8168_mdio_write(tp, 0x18, 0x2c34);
-        rtl8168_mdio_write(tp, 0x19, 0xac00);
-        rtl8168_mdio_write(tp, 0x18, 0x2c44);
-        rtl8168_mdio_write(tp, 0x19, 0x0800);
-        rtl8168_mdio_write(tp, 0x18, 0x2c54);
-        rtl8168_mdio_write(tp, 0x19, 0xfa00);
-        rtl8168_mdio_write(tp, 0x18, 0x2c64);
-        rtl8168_mdio_write(tp, 0x19, 0xe100);
-        rtl8168_mdio_write(tp, 0x18, 0x2c74);
-        rtl8168_mdio_write(tp, 0x19, 0x7f00);
-        rtl8168_mdio_write(tp, 0x18, 0x0001);
-        rtl8168_mdio_write(tp, 0x1f, 0x0000);
-        rtl8168_mdio_write(tp, 0x17, 0x2100);
-        rtl8168_mdio_write(tp, 0x1f, 0x0005);
-        rtl8168_mdio_write(tp, 0x05, 0xfff6);
-        rtl8168_mdio_write(tp, 0x06, 0x0080);
-        rtl8168_mdio_write(tp, 0x05, 0x8b88);
-        rtl8168_mdio_write(tp, 0x06, 0x0000);
-        rtl8168_mdio_write(tp, 0x06, 0x0000);
-        rtl8168_mdio_write(tp, 0x06, 0x0000);
-        rtl8168_mdio_write(tp, 0x06, 0x0000);
-        rtl8168_mdio_write(tp, 0x05, 0x8000);
-        rtl8168_mdio_write(tp, 0x06, 0xd480);
-        rtl8168_mdio_write(tp, 0x06, 0xc1e4);
-        rtl8168_mdio_write(tp, 0x06, 0x8b9a);
-        rtl8168_mdio_write(tp, 0x06, 0xe58b);
-        rtl8168_mdio_write(tp, 0x06, 0x9bee);
-        rtl8168_mdio_write(tp, 0x06, 0x8b83);
-        rtl8168_mdio_write(tp, 0x06, 0x41bf);
-        rtl8168_mdio_write(tp, 0x06, 0x8b88);
-        rtl8168_mdio_write(tp, 0x06, 0xec00);
-        rtl8168_mdio_write(tp, 0x06, 0x19a9);
-        rtl8168_mdio_write(tp, 0x06, 0x8b90);
-        rtl8168_mdio_write(tp, 0x06, 0xf9ee);
-        rtl8168_mdio_write(tp, 0x06, 0xfff6);
-        rtl8168_mdio_write(tp, 0x06, 0x00ee);
-        rtl8168_mdio_write(tp, 0x06, 0xfff7);
-        rtl8168_mdio_write(tp, 0x06, 0xffe0);
-        rtl8168_mdio_write(tp, 0x06, 0xe140);
-        rtl8168_mdio_write(tp, 0x06, 0xe1e1);
-        rtl8168_mdio_write(tp, 0x06, 0x41f7);
-        rtl8168_mdio_write(tp, 0x06, 0x2ff6);
-        rtl8168_mdio_write(tp, 0x06, 0x28e4);
-        rtl8168_mdio_write(tp, 0x06, 0xe140);
-        rtl8168_mdio_write(tp, 0x06, 0xe5e1);
-        rtl8168_mdio_write(tp, 0x06, 0x41f7);
-        rtl8168_mdio_write(tp, 0x06, 0x0002);
-        rtl8168_mdio_write(tp, 0x06, 0x020c);
-        rtl8168_mdio_write(tp, 0x06, 0x0202);
-        rtl8168_mdio_write(tp, 0x06, 0x1d02);
-        rtl8168_mdio_write(tp, 0x06, 0x0230);
-        rtl8168_mdio_write(tp, 0x06, 0x0202);
-        rtl8168_mdio_write(tp, 0x06, 0x4002);
-        rtl8168_mdio_write(tp, 0x06, 0x028b);
-        rtl8168_mdio_write(tp, 0x06, 0x0280);
-        rtl8168_mdio_write(tp, 0x06, 0x6c02);
-        rtl8168_mdio_write(tp, 0x06, 0x8085);
-        rtl8168_mdio_write(tp, 0x06, 0xe08b);
-        rtl8168_mdio_write(tp, 0x06, 0x88e1);
-        rtl8168_mdio_write(tp, 0x06, 0x8b89);
-        rtl8168_mdio_write(tp, 0x06, 0x1e01);
-        rtl8168_mdio_write(tp, 0x06, 0xe18b);
-        rtl8168_mdio_write(tp, 0x06, 0x8a1e);
-        rtl8168_mdio_write(tp, 0x06, 0x01e1);
-        rtl8168_mdio_write(tp, 0x06, 0x8b8b);
-        rtl8168_mdio_write(tp, 0x06, 0x1e01);
-        rtl8168_mdio_write(tp, 0x06, 0xe18b);
-        rtl8168_mdio_write(tp, 0x06, 0x8c1e);
-        rtl8168_mdio_write(tp, 0x06, 0x01e1);
-        rtl8168_mdio_write(tp, 0x06, 0x8b8d);
-        rtl8168_mdio_write(tp, 0x06, 0x1e01);
-        rtl8168_mdio_write(tp, 0x06, 0xe18b);
-        rtl8168_mdio_write(tp, 0x06, 0x8e1e);
-        rtl8168_mdio_write(tp, 0x06, 0x01a0);
-        rtl8168_mdio_write(tp, 0x06, 0x00c7);
-        rtl8168_mdio_write(tp, 0x06, 0xaec3);
-        rtl8168_mdio_write(tp, 0x06, 0xf8e0);
-        rtl8168_mdio_write(tp, 0x06, 0x8b8d);
-        rtl8168_mdio_write(tp, 0x06, 0xad20);
-        rtl8168_mdio_write(tp, 0x06, 0x10ee);
-        rtl8168_mdio_write(tp, 0x06, 0x8b8d);
-        rtl8168_mdio_write(tp, 0x06, 0x0002);
-        rtl8168_mdio_write(tp, 0x06, 0x1310);
-        rtl8168_mdio_write(tp, 0x06, 0x021f);
-        rtl8168_mdio_write(tp, 0x06, 0x9d02);
-        rtl8168_mdio_write(tp, 0x06, 0x1f0c);
-        rtl8168_mdio_write(tp, 0x06, 0x0227);
-        rtl8168_mdio_write(tp, 0x06, 0x49fc);
-        rtl8168_mdio_write(tp, 0x06, 0x04f8);
-        rtl8168_mdio_write(tp, 0x06, 0xe08b);
-        rtl8168_mdio_write(tp, 0x06, 0x8ead);
-        rtl8168_mdio_write(tp, 0x06, 0x200b);
-        rtl8168_mdio_write(tp, 0x06, 0xf620);
-        rtl8168_mdio_write(tp, 0x06, 0xe48b);
-        rtl8168_mdio_write(tp, 0x06, 0x8e02);
-        rtl8168_mdio_write(tp, 0x06, 0x830e);
-        rtl8168_mdio_write(tp, 0x06, 0x021b);
-        rtl8168_mdio_write(tp, 0x06, 0x67ad);
-        rtl8168_mdio_write(tp, 0x06, 0x2211);
-        rtl8168_mdio_write(tp, 0x06, 0xf622);
-        rtl8168_mdio_write(tp, 0x06, 0xe48b);
-        rtl8168_mdio_write(tp, 0x06, 0x8e02);
-        rtl8168_mdio_write(tp, 0x06, 0x2ba5);
-        rtl8168_mdio_write(tp, 0x06, 0x022a);
-        rtl8168_mdio_write(tp, 0x06, 0x2402);
-        rtl8168_mdio_write(tp, 0x06, 0x80c6);
-        rtl8168_mdio_write(tp, 0x06, 0x022a);
-        rtl8168_mdio_write(tp, 0x06, 0xf0ad);
-        rtl8168_mdio_write(tp, 0x06, 0x2511);
-        rtl8168_mdio_write(tp, 0x06, 0xf625);
-        rtl8168_mdio_write(tp, 0x06, 0xe48b);
-        rtl8168_mdio_write(tp, 0x06, 0x8e02);
-        rtl8168_mdio_write(tp, 0x06, 0x8226);
-        rtl8168_mdio_write(tp, 0x06, 0x0204);
-        rtl8168_mdio_write(tp, 0x06, 0x0302);
-        rtl8168_mdio_write(tp, 0x06, 0x19cc);
-        rtl8168_mdio_write(tp, 0x06, 0x022b);
-        rtl8168_mdio_write(tp, 0x06, 0x5bfc);
-        rtl8168_mdio_write(tp, 0x06, 0x04ee);
-        rtl8168_mdio_write(tp, 0x06, 0x8b8d);
-        rtl8168_mdio_write(tp, 0x06, 0x0105);
-        rtl8168_mdio_write(tp, 0x06, 0xf8e0);
-        rtl8168_mdio_write(tp, 0x06, 0x8b83);
-        rtl8168_mdio_write(tp, 0x06, 0xad24);
-        rtl8168_mdio_write(tp, 0x06, 0x44e0);
-        rtl8168_mdio_write(tp, 0x06, 0xe022);
-        rtl8168_mdio_write(tp, 0x06, 0xe1e0);
-        rtl8168_mdio_write(tp, 0x06, 0x23ad);
-        rtl8168_mdio_write(tp, 0x06, 0x223b);
-        rtl8168_mdio_write(tp, 0x06, 0xe08a);
-        rtl8168_mdio_write(tp, 0x06, 0xbea0);
-        rtl8168_mdio_write(tp, 0x06, 0x0005);
-        rtl8168_mdio_write(tp, 0x06, 0x0228);
-        rtl8168_mdio_write(tp, 0x06, 0xdeae);
-        rtl8168_mdio_write(tp, 0x06, 0x42a0);
-        rtl8168_mdio_write(tp, 0x06, 0x0105);
-        rtl8168_mdio_write(tp, 0x06, 0x0228);
-        rtl8168_mdio_write(tp, 0x06, 0xf1ae);
-        rtl8168_mdio_write(tp, 0x06, 0x3aa0);
-        rtl8168_mdio_write(tp, 0x06, 0x0205);
-        rtl8168_mdio_write(tp, 0x06, 0x0281);
-        rtl8168_mdio_write(tp, 0x06, 0x25ae);
-        rtl8168_mdio_write(tp, 0x06, 0x32a0);
-        rtl8168_mdio_write(tp, 0x06, 0x0305);
-        rtl8168_mdio_write(tp, 0x06, 0x0229);
-        rtl8168_mdio_write(tp, 0x06, 0x9aae);
-        rtl8168_mdio_write(tp, 0x06, 0x2aa0);
-        rtl8168_mdio_write(tp, 0x06, 0x0405);
-        rtl8168_mdio_write(tp, 0x06, 0x0229);
-        rtl8168_mdio_write(tp, 0x06, 0xaeae);
-        rtl8168_mdio_write(tp, 0x06, 0x22a0);
-        rtl8168_mdio_write(tp, 0x06, 0x0505);
-        rtl8168_mdio_write(tp, 0x06, 0x0229);
-        rtl8168_mdio_write(tp, 0x06, 0xd7ae);
-        rtl8168_mdio_write(tp, 0x06, 0x1aa0);
-        rtl8168_mdio_write(tp, 0x06, 0x0605);
-        rtl8168_mdio_write(tp, 0x06, 0x0229);
-        rtl8168_mdio_write(tp, 0x06, 0xfeae);
-        rtl8168_mdio_write(tp, 0x06, 0x12ee);
-        rtl8168_mdio_write(tp, 0x06, 0x8ac0);
-        rtl8168_mdio_write(tp, 0x06, 0x00ee);
-        rtl8168_mdio_write(tp, 0x06, 0x8ac1);
-        rtl8168_mdio_write(tp, 0x06, 0x00ee);
-        rtl8168_mdio_write(tp, 0x06, 0x8ac6);
-        rtl8168_mdio_write(tp, 0x06, 0x00ee);
-        rtl8168_mdio_write(tp, 0x06, 0x8abe);
-        rtl8168_mdio_write(tp, 0x06, 0x00ae);
-        rtl8168_mdio_write(tp, 0x06, 0x00fc);
-        rtl8168_mdio_write(tp, 0x06, 0x04f8);
-        rtl8168_mdio_write(tp, 0x06, 0x022a);
-        rtl8168_mdio_write(tp, 0x06, 0x67e0);
-        rtl8168_mdio_write(tp, 0x06, 0xe022);
-        rtl8168_mdio_write(tp, 0x06, 0xe1e0);
-        rtl8168_mdio_write(tp, 0x06, 0x230d);
-        rtl8168_mdio_write(tp, 0x06, 0x0658);
-        rtl8168_mdio_write(tp, 0x06, 0x03a0);
-        rtl8168_mdio_write(tp, 0x06, 0x0202);
-        rtl8168_mdio_write(tp, 0x06, 0xae2d);
-        rtl8168_mdio_write(tp, 0x06, 0xa001);
-        rtl8168_mdio_write(tp, 0x06, 0x02ae);
-        rtl8168_mdio_write(tp, 0x06, 0x2da0);
-        rtl8168_mdio_write(tp, 0x06, 0x004d);
-        rtl8168_mdio_write(tp, 0x06, 0xe0e2);
-        rtl8168_mdio_write(tp, 0x06, 0x00e1);
-        rtl8168_mdio_write(tp, 0x06, 0xe201);
-        rtl8168_mdio_write(tp, 0x06, 0xad24);
-        rtl8168_mdio_write(tp, 0x06, 0x44e0);
-        rtl8168_mdio_write(tp, 0x06, 0x8ac2);
-        rtl8168_mdio_write(tp, 0x06, 0xe48a);
-        rtl8168_mdio_write(tp, 0x06, 0xc4e0);
-        rtl8168_mdio_write(tp, 0x06, 0x8ac3);
-        rtl8168_mdio_write(tp, 0x06, 0xe48a);
-        rtl8168_mdio_write(tp, 0x06, 0xc5ee);
-        rtl8168_mdio_write(tp, 0x06, 0x8abe);
-        rtl8168_mdio_write(tp, 0x06, 0x03e0);
-        rtl8168_mdio_write(tp, 0x06, 0x8b83);
-        rtl8168_mdio_write(tp, 0x06, 0xad25);
-        rtl8168_mdio_write(tp, 0x06, 0x3aee);
-        rtl8168_mdio_write(tp, 0x06, 0x8abe);
-        rtl8168_mdio_write(tp, 0x06, 0x05ae);
-        rtl8168_mdio_write(tp, 0x06, 0x34e0);
-        rtl8168_mdio_write(tp, 0x06, 0x8ace);
-        rtl8168_mdio_write(tp, 0x06, 0xae03);
-        rtl8168_mdio_write(tp, 0x06, 0xe08a);
-        rtl8168_mdio_write(tp, 0x06, 0xcfe1);
-        rtl8168_mdio_write(tp, 0x06, 0x8ac2);
-        rtl8168_mdio_write(tp, 0x06, 0x4905);
-        rtl8168_mdio_write(tp, 0x06, 0xe58a);
-        rtl8168_mdio_write(tp, 0x06, 0xc4e1);
-        rtl8168_mdio_write(tp, 0x06, 0x8ac3);
-        rtl8168_mdio_write(tp, 0x06, 0x4905);
-        rtl8168_mdio_write(tp, 0x06, 0xe58a);
-        rtl8168_mdio_write(tp, 0x06, 0xc5ee);
-        rtl8168_mdio_write(tp, 0x06, 0x8abe);
-        rtl8168_mdio_write(tp, 0x06, 0x0502);
-        rtl8168_mdio_write(tp, 0x06, 0x2ab6);
-        rtl8168_mdio_write(tp, 0x06, 0xac20);
-        rtl8168_mdio_write(tp, 0x06, 0x1202);
-        rtl8168_mdio_write(tp, 0x06, 0x819b);
-        rtl8168_mdio_write(tp, 0x06, 0xac20);
-        rtl8168_mdio_write(tp, 0x06, 0x0cee);
-        rtl8168_mdio_write(tp, 0x06, 0x8ac1);
-        rtl8168_mdio_write(tp, 0x06, 0x00ee);
-        rtl8168_mdio_write(tp, 0x06, 0x8ac6);
-        rtl8168_mdio_write(tp, 0x06, 0x00ee);
-        rtl8168_mdio_write(tp, 0x06, 0x8abe);
-        rtl8168_mdio_write(tp, 0x06, 0x02fc);
-        rtl8168_mdio_write(tp, 0x06, 0x04d0);
-        rtl8168_mdio_write(tp, 0x06, 0x0002);
-        rtl8168_mdio_write(tp, 0x06, 0x81ad);
-        rtl8168_mdio_write(tp, 0x06, 0x590f);
-        rtl8168_mdio_write(tp, 0x06, 0x3902);
-        rtl8168_mdio_write(tp, 0x06, 0xaa04);
-        rtl8168_mdio_write(tp, 0x06, 0xd001);
-        rtl8168_mdio_write(tp, 0x06, 0xae02);
-        rtl8168_mdio_write(tp, 0x06, 0xd000);
-        rtl8168_mdio_write(tp, 0x06, 0x04f9);
-        rtl8168_mdio_write(tp, 0x06, 0xfae2);
-        rtl8168_mdio_write(tp, 0x06, 0xe2d2);
-        rtl8168_mdio_write(tp, 0x06, 0xe3e2);
-        rtl8168_mdio_write(tp, 0x06, 0xd3f9);
-        rtl8168_mdio_write(tp, 0x06, 0x5af7);
-        rtl8168_mdio_write(tp, 0x06, 0xe6e2);
-        rtl8168_mdio_write(tp, 0x06, 0xd2e7);
-        rtl8168_mdio_write(tp, 0x06, 0xe2d3);
-        rtl8168_mdio_write(tp, 0x06, 0xe2e0);
-        rtl8168_mdio_write(tp, 0x06, 0x2ce3);
-        rtl8168_mdio_write(tp, 0x06, 0xe02d);
-        rtl8168_mdio_write(tp, 0x06, 0xf95b);
-        rtl8168_mdio_write(tp, 0x06, 0xe01e);
-        rtl8168_mdio_write(tp, 0x06, 0x30e6);
-        rtl8168_mdio_write(tp, 0x06, 0xe02c);
-        rtl8168_mdio_write(tp, 0x06, 0xe7e0);
-        rtl8168_mdio_write(tp, 0x06, 0x2de2);
-        rtl8168_mdio_write(tp, 0x06, 0xe2cc);
-        rtl8168_mdio_write(tp, 0x06, 0xe3e2);
-        rtl8168_mdio_write(tp, 0x06, 0xcdf9);
-        rtl8168_mdio_write(tp, 0x06, 0x5a0f);
-        rtl8168_mdio_write(tp, 0x06, 0x6a50);
-        rtl8168_mdio_write(tp, 0x06, 0xe6e2);
-        rtl8168_mdio_write(tp, 0x06, 0xcce7);
-        rtl8168_mdio_write(tp, 0x06, 0xe2cd);
-        rtl8168_mdio_write(tp, 0x06, 0xe0e0);
-        rtl8168_mdio_write(tp, 0x06, 0x3ce1);
-        rtl8168_mdio_write(tp, 0x06, 0xe03d);
-        rtl8168_mdio_write(tp, 0x06, 0xef64);
-        rtl8168_mdio_write(tp, 0x06, 0xfde0);
-        rtl8168_mdio_write(tp, 0x06, 0xe2cc);
-        rtl8168_mdio_write(tp, 0x06, 0xe1e2);
-        rtl8168_mdio_write(tp, 0x06, 0xcd58);
-        rtl8168_mdio_write(tp, 0x06, 0x0f5a);
-        rtl8168_mdio_write(tp, 0x06, 0xf01e);
-        rtl8168_mdio_write(tp, 0x06, 0x02e4);
-        rtl8168_mdio_write(tp, 0x06, 0xe2cc);
-        rtl8168_mdio_write(tp, 0x06, 0xe5e2);
-        rtl8168_mdio_write(tp, 0x06, 0xcdfd);
-        rtl8168_mdio_write(tp, 0x06, 0xe0e0);
-        rtl8168_mdio_write(tp, 0x06, 0x2ce1);
-        rtl8168_mdio_write(tp, 0x06, 0xe02d);
-        rtl8168_mdio_write(tp, 0x06, 0x59e0);
-        rtl8168_mdio_write(tp, 0x06, 0x5b1f);
-        rtl8168_mdio_write(tp, 0x06, 0x1e13);
-        rtl8168_mdio_write(tp, 0x06, 0xe4e0);
-        rtl8168_mdio_write(tp, 0x06, 0x2ce5);
-        rtl8168_mdio_write(tp, 0x06, 0xe02d);
-        rtl8168_mdio_write(tp, 0x06, 0xfde0);
-        rtl8168_mdio_write(tp, 0x06, 0xe2d2);
-        rtl8168_mdio_write(tp, 0x06, 0xe1e2);
-        rtl8168_mdio_write(tp, 0x06, 0xd358);
-        rtl8168_mdio_write(tp, 0x06, 0xf75a);
-        rtl8168_mdio_write(tp, 0x06, 0x081e);
-        rtl8168_mdio_write(tp, 0x06, 0x02e4);
-        rtl8168_mdio_write(tp, 0x06, 0xe2d2);
-        rtl8168_mdio_write(tp, 0x06, 0xe5e2);
-        rtl8168_mdio_write(tp, 0x06, 0xd3ef);
-        rtl8168_mdio_write(tp, 0x06, 0x46fe);
-        rtl8168_mdio_write(tp, 0x06, 0xfd04);
-        rtl8168_mdio_write(tp, 0x06, 0xf8f9);
-        rtl8168_mdio_write(tp, 0x06, 0xfaef);
-        rtl8168_mdio_write(tp, 0x06, 0x69e0);
-        rtl8168_mdio_write(tp, 0x06, 0xe022);
-        rtl8168_mdio_write(tp, 0x06, 0xe1e0);
-        rtl8168_mdio_write(tp, 0x06, 0x2358);
-        rtl8168_mdio_write(tp, 0x06, 0xc4e1);
-        rtl8168_mdio_write(tp, 0x06, 0x8b6e);
-        rtl8168_mdio_write(tp, 0x06, 0x1f10);
-        rtl8168_mdio_write(tp, 0x06, 0x9e58);
-        rtl8168_mdio_write(tp, 0x06, 0xe48b);
-        rtl8168_mdio_write(tp, 0x06, 0x6ead);
-        rtl8168_mdio_write(tp, 0x06, 0x2222);
-        rtl8168_mdio_write(tp, 0x06, 0xac27);
-        rtl8168_mdio_write(tp, 0x06, 0x55ac);
-        rtl8168_mdio_write(tp, 0x06, 0x2602);
-        rtl8168_mdio_write(tp, 0x06, 0xae1a);
-        rtl8168_mdio_write(tp, 0x06, 0xd106);
-        rtl8168_mdio_write(tp, 0x06, 0xbf3b);
-        rtl8168_mdio_write(tp, 0x06, 0xba02);
-        rtl8168_mdio_write(tp, 0x06, 0x2dc1);
-        rtl8168_mdio_write(tp, 0x06, 0xd107);
-        rtl8168_mdio_write(tp, 0x06, 0xbf3b);
-        rtl8168_mdio_write(tp, 0x06, 0xbd02);
-        rtl8168_mdio_write(tp, 0x06, 0x2dc1);
-        rtl8168_mdio_write(tp, 0x06, 0xd107);
-        rtl8168_mdio_write(tp, 0x06, 0xbf3b);
-        rtl8168_mdio_write(tp, 0x06, 0xc002);
-        rtl8168_mdio_write(tp, 0x06, 0x2dc1);
-        rtl8168_mdio_write(tp, 0x06, 0xae30);
-        rtl8168_mdio_write(tp, 0x06, 0xd103);
-        rtl8168_mdio_write(tp, 0x06, 0xbf3b);
-        rtl8168_mdio_write(tp, 0x06, 0xc302);
-        rtl8168_mdio_write(tp, 0x06, 0x2dc1);
-        rtl8168_mdio_write(tp, 0x06, 0xd100);
-        rtl8168_mdio_write(tp, 0x06, 0xbf3b);
-        rtl8168_mdio_write(tp, 0x06, 0xc602);
-        rtl8168_mdio_write(tp, 0x06, 0x2dc1);
-        rtl8168_mdio_write(tp, 0x06, 0xd100);
-        rtl8168_mdio_write(tp, 0x06, 0xbf82);
-        rtl8168_mdio_write(tp, 0x06, 0xca02);
-        rtl8168_mdio_write(tp, 0x06, 0x2dc1);
-        rtl8168_mdio_write(tp, 0x06, 0xd10f);
-        rtl8168_mdio_write(tp, 0x06, 0xbf3b);
-        rtl8168_mdio_write(tp, 0x06, 0xba02);
-        rtl8168_mdio_write(tp, 0x06, 0x2dc1);
-        rtl8168_mdio_write(tp, 0x06, 0xd101);
-        rtl8168_mdio_write(tp, 0x06, 0xbf3b);
-        rtl8168_mdio_write(tp, 0x06, 0xbd02);
-        rtl8168_mdio_write(tp, 0x06, 0x2dc1);
-        rtl8168_mdio_write(tp, 0x06, 0xd101);
-        rtl8168_mdio_write(tp, 0x06, 0xbf3b);
-        rtl8168_mdio_write(tp, 0x06, 0xc002);
-        rtl8168_mdio_write(tp, 0x06, 0x2dc1);
-        rtl8168_mdio_write(tp, 0x06, 0xef96);
-        rtl8168_mdio_write(tp, 0x06, 0xfefd);
-        rtl8168_mdio_write(tp, 0x06, 0xfc04);
-        rtl8168_mdio_write(tp, 0x06, 0xd100);
-        rtl8168_mdio_write(tp, 0x06, 0xbf3b);
-        rtl8168_mdio_write(tp, 0x06, 0xc302);
-        rtl8168_mdio_write(tp, 0x06, 0x2dc1);
-        rtl8168_mdio_write(tp, 0x06, 0xd011);
-        rtl8168_mdio_write(tp, 0x06, 0x022b);
-        rtl8168_mdio_write(tp, 0x06, 0xfb59);
-        rtl8168_mdio_write(tp, 0x06, 0x03ef);
-        rtl8168_mdio_write(tp, 0x06, 0x01d1);
-        rtl8168_mdio_write(tp, 0x06, 0x00a0);
-        rtl8168_mdio_write(tp, 0x06, 0x0002);
-        rtl8168_mdio_write(tp, 0x06, 0xd101);
-        rtl8168_mdio_write(tp, 0x06, 0xbf3b);
-        rtl8168_mdio_write(tp, 0x06, 0xc602);
-        rtl8168_mdio_write(tp, 0x06, 0x2dc1);
-        rtl8168_mdio_write(tp, 0x06, 0xd111);
-        rtl8168_mdio_write(tp, 0x06, 0xad20);
-        rtl8168_mdio_write(tp, 0x06, 0x020c);
-        rtl8168_mdio_write(tp, 0x06, 0x11ad);
-        rtl8168_mdio_write(tp, 0x06, 0x2102);
-        rtl8168_mdio_write(tp, 0x06, 0x0c12);
-        rtl8168_mdio_write(tp, 0x06, 0xbf82);
-        rtl8168_mdio_write(tp, 0x06, 0xca02);
-        rtl8168_mdio_write(tp, 0x06, 0x2dc1);
-        rtl8168_mdio_write(tp, 0x06, 0xaec8);
-        rtl8168_mdio_write(tp, 0x06, 0x70e4);
-        rtl8168_mdio_write(tp, 0x06, 0x2602);
-        rtl8168_mdio_write(tp, 0x06, 0x82d1);
-        rtl8168_mdio_write(tp, 0x06, 0x05f8);
-        rtl8168_mdio_write(tp, 0x06, 0xfaef);
-        rtl8168_mdio_write(tp, 0x06, 0x69e0);
-        rtl8168_mdio_write(tp, 0x06, 0xe2fe);
-        rtl8168_mdio_write(tp, 0x06, 0xe1e2);
-        rtl8168_mdio_write(tp, 0x06, 0xffad);
-        rtl8168_mdio_write(tp, 0x06, 0x2d1a);
-        rtl8168_mdio_write(tp, 0x06, 0xe0e1);
-        rtl8168_mdio_write(tp, 0x06, 0x4ee1);
-        rtl8168_mdio_write(tp, 0x06, 0xe14f);
-        rtl8168_mdio_write(tp, 0x06, 0xac2d);
-        rtl8168_mdio_write(tp, 0x06, 0x22f6);
-        rtl8168_mdio_write(tp, 0x06, 0x0302);
-        rtl8168_mdio_write(tp, 0x06, 0x033b);
-        rtl8168_mdio_write(tp, 0x06, 0xf703);
-        rtl8168_mdio_write(tp, 0x06, 0xf706);
-        rtl8168_mdio_write(tp, 0x06, 0xbf84);
-        rtl8168_mdio_write(tp, 0x06, 0x4402);
-        rtl8168_mdio_write(tp, 0x06, 0x2d21);
-        rtl8168_mdio_write(tp, 0x06, 0xae11);
-        rtl8168_mdio_write(tp, 0x06, 0xe0e1);
-        rtl8168_mdio_write(tp, 0x06, 0x4ee1);
-        rtl8168_mdio_write(tp, 0x06, 0xe14f);
-        rtl8168_mdio_write(tp, 0x06, 0xad2d);
-        rtl8168_mdio_write(tp, 0x06, 0x08bf);
-        rtl8168_mdio_write(tp, 0x06, 0x844f);
-        rtl8168_mdio_write(tp, 0x06, 0x022d);
-        rtl8168_mdio_write(tp, 0x06, 0x21f6);
-        rtl8168_mdio_write(tp, 0x06, 0x06ef);
-        rtl8168_mdio_write(tp, 0x06, 0x96fe);
-        rtl8168_mdio_write(tp, 0x06, 0xfc04);
-        rtl8168_mdio_write(tp, 0x06, 0xf8fa);
-        rtl8168_mdio_write(tp, 0x06, 0xef69);
-        rtl8168_mdio_write(tp, 0x06, 0x0283);
-        rtl8168_mdio_write(tp, 0x06, 0x4502);
-        rtl8168_mdio_write(tp, 0x06, 0x83a2);
-        rtl8168_mdio_write(tp, 0x06, 0xe0e0);
-        rtl8168_mdio_write(tp, 0x06, 0x00e1);
-        rtl8168_mdio_write(tp, 0x06, 0xe001);
-        rtl8168_mdio_write(tp, 0x06, 0xad27);
-        rtl8168_mdio_write(tp, 0x06, 0x1fd1);
-        rtl8168_mdio_write(tp, 0x06, 0x01bf);
-        rtl8168_mdio_write(tp, 0x06, 0x843b);
-        rtl8168_mdio_write(tp, 0x06, 0x022d);
-        rtl8168_mdio_write(tp, 0x06, 0xc1e0);
-        rtl8168_mdio_write(tp, 0x06, 0xe020);
-        rtl8168_mdio_write(tp, 0x06, 0xe1e0);
-        rtl8168_mdio_write(tp, 0x06, 0x21ad);
-        rtl8168_mdio_write(tp, 0x06, 0x200e);
-        rtl8168_mdio_write(tp, 0x06, 0xd100);
-        rtl8168_mdio_write(tp, 0x06, 0xbf84);
-        rtl8168_mdio_write(tp, 0x06, 0x3b02);
-        rtl8168_mdio_write(tp, 0x06, 0x2dc1);
-        rtl8168_mdio_write(tp, 0x06, 0xbf3b);
-        rtl8168_mdio_write(tp, 0x06, 0x9602);
-        rtl8168_mdio_write(tp, 0x06, 0x2d21);
-        rtl8168_mdio_write(tp, 0x06, 0xef96);
-        rtl8168_mdio_write(tp, 0x06, 0xfefc);
-        rtl8168_mdio_write(tp, 0x06, 0x04f8);
-        rtl8168_mdio_write(tp, 0x06, 0xf9fa);
-        rtl8168_mdio_write(tp, 0x06, 0xef69);
-        rtl8168_mdio_write(tp, 0x06, 0xe08b);
-        rtl8168_mdio_write(tp, 0x06, 0x87ad);
-        rtl8168_mdio_write(tp, 0x06, 0x204c);
-        rtl8168_mdio_write(tp, 0x06, 0xd200);
-        rtl8168_mdio_write(tp, 0x06, 0xe0e2);
-        rtl8168_mdio_write(tp, 0x06, 0x0058);
-        rtl8168_mdio_write(tp, 0x06, 0x010c);
-        rtl8168_mdio_write(tp, 0x06, 0x021e);
-        rtl8168_mdio_write(tp, 0x06, 0x20e0);
-        rtl8168_mdio_write(tp, 0x06, 0xe000);
-        rtl8168_mdio_write(tp, 0x06, 0x5810);
-        rtl8168_mdio_write(tp, 0x06, 0x1e20);
-        rtl8168_mdio_write(tp, 0x06, 0xe0e0);
-        rtl8168_mdio_write(tp, 0x06, 0x3658);
-        rtl8168_mdio_write(tp, 0x06, 0x031e);
-        rtl8168_mdio_write(tp, 0x06, 0x20e0);
-        rtl8168_mdio_write(tp, 0x06, 0xe022);
-        rtl8168_mdio_write(tp, 0x06, 0xe1e0);
-        rtl8168_mdio_write(tp, 0x06, 0x2358);
-        rtl8168_mdio_write(tp, 0x06, 0xe01e);
-        rtl8168_mdio_write(tp, 0x06, 0x20e0);
-        rtl8168_mdio_write(tp, 0x06, 0x8b64);
-        rtl8168_mdio_write(tp, 0x06, 0x1f02);
-        rtl8168_mdio_write(tp, 0x06, 0x9e22);
-        rtl8168_mdio_write(tp, 0x06, 0xe68b);
-        rtl8168_mdio_write(tp, 0x06, 0x64ad);
-        rtl8168_mdio_write(tp, 0x06, 0x3214);
-        rtl8168_mdio_write(tp, 0x06, 0xad34);
-        rtl8168_mdio_write(tp, 0x06, 0x11ef);
-        rtl8168_mdio_write(tp, 0x06, 0x0258);
-        rtl8168_mdio_write(tp, 0x06, 0x039e);
-        rtl8168_mdio_write(tp, 0x06, 0x07ad);
-        rtl8168_mdio_write(tp, 0x06, 0x3508);
-        rtl8168_mdio_write(tp, 0x06, 0x5ac0);
-        rtl8168_mdio_write(tp, 0x06, 0x9f04);
-        rtl8168_mdio_write(tp, 0x06, 0xd101);
-        rtl8168_mdio_write(tp, 0x06, 0xae02);
-        rtl8168_mdio_write(tp, 0x06, 0xd100);
-        rtl8168_mdio_write(tp, 0x06, 0xbf84);
-        rtl8168_mdio_write(tp, 0x06, 0x3e02);
-        rtl8168_mdio_write(tp, 0x06, 0x2dc1);
-        rtl8168_mdio_write(tp, 0x06, 0xef96);
-        rtl8168_mdio_write(tp, 0x06, 0xfefd);
-        rtl8168_mdio_write(tp, 0x06, 0xfc04);
-        rtl8168_mdio_write(tp, 0x06, 0xf8f9);
-        rtl8168_mdio_write(tp, 0x06, 0xfbe0);
-        rtl8168_mdio_write(tp, 0x06, 0x8b85);
-        rtl8168_mdio_write(tp, 0x06, 0xad25);
-        rtl8168_mdio_write(tp, 0x06, 0x22e0);
-        rtl8168_mdio_write(tp, 0x06, 0xe022);
-        rtl8168_mdio_write(tp, 0x06, 0xe1e0);
-        rtl8168_mdio_write(tp, 0x06, 0x23e2);
-        rtl8168_mdio_write(tp, 0x06, 0xe036);
-        rtl8168_mdio_write(tp, 0x06, 0xe3e0);
-        rtl8168_mdio_write(tp, 0x06, 0x375a);
-        rtl8168_mdio_write(tp, 0x06, 0xc40d);
-        rtl8168_mdio_write(tp, 0x06, 0x0158);
-        rtl8168_mdio_write(tp, 0x06, 0x021e);
-        rtl8168_mdio_write(tp, 0x06, 0x20e3);
-        rtl8168_mdio_write(tp, 0x06, 0x8ae7);
-        rtl8168_mdio_write(tp, 0x06, 0xac31);
-        rtl8168_mdio_write(tp, 0x06, 0x60ac);
-        rtl8168_mdio_write(tp, 0x06, 0x3a08);
-        rtl8168_mdio_write(tp, 0x06, 0xac3e);
-        rtl8168_mdio_write(tp, 0x06, 0x26ae);
-        rtl8168_mdio_write(tp, 0x06, 0x67af);
-        rtl8168_mdio_write(tp, 0x06, 0x8437);
-        rtl8168_mdio_write(tp, 0x06, 0xad37);
-        rtl8168_mdio_write(tp, 0x06, 0x61e0);
-        rtl8168_mdio_write(tp, 0x06, 0x8ae8);
-        rtl8168_mdio_write(tp, 0x06, 0x10e4);
-        rtl8168_mdio_write(tp, 0x06, 0x8ae8);
-        rtl8168_mdio_write(tp, 0x06, 0xe18a);
-        rtl8168_mdio_write(tp, 0x06, 0xe91b);
-        rtl8168_mdio_write(tp, 0x06, 0x109e);
-        rtl8168_mdio_write(tp, 0x06, 0x02ae);
-        rtl8168_mdio_write(tp, 0x06, 0x51d1);
-        rtl8168_mdio_write(tp, 0x06, 0x00bf);
-        rtl8168_mdio_write(tp, 0x06, 0x8441);
-        rtl8168_mdio_write(tp, 0x06, 0x022d);
-        rtl8168_mdio_write(tp, 0x06, 0xc1ee);
-        rtl8168_mdio_write(tp, 0x06, 0x8ae8);
-        rtl8168_mdio_write(tp, 0x06, 0x00ae);
-        rtl8168_mdio_write(tp, 0x06, 0x43ad);
-        rtl8168_mdio_write(tp, 0x06, 0x3627);
-        rtl8168_mdio_write(tp, 0x06, 0xe08a);
-        rtl8168_mdio_write(tp, 0x06, 0xeee1);
-        rtl8168_mdio_write(tp, 0x06, 0x8aef);
-        rtl8168_mdio_write(tp, 0x06, 0xef74);
-        rtl8168_mdio_write(tp, 0x06, 0xe08a);
-        rtl8168_mdio_write(tp, 0x06, 0xeae1);
-        rtl8168_mdio_write(tp, 0x06, 0x8aeb);
-        rtl8168_mdio_write(tp, 0x06, 0x1b74);
-        rtl8168_mdio_write(tp, 0x06, 0x9e2e);
-        rtl8168_mdio_write(tp, 0x06, 0x14e4);
-        rtl8168_mdio_write(tp, 0x06, 0x8aea);
-        rtl8168_mdio_write(tp, 0x06, 0xe58a);
-        rtl8168_mdio_write(tp, 0x06, 0xebef);
-        rtl8168_mdio_write(tp, 0x06, 0x74e0);
-        rtl8168_mdio_write(tp, 0x06, 0x8aee);
-        rtl8168_mdio_write(tp, 0x06, 0xe18a);
-        rtl8168_mdio_write(tp, 0x06, 0xef1b);
-        rtl8168_mdio_write(tp, 0x06, 0x479e);
-        rtl8168_mdio_write(tp, 0x06, 0x0fae);
-        rtl8168_mdio_write(tp, 0x06, 0x19ee);
-        rtl8168_mdio_write(tp, 0x06, 0x8aea);
-        rtl8168_mdio_write(tp, 0x06, 0x00ee);
-        rtl8168_mdio_write(tp, 0x06, 0x8aeb);
-        rtl8168_mdio_write(tp, 0x06, 0x00ae);
-        rtl8168_mdio_write(tp, 0x06, 0x0fac);
-        rtl8168_mdio_write(tp, 0x06, 0x390c);
-        rtl8168_mdio_write(tp, 0x06, 0xd101);
-        rtl8168_mdio_write(tp, 0x06, 0xbf84);
-        rtl8168_mdio_write(tp, 0x06, 0x4102);
-        rtl8168_mdio_write(tp, 0x06, 0x2dc1);
-        rtl8168_mdio_write(tp, 0x06, 0xee8a);
-        rtl8168_mdio_write(tp, 0x06, 0xe800);
-        rtl8168_mdio_write(tp, 0x06, 0xe68a);
-        rtl8168_mdio_write(tp, 0x06, 0xe7ff);
-        rtl8168_mdio_write(tp, 0x06, 0xfdfc);
-        rtl8168_mdio_write(tp, 0x06, 0x0400);
-        rtl8168_mdio_write(tp, 0x06, 0xe234);
-        rtl8168_mdio_write(tp, 0x06, 0xcce2);
-        rtl8168_mdio_write(tp, 0x06, 0x0088);
-        rtl8168_mdio_write(tp, 0x06, 0xe200);
-        rtl8168_mdio_write(tp, 0x06, 0xa725);
-        rtl8168_mdio_write(tp, 0x06, 0xe50a);
-        rtl8168_mdio_write(tp, 0x06, 0x1de5);
-        rtl8168_mdio_write(tp, 0x06, 0x0a2c);
-        rtl8168_mdio_write(tp, 0x06, 0xe50a);
-        rtl8168_mdio_write(tp, 0x06, 0x6de5);
-        rtl8168_mdio_write(tp, 0x06, 0x0a1d);
-        rtl8168_mdio_write(tp, 0x06, 0xe50a);
-        rtl8168_mdio_write(tp, 0x06, 0x1ce5);
-        rtl8168_mdio_write(tp, 0x06, 0x0a2d);
-        rtl8168_mdio_write(tp, 0x06, 0xa755);
-        rtl8168_mdio_write(tp, 0x05, 0x8b64);
-        rtl8168_mdio_write(tp, 0x06, 0x0000);
-        rtl8168_mdio_write(tp, 0x05, 0x8b94);
-        rtl8168_mdio_write(tp, 0x06, 0x82cd);
-        rtl8168_mdio_write(tp, 0x05, 0x8b85);
-        rtl8168_mdio_write(tp, 0x06, 0x2000);
-        rtl8168_mdio_write(tp, 0x05, 0x8aee);
-        rtl8168_mdio_write(tp, 0x06, 0x03b8);
-        rtl8168_mdio_write(tp, 0x05, 0x8ae8);
-        rtl8168_mdio_write(tp, 0x06, 0x0002);
-        gphy_val = rtl8168_mdio_read(tp, 0x01);
-        gphy_val |= BIT_0;
-        rtl8168_mdio_write(tp, 0x01, gphy_val);
-        gphy_val = rtl8168_mdio_read(tp, 0x00);
-        gphy_val |= BIT_0;
-        rtl8168_mdio_write(tp, 0x00, gphy_val);
-        rtl8168_mdio_write(tp, 0x1f, 0x0000);
-        rtl8168_mdio_write(tp, 0x1f, 0x0005);
-        for (i = 0; i < 200; i++) {
-                udelay(100);
-                gphy_val = rtl8168_mdio_read(tp, 0x00);
-                if (gphy_val & BIT_7)
-                        break;
-        }
-        rtl8168_mdio_write(tp, 0x1f, 0x0007);
-        rtl8168_mdio_write(tp, 0x1e, 0x0023);
-        gphy_val = rtl8168_mdio_read(tp, 0x17);
-        gphy_val &= ~(BIT_0);
-        if (tp->RequiredSecLanDonglePatch)
-                gphy_val &= ~(BIT_2);
-        rtl8168_mdio_write(tp, 0x17, gphy_val);
-        rtl8168_mdio_write(tp, 0x1f, 0x0007);
-        rtl8168_mdio_write(tp, 0x1e, 0x0028);
-        rtl8168_mdio_write(tp, 0x15, 0x0010);
-        rtl8168_mdio_write(tp, 0x1f, 0x0007);
-        rtl8168_mdio_write(tp, 0x1e, 0x0041);
-        rtl8168_mdio_write(tp, 0x15, 0x0802);
-        rtl8168_mdio_write(tp, 0x16, 0x2185);
-        rtl8168_mdio_write(tp, 0x1f, 0x0000);
-}
-
-static void
-rtl8168_set_phy_mcu_8168e_2(struct net_device *dev)
-{
-        struct rtl8168_private *tp = netdev_priv(dev);
-        unsigned int gphy_val,i;
-
-        if (rtl8168_efuse_read(tp, 0x22) == 0x0c) {
-                rtl8168_mdio_write(tp, 0x1f, 0x0000);
-                rtl8168_mdio_write(tp, 0x00, 0x1800);
-                rtl8168_mdio_write(tp, 0x1f, 0x0007);
-                rtl8168_mdio_write(tp, 0x1e, 0x0023);
-                rtl8168_mdio_write(tp, 0x17, 0x0117);
-                rtl8168_mdio_write(tp, 0x1f, 0x0007);
-                rtl8168_mdio_write(tp, 0x1E, 0x002C);
-                rtl8168_mdio_write(tp, 0x1B, 0x5000);
-                rtl8168_mdio_write(tp, 0x1f, 0x0000);
-                rtl8168_mdio_write(tp, 0x16, 0x4104);
-                for (i = 0; i < 200; i++) {
-                        udelay(100);
-                        gphy_val = rtl8168_mdio_read(tp, 0x1E);
-                        gphy_val &= 0x03FF;
-                        if (gphy_val==0x000C)
-                                break;
-                }
-                rtl8168_mdio_write(tp, 0x1f, 0x0005);
-                for (i = 0; i < 200; i++) {
-                        udelay(100);
-                        gphy_val = rtl8168_mdio_read(tp, 0x07);
-                        if ((gphy_val & BIT_5) == 0)
-                                break;
-                }
-                gphy_val = rtl8168_mdio_read(tp, 0x07);
-                if (gphy_val & BIT_5) {
-                        rtl8168_mdio_write(tp, 0x1f, 0x0007);
-                        rtl8168_mdio_write(tp, 0x1e, 0x00a1);
-                        rtl8168_mdio_write(tp, 0x17, 0x1000);
-                        rtl8168_mdio_write(tp, 0x17, 0x0000);
-                        rtl8168_mdio_write(tp, 0x17, 0x2000);
-                        rtl8168_mdio_write(tp, 0x1e, 0x002f);
-                        rtl8168_mdio_write(tp, 0x18, 0x9bfb);
-                        rtl8168_mdio_write(tp, 0x1f, 0x0005);
-                        rtl8168_mdio_write(tp, 0x07, 0x0000);
-                        rtl8168_mdio_write(tp, 0x1f, 0x0000);
-                }
-                rtl8168_mdio_write(tp, 0x1f, 0x0005);
-                rtl8168_mdio_write(tp, 0x05, 0xfff6);
-                rtl8168_mdio_write(tp, 0x06, 0x0080);
-                gphy_val = rtl8168_mdio_read(tp, 0x00);
-                gphy_val &= ~(BIT_7);
-                rtl8168_mdio_write(tp, 0x00, gphy_val);
-                rtl8168_mdio_write(tp, 0x1f, 0x0002);
-                gphy_val = rtl8168_mdio_read(tp, 0x08);
-                gphy_val &= ~(BIT_7);
-                rtl8168_mdio_write(tp, 0x08, gphy_val);
-                rtl8168_mdio_write(tp, 0x1f, 0x0000);
-
-                rtl8168_mdio_write(tp, 0x1f, 0x0007);
-                rtl8168_mdio_write(tp, 0x1e, 0x0023);
-                rtl8168_mdio_write(tp, 0x16, 0x0306);
-                rtl8168_mdio_write(tp, 0x16, 0x0307);
-                rtl8168_mdio_write(tp, 0x15, 0x000e);
-                rtl8168_mdio_write(tp, 0x19, 0x000a);
-                rtl8168_mdio_write(tp, 0x15, 0x0010);
-                rtl8168_mdio_write(tp, 0x19, 0x0008);
-                rtl8168_mdio_write(tp, 0x15, 0x0018);
-                rtl8168_mdio_write(tp, 0x19, 0x4801);
-                rtl8168_mdio_write(tp, 0x15, 0x0019);
-                rtl8168_mdio_write(tp, 0x19, 0x6801);
-                rtl8168_mdio_write(tp, 0x15, 0x001a);
-                rtl8168_mdio_write(tp, 0x19, 0x66a1);
-                rtl8168_mdio_write(tp, 0x15, 0x001f);
-                rtl8168_mdio_write(tp, 0x19, 0x0000);
-                rtl8168_mdio_write(tp, 0x15, 0x0020);
-                rtl8168_mdio_write(tp, 0x19, 0x0000);
-                rtl8168_mdio_write(tp, 0x15, 0x0021);
-                rtl8168_mdio_write(tp, 0x19, 0x0000);
-                rtl8168_mdio_write(tp, 0x15, 0x0022);
-                rtl8168_mdio_write(tp, 0x19, 0x0000);
-                rtl8168_mdio_write(tp, 0x15, 0x0023);
-                rtl8168_mdio_write(tp, 0x19, 0x0000);
-                rtl8168_mdio_write(tp, 0x15, 0x0024);
-                rtl8168_mdio_write(tp, 0x19, 0x0000);
-                rtl8168_mdio_write(tp, 0x15, 0x0025);
-                rtl8168_mdio_write(tp, 0x19, 0x64a1);
-                rtl8168_mdio_write(tp, 0x15, 0x0026);
-                rtl8168_mdio_write(tp, 0x19, 0x40ea);
-                rtl8168_mdio_write(tp, 0x15, 0x0027);
-                rtl8168_mdio_write(tp, 0x19, 0x4503);
-                rtl8168_mdio_write(tp, 0x15, 0x0028);
-                rtl8168_mdio_write(tp, 0x19, 0x9f00);
-                rtl8168_mdio_write(tp, 0x15, 0x0029);
-                rtl8168_mdio_write(tp, 0x19, 0xa631);
-                rtl8168_mdio_write(tp, 0x15, 0x002a);
-                rtl8168_mdio_write(tp, 0x19, 0x9717);
-                rtl8168_mdio_write(tp, 0x15, 0x002b);
-                rtl8168_mdio_write(tp, 0x19, 0x302c);
-                rtl8168_mdio_write(tp, 0x15, 0x002c);
-                rtl8168_mdio_write(tp, 0x19, 0x4802);
-                rtl8168_mdio_write(tp, 0x15, 0x002d);
-                rtl8168_mdio_write(tp, 0x19, 0x58da);
-                rtl8168_mdio_write(tp, 0x15, 0x002e);
-                rtl8168_mdio_write(tp, 0x19, 0x400d);
-                rtl8168_mdio_write(tp, 0x15, 0x002f);
-                rtl8168_mdio_write(tp, 0x19, 0x4488);
-                rtl8168_mdio_write(tp, 0x15, 0x0030);
-                rtl8168_mdio_write(tp, 0x19, 0x9e00);
-                rtl8168_mdio_write(tp, 0x15, 0x0031);
-                rtl8168_mdio_write(tp, 0x19, 0x63c8);
-                rtl8168_mdio_write(tp, 0x15, 0x0032);
-                rtl8168_mdio_write(tp, 0x19, 0x6481);
-                rtl8168_mdio_write(tp, 0x15, 0x0033);
-                rtl8168_mdio_write(tp, 0x19, 0x0000);
-                rtl8168_mdio_write(tp, 0x15, 0x0034);
-                rtl8168_mdio_write(tp, 0x19, 0x0000);
-                rtl8168_mdio_write(tp, 0x15, 0x0035);
-                rtl8168_mdio_write(tp, 0x19, 0x0000);
-                rtl8168_mdio_write(tp, 0x15, 0x0036);
-                rtl8168_mdio_write(tp, 0x19, 0x0000);
-                rtl8168_mdio_write(tp, 0x15, 0x0037);
-                rtl8168_mdio_write(tp, 0x19, 0x0000);
-                rtl8168_mdio_write(tp, 0x15, 0x0038);
-                rtl8168_mdio_write(tp, 0x19, 0x0000);
-                rtl8168_mdio_write(tp, 0x15, 0x0039);
-                rtl8168_mdio_write(tp, 0x19, 0x0000);
-                rtl8168_mdio_write(tp, 0x15, 0x003a);
-                rtl8168_mdio_write(tp, 0x19, 0x0000);
-                rtl8168_mdio_write(tp, 0x15, 0x003b);
-                rtl8168_mdio_write(tp, 0x19, 0x63e8);
-                rtl8168_mdio_write(tp, 0x15, 0x003c);
-                rtl8168_mdio_write(tp, 0x19, 0x7d00);
-                rtl8168_mdio_write(tp, 0x15, 0x003d);
-                rtl8168_mdio_write(tp, 0x19, 0x59d4);
-                rtl8168_mdio_write(tp, 0x15, 0x003e);
-                rtl8168_mdio_write(tp, 0x19, 0x63f8);
-                rtl8168_mdio_write(tp, 0x15, 0x0040);
-                rtl8168_mdio_write(tp, 0x19, 0x64a1);
-                rtl8168_mdio_write(tp, 0x15, 0x0041);
-                rtl8168_mdio_write(tp, 0x19, 0x30de);
-                rtl8168_mdio_write(tp, 0x15, 0x0044);
-                rtl8168_mdio_write(tp, 0x19, 0x480f);
-                rtl8168_mdio_write(tp, 0x15, 0x0045);
-                rtl8168_mdio_write(tp, 0x19, 0x6800);
-                rtl8168_mdio_write(tp, 0x15, 0x0046);
-                rtl8168_mdio_write(tp, 0x19, 0x6680);
-                rtl8168_mdio_write(tp, 0x15, 0x0047);
-                rtl8168_mdio_write(tp, 0x19, 0x7c10);
-                rtl8168_mdio_write(tp, 0x15, 0x0048);
-                rtl8168_mdio_write(tp, 0x19, 0x63c8);
-                rtl8168_mdio_write(tp, 0x15, 0x0049);
-                rtl8168_mdio_write(tp, 0x19, 0x0000);
-                rtl8168_mdio_write(tp, 0x15, 0x004a);
-                rtl8168_mdio_write(tp, 0x19, 0x0000);
-                rtl8168_mdio_write(tp, 0x15, 0x004b);
-                rtl8168_mdio_write(tp, 0x19, 0x0000);
-                rtl8168_mdio_write(tp, 0x15, 0x004c);
-                rtl8168_mdio_write(tp, 0x19, 0x0000);
-                rtl8168_mdio_write(tp, 0x15, 0x004d);
-                rtl8168_mdio_write(tp, 0x19, 0x0000);
-                rtl8168_mdio_write(tp, 0x15, 0x004e);
-                rtl8168_mdio_write(tp, 0x19, 0x0000);
-                rtl8168_mdio_write(tp, 0x15, 0x004f);
-                rtl8168_mdio_write(tp, 0x19, 0x40ea);
-                rtl8168_mdio_write(tp, 0x15, 0x0050);
-                rtl8168_mdio_write(tp, 0x19, 0x4503);
-                rtl8168_mdio_write(tp, 0x15, 0x0051);
-                rtl8168_mdio_write(tp, 0x19, 0x58ca);
-                rtl8168_mdio_write(tp, 0x15, 0x0052);
-                rtl8168_mdio_write(tp, 0x19, 0x63c8);
-                rtl8168_mdio_write(tp, 0x15, 0x0053);
-                rtl8168_mdio_write(tp, 0x19, 0x63d8);
-                rtl8168_mdio_write(tp, 0x15, 0x0054);
-                rtl8168_mdio_write(tp, 0x19, 0x66a0);
-                rtl8168_mdio_write(tp, 0x15, 0x0055);
-                rtl8168_mdio_write(tp, 0x19, 0x9f00);
-                rtl8168_mdio_write(tp, 0x15, 0x0056);
-                rtl8168_mdio_write(tp, 0x19, 0x3000);
-                rtl8168_mdio_write(tp, 0x15, 0x00a1);
-                rtl8168_mdio_write(tp, 0x19, 0x3044);
-                rtl8168_mdio_write(tp, 0x15, 0x00ab);
-                rtl8168_mdio_write(tp, 0x19, 0x5820);
-                rtl8168_mdio_write(tp, 0x15, 0x00ac);
-                rtl8168_mdio_write(tp, 0x19, 0x5e04);
-                rtl8168_mdio_write(tp, 0x15, 0x00ad);
-                rtl8168_mdio_write(tp, 0x19, 0xb60c);
-                rtl8168_mdio_write(tp, 0x15, 0x00af);
-                rtl8168_mdio_write(tp, 0x19, 0x000a);
-                rtl8168_mdio_write(tp, 0x15, 0x00b2);
-                rtl8168_mdio_write(tp, 0x19, 0x30b9);
-                rtl8168_mdio_write(tp, 0x15, 0x00b9);
-                rtl8168_mdio_write(tp, 0x19, 0x4408);
-                rtl8168_mdio_write(tp, 0x15, 0x00ba);
-                rtl8168_mdio_write(tp, 0x19, 0x480b);
-                rtl8168_mdio_write(tp, 0x15, 0x00bb);
-                rtl8168_mdio_write(tp, 0x19, 0x5e00);
-                rtl8168_mdio_write(tp, 0x15, 0x00bc);
-                rtl8168_mdio_write(tp, 0x19, 0x405f);
-                rtl8168_mdio_write(tp, 0x15, 0x00bd);
-                rtl8168_mdio_write(tp, 0x19, 0x4448);
-                rtl8168_mdio_write(tp, 0x15, 0x00be);
-                rtl8168_mdio_write(tp, 0x19, 0x4020);
-                rtl8168_mdio_write(tp, 0x15, 0x00bf);
-                rtl8168_mdio_write(tp, 0x19, 0x4468);
-                rtl8168_mdio_write(tp, 0x15, 0x00c0);
-                rtl8168_mdio_write(tp, 0x19, 0x9c02);
-                rtl8168_mdio_write(tp, 0x15, 0x00c1);
-                rtl8168_mdio_write(tp, 0x19, 0x58a0);
-                rtl8168_mdio_write(tp, 0x15, 0x00c2);
-                rtl8168_mdio_write(tp, 0x19, 0xb605);
-                rtl8168_mdio_write(tp, 0x15, 0x00c3);
-                rtl8168_mdio_write(tp, 0x19, 0xc0d3);
-                rtl8168_mdio_write(tp, 0x15, 0x00c4);
-                rtl8168_mdio_write(tp, 0x19, 0x00e6);
-                rtl8168_mdio_write(tp, 0x15, 0x00c5);
-                rtl8168_mdio_write(tp, 0x19, 0xdaec);
-                rtl8168_mdio_write(tp, 0x15, 0x00c6);
-                rtl8168_mdio_write(tp, 0x19, 0x00fa);
-                rtl8168_mdio_write(tp, 0x15, 0x00c7);
-                rtl8168_mdio_write(tp, 0x19, 0x9df9);
-                rtl8168_mdio_write(tp, 0x15, 0x0112);
-                rtl8168_mdio_write(tp, 0x19, 0x6421);
-                rtl8168_mdio_write(tp, 0x15, 0x0113);
-                rtl8168_mdio_write(tp, 0x19, 0x7c08);
-                rtl8168_mdio_write(tp, 0x15, 0x0114);
-                rtl8168_mdio_write(tp, 0x19, 0x63f0);
-                rtl8168_mdio_write(tp, 0x15, 0x0115);
-                rtl8168_mdio_write(tp, 0x19, 0x4003);
-                rtl8168_mdio_write(tp, 0x15, 0x0116);
-                rtl8168_mdio_write(tp, 0x19, 0x4418);
-                rtl8168_mdio_write(tp, 0x15, 0x0117);
-                rtl8168_mdio_write(tp, 0x19, 0x9b00);
-                rtl8168_mdio_write(tp, 0x15, 0x0118);
-                rtl8168_mdio_write(tp, 0x19, 0x6461);
-                rtl8168_mdio_write(tp, 0x15, 0x0119);
-                rtl8168_mdio_write(tp, 0x19, 0x64e1);
-                rtl8168_mdio_write(tp, 0x15, 0x011a);
-                rtl8168_mdio_write(tp, 0x19, 0x0000);
-                rtl8168_mdio_write(tp, 0x15, 0x0150);
-                rtl8168_mdio_write(tp, 0x19, 0x7c80);
-                rtl8168_mdio_write(tp, 0x15, 0x0151);
-                rtl8168_mdio_write(tp, 0x19, 0x6461);
-                rtl8168_mdio_write(tp, 0x15, 0x0152);
-                rtl8168_mdio_write(tp, 0x19, 0x4003);
-                rtl8168_mdio_write(tp, 0x15, 0x0153);
-                rtl8168_mdio_write(tp, 0x19, 0x4540);
-                rtl8168_mdio_write(tp, 0x15, 0x0154);
-                rtl8168_mdio_write(tp, 0x19, 0x9f00);
-                rtl8168_mdio_write(tp, 0x15, 0x0155);
-                rtl8168_mdio_write(tp, 0x19, 0x9d00);
-                rtl8168_mdio_write(tp, 0x15, 0x0156);
-                rtl8168_mdio_write(tp, 0x19, 0x7c40);
-                rtl8168_mdio_write(tp, 0x15, 0x0157);
-                rtl8168_mdio_write(tp, 0x19, 0x6421);
-                rtl8168_mdio_write(tp, 0x15, 0x0158);
-                rtl8168_mdio_write(tp, 0x19, 0x7c80);
-                rtl8168_mdio_write(tp, 0x15, 0x0159);
-                rtl8168_mdio_write(tp, 0x19, 0x64a1);
-                rtl8168_mdio_write(tp, 0x15, 0x015a);
-                rtl8168_mdio_write(tp, 0x19, 0x30fe);
-                rtl8168_mdio_write(tp, 0x15, 0x029c);
-                rtl8168_mdio_write(tp, 0x19, 0x0070);
-                rtl8168_mdio_write(tp, 0x15, 0x02b2);
-                rtl8168_mdio_write(tp, 0x19, 0x005a);
-                rtl8168_mdio_write(tp, 0x15, 0x02bd);
-                rtl8168_mdio_write(tp, 0x19, 0xa522);
-                rtl8168_mdio_write(tp, 0x15, 0x02ce);
-                rtl8168_mdio_write(tp, 0x19, 0xb63e);
-                rtl8168_mdio_write(tp, 0x15, 0x02d9);
-                rtl8168_mdio_write(tp, 0x19, 0x32df);
-                rtl8168_mdio_write(tp, 0x15, 0x02df);
-                rtl8168_mdio_write(tp, 0x19, 0x4500);
-                rtl8168_mdio_write(tp, 0x15, 0x02e7);
-                rtl8168_mdio_write(tp, 0x19, 0x0000);
-                rtl8168_mdio_write(tp, 0x15, 0x02f4);
-                rtl8168_mdio_write(tp, 0x19, 0xb618);
-                rtl8168_mdio_write(tp, 0x15, 0x02fb);
-                rtl8168_mdio_write(tp, 0x19, 0xb900);
-                rtl8168_mdio_write(tp, 0x15, 0x02fc);
-                rtl8168_mdio_write(tp, 0x19, 0x49b5);
-                rtl8168_mdio_write(tp, 0x15, 0x02fd);
-                rtl8168_mdio_write(tp, 0x19, 0x6812);
-                rtl8168_mdio_write(tp, 0x15, 0x02fe);
-                rtl8168_mdio_write(tp, 0x19, 0x66a0);
-                rtl8168_mdio_write(tp, 0x15, 0x02ff);
-                rtl8168_mdio_write(tp, 0x19, 0x9900);
-                rtl8168_mdio_write(tp, 0x15, 0x0300);
-                rtl8168_mdio_write(tp, 0x19, 0x64a0);
-                rtl8168_mdio_write(tp, 0x15, 0x0301);
-                rtl8168_mdio_write(tp, 0x19, 0x3316);
-                rtl8168_mdio_write(tp, 0x15, 0x0308);
-                rtl8168_mdio_write(tp, 0x19, 0x0000);
-                rtl8168_mdio_write(tp, 0x15, 0x030c);
-                rtl8168_mdio_write(tp, 0x19, 0x3000);
-                rtl8168_mdio_write(tp, 0x15, 0x0312);
-                rtl8168_mdio_write(tp, 0x19, 0x0000);
-                rtl8168_mdio_write(tp, 0x15, 0x0313);
-                rtl8168_mdio_write(tp, 0x19, 0x0000);
-                rtl8168_mdio_write(tp, 0x15, 0x0314);
-                rtl8168_mdio_write(tp, 0x19, 0x0000);
-                rtl8168_mdio_write(tp, 0x15, 0x0315);
-                rtl8168_mdio_write(tp, 0x19, 0x0000);
-                rtl8168_mdio_write(tp, 0x15, 0x0316);
-                rtl8168_mdio_write(tp, 0x19, 0x49b5);
-                rtl8168_mdio_write(tp, 0x15, 0x0317);
-                rtl8168_mdio_write(tp, 0x19, 0x7d00);
-                rtl8168_mdio_write(tp, 0x15, 0x0318);
-                rtl8168_mdio_write(tp, 0x19, 0x4d00);
-                rtl8168_mdio_write(tp, 0x15, 0x0319);
-                rtl8168_mdio_write(tp, 0x19, 0x6810);
-                rtl8168_mdio_write(tp, 0x15, 0x031a);
-                rtl8168_mdio_write(tp, 0x19, 0x6c08);
-                rtl8168_mdio_write(tp, 0x15, 0x031b);
-                rtl8168_mdio_write(tp, 0x19, 0x4925);
-                rtl8168_mdio_write(tp, 0x15, 0x031c);
-                rtl8168_mdio_write(tp, 0x19, 0x403b);
-                rtl8168_mdio_write(tp, 0x15, 0x031d);
-                rtl8168_mdio_write(tp, 0x19, 0xa602);
-                rtl8168_mdio_write(tp, 0x15, 0x031e);
-                rtl8168_mdio_write(tp, 0x19, 0x402f);
-                rtl8168_mdio_write(tp, 0x15, 0x031f);
-                rtl8168_mdio_write(tp, 0x19, 0x4484);
-                rtl8168_mdio_write(tp, 0x15, 0x0320);
-                rtl8168_mdio_write(tp, 0x19, 0x40c8);
-                rtl8168_mdio_write(tp, 0x15, 0x0321);
-                rtl8168_mdio_write(tp, 0x19, 0x44c4);
-                rtl8168_mdio_write(tp, 0x15, 0x0322);
-                rtl8168_mdio_write(tp, 0x19, 0x404f);
-                rtl8168_mdio_write(tp, 0x15, 0x0323);
-                rtl8168_mdio_write(tp, 0x19, 0x44c8);
-                rtl8168_mdio_write(tp, 0x15, 0x0324);
-                rtl8168_mdio_write(tp, 0x19, 0xd64f);
-                rtl8168_mdio_write(tp, 0x15, 0x0325);
-                rtl8168_mdio_write(tp, 0x19, 0x00e7);
-                rtl8168_mdio_write(tp, 0x15, 0x0326);
-                rtl8168_mdio_write(tp, 0x19, 0x7c08);
-                rtl8168_mdio_write(tp, 0x15, 0x0327);
-                rtl8168_mdio_write(tp, 0x19, 0x8203);
-                rtl8168_mdio_write(tp, 0x15, 0x0328);
-                rtl8168_mdio_write(tp, 0x19, 0x4d48);
-                rtl8168_mdio_write(tp, 0x15, 0x0329);
-                rtl8168_mdio_write(tp, 0x19, 0x332b);
-                rtl8168_mdio_write(tp, 0x15, 0x032a);
-                rtl8168_mdio_write(tp, 0x19, 0x4d40);
-                rtl8168_mdio_write(tp, 0x15, 0x032c);
-                rtl8168_mdio_write(tp, 0x19, 0x00f8);
-                rtl8168_mdio_write(tp, 0x15, 0x032d);
-                rtl8168_mdio_write(tp, 0x19, 0x82b2);
-                rtl8168_mdio_write(tp, 0x15, 0x032f);
-                rtl8168_mdio_write(tp, 0x19, 0x00b0);
-                rtl8168_mdio_write(tp, 0x15, 0x0332);
-                rtl8168_mdio_write(tp, 0x19, 0x91f2);
-                rtl8168_mdio_write(tp, 0x15, 0x033f);
-                rtl8168_mdio_write(tp, 0x19, 0xb6cd);
-                rtl8168_mdio_write(tp, 0x15, 0x0340);
-                rtl8168_mdio_write(tp, 0x19, 0x9e01);
-                rtl8168_mdio_write(tp, 0x15, 0x0341);
-                rtl8168_mdio_write(tp, 0x19, 0xd11d);
-                rtl8168_mdio_write(tp, 0x15, 0x0342);
-                rtl8168_mdio_write(tp, 0x19, 0x009d);
-                rtl8168_mdio_write(tp, 0x15, 0x0343);
-                rtl8168_mdio_write(tp, 0x19, 0xbb1c);
-                rtl8168_mdio_write(tp, 0x15, 0x0344);
-                rtl8168_mdio_write(tp, 0x19, 0x8102);
-                rtl8168_mdio_write(tp, 0x15, 0x0345);
-                rtl8168_mdio_write(tp, 0x19, 0x3348);
-                rtl8168_mdio_write(tp, 0x15, 0x0346);
-                rtl8168_mdio_write(tp, 0x19, 0xa231);
-                rtl8168_mdio_write(tp, 0x15, 0x0347);
-                rtl8168_mdio_write(tp, 0x19, 0x335b);
-                rtl8168_mdio_write(tp, 0x15, 0x0348);
-                rtl8168_mdio_write(tp, 0x19, 0x91f7);
-                rtl8168_mdio_write(tp, 0x15, 0x0349);
-                rtl8168_mdio_write(tp, 0x19, 0xc218);
-                rtl8168_mdio_write(tp, 0x15, 0x034a);
-                rtl8168_mdio_write(tp, 0x19, 0x00f5);
-                rtl8168_mdio_write(tp, 0x15, 0x034b);
-                rtl8168_mdio_write(tp, 0x19, 0x335b);
-                rtl8168_mdio_write(tp, 0x15, 0x034c);
-                rtl8168_mdio_write(tp, 0x19, 0x0000);
-                rtl8168_mdio_write(tp, 0x15, 0x034d);
-                rtl8168_mdio_write(tp, 0x19, 0x0000);
-                rtl8168_mdio_write(tp, 0x15, 0x034e);
-                rtl8168_mdio_write(tp, 0x19, 0x0000);
-                rtl8168_mdio_write(tp, 0x15, 0x034f);
-                rtl8168_mdio_write(tp, 0x19, 0x0000);
-                rtl8168_mdio_write(tp, 0x15, 0x0350);
-                rtl8168_mdio_write(tp, 0x19, 0x0000);
-                rtl8168_mdio_write(tp, 0x15, 0x035b);
-                rtl8168_mdio_write(tp, 0x19, 0xa23c);
-                rtl8168_mdio_write(tp, 0x15, 0x035c);
-                rtl8168_mdio_write(tp, 0x19, 0x7c08);
-                rtl8168_mdio_write(tp, 0x15, 0x035d);
-                rtl8168_mdio_write(tp, 0x19, 0x4c00);
-                rtl8168_mdio_write(tp, 0x15, 0x035e);
-                rtl8168_mdio_write(tp, 0x19, 0x3397);
-                rtl8168_mdio_write(tp, 0x15, 0x0363);
-                rtl8168_mdio_write(tp, 0x19, 0xb6a9);
-                rtl8168_mdio_write(tp, 0x15, 0x0366);
-                rtl8168_mdio_write(tp, 0x19, 0x00f5);
-                rtl8168_mdio_write(tp, 0x15, 0x0382);
-                rtl8168_mdio_write(tp, 0x19, 0x7c40);
-                rtl8168_mdio_write(tp, 0x15, 0x0388);
-                rtl8168_mdio_write(tp, 0x19, 0x0084);
-                rtl8168_mdio_write(tp, 0x15, 0x0389);
-                rtl8168_mdio_write(tp, 0x19, 0xdd17);
-                rtl8168_mdio_write(tp, 0x15, 0x038a);
-                rtl8168_mdio_write(tp, 0x19, 0x000b);
-                rtl8168_mdio_write(tp, 0x15, 0x038b);
-                rtl8168_mdio_write(tp, 0x19, 0xa10a);
-                rtl8168_mdio_write(tp, 0x15, 0x038c);
-                rtl8168_mdio_write(tp, 0x19, 0x337e);
-                rtl8168_mdio_write(tp, 0x15, 0x038d);
-                rtl8168_mdio_write(tp, 0x19, 0x6c0b);
-                rtl8168_mdio_write(tp, 0x15, 0x038e);
-                rtl8168_mdio_write(tp, 0x19, 0xa107);
-                rtl8168_mdio_write(tp, 0x15, 0x038f);
-                rtl8168_mdio_write(tp, 0x19, 0x6c08);
-                rtl8168_mdio_write(tp, 0x15, 0x0390);
-                rtl8168_mdio_write(tp, 0x19, 0xc017);
-                rtl8168_mdio_write(tp, 0x15, 0x0391);
-                rtl8168_mdio_write(tp, 0x19, 0x0004);
-                rtl8168_mdio_write(tp, 0x15, 0x0392);
-                rtl8168_mdio_write(tp, 0x19, 0xd64f);
-                rtl8168_mdio_write(tp, 0x15, 0x0393);
-                rtl8168_mdio_write(tp, 0x19, 0x00f4);
-                rtl8168_mdio_write(tp, 0x15, 0x0397);
-                rtl8168_mdio_write(tp, 0x19, 0x4098);
-                rtl8168_mdio_write(tp, 0x15, 0x0398);
-                rtl8168_mdio_write(tp, 0x19, 0x4408);
-                rtl8168_mdio_write(tp, 0x15, 0x0399);
-                rtl8168_mdio_write(tp, 0x19, 0x55bf);
-                rtl8168_mdio_write(tp, 0x15, 0x039a);
-                rtl8168_mdio_write(tp, 0x19, 0x4bb9);
-                rtl8168_mdio_write(tp, 0x15, 0x039b);
-                rtl8168_mdio_write(tp, 0x19, 0x6810);
-                rtl8168_mdio_write(tp, 0x15, 0x039c);
-                rtl8168_mdio_write(tp, 0x19, 0x4b29);
-                rtl8168_mdio_write(tp, 0x15, 0x039d);
-                rtl8168_mdio_write(tp, 0x19, 0x4041);
-                rtl8168_mdio_write(tp, 0x15, 0x039e);
-                rtl8168_mdio_write(tp, 0x19, 0x442a);
-                rtl8168_mdio_write(tp, 0x15, 0x039f);
-                rtl8168_mdio_write(tp, 0x19, 0x4029);
-                rtl8168_mdio_write(tp, 0x15, 0x03aa);
-                rtl8168_mdio_write(tp, 0x19, 0x33b8);
-                rtl8168_mdio_write(tp, 0x15, 0x03b6);
-                rtl8168_mdio_write(tp, 0x19, 0x0000);
-                rtl8168_mdio_write(tp, 0x15, 0x03b7);
-                rtl8168_mdio_write(tp, 0x19, 0x0000);
-                rtl8168_mdio_write(tp, 0x15, 0x03b8);
-                rtl8168_mdio_write(tp, 0x19, 0x543f);
-                rtl8168_mdio_write(tp, 0x15, 0x03b9);
-                rtl8168_mdio_write(tp, 0x19, 0x499a);
-                rtl8168_mdio_write(tp, 0x15, 0x03ba);
-                rtl8168_mdio_write(tp, 0x19, 0x7c40);
-                rtl8168_mdio_write(tp, 0x15, 0x03bb);
-                rtl8168_mdio_write(tp, 0x19, 0x4c40);
-                rtl8168_mdio_write(tp, 0x15, 0x03bc);
-                rtl8168_mdio_write(tp, 0x19, 0x490a);
-                rtl8168_mdio_write(tp, 0x15, 0x03bd);
-                rtl8168_mdio_write(tp, 0x19, 0x405e);
-                rtl8168_mdio_write(tp, 0x15, 0x03c2);
-                rtl8168_mdio_write(tp, 0x19, 0x9a03);
-                rtl8168_mdio_write(tp, 0x15, 0x03c4);
-                rtl8168_mdio_write(tp, 0x19, 0x0015);
-                rtl8168_mdio_write(tp, 0x15, 0x03c5);
-                rtl8168_mdio_write(tp, 0x19, 0x9e03);
-                rtl8168_mdio_write(tp, 0x15, 0x03c8);
-                rtl8168_mdio_write(tp, 0x19, 0x9cf7);
-                rtl8168_mdio_write(tp, 0x15, 0x03c9);
-                rtl8168_mdio_write(tp, 0x19, 0x7c12);
-                rtl8168_mdio_write(tp, 0x15, 0x03ca);
-                rtl8168_mdio_write(tp, 0x19, 0x4c52);
-                rtl8168_mdio_write(tp, 0x15, 0x03cb);
-                rtl8168_mdio_write(tp, 0x19, 0x4458);
-                rtl8168_mdio_write(tp, 0x15, 0x03cd);
-                rtl8168_mdio_write(tp, 0x19, 0x4c40);
-                rtl8168_mdio_write(tp, 0x15, 0x03ce);
-                rtl8168_mdio_write(tp, 0x19, 0x33bf);
-                rtl8168_mdio_write(tp, 0x15, 0x03cf);
-                rtl8168_mdio_write(tp, 0x19, 0x0000);
-                rtl8168_mdio_write(tp, 0x15, 0x03d0);
-                rtl8168_mdio_write(tp, 0x19, 0x0000);
-                rtl8168_mdio_write(tp, 0x15, 0x03d1);
-                rtl8168_mdio_write(tp, 0x19, 0x0000);
-                rtl8168_mdio_write(tp, 0x15, 0x03d5);
-                rtl8168_mdio_write(tp, 0x19, 0x0000);
-                rtl8168_mdio_write(tp, 0x15, 0x03d6);
-                rtl8168_mdio_write(tp, 0x19, 0x0000);
-                rtl8168_mdio_write(tp, 0x15, 0x03d7);
-                rtl8168_mdio_write(tp, 0x19, 0x0000);
-                rtl8168_mdio_write(tp, 0x15, 0x03d8);
-                rtl8168_mdio_write(tp, 0x19, 0x0000);
-                rtl8168_mdio_write(tp, 0x15, 0x03d9);
-                rtl8168_mdio_write(tp, 0x19, 0x49bb);
-                rtl8168_mdio_write(tp, 0x15, 0x03da);
-                rtl8168_mdio_write(tp, 0x19, 0x4478);
-                rtl8168_mdio_write(tp, 0x15, 0x03db);
-                rtl8168_mdio_write(tp, 0x19, 0x492b);
-                rtl8168_mdio_write(tp, 0x15, 0x03dc);
-                rtl8168_mdio_write(tp, 0x19, 0x7c01);
-                rtl8168_mdio_write(tp, 0x15, 0x03dd);
-                rtl8168_mdio_write(tp, 0x19, 0x4c00);
-                rtl8168_mdio_write(tp, 0x15, 0x03de);
-                rtl8168_mdio_write(tp, 0x19, 0xbd1a);
-                rtl8168_mdio_write(tp, 0x15, 0x03df);
-                rtl8168_mdio_write(tp, 0x19, 0xc428);
-                rtl8168_mdio_write(tp, 0x15, 0x03e0);
-                rtl8168_mdio_write(tp, 0x19, 0x0008);
-                rtl8168_mdio_write(tp, 0x15, 0x03e1);
-                rtl8168_mdio_write(tp, 0x19, 0x9cfd);
-                rtl8168_mdio_write(tp, 0x15, 0x03e2);
-                rtl8168_mdio_write(tp, 0x19, 0x7c12);
-                rtl8168_mdio_write(tp, 0x15, 0x03e3);
-                rtl8168_mdio_write(tp, 0x19, 0x4c52);
-                rtl8168_mdio_write(tp, 0x15, 0x03e4);
-                rtl8168_mdio_write(tp, 0x19, 0x4458);
-                rtl8168_mdio_write(tp, 0x15, 0x03e5);
-                rtl8168_mdio_write(tp, 0x19, 0x7c12);
-                rtl8168_mdio_write(tp, 0x15, 0x03e6);
-                rtl8168_mdio_write(tp, 0x19, 0x4c40);
-                rtl8168_mdio_write(tp, 0x15, 0x03e7);
-                rtl8168_mdio_write(tp, 0x19, 0x33de);
-                rtl8168_mdio_write(tp, 0x15, 0x03e8);
-                rtl8168_mdio_write(tp, 0x19, 0xc218);
-                rtl8168_mdio_write(tp, 0x15, 0x03e9);
-                rtl8168_mdio_write(tp, 0x19, 0x0002);
-                rtl8168_mdio_write(tp, 0x15, 0x03ea);
-                rtl8168_mdio_write(tp, 0x19, 0x32df);
-                rtl8168_mdio_write(tp, 0x15, 0x03eb);
-                rtl8168_mdio_write(tp, 0x19, 0x3316);
-                rtl8168_mdio_write(tp, 0x15, 0x03ec);
-                rtl8168_mdio_write(tp, 0x19, 0x0000);
-                rtl8168_mdio_write(tp, 0x15, 0x03ed);
-                rtl8168_mdio_write(tp, 0x19, 0x0000);
-                rtl8168_mdio_write(tp, 0x15, 0x03ee);
-                rtl8168_mdio_write(tp, 0x19, 0x0000);
-                rtl8168_mdio_write(tp, 0x15, 0x03ef);
-                rtl8168_mdio_write(tp, 0x19, 0x0000);
-                rtl8168_mdio_write(tp, 0x15, 0x03f7);
-                rtl8168_mdio_write(tp, 0x19, 0x330c);
-                rtl8168_mdio_write(tp, 0x16, 0x0306);
-                rtl8168_mdio_write(tp, 0x16, 0x0300);
-
-                rtl8168_mdio_write(tp, 0x1f, 0x0005);
-                rtl8168_mdio_write(tp, 0x05, 0xfff6);
-                rtl8168_mdio_write(tp, 0x06, 0x0080);
-                rtl8168_mdio_write(tp, 0x05, 0x8000);
-                rtl8168_mdio_write(tp, 0x06, 0x0280);
-                rtl8168_mdio_write(tp, 0x06, 0x48f7);
-                rtl8168_mdio_write(tp, 0x06, 0x00e0);
-                rtl8168_mdio_write(tp, 0x06, 0xfff7);
-                rtl8168_mdio_write(tp, 0x06, 0xa080);
-                rtl8168_mdio_write(tp, 0x06, 0x02ae);
-                rtl8168_mdio_write(tp, 0x06, 0xf602);
-                rtl8168_mdio_write(tp, 0x06, 0x0200);
-                rtl8168_mdio_write(tp, 0x06, 0x0280);
-                rtl8168_mdio_write(tp, 0x06, 0x9002);
-                rtl8168_mdio_write(tp, 0x06, 0x0224);
-                rtl8168_mdio_write(tp, 0x06, 0x0202);
-                rtl8168_mdio_write(tp, 0x06, 0x3402);
-                rtl8168_mdio_write(tp, 0x06, 0x027f);
-                rtl8168_mdio_write(tp, 0x06, 0x0280);
-                rtl8168_mdio_write(tp, 0x06, 0xa602);
-                rtl8168_mdio_write(tp, 0x06, 0x80bf);
-                rtl8168_mdio_write(tp, 0x06, 0xe08b);
-                rtl8168_mdio_write(tp, 0x06, 0x88e1);
-                rtl8168_mdio_write(tp, 0x06, 0x8b89);
-                rtl8168_mdio_write(tp, 0x06, 0x1e01);
-                rtl8168_mdio_write(tp, 0x06, 0xe18b);
-                rtl8168_mdio_write(tp, 0x06, 0x8a1e);
-                rtl8168_mdio_write(tp, 0x06, 0x01e1);
-                rtl8168_mdio_write(tp, 0x06, 0x8b8b);
-                rtl8168_mdio_write(tp, 0x06, 0x1e01);
-                rtl8168_mdio_write(tp, 0x06, 0xe18b);
-                rtl8168_mdio_write(tp, 0x06, 0x8c1e);
-                rtl8168_mdio_write(tp, 0x06, 0x01e1);
-                rtl8168_mdio_write(tp, 0x06, 0x8b8d);
-                rtl8168_mdio_write(tp, 0x06, 0x1e01);
-                rtl8168_mdio_write(tp, 0x06, 0xe18b);
-                rtl8168_mdio_write(tp, 0x06, 0x8e1e);
-                rtl8168_mdio_write(tp, 0x06, 0x01a0);
-                rtl8168_mdio_write(tp, 0x06, 0x00c7);
-                rtl8168_mdio_write(tp, 0x06, 0xaebb);
-                rtl8168_mdio_write(tp, 0x06, 0xee8a);
-                rtl8168_mdio_write(tp, 0x06, 0xe600);
-                rtl8168_mdio_write(tp, 0x06, 0xee8a);
-                rtl8168_mdio_write(tp, 0x06, 0xee03);
-                rtl8168_mdio_write(tp, 0x06, 0xee8a);
-                rtl8168_mdio_write(tp, 0x06, 0xefb8);
-                rtl8168_mdio_write(tp, 0x06, 0xee8a);
-                rtl8168_mdio_write(tp, 0x06, 0xe902);
-                rtl8168_mdio_write(tp, 0x06, 0xee8b);
-                rtl8168_mdio_write(tp, 0x06, 0x8285);
-                rtl8168_mdio_write(tp, 0x06, 0xee8b);
-                rtl8168_mdio_write(tp, 0x06, 0x8520);
-                rtl8168_mdio_write(tp, 0x06, 0xee8b);
-                rtl8168_mdio_write(tp, 0x06, 0x8701);
-                rtl8168_mdio_write(tp, 0x06, 0xd481);
-                rtl8168_mdio_write(tp, 0x06, 0x35e4);
-                rtl8168_mdio_write(tp, 0x06, 0x8b94);
-                rtl8168_mdio_write(tp, 0x06, 0xe58b);
-                rtl8168_mdio_write(tp, 0x06, 0x95bf);
-                rtl8168_mdio_write(tp, 0x06, 0x8b88);
-                rtl8168_mdio_write(tp, 0x06, 0xec00);
-                rtl8168_mdio_write(tp, 0x06, 0x19a9);
-                rtl8168_mdio_write(tp, 0x06, 0x8b90);
-                rtl8168_mdio_write(tp, 0x06, 0xf9ee);
-                rtl8168_mdio_write(tp, 0x06, 0xfff6);
-                rtl8168_mdio_write(tp, 0x06, 0x00ee);
-                rtl8168_mdio_write(tp, 0x06, 0xfff7);
-                rtl8168_mdio_write(tp, 0x06, 0xffe0);
-                rtl8168_mdio_write(tp, 0x06, 0xe140);
-                rtl8168_mdio_write(tp, 0x06, 0xe1e1);
-                rtl8168_mdio_write(tp, 0x06, 0x41f7);
-                rtl8168_mdio_write(tp, 0x06, 0x2ff6);
-                rtl8168_mdio_write(tp, 0x06, 0x28e4);
-                rtl8168_mdio_write(tp, 0x06, 0xe140);
-                rtl8168_mdio_write(tp, 0x06, 0xe5e1);
-                rtl8168_mdio_write(tp, 0x06, 0x4104);
-                rtl8168_mdio_write(tp, 0x06, 0xf8e0);
-                rtl8168_mdio_write(tp, 0x06, 0x8b89);
-                rtl8168_mdio_write(tp, 0x06, 0xad20);
-                rtl8168_mdio_write(tp, 0x06, 0x0dee);
-                rtl8168_mdio_write(tp, 0x06, 0x8b89);
-                rtl8168_mdio_write(tp, 0x06, 0x0002);
-                rtl8168_mdio_write(tp, 0x06, 0x82f4);
-                rtl8168_mdio_write(tp, 0x06, 0x021f);
-                rtl8168_mdio_write(tp, 0x06, 0x4102);
-                rtl8168_mdio_write(tp, 0x06, 0x2812);
-                rtl8168_mdio_write(tp, 0x06, 0xfc04);
-                rtl8168_mdio_write(tp, 0x06, 0xf8e0);
-                rtl8168_mdio_write(tp, 0x06, 0x8b8d);
-                rtl8168_mdio_write(tp, 0x06, 0xad20);
-                rtl8168_mdio_write(tp, 0x06, 0x10ee);
-                rtl8168_mdio_write(tp, 0x06, 0x8b8d);
-                rtl8168_mdio_write(tp, 0x06, 0x0002);
-                rtl8168_mdio_write(tp, 0x06, 0x139d);
-                rtl8168_mdio_write(tp, 0x06, 0x0281);
-                rtl8168_mdio_write(tp, 0x06, 0xd602);
-                rtl8168_mdio_write(tp, 0x06, 0x1f99);
-                rtl8168_mdio_write(tp, 0x06, 0x0227);
-                rtl8168_mdio_write(tp, 0x06, 0xeafc);
-                rtl8168_mdio_write(tp, 0x06, 0x04f8);
-                rtl8168_mdio_write(tp, 0x06, 0xe08b);
-                rtl8168_mdio_write(tp, 0x06, 0x8ead);
-                rtl8168_mdio_write(tp, 0x06, 0x2014);
-                rtl8168_mdio_write(tp, 0x06, 0xf620);
-                rtl8168_mdio_write(tp, 0x06, 0xe48b);
-                rtl8168_mdio_write(tp, 0x06, 0x8e02);
-                rtl8168_mdio_write(tp, 0x06, 0x8104);
-                rtl8168_mdio_write(tp, 0x06, 0x021b);
-                rtl8168_mdio_write(tp, 0x06, 0xf402);
-                rtl8168_mdio_write(tp, 0x06, 0x2c9c);
-                rtl8168_mdio_write(tp, 0x06, 0x0281);
-                rtl8168_mdio_write(tp, 0x06, 0x7902);
-                rtl8168_mdio_write(tp, 0x06, 0x8443);
-                rtl8168_mdio_write(tp, 0x06, 0xad22);
-                rtl8168_mdio_write(tp, 0x06, 0x11f6);
-                rtl8168_mdio_write(tp, 0x06, 0x22e4);
-                rtl8168_mdio_write(tp, 0x06, 0x8b8e);
-                rtl8168_mdio_write(tp, 0x06, 0x022c);
-                rtl8168_mdio_write(tp, 0x06, 0x4602);
-                rtl8168_mdio_write(tp, 0x06, 0x2ac5);
-                rtl8168_mdio_write(tp, 0x06, 0x0229);
-                rtl8168_mdio_write(tp, 0x06, 0x2002);
-                rtl8168_mdio_write(tp, 0x06, 0x2b91);
-                rtl8168_mdio_write(tp, 0x06, 0xad25);
-                rtl8168_mdio_write(tp, 0x06, 0x11f6);
-                rtl8168_mdio_write(tp, 0x06, 0x25e4);
-                rtl8168_mdio_write(tp, 0x06, 0x8b8e);
-                rtl8168_mdio_write(tp, 0x06, 0x0284);
-                rtl8168_mdio_write(tp, 0x06, 0xe202);
-                rtl8168_mdio_write(tp, 0x06, 0x043a);
-                rtl8168_mdio_write(tp, 0x06, 0x021a);
-                rtl8168_mdio_write(tp, 0x06, 0x5902);
-                rtl8168_mdio_write(tp, 0x06, 0x2bfc);
-                rtl8168_mdio_write(tp, 0x06, 0xfc04);
-                rtl8168_mdio_write(tp, 0x06, 0xf8fa);
-                rtl8168_mdio_write(tp, 0x06, 0xef69);
-                rtl8168_mdio_write(tp, 0x06, 0xe0e0);
-                rtl8168_mdio_write(tp, 0x06, 0x00e1);
-                rtl8168_mdio_write(tp, 0x06, 0xe001);
-                rtl8168_mdio_write(tp, 0x06, 0xad27);
-                rtl8168_mdio_write(tp, 0x06, 0x1fd1);
-                rtl8168_mdio_write(tp, 0x06, 0x01bf);
-                rtl8168_mdio_write(tp, 0x06, 0x8638);
-                rtl8168_mdio_write(tp, 0x06, 0x022f);
-                rtl8168_mdio_write(tp, 0x06, 0x50e0);
-                rtl8168_mdio_write(tp, 0x06, 0xe020);
-                rtl8168_mdio_write(tp, 0x06, 0xe1e0);
-                rtl8168_mdio_write(tp, 0x06, 0x21ad);
-                rtl8168_mdio_write(tp, 0x06, 0x200e);
-                rtl8168_mdio_write(tp, 0x06, 0xd100);
-                rtl8168_mdio_write(tp, 0x06, 0xbf86);
-                rtl8168_mdio_write(tp, 0x06, 0x3802);
-                rtl8168_mdio_write(tp, 0x06, 0x2f50);
-                rtl8168_mdio_write(tp, 0x06, 0xbf3d);
-                rtl8168_mdio_write(tp, 0x06, 0x3902);
-                rtl8168_mdio_write(tp, 0x06, 0x2eb0);
-                rtl8168_mdio_write(tp, 0x06, 0xef96);
-                rtl8168_mdio_write(tp, 0x06, 0xfefc);
-                rtl8168_mdio_write(tp, 0x06, 0x0402);
-                rtl8168_mdio_write(tp, 0x06, 0x8591);
-                rtl8168_mdio_write(tp, 0x06, 0x0281);
-                rtl8168_mdio_write(tp, 0x06, 0x3c05);
-                rtl8168_mdio_write(tp, 0x06, 0xf8fa);
-                rtl8168_mdio_write(tp, 0x06, 0xef69);
-                rtl8168_mdio_write(tp, 0x06, 0xe0e2);
-                rtl8168_mdio_write(tp, 0x06, 0xfee1);
-                rtl8168_mdio_write(tp, 0x06, 0xe2ff);
-                rtl8168_mdio_write(tp, 0x06, 0xad2d);
-                rtl8168_mdio_write(tp, 0x06, 0x1ae0);
-                rtl8168_mdio_write(tp, 0x06, 0xe14e);
-                rtl8168_mdio_write(tp, 0x06, 0xe1e1);
-                rtl8168_mdio_write(tp, 0x06, 0x4fac);
-                rtl8168_mdio_write(tp, 0x06, 0x2d22);
-                rtl8168_mdio_write(tp, 0x06, 0xf603);
-                rtl8168_mdio_write(tp, 0x06, 0x0203);
-                rtl8168_mdio_write(tp, 0x06, 0x36f7);
-                rtl8168_mdio_write(tp, 0x06, 0x03f7);
-                rtl8168_mdio_write(tp, 0x06, 0x06bf);
-                rtl8168_mdio_write(tp, 0x06, 0x8622);
-                rtl8168_mdio_write(tp, 0x06, 0x022e);
-                rtl8168_mdio_write(tp, 0x06, 0xb0ae);
-                rtl8168_mdio_write(tp, 0x06, 0x11e0);
-                rtl8168_mdio_write(tp, 0x06, 0xe14e);
-                rtl8168_mdio_write(tp, 0x06, 0xe1e1);
-                rtl8168_mdio_write(tp, 0x06, 0x4fad);
-                rtl8168_mdio_write(tp, 0x06, 0x2d08);
-                rtl8168_mdio_write(tp, 0x06, 0xbf86);
-                rtl8168_mdio_write(tp, 0x06, 0x2d02);
-                rtl8168_mdio_write(tp, 0x06, 0x2eb0);
-                rtl8168_mdio_write(tp, 0x06, 0xf606);
-                rtl8168_mdio_write(tp, 0x06, 0xef96);
-                rtl8168_mdio_write(tp, 0x06, 0xfefc);
-                rtl8168_mdio_write(tp, 0x06, 0x04f8);
-                rtl8168_mdio_write(tp, 0x06, 0xf9fa);
-                rtl8168_mdio_write(tp, 0x06, 0xef69);
-                rtl8168_mdio_write(tp, 0x06, 0xe08b);
-                rtl8168_mdio_write(tp, 0x06, 0x87ad);
-                rtl8168_mdio_write(tp, 0x06, 0x204c);
-                rtl8168_mdio_write(tp, 0x06, 0xd200);
-                rtl8168_mdio_write(tp, 0x06, 0xe0e2);
-                rtl8168_mdio_write(tp, 0x06, 0x0058);
-                rtl8168_mdio_write(tp, 0x06, 0x010c);
-                rtl8168_mdio_write(tp, 0x06, 0x021e);
-                rtl8168_mdio_write(tp, 0x06, 0x20e0);
-                rtl8168_mdio_write(tp, 0x06, 0xe000);
-                rtl8168_mdio_write(tp, 0x06, 0x5810);
-                rtl8168_mdio_write(tp, 0x06, 0x1e20);
-                rtl8168_mdio_write(tp, 0x06, 0xe0e0);
-                rtl8168_mdio_write(tp, 0x06, 0x3658);
-                rtl8168_mdio_write(tp, 0x06, 0x031e);
-                rtl8168_mdio_write(tp, 0x06, 0x20e0);
-                rtl8168_mdio_write(tp, 0x06, 0xe022);
-                rtl8168_mdio_write(tp, 0x06, 0xe1e0);
-                rtl8168_mdio_write(tp, 0x06, 0x2358);
-                rtl8168_mdio_write(tp, 0x06, 0xe01e);
-                rtl8168_mdio_write(tp, 0x06, 0x20e0);
-                rtl8168_mdio_write(tp, 0x06, 0x8ae6);
-                rtl8168_mdio_write(tp, 0x06, 0x1f02);
-                rtl8168_mdio_write(tp, 0x06, 0x9e22);
-                rtl8168_mdio_write(tp, 0x06, 0xe68a);
-                rtl8168_mdio_write(tp, 0x06, 0xe6ad);
-                rtl8168_mdio_write(tp, 0x06, 0x3214);
-                rtl8168_mdio_write(tp, 0x06, 0xad34);
-                rtl8168_mdio_write(tp, 0x06, 0x11ef);
-                rtl8168_mdio_write(tp, 0x06, 0x0258);
-                rtl8168_mdio_write(tp, 0x06, 0x039e);
-                rtl8168_mdio_write(tp, 0x06, 0x07ad);
-                rtl8168_mdio_write(tp, 0x06, 0x3508);
-                rtl8168_mdio_write(tp, 0x06, 0x5ac0);
-                rtl8168_mdio_write(tp, 0x06, 0x9f04);
-                rtl8168_mdio_write(tp, 0x06, 0xd101);
-                rtl8168_mdio_write(tp, 0x06, 0xae02);
-                rtl8168_mdio_write(tp, 0x06, 0xd100);
-                rtl8168_mdio_write(tp, 0x06, 0xbf86);
-                rtl8168_mdio_write(tp, 0x06, 0x3e02);
-                rtl8168_mdio_write(tp, 0x06, 0x2f50);
-                rtl8168_mdio_write(tp, 0x06, 0xef96);
-                rtl8168_mdio_write(tp, 0x06, 0xfefd);
-                rtl8168_mdio_write(tp, 0x06, 0xfc04);
-                rtl8168_mdio_write(tp, 0x06, 0xf8f9);
-                rtl8168_mdio_write(tp, 0x06, 0xfae0);
-                rtl8168_mdio_write(tp, 0x06, 0x8b81);
-                rtl8168_mdio_write(tp, 0x06, 0xac26);
-                rtl8168_mdio_write(tp, 0x06, 0x0ee0);
-                rtl8168_mdio_write(tp, 0x06, 0x8b81);
-                rtl8168_mdio_write(tp, 0x06, 0xac21);
-                rtl8168_mdio_write(tp, 0x06, 0x08e0);
-                rtl8168_mdio_write(tp, 0x06, 0x8b87);
-                rtl8168_mdio_write(tp, 0x06, 0xac24);
-                rtl8168_mdio_write(tp, 0x06, 0x02ae);
-                rtl8168_mdio_write(tp, 0x06, 0x6bee);
-                rtl8168_mdio_write(tp, 0x06, 0xe0ea);
-                rtl8168_mdio_write(tp, 0x06, 0x00ee);
-                rtl8168_mdio_write(tp, 0x06, 0xe0eb);
-                rtl8168_mdio_write(tp, 0x06, 0x00e2);
-                rtl8168_mdio_write(tp, 0x06, 0xe07c);
-                rtl8168_mdio_write(tp, 0x06, 0xe3e0);
-                rtl8168_mdio_write(tp, 0x06, 0x7da5);
-                rtl8168_mdio_write(tp, 0x06, 0x1111);
-                rtl8168_mdio_write(tp, 0x06, 0x15d2);
-                rtl8168_mdio_write(tp, 0x06, 0x60d6);
-                rtl8168_mdio_write(tp, 0x06, 0x6666);
-                rtl8168_mdio_write(tp, 0x06, 0x0207);
-                rtl8168_mdio_write(tp, 0x06, 0xf9d2);
-                rtl8168_mdio_write(tp, 0x06, 0xa0d6);
-                rtl8168_mdio_write(tp, 0x06, 0xaaaa);
-                rtl8168_mdio_write(tp, 0x06, 0x0207);
-                rtl8168_mdio_write(tp, 0x06, 0xf902);
-                rtl8168_mdio_write(tp, 0x06, 0x825c);
-                rtl8168_mdio_write(tp, 0x06, 0xae44);
-                rtl8168_mdio_write(tp, 0x06, 0xa566);
-                rtl8168_mdio_write(tp, 0x06, 0x6602);
-                rtl8168_mdio_write(tp, 0x06, 0xae38);
-                rtl8168_mdio_write(tp, 0x06, 0xa5aa);
-                rtl8168_mdio_write(tp, 0x06, 0xaa02);
-                rtl8168_mdio_write(tp, 0x06, 0xae32);
-                rtl8168_mdio_write(tp, 0x06, 0xeee0);
-                rtl8168_mdio_write(tp, 0x06, 0xea04);
-                rtl8168_mdio_write(tp, 0x06, 0xeee0);
-                rtl8168_mdio_write(tp, 0x06, 0xeb06);
-                rtl8168_mdio_write(tp, 0x06, 0xe2e0);
-                rtl8168_mdio_write(tp, 0x06, 0x7ce3);
-                rtl8168_mdio_write(tp, 0x06, 0xe07d);
-                rtl8168_mdio_write(tp, 0x06, 0xe0e0);
-                rtl8168_mdio_write(tp, 0x06, 0x38e1);
-                rtl8168_mdio_write(tp, 0x06, 0xe039);
-                rtl8168_mdio_write(tp, 0x06, 0xad2e);
-                rtl8168_mdio_write(tp, 0x06, 0x21ad);
-                rtl8168_mdio_write(tp, 0x06, 0x3f13);
-                rtl8168_mdio_write(tp, 0x06, 0xe0e4);
-                rtl8168_mdio_write(tp, 0x06, 0x14e1);
-                rtl8168_mdio_write(tp, 0x06, 0xe415);
-                rtl8168_mdio_write(tp, 0x06, 0x6880);
-                rtl8168_mdio_write(tp, 0x06, 0xe4e4);
-                rtl8168_mdio_write(tp, 0x06, 0x14e5);
-                rtl8168_mdio_write(tp, 0x06, 0xe415);
-                rtl8168_mdio_write(tp, 0x06, 0x0282);
-                rtl8168_mdio_write(tp, 0x06, 0x5cae);
-                rtl8168_mdio_write(tp, 0x06, 0x0bac);
-                rtl8168_mdio_write(tp, 0x06, 0x3e02);
-                rtl8168_mdio_write(tp, 0x06, 0xae06);
-                rtl8168_mdio_write(tp, 0x06, 0x0282);
-                rtl8168_mdio_write(tp, 0x06, 0x8602);
-                rtl8168_mdio_write(tp, 0x06, 0x82b0);
-                rtl8168_mdio_write(tp, 0x06, 0xfefd);
-                rtl8168_mdio_write(tp, 0x06, 0xfc04);
-                rtl8168_mdio_write(tp, 0x06, 0xf8e1);
-                rtl8168_mdio_write(tp, 0x06, 0x8b2e);
-                rtl8168_mdio_write(tp, 0x06, 0xe08b);
-                rtl8168_mdio_write(tp, 0x06, 0x81ad);
-                rtl8168_mdio_write(tp, 0x06, 0x2605);
-                rtl8168_mdio_write(tp, 0x06, 0x0221);
-                rtl8168_mdio_write(tp, 0x06, 0xf3f7);
-                rtl8168_mdio_write(tp, 0x06, 0x28e0);
-                rtl8168_mdio_write(tp, 0x06, 0x8b81);
-                rtl8168_mdio_write(tp, 0x06, 0xad21);
-                rtl8168_mdio_write(tp, 0x06, 0x0502);
-                rtl8168_mdio_write(tp, 0x06, 0x22f8);
-                rtl8168_mdio_write(tp, 0x06, 0xf729);
-                rtl8168_mdio_write(tp, 0x06, 0xe08b);
-                rtl8168_mdio_write(tp, 0x06, 0x87ad);
-                rtl8168_mdio_write(tp, 0x06, 0x2405);
-                rtl8168_mdio_write(tp, 0x06, 0x0282);
-                rtl8168_mdio_write(tp, 0x06, 0xebf7);
-                rtl8168_mdio_write(tp, 0x06, 0x2ae5);
-                rtl8168_mdio_write(tp, 0x06, 0x8b2e);
-                rtl8168_mdio_write(tp, 0x06, 0xfc04);
-                rtl8168_mdio_write(tp, 0x06, 0xf8e0);
-                rtl8168_mdio_write(tp, 0x06, 0x8b81);
-                rtl8168_mdio_write(tp, 0x06, 0xad26);
-                rtl8168_mdio_write(tp, 0x06, 0x0302);
-                rtl8168_mdio_write(tp, 0x06, 0x2134);
-                rtl8168_mdio_write(tp, 0x06, 0xe08b);
-                rtl8168_mdio_write(tp, 0x06, 0x81ad);
-                rtl8168_mdio_write(tp, 0x06, 0x2109);
-                rtl8168_mdio_write(tp, 0x06, 0xe08b);
-                rtl8168_mdio_write(tp, 0x06, 0x2eac);
-                rtl8168_mdio_write(tp, 0x06, 0x2003);
-                rtl8168_mdio_write(tp, 0x06, 0x0283);
-                rtl8168_mdio_write(tp, 0x06, 0x52e0);
-                rtl8168_mdio_write(tp, 0x06, 0x8b87);
-                rtl8168_mdio_write(tp, 0x06, 0xad24);
-                rtl8168_mdio_write(tp, 0x06, 0x09e0);
-                rtl8168_mdio_write(tp, 0x06, 0x8b2e);
-                rtl8168_mdio_write(tp, 0x06, 0xac21);
-                rtl8168_mdio_write(tp, 0x06, 0x0302);
-                rtl8168_mdio_write(tp, 0x06, 0x8337);
-                rtl8168_mdio_write(tp, 0x06, 0xfc04);
-                rtl8168_mdio_write(tp, 0x06, 0xf8e1);
-                rtl8168_mdio_write(tp, 0x06, 0x8b2e);
-                rtl8168_mdio_write(tp, 0x06, 0xe08b);
-                rtl8168_mdio_write(tp, 0x06, 0x81ad);
-                rtl8168_mdio_write(tp, 0x06, 0x2608);
-                rtl8168_mdio_write(tp, 0x06, 0xe085);
-                rtl8168_mdio_write(tp, 0x06, 0xd2ad);
-                rtl8168_mdio_write(tp, 0x06, 0x2502);
-                rtl8168_mdio_write(tp, 0x06, 0xf628);
-                rtl8168_mdio_write(tp, 0x06, 0xe08b);
-                rtl8168_mdio_write(tp, 0x06, 0x81ad);
-                rtl8168_mdio_write(tp, 0x06, 0x210a);
-                rtl8168_mdio_write(tp, 0x06, 0xe086);
-                rtl8168_mdio_write(tp, 0x06, 0x0af6);
-                rtl8168_mdio_write(tp, 0x06, 0x27a0);
-                rtl8168_mdio_write(tp, 0x06, 0x0502);
-                rtl8168_mdio_write(tp, 0x06, 0xf629);
-                rtl8168_mdio_write(tp, 0x06, 0xe08b);
-                rtl8168_mdio_write(tp, 0x06, 0x87ad);
-                rtl8168_mdio_write(tp, 0x06, 0x2408);
-                rtl8168_mdio_write(tp, 0x06, 0xe08a);
-                rtl8168_mdio_write(tp, 0x06, 0xedad);
-                rtl8168_mdio_write(tp, 0x06, 0x2002);
-                rtl8168_mdio_write(tp, 0x06, 0xf62a);
-                rtl8168_mdio_write(tp, 0x06, 0xe58b);
-                rtl8168_mdio_write(tp, 0x06, 0x2ea1);
-                rtl8168_mdio_write(tp, 0x06, 0x0003);
-                rtl8168_mdio_write(tp, 0x06, 0x0221);
-                rtl8168_mdio_write(tp, 0x06, 0x11fc);
-                rtl8168_mdio_write(tp, 0x06, 0x04ee);
-                rtl8168_mdio_write(tp, 0x06, 0x8aed);
-                rtl8168_mdio_write(tp, 0x06, 0x00ee);
-                rtl8168_mdio_write(tp, 0x06, 0x8aec);
-                rtl8168_mdio_write(tp, 0x06, 0x0004);
-                rtl8168_mdio_write(tp, 0x06, 0xf8e0);
-                rtl8168_mdio_write(tp, 0x06, 0x8b87);
-                rtl8168_mdio_write(tp, 0x06, 0xad24);
-                rtl8168_mdio_write(tp, 0x06, 0x3ae0);
-                rtl8168_mdio_write(tp, 0x06, 0xe0ea);
-                rtl8168_mdio_write(tp, 0x06, 0xe1e0);
-                rtl8168_mdio_write(tp, 0x06, 0xeb58);
-                rtl8168_mdio_write(tp, 0x06, 0xf8d1);
-                rtl8168_mdio_write(tp, 0x06, 0x01e4);
-                rtl8168_mdio_write(tp, 0x06, 0xe0ea);
-                rtl8168_mdio_write(tp, 0x06, 0xe5e0);
-                rtl8168_mdio_write(tp, 0x06, 0xebe0);
-                rtl8168_mdio_write(tp, 0x06, 0xe07c);
-                rtl8168_mdio_write(tp, 0x06, 0xe1e0);
-                rtl8168_mdio_write(tp, 0x06, 0x7d5c);
-                rtl8168_mdio_write(tp, 0x06, 0x00ff);
-                rtl8168_mdio_write(tp, 0x06, 0x3c00);
-                rtl8168_mdio_write(tp, 0x06, 0x1eab);
-                rtl8168_mdio_write(tp, 0x06, 0x1ce0);
-                rtl8168_mdio_write(tp, 0x06, 0xe04c);
-                rtl8168_mdio_write(tp, 0x06, 0xe1e0);
-                rtl8168_mdio_write(tp, 0x06, 0x4d58);
-                rtl8168_mdio_write(tp, 0x06, 0xc1e4);
-                rtl8168_mdio_write(tp, 0x06, 0xe04c);
-                rtl8168_mdio_write(tp, 0x06, 0xe5e0);
-                rtl8168_mdio_write(tp, 0x06, 0x4de0);
-                rtl8168_mdio_write(tp, 0x06, 0xe0ee);
-                rtl8168_mdio_write(tp, 0x06, 0xe1e0);
-                rtl8168_mdio_write(tp, 0x06, 0xef69);
-                rtl8168_mdio_write(tp, 0x06, 0x3ce4);
-                rtl8168_mdio_write(tp, 0x06, 0xe0ee);
-                rtl8168_mdio_write(tp, 0x06, 0xe5e0);
-                rtl8168_mdio_write(tp, 0x06, 0xeffc);
-                rtl8168_mdio_write(tp, 0x06, 0x04f8);
-                rtl8168_mdio_write(tp, 0x06, 0xe08b);
-                rtl8168_mdio_write(tp, 0x06, 0x87ad);
-                rtl8168_mdio_write(tp, 0x06, 0x2412);
-                rtl8168_mdio_write(tp, 0x06, 0xe0e0);
-                rtl8168_mdio_write(tp, 0x06, 0xeee1);
-                rtl8168_mdio_write(tp, 0x06, 0xe0ef);
-                rtl8168_mdio_write(tp, 0x06, 0x59c3);
-                rtl8168_mdio_write(tp, 0x06, 0xe4e0);
-                rtl8168_mdio_write(tp, 0x06, 0xeee5);
-                rtl8168_mdio_write(tp, 0x06, 0xe0ef);
-                rtl8168_mdio_write(tp, 0x06, 0xee8a);
-                rtl8168_mdio_write(tp, 0x06, 0xed01);
-                rtl8168_mdio_write(tp, 0x06, 0xfc04);
-                rtl8168_mdio_write(tp, 0x06, 0xf8e0);
-                rtl8168_mdio_write(tp, 0x06, 0x8b81);
-                rtl8168_mdio_write(tp, 0x06, 0xac25);
-                rtl8168_mdio_write(tp, 0x06, 0x0502);
-                rtl8168_mdio_write(tp, 0x06, 0x8363);
-                rtl8168_mdio_write(tp, 0x06, 0xae03);
-                rtl8168_mdio_write(tp, 0x06, 0x0225);
-                rtl8168_mdio_write(tp, 0x06, 0x16fc);
-                rtl8168_mdio_write(tp, 0x06, 0x04f8);
-                rtl8168_mdio_write(tp, 0x06, 0xf9fa);
-                rtl8168_mdio_write(tp, 0x06, 0xef69);
-                rtl8168_mdio_write(tp, 0x06, 0xfae0);
-                rtl8168_mdio_write(tp, 0x06, 0x860a);
-                rtl8168_mdio_write(tp, 0x06, 0xa000);
-                rtl8168_mdio_write(tp, 0x06, 0x19e0);
-                rtl8168_mdio_write(tp, 0x06, 0x860b);
-                rtl8168_mdio_write(tp, 0x06, 0xe18b);
-                rtl8168_mdio_write(tp, 0x06, 0x331b);
-                rtl8168_mdio_write(tp, 0x06, 0x109e);
-                rtl8168_mdio_write(tp, 0x06, 0x04aa);
-                rtl8168_mdio_write(tp, 0x06, 0x02ae);
-                rtl8168_mdio_write(tp, 0x06, 0x06ee);
-                rtl8168_mdio_write(tp, 0x06, 0x860a);
-                rtl8168_mdio_write(tp, 0x06, 0x01ae);
-                rtl8168_mdio_write(tp, 0x06, 0xe602);
-                rtl8168_mdio_write(tp, 0x06, 0x241e);
-                rtl8168_mdio_write(tp, 0x06, 0xae14);
-                rtl8168_mdio_write(tp, 0x06, 0xa001);
-                rtl8168_mdio_write(tp, 0x06, 0x1402);
-                rtl8168_mdio_write(tp, 0x06, 0x2426);
-                rtl8168_mdio_write(tp, 0x06, 0xbf26);
-                rtl8168_mdio_write(tp, 0x06, 0x6d02);
-                rtl8168_mdio_write(tp, 0x06, 0x2eb0);
-                rtl8168_mdio_write(tp, 0x06, 0xee86);
-                rtl8168_mdio_write(tp, 0x06, 0x0b00);
-                rtl8168_mdio_write(tp, 0x06, 0xee86);
-                rtl8168_mdio_write(tp, 0x06, 0x0a02);
-                rtl8168_mdio_write(tp, 0x06, 0xaf84);
-                rtl8168_mdio_write(tp, 0x06, 0x3ca0);
-                rtl8168_mdio_write(tp, 0x06, 0x0252);
-                rtl8168_mdio_write(tp, 0x06, 0xee86);
-                rtl8168_mdio_write(tp, 0x06, 0x0400);
-                rtl8168_mdio_write(tp, 0x06, 0xee86);
-                rtl8168_mdio_write(tp, 0x06, 0x0500);
-                rtl8168_mdio_write(tp, 0x06, 0xe086);
-                rtl8168_mdio_write(tp, 0x06, 0x0be1);
-                rtl8168_mdio_write(tp, 0x06, 0x8b32);
-                rtl8168_mdio_write(tp, 0x06, 0x1b10);
-                rtl8168_mdio_write(tp, 0x06, 0x9e04);
-                rtl8168_mdio_write(tp, 0x06, 0xaa02);
-                rtl8168_mdio_write(tp, 0x06, 0xaecb);
-                rtl8168_mdio_write(tp, 0x06, 0xee86);
-                rtl8168_mdio_write(tp, 0x06, 0x0b00);
-                rtl8168_mdio_write(tp, 0x06, 0x0224);
-                rtl8168_mdio_write(tp, 0x06, 0x3ae2);
-                rtl8168_mdio_write(tp, 0x06, 0x8604);
-                rtl8168_mdio_write(tp, 0x06, 0xe386);
-                rtl8168_mdio_write(tp, 0x06, 0x05ef);
-                rtl8168_mdio_write(tp, 0x06, 0x65e2);
-                rtl8168_mdio_write(tp, 0x06, 0x8606);
-                rtl8168_mdio_write(tp, 0x06, 0xe386);
-                rtl8168_mdio_write(tp, 0x06, 0x071b);
-                rtl8168_mdio_write(tp, 0x06, 0x56aa);
-                rtl8168_mdio_write(tp, 0x06, 0x0eef);
-                rtl8168_mdio_write(tp, 0x06, 0x56e6);
-                rtl8168_mdio_write(tp, 0x06, 0x8606);
-                rtl8168_mdio_write(tp, 0x06, 0xe786);
-                rtl8168_mdio_write(tp, 0x06, 0x07e2);
-                rtl8168_mdio_write(tp, 0x06, 0x8609);
-                rtl8168_mdio_write(tp, 0x06, 0xe686);
-                rtl8168_mdio_write(tp, 0x06, 0x08e0);
-                rtl8168_mdio_write(tp, 0x06, 0x8609);
-                rtl8168_mdio_write(tp, 0x06, 0xa000);
-                rtl8168_mdio_write(tp, 0x06, 0x07ee);
-                rtl8168_mdio_write(tp, 0x06, 0x860a);
-                rtl8168_mdio_write(tp, 0x06, 0x03af);
-                rtl8168_mdio_write(tp, 0x06, 0x8369);
-                rtl8168_mdio_write(tp, 0x06, 0x0224);
-                rtl8168_mdio_write(tp, 0x06, 0x8e02);
-                rtl8168_mdio_write(tp, 0x06, 0x2426);
-                rtl8168_mdio_write(tp, 0x06, 0xae48);
-                rtl8168_mdio_write(tp, 0x06, 0xa003);
-                rtl8168_mdio_write(tp, 0x06, 0x21e0);
-                rtl8168_mdio_write(tp, 0x06, 0x8608);
-                rtl8168_mdio_write(tp, 0x06, 0xe186);
-                rtl8168_mdio_write(tp, 0x06, 0x091b);
-                rtl8168_mdio_write(tp, 0x06, 0x019e);
-                rtl8168_mdio_write(tp, 0x06, 0x0caa);
-                rtl8168_mdio_write(tp, 0x06, 0x0502);
-                rtl8168_mdio_write(tp, 0x06, 0x249d);
-                rtl8168_mdio_write(tp, 0x06, 0xaee7);
-                rtl8168_mdio_write(tp, 0x06, 0x0224);
-                rtl8168_mdio_write(tp, 0x06, 0x8eae);
-                rtl8168_mdio_write(tp, 0x06, 0xe2ee);
-                rtl8168_mdio_write(tp, 0x06, 0x860a);
-                rtl8168_mdio_write(tp, 0x06, 0x04ee);
-                rtl8168_mdio_write(tp, 0x06, 0x860b);
-                rtl8168_mdio_write(tp, 0x06, 0x00af);
-                rtl8168_mdio_write(tp, 0x06, 0x8369);
-                rtl8168_mdio_write(tp, 0x06, 0xa004);
-                rtl8168_mdio_write(tp, 0x06, 0x15e0);
-                rtl8168_mdio_write(tp, 0x06, 0x860b);
-                rtl8168_mdio_write(tp, 0x06, 0xe18b);
-                rtl8168_mdio_write(tp, 0x06, 0x341b);
-                rtl8168_mdio_write(tp, 0x06, 0x109e);
-                rtl8168_mdio_write(tp, 0x06, 0x05aa);
-                rtl8168_mdio_write(tp, 0x06, 0x03af);
-                rtl8168_mdio_write(tp, 0x06, 0x8383);
-                rtl8168_mdio_write(tp, 0x06, 0xee86);
-                rtl8168_mdio_write(tp, 0x06, 0x0a05);
-                rtl8168_mdio_write(tp, 0x06, 0xae0c);
-                rtl8168_mdio_write(tp, 0x06, 0xa005);
-                rtl8168_mdio_write(tp, 0x06, 0x02ae);
-                rtl8168_mdio_write(tp, 0x06, 0x0702);
-                rtl8168_mdio_write(tp, 0x06, 0x2309);
-                rtl8168_mdio_write(tp, 0x06, 0xee86);
-                rtl8168_mdio_write(tp, 0x06, 0x0a00);
-                rtl8168_mdio_write(tp, 0x06, 0xfeef);
-                rtl8168_mdio_write(tp, 0x06, 0x96fe);
-                rtl8168_mdio_write(tp, 0x06, 0xfdfc);
-                rtl8168_mdio_write(tp, 0x06, 0x04f8);
-                rtl8168_mdio_write(tp, 0x06, 0xf9fa);
-                rtl8168_mdio_write(tp, 0x06, 0xef69);
-                rtl8168_mdio_write(tp, 0x06, 0xfbe0);
-                rtl8168_mdio_write(tp, 0x06, 0x8b85);
-                rtl8168_mdio_write(tp, 0x06, 0xad25);
-                rtl8168_mdio_write(tp, 0x06, 0x22e0);
-                rtl8168_mdio_write(tp, 0x06, 0xe022);
-                rtl8168_mdio_write(tp, 0x06, 0xe1e0);
-                rtl8168_mdio_write(tp, 0x06, 0x23e2);
-                rtl8168_mdio_write(tp, 0x06, 0xe036);
-                rtl8168_mdio_write(tp, 0x06, 0xe3e0);
-                rtl8168_mdio_write(tp, 0x06, 0x375a);
-                rtl8168_mdio_write(tp, 0x06, 0xc40d);
-                rtl8168_mdio_write(tp, 0x06, 0x0158);
-                rtl8168_mdio_write(tp, 0x06, 0x021e);
-                rtl8168_mdio_write(tp, 0x06, 0x20e3);
-                rtl8168_mdio_write(tp, 0x06, 0x8ae7);
-                rtl8168_mdio_write(tp, 0x06, 0xac31);
-                rtl8168_mdio_write(tp, 0x06, 0x60ac);
-                rtl8168_mdio_write(tp, 0x06, 0x3a08);
-                rtl8168_mdio_write(tp, 0x06, 0xac3e);
-                rtl8168_mdio_write(tp, 0x06, 0x26ae);
-                rtl8168_mdio_write(tp, 0x06, 0x67af);
-                rtl8168_mdio_write(tp, 0x06, 0x84db);
-                rtl8168_mdio_write(tp, 0x06, 0xad37);
-                rtl8168_mdio_write(tp, 0x06, 0x61e0);
-                rtl8168_mdio_write(tp, 0x06, 0x8ae8);
-                rtl8168_mdio_write(tp, 0x06, 0x10e4);
-                rtl8168_mdio_write(tp, 0x06, 0x8ae8);
-                rtl8168_mdio_write(tp, 0x06, 0xe18a);
-                rtl8168_mdio_write(tp, 0x06, 0xe91b);
-                rtl8168_mdio_write(tp, 0x06, 0x109e);
-                rtl8168_mdio_write(tp, 0x06, 0x02ae);
-                rtl8168_mdio_write(tp, 0x06, 0x51d1);
-                rtl8168_mdio_write(tp, 0x06, 0x00bf);
-                rtl8168_mdio_write(tp, 0x06, 0x863b);
-                rtl8168_mdio_write(tp, 0x06, 0x022f);
-                rtl8168_mdio_write(tp, 0x06, 0x50ee);
-                rtl8168_mdio_write(tp, 0x06, 0x8ae8);
-                rtl8168_mdio_write(tp, 0x06, 0x00ae);
-                rtl8168_mdio_write(tp, 0x06, 0x43ad);
-                rtl8168_mdio_write(tp, 0x06, 0x3627);
-                rtl8168_mdio_write(tp, 0x06, 0xe08a);
-                rtl8168_mdio_write(tp, 0x06, 0xeee1);
-                rtl8168_mdio_write(tp, 0x06, 0x8aef);
-                rtl8168_mdio_write(tp, 0x06, 0xef74);
-                rtl8168_mdio_write(tp, 0x06, 0xe08a);
-                rtl8168_mdio_write(tp, 0x06, 0xeae1);
-                rtl8168_mdio_write(tp, 0x06, 0x8aeb);
-                rtl8168_mdio_write(tp, 0x06, 0x1b74);
-                rtl8168_mdio_write(tp, 0x06, 0x9e2e);
-                rtl8168_mdio_write(tp, 0x06, 0x14e4);
-                rtl8168_mdio_write(tp, 0x06, 0x8aea);
-                rtl8168_mdio_write(tp, 0x06, 0xe58a);
-                rtl8168_mdio_write(tp, 0x06, 0xebef);
-                rtl8168_mdio_write(tp, 0x06, 0x74e0);
-                rtl8168_mdio_write(tp, 0x06, 0x8aee);
-                rtl8168_mdio_write(tp, 0x06, 0xe18a);
-                rtl8168_mdio_write(tp, 0x06, 0xef1b);
-                rtl8168_mdio_write(tp, 0x06, 0x479e);
-                rtl8168_mdio_write(tp, 0x06, 0x0fae);
-                rtl8168_mdio_write(tp, 0x06, 0x19ee);
-                rtl8168_mdio_write(tp, 0x06, 0x8aea);
-                rtl8168_mdio_write(tp, 0x06, 0x00ee);
-                rtl8168_mdio_write(tp, 0x06, 0x8aeb);
-                rtl8168_mdio_write(tp, 0x06, 0x00ae);
-                rtl8168_mdio_write(tp, 0x06, 0x0fac);
-                rtl8168_mdio_write(tp, 0x06, 0x390c);
-                rtl8168_mdio_write(tp, 0x06, 0xd101);
-                rtl8168_mdio_write(tp, 0x06, 0xbf86);
-                rtl8168_mdio_write(tp, 0x06, 0x3b02);
-                rtl8168_mdio_write(tp, 0x06, 0x2f50);
-                rtl8168_mdio_write(tp, 0x06, 0xee8a);
-                rtl8168_mdio_write(tp, 0x06, 0xe800);
-                rtl8168_mdio_write(tp, 0x06, 0xe68a);
-                rtl8168_mdio_write(tp, 0x06, 0xe7ff);
-                rtl8168_mdio_write(tp, 0x06, 0xef96);
-                rtl8168_mdio_write(tp, 0x06, 0xfefd);
-                rtl8168_mdio_write(tp, 0x06, 0xfc04);
-                rtl8168_mdio_write(tp, 0x06, 0xf8f9);
-                rtl8168_mdio_write(tp, 0x06, 0xfaef);
-                rtl8168_mdio_write(tp, 0x06, 0x69e0);
-                rtl8168_mdio_write(tp, 0x06, 0xe022);
-                rtl8168_mdio_write(tp, 0x06, 0xe1e0);
-                rtl8168_mdio_write(tp, 0x06, 0x2358);
-                rtl8168_mdio_write(tp, 0x06, 0xc4e1);
-                rtl8168_mdio_write(tp, 0x06, 0x8b6e);
-                rtl8168_mdio_write(tp, 0x06, 0x1f10);
-                rtl8168_mdio_write(tp, 0x06, 0x9e24);
-                rtl8168_mdio_write(tp, 0x06, 0xe48b);
-                rtl8168_mdio_write(tp, 0x06, 0x6ead);
-                rtl8168_mdio_write(tp, 0x06, 0x2218);
-                rtl8168_mdio_write(tp, 0x06, 0xac27);
-                rtl8168_mdio_write(tp, 0x06, 0x0dac);
-                rtl8168_mdio_write(tp, 0x06, 0x2605);
-                rtl8168_mdio_write(tp, 0x06, 0x0203);
-                rtl8168_mdio_write(tp, 0x06, 0x8fae);
-                rtl8168_mdio_write(tp, 0x06, 0x1302);
-                rtl8168_mdio_write(tp, 0x06, 0x03c8);
-                rtl8168_mdio_write(tp, 0x06, 0xae0e);
-                rtl8168_mdio_write(tp, 0x06, 0x0203);
-                rtl8168_mdio_write(tp, 0x06, 0xe102);
-                rtl8168_mdio_write(tp, 0x06, 0x8520);
-                rtl8168_mdio_write(tp, 0x06, 0xae06);
-                rtl8168_mdio_write(tp, 0x06, 0x0203);
-                rtl8168_mdio_write(tp, 0x06, 0x8f02);
-                rtl8168_mdio_write(tp, 0x06, 0x8566);
-                rtl8168_mdio_write(tp, 0x06, 0xef96);
-                rtl8168_mdio_write(tp, 0x06, 0xfefd);
-                rtl8168_mdio_write(tp, 0x06, 0xfc04);
-                rtl8168_mdio_write(tp, 0x06, 0xf8fa);
-                rtl8168_mdio_write(tp, 0x06, 0xef69);
-                rtl8168_mdio_write(tp, 0x06, 0xe08b);
-                rtl8168_mdio_write(tp, 0x06, 0x82ad);
-                rtl8168_mdio_write(tp, 0x06, 0x2737);
-                rtl8168_mdio_write(tp, 0x06, 0xbf86);
-                rtl8168_mdio_write(tp, 0x06, 0x4402);
-                rtl8168_mdio_write(tp, 0x06, 0x2f23);
-                rtl8168_mdio_write(tp, 0x06, 0xac28);
-                rtl8168_mdio_write(tp, 0x06, 0x2ed1);
-                rtl8168_mdio_write(tp, 0x06, 0x01bf);
-                rtl8168_mdio_write(tp, 0x06, 0x8647);
-                rtl8168_mdio_write(tp, 0x06, 0x022f);
-                rtl8168_mdio_write(tp, 0x06, 0x50bf);
-                rtl8168_mdio_write(tp, 0x06, 0x8641);
-                rtl8168_mdio_write(tp, 0x06, 0x022f);
-                rtl8168_mdio_write(tp, 0x06, 0x23e5);
-                rtl8168_mdio_write(tp, 0x06, 0x8af0);
-                rtl8168_mdio_write(tp, 0x06, 0xe0e0);
-                rtl8168_mdio_write(tp, 0x06, 0x22e1);
-                rtl8168_mdio_write(tp, 0x06, 0xe023);
-                rtl8168_mdio_write(tp, 0x06, 0xac2e);
-                rtl8168_mdio_write(tp, 0x06, 0x04d1);
-                rtl8168_mdio_write(tp, 0x06, 0x01ae);
-                rtl8168_mdio_write(tp, 0x06, 0x02d1);
-                rtl8168_mdio_write(tp, 0x06, 0x00bf);
-                rtl8168_mdio_write(tp, 0x06, 0x8641);
-                rtl8168_mdio_write(tp, 0x06, 0x022f);
-                rtl8168_mdio_write(tp, 0x06, 0x50d1);
-                rtl8168_mdio_write(tp, 0x06, 0x01bf);
-                rtl8168_mdio_write(tp, 0x06, 0x8644);
-                rtl8168_mdio_write(tp, 0x06, 0x022f);
-                rtl8168_mdio_write(tp, 0x06, 0x50ef);
-                rtl8168_mdio_write(tp, 0x06, 0x96fe);
-                rtl8168_mdio_write(tp, 0x06, 0xfc04);
-                rtl8168_mdio_write(tp, 0x06, 0xf8fa);
-                rtl8168_mdio_write(tp, 0x06, 0xef69);
-                rtl8168_mdio_write(tp, 0x06, 0xbf86);
-                rtl8168_mdio_write(tp, 0x06, 0x4702);
-                rtl8168_mdio_write(tp, 0x06, 0x2f23);
-                rtl8168_mdio_write(tp, 0x06, 0xad28);
-                rtl8168_mdio_write(tp, 0x06, 0x19d1);
-                rtl8168_mdio_write(tp, 0x06, 0x00bf);
-                rtl8168_mdio_write(tp, 0x06, 0x8644);
-                rtl8168_mdio_write(tp, 0x06, 0x022f);
-                rtl8168_mdio_write(tp, 0x06, 0x50e1);
-                rtl8168_mdio_write(tp, 0x06, 0x8af0);
-                rtl8168_mdio_write(tp, 0x06, 0xbf86);
-                rtl8168_mdio_write(tp, 0x06, 0x4102);
-                rtl8168_mdio_write(tp, 0x06, 0x2f50);
-                rtl8168_mdio_write(tp, 0x06, 0xd100);
-                rtl8168_mdio_write(tp, 0x06, 0xbf86);
-                rtl8168_mdio_write(tp, 0x06, 0x4702);
-                rtl8168_mdio_write(tp, 0x06, 0x2f50);
-                rtl8168_mdio_write(tp, 0x06, 0xef96);
-                rtl8168_mdio_write(tp, 0x06, 0xfefc);
-                rtl8168_mdio_write(tp, 0x06, 0x04f8);
-                rtl8168_mdio_write(tp, 0x06, 0xe0e2);
-                rtl8168_mdio_write(tp, 0x06, 0xfee1);
-                rtl8168_mdio_write(tp, 0x06, 0xe2ff);
-                rtl8168_mdio_write(tp, 0x06, 0xad2e);
-                rtl8168_mdio_write(tp, 0x06, 0x63e0);
-                rtl8168_mdio_write(tp, 0x06, 0xe038);
-                rtl8168_mdio_write(tp, 0x06, 0xe1e0);
-                rtl8168_mdio_write(tp, 0x06, 0x39ad);
-                rtl8168_mdio_write(tp, 0x06, 0x2f10);
-                rtl8168_mdio_write(tp, 0x06, 0xe0e0);
-                rtl8168_mdio_write(tp, 0x06, 0x34e1);
-                rtl8168_mdio_write(tp, 0x06, 0xe035);
-                rtl8168_mdio_write(tp, 0x06, 0xf726);
-                rtl8168_mdio_write(tp, 0x06, 0xe4e0);
-                rtl8168_mdio_write(tp, 0x06, 0x34e5);
-                rtl8168_mdio_write(tp, 0x06, 0xe035);
-                rtl8168_mdio_write(tp, 0x06, 0xae0e);
-                rtl8168_mdio_write(tp, 0x06, 0xe0e2);
-                rtl8168_mdio_write(tp, 0x06, 0xd6e1);
-                rtl8168_mdio_write(tp, 0x06, 0xe2d7);
-                rtl8168_mdio_write(tp, 0x06, 0xf728);
-                rtl8168_mdio_write(tp, 0x06, 0xe4e2);
-                rtl8168_mdio_write(tp, 0x06, 0xd6e5);
-                rtl8168_mdio_write(tp, 0x06, 0xe2d7);
-                rtl8168_mdio_write(tp, 0x06, 0xe0e2);
-                rtl8168_mdio_write(tp, 0x06, 0x34e1);
-                rtl8168_mdio_write(tp, 0x06, 0xe235);
-                rtl8168_mdio_write(tp, 0x06, 0xf72b);
-                rtl8168_mdio_write(tp, 0x06, 0xe4e2);
-                rtl8168_mdio_write(tp, 0x06, 0x34e5);
-                rtl8168_mdio_write(tp, 0x06, 0xe235);
-                rtl8168_mdio_write(tp, 0x06, 0xd07d);
-                rtl8168_mdio_write(tp, 0x06, 0xb0fe);
-                rtl8168_mdio_write(tp, 0x06, 0xe0e2);
-                rtl8168_mdio_write(tp, 0x06, 0x34e1);
-                rtl8168_mdio_write(tp, 0x06, 0xe235);
-                rtl8168_mdio_write(tp, 0x06, 0xf62b);
-                rtl8168_mdio_write(tp, 0x06, 0xe4e2);
-                rtl8168_mdio_write(tp, 0x06, 0x34e5);
-                rtl8168_mdio_write(tp, 0x06, 0xe235);
-                rtl8168_mdio_write(tp, 0x06, 0xe0e0);
-                rtl8168_mdio_write(tp, 0x06, 0x34e1);
-                rtl8168_mdio_write(tp, 0x06, 0xe035);
-                rtl8168_mdio_write(tp, 0x06, 0xf626);
-                rtl8168_mdio_write(tp, 0x06, 0xe4e0);
-                rtl8168_mdio_write(tp, 0x06, 0x34e5);
-                rtl8168_mdio_write(tp, 0x06, 0xe035);
-                rtl8168_mdio_write(tp, 0x06, 0xe0e2);
-                rtl8168_mdio_write(tp, 0x06, 0xd6e1);
-                rtl8168_mdio_write(tp, 0x06, 0xe2d7);
-                rtl8168_mdio_write(tp, 0x06, 0xf628);
-                rtl8168_mdio_write(tp, 0x06, 0xe4e2);
-                rtl8168_mdio_write(tp, 0x06, 0xd6e5);
-                rtl8168_mdio_write(tp, 0x06, 0xe2d7);
-                rtl8168_mdio_write(tp, 0x06, 0xfc04);
-                rtl8168_mdio_write(tp, 0x06, 0xae20);
-                rtl8168_mdio_write(tp, 0x06, 0x0000);
-                rtl8168_mdio_write(tp, 0x06, 0x0000);
-                rtl8168_mdio_write(tp, 0x06, 0x0000);
-                rtl8168_mdio_write(tp, 0x06, 0x0000);
-                rtl8168_mdio_write(tp, 0x06, 0x0000);
-                rtl8168_mdio_write(tp, 0x06, 0x0000);
-                rtl8168_mdio_write(tp, 0x06, 0x0000);
-                rtl8168_mdio_write(tp, 0x06, 0x0000);
-                rtl8168_mdio_write(tp, 0x06, 0x0000);
-                rtl8168_mdio_write(tp, 0x06, 0x0000);
-                rtl8168_mdio_write(tp, 0x06, 0x0000);
-                rtl8168_mdio_write(tp, 0x06, 0x0000);
-                rtl8168_mdio_write(tp, 0x06, 0x0000);
-                rtl8168_mdio_write(tp, 0x06, 0x0000);
-                rtl8168_mdio_write(tp, 0x06, 0x0000);
-                rtl8168_mdio_write(tp, 0x06, 0x0000);
-                rtl8168_mdio_write(tp, 0x06, 0xa725);
-                rtl8168_mdio_write(tp, 0x06, 0xe50a);
-                rtl8168_mdio_write(tp, 0x06, 0x1de5);
-                rtl8168_mdio_write(tp, 0x06, 0x0a2c);
-                rtl8168_mdio_write(tp, 0x06, 0xe50a);
-                rtl8168_mdio_write(tp, 0x06, 0x6de5);
-                rtl8168_mdio_write(tp, 0x06, 0x0a1d);
-                rtl8168_mdio_write(tp, 0x06, 0xe50a);
-                rtl8168_mdio_write(tp, 0x06, 0x1ce5);
-                rtl8168_mdio_write(tp, 0x06, 0x0a2d);
-                rtl8168_mdio_write(tp, 0x06, 0xa755);
-                rtl8168_mdio_write(tp, 0x06, 0x00e2);
-                rtl8168_mdio_write(tp, 0x06, 0x3488);
-                rtl8168_mdio_write(tp, 0x06, 0xe200);
-                rtl8168_mdio_write(tp, 0x06, 0xcce2);
-                rtl8168_mdio_write(tp, 0x06, 0x0055);
-                rtl8168_mdio_write(tp, 0x06, 0xe020);
-                rtl8168_mdio_write(tp, 0x06, 0x55e2);
-                rtl8168_mdio_write(tp, 0x06, 0xd600);
-                rtl8168_mdio_write(tp, 0x06, 0xe24a);
-                gphy_val = rtl8168_mdio_read(tp, 0x01);
-                gphy_val |= BIT_0;
-                rtl8168_mdio_write(tp, 0x01, gphy_val);
-                gphy_val = rtl8168_mdio_read(tp, 0x00);
-                gphy_val |= BIT_0;
-                rtl8168_mdio_write(tp, 0x00, gphy_val);
-                rtl8168_mdio_write(tp, 0x1f, 0x0000);
-
-                rtl8168_mdio_write(tp, 0x1f, 0x0000);
-                rtl8168_mdio_write(tp, 0x17, 0x2179);
-                rtl8168_mdio_write(tp, 0x1f, 0x0001);
-                rtl8168_mdio_write(tp, 0x10, 0xf274);
-                rtl8168_mdio_write(tp, 0x1f, 0x0007);
-                rtl8168_mdio_write(tp, 0x1e, 0x0042);
-                rtl8168_mdio_write(tp, 0x15, 0x0f00);
-                rtl8168_mdio_write(tp, 0x15, 0x0f00);
-                rtl8168_mdio_write(tp, 0x16, 0x7408);
-                rtl8168_mdio_write(tp, 0x15, 0x0e00);
-                rtl8168_mdio_write(tp, 0x15, 0x0f00);
-                rtl8168_mdio_write(tp, 0x15, 0x0f01);
-                rtl8168_mdio_write(tp, 0x16, 0x4000);
-                rtl8168_mdio_write(tp, 0x15, 0x0e01);
-                rtl8168_mdio_write(tp, 0x15, 0x0f01);
-                rtl8168_mdio_write(tp, 0x15, 0x0f02);
-                rtl8168_mdio_write(tp, 0x16, 0x9400);
-                rtl8168_mdio_write(tp, 0x15, 0x0e02);
-                rtl8168_mdio_write(tp, 0x15, 0x0f02);
-                rtl8168_mdio_write(tp, 0x15, 0x0f03);
-                rtl8168_mdio_write(tp, 0x16, 0x7408);
-                rtl8168_mdio_write(tp, 0x15, 0x0e03);
-                rtl8168_mdio_write(tp, 0x15, 0x0f03);
-                rtl8168_mdio_write(tp, 0x15, 0x0f04);
-                rtl8168_mdio_write(tp, 0x16, 0x4008);
-                rtl8168_mdio_write(tp, 0x15, 0x0e04);
-                rtl8168_mdio_write(tp, 0x15, 0x0f04);
-                rtl8168_mdio_write(tp, 0x15, 0x0f05);
-                rtl8168_mdio_write(tp, 0x16, 0x9400);
-                rtl8168_mdio_write(tp, 0x15, 0x0e05);
-                rtl8168_mdio_write(tp, 0x15, 0x0f05);
-                rtl8168_mdio_write(tp, 0x15, 0x0f06);
-                rtl8168_mdio_write(tp, 0x16, 0x0803);
-                rtl8168_mdio_write(tp, 0x15, 0x0e06);
-                rtl8168_mdio_write(tp, 0x15, 0x0f06);
-                rtl8168_mdio_write(tp, 0x15, 0x0d00);
-                rtl8168_mdio_write(tp, 0x15, 0x0100);
-                rtl8168_mdio_write(tp, 0x1f, 0x0001);
-                rtl8168_mdio_write(tp, 0x10, 0xf074);
-                rtl8168_mdio_write(tp, 0x1f, 0x0000);
-                rtl8168_mdio_write(tp, 0x17, 0x2149);
-
-                rtl8168_mdio_write(tp, 0x1f, 0x0005);
-                for (i = 0; i < 200; i++) {
-                        udelay(100);
-                        gphy_val = rtl8168_mdio_read(tp, 0x00);
-                        if (gphy_val & BIT_7)
-                                break;
-                }
-                rtl8168_mdio_write(tp, 0x1f, 0x0007);
-                rtl8168_mdio_write(tp, 0x1e, 0x0023);
-                gphy_val = rtl8168_mdio_read(tp, 0x17);
-                gphy_val &= ~(BIT_0);
-                if (tp->RequiredSecLanDonglePatch)
-                        gphy_val &= ~(BIT_2);
-                rtl8168_mdio_write(tp, 0x17, gphy_val);
-                rtl8168_mdio_write(tp, 0x1f, 0x0000);
-                rtl8168_mdio_write(tp, 0x1f, 0x0007);
-                rtl8168_mdio_write(tp, 0x1e, 0x0023);
-                gphy_val = rtl8168_mdio_read(tp, 0x17);
-                gphy_val |= BIT_14;
-                rtl8168_mdio_write(tp, 0x17, gphy_val);
-                rtl8168_mdio_write(tp, 0x1e, 0x0020);
-                gphy_val = rtl8168_mdio_read(tp, 0x1b);
-                gphy_val |= BIT_7;
-                rtl8168_mdio_write(tp, 0x1b, gphy_val);
-                rtl8168_mdio_write(tp, 0x1e, 0x0041);
-                rtl8168_mdio_write(tp, 0x15, 0x0e02);
-                rtl8168_mdio_write(tp, 0x1e, 0x0028);
-                gphy_val = rtl8168_mdio_read(tp, 0x19);
-                gphy_val |= BIT_15;
-                rtl8168_mdio_write(tp, 0x19, gphy_val);
-                rtl8168_mdio_write(tp, 0x1f, 0x0000);
-        } else {
-                rtl8168_mdio_write(tp, 0x1f, 0x0000);
-                rtl8168_mdio_write(tp, 0x00, 0x1800);
-                rtl8168_mdio_write(tp, 0x1f, 0x0007);
-                rtl8168_mdio_write(tp, 0x1e, 0x0023);
-                rtl8168_mdio_write(tp, 0x17, 0x0117);
-                rtl8168_mdio_write(tp, 0x1f, 0x0007);
-                rtl8168_mdio_write(tp, 0x1E, 0x002C);
-                rtl8168_mdio_write(tp, 0x1B, 0x5000);
-                rtl8168_mdio_write(tp, 0x1f, 0x0000);
-                rtl8168_mdio_write(tp, 0x16, 0x4104);
-                for (i = 0; i < 200; i++) {
-                        udelay(100);
-                        gphy_val = rtl8168_mdio_read(tp, 0x1E);
-                        gphy_val &= 0x03FF;
-                        if (gphy_val==0x000C)
-                                break;
-                }
-                rtl8168_mdio_write(tp, 0x1f, 0x0005);
-                for (i = 0; i < 200; i++) {
-                        udelay(100);
-                        gphy_val = rtl8168_mdio_read(tp, 0x07);
-                        if ((gphy_val & BIT_5) == 0)
-                                break;
-                }
-                gphy_val = rtl8168_mdio_read(tp, 0x07);
-                if (gphy_val & BIT_5) {
-                        rtl8168_mdio_write(tp, 0x1f, 0x0007);
-                        rtl8168_mdio_write(tp, 0x1e, 0x00a1);
-                        rtl8168_mdio_write(tp, 0x17, 0x1000);
-                        rtl8168_mdio_write(tp, 0x17, 0x0000);
-                        rtl8168_mdio_write(tp, 0x17, 0x2000);
-                        rtl8168_mdio_write(tp, 0x1e, 0x002f);
-                        rtl8168_mdio_write(tp, 0x18, 0x9bfb);
-                        rtl8168_mdio_write(tp, 0x1f, 0x0005);
-                        rtl8168_mdio_write(tp, 0x07, 0x0000);
-                        rtl8168_mdio_write(tp, 0x1f, 0x0000);
-                }
-                rtl8168_mdio_write(tp, 0x1f, 0x0005);
-                rtl8168_mdio_write(tp, 0x05, 0xfff6);
-                rtl8168_mdio_write(tp, 0x06, 0x0080);
-                gphy_val = rtl8168_mdio_read(tp, 0x00);
-                gphy_val &= ~(BIT_7);
-                rtl8168_mdio_write(tp, 0x00, gphy_val);
-                rtl8168_mdio_write(tp, 0x1f, 0x0002);
-                gphy_val = rtl8168_mdio_read(tp, 0x08);
-                gphy_val &= ~(BIT_7);
-                rtl8168_mdio_write(tp, 0x08, gphy_val);
-                rtl8168_mdio_write(tp, 0x1f, 0x0000);
-
-                rtl8168_mdio_write(tp, 0x1f, 0x0007);
-                rtl8168_mdio_write(tp, 0x1e, 0x0023);
-                rtl8168_mdio_write(tp, 0x16, 0x0306);
-                rtl8168_mdio_write(tp, 0x16, 0x0307);
-                rtl8168_mdio_write(tp, 0x15, 0x000e);
-                rtl8168_mdio_write(tp, 0x19, 0x000a);
-                rtl8168_mdio_write(tp, 0x15, 0x0010);
-                rtl8168_mdio_write(tp, 0x19, 0x0008);
-                rtl8168_mdio_write(tp, 0x15, 0x0018);
-                rtl8168_mdio_write(tp, 0x19, 0x4801);
-                rtl8168_mdio_write(tp, 0x15, 0x0019);
-                rtl8168_mdio_write(tp, 0x19, 0x6801);
-                rtl8168_mdio_write(tp, 0x15, 0x001a);
-                rtl8168_mdio_write(tp, 0x19, 0x66a1);
-                rtl8168_mdio_write(tp, 0x15, 0x001f);
-                rtl8168_mdio_write(tp, 0x19, 0x0000);
-                rtl8168_mdio_write(tp, 0x15, 0x0020);
-                rtl8168_mdio_write(tp, 0x19, 0x0000);
-                rtl8168_mdio_write(tp, 0x15, 0x0021);
-                rtl8168_mdio_write(tp, 0x19, 0x0000);
-                rtl8168_mdio_write(tp, 0x15, 0x0022);
-                rtl8168_mdio_write(tp, 0x19, 0x0000);
-                rtl8168_mdio_write(tp, 0x15, 0x0023);
-                rtl8168_mdio_write(tp, 0x19, 0x0000);
-                rtl8168_mdio_write(tp, 0x15, 0x0024);
-                rtl8168_mdio_write(tp, 0x19, 0x0000);
-                rtl8168_mdio_write(tp, 0x15, 0x0025);
-                rtl8168_mdio_write(tp, 0x19, 0x64a1);
-                rtl8168_mdio_write(tp, 0x15, 0x0026);
-                rtl8168_mdio_write(tp, 0x19, 0x40ea);
-                rtl8168_mdio_write(tp, 0x15, 0x0027);
-                rtl8168_mdio_write(tp, 0x19, 0x4503);
-                rtl8168_mdio_write(tp, 0x15, 0x0028);
-                rtl8168_mdio_write(tp, 0x19, 0x9f00);
-                rtl8168_mdio_write(tp, 0x15, 0x0029);
-                rtl8168_mdio_write(tp, 0x19, 0xa631);
-                rtl8168_mdio_write(tp, 0x15, 0x002a);
-                rtl8168_mdio_write(tp, 0x19, 0x9717);
-                rtl8168_mdio_write(tp, 0x15, 0x002b);
-                rtl8168_mdio_write(tp, 0x19, 0x302c);
-                rtl8168_mdio_write(tp, 0x15, 0x002c);
-                rtl8168_mdio_write(tp, 0x19, 0x4802);
-                rtl8168_mdio_write(tp, 0x15, 0x002d);
-                rtl8168_mdio_write(tp, 0x19, 0x58da);
-                rtl8168_mdio_write(tp, 0x15, 0x002e);
-                rtl8168_mdio_write(tp, 0x19, 0x400d);
-                rtl8168_mdio_write(tp, 0x15, 0x002f);
-                rtl8168_mdio_write(tp, 0x19, 0x4488);
-                rtl8168_mdio_write(tp, 0x15, 0x0030);
-                rtl8168_mdio_write(tp, 0x19, 0x9e00);
-                rtl8168_mdio_write(tp, 0x15, 0x0031);
-                rtl8168_mdio_write(tp, 0x19, 0x63c8);
-                rtl8168_mdio_write(tp, 0x15, 0x0032);
-                rtl8168_mdio_write(tp, 0x19, 0x6481);
-                rtl8168_mdio_write(tp, 0x15, 0x0033);
-                rtl8168_mdio_write(tp, 0x19, 0x0000);
-                rtl8168_mdio_write(tp, 0x15, 0x0034);
-                rtl8168_mdio_write(tp, 0x19, 0x0000);
-                rtl8168_mdio_write(tp, 0x15, 0x0035);
-                rtl8168_mdio_write(tp, 0x19, 0x0000);
-                rtl8168_mdio_write(tp, 0x15, 0x0036);
-                rtl8168_mdio_write(tp, 0x19, 0x0000);
-                rtl8168_mdio_write(tp, 0x15, 0x0037);
-                rtl8168_mdio_write(tp, 0x19, 0x0000);
-                rtl8168_mdio_write(tp, 0x15, 0x0038);
-                rtl8168_mdio_write(tp, 0x19, 0x0000);
-                rtl8168_mdio_write(tp, 0x15, 0x0039);
-                rtl8168_mdio_write(tp, 0x19, 0x0000);
-                rtl8168_mdio_write(tp, 0x15, 0x003a);
-                rtl8168_mdio_write(tp, 0x19, 0x0000);
-                rtl8168_mdio_write(tp, 0x15, 0x003b);
-                rtl8168_mdio_write(tp, 0x19, 0x63e8);
-                rtl8168_mdio_write(tp, 0x15, 0x003c);
-                rtl8168_mdio_write(tp, 0x19, 0x7d00);
-                rtl8168_mdio_write(tp, 0x15, 0x003d);
-                rtl8168_mdio_write(tp, 0x19, 0x59d4);
-                rtl8168_mdio_write(tp, 0x15, 0x003e);
-                rtl8168_mdio_write(tp, 0x19, 0x63f8);
-                rtl8168_mdio_write(tp, 0x15, 0x0040);
-                rtl8168_mdio_write(tp, 0x19, 0x64a1);
-                rtl8168_mdio_write(tp, 0x15, 0x0041);
-                rtl8168_mdio_write(tp, 0x19, 0x30de);
-                rtl8168_mdio_write(tp, 0x15, 0x0044);
-                rtl8168_mdio_write(tp, 0x19, 0x480f);
-                rtl8168_mdio_write(tp, 0x15, 0x0045);
-                rtl8168_mdio_write(tp, 0x19, 0x6800);
-                rtl8168_mdio_write(tp, 0x15, 0x0046);
-                rtl8168_mdio_write(tp, 0x19, 0x6680);
-                rtl8168_mdio_write(tp, 0x15, 0x0047);
-                rtl8168_mdio_write(tp, 0x19, 0x7c10);
-                rtl8168_mdio_write(tp, 0x15, 0x0048);
-                rtl8168_mdio_write(tp, 0x19, 0x63c8);
-                rtl8168_mdio_write(tp, 0x15, 0x0049);
-                rtl8168_mdio_write(tp, 0x19, 0x0000);
-                rtl8168_mdio_write(tp, 0x15, 0x004a);
-                rtl8168_mdio_write(tp, 0x19, 0x0000);
-                rtl8168_mdio_write(tp, 0x15, 0x004b);
-                rtl8168_mdio_write(tp, 0x19, 0x0000);
-                rtl8168_mdio_write(tp, 0x15, 0x004c);
-                rtl8168_mdio_write(tp, 0x19, 0x0000);
-                rtl8168_mdio_write(tp, 0x15, 0x004d);
-                rtl8168_mdio_write(tp, 0x19, 0x0000);
-                rtl8168_mdio_write(tp, 0x15, 0x004e);
-                rtl8168_mdio_write(tp, 0x19, 0x0000);
-                rtl8168_mdio_write(tp, 0x15, 0x004f);
-                rtl8168_mdio_write(tp, 0x19, 0x40ea);
-                rtl8168_mdio_write(tp, 0x15, 0x0050);
-                rtl8168_mdio_write(tp, 0x19, 0x4503);
-                rtl8168_mdio_write(tp, 0x15, 0x0051);
-                rtl8168_mdio_write(tp, 0x19, 0x58ca);
-                rtl8168_mdio_write(tp, 0x15, 0x0052);
-                rtl8168_mdio_write(tp, 0x19, 0x63c8);
-                rtl8168_mdio_write(tp, 0x15, 0x0053);
-                rtl8168_mdio_write(tp, 0x19, 0x63d8);
-                rtl8168_mdio_write(tp, 0x15, 0x0054);
-                rtl8168_mdio_write(tp, 0x19, 0x66a0);
-                rtl8168_mdio_write(tp, 0x15, 0x0055);
-                rtl8168_mdio_write(tp, 0x19, 0x9f00);
-                rtl8168_mdio_write(tp, 0x15, 0x0056);
-                rtl8168_mdio_write(tp, 0x19, 0x3000);
-                rtl8168_mdio_write(tp, 0x15, 0x00a1);
-                rtl8168_mdio_write(tp, 0x19, 0x3044);
-                rtl8168_mdio_write(tp, 0x15, 0x00ab);
-                rtl8168_mdio_write(tp, 0x19, 0x5820);
-                rtl8168_mdio_write(tp, 0x15, 0x00ac);
-                rtl8168_mdio_write(tp, 0x19, 0x5e04);
-                rtl8168_mdio_write(tp, 0x15, 0x00ad);
-                rtl8168_mdio_write(tp, 0x19, 0xb60c);
-                rtl8168_mdio_write(tp, 0x15, 0x00af);
-                rtl8168_mdio_write(tp, 0x19, 0x000a);
-                rtl8168_mdio_write(tp, 0x15, 0x00b2);
-                rtl8168_mdio_write(tp, 0x19, 0x30b9);
-                rtl8168_mdio_write(tp, 0x15, 0x00b9);
-                rtl8168_mdio_write(tp, 0x19, 0x4408);
-                rtl8168_mdio_write(tp, 0x15, 0x00ba);
-                rtl8168_mdio_write(tp, 0x19, 0x480b);
-                rtl8168_mdio_write(tp, 0x15, 0x00bb);
-                rtl8168_mdio_write(tp, 0x19, 0x5e00);
-                rtl8168_mdio_write(tp, 0x15, 0x00bc);
-                rtl8168_mdio_write(tp, 0x19, 0x405f);
-                rtl8168_mdio_write(tp, 0x15, 0x00bd);
-                rtl8168_mdio_write(tp, 0x19, 0x4448);
-                rtl8168_mdio_write(tp, 0x15, 0x00be);
-                rtl8168_mdio_write(tp, 0x19, 0x4020);
-                rtl8168_mdio_write(tp, 0x15, 0x00bf);
-                rtl8168_mdio_write(tp, 0x19, 0x4468);
-                rtl8168_mdio_write(tp, 0x15, 0x00c0);
-                rtl8168_mdio_write(tp, 0x19, 0x9c02);
-                rtl8168_mdio_write(tp, 0x15, 0x00c1);
-                rtl8168_mdio_write(tp, 0x19, 0x58a0);
-                rtl8168_mdio_write(tp, 0x15, 0x00c2);
-                rtl8168_mdio_write(tp, 0x19, 0xb605);
-                rtl8168_mdio_write(tp, 0x15, 0x00c3);
-                rtl8168_mdio_write(tp, 0x19, 0xc0d3);
-                rtl8168_mdio_write(tp, 0x15, 0x00c4);
-                rtl8168_mdio_write(tp, 0x19, 0x00e6);
-                rtl8168_mdio_write(tp, 0x15, 0x00c5);
-                rtl8168_mdio_write(tp, 0x19, 0xdaec);
-                rtl8168_mdio_write(tp, 0x15, 0x00c6);
-                rtl8168_mdio_write(tp, 0x19, 0x00fa);
-                rtl8168_mdio_write(tp, 0x15, 0x00c7);
-                rtl8168_mdio_write(tp, 0x19, 0x9df9);
-                rtl8168_mdio_write(tp, 0x15, 0x0112);
-                rtl8168_mdio_write(tp, 0x19, 0x6421);
-                rtl8168_mdio_write(tp, 0x15, 0x0113);
-                rtl8168_mdio_write(tp, 0x19, 0x7c08);
-                rtl8168_mdio_write(tp, 0x15, 0x0114);
-                rtl8168_mdio_write(tp, 0x19, 0x63f0);
-                rtl8168_mdio_write(tp, 0x15, 0x0115);
-                rtl8168_mdio_write(tp, 0x19, 0x4003);
-                rtl8168_mdio_write(tp, 0x15, 0x0116);
-                rtl8168_mdio_write(tp, 0x19, 0x4418);
-                rtl8168_mdio_write(tp, 0x15, 0x0117);
-                rtl8168_mdio_write(tp, 0x19, 0x9b00);
-                rtl8168_mdio_write(tp, 0x15, 0x0118);
-                rtl8168_mdio_write(tp, 0x19, 0x6461);
-                rtl8168_mdio_write(tp, 0x15, 0x0119);
-                rtl8168_mdio_write(tp, 0x19, 0x64e1);
-                rtl8168_mdio_write(tp, 0x15, 0x011a);
-                rtl8168_mdio_write(tp, 0x19, 0x0000);
-                rtl8168_mdio_write(tp, 0x15, 0x0150);
-                rtl8168_mdio_write(tp, 0x19, 0x7c80);
-                rtl8168_mdio_write(tp, 0x15, 0x0151);
-                rtl8168_mdio_write(tp, 0x19, 0x6461);
-                rtl8168_mdio_write(tp, 0x15, 0x0152);
-                rtl8168_mdio_write(tp, 0x19, 0x4003);
-                rtl8168_mdio_write(tp, 0x15, 0x0153);
-                rtl8168_mdio_write(tp, 0x19, 0x4540);
-                rtl8168_mdio_write(tp, 0x15, 0x0154);
-                rtl8168_mdio_write(tp, 0x19, 0x9f00);
-                rtl8168_mdio_write(tp, 0x15, 0x0155);
-                rtl8168_mdio_write(tp, 0x19, 0x9d00);
-                rtl8168_mdio_write(tp, 0x15, 0x0156);
-                rtl8168_mdio_write(tp, 0x19, 0x7c40);
-                rtl8168_mdio_write(tp, 0x15, 0x0157);
-                rtl8168_mdio_write(tp, 0x19, 0x6421);
-                rtl8168_mdio_write(tp, 0x15, 0x0158);
-                rtl8168_mdio_write(tp, 0x19, 0x7c80);
-                rtl8168_mdio_write(tp, 0x15, 0x0159);
-                rtl8168_mdio_write(tp, 0x19, 0x64a1);
-                rtl8168_mdio_write(tp, 0x15, 0x015a);
-                rtl8168_mdio_write(tp, 0x19, 0x30fe);
-                rtl8168_mdio_write(tp, 0x15, 0x029c);
-                rtl8168_mdio_write(tp, 0x19, 0x0070);
-                rtl8168_mdio_write(tp, 0x15, 0x02b2);
-                rtl8168_mdio_write(tp, 0x19, 0x005a);
-                rtl8168_mdio_write(tp, 0x15, 0x02bd);
-                rtl8168_mdio_write(tp, 0x19, 0xa522);
-                rtl8168_mdio_write(tp, 0x15, 0x02ce);
-                rtl8168_mdio_write(tp, 0x19, 0xb63e);
-                rtl8168_mdio_write(tp, 0x15, 0x02d9);
-                rtl8168_mdio_write(tp, 0x19, 0x32df);
-                rtl8168_mdio_write(tp, 0x15, 0x02df);
-                rtl8168_mdio_write(tp, 0x19, 0x4500);
-                rtl8168_mdio_write(tp, 0x15, 0x02f4);
-                rtl8168_mdio_write(tp, 0x19, 0xb618);
-                rtl8168_mdio_write(tp, 0x15, 0x02fb);
-                rtl8168_mdio_write(tp, 0x19, 0xb900);
-                rtl8168_mdio_write(tp, 0x15, 0x02fc);
-                rtl8168_mdio_write(tp, 0x19, 0x49b5);
-                rtl8168_mdio_write(tp, 0x15, 0x02fd);
-                rtl8168_mdio_write(tp, 0x19, 0x6812);
-                rtl8168_mdio_write(tp, 0x15, 0x02fe);
-                rtl8168_mdio_write(tp, 0x19, 0x66a0);
-                rtl8168_mdio_write(tp, 0x15, 0x02ff);
-                rtl8168_mdio_write(tp, 0x19, 0x9900);
-                rtl8168_mdio_write(tp, 0x15, 0x0300);
-                rtl8168_mdio_write(tp, 0x19, 0x64a0);
-                rtl8168_mdio_write(tp, 0x15, 0x0301);
-                rtl8168_mdio_write(tp, 0x19, 0x3316);
-                rtl8168_mdio_write(tp, 0x15, 0x0308);
-                rtl8168_mdio_write(tp, 0x19, 0x0000);
-                rtl8168_mdio_write(tp, 0x15, 0x030c);
-                rtl8168_mdio_write(tp, 0x19, 0x3000);
-                rtl8168_mdio_write(tp, 0x15, 0x0312);
-                rtl8168_mdio_write(tp, 0x19, 0x0000);
-                rtl8168_mdio_write(tp, 0x15, 0x0313);
-                rtl8168_mdio_write(tp, 0x19, 0x0000);
-                rtl8168_mdio_write(tp, 0x15, 0x0314);
-                rtl8168_mdio_write(tp, 0x19, 0x0000);
-                rtl8168_mdio_write(tp, 0x15, 0x0315);
-                rtl8168_mdio_write(tp, 0x19, 0x0000);
-                rtl8168_mdio_write(tp, 0x15, 0x0316);
-                rtl8168_mdio_write(tp, 0x19, 0x49b5);
-                rtl8168_mdio_write(tp, 0x15, 0x0317);
-                rtl8168_mdio_write(tp, 0x19, 0x7d00);
-                rtl8168_mdio_write(tp, 0x15, 0x0318);
-                rtl8168_mdio_write(tp, 0x19, 0x4d00);
-                rtl8168_mdio_write(tp, 0x15, 0x0319);
-                rtl8168_mdio_write(tp, 0x19, 0x6810);
-                rtl8168_mdio_write(tp, 0x15, 0x031a);
-                rtl8168_mdio_write(tp, 0x19, 0x6c08);
-                rtl8168_mdio_write(tp, 0x15, 0x031b);
-                rtl8168_mdio_write(tp, 0x19, 0x4925);
-                rtl8168_mdio_write(tp, 0x15, 0x031c);
-                rtl8168_mdio_write(tp, 0x19, 0x403b);
-                rtl8168_mdio_write(tp, 0x15, 0x031d);
-                rtl8168_mdio_write(tp, 0x19, 0xa602);
-                rtl8168_mdio_write(tp, 0x15, 0x031e);
-                rtl8168_mdio_write(tp, 0x19, 0x402f);
-                rtl8168_mdio_write(tp, 0x15, 0x031f);
-                rtl8168_mdio_write(tp, 0x19, 0x4484);
-                rtl8168_mdio_write(tp, 0x15, 0x0320);
-                rtl8168_mdio_write(tp, 0x19, 0x40c8);
-                rtl8168_mdio_write(tp, 0x15, 0x0321);
-                rtl8168_mdio_write(tp, 0x19, 0x44c4);
-                rtl8168_mdio_write(tp, 0x15, 0x0322);
-                rtl8168_mdio_write(tp, 0x19, 0x404f);
-                rtl8168_mdio_write(tp, 0x15, 0x0323);
-                rtl8168_mdio_write(tp, 0x19, 0x44c8);
-                rtl8168_mdio_write(tp, 0x15, 0x0324);
-                rtl8168_mdio_write(tp, 0x19, 0xd64f);
-                rtl8168_mdio_write(tp, 0x15, 0x0325);
-                rtl8168_mdio_write(tp, 0x19, 0x00e7);
-                rtl8168_mdio_write(tp, 0x15, 0x0326);
-                rtl8168_mdio_write(tp, 0x19, 0x7c08);
-                rtl8168_mdio_write(tp, 0x15, 0x0327);
-                rtl8168_mdio_write(tp, 0x19, 0x8203);
-                rtl8168_mdio_write(tp, 0x15, 0x0328);
-                rtl8168_mdio_write(tp, 0x19, 0x4d48);
-                rtl8168_mdio_write(tp, 0x15, 0x0329);
-                rtl8168_mdio_write(tp, 0x19, 0x332b);
-                rtl8168_mdio_write(tp, 0x15, 0x032a);
-                rtl8168_mdio_write(tp, 0x19, 0x4d40);
-                rtl8168_mdio_write(tp, 0x15, 0x032c);
-                rtl8168_mdio_write(tp, 0x19, 0x00f8);
-                rtl8168_mdio_write(tp, 0x15, 0x032d);
-                rtl8168_mdio_write(tp, 0x19, 0x82b2);
-                rtl8168_mdio_write(tp, 0x15, 0x032f);
-                rtl8168_mdio_write(tp, 0x19, 0x00b0);
-                rtl8168_mdio_write(tp, 0x15, 0x0332);
-                rtl8168_mdio_write(tp, 0x19, 0x91f2);
-                rtl8168_mdio_write(tp, 0x15, 0x033f);
-                rtl8168_mdio_write(tp, 0x19, 0xb6cd);
-                rtl8168_mdio_write(tp, 0x15, 0x0340);
-                rtl8168_mdio_write(tp, 0x19, 0x9e01);
-                rtl8168_mdio_write(tp, 0x15, 0x0341);
-                rtl8168_mdio_write(tp, 0x19, 0xd11d);
-                rtl8168_mdio_write(tp, 0x15, 0x0342);
-                rtl8168_mdio_write(tp, 0x19, 0x009d);
-                rtl8168_mdio_write(tp, 0x15, 0x0343);
-                rtl8168_mdio_write(tp, 0x19, 0xbb1c);
-                rtl8168_mdio_write(tp, 0x15, 0x0344);
-                rtl8168_mdio_write(tp, 0x19, 0x8102);
-                rtl8168_mdio_write(tp, 0x15, 0x0345);
-                rtl8168_mdio_write(tp, 0x19, 0x3348);
-                rtl8168_mdio_write(tp, 0x15, 0x0346);
-                rtl8168_mdio_write(tp, 0x19, 0xa231);
-                rtl8168_mdio_write(tp, 0x15, 0x0347);
-                rtl8168_mdio_write(tp, 0x19, 0x335b);
-                rtl8168_mdio_write(tp, 0x15, 0x0348);
-                rtl8168_mdio_write(tp, 0x19, 0x91f7);
-                rtl8168_mdio_write(tp, 0x15, 0x0349);
-                rtl8168_mdio_write(tp, 0x19, 0xc218);
-                rtl8168_mdio_write(tp, 0x15, 0x034a);
-                rtl8168_mdio_write(tp, 0x19, 0x00f5);
-                rtl8168_mdio_write(tp, 0x15, 0x034b);
-                rtl8168_mdio_write(tp, 0x19, 0x335b);
-                rtl8168_mdio_write(tp, 0x15, 0x034c);
-                rtl8168_mdio_write(tp, 0x19, 0x0000);
-                rtl8168_mdio_write(tp, 0x15, 0x034d);
-                rtl8168_mdio_write(tp, 0x19, 0x0000);
-                rtl8168_mdio_write(tp, 0x15, 0x034e);
-                rtl8168_mdio_write(tp, 0x19, 0x0000);
-                rtl8168_mdio_write(tp, 0x15, 0x034f);
-                rtl8168_mdio_write(tp, 0x19, 0x0000);
-                rtl8168_mdio_write(tp, 0x15, 0x0350);
-                rtl8168_mdio_write(tp, 0x19, 0x0000);
-                rtl8168_mdio_write(tp, 0x15, 0x035b);
-                rtl8168_mdio_write(tp, 0x19, 0xa23c);
-                rtl8168_mdio_write(tp, 0x15, 0x035c);
-                rtl8168_mdio_write(tp, 0x19, 0x7c08);
-                rtl8168_mdio_write(tp, 0x15, 0x035d);
-                rtl8168_mdio_write(tp, 0x19, 0x4c00);
-                rtl8168_mdio_write(tp, 0x15, 0x035e);
-                rtl8168_mdio_write(tp, 0x19, 0x3397);
-                rtl8168_mdio_write(tp, 0x15, 0x0363);
-                rtl8168_mdio_write(tp, 0x19, 0xb6a9);
-                rtl8168_mdio_write(tp, 0x15, 0x0366);
-                rtl8168_mdio_write(tp, 0x19, 0x00f5);
-                rtl8168_mdio_write(tp, 0x15, 0x0382);
-                rtl8168_mdio_write(tp, 0x19, 0x7c40);
-                rtl8168_mdio_write(tp, 0x15, 0x0388);
-                rtl8168_mdio_write(tp, 0x19, 0x0084);
-                rtl8168_mdio_write(tp, 0x15, 0x0389);
-                rtl8168_mdio_write(tp, 0x19, 0xdd17);
-                rtl8168_mdio_write(tp, 0x15, 0x038a);
-                rtl8168_mdio_write(tp, 0x19, 0x000b);
-                rtl8168_mdio_write(tp, 0x15, 0x038b);
-                rtl8168_mdio_write(tp, 0x19, 0xa10a);
-                rtl8168_mdio_write(tp, 0x15, 0x038c);
-                rtl8168_mdio_write(tp, 0x19, 0x337e);
-                rtl8168_mdio_write(tp, 0x15, 0x038d);
-                rtl8168_mdio_write(tp, 0x19, 0x6c0b);
-                rtl8168_mdio_write(tp, 0x15, 0x038e);
-                rtl8168_mdio_write(tp, 0x19, 0xa107);
-                rtl8168_mdio_write(tp, 0x15, 0x038f);
-                rtl8168_mdio_write(tp, 0x19, 0x6c08);
-                rtl8168_mdio_write(tp, 0x15, 0x0390);
-                rtl8168_mdio_write(tp, 0x19, 0xc017);
-                rtl8168_mdio_write(tp, 0x15, 0x0391);
-                rtl8168_mdio_write(tp, 0x19, 0x0004);
-                rtl8168_mdio_write(tp, 0x15, 0x0392);
-                rtl8168_mdio_write(tp, 0x19, 0xd64f);
-                rtl8168_mdio_write(tp, 0x15, 0x0393);
-                rtl8168_mdio_write(tp, 0x19, 0x00f4);
-                rtl8168_mdio_write(tp, 0x15, 0x0397);
-                rtl8168_mdio_write(tp, 0x19, 0x4098);
-                rtl8168_mdio_write(tp, 0x15, 0x0398);
-                rtl8168_mdio_write(tp, 0x19, 0x4408);
-                rtl8168_mdio_write(tp, 0x15, 0x0399);
-                rtl8168_mdio_write(tp, 0x19, 0x55bf);
-                rtl8168_mdio_write(tp, 0x15, 0x039a);
-                rtl8168_mdio_write(tp, 0x19, 0x4bb9);
-                rtl8168_mdio_write(tp, 0x15, 0x039b);
-                rtl8168_mdio_write(tp, 0x19, 0x6810);
-                rtl8168_mdio_write(tp, 0x15, 0x039c);
-                rtl8168_mdio_write(tp, 0x19, 0x4b29);
-                rtl8168_mdio_write(tp, 0x15, 0x039d);
-                rtl8168_mdio_write(tp, 0x19, 0x4041);
-                rtl8168_mdio_write(tp, 0x15, 0x039e);
-                rtl8168_mdio_write(tp, 0x19, 0x442a);
-                rtl8168_mdio_write(tp, 0x15, 0x039f);
-                rtl8168_mdio_write(tp, 0x19, 0x4029);
-                rtl8168_mdio_write(tp, 0x15, 0x03aa);
-                rtl8168_mdio_write(tp, 0x19, 0x33b8);
-                rtl8168_mdio_write(tp, 0x15, 0x03b6);
-                rtl8168_mdio_write(tp, 0x19, 0x0000);
-                rtl8168_mdio_write(tp, 0x15, 0x03b7);
-                rtl8168_mdio_write(tp, 0x19, 0x0000);
-                rtl8168_mdio_write(tp, 0x15, 0x03b8);
-                rtl8168_mdio_write(tp, 0x19, 0x543f);
-                rtl8168_mdio_write(tp, 0x15, 0x03b9);
-                rtl8168_mdio_write(tp, 0x19, 0x499a);
-                rtl8168_mdio_write(tp, 0x15, 0x03ba);
-                rtl8168_mdio_write(tp, 0x19, 0x7c40);
-                rtl8168_mdio_write(tp, 0x15, 0x03bb);
-                rtl8168_mdio_write(tp, 0x19, 0x4c40);
-                rtl8168_mdio_write(tp, 0x15, 0x03bc);
-                rtl8168_mdio_write(tp, 0x19, 0x490a);
-                rtl8168_mdio_write(tp, 0x15, 0x03bd);
-                rtl8168_mdio_write(tp, 0x19, 0x405e);
-                rtl8168_mdio_write(tp, 0x15, 0x03c2);
-                rtl8168_mdio_write(tp, 0x19, 0x9a03);
-                rtl8168_mdio_write(tp, 0x15, 0x03c4);
-                rtl8168_mdio_write(tp, 0x19, 0x0015);
-                rtl8168_mdio_write(tp, 0x15, 0x03c5);
-                rtl8168_mdio_write(tp, 0x19, 0x9e03);
-                rtl8168_mdio_write(tp, 0x15, 0x03c8);
-                rtl8168_mdio_write(tp, 0x19, 0x9cf7);
-                rtl8168_mdio_write(tp, 0x15, 0x03c9);
-                rtl8168_mdio_write(tp, 0x19, 0x7c12);
-                rtl8168_mdio_write(tp, 0x15, 0x03ca);
-                rtl8168_mdio_write(tp, 0x19, 0x4c52);
-                rtl8168_mdio_write(tp, 0x15, 0x03cb);
-                rtl8168_mdio_write(tp, 0x19, 0x4458);
-                rtl8168_mdio_write(tp, 0x15, 0x03cd);
-                rtl8168_mdio_write(tp, 0x19, 0x4c40);
-                rtl8168_mdio_write(tp, 0x15, 0x03ce);
-                rtl8168_mdio_write(tp, 0x19, 0x33bf);
-                rtl8168_mdio_write(tp, 0x15, 0x03cf);
-                rtl8168_mdio_write(tp, 0x19, 0x0000);
-                rtl8168_mdio_write(tp, 0x15, 0x03d0);
-                rtl8168_mdio_write(tp, 0x19, 0x0000);
-                rtl8168_mdio_write(tp, 0x15, 0x03d1);
-                rtl8168_mdio_write(tp, 0x19, 0x0000);
-                rtl8168_mdio_write(tp, 0x15, 0x03d5);
-                rtl8168_mdio_write(tp, 0x19, 0x0000);
-                rtl8168_mdio_write(tp, 0x15, 0x03d6);
-                rtl8168_mdio_write(tp, 0x19, 0x0000);
-                rtl8168_mdio_write(tp, 0x15, 0x03d7);
-                rtl8168_mdio_write(tp, 0x19, 0x0000);
-                rtl8168_mdio_write(tp, 0x15, 0x03d8);
-                rtl8168_mdio_write(tp, 0x19, 0x0000);
-                rtl8168_mdio_write(tp, 0x15, 0x03d9);
-                rtl8168_mdio_write(tp, 0x19, 0x49bb);
-                rtl8168_mdio_write(tp, 0x15, 0x03da);
-                rtl8168_mdio_write(tp, 0x19, 0x4478);
-                rtl8168_mdio_write(tp, 0x15, 0x03db);
-                rtl8168_mdio_write(tp, 0x19, 0x492b);
-                rtl8168_mdio_write(tp, 0x15, 0x03dc);
-                rtl8168_mdio_write(tp, 0x19, 0x7c01);
-                rtl8168_mdio_write(tp, 0x15, 0x03dd);
-                rtl8168_mdio_write(tp, 0x19, 0x4c00);
-                rtl8168_mdio_write(tp, 0x15, 0x03de);
-                rtl8168_mdio_write(tp, 0x19, 0xbd1a);
-                rtl8168_mdio_write(tp, 0x15, 0x03df);
-                rtl8168_mdio_write(tp, 0x19, 0xc428);
-                rtl8168_mdio_write(tp, 0x15, 0x03e0);
-                rtl8168_mdio_write(tp, 0x19, 0x0008);
-                rtl8168_mdio_write(tp, 0x15, 0x03e1);
-                rtl8168_mdio_write(tp, 0x19, 0x9cfd);
-                rtl8168_mdio_write(tp, 0x15, 0x03e2);
-                rtl8168_mdio_write(tp, 0x19, 0x7c12);
-                rtl8168_mdio_write(tp, 0x15, 0x03e3);
-                rtl8168_mdio_write(tp, 0x19, 0x4c52);
-                rtl8168_mdio_write(tp, 0x15, 0x03e4);
-                rtl8168_mdio_write(tp, 0x19, 0x4458);
-                rtl8168_mdio_write(tp, 0x15, 0x03e5);
-                rtl8168_mdio_write(tp, 0x19, 0x7c12);
-                rtl8168_mdio_write(tp, 0x15, 0x03e6);
-                rtl8168_mdio_write(tp, 0x19, 0x4c40);
-                rtl8168_mdio_write(tp, 0x15, 0x03e7);
-                rtl8168_mdio_write(tp, 0x19, 0x33de);
-                rtl8168_mdio_write(tp, 0x15, 0x03e8);
-                rtl8168_mdio_write(tp, 0x19, 0xc218);
-                rtl8168_mdio_write(tp, 0x15, 0x03e9);
-                rtl8168_mdio_write(tp, 0x19, 0x0002);
-                rtl8168_mdio_write(tp, 0x15, 0x03ea);
-                rtl8168_mdio_write(tp, 0x19, 0x32df);
-                rtl8168_mdio_write(tp, 0x15, 0x03eb);
-                rtl8168_mdio_write(tp, 0x19, 0x3316);
-                rtl8168_mdio_write(tp, 0x15, 0x03ec);
-                rtl8168_mdio_write(tp, 0x19, 0x0000);
-                rtl8168_mdio_write(tp, 0x15, 0x03ed);
-                rtl8168_mdio_write(tp, 0x19, 0x0000);
-                rtl8168_mdio_write(tp, 0x15, 0x03ee);
-                rtl8168_mdio_write(tp, 0x19, 0x0000);
-                rtl8168_mdio_write(tp, 0x15, 0x03ef);
-                rtl8168_mdio_write(tp, 0x19, 0x0000);
-                rtl8168_mdio_write(tp, 0x15, 0x03f7);
-                rtl8168_mdio_write(tp, 0x19, 0x330c);
-                rtl8168_mdio_write(tp, 0x16, 0x0306);
-                rtl8168_mdio_write(tp, 0x16, 0x0300);
-
-                rtl8168_mdio_write(tp, 0x1f, 0x0005);
-                rtl8168_mdio_write(tp, 0x05, 0xfff6);
-                rtl8168_mdio_write(tp, 0x06, 0x0080);
-                rtl8168_mdio_write(tp, 0x05, 0x8000);
-                rtl8168_mdio_write(tp, 0x06, 0x0280);
-                rtl8168_mdio_write(tp, 0x06, 0x48f7);
-                rtl8168_mdio_write(tp, 0x06, 0x00e0);
-                rtl8168_mdio_write(tp, 0x06, 0xfff7);
-                rtl8168_mdio_write(tp, 0x06, 0xa080);
-                rtl8168_mdio_write(tp, 0x06, 0x02ae);
-                rtl8168_mdio_write(tp, 0x06, 0xf602);
-                rtl8168_mdio_write(tp, 0x06, 0x0200);
-                rtl8168_mdio_write(tp, 0x06, 0x0280);
-                rtl8168_mdio_write(tp, 0x06, 0x9002);
-                rtl8168_mdio_write(tp, 0x06, 0x0224);
-                rtl8168_mdio_write(tp, 0x06, 0x0202);
-                rtl8168_mdio_write(tp, 0x06, 0x3402);
-                rtl8168_mdio_write(tp, 0x06, 0x027f);
-                rtl8168_mdio_write(tp, 0x06, 0x0280);
-                rtl8168_mdio_write(tp, 0x06, 0xa602);
-                rtl8168_mdio_write(tp, 0x06, 0x80bf);
-                rtl8168_mdio_write(tp, 0x06, 0xe08b);
-                rtl8168_mdio_write(tp, 0x06, 0x88e1);
-                rtl8168_mdio_write(tp, 0x06, 0x8b89);
-                rtl8168_mdio_write(tp, 0x06, 0x1e01);
-                rtl8168_mdio_write(tp, 0x06, 0xe18b);
-                rtl8168_mdio_write(tp, 0x06, 0x8a1e);
-                rtl8168_mdio_write(tp, 0x06, 0x01e1);
-                rtl8168_mdio_write(tp, 0x06, 0x8b8b);
-                rtl8168_mdio_write(tp, 0x06, 0x1e01);
-                rtl8168_mdio_write(tp, 0x06, 0xe18b);
-                rtl8168_mdio_write(tp, 0x06, 0x8c1e);
-                rtl8168_mdio_write(tp, 0x06, 0x01e1);
-                rtl8168_mdio_write(tp, 0x06, 0x8b8d);
-                rtl8168_mdio_write(tp, 0x06, 0x1e01);
-                rtl8168_mdio_write(tp, 0x06, 0xe18b);
-                rtl8168_mdio_write(tp, 0x06, 0x8e1e);
-                rtl8168_mdio_write(tp, 0x06, 0x01a0);
-                rtl8168_mdio_write(tp, 0x06, 0x00c7);
-                rtl8168_mdio_write(tp, 0x06, 0xaebb);
-                rtl8168_mdio_write(tp, 0x06, 0xee8a);
-                rtl8168_mdio_write(tp, 0x06, 0xe600);
-                rtl8168_mdio_write(tp, 0x06, 0xee8a);
-                rtl8168_mdio_write(tp, 0x06, 0xee03);
-                rtl8168_mdio_write(tp, 0x06, 0xee8a);
-                rtl8168_mdio_write(tp, 0x06, 0xefb8);
-                rtl8168_mdio_write(tp, 0x06, 0xee8a);
-                rtl8168_mdio_write(tp, 0x06, 0xe902);
-                rtl8168_mdio_write(tp, 0x06, 0xee8b);
-                rtl8168_mdio_write(tp, 0x06, 0x8285);
-                rtl8168_mdio_write(tp, 0x06, 0xee8b);
-                rtl8168_mdio_write(tp, 0x06, 0x8520);
-                rtl8168_mdio_write(tp, 0x06, 0xee8b);
-                rtl8168_mdio_write(tp, 0x06, 0x8701);
-                rtl8168_mdio_write(tp, 0x06, 0xd481);
-                rtl8168_mdio_write(tp, 0x06, 0x35e4);
-                rtl8168_mdio_write(tp, 0x06, 0x8b94);
-                rtl8168_mdio_write(tp, 0x06, 0xe58b);
-                rtl8168_mdio_write(tp, 0x06, 0x95bf);
-                rtl8168_mdio_write(tp, 0x06, 0x8b88);
-                rtl8168_mdio_write(tp, 0x06, 0xec00);
-                rtl8168_mdio_write(tp, 0x06, 0x19a9);
-                rtl8168_mdio_write(tp, 0x06, 0x8b90);
-                rtl8168_mdio_write(tp, 0x06, 0xf9ee);
-                rtl8168_mdio_write(tp, 0x06, 0xfff6);
-                rtl8168_mdio_write(tp, 0x06, 0x00ee);
-                rtl8168_mdio_write(tp, 0x06, 0xfff7);
-                rtl8168_mdio_write(tp, 0x06, 0xffe0);
-                rtl8168_mdio_write(tp, 0x06, 0xe140);
-                rtl8168_mdio_write(tp, 0x06, 0xe1e1);
-                rtl8168_mdio_write(tp, 0x06, 0x41f7);
-                rtl8168_mdio_write(tp, 0x06, 0x2ff6);
-                rtl8168_mdio_write(tp, 0x06, 0x28e4);
-                rtl8168_mdio_write(tp, 0x06, 0xe140);
-                rtl8168_mdio_write(tp, 0x06, 0xe5e1);
-                rtl8168_mdio_write(tp, 0x06, 0x4104);
-                rtl8168_mdio_write(tp, 0x06, 0xf8e0);
-                rtl8168_mdio_write(tp, 0x06, 0x8b89);
-                rtl8168_mdio_write(tp, 0x06, 0xad20);
-                rtl8168_mdio_write(tp, 0x06, 0x0dee);
-                rtl8168_mdio_write(tp, 0x06, 0x8b89);
-                rtl8168_mdio_write(tp, 0x06, 0x0002);
-                rtl8168_mdio_write(tp, 0x06, 0x82f4);
-                rtl8168_mdio_write(tp, 0x06, 0x021f);
-                rtl8168_mdio_write(tp, 0x06, 0x4102);
-                rtl8168_mdio_write(tp, 0x06, 0x2812);
-                rtl8168_mdio_write(tp, 0x06, 0xfc04);
-                rtl8168_mdio_write(tp, 0x06, 0xf8e0);
-                rtl8168_mdio_write(tp, 0x06, 0x8b8d);
-                rtl8168_mdio_write(tp, 0x06, 0xad20);
-                rtl8168_mdio_write(tp, 0x06, 0x10ee);
-                rtl8168_mdio_write(tp, 0x06, 0x8b8d);
-                rtl8168_mdio_write(tp, 0x06, 0x0002);
-                rtl8168_mdio_write(tp, 0x06, 0x139d);
-                rtl8168_mdio_write(tp, 0x06, 0x0281);
-                rtl8168_mdio_write(tp, 0x06, 0xd602);
-                rtl8168_mdio_write(tp, 0x06, 0x1f99);
-                rtl8168_mdio_write(tp, 0x06, 0x0227);
-                rtl8168_mdio_write(tp, 0x06, 0xeafc);
-                rtl8168_mdio_write(tp, 0x06, 0x04f8);
-                rtl8168_mdio_write(tp, 0x06, 0xe08b);
-                rtl8168_mdio_write(tp, 0x06, 0x8ead);
-                rtl8168_mdio_write(tp, 0x06, 0x2014);
-                rtl8168_mdio_write(tp, 0x06, 0xf620);
-                rtl8168_mdio_write(tp, 0x06, 0xe48b);
-                rtl8168_mdio_write(tp, 0x06, 0x8e02);
-                rtl8168_mdio_write(tp, 0x06, 0x8104);
-                rtl8168_mdio_write(tp, 0x06, 0x021b);
-                rtl8168_mdio_write(tp, 0x06, 0xf402);
-                rtl8168_mdio_write(tp, 0x06, 0x2c9c);
-                rtl8168_mdio_write(tp, 0x06, 0x0281);
-                rtl8168_mdio_write(tp, 0x06, 0x7902);
-                rtl8168_mdio_write(tp, 0x06, 0x8443);
-                rtl8168_mdio_write(tp, 0x06, 0xad22);
-                rtl8168_mdio_write(tp, 0x06, 0x11f6);
-                rtl8168_mdio_write(tp, 0x06, 0x22e4);
-                rtl8168_mdio_write(tp, 0x06, 0x8b8e);
-                rtl8168_mdio_write(tp, 0x06, 0x022c);
-                rtl8168_mdio_write(tp, 0x06, 0x4602);
-                rtl8168_mdio_write(tp, 0x06, 0x2ac5);
-                rtl8168_mdio_write(tp, 0x06, 0x0229);
-                rtl8168_mdio_write(tp, 0x06, 0x2002);
-                rtl8168_mdio_write(tp, 0x06, 0x2b91);
-                rtl8168_mdio_write(tp, 0x06, 0xad25);
-                rtl8168_mdio_write(tp, 0x06, 0x11f6);
-                rtl8168_mdio_write(tp, 0x06, 0x25e4);
-                rtl8168_mdio_write(tp, 0x06, 0x8b8e);
-                rtl8168_mdio_write(tp, 0x06, 0x0284);
-                rtl8168_mdio_write(tp, 0x06, 0xe202);
-                rtl8168_mdio_write(tp, 0x06, 0x043a);
-                rtl8168_mdio_write(tp, 0x06, 0x021a);
-                rtl8168_mdio_write(tp, 0x06, 0x5902);
-                rtl8168_mdio_write(tp, 0x06, 0x2bfc);
-                rtl8168_mdio_write(tp, 0x06, 0xfc04);
-                rtl8168_mdio_write(tp, 0x06, 0xf8fa);
-                rtl8168_mdio_write(tp, 0x06, 0xef69);
-                rtl8168_mdio_write(tp, 0x06, 0xe0e0);
-                rtl8168_mdio_write(tp, 0x06, 0x00e1);
-                rtl8168_mdio_write(tp, 0x06, 0xe001);
-                rtl8168_mdio_write(tp, 0x06, 0xad27);
-                rtl8168_mdio_write(tp, 0x06, 0x1fd1);
-                rtl8168_mdio_write(tp, 0x06, 0x01bf);
-                rtl8168_mdio_write(tp, 0x06, 0x8638);
-                rtl8168_mdio_write(tp, 0x06, 0x022f);
-                rtl8168_mdio_write(tp, 0x06, 0x50e0);
-                rtl8168_mdio_write(tp, 0x06, 0xe020);
-                rtl8168_mdio_write(tp, 0x06, 0xe1e0);
-                rtl8168_mdio_write(tp, 0x06, 0x21ad);
-                rtl8168_mdio_write(tp, 0x06, 0x200e);
-                rtl8168_mdio_write(tp, 0x06, 0xd100);
-                rtl8168_mdio_write(tp, 0x06, 0xbf86);
-                rtl8168_mdio_write(tp, 0x06, 0x3802);
-                rtl8168_mdio_write(tp, 0x06, 0x2f50);
-                rtl8168_mdio_write(tp, 0x06, 0xbf3d);
-                rtl8168_mdio_write(tp, 0x06, 0x3902);
-                rtl8168_mdio_write(tp, 0x06, 0x2eb0);
-                rtl8168_mdio_write(tp, 0x06, 0xef96);
-                rtl8168_mdio_write(tp, 0x06, 0xfefc);
-                rtl8168_mdio_write(tp, 0x06, 0x0402);
-                rtl8168_mdio_write(tp, 0x06, 0x8591);
-                rtl8168_mdio_write(tp, 0x06, 0x0281);
-                rtl8168_mdio_write(tp, 0x06, 0x3c05);
-                rtl8168_mdio_write(tp, 0x06, 0xf8fa);
-                rtl8168_mdio_write(tp, 0x06, 0xef69);
-                rtl8168_mdio_write(tp, 0x06, 0xe0e2);
-                rtl8168_mdio_write(tp, 0x06, 0xfee1);
-                rtl8168_mdio_write(tp, 0x06, 0xe2ff);
-                rtl8168_mdio_write(tp, 0x06, 0xad2d);
-                rtl8168_mdio_write(tp, 0x06, 0x1ae0);
-                rtl8168_mdio_write(tp, 0x06, 0xe14e);
-                rtl8168_mdio_write(tp, 0x06, 0xe1e1);
-                rtl8168_mdio_write(tp, 0x06, 0x4fac);
-                rtl8168_mdio_write(tp, 0x06, 0x2d22);
-                rtl8168_mdio_write(tp, 0x06, 0xf603);
-                rtl8168_mdio_write(tp, 0x06, 0x0203);
-                rtl8168_mdio_write(tp, 0x06, 0x36f7);
-                rtl8168_mdio_write(tp, 0x06, 0x03f7);
-                rtl8168_mdio_write(tp, 0x06, 0x06bf);
-                rtl8168_mdio_write(tp, 0x06, 0x8622);
-                rtl8168_mdio_write(tp, 0x06, 0x022e);
-                rtl8168_mdio_write(tp, 0x06, 0xb0ae);
-                rtl8168_mdio_write(tp, 0x06, 0x11e0);
-                rtl8168_mdio_write(tp, 0x06, 0xe14e);
-                rtl8168_mdio_write(tp, 0x06, 0xe1e1);
-                rtl8168_mdio_write(tp, 0x06, 0x4fad);
-                rtl8168_mdio_write(tp, 0x06, 0x2d08);
-                rtl8168_mdio_write(tp, 0x06, 0xbf86);
-                rtl8168_mdio_write(tp, 0x06, 0x2d02);
-                rtl8168_mdio_write(tp, 0x06, 0x2eb0);
-                rtl8168_mdio_write(tp, 0x06, 0xf606);
-                rtl8168_mdio_write(tp, 0x06, 0xef96);
-                rtl8168_mdio_write(tp, 0x06, 0xfefc);
-                rtl8168_mdio_write(tp, 0x06, 0x04f8);
-                rtl8168_mdio_write(tp, 0x06, 0xf9fa);
-                rtl8168_mdio_write(tp, 0x06, 0xef69);
-                rtl8168_mdio_write(tp, 0x06, 0xe08b);
-                rtl8168_mdio_write(tp, 0x06, 0x87ad);
-                rtl8168_mdio_write(tp, 0x06, 0x204c);
-                rtl8168_mdio_write(tp, 0x06, 0xd200);
-                rtl8168_mdio_write(tp, 0x06, 0xe0e2);
-                rtl8168_mdio_write(tp, 0x06, 0x0058);
-                rtl8168_mdio_write(tp, 0x06, 0x010c);
-                rtl8168_mdio_write(tp, 0x06, 0x021e);
-                rtl8168_mdio_write(tp, 0x06, 0x20e0);
-                rtl8168_mdio_write(tp, 0x06, 0xe000);
-                rtl8168_mdio_write(tp, 0x06, 0x5810);
-                rtl8168_mdio_write(tp, 0x06, 0x1e20);
-                rtl8168_mdio_write(tp, 0x06, 0xe0e0);
-                rtl8168_mdio_write(tp, 0x06, 0x3658);
-                rtl8168_mdio_write(tp, 0x06, 0x031e);
-                rtl8168_mdio_write(tp, 0x06, 0x20e0);
-                rtl8168_mdio_write(tp, 0x06, 0xe022);
-                rtl8168_mdio_write(tp, 0x06, 0xe1e0);
-                rtl8168_mdio_write(tp, 0x06, 0x2358);
-                rtl8168_mdio_write(tp, 0x06, 0xe01e);
-                rtl8168_mdio_write(tp, 0x06, 0x20e0);
-                rtl8168_mdio_write(tp, 0x06, 0x8ae6);
-                rtl8168_mdio_write(tp, 0x06, 0x1f02);
-                rtl8168_mdio_write(tp, 0x06, 0x9e22);
-                rtl8168_mdio_write(tp, 0x06, 0xe68a);
-                rtl8168_mdio_write(tp, 0x06, 0xe6ad);
-                rtl8168_mdio_write(tp, 0x06, 0x3214);
-                rtl8168_mdio_write(tp, 0x06, 0xad34);
-                rtl8168_mdio_write(tp, 0x06, 0x11ef);
-                rtl8168_mdio_write(tp, 0x06, 0x0258);
-                rtl8168_mdio_write(tp, 0x06, 0x039e);
-                rtl8168_mdio_write(tp, 0x06, 0x07ad);
-                rtl8168_mdio_write(tp, 0x06, 0x3508);
-                rtl8168_mdio_write(tp, 0x06, 0x5ac0);
-                rtl8168_mdio_write(tp, 0x06, 0x9f04);
-                rtl8168_mdio_write(tp, 0x06, 0xd101);
-                rtl8168_mdio_write(tp, 0x06, 0xae02);
-                rtl8168_mdio_write(tp, 0x06, 0xd100);
-                rtl8168_mdio_write(tp, 0x06, 0xbf86);
-                rtl8168_mdio_write(tp, 0x06, 0x3e02);
-                rtl8168_mdio_write(tp, 0x06, 0x2f50);
-                rtl8168_mdio_write(tp, 0x06, 0xef96);
-                rtl8168_mdio_write(tp, 0x06, 0xfefd);
-                rtl8168_mdio_write(tp, 0x06, 0xfc04);
-                rtl8168_mdio_write(tp, 0x06, 0xf8f9);
-                rtl8168_mdio_write(tp, 0x06, 0xfae0);
-                rtl8168_mdio_write(tp, 0x06, 0x8b81);
-                rtl8168_mdio_write(tp, 0x06, 0xac26);
-                rtl8168_mdio_write(tp, 0x06, 0x0ee0);
-                rtl8168_mdio_write(tp, 0x06, 0x8b81);
-                rtl8168_mdio_write(tp, 0x06, 0xac21);
-                rtl8168_mdio_write(tp, 0x06, 0x08e0);
-                rtl8168_mdio_write(tp, 0x06, 0x8b87);
-                rtl8168_mdio_write(tp, 0x06, 0xac24);
-                rtl8168_mdio_write(tp, 0x06, 0x02ae);
-                rtl8168_mdio_write(tp, 0x06, 0x6bee);
-                rtl8168_mdio_write(tp, 0x06, 0xe0ea);
-                rtl8168_mdio_write(tp, 0x06, 0x00ee);
-                rtl8168_mdio_write(tp, 0x06, 0xe0eb);
-                rtl8168_mdio_write(tp, 0x06, 0x00e2);
-                rtl8168_mdio_write(tp, 0x06, 0xe07c);
-                rtl8168_mdio_write(tp, 0x06, 0xe3e0);
-                rtl8168_mdio_write(tp, 0x06, 0x7da5);
-                rtl8168_mdio_write(tp, 0x06, 0x1111);
-                rtl8168_mdio_write(tp, 0x06, 0x15d2);
-                rtl8168_mdio_write(tp, 0x06, 0x60d6);
-                rtl8168_mdio_write(tp, 0x06, 0x6666);
-                rtl8168_mdio_write(tp, 0x06, 0x0207);
-                rtl8168_mdio_write(tp, 0x06, 0xf9d2);
-                rtl8168_mdio_write(tp, 0x06, 0xa0d6);
-                rtl8168_mdio_write(tp, 0x06, 0xaaaa);
-                rtl8168_mdio_write(tp, 0x06, 0x0207);
-                rtl8168_mdio_write(tp, 0x06, 0xf902);
-                rtl8168_mdio_write(tp, 0x06, 0x825c);
-                rtl8168_mdio_write(tp, 0x06, 0xae44);
-                rtl8168_mdio_write(tp, 0x06, 0xa566);
-                rtl8168_mdio_write(tp, 0x06, 0x6602);
-                rtl8168_mdio_write(tp, 0x06, 0xae38);
-                rtl8168_mdio_write(tp, 0x06, 0xa5aa);
-                rtl8168_mdio_write(tp, 0x06, 0xaa02);
-                rtl8168_mdio_write(tp, 0x06, 0xae32);
-                rtl8168_mdio_write(tp, 0x06, 0xeee0);
-                rtl8168_mdio_write(tp, 0x06, 0xea04);
-                rtl8168_mdio_write(tp, 0x06, 0xeee0);
-                rtl8168_mdio_write(tp, 0x06, 0xeb06);
-                rtl8168_mdio_write(tp, 0x06, 0xe2e0);
-                rtl8168_mdio_write(tp, 0x06, 0x7ce3);
-                rtl8168_mdio_write(tp, 0x06, 0xe07d);
-                rtl8168_mdio_write(tp, 0x06, 0xe0e0);
-                rtl8168_mdio_write(tp, 0x06, 0x38e1);
-                rtl8168_mdio_write(tp, 0x06, 0xe039);
-                rtl8168_mdio_write(tp, 0x06, 0xad2e);
-                rtl8168_mdio_write(tp, 0x06, 0x21ad);
-                rtl8168_mdio_write(tp, 0x06, 0x3f13);
-                rtl8168_mdio_write(tp, 0x06, 0xe0e4);
-                rtl8168_mdio_write(tp, 0x06, 0x14e1);
-                rtl8168_mdio_write(tp, 0x06, 0xe415);
-                rtl8168_mdio_write(tp, 0x06, 0x6880);
-                rtl8168_mdio_write(tp, 0x06, 0xe4e4);
-                rtl8168_mdio_write(tp, 0x06, 0x14e5);
-                rtl8168_mdio_write(tp, 0x06, 0xe415);
-                rtl8168_mdio_write(tp, 0x06, 0x0282);
-                rtl8168_mdio_write(tp, 0x06, 0x5cae);
-                rtl8168_mdio_write(tp, 0x06, 0x0bac);
-                rtl8168_mdio_write(tp, 0x06, 0x3e02);
-                rtl8168_mdio_write(tp, 0x06, 0xae06);
-                rtl8168_mdio_write(tp, 0x06, 0x0282);
-                rtl8168_mdio_write(tp, 0x06, 0x8602);
-                rtl8168_mdio_write(tp, 0x06, 0x82b0);
-                rtl8168_mdio_write(tp, 0x06, 0xfefd);
-                rtl8168_mdio_write(tp, 0x06, 0xfc04);
-                rtl8168_mdio_write(tp, 0x06, 0xf8e1);
-                rtl8168_mdio_write(tp, 0x06, 0x8b2e);
-                rtl8168_mdio_write(tp, 0x06, 0xe08b);
-                rtl8168_mdio_write(tp, 0x06, 0x81ad);
-                rtl8168_mdio_write(tp, 0x06, 0x2605);
-                rtl8168_mdio_write(tp, 0x06, 0x0221);
-                rtl8168_mdio_write(tp, 0x06, 0xf3f7);
-                rtl8168_mdio_write(tp, 0x06, 0x28e0);
-                rtl8168_mdio_write(tp, 0x06, 0x8b81);
-                rtl8168_mdio_write(tp, 0x06, 0xad21);
-                rtl8168_mdio_write(tp, 0x06, 0x0502);
-                rtl8168_mdio_write(tp, 0x06, 0x22f8);
-                rtl8168_mdio_write(tp, 0x06, 0xf729);
-                rtl8168_mdio_write(tp, 0x06, 0xe08b);
-                rtl8168_mdio_write(tp, 0x06, 0x87ad);
-                rtl8168_mdio_write(tp, 0x06, 0x2405);
-                rtl8168_mdio_write(tp, 0x06, 0x0282);
-                rtl8168_mdio_write(tp, 0x06, 0xebf7);
-                rtl8168_mdio_write(tp, 0x06, 0x2ae5);
-                rtl8168_mdio_write(tp, 0x06, 0x8b2e);
-                rtl8168_mdio_write(tp, 0x06, 0xfc04);
-                rtl8168_mdio_write(tp, 0x06, 0xf8e0);
-                rtl8168_mdio_write(tp, 0x06, 0x8b81);
-                rtl8168_mdio_write(tp, 0x06, 0xad26);
-                rtl8168_mdio_write(tp, 0x06, 0x0302);
-                rtl8168_mdio_write(tp, 0x06, 0x2134);
-                rtl8168_mdio_write(tp, 0x06, 0xe08b);
-                rtl8168_mdio_write(tp, 0x06, 0x81ad);
-                rtl8168_mdio_write(tp, 0x06, 0x2109);
-                rtl8168_mdio_write(tp, 0x06, 0xe08b);
-                rtl8168_mdio_write(tp, 0x06, 0x2eac);
-                rtl8168_mdio_write(tp, 0x06, 0x2003);
-                rtl8168_mdio_write(tp, 0x06, 0x0283);
-                rtl8168_mdio_write(tp, 0x06, 0x52e0);
-                rtl8168_mdio_write(tp, 0x06, 0x8b87);
-                rtl8168_mdio_write(tp, 0x06, 0xad24);
-                rtl8168_mdio_write(tp, 0x06, 0x09e0);
-                rtl8168_mdio_write(tp, 0x06, 0x8b2e);
-                rtl8168_mdio_write(tp, 0x06, 0xac21);
-                rtl8168_mdio_write(tp, 0x06, 0x0302);
-                rtl8168_mdio_write(tp, 0x06, 0x8337);
-                rtl8168_mdio_write(tp, 0x06, 0xfc04);
-                rtl8168_mdio_write(tp, 0x06, 0xf8e1);
-                rtl8168_mdio_write(tp, 0x06, 0x8b2e);
-                rtl8168_mdio_write(tp, 0x06, 0xe08b);
-                rtl8168_mdio_write(tp, 0x06, 0x81ad);
-                rtl8168_mdio_write(tp, 0x06, 0x2608);
-                rtl8168_mdio_write(tp, 0x06, 0xe085);
-                rtl8168_mdio_write(tp, 0x06, 0xd2ad);
-                rtl8168_mdio_write(tp, 0x06, 0x2502);
-                rtl8168_mdio_write(tp, 0x06, 0xf628);
-                rtl8168_mdio_write(tp, 0x06, 0xe08b);
-                rtl8168_mdio_write(tp, 0x06, 0x81ad);
-                rtl8168_mdio_write(tp, 0x06, 0x210a);
-                rtl8168_mdio_write(tp, 0x06, 0xe086);
-                rtl8168_mdio_write(tp, 0x06, 0x0af6);
-                rtl8168_mdio_write(tp, 0x06, 0x27a0);
-                rtl8168_mdio_write(tp, 0x06, 0x0502);
-                rtl8168_mdio_write(tp, 0x06, 0xf629);
-                rtl8168_mdio_write(tp, 0x06, 0xe08b);
-                rtl8168_mdio_write(tp, 0x06, 0x87ad);
-                rtl8168_mdio_write(tp, 0x06, 0x2408);
-                rtl8168_mdio_write(tp, 0x06, 0xe08a);
-                rtl8168_mdio_write(tp, 0x06, 0xedad);
-                rtl8168_mdio_write(tp, 0x06, 0x2002);
-                rtl8168_mdio_write(tp, 0x06, 0xf62a);
-                rtl8168_mdio_write(tp, 0x06, 0xe58b);
-                rtl8168_mdio_write(tp, 0x06, 0x2ea1);
-                rtl8168_mdio_write(tp, 0x06, 0x0003);
-                rtl8168_mdio_write(tp, 0x06, 0x0221);
-                rtl8168_mdio_write(tp, 0x06, 0x11fc);
-                rtl8168_mdio_write(tp, 0x06, 0x04ee);
-                rtl8168_mdio_write(tp, 0x06, 0x8aed);
-                rtl8168_mdio_write(tp, 0x06, 0x00ee);
-                rtl8168_mdio_write(tp, 0x06, 0x8aec);
-                rtl8168_mdio_write(tp, 0x06, 0x0004);
-                rtl8168_mdio_write(tp, 0x06, 0xf8e0);
-                rtl8168_mdio_write(tp, 0x06, 0x8b87);
-                rtl8168_mdio_write(tp, 0x06, 0xad24);
-                rtl8168_mdio_write(tp, 0x06, 0x3ae0);
-                rtl8168_mdio_write(tp, 0x06, 0xe0ea);
-                rtl8168_mdio_write(tp, 0x06, 0xe1e0);
-                rtl8168_mdio_write(tp, 0x06, 0xeb58);
-                rtl8168_mdio_write(tp, 0x06, 0xf8d1);
-                rtl8168_mdio_write(tp, 0x06, 0x01e4);
-                rtl8168_mdio_write(tp, 0x06, 0xe0ea);
-                rtl8168_mdio_write(tp, 0x06, 0xe5e0);
-                rtl8168_mdio_write(tp, 0x06, 0xebe0);
-                rtl8168_mdio_write(tp, 0x06, 0xe07c);
-                rtl8168_mdio_write(tp, 0x06, 0xe1e0);
-                rtl8168_mdio_write(tp, 0x06, 0x7d5c);
-                rtl8168_mdio_write(tp, 0x06, 0x00ff);
-                rtl8168_mdio_write(tp, 0x06, 0x3c00);
-                rtl8168_mdio_write(tp, 0x06, 0x1eab);
-                rtl8168_mdio_write(tp, 0x06, 0x1ce0);
-                rtl8168_mdio_write(tp, 0x06, 0xe04c);
-                rtl8168_mdio_write(tp, 0x06, 0xe1e0);
-                rtl8168_mdio_write(tp, 0x06, 0x4d58);
-                rtl8168_mdio_write(tp, 0x06, 0xc1e4);
-                rtl8168_mdio_write(tp, 0x06, 0xe04c);
-                rtl8168_mdio_write(tp, 0x06, 0xe5e0);
-                rtl8168_mdio_write(tp, 0x06, 0x4de0);
-                rtl8168_mdio_write(tp, 0x06, 0xe0ee);
-                rtl8168_mdio_write(tp, 0x06, 0xe1e0);
-                rtl8168_mdio_write(tp, 0x06, 0xef69);
-                rtl8168_mdio_write(tp, 0x06, 0x3ce4);
-                rtl8168_mdio_write(tp, 0x06, 0xe0ee);
-                rtl8168_mdio_write(tp, 0x06, 0xe5e0);
-                rtl8168_mdio_write(tp, 0x06, 0xeffc);
-                rtl8168_mdio_write(tp, 0x06, 0x04f8);
-                rtl8168_mdio_write(tp, 0x06, 0xe08b);
-                rtl8168_mdio_write(tp, 0x06, 0x87ad);
-                rtl8168_mdio_write(tp, 0x06, 0x2412);
-                rtl8168_mdio_write(tp, 0x06, 0xe0e0);
-                rtl8168_mdio_write(tp, 0x06, 0xeee1);
-                rtl8168_mdio_write(tp, 0x06, 0xe0ef);
-                rtl8168_mdio_write(tp, 0x06, 0x59c3);
-                rtl8168_mdio_write(tp, 0x06, 0xe4e0);
-                rtl8168_mdio_write(tp, 0x06, 0xeee5);
-                rtl8168_mdio_write(tp, 0x06, 0xe0ef);
-                rtl8168_mdio_write(tp, 0x06, 0xee8a);
-                rtl8168_mdio_write(tp, 0x06, 0xed01);
-                rtl8168_mdio_write(tp, 0x06, 0xfc04);
-                rtl8168_mdio_write(tp, 0x06, 0xf8e0);
-                rtl8168_mdio_write(tp, 0x06, 0x8b81);
-                rtl8168_mdio_write(tp, 0x06, 0xac25);
-                rtl8168_mdio_write(tp, 0x06, 0x0502);
-                rtl8168_mdio_write(tp, 0x06, 0x8363);
-                rtl8168_mdio_write(tp, 0x06, 0xae03);
-                rtl8168_mdio_write(tp, 0x06, 0x0225);
-                rtl8168_mdio_write(tp, 0x06, 0x16fc);
-                rtl8168_mdio_write(tp, 0x06, 0x04f8);
-                rtl8168_mdio_write(tp, 0x06, 0xf9fa);
-                rtl8168_mdio_write(tp, 0x06, 0xef69);
-                rtl8168_mdio_write(tp, 0x06, 0xfae0);
-                rtl8168_mdio_write(tp, 0x06, 0x860a);
-                rtl8168_mdio_write(tp, 0x06, 0xa000);
-                rtl8168_mdio_write(tp, 0x06, 0x19e0);
-                rtl8168_mdio_write(tp, 0x06, 0x860b);
-                rtl8168_mdio_write(tp, 0x06, 0xe18b);
-                rtl8168_mdio_write(tp, 0x06, 0x331b);
-                rtl8168_mdio_write(tp, 0x06, 0x109e);
-                rtl8168_mdio_write(tp, 0x06, 0x04aa);
-                rtl8168_mdio_write(tp, 0x06, 0x02ae);
-                rtl8168_mdio_write(tp, 0x06, 0x06ee);
-                rtl8168_mdio_write(tp, 0x06, 0x860a);
-                rtl8168_mdio_write(tp, 0x06, 0x01ae);
-                rtl8168_mdio_write(tp, 0x06, 0xe602);
-                rtl8168_mdio_write(tp, 0x06, 0x241e);
-                rtl8168_mdio_write(tp, 0x06, 0xae14);
-                rtl8168_mdio_write(tp, 0x06, 0xa001);
-                rtl8168_mdio_write(tp, 0x06, 0x1402);
-                rtl8168_mdio_write(tp, 0x06, 0x2426);
-                rtl8168_mdio_write(tp, 0x06, 0xbf26);
-                rtl8168_mdio_write(tp, 0x06, 0x6d02);
-                rtl8168_mdio_write(tp, 0x06, 0x2eb0);
-                rtl8168_mdio_write(tp, 0x06, 0xee86);
-                rtl8168_mdio_write(tp, 0x06, 0x0b00);
-                rtl8168_mdio_write(tp, 0x06, 0xee86);
-                rtl8168_mdio_write(tp, 0x06, 0x0a02);
-                rtl8168_mdio_write(tp, 0x06, 0xaf84);
-                rtl8168_mdio_write(tp, 0x06, 0x3ca0);
-                rtl8168_mdio_write(tp, 0x06, 0x0252);
-                rtl8168_mdio_write(tp, 0x06, 0xee86);
-                rtl8168_mdio_write(tp, 0x06, 0x0400);
-                rtl8168_mdio_write(tp, 0x06, 0xee86);
-                rtl8168_mdio_write(tp, 0x06, 0x0500);
-                rtl8168_mdio_write(tp, 0x06, 0xe086);
-                rtl8168_mdio_write(tp, 0x06, 0x0be1);
-                rtl8168_mdio_write(tp, 0x06, 0x8b32);
-                rtl8168_mdio_write(tp, 0x06, 0x1b10);
-                rtl8168_mdio_write(tp, 0x06, 0x9e04);
-                rtl8168_mdio_write(tp, 0x06, 0xaa02);
-                rtl8168_mdio_write(tp, 0x06, 0xaecb);
-                rtl8168_mdio_write(tp, 0x06, 0xee86);
-                rtl8168_mdio_write(tp, 0x06, 0x0b00);
-                rtl8168_mdio_write(tp, 0x06, 0x0224);
-                rtl8168_mdio_write(tp, 0x06, 0x3ae2);
-                rtl8168_mdio_write(tp, 0x06, 0x8604);
-                rtl8168_mdio_write(tp, 0x06, 0xe386);
-                rtl8168_mdio_write(tp, 0x06, 0x05ef);
-                rtl8168_mdio_write(tp, 0x06, 0x65e2);
-                rtl8168_mdio_write(tp, 0x06, 0x8606);
-                rtl8168_mdio_write(tp, 0x06, 0xe386);
-                rtl8168_mdio_write(tp, 0x06, 0x071b);
-                rtl8168_mdio_write(tp, 0x06, 0x56aa);
-                rtl8168_mdio_write(tp, 0x06, 0x0eef);
-                rtl8168_mdio_write(tp, 0x06, 0x56e6);
-                rtl8168_mdio_write(tp, 0x06, 0x8606);
-                rtl8168_mdio_write(tp, 0x06, 0xe786);
-                rtl8168_mdio_write(tp, 0x06, 0x07e2);
-                rtl8168_mdio_write(tp, 0x06, 0x8609);
-                rtl8168_mdio_write(tp, 0x06, 0xe686);
-                rtl8168_mdio_write(tp, 0x06, 0x08e0);
-                rtl8168_mdio_write(tp, 0x06, 0x8609);
-                rtl8168_mdio_write(tp, 0x06, 0xa000);
-                rtl8168_mdio_write(tp, 0x06, 0x07ee);
-                rtl8168_mdio_write(tp, 0x06, 0x860a);
-                rtl8168_mdio_write(tp, 0x06, 0x03af);
-                rtl8168_mdio_write(tp, 0x06, 0x8369);
-                rtl8168_mdio_write(tp, 0x06, 0x0224);
-                rtl8168_mdio_write(tp, 0x06, 0x8e02);
-                rtl8168_mdio_write(tp, 0x06, 0x2426);
-                rtl8168_mdio_write(tp, 0x06, 0xae48);
-                rtl8168_mdio_write(tp, 0x06, 0xa003);
-                rtl8168_mdio_write(tp, 0x06, 0x21e0);
-                rtl8168_mdio_write(tp, 0x06, 0x8608);
-                rtl8168_mdio_write(tp, 0x06, 0xe186);
-                rtl8168_mdio_write(tp, 0x06, 0x091b);
-                rtl8168_mdio_write(tp, 0x06, 0x019e);
-                rtl8168_mdio_write(tp, 0x06, 0x0caa);
-                rtl8168_mdio_write(tp, 0x06, 0x0502);
-                rtl8168_mdio_write(tp, 0x06, 0x249d);
-                rtl8168_mdio_write(tp, 0x06, 0xaee7);
-                rtl8168_mdio_write(tp, 0x06, 0x0224);
-                rtl8168_mdio_write(tp, 0x06, 0x8eae);
-                rtl8168_mdio_write(tp, 0x06, 0xe2ee);
-                rtl8168_mdio_write(tp, 0x06, 0x860a);
-                rtl8168_mdio_write(tp, 0x06, 0x04ee);
-                rtl8168_mdio_write(tp, 0x06, 0x860b);
-                rtl8168_mdio_write(tp, 0x06, 0x00af);
-                rtl8168_mdio_write(tp, 0x06, 0x8369);
-                rtl8168_mdio_write(tp, 0x06, 0xa004);
-                rtl8168_mdio_write(tp, 0x06, 0x15e0);
-                rtl8168_mdio_write(tp, 0x06, 0x860b);
-                rtl8168_mdio_write(tp, 0x06, 0xe18b);
-                rtl8168_mdio_write(tp, 0x06, 0x341b);
-                rtl8168_mdio_write(tp, 0x06, 0x109e);
-                rtl8168_mdio_write(tp, 0x06, 0x05aa);
-                rtl8168_mdio_write(tp, 0x06, 0x03af);
-                rtl8168_mdio_write(tp, 0x06, 0x8383);
-                rtl8168_mdio_write(tp, 0x06, 0xee86);
-                rtl8168_mdio_write(tp, 0x06, 0x0a05);
-                rtl8168_mdio_write(tp, 0x06, 0xae0c);
-                rtl8168_mdio_write(tp, 0x06, 0xa005);
-                rtl8168_mdio_write(tp, 0x06, 0x02ae);
-                rtl8168_mdio_write(tp, 0x06, 0x0702);
-                rtl8168_mdio_write(tp, 0x06, 0x2309);
-                rtl8168_mdio_write(tp, 0x06, 0xee86);
-                rtl8168_mdio_write(tp, 0x06, 0x0a00);
-                rtl8168_mdio_write(tp, 0x06, 0xfeef);
-                rtl8168_mdio_write(tp, 0x06, 0x96fe);
-                rtl8168_mdio_write(tp, 0x06, 0xfdfc);
-                rtl8168_mdio_write(tp, 0x06, 0x04f8);
-                rtl8168_mdio_write(tp, 0x06, 0xf9fa);
-                rtl8168_mdio_write(tp, 0x06, 0xef69);
-                rtl8168_mdio_write(tp, 0x06, 0xfbe0);
-                rtl8168_mdio_write(tp, 0x06, 0x8b85);
-                rtl8168_mdio_write(tp, 0x06, 0xad25);
-                rtl8168_mdio_write(tp, 0x06, 0x22e0);
-                rtl8168_mdio_write(tp, 0x06, 0xe022);
-                rtl8168_mdio_write(tp, 0x06, 0xe1e0);
-                rtl8168_mdio_write(tp, 0x06, 0x23e2);
-                rtl8168_mdio_write(tp, 0x06, 0xe036);
-                rtl8168_mdio_write(tp, 0x06, 0xe3e0);
-                rtl8168_mdio_write(tp, 0x06, 0x375a);
-                rtl8168_mdio_write(tp, 0x06, 0xc40d);
-                rtl8168_mdio_write(tp, 0x06, 0x0158);
-                rtl8168_mdio_write(tp, 0x06, 0x021e);
-                rtl8168_mdio_write(tp, 0x06, 0x20e3);
-                rtl8168_mdio_write(tp, 0x06, 0x8ae7);
-                rtl8168_mdio_write(tp, 0x06, 0xac31);
-                rtl8168_mdio_write(tp, 0x06, 0x60ac);
-                rtl8168_mdio_write(tp, 0x06, 0x3a08);
-                rtl8168_mdio_write(tp, 0x06, 0xac3e);
-                rtl8168_mdio_write(tp, 0x06, 0x26ae);
-                rtl8168_mdio_write(tp, 0x06, 0x67af);
-                rtl8168_mdio_write(tp, 0x06, 0x84db);
-                rtl8168_mdio_write(tp, 0x06, 0xad37);
-                rtl8168_mdio_write(tp, 0x06, 0x61e0);
-                rtl8168_mdio_write(tp, 0x06, 0x8ae8);
-                rtl8168_mdio_write(tp, 0x06, 0x10e4);
-                rtl8168_mdio_write(tp, 0x06, 0x8ae8);
-                rtl8168_mdio_write(tp, 0x06, 0xe18a);
-                rtl8168_mdio_write(tp, 0x06, 0xe91b);
-                rtl8168_mdio_write(tp, 0x06, 0x109e);
-                rtl8168_mdio_write(tp, 0x06, 0x02ae);
-                rtl8168_mdio_write(tp, 0x06, 0x51d1);
-                rtl8168_mdio_write(tp, 0x06, 0x00bf);
-                rtl8168_mdio_write(tp, 0x06, 0x863b);
-                rtl8168_mdio_write(tp, 0x06, 0x022f);
-                rtl8168_mdio_write(tp, 0x06, 0x50ee);
-                rtl8168_mdio_write(tp, 0x06, 0x8ae8);
-                rtl8168_mdio_write(tp, 0x06, 0x00ae);
-                rtl8168_mdio_write(tp, 0x06, 0x43ad);
-                rtl8168_mdio_write(tp, 0x06, 0x3627);
-                rtl8168_mdio_write(tp, 0x06, 0xe08a);
-                rtl8168_mdio_write(tp, 0x06, 0xeee1);
-                rtl8168_mdio_write(tp, 0x06, 0x8aef);
-                rtl8168_mdio_write(tp, 0x06, 0xef74);
-                rtl8168_mdio_write(tp, 0x06, 0xe08a);
-                rtl8168_mdio_write(tp, 0x06, 0xeae1);
-                rtl8168_mdio_write(tp, 0x06, 0x8aeb);
-                rtl8168_mdio_write(tp, 0x06, 0x1b74);
-                rtl8168_mdio_write(tp, 0x06, 0x9e2e);
-                rtl8168_mdio_write(tp, 0x06, 0x14e4);
-                rtl8168_mdio_write(tp, 0x06, 0x8aea);
-                rtl8168_mdio_write(tp, 0x06, 0xe58a);
-                rtl8168_mdio_write(tp, 0x06, 0xebef);
-                rtl8168_mdio_write(tp, 0x06, 0x74e0);
-                rtl8168_mdio_write(tp, 0x06, 0x8aee);
-                rtl8168_mdio_write(tp, 0x06, 0xe18a);
-                rtl8168_mdio_write(tp, 0x06, 0xef1b);
-                rtl8168_mdio_write(tp, 0x06, 0x479e);
-                rtl8168_mdio_write(tp, 0x06, 0x0fae);
-                rtl8168_mdio_write(tp, 0x06, 0x19ee);
-                rtl8168_mdio_write(tp, 0x06, 0x8aea);
-                rtl8168_mdio_write(tp, 0x06, 0x00ee);
-                rtl8168_mdio_write(tp, 0x06, 0x8aeb);
-                rtl8168_mdio_write(tp, 0x06, 0x00ae);
-                rtl8168_mdio_write(tp, 0x06, 0x0fac);
-                rtl8168_mdio_write(tp, 0x06, 0x390c);
-                rtl8168_mdio_write(tp, 0x06, 0xd101);
-                rtl8168_mdio_write(tp, 0x06, 0xbf86);
-                rtl8168_mdio_write(tp, 0x06, 0x3b02);
-                rtl8168_mdio_write(tp, 0x06, 0x2f50);
-                rtl8168_mdio_write(tp, 0x06, 0xee8a);
-                rtl8168_mdio_write(tp, 0x06, 0xe800);
-                rtl8168_mdio_write(tp, 0x06, 0xe68a);
-                rtl8168_mdio_write(tp, 0x06, 0xe7ff);
-                rtl8168_mdio_write(tp, 0x06, 0xef96);
-                rtl8168_mdio_write(tp, 0x06, 0xfefd);
-                rtl8168_mdio_write(tp, 0x06, 0xfc04);
-                rtl8168_mdio_write(tp, 0x06, 0xf8f9);
-                rtl8168_mdio_write(tp, 0x06, 0xfaef);
-                rtl8168_mdio_write(tp, 0x06, 0x69e0);
-                rtl8168_mdio_write(tp, 0x06, 0xe022);
-                rtl8168_mdio_write(tp, 0x06, 0xe1e0);
-                rtl8168_mdio_write(tp, 0x06, 0x2358);
-                rtl8168_mdio_write(tp, 0x06, 0xc4e1);
-                rtl8168_mdio_write(tp, 0x06, 0x8b6e);
-                rtl8168_mdio_write(tp, 0x06, 0x1f10);
-                rtl8168_mdio_write(tp, 0x06, 0x9e24);
-                rtl8168_mdio_write(tp, 0x06, 0xe48b);
-                rtl8168_mdio_write(tp, 0x06, 0x6ead);
-                rtl8168_mdio_write(tp, 0x06, 0x2218);
-                rtl8168_mdio_write(tp, 0x06, 0xac27);
-                rtl8168_mdio_write(tp, 0x06, 0x0dac);
-                rtl8168_mdio_write(tp, 0x06, 0x2605);
-                rtl8168_mdio_write(tp, 0x06, 0x0203);
-                rtl8168_mdio_write(tp, 0x06, 0x8fae);
-                rtl8168_mdio_write(tp, 0x06, 0x1302);
-                rtl8168_mdio_write(tp, 0x06, 0x03c8);
-                rtl8168_mdio_write(tp, 0x06, 0xae0e);
-                rtl8168_mdio_write(tp, 0x06, 0x0203);
-                rtl8168_mdio_write(tp, 0x06, 0xe102);
-                rtl8168_mdio_write(tp, 0x06, 0x8520);
-                rtl8168_mdio_write(tp, 0x06, 0xae06);
-                rtl8168_mdio_write(tp, 0x06, 0x0203);
-                rtl8168_mdio_write(tp, 0x06, 0x8f02);
-                rtl8168_mdio_write(tp, 0x06, 0x8566);
-                rtl8168_mdio_write(tp, 0x06, 0xef96);
-                rtl8168_mdio_write(tp, 0x06, 0xfefd);
-                rtl8168_mdio_write(tp, 0x06, 0xfc04);
-                rtl8168_mdio_write(tp, 0x06, 0xf8fa);
-                rtl8168_mdio_write(tp, 0x06, 0xef69);
-                rtl8168_mdio_write(tp, 0x06, 0xe08b);
-                rtl8168_mdio_write(tp, 0x06, 0x82ad);
-                rtl8168_mdio_write(tp, 0x06, 0x2737);
-                rtl8168_mdio_write(tp, 0x06, 0xbf86);
-                rtl8168_mdio_write(tp, 0x06, 0x4402);
-                rtl8168_mdio_write(tp, 0x06, 0x2f23);
-                rtl8168_mdio_write(tp, 0x06, 0xac28);
-                rtl8168_mdio_write(tp, 0x06, 0x2ed1);
-                rtl8168_mdio_write(tp, 0x06, 0x01bf);
-                rtl8168_mdio_write(tp, 0x06, 0x8647);
-                rtl8168_mdio_write(tp, 0x06, 0x022f);
-                rtl8168_mdio_write(tp, 0x06, 0x50bf);
-                rtl8168_mdio_write(tp, 0x06, 0x8641);
-                rtl8168_mdio_write(tp, 0x06, 0x022f);
-                rtl8168_mdio_write(tp, 0x06, 0x23e5);
-                rtl8168_mdio_write(tp, 0x06, 0x8af0);
-                rtl8168_mdio_write(tp, 0x06, 0xe0e0);
-                rtl8168_mdio_write(tp, 0x06, 0x22e1);
-                rtl8168_mdio_write(tp, 0x06, 0xe023);
-                rtl8168_mdio_write(tp, 0x06, 0xac2e);
-                rtl8168_mdio_write(tp, 0x06, 0x04d1);
-                rtl8168_mdio_write(tp, 0x06, 0x01ae);
-                rtl8168_mdio_write(tp, 0x06, 0x02d1);
-                rtl8168_mdio_write(tp, 0x06, 0x00bf);
-                rtl8168_mdio_write(tp, 0x06, 0x8641);
-                rtl8168_mdio_write(tp, 0x06, 0x022f);
-                rtl8168_mdio_write(tp, 0x06, 0x50d1);
-                rtl8168_mdio_write(tp, 0x06, 0x01bf);
-                rtl8168_mdio_write(tp, 0x06, 0x8644);
-                rtl8168_mdio_write(tp, 0x06, 0x022f);
-                rtl8168_mdio_write(tp, 0x06, 0x50ef);
-                rtl8168_mdio_write(tp, 0x06, 0x96fe);
-                rtl8168_mdio_write(tp, 0x06, 0xfc04);
-                rtl8168_mdio_write(tp, 0x06, 0xf8fa);
-                rtl8168_mdio_write(tp, 0x06, 0xef69);
-                rtl8168_mdio_write(tp, 0x06, 0xbf86);
-                rtl8168_mdio_write(tp, 0x06, 0x4702);
-                rtl8168_mdio_write(tp, 0x06, 0x2f23);
-                rtl8168_mdio_write(tp, 0x06, 0xad28);
-                rtl8168_mdio_write(tp, 0x06, 0x19d1);
-                rtl8168_mdio_write(tp, 0x06, 0x00bf);
-                rtl8168_mdio_write(tp, 0x06, 0x8644);
-                rtl8168_mdio_write(tp, 0x06, 0x022f);
-                rtl8168_mdio_write(tp, 0x06, 0x50e1);
-                rtl8168_mdio_write(tp, 0x06, 0x8af0);
-                rtl8168_mdio_write(tp, 0x06, 0xbf86);
-                rtl8168_mdio_write(tp, 0x06, 0x4102);
-                rtl8168_mdio_write(tp, 0x06, 0x2f50);
-                rtl8168_mdio_write(tp, 0x06, 0xd100);
-                rtl8168_mdio_write(tp, 0x06, 0xbf86);
-                rtl8168_mdio_write(tp, 0x06, 0x4702);
-                rtl8168_mdio_write(tp, 0x06, 0x2f50);
-                rtl8168_mdio_write(tp, 0x06, 0xef96);
-                rtl8168_mdio_write(tp, 0x06, 0xfefc);
-                rtl8168_mdio_write(tp, 0x06, 0x04f8);
-                rtl8168_mdio_write(tp, 0x06, 0xe0e2);
-                rtl8168_mdio_write(tp, 0x06, 0xfee1);
-                rtl8168_mdio_write(tp, 0x06, 0xe2ff);
-                rtl8168_mdio_write(tp, 0x06, 0xad2e);
-                rtl8168_mdio_write(tp, 0x06, 0x63e0);
-                rtl8168_mdio_write(tp, 0x06, 0xe038);
-                rtl8168_mdio_write(tp, 0x06, 0xe1e0);
-                rtl8168_mdio_write(tp, 0x06, 0x39ad);
-                rtl8168_mdio_write(tp, 0x06, 0x2f10);
-                rtl8168_mdio_write(tp, 0x06, 0xe0e0);
-                rtl8168_mdio_write(tp, 0x06, 0x34e1);
-                rtl8168_mdio_write(tp, 0x06, 0xe035);
-                rtl8168_mdio_write(tp, 0x06, 0xf726);
-                rtl8168_mdio_write(tp, 0x06, 0xe4e0);
-                rtl8168_mdio_write(tp, 0x06, 0x34e5);
-                rtl8168_mdio_write(tp, 0x06, 0xe035);
-                rtl8168_mdio_write(tp, 0x06, 0xae0e);
-                rtl8168_mdio_write(tp, 0x06, 0xe0e2);
-                rtl8168_mdio_write(tp, 0x06, 0xd6e1);
-                rtl8168_mdio_write(tp, 0x06, 0xe2d7);
-                rtl8168_mdio_write(tp, 0x06, 0xf728);
-                rtl8168_mdio_write(tp, 0x06, 0xe4e2);
-                rtl8168_mdio_write(tp, 0x06, 0xd6e5);
-                rtl8168_mdio_write(tp, 0x06, 0xe2d7);
-                rtl8168_mdio_write(tp, 0x06, 0xe0e2);
-                rtl8168_mdio_write(tp, 0x06, 0x34e1);
-                rtl8168_mdio_write(tp, 0x06, 0xe235);
-                rtl8168_mdio_write(tp, 0x06, 0xf72b);
-                rtl8168_mdio_write(tp, 0x06, 0xe4e2);
-                rtl8168_mdio_write(tp, 0x06, 0x34e5);
-                rtl8168_mdio_write(tp, 0x06, 0xe235);
-                rtl8168_mdio_write(tp, 0x06, 0xd07d);
-                rtl8168_mdio_write(tp, 0x06, 0xb0fe);
-                rtl8168_mdio_write(tp, 0x06, 0xe0e2);
-                rtl8168_mdio_write(tp, 0x06, 0x34e1);
-                rtl8168_mdio_write(tp, 0x06, 0xe235);
-                rtl8168_mdio_write(tp, 0x06, 0xf62b);
-                rtl8168_mdio_write(tp, 0x06, 0xe4e2);
-                rtl8168_mdio_write(tp, 0x06, 0x34e5);
-                rtl8168_mdio_write(tp, 0x06, 0xe235);
-                rtl8168_mdio_write(tp, 0x06, 0xe0e0);
-                rtl8168_mdio_write(tp, 0x06, 0x34e1);
-                rtl8168_mdio_write(tp, 0x06, 0xe035);
-                rtl8168_mdio_write(tp, 0x06, 0xf626);
-                rtl8168_mdio_write(tp, 0x06, 0xe4e0);
-                rtl8168_mdio_write(tp, 0x06, 0x34e5);
-                rtl8168_mdio_write(tp, 0x06, 0xe035);
-                rtl8168_mdio_write(tp, 0x06, 0xe0e2);
-                rtl8168_mdio_write(tp, 0x06, 0xd6e1);
-                rtl8168_mdio_write(tp, 0x06, 0xe2d7);
-                rtl8168_mdio_write(tp, 0x06, 0xf628);
-                rtl8168_mdio_write(tp, 0x06, 0xe4e2);
-                rtl8168_mdio_write(tp, 0x06, 0xd6e5);
-                rtl8168_mdio_write(tp, 0x06, 0xe2d7);
-                rtl8168_mdio_write(tp, 0x06, 0xfc04);
-                rtl8168_mdio_write(tp, 0x06, 0xae20);
-                rtl8168_mdio_write(tp, 0x06, 0x0000);
-                rtl8168_mdio_write(tp, 0x06, 0x0000);
-                rtl8168_mdio_write(tp, 0x06, 0x0000);
-                rtl8168_mdio_write(tp, 0x06, 0x0000);
-                rtl8168_mdio_write(tp, 0x06, 0x0000);
-                rtl8168_mdio_write(tp, 0x06, 0x0000);
-                rtl8168_mdio_write(tp, 0x06, 0x0000);
-                rtl8168_mdio_write(tp, 0x06, 0x0000);
-                rtl8168_mdio_write(tp, 0x06, 0x0000);
-                rtl8168_mdio_write(tp, 0x06, 0x0000);
-                rtl8168_mdio_write(tp, 0x06, 0x0000);
-                rtl8168_mdio_write(tp, 0x06, 0x0000);
-                rtl8168_mdio_write(tp, 0x06, 0x0000);
-                rtl8168_mdio_write(tp, 0x06, 0x0000);
-                rtl8168_mdio_write(tp, 0x06, 0x0000);
-                rtl8168_mdio_write(tp, 0x06, 0x0000);
-                rtl8168_mdio_write(tp, 0x06, 0xa725);
-                rtl8168_mdio_write(tp, 0x06, 0xe50a);
-                rtl8168_mdio_write(tp, 0x06, 0x1de5);
-                rtl8168_mdio_write(tp, 0x06, 0x0a2c);
-                rtl8168_mdio_write(tp, 0x06, 0xe50a);
-                rtl8168_mdio_write(tp, 0x06, 0x6de5);
-                rtl8168_mdio_write(tp, 0x06, 0x0a1d);
-                rtl8168_mdio_write(tp, 0x06, 0xe50a);
-                rtl8168_mdio_write(tp, 0x06, 0x1ce5);
-                rtl8168_mdio_write(tp, 0x06, 0x0a2d);
-                rtl8168_mdio_write(tp, 0x06, 0xa755);
-                rtl8168_mdio_write(tp, 0x06, 0x00e2);
-                rtl8168_mdio_write(tp, 0x06, 0x3488);
-                rtl8168_mdio_write(tp, 0x06, 0xe200);
-                rtl8168_mdio_write(tp, 0x06, 0xcce2);
-                rtl8168_mdio_write(tp, 0x06, 0x0055);
-                rtl8168_mdio_write(tp, 0x06, 0xe020);
-                rtl8168_mdio_write(tp, 0x06, 0x55e2);
-                rtl8168_mdio_write(tp, 0x06, 0xd600);
-                rtl8168_mdio_write(tp, 0x06, 0xe24a);
-                gphy_val = rtl8168_mdio_read(tp, 0x01);
-                gphy_val |= BIT_0;
-                rtl8168_mdio_write(tp, 0x01, gphy_val);
-                gphy_val = rtl8168_mdio_read(tp, 0x00);
-                gphy_val |= BIT_0;
-                rtl8168_mdio_write(tp, 0x00, gphy_val);
-                rtl8168_mdio_write(tp, 0x1f, 0x0000);
-
-                rtl8168_mdio_write(tp, 0x1f, 0x0005);
-                for (i = 0; i < 200; i++) {
-                        udelay(100);
-                        gphy_val = rtl8168_mdio_read(tp, 0x00);
-                        if (gphy_val & BIT_7)
-                                break;
-                }
-                rtl8168_mdio_write(tp, 0x1f, 0x0007);
-                rtl8168_mdio_write(tp, 0x1e, 0x0023);
-                gphy_val = rtl8168_mdio_read(tp, 0x17);
-                gphy_val &= ~(BIT_0);
-                if (tp->RequiredSecLanDonglePatch)
-                        gphy_val &= ~(BIT_2);
-                rtl8168_mdio_write(tp, 0x17, gphy_val);
-                rtl8168_mdio_write(tp, 0x1f, 0x0000);
-        }
-}
-
-static void
-rtl8168_set_phy_mcu_8168evl_1(struct net_device *dev)
-{
-        struct rtl8168_private *tp = netdev_priv(dev);
-        unsigned int gphy_val,i;
-
-        rtl8168_mdio_write(tp, 0x1f, 0x0000);
-        rtl8168_mdio_write(tp, 0x00, 0x1800);
-        gphy_val = rtl8168_mdio_read(tp, 0x15);
-        gphy_val &= ~(BIT_12);
-        rtl8168_mdio_write(tp, 0x15, gphy_val);
-        mdelay(20);
-        rtl8168_mdio_write(tp, 0x1f, 0x0004);
-        rtl8168_mdio_write(tp, 0x1f, 0x0007);
-        rtl8168_mdio_write(tp, 0x1e, 0x0023);
-        gphy_val = rtl8168_mdio_read(tp, 0x17);
-        if ((gphy_val & BIT_11) == 0x0000) {
-                gphy_val |= BIT_0;
-                rtl8168_mdio_write(tp, 0x17, gphy_val);
-                for (i = 0; i < 200; i++) {
-                        udelay(100);
-                        gphy_val = rtl8168_mdio_read(tp, 0x17);
-                        if (gphy_val & BIT_11)
-                                break;
-                }
-        }
-        gphy_val = rtl8168_mdio_read(tp, 0x17);
-        gphy_val |= BIT_0;
-        rtl8168_mdio_write(tp, 0x17, gphy_val);
-        rtl8168_mdio_write(tp, 0x1f, 0x0004);
-        rtl8168_mdio_write(tp, 0x1f, 0x0007);
-        rtl8168_mdio_write(tp, 0x1E, 0x002C);
-        rtl8168_mdio_write(tp, 0x1B, 0x5000);
-        rtl8168_mdio_write(tp, 0x1E, 0x002d);
-        rtl8168_mdio_write(tp, 0x19, 0x0004);
-        rtl8168_mdio_write(tp, 0x1f, 0x0002);
-        rtl8168_mdio_write(tp, 0x1f, 0x0000);
-        for (i = 0; i < 200; i++) {
-                udelay(100);
-                gphy_val = rtl8168_mdio_read(tp, 0x1E);
-                if ((gphy_val & 0x03FF) == 0x0014)
-                        break;
-        }
-        rtl8168_mdio_write(tp, 0x1f, 0x0005);
-        for (i = 0; i < 200; i++) {
-                udelay(100);
-                gphy_val = rtl8168_mdio_read(tp, 0x07);
-                if ((gphy_val & BIT_5) == 0)
-                        break;
-        }
-        gphy_val = rtl8168_mdio_read(tp, 0x07);
-        if (gphy_val & BIT_5) {
-                rtl8168_mdio_write(tp, 0x1f, 0x0004);
-                rtl8168_mdio_write(tp, 0x1f, 0x0007);
-                rtl8168_mdio_write(tp, 0x1e, 0x00a1);
-                rtl8168_mdio_write(tp, 0x17, 0x1000);
-                rtl8168_mdio_write(tp, 0x17, 0x0000);
-                rtl8168_mdio_write(tp, 0x17, 0x2000);
-                rtl8168_mdio_write(tp, 0x1e, 0x002f);
-                rtl8168_mdio_write(tp, 0x18, 0x9bfb);
-                rtl8168_mdio_write(tp, 0x1f, 0x0005);
-                rtl8168_mdio_write(tp, 0x07, 0x0000);
-                rtl8168_mdio_write(tp, 0x1f, 0x0002);
-                rtl8168_mdio_write(tp, 0x1f, 0x0000);
-        }
-        rtl8168_mdio_write(tp, 0x1f, 0x0005);
-        rtl8168_mdio_write(tp, 0x05, 0xfff6);
-        rtl8168_mdio_write(tp, 0x06, 0x0080);
-        gphy_val = rtl8168_mdio_read(tp, 0x00);
-        gphy_val &= ~(BIT_7);
-        rtl8168_mdio_write(tp, 0x00, gphy_val);
-        rtl8168_mdio_write(tp, 0x1f, 0x0004);
-        rtl8168_mdio_write(tp, 0x1f, 0x0007);
-        rtl8168_mdio_write(tp, 0x1e, 0x0023);
-        rtl8168_mdio_write(tp, 0x16, 0x0306);
-        rtl8168_mdio_write(tp, 0x16, 0x0307);
-        rtl8168_mdio_write(tp, 0x15, 0x0000);
-        rtl8168_mdio_write(tp, 0x19, 0x407d);
-        rtl8168_mdio_write(tp, 0x15, 0x0001);
-        rtl8168_mdio_write(tp, 0x19, 0x440f);
-        rtl8168_mdio_write(tp, 0x15, 0x0002);
-        rtl8168_mdio_write(tp, 0x19, 0x7c03);
-        rtl8168_mdio_write(tp, 0x15, 0x0003);
-        rtl8168_mdio_write(tp, 0x19, 0x6c03);
-        rtl8168_mdio_write(tp, 0x15, 0x0004);
-        rtl8168_mdio_write(tp, 0x19, 0xc4d5);
-        rtl8168_mdio_write(tp, 0x15, 0x0005);
-        rtl8168_mdio_write(tp, 0x19, 0x00ff);
-        rtl8168_mdio_write(tp, 0x15, 0x0006);
-        rtl8168_mdio_write(tp, 0x19, 0x74f0);
-        rtl8168_mdio_write(tp, 0x15, 0x0007);
-        rtl8168_mdio_write(tp, 0x19, 0x4880);
-        rtl8168_mdio_write(tp, 0x15, 0x0008);
-        rtl8168_mdio_write(tp, 0x19, 0x4c00);
-        rtl8168_mdio_write(tp, 0x15, 0x0009);
-        rtl8168_mdio_write(tp, 0x19, 0x4800);
-        rtl8168_mdio_write(tp, 0x15, 0x000a);
-        rtl8168_mdio_write(tp, 0x19, 0x5000);
-        rtl8168_mdio_write(tp, 0x15, 0x000b);
-        rtl8168_mdio_write(tp, 0x19, 0x4400);
-        rtl8168_mdio_write(tp, 0x15, 0x000c);
-        rtl8168_mdio_write(tp, 0x19, 0x7801);
-        rtl8168_mdio_write(tp, 0x15, 0x000d);
-        rtl8168_mdio_write(tp, 0x19, 0x4000);
-        rtl8168_mdio_write(tp, 0x15, 0x000e);
-        rtl8168_mdio_write(tp, 0x19, 0x7800);
-        rtl8168_mdio_write(tp, 0x15, 0x000f);
-        rtl8168_mdio_write(tp, 0x19, 0x7010);
-        rtl8168_mdio_write(tp, 0x15, 0x0010);
-        rtl8168_mdio_write(tp, 0x19, 0x6804);
-        rtl8168_mdio_write(tp, 0x15, 0x0011);
-        rtl8168_mdio_write(tp, 0x19, 0x64a0);
-        rtl8168_mdio_write(tp, 0x15, 0x0012);
-        rtl8168_mdio_write(tp, 0x19, 0x63da);
-        rtl8168_mdio_write(tp, 0x15, 0x0013);
-        rtl8168_mdio_write(tp, 0x19, 0x63d8);
-        rtl8168_mdio_write(tp, 0x15, 0x0014);
-        rtl8168_mdio_write(tp, 0x19, 0x6f05);
-        rtl8168_mdio_write(tp, 0x15, 0x0015);
-        rtl8168_mdio_write(tp, 0x19, 0x5420);
-        rtl8168_mdio_write(tp, 0x15, 0x0016);
-        rtl8168_mdio_write(tp, 0x19, 0x58ce);
-        rtl8168_mdio_write(tp, 0x15, 0x0017);
-        rtl8168_mdio_write(tp, 0x19, 0x5cf3);
-        rtl8168_mdio_write(tp, 0x15, 0x0018);
-        rtl8168_mdio_write(tp, 0x19, 0xb600);
-        rtl8168_mdio_write(tp, 0x15, 0x0019);
-        rtl8168_mdio_write(tp, 0x19, 0xc659);
-        rtl8168_mdio_write(tp, 0x15, 0x001a);
-        rtl8168_mdio_write(tp, 0x19, 0x0018);
-        rtl8168_mdio_write(tp, 0x15, 0x001b);
-        rtl8168_mdio_write(tp, 0x19, 0xc403);
-        rtl8168_mdio_write(tp, 0x15, 0x001c);
-        rtl8168_mdio_write(tp, 0x19, 0x0016);
-        rtl8168_mdio_write(tp, 0x15, 0x001d);
-        rtl8168_mdio_write(tp, 0x19, 0xaa05);
-        rtl8168_mdio_write(tp, 0x15, 0x001e);
-        rtl8168_mdio_write(tp, 0x19, 0xc503);
-        rtl8168_mdio_write(tp, 0x15, 0x001f);
-        rtl8168_mdio_write(tp, 0x19, 0x0003);
-        rtl8168_mdio_write(tp, 0x15, 0x0020);
-        rtl8168_mdio_write(tp, 0x19, 0x89f8);
-        rtl8168_mdio_write(tp, 0x15, 0x0021);
-        rtl8168_mdio_write(tp, 0x19, 0x32ae);
-        rtl8168_mdio_write(tp, 0x15, 0x0022);
-        rtl8168_mdio_write(tp, 0x19, 0x7c03);
-        rtl8168_mdio_write(tp, 0x15, 0x0023);
-        rtl8168_mdio_write(tp, 0x19, 0x6c03);
-        rtl8168_mdio_write(tp, 0x15, 0x0024);
-        rtl8168_mdio_write(tp, 0x19, 0x7c03);
-        rtl8168_mdio_write(tp, 0x15, 0x0025);
-        rtl8168_mdio_write(tp, 0x19, 0x6801);
-        rtl8168_mdio_write(tp, 0x15, 0x0026);
-        rtl8168_mdio_write(tp, 0x19, 0x66a0);
-        rtl8168_mdio_write(tp, 0x15, 0x0027);
-        rtl8168_mdio_write(tp, 0x19, 0xa300);
-        rtl8168_mdio_write(tp, 0x15, 0x0028);
-        rtl8168_mdio_write(tp, 0x19, 0x64a0);
-        rtl8168_mdio_write(tp, 0x15, 0x0029);
-        rtl8168_mdio_write(tp, 0x19, 0x76f0);
-        rtl8168_mdio_write(tp, 0x15, 0x002a);
-        rtl8168_mdio_write(tp, 0x19, 0x7670);
-        rtl8168_mdio_write(tp, 0x15, 0x002b);
-        rtl8168_mdio_write(tp, 0x19, 0x7630);
-        rtl8168_mdio_write(tp, 0x15, 0x002c);
-        rtl8168_mdio_write(tp, 0x19, 0x31a6);
-        rtl8168_mdio_write(tp, 0x15, 0x002d);
-        rtl8168_mdio_write(tp, 0x19, 0x0000);
-        rtl8168_mdio_write(tp, 0x15, 0x002e);
-        rtl8168_mdio_write(tp, 0x19, 0x0000);
-        rtl8168_mdio_write(tp, 0x15, 0x002f);
-        rtl8168_mdio_write(tp, 0x19, 0x0000);
-        rtl8168_mdio_write(tp, 0x15, 0x0030);
-        rtl8168_mdio_write(tp, 0x19, 0x0000);
-        rtl8168_mdio_write(tp, 0x15, 0x0031);
-        rtl8168_mdio_write(tp, 0x19, 0x0000);
-        rtl8168_mdio_write(tp, 0x15, 0x0032);
-        rtl8168_mdio_write(tp, 0x19, 0x4801);
-        rtl8168_mdio_write(tp, 0x15, 0x0033);
-        rtl8168_mdio_write(tp, 0x19, 0x6803);
-        rtl8168_mdio_write(tp, 0x15, 0x0034);
-        rtl8168_mdio_write(tp, 0x19, 0x66a1);
-        rtl8168_mdio_write(tp, 0x15, 0x0035);
-        rtl8168_mdio_write(tp, 0x19, 0x7c03);
-        rtl8168_mdio_write(tp, 0x15, 0x0036);
-        rtl8168_mdio_write(tp, 0x19, 0x6c03);
-        rtl8168_mdio_write(tp, 0x15, 0x0037);
-        rtl8168_mdio_write(tp, 0x19, 0xa300);
-        rtl8168_mdio_write(tp, 0x15, 0x0038);
-        rtl8168_mdio_write(tp, 0x19, 0x64a1);
-        rtl8168_mdio_write(tp, 0x15, 0x0039);
-        rtl8168_mdio_write(tp, 0x19, 0x7c08);
-        rtl8168_mdio_write(tp, 0x15, 0x003a);
-        rtl8168_mdio_write(tp, 0x19, 0x74f8);
-        rtl8168_mdio_write(tp, 0x15, 0x003b);
-        rtl8168_mdio_write(tp, 0x19, 0x63d0);
-        rtl8168_mdio_write(tp, 0x15, 0x003c);
-        rtl8168_mdio_write(tp, 0x19, 0x7ff0);
-        rtl8168_mdio_write(tp, 0x15, 0x003d);
-        rtl8168_mdio_write(tp, 0x19, 0x77f0);
-        rtl8168_mdio_write(tp, 0x15, 0x003e);
-        rtl8168_mdio_write(tp, 0x19, 0x7ff0);
-        rtl8168_mdio_write(tp, 0x15, 0x003f);
-        rtl8168_mdio_write(tp, 0x19, 0x7750);
-        rtl8168_mdio_write(tp, 0x15, 0x0040);
-        rtl8168_mdio_write(tp, 0x19, 0x63d8);
-        rtl8168_mdio_write(tp, 0x15, 0x0041);
-        rtl8168_mdio_write(tp, 0x19, 0x7cf0);
-        rtl8168_mdio_write(tp, 0x15, 0x0042);
-        rtl8168_mdio_write(tp, 0x19, 0x7708);
-        rtl8168_mdio_write(tp, 0x15, 0x0043);
-        rtl8168_mdio_write(tp, 0x19, 0xa654);
-        rtl8168_mdio_write(tp, 0x15, 0x0044);
-        rtl8168_mdio_write(tp, 0x19, 0x304a);
-        rtl8168_mdio_write(tp, 0x15, 0x0045);
-        rtl8168_mdio_write(tp, 0x19, 0x0000);
-        rtl8168_mdio_write(tp, 0x15, 0x0046);
-        rtl8168_mdio_write(tp, 0x19, 0x0000);
-        rtl8168_mdio_write(tp, 0x15, 0x0047);
-        rtl8168_mdio_write(tp, 0x19, 0x0000);
-        rtl8168_mdio_write(tp, 0x15, 0x0048);
-        rtl8168_mdio_write(tp, 0x19, 0x0000);
-        rtl8168_mdio_write(tp, 0x15, 0x0049);
-        rtl8168_mdio_write(tp, 0x19, 0x0000);
-        rtl8168_mdio_write(tp, 0x15, 0x004a);
-        rtl8168_mdio_write(tp, 0x19, 0x4802);
-        rtl8168_mdio_write(tp, 0x15, 0x004b);
-        rtl8168_mdio_write(tp, 0x19, 0x4003);
-        rtl8168_mdio_write(tp, 0x15, 0x004c);
-        rtl8168_mdio_write(tp, 0x19, 0x4440);
-        rtl8168_mdio_write(tp, 0x15, 0x004d);
-        rtl8168_mdio_write(tp, 0x19, 0x63c8);
-        rtl8168_mdio_write(tp, 0x15, 0x004e);
-        rtl8168_mdio_write(tp, 0x19, 0x6481);
-        rtl8168_mdio_write(tp, 0x15, 0x004f);
-        rtl8168_mdio_write(tp, 0x19, 0x9d00);
-        rtl8168_mdio_write(tp, 0x15, 0x0050);
-        rtl8168_mdio_write(tp, 0x19, 0x63e8);
-        rtl8168_mdio_write(tp, 0x15, 0x0051);
-        rtl8168_mdio_write(tp, 0x19, 0x7d00);
-        rtl8168_mdio_write(tp, 0x15, 0x0052);
-        rtl8168_mdio_write(tp, 0x19, 0x5900);
-        rtl8168_mdio_write(tp, 0x15, 0x0053);
-        rtl8168_mdio_write(tp, 0x19, 0x63f8);
-        rtl8168_mdio_write(tp, 0x15, 0x0054);
-        rtl8168_mdio_write(tp, 0x19, 0x64a1);
-        rtl8168_mdio_write(tp, 0x15, 0x0055);
-        rtl8168_mdio_write(tp, 0x19, 0x3116);
-        rtl8168_mdio_write(tp, 0x15, 0x0056);
-        rtl8168_mdio_write(tp, 0x19, 0x0000);
-        rtl8168_mdio_write(tp, 0x15, 0x0057);
-        rtl8168_mdio_write(tp, 0x19, 0x0000);
-        rtl8168_mdio_write(tp, 0x15, 0x0058);
-        rtl8168_mdio_write(tp, 0x19, 0x0000);
-        rtl8168_mdio_write(tp, 0x15, 0x0059);
-        rtl8168_mdio_write(tp, 0x19, 0x0000);
-        rtl8168_mdio_write(tp, 0x15, 0x005a);
-        rtl8168_mdio_write(tp, 0x19, 0x7c03);
-        rtl8168_mdio_write(tp, 0x15, 0x005b);
-        rtl8168_mdio_write(tp, 0x19, 0x6c03);
-        rtl8168_mdio_write(tp, 0x15, 0x005c);
-        rtl8168_mdio_write(tp, 0x19, 0x7c08);
-        rtl8168_mdio_write(tp, 0x15, 0x005d);
-        rtl8168_mdio_write(tp, 0x19, 0x6000);
-        rtl8168_mdio_write(tp, 0x15, 0x005e);
-        rtl8168_mdio_write(tp, 0x19, 0x59ce);
-        rtl8168_mdio_write(tp, 0x15, 0x005f);
-        rtl8168_mdio_write(tp, 0x19, 0x4400);
-        rtl8168_mdio_write(tp, 0x15, 0x0060);
-        rtl8168_mdio_write(tp, 0x19, 0x7d00);
-        rtl8168_mdio_write(tp, 0x15, 0x0061);
-        rtl8168_mdio_write(tp, 0x19, 0x72b0);
-        rtl8168_mdio_write(tp, 0x15, 0x0062);
-        rtl8168_mdio_write(tp, 0x19, 0x400e);
-        rtl8168_mdio_write(tp, 0x15, 0x0063);
-        rtl8168_mdio_write(tp, 0x19, 0x4440);
-        rtl8168_mdio_write(tp, 0x15, 0x0064);
-        rtl8168_mdio_write(tp, 0x19, 0x9d00);
-        rtl8168_mdio_write(tp, 0x15, 0x0065);
-        rtl8168_mdio_write(tp, 0x19, 0x7f00);
-        rtl8168_mdio_write(tp, 0x15, 0x0066);
-        rtl8168_mdio_write(tp, 0x19, 0x70b0);
-        rtl8168_mdio_write(tp, 0x15, 0x0067);
-        rtl8168_mdio_write(tp, 0x19, 0x7c08);
-        rtl8168_mdio_write(tp, 0x15, 0x0068);
-        rtl8168_mdio_write(tp, 0x19, 0x6008);
-        rtl8168_mdio_write(tp, 0x15, 0x0069);
-        rtl8168_mdio_write(tp, 0x19, 0x7cf0);
-        rtl8168_mdio_write(tp, 0x15, 0x006a);
-        rtl8168_mdio_write(tp, 0x19, 0x7750);
-        rtl8168_mdio_write(tp, 0x15, 0x006b);
-        rtl8168_mdio_write(tp, 0x19, 0x4007);
-        rtl8168_mdio_write(tp, 0x15, 0x006c);
-        rtl8168_mdio_write(tp, 0x19, 0x4500);
-        rtl8168_mdio_write(tp, 0x15, 0x006d);
-        rtl8168_mdio_write(tp, 0x19, 0x4023);
-        rtl8168_mdio_write(tp, 0x15, 0x006e);
-        rtl8168_mdio_write(tp, 0x19, 0x4580);
-        rtl8168_mdio_write(tp, 0x15, 0x006f);
-        rtl8168_mdio_write(tp, 0x19, 0x9f00);
-        rtl8168_mdio_write(tp, 0x15, 0x0070);
-        rtl8168_mdio_write(tp, 0x19, 0xcd78);
-        rtl8168_mdio_write(tp, 0x15, 0x0071);
-        rtl8168_mdio_write(tp, 0x19, 0x0003);
-        rtl8168_mdio_write(tp, 0x15, 0x0072);
-        rtl8168_mdio_write(tp, 0x19, 0xbe02);
-        rtl8168_mdio_write(tp, 0x15, 0x0073);
-        rtl8168_mdio_write(tp, 0x19, 0x3070);
-        rtl8168_mdio_write(tp, 0x15, 0x0074);
-        rtl8168_mdio_write(tp, 0x19, 0x7cf0);
-        rtl8168_mdio_write(tp, 0x15, 0x0075);
-        rtl8168_mdio_write(tp, 0x19, 0x77f0);
-        rtl8168_mdio_write(tp, 0x15, 0x0076);
-        rtl8168_mdio_write(tp, 0x19, 0x4400);
-        rtl8168_mdio_write(tp, 0x15, 0x0077);
-        rtl8168_mdio_write(tp, 0x19, 0x4007);
-        rtl8168_mdio_write(tp, 0x15, 0x0078);
-        rtl8168_mdio_write(tp, 0x19, 0x4500);
-        rtl8168_mdio_write(tp, 0x15, 0x0079);
-        rtl8168_mdio_write(tp, 0x19, 0x4023);
-        rtl8168_mdio_write(tp, 0x15, 0x007a);
-        rtl8168_mdio_write(tp, 0x19, 0x4580);
-        rtl8168_mdio_write(tp, 0x15, 0x007b);
-        rtl8168_mdio_write(tp, 0x19, 0x9f00);
-        rtl8168_mdio_write(tp, 0x15, 0x007c);
-        rtl8168_mdio_write(tp, 0x19, 0xce80);
-        rtl8168_mdio_write(tp, 0x15, 0x007d);
-        rtl8168_mdio_write(tp, 0x19, 0x0004);
-        rtl8168_mdio_write(tp, 0x15, 0x007e);
-        rtl8168_mdio_write(tp, 0x19, 0xce80);
-        rtl8168_mdio_write(tp, 0x15, 0x007f);
-        rtl8168_mdio_write(tp, 0x19, 0x0002);
-        rtl8168_mdio_write(tp, 0x15, 0x0080);
-        rtl8168_mdio_write(tp, 0x19, 0x307c);
-        rtl8168_mdio_write(tp, 0x15, 0x0081);
-        rtl8168_mdio_write(tp, 0x19, 0x4400);
-        rtl8168_mdio_write(tp, 0x15, 0x0082);
-        rtl8168_mdio_write(tp, 0x19, 0x480f);
-        rtl8168_mdio_write(tp, 0x15, 0x0083);
-        rtl8168_mdio_write(tp, 0x19, 0x6802);
-        rtl8168_mdio_write(tp, 0x15, 0x0084);
-        rtl8168_mdio_write(tp, 0x19, 0x6680);
-        rtl8168_mdio_write(tp, 0x15, 0x0085);
-        rtl8168_mdio_write(tp, 0x19, 0x7c10);
-        rtl8168_mdio_write(tp, 0x15, 0x0086);
-        rtl8168_mdio_write(tp, 0x19, 0x6010);
-        rtl8168_mdio_write(tp, 0x15, 0x0087);
-        rtl8168_mdio_write(tp, 0x19, 0x400a);
-        rtl8168_mdio_write(tp, 0x15, 0x0088);
-        rtl8168_mdio_write(tp, 0x19, 0x4580);
-        rtl8168_mdio_write(tp, 0x15, 0x0089);
-        rtl8168_mdio_write(tp, 0x19, 0x9e00);
-        rtl8168_mdio_write(tp, 0x15, 0x008a);
-        rtl8168_mdio_write(tp, 0x19, 0x7d00);
-        rtl8168_mdio_write(tp, 0x15, 0x008b);
-        rtl8168_mdio_write(tp, 0x19, 0x5800);
-        rtl8168_mdio_write(tp, 0x15, 0x008c);
-        rtl8168_mdio_write(tp, 0x19, 0x63c8);
-        rtl8168_mdio_write(tp, 0x15, 0x008d);
-        rtl8168_mdio_write(tp, 0x19, 0x63d8);
-        rtl8168_mdio_write(tp, 0x15, 0x008e);
-        rtl8168_mdio_write(tp, 0x19, 0x66a0);
-        rtl8168_mdio_write(tp, 0x15, 0x008f);
-        rtl8168_mdio_write(tp, 0x19, 0x8300);
-        rtl8168_mdio_write(tp, 0x15, 0x0090);
-        rtl8168_mdio_write(tp, 0x19, 0x7ff0);
-        rtl8168_mdio_write(tp, 0x15, 0x0091);
-        rtl8168_mdio_write(tp, 0x19, 0x74f0);
-        rtl8168_mdio_write(tp, 0x15, 0x0092);
-        rtl8168_mdio_write(tp, 0x19, 0x3006);
-        rtl8168_mdio_write(tp, 0x15, 0x0093);
-        rtl8168_mdio_write(tp, 0x19, 0x0000);
-        rtl8168_mdio_write(tp, 0x15, 0x0094);
-        rtl8168_mdio_write(tp, 0x19, 0x0000);
-        rtl8168_mdio_write(tp, 0x15, 0x0095);
-        rtl8168_mdio_write(tp, 0x19, 0x0000);
-        rtl8168_mdio_write(tp, 0x15, 0x0096);
-        rtl8168_mdio_write(tp, 0x19, 0x0000);
-        rtl8168_mdio_write(tp, 0x15, 0x0097);
-        rtl8168_mdio_write(tp, 0x19, 0x4803);
-        rtl8168_mdio_write(tp, 0x15, 0x0098);
-        rtl8168_mdio_write(tp, 0x19, 0x7c03);
-        rtl8168_mdio_write(tp, 0x15, 0x0099);
-        rtl8168_mdio_write(tp, 0x19, 0x6c03);
-        rtl8168_mdio_write(tp, 0x15, 0x009a);
-        rtl8168_mdio_write(tp, 0x19, 0xa203);
-        rtl8168_mdio_write(tp, 0x15, 0x009b);
-        rtl8168_mdio_write(tp, 0x19, 0x64b1);
-        rtl8168_mdio_write(tp, 0x15, 0x009c);
-        rtl8168_mdio_write(tp, 0x19, 0x309e);
-        rtl8168_mdio_write(tp, 0x15, 0x009d);
-        rtl8168_mdio_write(tp, 0x19, 0x64b3);
-        rtl8168_mdio_write(tp, 0x15, 0x009e);
-        rtl8168_mdio_write(tp, 0x19, 0x4030);
-        rtl8168_mdio_write(tp, 0x15, 0x009f);
-        rtl8168_mdio_write(tp, 0x19, 0x440e);
-        rtl8168_mdio_write(tp, 0x15, 0x00a0);
-        rtl8168_mdio_write(tp, 0x19, 0x4020);
-        rtl8168_mdio_write(tp, 0x15, 0x00a1);
-        rtl8168_mdio_write(tp, 0x19, 0x4419);
-        rtl8168_mdio_write(tp, 0x15, 0x00a2);
-        rtl8168_mdio_write(tp, 0x19, 0x7801);
-        rtl8168_mdio_write(tp, 0x15, 0x00a3);
-        rtl8168_mdio_write(tp, 0x19, 0xc520);
-        rtl8168_mdio_write(tp, 0x15, 0x00a4);
-        rtl8168_mdio_write(tp, 0x19, 0x000b);
-        rtl8168_mdio_write(tp, 0x15, 0x00a5);
-        rtl8168_mdio_write(tp, 0x19, 0x4020);
-        rtl8168_mdio_write(tp, 0x15, 0x00a6);
-        rtl8168_mdio_write(tp, 0x19, 0x7800);
-        rtl8168_mdio_write(tp, 0x15, 0x00a7);
-        rtl8168_mdio_write(tp, 0x19, 0x58a4);
-        rtl8168_mdio_write(tp, 0x15, 0x00a8);
-        rtl8168_mdio_write(tp, 0x19, 0x63da);
-        rtl8168_mdio_write(tp, 0x15, 0x00a9);
-        rtl8168_mdio_write(tp, 0x19, 0x5cb0);
-        rtl8168_mdio_write(tp, 0x15, 0x00aa);
-        rtl8168_mdio_write(tp, 0x19, 0x7d00);
-        rtl8168_mdio_write(tp, 0x15, 0x00ab);
-        rtl8168_mdio_write(tp, 0x19, 0x72b0);
-        rtl8168_mdio_write(tp, 0x15, 0x00ac);
-        rtl8168_mdio_write(tp, 0x19, 0x7f00);
-        rtl8168_mdio_write(tp, 0x15, 0x00ad);
-        rtl8168_mdio_write(tp, 0x19, 0x70b0);
-        rtl8168_mdio_write(tp, 0x15, 0x00ae);
-        rtl8168_mdio_write(tp, 0x19, 0x30b8);
-        rtl8168_mdio_write(tp, 0x15, 0x00AF);
-        rtl8168_mdio_write(tp, 0x19, 0x4060);
-        rtl8168_mdio_write(tp, 0x15, 0x00B0);
-        rtl8168_mdio_write(tp, 0x19, 0x7800);
-        rtl8168_mdio_write(tp, 0x15, 0x00B1);
-        rtl8168_mdio_write(tp, 0x19, 0x7e00);
-        rtl8168_mdio_write(tp, 0x15, 0x00B2);
-        rtl8168_mdio_write(tp, 0x19, 0x72B0);
-        rtl8168_mdio_write(tp, 0x15, 0x00B3);
-        rtl8168_mdio_write(tp, 0x19, 0x7F00);
-        rtl8168_mdio_write(tp, 0x15, 0x00B4);
-        rtl8168_mdio_write(tp, 0x19, 0x73B0);
-        rtl8168_mdio_write(tp, 0x15, 0x00b5);
-        rtl8168_mdio_write(tp, 0x19, 0x58a0);
-        rtl8168_mdio_write(tp, 0x15, 0x00b6);
-        rtl8168_mdio_write(tp, 0x19, 0x63d2);
-        rtl8168_mdio_write(tp, 0x15, 0x00b7);
-        rtl8168_mdio_write(tp, 0x19, 0x5c00);
-        rtl8168_mdio_write(tp, 0x15, 0x00b8);
-        rtl8168_mdio_write(tp, 0x19, 0x5780);
-        rtl8168_mdio_write(tp, 0x15, 0x00b9);
-        rtl8168_mdio_write(tp, 0x19, 0xb60d);
-        rtl8168_mdio_write(tp, 0x15, 0x00ba);
-        rtl8168_mdio_write(tp, 0x19, 0x9bff);
-        rtl8168_mdio_write(tp, 0x15, 0x00bb);
-        rtl8168_mdio_write(tp, 0x19, 0x7c03);
-        rtl8168_mdio_write(tp, 0x15, 0x00bc);
-        rtl8168_mdio_write(tp, 0x19, 0x6001);
-        rtl8168_mdio_write(tp, 0x15, 0x00bd);
-        rtl8168_mdio_write(tp, 0x19, 0xc020);
-        rtl8168_mdio_write(tp, 0x15, 0x00be);
-        rtl8168_mdio_write(tp, 0x19, 0x002b);
-        rtl8168_mdio_write(tp, 0x15, 0x00bf);
-        rtl8168_mdio_write(tp, 0x19, 0xc137);
-        rtl8168_mdio_write(tp, 0x15, 0x00c0);
-        rtl8168_mdio_write(tp, 0x19, 0x0006);
-        rtl8168_mdio_write(tp, 0x15, 0x00c1);
-        rtl8168_mdio_write(tp, 0x19, 0x9af8);
-        rtl8168_mdio_write(tp, 0x15, 0x00c2);
-        rtl8168_mdio_write(tp, 0x19, 0x30c6);
-        rtl8168_mdio_write(tp, 0x15, 0x00c3);
-        rtl8168_mdio_write(tp, 0x19, 0x0000);
-        rtl8168_mdio_write(tp, 0x15, 0x00c4);
-        rtl8168_mdio_write(tp, 0x19, 0x0000);
-        rtl8168_mdio_write(tp, 0x15, 0x00c5);
-        rtl8168_mdio_write(tp, 0x19, 0x0000);
-        rtl8168_mdio_write(tp, 0x15, 0x00c6);
-        rtl8168_mdio_write(tp, 0x19, 0x7d00);
-        rtl8168_mdio_write(tp, 0x15, 0x00c7);
-        rtl8168_mdio_write(tp, 0x19, 0x70b0);
-        rtl8168_mdio_write(tp, 0x15, 0x00c8);
-        rtl8168_mdio_write(tp, 0x19, 0x4400);
-        rtl8168_mdio_write(tp, 0x15, 0x00c9);
-        rtl8168_mdio_write(tp, 0x19, 0x4804);
-        rtl8168_mdio_write(tp, 0x15, 0x00ca);
-        rtl8168_mdio_write(tp, 0x19, 0x7c80);
-        rtl8168_mdio_write(tp, 0x15, 0x00cb);
-        rtl8168_mdio_write(tp, 0x19, 0x5c80);
-        rtl8168_mdio_write(tp, 0x15, 0x00cc);
-        rtl8168_mdio_write(tp, 0x19, 0x4010);
-        rtl8168_mdio_write(tp, 0x15, 0x00cd);
-        rtl8168_mdio_write(tp, 0x19, 0x4415);
-        rtl8168_mdio_write(tp, 0x15, 0x00ce);
-        rtl8168_mdio_write(tp, 0x19, 0x9b00);
-        rtl8168_mdio_write(tp, 0x15, 0x00cf);
-        rtl8168_mdio_write(tp, 0x19, 0x7f00);
-        rtl8168_mdio_write(tp, 0x15, 0x00d0);
-        rtl8168_mdio_write(tp, 0x19, 0x70b0);
-        rtl8168_mdio_write(tp, 0x15, 0x00d1);
-        rtl8168_mdio_write(tp, 0x19, 0x3177);
-        rtl8168_mdio_write(tp, 0x15, 0x00d2);
-        rtl8168_mdio_write(tp, 0x19, 0x0000);
-        rtl8168_mdio_write(tp, 0x15, 0x00d3);
-        rtl8168_mdio_write(tp, 0x19, 0x0000);
-        rtl8168_mdio_write(tp, 0x15, 0x00d4);
-        rtl8168_mdio_write(tp, 0x19, 0x0000);
-        rtl8168_mdio_write(tp, 0x15, 0x00d5);
-        rtl8168_mdio_write(tp, 0x19, 0x4808);
-        rtl8168_mdio_write(tp, 0x15, 0x00d6);
-        rtl8168_mdio_write(tp, 0x19, 0x4007);
-        rtl8168_mdio_write(tp, 0x15, 0x00d7);
-        rtl8168_mdio_write(tp, 0x19, 0x4420);
-        rtl8168_mdio_write(tp, 0x15, 0x00d8);
-        rtl8168_mdio_write(tp, 0x19, 0x63d8);
-        rtl8168_mdio_write(tp, 0x15, 0x00d9);
-        rtl8168_mdio_write(tp, 0x19, 0xb608);
-        rtl8168_mdio_write(tp, 0x15, 0x00da);
-        rtl8168_mdio_write(tp, 0x19, 0xbcbd);
-        rtl8168_mdio_write(tp, 0x15, 0x00db);
-        rtl8168_mdio_write(tp, 0x19, 0xc60b);
-        rtl8168_mdio_write(tp, 0x15, 0x00dc);
-        rtl8168_mdio_write(tp, 0x19, 0x00fd);
-        rtl8168_mdio_write(tp, 0x15, 0x00dd);
-        rtl8168_mdio_write(tp, 0x19, 0x30e1);
-        rtl8168_mdio_write(tp, 0x15, 0x00de);
-        rtl8168_mdio_write(tp, 0x19, 0x0000);
-        rtl8168_mdio_write(tp, 0x15, 0x00df);
-        rtl8168_mdio_write(tp, 0x19, 0x0000);
-        rtl8168_mdio_write(tp, 0x15, 0x00e0);
-        rtl8168_mdio_write(tp, 0x19, 0x0000);
-        rtl8168_mdio_write(tp, 0x15, 0x00e1);
-        rtl8168_mdio_write(tp, 0x19, 0x4809);
-        rtl8168_mdio_write(tp, 0x15, 0x00e2);
-        rtl8168_mdio_write(tp, 0x19, 0x7e40);
-        rtl8168_mdio_write(tp, 0x15, 0x00e3);
-        rtl8168_mdio_write(tp, 0x19, 0x5a40);
-        rtl8168_mdio_write(tp, 0x15, 0x00e4);
-        rtl8168_mdio_write(tp, 0x19, 0x305a);
-        rtl8168_mdio_write(tp, 0x15, 0x00e5);
-        rtl8168_mdio_write(tp, 0x19, 0x0000);
-        rtl8168_mdio_write(tp, 0x15, 0x00e6);
-        rtl8168_mdio_write(tp, 0x19, 0x0000);
-        rtl8168_mdio_write(tp, 0x15, 0x00e7);
-        rtl8168_mdio_write(tp, 0x19, 0x0000);
-        rtl8168_mdio_write(tp, 0x15, 0x00e8);
-        rtl8168_mdio_write(tp, 0x19, 0x0000);
-        rtl8168_mdio_write(tp, 0x15, 0x00e9);
-        rtl8168_mdio_write(tp, 0x19, 0x480a);
-        rtl8168_mdio_write(tp, 0x15, 0x00ea);
-        rtl8168_mdio_write(tp, 0x19, 0x5820);
-        rtl8168_mdio_write(tp, 0x15, 0x00eb);
-        rtl8168_mdio_write(tp, 0x19, 0x6c03);
-        rtl8168_mdio_write(tp, 0x15, 0x00ec);
-        rtl8168_mdio_write(tp, 0x19, 0xb60a);
-        rtl8168_mdio_write(tp, 0x15, 0x00ed);
-        rtl8168_mdio_write(tp, 0x19, 0xda07);
-        rtl8168_mdio_write(tp, 0x15, 0x00ee);
-        rtl8168_mdio_write(tp, 0x19, 0x0008);
-        rtl8168_mdio_write(tp, 0x15, 0x00ef);
-        rtl8168_mdio_write(tp, 0x19, 0xc60b);
-        rtl8168_mdio_write(tp, 0x15, 0x00f0);
-        rtl8168_mdio_write(tp, 0x19, 0x00fc);
-        rtl8168_mdio_write(tp, 0x15, 0x00f1);
-        rtl8168_mdio_write(tp, 0x19, 0x30f6);
-        rtl8168_mdio_write(tp, 0x15, 0x00f2);
-        rtl8168_mdio_write(tp, 0x19, 0x0000);
-        rtl8168_mdio_write(tp, 0x15, 0x00f3);
-        rtl8168_mdio_write(tp, 0x19, 0x0000);
-        rtl8168_mdio_write(tp, 0x15, 0x00f4);
-        rtl8168_mdio_write(tp, 0x19, 0x0000);
-        rtl8168_mdio_write(tp, 0x15, 0x00f5);
-        rtl8168_mdio_write(tp, 0x19, 0x0000);
-        rtl8168_mdio_write(tp, 0x15, 0x00f6);
-        rtl8168_mdio_write(tp, 0x19, 0x4408);
-        rtl8168_mdio_write(tp, 0x15, 0x00f7);
-        rtl8168_mdio_write(tp, 0x19, 0x480b);
-        rtl8168_mdio_write(tp, 0x15, 0x00f8);
-        rtl8168_mdio_write(tp, 0x19, 0x6f03);
-        rtl8168_mdio_write(tp, 0x15, 0x00f9);
-        rtl8168_mdio_write(tp, 0x19, 0x405f);
-        rtl8168_mdio_write(tp, 0x15, 0x00fa);
-        rtl8168_mdio_write(tp, 0x19, 0x4448);
-        rtl8168_mdio_write(tp, 0x15, 0x00fb);
-        rtl8168_mdio_write(tp, 0x19, 0x4020);
-        rtl8168_mdio_write(tp, 0x15, 0x00fc);
-        rtl8168_mdio_write(tp, 0x19, 0x4468);
-        rtl8168_mdio_write(tp, 0x15, 0x00fd);
-        rtl8168_mdio_write(tp, 0x19, 0x9c03);
-        rtl8168_mdio_write(tp, 0x15, 0x00fe);
-        rtl8168_mdio_write(tp, 0x19, 0x6f07);
-        rtl8168_mdio_write(tp, 0x15, 0x00ff);
-        rtl8168_mdio_write(tp, 0x19, 0x58a0);
-        rtl8168_mdio_write(tp, 0x15, 0x0100);
-        rtl8168_mdio_write(tp, 0x19, 0xd6d1);
-        rtl8168_mdio_write(tp, 0x15, 0x0101);
-        rtl8168_mdio_write(tp, 0x19, 0x0004);
-        rtl8168_mdio_write(tp, 0x15, 0x0102);
-        rtl8168_mdio_write(tp, 0x19, 0xc137);
-        rtl8168_mdio_write(tp, 0x15, 0x0103);
-        rtl8168_mdio_write(tp, 0x19, 0x0002);
-        rtl8168_mdio_write(tp, 0x15, 0x0104);
-        rtl8168_mdio_write(tp, 0x19, 0xa0e5);
-        rtl8168_mdio_write(tp, 0x15, 0x0105);
-        rtl8168_mdio_write(tp, 0x19, 0x9df8);
-        rtl8168_mdio_write(tp, 0x15, 0x0106);
-        rtl8168_mdio_write(tp, 0x19, 0x30c6);
-        rtl8168_mdio_write(tp, 0x15, 0x0107);
-        rtl8168_mdio_write(tp, 0x19, 0x0000);
-        rtl8168_mdio_write(tp, 0x15, 0x0108);
-        rtl8168_mdio_write(tp, 0x19, 0x0000);
-        rtl8168_mdio_write(tp, 0x15, 0x0109);
-        rtl8168_mdio_write(tp, 0x19, 0x0000);
-        rtl8168_mdio_write(tp, 0x15, 0x010a);
-        rtl8168_mdio_write(tp, 0x19, 0x0000);
-        rtl8168_mdio_write(tp, 0x15, 0x010b);
-        rtl8168_mdio_write(tp, 0x19, 0x4808);
-        rtl8168_mdio_write(tp, 0x15, 0x010c);
-        rtl8168_mdio_write(tp, 0x19, 0xc32d);
-        rtl8168_mdio_write(tp, 0x15, 0x010d);
-        rtl8168_mdio_write(tp, 0x19, 0x0003);
-        rtl8168_mdio_write(tp, 0x15, 0x010e);
-        rtl8168_mdio_write(tp, 0x19, 0xc8b3);
-        rtl8168_mdio_write(tp, 0x15, 0x010f);
-        rtl8168_mdio_write(tp, 0x19, 0x00fc);
-        rtl8168_mdio_write(tp, 0x15, 0x0110);
-        rtl8168_mdio_write(tp, 0x19, 0x4400);
-        rtl8168_mdio_write(tp, 0x15, 0x0111);
-        rtl8168_mdio_write(tp, 0x19, 0x3116);
-        rtl8168_mdio_write(tp, 0x15, 0x0112);
-        rtl8168_mdio_write(tp, 0x19, 0x0000);
-        rtl8168_mdio_write(tp, 0x15, 0x0113);
-        rtl8168_mdio_write(tp, 0x19, 0x0000);
-        rtl8168_mdio_write(tp, 0x15, 0x0114);
-        rtl8168_mdio_write(tp, 0x19, 0x0000);
-        rtl8168_mdio_write(tp, 0x15, 0x0115);
-        rtl8168_mdio_write(tp, 0x19, 0x0000);
-        rtl8168_mdio_write(tp, 0x15, 0x0116);
-        rtl8168_mdio_write(tp, 0x19, 0x4803);
-        rtl8168_mdio_write(tp, 0x15, 0x0117);
-        rtl8168_mdio_write(tp, 0x19, 0x7c03);
-        rtl8168_mdio_write(tp, 0x15, 0x0118);
-        rtl8168_mdio_write(tp, 0x19, 0x6c02);
-        rtl8168_mdio_write(tp, 0x15, 0x0119);
-        rtl8168_mdio_write(tp, 0x19, 0x7c04);
-        rtl8168_mdio_write(tp, 0x15, 0x011a);
-        rtl8168_mdio_write(tp, 0x19, 0x6000);
-        rtl8168_mdio_write(tp, 0x15, 0x011b);
-        rtl8168_mdio_write(tp, 0x19, 0x5cf7);
-        rtl8168_mdio_write(tp, 0x15, 0x011c);
-        rtl8168_mdio_write(tp, 0x19, 0x7c2a);
-        rtl8168_mdio_write(tp, 0x15, 0x011d);
-        rtl8168_mdio_write(tp, 0x19, 0x5800);
-        rtl8168_mdio_write(tp, 0x15, 0x011e);
-        rtl8168_mdio_write(tp, 0x19, 0x5400);
-        rtl8168_mdio_write(tp, 0x15, 0x011f);
-        rtl8168_mdio_write(tp, 0x19, 0x7c08);
-        rtl8168_mdio_write(tp, 0x15, 0x0120);
-        rtl8168_mdio_write(tp, 0x19, 0x74f0);
-        rtl8168_mdio_write(tp, 0x15, 0x0121);
-        rtl8168_mdio_write(tp, 0x19, 0x4019);
-        rtl8168_mdio_write(tp, 0x15, 0x0122);
-        rtl8168_mdio_write(tp, 0x19, 0x440d);
-        rtl8168_mdio_write(tp, 0x15, 0x0123);
-        rtl8168_mdio_write(tp, 0x19, 0xb6c1);
-        rtl8168_mdio_write(tp, 0x15, 0x0124);
-        rtl8168_mdio_write(tp, 0x19, 0xc05b);
-        rtl8168_mdio_write(tp, 0x15, 0x0125);
-        rtl8168_mdio_write(tp, 0x19, 0x00bf);
-        rtl8168_mdio_write(tp, 0x15, 0x0126);
-        rtl8168_mdio_write(tp, 0x19, 0xc025);
-        rtl8168_mdio_write(tp, 0x15, 0x0127);
-        rtl8168_mdio_write(tp, 0x19, 0x00bd);
-        rtl8168_mdio_write(tp, 0x15, 0x0128);
-        rtl8168_mdio_write(tp, 0x19, 0xc603);
-        rtl8168_mdio_write(tp, 0x15, 0x0129);
-        rtl8168_mdio_write(tp, 0x19, 0x00bb);
-        rtl8168_mdio_write(tp, 0x15, 0x012a);
-        rtl8168_mdio_write(tp, 0x19, 0x8805);
-        rtl8168_mdio_write(tp, 0x15, 0x012b);
-        rtl8168_mdio_write(tp, 0x19, 0x7801);
-        rtl8168_mdio_write(tp, 0x15, 0x012c);
-        rtl8168_mdio_write(tp, 0x19, 0x4001);
-        rtl8168_mdio_write(tp, 0x15, 0x012d);
-        rtl8168_mdio_write(tp, 0x19, 0x7800);
-        rtl8168_mdio_write(tp, 0x15, 0x012e);
-        rtl8168_mdio_write(tp, 0x19, 0xa3dd);
-        rtl8168_mdio_write(tp, 0x15, 0x012f);
-        rtl8168_mdio_write(tp, 0x19, 0x7c03);
-        rtl8168_mdio_write(tp, 0x15, 0x0130);
-        rtl8168_mdio_write(tp, 0x19, 0x6c03);
-        rtl8168_mdio_write(tp, 0x15, 0x0131);
-        rtl8168_mdio_write(tp, 0x19, 0x8407);
-        rtl8168_mdio_write(tp, 0x15, 0x0132);
-        rtl8168_mdio_write(tp, 0x19, 0x7c03);
-        rtl8168_mdio_write(tp, 0x15, 0x0133);
-        rtl8168_mdio_write(tp, 0x19, 0x6c02);
-        rtl8168_mdio_write(tp, 0x15, 0x0134);
-        rtl8168_mdio_write(tp, 0x19, 0xd9b8);
-        rtl8168_mdio_write(tp, 0x15, 0x0135);
-        rtl8168_mdio_write(tp, 0x19, 0x0003);
-        rtl8168_mdio_write(tp, 0x15, 0x0136);
-        rtl8168_mdio_write(tp, 0x19, 0xc240);
-        rtl8168_mdio_write(tp, 0x15, 0x0137);
-        rtl8168_mdio_write(tp, 0x19, 0x0015);
-        rtl8168_mdio_write(tp, 0x15, 0x0138);
-        rtl8168_mdio_write(tp, 0x19, 0x7c03);
-        rtl8168_mdio_write(tp, 0x15, 0x0139);
-        rtl8168_mdio_write(tp, 0x19, 0x6c02);
-        rtl8168_mdio_write(tp, 0x15, 0x013a);
-        rtl8168_mdio_write(tp, 0x19, 0x9ae9);
-        rtl8168_mdio_write(tp, 0x15, 0x013b);
-        rtl8168_mdio_write(tp, 0x19, 0x3140);
-        rtl8168_mdio_write(tp, 0x15, 0x013c);
-        rtl8168_mdio_write(tp, 0x19, 0x0000);
-        rtl8168_mdio_write(tp, 0x15, 0x013d);
-        rtl8168_mdio_write(tp, 0x19, 0x0000);
-        rtl8168_mdio_write(tp, 0x15, 0x013e);
-        rtl8168_mdio_write(tp, 0x19, 0x0000);
-        rtl8168_mdio_write(tp, 0x15, 0x013f);
-        rtl8168_mdio_write(tp, 0x19, 0x0000);
-        rtl8168_mdio_write(tp, 0x15, 0x0140);
-        rtl8168_mdio_write(tp, 0x19, 0x4807);
-        rtl8168_mdio_write(tp, 0x15, 0x0141);
-        rtl8168_mdio_write(tp, 0x19, 0x4004);
-        rtl8168_mdio_write(tp, 0x15, 0x0142);
-        rtl8168_mdio_write(tp, 0x19, 0x4410);
-        rtl8168_mdio_write(tp, 0x15, 0x0143);
-        rtl8168_mdio_write(tp, 0x19, 0x7c0c);
-        rtl8168_mdio_write(tp, 0x15, 0x0144);
-        rtl8168_mdio_write(tp, 0x19, 0x600c);
-        rtl8168_mdio_write(tp, 0x15, 0x0145);
-        rtl8168_mdio_write(tp, 0x19, 0x9b00);
-        rtl8168_mdio_write(tp, 0x15, 0x0146);
-        rtl8168_mdio_write(tp, 0x19, 0xa68f);
-        rtl8168_mdio_write(tp, 0x15, 0x0147);
-        rtl8168_mdio_write(tp, 0x19, 0x3116);
-        rtl8168_mdio_write(tp, 0x15, 0x0148);
-        rtl8168_mdio_write(tp, 0x19, 0x0000);
-        rtl8168_mdio_write(tp, 0x15, 0x0149);
-        rtl8168_mdio_write(tp, 0x19, 0x0000);
-        rtl8168_mdio_write(tp, 0x15, 0x014a);
-        rtl8168_mdio_write(tp, 0x19, 0x0000);
-        rtl8168_mdio_write(tp, 0x15, 0x014b);
-        rtl8168_mdio_write(tp, 0x19, 0x0000);
-        rtl8168_mdio_write(tp, 0x15, 0x014c);
-        rtl8168_mdio_write(tp, 0x19, 0x4804);
-        rtl8168_mdio_write(tp, 0x15, 0x014d);
-        rtl8168_mdio_write(tp, 0x19, 0x54c0);
-        rtl8168_mdio_write(tp, 0x15, 0x014e);
-        rtl8168_mdio_write(tp, 0x19, 0xb703);
-        rtl8168_mdio_write(tp, 0x15, 0x014f);
-        rtl8168_mdio_write(tp, 0x19, 0x5cff);
-        rtl8168_mdio_write(tp, 0x15, 0x0150);
-        rtl8168_mdio_write(tp, 0x19, 0x315f);
-        rtl8168_mdio_write(tp, 0x15, 0x0151);
-        rtl8168_mdio_write(tp, 0x19, 0x7c08);
-        rtl8168_mdio_write(tp, 0x15, 0x0152);
-        rtl8168_mdio_write(tp, 0x19, 0x74f8);
-        rtl8168_mdio_write(tp, 0x15, 0x0153);
-        rtl8168_mdio_write(tp, 0x19, 0x6421);
-        rtl8168_mdio_write(tp, 0x15, 0x0154);
-        rtl8168_mdio_write(tp, 0x19, 0x7c08);
-        rtl8168_mdio_write(tp, 0x15, 0x0155);
-        rtl8168_mdio_write(tp, 0x19, 0x6000);
-        rtl8168_mdio_write(tp, 0x15, 0x0156);
-        rtl8168_mdio_write(tp, 0x19, 0x4003);
-        rtl8168_mdio_write(tp, 0x15, 0x0157);
-        rtl8168_mdio_write(tp, 0x19, 0x4418);
-        rtl8168_mdio_write(tp, 0x15, 0x0158);
-        rtl8168_mdio_write(tp, 0x19, 0x9b00);
-        rtl8168_mdio_write(tp, 0x15, 0x0159);
-        rtl8168_mdio_write(tp, 0x19, 0x6461);
-        rtl8168_mdio_write(tp, 0x15, 0x015a);
-        rtl8168_mdio_write(tp, 0x19, 0x64e1);
-        rtl8168_mdio_write(tp, 0x15, 0x015b);
-        rtl8168_mdio_write(tp, 0x19, 0x7c20);
-        rtl8168_mdio_write(tp, 0x15, 0x015c);
-        rtl8168_mdio_write(tp, 0x19, 0x5820);
-        rtl8168_mdio_write(tp, 0x15, 0x015d);
-        rtl8168_mdio_write(tp, 0x19, 0x5ccf);
-        rtl8168_mdio_write(tp, 0x15, 0x015e);
-        rtl8168_mdio_write(tp, 0x19, 0x7050);
-        rtl8168_mdio_write(tp, 0x15, 0x015f);
-        rtl8168_mdio_write(tp, 0x19, 0xd9b8);
-        rtl8168_mdio_write(tp, 0x15, 0x0160);
-        rtl8168_mdio_write(tp, 0x19, 0x0008);
-        rtl8168_mdio_write(tp, 0x15, 0x0161);
-        rtl8168_mdio_write(tp, 0x19, 0xdab1);
-        rtl8168_mdio_write(tp, 0x15, 0x0162);
-        rtl8168_mdio_write(tp, 0x19, 0x0015);
-        rtl8168_mdio_write(tp, 0x15, 0x0163);
-        rtl8168_mdio_write(tp, 0x19, 0xc244);
-        rtl8168_mdio_write(tp, 0x15, 0x0164);
-        rtl8168_mdio_write(tp, 0x19, 0x0013);
-        rtl8168_mdio_write(tp, 0x15, 0x0165);
-        rtl8168_mdio_write(tp, 0x19, 0xc021);
-        rtl8168_mdio_write(tp, 0x15, 0x0166);
-        rtl8168_mdio_write(tp, 0x19, 0x00f9);
-        rtl8168_mdio_write(tp, 0x15, 0x0167);
-        rtl8168_mdio_write(tp, 0x19, 0x3177);
-        rtl8168_mdio_write(tp, 0x15, 0x0168);
-        rtl8168_mdio_write(tp, 0x19, 0x5cf7);
-        rtl8168_mdio_write(tp, 0x15, 0x0169);
-        rtl8168_mdio_write(tp, 0x19, 0x4010);
-        rtl8168_mdio_write(tp, 0x15, 0x016a);
-        rtl8168_mdio_write(tp, 0x19, 0x4428);
-        rtl8168_mdio_write(tp, 0x15, 0x016b);
-        rtl8168_mdio_write(tp, 0x19, 0x9c00);
-        rtl8168_mdio_write(tp, 0x15, 0x016c);
-        rtl8168_mdio_write(tp, 0x19, 0x7c08);
-        rtl8168_mdio_write(tp, 0x15, 0x016d);
-        rtl8168_mdio_write(tp, 0x19, 0x6008);
-        rtl8168_mdio_write(tp, 0x15, 0x016e);
-        rtl8168_mdio_write(tp, 0x19, 0x7c08);
-        rtl8168_mdio_write(tp, 0x15, 0x016f);
-        rtl8168_mdio_write(tp, 0x19, 0x74f0);
-        rtl8168_mdio_write(tp, 0x15, 0x0170);
-        rtl8168_mdio_write(tp, 0x19, 0x6461);
-        rtl8168_mdio_write(tp, 0x15, 0x0171);
-        rtl8168_mdio_write(tp, 0x19, 0x6421);
-        rtl8168_mdio_write(tp, 0x15, 0x0172);
-        rtl8168_mdio_write(tp, 0x19, 0x64a1);
-        rtl8168_mdio_write(tp, 0x15, 0x0173);
-        rtl8168_mdio_write(tp, 0x19, 0x3116);
-        rtl8168_mdio_write(tp, 0x15, 0x0174);
-        rtl8168_mdio_write(tp, 0x19, 0x0000);
-        rtl8168_mdio_write(tp, 0x15, 0x0175);
-        rtl8168_mdio_write(tp, 0x19, 0x0000);
-        rtl8168_mdio_write(tp, 0x15, 0x0176);
-        rtl8168_mdio_write(tp, 0x19, 0x0000);
-        rtl8168_mdio_write(tp, 0x15, 0x0177);
-        rtl8168_mdio_write(tp, 0x19, 0x4805);
-        rtl8168_mdio_write(tp, 0x15, 0x0178);
-        rtl8168_mdio_write(tp, 0x19, 0xa103);
-        rtl8168_mdio_write(tp, 0x15, 0x0179);
-        rtl8168_mdio_write(tp, 0x19, 0x7c02);
-        rtl8168_mdio_write(tp, 0x15, 0x017a);
-        rtl8168_mdio_write(tp, 0x19, 0x6002);
-        rtl8168_mdio_write(tp, 0x15, 0x017b);
-        rtl8168_mdio_write(tp, 0x19, 0x7e00);
-        rtl8168_mdio_write(tp, 0x15, 0x017c);
-        rtl8168_mdio_write(tp, 0x19, 0x5400);
-        rtl8168_mdio_write(tp, 0x15, 0x017d);
-        rtl8168_mdio_write(tp, 0x19, 0x7c6b);
-        rtl8168_mdio_write(tp, 0x15, 0x017e);
-        rtl8168_mdio_write(tp, 0x19, 0x5c63);
-        rtl8168_mdio_write(tp, 0x15, 0x017f);
-        rtl8168_mdio_write(tp, 0x19, 0x407d);
-        rtl8168_mdio_write(tp, 0x15, 0x0180);
-        rtl8168_mdio_write(tp, 0x19, 0xa602);
-        rtl8168_mdio_write(tp, 0x15, 0x0181);
-        rtl8168_mdio_write(tp, 0x19, 0x4001);
-        rtl8168_mdio_write(tp, 0x15, 0x0182);
-        rtl8168_mdio_write(tp, 0x19, 0x4420);
-        rtl8168_mdio_write(tp, 0x15, 0x0183);
-        rtl8168_mdio_write(tp, 0x19, 0x4020);
-        rtl8168_mdio_write(tp, 0x15, 0x0184);
-        rtl8168_mdio_write(tp, 0x19, 0x44a1);
-        rtl8168_mdio_write(tp, 0x15, 0x0185);
-        rtl8168_mdio_write(tp, 0x19, 0xd6e0);
-        rtl8168_mdio_write(tp, 0x15, 0x0186);
-        rtl8168_mdio_write(tp, 0x19, 0x0009);
-        rtl8168_mdio_write(tp, 0x15, 0x0187);
-        rtl8168_mdio_write(tp, 0x19, 0x9efe);
-        rtl8168_mdio_write(tp, 0x15, 0x0188);
-        rtl8168_mdio_write(tp, 0x19, 0x7c02);
-        rtl8168_mdio_write(tp, 0x15, 0x0189);
-        rtl8168_mdio_write(tp, 0x19, 0x6000);
-        rtl8168_mdio_write(tp, 0x15, 0x018a);
-        rtl8168_mdio_write(tp, 0x19, 0x9c00);
-        rtl8168_mdio_write(tp, 0x15, 0x018b);
-        rtl8168_mdio_write(tp, 0x19, 0x318f);
-        rtl8168_mdio_write(tp, 0x15, 0x018c);
-        rtl8168_mdio_write(tp, 0x19, 0x0000);
-        rtl8168_mdio_write(tp, 0x15, 0x018d);
-        rtl8168_mdio_write(tp, 0x19, 0x0000);
-        rtl8168_mdio_write(tp, 0x15, 0x018e);
-        rtl8168_mdio_write(tp, 0x19, 0x0000);
-        rtl8168_mdio_write(tp, 0x15, 0x018f);
-        rtl8168_mdio_write(tp, 0x19, 0x4806);
-        rtl8168_mdio_write(tp, 0x15, 0x0190);
-        rtl8168_mdio_write(tp, 0x19, 0x7c10);
-        rtl8168_mdio_write(tp, 0x15, 0x0191);
-        rtl8168_mdio_write(tp, 0x19, 0x5c10);
-        rtl8168_mdio_write(tp, 0x15, 0x0192);
-        rtl8168_mdio_write(tp, 0x19, 0x40fa);
-        rtl8168_mdio_write(tp, 0x15, 0x0193);
-        rtl8168_mdio_write(tp, 0x19, 0xa602);
-        rtl8168_mdio_write(tp, 0x15, 0x0194);
-        rtl8168_mdio_write(tp, 0x19, 0x4010);
-        rtl8168_mdio_write(tp, 0x15, 0x0195);
-        rtl8168_mdio_write(tp, 0x19, 0x4440);
-        rtl8168_mdio_write(tp, 0x15, 0x0196);
-        rtl8168_mdio_write(tp, 0x19, 0x9d00);
-        rtl8168_mdio_write(tp, 0x15, 0x0197);
-        rtl8168_mdio_write(tp, 0x19, 0x7c80);
-        rtl8168_mdio_write(tp, 0x15, 0x0198);
-        rtl8168_mdio_write(tp, 0x19, 0x6400);
-        rtl8168_mdio_write(tp, 0x15, 0x0199);
-        rtl8168_mdio_write(tp, 0x19, 0x4003);
-        rtl8168_mdio_write(tp, 0x15, 0x019a);
-        rtl8168_mdio_write(tp, 0x19, 0x4540);
-        rtl8168_mdio_write(tp, 0x15, 0x019b);
-        rtl8168_mdio_write(tp, 0x19, 0x7c08);
-        rtl8168_mdio_write(tp, 0x15, 0x019c);
-        rtl8168_mdio_write(tp, 0x19, 0x6008);
-        rtl8168_mdio_write(tp, 0x15, 0x019d);
-        rtl8168_mdio_write(tp, 0x19, 0x9f00);
-        rtl8168_mdio_write(tp, 0x15, 0x019e);
-        rtl8168_mdio_write(tp, 0x19, 0x7c40);
-        rtl8168_mdio_write(tp, 0x15, 0x019f);
-        rtl8168_mdio_write(tp, 0x19, 0x6400);
-        rtl8168_mdio_write(tp, 0x15, 0x01a0);
-        rtl8168_mdio_write(tp, 0x19, 0x7c80);
-        rtl8168_mdio_write(tp, 0x15, 0x01a1);
-        rtl8168_mdio_write(tp, 0x19, 0x6480);
-        rtl8168_mdio_write(tp, 0x15, 0x01a2);
-        rtl8168_mdio_write(tp, 0x19, 0x3140);
-        rtl8168_mdio_write(tp, 0x15, 0x01a3);
-        rtl8168_mdio_write(tp, 0x19, 0x0000);
-        rtl8168_mdio_write(tp, 0x15, 0x01a4);
-        rtl8168_mdio_write(tp, 0x19, 0x0000);
-        rtl8168_mdio_write(tp, 0x15, 0x01a5);
-        rtl8168_mdio_write(tp, 0x19, 0x0000);
-        rtl8168_mdio_write(tp, 0x15, 0x01a6);
-        rtl8168_mdio_write(tp, 0x19, 0x4400);
-        rtl8168_mdio_write(tp, 0x15, 0x01a7);
-        rtl8168_mdio_write(tp, 0x19, 0x7c0b);
-        rtl8168_mdio_write(tp, 0x15, 0x01a8);
-        rtl8168_mdio_write(tp, 0x19, 0x6c01);
-        rtl8168_mdio_write(tp, 0x15, 0x01a9);
-        rtl8168_mdio_write(tp, 0x19, 0x64a8);
-        rtl8168_mdio_write(tp, 0x15, 0x01aa);
-        rtl8168_mdio_write(tp, 0x19, 0x6800);
-        rtl8168_mdio_write(tp, 0x15, 0x01ab);
-        rtl8168_mdio_write(tp, 0x19, 0x5cf0);
-        rtl8168_mdio_write(tp, 0x15, 0x01ac);
-        rtl8168_mdio_write(tp, 0x19, 0x588f);
-        rtl8168_mdio_write(tp, 0x15, 0x01ad);
-        rtl8168_mdio_write(tp, 0x19, 0xb628);
-        rtl8168_mdio_write(tp, 0x15, 0x01ae);
-        rtl8168_mdio_write(tp, 0x19, 0xc053);
-        rtl8168_mdio_write(tp, 0x15, 0x01af);
-        rtl8168_mdio_write(tp, 0x19, 0x0026);
-        rtl8168_mdio_write(tp, 0x15, 0x01b0);
-        rtl8168_mdio_write(tp, 0x19, 0xc02d);
-        rtl8168_mdio_write(tp, 0x15, 0x01b1);
-        rtl8168_mdio_write(tp, 0x19, 0x0024);
-        rtl8168_mdio_write(tp, 0x15, 0x01b2);
-        rtl8168_mdio_write(tp, 0x19, 0xc603);
-        rtl8168_mdio_write(tp, 0x15, 0x01b3);
-        rtl8168_mdio_write(tp, 0x19, 0x0022);
-        rtl8168_mdio_write(tp, 0x15, 0x01b4);
-        rtl8168_mdio_write(tp, 0x19, 0x8cf9);
-        rtl8168_mdio_write(tp, 0x15, 0x01b5);
-        rtl8168_mdio_write(tp, 0x19, 0x31ba);
-        rtl8168_mdio_write(tp, 0x15, 0x01b6);
-        rtl8168_mdio_write(tp, 0x19, 0x0000);
-        rtl8168_mdio_write(tp, 0x15, 0x01b7);
-        rtl8168_mdio_write(tp, 0x19, 0x0000);
-        rtl8168_mdio_write(tp, 0x15, 0x01b8);
-        rtl8168_mdio_write(tp, 0x19, 0x0000);
-        rtl8168_mdio_write(tp, 0x15, 0x01b9);
-        rtl8168_mdio_write(tp, 0x19, 0x0000);
-        rtl8168_mdio_write(tp, 0x15, 0x01ba);
-        rtl8168_mdio_write(tp, 0x19, 0x4400);
-        rtl8168_mdio_write(tp, 0x15, 0x01bb);
-        rtl8168_mdio_write(tp, 0x19, 0x5420);
-        rtl8168_mdio_write(tp, 0x15, 0x01bc);
-        rtl8168_mdio_write(tp, 0x19, 0x4811);
-        rtl8168_mdio_write(tp, 0x15, 0x01bd);
-        rtl8168_mdio_write(tp, 0x19, 0x5000);
-        rtl8168_mdio_write(tp, 0x15, 0x01be);
-        rtl8168_mdio_write(tp, 0x19, 0x4801);
-        rtl8168_mdio_write(tp, 0x15, 0x01bf);
-        rtl8168_mdio_write(tp, 0x19, 0x6800);
-        rtl8168_mdio_write(tp, 0x15, 0x01c0);
-        rtl8168_mdio_write(tp, 0x19, 0x31f5);
-        rtl8168_mdio_write(tp, 0x15, 0x01c1);
-        rtl8168_mdio_write(tp, 0x19, 0xb614);
-        rtl8168_mdio_write(tp, 0x15, 0x01c2);
-        rtl8168_mdio_write(tp, 0x19, 0x8ce4);
-        rtl8168_mdio_write(tp, 0x15, 0x01c3);
-        rtl8168_mdio_write(tp, 0x19, 0xb30c);
-        rtl8168_mdio_write(tp, 0x15, 0x01c4);
-        rtl8168_mdio_write(tp, 0x19, 0x7c03);
-        rtl8168_mdio_write(tp, 0x15, 0x01c5);
-        rtl8168_mdio_write(tp, 0x19, 0x6c02);
-        rtl8168_mdio_write(tp, 0x15, 0x01c6);
-        rtl8168_mdio_write(tp, 0x19, 0x8206);
-        rtl8168_mdio_write(tp, 0x15, 0x01c7);
-        rtl8168_mdio_write(tp, 0x19, 0x7c03);
-        rtl8168_mdio_write(tp, 0x15, 0x01c8);
-        rtl8168_mdio_write(tp, 0x19, 0x6c00);
-        rtl8168_mdio_write(tp, 0x15, 0x01c9);
-        rtl8168_mdio_write(tp, 0x19, 0x7c04);
-        rtl8168_mdio_write(tp, 0x15, 0x01ca);
-        rtl8168_mdio_write(tp, 0x19, 0x7404);
-        rtl8168_mdio_write(tp, 0x15, 0x01cb);
-        rtl8168_mdio_write(tp, 0x19, 0x31c0);
-        rtl8168_mdio_write(tp, 0x15, 0x01cc);
-        rtl8168_mdio_write(tp, 0x19, 0x7c04);
-        rtl8168_mdio_write(tp, 0x15, 0x01cd);
-        rtl8168_mdio_write(tp, 0x19, 0x7400);
-        rtl8168_mdio_write(tp, 0x15, 0x01ce);
-        rtl8168_mdio_write(tp, 0x19, 0x31c0);
-        rtl8168_mdio_write(tp, 0x15, 0x01cf);
-        rtl8168_mdio_write(tp, 0x19, 0x8df1);
-        rtl8168_mdio_write(tp, 0x15, 0x01d0);
-        rtl8168_mdio_write(tp, 0x19, 0x3248);
-        rtl8168_mdio_write(tp, 0x15, 0x01d1);
-        rtl8168_mdio_write(tp, 0x19, 0x0000);
-        rtl8168_mdio_write(tp, 0x15, 0x01d2);
-        rtl8168_mdio_write(tp, 0x19, 0x0000);
-        rtl8168_mdio_write(tp, 0x15, 0x01d3);
-        rtl8168_mdio_write(tp, 0x19, 0x0000);
-        rtl8168_mdio_write(tp, 0x15, 0x01d4);
-        rtl8168_mdio_write(tp, 0x19, 0x0000);
-        rtl8168_mdio_write(tp, 0x15, 0x01d5);
-        rtl8168_mdio_write(tp, 0x19, 0x4400);
-        rtl8168_mdio_write(tp, 0x15, 0x01d6);
-        rtl8168_mdio_write(tp, 0x19, 0x7c03);
-        rtl8168_mdio_write(tp, 0x15, 0x01d7);
-        rtl8168_mdio_write(tp, 0x19, 0x6c03);
-        rtl8168_mdio_write(tp, 0x15, 0x01d8);
-        rtl8168_mdio_write(tp, 0x19, 0x7670);
-        rtl8168_mdio_write(tp, 0x15, 0x01d9);
-        rtl8168_mdio_write(tp, 0x19, 0x4023);
-        rtl8168_mdio_write(tp, 0x15, 0x01da);
-        rtl8168_mdio_write(tp, 0x19, 0x4500);
-        rtl8168_mdio_write(tp, 0x15, 0x01db);
-        rtl8168_mdio_write(tp, 0x19, 0x4069);
-        rtl8168_mdio_write(tp, 0x15, 0x01dc);
-        rtl8168_mdio_write(tp, 0x19, 0x4580);
-        rtl8168_mdio_write(tp, 0x15, 0x01dd);
-        rtl8168_mdio_write(tp, 0x19, 0x9f00);
-        rtl8168_mdio_write(tp, 0x15, 0x01de);
-        rtl8168_mdio_write(tp, 0x19, 0xcff5);
-        rtl8168_mdio_write(tp, 0x15, 0x01df);
-        rtl8168_mdio_write(tp, 0x19, 0x00ff);
-        rtl8168_mdio_write(tp, 0x15, 0x01e0);
-        rtl8168_mdio_write(tp, 0x19, 0x76f0);
-        rtl8168_mdio_write(tp, 0x15, 0x01e1);
-        rtl8168_mdio_write(tp, 0x19, 0x4400);
-        rtl8168_mdio_write(tp, 0x15, 0x01e2);
-        rtl8168_mdio_write(tp, 0x19, 0x4023);
-        rtl8168_mdio_write(tp, 0x15, 0x01e3);
-        rtl8168_mdio_write(tp, 0x19, 0x4500);
-        rtl8168_mdio_write(tp, 0x15, 0x01e4);
-        rtl8168_mdio_write(tp, 0x19, 0x4069);
-        rtl8168_mdio_write(tp, 0x15, 0x01e5);
-        rtl8168_mdio_write(tp, 0x19, 0x4580);
-        rtl8168_mdio_write(tp, 0x15, 0x01e6);
-        rtl8168_mdio_write(tp, 0x19, 0x9f00);
-        rtl8168_mdio_write(tp, 0x15, 0x01e7);
-        rtl8168_mdio_write(tp, 0x19, 0xd0f5);
-        rtl8168_mdio_write(tp, 0x15, 0x01e8);
-        rtl8168_mdio_write(tp, 0x19, 0x00ff);
-        rtl8168_mdio_write(tp, 0x15, 0x01e9);
-        rtl8168_mdio_write(tp, 0x19, 0x4400);
-        rtl8168_mdio_write(tp, 0x15, 0x01ea);
-        rtl8168_mdio_write(tp, 0x19, 0x7c03);
-        rtl8168_mdio_write(tp, 0x15, 0x01eb);
-        rtl8168_mdio_write(tp, 0x19, 0x6800);
-        rtl8168_mdio_write(tp, 0x15, 0x01ec);
-        rtl8168_mdio_write(tp, 0x19, 0x66a0);
-        rtl8168_mdio_write(tp, 0x15, 0x01ed);
-        rtl8168_mdio_write(tp, 0x19, 0x8300);
-        rtl8168_mdio_write(tp, 0x15, 0x01ee);
-        rtl8168_mdio_write(tp, 0x19, 0x74f0);
-        rtl8168_mdio_write(tp, 0x15, 0x01ef);
-        rtl8168_mdio_write(tp, 0x19, 0x3006);
-        rtl8168_mdio_write(tp, 0x15, 0x01f0);
-        rtl8168_mdio_write(tp, 0x19, 0x0000);
-        rtl8168_mdio_write(tp, 0x15, 0x01f1);
-        rtl8168_mdio_write(tp, 0x19, 0x0000);
-        rtl8168_mdio_write(tp, 0x15, 0x01f2);
-        rtl8168_mdio_write(tp, 0x19, 0x0000);
-        rtl8168_mdio_write(tp, 0x15, 0x01f3);
-        rtl8168_mdio_write(tp, 0x19, 0x0000);
-        rtl8168_mdio_write(tp, 0x15, 0x01f4);
-        rtl8168_mdio_write(tp, 0x19, 0x0000);
-        rtl8168_mdio_write(tp, 0x15, 0x01f5);
-        rtl8168_mdio_write(tp, 0x19, 0x7c03);
-        rtl8168_mdio_write(tp, 0x15, 0x01f6);
-        rtl8168_mdio_write(tp, 0x19, 0x6c02);
-        rtl8168_mdio_write(tp, 0x15, 0x01f7);
-        rtl8168_mdio_write(tp, 0x19, 0x409d);
-        rtl8168_mdio_write(tp, 0x15, 0x01f8);
-        rtl8168_mdio_write(tp, 0x19, 0x7c87);
-        rtl8168_mdio_write(tp, 0x15, 0x01f9);
-        rtl8168_mdio_write(tp, 0x19, 0xae14);
-        rtl8168_mdio_write(tp, 0x15, 0x01fa);
-        rtl8168_mdio_write(tp, 0x19, 0x4400);
-        rtl8168_mdio_write(tp, 0x15, 0x01fb);
-        rtl8168_mdio_write(tp, 0x19, 0x7c40);
-        rtl8168_mdio_write(tp, 0x15, 0x01fc);
-        rtl8168_mdio_write(tp, 0x19, 0x6800);
-        rtl8168_mdio_write(tp, 0x15, 0x01fd);
-        rtl8168_mdio_write(tp, 0x19, 0x7801);
-        rtl8168_mdio_write(tp, 0x15, 0x01fe);
-        rtl8168_mdio_write(tp, 0x19, 0x980e);
-        rtl8168_mdio_write(tp, 0x15, 0x01ff);
-        rtl8168_mdio_write(tp, 0x19, 0x930c);
-        rtl8168_mdio_write(tp, 0x15, 0x0200);
-        rtl8168_mdio_write(tp, 0x19, 0x9206);
-        rtl8168_mdio_write(tp, 0x15, 0x0201);
-        rtl8168_mdio_write(tp, 0x19, 0x4002);
-        rtl8168_mdio_write(tp, 0x15, 0x0202);
-        rtl8168_mdio_write(tp, 0x19, 0x7800);
-        rtl8168_mdio_write(tp, 0x15, 0x0203);
-        rtl8168_mdio_write(tp, 0x19, 0x588f);
-        rtl8168_mdio_write(tp, 0x15, 0x0204);
-        rtl8168_mdio_write(tp, 0x19, 0x5520);
-        rtl8168_mdio_write(tp, 0x15, 0x0205);
-        rtl8168_mdio_write(tp, 0x19, 0x320c);
-        rtl8168_mdio_write(tp, 0x15, 0x0206);
-        rtl8168_mdio_write(tp, 0x19, 0x4000);
-        rtl8168_mdio_write(tp, 0x15, 0x0207);
-        rtl8168_mdio_write(tp, 0x19, 0x7800);
-        rtl8168_mdio_write(tp, 0x15, 0x0208);
-        rtl8168_mdio_write(tp, 0x19, 0x588d);
-        rtl8168_mdio_write(tp, 0x15, 0x0209);
-        rtl8168_mdio_write(tp, 0x19, 0x5500);
-        rtl8168_mdio_write(tp, 0x15, 0x020a);
-        rtl8168_mdio_write(tp, 0x19, 0x320c);
-        rtl8168_mdio_write(tp, 0x15, 0x020b);
-        rtl8168_mdio_write(tp, 0x19, 0x4002);
-        rtl8168_mdio_write(tp, 0x15, 0x020c);
-        rtl8168_mdio_write(tp, 0x19, 0x3220);
-        rtl8168_mdio_write(tp, 0x15, 0x020d);
-        rtl8168_mdio_write(tp, 0x19, 0x4480);
-        rtl8168_mdio_write(tp, 0x15, 0x020e);
-        rtl8168_mdio_write(tp, 0x19, 0x9e03);
-        rtl8168_mdio_write(tp, 0x15, 0x020f);
-        rtl8168_mdio_write(tp, 0x19, 0x7c40);
-        rtl8168_mdio_write(tp, 0x15, 0x0210);
-        rtl8168_mdio_write(tp, 0x19, 0x6840);
-        rtl8168_mdio_write(tp, 0x15, 0x0211);
-        rtl8168_mdio_write(tp, 0x19, 0x7801);
-        rtl8168_mdio_write(tp, 0x15, 0x0212);
-        rtl8168_mdio_write(tp, 0x19, 0x980e);
-        rtl8168_mdio_write(tp, 0x15, 0x0213);
-        rtl8168_mdio_write(tp, 0x19, 0x930c);
-        rtl8168_mdio_write(tp, 0x15, 0x0214);
-        rtl8168_mdio_write(tp, 0x19, 0x9206);
-        rtl8168_mdio_write(tp, 0x15, 0x0215);
-        rtl8168_mdio_write(tp, 0x19, 0x4000);
-        rtl8168_mdio_write(tp, 0x15, 0x0216);
-        rtl8168_mdio_write(tp, 0x19, 0x7800);
-        rtl8168_mdio_write(tp, 0x15, 0x0217);
-        rtl8168_mdio_write(tp, 0x19, 0x588f);
-        rtl8168_mdio_write(tp, 0x15, 0x0218);
-        rtl8168_mdio_write(tp, 0x19, 0x5520);
-        rtl8168_mdio_write(tp, 0x15, 0x0219);
-        rtl8168_mdio_write(tp, 0x19, 0x3220);
-        rtl8168_mdio_write(tp, 0x15, 0x021a);
-        rtl8168_mdio_write(tp, 0x19, 0x4002);
-        rtl8168_mdio_write(tp, 0x15, 0x021b);
-        rtl8168_mdio_write(tp, 0x19, 0x7800);
-        rtl8168_mdio_write(tp, 0x15, 0x021c);
-        rtl8168_mdio_write(tp, 0x19, 0x588d);
-        rtl8168_mdio_write(tp, 0x15, 0x021d);
-        rtl8168_mdio_write(tp, 0x19, 0x5540);
-        rtl8168_mdio_write(tp, 0x15, 0x021e);
-        rtl8168_mdio_write(tp, 0x19, 0x3220);
-        rtl8168_mdio_write(tp, 0x15, 0x021f);
-        rtl8168_mdio_write(tp, 0x19, 0x4000);
-        rtl8168_mdio_write(tp, 0x15, 0x0220);
-        rtl8168_mdio_write(tp, 0x19, 0x7800);
-        rtl8168_mdio_write(tp, 0x15, 0x0221);
-        rtl8168_mdio_write(tp, 0x19, 0x7c03);
-        rtl8168_mdio_write(tp, 0x15, 0x0222);
-        rtl8168_mdio_write(tp, 0x19, 0x6c00);
-        rtl8168_mdio_write(tp, 0x15, 0x0223);
-        rtl8168_mdio_write(tp, 0x19, 0x3231);
-        rtl8168_mdio_write(tp, 0x15, 0x0224);
-        rtl8168_mdio_write(tp, 0x19, 0xab06);
-        rtl8168_mdio_write(tp, 0x15, 0x0225);
-        rtl8168_mdio_write(tp, 0x19, 0xbf08);
-        rtl8168_mdio_write(tp, 0x15, 0x0226);
-        rtl8168_mdio_write(tp, 0x19, 0x4076);
-        rtl8168_mdio_write(tp, 0x15, 0x0227);
-        rtl8168_mdio_write(tp, 0x19, 0x7d07);
-        rtl8168_mdio_write(tp, 0x15, 0x0228);
-        rtl8168_mdio_write(tp, 0x19, 0x4502);
-        rtl8168_mdio_write(tp, 0x15, 0x0229);
-        rtl8168_mdio_write(tp, 0x19, 0x3231);
-        rtl8168_mdio_write(tp, 0x15, 0x022a);
-        rtl8168_mdio_write(tp, 0x19, 0x7d80);
-        rtl8168_mdio_write(tp, 0x15, 0x022b);
-        rtl8168_mdio_write(tp, 0x19, 0x5180);
-        rtl8168_mdio_write(tp, 0x15, 0x022c);
-        rtl8168_mdio_write(tp, 0x19, 0x322f);
-        rtl8168_mdio_write(tp, 0x15, 0x022d);
-        rtl8168_mdio_write(tp, 0x19, 0x7d80);
-        rtl8168_mdio_write(tp, 0x15, 0x022e);
-        rtl8168_mdio_write(tp, 0x19, 0x5000);
-        rtl8168_mdio_write(tp, 0x15, 0x022f);
-        rtl8168_mdio_write(tp, 0x19, 0x7d07);
-        rtl8168_mdio_write(tp, 0x15, 0x0230);
-        rtl8168_mdio_write(tp, 0x19, 0x4402);
-        rtl8168_mdio_write(tp, 0x15, 0x0231);
-        rtl8168_mdio_write(tp, 0x19, 0x7c03);
-        rtl8168_mdio_write(tp, 0x15, 0x0232);
-        rtl8168_mdio_write(tp, 0x19, 0x6c02);
-        rtl8168_mdio_write(tp, 0x15, 0x0233);
-        rtl8168_mdio_write(tp, 0x19, 0x7c03);
-        rtl8168_mdio_write(tp, 0x15, 0x0234);
-        rtl8168_mdio_write(tp, 0x19, 0xb309);
-        rtl8168_mdio_write(tp, 0x15, 0x0235);
-        rtl8168_mdio_write(tp, 0x19, 0xb204);
-        rtl8168_mdio_write(tp, 0x15, 0x0236);
-        rtl8168_mdio_write(tp, 0x19, 0xb105);
-        rtl8168_mdio_write(tp, 0x15, 0x0237);
-        rtl8168_mdio_write(tp, 0x19, 0x6c00);
-        rtl8168_mdio_write(tp, 0x15, 0x0238);
-        rtl8168_mdio_write(tp, 0x19, 0x31c1);
-        rtl8168_mdio_write(tp, 0x15, 0x0239);
-        rtl8168_mdio_write(tp, 0x19, 0x6c00);
-        rtl8168_mdio_write(tp, 0x15, 0x023a);
-        rtl8168_mdio_write(tp, 0x19, 0x3261);
-        rtl8168_mdio_write(tp, 0x15, 0x023b);
-        rtl8168_mdio_write(tp, 0x19, 0x6c00);
-        rtl8168_mdio_write(tp, 0x15, 0x023c);
-        rtl8168_mdio_write(tp, 0x19, 0x3250);
-        rtl8168_mdio_write(tp, 0x15, 0x023d);
-        rtl8168_mdio_write(tp, 0x19, 0xb203);
-        rtl8168_mdio_write(tp, 0x15, 0x023e);
-        rtl8168_mdio_write(tp, 0x19, 0x6c00);
-        rtl8168_mdio_write(tp, 0x15, 0x023f);
-        rtl8168_mdio_write(tp, 0x19, 0x327a);
-        rtl8168_mdio_write(tp, 0x15, 0x0240);
-        rtl8168_mdio_write(tp, 0x19, 0x6c00);
-        rtl8168_mdio_write(tp, 0x15, 0x0241);
-        rtl8168_mdio_write(tp, 0x19, 0x3293);
-        rtl8168_mdio_write(tp, 0x15, 0x0242);
-        rtl8168_mdio_write(tp, 0x19, 0x0000);
-        rtl8168_mdio_write(tp, 0x15, 0x0243);
-        rtl8168_mdio_write(tp, 0x19, 0x0000);
-        rtl8168_mdio_write(tp, 0x15, 0x0244);
-        rtl8168_mdio_write(tp, 0x19, 0x0000);
-        rtl8168_mdio_write(tp, 0x15, 0x0245);
-        rtl8168_mdio_write(tp, 0x19, 0x0000);
-        rtl8168_mdio_write(tp, 0x15, 0x0246);
-        rtl8168_mdio_write(tp, 0x19, 0x0000);
-        rtl8168_mdio_write(tp, 0x15, 0x0247);
-        rtl8168_mdio_write(tp, 0x19, 0x32a3);
-        rtl8168_mdio_write(tp, 0x15, 0x0248);
-        rtl8168_mdio_write(tp, 0x19, 0x5520);
-        rtl8168_mdio_write(tp, 0x15, 0x0249);
-        rtl8168_mdio_write(tp, 0x19, 0x403d);
-        rtl8168_mdio_write(tp, 0x15, 0x024a);
-        rtl8168_mdio_write(tp, 0x19, 0x440c);
-        rtl8168_mdio_write(tp, 0x15, 0x024b);
-        rtl8168_mdio_write(tp, 0x19, 0x4812);
-        rtl8168_mdio_write(tp, 0x15, 0x024c);
-        rtl8168_mdio_write(tp, 0x19, 0x5001);
-        rtl8168_mdio_write(tp, 0x15, 0x024d);
-        rtl8168_mdio_write(tp, 0x19, 0x4802);
-        rtl8168_mdio_write(tp, 0x15, 0x024e);
-        rtl8168_mdio_write(tp, 0x19, 0x6880);
-        rtl8168_mdio_write(tp, 0x15, 0x024f);
-        rtl8168_mdio_write(tp, 0x19, 0x31f5);
-        rtl8168_mdio_write(tp, 0x15, 0x0250);
-        rtl8168_mdio_write(tp, 0x19, 0xb685);
-        rtl8168_mdio_write(tp, 0x15, 0x0251);
-        rtl8168_mdio_write(tp, 0x19, 0x801c);
-        rtl8168_mdio_write(tp, 0x15, 0x0252);
-        rtl8168_mdio_write(tp, 0x19, 0xbaf5);
-        rtl8168_mdio_write(tp, 0x15, 0x0253);
-        rtl8168_mdio_write(tp, 0x19, 0xc07c);
-        rtl8168_mdio_write(tp, 0x15, 0x0254);
-        rtl8168_mdio_write(tp, 0x19, 0x00fb);
-        rtl8168_mdio_write(tp, 0x15, 0x0255);
-        rtl8168_mdio_write(tp, 0x19, 0x325a);
-        rtl8168_mdio_write(tp, 0x15, 0x0256);
-        rtl8168_mdio_write(tp, 0x19, 0x0000);
-        rtl8168_mdio_write(tp, 0x15, 0x0257);
-        rtl8168_mdio_write(tp, 0x19, 0x0000);
-        rtl8168_mdio_write(tp, 0x15, 0x0258);
-        rtl8168_mdio_write(tp, 0x19, 0x0000);
-        rtl8168_mdio_write(tp, 0x15, 0x0259);
-        rtl8168_mdio_write(tp, 0x19, 0x0000);
-        rtl8168_mdio_write(tp, 0x15, 0x025a);
-        rtl8168_mdio_write(tp, 0x19, 0x481a);
-        rtl8168_mdio_write(tp, 0x15, 0x025b);
-        rtl8168_mdio_write(tp, 0x19, 0x5001);
-        rtl8168_mdio_write(tp, 0x15, 0x025c);
-        rtl8168_mdio_write(tp, 0x19, 0x401b);
-        rtl8168_mdio_write(tp, 0x15, 0x025d);
-        rtl8168_mdio_write(tp, 0x19, 0x480a);
-        rtl8168_mdio_write(tp, 0x15, 0x025e);
-        rtl8168_mdio_write(tp, 0x19, 0x4418);
-        rtl8168_mdio_write(tp, 0x15, 0x025f);
-        rtl8168_mdio_write(tp, 0x19, 0x6900);
-        rtl8168_mdio_write(tp, 0x15, 0x0260);
-        rtl8168_mdio_write(tp, 0x19, 0x31f5);
-        rtl8168_mdio_write(tp, 0x15, 0x0261);
-        rtl8168_mdio_write(tp, 0x19, 0xb64b);
-        rtl8168_mdio_write(tp, 0x15, 0x0262);
-        rtl8168_mdio_write(tp, 0x19, 0xdb00);
-        rtl8168_mdio_write(tp, 0x15, 0x0263);
-        rtl8168_mdio_write(tp, 0x19, 0x0048);
-        rtl8168_mdio_write(tp, 0x15, 0x0264);
-        rtl8168_mdio_write(tp, 0x19, 0xdb7d);
-        rtl8168_mdio_write(tp, 0x15, 0x0265);
-        rtl8168_mdio_write(tp, 0x19, 0x0002);
-        rtl8168_mdio_write(tp, 0x15, 0x0266);
-        rtl8168_mdio_write(tp, 0x19, 0xa0fa);
-        rtl8168_mdio_write(tp, 0x15, 0x0267);
-        rtl8168_mdio_write(tp, 0x19, 0x4408);
-        rtl8168_mdio_write(tp, 0x15, 0x0268);
-        rtl8168_mdio_write(tp, 0x19, 0x3248);
-        rtl8168_mdio_write(tp, 0x15, 0x0269);
-        rtl8168_mdio_write(tp, 0x19, 0x0000);
-        rtl8168_mdio_write(tp, 0x15, 0x026a);
-        rtl8168_mdio_write(tp, 0x19, 0x0000);
-        rtl8168_mdio_write(tp, 0x15, 0x026b);
-        rtl8168_mdio_write(tp, 0x19, 0x0000);
-        rtl8168_mdio_write(tp, 0x15, 0x026c);
-        rtl8168_mdio_write(tp, 0x19, 0x0000);
-        rtl8168_mdio_write(tp, 0x15, 0x026d);
-        rtl8168_mdio_write(tp, 0x19, 0xb806);
-        rtl8168_mdio_write(tp, 0x15, 0x026e);
-        rtl8168_mdio_write(tp, 0x19, 0x588d);
-        rtl8168_mdio_write(tp, 0x15, 0x026f);
-        rtl8168_mdio_write(tp, 0x19, 0x5500);
-        rtl8168_mdio_write(tp, 0x15, 0x0270);
-        rtl8168_mdio_write(tp, 0x19, 0x7801);
-        rtl8168_mdio_write(tp, 0x15, 0x0271);
-        rtl8168_mdio_write(tp, 0x19, 0x4002);
-        rtl8168_mdio_write(tp, 0x15, 0x0272);
-        rtl8168_mdio_write(tp, 0x19, 0x7800);
-        rtl8168_mdio_write(tp, 0x15, 0x0273);
-        rtl8168_mdio_write(tp, 0x19, 0x4814);
-        rtl8168_mdio_write(tp, 0x15, 0x0274);
-        rtl8168_mdio_write(tp, 0x19, 0x500b);
-        rtl8168_mdio_write(tp, 0x15, 0x0275);
-        rtl8168_mdio_write(tp, 0x19, 0x4804);
-        rtl8168_mdio_write(tp, 0x15, 0x0276);
-        rtl8168_mdio_write(tp, 0x19, 0x40c4);
-        rtl8168_mdio_write(tp, 0x15, 0x0277);
-        rtl8168_mdio_write(tp, 0x19, 0x4425);
-        rtl8168_mdio_write(tp, 0x15, 0x0278);
-        rtl8168_mdio_write(tp, 0x19, 0x6a00);
-        rtl8168_mdio_write(tp, 0x15, 0x0279);
-        rtl8168_mdio_write(tp, 0x19, 0x31f5);
-        rtl8168_mdio_write(tp, 0x15, 0x027a);
-        rtl8168_mdio_write(tp, 0x19, 0xb632);
-        rtl8168_mdio_write(tp, 0x15, 0x027b);
-        rtl8168_mdio_write(tp, 0x19, 0xdc03);
-        rtl8168_mdio_write(tp, 0x15, 0x027c);
-        rtl8168_mdio_write(tp, 0x19, 0x0027);
-        rtl8168_mdio_write(tp, 0x15, 0x027d);
-        rtl8168_mdio_write(tp, 0x19, 0x80fc);
-        rtl8168_mdio_write(tp, 0x15, 0x027e);
-        rtl8168_mdio_write(tp, 0x19, 0x3283);
-        rtl8168_mdio_write(tp, 0x15, 0x027f);
-        rtl8168_mdio_write(tp, 0x19, 0x0000);
-        rtl8168_mdio_write(tp, 0x15, 0x0280);
-        rtl8168_mdio_write(tp, 0x19, 0x0000);
-        rtl8168_mdio_write(tp, 0x15, 0x0281);
-        rtl8168_mdio_write(tp, 0x19, 0x0000);
-        rtl8168_mdio_write(tp, 0x15, 0x0282);
-        rtl8168_mdio_write(tp, 0x19, 0x0000);
-        rtl8168_mdio_write(tp, 0x15, 0x0283);
-        rtl8168_mdio_write(tp, 0x19, 0xb806);
-        rtl8168_mdio_write(tp, 0x15, 0x0284);
-        rtl8168_mdio_write(tp, 0x19, 0x588f);
-        rtl8168_mdio_write(tp, 0x15, 0x0285);
-        rtl8168_mdio_write(tp, 0x19, 0x5520);
-        rtl8168_mdio_write(tp, 0x15, 0x0286);
-        rtl8168_mdio_write(tp, 0x19, 0x7801);
-        rtl8168_mdio_write(tp, 0x15, 0x0287);
-        rtl8168_mdio_write(tp, 0x19, 0x4000);
-        rtl8168_mdio_write(tp, 0x15, 0x0288);
-        rtl8168_mdio_write(tp, 0x19, 0x7800);
-        rtl8168_mdio_write(tp, 0x15, 0x0289);
-        rtl8168_mdio_write(tp, 0x19, 0x4818);
-        rtl8168_mdio_write(tp, 0x15, 0x028a);
-        rtl8168_mdio_write(tp, 0x19, 0x5051);
-        rtl8168_mdio_write(tp, 0x15, 0x028b);
-        rtl8168_mdio_write(tp, 0x19, 0x4808);
-        rtl8168_mdio_write(tp, 0x15, 0x028c);
-        rtl8168_mdio_write(tp, 0x19, 0x4050);
-        rtl8168_mdio_write(tp, 0x15, 0x028d);
-        rtl8168_mdio_write(tp, 0x19, 0x4462);
-        rtl8168_mdio_write(tp, 0x15, 0x028e);
-        rtl8168_mdio_write(tp, 0x19, 0x40c4);
-        rtl8168_mdio_write(tp, 0x15, 0x028f);
-        rtl8168_mdio_write(tp, 0x19, 0x4473);
-        rtl8168_mdio_write(tp, 0x15, 0x0290);
-        rtl8168_mdio_write(tp, 0x19, 0x5041);
-        rtl8168_mdio_write(tp, 0x15, 0x0291);
-        rtl8168_mdio_write(tp, 0x19, 0x6b00);
-        rtl8168_mdio_write(tp, 0x15, 0x0292);
-        rtl8168_mdio_write(tp, 0x19, 0x31f5);
-        rtl8168_mdio_write(tp, 0x15, 0x0293);
-        rtl8168_mdio_write(tp, 0x19, 0xb619);
-        rtl8168_mdio_write(tp, 0x15, 0x0294);
-        rtl8168_mdio_write(tp, 0x19, 0x80d9);
-        rtl8168_mdio_write(tp, 0x15, 0x0295);
-        rtl8168_mdio_write(tp, 0x19, 0xbd06);
-        rtl8168_mdio_write(tp, 0x15, 0x0296);
-        rtl8168_mdio_write(tp, 0x19, 0xbb0d);
-        rtl8168_mdio_write(tp, 0x15, 0x0297);
-        rtl8168_mdio_write(tp, 0x19, 0xaf14);
-        rtl8168_mdio_write(tp, 0x15, 0x0298);
-        rtl8168_mdio_write(tp, 0x19, 0x8efa);
-        rtl8168_mdio_write(tp, 0x15, 0x0299);
-        rtl8168_mdio_write(tp, 0x19, 0x5049);
-        rtl8168_mdio_write(tp, 0x15, 0x029a);
-        rtl8168_mdio_write(tp, 0x19, 0x3248);
-        rtl8168_mdio_write(tp, 0x15, 0x029b);
-        rtl8168_mdio_write(tp, 0x19, 0x4c10);
-        rtl8168_mdio_write(tp, 0x15, 0x029c);
-        rtl8168_mdio_write(tp, 0x19, 0x44b0);
-        rtl8168_mdio_write(tp, 0x15, 0x029d);
-        rtl8168_mdio_write(tp, 0x19, 0x4c00);
-        rtl8168_mdio_write(tp, 0x15, 0x029e);
-        rtl8168_mdio_write(tp, 0x19, 0x3292);
-        rtl8168_mdio_write(tp, 0x15, 0x029f);
-        rtl8168_mdio_write(tp, 0x19, 0x0000);
-        rtl8168_mdio_write(tp, 0x15, 0x02a0);
-        rtl8168_mdio_write(tp, 0x19, 0x0000);
-        rtl8168_mdio_write(tp, 0x15, 0x02a1);
-        rtl8168_mdio_write(tp, 0x19, 0x0000);
-        rtl8168_mdio_write(tp, 0x15, 0x02a2);
-        rtl8168_mdio_write(tp, 0x19, 0x0000);
-        rtl8168_mdio_write(tp, 0x15, 0x02a3);
-        rtl8168_mdio_write(tp, 0x19, 0x481f);
-        rtl8168_mdio_write(tp, 0x15, 0x02a4);
-        rtl8168_mdio_write(tp, 0x19, 0x5005);
-        rtl8168_mdio_write(tp, 0x15, 0x02a5);
-        rtl8168_mdio_write(tp, 0x19, 0x480f);
-        rtl8168_mdio_write(tp, 0x15, 0x02a6);
-        rtl8168_mdio_write(tp, 0x19, 0xac00);
-        rtl8168_mdio_write(tp, 0x15, 0x02a7);
-        rtl8168_mdio_write(tp, 0x19, 0x31a6);
-        rtl8168_mdio_write(tp, 0x15, 0x02a8);
-        rtl8168_mdio_write(tp, 0x19, 0x0000);
-        rtl8168_mdio_write(tp, 0x15, 0x02a9);
-        rtl8168_mdio_write(tp, 0x19, 0x0000);
-        rtl8168_mdio_write(tp, 0x15, 0x02aa);
-        rtl8168_mdio_write(tp, 0x19, 0x0000);
-        rtl8168_mdio_write(tp, 0x15, 0x02ab);
-        rtl8168_mdio_write(tp, 0x19, 0x31ba);
-        rtl8168_mdio_write(tp, 0x15, 0x02ac);
-        rtl8168_mdio_write(tp, 0x19, 0x31d5);
-        rtl8168_mdio_write(tp, 0x15, 0x02ad);
-        rtl8168_mdio_write(tp, 0x19, 0x0000);
-        rtl8168_mdio_write(tp, 0x15, 0x02ae);
-        rtl8168_mdio_write(tp, 0x19, 0x5cf0);
-        rtl8168_mdio_write(tp, 0x15, 0x02af);
-        rtl8168_mdio_write(tp, 0x19, 0x588c);
-        rtl8168_mdio_write(tp, 0x15, 0x02b0);
-        rtl8168_mdio_write(tp, 0x19, 0x542f);
-        rtl8168_mdio_write(tp, 0x15, 0x02b1);
-        rtl8168_mdio_write(tp, 0x19, 0x7ffb);
-        rtl8168_mdio_write(tp, 0x15, 0x02b2);
-        rtl8168_mdio_write(tp, 0x19, 0x6ff8);
-        rtl8168_mdio_write(tp, 0x15, 0x02b3);
-        rtl8168_mdio_write(tp, 0x19, 0x64a4);
-        rtl8168_mdio_write(tp, 0x15, 0x02b4);
-        rtl8168_mdio_write(tp, 0x19, 0x64a0);
-        rtl8168_mdio_write(tp, 0x15, 0x02b5);
-        rtl8168_mdio_write(tp, 0x19, 0x6800);
-        rtl8168_mdio_write(tp, 0x15, 0x02b6);
-        rtl8168_mdio_write(tp, 0x19, 0x4400);
-        rtl8168_mdio_write(tp, 0x15, 0x02b7);
-        rtl8168_mdio_write(tp, 0x19, 0x4020);
-        rtl8168_mdio_write(tp, 0x15, 0x02b8);
-        rtl8168_mdio_write(tp, 0x19, 0x4480);
-        rtl8168_mdio_write(tp, 0x15, 0x02b9);
-        rtl8168_mdio_write(tp, 0x19, 0x9e00);
-        rtl8168_mdio_write(tp, 0x15, 0x02ba);
-        rtl8168_mdio_write(tp, 0x19, 0x4891);
-        rtl8168_mdio_write(tp, 0x15, 0x02bb);
-        rtl8168_mdio_write(tp, 0x19, 0x4cc0);
-        rtl8168_mdio_write(tp, 0x15, 0x02bc);
-        rtl8168_mdio_write(tp, 0x19, 0x4801);
-        rtl8168_mdio_write(tp, 0x15, 0x02bd);
-        rtl8168_mdio_write(tp, 0x19, 0xa609);
-        rtl8168_mdio_write(tp, 0x15, 0x02be);
-        rtl8168_mdio_write(tp, 0x19, 0xd64f);
-        rtl8168_mdio_write(tp, 0x15, 0x02bf);
-        rtl8168_mdio_write(tp, 0x19, 0x004e);
-        rtl8168_mdio_write(tp, 0x15, 0x02c0);
-        rtl8168_mdio_write(tp, 0x19, 0x87fe);
-        rtl8168_mdio_write(tp, 0x15, 0x02c1);
-        rtl8168_mdio_write(tp, 0x19, 0x32c6);
-        rtl8168_mdio_write(tp, 0x15, 0x02c2);
-        rtl8168_mdio_write(tp, 0x19, 0x0000);
-        rtl8168_mdio_write(tp, 0x15, 0x02c3);
-        rtl8168_mdio_write(tp, 0x19, 0x0000);
-        rtl8168_mdio_write(tp, 0x15, 0x02c4);
-        rtl8168_mdio_write(tp, 0x19, 0x0000);
-        rtl8168_mdio_write(tp, 0x15, 0x02c5);
-        rtl8168_mdio_write(tp, 0x19, 0x0000);
-        rtl8168_mdio_write(tp, 0x15, 0x02c6);
-        rtl8168_mdio_write(tp, 0x19, 0x48b2);
-        rtl8168_mdio_write(tp, 0x15, 0x02c7);
-        rtl8168_mdio_write(tp, 0x19, 0x4020);
-        rtl8168_mdio_write(tp, 0x15, 0x02c8);
-        rtl8168_mdio_write(tp, 0x19, 0x4822);
-        rtl8168_mdio_write(tp, 0x15, 0x02c9);
-        rtl8168_mdio_write(tp, 0x19, 0x4488);
-        rtl8168_mdio_write(tp, 0x15, 0x02ca);
-        rtl8168_mdio_write(tp, 0x19, 0xd64f);
-        rtl8168_mdio_write(tp, 0x15, 0x02cb);
-        rtl8168_mdio_write(tp, 0x19, 0x0042);
-        rtl8168_mdio_write(tp, 0x15, 0x02cc);
-        rtl8168_mdio_write(tp, 0x19, 0x8203);
-        rtl8168_mdio_write(tp, 0x15, 0x02cd);
-        rtl8168_mdio_write(tp, 0x19, 0x4cc8);
-        rtl8168_mdio_write(tp, 0x15, 0x02ce);
-        rtl8168_mdio_write(tp, 0x19, 0x32d0);
-        rtl8168_mdio_write(tp, 0x15, 0x02cf);
-        rtl8168_mdio_write(tp, 0x19, 0x4cc0);
-        rtl8168_mdio_write(tp, 0x15, 0x02d0);
-        rtl8168_mdio_write(tp, 0x19, 0xc4d4);
-        rtl8168_mdio_write(tp, 0x15, 0x02d1);
-        rtl8168_mdio_write(tp, 0x19, 0x00f9);
-        rtl8168_mdio_write(tp, 0x15, 0x02d2);
-        rtl8168_mdio_write(tp, 0x19, 0xa51a);
-        rtl8168_mdio_write(tp, 0x15, 0x02d3);
-        rtl8168_mdio_write(tp, 0x19, 0x32d9);
-        rtl8168_mdio_write(tp, 0x15, 0x02d4);
-        rtl8168_mdio_write(tp, 0x19, 0x0000);
-        rtl8168_mdio_write(tp, 0x15, 0x02d5);
-        rtl8168_mdio_write(tp, 0x19, 0x0000);
-        rtl8168_mdio_write(tp, 0x15, 0x02d6);
-        rtl8168_mdio_write(tp, 0x19, 0x0000);
-        rtl8168_mdio_write(tp, 0x15, 0x02d7);
-        rtl8168_mdio_write(tp, 0x19, 0x0000);
-        rtl8168_mdio_write(tp, 0x15, 0x02d8);
-        rtl8168_mdio_write(tp, 0x19, 0x0000);
-        rtl8168_mdio_write(tp, 0x15, 0x02d9);
-        rtl8168_mdio_write(tp, 0x19, 0x48b3);
-        rtl8168_mdio_write(tp, 0x15, 0x02da);
-        rtl8168_mdio_write(tp, 0x19, 0x4020);
-        rtl8168_mdio_write(tp, 0x15, 0x02db);
-        rtl8168_mdio_write(tp, 0x19, 0x4823);
-        rtl8168_mdio_write(tp, 0x15, 0x02dc);
-        rtl8168_mdio_write(tp, 0x19, 0x4410);
-        rtl8168_mdio_write(tp, 0x15, 0x02dd);
-        rtl8168_mdio_write(tp, 0x19, 0xb630);
-        rtl8168_mdio_write(tp, 0x15, 0x02de);
-        rtl8168_mdio_write(tp, 0x19, 0x7dc8);
-        rtl8168_mdio_write(tp, 0x15, 0x02df);
-        rtl8168_mdio_write(tp, 0x19, 0x8203);
-        rtl8168_mdio_write(tp, 0x15, 0x02e0);
-        rtl8168_mdio_write(tp, 0x19, 0x4c48);
-        rtl8168_mdio_write(tp, 0x15, 0x02e1);
-        rtl8168_mdio_write(tp, 0x19, 0x32e3);
-        rtl8168_mdio_write(tp, 0x15, 0x02e2);
-        rtl8168_mdio_write(tp, 0x19, 0x4c40);
-        rtl8168_mdio_write(tp, 0x15, 0x02e3);
-        rtl8168_mdio_write(tp, 0x19, 0x9bfa);
-        rtl8168_mdio_write(tp, 0x15, 0x02e4);
-        rtl8168_mdio_write(tp, 0x19, 0x84ca);
-        rtl8168_mdio_write(tp, 0x15, 0x02e5);
-        rtl8168_mdio_write(tp, 0x19, 0x85f8);
-        rtl8168_mdio_write(tp, 0x15, 0x02e6);
-        rtl8168_mdio_write(tp, 0x19, 0x32ec);
-        rtl8168_mdio_write(tp, 0x15, 0x02e7);
-        rtl8168_mdio_write(tp, 0x19, 0x0000);
-        rtl8168_mdio_write(tp, 0x15, 0x02e8);
-        rtl8168_mdio_write(tp, 0x19, 0x0000);
-        rtl8168_mdio_write(tp, 0x15, 0x02e9);
-        rtl8168_mdio_write(tp, 0x19, 0x0000);
-        rtl8168_mdio_write(tp, 0x15, 0x02ea);
-        rtl8168_mdio_write(tp, 0x19, 0x0000);
-        rtl8168_mdio_write(tp, 0x15, 0x02eb);
-        rtl8168_mdio_write(tp, 0x19, 0x0000);
-        rtl8168_mdio_write(tp, 0x15, 0x02ec);
-        rtl8168_mdio_write(tp, 0x19, 0x48d4);
-        rtl8168_mdio_write(tp, 0x15, 0x02ed);
-        rtl8168_mdio_write(tp, 0x19, 0x4020);
-        rtl8168_mdio_write(tp, 0x15, 0x02ee);
-        rtl8168_mdio_write(tp, 0x19, 0x4844);
-        rtl8168_mdio_write(tp, 0x15, 0x02ef);
-        rtl8168_mdio_write(tp, 0x19, 0x4420);
-        rtl8168_mdio_write(tp, 0x15, 0x02f0);
-        rtl8168_mdio_write(tp, 0x19, 0x6800);
-        rtl8168_mdio_write(tp, 0x15, 0x02f1);
-        rtl8168_mdio_write(tp, 0x19, 0x7dc0);
-        rtl8168_mdio_write(tp, 0x15, 0x02f2);
-        rtl8168_mdio_write(tp, 0x19, 0x4c40);
-        rtl8168_mdio_write(tp, 0x15, 0x02f3);
-        rtl8168_mdio_write(tp, 0x19, 0x7c0b);
-        rtl8168_mdio_write(tp, 0x15, 0x02f4);
-        rtl8168_mdio_write(tp, 0x19, 0x6c08);
-        rtl8168_mdio_write(tp, 0x15, 0x02f5);
-        rtl8168_mdio_write(tp, 0x19, 0x3311);
-        rtl8168_mdio_write(tp, 0x15, 0x02f6);
-        rtl8168_mdio_write(tp, 0x19, 0x9cfd);
-        rtl8168_mdio_write(tp, 0x15, 0x02f7);
-        rtl8168_mdio_write(tp, 0x19, 0xb616);
-        rtl8168_mdio_write(tp, 0x15, 0x02f8);
-        rtl8168_mdio_write(tp, 0x19, 0xc42b);
-        rtl8168_mdio_write(tp, 0x15, 0x02f9);
-        rtl8168_mdio_write(tp, 0x19, 0x00e0);
-        rtl8168_mdio_write(tp, 0x15, 0x02fa);
-        rtl8168_mdio_write(tp, 0x19, 0xc455);
-        rtl8168_mdio_write(tp, 0x15, 0x02fb);
-        rtl8168_mdio_write(tp, 0x19, 0x00b3);
-        rtl8168_mdio_write(tp, 0x15, 0x02fc);
-        rtl8168_mdio_write(tp, 0x19, 0xb20a);
-        rtl8168_mdio_write(tp, 0x15, 0x02fd);
-        rtl8168_mdio_write(tp, 0x19, 0x7c03);
-        rtl8168_mdio_write(tp, 0x15, 0x02fe);
-        rtl8168_mdio_write(tp, 0x19, 0x6c02);
-        rtl8168_mdio_write(tp, 0x15, 0x02ff);
-        rtl8168_mdio_write(tp, 0x19, 0x8204);
-        rtl8168_mdio_write(tp, 0x15, 0x0300);
-        rtl8168_mdio_write(tp, 0x19, 0x7c04);
-        rtl8168_mdio_write(tp, 0x15, 0x0301);
-        rtl8168_mdio_write(tp, 0x19, 0x7404);
-        rtl8168_mdio_write(tp, 0x15, 0x0302);
-        rtl8168_mdio_write(tp, 0x19, 0x32f3);
-        rtl8168_mdio_write(tp, 0x15, 0x0303);
-        rtl8168_mdio_write(tp, 0x19, 0x7c04);
-        rtl8168_mdio_write(tp, 0x15, 0x0304);
-        rtl8168_mdio_write(tp, 0x19, 0x7400);
-        rtl8168_mdio_write(tp, 0x15, 0x0305);
-        rtl8168_mdio_write(tp, 0x19, 0x32f3);
-        rtl8168_mdio_write(tp, 0x15, 0x0306);
-        rtl8168_mdio_write(tp, 0x19, 0xefed);
-        rtl8168_mdio_write(tp, 0x15, 0x0307);
-        rtl8168_mdio_write(tp, 0x19, 0x3342);
-        rtl8168_mdio_write(tp, 0x15, 0x0308);
-        rtl8168_mdio_write(tp, 0x19, 0x0000);
-        rtl8168_mdio_write(tp, 0x15, 0x0309);
-        rtl8168_mdio_write(tp, 0x19, 0x0000);
-        rtl8168_mdio_write(tp, 0x15, 0x030a);
-        rtl8168_mdio_write(tp, 0x19, 0x0000);
-        rtl8168_mdio_write(tp, 0x15, 0x030b);
-        rtl8168_mdio_write(tp, 0x19, 0x0000);
-        rtl8168_mdio_write(tp, 0x15, 0x030c);
-        rtl8168_mdio_write(tp, 0x19, 0x0000);
-        rtl8168_mdio_write(tp, 0x15, 0x030d);
-        rtl8168_mdio_write(tp, 0x19, 0x3006);
-        rtl8168_mdio_write(tp, 0x15, 0x030e);
-        rtl8168_mdio_write(tp, 0x19, 0x0000);
-        rtl8168_mdio_write(tp, 0x15, 0x030f);
-        rtl8168_mdio_write(tp, 0x19, 0x0000);
-        rtl8168_mdio_write(tp, 0x15, 0x0310);
-        rtl8168_mdio_write(tp, 0x19, 0x0000);
-        rtl8168_mdio_write(tp, 0x15, 0x0311);
-        rtl8168_mdio_write(tp, 0x19, 0x7c08);
-        rtl8168_mdio_write(tp, 0x15, 0x0312);
-        rtl8168_mdio_write(tp, 0x19, 0xa207);
-        rtl8168_mdio_write(tp, 0x15, 0x0313);
-        rtl8168_mdio_write(tp, 0x19, 0x4c00);
-        rtl8168_mdio_write(tp, 0x15, 0x0314);
-        rtl8168_mdio_write(tp, 0x19, 0x3322);
-        rtl8168_mdio_write(tp, 0x15, 0x0315);
-        rtl8168_mdio_write(tp, 0x19, 0x4041);
-        rtl8168_mdio_write(tp, 0x15, 0x0316);
-        rtl8168_mdio_write(tp, 0x19, 0x7d07);
-        rtl8168_mdio_write(tp, 0x15, 0x0317);
-        rtl8168_mdio_write(tp, 0x19, 0x4502);
-        rtl8168_mdio_write(tp, 0x15, 0x0318);
-        rtl8168_mdio_write(tp, 0x19, 0x3322);
-        rtl8168_mdio_write(tp, 0x15, 0x0319);
-        rtl8168_mdio_write(tp, 0x19, 0x4c08);
-        rtl8168_mdio_write(tp, 0x15, 0x031a);
-        rtl8168_mdio_write(tp, 0x19, 0x3322);
-        rtl8168_mdio_write(tp, 0x15, 0x031b);
-        rtl8168_mdio_write(tp, 0x19, 0x7d80);
-        rtl8168_mdio_write(tp, 0x15, 0x031c);
-        rtl8168_mdio_write(tp, 0x19, 0x5180);
-        rtl8168_mdio_write(tp, 0x15, 0x031d);
-        rtl8168_mdio_write(tp, 0x19, 0x3320);
-        rtl8168_mdio_write(tp, 0x15, 0x031e);
-        rtl8168_mdio_write(tp, 0x19, 0x7d80);
-        rtl8168_mdio_write(tp, 0x15, 0x031f);
-        rtl8168_mdio_write(tp, 0x19, 0x5000);
-        rtl8168_mdio_write(tp, 0x15, 0x0320);
-        rtl8168_mdio_write(tp, 0x19, 0x7d07);
-        rtl8168_mdio_write(tp, 0x15, 0x0321);
-        rtl8168_mdio_write(tp, 0x19, 0x4402);
-        rtl8168_mdio_write(tp, 0x15, 0x0322);
-        rtl8168_mdio_write(tp, 0x19, 0x7c03);
-        rtl8168_mdio_write(tp, 0x15, 0x0323);
-        rtl8168_mdio_write(tp, 0x19, 0x6c02);
-        rtl8168_mdio_write(tp, 0x15, 0x0324);
-        rtl8168_mdio_write(tp, 0x19, 0x7c03);
-        rtl8168_mdio_write(tp, 0x15, 0x0325);
-        rtl8168_mdio_write(tp, 0x19, 0xb30c);
-        rtl8168_mdio_write(tp, 0x15, 0x0326);
-        rtl8168_mdio_write(tp, 0x19, 0xb206);
-        rtl8168_mdio_write(tp, 0x15, 0x0327);
-        rtl8168_mdio_write(tp, 0x19, 0xb103);
-        rtl8168_mdio_write(tp, 0x15, 0x0328);
-        rtl8168_mdio_write(tp, 0x19, 0x6c00);
-        rtl8168_mdio_write(tp, 0x15, 0x0329);
-        rtl8168_mdio_write(tp, 0x19, 0x32f6);
-        rtl8168_mdio_write(tp, 0x15, 0x032a);
-        rtl8168_mdio_write(tp, 0x19, 0x6c00);
-        rtl8168_mdio_write(tp, 0x15, 0x032b);
-        rtl8168_mdio_write(tp, 0x19, 0x3352);
-        rtl8168_mdio_write(tp, 0x15, 0x032c);
-        rtl8168_mdio_write(tp, 0x19, 0xb103);
-        rtl8168_mdio_write(tp, 0x15, 0x032d);
-        rtl8168_mdio_write(tp, 0x19, 0x6c00);
-        rtl8168_mdio_write(tp, 0x15, 0x032e);
-        rtl8168_mdio_write(tp, 0x19, 0x336a);
-        rtl8168_mdio_write(tp, 0x15, 0x032f);
-        rtl8168_mdio_write(tp, 0x19, 0x6c00);
-        rtl8168_mdio_write(tp, 0x15, 0x0330);
-        rtl8168_mdio_write(tp, 0x19, 0x3382);
-        rtl8168_mdio_write(tp, 0x15, 0x0331);
-        rtl8168_mdio_write(tp, 0x19, 0xb206);
-        rtl8168_mdio_write(tp, 0x15, 0x0332);
-        rtl8168_mdio_write(tp, 0x19, 0xb103);
-        rtl8168_mdio_write(tp, 0x15, 0x0333);
-        rtl8168_mdio_write(tp, 0x19, 0x6c00);
-        rtl8168_mdio_write(tp, 0x15, 0x0334);
-        rtl8168_mdio_write(tp, 0x19, 0x3395);
-        rtl8168_mdio_write(tp, 0x15, 0x0335);
-        rtl8168_mdio_write(tp, 0x19, 0x6c00);
-        rtl8168_mdio_write(tp, 0x15, 0x0336);
-        rtl8168_mdio_write(tp, 0x19, 0x33c6);
-        rtl8168_mdio_write(tp, 0x15, 0x0337);
-        rtl8168_mdio_write(tp, 0x19, 0xb103);
-        rtl8168_mdio_write(tp, 0x15, 0x0338);
-        rtl8168_mdio_write(tp, 0x19, 0x6c00);
-        rtl8168_mdio_write(tp, 0x15, 0x0339);
-        rtl8168_mdio_write(tp, 0x19, 0x33d7);
-        rtl8168_mdio_write(tp, 0x15, 0x033a);
-        rtl8168_mdio_write(tp, 0x19, 0x6c00);
-        rtl8168_mdio_write(tp, 0x15, 0x033b);
-        rtl8168_mdio_write(tp, 0x19, 0x33f2);
-        rtl8168_mdio_write(tp, 0x15, 0x033c);
-        rtl8168_mdio_write(tp, 0x19, 0x0000);
-        rtl8168_mdio_write(tp, 0x15, 0x033d);
-        rtl8168_mdio_write(tp, 0x19, 0x0000);
-        rtl8168_mdio_write(tp, 0x15, 0x033e);
-        rtl8168_mdio_write(tp, 0x19, 0x0000);
-        rtl8168_mdio_write(tp, 0x15, 0x033f);
-        rtl8168_mdio_write(tp, 0x19, 0x0000);
-        rtl8168_mdio_write(tp, 0x15, 0x0340);
-        rtl8168_mdio_write(tp, 0x19, 0x0000);
-        rtl8168_mdio_write(tp, 0x15, 0x0341);
-        rtl8168_mdio_write(tp, 0x19, 0x0000);
-        rtl8168_mdio_write(tp, 0x15, 0x0342);
-        rtl8168_mdio_write(tp, 0x19, 0x49b5);
-        rtl8168_mdio_write(tp, 0x15, 0x0343);
-        rtl8168_mdio_write(tp, 0x19, 0x7d00);
-        rtl8168_mdio_write(tp, 0x15, 0x0344);
-        rtl8168_mdio_write(tp, 0x19, 0x4d00);
-        rtl8168_mdio_write(tp, 0x15, 0x0345);
-        rtl8168_mdio_write(tp, 0x19, 0x6880);
-        rtl8168_mdio_write(tp, 0x15, 0x0346);
-        rtl8168_mdio_write(tp, 0x19, 0x7c08);
-        rtl8168_mdio_write(tp, 0x15, 0x0347);
-        rtl8168_mdio_write(tp, 0x19, 0x6c08);
-        rtl8168_mdio_write(tp, 0x15, 0x0348);
-        rtl8168_mdio_write(tp, 0x19, 0x4925);
-        rtl8168_mdio_write(tp, 0x15, 0x0349);
-        rtl8168_mdio_write(tp, 0x19, 0x403b);
-        rtl8168_mdio_write(tp, 0x15, 0x034a);
-        rtl8168_mdio_write(tp, 0x19, 0xa602);
-        rtl8168_mdio_write(tp, 0x15, 0x034b);
-        rtl8168_mdio_write(tp, 0x19, 0x402f);
-        rtl8168_mdio_write(tp, 0x15, 0x034c);
-        rtl8168_mdio_write(tp, 0x19, 0x4484);
-        rtl8168_mdio_write(tp, 0x15, 0x034d);
-        rtl8168_mdio_write(tp, 0x19, 0x40c8);
-        rtl8168_mdio_write(tp, 0x15, 0x034e);
-        rtl8168_mdio_write(tp, 0x19, 0x44c4);
-        rtl8168_mdio_write(tp, 0x15, 0x034f);
-        rtl8168_mdio_write(tp, 0x19, 0xd64f);
-        rtl8168_mdio_write(tp, 0x15, 0x0350);
-        rtl8168_mdio_write(tp, 0x19, 0x00bd);
-        rtl8168_mdio_write(tp, 0x15, 0x0351);
-        rtl8168_mdio_write(tp, 0x19, 0x3311);
-        rtl8168_mdio_write(tp, 0x15, 0x0352);
-        rtl8168_mdio_write(tp, 0x19, 0xc8ed);
-        rtl8168_mdio_write(tp, 0x15, 0x0353);
-        rtl8168_mdio_write(tp, 0x19, 0x00fc);
-        rtl8168_mdio_write(tp, 0x15, 0x0354);
-        rtl8168_mdio_write(tp, 0x19, 0x8221);
-        rtl8168_mdio_write(tp, 0x15, 0x0355);
-        rtl8168_mdio_write(tp, 0x19, 0xd11d);
-        rtl8168_mdio_write(tp, 0x15, 0x0356);
-        rtl8168_mdio_write(tp, 0x19, 0x001f);
-        rtl8168_mdio_write(tp, 0x15, 0x0357);
-        rtl8168_mdio_write(tp, 0x19, 0xde18);
-        rtl8168_mdio_write(tp, 0x15, 0x0358);
-        rtl8168_mdio_write(tp, 0x19, 0x0008);
-        rtl8168_mdio_write(tp, 0x15, 0x0359);
-        rtl8168_mdio_write(tp, 0x19, 0x91f6);
-        rtl8168_mdio_write(tp, 0x15, 0x035a);
-        rtl8168_mdio_write(tp, 0x19, 0x3360);
-        rtl8168_mdio_write(tp, 0x15, 0x035b);
-        rtl8168_mdio_write(tp, 0x19, 0x0000);
-        rtl8168_mdio_write(tp, 0x15, 0x035c);
-        rtl8168_mdio_write(tp, 0x19, 0x0000);
-        rtl8168_mdio_write(tp, 0x15, 0x035d);
-        rtl8168_mdio_write(tp, 0x19, 0x0000);
-        rtl8168_mdio_write(tp, 0x15, 0x035e);
-        rtl8168_mdio_write(tp, 0x19, 0x0000);
-        rtl8168_mdio_write(tp, 0x15, 0x035f);
-        rtl8168_mdio_write(tp, 0x19, 0x0000);
-        rtl8168_mdio_write(tp, 0x15, 0x0360);
-        rtl8168_mdio_write(tp, 0x19, 0x4bb6);
-        rtl8168_mdio_write(tp, 0x15, 0x0361);
-        rtl8168_mdio_write(tp, 0x19, 0x4064);
-        rtl8168_mdio_write(tp, 0x15, 0x0362);
-        rtl8168_mdio_write(tp, 0x19, 0x4b26);
-        rtl8168_mdio_write(tp, 0x15, 0x0363);
-        rtl8168_mdio_write(tp, 0x19, 0x4410);
-        rtl8168_mdio_write(tp, 0x15, 0x0364);
-        rtl8168_mdio_write(tp, 0x19, 0x4006);
-        rtl8168_mdio_write(tp, 0x15, 0x0365);
-        rtl8168_mdio_write(tp, 0x19, 0x4490);
-        rtl8168_mdio_write(tp, 0x15, 0x0366);
-        rtl8168_mdio_write(tp, 0x19, 0x6900);
-        rtl8168_mdio_write(tp, 0x15, 0x0367);
-        rtl8168_mdio_write(tp, 0x19, 0xb6a6);
-        rtl8168_mdio_write(tp, 0x15, 0x0368);
-        rtl8168_mdio_write(tp, 0x19, 0x9e02);
-        rtl8168_mdio_write(tp, 0x15, 0x0369);
-        rtl8168_mdio_write(tp, 0x19, 0x3311);
-        rtl8168_mdio_write(tp, 0x15, 0x036a);
-        rtl8168_mdio_write(tp, 0x19, 0xd11d);
-        rtl8168_mdio_write(tp, 0x15, 0x036b);
-        rtl8168_mdio_write(tp, 0x19, 0x000a);
-        rtl8168_mdio_write(tp, 0x15, 0x036c);
-        rtl8168_mdio_write(tp, 0x19, 0xbb0f);
-        rtl8168_mdio_write(tp, 0x15, 0x036d);
-        rtl8168_mdio_write(tp, 0x19, 0x8102);
-        rtl8168_mdio_write(tp, 0x15, 0x036e);
-        rtl8168_mdio_write(tp, 0x19, 0x3371);
-        rtl8168_mdio_write(tp, 0x15, 0x036f);
-        rtl8168_mdio_write(tp, 0x19, 0xa21e);
-        rtl8168_mdio_write(tp, 0x15, 0x0370);
-        rtl8168_mdio_write(tp, 0x19, 0x33b6);
-        rtl8168_mdio_write(tp, 0x15, 0x0371);
-        rtl8168_mdio_write(tp, 0x19, 0x91f6);
-        rtl8168_mdio_write(tp, 0x15, 0x0372);
-        rtl8168_mdio_write(tp, 0x19, 0xc218);
-        rtl8168_mdio_write(tp, 0x15, 0x0373);
-        rtl8168_mdio_write(tp, 0x19, 0x00f4);
-        rtl8168_mdio_write(tp, 0x15, 0x0374);
-        rtl8168_mdio_write(tp, 0x19, 0x33b6);
-        rtl8168_mdio_write(tp, 0x15, 0x0375);
-        rtl8168_mdio_write(tp, 0x19, 0x32ec);
-        rtl8168_mdio_write(tp, 0x15, 0x0376);
-        rtl8168_mdio_write(tp, 0x19, 0x0000);
-        rtl8168_mdio_write(tp, 0x15, 0x0377);
-        rtl8168_mdio_write(tp, 0x19, 0x0000);
-        rtl8168_mdio_write(tp, 0x15, 0x0378);
-        rtl8168_mdio_write(tp, 0x19, 0x0000);
-        rtl8168_mdio_write(tp, 0x15, 0x0379);
-        rtl8168_mdio_write(tp, 0x19, 0x0000);
-        rtl8168_mdio_write(tp, 0x15, 0x037a);
-        rtl8168_mdio_write(tp, 0x19, 0x0000);
-        rtl8168_mdio_write(tp, 0x15, 0x037b);
-        rtl8168_mdio_write(tp, 0x19, 0x4b97);
-        rtl8168_mdio_write(tp, 0x15, 0x037c);
-        rtl8168_mdio_write(tp, 0x19, 0x402b);
-        rtl8168_mdio_write(tp, 0x15, 0x037d);
-        rtl8168_mdio_write(tp, 0x19, 0x4b07);
-        rtl8168_mdio_write(tp, 0x15, 0x037e);
-        rtl8168_mdio_write(tp, 0x19, 0x4422);
-        rtl8168_mdio_write(tp, 0x15, 0x037f);
-        rtl8168_mdio_write(tp, 0x19, 0x6980);
-        rtl8168_mdio_write(tp, 0x15, 0x0380);
-        rtl8168_mdio_write(tp, 0x19, 0xb608);
-        rtl8168_mdio_write(tp, 0x15, 0x0381);
-        rtl8168_mdio_write(tp, 0x19, 0x3311);
-        rtl8168_mdio_write(tp, 0x15, 0x0382);
-        rtl8168_mdio_write(tp, 0x19, 0xbc05);
-        rtl8168_mdio_write(tp, 0x15, 0x0383);
-        rtl8168_mdio_write(tp, 0x19, 0xc21c);
-        rtl8168_mdio_write(tp, 0x15, 0x0384);
-        rtl8168_mdio_write(tp, 0x19, 0x0032);
-        rtl8168_mdio_write(tp, 0x15, 0x0385);
-        rtl8168_mdio_write(tp, 0x19, 0xa1fb);
-        rtl8168_mdio_write(tp, 0x15, 0x0386);
-        rtl8168_mdio_write(tp, 0x19, 0x338d);
-        rtl8168_mdio_write(tp, 0x15, 0x0387);
-        rtl8168_mdio_write(tp, 0x19, 0x32ae);
-        rtl8168_mdio_write(tp, 0x15, 0x0388);
-        rtl8168_mdio_write(tp, 0x19, 0x330d);
-        rtl8168_mdio_write(tp, 0x15, 0x0389);
-        rtl8168_mdio_write(tp, 0x19, 0x0000);
-        rtl8168_mdio_write(tp, 0x15, 0x038a);
-        rtl8168_mdio_write(tp, 0x19, 0x0000);
-        rtl8168_mdio_write(tp, 0x15, 0x038b);
-        rtl8168_mdio_write(tp, 0x19, 0x0000);
-        rtl8168_mdio_write(tp, 0x15, 0x038c);
-        rtl8168_mdio_write(tp, 0x19, 0x0000);
-        rtl8168_mdio_write(tp, 0x15, 0x038d);
-        rtl8168_mdio_write(tp, 0x19, 0x4b97);
-        rtl8168_mdio_write(tp, 0x15, 0x038e);
-        rtl8168_mdio_write(tp, 0x19, 0x6a08);
-        rtl8168_mdio_write(tp, 0x15, 0x038f);
-        rtl8168_mdio_write(tp, 0x19, 0x4b07);
-        rtl8168_mdio_write(tp, 0x15, 0x0390);
-        rtl8168_mdio_write(tp, 0x19, 0x40ac);
-        rtl8168_mdio_write(tp, 0x15, 0x0391);
-        rtl8168_mdio_write(tp, 0x19, 0x4445);
-        rtl8168_mdio_write(tp, 0x15, 0x0392);
-        rtl8168_mdio_write(tp, 0x19, 0x404e);
-        rtl8168_mdio_write(tp, 0x15, 0x0393);
-        rtl8168_mdio_write(tp, 0x19, 0x4461);
-        rtl8168_mdio_write(tp, 0x15, 0x0394);
-        rtl8168_mdio_write(tp, 0x19, 0x3311);
-        rtl8168_mdio_write(tp, 0x15, 0x0395);
-        rtl8168_mdio_write(tp, 0x19, 0x9c0a);
-        rtl8168_mdio_write(tp, 0x15, 0x0396);
-        rtl8168_mdio_write(tp, 0x19, 0x63da);
-        rtl8168_mdio_write(tp, 0x15, 0x0397);
-        rtl8168_mdio_write(tp, 0x19, 0x6f0c);
-        rtl8168_mdio_write(tp, 0x15, 0x0398);
-        rtl8168_mdio_write(tp, 0x19, 0x5440);
-        rtl8168_mdio_write(tp, 0x15, 0x0399);
-        rtl8168_mdio_write(tp, 0x19, 0x4b98);
-        rtl8168_mdio_write(tp, 0x15, 0x039a);
-        rtl8168_mdio_write(tp, 0x19, 0x7c40);
-        rtl8168_mdio_write(tp, 0x15, 0x039b);
-        rtl8168_mdio_write(tp, 0x19, 0x4c00);
-        rtl8168_mdio_write(tp, 0x15, 0x039c);
-        rtl8168_mdio_write(tp, 0x19, 0x4b08);
-        rtl8168_mdio_write(tp, 0x15, 0x039d);
-        rtl8168_mdio_write(tp, 0x19, 0x63d8);
-        rtl8168_mdio_write(tp, 0x15, 0x039e);
-        rtl8168_mdio_write(tp, 0x19, 0x33a5);
-        rtl8168_mdio_write(tp, 0x15, 0x039f);
-        rtl8168_mdio_write(tp, 0x19, 0xd64f);
-        rtl8168_mdio_write(tp, 0x15, 0x03a0);
-        rtl8168_mdio_write(tp, 0x19, 0x00e8);
-        rtl8168_mdio_write(tp, 0x15, 0x03a1);
-        rtl8168_mdio_write(tp, 0x19, 0x820e);
-        rtl8168_mdio_write(tp, 0x15, 0x03a2);
-        rtl8168_mdio_write(tp, 0x19, 0xa10d);
-        rtl8168_mdio_write(tp, 0x15, 0x03a3);
-        rtl8168_mdio_write(tp, 0x19, 0x9df1);
-        rtl8168_mdio_write(tp, 0x15, 0x03a4);
-        rtl8168_mdio_write(tp, 0x19, 0x33af);
-        rtl8168_mdio_write(tp, 0x15, 0x03a5);
-        rtl8168_mdio_write(tp, 0x19, 0xd64f);
-        rtl8168_mdio_write(tp, 0x15, 0x03a6);
-        rtl8168_mdio_write(tp, 0x19, 0x00f9);
-        rtl8168_mdio_write(tp, 0x15, 0x03a7);
-        rtl8168_mdio_write(tp, 0x19, 0xc017);
-        rtl8168_mdio_write(tp, 0x15, 0x03a8);
-        rtl8168_mdio_write(tp, 0x19, 0x0007);
-        rtl8168_mdio_write(tp, 0x15, 0x03a9);
-        rtl8168_mdio_write(tp, 0x19, 0x7c03);
-        rtl8168_mdio_write(tp, 0x15, 0x03aa);
-        rtl8168_mdio_write(tp, 0x19, 0x6c03);
-        rtl8168_mdio_write(tp, 0x15, 0x03ab);
-        rtl8168_mdio_write(tp, 0x19, 0xa104);
-        rtl8168_mdio_write(tp, 0x15, 0x03ac);
-        rtl8168_mdio_write(tp, 0x19, 0x7c03);
-        rtl8168_mdio_write(tp, 0x15, 0x03ad);
-        rtl8168_mdio_write(tp, 0x19, 0x6c00);
-        rtl8168_mdio_write(tp, 0x15, 0x03ae);
-        rtl8168_mdio_write(tp, 0x19, 0x9df7);
-        rtl8168_mdio_write(tp, 0x15, 0x03af);
-        rtl8168_mdio_write(tp, 0x19, 0x7c03);
-        rtl8168_mdio_write(tp, 0x15, 0x03b0);
-        rtl8168_mdio_write(tp, 0x19, 0x6c08);
-        rtl8168_mdio_write(tp, 0x15, 0x03b1);
-        rtl8168_mdio_write(tp, 0x19, 0x33b6);
-        rtl8168_mdio_write(tp, 0x15, 0x03b2);
-        rtl8168_mdio_write(tp, 0x19, 0x0000);
-        rtl8168_mdio_write(tp, 0x15, 0x03b3);
-        rtl8168_mdio_write(tp, 0x19, 0x0000);
-        rtl8168_mdio_write(tp, 0x15, 0x03b4);
-        rtl8168_mdio_write(tp, 0x19, 0x0000);
-        rtl8168_mdio_write(tp, 0x15, 0x03b5);
-        rtl8168_mdio_write(tp, 0x19, 0x0000);
-        rtl8168_mdio_write(tp, 0x15, 0x03b6);
-        rtl8168_mdio_write(tp, 0x19, 0x55af);
-        rtl8168_mdio_write(tp, 0x15, 0x03b7);
-        rtl8168_mdio_write(tp, 0x19, 0x7ff0);
-        rtl8168_mdio_write(tp, 0x15, 0x03b8);
-        rtl8168_mdio_write(tp, 0x19, 0x6ff0);
-        rtl8168_mdio_write(tp, 0x15, 0x03b9);
-        rtl8168_mdio_write(tp, 0x19, 0x4bb9);
-        rtl8168_mdio_write(tp, 0x15, 0x03ba);
-        rtl8168_mdio_write(tp, 0x19, 0x6a80);
-        rtl8168_mdio_write(tp, 0x15, 0x03bb);
-        rtl8168_mdio_write(tp, 0x19, 0x4b29);
-        rtl8168_mdio_write(tp, 0x15, 0x03bc);
-        rtl8168_mdio_write(tp, 0x19, 0x4041);
-        rtl8168_mdio_write(tp, 0x15, 0x03bd);
-        rtl8168_mdio_write(tp, 0x19, 0x440a);
-        rtl8168_mdio_write(tp, 0x15, 0x03be);
-        rtl8168_mdio_write(tp, 0x19, 0x4029);
-        rtl8168_mdio_write(tp, 0x15, 0x03bf);
-        rtl8168_mdio_write(tp, 0x19, 0x4418);
-        rtl8168_mdio_write(tp, 0x15, 0x03c0);
-        rtl8168_mdio_write(tp, 0x19, 0x4090);
-        rtl8168_mdio_write(tp, 0x15, 0x03c1);
-        rtl8168_mdio_write(tp, 0x19, 0x4438);
-        rtl8168_mdio_write(tp, 0x15, 0x03c2);
-        rtl8168_mdio_write(tp, 0x19, 0x40c4);
-        rtl8168_mdio_write(tp, 0x15, 0x03c3);
-        rtl8168_mdio_write(tp, 0x19, 0x447b);
-        rtl8168_mdio_write(tp, 0x15, 0x03c4);
-        rtl8168_mdio_write(tp, 0x19, 0xb6c4);
-        rtl8168_mdio_write(tp, 0x15, 0x03c5);
-        rtl8168_mdio_write(tp, 0x19, 0x3311);
-        rtl8168_mdio_write(tp, 0x15, 0x03c6);
-        rtl8168_mdio_write(tp, 0x19, 0x9bfe);
-        rtl8168_mdio_write(tp, 0x15, 0x03c7);
-        rtl8168_mdio_write(tp, 0x19, 0x33cc);
-        rtl8168_mdio_write(tp, 0x15, 0x03c8);
-        rtl8168_mdio_write(tp, 0x19, 0x0000);
-        rtl8168_mdio_write(tp, 0x15, 0x03c9);
-        rtl8168_mdio_write(tp, 0x19, 0x0000);
-        rtl8168_mdio_write(tp, 0x15, 0x03ca);
-        rtl8168_mdio_write(tp, 0x19, 0x0000);
-        rtl8168_mdio_write(tp, 0x15, 0x03cb);
-        rtl8168_mdio_write(tp, 0x19, 0x0000);
-        rtl8168_mdio_write(tp, 0x15, 0x03cc);
-        rtl8168_mdio_write(tp, 0x19, 0x542f);
-        rtl8168_mdio_write(tp, 0x15, 0x03cd);
-        rtl8168_mdio_write(tp, 0x19, 0x499a);
-        rtl8168_mdio_write(tp, 0x15, 0x03ce);
-        rtl8168_mdio_write(tp, 0x19, 0x7c40);
-        rtl8168_mdio_write(tp, 0x15, 0x03cf);
-        rtl8168_mdio_write(tp, 0x19, 0x4c40);
-        rtl8168_mdio_write(tp, 0x15, 0x03d0);
-        rtl8168_mdio_write(tp, 0x19, 0x490a);
-        rtl8168_mdio_write(tp, 0x15, 0x03d1);
-        rtl8168_mdio_write(tp, 0x19, 0x405e);
-        rtl8168_mdio_write(tp, 0x15, 0x03d2);
-        rtl8168_mdio_write(tp, 0x19, 0x44f8);
-        rtl8168_mdio_write(tp, 0x15, 0x03d3);
-        rtl8168_mdio_write(tp, 0x19, 0x6b00);
-        rtl8168_mdio_write(tp, 0x15, 0x03d4);
-        rtl8168_mdio_write(tp, 0x19, 0xd64f);
-        rtl8168_mdio_write(tp, 0x15, 0x03d5);
-        rtl8168_mdio_write(tp, 0x19, 0x0028);
-        rtl8168_mdio_write(tp, 0x15, 0x03d6);
-        rtl8168_mdio_write(tp, 0x19, 0x3311);
-        rtl8168_mdio_write(tp, 0x15, 0x03d7);
-        rtl8168_mdio_write(tp, 0x19, 0xbd27);
-        rtl8168_mdio_write(tp, 0x15, 0x03d8);
-        rtl8168_mdio_write(tp, 0x19, 0x9cfc);
-        rtl8168_mdio_write(tp, 0x15, 0x03d9);
-        rtl8168_mdio_write(tp, 0x19, 0xc639);
-        rtl8168_mdio_write(tp, 0x15, 0x03da);
-        rtl8168_mdio_write(tp, 0x19, 0x000f);
-        rtl8168_mdio_write(tp, 0x15, 0x03db);
-        rtl8168_mdio_write(tp, 0x19, 0x9e03);
-        rtl8168_mdio_write(tp, 0x15, 0x03dc);
-        rtl8168_mdio_write(tp, 0x19, 0x7c01);
-        rtl8168_mdio_write(tp, 0x15, 0x03dd);
-        rtl8168_mdio_write(tp, 0x19, 0x4c01);
-        rtl8168_mdio_write(tp, 0x15, 0x03de);
-        rtl8168_mdio_write(tp, 0x19, 0x9af6);
-        rtl8168_mdio_write(tp, 0x15, 0x03df);
-        rtl8168_mdio_write(tp, 0x19, 0x7c12);
-        rtl8168_mdio_write(tp, 0x15, 0x03e0);
-        rtl8168_mdio_write(tp, 0x19, 0x4c52);
-        rtl8168_mdio_write(tp, 0x15, 0x03e1);
-        rtl8168_mdio_write(tp, 0x19, 0x4470);
-        rtl8168_mdio_write(tp, 0x15, 0x03e2);
-        rtl8168_mdio_write(tp, 0x19, 0x7c12);
-        rtl8168_mdio_write(tp, 0x15, 0x03e3);
-        rtl8168_mdio_write(tp, 0x19, 0x4c40);
-        rtl8168_mdio_write(tp, 0x15, 0x03e4);
-        rtl8168_mdio_write(tp, 0x19, 0x33d4);
-        rtl8168_mdio_write(tp, 0x15, 0x03e5);
-        rtl8168_mdio_write(tp, 0x19, 0x0000);
-        rtl8168_mdio_write(tp, 0x15, 0x03e6);
-        rtl8168_mdio_write(tp, 0x19, 0x0000);
-        rtl8168_mdio_write(tp, 0x15, 0x03e7);
-        rtl8168_mdio_write(tp, 0x19, 0x0000);
-        rtl8168_mdio_write(tp, 0x15, 0x03e8);
-        rtl8168_mdio_write(tp, 0x19, 0x0000);
-        rtl8168_mdio_write(tp, 0x15, 0x03e9);
-        rtl8168_mdio_write(tp, 0x19, 0x49bb);
-        rtl8168_mdio_write(tp, 0x15, 0x03ea);
-        rtl8168_mdio_write(tp, 0x19, 0x4478);
-        rtl8168_mdio_write(tp, 0x15, 0x03eb);
-        rtl8168_mdio_write(tp, 0x19, 0x492b);
-        rtl8168_mdio_write(tp, 0x15, 0x03ec);
-        rtl8168_mdio_write(tp, 0x19, 0x6b80);
-        rtl8168_mdio_write(tp, 0x15, 0x03ed);
-        rtl8168_mdio_write(tp, 0x19, 0x7c01);
-        rtl8168_mdio_write(tp, 0x15, 0x03ee);
-        rtl8168_mdio_write(tp, 0x19, 0x4c00);
-        rtl8168_mdio_write(tp, 0x15, 0x03ef);
-        rtl8168_mdio_write(tp, 0x19, 0xd64f);
-        rtl8168_mdio_write(tp, 0x15, 0x03f0);
-        rtl8168_mdio_write(tp, 0x19, 0x000d);
-        rtl8168_mdio_write(tp, 0x15, 0x03f1);
-        rtl8168_mdio_write(tp, 0x19, 0x3311);
-        rtl8168_mdio_write(tp, 0x15, 0x03f2);
-        rtl8168_mdio_write(tp, 0x19, 0xbd0c);
-        rtl8168_mdio_write(tp, 0x15, 0x03f3);
-        rtl8168_mdio_write(tp, 0x19, 0xc428);
-        rtl8168_mdio_write(tp, 0x15, 0x03f4);
-        rtl8168_mdio_write(tp, 0x19, 0x0008);
-        rtl8168_mdio_write(tp, 0x15, 0x03f5);
-        rtl8168_mdio_write(tp, 0x19, 0x9afa);
-        rtl8168_mdio_write(tp, 0x15, 0x03f6);
-        rtl8168_mdio_write(tp, 0x19, 0x7c12);
-        rtl8168_mdio_write(tp, 0x15, 0x03f7);
-        rtl8168_mdio_write(tp, 0x19, 0x4c52);
-        rtl8168_mdio_write(tp, 0x15, 0x03f8);
-        rtl8168_mdio_write(tp, 0x19, 0x4470);
-        rtl8168_mdio_write(tp, 0x15, 0x03f9);
-        rtl8168_mdio_write(tp, 0x19, 0x7c12);
-        rtl8168_mdio_write(tp, 0x15, 0x03fa);
-        rtl8168_mdio_write(tp, 0x19, 0x4c40);
-        rtl8168_mdio_write(tp, 0x15, 0x03fb);
-        rtl8168_mdio_write(tp, 0x19, 0x33ef);
-        rtl8168_mdio_write(tp, 0x15, 0x03fc);
-        rtl8168_mdio_write(tp, 0x19, 0x3342);
-        rtl8168_mdio_write(tp, 0x15, 0x03fd);
-        rtl8168_mdio_write(tp, 0x19, 0x330d);
-        rtl8168_mdio_write(tp, 0x15, 0x03fe);
-        rtl8168_mdio_write(tp, 0x19, 0x32ae);
-        rtl8168_mdio_write(tp, 0x15, 0x0000);
-        rtl8168_mdio_write(tp, 0x16, 0x0306);
-        rtl8168_mdio_write(tp, 0x16, 0x0300);
-        rtl8168_mdio_write(tp, 0x1f, 0x0002);
-        rtl8168_mdio_write(tp, 0x1f, 0x0000);
-        rtl8168_mdio_write(tp, 0x1f, 0x0005);
-        rtl8168_mdio_write(tp, 0x05, 0xfff6);
-        rtl8168_mdio_write(tp, 0x06, 0x0080);
-        rtl8168_mdio_write(tp, 0x05, 0x8000);
-        rtl8168_mdio_write(tp, 0x06, 0x0280);
-        rtl8168_mdio_write(tp, 0x06, 0x48f7);
-        rtl8168_mdio_write(tp, 0x06, 0x00e0);
-        rtl8168_mdio_write(tp, 0x06, 0xfff7);
-        rtl8168_mdio_write(tp, 0x06, 0xa080);
-        rtl8168_mdio_write(tp, 0x06, 0x02ae);
-        rtl8168_mdio_write(tp, 0x06, 0xf602);
-        rtl8168_mdio_write(tp, 0x06, 0x0112);
-        rtl8168_mdio_write(tp, 0x06, 0x0201);
-        rtl8168_mdio_write(tp, 0x06, 0x1f02);
-        rtl8168_mdio_write(tp, 0x06, 0x012c);
-        rtl8168_mdio_write(tp, 0x06, 0x0201);
-        rtl8168_mdio_write(tp, 0x06, 0x3c02);
-        rtl8168_mdio_write(tp, 0x06, 0x0156);
-        rtl8168_mdio_write(tp, 0x06, 0x0201);
-        rtl8168_mdio_write(tp, 0x06, 0x6d02);
-        rtl8168_mdio_write(tp, 0x06, 0x809d);
-        rtl8168_mdio_write(tp, 0x06, 0xe08b);
-        rtl8168_mdio_write(tp, 0x06, 0x88e1);
-        rtl8168_mdio_write(tp, 0x06, 0x8b89);
-        rtl8168_mdio_write(tp, 0x06, 0x1e01);
-        rtl8168_mdio_write(tp, 0x06, 0xe18b);
-        rtl8168_mdio_write(tp, 0x06, 0x8a1e);
-        rtl8168_mdio_write(tp, 0x06, 0x01e1);
-        rtl8168_mdio_write(tp, 0x06, 0x8b8b);
-        rtl8168_mdio_write(tp, 0x06, 0x1e01);
-        rtl8168_mdio_write(tp, 0x06, 0xe18b);
-        rtl8168_mdio_write(tp, 0x06, 0x8c1e);
-        rtl8168_mdio_write(tp, 0x06, 0x01e1);
-        rtl8168_mdio_write(tp, 0x06, 0x8b8d);
-        rtl8168_mdio_write(tp, 0x06, 0x1e01);
-        rtl8168_mdio_write(tp, 0x06, 0xe18b);
-        rtl8168_mdio_write(tp, 0x06, 0x8e1e);
-        rtl8168_mdio_write(tp, 0x06, 0x01a0);
-        rtl8168_mdio_write(tp, 0x06, 0x00c7);
-        rtl8168_mdio_write(tp, 0x06, 0xaebb);
-        rtl8168_mdio_write(tp, 0x06, 0xd100);
-        rtl8168_mdio_write(tp, 0x06, 0xbf82);
-        rtl8168_mdio_write(tp, 0x06, 0xc702);
-        rtl8168_mdio_write(tp, 0x06, 0x320a);
-        rtl8168_mdio_write(tp, 0x06, 0xd105);
-        rtl8168_mdio_write(tp, 0x06, 0xbf82);
-        rtl8168_mdio_write(tp, 0x06, 0xcd02);
-        rtl8168_mdio_write(tp, 0x06, 0x320a);
-        rtl8168_mdio_write(tp, 0x06, 0xd100);
-        rtl8168_mdio_write(tp, 0x06, 0xbf82);
-        rtl8168_mdio_write(tp, 0x06, 0xca02);
-        rtl8168_mdio_write(tp, 0x06, 0x320a);
-        rtl8168_mdio_write(tp, 0x06, 0xd105);
-        rtl8168_mdio_write(tp, 0x06, 0xbf82);
-        rtl8168_mdio_write(tp, 0x06, 0xd002);
-        rtl8168_mdio_write(tp, 0x06, 0x320a);
-        rtl8168_mdio_write(tp, 0x06, 0xd481);
-        rtl8168_mdio_write(tp, 0x06, 0xc9e4);
-        rtl8168_mdio_write(tp, 0x06, 0x8b90);
-        rtl8168_mdio_write(tp, 0x06, 0xe58b);
-        rtl8168_mdio_write(tp, 0x06, 0x91d4);
-        rtl8168_mdio_write(tp, 0x06, 0x81b8);
-        rtl8168_mdio_write(tp, 0x06, 0xe48b);
-        rtl8168_mdio_write(tp, 0x06, 0x92e5);
-        rtl8168_mdio_write(tp, 0x06, 0x8b93);
-        rtl8168_mdio_write(tp, 0x06, 0xbf8b);
-        rtl8168_mdio_write(tp, 0x06, 0x88ec);
-        rtl8168_mdio_write(tp, 0x06, 0x0019);
-        rtl8168_mdio_write(tp, 0x06, 0xa98b);
-        rtl8168_mdio_write(tp, 0x06, 0x90f9);
-        rtl8168_mdio_write(tp, 0x06, 0xeeff);
-        rtl8168_mdio_write(tp, 0x06, 0xf600);
-        rtl8168_mdio_write(tp, 0x06, 0xeeff);
-        rtl8168_mdio_write(tp, 0x06, 0xf7fc);
-        rtl8168_mdio_write(tp, 0x06, 0xd100);
-        rtl8168_mdio_write(tp, 0x06, 0xbf82);
-        rtl8168_mdio_write(tp, 0x06, 0xc102);
-        rtl8168_mdio_write(tp, 0x06, 0x320a);
-        rtl8168_mdio_write(tp, 0x06, 0xd101);
-        rtl8168_mdio_write(tp, 0x06, 0xbf82);
-        rtl8168_mdio_write(tp, 0x06, 0xc402);
-        rtl8168_mdio_write(tp, 0x06, 0x320a);
-        rtl8168_mdio_write(tp, 0x06, 0x04f8);
-        rtl8168_mdio_write(tp, 0x06, 0xe08b);
-        rtl8168_mdio_write(tp, 0x06, 0x8ead);
-        rtl8168_mdio_write(tp, 0x06, 0x201a);
-        rtl8168_mdio_write(tp, 0x06, 0xf620);
-        rtl8168_mdio_write(tp, 0x06, 0xe48b);
-        rtl8168_mdio_write(tp, 0x06, 0x8e02);
-        rtl8168_mdio_write(tp, 0x06, 0x824b);
-        rtl8168_mdio_write(tp, 0x06, 0x0281);
-        rtl8168_mdio_write(tp, 0x06, 0x1902);
-        rtl8168_mdio_write(tp, 0x06, 0x2c9d);
-        rtl8168_mdio_write(tp, 0x06, 0x0203);
-        rtl8168_mdio_write(tp, 0x06, 0x9602);
-        rtl8168_mdio_write(tp, 0x06, 0x0473);
-        rtl8168_mdio_write(tp, 0x06, 0x022e);
-        rtl8168_mdio_write(tp, 0x06, 0x3902);
-        rtl8168_mdio_write(tp, 0x06, 0x044d);
-        rtl8168_mdio_write(tp, 0x06, 0xe08b);
-        rtl8168_mdio_write(tp, 0x06, 0x8ead);
-        rtl8168_mdio_write(tp, 0x06, 0x210b);
-        rtl8168_mdio_write(tp, 0x06, 0xf621);
-        rtl8168_mdio_write(tp, 0x06, 0xe48b);
-        rtl8168_mdio_write(tp, 0x06, 0x8e02);
-        rtl8168_mdio_write(tp, 0x06, 0x0416);
-        rtl8168_mdio_write(tp, 0x06, 0x021b);
-        rtl8168_mdio_write(tp, 0x06, 0xa4e0);
-        rtl8168_mdio_write(tp, 0x06, 0x8b8e);
-        rtl8168_mdio_write(tp, 0x06, 0xad22);
-        rtl8168_mdio_write(tp, 0x06, 0x05f6);
-        rtl8168_mdio_write(tp, 0x06, 0x22e4);
-        rtl8168_mdio_write(tp, 0x06, 0x8b8e);
-        rtl8168_mdio_write(tp, 0x06, 0xe08b);
-        rtl8168_mdio_write(tp, 0x06, 0x8ead);
-        rtl8168_mdio_write(tp, 0x06, 0x2305);
-        rtl8168_mdio_write(tp, 0x06, 0xf623);
-        rtl8168_mdio_write(tp, 0x06, 0xe48b);
-        rtl8168_mdio_write(tp, 0x06, 0x8ee0);
-        rtl8168_mdio_write(tp, 0x06, 0x8b8e);
-        rtl8168_mdio_write(tp, 0x06, 0xad24);
-        rtl8168_mdio_write(tp, 0x06, 0x05f6);
-        rtl8168_mdio_write(tp, 0x06, 0x24e4);
-        rtl8168_mdio_write(tp, 0x06, 0x8b8e);
-        rtl8168_mdio_write(tp, 0x06, 0xe08b);
-        rtl8168_mdio_write(tp, 0x06, 0x8ead);
-        rtl8168_mdio_write(tp, 0x06, 0x2505);
-        rtl8168_mdio_write(tp, 0x06, 0xf625);
-        rtl8168_mdio_write(tp, 0x06, 0xe48b);
-        rtl8168_mdio_write(tp, 0x06, 0x8ee0);
-        rtl8168_mdio_write(tp, 0x06, 0x8b8e);
-        rtl8168_mdio_write(tp, 0x06, 0xad26);
-        rtl8168_mdio_write(tp, 0x06, 0x08f6);
-        rtl8168_mdio_write(tp, 0x06, 0x26e4);
-        rtl8168_mdio_write(tp, 0x06, 0x8b8e);
-        rtl8168_mdio_write(tp, 0x06, 0x0281);
-        rtl8168_mdio_write(tp, 0x06, 0xdae0);
-        rtl8168_mdio_write(tp, 0x06, 0x8b8e);
-        rtl8168_mdio_write(tp, 0x06, 0xad27);
-        rtl8168_mdio_write(tp, 0x06, 0x05f6);
-        rtl8168_mdio_write(tp, 0x06, 0x27e4);
-        rtl8168_mdio_write(tp, 0x06, 0x8b8e);
-        rtl8168_mdio_write(tp, 0x06, 0x0203);
-        rtl8168_mdio_write(tp, 0x06, 0x5cfc);
-        rtl8168_mdio_write(tp, 0x06, 0x04f8);
-        rtl8168_mdio_write(tp, 0x06, 0xfaef);
-        rtl8168_mdio_write(tp, 0x06, 0x69e0);
-        rtl8168_mdio_write(tp, 0x06, 0x8b85);
-        rtl8168_mdio_write(tp, 0x06, 0xad21);
-        rtl8168_mdio_write(tp, 0x06, 0x57e0);
-        rtl8168_mdio_write(tp, 0x06, 0xe022);
-        rtl8168_mdio_write(tp, 0x06, 0xe1e0);
-        rtl8168_mdio_write(tp, 0x06, 0x2358);
-        rtl8168_mdio_write(tp, 0x06, 0xc059);
-        rtl8168_mdio_write(tp, 0x06, 0x021e);
-        rtl8168_mdio_write(tp, 0x06, 0x01e1);
-        rtl8168_mdio_write(tp, 0x06, 0x8b3c);
-        rtl8168_mdio_write(tp, 0x06, 0x1f10);
-        rtl8168_mdio_write(tp, 0x06, 0x9e44);
-        rtl8168_mdio_write(tp, 0x06, 0xe48b);
-        rtl8168_mdio_write(tp, 0x06, 0x3cad);
-        rtl8168_mdio_write(tp, 0x06, 0x211d);
-        rtl8168_mdio_write(tp, 0x06, 0xe18b);
-        rtl8168_mdio_write(tp, 0x06, 0x84f7);
-        rtl8168_mdio_write(tp, 0x06, 0x29e5);
-        rtl8168_mdio_write(tp, 0x06, 0x8b84);
-        rtl8168_mdio_write(tp, 0x06, 0xac27);
-        rtl8168_mdio_write(tp, 0x06, 0x0dac);
-        rtl8168_mdio_write(tp, 0x06, 0x2605);
-        rtl8168_mdio_write(tp, 0x06, 0x0281);
-        rtl8168_mdio_write(tp, 0x06, 0x7fae);
-        rtl8168_mdio_write(tp, 0x06, 0x2b02);
-        rtl8168_mdio_write(tp, 0x06, 0x2c23);
-        rtl8168_mdio_write(tp, 0x06, 0xae26);
-        rtl8168_mdio_write(tp, 0x06, 0x022c);
-        rtl8168_mdio_write(tp, 0x06, 0x41ae);
-        rtl8168_mdio_write(tp, 0x06, 0x21e0);
-        rtl8168_mdio_write(tp, 0x06, 0x8b87);
-        rtl8168_mdio_write(tp, 0x06, 0xad22);
-        rtl8168_mdio_write(tp, 0x06, 0x18e0);
-        rtl8168_mdio_write(tp, 0x06, 0xfff7);
-        rtl8168_mdio_write(tp, 0x06, 0x58fc);
-        rtl8168_mdio_write(tp, 0x06, 0xe4ff);
-        rtl8168_mdio_write(tp, 0x06, 0xf7d1);
-        rtl8168_mdio_write(tp, 0x06, 0x00bf);
-        rtl8168_mdio_write(tp, 0x06, 0x2eee);
-        rtl8168_mdio_write(tp, 0x06, 0x0232);
-        rtl8168_mdio_write(tp, 0x06, 0x0ad1);
-        rtl8168_mdio_write(tp, 0x06, 0x00bf);
-        rtl8168_mdio_write(tp, 0x06, 0x82e8);
-        rtl8168_mdio_write(tp, 0x06, 0x0232);
-        rtl8168_mdio_write(tp, 0x06, 0x0a02);
-        rtl8168_mdio_write(tp, 0x06, 0x2bdf);
-        rtl8168_mdio_write(tp, 0x06, 0xef96);
-        rtl8168_mdio_write(tp, 0x06, 0xfefc);
-        rtl8168_mdio_write(tp, 0x06, 0x04d0);
-        rtl8168_mdio_write(tp, 0x06, 0x0202);
-        rtl8168_mdio_write(tp, 0x06, 0x1e97);
-        rtl8168_mdio_write(tp, 0x06, 0xe08b);
-        rtl8168_mdio_write(tp, 0x06, 0x87ad);
-        rtl8168_mdio_write(tp, 0x06, 0x2228);
-        rtl8168_mdio_write(tp, 0x06, 0xd100);
-        rtl8168_mdio_write(tp, 0x06, 0xbf82);
-        rtl8168_mdio_write(tp, 0x06, 0xd302);
-        rtl8168_mdio_write(tp, 0x06, 0x320a);
-        rtl8168_mdio_write(tp, 0x06, 0xd10c);
-        rtl8168_mdio_write(tp, 0x06, 0xbf82);
-        rtl8168_mdio_write(tp, 0x06, 0xd602);
-        rtl8168_mdio_write(tp, 0x06, 0x320a);
-        rtl8168_mdio_write(tp, 0x06, 0xd104);
-        rtl8168_mdio_write(tp, 0x06, 0xbf82);
-        rtl8168_mdio_write(tp, 0x06, 0xd902);
-        rtl8168_mdio_write(tp, 0x06, 0x320a);
-        rtl8168_mdio_write(tp, 0x06, 0xd101);
-        rtl8168_mdio_write(tp, 0x06, 0xbf82);
-        rtl8168_mdio_write(tp, 0x06, 0xe802);
-        rtl8168_mdio_write(tp, 0x06, 0x320a);
-        rtl8168_mdio_write(tp, 0x06, 0xe0ff);
-        rtl8168_mdio_write(tp, 0x06, 0xf768);
-        rtl8168_mdio_write(tp, 0x06, 0x03e4);
-        rtl8168_mdio_write(tp, 0x06, 0xfff7);
-        rtl8168_mdio_write(tp, 0x06, 0xd004);
-        rtl8168_mdio_write(tp, 0x06, 0x0228);
-        rtl8168_mdio_write(tp, 0x06, 0x7a04);
-        rtl8168_mdio_write(tp, 0x06, 0xf8e0);
-        rtl8168_mdio_write(tp, 0x06, 0xe234);
-        rtl8168_mdio_write(tp, 0x06, 0xe1e2);
-        rtl8168_mdio_write(tp, 0x06, 0x35f6);
-        rtl8168_mdio_write(tp, 0x06, 0x2be4);
-        rtl8168_mdio_write(tp, 0x06, 0xe234);
-        rtl8168_mdio_write(tp, 0x06, 0xe5e2);
-        rtl8168_mdio_write(tp, 0x06, 0x35fc);
-        rtl8168_mdio_write(tp, 0x06, 0x05f8);
-        rtl8168_mdio_write(tp, 0x06, 0xe0e2);
-        rtl8168_mdio_write(tp, 0x06, 0x34e1);
-        rtl8168_mdio_write(tp, 0x06, 0xe235);
-        rtl8168_mdio_write(tp, 0x06, 0xf72b);
-        rtl8168_mdio_write(tp, 0x06, 0xe4e2);
-        rtl8168_mdio_write(tp, 0x06, 0x34e5);
-        rtl8168_mdio_write(tp, 0x06, 0xe235);
-        rtl8168_mdio_write(tp, 0x06, 0xfc05);
-        rtl8168_mdio_write(tp, 0x06, 0xf8f9);
-        rtl8168_mdio_write(tp, 0x06, 0xfaef);
-        rtl8168_mdio_write(tp, 0x06, 0x69ac);
-        rtl8168_mdio_write(tp, 0x06, 0x1b4c);
-        rtl8168_mdio_write(tp, 0x06, 0xbf2e);
-        rtl8168_mdio_write(tp, 0x06, 0x3002);
-        rtl8168_mdio_write(tp, 0x06, 0x31dd);
-        rtl8168_mdio_write(tp, 0x06, 0xef01);
-        rtl8168_mdio_write(tp, 0x06, 0xe28a);
-        rtl8168_mdio_write(tp, 0x06, 0x76e4);
-        rtl8168_mdio_write(tp, 0x06, 0x8a76);
-        rtl8168_mdio_write(tp, 0x06, 0x1f12);
-        rtl8168_mdio_write(tp, 0x06, 0x9e3a);
-        rtl8168_mdio_write(tp, 0x06, 0xef12);
-        rtl8168_mdio_write(tp, 0x06, 0x5907);
-        rtl8168_mdio_write(tp, 0x06, 0x9f12);
-        rtl8168_mdio_write(tp, 0x06, 0xf8e0);
-        rtl8168_mdio_write(tp, 0x06, 0x8b40);
-        rtl8168_mdio_write(tp, 0x06, 0xf721);
-        rtl8168_mdio_write(tp, 0x06, 0xe48b);
-        rtl8168_mdio_write(tp, 0x06, 0x40d0);
-        rtl8168_mdio_write(tp, 0x06, 0x0302);
-        rtl8168_mdio_write(tp, 0x06, 0x287a);
-        rtl8168_mdio_write(tp, 0x06, 0x0282);
-        rtl8168_mdio_write(tp, 0x06, 0x34fc);
-        rtl8168_mdio_write(tp, 0x06, 0xa000);
-        rtl8168_mdio_write(tp, 0x06, 0x1002);
-        rtl8168_mdio_write(tp, 0x06, 0x2dc3);
-        rtl8168_mdio_write(tp, 0x06, 0x022e);
-        rtl8168_mdio_write(tp, 0x06, 0x21e0);
-        rtl8168_mdio_write(tp, 0x06, 0x8b40);
-        rtl8168_mdio_write(tp, 0x06, 0xf621);
-        rtl8168_mdio_write(tp, 0x06, 0xe48b);
-        rtl8168_mdio_write(tp, 0x06, 0x40ae);
-        rtl8168_mdio_write(tp, 0x06, 0x0fbf);
-        rtl8168_mdio_write(tp, 0x06, 0x3fa5);
-        rtl8168_mdio_write(tp, 0x06, 0x0231);
-        rtl8168_mdio_write(tp, 0x06, 0x6cbf);
-        rtl8168_mdio_write(tp, 0x06, 0x3fa2);
-        rtl8168_mdio_write(tp, 0x06, 0x0231);
-        rtl8168_mdio_write(tp, 0x06, 0x6c02);
-        rtl8168_mdio_write(tp, 0x06, 0x2dc3);
-        rtl8168_mdio_write(tp, 0x06, 0xef96);
-        rtl8168_mdio_write(tp, 0x06, 0xfefd);
-        rtl8168_mdio_write(tp, 0x06, 0xfc04);
-        rtl8168_mdio_write(tp, 0x06, 0xf8e0);
-        rtl8168_mdio_write(tp, 0x06, 0xe2f4);
-        rtl8168_mdio_write(tp, 0x06, 0xe1e2);
-        rtl8168_mdio_write(tp, 0x06, 0xf5e4);
-        rtl8168_mdio_write(tp, 0x06, 0x8a78);
-        rtl8168_mdio_write(tp, 0x06, 0xe58a);
-        rtl8168_mdio_write(tp, 0x06, 0x79ee);
-        rtl8168_mdio_write(tp, 0x06, 0xe2f4);
-        rtl8168_mdio_write(tp, 0x06, 0xd8ee);
-        rtl8168_mdio_write(tp, 0x06, 0xe2f5);
-        rtl8168_mdio_write(tp, 0x06, 0x20fc);
-        rtl8168_mdio_write(tp, 0x06, 0x04f8);
-        rtl8168_mdio_write(tp, 0x06, 0xf9fa);
-        rtl8168_mdio_write(tp, 0x06, 0xef69);
-        rtl8168_mdio_write(tp, 0x06, 0xe08b);
-        rtl8168_mdio_write(tp, 0x06, 0x87ad);
-        rtl8168_mdio_write(tp, 0x06, 0x2065);
-        rtl8168_mdio_write(tp, 0x06, 0xd200);
-        rtl8168_mdio_write(tp, 0x06, 0xbf2e);
-        rtl8168_mdio_write(tp, 0x06, 0xe802);
-        rtl8168_mdio_write(tp, 0x06, 0x31dd);
-        rtl8168_mdio_write(tp, 0x06, 0x1e21);
-        rtl8168_mdio_write(tp, 0x06, 0xbf82);
-        rtl8168_mdio_write(tp, 0x06, 0xdf02);
-        rtl8168_mdio_write(tp, 0x06, 0x31dd);
-        rtl8168_mdio_write(tp, 0x06, 0x0c11);
-        rtl8168_mdio_write(tp, 0x06, 0x1e21);
-        rtl8168_mdio_write(tp, 0x06, 0xbf82);
-        rtl8168_mdio_write(tp, 0x06, 0xe202);
-        rtl8168_mdio_write(tp, 0x06, 0x31dd);
-        rtl8168_mdio_write(tp, 0x06, 0x0c12);
-        rtl8168_mdio_write(tp, 0x06, 0x1e21);
-        rtl8168_mdio_write(tp, 0x06, 0xbf82);
-        rtl8168_mdio_write(tp, 0x06, 0xe502);
-        rtl8168_mdio_write(tp, 0x06, 0x31dd);
-        rtl8168_mdio_write(tp, 0x06, 0x0c13);
-        rtl8168_mdio_write(tp, 0x06, 0x1e21);
-        rtl8168_mdio_write(tp, 0x06, 0xbf1f);
-        rtl8168_mdio_write(tp, 0x06, 0x5302);
-        rtl8168_mdio_write(tp, 0x06, 0x31dd);
-        rtl8168_mdio_write(tp, 0x06, 0x0c14);
-        rtl8168_mdio_write(tp, 0x06, 0x1e21);
-        rtl8168_mdio_write(tp, 0x06, 0xbf82);
-        rtl8168_mdio_write(tp, 0x06, 0xeb02);
-        rtl8168_mdio_write(tp, 0x06, 0x31dd);
-        rtl8168_mdio_write(tp, 0x06, 0x0c16);
-        rtl8168_mdio_write(tp, 0x06, 0x1e21);
-        rtl8168_mdio_write(tp, 0x06, 0xe083);
-        rtl8168_mdio_write(tp, 0x06, 0xe01f);
-        rtl8168_mdio_write(tp, 0x06, 0x029e);
-        rtl8168_mdio_write(tp, 0x06, 0x22e6);
-        rtl8168_mdio_write(tp, 0x06, 0x83e0);
-        rtl8168_mdio_write(tp, 0x06, 0xad31);
-        rtl8168_mdio_write(tp, 0x06, 0x14ad);
-        rtl8168_mdio_write(tp, 0x06, 0x3011);
-        rtl8168_mdio_write(tp, 0x06, 0xef02);
-        rtl8168_mdio_write(tp, 0x06, 0x580c);
-        rtl8168_mdio_write(tp, 0x06, 0x9e07);
-        rtl8168_mdio_write(tp, 0x06, 0xad36);
-        rtl8168_mdio_write(tp, 0x06, 0x085a);
-        rtl8168_mdio_write(tp, 0x06, 0x309f);
-        rtl8168_mdio_write(tp, 0x06, 0x04d1);
-        rtl8168_mdio_write(tp, 0x06, 0x01ae);
-        rtl8168_mdio_write(tp, 0x06, 0x02d1);
-        rtl8168_mdio_write(tp, 0x06, 0x00bf);
-        rtl8168_mdio_write(tp, 0x06, 0x82dc);
-        rtl8168_mdio_write(tp, 0x06, 0x0232);
-        rtl8168_mdio_write(tp, 0x06, 0x0aef);
-        rtl8168_mdio_write(tp, 0x06, 0x96fe);
-        rtl8168_mdio_write(tp, 0x06, 0xfdfc);
-        rtl8168_mdio_write(tp, 0x06, 0x0400);
-        rtl8168_mdio_write(tp, 0x06, 0xe140);
-        rtl8168_mdio_write(tp, 0x06, 0x77e1);
-        rtl8168_mdio_write(tp, 0x06, 0x4010);
-        rtl8168_mdio_write(tp, 0x06, 0xe150);
-        rtl8168_mdio_write(tp, 0x06, 0x32e1);
-        rtl8168_mdio_write(tp, 0x06, 0x5030);
-        rtl8168_mdio_write(tp, 0x06, 0xe144);
-        rtl8168_mdio_write(tp, 0x06, 0x74e1);
-        rtl8168_mdio_write(tp, 0x06, 0x44bb);
-        rtl8168_mdio_write(tp, 0x06, 0xe2d2);
-        rtl8168_mdio_write(tp, 0x06, 0x40e0);
-        rtl8168_mdio_write(tp, 0x06, 0x2cfc);
-        rtl8168_mdio_write(tp, 0x06, 0xe2cc);
-        rtl8168_mdio_write(tp, 0x06, 0xcce2);
-        rtl8168_mdio_write(tp, 0x06, 0x00cc);
-        rtl8168_mdio_write(tp, 0x06, 0xe000);
-        rtl8168_mdio_write(tp, 0x06, 0x99e0);
-        rtl8168_mdio_write(tp, 0x06, 0x3688);
-        rtl8168_mdio_write(tp, 0x06, 0xe036);
-        rtl8168_mdio_write(tp, 0x06, 0x99e1);
-        rtl8168_mdio_write(tp, 0x06, 0x40dd);
-        rtl8168_mdio_write(tp, 0x06, 0xe022);
-        rtl8168_mdio_write(tp, 0x05, 0xe142);
-        gphy_val = rtl8168_mdio_read(tp, 0x06);
-        gphy_val |= BIT_0;
-        rtl8168_mdio_write(tp, 0x06, gphy_val);
-        rtl8168_mdio_write(tp, 0x05, 0xe140);
-        gphy_val = rtl8168_mdio_read(tp, 0x06);
-        gphy_val |= BIT_0;
-        rtl8168_mdio_write(tp, 0x06, gphy_val);
-        rtl8168_mdio_write(tp, 0x1f, 0x0000);
-        rtl8168_mdio_write(tp, 0x1f, 0x0005);
-        for (i = 0; i < 200; i++) {
-                udelay(100);
-                gphy_val = rtl8168_mdio_read(tp, 0x00);
-                if (gphy_val & BIT_7)
-                        break;
-        }
-        rtl8168_mdio_write(tp, 0x1f, 0x0004);
-        rtl8168_mdio_write(tp, 0x1f, 0x0007);
-        rtl8168_mdio_write(tp, 0x1e, 0x0023);
-        gphy_val = rtl8168_mdio_read(tp, 0x17);
-        gphy_val &= ~(BIT_0);
-        gphy_val |= BIT_2;
-        rtl8168_mdio_write(tp, 0x17, gphy_val);
-        rtl8168_mdio_write(tp, 0x1f, 0x0002);
-        rtl8168_mdio_write(tp, 0x1f, 0x0000);
-}
-
-static void
-rtl8168_set_phy_mcu_8168evl_2(struct net_device *dev)
-{
-        struct rtl8168_private *tp = netdev_priv(dev);
-        struct pci_dev *pdev = tp->pci_dev;
-        unsigned int gphy_val,i;
-
-        rtl8168_mdio_write(tp, 0x1f, 0x0000);
-        rtl8168_mdio_write(tp, 0x00, 0x1800);
-        gphy_val = rtl8168_mdio_read(tp, 0x15);
-        gphy_val &= ~(BIT_12);
-        rtl8168_mdio_write(tp, 0x15, gphy_val);
-        rtl8168_mdio_write(tp, 0x00, 0x4800);
-        rtl8168_mdio_write(tp, 0x1f, 0x0007);
-        rtl8168_mdio_write(tp, 0x1e, 0x002f);
-        for (i = 0; i < 1000; i++) {
-                udelay(100);
-                gphy_val = rtl8168_mdio_read(tp, 0x1c);
-                if ((gphy_val & 0x0080) == 0x0080)
-                        break;
-        }
-        rtl8168_mdio_write(tp, 0x1f, 0x0000);
-        rtl8168_mdio_write(tp, 0x00, 0x1800);
-        rtl8168_mdio_write(tp, 0x1f, 0x0007);
-        rtl8168_mdio_write(tp, 0x1e, 0x0023);
-        for (i = 0; i < 200; i++) {
-                udelay(100);
-                gphy_val = rtl8168_mdio_read(tp, 0x17);
-                if (!(gphy_val & 0x0001))
-                        break;
-        }
-        rtl8168_mdio_write(tp, 0x1f, 0x0005);
-        rtl8168_mdio_write(tp, 0x05, 0xfff6);
-        rtl8168_mdio_write(tp, 0x06, 0x0080);
-        rtl8168_mdio_write(tp, 0x1f, 0x0007);
-        rtl8168_mdio_write(tp, 0x1e, 0x0023);
-        rtl8168_mdio_write(tp, 0x16, 0x0306);
-        rtl8168_mdio_write(tp, 0x16, 0x0307);
-        rtl8168_mdio_write(tp, 0x15, 0x00AF);
-        rtl8168_mdio_write(tp, 0x19, 0x4060);
-        rtl8168_mdio_write(tp, 0x15, 0x00B0);
-        rtl8168_mdio_write(tp, 0x19, 0x7800);
-        rtl8168_mdio_write(tp, 0x15, 0x00B1);
-        rtl8168_mdio_write(tp, 0x19, 0x7e00);
-        rtl8168_mdio_write(tp, 0x15, 0x00B2);
-        rtl8168_mdio_write(tp, 0x19, 0x72B0);
-        rtl8168_mdio_write(tp, 0x15, 0x00B3);
-        rtl8168_mdio_write(tp, 0x19, 0x7F00);
-        rtl8168_mdio_write(tp, 0x15, 0x00B4);
-        rtl8168_mdio_write(tp, 0x19, 0x73B0);
-        rtl8168_mdio_write(tp, 0x15, 0x0101);
-        rtl8168_mdio_write(tp, 0x19, 0x0005);
-        rtl8168_mdio_write(tp, 0x15, 0x0103);
-        rtl8168_mdio_write(tp, 0x19, 0x0003);
-        rtl8168_mdio_write(tp, 0x15, 0x0105);
-        rtl8168_mdio_write(tp, 0x19, 0x30FD);
-        rtl8168_mdio_write(tp, 0x15, 0x0106);
-        rtl8168_mdio_write(tp, 0x19, 0x9DF7);
-        rtl8168_mdio_write(tp, 0x15, 0x0107);
-        rtl8168_mdio_write(tp, 0x19, 0x30C6);
-        rtl8168_mdio_write(tp, 0x15, 0x0098);
-        rtl8168_mdio_write(tp, 0x19, 0x7c0b);
-        rtl8168_mdio_write(tp, 0x15, 0x0099);
-        rtl8168_mdio_write(tp, 0x19, 0x6c0b);
-        rtl8168_mdio_write(tp, 0x15, 0x00eb);
-        rtl8168_mdio_write(tp, 0x19, 0x6c0b);
-        rtl8168_mdio_write(tp, 0x15, 0x00f8);
-        rtl8168_mdio_write(tp, 0x19, 0x6f0b);
-        rtl8168_mdio_write(tp, 0x15, 0x00fe);
-        rtl8168_mdio_write(tp, 0x19, 0x6f0f);
-        rtl8168_mdio_write(tp, 0x15, 0x00db);
-        rtl8168_mdio_write(tp, 0x19, 0x6f09);
-        rtl8168_mdio_write(tp, 0x15, 0x00dc);
-        rtl8168_mdio_write(tp, 0x19, 0xaefd);
-        rtl8168_mdio_write(tp, 0x15, 0x00dd);
-        rtl8168_mdio_write(tp, 0x19, 0x6f0b);
-        rtl8168_mdio_write(tp, 0x15, 0x00de);
-        rtl8168_mdio_write(tp, 0x19, 0xc60b);
-        rtl8168_mdio_write(tp, 0x15, 0x00df);
-        rtl8168_mdio_write(tp, 0x19, 0x00fa);
-        rtl8168_mdio_write(tp, 0x15, 0x00e0);
-        rtl8168_mdio_write(tp, 0x19, 0x30e1);
-        rtl8168_mdio_write(tp, 0x15, 0x020c);
-        rtl8168_mdio_write(tp, 0x19, 0x3224);
-        rtl8168_mdio_write(tp, 0x15, 0x020e);
-        rtl8168_mdio_write(tp, 0x19, 0x9813);
-        rtl8168_mdio_write(tp, 0x15, 0x020f);
-        rtl8168_mdio_write(tp, 0x19, 0x7801);
-        rtl8168_mdio_write(tp, 0x15, 0x0210);
-        rtl8168_mdio_write(tp, 0x19, 0x930f);
-        rtl8168_mdio_write(tp, 0x15, 0x0211);
-        rtl8168_mdio_write(tp, 0x19, 0x9206);
-        rtl8168_mdio_write(tp, 0x15, 0x0212);
-        rtl8168_mdio_write(tp, 0x19, 0x4002);
-        rtl8168_mdio_write(tp, 0x15, 0x0213);
-        rtl8168_mdio_write(tp, 0x19, 0x7800);
-        rtl8168_mdio_write(tp, 0x15, 0x0214);
-        rtl8168_mdio_write(tp, 0x19, 0x588f);
-        rtl8168_mdio_write(tp, 0x15, 0x0215);
-        rtl8168_mdio_write(tp, 0x19, 0x5520);
-        rtl8168_mdio_write(tp, 0x15, 0x0216);
-        rtl8168_mdio_write(tp, 0x19, 0x3224);
-        rtl8168_mdio_write(tp, 0x15, 0x0217);
-        rtl8168_mdio_write(tp, 0x19, 0x4002);
-        rtl8168_mdio_write(tp, 0x15, 0x0218);
-        rtl8168_mdio_write(tp, 0x19, 0x7800);
-        rtl8168_mdio_write(tp, 0x15, 0x0219);
-        rtl8168_mdio_write(tp, 0x19, 0x588d);
-        rtl8168_mdio_write(tp, 0x15, 0x021a);
-        rtl8168_mdio_write(tp, 0x19, 0x5540);
-        rtl8168_mdio_write(tp, 0x15, 0x021b);
-        rtl8168_mdio_write(tp, 0x19, 0x9e03);
-        rtl8168_mdio_write(tp, 0x15, 0x021c);
-        rtl8168_mdio_write(tp, 0x19, 0x7c40);
-        rtl8168_mdio_write(tp, 0x15, 0x021d);
-        rtl8168_mdio_write(tp, 0x19, 0x6840);
-        rtl8168_mdio_write(tp, 0x15, 0x021e);
-        rtl8168_mdio_write(tp, 0x19, 0x3224);
-        rtl8168_mdio_write(tp, 0x15, 0x021f);
-        rtl8168_mdio_write(tp, 0x19, 0x4002);
-        rtl8168_mdio_write(tp, 0x15, 0x0220);
-        rtl8168_mdio_write(tp, 0x19, 0x3224);
-        rtl8168_mdio_write(tp, 0x15, 0x0221);
-        rtl8168_mdio_write(tp, 0x19, 0x9e03);
-        rtl8168_mdio_write(tp, 0x15, 0x0222);
-        rtl8168_mdio_write(tp, 0x19, 0x7c40);
-        rtl8168_mdio_write(tp, 0x15, 0x0223);
-        rtl8168_mdio_write(tp, 0x19, 0x6840);
-        rtl8168_mdio_write(tp, 0x15, 0x0224);
-        rtl8168_mdio_write(tp, 0x19, 0x7800);
-        rtl8168_mdio_write(tp, 0x15, 0x0225);
-        rtl8168_mdio_write(tp, 0x19, 0x3231);
-        rtl8168_mdio_write(tp, 0x15, 0x0000);
-        rtl8168_mdio_write(tp, 0x16, 0x0306);
-        rtl8168_mdio_write(tp, 0x16, 0x0300);
-        rtl8168_mdio_write(tp, 0x1f, 0x0002);
-        rtl8168_mdio_write(tp, 0x1f, 0x0000);
-        rtl8168_mdio_write(tp, 0x1f, 0x0000);
-        rtl8168_mdio_write(tp, 0x17, 0x2160);
-        rtl8168_mdio_write(tp, 0x1f, 0x0007);
-        rtl8168_mdio_write(tp, 0x1e, 0x0040);
-        rtl8168_mdio_write(tp, 0x18, 0x0004);
-        if (pdev->subsystem_vendor == 0x144d &&
-            pdev->subsystem_device == 0xc0a6) {
-                rtl8168_mdio_write(tp, 0x18, 0x0724);
-                rtl8168_mdio_write(tp, 0x19, 0xfe00);
-                rtl8168_mdio_write(tp, 0x18, 0x0734);
-                rtl8168_mdio_write(tp, 0x19, 0xfd00);
-                rtl8168_mdio_write(tp, 0x18, 0x1824);
-                rtl8168_mdio_write(tp, 0x19, 0xfc00);
-                rtl8168_mdio_write(tp, 0x18, 0x1834);
-                rtl8168_mdio_write(tp, 0x19, 0xfd00);
-        }
-        rtl8168_mdio_write(tp, 0x18, 0x09d4);
-        rtl8168_mdio_write(tp, 0x19, 0x4000);
-        rtl8168_mdio_write(tp, 0x18, 0x09e4);
-        rtl8168_mdio_write(tp, 0x19, 0x0800);
-        rtl8168_mdio_write(tp, 0x18, 0x09f4);
-        rtl8168_mdio_write(tp, 0x19, 0xff00);
-        rtl8168_mdio_write(tp, 0x18, 0x0a04);
-        rtl8168_mdio_write(tp, 0x19, 0x4000);
-        rtl8168_mdio_write(tp, 0x18, 0x0a14);
-        rtl8168_mdio_write(tp, 0x19, 0x0c00);
-        rtl8168_mdio_write(tp, 0x18, 0x0a24);
-        rtl8168_mdio_write(tp, 0x19, 0xff00);
-        rtl8168_mdio_write(tp, 0x18, 0x0a74);
-        rtl8168_mdio_write(tp, 0x19, 0xf600);
-        rtl8168_mdio_write(tp, 0x18, 0x1a24);
-        rtl8168_mdio_write(tp, 0x19, 0x7d00);
-        rtl8168_mdio_write(tp, 0x18, 0x1a64);
-        rtl8168_mdio_write(tp, 0x19, 0x0500);
-        rtl8168_mdio_write(tp, 0x18, 0x1a74);
-        rtl8168_mdio_write(tp, 0x19, 0x9500);
-        rtl8168_mdio_write(tp, 0x18, 0x1a84);
-        rtl8168_mdio_write(tp, 0x19, 0x8000);
-        rtl8168_mdio_write(tp, 0x18, 0x1a94);
-        rtl8168_mdio_write(tp, 0x19, 0x7d00);
-        rtl8168_mdio_write(tp, 0x18, 0x1aa4);
-        rtl8168_mdio_write(tp, 0x19, 0x9600);
-        rtl8168_mdio_write(tp, 0x18, 0x1ac4);
-        rtl8168_mdio_write(tp, 0x19, 0x4000);
-        rtl8168_mdio_write(tp, 0x18, 0x1ad4);
-        rtl8168_mdio_write(tp, 0x19, 0x0800);
-        rtl8168_mdio_write(tp, 0x18, 0x1af4);
-        rtl8168_mdio_write(tp, 0x19, 0xc400);
-        rtl8168_mdio_write(tp, 0x18, 0x1b04);
-        rtl8168_mdio_write(tp, 0x19, 0x4000);
-        rtl8168_mdio_write(tp, 0x18, 0x1b14);
-        rtl8168_mdio_write(tp, 0x19, 0x0800);
-        rtl8168_mdio_write(tp, 0x18, 0x1b24);
-        rtl8168_mdio_write(tp, 0x19, 0xfd00);
-        rtl8168_mdio_write(tp, 0x18, 0x1b34);
-        rtl8168_mdio_write(tp, 0x19, 0x4000);
-        rtl8168_mdio_write(tp, 0x18, 0x1b44);
-        rtl8168_mdio_write(tp, 0x19, 0x0400);
-        rtl8168_mdio_write(tp, 0x18, 0x1b94);
-        rtl8168_mdio_write(tp, 0x19, 0xf100);
-        rtl8168_mdio_write(tp, 0x1f, 0x0000);
-        rtl8168_mdio_write(tp, 0x17, 0x2100);
-        rtl8168_mdio_write(tp, 0x1f, 0x0007);
-        rtl8168_mdio_write(tp, 0x1e, 0x0040);
-        rtl8168_mdio_write(tp, 0x18, 0x0000);
-        rtl8168_mdio_write(tp, 0x1f, 0x0000);
-        rtl8168_mdio_write(tp, 0x1f, 0x0005);
-        rtl8168_mdio_write(tp, 0x05, 0xfff6);
-        rtl8168_mdio_write(tp, 0x06, 0x0080);
-        rtl8168_mdio_write(tp, 0x05, 0x8000);
-        rtl8168_mdio_write(tp, 0x06, 0x0280);
-        rtl8168_mdio_write(tp, 0x06, 0x48f7);
-        rtl8168_mdio_write(tp, 0x06, 0x00e0);
-        rtl8168_mdio_write(tp, 0x06, 0xfff7);
-        rtl8168_mdio_write(tp, 0x06, 0xa080);
-        rtl8168_mdio_write(tp, 0x06, 0x02ae);
-        rtl8168_mdio_write(tp, 0x06, 0xf602);
-        rtl8168_mdio_write(tp, 0x06, 0x0115);
-        rtl8168_mdio_write(tp, 0x06, 0x0201);
-        rtl8168_mdio_write(tp, 0x06, 0x2202);
-        rtl8168_mdio_write(tp, 0x06, 0x80a0);
-        rtl8168_mdio_write(tp, 0x06, 0x0201);
-        rtl8168_mdio_write(tp, 0x06, 0x3f02);
-        rtl8168_mdio_write(tp, 0x06, 0x0159);
-        rtl8168_mdio_write(tp, 0x06, 0x0280);
-        rtl8168_mdio_write(tp, 0x06, 0xbd02);
-        rtl8168_mdio_write(tp, 0x06, 0x80da);
-        rtl8168_mdio_write(tp, 0x06, 0xe08b);
-        rtl8168_mdio_write(tp, 0x06, 0x88e1);
-        rtl8168_mdio_write(tp, 0x06, 0x8b89);
-        rtl8168_mdio_write(tp, 0x06, 0x1e01);
-        rtl8168_mdio_write(tp, 0x06, 0xe18b);
-        rtl8168_mdio_write(tp, 0x06, 0x8a1e);
-        rtl8168_mdio_write(tp, 0x06, 0x01e1);
-        rtl8168_mdio_write(tp, 0x06, 0x8b8b);
-        rtl8168_mdio_write(tp, 0x06, 0x1e01);
-        rtl8168_mdio_write(tp, 0x06, 0xe18b);
-        rtl8168_mdio_write(tp, 0x06, 0x8c1e);
-        rtl8168_mdio_write(tp, 0x06, 0x01e1);
-        rtl8168_mdio_write(tp, 0x06, 0x8b8d);
-        rtl8168_mdio_write(tp, 0x06, 0x1e01);
-        rtl8168_mdio_write(tp, 0x06, 0xe18b);
-        rtl8168_mdio_write(tp, 0x06, 0x8e1e);
-        rtl8168_mdio_write(tp, 0x06, 0x01a0);
-        rtl8168_mdio_write(tp, 0x06, 0x00c7);
-        rtl8168_mdio_write(tp, 0x06, 0xaebb);
-        rtl8168_mdio_write(tp, 0x06, 0xd481);
-        rtl8168_mdio_write(tp, 0x06, 0xd2e4);
-        rtl8168_mdio_write(tp, 0x06, 0x8b92);
-        rtl8168_mdio_write(tp, 0x06, 0xe58b);
-        rtl8168_mdio_write(tp, 0x06, 0x93d1);
-        rtl8168_mdio_write(tp, 0x06, 0x03bf);
-        rtl8168_mdio_write(tp, 0x06, 0x859e);
-        rtl8168_mdio_write(tp, 0x06, 0x0237);
-        rtl8168_mdio_write(tp, 0x06, 0x23d1);
-        rtl8168_mdio_write(tp, 0x06, 0x02bf);
-        rtl8168_mdio_write(tp, 0x06, 0x85a1);
-        rtl8168_mdio_write(tp, 0x06, 0x0237);
-        rtl8168_mdio_write(tp, 0x06, 0x23ee);
-        rtl8168_mdio_write(tp, 0x06, 0x8608);
-        rtl8168_mdio_write(tp, 0x06, 0x03ee);
-        rtl8168_mdio_write(tp, 0x06, 0x860a);
-        rtl8168_mdio_write(tp, 0x06, 0x60ee);
-        rtl8168_mdio_write(tp, 0x06, 0x8610);
-        rtl8168_mdio_write(tp, 0x06, 0x00ee);
-        rtl8168_mdio_write(tp, 0x06, 0x8611);
-        rtl8168_mdio_write(tp, 0x06, 0x00ee);
-        rtl8168_mdio_write(tp, 0x06, 0x8abe);
-        rtl8168_mdio_write(tp, 0x06, 0x07ee);
-        rtl8168_mdio_write(tp, 0x06, 0x8abf);
-        rtl8168_mdio_write(tp, 0x06, 0x73ee);
-        rtl8168_mdio_write(tp, 0x06, 0x8a95);
-        rtl8168_mdio_write(tp, 0x06, 0x02bf);
-        rtl8168_mdio_write(tp, 0x06, 0x8b88);
-        rtl8168_mdio_write(tp, 0x06, 0xec00);
-        rtl8168_mdio_write(tp, 0x06, 0x19a9);
-        rtl8168_mdio_write(tp, 0x06, 0x8b90);
-        rtl8168_mdio_write(tp, 0x06, 0xf9ee);
-        rtl8168_mdio_write(tp, 0x06, 0xfff6);
-        rtl8168_mdio_write(tp, 0x06, 0x00ee);
-        rtl8168_mdio_write(tp, 0x06, 0xfff7);
-        rtl8168_mdio_write(tp, 0x06, 0xfed1);
-        rtl8168_mdio_write(tp, 0x06, 0x00bf);
-        rtl8168_mdio_write(tp, 0x06, 0x8595);
-        rtl8168_mdio_write(tp, 0x06, 0x0237);
-        rtl8168_mdio_write(tp, 0x06, 0x23d1);
-        rtl8168_mdio_write(tp, 0x06, 0x01bf);
-        rtl8168_mdio_write(tp, 0x06, 0x8598);
-        rtl8168_mdio_write(tp, 0x06, 0x0237);
-        rtl8168_mdio_write(tp, 0x06, 0x2304);
-        rtl8168_mdio_write(tp, 0x06, 0xf8e0);
-        rtl8168_mdio_write(tp, 0x06, 0x8b8a);
-        rtl8168_mdio_write(tp, 0x06, 0xad20);
-        rtl8168_mdio_write(tp, 0x06, 0x14ee);
-        rtl8168_mdio_write(tp, 0x06, 0x8b8a);
-        rtl8168_mdio_write(tp, 0x06, 0x0002);
-        rtl8168_mdio_write(tp, 0x06, 0x1f9a);
-        rtl8168_mdio_write(tp, 0x06, 0xe0e4);
-        rtl8168_mdio_write(tp, 0x06, 0x26e1);
-        rtl8168_mdio_write(tp, 0x06, 0xe427);
-        rtl8168_mdio_write(tp, 0x06, 0xeee4);
-        rtl8168_mdio_write(tp, 0x06, 0x2623);
-        rtl8168_mdio_write(tp, 0x06, 0xe5e4);
-        rtl8168_mdio_write(tp, 0x06, 0x27fc);
-        rtl8168_mdio_write(tp, 0x06, 0x04f8);
-        rtl8168_mdio_write(tp, 0x06, 0xe08b);
-        rtl8168_mdio_write(tp, 0x06, 0x8dad);
-        rtl8168_mdio_write(tp, 0x06, 0x2014);
-        rtl8168_mdio_write(tp, 0x06, 0xee8b);
-        rtl8168_mdio_write(tp, 0x06, 0x8d00);
-        rtl8168_mdio_write(tp, 0x06, 0xe08a);
-        rtl8168_mdio_write(tp, 0x06, 0x5a78);
-        rtl8168_mdio_write(tp, 0x06, 0x039e);
-        rtl8168_mdio_write(tp, 0x06, 0x0902);
-        rtl8168_mdio_write(tp, 0x06, 0x05db);
-        rtl8168_mdio_write(tp, 0x06, 0x0282);
-        rtl8168_mdio_write(tp, 0x06, 0x7b02);
-        rtl8168_mdio_write(tp, 0x06, 0x3231);
-        rtl8168_mdio_write(tp, 0x06, 0xfc04);
-        rtl8168_mdio_write(tp, 0x06, 0xf8e0);
-        rtl8168_mdio_write(tp, 0x06, 0x8b8e);
-        rtl8168_mdio_write(tp, 0x06, 0xad20);
-        rtl8168_mdio_write(tp, 0x06, 0x1df6);
-        rtl8168_mdio_write(tp, 0x06, 0x20e4);
-        rtl8168_mdio_write(tp, 0x06, 0x8b8e);
-        rtl8168_mdio_write(tp, 0x06, 0x0281);
-        rtl8168_mdio_write(tp, 0x06, 0x5c02);
-        rtl8168_mdio_write(tp, 0x06, 0x2bcb);
-        rtl8168_mdio_write(tp, 0x06, 0x022d);
-        rtl8168_mdio_write(tp, 0x06, 0x2902);
-        rtl8168_mdio_write(tp, 0x06, 0x03b4);
-        rtl8168_mdio_write(tp, 0x06, 0x0285);
-        rtl8168_mdio_write(tp, 0x06, 0x6402);
-        rtl8168_mdio_write(tp, 0x06, 0x2eca);
-        rtl8168_mdio_write(tp, 0x06, 0x0284);
-        rtl8168_mdio_write(tp, 0x06, 0xcd02);
-        rtl8168_mdio_write(tp, 0x06, 0x046f);
-        rtl8168_mdio_write(tp, 0x06, 0xe08b);
-        rtl8168_mdio_write(tp, 0x06, 0x8ead);
-        rtl8168_mdio_write(tp, 0x06, 0x210b);
-        rtl8168_mdio_write(tp, 0x06, 0xf621);
-        rtl8168_mdio_write(tp, 0x06, 0xe48b);
-        rtl8168_mdio_write(tp, 0x06, 0x8e02);
-        rtl8168_mdio_write(tp, 0x06, 0x8520);
-        rtl8168_mdio_write(tp, 0x06, 0x021b);
-        rtl8168_mdio_write(tp, 0x06, 0xe8e0);
-        rtl8168_mdio_write(tp, 0x06, 0x8b8e);
-        rtl8168_mdio_write(tp, 0x06, 0xad22);
-        rtl8168_mdio_write(tp, 0x06, 0x05f6);
-        rtl8168_mdio_write(tp, 0x06, 0x22e4);
-        rtl8168_mdio_write(tp, 0x06, 0x8b8e);
-        rtl8168_mdio_write(tp, 0x06, 0xe08b);
-        rtl8168_mdio_write(tp, 0x06, 0x8ead);
-        rtl8168_mdio_write(tp, 0x06, 0x2308);
-        rtl8168_mdio_write(tp, 0x06, 0xf623);
-        rtl8168_mdio_write(tp, 0x06, 0xe48b);
-        rtl8168_mdio_write(tp, 0x06, 0x8e02);
-        rtl8168_mdio_write(tp, 0x06, 0x311c);
-        rtl8168_mdio_write(tp, 0x06, 0xe08b);
-        rtl8168_mdio_write(tp, 0x06, 0x8ead);
-        rtl8168_mdio_write(tp, 0x06, 0x2405);
-        rtl8168_mdio_write(tp, 0x06, 0xf624);
-        rtl8168_mdio_write(tp, 0x06, 0xe48b);
-        rtl8168_mdio_write(tp, 0x06, 0x8ee0);
-        rtl8168_mdio_write(tp, 0x06, 0x8b8e);
-        rtl8168_mdio_write(tp, 0x06, 0xad25);
-        rtl8168_mdio_write(tp, 0x06, 0x05f6);
-        rtl8168_mdio_write(tp, 0x06, 0x25e4);
-        rtl8168_mdio_write(tp, 0x06, 0x8b8e);
-        rtl8168_mdio_write(tp, 0x06, 0xe08b);
-        rtl8168_mdio_write(tp, 0x06, 0x8ead);
-        rtl8168_mdio_write(tp, 0x06, 0x2608);
-        rtl8168_mdio_write(tp, 0x06, 0xf626);
-        rtl8168_mdio_write(tp, 0x06, 0xe48b);
-        rtl8168_mdio_write(tp, 0x06, 0x8e02);
-        rtl8168_mdio_write(tp, 0x06, 0x2df5);
-        rtl8168_mdio_write(tp, 0x06, 0xe08b);
-        rtl8168_mdio_write(tp, 0x06, 0x8ead);
-        rtl8168_mdio_write(tp, 0x06, 0x2705);
-        rtl8168_mdio_write(tp, 0x06, 0xf627);
-        rtl8168_mdio_write(tp, 0x06, 0xe48b);
-        rtl8168_mdio_write(tp, 0x06, 0x8e02);
-        rtl8168_mdio_write(tp, 0x06, 0x037a);
-        rtl8168_mdio_write(tp, 0x06, 0xfc04);
-        rtl8168_mdio_write(tp, 0x06, 0xf8f9);
-        rtl8168_mdio_write(tp, 0x06, 0xfaef);
-        rtl8168_mdio_write(tp, 0x06, 0x69e0);
-        rtl8168_mdio_write(tp, 0x06, 0x8b87);
-        rtl8168_mdio_write(tp, 0x06, 0xad20);
-        rtl8168_mdio_write(tp, 0x06, 0x65d2);
-        rtl8168_mdio_write(tp, 0x06, 0x00bf);
-        rtl8168_mdio_write(tp, 0x06, 0x2fe9);
-        rtl8168_mdio_write(tp, 0x06, 0x0236);
-        rtl8168_mdio_write(tp, 0x06, 0xf61e);
-        rtl8168_mdio_write(tp, 0x06, 0x21bf);
-        rtl8168_mdio_write(tp, 0x06, 0x2ff5);
-        rtl8168_mdio_write(tp, 0x06, 0x0236);
-        rtl8168_mdio_write(tp, 0x06, 0xf60c);
-        rtl8168_mdio_write(tp, 0x06, 0x111e);
-        rtl8168_mdio_write(tp, 0x06, 0x21bf);
-        rtl8168_mdio_write(tp, 0x06, 0x2ff8);
-        rtl8168_mdio_write(tp, 0x06, 0x0236);
-        rtl8168_mdio_write(tp, 0x06, 0xf60c);
-        rtl8168_mdio_write(tp, 0x06, 0x121e);
-        rtl8168_mdio_write(tp, 0x06, 0x21bf);
-        rtl8168_mdio_write(tp, 0x06, 0x2ffb);
-        rtl8168_mdio_write(tp, 0x06, 0x0236);
-        rtl8168_mdio_write(tp, 0x06, 0xf60c);
-        rtl8168_mdio_write(tp, 0x06, 0x131e);
-        rtl8168_mdio_write(tp, 0x06, 0x21bf);
-        rtl8168_mdio_write(tp, 0x06, 0x1f97);
-        rtl8168_mdio_write(tp, 0x06, 0x0236);
-        rtl8168_mdio_write(tp, 0x06, 0xf60c);
-        rtl8168_mdio_write(tp, 0x06, 0x141e);
-        rtl8168_mdio_write(tp, 0x06, 0x21bf);
-        rtl8168_mdio_write(tp, 0x06, 0x859b);
-        rtl8168_mdio_write(tp, 0x06, 0x0236);
-        rtl8168_mdio_write(tp, 0x06, 0xf60c);
-        rtl8168_mdio_write(tp, 0x06, 0x161e);
-        rtl8168_mdio_write(tp, 0x06, 0x21e0);
-        rtl8168_mdio_write(tp, 0x06, 0x8a8c);
-        rtl8168_mdio_write(tp, 0x06, 0x1f02);
-        rtl8168_mdio_write(tp, 0x06, 0x9e22);
-        rtl8168_mdio_write(tp, 0x06, 0xe68a);
-        rtl8168_mdio_write(tp, 0x06, 0x8cad);
-        rtl8168_mdio_write(tp, 0x06, 0x3114);
-        rtl8168_mdio_write(tp, 0x06, 0xad30);
-        rtl8168_mdio_write(tp, 0x06, 0x11ef);
-        rtl8168_mdio_write(tp, 0x06, 0x0258);
-        rtl8168_mdio_write(tp, 0x06, 0x0c9e);
-        rtl8168_mdio_write(tp, 0x06, 0x07ad);
-        rtl8168_mdio_write(tp, 0x06, 0x3608);
-        rtl8168_mdio_write(tp, 0x06, 0x5a30);
-        rtl8168_mdio_write(tp, 0x06, 0x9f04);
-        rtl8168_mdio_write(tp, 0x06, 0xd101);
-        rtl8168_mdio_write(tp, 0x06, 0xae02);
-        rtl8168_mdio_write(tp, 0x06, 0xd100);
-        rtl8168_mdio_write(tp, 0x06, 0xbf2f);
-        rtl8168_mdio_write(tp, 0x06, 0xf202);
-        rtl8168_mdio_write(tp, 0x06, 0x3723);
-        rtl8168_mdio_write(tp, 0x06, 0xef96);
-        rtl8168_mdio_write(tp, 0x06, 0xfefd);
-        rtl8168_mdio_write(tp, 0x06, 0xfc04);
-        rtl8168_mdio_write(tp, 0x06, 0xf8f9);
-        rtl8168_mdio_write(tp, 0x06, 0xface);
-        rtl8168_mdio_write(tp, 0x06, 0xfaef);
-        rtl8168_mdio_write(tp, 0x06, 0x69fa);
-        rtl8168_mdio_write(tp, 0x06, 0xd401);
-        rtl8168_mdio_write(tp, 0x06, 0x55b4);
-        rtl8168_mdio_write(tp, 0x06, 0xfebf);
-        rtl8168_mdio_write(tp, 0x06, 0x85a7);
-        rtl8168_mdio_write(tp, 0x06, 0x0236);
-        rtl8168_mdio_write(tp, 0x06, 0xf6ac);
-        rtl8168_mdio_write(tp, 0x06, 0x280b);
-        rtl8168_mdio_write(tp, 0x06, 0xbf85);
-        rtl8168_mdio_write(tp, 0x06, 0xa402);
-        rtl8168_mdio_write(tp, 0x06, 0x36f6);
-        rtl8168_mdio_write(tp, 0x06, 0xac28);
-        rtl8168_mdio_write(tp, 0x06, 0x49ae);
-        rtl8168_mdio_write(tp, 0x06, 0x64bf);
-        rtl8168_mdio_write(tp, 0x06, 0x85a4);
-        rtl8168_mdio_write(tp, 0x06, 0x0236);
-        rtl8168_mdio_write(tp, 0x06, 0xf6ac);
-        rtl8168_mdio_write(tp, 0x06, 0x285b);
-        rtl8168_mdio_write(tp, 0x06, 0xd000);
-        rtl8168_mdio_write(tp, 0x06, 0x0282);
-        rtl8168_mdio_write(tp, 0x06, 0x60ac);
-        rtl8168_mdio_write(tp, 0x06, 0x2105);
-        rtl8168_mdio_write(tp, 0x06, 0xac22);
-        rtl8168_mdio_write(tp, 0x06, 0x02ae);
-        rtl8168_mdio_write(tp, 0x06, 0x4ebf);
-        rtl8168_mdio_write(tp, 0x06, 0xe0c4);
-        rtl8168_mdio_write(tp, 0x06, 0xbe86);
-        rtl8168_mdio_write(tp, 0x06, 0x14d2);
-        rtl8168_mdio_write(tp, 0x06, 0x04d8);
-        rtl8168_mdio_write(tp, 0x06, 0x19d9);
-        rtl8168_mdio_write(tp, 0x06, 0x1907);
-        rtl8168_mdio_write(tp, 0x06, 0xdc19);
-        rtl8168_mdio_write(tp, 0x06, 0xdd19);
-        rtl8168_mdio_write(tp, 0x06, 0x0789);
-        rtl8168_mdio_write(tp, 0x06, 0x89ef);
-        rtl8168_mdio_write(tp, 0x06, 0x645e);
-        rtl8168_mdio_write(tp, 0x06, 0x07ff);
-        rtl8168_mdio_write(tp, 0x06, 0x0d65);
-        rtl8168_mdio_write(tp, 0x06, 0x5cf8);
-        rtl8168_mdio_write(tp, 0x06, 0x001e);
-        rtl8168_mdio_write(tp, 0x06, 0x46dc);
-        rtl8168_mdio_write(tp, 0x06, 0x19dd);
-        rtl8168_mdio_write(tp, 0x06, 0x19b2);
-        rtl8168_mdio_write(tp, 0x06, 0xe2d4);
-        rtl8168_mdio_write(tp, 0x06, 0x0001);
-        rtl8168_mdio_write(tp, 0x06, 0xbf85);
-        rtl8168_mdio_write(tp, 0x06, 0xa402);
-        rtl8168_mdio_write(tp, 0x06, 0x3723);
-        rtl8168_mdio_write(tp, 0x06, 0xae1d);
-        rtl8168_mdio_write(tp, 0x06, 0xbee0);
-        rtl8168_mdio_write(tp, 0x06, 0xc4bf);
-        rtl8168_mdio_write(tp, 0x06, 0x8614);
-        rtl8168_mdio_write(tp, 0x06, 0xd204);
-        rtl8168_mdio_write(tp, 0x06, 0xd819);
-        rtl8168_mdio_write(tp, 0x06, 0xd919);
-        rtl8168_mdio_write(tp, 0x06, 0x07dc);
-        rtl8168_mdio_write(tp, 0x06, 0x19dd);
-        rtl8168_mdio_write(tp, 0x06, 0x1907);
-        rtl8168_mdio_write(tp, 0x06, 0xb2f4);
-        rtl8168_mdio_write(tp, 0x06, 0xd400);
-        rtl8168_mdio_write(tp, 0x06, 0x00bf);
-        rtl8168_mdio_write(tp, 0x06, 0x85a4);
-        rtl8168_mdio_write(tp, 0x06, 0x0237);
-        rtl8168_mdio_write(tp, 0x06, 0x23fe);
-        rtl8168_mdio_write(tp, 0x06, 0xef96);
-        rtl8168_mdio_write(tp, 0x06, 0xfec6);
-        rtl8168_mdio_write(tp, 0x06, 0xfefd);
-        rtl8168_mdio_write(tp, 0x06, 0xfc05);
-        rtl8168_mdio_write(tp, 0x06, 0xf9e2);
-        rtl8168_mdio_write(tp, 0x06, 0xe0ea);
-        rtl8168_mdio_write(tp, 0x06, 0xe3e0);
-        rtl8168_mdio_write(tp, 0x06, 0xeb5a);
-        rtl8168_mdio_write(tp, 0x06, 0x070c);
-        rtl8168_mdio_write(tp, 0x06, 0x031e);
-        rtl8168_mdio_write(tp, 0x06, 0x20e6);
-        rtl8168_mdio_write(tp, 0x06, 0xe0ea);
-        rtl8168_mdio_write(tp, 0x06, 0xe7e0);
-        rtl8168_mdio_write(tp, 0x06, 0xebe0);
-        rtl8168_mdio_write(tp, 0x06, 0xe0fc);
-        rtl8168_mdio_write(tp, 0x06, 0xe1e0);
-        rtl8168_mdio_write(tp, 0x06, 0xfdfd);
-        rtl8168_mdio_write(tp, 0x06, 0x04f8);
-        rtl8168_mdio_write(tp, 0x06, 0xf9e0);
-        rtl8168_mdio_write(tp, 0x06, 0x8b81);
-        rtl8168_mdio_write(tp, 0x06, 0xac26);
-        rtl8168_mdio_write(tp, 0x06, 0x1ae0);
-        rtl8168_mdio_write(tp, 0x06, 0x8b81);
-        rtl8168_mdio_write(tp, 0x06, 0xac21);
-        rtl8168_mdio_write(tp, 0x06, 0x14e0);
-        rtl8168_mdio_write(tp, 0x06, 0x8b85);
-        rtl8168_mdio_write(tp, 0x06, 0xac20);
-        rtl8168_mdio_write(tp, 0x06, 0x0ee0);
-        rtl8168_mdio_write(tp, 0x06, 0x8b85);
-        rtl8168_mdio_write(tp, 0x06, 0xac23);
-        rtl8168_mdio_write(tp, 0x06, 0x08e0);
-        rtl8168_mdio_write(tp, 0x06, 0x8b87);
-        rtl8168_mdio_write(tp, 0x06, 0xac24);
-        rtl8168_mdio_write(tp, 0x06, 0x02ae);
-        rtl8168_mdio_write(tp, 0x06, 0x3802);
-        rtl8168_mdio_write(tp, 0x06, 0x1ab5);
-        rtl8168_mdio_write(tp, 0x06, 0xeee4);
-        rtl8168_mdio_write(tp, 0x06, 0x1c04);
-        rtl8168_mdio_write(tp, 0x06, 0xeee4);
-        rtl8168_mdio_write(tp, 0x06, 0x1d04);
-        rtl8168_mdio_write(tp, 0x06, 0xe2e0);
-        rtl8168_mdio_write(tp, 0x06, 0x7ce3);
-        rtl8168_mdio_write(tp, 0x06, 0xe07d);
-        rtl8168_mdio_write(tp, 0x06, 0xe0e0);
-        rtl8168_mdio_write(tp, 0x06, 0x38e1);
-        rtl8168_mdio_write(tp, 0x06, 0xe039);
-        rtl8168_mdio_write(tp, 0x06, 0xad2e);
-        rtl8168_mdio_write(tp, 0x06, 0x1bad);
-        rtl8168_mdio_write(tp, 0x06, 0x390d);
-        rtl8168_mdio_write(tp, 0x06, 0xd101);
-        rtl8168_mdio_write(tp, 0x06, 0xbf21);
-        rtl8168_mdio_write(tp, 0x06, 0xd502);
-        rtl8168_mdio_write(tp, 0x06, 0x3723);
-        rtl8168_mdio_write(tp, 0x06, 0x0282);
-        rtl8168_mdio_write(tp, 0x06, 0xd8ae);
-        rtl8168_mdio_write(tp, 0x06, 0x0bac);
-        rtl8168_mdio_write(tp, 0x06, 0x3802);
-        rtl8168_mdio_write(tp, 0x06, 0xae06);
-        rtl8168_mdio_write(tp, 0x06, 0x0283);
-        rtl8168_mdio_write(tp, 0x06, 0x1802);
-        rtl8168_mdio_write(tp, 0x06, 0x8360);
-        rtl8168_mdio_write(tp, 0x06, 0x021a);
-        rtl8168_mdio_write(tp, 0x06, 0xc6fd);
-        rtl8168_mdio_write(tp, 0x06, 0xfc04);
-        rtl8168_mdio_write(tp, 0x06, 0xf8e1);
-        rtl8168_mdio_write(tp, 0x06, 0x8af4);
-        rtl8168_mdio_write(tp, 0x06, 0xe08b);
-        rtl8168_mdio_write(tp, 0x06, 0x81ad);
-        rtl8168_mdio_write(tp, 0x06, 0x2605);
-        rtl8168_mdio_write(tp, 0x06, 0x0222);
-        rtl8168_mdio_write(tp, 0x06, 0xa4f7);
-        rtl8168_mdio_write(tp, 0x06, 0x28e0);
-        rtl8168_mdio_write(tp, 0x06, 0x8b81);
-        rtl8168_mdio_write(tp, 0x06, 0xad21);
-        rtl8168_mdio_write(tp, 0x06, 0x0502);
-        rtl8168_mdio_write(tp, 0x06, 0x23a9);
-        rtl8168_mdio_write(tp, 0x06, 0xf729);
-        rtl8168_mdio_write(tp, 0x06, 0xe08b);
-        rtl8168_mdio_write(tp, 0x06, 0x85ad);
-        rtl8168_mdio_write(tp, 0x06, 0x2005);
-        rtl8168_mdio_write(tp, 0x06, 0x0214);
-        rtl8168_mdio_write(tp, 0x06, 0xabf7);
-        rtl8168_mdio_write(tp, 0x06, 0x2ae0);
-        rtl8168_mdio_write(tp, 0x06, 0x8b85);
-        rtl8168_mdio_write(tp, 0x06, 0xad23);
-        rtl8168_mdio_write(tp, 0x06, 0x0502);
-        rtl8168_mdio_write(tp, 0x06, 0x12e7);
-        rtl8168_mdio_write(tp, 0x06, 0xf72b);
-        rtl8168_mdio_write(tp, 0x06, 0xe08b);
-        rtl8168_mdio_write(tp, 0x06, 0x87ad);
-        rtl8168_mdio_write(tp, 0x06, 0x2405);
-        rtl8168_mdio_write(tp, 0x06, 0x0283);
-        rtl8168_mdio_write(tp, 0x06, 0xbcf7);
-        rtl8168_mdio_write(tp, 0x06, 0x2ce5);
-        rtl8168_mdio_write(tp, 0x06, 0x8af4);
-        rtl8168_mdio_write(tp, 0x06, 0xfc04);
-        rtl8168_mdio_write(tp, 0x06, 0xf8e0);
-        rtl8168_mdio_write(tp, 0x06, 0x8b81);
-        rtl8168_mdio_write(tp, 0x06, 0xad26);
-        rtl8168_mdio_write(tp, 0x06, 0x0302);
-        rtl8168_mdio_write(tp, 0x06, 0x21e5);
-        rtl8168_mdio_write(tp, 0x06, 0xe08b);
-        rtl8168_mdio_write(tp, 0x06, 0x81ad);
-        rtl8168_mdio_write(tp, 0x06, 0x2109);
-        rtl8168_mdio_write(tp, 0x06, 0xe08a);
-        rtl8168_mdio_write(tp, 0x06, 0xf4ac);
-        rtl8168_mdio_write(tp, 0x06, 0x2003);
-        rtl8168_mdio_write(tp, 0x06, 0x0223);
-        rtl8168_mdio_write(tp, 0x06, 0x98e0);
-        rtl8168_mdio_write(tp, 0x06, 0x8b85);
-        rtl8168_mdio_write(tp, 0x06, 0xad20);
-        rtl8168_mdio_write(tp, 0x06, 0x09e0);
-        rtl8168_mdio_write(tp, 0x06, 0x8af4);
-        rtl8168_mdio_write(tp, 0x06, 0xac21);
-        rtl8168_mdio_write(tp, 0x06, 0x0302);
-        rtl8168_mdio_write(tp, 0x06, 0x13fb);
-        rtl8168_mdio_write(tp, 0x06, 0xe08b);
-        rtl8168_mdio_write(tp, 0x06, 0x85ad);
-        rtl8168_mdio_write(tp, 0x06, 0x2309);
-        rtl8168_mdio_write(tp, 0x06, 0xe08a);
-        rtl8168_mdio_write(tp, 0x06, 0xf4ac);
-        rtl8168_mdio_write(tp, 0x06, 0x2203);
-        rtl8168_mdio_write(tp, 0x06, 0x0212);
-        rtl8168_mdio_write(tp, 0x06, 0xfae0);
-        rtl8168_mdio_write(tp, 0x06, 0x8b87);
-        rtl8168_mdio_write(tp, 0x06, 0xad24);
-        rtl8168_mdio_write(tp, 0x06, 0x09e0);
-        rtl8168_mdio_write(tp, 0x06, 0x8af4);
-        rtl8168_mdio_write(tp, 0x06, 0xac23);
-        rtl8168_mdio_write(tp, 0x06, 0x0302);
-        rtl8168_mdio_write(tp, 0x06, 0x83c1);
-        rtl8168_mdio_write(tp, 0x06, 0xfc04);
-        rtl8168_mdio_write(tp, 0x06, 0xf8e1);
-        rtl8168_mdio_write(tp, 0x06, 0x8af4);
-        rtl8168_mdio_write(tp, 0x06, 0xe08b);
-        rtl8168_mdio_write(tp, 0x06, 0x81ad);
-        rtl8168_mdio_write(tp, 0x06, 0x2608);
-        rtl8168_mdio_write(tp, 0x06, 0xe083);
-        rtl8168_mdio_write(tp, 0x06, 0xd2ad);
-        rtl8168_mdio_write(tp, 0x06, 0x2502);
-        rtl8168_mdio_write(tp, 0x06, 0xf628);
-        rtl8168_mdio_write(tp, 0x06, 0xe08b);
-        rtl8168_mdio_write(tp, 0x06, 0x81ad);
-        rtl8168_mdio_write(tp, 0x06, 0x210a);
-        rtl8168_mdio_write(tp, 0x06, 0xe084);
-        rtl8168_mdio_write(tp, 0x06, 0x0af6);
-        rtl8168_mdio_write(tp, 0x06, 0x27a0);
-        rtl8168_mdio_write(tp, 0x06, 0x0502);
-        rtl8168_mdio_write(tp, 0x06, 0xf629);
-        rtl8168_mdio_write(tp, 0x06, 0xe08b);
-        rtl8168_mdio_write(tp, 0x06, 0x85ad);
-        rtl8168_mdio_write(tp, 0x06, 0x2008);
-        rtl8168_mdio_write(tp, 0x06, 0xe08a);
-        rtl8168_mdio_write(tp, 0x06, 0xe8ad);
-        rtl8168_mdio_write(tp, 0x06, 0x2102);
-        rtl8168_mdio_write(tp, 0x06, 0xf62a);
-        rtl8168_mdio_write(tp, 0x06, 0xe08b);
-        rtl8168_mdio_write(tp, 0x06, 0x85ad);
-        rtl8168_mdio_write(tp, 0x06, 0x2308);
-        rtl8168_mdio_write(tp, 0x06, 0xe08b);
-        rtl8168_mdio_write(tp, 0x06, 0x20a0);
-        rtl8168_mdio_write(tp, 0x06, 0x0302);
-        rtl8168_mdio_write(tp, 0x06, 0xf62b);
-        rtl8168_mdio_write(tp, 0x06, 0xe08b);
-        rtl8168_mdio_write(tp, 0x06, 0x87ad);
-        rtl8168_mdio_write(tp, 0x06, 0x2408);
-        rtl8168_mdio_write(tp, 0x06, 0xe086);
-        rtl8168_mdio_write(tp, 0x06, 0x02a0);
-        rtl8168_mdio_write(tp, 0x06, 0x0302);
-        rtl8168_mdio_write(tp, 0x06, 0xf62c);
-        rtl8168_mdio_write(tp, 0x06, 0xe58a);
-        rtl8168_mdio_write(tp, 0x06, 0xf4a1);
-        rtl8168_mdio_write(tp, 0x06, 0x0008);
-        rtl8168_mdio_write(tp, 0x06, 0xd100);
-        rtl8168_mdio_write(tp, 0x06, 0xbf21);
-        rtl8168_mdio_write(tp, 0x06, 0xd502);
-        rtl8168_mdio_write(tp, 0x06, 0x3723);
-        rtl8168_mdio_write(tp, 0x06, 0xfc04);
-        rtl8168_mdio_write(tp, 0x06, 0xee86);
-        rtl8168_mdio_write(tp, 0x06, 0x0200);
-        rtl8168_mdio_write(tp, 0x06, 0x04f8);
-        rtl8168_mdio_write(tp, 0x06, 0xe08b);
-        rtl8168_mdio_write(tp, 0x06, 0x87ad);
-        rtl8168_mdio_write(tp, 0x06, 0x241e);
-        rtl8168_mdio_write(tp, 0x06, 0xe086);
-        rtl8168_mdio_write(tp, 0x06, 0x02a0);
-        rtl8168_mdio_write(tp, 0x06, 0x0005);
-        rtl8168_mdio_write(tp, 0x06, 0x0283);
-        rtl8168_mdio_write(tp, 0x06, 0xe8ae);
-        rtl8168_mdio_write(tp, 0x06, 0xf5a0);
-        rtl8168_mdio_write(tp, 0x06, 0x0105);
-        rtl8168_mdio_write(tp, 0x06, 0x0283);
-        rtl8168_mdio_write(tp, 0x06, 0xf8ae);
-        rtl8168_mdio_write(tp, 0x06, 0x0ba0);
-        rtl8168_mdio_write(tp, 0x06, 0x0205);
-        rtl8168_mdio_write(tp, 0x06, 0x0284);
-        rtl8168_mdio_write(tp, 0x06, 0x14ae);
-        rtl8168_mdio_write(tp, 0x06, 0x03a0);
-        rtl8168_mdio_write(tp, 0x06, 0x0300);
-        rtl8168_mdio_write(tp, 0x06, 0xfc04);
-        rtl8168_mdio_write(tp, 0x06, 0xf8fa);
-        rtl8168_mdio_write(tp, 0x06, 0xef69);
-        rtl8168_mdio_write(tp, 0x06, 0x0284);
-        rtl8168_mdio_write(tp, 0x06, 0x2bee);
-        rtl8168_mdio_write(tp, 0x06, 0x8602);
-        rtl8168_mdio_write(tp, 0x06, 0x01ef);
-        rtl8168_mdio_write(tp, 0x06, 0x96fe);
-        rtl8168_mdio_write(tp, 0x06, 0xfc04);
-        rtl8168_mdio_write(tp, 0x06, 0xf8ee);
-        rtl8168_mdio_write(tp, 0x06, 0x8609);
-        rtl8168_mdio_write(tp, 0x06, 0x0002);
-        rtl8168_mdio_write(tp, 0x06, 0x8461);
-        rtl8168_mdio_write(tp, 0x06, 0xfc04);
-        rtl8168_mdio_write(tp, 0x06, 0xae10);
-        rtl8168_mdio_write(tp, 0x06, 0x0000);
-        rtl8168_mdio_write(tp, 0x06, 0x0000);
-        rtl8168_mdio_write(tp, 0x06, 0x0000);
-        rtl8168_mdio_write(tp, 0x06, 0x0000);
-        rtl8168_mdio_write(tp, 0x06, 0x0000);
-        rtl8168_mdio_write(tp, 0x06, 0x0000);
-        rtl8168_mdio_write(tp, 0x06, 0x0000);
-        rtl8168_mdio_write(tp, 0x06, 0x0000);
-        rtl8168_mdio_write(tp, 0x06, 0xf8e0);
-        rtl8168_mdio_write(tp, 0x06, 0x8608);
-        rtl8168_mdio_write(tp, 0x06, 0xe186);
-        rtl8168_mdio_write(tp, 0x06, 0x091f);
-        rtl8168_mdio_write(tp, 0x06, 0x019e);
-        rtl8168_mdio_write(tp, 0x06, 0x0611);
-        rtl8168_mdio_write(tp, 0x06, 0xe586);
-        rtl8168_mdio_write(tp, 0x06, 0x09ae);
-        rtl8168_mdio_write(tp, 0x06, 0x04ee);
-        rtl8168_mdio_write(tp, 0x06, 0x8602);
-        rtl8168_mdio_write(tp, 0x06, 0x01fc);
-        rtl8168_mdio_write(tp, 0x06, 0x04f8);
-        rtl8168_mdio_write(tp, 0x06, 0xf9fa);
-        rtl8168_mdio_write(tp, 0x06, 0xef69);
-        rtl8168_mdio_write(tp, 0x06, 0xfbbf);
-        rtl8168_mdio_write(tp, 0x06, 0x8604);
-        rtl8168_mdio_write(tp, 0x06, 0xef79);
-        rtl8168_mdio_write(tp, 0x06, 0xd200);
-        rtl8168_mdio_write(tp, 0x06, 0xd400);
-        rtl8168_mdio_write(tp, 0x06, 0x221e);
-        rtl8168_mdio_write(tp, 0x06, 0x02bf);
-        rtl8168_mdio_write(tp, 0x06, 0x2fec);
-        rtl8168_mdio_write(tp, 0x06, 0x0237);
-        rtl8168_mdio_write(tp, 0x06, 0x23bf);
-        rtl8168_mdio_write(tp, 0x06, 0x13f2);
-        rtl8168_mdio_write(tp, 0x06, 0x0236);
-        rtl8168_mdio_write(tp, 0x06, 0xf60d);
-        rtl8168_mdio_write(tp, 0x06, 0x4559);
-        rtl8168_mdio_write(tp, 0x06, 0x1fef);
-        rtl8168_mdio_write(tp, 0x06, 0x97dd);
-        rtl8168_mdio_write(tp, 0x06, 0xd308);
-        rtl8168_mdio_write(tp, 0x06, 0x1a93);
-        rtl8168_mdio_write(tp, 0x06, 0xdd12);
-        rtl8168_mdio_write(tp, 0x06, 0x17a2);
-        rtl8168_mdio_write(tp, 0x06, 0x04de);
-        rtl8168_mdio_write(tp, 0x06, 0xffef);
-        rtl8168_mdio_write(tp, 0x06, 0x96fe);
-        rtl8168_mdio_write(tp, 0x06, 0xfdfc);
-        rtl8168_mdio_write(tp, 0x06, 0x04f8);
-        rtl8168_mdio_write(tp, 0x06, 0xf9fa);
-        rtl8168_mdio_write(tp, 0x06, 0xef69);
-        rtl8168_mdio_write(tp, 0x06, 0xfbee);
-        rtl8168_mdio_write(tp, 0x06, 0x8602);
-        rtl8168_mdio_write(tp, 0x06, 0x03d5);
-        rtl8168_mdio_write(tp, 0x06, 0x0080);
-        rtl8168_mdio_write(tp, 0x06, 0xbf86);
-        rtl8168_mdio_write(tp, 0x06, 0x04ef);
-        rtl8168_mdio_write(tp, 0x06, 0x79ef);
-        rtl8168_mdio_write(tp, 0x06, 0x45bf);
-        rtl8168_mdio_write(tp, 0x06, 0x2fec);
-        rtl8168_mdio_write(tp, 0x06, 0x0237);
-        rtl8168_mdio_write(tp, 0x06, 0x23bf);
-        rtl8168_mdio_write(tp, 0x06, 0x13f2);
-        rtl8168_mdio_write(tp, 0x06, 0x0236);
-        rtl8168_mdio_write(tp, 0x06, 0xf6ad);
-        rtl8168_mdio_write(tp, 0x06, 0x2702);
-        rtl8168_mdio_write(tp, 0x06, 0x78ff);
-        rtl8168_mdio_write(tp, 0x06, 0xe186);
-        rtl8168_mdio_write(tp, 0x06, 0x0a1b);
-        rtl8168_mdio_write(tp, 0x06, 0x01aa);
-        rtl8168_mdio_write(tp, 0x06, 0x2eef);
-        rtl8168_mdio_write(tp, 0x06, 0x97d9);
-        rtl8168_mdio_write(tp, 0x06, 0x7900);
-        rtl8168_mdio_write(tp, 0x06, 0x9e2b);
-        rtl8168_mdio_write(tp, 0x06, 0x81dd);
-        rtl8168_mdio_write(tp, 0x06, 0xbf85);
-        rtl8168_mdio_write(tp, 0x06, 0xad02);
-        rtl8168_mdio_write(tp, 0x06, 0x3723);
-        rtl8168_mdio_write(tp, 0x06, 0xd101);
-        rtl8168_mdio_write(tp, 0x06, 0xef02);
-        rtl8168_mdio_write(tp, 0x06, 0x100c);
-        rtl8168_mdio_write(tp, 0x06, 0x11b0);
-        rtl8168_mdio_write(tp, 0x06, 0xfc0d);
-        rtl8168_mdio_write(tp, 0x06, 0x11bf);
-        rtl8168_mdio_write(tp, 0x06, 0x85aa);
-        rtl8168_mdio_write(tp, 0x06, 0x0237);
-        rtl8168_mdio_write(tp, 0x06, 0x23d1);
-        rtl8168_mdio_write(tp, 0x06, 0x00bf);
-        rtl8168_mdio_write(tp, 0x06, 0x85aa);
-        rtl8168_mdio_write(tp, 0x06, 0x0237);
-        rtl8168_mdio_write(tp, 0x06, 0x23ee);
-        rtl8168_mdio_write(tp, 0x06, 0x8602);
-        rtl8168_mdio_write(tp, 0x06, 0x02ae);
-        rtl8168_mdio_write(tp, 0x06, 0x0413);
-        rtl8168_mdio_write(tp, 0x06, 0xa38b);
-        rtl8168_mdio_write(tp, 0x06, 0xb4d3);
-        rtl8168_mdio_write(tp, 0x06, 0x8012);
-        rtl8168_mdio_write(tp, 0x06, 0x17a2);
-        rtl8168_mdio_write(tp, 0x06, 0x04ad);
-        rtl8168_mdio_write(tp, 0x06, 0xffef);
-        rtl8168_mdio_write(tp, 0x06, 0x96fe);
-        rtl8168_mdio_write(tp, 0x06, 0xfdfc);
-        rtl8168_mdio_write(tp, 0x06, 0x04f8);
-        rtl8168_mdio_write(tp, 0x06, 0xf9e0);
-        rtl8168_mdio_write(tp, 0x06, 0x8b85);
-        rtl8168_mdio_write(tp, 0x06, 0xad25);
-        rtl8168_mdio_write(tp, 0x06, 0x48e0);
-        rtl8168_mdio_write(tp, 0x06, 0x8a96);
-        rtl8168_mdio_write(tp, 0x06, 0xe18a);
-        rtl8168_mdio_write(tp, 0x06, 0x977c);
-        rtl8168_mdio_write(tp, 0x06, 0x0000);
-        rtl8168_mdio_write(tp, 0x06, 0x9e35);
-        rtl8168_mdio_write(tp, 0x06, 0xee8a);
-        rtl8168_mdio_write(tp, 0x06, 0x9600);
-        rtl8168_mdio_write(tp, 0x06, 0xee8a);
-        rtl8168_mdio_write(tp, 0x06, 0x9700);
-        rtl8168_mdio_write(tp, 0x06, 0xe08a);
-        rtl8168_mdio_write(tp, 0x06, 0xbee1);
-        rtl8168_mdio_write(tp, 0x06, 0x8abf);
-        rtl8168_mdio_write(tp, 0x06, 0xe286);
-        rtl8168_mdio_write(tp, 0x06, 0x10e3);
-        rtl8168_mdio_write(tp, 0x06, 0x8611);
-        rtl8168_mdio_write(tp, 0x06, 0x0236);
-        rtl8168_mdio_write(tp, 0x06, 0x1aad);
-        rtl8168_mdio_write(tp, 0x06, 0x2012);
-        rtl8168_mdio_write(tp, 0x06, 0xee8a);
-        rtl8168_mdio_write(tp, 0x06, 0x9603);
-        rtl8168_mdio_write(tp, 0x06, 0xee8a);
-        rtl8168_mdio_write(tp, 0x06, 0x97b7);
-        rtl8168_mdio_write(tp, 0x06, 0xee86);
-        rtl8168_mdio_write(tp, 0x06, 0x1000);
-        rtl8168_mdio_write(tp, 0x06, 0xee86);
-        rtl8168_mdio_write(tp, 0x06, 0x1100);
-        rtl8168_mdio_write(tp, 0x06, 0xae11);
-        rtl8168_mdio_write(tp, 0x06, 0x15e6);
-        rtl8168_mdio_write(tp, 0x06, 0x8610);
-        rtl8168_mdio_write(tp, 0x06, 0xe786);
-        rtl8168_mdio_write(tp, 0x06, 0x11ae);
-        rtl8168_mdio_write(tp, 0x06, 0x08ee);
-        rtl8168_mdio_write(tp, 0x06, 0x8610);
-        rtl8168_mdio_write(tp, 0x06, 0x00ee);
-        rtl8168_mdio_write(tp, 0x06, 0x8611);
-        rtl8168_mdio_write(tp, 0x06, 0x00fd);
-        rtl8168_mdio_write(tp, 0x06, 0xfc04);
-        rtl8168_mdio_write(tp, 0x06, 0xf8fa);
-        rtl8168_mdio_write(tp, 0x06, 0xef69);
-        rtl8168_mdio_write(tp, 0x06, 0xe0e0);
-        rtl8168_mdio_write(tp, 0x06, 0x00e1);
-        rtl8168_mdio_write(tp, 0x06, 0xe001);
-        rtl8168_mdio_write(tp, 0x06, 0xad27);
-        rtl8168_mdio_write(tp, 0x06, 0x32e0);
-        rtl8168_mdio_write(tp, 0x06, 0x8b40);
-        rtl8168_mdio_write(tp, 0x06, 0xf720);
-        rtl8168_mdio_write(tp, 0x06, 0xe48b);
-        rtl8168_mdio_write(tp, 0x06, 0x40bf);
-        rtl8168_mdio_write(tp, 0x06, 0x31f5);
-        rtl8168_mdio_write(tp, 0x06, 0x0236);
-        rtl8168_mdio_write(tp, 0x06, 0xf6ad);
-        rtl8168_mdio_write(tp, 0x06, 0x2821);
-        rtl8168_mdio_write(tp, 0x06, 0xe0e0);
-        rtl8168_mdio_write(tp, 0x06, 0x20e1);
-        rtl8168_mdio_write(tp, 0x06, 0xe021);
-        rtl8168_mdio_write(tp, 0x06, 0xad20);
-        rtl8168_mdio_write(tp, 0x06, 0x18e0);
-        rtl8168_mdio_write(tp, 0x06, 0x8b40);
-        rtl8168_mdio_write(tp, 0x06, 0xf620);
-        rtl8168_mdio_write(tp, 0x06, 0xe48b);
-        rtl8168_mdio_write(tp, 0x06, 0x40ee);
-        rtl8168_mdio_write(tp, 0x06, 0x8b3b);
-        rtl8168_mdio_write(tp, 0x06, 0xffe0);
-        rtl8168_mdio_write(tp, 0x06, 0x8a8a);
-        rtl8168_mdio_write(tp, 0x06, 0xe18a);
-        rtl8168_mdio_write(tp, 0x06, 0x8be4);
-        rtl8168_mdio_write(tp, 0x06, 0xe000);
-        rtl8168_mdio_write(tp, 0x06, 0xe5e0);
-        rtl8168_mdio_write(tp, 0x06, 0x01ef);
-        rtl8168_mdio_write(tp, 0x06, 0x96fe);
-        rtl8168_mdio_write(tp, 0x06, 0xfc04);
-        rtl8168_mdio_write(tp, 0x06, 0xf8fa);
-        rtl8168_mdio_write(tp, 0x06, 0xef69);
-        rtl8168_mdio_write(tp, 0x06, 0xe08b);
-        rtl8168_mdio_write(tp, 0x06, 0x80ad);
-        rtl8168_mdio_write(tp, 0x06, 0x2722);
-        rtl8168_mdio_write(tp, 0x06, 0xbf44);
-        rtl8168_mdio_write(tp, 0x06, 0xfc02);
-        rtl8168_mdio_write(tp, 0x06, 0x36f6);
-        rtl8168_mdio_write(tp, 0x06, 0xe08b);
-        rtl8168_mdio_write(tp, 0x06, 0x441f);
-        rtl8168_mdio_write(tp, 0x06, 0x019e);
-        rtl8168_mdio_write(tp, 0x06, 0x15e5);
-        rtl8168_mdio_write(tp, 0x06, 0x8b44);
-        rtl8168_mdio_write(tp, 0x06, 0xad29);
-        rtl8168_mdio_write(tp, 0x06, 0x07ac);
-        rtl8168_mdio_write(tp, 0x06, 0x2804);
-        rtl8168_mdio_write(tp, 0x06, 0xd101);
-        rtl8168_mdio_write(tp, 0x06, 0xae02);
-        rtl8168_mdio_write(tp, 0x06, 0xd100);
-        rtl8168_mdio_write(tp, 0x06, 0xbf85);
-        rtl8168_mdio_write(tp, 0x06, 0xb002);
-        rtl8168_mdio_write(tp, 0x06, 0x3723);
-        rtl8168_mdio_write(tp, 0x06, 0xef96);
-        rtl8168_mdio_write(tp, 0x06, 0xfefc);
-        rtl8168_mdio_write(tp, 0x06, 0x0400);
-        rtl8168_mdio_write(tp, 0x06, 0xe140);
-        rtl8168_mdio_write(tp, 0x06, 0x77e1);
-        rtl8168_mdio_write(tp, 0x06, 0x40dd);
-        rtl8168_mdio_write(tp, 0x06, 0xe022);
-        rtl8168_mdio_write(tp, 0x06, 0x32e1);
-        rtl8168_mdio_write(tp, 0x06, 0x5074);
-        rtl8168_mdio_write(tp, 0x06, 0xe144);
-        rtl8168_mdio_write(tp, 0x06, 0xffe0);
-        rtl8168_mdio_write(tp, 0x06, 0xdaff);
-        rtl8168_mdio_write(tp, 0x06, 0xe0c0);
-        rtl8168_mdio_write(tp, 0x06, 0x52e0);
-        rtl8168_mdio_write(tp, 0x06, 0xeed9);
-        rtl8168_mdio_write(tp, 0x06, 0xe04c);
-        rtl8168_mdio_write(tp, 0x06, 0xbbe0);
-        rtl8168_mdio_write(tp, 0x06, 0x2a00);
-        rtl8168_mdio_write(tp, 0x05, 0xe142);
-        gphy_val = rtl8168_mdio_read(tp, 0x06);
-        gphy_val |= BIT_0;
-        rtl8168_mdio_write(tp, 0x06, gphy_val);
-        rtl8168_mdio_write(tp, 0x05, 0xe140);
-        gphy_val = rtl8168_mdio_read(tp, 0x06);
-        gphy_val |= BIT_0;
-        rtl8168_mdio_write(tp, 0x06, gphy_val);
-        rtl8168_mdio_write(tp, 0x1f, 0x0000);
-        rtl8168_mdio_write(tp, 0x1f, 0x0005);
-        for (i = 0; i < 200; i++) {
-                udelay(100);
-                gphy_val = rtl8168_mdio_read(tp, 0x00);
-                if (gphy_val & BIT_7)
-                        break;
-        }
-        rtl8168_mdio_write(tp, 0x1f, 0x0007);
-        rtl8168_mdio_write(tp, 0x1e, 0x0042);
-        rtl8168_mdio_write(tp, 0x18, 0x2300);
-        rtl8168_mdio_write(tp, 0x1f, 0x0000);
-        rtl8168_mdio_write(tp, 0x1f, 0x0007);
-        rtl8168_mdio_write(tp, 0x1e, 0x0023);
-        if (tp->RequiredSecLanDonglePatch) {
-                gphy_val = rtl8168_mdio_read(tp, 0x17);
-                gphy_val &= ~BIT_2;
-                rtl8168_mdio_write(tp, 0x17, gphy_val);
-        }
-
-        rtl8168_mdio_write(tp, 0x1f, 0x0000);
-        rtl8168_mdio_write(tp, 0x00, 0x9200);
-}
-
-static void
-rtl8168_set_phy_mcu_8168f_1(struct net_device *dev)
-{
-        struct rtl8168_private *tp = netdev_priv(dev);
-        unsigned int gphy_val,i;
-
-        rtl8168_mdio_write(tp,0x1f, 0x0000);
-        rtl8168_mdio_write(tp,0x00, 0x1800);
-        gphy_val = rtl8168_mdio_read(tp, 0x15);
-        gphy_val &= ~(BIT_12);
-        rtl8168_mdio_write(tp,0x15, gphy_val);
-        rtl8168_mdio_write(tp,0x00, 0x4800);
-        rtl8168_mdio_write(tp,0x1f, 0x0007);
-        rtl8168_mdio_write(tp,0x1e, 0x002f);
-        for (i = 0; i < 1000; i++) {
-                udelay(100);
-                gphy_val = rtl8168_mdio_read(tp, 0x1c);
-                if (gphy_val & 0x0080)
-                        break;
-        }
-        rtl8168_mdio_write(tp,0x1f, 0x0000);
-        rtl8168_mdio_write(tp,0x00, 0x1800);
-        rtl8168_mdio_write(tp,0x1f, 0x0007);
-        rtl8168_mdio_write(tp,0x1e, 0x0023);
-        for (i = 0; i < 200; i++) {
-                udelay(100);
-                gphy_val = rtl8168_mdio_read(tp, 0x18);
-                if (!(gphy_val & 0x0001))
-                        break;
-        }
-        rtl8168_mdio_write(tp, 0x1f, 0x0005);
-        rtl8168_mdio_write(tp, 0x05, 0xfff6);
-        rtl8168_mdio_write(tp, 0x06, 0x0080);
-        rtl8168_mdio_write(tp, 0x1f, 0x0007);
-        rtl8168_mdio_write(tp, 0x1e, 0x0023);
-        rtl8168_mdio_write(tp, 0x16, 0x0306);
-        rtl8168_mdio_write(tp, 0x16, 0x0307);
-        rtl8168_mdio_write(tp, 0x15, 0x0194);
-        rtl8168_mdio_write(tp, 0x19, 0x407D);
-        rtl8168_mdio_write(tp, 0x15, 0x0098);
-        rtl8168_mdio_write(tp, 0x19, 0x7c0b);
-        rtl8168_mdio_write(tp, 0x15, 0x0099);
-        rtl8168_mdio_write(tp, 0x19, 0x6c0b);
-        rtl8168_mdio_write(tp, 0x15, 0x00eb);
-        rtl8168_mdio_write(tp, 0x19, 0x6c0b);
-        rtl8168_mdio_write(tp, 0x15, 0x00f8);
-        rtl8168_mdio_write(tp, 0x19, 0x6f0b);
-        rtl8168_mdio_write(tp, 0x15, 0x00fe);
-        rtl8168_mdio_write(tp, 0x19, 0x6f0f);
-        rtl8168_mdio_write(tp, 0x15, 0x00db);
-        rtl8168_mdio_write(tp, 0x19, 0x6f09);
-        rtl8168_mdio_write(tp, 0x15, 0x00dc);
-        rtl8168_mdio_write(tp, 0x19, 0xaefd);
-        rtl8168_mdio_write(tp, 0x15, 0x00dd);
-        rtl8168_mdio_write(tp, 0x19, 0x6f0b);
-        rtl8168_mdio_write(tp, 0x15, 0x00de);
-        rtl8168_mdio_write(tp, 0x19, 0xc60b);
-        rtl8168_mdio_write(tp, 0x15, 0x00df);
-        rtl8168_mdio_write(tp, 0x19, 0x00fa);
-        rtl8168_mdio_write(tp, 0x15, 0x00e0);
-        rtl8168_mdio_write(tp, 0x19, 0x30e1);
-        rtl8168_mdio_write(tp, 0x15, 0x020c);
-        rtl8168_mdio_write(tp, 0x19, 0x3224);
-        rtl8168_mdio_write(tp, 0x15, 0x020e);
-        rtl8168_mdio_write(tp, 0x19, 0x9813);
-        rtl8168_mdio_write(tp, 0x15, 0x020f);
-        rtl8168_mdio_write(tp, 0x19, 0x7801);
-        rtl8168_mdio_write(tp, 0x15, 0x0210);
-        rtl8168_mdio_write(tp, 0x19, 0x930f);
-        rtl8168_mdio_write(tp, 0x15, 0x0211);
-        rtl8168_mdio_write(tp, 0x19, 0x9206);
-        rtl8168_mdio_write(tp, 0x15, 0x0212);
-        rtl8168_mdio_write(tp, 0x19, 0x4002);
-        rtl8168_mdio_write(tp, 0x15, 0x0213);
-        rtl8168_mdio_write(tp, 0x19, 0x7800);
-        rtl8168_mdio_write(tp, 0x15, 0x0214);
-        rtl8168_mdio_write(tp, 0x19, 0x588f);
-        rtl8168_mdio_write(tp, 0x15, 0x0215);
-        rtl8168_mdio_write(tp, 0x19, 0x5520);
-        rtl8168_mdio_write(tp, 0x15, 0x0216);
-        rtl8168_mdio_write(tp, 0x19, 0x3224);
-        rtl8168_mdio_write(tp, 0x15, 0x0217);
-        rtl8168_mdio_write(tp, 0x19, 0x4002);
-        rtl8168_mdio_write(tp, 0x15, 0x0218);
-        rtl8168_mdio_write(tp, 0x19, 0x7800);
-        rtl8168_mdio_write(tp, 0x15, 0x0219);
-        rtl8168_mdio_write(tp, 0x19, 0x588d);
-        rtl8168_mdio_write(tp, 0x15, 0x021a);
-        rtl8168_mdio_write(tp, 0x19, 0x5540);
-        rtl8168_mdio_write(tp, 0x15, 0x021b);
-        rtl8168_mdio_write(tp, 0x19, 0x9e03);
-        rtl8168_mdio_write(tp, 0x15, 0x021c);
-        rtl8168_mdio_write(tp, 0x19, 0x7c40);
-        rtl8168_mdio_write(tp, 0x15, 0x021d);
-        rtl8168_mdio_write(tp, 0x19, 0x6840);
-        rtl8168_mdio_write(tp, 0x15, 0x021e);
-        rtl8168_mdio_write(tp, 0x19, 0x3224);
-        rtl8168_mdio_write(tp, 0x15, 0x021f);
-        rtl8168_mdio_write(tp, 0x19, 0x4002);
-        rtl8168_mdio_write(tp, 0x15, 0x0220);
-        rtl8168_mdio_write(tp, 0x19, 0x3224);
-        rtl8168_mdio_write(tp, 0x15, 0x0221);
-        rtl8168_mdio_write(tp, 0x19, 0x9e03);
-        rtl8168_mdio_write(tp, 0x15, 0x0222);
-        rtl8168_mdio_write(tp, 0x19, 0x7c40);
-        rtl8168_mdio_write(tp, 0x15, 0x0223);
-        rtl8168_mdio_write(tp, 0x19, 0x6840);
-        rtl8168_mdio_write(tp, 0x15, 0x0224);
-        rtl8168_mdio_write(tp, 0x19, 0x7800);
-        rtl8168_mdio_write(tp, 0x15, 0x0225);
-        rtl8168_mdio_write(tp, 0x19, 0x3231);
-        rtl8168_mdio_write(tp, 0x15, 0x0000);
-        rtl8168_mdio_write(tp, 0x16, 0x0306);
-        rtl8168_mdio_write(tp, 0x16, 0x0300);
-        rtl8168_mdio_write(tp, 0x1f, 0x0000);
-        rtl8168_mdio_write(tp, 0x1f, 0x0005);
-        rtl8168_mdio_write(tp, 0x05, 0xfff6);
-        rtl8168_mdio_write(tp, 0x06, 0x0080);
-        rtl8168_mdio_write(tp, 0x05, 0x8000);
-        rtl8168_mdio_write(tp, 0x06, 0x0280);
-        rtl8168_mdio_write(tp, 0x06, 0x48f7);
-        rtl8168_mdio_write(tp, 0x06, 0x00e0);
-        rtl8168_mdio_write(tp, 0x06, 0xfff7);
-        rtl8168_mdio_write(tp, 0x06, 0xa080);
-        rtl8168_mdio_write(tp, 0x06, 0x02ae);
-        rtl8168_mdio_write(tp, 0x06, 0xf602);
-        rtl8168_mdio_write(tp, 0x06, 0x0118);
-        rtl8168_mdio_write(tp, 0x06, 0x0201);
-        rtl8168_mdio_write(tp, 0x06, 0x2502);
-        rtl8168_mdio_write(tp, 0x06, 0x8090);
-        rtl8168_mdio_write(tp, 0x06, 0x0201);
-        rtl8168_mdio_write(tp, 0x06, 0x4202);
-        rtl8168_mdio_write(tp, 0x06, 0x015c);
-        rtl8168_mdio_write(tp, 0x06, 0x0280);
-        rtl8168_mdio_write(tp, 0x06, 0xad02);
-        rtl8168_mdio_write(tp, 0x06, 0x80ca);
-        rtl8168_mdio_write(tp, 0x06, 0xe08b);
-        rtl8168_mdio_write(tp, 0x06, 0x88e1);
-        rtl8168_mdio_write(tp, 0x06, 0x8b89);
-        rtl8168_mdio_write(tp, 0x06, 0x1e01);
-        rtl8168_mdio_write(tp, 0x06, 0xe18b);
-        rtl8168_mdio_write(tp, 0x06, 0x8a1e);
-        rtl8168_mdio_write(tp, 0x06, 0x01e1);
-        rtl8168_mdio_write(tp, 0x06, 0x8b8b);
-        rtl8168_mdio_write(tp, 0x06, 0x1e01);
-        rtl8168_mdio_write(tp, 0x06, 0xe18b);
-        rtl8168_mdio_write(tp, 0x06, 0x8c1e);
-        rtl8168_mdio_write(tp, 0x06, 0x01e1);
-        rtl8168_mdio_write(tp, 0x06, 0x8b8d);
-        rtl8168_mdio_write(tp, 0x06, 0x1e01);
-        rtl8168_mdio_write(tp, 0x06, 0xe18b);
-        rtl8168_mdio_write(tp, 0x06, 0x8e1e);
-        rtl8168_mdio_write(tp, 0x06, 0x01a0);
-        rtl8168_mdio_write(tp, 0x06, 0x00c7);
-        rtl8168_mdio_write(tp, 0x06, 0xaebb);
-        rtl8168_mdio_write(tp, 0x06, 0xd484);
-        rtl8168_mdio_write(tp, 0x06, 0x3ce4);
-        rtl8168_mdio_write(tp, 0x06, 0x8b92);
-        rtl8168_mdio_write(tp, 0x06, 0xe58b);
-        rtl8168_mdio_write(tp, 0x06, 0x93ee);
-        rtl8168_mdio_write(tp, 0x06, 0x8ac8);
-        rtl8168_mdio_write(tp, 0x06, 0x03ee);
-        rtl8168_mdio_write(tp, 0x06, 0x8aca);
-        rtl8168_mdio_write(tp, 0x06, 0x60ee);
-        rtl8168_mdio_write(tp, 0x06, 0x8ac0);
-        rtl8168_mdio_write(tp, 0x06, 0x00ee);
-        rtl8168_mdio_write(tp, 0x06, 0x8ac1);
-        rtl8168_mdio_write(tp, 0x06, 0x00ee);
-        rtl8168_mdio_write(tp, 0x06, 0x8abe);
-        rtl8168_mdio_write(tp, 0x06, 0x07ee);
-        rtl8168_mdio_write(tp, 0x06, 0x8abf);
-        rtl8168_mdio_write(tp, 0x06, 0x73ee);
-        rtl8168_mdio_write(tp, 0x06, 0x8a95);
-        rtl8168_mdio_write(tp, 0x06, 0x02bf);
-        rtl8168_mdio_write(tp, 0x06, 0x8b88);
-        rtl8168_mdio_write(tp, 0x06, 0xec00);
-        rtl8168_mdio_write(tp, 0x06, 0x19a9);
-        rtl8168_mdio_write(tp, 0x06, 0x8b90);
-        rtl8168_mdio_write(tp, 0x06, 0xf9ee);
-        rtl8168_mdio_write(tp, 0x06, 0xfff6);
-        rtl8168_mdio_write(tp, 0x06, 0x00ee);
-        rtl8168_mdio_write(tp, 0x06, 0xfff7);
-        rtl8168_mdio_write(tp, 0x06, 0xfed1);
-        rtl8168_mdio_write(tp, 0x06, 0x00bf);
-        rtl8168_mdio_write(tp, 0x06, 0x85a4);
-        rtl8168_mdio_write(tp, 0x06, 0x0238);
-        rtl8168_mdio_write(tp, 0x06, 0x7dd1);
-        rtl8168_mdio_write(tp, 0x06, 0x01bf);
-        rtl8168_mdio_write(tp, 0x06, 0x85a7);
-        rtl8168_mdio_write(tp, 0x06, 0x0238);
-        rtl8168_mdio_write(tp, 0x06, 0x7d04);
-        rtl8168_mdio_write(tp, 0x06, 0xf8e0);
-        rtl8168_mdio_write(tp, 0x06, 0x8b8a);
-        rtl8168_mdio_write(tp, 0x06, 0xad20);
-        rtl8168_mdio_write(tp, 0x06, 0x14ee);
-        rtl8168_mdio_write(tp, 0x06, 0x8b8a);
-        rtl8168_mdio_write(tp, 0x06, 0x0002);
-        rtl8168_mdio_write(tp, 0x06, 0x204b);
-        rtl8168_mdio_write(tp, 0x06, 0xe0e4);
-        rtl8168_mdio_write(tp, 0x06, 0x26e1);
-        rtl8168_mdio_write(tp, 0x06, 0xe427);
-        rtl8168_mdio_write(tp, 0x06, 0xeee4);
-        rtl8168_mdio_write(tp, 0x06, 0x2623);
-        rtl8168_mdio_write(tp, 0x06, 0xe5e4);
-        rtl8168_mdio_write(tp, 0x06, 0x27fc);
-        rtl8168_mdio_write(tp, 0x06, 0x04f8);
-        rtl8168_mdio_write(tp, 0x06, 0xe08b);
-        rtl8168_mdio_write(tp, 0x06, 0x8dad);
-        rtl8168_mdio_write(tp, 0x06, 0x2014);
-        rtl8168_mdio_write(tp, 0x06, 0xee8b);
-        rtl8168_mdio_write(tp, 0x06, 0x8d00);
-        rtl8168_mdio_write(tp, 0x06, 0xe08a);
-        rtl8168_mdio_write(tp, 0x06, 0x5a78);
-        rtl8168_mdio_write(tp, 0x06, 0x039e);
-        rtl8168_mdio_write(tp, 0x06, 0x0902);
-        rtl8168_mdio_write(tp, 0x06, 0x05e8);
-        rtl8168_mdio_write(tp, 0x06, 0x0281);
-        rtl8168_mdio_write(tp, 0x06, 0x4f02);
-        rtl8168_mdio_write(tp, 0x06, 0x326c);
-        rtl8168_mdio_write(tp, 0x06, 0xfc04);
-        rtl8168_mdio_write(tp, 0x06, 0xf8e0);
-        rtl8168_mdio_write(tp, 0x06, 0x8b8e);
-        rtl8168_mdio_write(tp, 0x06, 0xad20);
-        rtl8168_mdio_write(tp, 0x06, 0x1df6);
-        rtl8168_mdio_write(tp, 0x06, 0x20e4);
-        rtl8168_mdio_write(tp, 0x06, 0x8b8e);
-        rtl8168_mdio_write(tp, 0x06, 0x022f);
-        rtl8168_mdio_write(tp, 0x06, 0x0902);
-        rtl8168_mdio_write(tp, 0x06, 0x2ab0);
-        rtl8168_mdio_write(tp, 0x06, 0x0285);
-        rtl8168_mdio_write(tp, 0x06, 0x1602);
-        rtl8168_mdio_write(tp, 0x06, 0x03ba);
-        rtl8168_mdio_write(tp, 0x06, 0x0284);
-        rtl8168_mdio_write(tp, 0x06, 0xe502);
-        rtl8168_mdio_write(tp, 0x06, 0x2df1);
-        rtl8168_mdio_write(tp, 0x06, 0x0283);
-        rtl8168_mdio_write(tp, 0x06, 0x8302);
-        rtl8168_mdio_write(tp, 0x06, 0x0475);
-        rtl8168_mdio_write(tp, 0x06, 0xe08b);
-        rtl8168_mdio_write(tp, 0x06, 0x8ead);
-        rtl8168_mdio_write(tp, 0x06, 0x210b);
-        rtl8168_mdio_write(tp, 0x06, 0xf621);
-        rtl8168_mdio_write(tp, 0x06, 0xe48b);
-        rtl8168_mdio_write(tp, 0x06, 0x8e02);
-        rtl8168_mdio_write(tp, 0x06, 0x83f8);
-        rtl8168_mdio_write(tp, 0x06, 0x021c);
-        rtl8168_mdio_write(tp, 0x06, 0x99e0);
-        rtl8168_mdio_write(tp, 0x06, 0x8b8e);
-        rtl8168_mdio_write(tp, 0x06, 0xad22);
-        rtl8168_mdio_write(tp, 0x06, 0x08f6);
-        rtl8168_mdio_write(tp, 0x06, 0x22e4);
-        rtl8168_mdio_write(tp, 0x06, 0x8b8e);
-        rtl8168_mdio_write(tp, 0x06, 0x0235);
-        rtl8168_mdio_write(tp, 0x06, 0x63e0);
-        rtl8168_mdio_write(tp, 0x06, 0x8b8e);
-        rtl8168_mdio_write(tp, 0x06, 0xad23);
-        rtl8168_mdio_write(tp, 0x06, 0x08f6);
-        rtl8168_mdio_write(tp, 0x06, 0x23e4);
-        rtl8168_mdio_write(tp, 0x06, 0x8b8e);
-        rtl8168_mdio_write(tp, 0x06, 0x0231);
-        rtl8168_mdio_write(tp, 0x06, 0x57e0);
-        rtl8168_mdio_write(tp, 0x06, 0x8b8e);
-        rtl8168_mdio_write(tp, 0x06, 0xad24);
-        rtl8168_mdio_write(tp, 0x06, 0x05f6);
-        rtl8168_mdio_write(tp, 0x06, 0x24e4);
-        rtl8168_mdio_write(tp, 0x06, 0x8b8e);
-        rtl8168_mdio_write(tp, 0x06, 0xe08b);
-        rtl8168_mdio_write(tp, 0x06, 0x8ead);
-        rtl8168_mdio_write(tp, 0x06, 0x2505);
-        rtl8168_mdio_write(tp, 0x06, 0xf625);
-        rtl8168_mdio_write(tp, 0x06, 0xe48b);
-        rtl8168_mdio_write(tp, 0x06, 0x8ee0);
-        rtl8168_mdio_write(tp, 0x06, 0x8b8e);
-        rtl8168_mdio_write(tp, 0x06, 0xad26);
-        rtl8168_mdio_write(tp, 0x06, 0x08f6);
-        rtl8168_mdio_write(tp, 0x06, 0x26e4);
-        rtl8168_mdio_write(tp, 0x06, 0x8b8e);
-        rtl8168_mdio_write(tp, 0x06, 0x022d);
-        rtl8168_mdio_write(tp, 0x06, 0x1ce0);
-        rtl8168_mdio_write(tp, 0x06, 0x8b8e);
-        rtl8168_mdio_write(tp, 0x06, 0xad27);
-        rtl8168_mdio_write(tp, 0x06, 0x05f6);
-        rtl8168_mdio_write(tp, 0x06, 0x27e4);
-        rtl8168_mdio_write(tp, 0x06, 0x8b8e);
-        rtl8168_mdio_write(tp, 0x06, 0x0203);
-        rtl8168_mdio_write(tp, 0x06, 0x80fc);
-        rtl8168_mdio_write(tp, 0x06, 0x04f8);
-        rtl8168_mdio_write(tp, 0x06, 0xf9e0);
-        rtl8168_mdio_write(tp, 0x06, 0x8b81);
-        rtl8168_mdio_write(tp, 0x06, 0xac26);
-        rtl8168_mdio_write(tp, 0x06, 0x1ae0);
-        rtl8168_mdio_write(tp, 0x06, 0x8b81);
-        rtl8168_mdio_write(tp, 0x06, 0xac21);
-        rtl8168_mdio_write(tp, 0x06, 0x14e0);
-        rtl8168_mdio_write(tp, 0x06, 0x8b85);
-        rtl8168_mdio_write(tp, 0x06, 0xac20);
-        rtl8168_mdio_write(tp, 0x06, 0x0ee0);
-        rtl8168_mdio_write(tp, 0x06, 0x8b85);
-        rtl8168_mdio_write(tp, 0x06, 0xac23);
-        rtl8168_mdio_write(tp, 0x06, 0x08e0);
-        rtl8168_mdio_write(tp, 0x06, 0x8b87);
-        rtl8168_mdio_write(tp, 0x06, 0xac24);
-        rtl8168_mdio_write(tp, 0x06, 0x02ae);
-        rtl8168_mdio_write(tp, 0x06, 0x3802);
-        rtl8168_mdio_write(tp, 0x06, 0x1ac2);
-        rtl8168_mdio_write(tp, 0x06, 0xeee4);
-        rtl8168_mdio_write(tp, 0x06, 0x1c04);
-        rtl8168_mdio_write(tp, 0x06, 0xeee4);
-        rtl8168_mdio_write(tp, 0x06, 0x1d04);
-        rtl8168_mdio_write(tp, 0x06, 0xe2e0);
-        rtl8168_mdio_write(tp, 0x06, 0x7ce3);
-        rtl8168_mdio_write(tp, 0x06, 0xe07d);
-        rtl8168_mdio_write(tp, 0x06, 0xe0e0);
-        rtl8168_mdio_write(tp, 0x06, 0x38e1);
-        rtl8168_mdio_write(tp, 0x06, 0xe039);
-        rtl8168_mdio_write(tp, 0x06, 0xad2e);
-        rtl8168_mdio_write(tp, 0x06, 0x1bad);
-        rtl8168_mdio_write(tp, 0x06, 0x390d);
-        rtl8168_mdio_write(tp, 0x06, 0xd101);
-        rtl8168_mdio_write(tp, 0x06, 0xbf22);
-        rtl8168_mdio_write(tp, 0x06, 0x7a02);
-        rtl8168_mdio_write(tp, 0x06, 0x387d);
-        rtl8168_mdio_write(tp, 0x06, 0x0281);
-        rtl8168_mdio_write(tp, 0x06, 0xacae);
-        rtl8168_mdio_write(tp, 0x06, 0x0bac);
-        rtl8168_mdio_write(tp, 0x06, 0x3802);
-        rtl8168_mdio_write(tp, 0x06, 0xae06);
-        rtl8168_mdio_write(tp, 0x06, 0x0281);
-        rtl8168_mdio_write(tp, 0x06, 0xe902);
-        rtl8168_mdio_write(tp, 0x06, 0x822e);
-        rtl8168_mdio_write(tp, 0x06, 0x021a);
-        rtl8168_mdio_write(tp, 0x06, 0xd3fd);
-        rtl8168_mdio_write(tp, 0x06, 0xfc04);
-        rtl8168_mdio_write(tp, 0x06, 0xf8e1);
-        rtl8168_mdio_write(tp, 0x06, 0x8af4);
-        rtl8168_mdio_write(tp, 0x06, 0xe08b);
-        rtl8168_mdio_write(tp, 0x06, 0x81ad);
-        rtl8168_mdio_write(tp, 0x06, 0x2602);
-        rtl8168_mdio_write(tp, 0x06, 0xf728);
-        rtl8168_mdio_write(tp, 0x06, 0xe08b);
-        rtl8168_mdio_write(tp, 0x06, 0x81ad);
-        rtl8168_mdio_write(tp, 0x06, 0x2105);
-        rtl8168_mdio_write(tp, 0x06, 0x0222);
-        rtl8168_mdio_write(tp, 0x06, 0x8ef7);
-        rtl8168_mdio_write(tp, 0x06, 0x29e0);
-        rtl8168_mdio_write(tp, 0x06, 0x8b85);
-        rtl8168_mdio_write(tp, 0x06, 0xad20);
-        rtl8168_mdio_write(tp, 0x06, 0x0502);
-        rtl8168_mdio_write(tp, 0x06, 0x14b8);
-        rtl8168_mdio_write(tp, 0x06, 0xf72a);
-        rtl8168_mdio_write(tp, 0x06, 0xe08b);
-        rtl8168_mdio_write(tp, 0x06, 0x85ad);
-        rtl8168_mdio_write(tp, 0x06, 0x2305);
-        rtl8168_mdio_write(tp, 0x06, 0x0212);
-        rtl8168_mdio_write(tp, 0x06, 0xf4f7);
-        rtl8168_mdio_write(tp, 0x06, 0x2be0);
-        rtl8168_mdio_write(tp, 0x06, 0x8b87);
-        rtl8168_mdio_write(tp, 0x06, 0xad24);
-        rtl8168_mdio_write(tp, 0x06, 0x0502);
-        rtl8168_mdio_write(tp, 0x06, 0x8284);
-        rtl8168_mdio_write(tp, 0x06, 0xf72c);
-        rtl8168_mdio_write(tp, 0x06, 0xe58a);
-        rtl8168_mdio_write(tp, 0x06, 0xf4fc);
-        rtl8168_mdio_write(tp, 0x06, 0x04f8);
-        rtl8168_mdio_write(tp, 0x06, 0xe08b);
-        rtl8168_mdio_write(tp, 0x06, 0x81ad);
-        rtl8168_mdio_write(tp, 0x06, 0x2600);
-        rtl8168_mdio_write(tp, 0x06, 0xe08b);
-        rtl8168_mdio_write(tp, 0x06, 0x81ad);
-        rtl8168_mdio_write(tp, 0x06, 0x2109);
-        rtl8168_mdio_write(tp, 0x06, 0xe08a);
-        rtl8168_mdio_write(tp, 0x06, 0xf4ac);
-        rtl8168_mdio_write(tp, 0x06, 0x2003);
-        rtl8168_mdio_write(tp, 0x06, 0x0222);
-        rtl8168_mdio_write(tp, 0x06, 0x7de0);
-        rtl8168_mdio_write(tp, 0x06, 0x8b85);
-        rtl8168_mdio_write(tp, 0x06, 0xad20);
-        rtl8168_mdio_write(tp, 0x06, 0x09e0);
-        rtl8168_mdio_write(tp, 0x06, 0x8af4);
-        rtl8168_mdio_write(tp, 0x06, 0xac21);
-        rtl8168_mdio_write(tp, 0x06, 0x0302);
-        rtl8168_mdio_write(tp, 0x06, 0x1408);
-        rtl8168_mdio_write(tp, 0x06, 0xe08b);
-        rtl8168_mdio_write(tp, 0x06, 0x85ad);
-        rtl8168_mdio_write(tp, 0x06, 0x2309);
-        rtl8168_mdio_write(tp, 0x06, 0xe08a);
-        rtl8168_mdio_write(tp, 0x06, 0xf4ac);
-        rtl8168_mdio_write(tp, 0x06, 0x2203);
-        rtl8168_mdio_write(tp, 0x06, 0x0213);
-        rtl8168_mdio_write(tp, 0x06, 0x07e0);
-        rtl8168_mdio_write(tp, 0x06, 0x8b87);
-        rtl8168_mdio_write(tp, 0x06, 0xad24);
-        rtl8168_mdio_write(tp, 0x06, 0x09e0);
-        rtl8168_mdio_write(tp, 0x06, 0x8af4);
-        rtl8168_mdio_write(tp, 0x06, 0xac23);
-        rtl8168_mdio_write(tp, 0x06, 0x0302);
-        rtl8168_mdio_write(tp, 0x06, 0x8289);
-        rtl8168_mdio_write(tp, 0x06, 0xfc04);
-        rtl8168_mdio_write(tp, 0x06, 0xf8e1);
-        rtl8168_mdio_write(tp, 0x06, 0x8af4);
-        rtl8168_mdio_write(tp, 0x06, 0xe08b);
-        rtl8168_mdio_write(tp, 0x06, 0x81ad);
-        rtl8168_mdio_write(tp, 0x06, 0x2602);
-        rtl8168_mdio_write(tp, 0x06, 0xf628);
-        rtl8168_mdio_write(tp, 0x06, 0xe08b);
-        rtl8168_mdio_write(tp, 0x06, 0x81ad);
-        rtl8168_mdio_write(tp, 0x06, 0x210a);
-        rtl8168_mdio_write(tp, 0x06, 0xe083);
-        rtl8168_mdio_write(tp, 0x06, 0xecf6);
-        rtl8168_mdio_write(tp, 0x06, 0x27a0);
-        rtl8168_mdio_write(tp, 0x06, 0x0502);
-        rtl8168_mdio_write(tp, 0x06, 0xf629);
-        rtl8168_mdio_write(tp, 0x06, 0xe08b);
-        rtl8168_mdio_write(tp, 0x06, 0x85ad);
-        rtl8168_mdio_write(tp, 0x06, 0x2008);
-        rtl8168_mdio_write(tp, 0x06, 0xe08a);
-        rtl8168_mdio_write(tp, 0x06, 0xe8ad);
-        rtl8168_mdio_write(tp, 0x06, 0x2102);
-        rtl8168_mdio_write(tp, 0x06, 0xf62a);
-        rtl8168_mdio_write(tp, 0x06, 0xe08b);
-        rtl8168_mdio_write(tp, 0x06, 0x85ad);
-        rtl8168_mdio_write(tp, 0x06, 0x2308);
-        rtl8168_mdio_write(tp, 0x06, 0xe08b);
-        rtl8168_mdio_write(tp, 0x06, 0x20a0);
-        rtl8168_mdio_write(tp, 0x06, 0x0302);
-        rtl8168_mdio_write(tp, 0x06, 0xf62b);
-        rtl8168_mdio_write(tp, 0x06, 0xe08b);
-        rtl8168_mdio_write(tp, 0x06, 0x87ad);
-        rtl8168_mdio_write(tp, 0x06, 0x2408);
-        rtl8168_mdio_write(tp, 0x06, 0xe08a);
-        rtl8168_mdio_write(tp, 0x06, 0xc2a0);
-        rtl8168_mdio_write(tp, 0x06, 0x0302);
-        rtl8168_mdio_write(tp, 0x06, 0xf62c);
-        rtl8168_mdio_write(tp, 0x06, 0xe58a);
-        rtl8168_mdio_write(tp, 0x06, 0xf4a1);
-        rtl8168_mdio_write(tp, 0x06, 0x0008);
-        rtl8168_mdio_write(tp, 0x06, 0xd100);
-        rtl8168_mdio_write(tp, 0x06, 0xbf22);
-        rtl8168_mdio_write(tp, 0x06, 0x7a02);
-        rtl8168_mdio_write(tp, 0x06, 0x387d);
-        rtl8168_mdio_write(tp, 0x06, 0xfc04);
-        rtl8168_mdio_write(tp, 0x06, 0xee8a);
-        rtl8168_mdio_write(tp, 0x06, 0xc200);
-        rtl8168_mdio_write(tp, 0x06, 0x04f8);
-        rtl8168_mdio_write(tp, 0x06, 0xe08b);
-        rtl8168_mdio_write(tp, 0x06, 0x87ad);
-        rtl8168_mdio_write(tp, 0x06, 0x241e);
-        rtl8168_mdio_write(tp, 0x06, 0xe08a);
-        rtl8168_mdio_write(tp, 0x06, 0xc2a0);
-        rtl8168_mdio_write(tp, 0x06, 0x0005);
-        rtl8168_mdio_write(tp, 0x06, 0x0282);
-        rtl8168_mdio_write(tp, 0x06, 0xb0ae);
-        rtl8168_mdio_write(tp, 0x06, 0xf5a0);
-        rtl8168_mdio_write(tp, 0x06, 0x0105);
-        rtl8168_mdio_write(tp, 0x06, 0x0282);
-        rtl8168_mdio_write(tp, 0x06, 0xc0ae);
-        rtl8168_mdio_write(tp, 0x06, 0x0ba0);
-        rtl8168_mdio_write(tp, 0x06, 0x0205);
-        rtl8168_mdio_write(tp, 0x06, 0x0282);
-        rtl8168_mdio_write(tp, 0x06, 0xcaae);
-        rtl8168_mdio_write(tp, 0x06, 0x03a0);
-        rtl8168_mdio_write(tp, 0x06, 0x0300);
-        rtl8168_mdio_write(tp, 0x06, 0xfc04);
-        rtl8168_mdio_write(tp, 0x06, 0xf8fa);
-        rtl8168_mdio_write(tp, 0x06, 0xef69);
-        rtl8168_mdio_write(tp, 0x06, 0x0282);
-        rtl8168_mdio_write(tp, 0x06, 0xe1ee);
-        rtl8168_mdio_write(tp, 0x06, 0x8ac2);
-        rtl8168_mdio_write(tp, 0x06, 0x01ef);
-        rtl8168_mdio_write(tp, 0x06, 0x96fe);
-        rtl8168_mdio_write(tp, 0x06, 0xfc04);
-        rtl8168_mdio_write(tp, 0x06, 0xf8ee);
-        rtl8168_mdio_write(tp, 0x06, 0x8ac9);
-        rtl8168_mdio_write(tp, 0x06, 0x0002);
-        rtl8168_mdio_write(tp, 0x06, 0x8317);
-        rtl8168_mdio_write(tp, 0x06, 0xfc04);
-        rtl8168_mdio_write(tp, 0x06, 0xf8e0);
-        rtl8168_mdio_write(tp, 0x06, 0x8ac8);
-        rtl8168_mdio_write(tp, 0x06, 0xe18a);
-        rtl8168_mdio_write(tp, 0x06, 0xc91f);
-        rtl8168_mdio_write(tp, 0x06, 0x019e);
-        rtl8168_mdio_write(tp, 0x06, 0x0611);
-        rtl8168_mdio_write(tp, 0x06, 0xe58a);
-        rtl8168_mdio_write(tp, 0x06, 0xc9ae);
-        rtl8168_mdio_write(tp, 0x06, 0x04ee);
-        rtl8168_mdio_write(tp, 0x06, 0x8ac2);
-        rtl8168_mdio_write(tp, 0x06, 0x01fc);
-        rtl8168_mdio_write(tp, 0x06, 0x04f8);
-        rtl8168_mdio_write(tp, 0x06, 0xf9fa);
-        rtl8168_mdio_write(tp, 0x06, 0xef69);
-        rtl8168_mdio_write(tp, 0x06, 0xfbbf);
-        rtl8168_mdio_write(tp, 0x06, 0x8ac4);
-        rtl8168_mdio_write(tp, 0x06, 0xef79);
-        rtl8168_mdio_write(tp, 0x06, 0xd200);
-        rtl8168_mdio_write(tp, 0x06, 0xd400);
-        rtl8168_mdio_write(tp, 0x06, 0x221e);
-        rtl8168_mdio_write(tp, 0x06, 0x02bf);
-        rtl8168_mdio_write(tp, 0x06, 0x3024);
-        rtl8168_mdio_write(tp, 0x06, 0x0238);
-        rtl8168_mdio_write(tp, 0x06, 0x7dbf);
-        rtl8168_mdio_write(tp, 0x06, 0x13ff);
-        rtl8168_mdio_write(tp, 0x06, 0x0238);
-        rtl8168_mdio_write(tp, 0x06, 0x500d);
-        rtl8168_mdio_write(tp, 0x06, 0x4559);
-        rtl8168_mdio_write(tp, 0x06, 0x1fef);
-        rtl8168_mdio_write(tp, 0x06, 0x97dd);
-        rtl8168_mdio_write(tp, 0x06, 0xd308);
-        rtl8168_mdio_write(tp, 0x06, 0x1a93);
-        rtl8168_mdio_write(tp, 0x06, 0xdd12);
-        rtl8168_mdio_write(tp, 0x06, 0x17a2);
-        rtl8168_mdio_write(tp, 0x06, 0x04de);
-        rtl8168_mdio_write(tp, 0x06, 0xffef);
-        rtl8168_mdio_write(tp, 0x06, 0x96fe);
-        rtl8168_mdio_write(tp, 0x06, 0xfdfc);
-        rtl8168_mdio_write(tp, 0x06, 0x04f8);
-        rtl8168_mdio_write(tp, 0x06, 0xf9fa);
-        rtl8168_mdio_write(tp, 0x06, 0xef69);
-        rtl8168_mdio_write(tp, 0x06, 0xfbee);
-        rtl8168_mdio_write(tp, 0x06, 0x8ac2);
-        rtl8168_mdio_write(tp, 0x06, 0x03d5);
-        rtl8168_mdio_write(tp, 0x06, 0x0080);
-        rtl8168_mdio_write(tp, 0x06, 0xbf8a);
-        rtl8168_mdio_write(tp, 0x06, 0xc4ef);
-        rtl8168_mdio_write(tp, 0x06, 0x79ef);
-        rtl8168_mdio_write(tp, 0x06, 0x45bf);
-        rtl8168_mdio_write(tp, 0x06, 0x3024);
-        rtl8168_mdio_write(tp, 0x06, 0x0238);
-        rtl8168_mdio_write(tp, 0x06, 0x7dbf);
-        rtl8168_mdio_write(tp, 0x06, 0x13ff);
-        rtl8168_mdio_write(tp, 0x06, 0x0238);
-        rtl8168_mdio_write(tp, 0x06, 0x50ad);
-        rtl8168_mdio_write(tp, 0x06, 0x2702);
-        rtl8168_mdio_write(tp, 0x06, 0x78ff);
-        rtl8168_mdio_write(tp, 0x06, 0xe18a);
-        rtl8168_mdio_write(tp, 0x06, 0xca1b);
-        rtl8168_mdio_write(tp, 0x06, 0x01aa);
-        rtl8168_mdio_write(tp, 0x06, 0x2eef);
-        rtl8168_mdio_write(tp, 0x06, 0x97d9);
-        rtl8168_mdio_write(tp, 0x06, 0x7900);
-        rtl8168_mdio_write(tp, 0x06, 0x9e2b);
-        rtl8168_mdio_write(tp, 0x06, 0x81dd);
-        rtl8168_mdio_write(tp, 0x06, 0xbf85);
-        rtl8168_mdio_write(tp, 0x06, 0xad02);
-        rtl8168_mdio_write(tp, 0x06, 0x387d);
-        rtl8168_mdio_write(tp, 0x06, 0xd101);
-        rtl8168_mdio_write(tp, 0x06, 0xef02);
-        rtl8168_mdio_write(tp, 0x06, 0x100c);
-        rtl8168_mdio_write(tp, 0x06, 0x11b0);
-        rtl8168_mdio_write(tp, 0x06, 0xfc0d);
-        rtl8168_mdio_write(tp, 0x06, 0x11bf);
-        rtl8168_mdio_write(tp, 0x06, 0x85aa);
-        rtl8168_mdio_write(tp, 0x06, 0x0238);
-        rtl8168_mdio_write(tp, 0x06, 0x7dd1);
-        rtl8168_mdio_write(tp, 0x06, 0x00bf);
-        rtl8168_mdio_write(tp, 0x06, 0x85aa);
-        rtl8168_mdio_write(tp, 0x06, 0x0238);
-        rtl8168_mdio_write(tp, 0x06, 0x7dee);
-        rtl8168_mdio_write(tp, 0x06, 0x8ac2);
-        rtl8168_mdio_write(tp, 0x06, 0x02ae);
-        rtl8168_mdio_write(tp, 0x06, 0x0413);
-        rtl8168_mdio_write(tp, 0x06, 0xa38b);
-        rtl8168_mdio_write(tp, 0x06, 0xb4d3);
-        rtl8168_mdio_write(tp, 0x06, 0x8012);
-        rtl8168_mdio_write(tp, 0x06, 0x17a2);
-        rtl8168_mdio_write(tp, 0x06, 0x04ad);
-        rtl8168_mdio_write(tp, 0x06, 0xffef);
-        rtl8168_mdio_write(tp, 0x06, 0x96fe);
-        rtl8168_mdio_write(tp, 0x06, 0xfdfc);
-        rtl8168_mdio_write(tp, 0x06, 0x04f8);
-        rtl8168_mdio_write(tp, 0x06, 0xf9e0);
-        rtl8168_mdio_write(tp, 0x06, 0x8b85);
-        rtl8168_mdio_write(tp, 0x06, 0xad25);
-        rtl8168_mdio_write(tp, 0x06, 0x48e0);
-        rtl8168_mdio_write(tp, 0x06, 0x8a96);
-        rtl8168_mdio_write(tp, 0x06, 0xe18a);
-        rtl8168_mdio_write(tp, 0x06, 0x977c);
-        rtl8168_mdio_write(tp, 0x06, 0x0000);
-        rtl8168_mdio_write(tp, 0x06, 0x9e35);
-        rtl8168_mdio_write(tp, 0x06, 0xee8a);
-        rtl8168_mdio_write(tp, 0x06, 0x9600);
-        rtl8168_mdio_write(tp, 0x06, 0xee8a);
-        rtl8168_mdio_write(tp, 0x06, 0x9700);
-        rtl8168_mdio_write(tp, 0x06, 0xe08a);
-        rtl8168_mdio_write(tp, 0x06, 0xbee1);
-        rtl8168_mdio_write(tp, 0x06, 0x8abf);
-        rtl8168_mdio_write(tp, 0x06, 0xe28a);
-        rtl8168_mdio_write(tp, 0x06, 0xc0e3);
-        rtl8168_mdio_write(tp, 0x06, 0x8ac1);
-        rtl8168_mdio_write(tp, 0x06, 0x0237);
-        rtl8168_mdio_write(tp, 0x06, 0x74ad);
-        rtl8168_mdio_write(tp, 0x06, 0x2012);
-        rtl8168_mdio_write(tp, 0x06, 0xee8a);
-        rtl8168_mdio_write(tp, 0x06, 0x9603);
-        rtl8168_mdio_write(tp, 0x06, 0xee8a);
-        rtl8168_mdio_write(tp, 0x06, 0x97b7);
-        rtl8168_mdio_write(tp, 0x06, 0xee8a);
-        rtl8168_mdio_write(tp, 0x06, 0xc000);
-        rtl8168_mdio_write(tp, 0x06, 0xee8a);
-        rtl8168_mdio_write(tp, 0x06, 0xc100);
-        rtl8168_mdio_write(tp, 0x06, 0xae11);
-        rtl8168_mdio_write(tp, 0x06, 0x15e6);
-        rtl8168_mdio_write(tp, 0x06, 0x8ac0);
-        rtl8168_mdio_write(tp, 0x06, 0xe78a);
-        rtl8168_mdio_write(tp, 0x06, 0xc1ae);
-        rtl8168_mdio_write(tp, 0x06, 0x08ee);
-        rtl8168_mdio_write(tp, 0x06, 0x8ac0);
-        rtl8168_mdio_write(tp, 0x06, 0x00ee);
-        rtl8168_mdio_write(tp, 0x06, 0x8ac1);
-        rtl8168_mdio_write(tp, 0x06, 0x00fd);
-        rtl8168_mdio_write(tp, 0x06, 0xfc04);
-        rtl8168_mdio_write(tp, 0x06, 0xae20);
-        rtl8168_mdio_write(tp, 0x06, 0x0000);
-        rtl8168_mdio_write(tp, 0x06, 0x0000);
-        rtl8168_mdio_write(tp, 0x06, 0x0000);
-        rtl8168_mdio_write(tp, 0x06, 0x0000);
-        rtl8168_mdio_write(tp, 0x06, 0x0000);
-        rtl8168_mdio_write(tp, 0x06, 0x0000);
-        rtl8168_mdio_write(tp, 0x06, 0x0000);
-        rtl8168_mdio_write(tp, 0x06, 0x0000);
-        rtl8168_mdio_write(tp, 0x06, 0x0000);
-        rtl8168_mdio_write(tp, 0x06, 0x0000);
-        rtl8168_mdio_write(tp, 0x06, 0x0000);
-        rtl8168_mdio_write(tp, 0x06, 0x0000);
-        rtl8168_mdio_write(tp, 0x06, 0x0000);
-        rtl8168_mdio_write(tp, 0x06, 0x0000);
-        rtl8168_mdio_write(tp, 0x06, 0x0000);
-        rtl8168_mdio_write(tp, 0x06, 0x0000);
-        rtl8168_mdio_write(tp, 0x06, 0xf8fa);
-        rtl8168_mdio_write(tp, 0x06, 0xef69);
-        rtl8168_mdio_write(tp, 0x06, 0xe0e0);
-        rtl8168_mdio_write(tp, 0x06, 0x00e1);
-        rtl8168_mdio_write(tp, 0x06, 0xe001);
-        rtl8168_mdio_write(tp, 0x06, 0xad27);
-        rtl8168_mdio_write(tp, 0x06, 0x32e0);
-        rtl8168_mdio_write(tp, 0x06, 0x8b40);
-        rtl8168_mdio_write(tp, 0x06, 0xf720);
-        rtl8168_mdio_write(tp, 0x06, 0xe48b);
-        rtl8168_mdio_write(tp, 0x06, 0x40bf);
-        rtl8168_mdio_write(tp, 0x06, 0x3230);
-        rtl8168_mdio_write(tp, 0x06, 0x0238);
-        rtl8168_mdio_write(tp, 0x06, 0x50ad);
-        rtl8168_mdio_write(tp, 0x06, 0x2821);
-        rtl8168_mdio_write(tp, 0x06, 0xe0e0);
-        rtl8168_mdio_write(tp, 0x06, 0x20e1);
-        rtl8168_mdio_write(tp, 0x06, 0xe021);
-        rtl8168_mdio_write(tp, 0x06, 0xad20);
-        rtl8168_mdio_write(tp, 0x06, 0x18e0);
-        rtl8168_mdio_write(tp, 0x06, 0x8b40);
-        rtl8168_mdio_write(tp, 0x06, 0xf620);
-        rtl8168_mdio_write(tp, 0x06, 0xe48b);
-        rtl8168_mdio_write(tp, 0x06, 0x40ee);
-        rtl8168_mdio_write(tp, 0x06, 0x8b3b);
-        rtl8168_mdio_write(tp, 0x06, 0xffe0);
-        rtl8168_mdio_write(tp, 0x06, 0x8a8a);
-        rtl8168_mdio_write(tp, 0x06, 0xe18a);
-        rtl8168_mdio_write(tp, 0x06, 0x8be4);
-        rtl8168_mdio_write(tp, 0x06, 0xe000);
-        rtl8168_mdio_write(tp, 0x06, 0xe5e0);
-        rtl8168_mdio_write(tp, 0x06, 0x01ef);
-        rtl8168_mdio_write(tp, 0x06, 0x96fe);
-        rtl8168_mdio_write(tp, 0x06, 0xfc04);
-        rtl8168_mdio_write(tp, 0x06, 0xf8f9);
-        rtl8168_mdio_write(tp, 0x06, 0xface);
-        rtl8168_mdio_write(tp, 0x06, 0xfaef);
-        rtl8168_mdio_write(tp, 0x06, 0x69fa);
-        rtl8168_mdio_write(tp, 0x06, 0xd401);
-        rtl8168_mdio_write(tp, 0x06, 0x55b4);
-        rtl8168_mdio_write(tp, 0x06, 0xfebf);
-        rtl8168_mdio_write(tp, 0x06, 0x1c1e);
-        rtl8168_mdio_write(tp, 0x06, 0x0238);
-        rtl8168_mdio_write(tp, 0x06, 0x50ac);
-        rtl8168_mdio_write(tp, 0x06, 0x280b);
-        rtl8168_mdio_write(tp, 0x06, 0xbf1c);
-        rtl8168_mdio_write(tp, 0x06, 0x1b02);
-        rtl8168_mdio_write(tp, 0x06, 0x3850);
-        rtl8168_mdio_write(tp, 0x06, 0xac28);
-        rtl8168_mdio_write(tp, 0x06, 0x49ae);
-        rtl8168_mdio_write(tp, 0x06, 0x64bf);
-        rtl8168_mdio_write(tp, 0x06, 0x1c1b);
-        rtl8168_mdio_write(tp, 0x06, 0x0238);
-        rtl8168_mdio_write(tp, 0x06, 0x50ac);
-        rtl8168_mdio_write(tp, 0x06, 0x285b);
-        rtl8168_mdio_write(tp, 0x06, 0xd000);
-        rtl8168_mdio_write(tp, 0x06, 0x0284);
-        rtl8168_mdio_write(tp, 0x06, 0xcaac);
-        rtl8168_mdio_write(tp, 0x06, 0x2105);
-        rtl8168_mdio_write(tp, 0x06, 0xac22);
-        rtl8168_mdio_write(tp, 0x06, 0x02ae);
-        rtl8168_mdio_write(tp, 0x06, 0x4ebf);
-        rtl8168_mdio_write(tp, 0x06, 0xe0c4);
-        rtl8168_mdio_write(tp, 0x06, 0xbe85);
-        rtl8168_mdio_write(tp, 0x06, 0xf6d2);
-        rtl8168_mdio_write(tp, 0x06, 0x04d8);
-        rtl8168_mdio_write(tp, 0x06, 0x19d9);
-        rtl8168_mdio_write(tp, 0x06, 0x1907);
-        rtl8168_mdio_write(tp, 0x06, 0xdc19);
-        rtl8168_mdio_write(tp, 0x06, 0xdd19);
-        rtl8168_mdio_write(tp, 0x06, 0x0789);
-        rtl8168_mdio_write(tp, 0x06, 0x89ef);
-        rtl8168_mdio_write(tp, 0x06, 0x645e);
-        rtl8168_mdio_write(tp, 0x06, 0x07ff);
-        rtl8168_mdio_write(tp, 0x06, 0x0d65);
-        rtl8168_mdio_write(tp, 0x06, 0x5cf8);
-        rtl8168_mdio_write(tp, 0x06, 0x001e);
-        rtl8168_mdio_write(tp, 0x06, 0x46dc);
-        rtl8168_mdio_write(tp, 0x06, 0x19dd);
-        rtl8168_mdio_write(tp, 0x06, 0x19b2);
-        rtl8168_mdio_write(tp, 0x06, 0xe2d4);
-        rtl8168_mdio_write(tp, 0x06, 0x0001);
-        rtl8168_mdio_write(tp, 0x06, 0xbf1c);
-        rtl8168_mdio_write(tp, 0x06, 0x1b02);
-        rtl8168_mdio_write(tp, 0x06, 0x387d);
-        rtl8168_mdio_write(tp, 0x06, 0xae1d);
-        rtl8168_mdio_write(tp, 0x06, 0xbee0);
-        rtl8168_mdio_write(tp, 0x06, 0xc4bf);
-        rtl8168_mdio_write(tp, 0x06, 0x85f6);
-        rtl8168_mdio_write(tp, 0x06, 0xd204);
-        rtl8168_mdio_write(tp, 0x06, 0xd819);
-        rtl8168_mdio_write(tp, 0x06, 0xd919);
-        rtl8168_mdio_write(tp, 0x06, 0x07dc);
-        rtl8168_mdio_write(tp, 0x06, 0x19dd);
-        rtl8168_mdio_write(tp, 0x06, 0x1907);
-        rtl8168_mdio_write(tp, 0x06, 0xb2f4);
-        rtl8168_mdio_write(tp, 0x06, 0xd400);
-        rtl8168_mdio_write(tp, 0x06, 0x00bf);
-        rtl8168_mdio_write(tp, 0x06, 0x1c1b);
-        rtl8168_mdio_write(tp, 0x06, 0x0238);
-        rtl8168_mdio_write(tp, 0x06, 0x7dfe);
-        rtl8168_mdio_write(tp, 0x06, 0xef96);
-        rtl8168_mdio_write(tp, 0x06, 0xfec6);
-        rtl8168_mdio_write(tp, 0x06, 0xfefd);
-        rtl8168_mdio_write(tp, 0x06, 0xfc05);
-        rtl8168_mdio_write(tp, 0x06, 0xf9e2);
-        rtl8168_mdio_write(tp, 0x06, 0xe0ea);
-        rtl8168_mdio_write(tp, 0x06, 0xe3e0);
-        rtl8168_mdio_write(tp, 0x06, 0xeb5a);
-        rtl8168_mdio_write(tp, 0x06, 0x070c);
-        rtl8168_mdio_write(tp, 0x06, 0x031e);
-        rtl8168_mdio_write(tp, 0x06, 0x20e6);
-        rtl8168_mdio_write(tp, 0x06, 0xe0ea);
-        rtl8168_mdio_write(tp, 0x06, 0xe7e0);
-        rtl8168_mdio_write(tp, 0x06, 0xebe0);
-        rtl8168_mdio_write(tp, 0x06, 0xe0fc);
-        rtl8168_mdio_write(tp, 0x06, 0xe1e0);
-        rtl8168_mdio_write(tp, 0x06, 0xfdfd);
-        rtl8168_mdio_write(tp, 0x06, 0x04f8);
-        rtl8168_mdio_write(tp, 0x06, 0xfaef);
-        rtl8168_mdio_write(tp, 0x06, 0x69e0);
-        rtl8168_mdio_write(tp, 0x06, 0x8b80);
-        rtl8168_mdio_write(tp, 0x06, 0xad27);
-        rtl8168_mdio_write(tp, 0x06, 0x22bf);
-        rtl8168_mdio_write(tp, 0x06, 0x4616);
-        rtl8168_mdio_write(tp, 0x06, 0x0238);
-        rtl8168_mdio_write(tp, 0x06, 0x50e0);
-        rtl8168_mdio_write(tp, 0x06, 0x8b44);
-        rtl8168_mdio_write(tp, 0x06, 0x1f01);
-        rtl8168_mdio_write(tp, 0x06, 0x9e15);
-        rtl8168_mdio_write(tp, 0x06, 0xe58b);
-        rtl8168_mdio_write(tp, 0x06, 0x44ad);
-        rtl8168_mdio_write(tp, 0x06, 0x2907);
-        rtl8168_mdio_write(tp, 0x06, 0xac28);
-        rtl8168_mdio_write(tp, 0x06, 0x04d1);
-        rtl8168_mdio_write(tp, 0x06, 0x01ae);
-        rtl8168_mdio_write(tp, 0x06, 0x02d1);
-        rtl8168_mdio_write(tp, 0x06, 0x00bf);
-        rtl8168_mdio_write(tp, 0x06, 0x85b0);
-        rtl8168_mdio_write(tp, 0x06, 0x0238);
-        rtl8168_mdio_write(tp, 0x06, 0x7def);
-        rtl8168_mdio_write(tp, 0x06, 0x96fe);
-        rtl8168_mdio_write(tp, 0x06, 0xfc04);
-        rtl8168_mdio_write(tp, 0x06, 0xf8e0);
-        rtl8168_mdio_write(tp, 0x06, 0x8b85);
-        rtl8168_mdio_write(tp, 0x06, 0xad26);
-        rtl8168_mdio_write(tp, 0x06, 0x30e0);
-        rtl8168_mdio_write(tp, 0x06, 0xe036);
-        rtl8168_mdio_write(tp, 0x06, 0xe1e0);
-        rtl8168_mdio_write(tp, 0x06, 0x37e1);
-        rtl8168_mdio_write(tp, 0x06, 0x8b3f);
-        rtl8168_mdio_write(tp, 0x06, 0x1f10);
-        rtl8168_mdio_write(tp, 0x06, 0x9e23);
-        rtl8168_mdio_write(tp, 0x06, 0xe48b);
-        rtl8168_mdio_write(tp, 0x06, 0x3fac);
-        rtl8168_mdio_write(tp, 0x06, 0x200b);
-        rtl8168_mdio_write(tp, 0x06, 0xac21);
-        rtl8168_mdio_write(tp, 0x06, 0x0dac);
-        rtl8168_mdio_write(tp, 0x06, 0x250f);
-        rtl8168_mdio_write(tp, 0x06, 0xac27);
-        rtl8168_mdio_write(tp, 0x06, 0x11ae);
-        rtl8168_mdio_write(tp, 0x06, 0x1202);
-        rtl8168_mdio_write(tp, 0x06, 0x2c47);
-        rtl8168_mdio_write(tp, 0x06, 0xae0d);
-        rtl8168_mdio_write(tp, 0x06, 0x0285);
-        rtl8168_mdio_write(tp, 0x06, 0x4fae);
-        rtl8168_mdio_write(tp, 0x06, 0x0802);
-        rtl8168_mdio_write(tp, 0x06, 0x2c69);
-        rtl8168_mdio_write(tp, 0x06, 0xae03);
-        rtl8168_mdio_write(tp, 0x06, 0x022c);
-        rtl8168_mdio_write(tp, 0x06, 0x7cfc);
-        rtl8168_mdio_write(tp, 0x06, 0x04f8);
-        rtl8168_mdio_write(tp, 0x06, 0xfaef);
-        rtl8168_mdio_write(tp, 0x06, 0x6902);
-        rtl8168_mdio_write(tp, 0x06, 0x856c);
-        rtl8168_mdio_write(tp, 0x06, 0xe0e0);
-        rtl8168_mdio_write(tp, 0x06, 0x14e1);
-        rtl8168_mdio_write(tp, 0x06, 0xe015);
-        rtl8168_mdio_write(tp, 0x06, 0xad26);
-        rtl8168_mdio_write(tp, 0x06, 0x08d1);
-        rtl8168_mdio_write(tp, 0x06, 0x1ebf);
-        rtl8168_mdio_write(tp, 0x06, 0x2cd9);
-        rtl8168_mdio_write(tp, 0x06, 0x0238);
-        rtl8168_mdio_write(tp, 0x06, 0x7def);
-        rtl8168_mdio_write(tp, 0x06, 0x96fe);
-        rtl8168_mdio_write(tp, 0x06, 0xfc04);
-        rtl8168_mdio_write(tp, 0x06, 0xf8e0);
-        rtl8168_mdio_write(tp, 0x06, 0x8b85);
-        rtl8168_mdio_write(tp, 0x06, 0xad27);
-        rtl8168_mdio_write(tp, 0x06, 0x2fd0);
-        rtl8168_mdio_write(tp, 0x06, 0x0b02);
-        rtl8168_mdio_write(tp, 0x06, 0x3682);
-        rtl8168_mdio_write(tp, 0x06, 0x5882);
-        rtl8168_mdio_write(tp, 0x06, 0x7882);
-        rtl8168_mdio_write(tp, 0x06, 0x9f24);
-        rtl8168_mdio_write(tp, 0x06, 0xe08b);
-        rtl8168_mdio_write(tp, 0x06, 0x32e1);
-        rtl8168_mdio_write(tp, 0x06, 0x8b33);
-        rtl8168_mdio_write(tp, 0x06, 0x1f10);
-        rtl8168_mdio_write(tp, 0x06, 0x9e1a);
-        rtl8168_mdio_write(tp, 0x06, 0x10e4);
-        rtl8168_mdio_write(tp, 0x06, 0x8b32);
-        rtl8168_mdio_write(tp, 0x06, 0xe0e0);
-        rtl8168_mdio_write(tp, 0x06, 0x28e1);
-        rtl8168_mdio_write(tp, 0x06, 0xe029);
-        rtl8168_mdio_write(tp, 0x06, 0xf72c);
-        rtl8168_mdio_write(tp, 0x06, 0xe4e0);
-        rtl8168_mdio_write(tp, 0x06, 0x28e5);
-        rtl8168_mdio_write(tp, 0x06, 0xe029);
-        rtl8168_mdio_write(tp, 0x06, 0xf62c);
-        rtl8168_mdio_write(tp, 0x06, 0xe4e0);
-        rtl8168_mdio_write(tp, 0x06, 0x28e5);
-        rtl8168_mdio_write(tp, 0x06, 0xe029);
-        rtl8168_mdio_write(tp, 0x06, 0xfc04);
-        rtl8168_mdio_write(tp, 0x06, 0x00e1);
-        rtl8168_mdio_write(tp, 0x06, 0x4077);
-        rtl8168_mdio_write(tp, 0x06, 0xe140);
-        rtl8168_mdio_write(tp, 0x06, 0x52e0);
-        rtl8168_mdio_write(tp, 0x06, 0xeed9);
-        rtl8168_mdio_write(tp, 0x06, 0xe04c);
-        rtl8168_mdio_write(tp, 0x06, 0xbbe0);
-        rtl8168_mdio_write(tp, 0x06, 0x2a00);
-        rtl8168_mdio_write(tp, 0x05, 0xe142);
-        gphy_val = rtl8168_mdio_read(tp, 0x06);
-        gphy_val |= BIT_0;
-        rtl8168_mdio_write(tp,0x06, gphy_val);
-        rtl8168_mdio_write(tp, 0x05, 0xe140);
-        gphy_val = rtl8168_mdio_read(tp, 0x06);
-        gphy_val |= BIT_0;
-        rtl8168_mdio_write(tp,0x06, gphy_val);
-        rtl8168_mdio_write(tp, 0x1f, 0x0000);
-        rtl8168_mdio_write(tp,0x1f, 0x0005);
-        for (i = 0; i < 200; i++) {
-                udelay(100);
-                gphy_val = rtl8168_mdio_read(tp, 0x00);
-                if (gphy_val & BIT_7)
-                        break;
-        }
-        rtl8168_mdio_write(tp, 0x1f, 0x0007);
-        rtl8168_mdio_write(tp, 0x1e, 0x0023);
-        gphy_val = rtl8168_mdio_read(tp, 0x17);
-        gphy_val |= BIT_1;
-        if (tp->RequiredSecLanDonglePatch)
-                gphy_val &= ~BIT_2;
-        rtl8168_mdio_write(tp, 0x17, gphy_val);
-        rtl8168_mdio_write(tp, 0x1f, 0x0000);
-
-        rtl8168_mdio_write(tp, 0x1F, 0x0003);
-        rtl8168_mdio_write(tp, 0x09, 0xA20F);
-        rtl8168_mdio_write(tp, 0x1F, 0x0000);
-        rtl8168_mdio_write(tp, 0x1f, 0x0003);
-        rtl8168_mdio_write(tp, 0x01, 0x328A);
-        rtl8168_mdio_write(tp, 0x1f, 0x0000);
-
-        rtl8168_mdio_write(tp, 0x1f, 0x0000);
-        rtl8168_mdio_write(tp, 0x00, 0x9200);
-}
-
-static void
-rtl8168_set_phy_mcu_8168f_2(struct net_device *dev)
-{
-        struct rtl8168_private *tp = netdev_priv(dev);
-        unsigned int gphy_val,i;
-
-        rtl8168_mdio_write(tp,0x1f, 0x0000);
-        rtl8168_mdio_write(tp,0x00, 0x1800);
-        gphy_val = rtl8168_mdio_read(tp, 0x15);
-        gphy_val &= ~(BIT_12);
-        rtl8168_mdio_write(tp,0x15, gphy_val);
-        rtl8168_mdio_write(tp,0x00, 0x4800);
-        rtl8168_mdio_write(tp,0x1f, 0x0007);
-        rtl8168_mdio_write(tp,0x1e, 0x002f);
-        for (i = 0; i < 1000; i++) {
-                udelay(100);
-                gphy_val = rtl8168_mdio_read(tp, 0x1c);
-                if (gphy_val & 0x0080)
-                        break;
-        }
-        rtl8168_mdio_write(tp,0x1f, 0x0000);
-        rtl8168_mdio_write(tp,0x00, 0x1800);
-        rtl8168_mdio_write(tp,0x1f, 0x0007);
-        rtl8168_mdio_write(tp,0x1e, 0x0023);
-        for (i = 0; i < 200; i++) {
-                udelay(100);
-                gphy_val = rtl8168_mdio_read(tp, 0x18);
-                if (!(gphy_val & 0x0001))
-                        break;
-        }
-        rtl8168_mdio_write(tp, 0x1f, 0x0005);
-        rtl8168_mdio_write(tp, 0x05, 0xfff6);
-        rtl8168_mdio_write(tp, 0x06, 0x0080);
-        rtl8168_mdio_write(tp, 0x1f, 0x0007);
-        rtl8168_mdio_write(tp, 0x1e, 0x0023);
-        rtl8168_mdio_write(tp, 0x16, 0x0306);
-        rtl8168_mdio_write(tp, 0x16, 0x0307);
-        rtl8168_mdio_write(tp, 0x15, 0x0098);
-        rtl8168_mdio_write(tp, 0x19, 0x7c0b);
-        rtl8168_mdio_write(tp, 0x15, 0x0099);
-        rtl8168_mdio_write(tp, 0x19, 0x6c0b);
-        rtl8168_mdio_write(tp, 0x15, 0x00eb);
-        rtl8168_mdio_write(tp, 0x19, 0x6c0b);
-        rtl8168_mdio_write(tp, 0x15, 0x00f8);
-        rtl8168_mdio_write(tp, 0x19, 0x6f0b);
-        rtl8168_mdio_write(tp, 0x15, 0x00fe);
-        rtl8168_mdio_write(tp, 0x19, 0x6f0f);
-        rtl8168_mdio_write(tp, 0x15, 0x00db);
-        rtl8168_mdio_write(tp, 0x19, 0x6f09);
-        rtl8168_mdio_write(tp, 0x15, 0x00dc);
-        rtl8168_mdio_write(tp, 0x19, 0xaefd);
-        rtl8168_mdio_write(tp, 0x15, 0x00dd);
-        rtl8168_mdio_write(tp, 0x19, 0x6f0b);
-        rtl8168_mdio_write(tp, 0x15, 0x00de);
-        rtl8168_mdio_write(tp, 0x19, 0xc60b);
-        rtl8168_mdio_write(tp, 0x15, 0x00df);
-        rtl8168_mdio_write(tp, 0x19, 0x00fa);
-        rtl8168_mdio_write(tp, 0x15, 0x00e0);
-        rtl8168_mdio_write(tp, 0x19, 0x30e1);
-        rtl8168_mdio_write(tp, 0x15, 0x020c);
-        rtl8168_mdio_write(tp, 0x19, 0x3224);
-        rtl8168_mdio_write(tp, 0x15, 0x020e);
-        rtl8168_mdio_write(tp, 0x19, 0x9813);
-        rtl8168_mdio_write(tp, 0x15, 0x020f);
-        rtl8168_mdio_write(tp, 0x19, 0x7801);
-        rtl8168_mdio_write(tp, 0x15, 0x0210);
-        rtl8168_mdio_write(tp, 0x19, 0x930f);
-        rtl8168_mdio_write(tp, 0x15, 0x0211);
-        rtl8168_mdio_write(tp, 0x19, 0x9206);
-        rtl8168_mdio_write(tp, 0x15, 0x0212);
-        rtl8168_mdio_write(tp, 0x19, 0x4002);
-        rtl8168_mdio_write(tp, 0x15, 0x0213);
-        rtl8168_mdio_write(tp, 0x19, 0x7800);
-        rtl8168_mdio_write(tp, 0x15, 0x0214);
-        rtl8168_mdio_write(tp, 0x19, 0x588f);
-        rtl8168_mdio_write(tp, 0x15, 0x0215);
-        rtl8168_mdio_write(tp, 0x19, 0x5520);
-        rtl8168_mdio_write(tp, 0x15, 0x0216);
-        rtl8168_mdio_write(tp, 0x19, 0x3224);
-        rtl8168_mdio_write(tp, 0x15, 0x0217);
-        rtl8168_mdio_write(tp, 0x19, 0x4002);
-        rtl8168_mdio_write(tp, 0x15, 0x0218);
-        rtl8168_mdio_write(tp, 0x19, 0x7800);
-        rtl8168_mdio_write(tp, 0x15, 0x0219);
-        rtl8168_mdio_write(tp, 0x19, 0x588d);
-        rtl8168_mdio_write(tp, 0x15, 0x021a);
-        rtl8168_mdio_write(tp, 0x19, 0x5540);
-        rtl8168_mdio_write(tp, 0x15, 0x021b);
-        rtl8168_mdio_write(tp, 0x19, 0x9e03);
-        rtl8168_mdio_write(tp, 0x15, 0x021c);
-        rtl8168_mdio_write(tp, 0x19, 0x7c40);
-        rtl8168_mdio_write(tp, 0x15, 0x021d);
-        rtl8168_mdio_write(tp, 0x19, 0x6840);
-        rtl8168_mdio_write(tp, 0x15, 0x021e);
-        rtl8168_mdio_write(tp, 0x19, 0x3224);
-        rtl8168_mdio_write(tp, 0x15, 0x021f);
-        rtl8168_mdio_write(tp, 0x19, 0x4002);
-        rtl8168_mdio_write(tp, 0x15, 0x0220);
-        rtl8168_mdio_write(tp, 0x19, 0x3224);
-        rtl8168_mdio_write(tp, 0x15, 0x0221);
-        rtl8168_mdio_write(tp, 0x19, 0x9e03);
-        rtl8168_mdio_write(tp, 0x15, 0x0222);
-        rtl8168_mdio_write(tp, 0x19, 0x7c40);
-        rtl8168_mdio_write(tp, 0x15, 0x0223);
-        rtl8168_mdio_write(tp, 0x19, 0x6840);
-        rtl8168_mdio_write(tp, 0x15, 0x0224);
-        rtl8168_mdio_write(tp, 0x19, 0x7800);
-        rtl8168_mdio_write(tp, 0x15, 0x0225);
-        rtl8168_mdio_write(tp, 0x19, 0x3231);
-        rtl8168_mdio_write(tp, 0x15, 0x0000);
-        rtl8168_mdio_write(tp, 0x16, 0x0306);
-        rtl8168_mdio_write(tp, 0x16, 0x0300);
-        rtl8168_mdio_write(tp, 0x1f, 0x0000);
-        rtl8168_mdio_write(tp, 0x1f, 0x0005);
-        rtl8168_mdio_write(tp, 0x05, 0xfff6);
-        rtl8168_mdio_write(tp, 0x06, 0x0080);
-        rtl8168_mdio_write(tp, 0x05, 0x8000);
-        rtl8168_mdio_write(tp, 0x06, 0x0280);
-        rtl8168_mdio_write(tp, 0x06, 0x48f7);
-        rtl8168_mdio_write(tp, 0x06, 0x00e0);
-        rtl8168_mdio_write(tp, 0x06, 0xfff7);
-        rtl8168_mdio_write(tp, 0x06, 0xa080);
-        rtl8168_mdio_write(tp, 0x06, 0x02ae);
-        rtl8168_mdio_write(tp, 0x06, 0xf602);
-        rtl8168_mdio_write(tp, 0x06, 0x011b);
-        rtl8168_mdio_write(tp, 0x06, 0x0201);
-        rtl8168_mdio_write(tp, 0x06, 0x2802);
-        rtl8168_mdio_write(tp, 0x06, 0x0135);
-        rtl8168_mdio_write(tp, 0x06, 0x0201);
-        rtl8168_mdio_write(tp, 0x06, 0x4502);
-        rtl8168_mdio_write(tp, 0x06, 0x015f);
-        rtl8168_mdio_write(tp, 0x06, 0x0280);
-        rtl8168_mdio_write(tp, 0x06, 0x6b02);
-        rtl8168_mdio_write(tp, 0x06, 0x80e5);
-        rtl8168_mdio_write(tp, 0x06, 0xe08b);
-        rtl8168_mdio_write(tp, 0x06, 0x88e1);
-        rtl8168_mdio_write(tp, 0x06, 0x8b89);
-        rtl8168_mdio_write(tp, 0x06, 0x1e01);
-        rtl8168_mdio_write(tp, 0x06, 0xe18b);
-        rtl8168_mdio_write(tp, 0x06, 0x8a1e);
-        rtl8168_mdio_write(tp, 0x06, 0x01e1);
-        rtl8168_mdio_write(tp, 0x06, 0x8b8b);
-        rtl8168_mdio_write(tp, 0x06, 0x1e01);
-        rtl8168_mdio_write(tp, 0x06, 0xe18b);
-        rtl8168_mdio_write(tp, 0x06, 0x8c1e);
-        rtl8168_mdio_write(tp, 0x06, 0x01e1);
-        rtl8168_mdio_write(tp, 0x06, 0x8b8d);
-        rtl8168_mdio_write(tp, 0x06, 0x1e01);
-        rtl8168_mdio_write(tp, 0x06, 0xe18b);
-        rtl8168_mdio_write(tp, 0x06, 0x8e1e);
-        rtl8168_mdio_write(tp, 0x06, 0x01a0);
-        rtl8168_mdio_write(tp, 0x06, 0x00c7);
-        rtl8168_mdio_write(tp, 0x06, 0xaebb);
-        rtl8168_mdio_write(tp, 0x06, 0xbf8b);
-        rtl8168_mdio_write(tp, 0x06, 0x88ec);
-        rtl8168_mdio_write(tp, 0x06, 0x0019);
-        rtl8168_mdio_write(tp, 0x06, 0xa98b);
-        rtl8168_mdio_write(tp, 0x06, 0x90f9);
-        rtl8168_mdio_write(tp, 0x06, 0xeeff);
-        rtl8168_mdio_write(tp, 0x06, 0xf600);
-        rtl8168_mdio_write(tp, 0x06, 0xeeff);
-        rtl8168_mdio_write(tp, 0x06, 0xf7fe);
-        rtl8168_mdio_write(tp, 0x06, 0xd100);
-        rtl8168_mdio_write(tp, 0x06, 0xbf81);
-        rtl8168_mdio_write(tp, 0x06, 0x9802);
-        rtl8168_mdio_write(tp, 0x06, 0x39f3);
-        rtl8168_mdio_write(tp, 0x06, 0xd101);
-        rtl8168_mdio_write(tp, 0x06, 0xbf81);
-        rtl8168_mdio_write(tp, 0x06, 0x9b02);
-        rtl8168_mdio_write(tp, 0x06, 0x39f3);
-        rtl8168_mdio_write(tp, 0x06, 0x04f8);
-        rtl8168_mdio_write(tp, 0x06, 0xe08b);
-        rtl8168_mdio_write(tp, 0x06, 0x8dad);
-        rtl8168_mdio_write(tp, 0x06, 0x2014);
-        rtl8168_mdio_write(tp, 0x06, 0xee8b);
-        rtl8168_mdio_write(tp, 0x06, 0x8d00);
-        rtl8168_mdio_write(tp, 0x06, 0xe08a);
-        rtl8168_mdio_write(tp, 0x06, 0x5a78);
-        rtl8168_mdio_write(tp, 0x06, 0x039e);
-        rtl8168_mdio_write(tp, 0x06, 0x0902);
-        rtl8168_mdio_write(tp, 0x06, 0x05fc);
-        rtl8168_mdio_write(tp, 0x06, 0x0280);
-        rtl8168_mdio_write(tp, 0x06, 0x8802);
-        rtl8168_mdio_write(tp, 0x06, 0x32dd);
-        rtl8168_mdio_write(tp, 0x06, 0xfc04);
-        rtl8168_mdio_write(tp, 0x06, 0xf8f9);
-        rtl8168_mdio_write(tp, 0x06, 0xe08b);
-        rtl8168_mdio_write(tp, 0x06, 0x81ac);
-        rtl8168_mdio_write(tp, 0x06, 0x261a);
-        rtl8168_mdio_write(tp, 0x06, 0xe08b);
-        rtl8168_mdio_write(tp, 0x06, 0x81ac);
-        rtl8168_mdio_write(tp, 0x06, 0x2114);
-        rtl8168_mdio_write(tp, 0x06, 0xe08b);
-        rtl8168_mdio_write(tp, 0x06, 0x85ac);
-        rtl8168_mdio_write(tp, 0x06, 0x200e);
-        rtl8168_mdio_write(tp, 0x06, 0xe08b);
-        rtl8168_mdio_write(tp, 0x06, 0x85ac);
-        rtl8168_mdio_write(tp, 0x06, 0x2308);
-        rtl8168_mdio_write(tp, 0x06, 0xe08b);
-        rtl8168_mdio_write(tp, 0x06, 0x87ac);
-        rtl8168_mdio_write(tp, 0x06, 0x2402);
-        rtl8168_mdio_write(tp, 0x06, 0xae38);
-        rtl8168_mdio_write(tp, 0x06, 0x021a);
-        rtl8168_mdio_write(tp, 0x06, 0xd6ee);
-        rtl8168_mdio_write(tp, 0x06, 0xe41c);
-        rtl8168_mdio_write(tp, 0x06, 0x04ee);
-        rtl8168_mdio_write(tp, 0x06, 0xe41d);
-        rtl8168_mdio_write(tp, 0x06, 0x04e2);
-        rtl8168_mdio_write(tp, 0x06, 0xe07c);
-        rtl8168_mdio_write(tp, 0x06, 0xe3e0);
-        rtl8168_mdio_write(tp, 0x06, 0x7de0);
-        rtl8168_mdio_write(tp, 0x06, 0xe038);
-        rtl8168_mdio_write(tp, 0x06, 0xe1e0);
-        rtl8168_mdio_write(tp, 0x06, 0x39ad);
-        rtl8168_mdio_write(tp, 0x06, 0x2e1b);
-        rtl8168_mdio_write(tp, 0x06, 0xad39);
-        rtl8168_mdio_write(tp, 0x06, 0x0dd1);
-        rtl8168_mdio_write(tp, 0x06, 0x01bf);
-        rtl8168_mdio_write(tp, 0x06, 0x22c8);
-        rtl8168_mdio_write(tp, 0x06, 0x0239);
-        rtl8168_mdio_write(tp, 0x06, 0xf302);
-        rtl8168_mdio_write(tp, 0x06, 0x21f0);
-        rtl8168_mdio_write(tp, 0x06, 0xae0b);
-        rtl8168_mdio_write(tp, 0x06, 0xac38);
-        rtl8168_mdio_write(tp, 0x06, 0x02ae);
-        rtl8168_mdio_write(tp, 0x06, 0x0602);
-        rtl8168_mdio_write(tp, 0x06, 0x222d);
-        rtl8168_mdio_write(tp, 0x06, 0x0222);
-        rtl8168_mdio_write(tp, 0x06, 0x7202);
-        rtl8168_mdio_write(tp, 0x06, 0x1ae7);
-        rtl8168_mdio_write(tp, 0x06, 0xfdfc);
-        rtl8168_mdio_write(tp, 0x06, 0x04f8);
-        rtl8168_mdio_write(tp, 0x06, 0xe08b);
-        rtl8168_mdio_write(tp, 0x06, 0x8ead);
-        rtl8168_mdio_write(tp, 0x06, 0x201a);
-        rtl8168_mdio_write(tp, 0x06, 0xf620);
-        rtl8168_mdio_write(tp, 0x06, 0xe48b);
-        rtl8168_mdio_write(tp, 0x06, 0x8e02);
-        rtl8168_mdio_write(tp, 0x06, 0x2afe);
-        rtl8168_mdio_write(tp, 0x06, 0x022c);
-        rtl8168_mdio_write(tp, 0x06, 0x5c02);
-        rtl8168_mdio_write(tp, 0x06, 0x03c5);
-        rtl8168_mdio_write(tp, 0x06, 0x0281);
-        rtl8168_mdio_write(tp, 0x06, 0x6702);
-        rtl8168_mdio_write(tp, 0x06, 0x2e4f);
-        rtl8168_mdio_write(tp, 0x06, 0x0204);
-        rtl8168_mdio_write(tp, 0x06, 0x8902);
-        rtl8168_mdio_write(tp, 0x06, 0x2f7a);
-        rtl8168_mdio_write(tp, 0x06, 0xe08b);
-        rtl8168_mdio_write(tp, 0x06, 0x8ead);
-        rtl8168_mdio_write(tp, 0x06, 0x210b);
-        rtl8168_mdio_write(tp, 0x06, 0xf621);
-        rtl8168_mdio_write(tp, 0x06, 0xe48b);
-        rtl8168_mdio_write(tp, 0x06, 0x8e02);
-        rtl8168_mdio_write(tp, 0x06, 0x0445);
-        rtl8168_mdio_write(tp, 0x06, 0x021c);
-        rtl8168_mdio_write(tp, 0x06, 0xb8e0);
-        rtl8168_mdio_write(tp, 0x06, 0x8b8e);
-        rtl8168_mdio_write(tp, 0x06, 0xad22);
-        rtl8168_mdio_write(tp, 0x06, 0x08f6);
-        rtl8168_mdio_write(tp, 0x06, 0x22e4);
-        rtl8168_mdio_write(tp, 0x06, 0x8b8e);
-        rtl8168_mdio_write(tp, 0x06, 0x0235);
-        rtl8168_mdio_write(tp, 0x06, 0xd4e0);
-        rtl8168_mdio_write(tp, 0x06, 0x8b8e);
-        rtl8168_mdio_write(tp, 0x06, 0xad23);
-        rtl8168_mdio_write(tp, 0x06, 0x08f6);
-        rtl8168_mdio_write(tp, 0x06, 0x23e4);
-        rtl8168_mdio_write(tp, 0x06, 0x8b8e);
-        rtl8168_mdio_write(tp, 0x06, 0x0231);
-        rtl8168_mdio_write(tp, 0x06, 0xc8e0);
-        rtl8168_mdio_write(tp, 0x06, 0x8b8e);
-        rtl8168_mdio_write(tp, 0x06, 0xad24);
-        rtl8168_mdio_write(tp, 0x06, 0x05f6);
-        rtl8168_mdio_write(tp, 0x06, 0x24e4);
-        rtl8168_mdio_write(tp, 0x06, 0x8b8e);
-        rtl8168_mdio_write(tp, 0x06, 0xe08b);
-        rtl8168_mdio_write(tp, 0x06, 0x8ead);
-        rtl8168_mdio_write(tp, 0x06, 0x2505);
-        rtl8168_mdio_write(tp, 0x06, 0xf625);
-        rtl8168_mdio_write(tp, 0x06, 0xe48b);
-        rtl8168_mdio_write(tp, 0x06, 0x8ee0);
-        rtl8168_mdio_write(tp, 0x06, 0x8b8e);
-        rtl8168_mdio_write(tp, 0x06, 0xad26);
-        rtl8168_mdio_write(tp, 0x06, 0x08f6);
-        rtl8168_mdio_write(tp, 0x06, 0x26e4);
-        rtl8168_mdio_write(tp, 0x06, 0x8b8e);
-        rtl8168_mdio_write(tp, 0x06, 0x022d);
-        rtl8168_mdio_write(tp, 0x06, 0x6ae0);
-        rtl8168_mdio_write(tp, 0x06, 0x8b8e);
-        rtl8168_mdio_write(tp, 0x06, 0xad27);
-        rtl8168_mdio_write(tp, 0x06, 0x05f6);
-        rtl8168_mdio_write(tp, 0x06, 0x27e4);
-        rtl8168_mdio_write(tp, 0x06, 0x8b8e);
-        rtl8168_mdio_write(tp, 0x06, 0x0203);
-        rtl8168_mdio_write(tp, 0x06, 0x8bfc);
-        rtl8168_mdio_write(tp, 0x06, 0x04f8);
-        rtl8168_mdio_write(tp, 0x06, 0xfaef);
-        rtl8168_mdio_write(tp, 0x06, 0x69e0);
-        rtl8168_mdio_write(tp, 0x06, 0x8b80);
-        rtl8168_mdio_write(tp, 0x06, 0xad27);
-        rtl8168_mdio_write(tp, 0x06, 0x22bf);
-        rtl8168_mdio_write(tp, 0x06, 0x479a);
-        rtl8168_mdio_write(tp, 0x06, 0x0239);
-        rtl8168_mdio_write(tp, 0x06, 0xc6e0);
-        rtl8168_mdio_write(tp, 0x06, 0x8b44);
-        rtl8168_mdio_write(tp, 0x06, 0x1f01);
-        rtl8168_mdio_write(tp, 0x06, 0x9e15);
-        rtl8168_mdio_write(tp, 0x06, 0xe58b);
-        rtl8168_mdio_write(tp, 0x06, 0x44ad);
-        rtl8168_mdio_write(tp, 0x06, 0x2907);
-        rtl8168_mdio_write(tp, 0x06, 0xac28);
-        rtl8168_mdio_write(tp, 0x06, 0x04d1);
-        rtl8168_mdio_write(tp, 0x06, 0x01ae);
-        rtl8168_mdio_write(tp, 0x06, 0x02d1);
-        rtl8168_mdio_write(tp, 0x06, 0x00bf);
-        rtl8168_mdio_write(tp, 0x06, 0x819e);
-        rtl8168_mdio_write(tp, 0x06, 0x0239);
-        rtl8168_mdio_write(tp, 0x06, 0xf3ef);
-        rtl8168_mdio_write(tp, 0x06, 0x96fe);
-        rtl8168_mdio_write(tp, 0x06, 0xfc04);
-        rtl8168_mdio_write(tp, 0x06, 0x00e1);
-        rtl8168_mdio_write(tp, 0x06, 0x4077);
-        rtl8168_mdio_write(tp, 0x06, 0xe140);
-        rtl8168_mdio_write(tp, 0x06, 0xbbe0);
-        rtl8168_mdio_write(tp, 0x06, 0x2a00);
-        rtl8168_mdio_write(tp, 0x05, 0xe142);
-        gphy_val = rtl8168_mdio_read(tp, 0x06);
-        gphy_val |= BIT_0;
-        rtl8168_mdio_write(tp, 0x06, gphy_val);
-        rtl8168_mdio_write(tp, 0x05, 0xe140);
-        gphy_val = rtl8168_mdio_read(tp, 0x06);
-        gphy_val |= BIT_0;
-        rtl8168_mdio_write(tp, 0x06, gphy_val);
-        rtl8168_mdio_write(tp, 0x1f, 0x0000);
-        rtl8168_mdio_write(tp,0x1f, 0x0005);
-        for (i = 0; i < 200; i++) {
-                udelay(100);
-                gphy_val = rtl8168_mdio_read(tp, 0x00);
-                if (gphy_val & BIT_7)
-                        break;
-        }
-        rtl8168_mdio_write(tp, 0x1f, 0x0007);
-        rtl8168_mdio_write(tp, 0x1e, 0x0023);
-        gphy_val = rtl8168_mdio_read(tp, 0x17);
-        gphy_val |= BIT_1;
-        if (tp->RequiredSecLanDonglePatch)
-                gphy_val &= ~BIT_2;
-        rtl8168_mdio_write(tp, 0x17, gphy_val);
-        rtl8168_mdio_write(tp, 0x1f, 0x0000);
-        rtl8168_mdio_write(tp, 0x1f, 0x0000);
-        rtl8168_mdio_write(tp, 0x00, 0x9200);
-}
-
-static void
-rtl8168_set_phy_mcu_8411_1(struct net_device *dev)
-{
-        struct rtl8168_private *tp = netdev_priv(dev);
-        unsigned int gphy_val,i;
-
-        rtl8168_mdio_write(tp,0x1f, 0x0000);
-        rtl8168_mdio_write(tp,0x00, 0x1800);
-        gphy_val = rtl8168_mdio_read(tp, 0x15);
-        gphy_val &= ~(BIT_12);
-        rtl8168_mdio_write(tp,0x15, gphy_val);
-        rtl8168_mdio_write(tp,0x00, 0x4800);
-        rtl8168_mdio_write(tp,0x1f, 0x0007);
-        rtl8168_mdio_write(tp,0x1e, 0x002f);
-        for (i = 0; i < 1000; i++) {
-                udelay(100);
-                gphy_val = rtl8168_mdio_read(tp, 0x1c);
-                if (gphy_val & 0x0080)
-                        break;
-        }
-        rtl8168_mdio_write(tp,0x1f, 0x0000);
-        rtl8168_mdio_write(tp,0x00, 0x1800);
-        rtl8168_mdio_write(tp,0x1f, 0x0007);
-        rtl8168_mdio_write(tp,0x1e, 0x0023);
-        for (i = 0; i < 200; i++) {
-                udelay(100);
-                gphy_val = rtl8168_mdio_read(tp, 0x18);
-                if (!(gphy_val & 0x0001))
-                        break;
-        }
-        rtl8168_mdio_write(tp,0x1f, 0x0005);
-        rtl8168_mdio_write(tp,0x05, 0xfff6);
-        rtl8168_mdio_write(tp,0x06, 0x0080);
-        rtl8168_mdio_write(tp, 0x1f, 0x0007);
-        rtl8168_mdio_write(tp, 0x1e, 0x0023);
-        rtl8168_mdio_write(tp, 0x16, 0x0306);
-        rtl8168_mdio_write(tp, 0x16, 0x0307);
-        rtl8168_mdio_write(tp, 0x15, 0x0098);
-        rtl8168_mdio_write(tp, 0x19, 0x7c0b);
-        rtl8168_mdio_write(tp, 0x15, 0x0099);
-        rtl8168_mdio_write(tp, 0x19, 0x6c0b);
-        rtl8168_mdio_write(tp, 0x15, 0x00eb);
-        rtl8168_mdio_write(tp, 0x19, 0x6c0b);
-        rtl8168_mdio_write(tp, 0x15, 0x00f8);
-        rtl8168_mdio_write(tp, 0x19, 0x6f0b);
-        rtl8168_mdio_write(tp, 0x15, 0x00fe);
-        rtl8168_mdio_write(tp, 0x19, 0x6f0f);
-        rtl8168_mdio_write(tp, 0x15, 0x00db);
-        rtl8168_mdio_write(tp, 0x19, 0x6f09);
-        rtl8168_mdio_write(tp, 0x15, 0x00dc);
-        rtl8168_mdio_write(tp, 0x19, 0xaefd);
-        rtl8168_mdio_write(tp, 0x15, 0x00dd);
-        rtl8168_mdio_write(tp, 0x19, 0x6f0b);
-        rtl8168_mdio_write(tp, 0x15, 0x00de);
-        rtl8168_mdio_write(tp, 0x19, 0xc60b);
-        rtl8168_mdio_write(tp, 0x15, 0x00df);
-        rtl8168_mdio_write(tp, 0x19, 0x00fa);
-        rtl8168_mdio_write(tp, 0x15, 0x00e0);
-        rtl8168_mdio_write(tp, 0x19, 0x30e1);
-        rtl8168_mdio_write(tp, 0x15, 0x020c);
-        rtl8168_mdio_write(tp, 0x19, 0x3224);
-        rtl8168_mdio_write(tp, 0x15, 0x020e);
-        rtl8168_mdio_write(tp, 0x19, 0x9813);
-        rtl8168_mdio_write(tp, 0x15, 0x020f);
-        rtl8168_mdio_write(tp, 0x19, 0x7801);
-        rtl8168_mdio_write(tp, 0x15, 0x0210);
-        rtl8168_mdio_write(tp, 0x19, 0x930f);
-        rtl8168_mdio_write(tp, 0x15, 0x0211);
-        rtl8168_mdio_write(tp, 0x19, 0x9206);
-        rtl8168_mdio_write(tp, 0x15, 0x0212);
-        rtl8168_mdio_write(tp, 0x19, 0x4002);
-        rtl8168_mdio_write(tp, 0x15, 0x0213);
-        rtl8168_mdio_write(tp, 0x19, 0x7800);
-        rtl8168_mdio_write(tp, 0x15, 0x0214);
-        rtl8168_mdio_write(tp, 0x19, 0x588f);
-        rtl8168_mdio_write(tp, 0x15, 0x0215);
-        rtl8168_mdio_write(tp, 0x19, 0x5520);
-        rtl8168_mdio_write(tp, 0x15, 0x0216);
-        rtl8168_mdio_write(tp, 0x19, 0x3224);
-        rtl8168_mdio_write(tp, 0x15, 0x0217);
-        rtl8168_mdio_write(tp, 0x19, 0x4002);
-        rtl8168_mdio_write(tp, 0x15, 0x0218);
-        rtl8168_mdio_write(tp, 0x19, 0x7800);
-        rtl8168_mdio_write(tp, 0x15, 0x0219);
-        rtl8168_mdio_write(tp, 0x19, 0x588d);
-        rtl8168_mdio_write(tp, 0x15, 0x021a);
-        rtl8168_mdio_write(tp, 0x19, 0x5540);
-        rtl8168_mdio_write(tp, 0x15, 0x021b);
-        rtl8168_mdio_write(tp, 0x19, 0x9e03);
-        rtl8168_mdio_write(tp, 0x15, 0x021c);
-        rtl8168_mdio_write(tp, 0x19, 0x7c40);
-        rtl8168_mdio_write(tp, 0x15, 0x021d);
-        rtl8168_mdio_write(tp, 0x19, 0x6840);
-        rtl8168_mdio_write(tp, 0x15, 0x021e);
-        rtl8168_mdio_write(tp, 0x19, 0x3224);
-        rtl8168_mdio_write(tp, 0x15, 0x021f);
-        rtl8168_mdio_write(tp, 0x19, 0x4002);
-        rtl8168_mdio_write(tp, 0x15, 0x0220);
-        rtl8168_mdio_write(tp, 0x19, 0x3224);
-        rtl8168_mdio_write(tp, 0x15, 0x0221);
-        rtl8168_mdio_write(tp, 0x19, 0x9e03);
-        rtl8168_mdio_write(tp, 0x15, 0x0222);
-        rtl8168_mdio_write(tp, 0x19, 0x7c40);
-        rtl8168_mdio_write(tp, 0x15, 0x0223);
-        rtl8168_mdio_write(tp, 0x19, 0x6840);
-        rtl8168_mdio_write(tp, 0x15, 0x0224);
-        rtl8168_mdio_write(tp, 0x19, 0x7800);
-        rtl8168_mdio_write(tp, 0x15, 0x0225);
-        rtl8168_mdio_write(tp, 0x19, 0x3231);
-        rtl8168_mdio_write(tp, 0x15, 0x0000);
-        rtl8168_mdio_write(tp, 0x16, 0x0306);
-        rtl8168_mdio_write(tp, 0x16, 0x0300);
-        rtl8168_mdio_write(tp, 0x1f, 0x0000);
-        rtl8168_mdio_write(tp, 0x1f, 0x0005);
-        rtl8168_mdio_write(tp, 0x05, 0xfff6);
-        rtl8168_mdio_write(tp, 0x06, 0x0080);
-        rtl8168_mdio_write(tp, 0x05, 0x8000);
-        rtl8168_mdio_write(tp, 0x06, 0x0280);
-        rtl8168_mdio_write(tp, 0x06, 0x48f7);
-        rtl8168_mdio_write(tp, 0x06, 0x00e0);
-        rtl8168_mdio_write(tp, 0x06, 0xfff7);
-        rtl8168_mdio_write(tp, 0x06, 0xa080);
-        rtl8168_mdio_write(tp, 0x06, 0x02ae);
-        rtl8168_mdio_write(tp, 0x06, 0xf602);
-        rtl8168_mdio_write(tp, 0x06, 0x011e);
-        rtl8168_mdio_write(tp, 0x06, 0x0201);
-        rtl8168_mdio_write(tp, 0x06, 0x2b02);
-        rtl8168_mdio_write(tp, 0x06, 0x8077);
-        rtl8168_mdio_write(tp, 0x06, 0x0201);
-        rtl8168_mdio_write(tp, 0x06, 0x4802);
-        rtl8168_mdio_write(tp, 0x06, 0x0162);
-        rtl8168_mdio_write(tp, 0x06, 0x0280);
-        rtl8168_mdio_write(tp, 0x06, 0x9402);
-        rtl8168_mdio_write(tp, 0x06, 0x810e);
-        rtl8168_mdio_write(tp, 0x06, 0xe08b);
-        rtl8168_mdio_write(tp, 0x06, 0x88e1);
-        rtl8168_mdio_write(tp, 0x06, 0x8b89);
-        rtl8168_mdio_write(tp, 0x06, 0x1e01);
-        rtl8168_mdio_write(tp, 0x06, 0xe18b);
-        rtl8168_mdio_write(tp, 0x06, 0x8a1e);
-        rtl8168_mdio_write(tp, 0x06, 0x01e1);
-        rtl8168_mdio_write(tp, 0x06, 0x8b8b);
-        rtl8168_mdio_write(tp, 0x06, 0x1e01);
-        rtl8168_mdio_write(tp, 0x06, 0xe18b);
-        rtl8168_mdio_write(tp, 0x06, 0x8c1e);
-        rtl8168_mdio_write(tp, 0x06, 0x01e1);
-        rtl8168_mdio_write(tp, 0x06, 0x8b8d);
-        rtl8168_mdio_write(tp, 0x06, 0x1e01);
-        rtl8168_mdio_write(tp, 0x06, 0xe18b);
-        rtl8168_mdio_write(tp, 0x06, 0x8e1e);
-        rtl8168_mdio_write(tp, 0x06, 0x01a0);
-        rtl8168_mdio_write(tp, 0x06, 0x00c7);
-        rtl8168_mdio_write(tp, 0x06, 0xaebb);
-        rtl8168_mdio_write(tp, 0x06, 0xd481);
-        rtl8168_mdio_write(tp, 0x06, 0xd4e4);
-        rtl8168_mdio_write(tp, 0x06, 0x8b92);
-        rtl8168_mdio_write(tp, 0x06, 0xe58b);
-        rtl8168_mdio_write(tp, 0x06, 0x9302);
-        rtl8168_mdio_write(tp, 0x06, 0x2e5a);
-        rtl8168_mdio_write(tp, 0x06, 0xbf8b);
-        rtl8168_mdio_write(tp, 0x06, 0x88ec);
-        rtl8168_mdio_write(tp, 0x06, 0x0019);
-        rtl8168_mdio_write(tp, 0x06, 0xa98b);
-        rtl8168_mdio_write(tp, 0x06, 0x90f9);
-        rtl8168_mdio_write(tp, 0x06, 0xeeff);
-        rtl8168_mdio_write(tp, 0x06, 0xf600);
-        rtl8168_mdio_write(tp, 0x06, 0xeeff);
-        rtl8168_mdio_write(tp, 0x06, 0xf7fc);
-        rtl8168_mdio_write(tp, 0x06, 0xd100);
-        rtl8168_mdio_write(tp, 0x06, 0xbf83);
-        rtl8168_mdio_write(tp, 0x06, 0x3c02);
-        rtl8168_mdio_write(tp, 0x06, 0x3a21);
-        rtl8168_mdio_write(tp, 0x06, 0xd101);
-        rtl8168_mdio_write(tp, 0x06, 0xbf83);
-        rtl8168_mdio_write(tp, 0x06, 0x3f02);
-        rtl8168_mdio_write(tp, 0x06, 0x3a21);
-        rtl8168_mdio_write(tp, 0x06, 0x04f8);
-        rtl8168_mdio_write(tp, 0x06, 0xe08b);
-        rtl8168_mdio_write(tp, 0x06, 0x8aad);
-        rtl8168_mdio_write(tp, 0x06, 0x2014);
-        rtl8168_mdio_write(tp, 0x06, 0xee8b);
-        rtl8168_mdio_write(tp, 0x06, 0x8a00);
-        rtl8168_mdio_write(tp, 0x06, 0x0220);
-        rtl8168_mdio_write(tp, 0x06, 0x8be0);
-        rtl8168_mdio_write(tp, 0x06, 0xe426);
-        rtl8168_mdio_write(tp, 0x06, 0xe1e4);
-        rtl8168_mdio_write(tp, 0x06, 0x27ee);
-        rtl8168_mdio_write(tp, 0x06, 0xe426);
-        rtl8168_mdio_write(tp, 0x06, 0x23e5);
-        rtl8168_mdio_write(tp, 0x06, 0xe427);
-        rtl8168_mdio_write(tp, 0x06, 0xfc04);
-        rtl8168_mdio_write(tp, 0x06, 0xf8e0);
-        rtl8168_mdio_write(tp, 0x06, 0x8b8d);
-        rtl8168_mdio_write(tp, 0x06, 0xad20);
-        rtl8168_mdio_write(tp, 0x06, 0x14ee);
-        rtl8168_mdio_write(tp, 0x06, 0x8b8d);
-        rtl8168_mdio_write(tp, 0x06, 0x00e0);
-        rtl8168_mdio_write(tp, 0x06, 0x8a5a);
-        rtl8168_mdio_write(tp, 0x06, 0x7803);
-        rtl8168_mdio_write(tp, 0x06, 0x9e09);
-        rtl8168_mdio_write(tp, 0x06, 0x0206);
-        rtl8168_mdio_write(tp, 0x06, 0x2802);
-        rtl8168_mdio_write(tp, 0x06, 0x80b1);
-        rtl8168_mdio_write(tp, 0x06, 0x0232);
-        rtl8168_mdio_write(tp, 0x06, 0xfdfc);
-        rtl8168_mdio_write(tp, 0x06, 0x04f8);
-        rtl8168_mdio_write(tp, 0x06, 0xf9e0);
-        rtl8168_mdio_write(tp, 0x06, 0x8b81);
-        rtl8168_mdio_write(tp, 0x06, 0xac26);
-        rtl8168_mdio_write(tp, 0x06, 0x1ae0);
-        rtl8168_mdio_write(tp, 0x06, 0x8b81);
-        rtl8168_mdio_write(tp, 0x06, 0xac21);
-        rtl8168_mdio_write(tp, 0x06, 0x14e0);
-        rtl8168_mdio_write(tp, 0x06, 0x8b85);
-        rtl8168_mdio_write(tp, 0x06, 0xac20);
-        rtl8168_mdio_write(tp, 0x06, 0x0ee0);
-        rtl8168_mdio_write(tp, 0x06, 0x8b85);
-        rtl8168_mdio_write(tp, 0x06, 0xac23);
-        rtl8168_mdio_write(tp, 0x06, 0x08e0);
-        rtl8168_mdio_write(tp, 0x06, 0x8b87);
-        rtl8168_mdio_write(tp, 0x06, 0xac24);
-        rtl8168_mdio_write(tp, 0x06, 0x02ae);
-        rtl8168_mdio_write(tp, 0x06, 0x3802);
-        rtl8168_mdio_write(tp, 0x06, 0x1b02);
-        rtl8168_mdio_write(tp, 0x06, 0xeee4);
-        rtl8168_mdio_write(tp, 0x06, 0x1c04);
-        rtl8168_mdio_write(tp, 0x06, 0xeee4);
-        rtl8168_mdio_write(tp, 0x06, 0x1d04);
-        rtl8168_mdio_write(tp, 0x06, 0xe2e0);
-        rtl8168_mdio_write(tp, 0x06, 0x7ce3);
-        rtl8168_mdio_write(tp, 0x06, 0xe07d);
-        rtl8168_mdio_write(tp, 0x06, 0xe0e0);
-        rtl8168_mdio_write(tp, 0x06, 0x38e1);
-        rtl8168_mdio_write(tp, 0x06, 0xe039);
-        rtl8168_mdio_write(tp, 0x06, 0xad2e);
-        rtl8168_mdio_write(tp, 0x06, 0x1bad);
-        rtl8168_mdio_write(tp, 0x06, 0x390d);
-        rtl8168_mdio_write(tp, 0x06, 0xd101);
-        rtl8168_mdio_write(tp, 0x06, 0xbf22);
-        rtl8168_mdio_write(tp, 0x06, 0xe802);
-        rtl8168_mdio_write(tp, 0x06, 0x3a21);
-        rtl8168_mdio_write(tp, 0x06, 0x0222);
-        rtl8168_mdio_write(tp, 0x06, 0x10ae);
-        rtl8168_mdio_write(tp, 0x06, 0x0bac);
-        rtl8168_mdio_write(tp, 0x06, 0x3802);
-        rtl8168_mdio_write(tp, 0x06, 0xae06);
-        rtl8168_mdio_write(tp, 0x06, 0x0222);
-        rtl8168_mdio_write(tp, 0x06, 0x4d02);
-        rtl8168_mdio_write(tp, 0x06, 0x2292);
-        rtl8168_mdio_write(tp, 0x06, 0x021b);
-        rtl8168_mdio_write(tp, 0x06, 0x13fd);
-        rtl8168_mdio_write(tp, 0x06, 0xfc04);
-        rtl8168_mdio_write(tp, 0x06, 0xf8e0);
-        rtl8168_mdio_write(tp, 0x06, 0x8b8e);
-        rtl8168_mdio_write(tp, 0x06, 0xad20);
-        rtl8168_mdio_write(tp, 0x06, 0x1af6);
-        rtl8168_mdio_write(tp, 0x06, 0x20e4);
-        rtl8168_mdio_write(tp, 0x06, 0x8b8e);
-        rtl8168_mdio_write(tp, 0x06, 0x022b);
-        rtl8168_mdio_write(tp, 0x06, 0x1e02);
-        rtl8168_mdio_write(tp, 0x06, 0x82ae);
-        rtl8168_mdio_write(tp, 0x06, 0x0203);
-        rtl8168_mdio_write(tp, 0x06, 0xc002);
-        rtl8168_mdio_write(tp, 0x06, 0x827d);
-        rtl8168_mdio_write(tp, 0x06, 0x022e);
-        rtl8168_mdio_write(tp, 0x06, 0x6f02);
-        rtl8168_mdio_write(tp, 0x06, 0x047b);
-        rtl8168_mdio_write(tp, 0x06, 0x022f);
-        rtl8168_mdio_write(tp, 0x06, 0x9ae0);
-        rtl8168_mdio_write(tp, 0x06, 0x8b8e);
-        rtl8168_mdio_write(tp, 0x06, 0xad21);
-        rtl8168_mdio_write(tp, 0x06, 0x0bf6);
-        rtl8168_mdio_write(tp, 0x06, 0x21e4);
-        rtl8168_mdio_write(tp, 0x06, 0x8b8e);
-        rtl8168_mdio_write(tp, 0x06, 0x0281);
-        rtl8168_mdio_write(tp, 0x06, 0x9002);
-        rtl8168_mdio_write(tp, 0x06, 0x1cd9);
-        rtl8168_mdio_write(tp, 0x06, 0xe08b);
-        rtl8168_mdio_write(tp, 0x06, 0x8ead);
-        rtl8168_mdio_write(tp, 0x06, 0x2208);
-        rtl8168_mdio_write(tp, 0x06, 0xf622);
-        rtl8168_mdio_write(tp, 0x06, 0xe48b);
-        rtl8168_mdio_write(tp, 0x06, 0x8e02);
-        rtl8168_mdio_write(tp, 0x06, 0x35f4);
-        rtl8168_mdio_write(tp, 0x06, 0xe08b);
-        rtl8168_mdio_write(tp, 0x06, 0x8ead);
-        rtl8168_mdio_write(tp, 0x06, 0x2308);
-        rtl8168_mdio_write(tp, 0x06, 0xf623);
-        rtl8168_mdio_write(tp, 0x06, 0xe48b);
-        rtl8168_mdio_write(tp, 0x06, 0x8e02);
-        rtl8168_mdio_write(tp, 0x06, 0x31e8);
-        rtl8168_mdio_write(tp, 0x06, 0xe08b);
-        rtl8168_mdio_write(tp, 0x06, 0x8ead);
-        rtl8168_mdio_write(tp, 0x06, 0x2405);
-        rtl8168_mdio_write(tp, 0x06, 0xf624);
-        rtl8168_mdio_write(tp, 0x06, 0xe48b);
-        rtl8168_mdio_write(tp, 0x06, 0x8ee0);
-        rtl8168_mdio_write(tp, 0x06, 0x8b8e);
-        rtl8168_mdio_write(tp, 0x06, 0xad25);
-        rtl8168_mdio_write(tp, 0x06, 0x05f6);
-        rtl8168_mdio_write(tp, 0x06, 0x25e4);
-        rtl8168_mdio_write(tp, 0x06, 0x8b8e);
-        rtl8168_mdio_write(tp, 0x06, 0xe08b);
-        rtl8168_mdio_write(tp, 0x06, 0x8ead);
-        rtl8168_mdio_write(tp, 0x06, 0x2608);
-        rtl8168_mdio_write(tp, 0x06, 0xf626);
-        rtl8168_mdio_write(tp, 0x06, 0xe48b);
-        rtl8168_mdio_write(tp, 0x06, 0x8e02);
-        rtl8168_mdio_write(tp, 0x06, 0x2d8a);
-        rtl8168_mdio_write(tp, 0x06, 0xe08b);
-        rtl8168_mdio_write(tp, 0x06, 0x8ead);
-        rtl8168_mdio_write(tp, 0x06, 0x2705);
-        rtl8168_mdio_write(tp, 0x06, 0xf627);
-        rtl8168_mdio_write(tp, 0x06, 0xe48b);
-        rtl8168_mdio_write(tp, 0x06, 0x8e02);
-        rtl8168_mdio_write(tp, 0x06, 0x0386);
-        rtl8168_mdio_write(tp, 0x06, 0xfc04);
-        rtl8168_mdio_write(tp, 0x06, 0xf8fa);
-        rtl8168_mdio_write(tp, 0x06, 0xef69);
-        rtl8168_mdio_write(tp, 0x06, 0xe0e0);
-        rtl8168_mdio_write(tp, 0x06, 0x00e1);
-        rtl8168_mdio_write(tp, 0x06, 0xe001);
-        rtl8168_mdio_write(tp, 0x06, 0xad27);
-        rtl8168_mdio_write(tp, 0x06, 0x32e0);
-        rtl8168_mdio_write(tp, 0x06, 0x8b40);
-        rtl8168_mdio_write(tp, 0x06, 0xf720);
-        rtl8168_mdio_write(tp, 0x06, 0xe48b);
-        rtl8168_mdio_write(tp, 0x06, 0x40bf);
-        rtl8168_mdio_write(tp, 0x06, 0x32c1);
-        rtl8168_mdio_write(tp, 0x06, 0x0239);
-        rtl8168_mdio_write(tp, 0x06, 0xf4ad);
-        rtl8168_mdio_write(tp, 0x06, 0x2821);
-        rtl8168_mdio_write(tp, 0x06, 0xe0e0);
-        rtl8168_mdio_write(tp, 0x06, 0x20e1);
-        rtl8168_mdio_write(tp, 0x06, 0xe021);
-        rtl8168_mdio_write(tp, 0x06, 0xad20);
-        rtl8168_mdio_write(tp, 0x06, 0x18e0);
-        rtl8168_mdio_write(tp, 0x06, 0x8b40);
-        rtl8168_mdio_write(tp, 0x06, 0xf620);
-        rtl8168_mdio_write(tp, 0x06, 0xe48b);
-        rtl8168_mdio_write(tp, 0x06, 0x40ee);
-        rtl8168_mdio_write(tp, 0x06, 0x8b3b);
-        rtl8168_mdio_write(tp, 0x06, 0xffe0);
-        rtl8168_mdio_write(tp, 0x06, 0x8a8a);
-        rtl8168_mdio_write(tp, 0x06, 0xe18a);
-        rtl8168_mdio_write(tp, 0x06, 0x8be4);
-        rtl8168_mdio_write(tp, 0x06, 0xe000);
-        rtl8168_mdio_write(tp, 0x06, 0xe5e0);
-        rtl8168_mdio_write(tp, 0x06, 0x01ef);
-        rtl8168_mdio_write(tp, 0x06, 0x96fe);
-        rtl8168_mdio_write(tp, 0x06, 0xfc04);
-        rtl8168_mdio_write(tp, 0x06, 0xf8f9);
-        rtl8168_mdio_write(tp, 0x06, 0xface);
-        rtl8168_mdio_write(tp, 0x06, 0xfaef);
-        rtl8168_mdio_write(tp, 0x06, 0x69fa);
-        rtl8168_mdio_write(tp, 0x06, 0xd401);
-        rtl8168_mdio_write(tp, 0x06, 0x55b4);
-        rtl8168_mdio_write(tp, 0x06, 0xfebf);
-        rtl8168_mdio_write(tp, 0x06, 0x1c5e);
-        rtl8168_mdio_write(tp, 0x06, 0x0239);
-        rtl8168_mdio_write(tp, 0x06, 0xf4ac);
-        rtl8168_mdio_write(tp, 0x06, 0x280b);
-        rtl8168_mdio_write(tp, 0x06, 0xbf1c);
-        rtl8168_mdio_write(tp, 0x06, 0x5b02);
-        rtl8168_mdio_write(tp, 0x06, 0x39f4);
-        rtl8168_mdio_write(tp, 0x06, 0xac28);
-        rtl8168_mdio_write(tp, 0x06, 0x49ae);
-        rtl8168_mdio_write(tp, 0x06, 0x64bf);
-        rtl8168_mdio_write(tp, 0x06, 0x1c5b);
-        rtl8168_mdio_write(tp, 0x06, 0x0239);
-        rtl8168_mdio_write(tp, 0x06, 0xf4ac);
-        rtl8168_mdio_write(tp, 0x06, 0x285b);
-        rtl8168_mdio_write(tp, 0x06, 0xd000);
-        rtl8168_mdio_write(tp, 0x06, 0x0282);
-        rtl8168_mdio_write(tp, 0x06, 0x62ac);
-        rtl8168_mdio_write(tp, 0x06, 0x2105);
-        rtl8168_mdio_write(tp, 0x06, 0xac22);
-        rtl8168_mdio_write(tp, 0x06, 0x02ae);
-        rtl8168_mdio_write(tp, 0x06, 0x4ebf);
-        rtl8168_mdio_write(tp, 0x06, 0xe0c4);
-        rtl8168_mdio_write(tp, 0x06, 0xbe85);
-        rtl8168_mdio_write(tp, 0x06, 0xecd2);
-        rtl8168_mdio_write(tp, 0x06, 0x04d8);
-        rtl8168_mdio_write(tp, 0x06, 0x19d9);
-        rtl8168_mdio_write(tp, 0x06, 0x1907);
-        rtl8168_mdio_write(tp, 0x06, 0xdc19);
-        rtl8168_mdio_write(tp, 0x06, 0xdd19);
-        rtl8168_mdio_write(tp, 0x06, 0x0789);
-        rtl8168_mdio_write(tp, 0x06, 0x89ef);
-        rtl8168_mdio_write(tp, 0x06, 0x645e);
-        rtl8168_mdio_write(tp, 0x06, 0x07ff);
-        rtl8168_mdio_write(tp, 0x06, 0x0d65);
-        rtl8168_mdio_write(tp, 0x06, 0x5cf8);
-        rtl8168_mdio_write(tp, 0x06, 0x001e);
-        rtl8168_mdio_write(tp, 0x06, 0x46dc);
-        rtl8168_mdio_write(tp, 0x06, 0x19dd);
-        rtl8168_mdio_write(tp, 0x06, 0x19b2);
-        rtl8168_mdio_write(tp, 0x06, 0xe2d4);
-        rtl8168_mdio_write(tp, 0x06, 0x0001);
-        rtl8168_mdio_write(tp, 0x06, 0xbf1c);
-        rtl8168_mdio_write(tp, 0x06, 0x5b02);
-        rtl8168_mdio_write(tp, 0x06, 0x3a21);
-        rtl8168_mdio_write(tp, 0x06, 0xae1d);
-        rtl8168_mdio_write(tp, 0x06, 0xbee0);
-        rtl8168_mdio_write(tp, 0x06, 0xc4bf);
-        rtl8168_mdio_write(tp, 0x06, 0x85ec);
-        rtl8168_mdio_write(tp, 0x06, 0xd204);
-        rtl8168_mdio_write(tp, 0x06, 0xd819);
-        rtl8168_mdio_write(tp, 0x06, 0xd919);
-        rtl8168_mdio_write(tp, 0x06, 0x07dc);
-        rtl8168_mdio_write(tp, 0x06, 0x19dd);
-        rtl8168_mdio_write(tp, 0x06, 0x1907);
-        rtl8168_mdio_write(tp, 0x06, 0xb2f4);
-        rtl8168_mdio_write(tp, 0x06, 0xd400);
-        rtl8168_mdio_write(tp, 0x06, 0x00bf);
-        rtl8168_mdio_write(tp, 0x06, 0x1c5b);
-        rtl8168_mdio_write(tp, 0x06, 0x023a);
-        rtl8168_mdio_write(tp, 0x06, 0x21fe);
-        rtl8168_mdio_write(tp, 0x06, 0xef96);
-        rtl8168_mdio_write(tp, 0x06, 0xfec6);
-        rtl8168_mdio_write(tp, 0x06, 0xfefd);
-        rtl8168_mdio_write(tp, 0x06, 0xfc05);
-        rtl8168_mdio_write(tp, 0x06, 0xf9e2);
-        rtl8168_mdio_write(tp, 0x06, 0xe0ea);
-        rtl8168_mdio_write(tp, 0x06, 0xe3e0);
-        rtl8168_mdio_write(tp, 0x06, 0xeb5a);
-        rtl8168_mdio_write(tp, 0x06, 0x070c);
-        rtl8168_mdio_write(tp, 0x06, 0x031e);
-        rtl8168_mdio_write(tp, 0x06, 0x20e6);
-        rtl8168_mdio_write(tp, 0x06, 0xe0ea);
-        rtl8168_mdio_write(tp, 0x06, 0xe7e0);
-        rtl8168_mdio_write(tp, 0x06, 0xebe0);
-        rtl8168_mdio_write(tp, 0x06, 0xe0fc);
-        rtl8168_mdio_write(tp, 0x06, 0xe1e0);
-        rtl8168_mdio_write(tp, 0x06, 0xfdfd);
-        rtl8168_mdio_write(tp, 0x06, 0x04f8);
-        rtl8168_mdio_write(tp, 0x06, 0xfaef);
-        rtl8168_mdio_write(tp, 0x06, 0x69e0);
-        rtl8168_mdio_write(tp, 0x06, 0x8b80);
-        rtl8168_mdio_write(tp, 0x06, 0xad27);
-        rtl8168_mdio_write(tp, 0x06, 0x22bf);
-        rtl8168_mdio_write(tp, 0x06, 0x47ba);
-        rtl8168_mdio_write(tp, 0x06, 0x0239);
-        rtl8168_mdio_write(tp, 0x06, 0xf4e0);
-        rtl8168_mdio_write(tp, 0x06, 0x8b44);
-        rtl8168_mdio_write(tp, 0x06, 0x1f01);
-        rtl8168_mdio_write(tp, 0x06, 0x9e15);
-        rtl8168_mdio_write(tp, 0x06, 0xe58b);
-        rtl8168_mdio_write(tp, 0x06, 0x44ad);
-        rtl8168_mdio_write(tp, 0x06, 0x2907);
-        rtl8168_mdio_write(tp, 0x06, 0xac28);
-        rtl8168_mdio_write(tp, 0x06, 0x04d1);
-        rtl8168_mdio_write(tp, 0x06, 0x01ae);
-        rtl8168_mdio_write(tp, 0x06, 0x02d1);
-        rtl8168_mdio_write(tp, 0x06, 0x00bf);
-        rtl8168_mdio_write(tp, 0x06, 0x8342);
-        rtl8168_mdio_write(tp, 0x06, 0x023a);
-        rtl8168_mdio_write(tp, 0x06, 0x21ef);
-        rtl8168_mdio_write(tp, 0x06, 0x96fe);
-        rtl8168_mdio_write(tp, 0x06, 0xfc04);
-        rtl8168_mdio_write(tp, 0x06, 0xf8e0);
-        rtl8168_mdio_write(tp, 0x06, 0x8b85);
-        rtl8168_mdio_write(tp, 0x06, 0xad26);
-        rtl8168_mdio_write(tp, 0x06, 0x30e0);
-        rtl8168_mdio_write(tp, 0x06, 0xe036);
-        rtl8168_mdio_write(tp, 0x06, 0xe1e0);
-        rtl8168_mdio_write(tp, 0x06, 0x37e1);
-        rtl8168_mdio_write(tp, 0x06, 0x8b3f);
-        rtl8168_mdio_write(tp, 0x06, 0x1f10);
-        rtl8168_mdio_write(tp, 0x06, 0x9e23);
-        rtl8168_mdio_write(tp, 0x06, 0xe48b);
-        rtl8168_mdio_write(tp, 0x06, 0x3fac);
-        rtl8168_mdio_write(tp, 0x06, 0x200b);
-        rtl8168_mdio_write(tp, 0x06, 0xac21);
-        rtl8168_mdio_write(tp, 0x06, 0x0dac);
-        rtl8168_mdio_write(tp, 0x06, 0x250f);
-        rtl8168_mdio_write(tp, 0x06, 0xac27);
-        rtl8168_mdio_write(tp, 0x06, 0x11ae);
-        rtl8168_mdio_write(tp, 0x06, 0x1202);
-        rtl8168_mdio_write(tp, 0x06, 0x2cb5);
-        rtl8168_mdio_write(tp, 0x06, 0xae0d);
-        rtl8168_mdio_write(tp, 0x06, 0x0282);
-        rtl8168_mdio_write(tp, 0x06, 0xe7ae);
-        rtl8168_mdio_write(tp, 0x06, 0x0802);
-        rtl8168_mdio_write(tp, 0x06, 0x2cd7);
-        rtl8168_mdio_write(tp, 0x06, 0xae03);
-        rtl8168_mdio_write(tp, 0x06, 0x022c);
-        rtl8168_mdio_write(tp, 0x06, 0xeafc);
-        rtl8168_mdio_write(tp, 0x06, 0x04f8);
-        rtl8168_mdio_write(tp, 0x06, 0xfaef);
-        rtl8168_mdio_write(tp, 0x06, 0x6902);
-        rtl8168_mdio_write(tp, 0x06, 0x8304);
-        rtl8168_mdio_write(tp, 0x06, 0xe0e0);
-        rtl8168_mdio_write(tp, 0x06, 0x14e1);
-        rtl8168_mdio_write(tp, 0x06, 0xe015);
-        rtl8168_mdio_write(tp, 0x06, 0xad26);
-        rtl8168_mdio_write(tp, 0x06, 0x08d1);
-        rtl8168_mdio_write(tp, 0x06, 0x1ebf);
-        rtl8168_mdio_write(tp, 0x06, 0x2d47);
-        rtl8168_mdio_write(tp, 0x06, 0x023a);
-        rtl8168_mdio_write(tp, 0x06, 0x21ef);
-        rtl8168_mdio_write(tp, 0x06, 0x96fe);
-        rtl8168_mdio_write(tp, 0x06, 0xfc04);
-        rtl8168_mdio_write(tp, 0x06, 0xf8e0);
-        rtl8168_mdio_write(tp, 0x06, 0x8b85);
-        rtl8168_mdio_write(tp, 0x06, 0xad27);
-        rtl8168_mdio_write(tp, 0x06, 0x2fd0);
-        rtl8168_mdio_write(tp, 0x06, 0x0b02);
-        rtl8168_mdio_write(tp, 0x06, 0x3826);
-        rtl8168_mdio_write(tp, 0x06, 0x5882);
-        rtl8168_mdio_write(tp, 0x06, 0x7882);
-        rtl8168_mdio_write(tp, 0x06, 0x9f24);
-        rtl8168_mdio_write(tp, 0x06, 0xe08b);
-        rtl8168_mdio_write(tp, 0x06, 0x32e1);
-        rtl8168_mdio_write(tp, 0x06, 0x8b33);
-        rtl8168_mdio_write(tp, 0x06, 0x1f10);
-        rtl8168_mdio_write(tp, 0x06, 0x9e1a);
-        rtl8168_mdio_write(tp, 0x06, 0x10e4);
-        rtl8168_mdio_write(tp, 0x06, 0x8b32);
-        rtl8168_mdio_write(tp, 0x06, 0xe0e0);
-        rtl8168_mdio_write(tp, 0x06, 0x28e1);
-        rtl8168_mdio_write(tp, 0x06, 0xe029);
-        rtl8168_mdio_write(tp, 0x06, 0xf72c);
-        rtl8168_mdio_write(tp, 0x06, 0xe4e0);
-        rtl8168_mdio_write(tp, 0x06, 0x28e5);
-        rtl8168_mdio_write(tp, 0x06, 0xe029);
-        rtl8168_mdio_write(tp, 0x06, 0xf62c);
-        rtl8168_mdio_write(tp, 0x06, 0xe4e0);
-        rtl8168_mdio_write(tp, 0x06, 0x28e5);
-        rtl8168_mdio_write(tp, 0x06, 0xe029);
-        rtl8168_mdio_write(tp, 0x06, 0xfc04);
-        rtl8168_mdio_write(tp, 0x06, 0x00e1);
-        rtl8168_mdio_write(tp, 0x06, 0x4077);
-        rtl8168_mdio_write(tp, 0x06, 0xe140);
-        rtl8168_mdio_write(tp, 0x06, 0xbbe0);
-        rtl8168_mdio_write(tp, 0x06, 0x2a00);
-        rtl8168_mdio_write(tp, 0x05, 0xe142);
-        gphy_val = rtl8168_mdio_read(tp, 0x06);
-        gphy_val |= BIT_0;
-        rtl8168_mdio_write(tp,0x06, gphy_val);
-        rtl8168_mdio_write(tp, 0x05, 0xe140);
-        gphy_val = rtl8168_mdio_read(tp, 0x06);
-        gphy_val |= BIT_0;
-        rtl8168_mdio_write(tp,0x06, gphy_val);
-        rtl8168_mdio_write(tp, 0x1f, 0x0000);
-        rtl8168_mdio_write(tp,0x1f, 0x0005);
-        for (i = 0; i < 200; i++) {
-                udelay(100);
-                gphy_val = rtl8168_mdio_read(tp, 0x00);
-                if (gphy_val & BIT_7)
-                        break;
-        }
-        rtl8168_mdio_write(tp,0x1f, 0x0007);
-        rtl8168_mdio_write(tp,0x1e, 0x0023);
-        gphy_val = rtl8168_mdio_read(tp, 0x17);
-        gphy_val |= BIT_1;
-        if (tp->RequiredSecLanDonglePatch)
-                gphy_val &= ~BIT_2;
-        rtl8168_mdio_write(tp,0x17, gphy_val);
-        rtl8168_mdio_write(tp,0x1f, 0x0000);
-
-        rtl8168_mdio_write(tp, 0x1F, 0x0003);
-        rtl8168_mdio_write(tp, 0x09, 0xA20F);
-        rtl8168_mdio_write(tp, 0x1F, 0x0000);
-        rtl8168_mdio_write(tp, 0x1f, 0x0003);
-        rtl8168_mdio_write(tp, 0x01, 0x328A);
-        rtl8168_mdio_write(tp, 0x1f, 0x0000);
-
-        rtl8168_mdio_write(tp,0x1f, 0x0000);
-        rtl8168_mdio_write(tp,0x00, 0x9200);
-}
-
-static void
-rtl8168_set_phy_mcu_8168g_1(struct net_device *dev)
-{
-        struct rtl8168_private *tp = netdev_priv(dev);
-        unsigned int gphy_val;
-
-        rtl8168_set_phy_mcu_patch_request(tp);
-        rtl8168_mdio_write(tp, 0x1f, 0x0A43);
-        rtl8168_mdio_write(tp, 0x13, 0x8146);
-        rtl8168_mdio_write(tp, 0x14, 0x2300);
-        rtl8168_mdio_write(tp, 0x13, 0xB820);
-        rtl8168_mdio_write(tp, 0x14, 0x0210);
-
-        rtl8168_mdio_write(tp, 0x1F, 0x0A43);
-        rtl8168_mdio_write(tp, 0x13, 0xB820);
-        rtl8168_mdio_write(tp, 0x14, 0x0290);
-        rtl8168_mdio_write(tp, 0x13, 0xA012);
-        rtl8168_mdio_write(tp, 0x14, 0x0000);
-        rtl8168_mdio_write(tp, 0x13, 0xA014);
-        rtl8168_mdio_write(tp, 0x14, 0x2c04);
-        rtl8168_mdio_write(tp, 0x14, 0x2c0c);
-        rtl8168_mdio_write(tp, 0x14, 0x2c6c);
-        rtl8168_mdio_write(tp, 0x14, 0x2d0d);
-        rtl8168_mdio_write(tp, 0x14, 0x31ce);
-        rtl8168_mdio_write(tp, 0x14, 0x506d);
-        rtl8168_mdio_write(tp, 0x14, 0xd708);
-        rtl8168_mdio_write(tp, 0x14, 0x3108);
-        rtl8168_mdio_write(tp, 0x14, 0x106d);
-        rtl8168_mdio_write(tp, 0x14, 0x1560);
-        rtl8168_mdio_write(tp, 0x14, 0x15a9);
-        rtl8168_mdio_write(tp, 0x14, 0x206e);
-        rtl8168_mdio_write(tp, 0x14, 0x175b);
-        rtl8168_mdio_write(tp, 0x14, 0x6062);
-        rtl8168_mdio_write(tp, 0x14, 0xd700);
-        rtl8168_mdio_write(tp, 0x14, 0x5fae);
-        rtl8168_mdio_write(tp, 0x14, 0xd708);
-        rtl8168_mdio_write(tp, 0x14, 0x3107);
-        rtl8168_mdio_write(tp, 0x14, 0x4c1e);
-        rtl8168_mdio_write(tp, 0x14, 0x4169);
-        rtl8168_mdio_write(tp, 0x14, 0x316a);
-        rtl8168_mdio_write(tp, 0x14, 0x0c19);
-        rtl8168_mdio_write(tp, 0x14, 0x31aa);
-        rtl8168_mdio_write(tp, 0x14, 0x0c19);
-        rtl8168_mdio_write(tp, 0x14, 0x2c1b);
-        rtl8168_mdio_write(tp, 0x14, 0x5e62);
-        rtl8168_mdio_write(tp, 0x14, 0x26b5);
-        rtl8168_mdio_write(tp, 0x14, 0x31ab);
-        rtl8168_mdio_write(tp, 0x14, 0x5c1e);
-        rtl8168_mdio_write(tp, 0x14, 0x2c0c);
-        rtl8168_mdio_write(tp, 0x14, 0xc040);
-        rtl8168_mdio_write(tp, 0x14, 0x8808);
-        rtl8168_mdio_write(tp, 0x14, 0xc520);
-        rtl8168_mdio_write(tp, 0x14, 0xc421);
-        rtl8168_mdio_write(tp, 0x14, 0xd05a);
-        rtl8168_mdio_write(tp, 0x14, 0xd19a);
-        rtl8168_mdio_write(tp, 0x14, 0xd709);
-        rtl8168_mdio_write(tp, 0x14, 0x608f);
-        rtl8168_mdio_write(tp, 0x14, 0xd06b);
-        rtl8168_mdio_write(tp, 0x14, 0xd18a);
-        rtl8168_mdio_write(tp, 0x14, 0x2c2c);
-        rtl8168_mdio_write(tp, 0x14, 0xd0be);
-        rtl8168_mdio_write(tp, 0x14, 0xd188);
-        rtl8168_mdio_write(tp, 0x14, 0x2c2c);
-        rtl8168_mdio_write(tp, 0x14, 0xd708);
-        rtl8168_mdio_write(tp, 0x14, 0x4072);
-        rtl8168_mdio_write(tp, 0x14, 0xc104);
-        rtl8168_mdio_write(tp, 0x14, 0x2c3e);
-        rtl8168_mdio_write(tp, 0x14, 0x4076);
-        rtl8168_mdio_write(tp, 0x14, 0xc110);
-        rtl8168_mdio_write(tp, 0x14, 0x2c3e);
-        rtl8168_mdio_write(tp, 0x14, 0x4071);
-        rtl8168_mdio_write(tp, 0x14, 0xc102);
-        rtl8168_mdio_write(tp, 0x14, 0x2c3e);
-        rtl8168_mdio_write(tp, 0x14, 0x4070);
-        rtl8168_mdio_write(tp, 0x14, 0xc101);
-        rtl8168_mdio_write(tp, 0x14, 0x2c3e);
-        rtl8168_mdio_write(tp, 0x14, 0x175b);
-        rtl8168_mdio_write(tp, 0x14, 0xd709);
-        rtl8168_mdio_write(tp, 0x14, 0x3390);
-        rtl8168_mdio_write(tp, 0x14, 0x5c39);
-        rtl8168_mdio_write(tp, 0x14, 0x2c4e);
-        rtl8168_mdio_write(tp, 0x14, 0x175b);
-        rtl8168_mdio_write(tp, 0x14, 0xd708);
-        rtl8168_mdio_write(tp, 0x14, 0x6193);
-        rtl8168_mdio_write(tp, 0x14, 0xd709);
-        rtl8168_mdio_write(tp, 0x14, 0x5f9d);
-        rtl8168_mdio_write(tp, 0x14, 0x408b);
-        rtl8168_mdio_write(tp, 0x14, 0xd71e);
-        rtl8168_mdio_write(tp, 0x14, 0x6042);
-        rtl8168_mdio_write(tp, 0x14, 0xb401);
-        rtl8168_mdio_write(tp, 0x14, 0x175b);
-        rtl8168_mdio_write(tp, 0x14, 0xd708);
-        rtl8168_mdio_write(tp, 0x14, 0x6073);
-        rtl8168_mdio_write(tp, 0x14, 0x5fbc);
-        rtl8168_mdio_write(tp, 0x14, 0x2c4d);
-        rtl8168_mdio_write(tp, 0x14, 0x26ed);
-        rtl8168_mdio_write(tp, 0x14, 0xb280);
-        rtl8168_mdio_write(tp, 0x14, 0xa841);
-        rtl8168_mdio_write(tp, 0x14, 0x9420);
-        rtl8168_mdio_write(tp, 0x14, 0x8710);
-        rtl8168_mdio_write(tp, 0x14, 0xd709);
-        rtl8168_mdio_write(tp, 0x14, 0x42ec);
-        rtl8168_mdio_write(tp, 0x14, 0x606d);
-        rtl8168_mdio_write(tp, 0x14, 0xd207);
-        rtl8168_mdio_write(tp, 0x14, 0x2c57);
-        rtl8168_mdio_write(tp, 0x14, 0xd203);
-        rtl8168_mdio_write(tp, 0x14, 0x33ff);
-        rtl8168_mdio_write(tp, 0x14, 0x563b);
-        rtl8168_mdio_write(tp, 0x14, 0x3275);
-        rtl8168_mdio_write(tp, 0x14, 0x7c5e);
-        rtl8168_mdio_write(tp, 0x14, 0xb240);
-        rtl8168_mdio_write(tp, 0x14, 0xb402);
-        rtl8168_mdio_write(tp, 0x14, 0x263b);
-        rtl8168_mdio_write(tp, 0x14, 0x6096);
-        rtl8168_mdio_write(tp, 0x14, 0xb240);
-        rtl8168_mdio_write(tp, 0x14, 0xb406);
-        rtl8168_mdio_write(tp, 0x14, 0x263b);
-        rtl8168_mdio_write(tp, 0x14, 0x31d7);
-        rtl8168_mdio_write(tp, 0x14, 0x7c67);
-        rtl8168_mdio_write(tp, 0x14, 0xb240);
-        rtl8168_mdio_write(tp, 0x14, 0xb40e);
-        rtl8168_mdio_write(tp, 0x14, 0x263b);
-        rtl8168_mdio_write(tp, 0x14, 0xb410);
-        rtl8168_mdio_write(tp, 0x14, 0x8802);
-        rtl8168_mdio_write(tp, 0x14, 0xb240);
-        rtl8168_mdio_write(tp, 0x14, 0x940e);
-        rtl8168_mdio_write(tp, 0x14, 0x263b);
-        rtl8168_mdio_write(tp, 0x14, 0xba04);
-        rtl8168_mdio_write(tp, 0x14, 0x1cd6);
-        rtl8168_mdio_write(tp, 0x14, 0xa902);
-        rtl8168_mdio_write(tp, 0x14, 0xd711);
-        rtl8168_mdio_write(tp, 0x14, 0x4045);
-        rtl8168_mdio_write(tp, 0x14, 0xa980);
-        rtl8168_mdio_write(tp, 0x14, 0x3003);
-        rtl8168_mdio_write(tp, 0x14, 0x59b1);
-        rtl8168_mdio_write(tp, 0x14, 0xa540);
-        rtl8168_mdio_write(tp, 0x14, 0xa601);
-        rtl8168_mdio_write(tp, 0x14, 0xd710);
-        rtl8168_mdio_write(tp, 0x14, 0x4043);
-        rtl8168_mdio_write(tp, 0x14, 0xa910);
-        rtl8168_mdio_write(tp, 0x14, 0xd711);
-        rtl8168_mdio_write(tp, 0x14, 0x60a0);
-        rtl8168_mdio_write(tp, 0x14, 0xca33);
-        rtl8168_mdio_write(tp, 0x14, 0xcb33);
-        rtl8168_mdio_write(tp, 0x14, 0xa941);
-        rtl8168_mdio_write(tp, 0x14, 0x2c82);
-        rtl8168_mdio_write(tp, 0x14, 0xcaff);
-        rtl8168_mdio_write(tp, 0x14, 0xcbff);
-        rtl8168_mdio_write(tp, 0x14, 0xa921);
-        rtl8168_mdio_write(tp, 0x14, 0xce02);
-        rtl8168_mdio_write(tp, 0x14, 0xe070);
-        rtl8168_mdio_write(tp, 0x14, 0x0f10);
-        rtl8168_mdio_write(tp, 0x14, 0xaf01);
-        rtl8168_mdio_write(tp, 0x14, 0x8f01);
-        rtl8168_mdio_write(tp, 0x14, 0x1766);
-        rtl8168_mdio_write(tp, 0x14, 0x8e02);
-        rtl8168_mdio_write(tp, 0x14, 0x1787);
-        rtl8168_mdio_write(tp, 0x14, 0xd710);
-        rtl8168_mdio_write(tp, 0x14, 0x609c);
-        rtl8168_mdio_write(tp, 0x14, 0xd71e);
-        rtl8168_mdio_write(tp, 0x14, 0x7fa4);
-        rtl8168_mdio_write(tp, 0x14, 0x2cd4);
-        rtl8168_mdio_write(tp, 0x14, 0x1ce9);
-        rtl8168_mdio_write(tp, 0x14, 0xce04);
-        rtl8168_mdio_write(tp, 0x14, 0xe070);
-        rtl8168_mdio_write(tp, 0x14, 0x0f20);
-        rtl8168_mdio_write(tp, 0x14, 0xaf01);
-        rtl8168_mdio_write(tp, 0x14, 0x8f01);
-        rtl8168_mdio_write(tp, 0x14, 0x1766);
-        rtl8168_mdio_write(tp, 0x14, 0x8e04);
-        rtl8168_mdio_write(tp, 0x14, 0x6044);
-        rtl8168_mdio_write(tp, 0x14, 0x2cd4);
-        rtl8168_mdio_write(tp, 0x14, 0xa520);
-        rtl8168_mdio_write(tp, 0x14, 0xd710);
-        rtl8168_mdio_write(tp, 0x14, 0x4043);
-        rtl8168_mdio_write(tp, 0x14, 0x2cc1);
-        rtl8168_mdio_write(tp, 0x14, 0xe00f);
-        rtl8168_mdio_write(tp, 0x14, 0x0501);
-        rtl8168_mdio_write(tp, 0x14, 0x1cef);
-        rtl8168_mdio_write(tp, 0x14, 0xb801);
-        rtl8168_mdio_write(tp, 0x14, 0xd71e);
-        rtl8168_mdio_write(tp, 0x14, 0x4060);
-        rtl8168_mdio_write(tp, 0x14, 0x7fc4);
-        rtl8168_mdio_write(tp, 0x14, 0x2cd4);
-        rtl8168_mdio_write(tp, 0x14, 0x1cf5);
-        rtl8168_mdio_write(tp, 0x14, 0xe00f);
-        rtl8168_mdio_write(tp, 0x14, 0x0502);
-        rtl8168_mdio_write(tp, 0x14, 0x1cef);
-        rtl8168_mdio_write(tp, 0x14, 0xb802);
-        rtl8168_mdio_write(tp, 0x14, 0xd71e);
-        rtl8168_mdio_write(tp, 0x14, 0x4061);
-        rtl8168_mdio_write(tp, 0x14, 0x7fc4);
-        rtl8168_mdio_write(tp, 0x14, 0x2cd4);
-        rtl8168_mdio_write(tp, 0x14, 0x1cf5);
-        rtl8168_mdio_write(tp, 0x14, 0xe00f);
-        rtl8168_mdio_write(tp, 0x14, 0x0504);
-        rtl8168_mdio_write(tp, 0x14, 0xd710);
-        rtl8168_mdio_write(tp, 0x14, 0x6099);
-        rtl8168_mdio_write(tp, 0x14, 0xd71e);
-        rtl8168_mdio_write(tp, 0x14, 0x7fa4);
-        rtl8168_mdio_write(tp, 0x14, 0x2cd4);
-        rtl8168_mdio_write(tp, 0x14, 0xc17f);
-        rtl8168_mdio_write(tp, 0x14, 0xc200);
-        rtl8168_mdio_write(tp, 0x14, 0xc43f);
-        rtl8168_mdio_write(tp, 0x14, 0xcc03);
-        rtl8168_mdio_write(tp, 0x14, 0xa701);
-        rtl8168_mdio_write(tp, 0x14, 0xa510);
-        rtl8168_mdio_write(tp, 0x14, 0xd710);
-        rtl8168_mdio_write(tp, 0x14, 0x4018);
-        rtl8168_mdio_write(tp, 0x14, 0x9910);
-        rtl8168_mdio_write(tp, 0x14, 0x8510);
-        rtl8168_mdio_write(tp, 0x14, 0x2860);
-        rtl8168_mdio_write(tp, 0x14, 0xe00f);
-        rtl8168_mdio_write(tp, 0x14, 0x0504);
-        rtl8168_mdio_write(tp, 0x14, 0xd710);
-        rtl8168_mdio_write(tp, 0x14, 0x6099);
-        rtl8168_mdio_write(tp, 0x14, 0xd71e);
-        rtl8168_mdio_write(tp, 0x14, 0x7fa4);
-        rtl8168_mdio_write(tp, 0x14, 0x2cd4);
-        rtl8168_mdio_write(tp, 0x14, 0xa608);
-        rtl8168_mdio_write(tp, 0x14, 0xc17d);
-        rtl8168_mdio_write(tp, 0x14, 0xc200);
-        rtl8168_mdio_write(tp, 0x14, 0xc43f);
-        rtl8168_mdio_write(tp, 0x14, 0xcc03);
-        rtl8168_mdio_write(tp, 0x14, 0xa701);
-        rtl8168_mdio_write(tp, 0x14, 0xa510);
-        rtl8168_mdio_write(tp, 0x14, 0xd710);
-        rtl8168_mdio_write(tp, 0x14, 0x4018);
-        rtl8168_mdio_write(tp, 0x14, 0x9910);
-        rtl8168_mdio_write(tp, 0x14, 0x8510);
-        rtl8168_mdio_write(tp, 0x14, 0x2926);
-        rtl8168_mdio_write(tp, 0x14, 0x1792);
-        rtl8168_mdio_write(tp, 0x14, 0x27db);
-        rtl8168_mdio_write(tp, 0x14, 0xc000);
-        rtl8168_mdio_write(tp, 0x14, 0xc100);
-        rtl8168_mdio_write(tp, 0x14, 0xc200);
-        rtl8168_mdio_write(tp, 0x14, 0xc300);
-        rtl8168_mdio_write(tp, 0x14, 0xc400);
-        rtl8168_mdio_write(tp, 0x14, 0xc500);
-        rtl8168_mdio_write(tp, 0x14, 0xc600);
-        rtl8168_mdio_write(tp, 0x14, 0xc7c1);
-        rtl8168_mdio_write(tp, 0x14, 0xc800);
-        rtl8168_mdio_write(tp, 0x14, 0xcc00);
-        rtl8168_mdio_write(tp, 0x14, 0x0800);
-        rtl8168_mdio_write(tp, 0x14, 0xca0f);
-        rtl8168_mdio_write(tp, 0x14, 0xcbff);
-        rtl8168_mdio_write(tp, 0x14, 0xa901);
-        rtl8168_mdio_write(tp, 0x14, 0x8902);
-        rtl8168_mdio_write(tp, 0x14, 0xc900);
-        rtl8168_mdio_write(tp, 0x14, 0xca00);
-        rtl8168_mdio_write(tp, 0x14, 0xcb00);
-        rtl8168_mdio_write(tp, 0x14, 0x0800);
-        rtl8168_mdio_write(tp, 0x14, 0xb804);
-        rtl8168_mdio_write(tp, 0x14, 0x0800);
-        rtl8168_mdio_write(tp, 0x14, 0xd71e);
-        rtl8168_mdio_write(tp, 0x14, 0x6044);
-        rtl8168_mdio_write(tp, 0x14, 0x9804);
-        rtl8168_mdio_write(tp, 0x14, 0x0800);
-        rtl8168_mdio_write(tp, 0x14, 0xd710);
-        rtl8168_mdio_write(tp, 0x14, 0x6099);
-        rtl8168_mdio_write(tp, 0x14, 0xd71e);
-        rtl8168_mdio_write(tp, 0x14, 0x7fa4);
-        rtl8168_mdio_write(tp, 0x14, 0x2cd4);
-        rtl8168_mdio_write(tp, 0x14, 0x0800);
-        rtl8168_mdio_write(tp, 0x14, 0xa510);
-        rtl8168_mdio_write(tp, 0x14, 0xd710);
-        rtl8168_mdio_write(tp, 0x14, 0x6098);
-        rtl8168_mdio_write(tp, 0x14, 0xd71e);
-        rtl8168_mdio_write(tp, 0x14, 0x7fa4);
-        rtl8168_mdio_write(tp, 0x14, 0x2cd4);
-        rtl8168_mdio_write(tp, 0x14, 0x8510);
-        rtl8168_mdio_write(tp, 0x14, 0x0800);
-        rtl8168_mdio_write(tp, 0x14, 0xd711);
-        rtl8168_mdio_write(tp, 0x14, 0x3003);
-        rtl8168_mdio_write(tp, 0x14, 0x1d01);
-        rtl8168_mdio_write(tp, 0x14, 0x2d0b);
-        rtl8168_mdio_write(tp, 0x14, 0xd710);
-        rtl8168_mdio_write(tp, 0x14, 0x60be);
-        rtl8168_mdio_write(tp, 0x14, 0xe060);
-        rtl8168_mdio_write(tp, 0x14, 0x0920);
-        rtl8168_mdio_write(tp, 0x14, 0x1cd6);
-        rtl8168_mdio_write(tp, 0x14, 0x2c89);
-        rtl8168_mdio_write(tp, 0x14, 0xd71e);
-        rtl8168_mdio_write(tp, 0x14, 0x3063);
-        rtl8168_mdio_write(tp, 0x14, 0x1948);
-        rtl8168_mdio_write(tp, 0x14, 0x288a);
-        rtl8168_mdio_write(tp, 0x14, 0x1cd6);
-        rtl8168_mdio_write(tp, 0x14, 0x29bd);
-        rtl8168_mdio_write(tp, 0x14, 0xa802);
-        rtl8168_mdio_write(tp, 0x14, 0xa303);
-        rtl8168_mdio_write(tp, 0x14, 0x843f);
-        rtl8168_mdio_write(tp, 0x14, 0x81ff);
-        rtl8168_mdio_write(tp, 0x14, 0x8208);
-        rtl8168_mdio_write(tp, 0x14, 0xa201);
-        rtl8168_mdio_write(tp, 0x14, 0xc001);
-        rtl8168_mdio_write(tp, 0x14, 0xd710);
-        rtl8168_mdio_write(tp, 0x14, 0x30a0);
-        rtl8168_mdio_write(tp, 0x14, 0x0d1c);
-        rtl8168_mdio_write(tp, 0x14, 0x30a0);
-        rtl8168_mdio_write(tp, 0x14, 0x3d13);
-        rtl8168_mdio_write(tp, 0x14, 0xd71e);
-        rtl8168_mdio_write(tp, 0x14, 0x7f4c);
-        rtl8168_mdio_write(tp, 0x14, 0x2ab6);
-        rtl8168_mdio_write(tp, 0x14, 0xe003);
-        rtl8168_mdio_write(tp, 0x14, 0x0202);
-        rtl8168_mdio_write(tp, 0x14, 0xd710);
-        rtl8168_mdio_write(tp, 0x14, 0x6090);
-        rtl8168_mdio_write(tp, 0x14, 0xd71e);
-        rtl8168_mdio_write(tp, 0x14, 0x7fac);
-        rtl8168_mdio_write(tp, 0x14, 0x2ab6);
-        rtl8168_mdio_write(tp, 0x14, 0xa20c);
-        rtl8168_mdio_write(tp, 0x14, 0xd710);
-        rtl8168_mdio_write(tp, 0x14, 0x6091);
-        rtl8168_mdio_write(tp, 0x14, 0xd71e);
-        rtl8168_mdio_write(tp, 0x14, 0x7fac);
-        rtl8168_mdio_write(tp, 0x14, 0x2ab6);
-        rtl8168_mdio_write(tp, 0x14, 0x820e);
-        rtl8168_mdio_write(tp, 0x14, 0xa3e0);
-        rtl8168_mdio_write(tp, 0x14, 0xa520);
-        rtl8168_mdio_write(tp, 0x14, 0xd710);
-        rtl8168_mdio_write(tp, 0x14, 0x609d);
-        rtl8168_mdio_write(tp, 0x14, 0xd71e);
-        rtl8168_mdio_write(tp, 0x14, 0x7fac);
-        rtl8168_mdio_write(tp, 0x14, 0x2ab6);
-        rtl8168_mdio_write(tp, 0x14, 0x8520);
-        rtl8168_mdio_write(tp, 0x14, 0x6703);
-        rtl8168_mdio_write(tp, 0x14, 0x2d34);
-        rtl8168_mdio_write(tp, 0x14, 0xa13e);
-        rtl8168_mdio_write(tp, 0x14, 0xc001);
-        rtl8168_mdio_write(tp, 0x14, 0xd710);
-        rtl8168_mdio_write(tp, 0x14, 0x4000);
-        rtl8168_mdio_write(tp, 0x14, 0x6046);
-        rtl8168_mdio_write(tp, 0x14, 0x2d0d);
-        rtl8168_mdio_write(tp, 0x14, 0xa43f);
-        rtl8168_mdio_write(tp, 0x14, 0xa101);
-        rtl8168_mdio_write(tp, 0x14, 0xc020);
-        rtl8168_mdio_write(tp, 0x14, 0xd710);
-        rtl8168_mdio_write(tp, 0x14, 0x3121);
-        rtl8168_mdio_write(tp, 0x14, 0x0d45);
-        rtl8168_mdio_write(tp, 0x14, 0x30c0);
-        rtl8168_mdio_write(tp, 0x14, 0x3d0d);
-        rtl8168_mdio_write(tp, 0x14, 0xd71e);
-        rtl8168_mdio_write(tp, 0x14, 0x7f4c);
-        rtl8168_mdio_write(tp, 0x14, 0x2ab6);
-        rtl8168_mdio_write(tp, 0x14, 0xa540);
-        rtl8168_mdio_write(tp, 0x14, 0xc001);
-        rtl8168_mdio_write(tp, 0x14, 0xd710);
-        rtl8168_mdio_write(tp, 0x14, 0x4001);
-        rtl8168_mdio_write(tp, 0x14, 0xe00f);
-        rtl8168_mdio_write(tp, 0x14, 0x0501);
-        rtl8168_mdio_write(tp, 0x14, 0x1dac);
-        rtl8168_mdio_write(tp, 0x14, 0xc1c4);
-        rtl8168_mdio_write(tp, 0x14, 0xa268);
-        rtl8168_mdio_write(tp, 0x14, 0xa303);
-        rtl8168_mdio_write(tp, 0x14, 0x8420);
-        rtl8168_mdio_write(tp, 0x14, 0xe00f);
-        rtl8168_mdio_write(tp, 0x14, 0x0502);
-        rtl8168_mdio_write(tp, 0x14, 0x1dac);
-        rtl8168_mdio_write(tp, 0x14, 0xc002);
-        rtl8168_mdio_write(tp, 0x14, 0xd710);
-        rtl8168_mdio_write(tp, 0x14, 0x4000);
-        rtl8168_mdio_write(tp, 0x14, 0x8208);
-        rtl8168_mdio_write(tp, 0x14, 0x8410);
-        rtl8168_mdio_write(tp, 0x14, 0xa121);
-        rtl8168_mdio_write(tp, 0x14, 0xc002);
-        rtl8168_mdio_write(tp, 0x14, 0xd710);
-        rtl8168_mdio_write(tp, 0x14, 0x4000);
-        rtl8168_mdio_write(tp, 0x14, 0x8120);
-        rtl8168_mdio_write(tp, 0x14, 0x8180);
-        rtl8168_mdio_write(tp, 0x14, 0x1d97);
-        rtl8168_mdio_write(tp, 0x14, 0xa180);
-        rtl8168_mdio_write(tp, 0x14, 0xa13a);
-        rtl8168_mdio_write(tp, 0x14, 0x8240);
-        rtl8168_mdio_write(tp, 0x14, 0xa430);
-        rtl8168_mdio_write(tp, 0x14, 0xc010);
-        rtl8168_mdio_write(tp, 0x14, 0xd710);
-        rtl8168_mdio_write(tp, 0x14, 0x30e1);
-        rtl8168_mdio_write(tp, 0x14, 0x0abc);
-        rtl8168_mdio_write(tp, 0x14, 0xd71e);
-        rtl8168_mdio_write(tp, 0x14, 0x7f8c);
-        rtl8168_mdio_write(tp, 0x14, 0x2ab6);
-        rtl8168_mdio_write(tp, 0x14, 0xa480);
-        rtl8168_mdio_write(tp, 0x14, 0xa230);
-        rtl8168_mdio_write(tp, 0x14, 0xa303);
-        rtl8168_mdio_write(tp, 0x14, 0xc001);
-        rtl8168_mdio_write(tp, 0x14, 0xd70c);
-        rtl8168_mdio_write(tp, 0x14, 0x4124);
-        rtl8168_mdio_write(tp, 0x14, 0xd710);
-        rtl8168_mdio_write(tp, 0x14, 0x6120);
-        rtl8168_mdio_write(tp, 0x14, 0xd711);
-        rtl8168_mdio_write(tp, 0x14, 0x3128);
-        rtl8168_mdio_write(tp, 0x14, 0x3d76);
-        rtl8168_mdio_write(tp, 0x14, 0x2d70);
-        rtl8168_mdio_write(tp, 0x14, 0xa801);
-        rtl8168_mdio_write(tp, 0x14, 0x2d6c);
-        rtl8168_mdio_write(tp, 0x14, 0xd710);
-        rtl8168_mdio_write(tp, 0x14, 0x4000);
-        rtl8168_mdio_write(tp, 0x14, 0xe018);
-        rtl8168_mdio_write(tp, 0x14, 0x0208);
-        rtl8168_mdio_write(tp, 0x14, 0xa1f8);
-        rtl8168_mdio_write(tp, 0x14, 0x8480);
-        rtl8168_mdio_write(tp, 0x14, 0xc004);
-        rtl8168_mdio_write(tp, 0x14, 0xd710);
-        rtl8168_mdio_write(tp, 0x14, 0x4000);
-        rtl8168_mdio_write(tp, 0x14, 0x6046);
-        rtl8168_mdio_write(tp, 0x14, 0x2d0d);
-        rtl8168_mdio_write(tp, 0x14, 0xa43f);
-        rtl8168_mdio_write(tp, 0x14, 0xa105);
-        rtl8168_mdio_write(tp, 0x14, 0x8228);
-        rtl8168_mdio_write(tp, 0x14, 0xc004);
-        rtl8168_mdio_write(tp, 0x14, 0xd710);
-        rtl8168_mdio_write(tp, 0x14, 0x4000);
-        rtl8168_mdio_write(tp, 0x14, 0x81bc);
-        rtl8168_mdio_write(tp, 0x14, 0xa220);
-        rtl8168_mdio_write(tp, 0x14, 0x1d97);
-        rtl8168_mdio_write(tp, 0x14, 0x8220);
-        rtl8168_mdio_write(tp, 0x14, 0xa1bc);
-        rtl8168_mdio_write(tp, 0x14, 0xc040);
-        rtl8168_mdio_write(tp, 0x14, 0xd710);
-        rtl8168_mdio_write(tp, 0x14, 0x30e1);
-        rtl8168_mdio_write(tp, 0x14, 0x0abc);
-        rtl8168_mdio_write(tp, 0x14, 0x30e1);
-        rtl8168_mdio_write(tp, 0x14, 0x3d0d);
-        rtl8168_mdio_write(tp, 0x14, 0xd71e);
-        rtl8168_mdio_write(tp, 0x14, 0x7f4c);
-        rtl8168_mdio_write(tp, 0x14, 0x2ab6);
-        rtl8168_mdio_write(tp, 0x14, 0xa802);
-        rtl8168_mdio_write(tp, 0x14, 0xd70c);
-        rtl8168_mdio_write(tp, 0x14, 0x4244);
-        rtl8168_mdio_write(tp, 0x14, 0xa301);
-        rtl8168_mdio_write(tp, 0x14, 0xc004);
-        rtl8168_mdio_write(tp, 0x14, 0xd711);
-        rtl8168_mdio_write(tp, 0x14, 0x3128);
-        rtl8168_mdio_write(tp, 0x14, 0x3da5);
-        rtl8168_mdio_write(tp, 0x14, 0xd710);
-        rtl8168_mdio_write(tp, 0x14, 0x5f80);
-        rtl8168_mdio_write(tp, 0x14, 0xd711);
-        rtl8168_mdio_write(tp, 0x14, 0x3109);
-        rtl8168_mdio_write(tp, 0x14, 0x3da7);
-        rtl8168_mdio_write(tp, 0x14, 0x2dab);
-        rtl8168_mdio_write(tp, 0x14, 0xa801);
-        rtl8168_mdio_write(tp, 0x14, 0x2d9a);
-        rtl8168_mdio_write(tp, 0x14, 0xa802);
-        rtl8168_mdio_write(tp, 0x14, 0xc004);
-        rtl8168_mdio_write(tp, 0x14, 0xd710);
-        rtl8168_mdio_write(tp, 0x14, 0x4000);
-        rtl8168_mdio_write(tp, 0x14, 0x0800);
-        rtl8168_mdio_write(tp, 0x14, 0xa510);
-        rtl8168_mdio_write(tp, 0x14, 0xd710);
-        rtl8168_mdio_write(tp, 0x14, 0x609a);
-        rtl8168_mdio_write(tp, 0x14, 0xd71e);
-        rtl8168_mdio_write(tp, 0x14, 0x7fac);
-        rtl8168_mdio_write(tp, 0x14, 0x2ab6);
-        rtl8168_mdio_write(tp, 0x14, 0x8510);
-        rtl8168_mdio_write(tp, 0x14, 0x0800);
-        rtl8168_mdio_write(tp, 0x13, 0xA01A);
-        rtl8168_mdio_write(tp, 0x14, 0x0000);
-        rtl8168_mdio_write(tp, 0x13, 0xA006);
-        rtl8168_mdio_write(tp, 0x14, 0x0ad6);
-        rtl8168_mdio_write(tp, 0x13, 0xA004);
-        rtl8168_mdio_write(tp, 0x14, 0x07f5);
-        rtl8168_mdio_write(tp, 0x13, 0xA002);
-        rtl8168_mdio_write(tp, 0x14, 0x06a9);
-        rtl8168_mdio_write(tp, 0x13, 0xA000);
-        rtl8168_mdio_write(tp, 0x14, 0xf069);
-        rtl8168_mdio_write(tp, 0x13, 0xB820);
-        rtl8168_mdio_write(tp, 0x14, 0x0210);
-
-        rtl8168_mdio_write(tp, 0x1F, 0x0A43);
-        rtl8168_mdio_write(tp, 0x13, 0x83a0);
-        rtl8168_mdio_write(tp, 0x14, 0xaf83);
-        rtl8168_mdio_write(tp, 0x14, 0xacaf);
-        rtl8168_mdio_write(tp, 0x14, 0x83b8);
-        rtl8168_mdio_write(tp, 0x14, 0xaf83);
-        rtl8168_mdio_write(tp, 0x14, 0xcdaf);
-        rtl8168_mdio_write(tp, 0x14, 0x83d3);
-        rtl8168_mdio_write(tp, 0x14, 0x0204);
-        rtl8168_mdio_write(tp, 0x14, 0x9a02);
-        rtl8168_mdio_write(tp, 0x14, 0x09a9);
-        rtl8168_mdio_write(tp, 0x14, 0x0284);
-        rtl8168_mdio_write(tp, 0x14, 0x61af);
-        rtl8168_mdio_write(tp, 0x14, 0x02fc);
-        rtl8168_mdio_write(tp, 0x14, 0xad20);
-        rtl8168_mdio_write(tp, 0x14, 0x0302);
-        rtl8168_mdio_write(tp, 0x14, 0x867c);
-        rtl8168_mdio_write(tp, 0x14, 0xad21);
-        rtl8168_mdio_write(tp, 0x14, 0x0302);
-        rtl8168_mdio_write(tp, 0x14, 0x85c9);
-        rtl8168_mdio_write(tp, 0x14, 0xad22);
-        rtl8168_mdio_write(tp, 0x14, 0x0302);
-        rtl8168_mdio_write(tp, 0x14, 0x1bc0);
-        rtl8168_mdio_write(tp, 0x14, 0xaf17);
-        rtl8168_mdio_write(tp, 0x14, 0xe302);
-        rtl8168_mdio_write(tp, 0x14, 0x8703);
-        rtl8168_mdio_write(tp, 0x14, 0xaf18);
-        rtl8168_mdio_write(tp, 0x14, 0x6201);
-        rtl8168_mdio_write(tp, 0x14, 0x06e0);
-        rtl8168_mdio_write(tp, 0x14, 0x8148);
-        rtl8168_mdio_write(tp, 0x14, 0xaf3c);
-        rtl8168_mdio_write(tp, 0x14, 0x69f8);
-        rtl8168_mdio_write(tp, 0x14, 0xf9fa);
-        rtl8168_mdio_write(tp, 0x14, 0xef69);
-        rtl8168_mdio_write(tp, 0x14, 0xee80);
-        rtl8168_mdio_write(tp, 0x14, 0x10f7);
-        rtl8168_mdio_write(tp, 0x14, 0xee80);
-        rtl8168_mdio_write(tp, 0x14, 0x131f);
-        rtl8168_mdio_write(tp, 0x14, 0xd104);
-        rtl8168_mdio_write(tp, 0x14, 0xbf87);
-        rtl8168_mdio_write(tp, 0x14, 0xf302);
-        rtl8168_mdio_write(tp, 0x14, 0x4259);
-        rtl8168_mdio_write(tp, 0x14, 0x0287);
-        rtl8168_mdio_write(tp, 0x14, 0x88bf);
-        rtl8168_mdio_write(tp, 0x14, 0x87cf);
-        rtl8168_mdio_write(tp, 0x14, 0xd7b8);
-        rtl8168_mdio_write(tp, 0x14, 0x22d0);
-        rtl8168_mdio_write(tp, 0x14, 0x0c02);
-        rtl8168_mdio_write(tp, 0x14, 0x4252);
-        rtl8168_mdio_write(tp, 0x14, 0xee80);
-        rtl8168_mdio_write(tp, 0x14, 0xcda0);
-        rtl8168_mdio_write(tp, 0x14, 0xee80);
-        rtl8168_mdio_write(tp, 0x14, 0xce8b);
-        rtl8168_mdio_write(tp, 0x14, 0xee80);
-        rtl8168_mdio_write(tp, 0x14, 0xd1f5);
-        rtl8168_mdio_write(tp, 0x14, 0xee80);
-        rtl8168_mdio_write(tp, 0x14, 0xd2a9);
-        rtl8168_mdio_write(tp, 0x14, 0xee80);
-        rtl8168_mdio_write(tp, 0x14, 0xd30a);
-        rtl8168_mdio_write(tp, 0x14, 0xee80);
-        rtl8168_mdio_write(tp, 0x14, 0xf010);
-        rtl8168_mdio_write(tp, 0x14, 0xee80);
-        rtl8168_mdio_write(tp, 0x14, 0xf38f);
-        rtl8168_mdio_write(tp, 0x14, 0xee81);
-        rtl8168_mdio_write(tp, 0x14, 0x011e);
-        rtl8168_mdio_write(tp, 0x14, 0xee81);
-        rtl8168_mdio_write(tp, 0x14, 0x0b4a);
-        rtl8168_mdio_write(tp, 0x14, 0xee81);
-        rtl8168_mdio_write(tp, 0x14, 0x0c7c);
-        rtl8168_mdio_write(tp, 0x14, 0xee81);
-        rtl8168_mdio_write(tp, 0x14, 0x127f);
-        rtl8168_mdio_write(tp, 0x14, 0xd100);
-        rtl8168_mdio_write(tp, 0x14, 0x0210);
-        rtl8168_mdio_write(tp, 0x14, 0xb5ee);
-        rtl8168_mdio_write(tp, 0x14, 0x8088);
-        rtl8168_mdio_write(tp, 0x14, 0xa4ee);
-        rtl8168_mdio_write(tp, 0x14, 0x8089);
-        rtl8168_mdio_write(tp, 0x14, 0x44ee);
-        rtl8168_mdio_write(tp, 0x14, 0x809a);
-        rtl8168_mdio_write(tp, 0x14, 0xa4ee);
-        rtl8168_mdio_write(tp, 0x14, 0x809b);
-        rtl8168_mdio_write(tp, 0x14, 0x44ee);
-        rtl8168_mdio_write(tp, 0x14, 0x809c);
-        rtl8168_mdio_write(tp, 0x14, 0xa7ee);
-        rtl8168_mdio_write(tp, 0x14, 0x80a5);
-        rtl8168_mdio_write(tp, 0x14, 0xa7d2);
-        rtl8168_mdio_write(tp, 0x14, 0x0002);
-        rtl8168_mdio_write(tp, 0x14, 0x0e66);
-        rtl8168_mdio_write(tp, 0x14, 0x0285);
-        rtl8168_mdio_write(tp, 0x14, 0xc0ee);
-        rtl8168_mdio_write(tp, 0x14, 0x87fc);
-        rtl8168_mdio_write(tp, 0x14, 0x00e0);
-        rtl8168_mdio_write(tp, 0x14, 0x8245);
-        rtl8168_mdio_write(tp, 0x14, 0xf622);
-        rtl8168_mdio_write(tp, 0x14, 0xe482);
-        rtl8168_mdio_write(tp, 0x14, 0x45ef);
-        rtl8168_mdio_write(tp, 0x14, 0x96fe);
-        rtl8168_mdio_write(tp, 0x14, 0xfdfc);
-        rtl8168_mdio_write(tp, 0x14, 0x0402);
-        rtl8168_mdio_write(tp, 0x14, 0x847a);
-        rtl8168_mdio_write(tp, 0x14, 0x0284);
-        rtl8168_mdio_write(tp, 0x14, 0xb302);
-        rtl8168_mdio_write(tp, 0x14, 0x0cab);
-        rtl8168_mdio_write(tp, 0x14, 0x020c);
-        rtl8168_mdio_write(tp, 0x14, 0xc402);
-        rtl8168_mdio_write(tp, 0x14, 0x0cef);
-        rtl8168_mdio_write(tp, 0x14, 0x020d);
-        rtl8168_mdio_write(tp, 0x14, 0x0802);
-        rtl8168_mdio_write(tp, 0x14, 0x0d33);
-        rtl8168_mdio_write(tp, 0x14, 0x020c);
-        rtl8168_mdio_write(tp, 0x14, 0x3d04);
-        rtl8168_mdio_write(tp, 0x14, 0xf8fa);
-        rtl8168_mdio_write(tp, 0x14, 0xef69);
-        rtl8168_mdio_write(tp, 0x14, 0xe182);
-        rtl8168_mdio_write(tp, 0x14, 0x2fac);
-        rtl8168_mdio_write(tp, 0x14, 0x291a);
-        rtl8168_mdio_write(tp, 0x14, 0xe082);
-        rtl8168_mdio_write(tp, 0x14, 0x24ac);
-        rtl8168_mdio_write(tp, 0x14, 0x2102);
-        rtl8168_mdio_write(tp, 0x14, 0xae22);
-        rtl8168_mdio_write(tp, 0x14, 0x0210);
-        rtl8168_mdio_write(tp, 0x14, 0x57f6);
-        rtl8168_mdio_write(tp, 0x14, 0x21e4);
-        rtl8168_mdio_write(tp, 0x14, 0x8224);
-        rtl8168_mdio_write(tp, 0x14, 0xd101);
-        rtl8168_mdio_write(tp, 0x14, 0xbf44);
-        rtl8168_mdio_write(tp, 0x14, 0xd202);
-        rtl8168_mdio_write(tp, 0x14, 0x4259);
-        rtl8168_mdio_write(tp, 0x14, 0xae10);
-        rtl8168_mdio_write(tp, 0x14, 0x0212);
-        rtl8168_mdio_write(tp, 0x14, 0x4cf6);
-        rtl8168_mdio_write(tp, 0x14, 0x29e5);
-        rtl8168_mdio_write(tp, 0x14, 0x822f);
-        rtl8168_mdio_write(tp, 0x14, 0xe082);
-        rtl8168_mdio_write(tp, 0x14, 0x24f6);
-        rtl8168_mdio_write(tp, 0x14, 0x21e4);
-        rtl8168_mdio_write(tp, 0x14, 0x8224);
-        rtl8168_mdio_write(tp, 0x14, 0xef96);
-        rtl8168_mdio_write(tp, 0x14, 0xfefc);
-        rtl8168_mdio_write(tp, 0x14, 0x04f8);
-        rtl8168_mdio_write(tp, 0x14, 0xe182);
-        rtl8168_mdio_write(tp, 0x14, 0x2fac);
-        rtl8168_mdio_write(tp, 0x14, 0x2a18);
-        rtl8168_mdio_write(tp, 0x14, 0xe082);
-        rtl8168_mdio_write(tp, 0x14, 0x24ac);
-        rtl8168_mdio_write(tp, 0x14, 0x2202);
-        rtl8168_mdio_write(tp, 0x14, 0xae26);
-        rtl8168_mdio_write(tp, 0x14, 0x0284);
-        rtl8168_mdio_write(tp, 0x14, 0xf802);
-        rtl8168_mdio_write(tp, 0x14, 0x8565);
-        rtl8168_mdio_write(tp, 0x14, 0xd101);
-        rtl8168_mdio_write(tp, 0x14, 0xbf44);
-        rtl8168_mdio_write(tp, 0x14, 0xd502);
-        rtl8168_mdio_write(tp, 0x14, 0x4259);
-        rtl8168_mdio_write(tp, 0x14, 0xae0e);
-        rtl8168_mdio_write(tp, 0x14, 0x0284);
-        rtl8168_mdio_write(tp, 0x14, 0xea02);
-        rtl8168_mdio_write(tp, 0x14, 0x85a9);
-        rtl8168_mdio_write(tp, 0x14, 0xe182);
-        rtl8168_mdio_write(tp, 0x14, 0x2ff6);
-        rtl8168_mdio_write(tp, 0x14, 0x2ae5);
-        rtl8168_mdio_write(tp, 0x14, 0x822f);
-        rtl8168_mdio_write(tp, 0x14, 0xe082);
-        rtl8168_mdio_write(tp, 0x14, 0x24f6);
-        rtl8168_mdio_write(tp, 0x14, 0x22e4);
-        rtl8168_mdio_write(tp, 0x14, 0x8224);
-        rtl8168_mdio_write(tp, 0x14, 0xfc04);
-        rtl8168_mdio_write(tp, 0x14, 0xf9e2);
-        rtl8168_mdio_write(tp, 0x14, 0x8011);
-        rtl8168_mdio_write(tp, 0x14, 0xad31);
-        rtl8168_mdio_write(tp, 0x14, 0x05d2);
-        rtl8168_mdio_write(tp, 0x14, 0x0002);
-        rtl8168_mdio_write(tp, 0x14, 0x0e66);
-        rtl8168_mdio_write(tp, 0x14, 0xfd04);
-        rtl8168_mdio_write(tp, 0x14, 0xf8f9);
-        rtl8168_mdio_write(tp, 0x14, 0xfaef);
-        rtl8168_mdio_write(tp, 0x14, 0x69e0);
-        rtl8168_mdio_write(tp, 0x14, 0x8011);
-        rtl8168_mdio_write(tp, 0x14, 0xad21);
-        rtl8168_mdio_write(tp, 0x14, 0x5cbf);
-        rtl8168_mdio_write(tp, 0x14, 0x43be);
-        rtl8168_mdio_write(tp, 0x14, 0x0242);
-        rtl8168_mdio_write(tp, 0x14, 0x97ac);
-        rtl8168_mdio_write(tp, 0x14, 0x281b);
-        rtl8168_mdio_write(tp, 0x14, 0xbf43);
-        rtl8168_mdio_write(tp, 0x14, 0xc102);
-        rtl8168_mdio_write(tp, 0x14, 0x4297);
-        rtl8168_mdio_write(tp, 0x14, 0xac28);
-        rtl8168_mdio_write(tp, 0x14, 0x12bf);
-        rtl8168_mdio_write(tp, 0x14, 0x43c7);
-        rtl8168_mdio_write(tp, 0x14, 0x0242);
-        rtl8168_mdio_write(tp, 0x14, 0x97ac);
-        rtl8168_mdio_write(tp, 0x14, 0x2804);
-        rtl8168_mdio_write(tp, 0x14, 0xd300);
-        rtl8168_mdio_write(tp, 0x14, 0xae07);
-        rtl8168_mdio_write(tp, 0x14, 0xd306);
-        rtl8168_mdio_write(tp, 0x14, 0xaf85);
-        rtl8168_mdio_write(tp, 0x14, 0x56d3);
-        rtl8168_mdio_write(tp, 0x14, 0x03e0);
-        rtl8168_mdio_write(tp, 0x14, 0x8011);
-        rtl8168_mdio_write(tp, 0x14, 0xad26);
-        rtl8168_mdio_write(tp, 0x14, 0x25bf);
-        rtl8168_mdio_write(tp, 0x14, 0x4559);
-        rtl8168_mdio_write(tp, 0x14, 0x0242);
-        rtl8168_mdio_write(tp, 0x14, 0x97e2);
-        rtl8168_mdio_write(tp, 0x14, 0x8073);
-        rtl8168_mdio_write(tp, 0x14, 0x0d21);
-        rtl8168_mdio_write(tp, 0x14, 0xf637);
-        rtl8168_mdio_write(tp, 0x14, 0x0d11);
-        rtl8168_mdio_write(tp, 0x14, 0xf62f);
-        rtl8168_mdio_write(tp, 0x14, 0x1b21);
-        rtl8168_mdio_write(tp, 0x14, 0xaa02);
-        rtl8168_mdio_write(tp, 0x14, 0xae10);
-        rtl8168_mdio_write(tp, 0x14, 0xe280);
-        rtl8168_mdio_write(tp, 0x14, 0x740d);
-        rtl8168_mdio_write(tp, 0x14, 0x21f6);
-        rtl8168_mdio_write(tp, 0x14, 0x371b);
-        rtl8168_mdio_write(tp, 0x14, 0x21aa);
-        rtl8168_mdio_write(tp, 0x14, 0x0313);
-        rtl8168_mdio_write(tp, 0x14, 0xae02);
-        rtl8168_mdio_write(tp, 0x14, 0x2b02);
-        rtl8168_mdio_write(tp, 0x14, 0x020e);
-        rtl8168_mdio_write(tp, 0x14, 0x5102);
-        rtl8168_mdio_write(tp, 0x14, 0x0e66);
-        rtl8168_mdio_write(tp, 0x14, 0x020f);
-        rtl8168_mdio_write(tp, 0x14, 0xa3ef);
-        rtl8168_mdio_write(tp, 0x14, 0x96fe);
-        rtl8168_mdio_write(tp, 0x14, 0xfdfc);
-        rtl8168_mdio_write(tp, 0x14, 0x04f8);
-        rtl8168_mdio_write(tp, 0x14, 0xf9fa);
-        rtl8168_mdio_write(tp, 0x14, 0xef69);
-        rtl8168_mdio_write(tp, 0x14, 0xe080);
-        rtl8168_mdio_write(tp, 0x14, 0x12ad);
-        rtl8168_mdio_write(tp, 0x14, 0x2733);
-        rtl8168_mdio_write(tp, 0x14, 0xbf43);
-        rtl8168_mdio_write(tp, 0x14, 0xbe02);
-        rtl8168_mdio_write(tp, 0x14, 0x4297);
-        rtl8168_mdio_write(tp, 0x14, 0xac28);
-        rtl8168_mdio_write(tp, 0x14, 0x09bf);
-        rtl8168_mdio_write(tp, 0x14, 0x43c1);
-        rtl8168_mdio_write(tp, 0x14, 0x0242);
-        rtl8168_mdio_write(tp, 0x14, 0x97ad);
-        rtl8168_mdio_write(tp, 0x14, 0x2821);
-        rtl8168_mdio_write(tp, 0x14, 0xbf45);
-        rtl8168_mdio_write(tp, 0x14, 0x5902);
-        rtl8168_mdio_write(tp, 0x14, 0x4297);
-        rtl8168_mdio_write(tp, 0x14, 0xe387);
-        rtl8168_mdio_write(tp, 0x14, 0xffd2);
-        rtl8168_mdio_write(tp, 0x14, 0x001b);
-        rtl8168_mdio_write(tp, 0x14, 0x45ac);
-        rtl8168_mdio_write(tp, 0x14, 0x2711);
-        rtl8168_mdio_write(tp, 0x14, 0xe187);
-        rtl8168_mdio_write(tp, 0x14, 0xfebf);
-        rtl8168_mdio_write(tp, 0x14, 0x87e4);
-        rtl8168_mdio_write(tp, 0x14, 0x0242);
-        rtl8168_mdio_write(tp, 0x14, 0x590d);
-        rtl8168_mdio_write(tp, 0x14, 0x11bf);
-        rtl8168_mdio_write(tp, 0x14, 0x87e7);
-        rtl8168_mdio_write(tp, 0x14, 0x0242);
-        rtl8168_mdio_write(tp, 0x14, 0x59ef);
-        rtl8168_mdio_write(tp, 0x14, 0x96fe);
-        rtl8168_mdio_write(tp, 0x14, 0xfdfc);
-        rtl8168_mdio_write(tp, 0x14, 0x04f8);
-        rtl8168_mdio_write(tp, 0x14, 0xfaef);
-        rtl8168_mdio_write(tp, 0x14, 0x69d1);
-        rtl8168_mdio_write(tp, 0x14, 0x00bf);
-        rtl8168_mdio_write(tp, 0x14, 0x87e4);
-        rtl8168_mdio_write(tp, 0x14, 0x0242);
-        rtl8168_mdio_write(tp, 0x14, 0x59bf);
-        rtl8168_mdio_write(tp, 0x14, 0x87e7);
-        rtl8168_mdio_write(tp, 0x14, 0x0242);
-        rtl8168_mdio_write(tp, 0x14, 0x59ef);
-        rtl8168_mdio_write(tp, 0x14, 0x96fe);
-        rtl8168_mdio_write(tp, 0x14, 0xfc04);
-        rtl8168_mdio_write(tp, 0x14, 0xee87);
-        rtl8168_mdio_write(tp, 0x14, 0xff46);
-        rtl8168_mdio_write(tp, 0x14, 0xee87);
-        rtl8168_mdio_write(tp, 0x14, 0xfe01);
-        rtl8168_mdio_write(tp, 0x14, 0x04f8);
-        rtl8168_mdio_write(tp, 0x14, 0xfaef);
-        rtl8168_mdio_write(tp, 0x14, 0x69e0);
-        rtl8168_mdio_write(tp, 0x14, 0x8241);
-        rtl8168_mdio_write(tp, 0x14, 0xa000);
-        rtl8168_mdio_write(tp, 0x14, 0x0502);
-        rtl8168_mdio_write(tp, 0x14, 0x85eb);
-        rtl8168_mdio_write(tp, 0x14, 0xae0e);
-        rtl8168_mdio_write(tp, 0x14, 0xa001);
-        rtl8168_mdio_write(tp, 0x14, 0x0502);
-        rtl8168_mdio_write(tp, 0x14, 0x1a5a);
-        rtl8168_mdio_write(tp, 0x14, 0xae06);
-        rtl8168_mdio_write(tp, 0x14, 0xa002);
-        rtl8168_mdio_write(tp, 0x14, 0x0302);
-        rtl8168_mdio_write(tp, 0x14, 0x1ae6);
-        rtl8168_mdio_write(tp, 0x14, 0xef96);
-        rtl8168_mdio_write(tp, 0x14, 0xfefc);
-        rtl8168_mdio_write(tp, 0x14, 0x04f8);
-        rtl8168_mdio_write(tp, 0x14, 0xf9fa);
-        rtl8168_mdio_write(tp, 0x14, 0xef69);
-        rtl8168_mdio_write(tp, 0x14, 0xe082);
-        rtl8168_mdio_write(tp, 0x14, 0x29f6);
-        rtl8168_mdio_write(tp, 0x14, 0x21e4);
-        rtl8168_mdio_write(tp, 0x14, 0x8229);
-        rtl8168_mdio_write(tp, 0x14, 0xe080);
-        rtl8168_mdio_write(tp, 0x14, 0x10ac);
-        rtl8168_mdio_write(tp, 0x14, 0x2202);
-        rtl8168_mdio_write(tp, 0x14, 0xae76);
-        rtl8168_mdio_write(tp, 0x14, 0xe082);
-        rtl8168_mdio_write(tp, 0x14, 0x27f7);
-        rtl8168_mdio_write(tp, 0x14, 0x21e4);
-        rtl8168_mdio_write(tp, 0x14, 0x8227);
-        rtl8168_mdio_write(tp, 0x14, 0xbf43);
-        rtl8168_mdio_write(tp, 0x14, 0x1302);
-        rtl8168_mdio_write(tp, 0x14, 0x4297);
-        rtl8168_mdio_write(tp, 0x14, 0xef21);
-        rtl8168_mdio_write(tp, 0x14, 0xbf43);
-        rtl8168_mdio_write(tp, 0x14, 0x1602);
-        rtl8168_mdio_write(tp, 0x14, 0x4297);
-        rtl8168_mdio_write(tp, 0x14, 0x0c11);
-        rtl8168_mdio_write(tp, 0x14, 0x1e21);
-        rtl8168_mdio_write(tp, 0x14, 0xbf43);
-        rtl8168_mdio_write(tp, 0x14, 0x1902);
-        rtl8168_mdio_write(tp, 0x14, 0x4297);
-        rtl8168_mdio_write(tp, 0x14, 0x0c12);
-        rtl8168_mdio_write(tp, 0x14, 0x1e21);
-        rtl8168_mdio_write(tp, 0x14, 0xe682);
-        rtl8168_mdio_write(tp, 0x14, 0x43a2);
-        rtl8168_mdio_write(tp, 0x14, 0x000a);
-        rtl8168_mdio_write(tp, 0x14, 0xe182);
-        rtl8168_mdio_write(tp, 0x14, 0x27f6);
-        rtl8168_mdio_write(tp, 0x14, 0x29e5);
-        rtl8168_mdio_write(tp, 0x14, 0x8227);
-        rtl8168_mdio_write(tp, 0x14, 0xae42);
-        rtl8168_mdio_write(tp, 0x14, 0xe082);
-        rtl8168_mdio_write(tp, 0x14, 0x44f7);
-        rtl8168_mdio_write(tp, 0x14, 0x21e4);
-        rtl8168_mdio_write(tp, 0x14, 0x8244);
-        rtl8168_mdio_write(tp, 0x14, 0x0246);
-        rtl8168_mdio_write(tp, 0x14, 0xaebf);
-        rtl8168_mdio_write(tp, 0x14, 0x4325);
-        rtl8168_mdio_write(tp, 0x14, 0x0242);
-        rtl8168_mdio_write(tp, 0x14, 0x97ef);
-        rtl8168_mdio_write(tp, 0x14, 0x21bf);
-        rtl8168_mdio_write(tp, 0x14, 0x431c);
-        rtl8168_mdio_write(tp, 0x14, 0x0242);
-        rtl8168_mdio_write(tp, 0x14, 0x970c);
-        rtl8168_mdio_write(tp, 0x14, 0x121e);
-        rtl8168_mdio_write(tp, 0x14, 0x21bf);
-        rtl8168_mdio_write(tp, 0x14, 0x431f);
-        rtl8168_mdio_write(tp, 0x14, 0x0242);
-        rtl8168_mdio_write(tp, 0x14, 0x970c);
-        rtl8168_mdio_write(tp, 0x14, 0x131e);
-        rtl8168_mdio_write(tp, 0x14, 0x21bf);
-        rtl8168_mdio_write(tp, 0x14, 0x4328);
-        rtl8168_mdio_write(tp, 0x14, 0x0242);
-        rtl8168_mdio_write(tp, 0x14, 0x970c);
-        rtl8168_mdio_write(tp, 0x14, 0x141e);
-        rtl8168_mdio_write(tp, 0x14, 0x21bf);
-        rtl8168_mdio_write(tp, 0x14, 0x44b1);
-        rtl8168_mdio_write(tp, 0x14, 0x0242);
-        rtl8168_mdio_write(tp, 0x14, 0x970c);
-        rtl8168_mdio_write(tp, 0x14, 0x161e);
-        rtl8168_mdio_write(tp, 0x14, 0x21e6);
-        rtl8168_mdio_write(tp, 0x14, 0x8242);
-        rtl8168_mdio_write(tp, 0x14, 0xee82);
-        rtl8168_mdio_write(tp, 0x14, 0x4101);
-        rtl8168_mdio_write(tp, 0x14, 0xef96);
-        rtl8168_mdio_write(tp, 0x14, 0xfefd);
-        rtl8168_mdio_write(tp, 0x14, 0xfc04);
-        rtl8168_mdio_write(tp, 0x14, 0xf8fa);
-        rtl8168_mdio_write(tp, 0x14, 0xef69);
-        rtl8168_mdio_write(tp, 0x14, 0xe082);
-        rtl8168_mdio_write(tp, 0x14, 0x46a0);
-        rtl8168_mdio_write(tp, 0x14, 0x0005);
-        rtl8168_mdio_write(tp, 0x14, 0x0286);
-        rtl8168_mdio_write(tp, 0x14, 0x96ae);
-        rtl8168_mdio_write(tp, 0x14, 0x06a0);
-        rtl8168_mdio_write(tp, 0x14, 0x0103);
-        rtl8168_mdio_write(tp, 0x14, 0x0219);
-        rtl8168_mdio_write(tp, 0x14, 0x19ef);
-        rtl8168_mdio_write(tp, 0x14, 0x96fe);
-        rtl8168_mdio_write(tp, 0x14, 0xfc04);
-        rtl8168_mdio_write(tp, 0x14, 0xf8fa);
-        rtl8168_mdio_write(tp, 0x14, 0xef69);
-        rtl8168_mdio_write(tp, 0x14, 0xe082);
-        rtl8168_mdio_write(tp, 0x14, 0x29f6);
-        rtl8168_mdio_write(tp, 0x14, 0x20e4);
-        rtl8168_mdio_write(tp, 0x14, 0x8229);
-        rtl8168_mdio_write(tp, 0x14, 0xe080);
-        rtl8168_mdio_write(tp, 0x14, 0x10ac);
-        rtl8168_mdio_write(tp, 0x14, 0x2102);
-        rtl8168_mdio_write(tp, 0x14, 0xae54);
-        rtl8168_mdio_write(tp, 0x14, 0xe082);
-        rtl8168_mdio_write(tp, 0x14, 0x27f7);
-        rtl8168_mdio_write(tp, 0x14, 0x20e4);
-        rtl8168_mdio_write(tp, 0x14, 0x8227);
-        rtl8168_mdio_write(tp, 0x14, 0xbf42);
-        rtl8168_mdio_write(tp, 0x14, 0xe602);
-        rtl8168_mdio_write(tp, 0x14, 0x4297);
-        rtl8168_mdio_write(tp, 0x14, 0xac28);
-        rtl8168_mdio_write(tp, 0x14, 0x22bf);
-        rtl8168_mdio_write(tp, 0x14, 0x430d);
-        rtl8168_mdio_write(tp, 0x14, 0x0242);
-        rtl8168_mdio_write(tp, 0x14, 0x97e5);
-        rtl8168_mdio_write(tp, 0x14, 0x8247);
-        rtl8168_mdio_write(tp, 0x14, 0xac28);
-        rtl8168_mdio_write(tp, 0x14, 0x20d1);
-        rtl8168_mdio_write(tp, 0x14, 0x03bf);
-        rtl8168_mdio_write(tp, 0x14, 0x4307);
-        rtl8168_mdio_write(tp, 0x14, 0x0242);
-        rtl8168_mdio_write(tp, 0x14, 0x59ee);
-        rtl8168_mdio_write(tp, 0x14, 0x8246);
-        rtl8168_mdio_write(tp, 0x14, 0x00e1);
-        rtl8168_mdio_write(tp, 0x14, 0x8227);
-        rtl8168_mdio_write(tp, 0x14, 0xf628);
-        rtl8168_mdio_write(tp, 0x14, 0xe582);
-        rtl8168_mdio_write(tp, 0x14, 0x27ae);
-        rtl8168_mdio_write(tp, 0x14, 0x21d1);
-        rtl8168_mdio_write(tp, 0x14, 0x04bf);
-        rtl8168_mdio_write(tp, 0x14, 0x4307);
-        rtl8168_mdio_write(tp, 0x14, 0x0242);
-        rtl8168_mdio_write(tp, 0x14, 0x59ae);
-        rtl8168_mdio_write(tp, 0x14, 0x08d1);
-        rtl8168_mdio_write(tp, 0x14, 0x05bf);
-        rtl8168_mdio_write(tp, 0x14, 0x4307);
-        rtl8168_mdio_write(tp, 0x14, 0x0242);
-        rtl8168_mdio_write(tp, 0x14, 0x59e0);
-        rtl8168_mdio_write(tp, 0x14, 0x8244);
-        rtl8168_mdio_write(tp, 0x14, 0xf720);
-        rtl8168_mdio_write(tp, 0x14, 0xe482);
-        rtl8168_mdio_write(tp, 0x14, 0x4402);
-        rtl8168_mdio_write(tp, 0x14, 0x46ae);
-        rtl8168_mdio_write(tp, 0x14, 0xee82);
-        rtl8168_mdio_write(tp, 0x14, 0x4601);
-        rtl8168_mdio_write(tp, 0x14, 0xef96);
-        rtl8168_mdio_write(tp, 0x14, 0xfefc);
-        rtl8168_mdio_write(tp, 0x14, 0x04f8);
-        rtl8168_mdio_write(tp, 0x14, 0xfaef);
-        rtl8168_mdio_write(tp, 0x14, 0x69e0);
-        rtl8168_mdio_write(tp, 0x14, 0x8013);
-        rtl8168_mdio_write(tp, 0x14, 0xad24);
-        rtl8168_mdio_write(tp, 0x14, 0x1cbf);
-        rtl8168_mdio_write(tp, 0x14, 0x87f0);
-        rtl8168_mdio_write(tp, 0x14, 0x0242);
-        rtl8168_mdio_write(tp, 0x14, 0x97ad);
-        rtl8168_mdio_write(tp, 0x14, 0x2813);
-        rtl8168_mdio_write(tp, 0x14, 0xe087);
-        rtl8168_mdio_write(tp, 0x14, 0xfca0);
-        rtl8168_mdio_write(tp, 0x14, 0x0005);
-        rtl8168_mdio_write(tp, 0x14, 0x0287);
-        rtl8168_mdio_write(tp, 0x14, 0x36ae);
-        rtl8168_mdio_write(tp, 0x14, 0x10a0);
-        rtl8168_mdio_write(tp, 0x14, 0x0105);
-        rtl8168_mdio_write(tp, 0x14, 0x0287);
-        rtl8168_mdio_write(tp, 0x14, 0x48ae);
-        rtl8168_mdio_write(tp, 0x14, 0x08e0);
-        rtl8168_mdio_write(tp, 0x14, 0x8230);
-        rtl8168_mdio_write(tp, 0x14, 0xf626);
-        rtl8168_mdio_write(tp, 0x14, 0xe482);
-        rtl8168_mdio_write(tp, 0x14, 0x30ef);
-        rtl8168_mdio_write(tp, 0x14, 0x96fe);
-        rtl8168_mdio_write(tp, 0x14, 0xfc04);
-        rtl8168_mdio_write(tp, 0x14, 0xf8e0);
-        rtl8168_mdio_write(tp, 0x14, 0x8245);
-        rtl8168_mdio_write(tp, 0x14, 0xf722);
-        rtl8168_mdio_write(tp, 0x14, 0xe482);
-        rtl8168_mdio_write(tp, 0x14, 0x4502);
-        rtl8168_mdio_write(tp, 0x14, 0x46ae);
-        rtl8168_mdio_write(tp, 0x14, 0xee87);
-        rtl8168_mdio_write(tp, 0x14, 0xfc01);
-        rtl8168_mdio_write(tp, 0x14, 0xfc04);
-        rtl8168_mdio_write(tp, 0x14, 0xf8fa);
-        rtl8168_mdio_write(tp, 0x14, 0xef69);
-        rtl8168_mdio_write(tp, 0x14, 0xfb02);
-        rtl8168_mdio_write(tp, 0x14, 0x46d3);
-        rtl8168_mdio_write(tp, 0x14, 0xad50);
-        rtl8168_mdio_write(tp, 0x14, 0x2fbf);
-        rtl8168_mdio_write(tp, 0x14, 0x87ed);
-        rtl8168_mdio_write(tp, 0x14, 0xd101);
-        rtl8168_mdio_write(tp, 0x14, 0x0242);
-        rtl8168_mdio_write(tp, 0x14, 0x59bf);
-        rtl8168_mdio_write(tp, 0x14, 0x87ed);
-        rtl8168_mdio_write(tp, 0x14, 0xd100);
-        rtl8168_mdio_write(tp, 0x14, 0x0242);
-        rtl8168_mdio_write(tp, 0x14, 0x59e0);
-        rtl8168_mdio_write(tp, 0x14, 0x8245);
-        rtl8168_mdio_write(tp, 0x14, 0xf622);
-        rtl8168_mdio_write(tp, 0x14, 0xe482);
-        rtl8168_mdio_write(tp, 0x14, 0x4502);
-        rtl8168_mdio_write(tp, 0x14, 0x46ae);
-        rtl8168_mdio_write(tp, 0x14, 0xd100);
-        rtl8168_mdio_write(tp, 0x14, 0xbf87);
-        rtl8168_mdio_write(tp, 0x14, 0xf002);
-        rtl8168_mdio_write(tp, 0x14, 0x4259);
-        rtl8168_mdio_write(tp, 0x14, 0xee87);
-        rtl8168_mdio_write(tp, 0x14, 0xfc00);
-        rtl8168_mdio_write(tp, 0x14, 0xe082);
-        rtl8168_mdio_write(tp, 0x14, 0x30f6);
-        rtl8168_mdio_write(tp, 0x14, 0x26e4);
-        rtl8168_mdio_write(tp, 0x14, 0x8230);
-        rtl8168_mdio_write(tp, 0x14, 0xffef);
-        rtl8168_mdio_write(tp, 0x14, 0x96fe);
-        rtl8168_mdio_write(tp, 0x14, 0xfc04);
-        rtl8168_mdio_write(tp, 0x14, 0xf8f9);
-        rtl8168_mdio_write(tp, 0x14, 0xface);
-        rtl8168_mdio_write(tp, 0x14, 0xfaef);
-        rtl8168_mdio_write(tp, 0x14, 0x69fb);
-        rtl8168_mdio_write(tp, 0x14, 0xbf87);
-        rtl8168_mdio_write(tp, 0x14, 0xb3d7);
-        rtl8168_mdio_write(tp, 0x14, 0x001c);
-        rtl8168_mdio_write(tp, 0x14, 0xd819);
-        rtl8168_mdio_write(tp, 0x14, 0xd919);
-        rtl8168_mdio_write(tp, 0x14, 0xda19);
-        rtl8168_mdio_write(tp, 0x14, 0xdb19);
-        rtl8168_mdio_write(tp, 0x14, 0x07ef);
-        rtl8168_mdio_write(tp, 0x14, 0x9502);
-        rtl8168_mdio_write(tp, 0x14, 0x4259);
-        rtl8168_mdio_write(tp, 0x14, 0x073f);
-        rtl8168_mdio_write(tp, 0x14, 0x0004);
-        rtl8168_mdio_write(tp, 0x14, 0x9fec);
-        rtl8168_mdio_write(tp, 0x14, 0xffef);
-        rtl8168_mdio_write(tp, 0x14, 0x96fe);
-        rtl8168_mdio_write(tp, 0x14, 0xc6fe);
-        rtl8168_mdio_write(tp, 0x14, 0xfdfc);
-        rtl8168_mdio_write(tp, 0x14, 0x0400);
-        rtl8168_mdio_write(tp, 0x14, 0x0145);
-        rtl8168_mdio_write(tp, 0x14, 0x7d00);
-        rtl8168_mdio_write(tp, 0x14, 0x0345);
-        rtl8168_mdio_write(tp, 0x14, 0x5c00);
-        rtl8168_mdio_write(tp, 0x14, 0x0143);
-        rtl8168_mdio_write(tp, 0x14, 0x4f00);
-        rtl8168_mdio_write(tp, 0x14, 0x0387);
-        rtl8168_mdio_write(tp, 0x14, 0xdb00);
-        rtl8168_mdio_write(tp, 0x14, 0x0987);
-        rtl8168_mdio_write(tp, 0x14, 0xde00);
-        rtl8168_mdio_write(tp, 0x14, 0x0987);
-        rtl8168_mdio_write(tp, 0x14, 0xe100);
-        rtl8168_mdio_write(tp, 0x14, 0x0087);
-        rtl8168_mdio_write(tp, 0x14, 0xeaa4);
-        rtl8168_mdio_write(tp, 0x14, 0x00b8);
-        rtl8168_mdio_write(tp, 0x14, 0x20c4);
-        rtl8168_mdio_write(tp, 0x14, 0x1600);
-        rtl8168_mdio_write(tp, 0x14, 0x000f);
-        rtl8168_mdio_write(tp, 0x14, 0xf800);
-        rtl8168_mdio_write(tp, 0x14, 0x7098);
-        rtl8168_mdio_write(tp, 0x14, 0xa58a);
-        rtl8168_mdio_write(tp, 0x14, 0xb6a8);
-        rtl8168_mdio_write(tp, 0x14, 0x3e50);
-        rtl8168_mdio_write(tp, 0x14, 0xa83e);
-        rtl8168_mdio_write(tp, 0x14, 0x33bc);
-        rtl8168_mdio_write(tp, 0x14, 0xc622);
-        rtl8168_mdio_write(tp, 0x14, 0xbcc6);
-        rtl8168_mdio_write(tp, 0x14, 0xaaa4);
-        rtl8168_mdio_write(tp, 0x14, 0x42ff);
-        rtl8168_mdio_write(tp, 0x14, 0xc408);
-        rtl8168_mdio_write(tp, 0x14, 0x00c4);
-        rtl8168_mdio_write(tp, 0x14, 0x16a8);
-        rtl8168_mdio_write(tp, 0x14, 0xbcc0);
-        rtl8168_mdio_write(tp, 0x13, 0xb818);
-        rtl8168_mdio_write(tp, 0x14, 0x02f3);
-        rtl8168_mdio_write(tp, 0x13, 0xb81a);
-        rtl8168_mdio_write(tp, 0x14, 0x17d1);
-        rtl8168_mdio_write(tp, 0x13, 0xb81c);
-        rtl8168_mdio_write(tp, 0x14, 0x185a);
-        rtl8168_mdio_write(tp, 0x13, 0xb81e);
-        rtl8168_mdio_write(tp, 0x14, 0x3c66);
-        rtl8168_mdio_write(tp, 0x13, 0xb820);
-        rtl8168_mdio_write(tp, 0x14, 0x021f);
-        rtl8168_mdio_write(tp, 0x13, 0xc416);
-        rtl8168_mdio_write(tp, 0x14, 0x0500);
-        rtl8168_mdio_write(tp, 0x13, 0xb82e);
-        rtl8168_mdio_write(tp, 0x14, 0xfffc);
-
-        rtl8168_mdio_write(tp, 0x1F, 0x0A43);
-        rtl8168_mdio_write(tp, 0x13, 0x0000);
-        rtl8168_mdio_write(tp, 0x14, 0x0000);
-        rtl8168_mdio_write(tp, 0x1f, 0x0B82);
-        gphy_val = rtl8168_mdio_read(tp, 0x10);
-        gphy_val &= ~(BIT_9);
-        rtl8168_mdio_write(tp, 0x10, gphy_val);
-        rtl8168_mdio_write(tp, 0x1f, 0x0A43);
-        rtl8168_mdio_write(tp, 0x13, 0x8146);
-        rtl8168_mdio_write(tp, 0x14, 0x0000);
-
-        rtl8168_clear_phy_mcu_patch_request(tp);
-}
-
-static void
-rtl8168_set_phy_mcu_8168gu_2(struct net_device *dev)
-{
-        struct rtl8168_private *tp = netdev_priv(dev);
-        unsigned int gphy_val;
-
-        rtl8168_set_phy_mcu_patch_request(tp);
-        rtl8168_mdio_write(tp, 0x1f, 0x0A43);
-        rtl8168_mdio_write(tp, 0x13, 0x8146);
-        rtl8168_mdio_write(tp, 0x14, 0x0300);
-        rtl8168_mdio_write(tp, 0x13, 0xB82E);
-        rtl8168_mdio_write(tp, 0x14, 0x0001);
-        rtl8168_mdio_write(tp, 0x1F, 0x0A43);
-        rtl8168_mdio_write(tp, 0x13, 0xb820);
-        rtl8168_mdio_write(tp, 0x14, 0x0290);
-        rtl8168_mdio_write(tp, 0x13, 0xa012);
-        rtl8168_mdio_write(tp, 0x14, 0x0000);
-        rtl8168_mdio_write(tp, 0x13, 0xa014);
-        rtl8168_mdio_write(tp, 0x14, 0x2c04);
-        rtl8168_mdio_write(tp, 0x14, 0x2c07);
-        rtl8168_mdio_write(tp, 0x14, 0x2c07);
-        rtl8168_mdio_write(tp, 0x14, 0x2c07);
-        rtl8168_mdio_write(tp, 0x14, 0xa304);
-        rtl8168_mdio_write(tp, 0x14, 0xa301);
-        rtl8168_mdio_write(tp, 0x14, 0x207e);
-        rtl8168_mdio_write(tp, 0x13, 0xa01a);
-        rtl8168_mdio_write(tp, 0x14, 0x0000);
-        rtl8168_mdio_write(tp, 0x13, 0xa006);
-        rtl8168_mdio_write(tp, 0x14, 0x0fff);
-        rtl8168_mdio_write(tp, 0x13, 0xa004);
-        rtl8168_mdio_write(tp, 0x14, 0x0fff);
-        rtl8168_mdio_write(tp, 0x13, 0xa002);
-        rtl8168_mdio_write(tp, 0x14, 0x0fff);
-        rtl8168_mdio_write(tp, 0x13, 0xa000);
-        rtl8168_mdio_write(tp, 0x14, 0x107c);
-        rtl8168_mdio_write(tp, 0x13, 0xb820);
-        rtl8168_mdio_write(tp, 0x14, 0x0210);
-        rtl8168_mdio_write(tp, 0x1F, 0x0A43);
-        rtl8168_mdio_write(tp, 0x13, 0x0000);
-        rtl8168_mdio_write(tp, 0x14, 0x0000);
-        rtl8168_mdio_write(tp, 0x1f, 0x0B82);
-        gphy_val = rtl8168_mdio_read(tp, 0x17);
-        gphy_val &= ~(BIT_0);
-        rtl8168_mdio_write(tp, 0x17, gphy_val);
-        rtl8168_mdio_write(tp, 0x1f, 0x0A43);
-        rtl8168_mdio_write(tp, 0x13, 0x8146);
-        rtl8168_mdio_write(tp, 0x14, 0x0000);
-
-        rtl8168_clear_phy_mcu_patch_request(tp);
-}
-
-static void
-rtl8168_set_phy_mcu_8411b_1(struct net_device *dev)
-{
-        struct rtl8168_private *tp = netdev_priv(dev);
-        unsigned int gphy_val;
-
-        rtl8168_set_phy_mcu_patch_request(tp);
-
-        rtl8168_mdio_write(tp,0x1f, 0x0A43);
-        rtl8168_mdio_write(tp,0x13, 0x8146);
-        rtl8168_mdio_write(tp,0x14, 0x0100);
-        rtl8168_mdio_write(tp,0x13, 0xB82E);
-        rtl8168_mdio_write(tp,0x14, 0x0001);
-
-
-        rtl8168_mdio_write(tp,0x1F, 0x0A43);
-        rtl8168_mdio_write(tp, 0x13, 0xb820);
-        rtl8168_mdio_write(tp, 0x14, 0x0290);
-        rtl8168_mdio_write(tp, 0x13, 0xa012);
-        rtl8168_mdio_write(tp, 0x14, 0x0000);
-        rtl8168_mdio_write(tp, 0x13, 0xa014);
-        rtl8168_mdio_write(tp, 0x14, 0x2c04);
-        rtl8168_mdio_write(tp, 0x14, 0x2c07);
-        rtl8168_mdio_write(tp, 0x14, 0x2c07);
-        rtl8168_mdio_write(tp, 0x14, 0x2c07);
-        rtl8168_mdio_write(tp, 0x14, 0xa304);
-        rtl8168_mdio_write(tp, 0x14, 0xa301);
-        rtl8168_mdio_write(tp, 0x14, 0x207e);
-        rtl8168_mdio_write(tp, 0x13, 0xa01a);
-        rtl8168_mdio_write(tp, 0x14, 0x0000);
-        rtl8168_mdio_write(tp, 0x13, 0xa006);
-        rtl8168_mdio_write(tp, 0x14, 0x0fff);
-        rtl8168_mdio_write(tp, 0x13, 0xa004);
-        rtl8168_mdio_write(tp, 0x14, 0x0fff);
-        rtl8168_mdio_write(tp, 0x13, 0xa002);
-        rtl8168_mdio_write(tp, 0x14, 0x0fff);
-        rtl8168_mdio_write(tp, 0x13, 0xa000);
-        rtl8168_mdio_write(tp, 0x14, 0x107c);
-        rtl8168_mdio_write(tp, 0x13, 0xb820);
-        rtl8168_mdio_write(tp, 0x14, 0x0210);
-
-
-        rtl8168_mdio_write(tp, 0x1F, 0x0A43);
-        rtl8168_mdio_write(tp, 0x13, 0x0000);
-        rtl8168_mdio_write(tp, 0x14, 0x0000);
-        rtl8168_mdio_write(tp, 0x1f, 0x0B82);
-        gphy_val = rtl8168_mdio_read(tp, 0x17);
-        gphy_val &= ~(BIT_0);
-        rtl8168_mdio_write(tp, 0x17, gphy_val);
-        rtl8168_mdio_write(tp, 0x1f, 0x0A43);
-        rtl8168_mdio_write(tp, 0x13, 0x8146);
-        rtl8168_mdio_write(tp, 0x14, 0x0000);
-
-        rtl8168_clear_phy_mcu_patch_request(tp);
-}
-
-static void
-rtl8168_set_phy_mcu_8168ep_2(struct net_device *dev)
-{
-        struct rtl8168_private *tp = netdev_priv(dev);
-        unsigned int gphy_val;
-
-        rtl8168_set_phy_mcu_patch_request(tp);
-
-        rtl8168_mdio_write(tp,0x1f, 0x0A43);
-        rtl8168_mdio_write(tp,0x13, 0x8146);
-        rtl8168_mdio_write(tp,0x14, 0x8700);
-        rtl8168_mdio_write(tp,0x13, 0xB82E);
-        rtl8168_mdio_write(tp,0x14, 0x0001);
-
-        rtl8168_mdio_write(tp, 0x1F, 0x0A43);
-
-        rtl8168_mdio_write(tp, 0x13, 0x83DD);
-        rtl8168_mdio_write(tp, 0x14, 0xAF83);
-        rtl8168_mdio_write(tp, 0x14, 0xE9AF);
-        rtl8168_mdio_write(tp, 0x14, 0x83EE);
-        rtl8168_mdio_write(tp, 0x14, 0xAF83);
-        rtl8168_mdio_write(tp, 0x14, 0xF1A1);
-        rtl8168_mdio_write(tp, 0x14, 0x83F4);
-        rtl8168_mdio_write(tp, 0x14, 0xD149);
-        rtl8168_mdio_write(tp, 0x14, 0xAF06);
-        rtl8168_mdio_write(tp, 0x14, 0x47AF);
-        rtl8168_mdio_write(tp, 0x14, 0x0000);
-        rtl8168_mdio_write(tp, 0x14, 0xAF00);
-        rtl8168_mdio_write(tp, 0x14, 0x00AF);
-        rtl8168_mdio_write(tp, 0x14, 0x0000);
-
-        rtl8168_mdio_write(tp, 0x13, 0xB818);
-        rtl8168_mdio_write(tp, 0x14, 0x0645);
-
-        rtl8168_mdio_write(tp, 0x13, 0xB81A);
-        rtl8168_mdio_write(tp, 0x14, 0x0000);
-
-        rtl8168_mdio_write(tp, 0x13, 0xB81C);
-        rtl8168_mdio_write(tp, 0x14, 0x0000);
-
-        rtl8168_mdio_write(tp, 0x13, 0xB81E);
-        rtl8168_mdio_write(tp, 0x14, 0x0000);
-
-        rtl8168_mdio_write(tp, 0x13, 0xB832);
-        rtl8168_mdio_write(tp, 0x14, 0x0001);
-
-        rtl8168_mdio_write(tp, 0x1F, 0x0A43);
-        rtl8168_mdio_write(tp, 0x13, 0x0000);
-        rtl8168_mdio_write(tp, 0x14, 0x0000);
-        rtl8168_mdio_write(tp, 0x1f, 0x0B82);
-        gphy_val = rtl8168_mdio_read(tp, 0x17);
-        gphy_val &= ~(BIT_0);
-        rtl8168_mdio_write(tp, 0x17, gphy_val);
-        rtl8168_mdio_write(tp, 0x1f, 0x0A43);
-        rtl8168_mdio_write(tp, 0x13, 0x8146);
-        rtl8168_mdio_write(tp, 0x14, 0x0000);
-
-        rtl8168_clear_phy_mcu_patch_request(tp);
-}
-
-static void
-rtl8168_set_phy_mcu_8168h_1(struct net_device *dev)
-{
-        struct rtl8168_private *tp = netdev_priv(dev);
-        unsigned int gphy_val;
-
-        rtl8168_set_phy_mcu_patch_request(tp);
-
-        rtl8168_mdio_write(tp, 0x1f, 0x0A43);
-        rtl8168_mdio_write(tp, 0x13, 0x8028);
-        rtl8168_mdio_write(tp, 0x14, 0x6200);
-        rtl8168_mdio_write(tp, 0x13, 0xB82E);
-        rtl8168_mdio_write(tp, 0x14, 0x0001);
-
-
-        rtl8168_mdio_write(tp, 0x1F, 0x0A43);
-        rtl8168_mdio_write(tp, 0x13, 0xB820);
-        rtl8168_mdio_write(tp, 0x14, 0x0290);
-        rtl8168_mdio_write(tp, 0x13, 0xA012);
-        rtl8168_mdio_write(tp, 0x14, 0x0000);
-        rtl8168_mdio_write(tp, 0x13, 0xA014);
-        rtl8168_mdio_write(tp, 0x14, 0x2c04);
-        rtl8168_mdio_write(tp, 0x14, 0x2c10);
-        rtl8168_mdio_write(tp, 0x14, 0x2c10);
-        rtl8168_mdio_write(tp, 0x14, 0x2c10);
-        rtl8168_mdio_write(tp, 0x14, 0xa210);
-        rtl8168_mdio_write(tp, 0x14, 0xa101);
-        rtl8168_mdio_write(tp, 0x14, 0xce10);
-        rtl8168_mdio_write(tp, 0x14, 0xe070);
-        rtl8168_mdio_write(tp, 0x14, 0x0f40);
-        rtl8168_mdio_write(tp, 0x14, 0xaf01);
-        rtl8168_mdio_write(tp, 0x14, 0x8f01);
-        rtl8168_mdio_write(tp, 0x14, 0x183e);
-        rtl8168_mdio_write(tp, 0x14, 0x8e10);
-        rtl8168_mdio_write(tp, 0x14, 0x8101);
-        rtl8168_mdio_write(tp, 0x14, 0x8210);
-        rtl8168_mdio_write(tp, 0x14, 0x28da);
-        rtl8168_mdio_write(tp, 0x13, 0xA01A);
-        rtl8168_mdio_write(tp, 0x14, 0x0000);
-        rtl8168_mdio_write(tp, 0x13, 0xA006);
-        rtl8168_mdio_write(tp, 0x14, 0x0017);
-        rtl8168_mdio_write(tp, 0x13, 0xA004);
-        rtl8168_mdio_write(tp, 0x14, 0x0015);
-        rtl8168_mdio_write(tp, 0x13, 0xA002);
-        rtl8168_mdio_write(tp, 0x14, 0x0013);
-        rtl8168_mdio_write(tp, 0x13, 0xA000);
-        rtl8168_mdio_write(tp, 0x14, 0x18d1);
-        rtl8168_mdio_write(tp, 0x13, 0xB820);
-        rtl8168_mdio_write(tp, 0x14, 0x0210);
-
-
-        rtl8168_mdio_write(tp, 0x1F, 0x0A43);
-        rtl8168_mdio_write(tp, 0x13, 0x0000);
-        rtl8168_mdio_write(tp, 0x14, 0x0000);
-        rtl8168_mdio_write(tp, 0x1f, 0x0B82);
-        gphy_val = rtl8168_mdio_read(tp,  0x17);
-        gphy_val &= ~(BIT_0);
-        rtl8168_mdio_write(tp, 0x17, gphy_val);
-        rtl8168_mdio_write(tp, 0x1f, 0x0A43);
-        rtl8168_mdio_write(tp, 0x13, 0x8028);
-        rtl8168_mdio_write(tp, 0x14, 0x0000);
-
-        rtl8168_clear_phy_mcu_patch_request(tp);
-}
-
-static void
-rtl8168_set_phy_mcu_8168h_2(struct net_device *dev)
-{
-        struct rtl8168_private *tp = netdev_priv(dev);
-        unsigned int gphy_val;
-
-        rtl8168_set_phy_mcu_patch_request(tp);
-
-        rtl8168_mdio_write(tp, 0x1f, 0x0A43);
-        rtl8168_mdio_write(tp, 0x13, 0x8028);
-        rtl8168_mdio_write(tp, 0x14, 0x6201);
-        rtl8168_mdio_write(tp, 0x13, 0xB82E);
-        rtl8168_mdio_write(tp, 0x14, 0x0001);
-
-
-        rtl8168_mdio_write(tp, 0x1F, 0x0A43);
-        rtl8168_mdio_write(tp, 0x13, 0xB820);
-        rtl8168_mdio_write(tp, 0x14, 0x0290);
-        rtl8168_mdio_write(tp, 0x13, 0xA012);
-        rtl8168_mdio_write(tp, 0x14, 0x0000);
-        rtl8168_mdio_write(tp, 0x13, 0xA014);
-        rtl8168_mdio_write(tp, 0x14, 0x2c04);
-        rtl8168_mdio_write(tp, 0x14, 0x2c09);
-        rtl8168_mdio_write(tp, 0x14, 0x2c09);
-        rtl8168_mdio_write(tp, 0x14, 0x2c09);
-        rtl8168_mdio_write(tp, 0x14, 0xad01);
-        rtl8168_mdio_write(tp, 0x14, 0xad01);
-        rtl8168_mdio_write(tp, 0x14, 0xad01);
-        rtl8168_mdio_write(tp, 0x14, 0xad01);
-        rtl8168_mdio_write(tp, 0x14, 0x236c);
-        rtl8168_mdio_write(tp, 0x13, 0xA01A);
-        rtl8168_mdio_write(tp, 0x14, 0x0000);
-        rtl8168_mdio_write(tp, 0x13, 0xA006);
-        rtl8168_mdio_write(tp, 0x14, 0x0fff);
-        rtl8168_mdio_write(tp, 0x13, 0xA004);
-        rtl8168_mdio_write(tp, 0x14, 0x0fff);
-        rtl8168_mdio_write(tp, 0x13, 0xA002);
-        rtl8168_mdio_write(tp, 0x14, 0x0fff);
-        rtl8168_mdio_write(tp, 0x13, 0xA000);
-        rtl8168_mdio_write(tp, 0x14, 0x136b);
-        rtl8168_mdio_write(tp, 0x13, 0xB820);
-        rtl8168_mdio_write(tp, 0x14, 0x0210);
-
-
-        rtl8168_mdio_write(tp, 0x1F, 0x0A43);
-        rtl8168_mdio_write(tp, 0x13, 0x8323);
-        rtl8168_mdio_write(tp, 0x14, 0xaf83);
-        rtl8168_mdio_write(tp, 0x14, 0x2faf);
-        rtl8168_mdio_write(tp, 0x14, 0x853d);
-        rtl8168_mdio_write(tp, 0x14, 0xaf85);
-        rtl8168_mdio_write(tp, 0x14, 0x3daf);
-        rtl8168_mdio_write(tp, 0x14, 0x853d);
-        rtl8168_mdio_write(tp, 0x14, 0xe082);
-        rtl8168_mdio_write(tp, 0x14, 0x45ad);
-        rtl8168_mdio_write(tp, 0x14, 0x2052);
-        rtl8168_mdio_write(tp, 0x14, 0xe082);
-        rtl8168_mdio_write(tp, 0x14, 0x7ae3);
-        rtl8168_mdio_write(tp, 0x14, 0x85fe);
-        rtl8168_mdio_write(tp, 0x14, 0x1a03);
-        rtl8168_mdio_write(tp, 0x14, 0x10e4);
-        rtl8168_mdio_write(tp, 0x14, 0x85f6);
-        rtl8168_mdio_write(tp, 0x14, 0xe082);
-        rtl8168_mdio_write(tp, 0x14, 0x7a1b);
-        rtl8168_mdio_write(tp, 0x14, 0x03e4);
-        rtl8168_mdio_write(tp, 0x14, 0x85fa);
-        rtl8168_mdio_write(tp, 0x14, 0xe082);
-        rtl8168_mdio_write(tp, 0x14, 0x7be3);
-        rtl8168_mdio_write(tp, 0x14, 0x85fe);
-        rtl8168_mdio_write(tp, 0x14, 0x1a03);
-        rtl8168_mdio_write(tp, 0x14, 0x10e4);
-        rtl8168_mdio_write(tp, 0x14, 0x85f7);
-        rtl8168_mdio_write(tp, 0x14, 0xe082);
-        rtl8168_mdio_write(tp, 0x14, 0x7b1b);
-        rtl8168_mdio_write(tp, 0x14, 0x03e4);
-        rtl8168_mdio_write(tp, 0x14, 0x85fb);
-        rtl8168_mdio_write(tp, 0x14, 0xe082);
-        rtl8168_mdio_write(tp, 0x14, 0x7ce3);
-        rtl8168_mdio_write(tp, 0x14, 0x85fe);
-        rtl8168_mdio_write(tp, 0x14, 0x1a03);
-        rtl8168_mdio_write(tp, 0x14, 0x10e4);
-        rtl8168_mdio_write(tp, 0x14, 0x85f8);
-        rtl8168_mdio_write(tp, 0x14, 0xe082);
-        rtl8168_mdio_write(tp, 0x14, 0x7c1b);
-        rtl8168_mdio_write(tp, 0x14, 0x03e4);
-        rtl8168_mdio_write(tp, 0x14, 0x85fc);
-        rtl8168_mdio_write(tp, 0x14, 0xe082);
-        rtl8168_mdio_write(tp, 0x14, 0x7de3);
-        rtl8168_mdio_write(tp, 0x14, 0x85fe);
-        rtl8168_mdio_write(tp, 0x14, 0x1a03);
-        rtl8168_mdio_write(tp, 0x14, 0x10e4);
-        rtl8168_mdio_write(tp, 0x14, 0x85f9);
-        rtl8168_mdio_write(tp, 0x14, 0xe082);
-        rtl8168_mdio_write(tp, 0x14, 0x7d1b);
-        rtl8168_mdio_write(tp, 0x14, 0x03e4);
-        rtl8168_mdio_write(tp, 0x14, 0x85fd);
-        rtl8168_mdio_write(tp, 0x14, 0xae50);
-        rtl8168_mdio_write(tp, 0x14, 0xe082);
-        rtl8168_mdio_write(tp, 0x14, 0x7ee3);
-        rtl8168_mdio_write(tp, 0x14, 0x85ff);
-        rtl8168_mdio_write(tp, 0x14, 0x1a03);
-        rtl8168_mdio_write(tp, 0x14, 0x10e4);
-        rtl8168_mdio_write(tp, 0x14, 0x85f6);
-        rtl8168_mdio_write(tp, 0x14, 0xe082);
-        rtl8168_mdio_write(tp, 0x14, 0x7e1b);
-        rtl8168_mdio_write(tp, 0x14, 0x03e4);
-        rtl8168_mdio_write(tp, 0x14, 0x85fa);
-        rtl8168_mdio_write(tp, 0x14, 0xe082);
-        rtl8168_mdio_write(tp, 0x14, 0x7fe3);
-        rtl8168_mdio_write(tp, 0x14, 0x85ff);
-        rtl8168_mdio_write(tp, 0x14, 0x1a03);
-        rtl8168_mdio_write(tp, 0x14, 0x10e4);
-        rtl8168_mdio_write(tp, 0x14, 0x85f7);
-        rtl8168_mdio_write(tp, 0x14, 0xe082);
-        rtl8168_mdio_write(tp, 0x14, 0x7f1b);
-        rtl8168_mdio_write(tp, 0x14, 0x03e4);
-        rtl8168_mdio_write(tp, 0x14, 0x85fb);
-        rtl8168_mdio_write(tp, 0x14, 0xe082);
-        rtl8168_mdio_write(tp, 0x14, 0x80e3);
-        rtl8168_mdio_write(tp, 0x14, 0x85ff);
-        rtl8168_mdio_write(tp, 0x14, 0x1a03);
-        rtl8168_mdio_write(tp, 0x14, 0x10e4);
-        rtl8168_mdio_write(tp, 0x14, 0x85f8);
-        rtl8168_mdio_write(tp, 0x14, 0xe082);
-        rtl8168_mdio_write(tp, 0x14, 0x801b);
-        rtl8168_mdio_write(tp, 0x14, 0x03e4);
-        rtl8168_mdio_write(tp, 0x14, 0x85fc);
-        rtl8168_mdio_write(tp, 0x14, 0xe082);
-        rtl8168_mdio_write(tp, 0x14, 0x81e3);
-        rtl8168_mdio_write(tp, 0x14, 0x85ff);
-        rtl8168_mdio_write(tp, 0x14, 0x1a03);
-        rtl8168_mdio_write(tp, 0x14, 0x10e4);
-        rtl8168_mdio_write(tp, 0x14, 0x85f9);
-        rtl8168_mdio_write(tp, 0x14, 0xe082);
-        rtl8168_mdio_write(tp, 0x14, 0x811b);
-        rtl8168_mdio_write(tp, 0x14, 0x03e4);
-        rtl8168_mdio_write(tp, 0x14, 0x85fd);
-        rtl8168_mdio_write(tp, 0x14, 0xe085);
-        rtl8168_mdio_write(tp, 0x14, 0xf6ad);
-        rtl8168_mdio_write(tp, 0x14, 0x2404);
-        rtl8168_mdio_write(tp, 0x14, 0xee85);
-        rtl8168_mdio_write(tp, 0x14, 0xf610);
-        rtl8168_mdio_write(tp, 0x14, 0xe085);
-        rtl8168_mdio_write(tp, 0x14, 0xf7ad);
-        rtl8168_mdio_write(tp, 0x14, 0x2404);
-        rtl8168_mdio_write(tp, 0x14, 0xee85);
-        rtl8168_mdio_write(tp, 0x14, 0xf710);
-        rtl8168_mdio_write(tp, 0x14, 0xe085);
-        rtl8168_mdio_write(tp, 0x14, 0xf8ad);
-        rtl8168_mdio_write(tp, 0x14, 0x2404);
-        rtl8168_mdio_write(tp, 0x14, 0xee85);
-        rtl8168_mdio_write(tp, 0x14, 0xf810);
-        rtl8168_mdio_write(tp, 0x14, 0xe085);
-        rtl8168_mdio_write(tp, 0x14, 0xf9ad);
-        rtl8168_mdio_write(tp, 0x14, 0x2404);
-        rtl8168_mdio_write(tp, 0x14, 0xee85);
-        rtl8168_mdio_write(tp, 0x14, 0xf910);
-        rtl8168_mdio_write(tp, 0x14, 0xe085);
-        rtl8168_mdio_write(tp, 0x14, 0xfaad);
-        rtl8168_mdio_write(tp, 0x14, 0x2704);
-        rtl8168_mdio_write(tp, 0x14, 0xee85);
-        rtl8168_mdio_write(tp, 0x14, 0xfa00);
-        rtl8168_mdio_write(tp, 0x14, 0xe085);
-        rtl8168_mdio_write(tp, 0x14, 0xfbad);
-        rtl8168_mdio_write(tp, 0x14, 0x2704);
-        rtl8168_mdio_write(tp, 0x14, 0xee85);
-        rtl8168_mdio_write(tp, 0x14, 0xfb00);
-        rtl8168_mdio_write(tp, 0x14, 0xe085);
-        rtl8168_mdio_write(tp, 0x14, 0xfcad);
-        rtl8168_mdio_write(tp, 0x14, 0x2704);
-        rtl8168_mdio_write(tp, 0x14, 0xee85);
-        rtl8168_mdio_write(tp, 0x14, 0xfc00);
-        rtl8168_mdio_write(tp, 0x14, 0xe085);
-        rtl8168_mdio_write(tp, 0x14, 0xfdad);
-        rtl8168_mdio_write(tp, 0x14, 0x2704);
-        rtl8168_mdio_write(tp, 0x14, 0xee85);
-        rtl8168_mdio_write(tp, 0x14, 0xfd00);
-        rtl8168_mdio_write(tp, 0x14, 0xe082);
-        rtl8168_mdio_write(tp, 0x14, 0x44ad);
-        rtl8168_mdio_write(tp, 0x14, 0x203f);
-        rtl8168_mdio_write(tp, 0x14, 0xe085);
-        rtl8168_mdio_write(tp, 0x14, 0xf6e4);
-        rtl8168_mdio_write(tp, 0x14, 0x8288);
-        rtl8168_mdio_write(tp, 0x14, 0xe085);
-        rtl8168_mdio_write(tp, 0x14, 0xfae4);
-        rtl8168_mdio_write(tp, 0x14, 0x8289);
-        rtl8168_mdio_write(tp, 0x14, 0xe082);
-        rtl8168_mdio_write(tp, 0x14, 0x440d);
-        rtl8168_mdio_write(tp, 0x14, 0x0458);
-        rtl8168_mdio_write(tp, 0x14, 0x01bf);
-        rtl8168_mdio_write(tp, 0x14, 0x8264);
-        rtl8168_mdio_write(tp, 0x14, 0x0215);
-        rtl8168_mdio_write(tp, 0x14, 0x38bf);
-        rtl8168_mdio_write(tp, 0x14, 0x824e);
-        rtl8168_mdio_write(tp, 0x14, 0x0213);
-        rtl8168_mdio_write(tp, 0x14, 0x06a0);
-        rtl8168_mdio_write(tp, 0x14, 0x010f);
-        rtl8168_mdio_write(tp, 0x14, 0xe082);
-        rtl8168_mdio_write(tp, 0x14, 0x44f6);
-        rtl8168_mdio_write(tp, 0x14, 0x20e4);
-        rtl8168_mdio_write(tp, 0x14, 0x8244);
-        rtl8168_mdio_write(tp, 0x14, 0x580f);
-        rtl8168_mdio_write(tp, 0x14, 0xe582);
-        rtl8168_mdio_write(tp, 0x14, 0x5aae);
-        rtl8168_mdio_write(tp, 0x14, 0x0ebf);
-        rtl8168_mdio_write(tp, 0x14, 0x825e);
-        rtl8168_mdio_write(tp, 0x14, 0xe382);
-        rtl8168_mdio_write(tp, 0x14, 0x44f7);
-        rtl8168_mdio_write(tp, 0x14, 0x3ce7);
-        rtl8168_mdio_write(tp, 0x14, 0x8244);
-        rtl8168_mdio_write(tp, 0x14, 0x0212);
-        rtl8168_mdio_write(tp, 0x14, 0xf0ad);
-        rtl8168_mdio_write(tp, 0x14, 0x213f);
-        rtl8168_mdio_write(tp, 0x14, 0xe085);
-        rtl8168_mdio_write(tp, 0x14, 0xf7e4);
-        rtl8168_mdio_write(tp, 0x14, 0x8288);
-        rtl8168_mdio_write(tp, 0x14, 0xe085);
-        rtl8168_mdio_write(tp, 0x14, 0xfbe4);
-        rtl8168_mdio_write(tp, 0x14, 0x8289);
-        rtl8168_mdio_write(tp, 0x14, 0xe082);
-        rtl8168_mdio_write(tp, 0x14, 0x440d);
-        rtl8168_mdio_write(tp, 0x14, 0x0558);
-        rtl8168_mdio_write(tp, 0x14, 0x01bf);
-        rtl8168_mdio_write(tp, 0x14, 0x826b);
-        rtl8168_mdio_write(tp, 0x14, 0x0215);
-        rtl8168_mdio_write(tp, 0x14, 0x38bf);
-        rtl8168_mdio_write(tp, 0x14, 0x824f);
-        rtl8168_mdio_write(tp, 0x14, 0x0213);
-        rtl8168_mdio_write(tp, 0x14, 0x06a0);
-        rtl8168_mdio_write(tp, 0x14, 0x010f);
-        rtl8168_mdio_write(tp, 0x14, 0xe082);
-        rtl8168_mdio_write(tp, 0x14, 0x44f6);
-        rtl8168_mdio_write(tp, 0x14, 0x21e4);
-        rtl8168_mdio_write(tp, 0x14, 0x8244);
-        rtl8168_mdio_write(tp, 0x14, 0x580f);
-        rtl8168_mdio_write(tp, 0x14, 0xe582);
-        rtl8168_mdio_write(tp, 0x14, 0x5bae);
-        rtl8168_mdio_write(tp, 0x14, 0x0ebf);
-        rtl8168_mdio_write(tp, 0x14, 0x8265);
-        rtl8168_mdio_write(tp, 0x14, 0xe382);
-        rtl8168_mdio_write(tp, 0x14, 0x44f7);
-        rtl8168_mdio_write(tp, 0x14, 0x3de7);
-        rtl8168_mdio_write(tp, 0x14, 0x8244);
-        rtl8168_mdio_write(tp, 0x14, 0x0212);
-        rtl8168_mdio_write(tp, 0x14, 0xf0ad);
-        rtl8168_mdio_write(tp, 0x14, 0x223f);
-        rtl8168_mdio_write(tp, 0x14, 0xe085);
-        rtl8168_mdio_write(tp, 0x14, 0xf8e4);
-        rtl8168_mdio_write(tp, 0x14, 0x8288);
-        rtl8168_mdio_write(tp, 0x14, 0xe085);
-        rtl8168_mdio_write(tp, 0x14, 0xfce4);
-        rtl8168_mdio_write(tp, 0x14, 0x8289);
-        rtl8168_mdio_write(tp, 0x14, 0xe082);
-        rtl8168_mdio_write(tp, 0x14, 0x440d);
-        rtl8168_mdio_write(tp, 0x14, 0x0658);
-        rtl8168_mdio_write(tp, 0x14, 0x01bf);
-        rtl8168_mdio_write(tp, 0x14, 0x8272);
-        rtl8168_mdio_write(tp, 0x14, 0x0215);
-        rtl8168_mdio_write(tp, 0x14, 0x38bf);
-        rtl8168_mdio_write(tp, 0x14, 0x8250);
-        rtl8168_mdio_write(tp, 0x14, 0x0213);
-        rtl8168_mdio_write(tp, 0x14, 0x06a0);
-        rtl8168_mdio_write(tp, 0x14, 0x010f);
-        rtl8168_mdio_write(tp, 0x14, 0xe082);
-        rtl8168_mdio_write(tp, 0x14, 0x44f6);
-        rtl8168_mdio_write(tp, 0x14, 0x22e4);
-        rtl8168_mdio_write(tp, 0x14, 0x8244);
-        rtl8168_mdio_write(tp, 0x14, 0x580f);
-        rtl8168_mdio_write(tp, 0x14, 0xe582);
-        rtl8168_mdio_write(tp, 0x14, 0x5cae);
-        rtl8168_mdio_write(tp, 0x14, 0x0ebf);
-        rtl8168_mdio_write(tp, 0x14, 0x826c);
-        rtl8168_mdio_write(tp, 0x14, 0xe382);
-        rtl8168_mdio_write(tp, 0x14, 0x44f7);
-        rtl8168_mdio_write(tp, 0x14, 0x3ee7);
-        rtl8168_mdio_write(tp, 0x14, 0x8244);
-        rtl8168_mdio_write(tp, 0x14, 0x0212);
-        rtl8168_mdio_write(tp, 0x14, 0xf0ad);
-        rtl8168_mdio_write(tp, 0x14, 0x233f);
-        rtl8168_mdio_write(tp, 0x14, 0xe085);
-        rtl8168_mdio_write(tp, 0x14, 0xf9e4);
-        rtl8168_mdio_write(tp, 0x14, 0x8288);
-        rtl8168_mdio_write(tp, 0x14, 0xe085);
-        rtl8168_mdio_write(tp, 0x14, 0xfde4);
-        rtl8168_mdio_write(tp, 0x14, 0x8289);
-        rtl8168_mdio_write(tp, 0x14, 0xe082);
-        rtl8168_mdio_write(tp, 0x14, 0x440d);
-        rtl8168_mdio_write(tp, 0x14, 0x0758);
-        rtl8168_mdio_write(tp, 0x14, 0x01bf);
-        rtl8168_mdio_write(tp, 0x14, 0x8279);
-        rtl8168_mdio_write(tp, 0x14, 0x0215);
-        rtl8168_mdio_write(tp, 0x14, 0x38bf);
-        rtl8168_mdio_write(tp, 0x14, 0x8251);
-        rtl8168_mdio_write(tp, 0x14, 0x0213);
-        rtl8168_mdio_write(tp, 0x14, 0x06a0);
-        rtl8168_mdio_write(tp, 0x14, 0x010f);
-        rtl8168_mdio_write(tp, 0x14, 0xe082);
-        rtl8168_mdio_write(tp, 0x14, 0x44f6);
-        rtl8168_mdio_write(tp, 0x14, 0x23e4);
-        rtl8168_mdio_write(tp, 0x14, 0x8244);
-        rtl8168_mdio_write(tp, 0x14, 0x580f);
-        rtl8168_mdio_write(tp, 0x14, 0xe582);
-        rtl8168_mdio_write(tp, 0x14, 0x5dae);
-        rtl8168_mdio_write(tp, 0x14, 0x0ebf);
-        rtl8168_mdio_write(tp, 0x14, 0x8273);
-        rtl8168_mdio_write(tp, 0x14, 0xe382);
-        rtl8168_mdio_write(tp, 0x14, 0x44f7);
-        rtl8168_mdio_write(tp, 0x14, 0x3fe7);
-        rtl8168_mdio_write(tp, 0x14, 0x8244);
-        rtl8168_mdio_write(tp, 0x14, 0x0212);
-        rtl8168_mdio_write(tp, 0x14, 0xf0ee);
-        rtl8168_mdio_write(tp, 0x14, 0x8288);
-        rtl8168_mdio_write(tp, 0x14, 0x10ee);
-        rtl8168_mdio_write(tp, 0x14, 0x8289);
-        rtl8168_mdio_write(tp, 0x14, 0x00af);
-        rtl8168_mdio_write(tp, 0x14, 0x14aa);
-        rtl8168_mdio_write(tp, 0x13, 0xb818);
-        rtl8168_mdio_write(tp, 0x14, 0x13cf);
-        rtl8168_mdio_write(tp, 0x13, 0xb81a);
-        rtl8168_mdio_write(tp, 0x14, 0xfffd);
-        rtl8168_mdio_write(tp, 0x13, 0xb81c);
-        rtl8168_mdio_write(tp, 0x14, 0xfffd);
-        rtl8168_mdio_write(tp, 0x13, 0xb81e);
-        rtl8168_mdio_write(tp, 0x14, 0xfffd);
-        rtl8168_mdio_write(tp, 0x13, 0xb832);
-        rtl8168_mdio_write(tp, 0x14, 0x0001);
-
-
-        rtl8168_mdio_write(tp, 0x1F, 0x0A43);
-        rtl8168_mdio_write(tp, 0x13, 0x0000);
-        rtl8168_mdio_write(tp, 0x14, 0x0000);
-        rtl8168_mdio_write(tp, 0x1f, 0x0B82);
-        gphy_val = rtl8168_mdio_read(tp, 0x17);
-        gphy_val &= ~(BIT_0);
-        rtl8168_mdio_write(tp, 0x17, gphy_val);
-        rtl8168_mdio_write(tp, 0x1f, 0x0A43);
-        rtl8168_mdio_write(tp, 0x13, 0x8028);
-        rtl8168_mdio_write(tp, 0x14, 0x0000);
-
-        rtl8168_clear_phy_mcu_patch_request(tp);
-
-        if (tp->RequiredSecLanDonglePatch) {
-                rtl8168_mdio_write(tp, 0x1F, 0x0A43);
-                gphy_val = rtl8168_mdio_read(tp, 0x11);
-                gphy_val &= ~BIT_6;
-                rtl8168_mdio_write(tp, 0x11, gphy_val);
-        }
-}
-
-static void
-rtl8168_init_hw_phy_mcu(struct net_device *dev)
-{
-        struct rtl8168_private *tp = netdev_priv(dev);
-        u8 require_disable_phy_disable_mode = FALSE;
-
-        if (tp->NotWrRamCodeToMicroP == TRUE) return;
-        if (rtl8168_check_hw_phy_mcu_code_ver(dev)) return;
-
-        if (FALSE == rtl8168_phy_ram_code_check(dev)) {
-                rtl8168_set_phy_ram_code_check_fail_flag(dev);
-                return;
-        }
-
-        if (HW_SUPPORT_CHECK_PHY_DISABLE_MODE(tp) && rtl8168_is_in_phy_disable_mode(dev))
-                require_disable_phy_disable_mode = TRUE;
-
-        if (require_disable_phy_disable_mode)
-                rtl8168_disable_phy_disable_mode(dev);
-
-        switch (tp->mcfg) {
-        case CFG_METHOD_14:
-                rtl8168_set_phy_mcu_8168e_1(dev);
-                break;
-        case CFG_METHOD_15:
-                rtl8168_set_phy_mcu_8168e_2(dev);
-                break;
-        case CFG_METHOD_16:
-                rtl8168_set_phy_mcu_8168evl_1(dev);
-                break;
-        case CFG_METHOD_17:
-                rtl8168_set_phy_mcu_8168evl_2(dev);
-                break;
-        case CFG_METHOD_18:
-                rtl8168_set_phy_mcu_8168f_1(dev);
-                break;
-        case CFG_METHOD_19:
-                rtl8168_set_phy_mcu_8168f_2(dev);
-                break;
-        case CFG_METHOD_20:
-                rtl8168_set_phy_mcu_8411_1(dev);
-                break;
-        case CFG_METHOD_21:
-                rtl8168_set_phy_mcu_8168g_1(dev);
-                break;
-        case CFG_METHOD_25:
-                rtl8168_set_phy_mcu_8168gu_2(dev);
-                break;
-        case CFG_METHOD_26:
-                rtl8168_set_phy_mcu_8411b_1(dev);
-                break;
-        case CFG_METHOD_28:
-                rtl8168_set_phy_mcu_8168ep_2(dev);
-                break;
-        case CFG_METHOD_29:
-                rtl8168_set_phy_mcu_8168h_1(dev);
-                break;
-        case CFG_METHOD_30:
-                rtl8168_set_phy_mcu_8168h_2(dev);
-                break;
-        }
-
-        if (require_disable_phy_disable_mode)
-                rtl8168_enable_phy_disable_mode(dev);
-
-        rtl8168_write_hw_phy_mcu_code_ver(dev);
-
-        rtl8168_mdio_write(tp,0x1F, 0x0000);
-
-        tp->HwHasWrRamCodeToMicroP = TRUE;
+        return hw_ram_code_ver;
 }
 
 static void
@@ -21343,8 +8038,6 @@ rtl8168_hw_phy_config(struct net_device *dev)
         tp->phy_reset_enable(dev);
 
         if (HW_DASH_SUPPORT_TYPE_3(tp) && tp->HwPkgDet == 0x06) return;
-
-        rtl8168_init_hw_phy_mcu(dev);
 
         if (tp->mcfg == CFG_METHOD_1) {
                 rtl8168_mdio_write(tp, 0x1F, 0x0001);
@@ -24060,6 +10753,16 @@ rtl8168_init_software_variable(struct net_device *dev)
         }
 
         switch (tp->mcfg) {
+        case CFG_METHOD_29:
+        case CFG_METHOD_30:
+        case CFG_METHOD_31:
+        case CFG_METHOD_32:
+        case CFG_METHOD_33:
+                tp->HwSuppUpsVer = 1;
+                break;
+        }
+
+        switch (tp->mcfg) {
         case CFG_METHOD_31:
         case CFG_METHOD_32:
         case CFG_METHOD_33:
@@ -24072,6 +10775,34 @@ rtl8168_init_software_variable(struct net_device *dev)
                 tp->HwPcieSNOffset = 0x164;
                 break;
         }
+
+        switch (tp->mcfg) {
+        case CFG_METHOD_14:
+        case CFG_METHOD_15:
+        case CFG_METHOD_16:
+        case CFG_METHOD_17:
+        case CFG_METHOD_18:
+        case CFG_METHOD_19:
+        case CFG_METHOD_20:
+        case CFG_METHOD_21:
+        case CFG_METHOD_22:
+        case CFG_METHOD_23:
+        case CFG_METHOD_24:
+        case CFG_METHOD_25:
+        case CFG_METHOD_26:
+        case CFG_METHOD_27:
+        case CFG_METHOD_28:
+        case CFG_METHOD_29:
+        case CFG_METHOD_30:
+        case CFG_METHOD_31:
+        case CFG_METHOD_32:
+        case CFG_METHOD_33:
+                tp->HwSuppAspmClkIntrLock = 1;
+                break;
+        }
+
+        if (!aspm || !tp->HwSuppAspmClkIntrLock)
+                dynamic_aspm = 0;
 
 #ifdef ENABLE_REALWOW_SUPPORT
         rtl8168_get_realwow_hw_version(dev);
@@ -24106,6 +10837,8 @@ rtl8168_init_software_variable(struct net_device *dev)
                                 tp->mapped_cmac_ioaddr = cmac_ioaddr;
                         }
                 }
+
+                eee_enable = 0;
         }
 
 #ifdef ENABLE_DASH_SUPPORT
@@ -24352,6 +11085,26 @@ rtl8168_init_software_variable(struct net_device *dev)
         }
 
         switch (tp->mcfg) {
+        case CFG_METHOD_29:
+        case CFG_METHOD_30:
+                tp->HwSuppEsdVer = 2;
+                break;
+        default:
+                tp->HwSuppEsdVer = 1;
+                break;
+        }
+
+        if (tp->HwSuppEsdVer == 2) {
+                rtl8168_mdio_write(tp, 0x1F, 0x0A46);
+                tp->BackupPhyFuseDout_15_0 = rtl8168_mdio_read(tp, 0x10);
+                tp->BackupPhyFuseDout_47_32 = rtl8168_mdio_read(tp, 0x12);
+                tp->BackupPhyFuseDout_63_48 = rtl8168_mdio_read(tp, 0x13);
+                rtl8168_mdio_write(tp, 0x1F, 0x0000);
+
+                tp->TestPhyOcpReg = TRUE;
+        }
+
+        switch (tp->mcfg) {
         case CFG_METHOD_16:
         case CFG_METHOD_17:
                 tp->HwSuppCheckPhyDisableModeVer = 1;
@@ -24374,24 +11127,6 @@ rtl8168_init_software_variable(struct net_device *dev)
         case CFG_METHOD_32:
         case CFG_METHOD_33:
                 tp->HwSuppCheckPhyDisableModeVer = 3;
-                break;
-        }
-
-        switch (tp->mcfg) {
-        case CFG_METHOD_21:
-        case CFG_METHOD_22:
-        case CFG_METHOD_23:
-        case CFG_METHOD_24:
-        case CFG_METHOD_25:
-        case CFG_METHOD_26:
-        case CFG_METHOD_27:
-        case CFG_METHOD_28:
-        case CFG_METHOD_29:
-        case CFG_METHOD_30:
-        case CFG_METHOD_31:
-        case CFG_METHOD_32:
-        case CFG_METHOD_33:
-                tp->HwSuppGigaForceMode = TRUE;
                 break;
         }
 
@@ -24459,7 +11194,7 @@ rtl8168_init_software_variable(struct net_device *dev)
         tp->max_jumbo_frame_size = rtl_chip_info[tp->chipset].jumbo_frame_sz;
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(4,10,0)
         /* MTU range: 60 - hw-specific max */
-        dev->min_mtu = ETH_ZLEN;
+        dev->min_mtu = ETH_MIN_MTU;
         dev->max_mtu = tp->max_jumbo_frame_size;
 #endif //LINUX_VERSION_CODE >= KERNEL_VERSION(4,10,0)
         tp->eee_enabled = eee_enable;
@@ -24495,6 +11230,7 @@ rtl8168_release_board(struct pci_dev *pdev,
 
         iounmap(ioaddr);
         pci_release_regions(pdev);
+        pci_clear_mwi(pdev);
         pci_disable_device(pdev);
         free_netdev(dev);
 }
@@ -25436,15 +12172,8 @@ rtl8168_phy_power_up(struct net_device *dev)
         }
 
         //wait ups resume (phy state 3)
-        switch (tp->mcfg) {
-        case CFG_METHOD_29:
-        case CFG_METHOD_30:
-        case CFG_METHOD_31:
-        case CFG_METHOD_32:
-        case CFG_METHOD_33:
-                rtl8168_wait_phy_ups_resume(dev, 3);
-                break;
-        };
+        if (HW_SUPPORT_UPS_MODE(tp))
+                rtl8168_wait_phy_ups_resume(dev, HW_PHY_STATUS_LAN_ON);
 }
 
 static void
@@ -25530,11 +12259,12 @@ rtl8168_init_board(struct pci_dev *pdev,
         tp->dev = dev;
         tp->msg_enable = netif_msg_init(debug.msg_enable, R8168_MSG_DEFAULT);
 
+        if (!aspm || tp->mcfg == CFG_METHOD_9) {
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,26)
-        if (!aspm || tp->mcfg == CFG_METHOD_9)
                 pci_disable_link_state(pdev, PCIE_LINK_STATE_L0S | PCIE_LINK_STATE_L1 |
                                        PCIE_LINK_STATE_CLKPM);
 #endif
+        }
 
         /* enable device (incl. PCI PM wakeup and hotplug setup) */
         rc = pci_enable_device(pdev);
@@ -25546,9 +12276,12 @@ rtl8168_init_board(struct pci_dev *pdev,
                 goto err_out_free_dev;
         }
 
-        rc = pci_set_mwi(pdev);
-        if (rc < 0)
-                goto err_out_disable;
+        if (pci_set_mwi(pdev) < 0) {
+#if LINUX_VERSION_CODE > KERNEL_VERSION(2,6,0)
+                if (netif_msg_drv(&debug))
+                        dev_info(&pdev->dev, "Mem-Wr-Inval unavailable.\n");
+#endif //LINUX_VERSION_CODE > KERNEL_VERSION(2,6,0)
+        }
 
         /* save power state before pci_enable_device overwrites it */
         pm_cap = pci_find_capability(pdev, PCI_CAP_ID_PM);
@@ -25611,8 +12344,6 @@ rtl8168_init_board(struct pci_dev *pdev,
                 }
         }
 
-        pci_set_master(pdev);
-
         /* ioremap MMIO region */
         ioaddr = ioremap(pci_resource_start(pdev, 2), R8168_REGS_SIZE);
         if (ioaddr == NULL) {
@@ -25656,13 +12387,9 @@ out:
 
 err_out_free_res:
         pci_release_regions(pdev);
-
 err_out_mwi:
         pci_clear_mwi(pdev);
-
-err_out_disable:
         pci_disable_device(pdev);
-
 err_out_free_dev:
         free_netdev(dev);
 err_out:
@@ -25816,6 +12543,9 @@ rtl8168_esd_timer(struct timer_list *t)
                         tp->esd_flag |= BIT_14;
                 }
         }
+
+        if (tp->TestPhyOcpReg && rtl8168_test_phy_ocp(tp))
+                tp->esd_flag |= BIT_15;
 
         if (tp->esd_flag != 0) {
                 printk(KERN_ERR "%s: esd_flag = 0x%04x\n.\n", dev->name, tp->esd_flag);
@@ -25989,19 +12719,24 @@ rtl8168_init_one(struct pci_dev *pdev,
         }
 #endif
 
+        /* There has been a number of reports that using SG/TSO results in
+         * tx timeouts. However for a lot of people SG/TSO works fine.
+         * Therefore disable both features by default, but allow users to
+         * enable them. Use at own risk!
+         */
         tp->cp_cmd |= RTL_R16(tp, CPlusCmd);
         if (tp->mcfg != CFG_METHOD_DEFAULT) {
                 dev->features |= NETIF_F_IP_CSUM;
 #if LINUX_VERSION_CODE < KERNEL_VERSION(3,0,0)
                 tp->cp_cmd |= RxChkSum;
 #else
-                dev->features |= NETIF_F_RXCSUM | NETIF_F_SG;
+                dev->features |= NETIF_F_RXCSUM;
                 dev->hw_features = NETIF_F_SG | NETIF_F_IP_CSUM |
                                    NETIF_F_RXCSUM | NETIF_F_HW_VLAN_TX | NETIF_F_HW_VLAN_RX;
                 dev->vlan_features = NETIF_F_SG | NETIF_F_IP_CSUM |
                                      NETIF_F_HIGHDMA;
                 if ((tp->mcfg != CFG_METHOD_16) && (tp->mcfg != CFG_METHOD_17)) {
-                        dev->features |= NETIF_F_TSO;
+                        //dev->features |= NETIF_F_TSO;
                         dev->hw_features |= NETIF_F_TSO;
                         dev->vlan_features |= NETIF_F_TSO;
                 }
@@ -26025,7 +12760,7 @@ rtl8168_init_one(struct pci_dev *pdev,
                         dev->features |=  NETIF_F_IPV6_CSUM;
                         if ((tp->mcfg != CFG_METHOD_16) && (tp->mcfg != CFG_METHOD_17)) {
                                 dev->hw_features |= NETIF_F_TSO6;
-                                dev->features |=  NETIF_F_TSO6;
+                                //dev->features |=  NETIF_F_TSO6;
                         }
                         netif_set_gso_max_size(dev, LSO_64K);
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(3,18,0)
@@ -26069,6 +12804,8 @@ rtl8168_init_one(struct pci_dev *pdev,
                 rtl8168_set_eeprom_sel_low(tp);
 
         rtl8168_get_mac_address(dev);
+
+        tp->fw_name = rtl_chip_fw_infos[tp->mcfg].fw_name;
 
 #if defined(ENABLE_DASH_PRINTER_SUPPORT)
         init_completion(&tp->fw_host_ok);
@@ -26146,6 +12883,11 @@ rtl8168_remove_one(struct pci_dev *pdev)
         }
 
         rtl8168_release_board(pdev, dev);
+
+#ifdef ENABLE_USE_FIRMWARE_FILE
+        rtl8168_release_firmware(tp);
+#endif
+
         pci_set_drvdata(pdev, NULL);
 }
 
@@ -26157,6 +12899,33 @@ rtl8168_set_rxbufsize(struct rtl8168_private *tp,
 
         tp->rx_buf_sz = (mtu > ETH_DATA_LEN) ? mtu + ETH_HLEN + 8 + 1 : RX_BUF_SIZE;
 }
+
+#ifdef ENABLE_USE_FIRMWARE_FILE
+static void rtl8168_request_firmware(struct rtl8168_private *tp)
+{
+        struct rtl8168_fw *rtl_fw;
+
+        /* firmware loaded already or no firmware available */
+        if (tp->rtl_fw || !tp->fw_name)
+                return;
+
+        rtl_fw = kzalloc(sizeof(*rtl_fw), GFP_KERNEL);
+        if (!rtl_fw)
+                return;
+
+        rtl_fw->phy_write = rtl8168_mdio_write;
+        rtl_fw->phy_read = rtl8168_mdio_read;
+        rtl_fw->mac_mcu_write = mac_mcu_write;
+        rtl_fw->mac_mcu_read = mac_mcu_read;
+        rtl_fw->fw_name = tp->fw_name;
+        rtl_fw->dev = tp_to_dev(tp);
+
+        if (rtl8168_fw_request_firmware(rtl_fw))
+                kfree(rtl_fw);
+        else
+                tp->rtl_fw = rtl_fw;
+}
+#endif
 
 static int rtl8168_open(struct net_device *dev)
 {
@@ -26172,9 +12941,9 @@ static int rtl8168_open(struct net_device *dev)
 #endif
         rtl8168_set_rxbufsize(tp, dev);
         /*
-         * Rx and Tx descriptors needs 256 bytes alignment.
-         * pci_alloc_consistent provides more.
-         */
+        * Rx and Tx descriptors needs 256 bytes alignment.
+        * pci_alloc_consistent provides more.
+        */
         tp->TxDescArray = dma_alloc_coherent(&pdev->dev, R8168_TX_RING_BYTES,
                                              &tp->TxPhyAddr, GFP_KERNEL);
         if (!tp->TxDescArray)
@@ -26185,17 +12954,12 @@ static int rtl8168_open(struct net_device *dev)
         if (!tp->RxDescArray)
                 goto err_free_all_allocated_mem;
 
-        if (tp->UseSwPaddingShortPkt) {
-                tp->ShortPacketEmptyBuffer = dma_alloc_coherent(&pdev->dev, SHORT_PACKET_PADDING_BUF_SIZE,
-                                             &tp->ShortPacketEmptyBufferPhy, GFP_KERNEL);
-                if (!tp->ShortPacketEmptyBuffer)
-                        goto err_free_all_allocated_mem;
-
-                memset(tp->ShortPacketEmptyBuffer, 0x0, SHORT_PACKET_PADDING_BUF_SIZE);
-        }
-
         retval = rtl8168_init_ring(dev);
         if (retval < 0)
+                goto err_free_all_allocated_mem;
+
+        retval = request_irq(dev->irq, rtl8168_interrupt, (tp->features & RTL_FEATURE_MSI) ? 0 : SA_SHIRQ, dev->name, dev);
+        if (retval<0)
                 goto err_free_all_allocated_mem;
 
         if (netif_msg_probe(tp)) {
@@ -26209,11 +12973,17 @@ static int rtl8168_open(struct net_device *dev)
                        dev->dev_addr[4], dev->dev_addr[5], dev->irq);
         }
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,20)
-        INIT_WORK(&tp->task, NULL, dev);
-#else
-        INIT_DELAYED_WORK(&tp->task, NULL);
+#ifdef ENABLE_USE_FIRMWARE_FILE
+        rtl8168_request_firmware(tp);
 #endif
+
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,20)
+        INIT_WORK(&tp->task, rtl8168_reset_task, dev);
+#else
+        INIT_DELAYED_WORK(&tp->task, rtl8168_reset_task);
+#endif
+
+        pci_set_master(pdev);
 
 #ifdef  CONFIG_R8168_NAPI
 #if LINUX_VERSION_CODE > KERNEL_VERSION(2,6,0)
@@ -26242,10 +13012,6 @@ static int rtl8168_open(struct net_device *dev)
 
         spin_unlock_irqrestore(&tp->lock, flags);
 
-        retval = request_irq(dev->irq, rtl8168_interrupt, (tp->features & RTL_FEATURE_MSI) ? 0 : SA_SHIRQ, dev->name, dev);
-        if (retval<0)
-                goto err_free_all_allocated_mem;
-
         if (tp->esd_flag == 0)
                 rtl8168_request_esd_timer(dev);
 
@@ -26266,12 +13032,6 @@ err_free_all_allocated_mem:
                 dma_free_coherent(&pdev->dev, R8168_TX_RING_BYTES, tp->TxDescArray,
                                   tp->TxPhyAddr);
                 tp->TxDescArray = NULL;
-        }
-
-        if (tp->ShortPacketEmptyBuffer != NULL) {
-                dma_free_coherent(&pdev->dev, ETH_ZLEN, tp->ShortPacketEmptyBuffer,
-                                  tp->ShortPacketEmptyBufferPhy);
-                tp->ShortPacketEmptyBuffer = NULL;
         }
 
         goto out;
@@ -26453,31 +13213,9 @@ rtl8168_hw_config(struct net_device *dev)
         rtl8168_hw_reset(dev);
 
         rtl8168_enable_cfg9346_write(tp);
-        switch (tp->mcfg) {
-        case CFG_METHOD_14:
-        case CFG_METHOD_15:
-        case CFG_METHOD_16:
-        case CFG_METHOD_17:
-        case CFG_METHOD_18:
-        case CFG_METHOD_19:
-        case CFG_METHOD_20:
-        case CFG_METHOD_21:
-        case CFG_METHOD_22:
-        case CFG_METHOD_23:
-        case CFG_METHOD_24:
-        case CFG_METHOD_25:
-        case CFG_METHOD_26:
-        case CFG_METHOD_27:
-        case CFG_METHOD_28:
-        case CFG_METHOD_29:
-        case CFG_METHOD_30:
-        case CFG_METHOD_31:
-        case CFG_METHOD_32:
-        case CFG_METHOD_33:
+        if (tp->HwSuppAspmClkIntrLock) {
                 RTL_W8(tp, 0xF1, RTL_R8(tp, 0xF1) & ~BIT_7);
-                RTL_W8(tp, Config2, RTL_R8(tp, Config2) & ~BIT_7);
-                RTL_W8(tp, Config5, RTL_R8(tp, Config5) & ~BIT_0);
-                break;
+                rtl8168_hw_aspm_clkreq_enable(tp, false);
         }
 
         //clear io_rdy_l23
@@ -26776,8 +13514,10 @@ rtl8168_hw_config(struct net_device *dev)
 
                 RTL_W8(tp, TDFNR, 0x8);
 
+                /*
                 if (aspm)
-                        RTL_W8(tp, 0xF1, RTL_R8(tp, 0xF1) | BIT_7);
+                RTL_W8(tp, 0xF1, RTL_R8(tp, 0xF1) | BIT_7);
+                */
 
                 RTL_W8(tp, Config5, RTL_R8(tp, Config5) & ~BIT_3);
 
@@ -26792,9 +13532,6 @@ rtl8168_hw_config(struct net_device *dev)
                 rtl8168_eri_write(tp, 0xB8, 4, 0x00000000, ERIAR_ExGMAC);
                 rtl8168_eri_write(tp, 0xC8, 4, 0x00100002, ERIAR_ExGMAC);
                 rtl8168_eri_write(tp, 0xE8, 4, 0x00100006, ERIAR_ExGMAC);
-                csi_tmp = rtl8168_eri_read(tp, 0xD4, 4, ERIAR_ExGMAC);
-                csi_tmp |= (BIT_8 | BIT_9 | BIT_10 | BIT_11 | BIT_12);
-                rtl8168_eri_write(tp, 0xD4, 4, csi_tmp, ERIAR_ExGMAC);
                 csi_tmp = rtl8168_eri_read(tp, 0x1D0, 4, ERIAR_ExGMAC);
                 csi_tmp |= BIT_1;
                 rtl8168_eri_write(tp, 0x1D0, 1, csi_tmp, ERIAR_ExGMAC);
@@ -26848,8 +13585,10 @@ rtl8168_hw_config(struct net_device *dev)
                 csi_tmp |= BIT_0;
                 rtl8168_eri_write(tp, 0xDC, 1, csi_tmp, ERIAR_ExGMAC);
 
+                /*
                 if (aspm)
-                        RTL_W8(tp, 0xF1, RTL_R8(tp, 0xF1) | BIT_7);
+                RTL_W8(tp, 0xF1, RTL_R8(tp, 0xF1) | BIT_7);
+                */
 
                 if (dev->mtu > ETH_DATA_LEN)
                         RTL_W8(tp, MTPS, 0x27);
@@ -26861,9 +13600,6 @@ rtl8168_hw_config(struct net_device *dev)
 
                 rtl8168_eri_write(tp, 0xC0, 2, 0x0000, ERIAR_ExGMAC);
                 rtl8168_eri_write(tp, 0xB8, 4, 0x00000000, ERIAR_ExGMAC);
-                csi_tmp = rtl8168_eri_read(tp, 0xD4, 4, ERIAR_ExGMAC);
-                csi_tmp |= (BIT_8 | BIT_9 | BIT_10 | BIT_11 | BIT_12);
-                rtl8168_eri_write(tp, 0xD4, 4, csi_tmp, ERIAR_ExGMAC);
                 RTL_W8(tp, 0x1B,RTL_R8(tp, 0x1B) & ~0x07);
 
                 csi_tmp = rtl8168_eri_read(tp, 0x1B0, 1, ERIAR_ExGMAC);
@@ -26888,8 +13624,10 @@ rtl8168_hw_config(struct net_device *dev)
                 csi_tmp |= BIT_0;
                 rtl8168_eri_write(tp, 0xDC, 1, csi_tmp, ERIAR_ExGMAC);
 
+                /*
                 if (aspm)
-                        RTL_W8(tp, 0xF1, RTL_R8(tp, 0xF1) | BIT_7);
+                RTL_W8(tp, 0xF1, RTL_R8(tp, 0xF1) | BIT_7);
+                */
 
                 if (dev->mtu > ETH_DATA_LEN)
                         RTL_W8(tp, MTPS, 0x27);
@@ -26900,9 +13638,6 @@ rtl8168_hw_config(struct net_device *dev)
                 RTL_W8(tp, 0xF2, RTL_R8(tp, 0xF2) | BIT_6);
                 rtl8168_eri_write(tp, 0xC0, 2, 0x0000, ERIAR_ExGMAC);
                 rtl8168_eri_write(tp, 0xB8, 4, 0x00000000, ERIAR_ExGMAC);
-                csi_tmp = rtl8168_eri_read(tp, 0xD4, 4, ERIAR_ExGMAC);
-                csi_tmp |= BIT_10 | BIT_11;
-                rtl8168_eri_write(tp, 0xD4, 4, csi_tmp, ERIAR_ExGMAC);
 
                 csi_tmp = rtl8168_eri_read(tp, 0x1B0, 1, ERIAR_ExGMAC);
                 csi_tmp |= BIT_4;
@@ -26937,7 +13672,7 @@ rtl8168_hw_config(struct net_device *dev)
                 if (tp->mcfg == CFG_METHOD_26) {
                         mac_ocp_data = rtl8168_mac_ocp_read(tp, 0xD3C0);
                         mac_ocp_data &= ~(BIT_11 | BIT_10 | BIT_9 | BIT_8 | BIT_7 | BIT_6 | BIT_5 | BIT_4 | BIT_3 | BIT_2 | BIT_1 | BIT_0);
-                        mac_ocp_data |= 0x03A9;
+                        mac_ocp_data |= 0x0FFF;
                         rtl8168_mac_ocp_write(tp, 0xD3C0, mac_ocp_data);
                         mac_ocp_data = rtl8168_mac_ocp_read(tp, 0xD3C2);
                         mac_ocp_data &= ~(BIT_7 | BIT_6 | BIT_5 | BIT_4 | BIT_3 | BIT_2 | BIT_1 | BIT_0);
@@ -26956,18 +13691,18 @@ rtl8168_hw_config(struct net_device *dev)
 
                         mac_ocp_data = rtl8168_mac_ocp_read(tp, 0xE056);
                         mac_ocp_data &= ~(BIT_7 | BIT_6 | BIT_5 | BIT_4);
-                        mac_ocp_data |= (BIT_6 | BIT_5 | BIT_4);
+                        //mac_ocp_data |= (BIT_6 | BIT_5 | BIT_4);
                         rtl8168_mac_ocp_write(tp, 0xE056, mac_ocp_data);
 
                         mac_ocp_data = rtl8168_mac_ocp_read(tp, 0xE052);
-                        mac_ocp_data &= ~( BIT_14 | BIT_13);
+                        mac_ocp_data &= ~(BIT_15 | BIT_14 | BIT_13 | BIT_3);
                         mac_ocp_data |= BIT_15;
-                        mac_ocp_data |= BIT_3;
+                        //mac_ocp_data |= BIT_3;
                         rtl8168_mac_ocp_write(tp, 0xE052, mac_ocp_data);
 
                         mac_ocp_data = rtl8168_mac_ocp_read(tp, 0xD420);
                         mac_ocp_data &= ~(BIT_11 | BIT_10 | BIT_9 | BIT_8 | BIT_7 | BIT_6 | BIT_5 | BIT_4 | BIT_3 | BIT_2 | BIT_1 | BIT_0);
-                        mac_ocp_data |= 0x47F;
+                        mac_ocp_data |= 0x45F;
                         rtl8168_mac_ocp_write(tp, 0xD420, mac_ocp_data);
 
                         mac_ocp_data = rtl8168_mac_ocp_read(tp, 0xE0D6);
@@ -26984,8 +13719,10 @@ rtl8168_hw_config(struct net_device *dev)
 
                 RTL_W8(tp, Config2, RTL_R8(tp, Config2) & ~PMSTS_En);
 
+                /*
                 if (aspm)
-                        RTL_W8(tp, 0xF1, RTL_R8(tp, 0xF1) | BIT_7);
+                RTL_W8(tp, 0xF1, RTL_R8(tp, 0xF1) | BIT_7);
+                */
 
                 if (dev->mtu > ETH_DATA_LEN)
                         RTL_W8(tp, MTPS, 0x27);
@@ -26998,23 +13735,18 @@ rtl8168_hw_config(struct net_device *dev)
                 rtl8168_eri_write(tp, 0xC0, 2, 0x0000, ERIAR_ExGMAC);
                 rtl8168_eri_write(tp, 0xB8, 4, 0x00000000, ERIAR_ExGMAC);
 
-                if (tp->mcfg == CFG_METHOD_29 || tp->mcfg == CFG_METHOD_30)
-                        rtl8168_mac_ocp_write(tp, 0xE054, 0xFC01);
+                if (tp->mcfg == CFG_METHOD_29 || tp->mcfg == CFG_METHOD_30) {
+                        rtl8168_mac_ocp_write(tp, 0xE054, 0x0000);
 
-                rtl8168_eri_write(tp, 0x5F0, 2, 0x4F87, ERIAR_ExGMAC);
+                        rtl8168_eri_write(tp, 0x5F0, 2, 0x4000, ERIAR_ExGMAC);
+                } else {
+                        rtl8168_eri_write(tp, 0x5F0, 2, 0x4F87, ERIAR_ExGMAC);
+                }
 
                 if (tp->mcfg == CFG_METHOD_29 || tp->mcfg == CFG_METHOD_30) {
-                        csi_tmp = rtl8168_eri_read(tp, 0xD4, 4, ERIAR_ExGMAC);
-                        csi_tmp |= (BIT_8 | BIT_9 | BIT_10 | BIT_11 | BIT_12);
-                        rtl8168_eri_write(tp, 0xD4, 4, csi_tmp, ERIAR_ExGMAC);
-
                         csi_tmp = rtl8168_eri_read(tp, 0xDC, 4, ERIAR_ExGMAC);
                         csi_tmp |= (BIT_2 | BIT_3 | BIT_4);
                         rtl8168_eri_write(tp, 0xDC, 4, csi_tmp, ERIAR_ExGMAC);
-                } else {
-                        csi_tmp = rtl8168_eri_read(tp, 0xD4, 4, ERIAR_ExGMAC);
-                        csi_tmp |= (BIT_7 | BIT_8 | BIT_9 | BIT_10 | BIT_11 | BIT_12);
-                        rtl8168_eri_write(tp, 0xD4, 4, csi_tmp, ERIAR_ExGMAC);
                 }
 
                 if (tp->mcfg == CFG_METHOD_21 || tp->mcfg == CFG_METHOD_22 ||
@@ -27074,8 +13806,10 @@ rtl8168_hw_config(struct net_device *dev)
 
                 RTL_W8(tp, TDFNR, 0x4);
 
+                /*
                 if (aspm)
-                        RTL_W8(tp, 0xF1, RTL_R8(tp, 0xF1) | BIT_7);
+                RTL_W8(tp, 0xF1, RTL_R8(tp, 0xF1) | BIT_7);
+                */
 
                 csi_tmp = rtl8168_eri_read(tp, 0x1B0, 4, ERIAR_ExGMAC);
                 csi_tmp &= ~BIT_12;
@@ -27083,7 +13817,7 @@ rtl8168_hw_config(struct net_device *dev)
 
                 csi_tmp = rtl8168_eri_read(tp, 0x2FC, 1, ERIAR_ExGMAC);
                 csi_tmp &= ~(BIT_0 | BIT_1 | BIT_2);
-                csi_tmp |= BIT_0;
+                csi_tmp |= (BIT_0 | BIT_1);
                 rtl8168_eri_write(tp, 0x2FC, 1, csi_tmp, ERIAR_ExGMAC);
 
                 csi_tmp = rtl8168_eri_read(tp, 0x1D0, 1, ERIAR_ExGMAC);
@@ -27099,17 +13833,13 @@ rtl8168_hw_config(struct net_device *dev)
                         rtl8168_oob_mutex_unlock(tp);
                 }
 
-                csi_tmp = rtl8168_eri_read(tp, 0xD4, 4, ERIAR_ExGMAC);
-                csi_tmp  |= ( BIT_7 | BIT_8 | BIT_9 | BIT_10 | BIT_11 | BIT_12 );
-                rtl8168_eri_write(tp, 0xD4, 4, csi_tmp, ERIAR_ExGMAC);
-
                 rtl8168_mac_ocp_write(tp, 0xC140, 0xFFFF);
                 rtl8168_mac_ocp_write(tp, 0xC142, 0xFFFF);
 
                 if (tp->mcfg == CFG_METHOD_28) {
                         mac_ocp_data = rtl8168_mac_ocp_read(tp, 0xD3E2);
                         mac_ocp_data &= 0xF000;
-                        mac_ocp_data |= 0x3A9;
+                        mac_ocp_data |= 0xAFD;
                         rtl8168_mac_ocp_write(tp, 0xD3E2, mac_ocp_data);
 
                         mac_ocp_data = rtl8168_mac_ocp_read(tp, 0xD3E4);
@@ -27147,8 +13877,6 @@ rtl8168_hw_config(struct net_device *dev)
 
                 mac_ocp_data = rtl8168_mac_ocp_read(tp, 0xE056);
                 mac_ocp_data &= ~(BIT_7 | BIT_6 | BIT_5 | BIT_4);
-                if (FALSE == HW_SUPP_SERDES_PHY(tp))
-                        mac_ocp_data |= (BIT_6 | BIT_5 | BIT_4);
                 rtl8168_mac_ocp_write(tp, 0xE056, mac_ocp_data);
                 if (FALSE == HW_SUPP_SERDES_PHY(tp))
                         rtl8168_mac_ocp_write(tp, 0xEA80, 0x0003);
@@ -27158,17 +13886,12 @@ rtl8168_hw_config(struct net_device *dev)
                 rtl8168_oob_mutex_lock(tp);
                 mac_ocp_data = rtl8168_mac_ocp_read(tp, 0xE052);
                 mac_ocp_data &= ~(BIT_3 | BIT_0);
-                if (FALSE == HW_SUPP_SERDES_PHY(tp)) {
-                        mac_ocp_data |= BIT_0;
-                        if (tp->mcfg == CFG_METHOD_32 || tp->mcfg == CFG_METHOD_33)
-                                mac_ocp_data |= BIT_3;
-                }
                 rtl8168_mac_ocp_write(tp, 0xE052, mac_ocp_data);
                 rtl8168_oob_mutex_unlock(tp);
 
                 mac_ocp_data = rtl8168_mac_ocp_read(tp, 0xD420);
                 mac_ocp_data &= ~(BIT_11 | BIT_10 | BIT_9 | BIT_8 | BIT_7 | BIT_6 | BIT_5 | BIT_4 | BIT_3 | BIT_2 | BIT_1 | BIT_0);
-                mac_ocp_data |= 0x47F;
+                mac_ocp_data |= 0x45F;
                 rtl8168_mac_ocp_write(tp, 0xD420, mac_ocp_data);
 
                 RTL_W8(tp, Config3, RTL_R8(tp, Config3) & ~Beacon_en);
@@ -27179,8 +13902,10 @@ rtl8168_hw_config(struct net_device *dev)
 
                 RTL_W8(tp, Config2, RTL_R8(tp, Config2) & ~PMSTS_En);
 
+                /*
                 if (aspm)
-                        RTL_W8(tp, 0xF1, RTL_R8(tp, 0xF1) | BIT_7);
+                RTL_W8(tp, 0xF1, RTL_R8(tp, 0xF1) | BIT_7);
+                */
 
                 if (dev->mtu > ETH_DATA_LEN)
                         RTL_W8(tp, MTPS, 0x27);
@@ -27199,17 +13924,14 @@ rtl8168_hw_config(struct net_device *dev)
                 rtl8168_eri_write(tp, 0xB8, 4, 0x00000000, ERIAR_ExGMAC);
 
                 rtl8168_oob_mutex_lock(tp);
-                if (FALSE == HW_SUPP_SERDES_PHY(tp))
-                        rtl8168_eri_write(tp, 0x5F0, 2, 0x4F87, ERIAR_ExGMAC);
-                else
-                        rtl8168_eri_write(tp, 0x5F0, 2, 0x4080, ERIAR_ExGMAC);
+                rtl8168_eri_write(tp, 0x5F0, 2, 0x4000, ERIAR_ExGMAC);
                 rtl8168_oob_mutex_unlock(tp);
 
-                csi_tmp = rtl8168_eri_read(tp, 0xD4, 4, ERIAR_ExGMAC);
-                csi_tmp |= (BIT_7 | BIT_8 | BIT_9 | BIT_10 | BIT_11 | BIT_12);
-                if (tp->mcfg == CFG_METHOD_32 || tp->mcfg == CFG_METHOD_33)
-                        csi_tmp|= BIT_4;
-                rtl8168_eri_write(tp, 0xD4, 4, csi_tmp, ERIAR_ExGMAC);
+                if (tp->mcfg == CFG_METHOD_32 || tp->mcfg == CFG_METHOD_33) {
+                        csi_tmp = rtl8168_eri_read(tp, 0xD4, 4, ERIAR_ExGMAC);
+                        csi_tmp |= BIT_4;
+                        rtl8168_eri_write(tp, 0xD4, 4, csi_tmp, ERIAR_ExGMAC);
+                }
 
                 rtl8168_mac_ocp_write(tp, 0xC140, 0xFFFF);
                 rtl8168_mac_ocp_write(tp, 0xC142, 0xFFFF);
@@ -27320,6 +14042,8 @@ rtl8168_hw_config(struct net_device *dev)
         }
 
         rtl8168_hw_clear_timer_int(dev);
+
+        rtl8168_enable_exit_l1_mask(tp);
 
         switch (tp->mcfg) {
         case CFG_METHOD_25:
@@ -27452,36 +14176,8 @@ rtl8168_hw_config(struct net_device *dev)
                 NICChkTypeEnableDashInterrupt(tp);
 #endif
 
-        switch (tp->mcfg) {
-        case CFG_METHOD_14:
-        case CFG_METHOD_15:
-        case CFG_METHOD_16:
-        case CFG_METHOD_17:
-        case CFG_METHOD_18:
-        case CFG_METHOD_19:
-        case CFG_METHOD_20:
-        case CFG_METHOD_21:
-        case CFG_METHOD_22:
-        case CFG_METHOD_23:
-        case CFG_METHOD_24:
-        case CFG_METHOD_25:
-        case CFG_METHOD_26:
-        case CFG_METHOD_27:
-        case CFG_METHOD_28:
-        case CFG_METHOD_29:
-        case CFG_METHOD_30:
-        case CFG_METHOD_31:
-        case CFG_METHOD_32:
-        case CFG_METHOD_33:
-                if (aspm) {
-                        RTL_W8(tp, Config5, RTL_R8(tp, Config5) | BIT_0);
-                        RTL_W8(tp, Config2, RTL_R8(tp, Config2) | BIT_7);
-                } else {
-                        RTL_W8(tp, Config2, RTL_R8(tp, Config2) & ~BIT_7);
-                        RTL_W8(tp, Config5, RTL_R8(tp, Config5) & ~BIT_0);
-                }
-                break;
-        }
+        if (tp->HwSuppAspmClkIntrLock)
+                rtl8168_hw_aspm_clkreq_enable(tp, true);
 
         rtl8168_disable_cfg9346_write(tp);
 
@@ -27498,7 +14194,6 @@ rtl8168_hw_start(struct net_device *dev)
         rtl8168_enable_hw_interrupt(tp);
 }
 
-
 static int
 rtl8168_change_mtu(struct net_device *dev,
                    int new_mtu)
@@ -27508,7 +14203,7 @@ rtl8168_change_mtu(struct net_device *dev,
         unsigned long flags;
 
 #if LINUX_VERSION_CODE < KERNEL_VERSION(4,10,0)
-        if (new_mtu < ETH_ZLEN)
+        if (new_mtu < ETH_MIN_MTU)
                 return -EINVAL;
         else if (new_mtu > tp->max_jumbo_frame_size)
                 new_mtu = tp->max_jumbo_frame_size;
@@ -27619,9 +14314,9 @@ rtl8168_alloc_rx_skb(struct rtl8168_private *tp,
 
         skb_reserve(skb, RTK_RX_ALIGN);
 
-        mapping = dma_map_single(&tp->pci_dev->dev, skb->data, rx_buf_sz,
+        mapping = dma_map_single(tp_to_dev(tp), skb->data, rx_buf_sz,
                                  DMA_FROM_DEVICE);
-        if (unlikely(dma_mapping_error(&tp->pci_dev->dev, mapping))) {
+        if (unlikely(dma_mapping_error(tp_to_dev(tp), mapping))) {
                 if (unlikely(net_ratelimit()))
                         netif_err(tp, drv, tp->dev, "Failed to map RX DMA!\n");
                 goto err_out;
@@ -27713,6 +14408,8 @@ rtl8168_rx_desc_offset0_init(struct rtl8168_private *tp, int own)
 {
         int i = 0;
         int ownbit = 0;
+
+        if (tp->RxDescArray == NULL) return;
 
         if (own)
                 ownbit = DescOwn;
@@ -27982,8 +14679,7 @@ rtl8168_get_txd_opts1(u32 opts1, u32 len, unsigned int entry)
 static int
 rtl8168_xmit_frags(struct rtl8168_private *tp,
                    struct sk_buff *skb,
-                   u32 opts1,
-                   u32 opts2)
+                   const u32 *opts)
 {
         struct skb_shared_info *info = skb_shinfo(skb);
         unsigned int cur_frag, entry;
@@ -28007,9 +14703,9 @@ rtl8168_xmit_frags(struct rtl8168_private *tp,
                 len = skb_frag_size(frag);
                 addr = skb_frag_address(frag);
 #endif
-                mapping = dma_map_single(&tp->pci_dev->dev, addr, len, DMA_TO_DEVICE);
+                mapping = dma_map_single(tp_to_dev(tp), addr, len, DMA_TO_DEVICE);
 
-                if (unlikely(dma_mapping_error(&tp->pci_dev->dev, mapping))) {
+                if (unlikely(dma_mapping_error(tp_to_dev(tp), mapping))) {
                         if (unlikely(net_ratelimit()))
                                 netif_err(tp, drv, tp->dev,
                                           "Failed to map TX fragments DMA!\n");
@@ -28017,7 +14713,7 @@ rtl8168_xmit_frags(struct rtl8168_private *tp,
                 }
 
                 /* anti gcc 2.95.3 bugware (sic) */
-                status = rtl8168_get_txd_opts1(opts1, len, entry);
+                status = rtl8168_get_txd_opts1(opts[0], len, entry);
                 if (cur_frag == (nr_frags - 1)) {
                         tp->tx_skb[entry].skb = skb;
                         status |= LastFrag;
@@ -28027,7 +14723,7 @@ rtl8168_xmit_frags(struct rtl8168_private *tp,
 
                 tp->tx_skb[entry].len = len;
 
-                txd->opts2 = cpu_to_le32(opts2);
+                txd->opts2 = cpu_to_le32(opts[1]);
                 wmb();
                 txd->opts1 = cpu_to_le32(status);
         }
@@ -28042,6 +14738,9 @@ err_out:
 static inline
 __be16 get_protocol(struct sk_buff *skb)
 {
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,37)
+        return vlan_get_protocol(skb);
+#else
         __be16 protocol;
 
         if (skb->protocol == htons(ETH_P_8021Q))
@@ -28050,11 +14749,25 @@ __be16 get_protocol(struct sk_buff *skb)
                 protocol = skb->protocol;
 
         return protocol;
+#endif
 }
 
-static inline u32
+static bool rtl8168_skb_pad(struct sk_buff *skb)
+{
+#if LINUX_VERSION_CODE < KERNEL_VERSION(3,19,0)
+        if (skb_padto(skb, ETH_ZLEN))
+                return false;
+        skb_put(skb, ETH_ZLEN - skb->len);
+        return true;
+#else
+        return !eth_skb_pad(skb);
+#endif
+}
+
+static inline bool
 rtl8168_tx_csum(struct sk_buff *skb,
-                struct net_device *dev)
+                struct net_device *dev,
+                u32 *opts)
 {
         struct rtl8168_private *tp = netdev_priv(dev);
         u32 csum_cmd = 0;
@@ -28111,8 +14824,22 @@ rtl8168_tx_csum(struct sk_buff *skb,
                 }
         }
 
-        if (tp->ShortPacketSwChecksum && skb->len < 60 && csum_cmd != 0)
-                sw_calc_csum = TRUE;
+        if (csum_cmd != 0) {
+                if (tp->ShortPacketSwChecksum && skb->len < ETH_ZLEN) {
+                        sw_calc_csum = TRUE;
+                        if (!rtl8168_skb_pad(skb))
+                                return false;
+                } else {
+                        if ((tp->mcfg == CFG_METHOD_1) || (tp->mcfg == CFG_METHOD_2) || (tp->mcfg == CFG_METHOD_3))
+                                opts[0] |= csum_cmd;
+                        else
+                                opts[1] |= csum_cmd;
+                }
+        }
+
+        if (tp->UseSwPaddingShortPkt && skb->len < ETH_ZLEN)
+                if (!rtl8168_skb_pad(skb))
+                        return false;
 
         if (sw_calc_csum) {
 #if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,10) && LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,7)
@@ -28122,58 +14849,14 @@ rtl8168_tx_csum(struct sk_buff *skb,
 #else
                 skb_checksum_help(skb);
 #endif
-                csum_cmd = 0;
         }
 
-        return csum_cmd;
-}
-
-static int
-rtl8168_sw_padding_short_pkt(struct rtl8168_private *tp,
-                             struct sk_buff *skb,
-                             u32 opts1,
-                             u32 opts2)
-{
-        unsigned int entry;
-        dma_addr_t mapping;
-        u32 status, len;
-        void *addr;
-        struct TxDesc *txd = NULL;
-        int ret = 0;
-
-        if (skb->len >= ETH_ZLEN)
-                goto out;
-
-        entry = tp->cur_tx;
-
-        entry = (entry + 1) % NUM_TX_DESC;
-
-        txd = tp->TxDescArray + entry;
-        len = ETH_ZLEN - skb->len;
-        addr = tp->ShortPacketEmptyBuffer;
-        mapping = dma_map_single(&tp->pci_dev->dev, addr, len, DMA_TO_DEVICE);
-        if (unlikely(dma_mapping_error(&tp->pci_dev->dev, mapping))) {
-                if (unlikely(net_ratelimit()))
-                        netif_err(tp, drv, tp->dev,
-                                  "Failed to map Short Packet Buffer DMA!\n");
-                ret = -ENOMEM;
-                goto out;
-        }
-        status = rtl8168_get_txd_opts1(opts1, len, entry);
-        status |= LastFrag;
-
-        txd->addr = cpu_to_le64(mapping);
-
-        txd->opts2 = cpu_to_le32(opts2);
-        wmb();
-        txd->opts1 = cpu_to_le32(status);
-out:
-        return ret;
+        return true;
 }
 
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(3,14,0)
 /* r8169_csum_workaround()
-  * The hw limites the value the transport offset. When the offset is out of the
+  * The hw limits the value the transport offset. When the offset is out of the
   * range, calculate the checksum by sw.
   */
 static void r8168_csum_workaround(struct rtl8168_private *tp,
@@ -28244,7 +14927,7 @@ static bool rtl8168_tx_slots_avail(struct rtl8168_private *tp,
         return slots_avail > nr_frags;
 }
 
-static int
+static netdev_tx_t
 rtl8168_start_xmit(struct sk_buff *skb,
                    struct net_device *dev)
 {
@@ -28253,9 +14936,8 @@ rtl8168_start_xmit(struct sk_buff *skb,
         struct TxDesc *txd;
         dma_addr_t mapping;
         u32 len;
-        u32 opts1;
-        u32 opts2;
-        int ret = NETDEV_TX_OK;
+        u32 opts[2];
+        netdev_tx_t ret = NETDEV_TX_OK;
         unsigned long flags, large_send;
         int frags;
 
@@ -28282,8 +14964,8 @@ rtl8168_start_xmit(struct sk_buff *skb,
                 goto err_stop;
         }
 
-        opts1 = DescOwn;
-        opts2 = rtl8168_tx_vlan_tag(tp, skb);
+        opts[0] = DescOwn;
+        opts[1] = rtl8168_tx_vlan_tag(tp, skb);
 
         large_send = 0;
 #if LINUX_VERSION_CODE > KERNEL_VERSION(2,6,0)
@@ -28299,16 +14981,16 @@ rtl8168_start_xmit(struct sk_buff *skb,
                         if ((tp->mcfg == CFG_METHOD_1) ||
                             (tp->mcfg == CFG_METHOD_2) ||
                             (tp->mcfg == CFG_METHOD_3)) {
-                                opts1 |= LargeSend | (min(mss, MSS_MAX) << 16);
+                                opts[0] |= LargeSend | (min(mss, MSS_MAX) << 16);
                                 large_send = 1;
                         } else {
                                 u32 transport_offset = (u32)skb_transport_offset(skb);
                                 switch (get_protocol(skb)) {
                                 case __constant_htons(ETH_P_IP):
-                                        if (transport_offset <= 128) {
-                                                opts1 |= GiantSendv4;
-                                                opts1 |= transport_offset << GTTCPHO_SHIFT;
-                                                opts2 |= min(mss, MSS_MAX) << 18;
+                                        if (transport_offset <= GTTCPHO_MAX) {
+                                                opts[0] |= GiantSendv4;
+                                                opts[0] |= transport_offset << GTTCPHO_SHIFT;
+                                                opts[1] |= min(mss, MSS_MAX) << 18;
                                                 large_send = 1;
                                         }
                                         break;
@@ -28320,10 +15002,10 @@ rtl8168_start_xmit(struct sk_buff *skb,
                                                 goto out;
                                         }
 #endif
-                                        if (transport_offset <= 128) {
-                                                opts1 |= GiantSendv6;
-                                                opts1 |= transport_offset << GTTCPHO_SHIFT;
-                                                opts2 |= min(mss, MSS_MAX) << 18;
+                                        if (transport_offset <= GTTCPHO_MAX) {
+                                                opts[0] |= GiantSendv6;
+                                                opts[0] |= transport_offset << GTTCPHO_SHIFT;
+                                                opts[1] |= min(mss, MSS_MAX) << 18;
                                                 large_send = 1;
                                         }
                                         break;
@@ -28341,47 +15023,36 @@ rtl8168_start_xmit(struct sk_buff *skb,
 #endif //LINUX_VERSION_CODE > KERNEL_VERSION(2,6,0)
 
         if (large_send == 0) {
-                if (skb->ip_summed == CHECKSUM_PARTIAL) {
-                        if ((tp->mcfg == CFG_METHOD_1) || (tp->mcfg == CFG_METHOD_2) || (tp->mcfg == CFG_METHOD_3))
-                                opts1 |= rtl8168_tx_csum(skb, dev);
-                        else
-                                opts2 |= rtl8168_tx_csum(skb, dev);
-                }
+                if (unlikely(!rtl8168_tx_csum(skb, dev, opts)))
+                        goto err_dma_0;
         }
 
-        frags = rtl8168_xmit_frags(tp, skb, opts1, opts2);
+        frags = rtl8168_xmit_frags(tp, skb, opts);
         if (unlikely(frags < 0))
                 goto err_dma_0;
         if (frags) {
                 len = skb_headlen(skb);
-                opts1 |= FirstFrag;
+                opts[0] |= FirstFrag;
         } else {
                 len = skb->len;
 
                 tp->tx_skb[entry].skb = skb;
 
-                if (tp->UseSwPaddingShortPkt && len < 60) {
-                        if (unlikely(rtl8168_sw_padding_short_pkt(tp, skb, opts1, opts2)))
-                                goto err_dma_1;
-                        opts1 |= FirstFrag;
-                        frags++;
-                } else {
-                        opts1 |= FirstFrag | LastFrag;
-                }
+                opts[0] |= FirstFrag | LastFrag;
         }
 
-        opts1 = rtl8168_get_txd_opts1(opts1, len, entry);
-        mapping = dma_map_single(&tp->pci_dev->dev, skb->data, len, DMA_TO_DEVICE);
-        if (unlikely(dma_mapping_error(&tp->pci_dev->dev, mapping))) {
+        opts[0] = rtl8168_get_txd_opts1(opts[0], len, entry);
+        mapping = dma_map_single(tp_to_dev(tp), skb->data, len, DMA_TO_DEVICE);
+        if (unlikely(dma_mapping_error(tp_to_dev(tp), mapping))) {
                 if (unlikely(net_ratelimit()))
                         netif_err(tp, drv, dev, "Failed to map TX DMA!\n");
                 goto err_dma_1;
         }
         tp->tx_skb[entry].len = len;
         txd->addr = cpu_to_le64(mapping);
-        txd->opts2 = cpu_to_le32(opts2);
+        txd->opts2 = cpu_to_le32(opts[1]);
         wmb();
-        txd->opts1 = cpu_to_le32(opts1);
+        txd->opts1 = cpu_to_le32(opts[0]);
 
 #if LINUX_VERSION_CODE < KERNEL_VERSION(3,5,0)
         dev->trans_start = jiffies;
@@ -28435,6 +15106,7 @@ rtl8168_tx_interrupt(struct net_device *dev,
         dirty_tx = tp->dirty_tx;
         smp_rmb();
         tx_left = tp->cur_tx - dirty_tx;
+        tp->dynamic_aspm_packet_count += tx_left;
 
         while (tx_left > 0) {
                 unsigned int entry = dirty_tx % NUM_TX_DESC;
@@ -28465,6 +15137,8 @@ rtl8168_tx_interrupt(struct net_device *dev,
                 dirty_tx++;
                 tx_left--;
         }
+
+        tp->dynamic_aspm_packet_count -= tx_left;
 
         if (tp->dirty_tx != dirty_tx) {
                 tp->dirty_tx = dirty_tx;
@@ -28577,7 +15251,7 @@ rtl8168_rx_interrupt(struct net_device *dev,
         assert(dev != NULL);
         assert(tp != NULL);
 
-        if ((tp->RxDescArray == NULL) || (tp->Rx_skbuff == NULL))
+        if (tp->RxDescArray == NULL)
                 goto rx_out;
 
         rx_quota = RTL_RX_QUOTA(budget);
@@ -28633,17 +15307,17 @@ process_pkt:
 
                         skb = tp->Rx_skbuff[entry];
 
-                        dma_sync_single_for_cpu(&tp->pci_dev->dev,
+                        dma_sync_single_for_cpu(tp_to_dev(tp),
                                                 le64_to_cpu(desc->addr), tp->rx_buf_sz,
                                                 DMA_FROM_DEVICE);
 
                         if (rtl8168_try_rx_copy(tp, &skb, pkt_size,
                                                 desc, tp->rx_buf_sz)) {
                                 tp->Rx_skbuff[entry] = NULL;
-                                dma_unmap_single(&tp->pci_dev->dev, le64_to_cpu(desc->addr),
+                                dma_unmap_single(tp_to_dev(tp), le64_to_cpu(desc->addr),
                                                  tp->rx_buf_sz, DMA_FROM_DEVICE);
                         } else {
-                                dma_sync_single_for_device(&tp->pci_dev->dev, le64_to_cpu(desc->addr),
+                                dma_sync_single_for_device(tp_to_dev(tp), le64_to_cpu(desc->addr),
                                                            tp->rx_buf_sz, DMA_FROM_DEVICE);
                         }
 
@@ -28681,6 +15355,8 @@ process_pkt:
         if (!delta && count && netif_msg_intr(tp))
                 printk(KERN_INFO "%s: no Rx buffer allocated\n", dev->name);
         tp->dirty_rx += delta;
+
+        tp->dynamic_aspm_packet_count += delta;
 
         /*
          * FIXME: until there is periodic timer to try and refill the ring,
@@ -28909,6 +15585,8 @@ static void rtl8168_sleep_rx_enable(struct net_device *dev)
 {
         struct rtl8168_private *tp = netdev_priv(dev);
 
+        if (tp->wol_enabled != WOL_ENABLED) return;
+
         if ((tp->mcfg == CFG_METHOD_1) || (tp->mcfg == CFG_METHOD_2)) {
                 RTL_W8(tp, ChipCmd, CmdReset);
                 rtl8168_rx_desc_offset0_init(tp, 0);
@@ -28959,8 +15637,6 @@ static void rtl8168_down(struct net_device *dev)
 
         rtl8168_rx_clear(tp);
 
-        rtl8168_sleep_rx_enable(dev);
-
         spin_unlock_irqrestore(&tp->lock, flags);
 }
 
@@ -28975,11 +15651,15 @@ static int rtl8168_close(struct net_device *dev)
 
                 rtl8168_down(dev);
 
+                pci_clear_master(tp->pci_dev);
+
                 spin_lock_irqsave(&tp->lock, flags);
 
                 rtl8168_hw_d3_para(dev);
 
                 rtl8168_powerdown_pll(dev);
+
+                rtl8168_sleep_rx_enable(dev);
 
                 spin_unlock_irqrestore(&tp->lock, flags);
 
@@ -28991,12 +15671,6 @@ static int rtl8168_close(struct net_device *dev)
                                   tp->TxPhyAddr);
                 tp->TxDescArray = NULL;
                 tp->RxDescArray = NULL;
-
-                if (tp->ShortPacketEmptyBuffer != NULL) {
-                        dma_free_coherent(&pdev->dev, SHORT_PACKET_PADDING_BUF_SIZE, tp->ShortPacketEmptyBuffer,
-                                          tp->ShortPacketEmptyBufferPhy);
-                        tp->ShortPacketEmptyBuffer = NULL;
-                }
         } else {
                 spin_lock_irqsave(&tp->lock, flags);
 
@@ -29032,6 +15706,13 @@ static void rtl8168_shutdown(struct pci_dev *pdev)
 
         rtl8168_close(dev);
         rtl8168_disable_msi(pdev, tp);
+
+        if (system_state == SYSTEM_POWER_OFF) {
+                pci_clear_master(tp->pci_dev);
+                rtl8168_sleep_rx_enable(dev);
+                pci_wake_from_d3(pdev, tp->wol_enabled);
+                pci_set_power_state(pdev, PCI_D3hot);
+        }
 }
 #endif
 
@@ -29093,7 +15774,7 @@ rtl8168_suspend(struct pci_dev *pdev, pm_message_t state)
 
         rtl8168_hw_reset(dev);
 
-        rtl8168_sleep_rx_enable(dev);
+        pci_clear_master(pdev);
 
         rtl8168_hw_d3_para(dev);
 
@@ -29102,6 +15783,8 @@ rtl8168_suspend(struct pci_dev *pdev, pm_message_t state)
 #endif  //ENABLE_FIBER_SUPPORT
 
         rtl8168_powerdown_pll(dev);
+
+        rtl8168_sleep_rx_enable(dev);
 
         spin_unlock_irqrestore(&tp->lock, flags);
 
@@ -29157,6 +15840,8 @@ rtl8168_resume(struct pci_dev *pdev)
                 goto out;
         }
 
+        pci_set_master(pdev);
+
         spin_lock_irqsave(&tp->lock, flags);
 
         rtl8168_exit_oob(dev);
@@ -29170,6 +15855,8 @@ rtl8168_resume(struct pci_dev *pdev)
         rtl8168_hw_ephy_config(dev);
 
         rtl8168_hw_phy_config(dev);
+
+        rtl8168_hw_config(dev);
 
         spin_unlock_irqrestore(&tp->lock, flags);
 
