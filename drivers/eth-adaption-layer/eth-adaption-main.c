@@ -28,6 +28,7 @@
 struct mutex eam_lock;
 /* debug fs directory for stats*/
 struct dentry *debugfs_dir;
+struct kthread_work *dummy;
 
 /* global data for stats*/
 unsigned long receive_allocfree_stat;
@@ -65,12 +66,11 @@ int gpio_link_state;
 int gpio_init;
 
 /* power management state*/
-enum eam_power_management_state power_state;
 /* Power state lock */
 struct mutex power_state_lock;
 
 /* Variable to indicate if peer has toggle wake up GPIO*/
-bool peer_gpio_toggled = 0;
+bool peer_gpio_toggled = 1;
 /* Power state lock */
 struct mutex gpio_toggle_lock;
 
@@ -108,6 +108,15 @@ MODULE_PARM_DESC(destipv4, "Destination IPV4 address [10.129.41.200]");
 int dest_port=5020;
 module_param(dest_port, int, S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP);
 MODULE_PARM_DESC(iptype, "Destination TCP port[5020]");
+
+module_param(keepidle, int, S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP);
+MODULE_PARM_DESC(keepidle, "TCP keepidle");
+
+module_param(keepintvl, int, S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP);
+MODULE_PARM_DESC(keepintvl, "TCP keepintvl");
+
+module_param(keepcnt, int, S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP);
+MODULE_PARM_DESC(keepcnt, "TCP keepcnt");
 
 /**
 * eth_adaption_set_link_state()handler function set link up and down evts.
@@ -383,18 +392,6 @@ fail:
 	return -ENOMEM;
 }
 
-
-/**
-* eth_adaption_wake_up() - Function to wake up waiting thread.
-* Return: 0 on success, non-zero otherwise
-*/
-int eth_adaption_wake_up(void)
-{
-	wake_up(&suspend_wait);
-	return 0;
-}
-
-
 /**
 * eth_adaption_send() - Function to send QMI packet from IPCRTR over TCP socket.
 *
@@ -410,44 +407,26 @@ int eth_adaption_send(struct sk_buff *skb)
 	if (skb == NULL)
 	return -1;
 
-	/**
-	* Check and block on power susupend state and wait until running
-	* This enables the queue mechanism of incoming packets from QRTR
-	*/
-check_suspend:
-	mutex_lock(&power_state_lock);
-	if(power_state == EAM_POWER_STATE_SUSPENDING || power_state == EAM_POWER_STATE_RESUMING)
-	{
-		mutex_unlock(&power_state_lock);
-		wait_event_timeout(suspend_wait,
-					(power_state != EAM_POWER_STATE_SUSPENDING && power_state != EAM_POWER_STATE_RESUMING),
-					1*HZ);
-		goto check_suspend;
-	}
-
-	if(power_state == EAM_POWER_STATE_SUSPENDED)
-	{
-		mutex_unlock(&power_state_lock);
-		ETHADPTDBG("%s state suspended, starting resume, peer_gpio_toggled: %d\n",
-					__func__, peer_gpio_toggled);
 		if (atomic_read(&acquire_wakelock) == 1)
 		{
 			__pm_stay_awake(eth_ws);
 		}
 		eth_adaption_handle_resume();
-		goto check_suspend;
-	}
-	else
-		mutex_unlock(&power_state_lock);
 
 	ETHADPTDBG("%s state running sending\n", __func__);
 	if (server)
 	{
 		ret = eth_adaption_server_send(skb->data,skb->len);
+		if(ret < 0)
+			eth_adaption_server_sock_cleanup();
 	}
 	else
 	{
 		ret = eth_adaption_client_send(skb->data,skb->len);
+		if(ret < 0) {
+			eth_adaption_client_sock_cleanup();
+			eth_adaption_client_start(dummy);
+		}
 	}
 	return 0;
 }
@@ -462,39 +441,19 @@ int eth_adaption_handle_resume()
 	ETHADPTDBG("eth_adapt handle resume\n");
 	int ret = 0;
 
-	mutex_lock(&power_state_lock);
-	power_state = EAM_POWER_STATE_RESUMING;
-	ETHADPTDBG("%s EAM_POWER_STATE_RESUMING\n", __func__);
-	mutex_unlock(&power_state_lock);
-
 	mutex_lock(&gpio_toggle_lock);
 	if(peer_gpio_toggled == false)
 	{
-		mutex_unlock(&gpio_toggle_lock);
 		ETHADPTDBG("%s gpio resume toggle\n", __func__);
 		sb_notifier_call_chain(EVENT_REQUEST_WAKE_UP, NULL);
+		peer_gpio_toggled = true;
+		mutex_unlock(&gpio_toggle_lock);
 	}
 	else
 	{
 		mutex_unlock(&gpio_toggle_lock);
 	}
 
-	if(server)
-	{
-	// start server
-		ret=eth_adaption_server_connect(dest_port,iptype,connect_retry_cnt,true);
-	}
-	else
-	{
-		if (iptype == 0)
-		{
-			ret = eth_adaption_client_connect(destipv4,iptype,dest_port,connect_retry_cnt,true);
-		}
-		else
-		{
-			ret = eth_adaption_client_connect(destipv6,iptype,dest_port,connect_retry_cnt,true);
-		}
-	}
 
 	return ret;
 }
@@ -507,31 +466,18 @@ int eth_adaption_handle_suspend()
 {
 	int ret = 0;
 
-	/* Critical section. Set state to suspend for blocking TX data*/
-	mutex_lock(&power_state_lock);
-	power_state = EAM_POWER_STATE_SUSPENDING;
-	ETHADPTDBG("%s EAM_POWER_STATE_SUSPENDING\n", __func__);
-	mutex_unlock(&power_state_lock);
+#ifdef CONFIG_MSM_BOOT_TIME_MARKER
+	update_marker("M - eth-adaption-layer start Suspend: start");
+#endif
 
 	mutex_lock(&gpio_toggle_lock);
 	peer_gpio_toggled = false;
 	mutex_unlock(&gpio_toggle_lock);
 
-	/*Clean up TCP sockets for susepnd handling*/
-	if(server)
-	{
-		eth_adaption_server_cleanup(false);
-	}
-	else
-	{
-		eth_adaption_client_cleanup(false);
-	}
 
-	mutex_lock(&power_state_lock);
-	power_state = EAM_POWER_STATE_SUSPENDED;
-	ETHADPTDBG("%s EAM_POWER_STATE_SUSPENDED\n", __func__);
-	mutex_unlock(&power_state_lock);
-	eth_adaption_wake_up();
+#ifdef CONFIG_MSM_BOOT_TIME_MARKER
+	update_marker("M - eth-adaption-layer Suspended");
+#endif
 	return ret;
 }
 
@@ -572,18 +518,8 @@ static int eth_adaption_pm_notifier(struct notifier_block *nb,
 	switch (event)
 	{
 		case PM_SUSPEND_PREPARE:
-				mutex_lock(&power_state_lock);
-				if(power_state == EAM_POWER_STATE_RUNNING || power_state == EAM_POWER_STATE_RESUMING)
-				{
-					mutex_unlock(&power_state_lock);
 					eth_adaption_handle_suspend();
 					atomic_set(&acquire_wakelock, 1);
-				}
-				else
-				{
-					mutex_unlock(&power_state_lock);
-					ETHADPTERR("%s Ignoring system suspend \n", __func__);
-				}
 				break;
 	}
 	return NOTIFY_DONE;
@@ -616,20 +552,11 @@ static int eth_adaption_gpio_notifier_device_event
 			mutex_lock(&gpio_toggle_lock);
 			peer_gpio_toggled = true;
 			mutex_unlock(&gpio_toggle_lock);
-			mutex_lock(&power_state_lock);
-			if(power_state == EAM_POWER_STATE_SUSPENDED)
-			{
-				mutex_unlock(&power_state_lock);
 				if (atomic_read(&acquire_wakelock) == 1)
 				{
 					__pm_stay_awake(eth_ws);
 				}
 				eth_adaption_handle_resume();
-			}
-			else
-			{
-				mutex_unlock(&power_state_lock);
-			}
 			break;
 	}
 	return NOTIFY_DONE;
@@ -685,6 +612,8 @@ static int __init eth_adaption_init(void)
 	ETHADPTDBG("eth_adapt_init iptype %d\n",iptype);
 	ETHADPTDBG("eth_adapt_init server %d\n",server);
 
+        mutex_init(&eam_lock);
+        mutex_init(&gpio_toggle_lock);
 	// register for eth netdev linkup linkdown events.
 	if(server)
 	{
@@ -720,9 +649,6 @@ static int __init eth_adaption_init(void)
 		ETHADPTERR(" %s wakeup_source_register failed \n",__func__);
 	}
 
-	mutex_init(&power_state_lock);
-	mutex_init(&gpio_toggle_lock);
-
 #ifdef CONFIG_MSM_BOOT_TIME_MARKER
 		place_marker("M - eth-adaption-layer init");
 #endif
@@ -755,8 +681,8 @@ static void __exit eth_adaption_exit(void)
 		eth_adaption_server_cleanup(true);
 	else
 		eth_adaption_client_cleanup(true);
-	mutex_destroy(&power_state_lock);
 	mutex_destroy(&gpio_toggle_lock);
+	mutex_destroy(&eam_lock);
 	wakeup_source_unregister(eth_ws);
 	unregister_pm_notifier(&eth_adaption_pm_nb);
 #ifdef CONFIG_MSM_BOOT_TIME_MARKER

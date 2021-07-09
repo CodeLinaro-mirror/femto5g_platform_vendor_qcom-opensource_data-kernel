@@ -56,3 +56,7 @@ int eth_adaption_client_send(const char *buf, const size_t length);
 * Return: void
 */
 void eth_adaption_client_cleanup(bool cleanup_lock);
+
+void eth_adaption_client_sock_cleanup(void);
+
+void eth_adaption_client_start(struct kthread_work *work);
