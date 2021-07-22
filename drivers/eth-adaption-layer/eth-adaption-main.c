@@ -427,6 +427,11 @@ int eth_adaption_send(struct sk_buff *skb)
 			eth_adaption_client_sock_cleanup();
 			eth_adaption_client_start(dummy);
 		}
+		if (atomic_read(&acquire_wakelock) == 1) {
+			msleep(200);
+			atomic_set(&acquire_wakelock, 0);
+			__pm_relax(eth_ws);
+		}
 	}
 	return 0;
 }
