@@ -115,6 +115,8 @@
 #define FIRMWARE_8168FP_3   "rtl_nic/rtl8168fp-3.fw"
 #define FIRMWARE_8168FP_4   "rtl_nic/rtl8168fp-4.fw"
 
+#define ARRAY_SIZE_CUSTOM(x) (sizeof(x) / sizeof((x)[0]))
+
 /* Maximum number of multicast addresses to filter (vs. Rx-all-multicast).
    The RTL chips use a 64 element hash table based on the Ethernet CRC. */
 static const int multicast_filter_limit = 32;
@@ -935,7 +937,7 @@ static int proc_get_driver_variable(struct seq_file *m, void *v)
 {
         struct net_device *dev = m->private;
         struct rtl8168_private *tp = netdev_priv(dev);
-        unsigned long flags;
+        unsigned long flags = 0;
 
         seq_puts(m, "\nDump Driver Variable\n");
 
@@ -1037,7 +1039,7 @@ static int proc_get_tally_counter(struct seq_file *m, void *v)
         dma_addr_t paddr;
         u32 cmd;
         u32 WaitCnt;
-        unsigned long flags;
+        unsigned long flags = 0;
 
         seq_puts(m, "\nDump Tally Counter\n");
 
@@ -1091,7 +1093,7 @@ static int proc_get_registers(struct seq_file *m, void *v)
         u8 byte_rd;
         struct rtl8168_private *tp = netdev_priv(dev);
         void __iomem *ioaddr = tp->mmio_addr;
-        unsigned long flags;
+        unsigned long flags = 0;
 
         seq_puts(m, "\nDump MAC Registers\n");
         seq_puts(m, "Offset\tValue\n------\t-----\n");
@@ -1117,7 +1119,7 @@ static int proc_get_pcie_phy(struct seq_file *m, void *v)
         int i, n, max = R8168_EPHY_REGS_SIZE/2;
         u16 word_rd;
         struct rtl8168_private *tp = netdev_priv(dev);
-        unsigned long flags;
+        unsigned long flags = 0;
 
         seq_puts(m, "\nDump PCIE PHY\n");
         seq_puts(m, "\nOffset\tValue\n------\t-----\n ");
@@ -1143,7 +1145,7 @@ static int proc_get_eth_phy(struct seq_file *m, void *v)
         int i, n, max = R8168_PHY_REGS_SIZE/2;
         u16 word_rd;
         struct rtl8168_private *tp = netdev_priv(dev);
-        unsigned long flags;
+        unsigned long flags = 0;
 
         seq_puts(m, "\nDump Ethernet PHY\n");
         seq_puts(m, "\nOffset\tValue\n------\t-----\n ");
@@ -1171,7 +1173,7 @@ static int proc_get_extended_registers(struct seq_file *m, void *v)
         int i, n, max = R8168_ERI_REGS_SIZE;
         u32 dword_rd;
         struct rtl8168_private *tp = netdev_priv(dev);
-        unsigned long flags;
+        unsigned long flags = 0;
 
         switch (tp->mcfg) {
         case CFG_METHOD_1:
@@ -1206,7 +1208,7 @@ static int proc_get_pci_registers(struct seq_file *m, void *v)
         int i, n, max = R8168_PCI_REGS_SIZE;
         u32 dword_rd;
         struct rtl8168_private *tp = netdev_priv(dev);
-        unsigned long flags;
+        unsigned long flags = 0;
 
         seq_puts(m, "\nDump PCI Registers\n");
         seq_puts(m, "\nOffset\tValue\n------\t-----\n ");
@@ -4726,7 +4728,7 @@ rtl8168_set_hw_wol(struct net_device *dev, u32 wolopts)
 
         switch (tp->HwSuppMagicPktVer) {
         case WAKEUP_MAGIC_PACKET_V2:
-                tmp = ARRAY_SIZE(cfg) - 1;
+                tmp = ARRAY_SIZE_CUSTOM(cfg) - 1;
 
                 if (wolopts & WAKE_MAGIC)
                         rtl8168_enable_magic_packet(dev);
@@ -4734,13 +4736,13 @@ rtl8168_set_hw_wol(struct net_device *dev, u32 wolopts)
                         rtl8168_disable_magic_packet(dev);
                 break;
         default:
-                tmp = ARRAY_SIZE(cfg);
+                tmp = ARRAY_SIZE_CUSTOM(cfg);
                 break;
         }
 
         rtl8168_enable_cfg9346_write(tp);
 
-        for (i = 0; i < tmp; i++) {
+        for (i = 0; i < tmp ; i++) {
                 u8 options = RTL_R8(tp, cfg[i].reg) & ~cfg[i].mask;
                 if (wolopts & cfg[i].opt)
                         options |= cfg[i].mask;
@@ -4946,7 +4948,7 @@ rtl8168_get_wol(struct net_device *dev,
 {
         struct rtl8168_private *tp = netdev_priv(dev);
         u8 options;
-        unsigned long flags;
+        unsigned long flags = 0;
 
         wol->wolopts = 0;
 
@@ -4974,7 +4976,7 @@ rtl8168_set_wol(struct net_device *dev,
                 struct ethtool_wolinfo *wol)
 {
         struct rtl8168_private *tp = netdev_priv(dev);
-        unsigned long flags;
+        unsigned long flags = 0;
 
         if (tp->mcfg == CFG_METHOD_DEFAULT)
                 return -EOPNOTSUPP;
@@ -5132,7 +5134,7 @@ rtl8168_set_settings(struct net_device *dev,
 {
         struct rtl8168_private *tp = netdev_priv(dev);
         int ret;
-        unsigned long flags;
+        unsigned long flags = 0;
         u8 autoneg;
         u32 speed;
         u8 duplex;
@@ -5673,7 +5675,7 @@ rtl8168_get_ethtool_stats(struct net_device *dev,
         dma_addr_t paddr;
         u32 cmd;
         u32 WaitCnt;
-        unsigned long flags;
+        unsigned long flags = 0;
 
         ASSERT_RTNL();
 
@@ -10821,11 +10823,13 @@ rtl8168_init_software_variable(struct net_device *dev)
 
                         pdev_cmac = pci_get_slot(pdev->bus, PCI_DEVFN(PCI_SLOT(pdev->devfn), 0));
 
-                        //map CMAC IO space
-                        CmacMemPhysAddress = pci_resource_start(pdev_cmac, 2);
+			if (pdev_cmac) {
+	                        //map CMAC IO space
+	                        CmacMemPhysAddress = pci_resource_start(pdev_cmac, 2);
 
-                        /* ioremap MMIO region */
-                        cmac_ioaddr = ioremap(CmacMemPhysAddress, R8168_REGS_SIZE);
+	                        /* ioremap MMIO region */
+	                        cmac_ioaddr = ioremap(CmacMemPhysAddress, R8168_REGS_SIZE);
+			}
 
                         if (cmac_ioaddr == NULL) {
 #if LINUX_VERSION_CODE > KERNEL_VERSION(2,6,0)
@@ -12410,13 +12414,14 @@ rtl8168_esd_timer(struct timer_list *t)
         struct rtl8168_private *tp = netdev_priv(dev);
         struct timer_list *timer = &tp->esd_timer;
 #else
-        struct rtl8168_private *tp = from_timer(tp, t, esd_timer);
+        struct rtl8168_private *tp = NULL;
+	tp = from_timer(tp, t, esd_timer);
         struct net_device *dev = tp->dev;
         struct timer_list *timer = t;
 #endif
         struct pci_dev *pdev = tp->pci_dev;
         unsigned long timeout = RTL8168_ESD_TIMEOUT;
-        unsigned long flags;
+        unsigned long flags = 0;
         u8 cmd;
         u16 io_base_l;
         u16 mem_base_l;
@@ -12580,11 +12585,12 @@ rtl8168_link_timer(struct timer_list *t)
         struct rtl8168_private *tp = netdev_priv(dev);
         struct timer_list *timer = &tp->link_timer;
 #else
-        struct rtl8168_private *tp = from_timer(tp, t, link_timer);
+        struct rtl8168_private *tp = NULL;
+	tp = from_timer(tp, t, link_timer);
         struct net_device *dev = tp->dev;
         struct timer_list *timer = t;
 #endif
-        unsigned long flags;
+        unsigned long flags = 0;
 
         spin_lock_irqsave(&tp->lock, flags);
         rtl8168_check_link_status(dev);
@@ -12683,6 +12689,9 @@ rtl8168_init_one(struct pci_dev *pdev,
 
         rc = rtl8168_init_board(pdev, &dev, &ioaddr);
         if (rc)
+                goto out;
+
+        if(!dev)
                 goto out;
 
         tp = netdev_priv(dev);
@@ -12931,7 +12940,7 @@ static int rtl8168_open(struct net_device *dev)
 {
         struct rtl8168_private *tp = netdev_priv(dev);
         struct pci_dev *pdev = tp->pci_dev;
-        unsigned long flags;
+        unsigned long flags = 0;
         int retval;
 
         retval = -ENOMEM;
@@ -13151,13 +13160,15 @@ rtl8168_hw_set_rx_packet_filter(struct net_device *dev)
                         rx_mode |= AcceptMulticast;
                 }
 #else
-                struct netdev_hw_addr *ha;
+                struct netdev_hw_addr *ha = NULL;
 
                 rx_mode = AcceptBroadcast | AcceptMyPhys;
                 mc_filter[1] = mc_filter[0] = 0;
                 netdev_for_each_mc_addr(ha, dev) {
-                        int bit_nr = ether_crc(ETH_ALEN, ha->addr) >> 26;
-                        mc_filter[bit_nr >> 5] |= 1 << (bit_nr & 31);
+			if (ha) {
+                        	int bit_nr = ether_crc(ETH_ALEN, ha->addr) >> 26;
+                        	mc_filter[bit_nr >> 5] |= 1 << (bit_nr & 31);
+			}
                         rx_mode |= AcceptMulticast;
                 }
 #endif
@@ -13182,7 +13193,7 @@ static void
 rtl8168_set_rx_mode(struct net_device *dev)
 {
         struct rtl8168_private *tp = netdev_priv(dev);
-        unsigned long flags;
+        unsigned long flags = 0;
 
         spin_lock_irqsave(&tp->lock, flags);
 
@@ -14200,7 +14211,7 @@ rtl8168_change_mtu(struct net_device *dev,
 {
         struct rtl8168_private *tp = netdev_priv(dev);
         int ret = 0;
-        unsigned long flags;
+        unsigned long flags = 0;
 
 #if LINUX_VERSION_CODE < KERNEL_VERSION(4,10,0)
         if (new_mtu < ETH_MIN_MTU)
