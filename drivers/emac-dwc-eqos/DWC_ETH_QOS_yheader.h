@@ -1909,6 +1909,9 @@ struct DWC_ETH_QOS_prv_data {
 	struct class* avb_class_b_class;
 
 	unsigned long default_ptp_clock;
+	int chan_num;
+	int emac_enable_ipc_low_rx;
+	int emac_enable_ipc_low_tx;
 };
 
 struct ip_params {
@@ -2085,6 +2088,8 @@ void DWC_ETH_QOS_defer_phy_isr_work(struct work_struct *work);
 irqreturn_t DWC_ETH_QOS_PHY_ISR(int irq, void *dev_id);
 
 void DWC_ETH_QOS_dma_desc_stats_read(struct DWC_ETH_QOS_prv_data *pdata);
+void DWC_ETH_QOS_dma_desc_stats_read_chan(struct DWC_ETH_QOS_prv_data *pdata, int chan);
+
 void DWC_ETH_QOS_dma_desc_stats_init(struct DWC_ETH_QOS_prv_data *pdata);
 int DWC_ETH_QOS_add_ipaddr(struct DWC_ETH_QOS_prv_data *);
 int DWC_ETH_QOS_add_ipv6addr(struct DWC_ETH_QOS_prv_data *);
