@@ -2936,10 +2936,9 @@ static void DWC_ETH_QOS_tx_interrupt(struct net_device *dev,
 		if (!hw_if->tx_complete(txptr))
 			break;
 
-#ifdef DWC_ETH_QOS_ENABLE_TX_DESC_DUMP
-		dump_tx_desc(pdata, desc_data->dirty_tx, desc_data->dirty_tx,
+		if (pdata->emac_enable_ipc_low_tx)
+			dump_tx_desc(pdata, desc_data->dirty_tx, desc_data->dirty_tx,
 			     0, qinx);
-#endif
 
 #ifndef DWC_ETH_QOS_CERTIFICATION_PKTBURSTCNT
 		/* update the tx error if any by looking at last segment
@@ -3019,7 +3018,8 @@ static void DWC_ETH_QOS_tx_interrupt(struct net_device *dev,
 					tstamp_taken = DWC_ETH_QOS_get_tx_hwtstamp(pdata,
 										   txptr, buffer->skb);
 					if (tstamp_taken) {
-						dump_tx_desc(pdata, desc_data->dirty_tx, desc_data->dirty_tx,
+						if (pdata->emac_enable_ipc_low_tx)
+							dump_tx_desc(pdata, desc_data->dirty_tx, desc_data->dirty_tx,
 							     0, qinx);
 						DBGPR_PTP("passed tx timestamp to stack[qinx = %d, dirty_tx = %d]\n",
 							  qinx, desc_data->dirty_tx);
@@ -3271,9 +3271,8 @@ static int DWC_ETH_QOS_clean_split_hdr_rx_irq(
 
 		/* check for data availability */
 		if (!(RX_NORMAL_DESC->RDES3 & DWC_ETH_QOS_RDESC3_OWN)) {
-#ifdef DWC_ETH_QOS_ENABLE_RX_DESC_DUMP
-			dump_rx_desc(qinx, RX_NORMAL_DESC, desc_data->cur_rx);
-#endif
+			if(pdata->emac_enable_ipc_low_rx)
+				dump_rx_desc(qinx, RX_NORMAL_DESC, desc_data->cur_rx);
 			/* assign it to new skb */
 			skb = buffer->skb;
 			buffer->skb = NULL;
@@ -3309,7 +3308,8 @@ static int DWC_ETH_QOS_clean_split_hdr_rx_irq(
 			if ((RX_NORMAL_DESC->RDES3 & DWC_ETH_QOS_RDESC3_ES) &&
 			    (RX_NORMAL_DESC->RDES3 & DWC_ETH_QOS_RDESC3_LD)) {
 				DBGPR("Error in rcved pkt, failed to pass it to upper layer\n");
-				dump_rx_desc(qinx, RX_NORMAL_DESC, desc_data->cur_rx);
+				if(pdata->emac_enable_ipc_low_rx)
+					dump_rx_desc(qinx, RX_NORMAL_DESC, desc_data->cur_rx);
 				dev->stats.rx_errors++;
 				DWC_ETH_QOS_update_rx_errors(dev,
 							     RX_NORMAL_DESC->RDES3);
@@ -3553,9 +3553,9 @@ static int DWC_ETH_QOS_clean_jumbo_rx_irq(struct DWC_ETH_QOS_prv_data *pdata,
 
 		/* check for data availability */
 		if (!(RX_NORMAL_DESC->RDES3 & DWC_ETH_QOS_RDESC3_OWN)) {
-#ifdef DWC_ETH_QOS_ENABLE_RX_DESC_DUMP
-			dump_rx_desc(qinx, RX_NORMAL_DESC, desc_data->cur_rx);
-#endif
+			if(pdata->emac_enable_ipc_low_rx)
+				dump_rx_desc(qinx, RX_NORMAL_DESC, desc_data->cur_rx);
+
 			/* assign it to new skb */
 			skb = buffer->skb;
 			buffer->skb = NULL;
@@ -3580,7 +3580,8 @@ static int DWC_ETH_QOS_clean_jumbo_rx_irq(struct DWC_ETH_QOS_prv_data *pdata,
 			if ((RX_NORMAL_DESC->RDES3 & DWC_ETH_QOS_RDESC3_ES) &&
 			    (RX_NORMAL_DESC->RDES3 & DWC_ETH_QOS_RDESC3_LD)) {
 				DBGPR("Error in rcved pkt, failed to pass it to upper layer\n");
-				dump_rx_desc(qinx, RX_NORMAL_DESC, desc_data->cur_rx);
+				if(pdata->emac_enable_ipc_low_rx)
+					dump_rx_desc(qinx, RX_NORMAL_DESC, desc_data->cur_rx);
 				dev->stats.rx_errors++;
 				DWC_ETH_QOS_update_rx_errors(dev,
 							     RX_NORMAL_DESC->RDES3);
@@ -3836,9 +3837,8 @@ static int DWC_ETH_QOS_clean_rx_irq(struct DWC_ETH_QOS_prv_data *pdata,
 
 		/* check for data availability */
 		if (!(RX_NORMAL_DESC->RDES3 & DWC_ETH_QOS_RDESC3_OWN)) {
-#ifdef DWC_ETH_QOS_ENABLE_RX_DESC_DUMP
-			dump_rx_desc(qinx, RX_NORMAL_DESC, desc_data->cur_rx);
-#endif
+			if(pdata->emac_enable_ipc_low_rx)
+				dump_rx_desc(qinx, RX_NORMAL_DESC, desc_data->cur_rx);
 			/* assign it to new skb */
 			skb = buffer->skb;
 			buffer->skb = NULL;
@@ -3955,7 +3955,8 @@ static int DWC_ETH_QOS_clean_rx_irq(struct DWC_ETH_QOS_prv_data *pdata,
 				}
 #endif
 			} else {
-				dump_rx_desc(qinx, RX_NORMAL_DESC, desc_data->cur_rx);
+				if(pdata->emac_enable_ipc_low_rx)
+					dump_rx_desc(qinx, RX_NORMAL_DESC, desc_data->cur_rx);
 				if (!(RX_NORMAL_DESC->RDES3 &
 					  DWC_ETH_QOS_RDESC3_LD))
 					DBGPR("Received oversized pkt, spanned across multiple desc\n");
@@ -7714,19 +7715,25 @@ void dump_tx_desc(struct DWC_ETH_QOS_prv_data *pdata, int first_desc_idx,
 	int i;
 	struct s_TX_NORMAL_DESC *desc = NULL;
 	UINT VARCTXT;
+	UINT VAROWN;
+	UINT VARFD;
+	UINT VARLD;
+
 
 	if (first_desc_idx == last_desc_idx) {
 		desc = GET_TX_DESC_PTR(qinx, first_desc_idx);
 
 		TX_NORMAL_DESC_TDES3_CTXT_MLF_RD(desc->TDES3, VARCTXT);
+		TX_NORMAL_DESC_TDES3_OWN_MLF_RD(desc->TDES3, VAROWN);
+		TX_NORMAL_DESC_TDES3_FD_MLF_RD(desc->TDES3, VARFD);
+		TX_NORMAL_DESC_TDES3_LD_MLF_RD(desc->TDES3, VARLD);
 
-		dev_alert(&pdata->pdev->dev, "\n%s[%02d %4p %03d %s] = %#x:%#x:%#x:%#x",
-			  (VARCTXT == 1) ? "TX_CONTXT_DESC" : "TX_NORMAL_DESC",
+		EMACINFO_TX_LOW(" DESC [%02d %4p %03d %s] = %#x:%#x:%#x:%#x OWN = %02d CTXT = %02d FD = %02d, LD = %02d\n",
 		qinx, desc, first_desc_idx,
 		((flag == 1) ? "QUEUED FOR TRANSMISSION" :
 		((flag == 0) ? "FREED/FETCHED BY DEVICE" : "DEBUG DESC DUMP")),
 		desc->TDES0, desc->TDES1,
-		desc->TDES2, desc->TDES3);
+		desc->TDES2, desc->TDES3, VAROWN, VARCTXT, VARFD, VARLD);
 	} else {
 		int lp_cnt;
 
@@ -7739,12 +7746,17 @@ void dump_tx_desc(struct DWC_ETH_QOS_prv_data *pdata, int first_desc_idx,
 			desc = GET_TX_DESC_PTR(qinx, i);
 
 			TX_NORMAL_DESC_TDES3_CTXT_MLF_RD(desc->TDES3, VARCTXT);
+			TX_NORMAL_DESC_TDES3_OWN_MLF_RD(desc->TDES3, VAROWN);
+			TX_NORMAL_DESC_TDES3_FD_MLF_RD(desc->TDES3, VARFD);
+			TX_NORMAL_DESC_TDES3_LD_MLF_RD(desc->TDES3, VARLD);
 
-			dev_alert(&pdata->pdev->dev, "\n%s[%02d %4p %03d %s] = %#x:%#x:%#x:%#x",
-				  (VARCTXT == 1) ? "TX_CONTXT_DESC" : "TX_NORMAL_DESC",
+			EMACINFO_TX_LOW(" DESC [%02d %4p %03d %s] = %#x:%#x:%#x:%#x OWN = %02d CTXT = %02d FD = %02d, LD = %02d\n",
 			 qinx, desc, i,
 			 ((flag == 1) ? "QUEUED FOR TRANSMISSION" :
 			 "FREED/FETCHED BY DEVICE"), desc->TDES0,
+			 desc->TDES1, desc->TDES2, desc->TDES3, VAROWN, VARCTXT , VARFD, VARLD);
+			 if(VARCTXT)
+			 	pr_err("CTXT desc %3d %#x:%#x:%#x:%#x \n",i, desc->TDES0,
 			 desc->TDES1, desc->TDES2, desc->TDES3);
 			INCR_TX_DESC_INDEX(i, 1, pdata->tx_queue[qinx].desc_cnt);
 		}
@@ -7764,10 +7776,16 @@ void dump_tx_desc(struct DWC_ETH_QOS_prv_data *pdata, int first_desc_idx,
 
 void dump_rx_desc(UINT qinx, struct s_RX_NORMAL_DESC *desc, int desc_idx)
 {
-	pr_alert("\nRX_NORMAL_DESC[%02d %4p %03d RECEIVED FROM DEVICE]",
-		 qinx, desc, desc_idx);
-	pr_alert(" = %#x:%#x:%#x:%#x\n",
-		 desc->RDES0, desc->RDES1, desc->RDES2, desc->RDES3);
+
+	UINT VARCTXT;
+	UINT VAROWN;
+
+	RX_NORMAL_DESC_RDES3_CTXT_MLF_RD(desc->RDES3, VARCTXT);
+	RX_NORMAL_DESC_RDES3_OWN_MLF_RD(desc->RDES3, VAROWN);
+
+	EMACINFO_RX_LOW("DESC [%02d %4p %03d RECEIVED FROM DEVICE] = %#x:%#x:%#x:%#x OWN = %02d CTXT = %02d \n ",
+		 qinx, desc, desc_idx,
+		 desc->RDES0, desc->RDES1, desc->RDES2, desc->RDES3, VAROWN, VARCTXT);
 }
 
 /*!
@@ -8139,6 +8157,32 @@ phy_interface_t DWC_ETH_QOS_get_phy_interface(
 
 	return ret;
 }
+
+
+void DWC_ETH_QOS_dma_desc_stats_read_chan(struct DWC_ETH_QOS_prv_data *pdata, int qinx)
+{
+	EMACDBG("Enter\n");
+	pdata->xstats.dma_ch_intr_status = DWC_ETH_QOS_reg_read(DMA_ISR_RGOFFADDR);
+	pdata->xstats.dma_debug_status0 = DWC_ETH_QOS_reg_read(DMA_DSR0_RGOFFADDR);
+	pdata->xstats.dma_debug_status1 = DWC_ETH_QOS_reg_read(DMA_DSR1_RGOFFADDR);
+	pdata->xstats.dma_ch_status[qinx] = DWC_ETH_QOS_reg_read(DMA_SR_RGOFFADDRESS(qinx));
+	pdata->xstats.dma_ch_intr_enable[qinx] = DWC_ETH_QOS_reg_read(DMA_IER_RGOFFADDRESS(qinx));
+	pdata->xstats.dma_ch_tx_control[qinx] = DWC_ETH_QOS_reg_read(DMA_TCR_RGOFFADDRESS(qinx));
+	pdata->xstats.dma_ch_txdesc_list_addr[qinx] = DWC_ETH_QOS_reg_read(DMA_TDLAR_RGOFFADDRESS(qinx));
+	pdata->xstats.dma_ch_txdesc_ring_len[qinx] = DWC_ETH_QOS_reg_read(DMA_TDRLR_RGOFFADDRESS(qinx));
+	pdata->xstats.dma_ch_curr_app_txdesc[qinx] = DWC_ETH_QOS_reg_read(DMA_CHTDR_RGOFFADDRESS(qinx));
+	pdata->xstats.dma_ch_txdesc_tail_ptr[qinx] = DWC_ETH_QOS_reg_read(DMA_TDTP_TPDR_RGOFFADDRESS(qinx));
+	pdata->xstats.dma_ch_curr_app_txbuf[qinx] = DWC_ETH_QOS_reg_read(DMA_CHTBAR_RGOFFADDRESS(qinx));
+	pdata->xstats.dma_ch_rx_control[qinx] = DWC_ETH_QOS_reg_read(DMA_RCR_RGOFFADDRESS(qinx));
+	pdata->xstats.dma_ch_rxdesc_list_addr[qinx] = DWC_ETH_QOS_reg_read(DMA_RDLAR_RGOFFADDRESS(qinx));
+	pdata->xstats.dma_ch_rxdesc_ring_len[qinx] = DWC_ETH_QOS_reg_read(DMA_RDRLR_RGOFFADDRESS(qinx));
+	pdata->xstats.dma_ch_curr_app_rxdesc[qinx] = DWC_ETH_QOS_reg_read(DMA_CHRDR_RGOFFADDRESS(qinx));
+	pdata->xstats.dma_ch_rxdesc_tail_ptr[qinx] = DWC_ETH_QOS_reg_read(DMA_RDTP_RPDR_RGOFFADDRESS(qinx));
+	pdata->xstats.dma_ch_curr_app_rxbuf[qinx] = DWC_ETH_QOS_reg_read(DMA_CHRBAR_RGOFFADDRESS(qinx));
+	pdata->xstats.dma_ch_miss_frame_count[qinx] = DWC_ETH_QOS_reg_read(DMA_CH_MISS_FRAME_CNT_RGOFFADDRESS(qinx));
+	EMACDBG("Exit\n");
+}
+
 
 /*!
  * \details This function is invoked by ethtool function when user wants to
