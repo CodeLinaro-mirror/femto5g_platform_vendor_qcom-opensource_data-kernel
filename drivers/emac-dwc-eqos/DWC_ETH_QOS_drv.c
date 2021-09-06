@@ -1,4 +1,4 @@
-/* Copyright (c) 2017-2019, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2017-2019,2021 The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -2557,7 +2557,7 @@ static int DWC_ETH_QOS_start_xmit(struct sk_buff *skb, struct net_device *dev)
 	if (desc_data->free_desc_cnt < desc_count) {
 		desc_data->queue_stopped = 1;
 		netif_stop_subqueue(dev, qinx);
-		DBGPR("stopped TX queue(%d) since there are no sufficient descriptor available for the current transfer\n",
+		EMACINFO("stopped TX queue(%d), no sufficient descriptors available\n",
 		      qinx);
 		retval = NETDEV_TX_BUSY;
 		goto tx_netdev_return;
@@ -3034,6 +3034,7 @@ static void DWC_ETH_QOS_tx_interrupt(struct net_device *dev,
 
 	if ((desc_data->queue_stopped == 1) && (desc_data->free_desc_cnt > 0)) {
 		desc_data->queue_stopped = 0;
+		EMACINFO("Wake up stopped TX queue(%d)\n", qinx);
 		netif_wake_subqueue(dev, qinx);
 	}
 #ifdef DWC_ETH_QOS_CERTIFICATION_PKTBURSTCNT
@@ -4043,6 +4044,7 @@ int DWC_ETH_QOS_poll_mq(struct napi_struct *napi, int budget)
 	struct DWC_ETH_QOS_prv_data *pdata = rx_queue->pdata;
 	/* divide the budget evenly among all the queues */
 	int per_q_budget = budget / DWC_ETH_QOS_RX_QUEUE_CNT;
+	int q_budget_used = 0;
 	int qinx = 0;
 	int received = 0, per_q_received = 0;
 	unsigned long flags;
@@ -4074,6 +4076,10 @@ int DWC_ETH_QOS_poll_mq(struct napi_struct *napi, int budget)
 		received += per_q_received;
 		pdata->xstats.rx_pkt_n += per_q_received;
 		pdata->xstats.q_rx_pkt_n[qinx] += per_q_received;
+
+		if (per_q_received > 0)
+			q_budget_used += per_q_budget;
+
 #ifdef DWC_INET_LRO
 		if (rx_queue->lro_flush_needed)
 			lro_flush_all(&rx_queue->lro_mgr);
@@ -4083,7 +4089,7 @@ int DWC_ETH_QOS_poll_mq(struct napi_struct *napi, int budget)
 	/* If we processed all pkts, we are done;
 	 * tell the kernel & re-enable interrupt
 	 */
-	if (received < budget) {
+	if ((received < q_budget_used) || (received == 0)) {
 		if (pdata->dev->features & NETIF_F_GRO) {
 			/* to turn off polling */
 			napi_complete(napi);
@@ -4103,11 +4109,12 @@ int DWC_ETH_QOS_poll_mq(struct napi_struct *napi, int budget)
 			DWC_ETH_QOS_enable_all_ch_rx_interrpt(pdata);
 			spin_unlock_irqrestore(&pdata->lock, flags);
 		}
+		return received;
 	}
 
 	DBGPR("<--DWC_ETH_QOS_poll_mq\n");
 
-	return received;
+	return budget;
 }
 
 /*!
@@ -6891,8 +6898,18 @@ static void DWC_ETH_QOS_program_dcb_algorithm(
 	DBGPR("-->DWC_ETH_QOS_program_dcb_algorithm\n");
 
 	if (copy_from_user(&l_dcb_struct, u_dcb_struct,
-			   sizeof(struct DWC_ETH_QOS_dcb_algorithm)))
-		dev_alert(&pdata->pdev->dev, "Failed to fetch DCB Struct info from user\n");
+			   sizeof(struct DWC_ETH_QOS_dcb_algorithm))) {
+		dev_alert(&pdata->pdev->dev,
+			  "Failed to fetch DCB Struct info from user\n");
+		return;
+	}
+
+	if (l_dcb_struct.qinx >= DWC_ETH_QOS_TX_QUEUE_CNT) {
+		dev_alert(&pdata->pdev->dev,
+			  "Invaild queue number[%u] in DCB Struct from user\n",
+			  l_dcb_struct.qinx);
+		return;
+	}
 
 	hw_if->set_tx_queue_operating_mode(l_dcb_struct.qinx,
 		(UINT)l_dcb_struct.op_mode);
@@ -6928,8 +6945,10 @@ static void DWC_ETH_QOS_program_avb_algorithm(
 	DBGPR("-->DWC_ETH_QOS_program_avb_algorithm\n");
 
 	if (copy_from_user(&l_avb_struct, u_avb_struct,
-			   sizeof(struct DWC_ETH_QOS_avb_algorithm)))
+			   sizeof(struct DWC_ETH_QOS_avb_algorithm))) {
 		dev_alert(&pdata->pdev->dev, "Failed to fetch AVB Struct info from user\n");
+		return;
+	}
 
 	if (pdata->speed == SPEED_1000)
 		avb_params = &l_avb_struct.speed1000params;
@@ -6938,10 +6957,16 @@ static void DWC_ETH_QOS_program_avb_algorithm(
 
 	/*Application uses 1 for CLASS A traffic and 2 for CLASS B traffic
 	  Configure right channel accordingly*/
-	if (l_avb_struct.qinx == 1)
+	if (l_avb_struct.qinx == 1) {
 		l_avb_struct.qinx = CLASS_A_TRAFFIC_TX_CHANNEL;
-	else if (l_avb_struct.qinx == 2)
+	} else if (l_avb_struct.qinx == 2) {
 		l_avb_struct.qinx = CLASS_B_TRAFFIC_TX_CHANNEL;
+	} else {
+		dev_alert(&pdata->pdev->dev,
+			  "Invalid queue number[%u] in AVB struct from user\n",
+			  l_avb_struct.qinx);
+		return;
+	}
 
 	hw_if->set_tx_queue_operating_mode(l_avb_struct.qinx,
 		(UINT)l_avb_struct.op_mode);
@@ -8169,7 +8194,7 @@ void DWC_ETH_QOS_dma_desc_stats_read(struct DWC_ETH_QOS_prv_data *pdata)
 	pdata->xstats.dma_debug_status1 = DWC_ETH_QOS_reg_read(DMA_DSR1_RGOFFADDR);
 
 	for (qinx = 0; qinx < DWC_ETH_QOS_TX_QUEUE_CNT; qinx++) {
-		if (qinx == IPA_DMA_TX_CH)
+		if (pdata->ipa_enabled && qinx == IPA_DMA_TX_CH)
 			continue;
 		pdata->xstats.dma_ch_status[qinx] = DWC_ETH_QOS_reg_read(DMA_SR_RGOFFADDRESS(qinx));
 		pdata->xstats.dma_ch_intr_enable[qinx] = DWC_ETH_QOS_reg_read(DMA_IER_RGOFFADDRESS(qinx));
@@ -8182,7 +8207,7 @@ void DWC_ETH_QOS_dma_desc_stats_read(struct DWC_ETH_QOS_prv_data *pdata)
 	}
 
 	for (qinx = 0; qinx < DWC_ETH_QOS_RX_QUEUE_CNT; qinx++) {
-		if (qinx == IPA_DMA_RX_CH)
+		if (pdata->ipa_enabled && qinx == IPA_DMA_RX_CH)
 			continue;
 		pdata->xstats.dma_ch_rx_control[qinx] = DWC_ETH_QOS_reg_read(DMA_RCR_RGOFFADDRESS(qinx));
 		pdata->xstats.dma_ch_rxdesc_list_addr[qinx] = DWC_ETH_QOS_reg_read(DMA_RDLAR_RGOFFADDRESS(qinx));
