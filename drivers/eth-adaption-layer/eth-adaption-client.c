@@ -1,4 +1,4 @@
-/* Copyright (c) 2020, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2020-2021, The Linux Foundation. All rights reserved.
 
 * This program is free software; you can redistribute it and/or modify
 * it under the terms of the GNU General Public License version 2 and
@@ -15,8 +15,8 @@
  * Owner - Abhishek B Chauhan - 8/18/2020
 */
 
-#include <eth-adaption-main.h>
-#include <eth-adaption-client.h>
+#include "eth-adaption-main.h"
+#include "eth-adaption-client.h"
 #include <soc/qcom/qrtr_ethernet.h>
 
 #define IPV4_ADDR_LEN 32
@@ -398,7 +398,7 @@ connect:
 		goto release;
 	}
 
-return cn;
+return;
 	// Call qrtr to initialize endpoint and pass the eth_adapt_send fn ptr to qrtr
 
 release:
@@ -416,7 +416,7 @@ release:
 		atomic_set(&acquire_wakelock, 0);
 		__pm_relax(eth_ws);
 	}
-	return cn;
+	return;
 }
 
 /**
@@ -470,7 +470,7 @@ int eth_adaption_client_connect(unsigned char *destip, int iptype, int port,int 
 		if (IS_ERR(client_sk.task))
 		{
 			ETHADPTERR("%s: Error allocating wq\n", __func__);
-			return;
+			return -1;
 		}
 	}
 	kthread_queue_work(&client_sk.kworker, &client_sk.init_client);

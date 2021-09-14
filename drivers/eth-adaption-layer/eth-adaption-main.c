@@ -15,11 +15,14 @@
  * Owner - Abhishek B Chauhan - 8/18/2020
 */
 
-#include <eth-adaption-main.h>
-#include <eth-adaption-server.h>
-#include <eth-adaption-client.h>
+#include "eth-adaption-main.h"
+#include "eth-adaption-server.h"
+#include "eth-adaption-client.h"
 #include <soc/qcom/qrtr_ethernet.h>
+#include <linux/version.h>
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 4, 0))
 #include <soc/qcom/sb_notification.h>
+#endif
 #include <linux/eth_adapt_power.h>
 #include <linux/suspend.h>
 #include <linux/pm_wakeup.h>
@@ -57,6 +60,7 @@ int qrtr_init;
 /* Critical section variable for QRTR initialization */
 int link_state;
 
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 4, 0))
 /* SSR notifier block for SSR event handling */
 struct notifier_block qrtr_nb;
 
@@ -64,6 +68,7 @@ struct notifier_block qrtr_nb;
 struct notifier_block gpio_notifier;
 int gpio_link_state;
 int gpio_init;
+#endif
 
 /* power management state*/
 /* Power state lock */
@@ -225,6 +230,7 @@ static struct notifier_block eth_adaption_notifier = {
 	.notifier_call = eth_adaption_notifier_device_event,
 };
 
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 4, 0))
 /**
 * eth_adaption_sb_notifier_device_event()handler function for SSR events
 *
@@ -255,6 +261,7 @@ static int eth_adaption_sb_notifier_device_event
 	}
 	return NOTIFY_DONE;
 }
+#endif
 
 /**
 * eth_adaption_init_notifier_thread()handler function to init notifier kthread
@@ -275,6 +282,7 @@ static void eth_adaption_init_notifier_thread(void)
 	}
 }
 
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 4, 0))
 /**
 * eth_adaption_sb_register_listener()handler function to register for SSR events
 * @void
@@ -319,7 +327,21 @@ static void eth_adaption_sb_unregister_listener(void)
 		sb_task = NULL;
 	}
 }
-
+#else
+static void eth_adaption_exit_notifier_thread(void)
+{
+	if(sb_task)
+	{
+		kthread_cancel_work_sync(&sb_link_up);
+		kthread_cancel_work_sync(&sb_link_down);
+		kthread_flush_work(&sb_link_up);
+		kthread_flush_work(&sb_link_down);
+		kthread_flush_worker(&sb_kworker);
+		kthread_stop(sb_task);
+		sb_task = NULL;
+	}
+}
+#endif
 
 /**
 * eth_adaption_current_stats()handler function for file operations.
@@ -473,7 +495,9 @@ int eth_adaption_handle_resume()
 	if(peer_gpio_toggled == false)
 	{
 		ETHADPTDBG("%s gpio resume toggle\n", __func__);
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 4, 0))
 		sb_notifier_call_chain(EVENT_REQUEST_WAKE_UP, NULL);
+#endif
 		peer_gpio_toggled = true;
 		mutex_unlock(&gpio_toggle_lock);
 	}
@@ -558,6 +582,7 @@ static struct notifier_block eth_adaption_pm_nb = {
 	.priority = INT_MAX,
 };
 
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 4, 0))
 /**
 * eth_adaption_gpio_notifier_device_event(): handler function for gpio events
 * @notifier_block:
@@ -622,6 +647,7 @@ static void eth_adaption_gpio_unregister_listener(void)
 	}
 	return;
 }
+#endif
 
 /**
 * eth_adapt_init() - Initialize Ethernet adaptation module.
@@ -661,9 +687,11 @@ static int __init eth_adaption_init(void)
 	}
 	eth_adaption_init_notifier_thread();
 	eth_adaption_register_netdevice_notifier();
-	eth_adaption_sb_register_listener();
 	eth_adaption_create_debugfs();
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 4, 0))
+	eth_adaption_sb_register_listener();
 	eth_adaption_gpio_register_listener();
+#endif
 
 	ret = register_pm_notifier(&eth_adaption_pm_nb);
 	if (ret)
@@ -703,8 +731,12 @@ static void __exit eth_adaption_exit(void)
 	mutex_unlock(&eam_lock);
 
 	eth_adaption_unregister_netdevice_notifier();
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 4, 0))
 	eth_adaption_sb_unregister_listener();
 	eth_adaption_gpio_unregister_listener();
+#else
+	eth_adaption_exit_notifier_thread();
+#endif
 	if(server)
 		eth_adaption_server_cleanup(true);
 	else
