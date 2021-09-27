@@ -58,3 +58,5 @@ int eth_adaption_server_send(const char *buf, const size_t length);
 * Return: void.
 */
 void eth_adaption_server_cleanup(bool clean_up);
+
+void eth_adaption_server_sock_cleanup (void);

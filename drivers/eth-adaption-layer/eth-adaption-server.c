@@ -33,6 +33,8 @@ struct server_socket
 	struct sockaddr_in6 *serverv6;
 	struct kthread_worker kworker;
 	struct task_struct *task;
+	struct task_struct *accept_task;
+	struct kthread_worker accept_kworker;
 	struct kthread_work init_server;
 	struct kthread_work read_data;
 	struct qrtr_ethernet_cb_info *cb_info_server;
@@ -51,6 +53,7 @@ extern struct eth_adapt_result eth_res;
 extern int qrtr_init;
 extern struct mutex eam_lock;
 
+int server_send_retry = 0;
 struct qrtr_ethernet_cb_info *cb_info_server;
 
 /**
@@ -87,9 +90,12 @@ repeat_send:
 
 	len = kernel_sendmsg(serv_sk.newsocket, &msg, &vec, left, left);
 
-	if((len == -ERESTARTSYS) || (!(flags & MSG_DONTWAIT) &&\
-		(len == -EAGAIN)))
+	if(len <= 0) {
+		if(server_send_retry >10)
+			return -1;
+		server_send_retry++;
 		goto repeat_send;
+	}
 
 	if(len > 0)
 	{
@@ -154,8 +160,7 @@ static void eth_adaption_server_receive(struct kthread_work *work)
 	vec.iov_base = buf;
 
 	len = kernel_recvmsg(serv_sk.newsocket, &msg, &vec, max_size, max_size, MSG_DONTWAIT);
-
-	if(len == -EAGAIN || len == -ERESTARTSYS)
+	if(len<=0)
 	{
 		ETHADPTDBG("Failure to read QRTR packets kernel error code %d\n",len);
 		error_stat+=len;
@@ -216,9 +221,10 @@ static void eth_adaption_server_start(struct kthread_work *work)
 	int reuseport = 1;
 	int tcpnodelay = 1;
 	int error,bin,listen;
-	int cn;
+	int cn = -1;
 	int count = 0;
 	bool ret;
+	int keepalive = 1;
 
 	if (serv_sk.iptype == 0)
 	{
@@ -304,73 +310,98 @@ static void eth_adaption_server_start(struct kthread_work *work)
 		goto release;
 	}
 
-	while((cn = kernel_accept(sock,&client,O_NONBLOCK)) < 0 && serv_sk.rmmod == false)
-	{
-		//Do nothing
-	}
-	ETHADPTINFO("kernel accept succeeded %d cn %d\n",serv_sk.rmmod,cn);
-
-	if(cn == 0)
-	{
-		/* Critical section */
-		mutex_lock(&power_state_lock);
-		power_state = EAM_POWER_STATE_RUNNING;
-		ETHADPTDBG("%s EAM_POWER_STATE_RUNNING server:%d\n", __func__,server);
-		mutex_unlock(&power_state_lock);
-
-		serv_sk.sock = sock;
-		serv_sk.newsocket = client;
-		serv_sk.cb_info_server = cb_info_server;
-
-		if(serv_sk.iptype == 0)
+	while(serv_sk.rmmod == false) {
+		while((cn = kernel_accept(sock,&client,O_NONBLOCK)) < 0 && serv_sk.rmmod == false)
 		{
-			serv_sk.server = server;
+			msleep(500);
 		}
-		else if (serv_sk.iptype == 1)
-		{
-			serv_sk.serverv6 = serverv6;
-		}
-		error = kernel_setsockopt(client, SOL_TCP, TCP_NODELAY, (char *)&tcpnodelay, sizeof(tcpnodelay));
-		if (error < 0)
-		{
-			ETHADPTERR(KERN_ALERT "Can`t set a socket option TCP_NODELAY %d\n", error);
-			return;
-		}
-		mutex_lock(&eam_lock);
-		if (qrtr_init == QRTR_DEINIT || qrtr_init == QRTR_INPROGRESS)
-		{
-			mutex_unlock(&eam_lock);
+		ETHADPTINFO("kernel accept succeeded %d cn %d\n",serv_sk.rmmod,cn);
 
-			if(!cb_info_server)
+		if(cn == 0)
+		{
+				if(serv_sk.newsocket) {
+					ETHADPTERR(" going for sock cleanup");
+					eth_adaption_server_sock_cleanup();
+				}
+			error = kernel_setsockopt(sock, SOL_SOCKET, SO_KEEPALIVE, (char *)&keepalive, sizeof(keepalive));
+			if (error < 0)
 			{
-				ETHADPTERR("kmalloc failed ");
+				ETHADPTERR("Can`t set a socket option SO_KEEPALIVE %d\n", error);
 				goto release;
 			}
-			// Call qrtr to initialize endpoint and pass the eth_adapt_send fn ptr to qrtr
-			cb_info_server->eth_send = eth_adaption_send;
-			qcom_ethernet_init_cb(cb_info_server);
 
-			/* Critical section */
+			error = kernel_setsockopt(sock, IPPROTO_TCP, TCP_KEEPIDLE, (char *)&keepidle, sizeof(keepidle));
+			if (error < 0)
+			{
+				ETHADPTERR("Can`t set a socket option TCP_KEEPIDLE %d\n", error);
+				goto release;
+			}
+
+			error = kernel_setsockopt(sock, IPPROTO_TCP, TCP_KEEPINTVL, (char *)&keepintvl, sizeof(keepintvl));
+			if (error < 0)
+			{
+				ETHADPTERR("Can`t set a socket option TCP_KEEPINTVL %d\n", error);
+				goto release;
+			}
+
+			error = kernel_setsockopt(sock, IPPROTO_TCP, TCP_KEEPCNT, (char *)&keepcnt, sizeof(keepcnt));
+			if (error < 0)
+			{
+				ETHADPTERR("Can`t set a socket option TCP_KEEPCNT %d\n", error);
+				goto release;
+			}
+
+			serv_sk.sock = sock;
+			serv_sk.newsocket = client;
+			serv_sk.cb_info_server = cb_info_server;
+
+			if(serv_sk.iptype == 0)
+			{
+				serv_sk.server = server;
+			}
+			else if (serv_sk.iptype == 1)
+			{
+				serv_sk.serverv6 = serverv6;
+			}
+			error = kernel_setsockopt(client, SOL_TCP, TCP_NODELAY, (char *)&tcpnodelay, sizeof(tcpnodelay));
+			if (error < 0)
+			{
+				ETHADPTERR(KERN_ALERT "Can`t set a socket option TCP_NODELAY %d\n", error);
+				return;
+			}
 			mutex_lock(&eam_lock);
-			qrtr_init = QRTR_INIT;
-			mutex_unlock(&eam_lock);
-		}
-		else
-		{
-			mutex_unlock(&eam_lock);
-		}
+			if (qrtr_init == QRTR_DEINIT || qrtr_init == QRTR_INPROGRESS)
+			{
+				mutex_unlock(&eam_lock);
 
-		kthread_init_work(&serv_sk.read_data, eth_adaption_server_receive);
-		serv_sk.newsocket->sk->sk_data_ready = eth_adaption_server_data_ready;
-		eth_adaption_wake_up();
+				if(!cb_info_server)
+				{
+					ETHADPTERR("kmalloc failed ");
+					goto release;
+				}
+				// Call qrtr to initialize endpoint and pass the eth_adapt_send fn ptr to qrtr
+				cb_info_server->eth_send = eth_adaption_send;
+				qcom_ethernet_init_cb(cb_info_server);
 
+				/* Critical section */
+				mutex_lock(&eam_lock);
+				qrtr_init = QRTR_INIT;
+				mutex_unlock(&eam_lock);
+			}
+			else
+			{
+				mutex_unlock(&eam_lock);
+			}
+
+			kthread_init_work(&serv_sk.read_data, eth_adaption_server_receive);
+			serv_sk.newsocket->sk->sk_data_ready = eth_adaption_server_data_ready;
 
 #ifdef CONFIG_MSM_BOOT_TIME_MARKER
 			update_marker("M - eth-adaption-layer server_start connected");
 #endif
+		}
 	}
-
-return cn;
+	return cn;
 
 release:
 	/* Critical section */
@@ -406,10 +437,7 @@ int eth_adaption_server_connect(int port,int iptype,int connect_retry_cnt,int is
 {
 	/*First thing you need to do is MUTEX init*/
 	/*Do not add any code above this comment*/
-	if (!is_resume)
-	{
-		mutex_init(&eam_lock);
-	}
+
 	serv_sk.server_port = port;
 	serv_sk.iptype = iptype;
 	serv_sk.connect_retry_cnt = connect_retry_cnt;
@@ -434,17 +462,25 @@ int eth_adaption_server_connect(int port,int iptype,int connect_retry_cnt,int is
 	{
 		kthread_init_work(&serv_sk.init_server, eth_adaption_server_start);
 		kthread_init_worker(&serv_sk.kworker);
+		kthread_init_worker(&serv_sk.accept_kworker);
 		serv_sk.task = kthread_run(kthread_worker_fn, &serv_sk.kworker, "eth_adapt_rx");
+		serv_sk.accept_task = kthread_run(kthread_worker_fn, &serv_sk.accept_kworker, "eth_adapt_accept");
 		if (IS_ERR(serv_sk.task))
 		{
-			ETHADPTERR("%s: Error allocating wq\n", __func__);
+			ETHADPTERR("%s: Error allocating eth_adapt_rx wq\n", __func__);
+			return -1;
+		}
+		if (IS_ERR(serv_sk.task))
+		{
+			ETHADPTERR("%s: Error allocating eth_adapt_accept wq\n", __func__);
 			return -1;
 		}
 	}
-	kthread_queue_work(&serv_sk.kworker, &serv_sk.init_server);
+	kthread_queue_work(&serv_sk.accept_kworker, &serv_sk.init_server);
 #ifdef CONFIG_MSM_BOOT_TIME_MARKER
 		update_marker("M - eth-adaption-layer server_init");
 #endif
+	ETHADPTINFO("%s: Server connect exit, qrtr state %d\n", __func__,qrtr_init);
 	return 0;
 }
 
@@ -467,8 +503,6 @@ void eth_adaption_server_cleanup(bool clean_up)
 	}
 
 	/*reset packet stats*/
-	send_data = 0;
-	recevied_data = 0;
 	receive_allocfree_stat = 0;
 	error_stat = 0;
 	if (clean_up && serv_sk.task)
@@ -478,8 +512,11 @@ void eth_adaption_server_cleanup(bool clean_up)
 		kthread_flush_work(&serv_sk.init_server);
 		kthread_flush_work(&serv_sk.read_data);
 		kthread_flush_worker(&serv_sk.kworker);
+		kthread_flush_worker(&serv_sk.accept_kworker);
 		kthread_stop(serv_sk.task);
+		kthread_stop(serv_sk.accept_task);
 		serv_sk.task = NULL;
+		serv_sk.accept_task = NULL;
 	}
 
 	if(serv_sk.newsocket)
@@ -517,10 +554,40 @@ void eth_adaption_server_cleanup(bool clean_up)
 		kfree(serv_sk.serverv6);
 		serv_sk.serverv6 = NULL;
 	}
+	send_data = 0;
+	recevied_data = 0;
 	ETHADPTINFO("server_cleanup exit \n");
-	if (clean_up)
+}
+
+
+void eth_adaption_server_sock_cleanup (void)
+{
+	ETHADPTINFO("eth_adaption_server_sock_cleanup entry \n");
+
+	kthread_cancel_work_sync(&serv_sk.read_data);
+	kthread_flush_work(&serv_sk.read_data);
+	kthread_flush_worker(&serv_sk.kworker);
+
+	/*reset packet stats*/
+	send_data = 0;
+	recevied_data = 0;
+	receive_allocfree_stat = 0;
+	error_stat = 0;
+
+
+	if(serv_sk.newsocket)
 	{
-		mutex_destroy(&eam_lock);
+		kernel_sock_shutdown(serv_sk.newsocket,SHUT_RDWR);
+		tcp_abort(serv_sk.newsocket->sk, ENODEV);
 	}
+
+	if (serv_sk.newsocket)
+	{
+		sock_release(serv_sk.newsocket);
+		serv_sk.newsocket  = NULL;
+	}
+
+	ETHADPTINFO("eth_adaption_server_sock_cleanup \n");
+
 }
 

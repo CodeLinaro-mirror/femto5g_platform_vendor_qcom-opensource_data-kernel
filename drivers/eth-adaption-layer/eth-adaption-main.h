@@ -72,17 +72,10 @@ do {\
 	pr_info(DRV_NAME " %s:%d " fmt, __func__, __LINE__, ## args);\
 } while (0)
 
-enum eam_power_management_state
-{
-	EAM_POWER_STATE_SUSPENDED,
-	EAM_POWER_STATE_RUNNING,
-	EAM_POWER_STATE_SUSPENDING,
-	EAM_POWER_STATE_RESUMING,
-};
-/* power management state*/
-extern enum eam_power_management_state power_state;
-/* Power state lock */
-extern struct mutex power_state_lock;
+static int keepidle=30000;
+static int keepintvl=30000;
+static int keepcnt=120;
+
 
 /* Variable to indicate if peer has toggle wake up GPIO*/
 extern bool peer_gpio_toggled;
@@ -126,9 +119,3 @@ int eth_adaption_handle_suspend(void);
 * scenario Return:int
 */
 int eth_adaption_handle_resume(void);
-
-/**
-* eth_adaption_wake_up() - Function to wake up waiting thread.
-* Return: 0 on success, non-zero otherwise
-*/
-int eth_adaption_wake_up(void);
