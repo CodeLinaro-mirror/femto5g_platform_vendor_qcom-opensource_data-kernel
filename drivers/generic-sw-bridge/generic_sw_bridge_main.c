@@ -2355,7 +2355,7 @@ static void __exit gsb_exit_module(void)
 	if (NULL == pgsb_ctx)
 	{
 		DEBUG_ERROR("Context is NULL\n");
-		return -EFAULT;
+		return;
 	}
 	pgsb_ctx->module_exiting = true;
 
