@@ -90,6 +90,12 @@
 #include <linux/seq_file.h>
 #endif
 
+#ifdef ENABLE_LIB_SUPPORT
+#include <linux/qcom_eth_smmu.h>
+#endif
+
+#include "r8125_ipa.h"
+
 #define FIRMWARE_8125A_3	"rtl_nic/rtl8125a-3.fw"
 #define FIRMWARE_8125B_2	"rtl_nic/rtl8125b-2.fw"
 
@@ -12709,13 +12715,38 @@ rtl8125_init_module(void)
         rtl8125_proc_module_init();
 #endif
 
+#ifdef ENABLE_LIB_SUPPORT
+        ret = qcom_smmu_register(&rtl8125_pci_driver);
+#endif
+
+        if (ret) {
+                printk(KERN_INFO "%s: r8125 : Failed to register smmu with platform\n",
+                       MODULENAME);
+                return ret;
+        }
+
+        ret = rtl8125_ipa_register(&rtl8125_pci_driver);
+        if (ret) {
+            printk(KERN_INFO "%s: r8125 : Failed to register with IOSS\n",
+                      MODULENAME);
+            goto err_ipa_register;
+        }
+
 #if LINUX_VERSION_CODE > KERNEL_VERSION(2,6,0)
 
         ret = pci_register_driver(&rtl8125_pci_driver);
 #else
         ret = pci_module_init(&rtl8125_pci_driver);
 #endif
-
+        if (ret)
+                goto err_pci_reg;
+        return ret;
+err_pci_reg:
+        rtl8125_ipa_unregister(&rtl8125_pci_driver);
+err_ipa_register:
+#ifdef ENABLE_LIB_SUPPORT
+        qcom_smmu_unregister(&rtl8125_pci_driver);
+#endif
         return ret;
 }
 
@@ -12723,7 +12754,10 @@ static void __exit
 rtl8125_cleanup_module(void)
 {
         pci_unregister_driver(&rtl8125_pci_driver);
-
+        rtl8125_ipa_unregister(&rtl8125_pci_driver);
+#ifdef ENABLE_LIB_SUPPORT
+        qcom_smmu_unregister(&rtl8125_pci_driver);
+#endif
 #ifdef ENABLE_R8125_PROCFS
         if (rtl8125_proc) {
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(3,10,0)
