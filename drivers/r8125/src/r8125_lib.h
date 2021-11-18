@@ -1,11 +1,10 @@
-/* SPDX-License-Identifier: GPL-2.0-only */
 /*
 ################################################################################
 #
 # r8125 is the Linux device driver released for Realtek 2.5Gigabit Ethernet
 # controllers with PCI-Express interface.
 #
-# Copyright(c) 2020 Realtek Semiconductor Corp. All rights reserved.
+# Copyright(c) 2021 Realtek Semiconductor Corp. All rights reserved.
 #
 # This program is free software; you can redistribute it and/or modify it
 # under the terms of the GNU General Public License as published by the Free
@@ -133,6 +132,9 @@ struct rtl8125_ring {
         void *private;
 };
 
+struct rtl8125_counters;
+struct rtl8125_regs_save;
+
 enum rtl8125_rss_flags {
         RTL8125_RSS_HASH_IPV4 = BIT(0),
         RTL8125_RSS_HASH_IPV6 = BIT(1),
@@ -189,10 +191,21 @@ int rtl8125_rss_reset(struct net_device *ndev);
 /* Get net_device object from struct device. */
 struct net_device *rtl8125_get_netdev(struct device *dev);
 
+int rtl8125_receive_skb(struct net_device *net_dev, struct sk_buff *skb,
+                        bool napi);
+
 int rtl8125_register_notifier(struct net_device *net_dev,
-        struct notifier_block *nb);
+                              struct notifier_block *nb);
 
 int rtl8125_unregister_notifier(struct net_device *net_dev,
-        struct notifier_block *nb);
+                                struct notifier_block *nb);
+
+void rtl8125_lib_reset_prepare(struct rtl8125_private *tp);
+
+void rtl8125_lib_reset_complete(struct rtl8125_private *tp);
+
+int rtl8125_lib_get_stats(struct net_device *ndev, struct rtl8125_counters *stats);
+
+int rtl8125_lib_save_regs(struct net_device *ndev, struct rtl8125_regs_save *stats);
 
 #endif /* _LINUX_rtl8125_LIB_H */
