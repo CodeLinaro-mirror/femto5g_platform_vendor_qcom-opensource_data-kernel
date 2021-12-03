@@ -40,6 +40,8 @@
 #include <linux/ratelimit.h>
 
 extern void *ipc_emac_log_ctxt;
+extern void *ipc_emac_log_ctxt_low_tx;
+extern void *ipc_emac_log_ctxt_low_rx;
 extern void *ipc_emac_log_ctxt_low;
 #define IPC_RATELIMIT_BURST 1
 #define WARNON_RATELIMIT_BURST 1
@@ -90,6 +92,24 @@ do {\
 	if (ipc_emac_log_ctxt_low) { \
 		ipc_log_string(ipc_emac_log_ctxt_low, \
 		"%s: %s[%u]:[ipc] DEBUG:" fmt, __FILENAME__ , \
+		__func__, __LINE__, ## args); \
+	} \
+}while(0)
+
+#define EMACINFO_TX_LOW(fmt, args...) \
+do {\
+	if (ipc_emac_log_ctxt_low_tx) { \
+		ipc_log_string(ipc_emac_log_ctxt_low_tx, \
+		"%s: %s[%u]:[emac] INFO:" fmt, __FILENAME__ , \
+		__func__, __LINE__, ## args); \
+	} \
+}while(0)
+
+#define EMACINFO_RX_LOW(fmt, args...) \
+do {\
+	if (ipc_emac_log_ctxt_low_rx) { \
+		ipc_log_string(ipc_emac_log_ctxt_low_rx, \
+		"%s: %s[%u]:[emac] INFO:" fmt, __FILENAME__ , \
 		__func__, __LINE__, ## args); \
 	} \
 }while(0)

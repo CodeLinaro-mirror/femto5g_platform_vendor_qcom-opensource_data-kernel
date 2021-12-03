@@ -50,6 +50,8 @@
 #include "DWC_ETH_QOS_ipa.h"
 
 void *ipc_emac_log_ctxt;
+void *ipc_emac_log_ctxt_low_tx;
+void *ipc_emac_log_ctxt_low_rx;
 void *ipc_emac_log_ctxt_low;
 int emac_enable_ipc_low;
 #define MAX_PROC_SIZE 1024
@@ -347,6 +349,137 @@ static const struct file_operations fops_phy_reg_dump = {
 	.llseek = default_llseek,
 };
 
+static ssize_t read_ipc_emac_log_ctxt_low_tx(struct file *file,
+	char __user *user_buf, size_t count, loff_t *ppos)
+{
+	struct DWC_ETH_QOS_prv_data *pdata = file->private_data;
+	unsigned int len = 0, buf_len = 2000;
+	char* buf;
+	ssize_t ret_cnt;
+
+	buf = kzalloc(buf_len, GFP_KERNEL);
+	if (!buf)
+		return -ENOMEM;
+
+	len += scnprintf(buf + len, buf_len - len,
+					 "ipc_emac_low_tx value=%d\n", pdata->emac_enable_ipc_low_tx);
+
+	if (len > buf_len) {
+		EMACERR(" %s (len > buf_len) buffer not sufficient\n",__func__);
+		len = buf_len;
+	}
+
+	ret_cnt = simple_read_from_buffer(user_buf, count, ppos, buf, len);
+	kfree(buf);
+	return ret_cnt;
+}
+
+static ssize_t write_ipc_emac_log_ctxt_low_tx(struct file *file,
+	const char __user *buf, size_t count, loff_t *data)
+{
+	struct DWC_ETH_QOS_prv_data *pdata = file->private_data;
+	int tmp = 0;
+	if(count > MAX_PROC_SIZE)
+		count = MAX_PROC_SIZE;
+	if(copy_from_user(tmp_buff, buf, count))
+		return -EFAULT;
+	if (sscanf(tmp_buff, "%du", &tmp) < 0)
+		pr_err("sscanf failed\n");
+	else {
+		if (tmp) {
+			if (!ipc_emac_log_ctxt_low_tx) {
+				ipc_emac_log_ctxt_low_tx = ipc_log_context_create(IPCLOG_STATE_PAGES, "emac_low_tx", 0);
+			}
+			if (!ipc_emac_log_ctxt_low_tx) {
+				pr_err("failed to create ipc emac low tx context\n");
+				return -EFAULT;
+			}
+		}
+		else {
+			if (ipc_emac_log_ctxt_low_tx)
+				ipc_log_context_destroy(ipc_emac_log_ctxt_low_tx);
+			ipc_emac_log_ctxt_low_tx = NULL;
+		}
+	}
+	pdata->emac_enable_ipc_low_tx = tmp;
+	return count;
+
+}
+
+static const struct file_operations fops_ipc_emac_log_ctxt_low_tx = {
+	.write = write_ipc_emac_log_ctxt_low_tx,
+	.read = read_ipc_emac_log_ctxt_low_tx,
+	.open = simple_open,
+	.owner = THIS_MODULE,
+	.llseek = default_llseek,
+};
+
+static ssize_t read_ipc_emac_log_ctxt_low_rx(struct file *file,
+	char __user *user_buf, size_t count, loff_t *ppos)
+{
+	struct DWC_ETH_QOS_prv_data *pdata = file->private_data;
+	unsigned int len = 0, buf_len = 2000;
+	char* buf;
+	ssize_t ret_cnt;
+
+	buf = kzalloc(buf_len, GFP_KERNEL);
+	if (!buf)
+		return -ENOMEM;
+
+	len += scnprintf(buf + len, buf_len - len,
+					 "ipc_emac_low_rx value=%d\n", pdata->emac_enable_ipc_low_rx);
+
+	if (len > buf_len) {
+		EMACERR(" %s (len > buf_len) buffer not sufficient\n",__func__);
+		len = buf_len;
+	}
+
+	ret_cnt = simple_read_from_buffer(user_buf, count, ppos, buf, len);
+	kfree(buf);
+	return ret_cnt;
+}
+
+static ssize_t write_ipc_emac_log_ctxt_low_rx(struct file *file,
+	const char __user *buf, size_t count, loff_t *data)
+{
+	struct DWC_ETH_QOS_prv_data *pdata = file->private_data;
+	int tmp = 0;
+	if(count > MAX_PROC_SIZE)
+		count = MAX_PROC_SIZE;
+	if(copy_from_user(tmp_buff, buf, count))
+		return -EFAULT;
+	if (sscanf(tmp_buff, "%du", &tmp) < 0)
+		pr_err("sscanf failed\n");
+	else {
+		if (tmp) {
+			if (!ipc_emac_log_ctxt_low_rx) {
+				ipc_emac_log_ctxt_low_rx = ipc_log_context_create(IPCLOG_STATE_PAGES, "emac_low_rx", 0);
+			}
+			if (!ipc_emac_log_ctxt_low_rx) {
+				pr_err("failed to create ipc emac low rx context\n");
+				return -EFAULT;
+			}
+		}
+		else {
+			if (ipc_emac_log_ctxt_low_rx)
+				ipc_log_context_destroy(ipc_emac_log_ctxt_low_rx);
+			ipc_emac_log_ctxt_low_rx = NULL;
+		}
+	}
+	pdata->emac_enable_ipc_low_rx = tmp;
+	return count;
+
+}
+
+static const struct file_operations fops_ipc_emac_log_ctxt_low_rx = {
+	.write = write_ipc_emac_log_ctxt_low_rx,
+	.read = read_ipc_emac_log_ctxt_low_rx,
+	.open = simple_open,
+	.owner = THIS_MODULE,
+	.llseek = default_llseek,
+};
+
+
 static ssize_t write_ipc_emac_log_ctxt_low(struct file *file,
 	const char __user *buf, size_t count, loff_t *data)
 {
@@ -385,10 +518,189 @@ static const struct file_operations fops_ipc_emac_log_ctxt_low = {
 	.llseek = default_llseek,
 };
 
+static ssize_t read_dma_dump(struct file *file,
+	char __user *user_buf, size_t count, loff_t *ppos)
+{
+	struct DWC_ETH_QOS_prv_data *pdata = file->private_data;
+	unsigned int len = 0, buf_len = 200000;
+	char* buf;
+	ssize_t ret_cnt;
+	int phydata = 0;
+	int i = 0;
+	int chan = pdata->chan_num;
+	int lp_cnt;
+	struct DWC_ETH_QOS_rx_wrapper_descriptor *rx_desc_data =
+	    GET_RX_WRAPPER_DESC(chan);
+	struct DWC_ETH_QOS_tx_wrapper_descriptor *tx_desc_data =
+		GET_TX_WRAPPER_DESC(chan);
+	struct s_RX_NORMAL_DESC *RX_NORMAL_DESC;
+	struct s_TX_NORMAL_DESC *TX_NORMAL_DESC;
+
+	if (!pdata || !pdata->phydev) {
+		EMACERR(" %s NULL Pointer \n",__func__);
+		return -EINVAL;
+	}
+
+	buf = kzalloc(buf_len, GFP_KERNEL);
+	if (!buf)
+		return -ENOMEM;
+
+	len += scnprintf(buf + len, buf_len - len,
+					 "\n************* DMA TX channel %d dump *************\n",chan);
+
+	DWC_ETH_QOS_dma_desc_stats_read_chan(pdata, pdata->chan_num);
+	len += scnprintf(buf + len, buf_len - len,
+					 "DMA dma_ch_intr_status = %#x\n",
+					  pdata->xstats.dma_ch_intr_status);
+	len += scnprintf(buf + len, buf_len - len,
+					 "DMA dma_debug_status0 = %#x\n",
+					 chan, pdata->xstats.dma_debug_status0);
+	len += scnprintf(buf + len, buf_len - len,
+					 "DMA dma_ch_status[%d] = %#x\n",
+					 chan, pdata->xstats.dma_ch_status[chan]);
+	len += scnprintf(buf + len, buf_len - len,
+					 "DMA dma_ch_intr_enable[%d]] = %#x\n",
+					 chan, pdata->xstats.dma_ch_intr_enable[chan]);
+	len += scnprintf(buf + len, buf_len - len,
+					 "DMA dma_ch_tx_control[%d] = %#x\n",
+					 chan, pdata->xstats.dma_ch_tx_control[chan]);
+
+	len += scnprintf(buf + len, buf_len - len,
+					 "DMA dma_ch_txdesc_list_addr[%d] = %#x\n",
+					 chan, pdata->xstats.dma_ch_txdesc_list_addr[chan]);
+
+	len += scnprintf(buf + len, buf_len - len,
+					 "DMA dma_ch_txdesc_ring_len[%d] = %#x\n",
+					 chan, pdata->xstats.dma_ch_txdesc_ring_len[chan]);
+
+	len += scnprintf(buf + len, buf_len - len,
+					 "DMA dma_ch_curr_app_txdesc[%d] = %#x\n",
+					 chan, pdata->xstats.dma_ch_curr_app_txdesc[chan]);
+
+	len += scnprintf(buf + len, buf_len - len,
+					 "DMA dma_ch_txdesc_tail_ptr[%d] = %#x\n",
+					 chan, pdata->xstats.dma_ch_txdesc_tail_ptr[chan]);
+
+	len += scnprintf(buf + len, buf_len - len,
+					 "DMA dma_ch_curr_app_txbuf[%d] = %#x\n",
+					 chan, pdata->xstats.dma_ch_curr_app_txbuf[chan]);
+
+	len += scnprintf(buf + len, buf_len - len,
+					 "DMA dma_ch_curr_app_txbuf[%d] = %#x\n",
+					 chan, pdata->xstats.dma_ch_curr_app_txbuf[chan]);
+
+	len += scnprintf(buf + len, buf_len - len,
+								 "\n************* DMA RX channel %d dump *************\n",chan);
+
+	len += scnprintf(buf + len, buf_len - len,
+					 "DMA dma_ch_rx_control[%d] = %#x\n",
+					 chan, pdata->xstats.dma_ch_rx_control[chan]);
+	len += scnprintf(buf + len, buf_len - len,
+					 "DMA dma_ch_rxdesc_list_addr[%d] = %#x\n",
+					 chan, pdata->xstats.dma_ch_rxdesc_list_addr[chan]);
+	len += scnprintf(buf + len, buf_len - len,
+					 "DMA pdata->xstats.dma_ch_rxdesc_ring_len[%d] = %#x\n",
+					 chan, pdata->xstats.dma_ch_rxdesc_ring_len[chan]);
+	len += scnprintf(buf + len, buf_len - len,
+					 "DMA pdata->xstats.dma_ch_curr_app_rxdesc[%d] = %#x\n",
+					 chan, pdata->xstats.dma_ch_curr_app_rxdesc[chan]);
+	len += scnprintf(buf + len, buf_len - len,
+					 "DMA pdata->xstats.dma_ch_rxdesc_tail_ptr[%d] = %#x\n",
+					 chan,pdata->xstats.dma_ch_rxdesc_tail_ptr[chan]);
+	len += scnprintf(buf + len, buf_len - len,
+					 "DMA pdata->xstats.dma_ch_curr_app_rxbuf[%d] = %#x\n",
+					 chan,pdata->xstats.dma_ch_curr_app_rxbuf[chan]);
+	len += scnprintf(buf + len, buf_len - len,
+					 "DMA pdata->xstats.dma_ch_miss_frame_count[%d] = %#x\n",
+					 chan, pdata->xstats.dma_ch_miss_frame_count[chan]);
+
+
+	len += scnprintf(buf + len, buf_len - len,
+					 "\n************* DMA RX chan %d desciptor start cnt=%d*************\n",
+					 chan, pdata->rx_queue[chan].desc_cnt);
+	//dump rx descriptor
+
+	for (i = 0,lp_cnt= pdata->rx_queue[chan].desc_cnt; lp_cnt >= 0; lp_cnt--) {
+		RX_NORMAL_DESC =
+		GET_RX_DESC_PTR(chan, i);
+		UINT varRDES3 = 0;
+		RX_NORMAL_DESC_RDES3_ML_RD(RX_NORMAL_DESC->RDES3,
+									   varRDES3);
+
+		RX_NORMAL_DESC = GET_RX_DESC_PTR(chan, i);
+		len += scnprintf(buf + len, buf_len - len,
+				 "Rx Desc[%d] RDES0=%x,RDES1=%x , RDES2=%x,RDES3=%x Is own bit set=%d\n",
+				 i,RX_NORMAL_DESC->RDES0,RX_NORMAL_DESC->RDES1,RX_NORMAL_DESC->RDES2,RX_NORMAL_DESC->RDES3, (varRDES3 & (1<<31)) ? 1 : 0);
+				INCR_RX_DESC_INDEX(i, 1, pdata->rx_queue[chan].desc_cnt);
+	}
+	len += scnprintf(buf + len, buf_len - len,
+					 "\n************* DMA RX chan %d desciptor end *************\n",chan);
+
+	len += scnprintf(buf + len, buf_len - len,
+					 "\n************* DMA TX chan %d desciptor start *************\n",chan);
+	//dump tx descrptor
+	for (i = 0,lp_cnt= pdata->tx_queue[chan].desc_cnt; lp_cnt >= 0; lp_cnt--) {
+		TX_NORMAL_DESC = GET_TX_DESC_PTR(chan, i);
+		UINT varTDES3 = 0;
+		TX_NORMAL_DESC_TDES3_ML_RD(TX_NORMAL_DESC->TDES3, varTDES3);
+		len += scnprintf(buf + len, buf_len - len,
+				 "Tx Desc[%d] TDES0=%x,TDES1=%x , TDES2=%x,TDES3=%x Is own bit set=%d\n",
+				 i,TX_NORMAL_DESC->TDES0,TX_NORMAL_DESC->TDES1,TX_NORMAL_DESC->TDES2,TX_NORMAL_DESC->TDES3, (varTDES3 & (1<<31)) ? 1:0);
+
+		INCR_TX_DESC_INDEX(i, 1, pdata->tx_queue[chan].desc_cnt);
+	}
+	len += scnprintf(buf + len, buf_len - len,
+					 "\n************* DMA TX chan %d desciptor End *************\n\n\n",chan);
+
+	if (len > buf_len) {
+		EMACERR(" %s (len > buf_len) buffer not sufficient\n",__func__);
+		len = buf_len;
+	}
+
+	ret_cnt = simple_read_from_buffer(user_buf, count, ppos, buf, len);
+	kfree(buf);
+	return ret_cnt;
+}
+
+
+static ssize_t write_dump_dma(struct file *file,
+	const char __user *buf, size_t count, loff_t *data)
+{
+	int tmp = 0;
+	struct DWC_ETH_QOS_prv_data *pdata = file->private_data;
+	if(count > MAX_PROC_SIZE)
+		count = MAX_PROC_SIZE;
+	if (!pdata) {
+		EMACERR(" %s NULL Pointer \n",__func__);
+		return -EINVAL;
+	}
+	if(copy_from_user(tmp_buff, buf, count))
+		return -EFAULT;
+	if (sscanf(tmp_buff, "%du", &tmp) < 0)
+		pr_err("sscanf failed\n");
+	else
+		pdata->chan_num = tmp;
+
+	EMACINFO("chanel number is %d", pdata->chan_num);
+	return count;
+}
+
+static const struct file_operations fops_dump_dma = {
+	.read = read_dma_dump,
+	.write = write_dump_dma,
+	.open = simple_open,
+	.owner = THIS_MODULE,
+	.llseek = default_llseek,
+};
+
+
 int DWC_ETH_QOS_create_debugfs(struct DWC_ETH_QOS_prv_data *pdata)
 {
 	static struct dentry *phy_reg_dump = NULL;
 	static struct dentry *ipc_emac_log_low= NULL;
+	static struct dentry *ipc_emac_log_low_rx= NULL;
+	static struct dentry *ipc_emac_log_low_tx= NULL;
+	static struct dentry *dump_dma= NULL;
 
 	if(!pdata) {
 		EMACERR( "Null Param %s \n", __func__);
@@ -413,6 +725,27 @@ int DWC_ETH_QOS_create_debugfs(struct DWC_ETH_QOS_prv_data *pdata)
 				pdata, &fops_ipc_emac_log_ctxt_low);
 	if (!ipc_emac_log_low || IS_ERR(ipc_emac_log_low)) {
 		EMACERR( "Cannot create debugfs ipc_emac_log_low %d \n", (int)ipc_emac_log_low);
+		goto fail;
+	}
+
+	dump_dma = debugfs_create_file("dump_dma", 0644, pdata->debugfs_dir,
+				pdata, &fops_dump_dma);
+	if (!dump_dma || IS_ERR(dump_dma)) {
+		EMACERR( "Cannot create debugfs dump_dma %d \n", (int)dump_dma);
+		goto fail;
+	}
+
+	ipc_emac_log_low_rx = debugfs_create_file("ipc_emac_log_low_rx", 0220, pdata->debugfs_dir,
+				pdata, &fops_ipc_emac_log_ctxt_low_rx);
+	if (!ipc_emac_log_low_rx || IS_ERR(ipc_emac_log_low_rx)) {
+		EMACERR( "Cannot create debugfs ipc_emac_log_low_rx %d \n", (int)ipc_emac_log_low_rx);
+		goto fail;
+	}
+
+	ipc_emac_log_low_tx = debugfs_create_file("ipc_emac_log_low_tx", 0220, pdata->debugfs_dir,
+				pdata, &fops_ipc_emac_log_ctxt_low_tx);
+	if (!ipc_emac_log_low_tx || IS_ERR(ipc_emac_log_low_tx)) {
+		EMACERR( "Cannot create debugfs ipc_emac_log_low_tx %d \n", (int)ipc_emac_log_low_tx);
 		goto fail;
 	}
 
@@ -3018,6 +3351,12 @@ static void __exit DWC_ETH_QOS_exit_module(void)
 
 	if (ipc_emac_log_ctxt_low != NULL)
 		ipc_log_context_destroy(ipc_emac_log_ctxt_low);
+
+	if (ipc_emac_log_ctxt_low_rx != NULL)
+		ipc_log_context_destroy(ipc_emac_log_ctxt_low_rx);
+
+	if (ipc_emac_log_ctxt_low_tx != NULL)
+		ipc_log_context_destroy(ipc_emac_log_ctxt_low_tx);
 
 	DBGPR("<--DWC_ETH_QOS_exit_module\n");
 }
