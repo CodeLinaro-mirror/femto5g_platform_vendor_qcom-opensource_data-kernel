@@ -2226,6 +2226,15 @@ static const struct file_operations emac_rec_fops = {
 	.poll = DWC_ETH_QOS_poll_rec_dev_emac,
 };
 
+static void DWC_ETH_QOS_remove_emac_rec_device_node(struct DWC_ETH_QOS_prv_data *pdata)
+{
+	device_destroy(pdata->emac_rec_class, pdata->emac_rec_dev_t);
+	class_destroy(pdata->emac_rec_class);
+	cdev_del(pdata->emac_rec_cdev);
+	unregister_chrdev_region(pdata->emac_rec_dev_t, 1);
+}
+
+
 static int DWC_ETH_QOS_create_emac_rec_device_node(dev_t *emac_dev_t,
 						struct cdev **emac_cdev,
 						struct class **emac_class,
@@ -3220,6 +3229,8 @@ int DWC_ETH_QOS_remove(struct platform_device *pdev)
 			pdata->en_ptp_pps_avb_class_b_irq = false;
 		}
 	}
+
+	DWC_ETH_QOS_remove_emac_rec_device_node(pdata);
 
 	if (pdata->hw_feat.sma_sel == 1)
 		DWC_ETH_QOS_mdio_unregister(dev);
