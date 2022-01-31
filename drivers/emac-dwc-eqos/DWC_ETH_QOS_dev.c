@@ -3872,11 +3872,10 @@ static void pre_transmit(struct DWC_ETH_QOS_prv_data *pdata,
 	TX_NORMAL_DESC = GET_TX_DESC_PTR(QINX, start_index);
 	TX_NORMAL_DESC_TDES3_OWN_MLF_WR(TX_NORMAL_DESC->TDES3, 0x1);
 
-#ifdef DWC_ETH_QOS_ENABLE_TX_DESC_DUMP
-	dump_tx_desc(
+	if (pdata->emac_enable_ipc_low_tx)
+		dump_tx_desc(
 		pdata, original_start_index,
 		(tx_desc_data->cur_tx - 1), 1, QINX);
-#endif
 
 #ifdef DWC_ETH_QOS_CERTIFICATION_PKTBURSTCNT
 	/* updating descriptor tail pointer for DMA Transmit
@@ -4011,10 +4010,10 @@ static void device_read(struct DWC_ETH_QOS_prv_data *pdata, UINT QINX)
 			}
 #endif
 		} else {
-#ifdef DWC_ETH_QOS_ENABLE_RX_DESC_DUMP
-			dump_rx_desc(
+			if(pdata->emac_enable_ipc_low_rx)
+				dump_rx_desc(
 				QINX, RX_NORMAL_DESC, rx_desc_data->cur_rx);
-#endif
+
 			/* not a good packet, hence check for
 			 * appropriate errors.
 			 */
