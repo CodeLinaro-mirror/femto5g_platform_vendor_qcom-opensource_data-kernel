@@ -482,6 +482,7 @@ static int DWC_ETH_QOS_ipa_offload_resume(struct DWC_ETH_QOS_prv_data *pdata, bo
 	struct hw_if_struct *hw_if = &(pdata->hw_if);
 	int ret = Y_SUCCESS;
 	struct ipa_perf_profile profile;
+	u32 reg_val;
 
 	EMACDBG("Enter\n");
 
@@ -518,6 +519,12 @@ static int DWC_ETH_QOS_ipa_offload_resume(struct DWC_ETH_QOS_prv_data *pdata, bo
 	if (ret) {
 		EMACERR("Offload channel Init Failed \n");
 		return ret;
+	}
+	if (pdata->current_loopback > 0) {
+		MTL_RQDCM0R_RGRD(reg_val);
+		reg_val |= IPA_RX_TO_DMA_CH_MAP_NUM;
+		MTL_RQDCM0R_RGWR(reg_val);
+		EMACINFO("Mapped queue 0 to channel 1\n");
 	}
 
 	EMACDBG("Exit\n");
@@ -692,7 +699,9 @@ static void ntn_ipa_notify_cb(void *priv, enum ipa_dp_evt_type evt,
 			iph = (struct iphdr *)skb->data;
 		}
 		else {
-		skb->protocol = eth_type_trans(skb, skb->dev);
+			if (pdata->current_loopback > DISABLE_LOOPBACK)
+				swap_ip_port(skb, ETH_P_IP);
+			skb->protocol = eth_type_trans(skb, skb->dev);
 			iph = (struct iphdr *)(skb_mac_header(skb) + ETH_HLEN);
 		}
 

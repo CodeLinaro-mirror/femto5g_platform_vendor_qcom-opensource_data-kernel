@@ -861,6 +861,11 @@ static int DWC_ETH_QOS_set_wol(struct net_device *dev,
 		return -ENODEV;
 	}
 
+	if (!pdata->phydev->link) {
+		EMACDBG("Phy is in off state phy dump is not possible\n");
+		return -EOPNOTSUPP;
+	}
+
 	if (wol->wolopts & ~emac_wol_support)
 		return -EOPNOTSUPP;
 

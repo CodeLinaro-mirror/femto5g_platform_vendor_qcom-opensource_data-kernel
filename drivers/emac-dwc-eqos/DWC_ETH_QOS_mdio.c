@@ -77,6 +77,11 @@ INT DWC_ETH_QOS_mdio_read_direct(struct DWC_ETH_QOS_prv_data *pdata,
 
 	DBGPR_MDIO("--> DWC_ETH_QOS_mdio_read_direct\n");
 
+	if (pdata->phy_state == PHY_IS_OFF) {
+		EMACDBG("Phy is in off state reading is not possible\n");
+		return -EOPNOTSUPP;
+	}
+
 	if (hw_if->read_phy_regs) {
 		phy_reg_read_status =
 		    hw_if->read_phy_regs(phyaddr, phyreg, phydata);
@@ -118,6 +123,11 @@ INT DWC_ETH_QOS_mdio_write_direct(struct DWC_ETH_QOS_prv_data *pdata,
 	int phy_reg_write_status;
 
 	DBGPR_MDIO("--> DWC_ETH_QOS_mdio_write_direct\n");
+
+	if (pdata->phy_state == PHY_IS_OFF) {
+		EMACDBG("Phy is in off state writing is not possible\n");
+		return -EOPNOTSUPP;
+	}
 
 	if (hw_if->write_phy_regs) {
 		phy_reg_write_status =
@@ -234,6 +244,11 @@ static INT DWC_ETH_QOS_mdio_read(struct mii_bus *bus, int phyaddr, int phyreg)
 	DBGPR_MDIO("--> DWC_ETH_QOS_mdio_read: phyaddr = %d, phyreg = %d\n",
 		   phyaddr, phyreg);
 
+	if (pdata->phy_state == PHY_IS_OFF) {
+		EMACDBG("Phy is in off state reading is not possible\n");
+		return -EOPNOTSUPP;
+	}
+
 	if (hw_if->read_phy_regs)
 		hw_if->read_phy_regs(phyaddr, phyreg, &phydata);
 	else
@@ -268,6 +283,11 @@ static INT DWC_ETH_QOS_mdio_write(struct mii_bus *bus, int phyaddr, int phyreg,
 	INT ret = Y_SUCCESS;
 
 	DBGPR_MDIO("--> DWC_ETH_QOS_mdio_write\n");
+
+	if (pdata->phy_state == PHY_IS_OFF) {
+		EMACDBG("Phy is in off state writing is not possible\n");
+		return -EOPNOTSUPP;
+	}
 
 	if (hw_if->write_phy_regs) {
 		hw_if->write_phy_regs(phyaddr, phyreg, phydata);
@@ -780,7 +800,7 @@ void DWC_ETH_QOS_set_clk_and_bus_config(struct DWC_ETH_QOS_prv_data *pdata, int 
  * \retval Y_SUCCESS on success and Y_FAILURE on failure.
  */
 
-static inline int DWC_ETH_QOS_configure_io_macro_dll_settings(
+int DWC_ETH_QOS_configure_io_macro_dll_settings(
 			struct DWC_ETH_QOS_prv_data *pdata)
 {
 	int ret = Y_SUCCESS;
@@ -801,6 +821,7 @@ static inline int DWC_ETH_QOS_configure_io_macro_dll_settings(
 			EMACERR("DLL init failed \n");
 			return ret;
 		}
+
 		if (pdata->speed == SPEED_1000) {
 			ret = DWC_ETH_QOS_rgmii_io_macro_sdcdc_config(pdata);
 			if (ret < 0) {

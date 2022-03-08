@@ -3115,6 +3115,13 @@ static void DWC_ETH_QOS_receive_skb(struct DWC_ETH_QOS_prv_data *pdata,
 {
 	static int cnt_ipv4 = 0, cnt_ipv6 = 0;
 	struct DWC_ETH_QOS_rx_queue *rx_queue = GET_RX_QUEUE_PTR(qinx);
+	unsigned int eth_type;
+
+	if (pdata->current_loopback > 0) {
+		eth_type = GET_ETH_TYPE(skb->data)
+		if (eth_type == ETH_P_IP)
+			swap_ip_port(skb, eth_type);
+	}
 
 	skb_record_rx_queue(skb, qinx);
 	skb->dev = dev;
@@ -4381,6 +4388,47 @@ static int DWC_ETH_QOS_config_rx_split_hdr_mode(struct net_device *dev,
  *
  * \retval zero on success and -ve number on failure.
  */
+static u16 csum(u16 old_csum)
+{
+	u16 new_checksum = 0;
+
+	new_checksum = ~(~old_csum + (-8) + 0);
+	return new_checksum;
+}
+
+void swap_ip_port(struct sk_buff *skb, unsigned int eth_type)
+{
+	__be32 temp_addr;
+	unsigned char *buf = skb->data;
+	struct icmphdr *icmp_hdr;
+	unsigned char eth_temp[ETH_ALEN] = {};
+	struct ethhdr *eth = (struct ethhdr *)(buf);
+	struct iphdr *ip_header;
+
+	if (eth_type == ETH_P_IP) {
+		ip_header = (struct iphdr *)(buf + sizeof(struct ethhdr));
+		if (ip_header->protocol == IPPROTO_UDP ||
+		    ip_header->protocol ==  IPPROTO_ICMP) {
+			//swap mac address
+			memcpy(eth_temp, eth->h_dest, ETH_ALEN);
+			memcpy(eth->h_dest, eth->h_source, ETH_ALEN);
+			memcpy(eth->h_source, eth_temp, ETH_ALEN);
+			//swap ip address
+			temp_addr = ip_header->daddr;
+			ip_header->daddr = ip_header->saddr;
+			ip_header->saddr = temp_addr;
+
+			icmp_hdr = (struct icmphdr *)(buf
+					+ sizeof(struct ethhdr)
+					+ sizeof(struct iphdr));
+			if (icmp_hdr->type == ICMP_ECHO) {
+				icmp_hdr->type = ICMP_ECHOREPLY;
+				icmp_hdr->checksum = csum(icmp_hdr->checksum);
+			}
+		}
+	}
+}
+
 static int DWC_ETH_QOS_config_l3_l4_filtering(struct net_device *dev,
 					      unsigned int flags)
 {
