@@ -130,6 +130,11 @@
 #include <linux/inet.h>
 #include <asm/uaccess.h>
 #include "DWC_ETH_QOS_ipc.h"
+#include <linux/sysfs.h>
+#include <linux/udp.h>
+#include <linux/if_ether.h>
+#include <linux/if_arp.h>
+#include <linux/icmp.h>
 
 #ifdef CONFIG_MSM_BOOT_TIME_MARKER
 #include <soc/qcom/boot_stats.h>
@@ -226,6 +231,12 @@
 /* #define YDEBUG_PTP */
 /* #define YDEBUG_FILTER */
 /* #define YDEBUG_EEE */
+//Mac config
+#define MAC_CONFIGURATION 0x0
+#define MAC_LM BIT(12)
+#define RGMII_IO_MACRO_CONFIG 1
+#define RGMII_IO_MACRO_CONFIG2 2
+#define RGMII_CONFIG_LOOPBACK_EN BIT(2)
 
 #define Y_TRUE 1
 #define Y_FALSE 0
@@ -272,7 +283,7 @@
 #define DWC_ETH_QOS_MAX_LRO_AGGR 32
 
 #define MIN_PACKET_SIZE 60
-
+#define BUFF_SZ 256
 /*
 #ifdef DWC_ETH_QOS_ENABLE_VLAN_TAG
 #define MAX_PACKET_SIZE VLAN_ETH_FRAME_LEN
@@ -762,6 +773,26 @@ typedef unsigned short USHORT;
 typedef unsigned short *USHORTP;
 typedef void VOID;
 typedef void *VOIDP;
+
+enum phy_power_mode {
+	DISABLE_PHY_IMMEDIATELY = 1,
+	ENABLE_PHY_IMMEDIATELY,
+	DISABLE_PHY_AT_SUSPEND_ONLY,
+	DISABLE_PHY_SUSPEND_ENABLE_RESUME,
+	DISABLE_PHY_ON_OFF,
+};
+
+enum loopback_mode {
+	DISABLE_LOOPBACK = 0,
+	ENABLE_IO_MACRO_LOOPBACK,
+	ENABLE_MAC_LOOPBACK,
+	ENABLE_PHY_LOOPBACK
+};
+
+enum current_phy_state {
+	PHY_IS_ON = 0,
+	PHY_IS_OFF,
+};
 
 struct s_RX_CONTEXT_DESC {
 	UINT RDES0;
@@ -1748,6 +1779,19 @@ struct DWC_ETH_QOS_prv_data {
 	int bus_id;
 	u32 dev_state;
 	u32 interface;
+	unsigned int emac_phy_off_suspend;
+	int loopback_speed;
+	enum loopback_mode current_loopback;
+	enum phy_power_mode current_phy_mode;
+	enum current_phy_state phy_state;
+	/*Backup variable for phy loopback*/
+	int backup_duplex;
+	int backup_speed;
+	u32 bmcr_backup;
+	/*Backup variable for suspend resume*/
+	int backup_suspend_speed;
+	u32 backup_bmcr;
+	unsigned backup_autoneg:1;
 
 	/* state of wol */
 	bool en_wol;
@@ -2116,6 +2160,11 @@ int DWC_ETH_QOS_rgmii_io_macro_dll_reset(struct DWC_ETH_QOS_prv_data *pdata);
 void dump_rgmii_io_macro_registers(void);
 int DWC_ETH_QOS_set_rgmii_func_clk_en(void);
 u32 DWC_ETH_QOS_rgmii_io_macro_num_of_regs(u32 emac_hw_version);
+void swap_ip_port(struct sk_buff *skb, unsigned int eth_type);
+void rgmii_io_macro_config_update(struct DWC_ETH_QOS_prv_data *pdata, int val);
+void rgmii_io_macro_loopback_config(struct DWC_ETH_QOS_prv_data *pdata, int mode);
+int DWC_ETH_QOS_configure_io_macro_dll_settings(struct DWC_ETH_QOS_prv_data *pdata);
+
 
 #define EMAC_MDC "dev-emac-mdc"
 #define EMAC_MDIO "dev-emac-mdio"

@@ -62,6 +62,10 @@ char tmp_buff[MAX_PROC_SIZE];
 
 #define MAC_ADDR_CFG_FPATH "/data/emac_config.ini"
 
+#define PHY_LOOPBACK_1000 0x4140
+#define PHY_LOOPBACK_100 0x6100
+#define PHY_LOOPBACK_10 0x4100
+
 static UCHAR dev_addr[ETH_ALEN] = {0, 0x55, 0x7b, 0xb5, 0x7d, 0xf7};
 struct DWC_ETH_QOS_res_data dwc_eth_qos_res_data = {0, };
 static struct msm_bus_scale_pdata *emac_bus_scale_vec = NULL;
@@ -82,6 +86,20 @@ extern int create_pps_interrupt_info_device_node(dev_t *pps_dev_t,
 	char *pps_dev_node_name);
 extern int remove_pps_interrupt_info_device_node(struct DWC_ETH_QOS_prv_data *pdata);
 
+void DWC_ETH_QOS_phy_power_off(struct DWC_ETH_QOS_prv_data *pdata);
+int DWC_ETH_QOS_phy_power_on(struct DWC_ETH_QOS_prv_data *pdata);
+void DWC_ETH_QOS_reset_phy_enable_interrupt(struct DWC_ETH_QOS_prv_data *pdata);
+void DWC_ETH_QOS_free_gpios(void);
+int DWC_ETH_QOS_create_sysfs(struct platform_device *pdev);
+int DWC_ETH_QOS_remove_sysfs(struct platform_device *pdev);
+static void print_loopback_detail(enum loopback_mode loopback);
+static void setup_config_registers(struct DWC_ETH_QOS_prv_data *pdata,
+				   int speed, int duplex, int mode);
+void mac_loopback_config(struct DWC_ETH_QOS_prv_data *pdata, int mode);
+static int phy_digital_loopback_config(
+	struct DWC_ETH_QOS_prv_data *pdata, int speed, int config);
+void DWC_ETH_QOS_fix_mac_speed(struct DWC_ETH_QOS_prv_data *pdata,
+						unsigned int speed);
 
 static char err_names[10][14] = {"PHY_RW_ERR",
 	"PHY_DET_ERR",
@@ -247,6 +265,11 @@ static ssize_t read_phy_reg_dump(struct file *file,
 		return -EINVAL;
 	}
 
+	if (pdata->phy_state == PHY_IS_OFF) {
+		EMACDBG("Phy is in off state phy dump is not possible\n");
+		return -EOPNOTSUPP;
+	}
+
 	buf = kzalloc(buf_len, GFP_KERNEL);
 	if (!buf)
 		return -ENOMEM;
@@ -284,6 +307,393 @@ static const struct file_operations fops_io_macro_reg_dump = {
 	.owner = THIS_MODULE,
 	.llseek = default_llseek,
 };
+
+static ssize_t read_phy_off(struct device *dev,
+			    struct device_attribute *attr,
+			    char *user_buf)
+{
+	struct net_device *netdev = to_net_dev(dev);
+
+	if (!netdev) {
+		EMACDBG("netdev is NULL\n");
+		return -EINVAL;
+	}
+
+	struct DWC_ETH_QOS_prv_data *pdata = netdev_priv(netdev);
+
+	if (!pdata) {
+		EMACERR("netdev: 0x%p pdata: 0x%p\n");
+		return -EINVAL;
+	}
+
+	if (pdata->current_phy_mode == DISABLE_PHY_IMMEDIATELY)
+		return snprintf(user_buf, BUFF_SZ,
+				"Disable phy immediately enabled\n");
+	else if (pdata->current_phy_mode == ENABLE_PHY_IMMEDIATELY)
+		return snprintf(user_buf, BUFF_SZ,
+				 "Enable phy immediately enabled\n");
+	else if (pdata->current_phy_mode == DISABLE_PHY_AT_SUSPEND_ONLY) {
+		return snprintf(user_buf, BUFF_SZ,
+				"%s %s",
+				 "Disable Phy at suspend",
+				 " & do not enable at resume enabled\n");
+	} else if (pdata->current_phy_mode ==
+		 DISABLE_PHY_SUSPEND_ENABLE_RESUME) {
+		return snprintf(user_buf, BUFF_SZ,
+				"%s %s",
+				 "Disable Phy at suspend",
+				 " & enable at resume enabled\n");
+	} else if (pdata->current_phy_mode == DISABLE_PHY_ON_OFF)
+		return snprintf(user_buf, BUFF_SZ,
+				 "Disable phy on/off disabled\n");
+	else
+		return snprintf(user_buf, BUFF_SZ,
+					"Invalid Phy State\n");
+}
+
+static ssize_t phy_off_config(struct device *dev,
+			      struct device_attribute *attr,
+			      const char *user_buf, size_t count)
+{
+	s8 config = 0;
+	struct net_device *ndev = to_net_dev(dev);
+	unsigned int phydata = 0;
+
+	if (!ndev) {
+		EMACDBG("ndev is NULL\n");
+		return -EINVAL;
+	}
+
+	struct DWC_ETH_QOS_prv_data *pdata = netdev_priv(ndev);
+
+	if (!pdata) {
+		EMACERR("netdev: 0x%p pdata: 0x%p\n");
+		return -EINVAL;
+	}
+
+	if (kstrtos8(user_buf, 0, &config)) {
+		EMACDBG("Error in reading option from user\n");
+		return -EINVAL;
+	}
+	if (config > DISABLE_PHY_ON_OFF || config < DISABLE_PHY_IMMEDIATELY) {
+		EMACDBG("Invalid option =%d\n", config);
+		return -EINVAL;
+	}
+	if (config == pdata->current_phy_mode) {
+		EMACDBG("No effect as duplicate config\n");
+		return -EPERM;
+	}
+	if (config == DISABLE_PHY_IMMEDIATELY) {
+		pdata->current_phy_mode = DISABLE_PHY_IMMEDIATELY;
+	//make phy off
+		if (pdata->current_loopback == ENABLE_PHY_LOOPBACK) {
+			/* If Phy loopback is enabled
+			 *  Disabled It before phy off
+			 */
+			phy_digital_loopback_config(pdata,
+						    pdata->loopback_speed, 0);
+			EMACDBG("Disable phy Loopback\n");
+			pdata->current_loopback = ENABLE_PHY_LOOPBACK;
+		}
+
+		/*Backup phy related data*/
+		if (pdata->phydev && pdata->phydev->autoneg == AUTONEG_DISABLE) {
+			pdata->backup_autoneg = pdata->phydev->autoneg;
+			pdata->backup_bmcr = DWC_ETH_QOS_mdio_read_direct(pdata,
+									  pdata->phyaddr,
+									  MII_BMCR, &pdata->backup_bmcr);
+		} else {
+			pdata->backup_autoneg = AUTONEG_ENABLE;
+		}
+
+		if (pdata->phydev) {
+			if (DWC_ETH_QOS_is_phy_link_up(pdata) && (pdata->current_loopback == DISABLE_LOOPBACK)) {
+				EMACDBG("Post Link down before PHY off\n");
+				netif_carrier_off(ndev);
+				phy_mac_interrupt(pdata->phydev, LINK_DOWN);
+			}
+		}
+
+		DWC_ETH_QOS_phy_power_off(pdata);
+	}
+	else if (config == ENABLE_PHY_IMMEDIATELY) {
+		pdata->current_phy_mode = ENABLE_PHY_IMMEDIATELY;
+		//make phy on
+		DWC_ETH_QOS_phy_power_on(pdata);
+		DWC_ETH_QOS_reset_phy_enable_interrupt(pdata);
+		if (pdata->backup_autoneg == AUTONEG_DISABLE) {
+			pdata->phydev->autoneg = pdata->backup_autoneg;
+			phy_write(pdata->phydev, MII_BMCR, pdata->backup_bmcr);
+		}
+		if (pdata->current_loopback == ENABLE_PHY_LOOPBACK) {
+			/*If Phy loopback is enabled , enabled It again*/
+			phy_digital_loopback_config(pdata,
+						    pdata->loopback_speed, 1);
+			EMACDBG("Enabling Phy loopback again");
+		}
+
+	} else if (config == DISABLE_PHY_AT_SUSPEND_ONLY) {
+		pdata->current_phy_mode = DISABLE_PHY_AT_SUSPEND_ONLY;
+	} else if (config == DISABLE_PHY_SUSPEND_ENABLE_RESUME) {
+		pdata->current_phy_mode = DISABLE_PHY_SUSPEND_ENABLE_RESUME;
+	} else if (config == DISABLE_PHY_ON_OFF) {
+		pdata->current_phy_mode = DISABLE_PHY_ON_OFF;
+	} else {
+		EMACDBG("Invalid option\n");
+		return -EINVAL;
+	}
+	return count;
+}
+
+static void setup_config_registers(struct DWC_ETH_QOS_prv_data *pdata,
+				   int speed, int duplex, int mode)
+{
+	struct net_device *dev = pdata->dev;
+	struct hw_if_struct *hw_if = &pdata->hw_if;
+	struct phy_device *phydev = pdata->phydev;
+	u32 reg_val;
+
+	EMACDBG("Speed=%d,dupex=%d,mode=%d\n", speed, duplex, mode);
+
+	if (mode > DISABLE_LOOPBACK && !DWC_ETH_QOS_is_phy_link_up(pdata)) {
+		/*If Link is Down & need to enable Loopback*/
+		EMACDBG("Enable Lower Up Flag & disable phy dev\n");
+		EMACDBG("IRQ so that Rx/Tx can happen before Link down\n");
+		netif_carrier_on(dev);
+		/*Disable phy interrupt by Link/Down by cable plug in/out*/
+		disable_irq(pdata->phy_irq);
+	} else if (mode > DISABLE_LOOPBACK &&
+			DWC_ETH_QOS_is_phy_link_up(pdata)) {
+		EMACDBG("Only disable phy irq Link is UP\n");
+		/*Since link is up no need to set Lower UP flag*/
+		/*Disable phy interrupt by Link/Down by cable plug in/out*/
+		disable_irq(pdata->phy_irq);
+	} else if (mode == DISABLE_LOOPBACK &&
+		!DWC_ETH_QOS_is_phy_link_up(pdata)) {
+		EMACDBG("Disable Lower Up as Link is down\n");
+		netif_carrier_off(dev);
+		enable_irq(pdata->phy_irq);
+	}
+
+	if (duplex)
+		hw_if->set_full_duplex();
+	else
+		hw_if->set_half_duplex();
+
+	phydev->duplex = duplex;
+	pdata->oldduplex = duplex;
+
+	switch (speed) {
+	case SPEED_1000:
+		pr_info("SPEED_1000");
+		hw_if->set_gmii_speed();
+		break;
+	case SPEED_100:
+		pr_info("SPEED_100");
+		hw_if->set_mii_speed_100();
+		break;
+	case SPEED_10:
+		pr_info("SPEED_10");
+		hw_if->set_mii_speed_10();
+		break;
+	default:
+		speed = SPEED_UNKNOWN;
+		EMACDBG("unknown speed\n");
+		break;
+	}
+
+	pdata->phydev->speed = speed;
+	pdata->speed  = speed;
+
+	if (mode > DISABLE_LOOPBACK && pdata->ipa_enabled) {
+		MTL_RQDCM0R_RGRD(reg_val);
+		reg_val |= IPA_RX_TO_DMA_CH_MAP_NUM;
+		MTL_RQDCM0R_RGWR(reg_val);
+		EMACINFO("Mapped queue 0 to channel 1\n");
+	} else {
+		MTL_RQDCM0R_RGRD(reg_val);
+		reg_val &= ~IPA_RX_TO_DMA_CH_MAP_NUM;
+		MTL_RQDCM0R_RGWR(reg_val);
+		EMACINFO("Mapped queue 0 to channel 0\n");
+	}
+
+	if (pdata->phydev->speed != SPEED_UNKNOWN)
+		DWC_ETH_QOS_fix_mac_speed(pdata, pdata->speed);
+
+	if (mode > DISABLE_LOOPBACK) {
+		if (mode == ENABLE_MAC_LOOPBACK ||
+		    mode == ENABLE_IO_MACRO_LOOPBACK)
+			rgmii_io_macro_config_update(pdata, RGMII_CONFIG_LOOPBACK_EN);
+	} else if (mode == DISABLE_LOOPBACK) {
+		if (pdata->emac_hw_version_type == EMAC_HW_v2_3_2 ||
+		    pdata->emac_hw_version_type == EMAC_HW_v2_1_2)
+			rgmii_io_macro_config_update(pdata, 0);
+	}
+	EMACDBG("End");
+}
+
+static ssize_t loopback_handling_config(struct device *dev,
+			      struct device_attribute *attr,
+			      const char *user_buf, size_t count)
+{
+	char *in_buf;
+	int buf_len = 2000;
+	unsigned long ret;
+	int config = 0;
+	unsigned int val = 0;
+	int err;
+	struct net_device *ndev = to_net_dev(dev);
+
+	if (!ndev) {
+		EMACDBG("ndev is NULL");
+		return -EINVAL;
+	}
+
+	struct DWC_ETH_QOS_prv_data *pdata = netdev_priv(ndev);
+
+	if (!pdata) {
+		EMACERR("netdev: 0x%p pdata: 0x%p");
+		return -EINVAL;
+	}
+
+	if(pdata->current_phy_mode == DISABLE_PHY_IMMEDIATELY)
+		return -EOPNOTSUPP;
+
+	int speed = 0;
+
+	ret = sscanf(user_buf, "%d %d", &config,  &speed);
+	if (config > DISABLE_LOOPBACK && ret != 2) {
+		EMACERR("Speed is also needed while enabling loopback\n");
+		return -EINVAL;
+	}
+	if (config < DISABLE_LOOPBACK || config > ENABLE_PHY_LOOPBACK) {
+		EMACERR("Invalid config =%d\n", config);
+		return -EINVAL;
+	}
+
+	/*Argument validation*/
+	if (config == ENABLE_IO_MACRO_LOOPBACK ||
+	    config == ENABLE_MAC_LOOPBACK || config == ENABLE_PHY_LOOPBACK) {
+		if (speed != SPEED_1000 && speed != SPEED_100 &&
+		    speed != SPEED_10)
+			return -EINVAL;
+	}
+
+	if (config == pdata->current_loopback) {
+		switch (config) {
+		case DISABLE_LOOPBACK:
+			EMACINFO("Loopback is already disabled\n");
+			break;
+		case ENABLE_IO_MACRO_LOOPBACK:
+			EMACINFO("Loopback is already Enabled as ");
+			EMACINFO("IO MACRO LOOPBACK\n");
+			break;
+		case ENABLE_MAC_LOOPBACK:
+			EMACINFO("Loopback is already Enabled as ");
+			EMACINFO("MAC LOOPBACK\n");
+			break;
+		case ENABLE_PHY_LOOPBACK:
+			EMACINFO("Loopback is already Enabled as ");
+			EMACINFO("PHY LOOPBACK\n");
+			break;
+		}
+		return -EINVAL;
+	}
+	/*If request to enable loopback & some other loopback already enabled*/
+	if (config != DISABLE_LOOPBACK &&
+	    pdata->current_loopback > DISABLE_LOOPBACK) {
+		EMACINFO("Loopback is already enabled\n");
+		print_loopback_detail(pdata->current_loopback);
+		return -EINVAL;
+	}
+	EMACINFO("enable loopback = %d with link speed = %d backup now\n",
+		   config, speed);
+
+	/*Backup speed & duplex before Enabling Loopback */
+	if (pdata->current_loopback == DISABLE_LOOPBACK &&
+	    config > DISABLE_LOOPBACK) {
+		/*Backup old speed & duplex*/
+		pdata->backup_speed = pdata->speed;
+		pdata->backup_duplex = pdata->phydev->duplex;
+	}
+	/*Backup BMCR before Enabling Phy LoopbackLoopback */
+	if (pdata->current_loopback == DISABLE_LOOPBACK &&
+	    config == ENABLE_PHY_LOOPBACK)
+		DWC_ETH_QOS_mdio_read_direct(pdata, pdata->phyaddr, MII_BMCR,
+				&pdata->backup_bmcr);
+
+	if (config == DISABLE_LOOPBACK)
+		setup_config_registers(pdata, pdata->backup_speed,
+				       pdata->backup_duplex, 0);
+	else
+		setup_config_registers(pdata, speed, DUPLEX_FULL, config);
+
+	switch (config) {
+	case DISABLE_LOOPBACK:
+		EMACINFO("Request to Disable Loopback\n");
+		if (pdata->current_loopback == ENABLE_IO_MACRO_LOOPBACK) {
+			rgmii_io_macro_loopback_config(pdata, 0);
+		}
+		else if (pdata->current_loopback == ENABLE_MAC_LOOPBACK) {
+			mac_loopback_config(pdata, 0);
+			RGMII_CONFIG_2_TX_TO_RX_LOOPBACK_EN_UDFWR(0x0);
+		}
+		else if (pdata->current_loopback == ENABLE_PHY_LOOPBACK)
+			phy_digital_loopback_config(pdata,
+						    pdata->backup_speed, 0);
+		break;
+	case ENABLE_IO_MACRO_LOOPBACK:
+		EMACINFO("Request to Enable IO MACRO LOOPBACK\n");
+		rgmii_io_macro_loopback_config(pdata, 1);
+		break;
+	case ENABLE_MAC_LOOPBACK:
+		EMACINFO("Request to Enable MAC LOOPBACK\n");
+		RGMII_CONFIG_2_TX_TO_RX_LOOPBACK_EN_UDFWR(0x1);
+		mac_loopback_config(pdata, 1);
+		break;
+	case ENABLE_PHY_LOOPBACK:
+		EMACINFO("Request to Enable PHY LOOPBACK\n");
+		phy_digital_loopback_config(pdata, speed, 1);
+		break;
+	default:
+		EMACINFO("Invalid Loopback=%d\n", config);
+		break;
+	}
+
+	pdata->current_loopback = config;
+	kfree(in_buf);
+	return count;
+}
+
+static ssize_t read_loopback_config(struct device *dev,
+			    struct device_attribute *attr,
+			    char *user_buf)
+{
+	struct net_device *ndev = to_net_dev(dev);
+	struct DWC_ETH_QOS_prv_data *pdata = netdev_priv(ndev);
+
+	if (pdata->current_loopback == DISABLE_LOOPBACK)
+		return scnprintf(user_buf, BUFF_SZ,
+						"Loopback is Disabled\n");
+	else if (pdata->current_loopback == ENABLE_IO_MACRO_LOOPBACK)
+		return scnprintf(user_buf, BUFF_SZ,
+						"Current Loopback is IO MACRO LOOPBACK\n");
+	else if (pdata->current_loopback == ENABLE_MAC_LOOPBACK)
+		return scnprintf(user_buf, BUFF_SZ,
+						"Current Loopback is MAC LOOPBACK\n");
+	else if (pdata->current_loopback == ENABLE_PHY_LOOPBACK)
+		return scnprintf(user_buf, BUFF_SZ,
+						"Current Loopback is PHY LOOPBACK\n");
+	else
+		return scnprintf(user_buf, BUFF_SZ,
+						"Invalid LOOPBACK Config\n");
+}
+
+static DEVICE_ATTR(phy_off, 0644,
+	read_phy_off, phy_off_config);
+
+static DEVICE_ATTR(loopback_enable_mode, 0644,
+	read_loopback_config, loopback_handling_config);
 
 static ssize_t write_ipc_emac_log_ctxt_low(struct file *file,
 	const char __user *buf, size_t count, loff_t *data)
@@ -400,6 +810,85 @@ static ssize_t DWC_ETH_QOS_test_mac_recovery(struct file *file,
 	return count;
 }
 
+void mac_loopback_config(struct DWC_ETH_QOS_prv_data *pdata, int mode)
+{
+	u32 read_value = (u32)readl_relaxed(dwc_eth_qos_base_addr + MAC_CONFIGURATION);
+	/* Set loopback mode */
+	if (mode == 1)
+		read_value |= MAC_LM;
+	else
+		read_value &= ~MAC_LM;
+	writel_relaxed(read_value, dwc_eth_qos_base_addr + MAC_CONFIGURATION);
+}
+
+static int phy_digital_loopback_config(
+	struct DWC_ETH_QOS_prv_data *pdata, int speed, int config)
+{
+	int phydata = 0;
+
+	if (config == 1) {
+		EMACINFO("Request for phy digital loopback enable\n");
+		switch (speed) {
+		case SPEED_1000:
+			phydata = PHY_LOOPBACK_1000;
+			break;
+		case SPEED_100:
+			phydata = PHY_LOOPBACK_100;
+			break;
+		case SPEED_10:
+			phydata = PHY_LOOPBACK_10;
+			break;
+		default:
+			EMACERR("Invalid link speed\n");
+			break;
+		}
+	} else if (config == 0) {
+		EMACINFO("Request for phy digital loopback disable\n");
+		if (pdata->backup_bmcr)
+			phydata = pdata->backup_bmcr;
+		else
+			phydata = 0x1140;
+	} else {
+		EMACERR("Invalid option\n");
+		return -EINVAL;
+	}
+	if (phydata != 0) {
+		if (pdata->phydev) {
+			phy_write(pdata->phydev, MII_BMCR, phydata);
+			EMACINFO("write done for phy loopback\n");
+		} else {
+			EMACINFO("Phy dev is NULL\n");
+		}
+	}
+	return 0;
+}
+
+void DWC_ETH_QOS_fix_mac_speed(struct DWC_ETH_QOS_prv_data *pdata,
+						unsigned int speed)
+{
+	DWC_ETH_QOS_set_clk_and_bus_config(pdata, speed);
+	DWC_ETH_QOS_configure_io_macro_dll_settings(pdata);
+}
+static void print_loopback_detail(enum loopback_mode loopback)
+{
+	switch (loopback) {
+	case DISABLE_LOOPBACK:
+		EMACINFO("Loopback is disabled\n");
+		break;
+	case ENABLE_IO_MACRO_LOOPBACK:
+		EMACINFO("Loopback is Enabled as IO MACRO LOOPBACK\n");
+		break;
+	case ENABLE_MAC_LOOPBACK:
+		EMACINFO("Loopback is Enabled as MAC LOOPBACK\n");
+		break;
+	case ENABLE_PHY_LOOPBACK:
+		EMACINFO("Loopback is Enabled as PHY LOOPBACK\n");
+		break;
+	default:
+		EMACINFO("Invalid Loopback=%d\n", loopback);
+		break;
+	}
+}
 
 static const struct file_operations fops_mac_rec = {
 	.read = read_mac_recovery_enable,
@@ -1764,10 +2253,55 @@ reg_error:
 	return ret;
 }
 
+void DWC_ETH_QOS_reset_phy_enable_interrupt(struct DWC_ETH_QOS_prv_data *pdata)
+{
+	int ret =  0;
+	//reset phy
+	if (dwc_eth_qos_res_data.is_gpio_phy_reset &&
+	    !dwc_eth_qos_res_data.phyad_change) {
+		ret = setup_gpio_output_common(
+					&pdata->pdev->dev, EMAC_GPIO_PHY_RESET_NAME,
+					&pdata->res_data->gpio_phy_reset, PHY_RESET_GPIO_LOW);
+		if (ret) {
+			EMACERR("Failed to setup <%s> gpio\n",
+				EMAC_GPIO_PHY_RESET_NAME);
+			goto gpio_error;
+		}
+		if (dwc_eth_qos_res_data.phy_reset_delay_msecs[0]) {
+			EMACERR("phy Hw pre reset delay in msecs %d\n",dwc_eth_qos_res_data.phy_reset_delay_msecs[0]);
+			mdelay(dwc_eth_qos_res_data.phy_reset_delay_msecs[0]);
+		}
+
+		gpio_set_value(dwc_eth_qos_res_data.gpio_phy_reset, PHY_RESET_GPIO_HIGH);
+		EMACERR("PHY is out of reset successfully\n");
+
+		if (dwc_eth_qos_res_data.phy_reset_delay_msecs[1]) {
+			/* Add delay of 50ms so that phy should get sufficient time*/
+			EMACERR("phy Hw post reset delay in msecs %d\n",dwc_eth_qos_res_data.phy_reset_delay_msecs[1]);
+			mdelay(dwc_eth_qos_res_data.phy_reset_delay_msecs[1]);
+		}
+	}
+
+	/*Enable phy interrupt*/
+	if (pdata->phy_intr_en) {
+		pdata->phydev->irq = PHY_IGNORE_INTERRUPT;
+		pdata->phydev->interrupts =  PHY_INTERRUPT_ENABLED;
+		if (pdata->phydev->drv->config_intr &&
+			!pdata->phydev->drv->config_intr(pdata->phydev)){
+			DWC_ETH_QOS_request_phy_wol(pdata);
+		} else {
+			EMACERR("Failed to configure PHY interrupts");
+		}
+	}
+gpio_error:
+	DWC_ETH_QOS_free_gpios();
+	return ret;
+}
 
 int DWC_ETH_QOS_phy_power_on(struct DWC_ETH_QOS_prv_data *pdata)
 {
 	int ret = 0;
+
 	if(pdata->res_data->reg_emac_phy) {
 		ret = regulator_enable(pdata->res_data->reg_emac_phy);
 		if (ret) {
@@ -1784,10 +2318,14 @@ int DWC_ETH_QOS_phy_power_on(struct DWC_ETH_QOS_prv_data *pdata)
 void DWC_ETH_QOS_phy_power_off(struct DWC_ETH_QOS_prv_data *pdata)
 {
 	if(pdata->res_data->reg_emac_phy) {
-		regulator_disable(pdata->res_data->reg_emac_phy);
-	}
-	else {
-		EMACERR("reg_emac_phy is NULL\n");
+		if (regulator_is_enabled(pdata->res_data->reg_emac_phy)) {
+			regulator_disable(pdata->res_data->reg_emac_phy);
+			if (gpio_is_valid(dwc_eth_qos_res_data.gpio_phy_reset))
+				gpio_free(dwc_eth_qos_res_data.gpio_phy_reset);
+			dwc_eth_qos_res_data.gpio_phy_reset = -1;
+		} else {
+			EMACERR("reg_emac_phy is NULL\n");
+		}
 	}
 }
 
@@ -1868,7 +2406,7 @@ int setup_gpio_output_common
 	return ret;
 }
 
-static void DWC_ETH_QOS_free_gpios(void)
+void DWC_ETH_QOS_free_gpios(void)
 {
 	if (gpio_is_valid(dwc_eth_qos_res_data.gpio_phy_intr_redirect))
 		gpio_free(dwc_eth_qos_res_data.gpio_phy_intr_redirect);
@@ -2609,6 +3147,20 @@ static int DWC_ETH_QOS_configure_netdevice(struct platform_device *pdev)
 		dwc_eth_qos_res_data.emac_mem_base;
 	pdata->rgmii_reg_base_address =
 		dwc_eth_qos_res_data.rgmii_mem_base;
+
+	if (of_property_read_bool(pdev->dev.of_node,
+			"emac-phy-off-suspend")) {
+		/* Read emac core version value from dtsi */
+		ret = of_property_read_u32(pdev->dev.of_node,
+					   "emac-phy-off-suspend",
+					   &pdata->current_phy_mode);
+		if (ret) {
+			EMACDBG(":resource emac-phy-off-suspend! ");
+			EMACDBG("not in dtsi\n");
+			pdata->current_phy_mode = 0;
+		}
+	}
+
 #ifdef DWC_ETH_QOS_CONFIG_DEBUGFS
 	/* to give prv data to debugfs */
 	DWC_ETH_QOS_get_pdata(pdata);
@@ -2860,6 +3412,7 @@ static int DWC_ETH_QOS_configure_netdevice(struct platform_device *pdev)
 	}
 
 	DWC_ETH_QOS_create_debugfs(pdata);
+	DWC_ETH_QOS_create_sysfs(pdev);
 
 	if (pdata->res_data->early_eth_en) {
 		if (pparams.is_valid_ipv4_addr)
@@ -3121,6 +3674,7 @@ static int DWC_ETH_QOS_probe(struct platform_device *pdev)
 		if (ret)
 			goto err_out_dev_failed;
 	}
+
 	EMACDBG("<-- DWC_ETH_QOS_probe\n");
 
 #if defined DWC_ETH_QOS_BUILTIN && defined CONFIG_MSM_BOOT_TIME_MARKER
@@ -3197,6 +3751,7 @@ int DWC_ETH_QOS_remove(struct platform_device *pdev)
 	}
 
 	DWC_ETH_QOS_cleanup_debugfs(pdata);
+	DWC_ETH_QOS_remove_sysfs(pdev);
 
 	if (pdata->emac_hw_version_type == EMAC_HW_v2_3_1)
 		remove_pps_interrupt_info_device_node(pdata);
@@ -3280,6 +3835,61 @@ int DWC_ETH_QOS_remove(struct platform_device *pdev)
 	EMACDBG("<-- DWC_ETH_QOS_remove\n");
 
 	return 0;
+}
+
+int DWC_ETH_QOS_remove_sysfs(struct platform_device *pdev)
+{
+	struct net_device *netdev;
+
+	netdev = platform_get_drvdata(pdev);
+	if (!netdev) {
+		EMACDBG("netdev is NULL\n");
+		return -EINVAL;
+	}
+
+	sysfs_remove_file(&netdev->dev.kobj,
+			  &dev_attr_phy_off.attr);
+	EMACDBG("phy_off sysfs node removed successfully\n");
+
+	sysfs_remove_file(&netdev->dev.kobj,
+			  &dev_attr_loopback_enable_mode.attr);
+	EMACDBG("loopback_enable_mode sysfs node removed successfully\n");
+
+	return 0;
+}
+
+int DWC_ETH_QOS_create_sysfs(struct platform_device *pdev)
+{
+	struct net_device *netdev;
+	int ret = 0;
+	EMACDBG("ENTER SYSFS CREATE");
+
+	netdev = platform_get_drvdata(pdev);
+	if (!netdev) {
+		EMACDBG("netdev is NULL\n");
+		return -EINVAL;
+	}
+
+	ret = sysfs_create_file(&netdev->dev.kobj,
+					&dev_attr_phy_off.attr);
+	if (ret) {
+		EMACDBG("unable to create phy_off sysfs node\n");
+		goto fail;
+	}
+	EMACDBG("phy_off sysfs node created successfully\n");
+
+	ret = sysfs_create_file(&netdev->dev.kobj,
+					&dev_attr_loopback_enable_mode.attr);
+	if (ret) {
+		EMACDBG("unable to create loopback_enable_mode sysfs node\n");
+		goto fail;
+	}
+	EMACDBG("loopback_enable_mode sysfs node created successfully\n");
+
+	return ret;
+
+fail:
+	return DWC_ETH_QOS_remove_sysfs(pdev);
 }
 
 static void DWC_ETH_QOS_shutdown(struct platform_device *pdev)
@@ -3376,7 +3986,25 @@ static INT DWC_ETH_QOS_suspend(struct platform_device *pdev, pm_message_t state)
 
 	ret = DWC_ETH_QOS_powerdown(dev, pmt_flags, DWC_ETH_QOS_DRIVER_CONTEXT);
 
+	if (pdata->current_phy_mode == DISABLE_PHY_AT_SUSPEND_ONLY ||
+	    pdata->current_phy_mode == DISABLE_PHY_SUSPEND_ENABLE_RESUME) {
+		if (pdata->phydev && pdata->phydev->autoneg == AUTONEG_DISABLE) {
+			pdata->backup_autoneg = pdata->phydev->autoneg;
+			pdata->backup_bmcr = DWC_ETH_QOS_mdio_read_direct(pdata,
+							       pdata->phyaddr,
+							       MII_BMCR, &pdata->backup_bmcr);
+		} else {
+			pdata->backup_autoneg = AUTONEG_ENABLE;
+		}
+
+	}
+
 	DWC_ETH_QOS_suspend_clks(pdata);
+	if (pdata->current_phy_mode == DISABLE_PHY_AT_SUSPEND_ONLY ||
+	    pdata->current_phy_mode == DISABLE_PHY_SUSPEND_ENABLE_RESUME) {
+		EMACDBG("disable phy at suspend\n");
+		DWC_ETH_QOS_phy_power_off(pdata);
+	}
 	pdata->print_kpi = 0;
 	EMACKPI("M - Ethernet suspend end");
 	EMACDBG("<--DWC_ETH_QOS_suspend ret = %d\n", ret);
@@ -3430,7 +4058,27 @@ static INT DWC_ETH_QOS_resume(struct platform_device *pdev)
 		return 0;
 	}
 
+	if (pdata->current_phy_mode == DISABLE_PHY_SUSPEND_ENABLE_RESUME) {
+		EMACDBG("enable phy at resume\n");
+		DWC_ETH_QOS_phy_power_on(pdata);
+	}
+
 	DWC_ETH_QOS_resume_clks(pdata);
+
+	if (pdata->current_phy_mode == DISABLE_PHY_SUSPEND_ENABLE_RESUME) {
+		EMACDBG("reset phy after clock\n");
+		DWC_ETH_QOS_reset_phy_enable_interrupt(pdata);
+		if (pdata->backup_autoneg == AUTONEG_DISABLE) {
+			if (pdata->phydev) {
+				pdata->phydev->autoneg = pdata->backup_autoneg;
+				phy_write(pdata->phydev,
+					  MII_BMCR,
+					  pdata->backup_bmcr);
+			} else {
+				EMACDBG("Phy dev is NULL\n");
+			}
+		}
+	}
 
 	ret = DWC_ETH_QOS_powerup(dev, DWC_ETH_QOS_DRIVER_CONTEXT);
 
