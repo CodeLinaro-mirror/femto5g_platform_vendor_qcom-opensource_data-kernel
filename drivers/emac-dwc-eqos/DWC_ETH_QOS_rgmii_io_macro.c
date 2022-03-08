@@ -797,3 +797,25 @@ void dump_rgmii_io_macro_registers(void)
 
 	pr_alert("\n****************************************************\n");
 }
+
+void rgmii_io_macro_loopback_config(struct DWC_ETH_QOS_prv_data *pdata, int mode)
+{
+	/* Set loopback mode */
+	if (mode == 1) {
+		RGMII_CONFIG_2_TX_TO_RX_LOOPBACK_EN_UDFWR(0x1);
+		RGMII_CONFIG_2_RX_PROG_SWAP_UDFWR(0x0);
+	} else {
+		RGMII_CONFIG_2_TX_TO_RX_LOOPBACK_EN_UDFWR(0x0);
+		RGMII_CONFIG_2_RX_PROG_SWAP_UDFWR(0x1);
+	}
+}
+
+void rgmii_io_macro_config_update(struct DWC_ETH_QOS_prv_data *pdata, int val)
+{
+	unsigned int loopback_mode = 0x1;
+
+	if (val == RGMII_CONFIG_LOOPBACK_EN)
+		RGMII_LOOPBACK_EN_UDFWR(loopback_mode);
+	else
+		RGMII_LOOPBACK_EN_UDFWR(0x0);
+}
