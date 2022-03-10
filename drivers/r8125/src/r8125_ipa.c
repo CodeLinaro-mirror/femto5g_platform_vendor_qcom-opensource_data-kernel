@@ -161,7 +161,7 @@ enum RTL8125_registers_extra {
 	R8125_RSS_I_TABLE = 0x4700,
 };
 
-struct rtl8125_regs {
+struct rtl8125_regs_internal {
 	ktime_t begin_ktime;
 	ktime_t end_ktime;
 	u64 duration_ns;
@@ -227,7 +227,7 @@ struct rtl8125_device {
 
 	struct ipa_eth_client eth_client;
 	struct ipa_eth_intf_info intf;
-	struct rtl8125_regs regs_save;
+	struct rtl8125_regs_internal regs_save;
 	struct rtl8125_ch_info rx_info;
 	struct rtl8125_ch_info tx_info;
 	union rtl8125_ipa_eth_hdr hdr_v4;
@@ -943,7 +943,7 @@ static int rtl8125_save_regs(struct ipa_eth_device *eth_dev,
 {
 	struct rtl8125_device *rtl_dev = eth_dev->od_priv;
 	struct rtl8125_private *tp = rtl_dev->rtl8125_tp;
-	struct rtl8125_regs *rtl_regs = &rtl_dev->regs_save;
+	struct rtl8125_regs_internal *rtl_regs = &rtl_dev->regs_save;
 	int i;
 
 	rtl_regs->begin_ktime = ktime_get();
