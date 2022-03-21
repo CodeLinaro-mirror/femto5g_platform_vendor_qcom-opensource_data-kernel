@@ -2173,46 +2173,46 @@ static ssize_t DWC_ETH_QOS_read_rec_dev_emac(struct file *file, char __user *usr
 			"WDT_ERR", gDWC_ETH_QOS_prv_data->mac_err_cnt[WDT_ERR]);
 
 	len += scnprintf(buf + len, buf_len - len, "\n\n%s  =  %d\n",
-			"PHY_RW_rec", gDWC_ETH_QOS_prv_data->mac_rec_en[PHY_RW_ERR]);
+			"PHY_RW_EN", gDWC_ETH_QOS_prv_data->mac_rec_en[PHY_RW_ERR]);
 	len += scnprintf(buf + len, buf_len - len, "%s  =  %d\n",
-			"PHY_DET_rec", gDWC_ETH_QOS_prv_data->mac_rec_en[PHY_DET_ERR]);
+			"PHY_DET_EN", gDWC_ETH_QOS_prv_data->mac_rec_en[PHY_DET_ERR]);
 	len += scnprintf(buf + len, buf_len - len, "%s  =  %d\n",
-			"CRC_rec", gDWC_ETH_QOS_prv_data->mac_rec_en[CRC_ERR]);
+			"CRC_EN", gDWC_ETH_QOS_prv_data->mac_rec_en[CRC_ERR]);
 	len += scnprintf(buf + len, buf_len - len, "%s  =  %d\n",
-			"RECEIVE_rec", gDWC_ETH_QOS_prv_data->mac_rec_en[RECEIVE_ERR]);
+			"RECEIVE_EN", gDWC_ETH_QOS_prv_data->mac_rec_en[RECEIVE_ERR]);
 	len += scnprintf(buf + len, buf_len - len, "%s  =  %d\n",
-			"OVERFLOW_rec", gDWC_ETH_QOS_prv_data->mac_rec_en[OVERFLOW_ERR]);
+			"OVERFLOW_EN", gDWC_ETH_QOS_prv_data->mac_rec_en[OVERFLOW_ERR]);
 	len += scnprintf(buf + len, buf_len - len, "%s  =  %d\n",
-			"FBE_rec", gDWC_ETH_QOS_prv_data->mac_rec_en[FBE_ERR]);
+			"FBE_EN", gDWC_ETH_QOS_prv_data->mac_rec_en[FBE_ERR]);
 	len += scnprintf(buf + len, buf_len - len, "%s  =  %d\n",
-			"RBU_rec", gDWC_ETH_QOS_prv_data->mac_rec_en[RBU_ERR]);
+			"RBU_EN", gDWC_ETH_QOS_prv_data->mac_rec_en[RBU_ERR]);
 	len += scnprintf(buf + len, buf_len - len, "%s  =  %d\n",
-			"TDU_rec", gDWC_ETH_QOS_prv_data->mac_rec_en[TDU_ERR]);
+			"TDU_EN", gDWC_ETH_QOS_prv_data->mac_rec_en[TDU_ERR]);
 	len += scnprintf(buf + len, buf_len - len, "%s  =  %d\n",
-			"DRIBBLE_rec", gDWC_ETH_QOS_prv_data->mac_rec_en[DRIBBLE_ERR]);
+			"DRIBBLE_EN", gDWC_ETH_QOS_prv_data->mac_rec_en[DRIBBLE_ERR]);
 	len += scnprintf(buf + len, buf_len - len, "%s  =  %d\n",
-			"WDT_rec", gDWC_ETH_QOS_prv_data->mac_rec_en[WDT_ERR]);
+			"WDT_EN", gDWC_ETH_QOS_prv_data->mac_rec_en[WDT_ERR]);
 
 	len += scnprintf(buf + len, buf_len - len, "\n\n%s  =  %d\n",
-			"PHY_RW_ERR", gDWC_ETH_QOS_prv_data->mac_rec_cnt[PHY_RW_ERR]);
+			"PHY_RW_REC", gDWC_ETH_QOS_prv_data->mac_rec_cnt[PHY_RW_ERR]);
 	len += scnprintf(buf + len, buf_len - len, "%s  =  %d\n",
-			"PHY_DET_ERR", gDWC_ETH_QOS_prv_data->mac_rec_cnt[PHY_DET_ERR]);
+			"PHY_DET_REC", gDWC_ETH_QOS_prv_data->mac_rec_cnt[PHY_DET_ERR]);
 	len += scnprintf(buf + len, buf_len - len, "%s  =  %d\n",
-			"CRC_ERR", gDWC_ETH_QOS_prv_data->mac_rec_cnt[CRC_ERR]);
+			"CRC_REC", gDWC_ETH_QOS_prv_data->mac_rec_cnt[CRC_ERR]);
 	len += scnprintf(buf + len, buf_len - len, "%s  =  %d\n",
-			"RECEIVE_ERR", gDWC_ETH_QOS_prv_data->mac_rec_cnt[RECEIVE_ERR]);
+			"RECEIVE_REC", gDWC_ETH_QOS_prv_data->mac_rec_cnt[RECEIVE_ERR]);
 	len += scnprintf(buf + len, buf_len - len, "%s  =  %d\n",
-			"OVERFLOW_ERR", gDWC_ETH_QOS_prv_data->mac_rec_cnt[OVERFLOW_ERR]);
+			"OVERFLOW_REC", gDWC_ETH_QOS_prv_data->mac_rec_cnt[OVERFLOW_ERR]);
 	len += scnprintf(buf + len, buf_len - len, "%s  =  %d\n",
-			"FBE_ERR", gDWC_ETH_QOS_prv_data->mac_rec_cnt[FBE_ERR]);
+			"FBE_REC", gDWC_ETH_QOS_prv_data->mac_rec_cnt[FBE_ERR]);
 	len += scnprintf(buf + len, buf_len - len, "%s  =  %d\n",
-			"RBU_ERR", gDWC_ETH_QOS_prv_data->mac_rec_cnt[RBU_ERR]);
+			"RBU_REC", gDWC_ETH_QOS_prv_data->mac_rec_cnt[RBU_ERR]);
 	len += scnprintf(buf + len, buf_len - len, "%s  =  %d\n",
-			"TDU_ERR", gDWC_ETH_QOS_prv_data->mac_rec_cnt[TDU_ERR]);
+			"TDU_REC", gDWC_ETH_QOS_prv_data->mac_rec_cnt[TDU_ERR]);
 	len += scnprintf(buf + len, buf_len - len, "%s  =  %d\n",
-			"DRIBBLE_ERR", gDWC_ETH_QOS_prv_data->mac_rec_cnt[DRIBBLE_ERR]);
+			"DRIBBLE_REC", gDWC_ETH_QOS_prv_data->mac_rec_cnt[DRIBBLE_ERR]);
 	len += scnprintf(buf + len, buf_len - len, "%s  =  %d\n",
-			"WDT_ERR", gDWC_ETH_QOS_prv_data->mac_rec_cnt[WDT_ERR]);
+			"WDT_REC", gDWC_ETH_QOS_prv_data->mac_rec_cnt[WDT_ERR]);
 
 	if (len > buf_len)
 		len = buf_len;
