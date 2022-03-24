@@ -281,7 +281,6 @@ struct ecpri_dma_exception_stats {
  * @tasklet: EP tasklet to handle completion notification
  * @spinlock: EP lock to sync accesses to EP resources
  * @l2_mhi_channel_ptr: Pointer to the MHI Channel CTX
- * @data: Data Pattern to use when generating the MSI
  * @mask: Mask indicating number of messages assigned by the host to device
  *
  */

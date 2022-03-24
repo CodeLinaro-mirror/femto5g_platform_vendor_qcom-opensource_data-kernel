@@ -11,6 +11,7 @@
 #include <linux/elf.h>
 #include "ecpri_dma_i.h"
 #include "ecpri_dma_utils.h"
+#include "ecpri_dma_mhi_client.h"
 #include "ecpri_dma_dp.h"
 #include "dmahal.h"
 #include "gsi.h"
@@ -700,7 +701,7 @@ static const struct dma_gsi_ep_config ecpri_dma_endp_mapping
 					false, 0, false,
 					ECPRI_DMA_VM_IDS_NONE },
 		[ECPRI_HW_V1_0][ECPRI_HW_FLAVOR_DU_PCIE]
-				[65] = { true, 5, 16, 16, ECPRI_DMA_EE_VM0,
+			       [65] = { true, 5, 16, 16, ECPRI_DMA_EE_VM0,
 					GSI_SMART_PRE_FETCH, 8,
 					ECPRI_DMA_ENDP_DIR_DEST,
 					ECPRI_DMA_ENDP_STREAM_MODE_M2M, {{0, 0}},
@@ -1745,6 +1746,26 @@ static void ecpri_dma_gsi_chan_err_cb(struct gsi_chan_err_notify* notify)
 	}
 }
 
+static void  ecpri_dma_gsi_ev_err_cb(struct gsi_evt_err_notify* notify)
+{
+	switch (notify->evt_id) {
+	case GSI_EVT_OUT_OF_BUFFERS_ERR:
+		DMAERR("Received GSI_EVT_OUT_OF_BUFFERS_ERR\n");
+		break;
+	case GSI_EVT_OUT_OF_RESOURCES_ERR:
+		DMAERR("Received GSI_EVT_OUT_OF_RESOURCES_ERR\n");
+		break;
+	case GSI_EVT_UNSUPPORTED_INTER_EE_OP_ERR:
+		DMAERR("Received GSI_EVT_UNSUPPORTED_INTER_EE_OP_ERR\n");
+		break;
+	case GSI_EVT_EVT_RING_EMPTY_ERR:
+		DMAERR("Received GSI_EVT_EVT_RING_EMPTY_ERR\n");
+		break;
+	default:
+		DMAERR("Unexpected err evt: %d\n", notify->evt_id);
+	}
+}
+
 /**
  * ecpri_dma_hw_init() - initialize DMA HW according to HPG
  */
@@ -2055,7 +2076,8 @@ int ecpri_dma_setup_dma_endps(const struct dma_gsi_ep_config *endp_map)
 						endp_cfg_xbar.value);
 					break;
 				default:
-					DMADBG("SRC ENDP %d isn't M2M or S2M, address = 0x%px\n",i , &endp_map[i]);
+					DMADBG("SRC ENDP %d isn't M2M or S2M, address = 0x%px\n",
+						i , &endp_map[i]);
 					break;
 				}
 				break;
@@ -2082,7 +2104,8 @@ int ecpri_dma_setup_dma_endps(const struct dma_gsi_ep_config *endp_map)
 					}
 					break;
 				default:
-					DMADBG("DEST ENDP %d isn't M2M or S2M, address = 0x%px\n", i, &endp_map[i]);
+					DMADBG("DEST ENDP %d isn't M2M or S2M, address = 0x%px\n",
+						i, &endp_map[i]);
 					break;
 				}
 				break;
@@ -2182,10 +2205,13 @@ bool ecpri_dma_is_ready(void)
 int ecpri_dma_gsi_setup_event_ring(struct ecpri_dma_endp_context *ep,
 	u32 ring_length, gfp_t mem_flag)
 {
+	struct ecpri_dma_mhi_channel_ctx* channel;
 	struct gsi_evt_ring_props gsi_evt_ring_props;
 	dma_addr_t evt_dma_addr;
 	dma_addr_t evt_rp_dma_addr;
 	const struct dma_gsi_ep_config* gsi_ep_info;
+	uint64_t msi_addr;
+	uint64_t rp_update_addr;
 	int result;
 	struct device* gsi_dev =
 		((struct gsi_ctx*)ecpri_dma_ctx->gsi_dev_hdl)->dev;
@@ -2196,21 +2222,47 @@ int ecpri_dma_gsi_setup_event_ring(struct ecpri_dma_endp_context *ep,
 	memset(&gsi_evt_ring_props, 0, sizeof(gsi_evt_ring_props));
 	gsi_evt_ring_props.intf = GSI_EVT_CHTYPE_MHI_EV;
 
-	gsi_evt_ring_props.intr = GSI_INTR_IRQ;
-	gsi_evt_ring_props.ring_len = ring_length;
-	gsi_evt_ring_props.ring_base_vaddr =
-		dma_alloc_coherent(gsi_dev, gsi_evt_ring_props.ring_len, &evt_dma_addr,
-			mem_flag);
-	if (!gsi_evt_ring_props.ring_base_vaddr) {
-		DMAERR("fail to dma alloc %u bytes\n",
-			gsi_evt_ring_props.ring_len);
-		return -ENOMEM;
+	if (ep->is_endp_mhi_l2 && ep->l2_mhi_channel_ptr != NULL) {
+			channel = ep->l2_mhi_channel_ptr;
+			if (channel->state == ECPRI_DMA_HW_MHI_CHANNEL_STATE_INVALID) {
+				gsi_evt_ring_props.msi_irq = GSI_INTR_MSI;
+				gsi_evt_ring_props.int_modt = channel->ev_ctx_host.intmodt *
+					ECPRI_DMA_MHI_SLEEP_CLK_RATE_KHZ;
+				gsi_evt_ring_props.int_modc = channel->ev_ctx_host.intmodc;
+				gsi_evt_ring_props.intvec = ((channel->msi_config->data
+					& ~channel->msi_config->mask) |
+					(channel->ev_ctx_host.msivec & channel->msi_config->mask));
+				gsi_evt_ring_props.ring_len = channel->ev_ctx_host.rlen;
+				gsi_evt_ring_props.ring_base_addr =
+					ECPRI_DMA_MHI_HOST_ADDR_COND(
+						channel->ev_ctx_host.rbase, ep);
+
+				msi_addr = ((uint64_t)channel->msi_config->addr_hi << 32 |
+					channel->msi_config->addr_low);
+				gsi_evt_ring_props.msi_addr =
+					ECPRI_DMA_MHI_HOST_ADDR_COND(msi_addr, ep);
+
+				rp_update_addr = channel->ev_context_addr +
+					offsetof(struct ecpri_dma_mhi_host_ev_ctx, rp);
+				gsi_evt_ring_props.rp_update_addr =
+					ECPRI_DMA_MHI_HOST_ADDR_COND(rp_update_addr, ep);
+			}
 	}
+	else {
+		gsi_evt_ring_props.intr = GSI_INTR_IRQ;
+		gsi_evt_ring_props.ring_len = ring_length;
+		gsi_evt_ring_props.ring_base_vaddr = dma_alloc_coherent(
+			gsi_dev, gsi_evt_ring_props.ring_len, &evt_dma_addr, mem_flag);
+		if (!gsi_evt_ring_props.ring_base_vaddr) {
+			DMAERR("fail to dma alloc %u bytes\n",
+				gsi_evt_ring_props.ring_len);
+			return -ENOMEM;
+		}
 
-	gsi_evt_ring_props.ring_base_addr = evt_dma_addr;
-	gsi_evt_ring_props.int_modt = ep->int_modt;
-	gsi_evt_ring_props.int_modc = ep->int_modc;
-
+		gsi_evt_ring_props.ring_base_addr = evt_dma_addr;
+		gsi_evt_ring_props.int_modt = ep->int_modt;
+		gsi_evt_ring_props.int_modc = ep->int_modc;
+	}
 
 	gsi_evt_ring_props.re_size = GSI_EVT_RING_RE_SIZE_16B;
 
@@ -2222,10 +2274,16 @@ int ecpri_dma_gsi_setup_event_ring(struct ecpri_dma_endp_context *ep,
 		gsi_evt_ring_props.ring_base_vaddr;
 
 	gsi_evt_ring_props.exclusive = true;
-
-	gsi_evt_ring_props.user_data = NULL;
-	gsi_evt_ring_props.err_cb = ecpri_dma_dp_gsi_evt_ring_err_cb;
-
+	if (ep->is_endp_mhi_l2) {
+		gsi_evt_ring_props.err_cb = ecpri_dma_gsi_ev_err_cb;
+		gsi_evt_ring_props.user_data = (void*)channel;
+		gsi_evt_ring_props.evchid_valid = true;
+		gsi_evt_ring_props.evchid =	channel->event_id;
+	}
+	else {
+		gsi_evt_ring_props.user_data = NULL;
+		gsi_evt_ring_props.err_cb = ecpri_dma_dp_gsi_evt_ring_err_cb;
+	}
 	gsi_evt_ring_props.ee = gsi_ep_info->ee;
 
 	/* Send command to GSI to allocate an event channel */
@@ -2245,6 +2303,7 @@ int ecpri_dma_gsi_setup_transfer_ring(struct ecpri_dma_endp_context *ep,
 	u32 ring_length, gfp_t mem_flag)
 {
 	dma_addr_t dma_addr;
+	struct ecpri_dma_mhi_channel_ctx* channel;
 	struct gsi_chan_props gsi_channel_props;
 	const struct dma_gsi_ep_config *gsi_ep_info;
 	int result;
@@ -2263,18 +2322,31 @@ int ecpri_dma_gsi_setup_transfer_ring(struct ecpri_dma_endp_context *ep,
 
 	gsi_channel_props.evt_ring_hdl = ep->gsi_evt_ring_hdl;
 	gsi_channel_props.re_size = GSI_CHAN_RE_SIZE_16B;
+	gsi_channel_props.low_latency_en = 0;
 
-	gsi_channel_props.ring_len = ring_length;
-	gsi_channel_props.ring_base_vaddr = dma_alloc_coherent(gsi_dev,
-		gsi_channel_props.ring_len, &dma_addr, mem_flag);
-	if (!gsi_channel_props.ring_base_vaddr) {
-		DMAERR("fail to dma alloc %u bytes\n",
-			gsi_channel_props.ring_len);
-		result = -ENOMEM;
-		goto fail_alloc_channel_ring;
+	if (ep->is_endp_mhi_l2 && ep->l2_mhi_channel_ptr != NULL) {
+			channel = ep->l2_mhi_channel_ptr;
+			gsi_channel_props.ring_len = channel->ch_ctx_host.rlen;
+			gsi_channel_props.ring_base_addr =
+				ECPRI_DMA_MHI_HOST_ADDR_COND(
+					channel->ch_ctx_host.rbase, ep);
+			gsi_channel_props.chan_user_data = (void*)channel;
 	}
-	gsi_channel_props.ring_base_addr = dma_addr;
-	gsi_channel_props.chan_user_data = (void*)ep;
+	else {
+		gsi_channel_props.ring_len = ring_length;
+		gsi_channel_props.ring_base_vaddr =
+			dma_alloc_coherent(gsi_dev,
+				gsi_channel_props.ring_len, &dma_addr,
+				mem_flag);
+		if (!gsi_channel_props.ring_base_vaddr) {
+			DMAERR("fail to dma alloc %u bytes\n",
+				gsi_channel_props.ring_len);
+			result = -ENOMEM;
+			goto fail_alloc_channel_ring;
+		}
+		gsi_channel_props.ring_base_addr = dma_addr;
+		gsi_channel_props.chan_user_data = (void*)ep;
+	}
 
 	/* copy mem info */
 	ep->gsi_mem_info.chan_ring_len = gsi_channel_props.ring_len;
@@ -2363,7 +2435,7 @@ int ecpri_dma_gsi_release_channel(struct ecpri_dma_endp_context *ep)
 		return ret;
 	}
 
-	if (mode != ECPRI_DMA_NOTIFY_MODE_IRQ)
+	if (!ep->eventless_endp && mode != ECPRI_DMA_NOTIFY_MODE_IRQ)
 	{
 		ret = ecpri_dma_set_endp_mode(ep, ECPRI_DMA_NOTIFY_MODE_IRQ);
 		if (ret) {
@@ -2375,7 +2447,6 @@ int ecpri_dma_gsi_release_channel(struct ecpri_dma_endp_context *ep)
 	if (ep->gsi_ep_cfg->dir == ECPRI_DMA_ENDP_DIR_DEST)
 	{
 		endp_gsi_cfg.def.endp_en = 1;
-		endp_gsi_cfg.def.endp_flush = 1;
 		ecpri_dma_hal_write_reg_n(
 			ECPRI_ENDP_GSI_CFG_n, ep->endp_id, endp_gsi_cfg.value);
 	}
@@ -2386,19 +2457,25 @@ int ecpri_dma_gsi_release_channel(struct ecpri_dma_endp_context *ep)
 		return gsi_res;
 	}
 
-	dma_free_coherent(gsi_dev, ep->gsi_mem_info.chan_ring_len,
+	if (!ep->is_endp_mhi_l2) {
+		dma_free_coherent(gsi_dev, ep->gsi_mem_info.chan_ring_len,
 		ep->gsi_mem_info.chan_ring_base_vaddr,
 		ep->gsi_mem_info.chan_ring_base_addr);
-
-	gsi_res = gsi_dealloc_evt_ring(ep->gsi_evt_ring_hdl);
-	if (gsi_res != GSI_STATUS_SUCCESS) {
-		DMAERR("Error deallocating event: %d\n", gsi_res);
-		return gsi_res;
 	}
 
-	dma_free_coherent(gsi_dev, ep->gsi_mem_info.evt_ring_len,
+	if (!ep->eventless_endp) {
+		gsi_res = gsi_dealloc_evt_ring(ep->gsi_evt_ring_hdl);
+		if (gsi_res != GSI_STATUS_SUCCESS) {
+			DMAERR("Error deallocating event: %d\n", gsi_res);
+			return gsi_res;
+		}
+	}
+
+	if (!ep->is_endp_mhi_l2) {
+		dma_free_coherent(gsi_dev, ep->gsi_mem_info.evt_ring_len,
 		ep->gsi_mem_info.evt_ring_base_vaddr,
 		ep->gsi_mem_info.evt_ring_base_addr);
+	}
 
 	atomic_set(&ep->disconnect_in_progress, 0);
 
@@ -2409,6 +2486,7 @@ int ecpri_dma_gsi_setup_channel(struct ecpri_dma_endp_context *ep)
 {
 	u32 ring_size;
 	int result;
+	struct ecpri_dma_mhi_channel_ctx* channel;
 	struct device* gsi_dev =
 		((struct gsi_ctx*)ecpri_dma_ctx->gsi_dev_hdl)->dev;
 
@@ -2429,6 +2507,15 @@ int ecpri_dma_gsi_setup_channel(struct ecpri_dma_endp_context *ep)
 			goto fail_setup_event_ring;
 	}
 
+	if (ep->l2_mhi_channel_ptr != NULL && ep->is_endp_mhi_l2) {
+		ep->use_msi = true;
+		channel = ep->l2_mhi_channel_ptr;
+		result = gsi_ring_evt_ring_db(ep->gsi_evt_ring_hdl,
+			channel->ev_ctx_host.wp);
+		if (result)
+			goto fail_ring_db;
+	}
+
 	result = ecpri_dma_gsi_setup_transfer_ring(ep, ring_size, mem_flag);
 	if (result)
 		goto fail_setup_transfer_ring;
@@ -2440,6 +2527,7 @@ fail_setup_transfer_ring:
 		dma_free_coherent(gsi_dev, ep->gsi_mem_info.evt_ring_len,
 			ep->gsi_mem_info.evt_ring_base_vaddr,
 			ep->gsi_mem_info.evt_ring_base_addr);
+fail_ring_db:
 fail_setup_event_ring:
 	DMAERR("Return with err: %d\n", result);
 	return result;
@@ -2492,7 +2580,6 @@ int ecpri_dma_gsi_start_channel(struct ecpri_dma_endp_context *ep)
 	}
 
 	return ret;
-
 }
 
 u32 ecpri_dma_get_ctx_hw_ver()

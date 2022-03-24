@@ -45,6 +45,7 @@
 #include "ecpri_dma_debugfs.h"
 #include "ecpri_dma_utils.h"
 #include "ecpri_dma_eth_client.h"
+#include "ecpri_dma_mhi_client.h"
 #include "dmahal.h"
 
 #define ECPRI_DMA_EXCEPTION_MAX_INITIAL_CREDITS (20)
@@ -771,6 +772,8 @@ static int ecpri_dma_post_init(void)
 			break;
 		}
 	}
+	gsi_props.mhi_er_id_limits[0] = 0;
+	gsi_props.mhi_er_id_limits[1] = ECPRI_DMA_MHI_MAX_HW_CHANNELS - 1;
 	gsi_props.notify_cb = ecpri_dma_gsi_notify_cb;
 	gsi_props.req_clk_cb = NULL;
 	gsi_props.rel_clk_cb = NULL;
