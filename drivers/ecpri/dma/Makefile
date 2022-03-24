@@ -13,7 +13,16 @@ gsim-m +=	drivers/gsi/gsi.o \
 
 gsim-$(CONFIG_DEBUG_FS) += drivers/gsi/gsi_dbg.o
 
+ecpri_dmam-m += \
+	drivers/ecpri_dma/ecpri_dma.o \
+	drivers/ecpri_dma/ecpri_dma_utils.o \
+	drivers/ecpri_dma/ecpri_dma_interrupts.o \
+	drivers/ecpri_dma/ecpri_dma_debugfs.o \
+	drivers/ecpri_dma/dmahal/dmahal.o \
+	drivers/ecpri_dma/dmahal/dmahal_reg.o
+
 obj-$(CONFIG_GSI) += gsim.o
+obj-$(CONFIG_ECPRI_DMA) += ecpri_dmam.o
 
 
 all:
