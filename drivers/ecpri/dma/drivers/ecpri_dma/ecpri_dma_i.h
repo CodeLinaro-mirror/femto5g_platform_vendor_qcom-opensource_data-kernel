@@ -40,6 +40,8 @@
 #define CONFIG_ECPRI_DMA_UT (1)
 #endif
 
+#define ECPRI_DMA_RESET_WA_ENABLE (1)
+
 #define DRV_NAME "ecpri-dma"
 
 extern struct ecpri_dma_context *ecpri_dma_ctx;

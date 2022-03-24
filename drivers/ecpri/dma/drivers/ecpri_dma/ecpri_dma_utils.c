@@ -15,6 +15,7 @@
 #include "ecpri_dma_dp.h"
 #include "dmahal.h"
 #include "gsi.h"
+#include "ecpri_gsi_hwio.h"
 
 /* NOTE: The following and MHI,ETH static const arrays should be updated
 *        per driver version
@@ -1719,6 +1720,247 @@ static const struct ecpri_dma_endp_mapping ecpri_dma_port_mapping
 	}
 };
 
+#ifdef ECPRI_DMA_RESET_WA_ENABLE
+
+// FW interrupt entry points (IEP) initialization
+#define GSI_UC_IEP_DEF(iep_name, iep_offset)    {#iep_name, iep_offset}
+
+#define GSI_MAX_IEP_NAME_LEN        50
+#define GSI_MAX_NUMBER_OF_IEPS      19
+
+#define GCC_ECPRI_AHB_CHCR_OFFSET (0x2a008)
+#define ECPRI_CC_CLK_CTL_TOP_ECPRI_CC_ECPRI_SS_BCR_OFFSET (0x1000)
+
+typedef struct GSI_MCS_IEP
+{
+	uint8_t name[GSI_MAX_IEP_NAME_LEN];
+	uint32_t offset_val;
+} GSI_MCS_IEP;
+
+#define GSI_IEP_MAP(iepName) { "GSI_IRAM_PTR_" #iepName , HWIO_GSI_GSI_IRAM_PTR_##iepName##_OFFS }
+
+static GSI_MCS_IEP iep[GSI_MAX_NUMBER_OF_IEPS] = {
+	GSI_UC_IEP_DEF(GSI_IRAM_PTR_CH_CMD, 1),
+	GSI_UC_IEP_DEF(GSI_IRAM_PTR_CH_DB, 2),
+	GSI_UC_IEP_DEF(GSI_IRAM_PTR_CH_DIS_COMP, 3),
+	GSI_UC_IEP_DEF(GSI_IRAM_PTR_CH_EMPTY, 4),
+	GSI_UC_IEP_DEF(GSI_IRAM_PTR_EE_GENERIC_CMD, 5),
+	GSI_UC_IEP_DEF(GSI_IRAM_PTR_EV_DB, 14),
+	GSI_UC_IEP_DEF(GSI_IRAM_PTR_EVENT_GEN_COMP, 6),
+	GSI_UC_IEP_DEF(GSI_IRAM_PTR_INT_MOD_STOPED, 7),
+	GSI_UC_IEP_DEF(GSI_IRAM_PTR_INT_NOTIFY_MCS, 19),
+	GSI_UC_IEP_DEF(GSI_IRAM_PTR_MSI_DB, 18),
+	GSI_UC_IEP_DEF(GSI_IRAM_PTR_NEW_RE, 11),
+	GSI_UC_IEP_DEF(GSI_IRAM_PTR_PERIPH_IF_TLV_IN_0, 8),
+	GSI_UC_IEP_DEF(GSI_IRAM_PTR_PERIPH_IF_TLV_IN_1, 10),
+	GSI_UC_IEP_DEF(GSI_IRAM_PTR_PERIPH_IF_TLV_IN_2, 9),
+	GSI_UC_IEP_DEF(GSI_IRAM_PTR_READ_ENG_COMP, 12),
+	GSI_UC_IEP_DEF(GSI_IRAM_PTR_TIMER_EXPIRED, 13),
+	GSI_UC_IEP_DEF(GSI_IRAM_PTR_TLV_CH_NOT_FULL, 17),
+	GSI_UC_IEP_DEF(GSI_IRAM_PTR_UC_GP_INT, 15),
+	GSI_UC_IEP_DEF(GSI_IRAM_PTR_WRITE_ENG_COMP, 16)
+};
+
+// here we store register offset in place of IEP offset.
+static GSI_MCS_IEP iepRegMap[] = {
+	GSI_IEP_MAP(CH_CMD),
+	GSI_IEP_MAP(CH_DB),
+	GSI_IEP_MAP(CH_DIS_COMP),
+	GSI_IEP_MAP(CH_EMPTY),
+	GSI_IEP_MAP(EE_GENERIC_CMD),
+	GSI_IEP_MAP(EVENT_GEN_COMP),
+	GSI_IEP_MAP(INT_MOD_STOPED),
+	GSI_IEP_MAP(PERIPH_IF_TLV_IN_0),
+	GSI_IEP_MAP(PERIPH_IF_TLV_IN_2),
+	GSI_IEP_MAP(PERIPH_IF_TLV_IN_1),
+	GSI_IEP_MAP(NEW_RE),
+	GSI_IEP_MAP(READ_ENG_COMP),
+	GSI_IEP_MAP(TIMER_EXPIRED),
+	GSI_IEP_MAP(EV_DB),
+	GSI_IEP_MAP(UC_GP_INT),
+	GSI_IEP_MAP(WRITE_ENG_COMP),
+	GSI_IEP_MAP(TLV_CH_NOT_FULL),
+	GSI_IEP_MAP(INT_NOTIFY_MCS),
+	GSI_IEP_MAP(MSI_DB),
+};
+
+static void __iomem* gsi_base;
+static void __iomem* gcc_base;
+static void __iomem* ecpri_cc_base;
+
+static inline void ecpri_dma_write_reg(void* base, u32 offset, u32 val)
+{
+	iowrite32(val, base + offset);
+}
+
+static inline int ecpri_dma_read_reg(void* base, u32 offset)
+{
+	return ioread32(base + offset);
+}
+
+static void gsi_write_iep(const uint8_t* name, uint32_t val)
+{
+	uint32_t i;
+
+	// we don't want zero-length items to match empty cells in map
+	if (*name == '\0')
+		return;
+
+	for (i = 0; i < ARRAY_SIZE(iepRegMap); ++i) {
+		if (strncmp(iepRegMap[i].name, name, GSI_MAX_IEP_NAME_LEN) == 0) {
+			writel_relaxed(val, gsi_base + iepRegMap[i].offset_val);
+			return;
+		}
+	}
+	return;
+}
+
+static void ecpri_dma_gsi_setup_ch_and_pipes(void)
+{
+	u32 reg_val, start;
+	int i;
+	const struct dma_gsi_ep_config* gsi_ep_info_cfg;
+	const struct dma_gsi_ep_config* endp_map;
+
+	/* setup DMA_ENDP_GSI_CFG_TLV_n reg */
+	start = 0;
+
+	/* Set ENDP mappings according to HW version and flavor */
+	if (ecpri_dma_get_endp_mapping(ecpri_dma_ctx->ecpri_hw_ver,
+		ecpri_dma_ctx->hw_flavor, &endp_map)) {
+		DMAERR("Failed retrieving eCPRI DMA ENDP mapping\n");
+		return;
+	}
+
+	for (i = 0; i < ecpri_dma_ctx->ecpri_dma_num_endps; i++) {
+		gsi_ep_info_cfg = &endp_map[i];
+		/*DMAERR("for ep %d gsi_ep_info_cfg=%px\n",
+			i, gsi_ep_info_cfg);*/
+		if (!gsi_ep_info_cfg || !gsi_ep_info_cfg->valid)
+			continue;
+		reg_val = ((gsi_ep_info_cfg->dma_if_tlv << 16) & 0x00FF0000);
+		reg_val += (start & 0xFFFF);
+		start += gsi_ep_info_cfg->dma_if_tlv;
+		ecpri_dma_write_reg(ecpri_dma_ctx->mmio,
+			HWIO_ECPRI_ENDP_GSI_IF_FIFO_CFG_TLV_n_OFFS(i),
+			reg_val);
+	}
+
+	start = 0;
+
+	/* setup DMA_ENDP_GSI_CFG_AOS_n reg */
+	for (i = 0; i < ecpri_dma_ctx->ecpri_dma_num_endps; i++) {
+		gsi_ep_info_cfg = &endp_map[i];
+		/*DMAERR("for ep %d gsi_ep_info_cfg=%px\n",
+			i, gsi_ep_info_cfg);*/
+		if (!gsi_ep_info_cfg || !gsi_ep_info_cfg->valid)
+			continue;
+
+		reg_val = ((gsi_ep_info_cfg->dma_if_aos << 16) & 0x00FF0000);
+		reg_val += (start & 0xFFFF);
+		start += gsi_ep_info_cfg->dma_if_aos;
+		ecpri_dma_write_reg(ecpri_dma_ctx->mmio,
+			HWIO_ECPRI_ENDP_GSI_IF_FIFO_CFG_AOS_n_OFFS(i),
+			reg_val);
+	}
+
+	/* setup GSI_MAP_EE_n_CH_k_VP_TABLE reg */
+	for (i = 0; i < ecpri_dma_ctx->ecpri_dma_num_endps; i++) {
+		gsi_ep_info_cfg = &endp_map[i];
+		/*DMAERR("for ep %d gsi_ep_info_cfg=%px\n",
+			i, gsi_ep_info_cfg);*/
+		if (!gsi_ep_info_cfg || !gsi_ep_info_cfg->valid)
+			continue;
+
+		reg_val = i & 0xFF;
+
+		writel_relaxed(reg_val,
+			gsi_base +
+			HWIO_GSI_GSI_MAP_EE_n_CH_k_VP_TABLE_OFFS(gsi_ep_info_cfg->ee,
+				gsi_ep_info_cfg->dma_gsi_chan_num));
+	}
+
+	DMAERR("registers setup Done\n");
+}
+
+static void ecpri_dma_reset_ecpri_block(void)
+{
+	u32 reg_val, reset_reg_val, value, i;
+	//Available in DTSi, for WA hard code this, ECPRI_GSI address and size
+	gsi_base = ioremap(0x9004000, 0xFC000);
+	BUG_ON(!gsi_base);
+	gcc_base = ioremap(0x00090000, 0x1E0000);
+	BUG_ON(!gcc_base);
+	ecpri_cc_base = ioremap(0x00288000, 0x28000);
+	BUG_ON(!ecpri_cc_base);
+
+	DMAERR("eCPRI Block reset WA is used\n");
+	DMADBG("gsi_base: %px\n", gsi_base);
+	DMADBG("gcc_base: %px\n", gcc_base);
+	DMADBG("ecpri_cc_base: %px\n", ecpri_cc_base);
+
+	//Reset DMA and GSI
+	writel_relaxed(1,
+		ecpri_cc_base + ECPRI_CC_CLK_CTL_TOP_ECPRI_CC_ECPRI_SS_BCR_OFFSET);
+	reg_val = readl_relaxed(gcc_base + GCC_ECPRI_AHB_CHCR_OFFSET);
+	usleep_range(100000, 400000);
+	reset_reg_val = reg_val | 0x4;
+	writel_relaxed(reset_reg_val, gcc_base + GCC_ECPRI_AHB_CHCR_OFFSET);
+	usleep_range(100000, 400000);
+	writel_relaxed(reg_val, gcc_base + GCC_ECPRI_AHB_CHCR_OFFSET);
+	usleep_range(100000, 400000);
+	writel_relaxed(0,
+		ecpri_cc_base + ECPRI_CC_CLK_CTL_TOP_ECPRI_CC_ECPRI_SS_BCR_OFFSET);
+
+	ecpri_dma_gsi_setup_ch_and_pipes();
+
+	for (i = 0; i < GSI_MAX_NUMBER_OF_IEPS; i++) {
+		gsi_write_iep(iep[i].name, iep[i].offset_val);
+	}
+
+	writel_relaxed(0, gsi_base + HWIO_GSI_GSI_PERIPH_BASE_ADDR_MSB_OFFS);
+	writel_relaxed(0x09000000,
+		gsi_base + HWIO_GSI_GSI_PERIPH_BASE_ADDR_LSB_OFFS);
+
+	//Enable MCS
+	value = readl_relaxed(gsi_base + HWIO_GSI_GSI_CFG_OFFS);
+	DMAERR("GSI CFG Value: 0x%x", value);
+	value |= ((1 << HWIO_GSI_GSI_CFG_GSI_ENABLE_SHFT) &
+		HWIO_GSI_GSI_CFG_GSI_ENABLE_BMSK);
+	DMAERR("GSI CFG Value2: 0x%x", value);
+	__iowmb();
+	writel_relaxed(value, gsi_base + HWIO_GSI_GSI_CFG_OFFS);
+
+	usleep_range(1000, 4000);
+
+	value = ((1 << HWIO_GSI_GSI_MCS_CFG_MCS_ENABLE_SHFT) &
+		HWIO_GSI_GSI_MCS_CFG_MCS_ENABLE_BMSK);
+	writel_relaxed(value, gsi_base + HWIO_GSI_GSI_MCS_CFG_OFFS);
+
+	value = 0;
+	i = 0;
+	while (!value)
+	{
+		__iowmb();
+		usleep_range(1000, 4000);
+		value = readl_relaxed(gsi_base + HWIO_GSI_EE_n_GSI_STATUS_OFFS(0));
+		DMAERR("IS MCS Running: 0x%x", value);
+	}
+
+	iounmap(gsi_base);
+	gsi_base = NULL;
+	iounmap(ecpri_cc_base);
+	gsi_base = ecpri_cc_base;
+	iounmap(gcc_base);
+	gsi_base = gcc_base;
+
+	DMAERR("eCPRI Block reset Done\n");
+}
+
+
+
+#endif
+
 void *ecpri_dma_get_ipc_logbuf(void)
 {
 	if (ecpri_dma_ctx)
@@ -1999,6 +2241,11 @@ int ecpri_dma_hw_init(void)
 	       hw_params_0.total_channels_n);
 	if (hw_params_0.total_channels_n == 0)
 		return -EFAULT;
+
+#ifdef ECPRI_DMA_RESET_WA_ENABLE
+	/* Reset eCPRI block for SMMU issue WA */
+	ecpri_dma_reset_ecpri_block();
+#endif
 
 	return 0;
 }
