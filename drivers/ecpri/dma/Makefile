@@ -19,11 +19,13 @@ ecpri_dmam-m += \
 	drivers/ecpri_dma/ecpri_dma_interrupts.o \
 	drivers/ecpri_dma/ecpri_dma_debugfs.o \
 	drivers/ecpri_dma/ecpri_dma_dp.o \
+	drivers/ecpri_dma/dma_clients/ecpri_dma_eth_client.o \
 	drivers/ecpri_dma/dmahal/dmahal.o \
 	drivers/ecpri_dma/dmahal/dmahal_reg.o
 
 ecpri_dmam-$(CONFIG_ECPRI_DMA_UT) += \
 	drivers/ecpri_dma/test/ecpri_dma_test_dp.o \
+	drivers/ecpri_dma/test/ecpri_dma_eth_dp_test.o \
 	drivers/ecpri_dma/test/ecpri_dma_test_driver_init.o \
 	drivers/ecpri_dma/test/ecpri_dma_test_example.o \
 	drivers/ecpri_dma/test/ecpri_dma_ut_framework.o

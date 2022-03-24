@@ -44,6 +44,7 @@
 #include "ecpri_dma_dp.h"
 #include "ecpri_dma_debugfs.h"
 #include "ecpri_dma_utils.h"
+#include "ecpri_dma_eth_client.h"
 #include "dmahal.h"
 
 #define ECPRI_DMA_EXCEPTION_MAX_INITIAL_CREDITS (20)
