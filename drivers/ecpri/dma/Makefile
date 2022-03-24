@@ -21,9 +21,13 @@ ecpri_dmam-m += \
 	drivers/ecpri_dma/dmahal/dmahal.o \
 	drivers/ecpri_dma/dmahal/dmahal_reg.o
 
+ecpri_dmam-$(CONFIG_ECPRI_DMA_UT) += \
+	drivers/ecpri_dma/test/ecpri_dma_test_driver_init.o \
+	drivers/ecpri_dma/test/ecpri_dma_test_example.o \
+	drivers/ecpri_dma/test/ecpri_dma_ut_framework.o
+
 obj-$(CONFIG_GSI) += gsim.o
 obj-$(CONFIG_ECPRI_DMA) += ecpri_dmam.o
-
 
 all:
 	make -C $(KERNEL_SRC)/include/linux M=$(PWD) modules

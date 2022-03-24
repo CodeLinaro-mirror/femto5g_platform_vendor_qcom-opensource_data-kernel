@@ -32,6 +32,14 @@
 #include "ecpri_dma.h"
 #include "gsi.h"
 
+#if IS_ENABLED(CONFIG_DEBUG_FS) && !defined(CONFIG_DEBUG_FS)
+#define CONFIG_DEBUG_FS (1)
+#endif
+
+#if IS_ENABLED(CONFIG_ECPRI_DMA_UT)  && !defined(CONFIG_ECPRI_DMA_UT)
+#define CONFIG_ECPRI_DMA_UT (1)
+#endif
+
 #define DRV_NAME "ecpri-dma"
 
 extern struct ecpri_dma_context *ecpri_dma_ctx;
