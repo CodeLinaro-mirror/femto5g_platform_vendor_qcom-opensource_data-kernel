@@ -34,6 +34,7 @@ enum ecpri_dma_hal_reg_name {
     ECPRI_NFAPI_REASSEMBLY_VM_CFG_1_n,
     ECPRI_NFAPI_REASSEMBLY_VM_CFG_2_n,
     ECPRI_ENDP_GSI_CFG_n,
+    ECPRI_SPARE_REG,
     DMA_REG_MAX,
 };
 

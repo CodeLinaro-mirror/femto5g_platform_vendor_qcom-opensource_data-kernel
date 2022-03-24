@@ -41,6 +41,7 @@
 
 #include "ecpri_dma_i.h"
 #include "ecpri_dma_interrupts.h"
+#include "ecpri_dma_dp.h"
 #include "ecpri_dma_debugfs.h"
 #include "ecpri_dma_utils.h"
 #include "dmahal.h"
@@ -237,6 +238,45 @@ static void ecpri_dma_register_panic_hdlr(void)
 		&ecpri_dma_panic_blk);
 }
 
+static void ecpri_dma_notify_dma_ready(void)
+{
+	struct ecpri_dma_ready_cb_wrapper *entry;
+	struct ecpri_dma_ready_cb_wrapper *next;
+	ecpri_hwio_def_ecpri_spare_reg_u spare_reg;
+
+	DMADBG("Notify that DMA driver is ready\n");
+	mutex_lock(&ecpri_dma_ctx->lock);
+	if (!ecpri_dma_is_ready()) {
+		DMAERR("Cannot notify that DMA driver is ready\n");
+		mutex_unlock(&ecpri_dma_ctx->lock);
+		return;
+	}
+
+	list_for_each_entry_safe(entry, next,
+		&ecpri_dma_ctx->ecpri_dma_ready_cb_list, link)
+	{
+		if (entry->info.notify) {
+			entry->info.notify(entry->info.userdata);
+			DMADBG("Invoked CB function %ps address %pf\n",
+				entry->info.notify, entry->info.notify);
+		}
+		/* remove from list once notify is done */
+		list_del(&entry->link);
+		kfree(entry);
+	}
+
+	/* Trigger Q6 init without QMI */
+	spare_reg.value = 1;
+	ecpri_dma_hal_write_reg(
+		ECPRI_SPARE_REG, spare_reg.value);
+
+	mutex_unlock(&ecpri_dma_ctx->lock);
+
+	DMADBG("Written to SPARE_REG to trigger Q6 init\n");
+
+	DMADBG("Finished DMA ready notify\n");
+}
+
 static void ecpri_dma_gsi_notify_cb(struct gsi_per_notify *notify)
 {
 	/*
@@ -294,6 +334,242 @@ int ecpri_dma_active_clks_status(void)
 static void ecpri_dma_handle_gsi_differ_irq(void)
 {
 	return;
+}
+
+static void ecpri_dma_exception_replenish_work(struct work_struct *work)
+{
+	int ret = 0;
+	struct ecpri_dma_endp_context *ep;
+	struct ecpri_dma_exception_replenish_work_wrap *work_data =
+		container_of(work,
+			     struct ecpri_dma_exception_replenish_work_wrap,
+			     replenish_work);
+
+	ep = &ecpri_dma_ctx->endp_ctx[ecpri_dma_ctx->exception_endp];
+
+	DMADBG("replenish %d credits to exception\n",
+	       work_data->num_to_replenish);
+
+	ret = ecpri_dma_dp_exception_replenish(ep,
+					       work_data->num_to_replenish);
+	if (ret) {
+		DMAERR("Failed to replenish exception endp\n");
+		kfree(work_data);
+		return;
+	}
+
+	kfree(work_data);
+
+	DMADBG("Exception pipe is ready, driver is ready \n");
+
+	mutex_lock(&ecpri_dma_ctx->lock);
+	ecpri_dma_ctx->dma_initialization_complete = true;
+	mutex_unlock(&ecpri_dma_ctx->lock);
+
+	ecpri_dma_notify_dma_ready();
+}
+
+static int ecpri_dma_alloc_exception_endp(void)
+{
+	const struct dma_gsi_ep_config *gsi_ep_cfg;
+	struct ecpri_dma_endp_context *ep;
+	struct ecpri_dma_exception_replenish_work_wrap *work;
+	bool found_exception = false;
+	int ret = 0;
+	int i;
+
+	for (i = 0; i < ECPRI_DMA_ENDP_NUM_MAX; i++) {
+		if (ecpri_dma_ctx->endp_map[i].valid &&
+			ecpri_dma_ctx->endp_map[i].is_exception) {
+			gsi_ep_cfg = &ecpri_dma_ctx->endp_map[i];
+			ep = &ecpri_dma_ctx->endp_ctx[i];
+			DMADBG("Exception endp is ENDP# %d\n", i);
+
+			ep->gsi_ep_cfg = gsi_ep_cfg;
+			if (ep->valid) {
+				DMAERR("EP %d already allocated.\n", i);
+				goto fail_gen;
+			}
+
+			work = kzalloc(
+				sizeof(struct ecpri_dma_exception_replenish_work_wrap),
+				GFP_ATOMIC);
+			if (!work) {
+				DMAERR("failed to alloc ecpri_dma_exception_replenish_work\n");
+				ret = -ENOMEM;
+				goto fail_gen;
+			}
+
+			INIT_WORK(&work->replenish_work,
+				  ecpri_dma_exception_replenish_work);
+
+			INIT_LIST_HEAD(&ep->available_outstanding_pkts_list);
+			INIT_LIST_HEAD(&ep->completed_pkt_list);
+			INIT_LIST_HEAD(&ep->outstanding_pkt_list);
+			spin_lock_init(&ep->spinlock);
+
+			tasklet_init(&ep->tasklet, ecpri_dma_dp_tasklet_exception_notify,
+				(unsigned long)ep);
+
+			/* Configure endp GSI params */
+			ep->valid = true;
+			ep->endp_id = i;
+			ep->ring_length = gsi_ep_cfg->dma_if_aos;
+			ep->int_modt = ECPRI_DMA_EXCEPTION_ENDP_MODT;
+			ep->int_modc = ECPRI_DMA_EXCEPTION_ENDP_MODC;
+			ep->buff_size = ECPRI_DMA_EXCEPTION_ENDP_BUFF_SIZE;
+			ep->page_order = get_order(ep->buff_size);
+			ep->is_over_pcie = false;
+
+			ep->notify_comp =
+				ecpri_dma_dp_exception_endp_notify_completion;
+
+			ret = ecpri_dma_gsi_setup_channel(ep);
+			if (ret) {
+				DMAERR("Failed to setup GSI channel\n");
+				goto fail_gen;
+			}
+
+			ret = gsi_start_channel(ep->gsi_chan_hdl);
+			if (ret != GSI_STATUS_SUCCESS) {
+				DMAERR("gsi_start_channel failed res=%d ep=%d.\n", ret, i);
+				goto fail_start;
+			}
+			DMADBG("Exception endp (ep: %d) allocated and started\n", i);
+
+			ep->available_outstanding_pkts_cache = kmem_cache_create(
+				"DMA_OUTSTANDING_PKTS_WRAPPER",
+				sizeof(struct ecpri_dma_outstanding_pkt_wrapper), 0, 0, NULL);
+			if (!ep->available_outstanding_pkts_cache) {
+				DMAERR("DMA outstanding pkts wrapper cache create failed\n");
+				ret = -ENOMEM;
+				goto fail_out_cache;
+			}
+
+			ep->available_exception_pkts_cache = kmem_cache_create(
+				"DMA_EXCEPTION_PKTS_WRAPPER",
+				sizeof(struct ecpri_dma_pkt), 0, 0, NULL);
+			if (!ep->available_exception_pkts_cache) {
+				DMAERR("DMA exception pkts wrapper cache create failed\n");
+				ret = -ENOMEM;
+				goto fail_exception_pkt;
+			}
+
+			ep->available_exception_buffs_cache = kmem_cache_create(
+				"DMA_EXCEPTION_BUFFS_WRAPPER",
+				sizeof(struct ecpri_dma_mem_buffer), 0, 0, NULL);
+			if (!ep->available_exception_buffs_cache) {
+				DMAERR("DMA exception buffs wrapper cache create failed\n");
+				ret = -ENOMEM;
+				goto fail_exception_buff;
+			}
+
+			/* Fill ring with credtis */
+			work->num_to_replenish =
+				gsi_ep_cfg->dma_if_aos - 1 >
+						ECPRI_DMA_EXCEPTION_MAX_INITIAL_CREDITS ?
+					      ECPRI_DMA_EXCEPTION_MAX_INITIAL_CREDITS :
+					      gsi_ep_cfg->dma_if_aos - 1;
+
+			found_exception = true;
+
+			/* Save exception ENDP id for easier future access */
+			ecpri_dma_ctx->exception_endp = i;
+			
+			queue_work(ecpri_dma_ctx->ecpri_dma_exception_wq,
+				   &work->replenish_work);
+			break;
+		}
+	}
+
+	if(!found_exception) {
+		DMAERR("Exception endp not found\n");
+		return -EINVAL;
+	}
+
+	return ret;
+
+fail_exception_buff:
+	kmem_cache_destroy(ep->available_exception_pkts_cache);
+fail_exception_pkt:
+	kmem_cache_destroy(ep->available_outstanding_pkts_cache);
+fail_out_cache:
+	gsi_stop_channel(ep->gsi_chan_hdl);
+fail_start:
+	gsi_dealloc_channel(ep->gsi_chan_hdl);
+fail_gen:
+	return ret;
+}
+
+int ecpri_dma_alloc_endp(int endp_id, u32 ring_length,
+				   struct ecpri_dma_moderation_config *mod_cfg,
+				   bool is_over_pcie,
+				   client_notify_comp notify_comp)
+{
+	const struct dma_gsi_ep_config *gsi_ep_cfg;
+	struct ecpri_dma_endp_context *ep;
+	int ret = 0;
+
+	if(endp_id < 0 || endp_id >= ECPRI_DMA_ENDP_NUM_MAX || ring_length == 0||
+		!mod_cfg) {
+		DMAERR("Invalid params\n");
+		return -EINVAL;
+	}
+
+	if (!ecpri_dma_ctx->endp_map[endp_id].valid) {
+		DMAERR("EP %d is not valid\n", endp_id);
+		return -EINVAL;
+	}
+
+	ep = &ecpri_dma_ctx->endp_ctx[endp_id];
+	if (ep->valid) {
+		DMAERR("EP %d already allocated.\n", endp_id);
+		return -EINVAL;
+	}
+
+	gsi_ep_cfg = &ecpri_dma_ctx->endp_map[endp_id];
+	ep->gsi_ep_cfg = gsi_ep_cfg;
+
+	INIT_LIST_HEAD(&ep->available_outstanding_pkts_list);
+	INIT_LIST_HEAD(&ep->completed_pkt_list);
+	INIT_LIST_HEAD(&ep->outstanding_pkt_list);
+	spin_lock_init(&ep->spinlock);
+
+	if (gsi_ep_cfg->dir == ECPRI_DMA_ENDP_DIR_SRC) {
+		tasklet_init(&ep->tasklet, ecpri_dma_tasklet_transmit_done,
+			(unsigned long)ep);
+	} else {
+		tasklet_init(&ep->tasklet, ecpri_dma_tasklet_rx_done,
+			     (unsigned long)ep);
+	}
+
+	/* Configure endp GSI params */
+	ep->valid = true;
+	ep->endp_id = endp_id;
+	ep->ring_length = ring_length;
+	ep->int_modt = mod_cfg->moderation_timer_threshold;
+	ep->int_modc = mod_cfg->moderation_counter_threshold;
+	ep->is_over_pcie = is_over_pcie;
+
+	ep->notify_comp = notify_comp;
+
+	ret = ecpri_dma_gsi_setup_channel(ep);
+	if (ret) {
+		DMAERR("Failed to setup GSI channel\n");
+		return ret;
+	}
+	DMADBG("ENDP %d is allocated\n", endp_id);
+
+	ep->available_outstanding_pkts_cache = kmem_cache_create(
+		"DMA_OUTSTANDING_PKTS_WRAPPER",
+		sizeof(struct ecpri_dma_outstanding_pkt_wrapper), 0, 0, NULL);
+	if (!ep->available_outstanding_pkts_cache) {
+		DMAERR("DMA outstanding pkts wrapper cache create failed\n");
+		ret = -ENOMEM;
+		return ret;
+	}
+
+	return 0;
 }
 
 int ecpri_dma_reset_endp(struct ecpri_dma_endp_context *endp_cfg)
@@ -354,6 +630,7 @@ int ecpri_dma_dealloc_endp(struct ecpri_dma_endp_context *endp_cfg)
 {
 	int ret = 0;
 	struct list_head* pos = NULL, *n = NULL;
+	struct ecpri_dma_outstanding_pkt_wrapper* curr_pkt_wrapper = NULL;
 
 	if (!endp_cfg->valid) {
 		DMADBG("ENDP %d isn't valid and cannot be deallocated\n", endp_cfg->endp_id);
@@ -366,12 +643,42 @@ int ecpri_dma_dealloc_endp(struct ecpri_dma_endp_context *endp_cfg)
 		return ret;
 	}
 
-	pos = NULL;
-	n = NULL;
+	/* Free allocated entry */
+	list_for_each_safe(pos, n, &endp_cfg->outstanding_pkt_list)
+	{
+		curr_pkt_wrapper = list_entry(pos,
+			struct ecpri_dma_outstanding_pkt_wrapper,
+			link);
+			list_del(&curr_pkt_wrapper->link);
+			kmem_cache_free(endp_cfg->available_outstanding_pkts_cache,
+				curr_pkt_wrapper);
+	}
 
 	pos = NULL;
 	n = NULL;
+	list_for_each_safe(pos, n, &endp_cfg->completed_pkt_list)
+	{
+		curr_pkt_wrapper = list_entry(pos,
+			struct ecpri_dma_outstanding_pkt_wrapper,
+			link);
+		list_del(&curr_pkt_wrapper->link);
+		kmem_cache_free(endp_cfg->available_outstanding_pkts_cache,
+			curr_pkt_wrapper);
+	}
 
+	pos = NULL;
+	n = NULL;
+	list_for_each_safe(pos, n, &endp_cfg->available_outstanding_pkts_list)
+	{
+		curr_pkt_wrapper = list_entry(pos,
+			struct ecpri_dma_outstanding_pkt_wrapper,
+			link);
+		list_del(&curr_pkt_wrapper->link);
+		kmem_cache_free(endp_cfg->available_outstanding_pkts_cache,
+			curr_pkt_wrapper);
+	}
+
+	kmem_cache_destroy(endp_cfg->available_outstanding_pkts_cache);
 	endp_cfg->curr_outstanding_num = 0;
 	endp_cfg->curr_completed_num = 0;
 
@@ -515,6 +822,13 @@ static int ecpri_dma_post_init(void)
 		goto fail_remove_debugfs;
 	}
 #endif
+
+	result = ecpri_dma_alloc_exception_endp();
+	if (result) {
+		DMAERR("Failed allocating and starting exception ENDPs\n");
+		result = -ENODEV;
+		goto fail_endp_map;
+	}
 
 	DMADBG("eCPRI DMA post init completed");
 

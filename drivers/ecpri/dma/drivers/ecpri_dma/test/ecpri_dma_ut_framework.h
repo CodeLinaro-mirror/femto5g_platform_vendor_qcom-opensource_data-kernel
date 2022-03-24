@@ -9,6 +9,7 @@
 #include <linux/kernel.h>
 #include "ecpri_dma_i.h"
 #include "ecpri_dma_interrupts.h"
+#include "ecpri_dma_dp.h"
 #include "ecpri_dma_debugfs.h"
 #include "ecpri_dma_utils.h"
 

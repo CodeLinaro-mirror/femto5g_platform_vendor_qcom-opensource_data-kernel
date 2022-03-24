@@ -42,6 +42,7 @@ static const char *ecpri_dma_reg_name_to_str[DMA_REG_MAX] = {
 	__stringify(ECPRI_DMA_ECPRI_NFAPI_REASSEMBLY_VM_CFG_1_n),
 	__stringify(ECPRI_DMA_ECPRI_NFAPI_REASSEMBLY_VM_CFG_2_n),
 	__stringify(ECPRI_DMA_ECPRI_ENDP_GSI_CFG_n),
+	__stringify(ECPRI_SPARE_REG),
 };
 
 static void ecpri_dma_reg_construct_dummy(enum ecpri_dma_hal_reg_name reg,
@@ -319,6 +320,9 @@ static struct ecpri_dma_hal_reg_obj ecpri_dma_hal_reg_objs[ECPRI_HW_MAX][DMA_REG
 	HWIO_ECPRI_ENDP_GSI_CFG_n_OFFS(0), HWIO_ECPRI_ENDP_GSI_CFG_n_OFFS(1) -
 	HWIO_ECPRI_ENDP_GSI_CFG_n_OFFS(0), 0, HWIO_ECPRI_ENDP_GSI_CFG_n_MAXn, 0, 0,
 	HWIO_ECPRI_ENDP_GSI_CFG_n_ATTR},
+	[ECPRI_HW_V1_0][ECPRI_SPARE_REG] = {
+	ecpri_dma_reg_construct_dummy, ecpri_dma_reg_parse_dummy,
+	HWIO_ECPRI_SPARE_REG_OFFS, 0, 0, 0, 0, 0, HWIO_ECPRI_SPARE_REG_ATTR},
 };
 
 /*

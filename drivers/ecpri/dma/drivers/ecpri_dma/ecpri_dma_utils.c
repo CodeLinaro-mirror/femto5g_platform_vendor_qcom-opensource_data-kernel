@@ -11,6 +11,7 @@
 #include <linux/elf.h>
 #include "ecpri_dma_i.h"
 #include "ecpri_dma_utils.h"
+#include "ecpri_dma_dp.h"
 #include "dmahal.h"
 #include "gsi.h"
 
@@ -2223,6 +2224,7 @@ int ecpri_dma_gsi_setup_event_ring(struct ecpri_dma_endp_context *ep,
 	gsi_evt_ring_props.exclusive = true;
 
 	gsi_evt_ring_props.user_data = NULL;
+	gsi_evt_ring_props.err_cb = ecpri_dma_dp_gsi_evt_ring_err_cb;
 
 	gsi_evt_ring_props.ee = gsi_ep_info->ee;
 
@@ -2290,6 +2292,13 @@ int ecpri_dma_gsi_setup_transfer_ring(struct ecpri_dma_endp_context *ep,
 	gsi_channel_props.ee = gsi_ep_info->ee;
 
 	gsi_channel_props.err_cb = ecpri_dma_gsi_chan_err_cb;
+	if (gsi_ep_info->dir == ECPRI_DMA_ENDP_DIR_SRC)
+		gsi_channel_props.xfer_cb = ecpri_dma_dp_tx_comp_hdlr;
+	else {
+		gsi_channel_props.xfer_cb = ecpri_dma_dp_rx_comp_hdlr;
+		//TODO: Ucomment whem impelemnting cleanup_cb
+		//gsi_channel_props.cleanup_cb = free_rx_pkt;
+	}
 
 	result = gsi_alloc_channel(&gsi_channel_props, ecpri_dma_ctx->gsi_dev_hdl,
 		&ep->gsi_chan_hdl);
@@ -2335,6 +2344,8 @@ int ecpri_dma_gsi_reset_channel(struct ecpri_dma_endp_context *ep)
 int ecpri_dma_gsi_release_channel(struct ecpri_dma_endp_context *ep)
 {
 	enum gsi_status gsi_res;
+	enum ecpri_dma_notify_mode mode;
+	int ret = 0;
 	ecpri_hwio_def_ecpri_endp_gsi_cfg_n_u endp_gsi_cfg = { 0 };
 	struct device* gsi_dev =
 		((struct gsi_ctx*)ecpri_dma_ctx->gsi_dev_hdl)->dev;
@@ -2345,6 +2356,21 @@ int ecpri_dma_gsi_release_channel(struct ecpri_dma_endp_context *ep)
 	}
 
 	atomic_set(&ep->disconnect_in_progress, 1);
+
+	ret = ecpri_dma_get_endp_mode(ep, &mode);
+	if (ret) {
+		DMAERR("Error getting ENDP mode. ret: %d\n", ret);
+		return ret;
+	}
+
+	if (mode != ECPRI_DMA_NOTIFY_MODE_IRQ)
+	{
+		ret = ecpri_dma_set_endp_mode(ep, ECPRI_DMA_NOTIFY_MODE_IRQ);
+		if (ret) {
+			DMAERR("Error setting ENDP mode. ret: %d\n", ret);
+			return ret;
+		}
+	}
 
 	if (ep->gsi_ep_cfg->dir == ECPRI_DMA_ENDP_DIR_DEST)
 	{
