@@ -16,6 +16,7 @@ DMA_UT_DECLARE_SUITE(example);
 DMA_UT_DECLARE_SUITE(driver_init);
 DMA_UT_DECLARE_SUITE(driver_dp);
 DMA_UT_DECLARE_SUITE(eth_dp);
+DMA_UT_DECLARE_SUITE(ss_core_client);
 
 /**
  * Register every suite inside the below block.
@@ -27,6 +28,7 @@ DMA_UT_DEFINE_ALL_SUITES_START
     DMA_UT_REGISTER_SUITE(driver_init),
     DMA_UT_REGISTER_SUITE(driver_dp),
     DMA_UT_REGISTER_SUITE(eth_dp),
+    DMA_UT_REGISTER_SUITE(ss_core_client),
 } DMA_UT_DEFINE_ALL_SUITES_END;
 
 #endif /* _DMA_UT_SUITE_LIST_H_ */
