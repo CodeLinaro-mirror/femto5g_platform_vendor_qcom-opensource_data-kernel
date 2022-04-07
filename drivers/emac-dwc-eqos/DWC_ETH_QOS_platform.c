@@ -399,9 +399,9 @@ static ssize_t phy_off_config(struct device *dev,
 		/*Backup phy related data*/
 		if (pdata->phydev && pdata->phydev->autoneg == AUTONEG_DISABLE) {
 			pdata->backup_autoneg = pdata->phydev->autoneg;
-			pdata->backup_bmcr = DWC_ETH_QOS_mdio_read_direct(pdata,
-									  pdata->phyaddr,
-									  MII_BMCR, &pdata->backup_bmcr);
+			DWC_ETH_QOS_mdio_read_direct(pdata,
+						     pdata->phyaddr,
+						     MII_BMCR, &pdata->backup_bmcr);
 		} else {
 			pdata->backup_autoneg = AUTONEG_ENABLE;
 		}
@@ -421,6 +421,7 @@ static ssize_t phy_off_config(struct device *dev,
 		//make phy on
 		DWC_ETH_QOS_phy_power_on(pdata);
 		DWC_ETH_QOS_reset_phy_enable_interrupt(pdata);
+
 		if (pdata->backup_autoneg == AUTONEG_DISABLE) {
 			pdata->phydev->autoneg = pdata->backup_autoneg;
 			phy_write(pdata->phydev, MII_BMCR, pdata->backup_bmcr);
@@ -3979,9 +3980,9 @@ static INT DWC_ETH_QOS_suspend(struct platform_device *pdev, pm_message_t state)
 	    pdata->current_phy_mode == DISABLE_PHY_SUSPEND_ENABLE_RESUME) {
 		if (pdata->phydev && pdata->phydev->autoneg == AUTONEG_DISABLE) {
 			pdata->backup_autoneg = pdata->phydev->autoneg;
-			pdata->backup_bmcr = DWC_ETH_QOS_mdio_read_direct(pdata,
-							       pdata->phyaddr,
-							       MII_BMCR, &pdata->backup_bmcr);
+			DWC_ETH_QOS_mdio_read_direct(pdata,
+						     pdata->phyaddr,
+						     MII_BMCR, &pdata->backup_bmcr);
 		} else {
 			pdata->backup_autoneg = AUTONEG_ENABLE;
 		}
