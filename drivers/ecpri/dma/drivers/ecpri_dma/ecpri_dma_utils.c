@@ -1782,7 +1782,7 @@ int ecpri_dma_hw_init(void)
 		DMAERR("Failed to get gcc_ecpri_noc_ahb\n");
 		return -ENOMEM;
 	}
-	
+
 	ecpri_dma_ctx->clks.gcc_ecpri_ahb = devm_clk_get(ecpri_dma_ctx->pdev,
 		"gcc_ecpri_ahb");
 	if (!ecpri_dma_ctx->clks.gcc_ecpri_ahb) {
@@ -1848,13 +1848,13 @@ int ecpri_dma_hw_init(void)
 
 	/* Vote clocks */
 	DMADBG("Started clocks vote\n");
-	
+
 	ret = clk_prepare_enable(ecpri_dma_ctx->clks.gcc_ecpri_noc_ahb);
 	if (ret)
 	{
 		DMAERR("Failed to vote gcc_ecpri_noc_ahb\n");
 	}
-	
+
 	ret = clk_prepare_enable(ecpri_dma_ctx->clks.gcc_ecpri_ahb);
 	if (ret)
 	{
@@ -1866,7 +1866,7 @@ int ecpri_dma_hw_init(void)
 	{
 		DMAERR("Failed to vote gcc_ecpri_xo\n");
 	}
-	
+
 	ret = clk_prepare_enable(ecpri_dma_ctx->clks.ecpri_cg_clk);
 	if (ret)
 	{
@@ -1913,8 +1913,8 @@ int ecpri_dma_hw_init(void)
 	}
 
 	/* Read eCPRI HW Params 0 and make sure we have access to the registers */
-	ecpri_dma_hal_read_reg_fields(HW_PARAMS_0, &hw_params_0);
-	DMADBG("HW_PARAMS_0 DST=%u SRC=%u TOTAL=%u\n",
+	ecpri_dma_hal_read_reg_fields(ECPRI_HW_PARAMS_0, &hw_params_0);
+	DMADBG("ECPRI_HW_PARAMS_0 DST=%u SRC=%u TOTAL=%u\n",
 	       hw_params_0.dst_channel_n, hw_params_0.src_channel_n,
 	       hw_params_0.total_channels_n);
 	if (hw_params_0.total_channels_n == 0)

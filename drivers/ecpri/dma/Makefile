@@ -4,6 +4,7 @@ ccflags-y += -I$(src)/../../include
 ccflags-y += -I$(ECPRIDMADRVTOP)/gsi
 ccflags-y += -I$(ECPRIDMADRVTOP)/gsi/gsihal
 ccflags-y += -I$(ECPRIDMADRVTOP)/ecpri_dma
+ccflags-y += -I$(ECPRIDMADRVTOP)/ecpri_dma/dump
 ccflags-y += -I$(ECPRIDMADRVTOP)/ecpri_dma/dmahal
 ccflags-y += -I$(ECPRIDMADRVTOP)/ecpri_dma/dma_clients
 
@@ -19,6 +20,7 @@ ecpri_dmam-m += \
 	drivers/ecpri_dma/ecpri_dma_interrupts.o \
 	drivers/ecpri_dma/ecpri_dma_debugfs.o \
 	drivers/ecpri_dma/ecpri_dma_dp.o \
+	drivers/ecpri_dma/dump/ecpri_dma_reg_dump.o \
 	drivers/ecpri_dma/dma_clients/ecpri_dma_eth_client.o \
 	drivers/ecpri_dma/dma_clients/ecpri_dma_ss_core.o \
 	drivers/ecpri_dma/dma_clients/ecpri_dma_mhi_client.o \

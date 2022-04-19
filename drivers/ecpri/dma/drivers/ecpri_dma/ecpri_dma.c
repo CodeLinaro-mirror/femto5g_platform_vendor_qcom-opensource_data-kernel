@@ -47,6 +47,7 @@
 #include "ecpri_dma_eth_client.h"
 #include "ecpri_dma_mhi_client.h"
 #include "dmahal.h"
+#include "ecpri_dma_reg_dump.h"
 
 #define ECPRI_DMA_EXCEPTION_MAX_INITIAL_CREDITS (20)
 
@@ -222,7 +223,7 @@ static int ecpri_dma_panic_notifier(struct notifier_block *this,
 			return NOTIFY_DONE;
 	}
 
-	//TODO: Add REG_SAVE API here
+	ecpri_dma_save_registers();
 
 	return NOTIFY_DONE;
 }
@@ -477,7 +478,7 @@ static int ecpri_dma_alloc_exception_endp(void)
 
 			/* Save exception ENDP id for easier future access */
 			ecpri_dma_ctx->exception_endp = i;
-			
+
 			queue_work(ecpri_dma_ctx->ecpri_dma_exception_wq,
 				   &work->replenish_work);
 			break;

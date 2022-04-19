@@ -10,6 +10,7 @@
 #include <linux/stringify.h>
 #include "ecpri_dma_i.h"
 #include "dmahal.h"
+#include "ecpri_dma_reg_dump.h"
 
 #define DMA_MAX_ENTRY_STRING_LEN 500
 #define DMA_MAX_MSG_LEN 4096
@@ -141,6 +142,16 @@ static ssize_t ecpri_dma_read_ecpri_dma_hal_regs(struct file *file, char __user 
 
 	return 0;
 }
+
+static ssize_t ecpri_dma_trigger_dump_collect(struct file* file,
+	const char __user* buf,
+	size_t count, loff_t* ppos)
+{
+	ecpri_dma_save_registers();
+
+	return count;
+}
+
 static const struct ecpri_dma_debugfs_file debugfs_files[] = {
 	{
 		"gen_reg", DMA_READ_ONLY_MODE, NULL, {
@@ -156,8 +167,12 @@ static const struct ecpri_dma_debugfs_file debugfs_files[] = {
 			.read = ecpri_dma_read_stats,
 		}
 	}, {
-		"ecpri_dma_dump_regs", DMA_READ_ONLY_MODE, NULL, {
+		"ecpri_dma_print_regs", DMA_READ_ONLY_MODE, NULL, {
 			.read = ecpri_dma_read_ecpri_dma_hal_regs,
+		}
+	},{
+		"ecpri_dma_collect_regs", DMA_WRITE_ONLY_MODE, NULL, {
+			.write = ecpri_dma_trigger_dump_collect,
 		}
 	},
 };

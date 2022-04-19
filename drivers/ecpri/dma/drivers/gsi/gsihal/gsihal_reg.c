@@ -64,7 +64,9 @@ static const char *gsireg_name_to_str[GSI_REG_MAX] = {
 	__stringify(GSI_EE_n_GSI_CH_k_DOORBELL_0),
 	__stringify(GSI_EE_n_CNTXT_GSI_IRQ_STTS),
 	__stringify(GSI_EE_n_CNTXT_GSI_IRQ_CLR),
+	__stringify(GSI_EE_n_GSI_HW_PARAM),
 	__stringify(GSI_EE_n_GSI_HW_PARAM_0),
+	__stringify(GSI_EE_n_GSI_HW_PARAM_1),
 	__stringify(GSI_EE_n_GSI_HW_PARAM_2),
 	__stringify(GSI_EE_n_GSI_HW_PARAM_4),
 	__stringify(GSI_EE_n_GSI_SW_VERSION),
@@ -73,6 +75,7 @@ static const char *gsireg_name_to_str[GSI_REG_MAX] = {
 	__stringify(GSI_EE_n_CNTXT_MSI_BASE_MSB),
 	__stringify(GSI_EE_n_GSI_STATUS),
 	__stringify(GSI_EE_n_CNTXT_SCRATCH_0),
+	__stringify(GSI_EE_n_CNTXT_SCRATCH_1),
 	__stringify(GSI_EE_n_EV_CH_k_CNTXT_1),
 	__stringify(GSI_EE_n_EV_CH_k_CNTXT_2),
 	__stringify(GSI_EE_n_EV_CH_k_CNTXT_3),
@@ -86,6 +89,7 @@ static const char *gsireg_name_to_str[GSI_REG_MAX] = {
 	__stringify(GSI_EE_n_EV_CH_CMD),
 	__stringify(GSI_EE_n_EV_CH_k_SCRATCH_0),
 	__stringify(GSI_EE_n_EV_CH_k_SCRATCH_1),
+	__stringify(GSI_EE_n_EV_CH_k_SCRATCH_2),
 	__stringify(GSI_EE_n_GSI_CH_k_DOORBELL_1),
 	__stringify(GSI_EE_n_GSI_CH_k_QOS),
 	__stringify(GSI_EE_n_GSI_CH_k_CNTXT_1),
@@ -117,7 +121,6 @@ static const char *gsireg_name_to_str[GSI_REG_MAX] = {
 	__stringify(GSI_GSI_IRAM_PTR_CH_EMPTY),
 	__stringify(GSI_GSI_IRAM_PTR_EE_GENERIC_CMD),
 	__stringify(GSI_GSI_IRAM_PTR_EVENT_GEN_COMP),
-	__stringify(GSI_GSI_IRAM_PTR_INT_MOD_STOPED),
 	__stringify(GSI_GSI_IRAM_PTR_PERIPH_IF_TLV_IN_0),
 	__stringify(GSI_GSI_IRAM_PTR_PERIPH_IF_TLV_IN_2),
 	__stringify(GSI_GSI_IRAM_PTR_PERIPH_IF_TLV_IN_1),
@@ -164,6 +167,64 @@ static const char *gsireg_name_to_str[GSI_REG_MAX] = {
 	__stringify(GSI_EE_n_GSI_CH_k_CH_ALMST_EMPTY_THRSHOLD),
 	__stringify(GSI_GSI_DEBUG_PC_FOR_DEBUG),
 	__stringify(GSI_GSI_DEBUG_BUSY_REG),
+	__stringify(GSI_GSI_MANAGER_MCS_CODE_VER),
+	__stringify(GSI_GSI_ZEROS),
+	__stringify(GSI_GSI_CGC_CTRL),
+	__stringify(GSI_GSI_MOQA_CFG),
+	__stringify(GSI_GSI_REE_CFG),
+	__stringify(GSI_GSI_MSI_CACHEATTR),
+	__stringify(GSI_GSI_EVENT_CACHEATTR),
+	__stringify(GSI_GSI_DATA_CACHEATTR),
+	__stringify(GSI_GSI_TRE_CACHEATTR),
+	__stringify(GSI_LOW_LATENCY_ARB_WEIGHT),
+	__stringify(GSI_GSI_SHRAM_PTR_CH_CNTXT_BASE_ADDR),
+	__stringify(GSI_GSI_SHRAM_PTR_EV_CNTXT_BASE_ADDR),
+	__stringify(GSI_GSI_SHRAM_PTR_RE_STORAGE_BASE_ADDR),
+	__stringify(GSI_GSI_SHRAM_PTR_RE_ESC_BUF_BASE_ADDR),
+	__stringify(GSI_GSI_SHRAM_PTR_MCS_SCRATCH_BASE_ADDR),
+	__stringify(GSI_GSI_SHRAM_PTR_MCS_SCRATCH1_BASE_ADDR),
+	__stringify(GSI_GSI_SHRAM_PTR_MCS_SCRATCH2_BASE_ADDR),
+	__stringify(GSI_GSI_SHRAM_PTR_MCS_SCRATCH3_BASE_ADDR),
+	__stringify(GSI_GSI_SHRAM_PTR_EE_SCRACH_BASE_ADDR),
+	__stringify(GSI_GSI_SHRAM_PTR_FUNC_STACK_BASE_ADDR),
+	__stringify(GSI_GSI_SHRAM_PTR_CH_VP_TRANS_TABLE_BASE_ADDR),
+	__stringify(GSI_GSI_SHRAM_PTR_EV_VP_TRANS_TABLE_BASE_ADDR),
+	__stringify(GSI_GSI_SHRAM_PTR_USER_INFO_DATA_BASE_ADDR),
+	__stringify(GSI_GSI_SHRAM_PTR_EE_CMD_FIFO_BASE_ADDR),
+	__stringify(GSI_GSI_SHRAM_PTR_CH_CMD_FIFO_BASE_ADDR),
+	__stringify(GSI_GSI_SHRAM_PTR_EVE_ED_STORAGE_BASE_ADDR),
+	__stringify(GSI_GSI_IRAM_PTR_INT_MOD_STOPED),
+	__stringify(GSI_GSI_TEST_BUS_SEL),
+	__stringify(GSI_GSI_TEST_BUS_REG),
+	__stringify(GSI_GSI_SPARE_REG_1),
+	__stringify(GSI_GSI_DEBUG_PC_FROM_SW),
+	__stringify(GSI_GSI_DEBUG_SW_STALL),
+	__stringify(GSI_GSI_DEBUG_QSB_LOG_SEL),
+	__stringify(GSI_GSI_DEBUG_QSB_LOG_ERR_TRNS_ID),
+	__stringify(GSI_GSI_DEBUG_QSB_LOG_0),
+	__stringify(GSI_GSI_DEBUG_QSB_LOG_1),
+	__stringify(GSI_GSI_DEBUG_QSB_LOG_2),
+	__stringify(GSI_GSI_DEBUG_REE_PREFETCH_BUF_CH_ID),
+	__stringify(GSI_GSI_DEBUG_REE_PREFETCH_BUF_STATUS),
+	__stringify(GSI_GSI_TZ_FW_AUTH_LOCK),
+	__stringify(GSI_GSI_MSA_FW_AUTH_LOCK),
+	__stringify(GSI_GSI_SP_FW_AUTH_LOCK),
+	__stringify(GSI_GSI_PERIPH_PENDING_k),
+	__stringify(GSI_GSI_DEBUG_EVENT_PENDING_k),
+	__stringify(GSI_GSI_DEBUG_TIMER_PENDING_k),
+	__stringify(GSI_GSI_DEBUG_RD_WR_PENDING_k),
+	__stringify(GSI_GSI_MANAGER_EE_QOS_n),
+	__stringify(GSI_GSI_DEBUG_SW_RF_n_READ),
+	__stringify(GSI_GSI_DEBUG_COUNTER_CFGn),
+	__stringify(GSI_GSI_DEBUG_COUNTERn),
+	__stringify(GSI_GSI_DEBUG_QSB_LOG_LAST_MISC_IDn),
+	__stringify(GSI_EE_n_GSI_MCS_CODE_VER),
+	__stringify(GSI_EE_n_CNTXT_INT_VEC),
+	__stringify(GSI_GSI_DEBUG_SW_MSK_REG_n_SEC_k_RD),
+	__stringify(GSI_GSI_DEBUG_EE_n_EV_k_VP_TABLE),
+	__stringify(GSI_EE_n_GSI_CH_k_ELEM_SIZE_SHIFT),
+	__stringify(GSI_EE_n_GSI_CH_k_DB_ENG_WRITE_PTR),
+	__stringify(GSI_EE_n_EV_CH_k_ELEM_SIZE_SHIFT),
 };
 
 /*
@@ -1171,6 +1232,192 @@ static struct gsihal_reg_obj gsihal_reg_objs[GSI_VER_MAX][GSI_REG_MAX] = {
 	[GSI_VER_3_0][GSI_GSI_DEBUG_PC_FOR_DEBUG] = {
 	gsireg_construct_dummy, gsireg_parse_dummy,
 	GSIHAL_REG_FIELD_FILL_OFFSET(GSI_GSI_DEBUG_PC_FOR_DEBUG) },
+	[GSI_VER_3_0][GSI_GSI_MANAGER_MCS_CODE_VER] = {
+	gsireg_construct_dummy, gsireg_parse_dummy,
+	GSIHAL_REG_FIELD_FILL_OFFSET(GSI_GSI_MANAGER_MCS_CODE_VER) },
+	[GSI_VER_3_0][GSI_GSI_ZEROS] = {
+	gsireg_construct_dummy, gsireg_parse_dummy,
+	GSIHAL_REG_FIELD_FILL_OFFSET(GSI_GSI_ZEROS) },
+	[GSI_VER_3_0][GSI_GSI_CGC_CTRL] = {
+	gsireg_construct_dummy, gsireg_parse_dummy,
+	GSIHAL_REG_FIELD_FILL_OFFSET(GSI_GSI_CGC_CTRL) },
+	[GSI_VER_3_0][GSI_GSI_MOQA_CFG] = {
+	gsireg_construct_dummy, gsireg_parse_dummy,
+	GSIHAL_REG_FIELD_FILL_OFFSET(GSI_GSI_MOQA_CFG) },
+	[GSI_VER_3_0][GSI_GSI_REE_CFG] = {
+	gsireg_construct_dummy, gsireg_parse_dummy,
+	GSIHAL_REG_FIELD_FILL_OFFSET(GSI_GSI_REE_CFG) },
+	[GSI_VER_3_0][GSI_GSI_MSI_CACHEATTR] = {
+	gsireg_construct_dummy, gsireg_parse_dummy,
+	GSIHAL_REG_FIELD_FILL_OFFSET(GSI_GSI_MSI_CACHEATTR) },
+	[GSI_VER_3_0][GSI_GSI_EVENT_CACHEATTR] = {
+	gsireg_construct_dummy, gsireg_parse_dummy,
+	GSIHAL_REG_FIELD_FILL_OFFSET(GSI_GSI_EVENT_CACHEATTR) },
+	[GSI_VER_3_0][GSI_GSI_DATA_CACHEATTR] = {
+	gsireg_construct_dummy, gsireg_parse_dummy,
+	GSIHAL_REG_FIELD_FILL_OFFSET(GSI_GSI_DATA_CACHEATTR) },
+	[GSI_VER_3_0][GSI_GSI_TRE_CACHEATTR] = {
+	gsireg_construct_dummy, gsireg_parse_dummy,
+	GSIHAL_REG_FIELD_FILL_OFFSET(GSI_GSI_TRE_CACHEATTR) },
+	[GSI_VER_3_0][GSI_LOW_LATENCY_ARB_WEIGHT] = {
+	gsireg_construct_dummy, gsireg_parse_dummy,
+	GSIHAL_REG_FIELD_FILL_OFFSET(GSI_LOW_LATENCY_ARB_WEIGHT) },
+	[GSI_VER_3_0][GSI_GSI_SHRAM_PTR_CH_CNTXT_BASE_ADDR] = {
+	gsireg_construct_dummy, gsireg_parse_dummy,
+	GSIHAL_REG_FIELD_FILL_OFFSET(GSI_GSI_SHRAM_PTR_CH_CNTXT_BASE_ADDR) },
+	[GSI_VER_3_0][GSI_GSI_SHRAM_PTR_EV_CNTXT_BASE_ADDR] = {
+	gsireg_construct_dummy, gsireg_parse_dummy,
+	GSIHAL_REG_FIELD_FILL_OFFSET(GSI_GSI_SHRAM_PTR_EV_CNTXT_BASE_ADDR) },
+	[GSI_VER_3_0][GSI_GSI_SHRAM_PTR_RE_STORAGE_BASE_ADDR] = {
+	gsireg_construct_dummy, gsireg_parse_dummy,
+	GSIHAL_REG_FIELD_FILL_OFFSET(GSI_GSI_SHRAM_PTR_RE_STORAGE_BASE_ADDR) },
+	[GSI_VER_3_0][GSI_GSI_SHRAM_PTR_RE_ESC_BUF_BASE_ADDR] = {
+	gsireg_construct_dummy, gsireg_parse_dummy,
+	GSIHAL_REG_FIELD_FILL_OFFSET(GSI_GSI_SHRAM_PTR_RE_ESC_BUF_BASE_ADDR) },
+	[GSI_VER_3_0][GSI_GSI_SHRAM_PTR_MCS_SCRATCH_BASE_ADDR] = {
+	gsireg_construct_dummy, gsireg_parse_dummy,
+	GSIHAL_REG_FIELD_FILL_OFFSET(GSI_GSI_SHRAM_PTR_MCS_SCRATCH_BASE_ADDR) },
+	[GSI_VER_3_0][GSI_GSI_SHRAM_PTR_MCS_SCRATCH1_BASE_ADDR] = {
+	gsireg_construct_dummy, gsireg_parse_dummy,
+	GSIHAL_REG_FIELD_FILL_OFFSET(GSI_GSI_SHRAM_PTR_MCS_SCRATCH1_BASE_ADDR) },
+	[GSI_VER_3_0][GSI_GSI_SHRAM_PTR_MCS_SCRATCH2_BASE_ADDR] = {
+	gsireg_construct_dummy, gsireg_parse_dummy,
+	GSIHAL_REG_FIELD_FILL_OFFSET(GSI_GSI_SHRAM_PTR_MCS_SCRATCH2_BASE_ADDR) },
+	[GSI_VER_3_0][GSI_GSI_SHRAM_PTR_MCS_SCRATCH3_BASE_ADDR] = {
+	gsireg_construct_dummy, gsireg_parse_dummy,
+	GSIHAL_REG_FIELD_FILL_OFFSET(GSI_GSI_SHRAM_PTR_MCS_SCRATCH3_BASE_ADDR) },
+	[GSI_VER_3_0][GSI_GSI_SHRAM_PTR_EE_SCRACH_BASE_ADDR] = {
+	gsireg_construct_dummy, gsireg_parse_dummy,
+	GSIHAL_REG_FIELD_FILL_OFFSET(GSI_GSI_SHRAM_PTR_EE_SCRACH_BASE_ADDR) },
+	[GSI_VER_3_0][GSI_GSI_SHRAM_PTR_FUNC_STACK_BASE_ADDR] = {
+	gsireg_construct_dummy, gsireg_parse_dummy,
+	GSIHAL_REG_FIELD_FILL_OFFSET(GSI_GSI_SHRAM_PTR_FUNC_STACK_BASE_ADDR) },
+	[GSI_VER_3_0][GSI_GSI_SHRAM_PTR_CH_VP_TRANS_TABLE_BASE_ADDR] = {
+	gsireg_construct_dummy, gsireg_parse_dummy,
+	GSIHAL_REG_FIELD_FILL_OFFSET(GSI_GSI_SHRAM_PTR_CH_VP_TRANS_TABLE_BASE_ADDR) },
+	[GSI_VER_3_0][GSI_GSI_SHRAM_PTR_EV_VP_TRANS_TABLE_BASE_ADDR] = {
+	gsireg_construct_dummy, gsireg_parse_dummy,
+	GSIHAL_REG_FIELD_FILL_OFFSET(GSI_GSI_SHRAM_PTR_EV_VP_TRANS_TABLE_BASE_ADDR) },
+	[GSI_VER_3_0][GSI_GSI_SHRAM_PTR_USER_INFO_DATA_BASE_ADDR] = {
+	gsireg_construct_dummy, gsireg_parse_dummy,
+	GSIHAL_REG_FIELD_FILL_OFFSET(GSI_GSI_SHRAM_PTR_USER_INFO_DATA_BASE_ADDR) },
+	[GSI_VER_3_0][GSI_GSI_SHRAM_PTR_EE_CMD_FIFO_BASE_ADDR] = {
+	gsireg_construct_dummy, gsireg_parse_dummy,
+	GSIHAL_REG_FIELD_FILL_OFFSET(GSI_GSI_SHRAM_PTR_EE_CMD_FIFO_BASE_ADDR) },
+	[GSI_VER_3_0][GSI_GSI_SHRAM_PTR_CH_CMD_FIFO_BASE_ADDR] = {
+	gsireg_construct_dummy, gsireg_parse_dummy,
+	GSIHAL_REG_FIELD_FILL_OFFSET(GSI_GSI_SHRAM_PTR_CH_CMD_FIFO_BASE_ADDR) },
+	[GSI_VER_3_0][GSI_GSI_SHRAM_PTR_EVE_ED_STORAGE_BASE_ADDR] = {
+	gsireg_construct_dummy, gsireg_parse_dummy,
+	GSIHAL_REG_FIELD_FILL_OFFSET(GSI_GSI_SHRAM_PTR_EVE_ED_STORAGE_BASE_ADDR) },
+	[GSI_VER_3_0][GSI_GSI_IRAM_PTR_INT_MOD_STOPED] = {
+	gsireg_construct_dummy, gsireg_parse_dummy,
+	GSIHAL_REG_FIELD_FILL_OFFSET(GSI_GSI_IRAM_PTR_INT_MOD_STOPED) },
+	[GSI_VER_3_0][GSI_GSI_TEST_BUS_SEL] = {
+	gsireg_construct_dummy, gsireg_parse_dummy,
+	GSIHAL_REG_FIELD_FILL_OFFSET(GSI_GSI_TEST_BUS_SEL) },
+	[GSI_VER_3_0][GSI_GSI_TEST_BUS_REG] = {
+	gsireg_construct_dummy, gsireg_parse_dummy,
+	GSIHAL_REG_FIELD_FILL_OFFSET(GSI_GSI_TEST_BUS_REG) },
+	[GSI_VER_3_0][GSI_GSI_SPARE_REG_1] = {
+	gsireg_construct_dummy, gsireg_parse_dummy,
+	GSIHAL_REG_FIELD_FILL_OFFSET(GSI_GSI_SPARE_REG_1) },
+	[GSI_VER_3_0][GSI_GSI_DEBUG_PC_FROM_SW] = {
+	gsireg_construct_dummy, gsireg_parse_dummy,
+	GSIHAL_REG_FIELD_FILL_OFFSET(GSI_GSI_DEBUG_PC_FROM_SW) },
+	[GSI_VER_3_0][GSI_GSI_DEBUG_SW_STALL] = {
+	gsireg_construct_dummy, gsireg_parse_dummy,
+	GSIHAL_REG_FIELD_FILL_OFFSET(GSI_GSI_DEBUG_SW_STALL) },
+	[GSI_VER_3_0][GSI_GSI_DEBUG_QSB_LOG_SEL] = {
+	gsireg_construct_dummy, gsireg_parse_dummy,
+	GSIHAL_REG_FIELD_FILL_OFFSET(GSI_GSI_DEBUG_QSB_LOG_SEL) },
+	[GSI_VER_3_0][GSI_GSI_DEBUG_QSB_LOG_ERR_TRNS_ID] = {
+	gsireg_construct_dummy, gsireg_parse_dummy,
+	GSIHAL_REG_FIELD_FILL_OFFSET(GSI_GSI_DEBUG_QSB_LOG_ERR_TRNS_ID) },
+	[GSI_VER_3_0][GSI_GSI_DEBUG_QSB_LOG_0] = {
+	gsireg_construct_dummy, gsireg_parse_dummy,
+	GSIHAL_REG_FIELD_FILL_OFFSET(GSI_GSI_DEBUG_QSB_LOG_0) },
+	[GSI_VER_3_0][GSI_GSI_DEBUG_QSB_LOG_1] = {
+	gsireg_construct_dummy, gsireg_parse_dummy,
+	GSIHAL_REG_FIELD_FILL_OFFSET(GSI_GSI_DEBUG_QSB_LOG_1) },
+	[GSI_VER_3_0][GSI_GSI_DEBUG_QSB_LOG_2] = {
+	gsireg_construct_dummy, gsireg_parse_dummy,
+	GSIHAL_REG_FIELD_FILL_OFFSET(GSI_GSI_DEBUG_QSB_LOG_2) },
+	[GSI_VER_3_0][GSI_GSI_DEBUG_REE_PREFETCH_BUF_CH_ID] = {
+	gsireg_construct_dummy, gsireg_parse_dummy,
+	GSIHAL_REG_FIELD_FILL_OFFSET(GSI_GSI_DEBUG_REE_PREFETCH_BUF_CH_ID) },
+	[GSI_VER_3_0][GSI_GSI_DEBUG_REE_PREFETCH_BUF_STATUS] = {
+	gsireg_construct_dummy, gsireg_parse_dummy,
+	GSIHAL_REG_FIELD_FILL_OFFSET(GSI_GSI_DEBUG_REE_PREFETCH_BUF_STATUS) },
+	[GSI_VER_3_0][GSI_GSI_TZ_FW_AUTH_LOCK] = {
+	gsireg_construct_dummy, gsireg_parse_dummy,
+	GSIHAL_REG_FIELD_FILL_OFFSET(GSI_GSI_TZ_FW_AUTH_LOCK) },
+	[GSI_VER_3_0][GSI_GSI_MSA_FW_AUTH_LOCK] = {
+	gsireg_construct_dummy, gsireg_parse_dummy,
+	GSIHAL_REG_FIELD_FILL_OFFSET(GSI_GSI_MSA_FW_AUTH_LOCK) },
+	[GSI_VER_3_0][GSI_GSI_SP_FW_AUTH_LOCK] = {
+	gsireg_construct_dummy, gsireg_parse_dummy,
+	GSIHAL_REG_FIELD_FILL_OFFSET(GSI_GSI_SP_FW_AUTH_LOCK) },
+	[GSI_VER_3_0][GSI_GSI_MANAGER_EE_QOS_n] = {
+	gsireg_construct_dummy, gsireg_parse_dummy,
+	GSIHAL_REG_FIELD_FILL_OFFSET_N(GSI_GSI_MANAGER_EE_QOS_n) },
+	[GSI_VER_3_0][GSI_GSI_DEBUG_SW_RF_n_READ] = {
+	gsireg_construct_dummy, gsireg_parse_dummy,
+	GSIHAL_REG_FIELD_FILL_OFFSET_N(GSI_GSI_DEBUG_SW_RF_n_READ) },
+	[GSI_VER_3_0][GSI_GSI_DEBUG_COUNTER_CFGn] = {
+	gsireg_construct_dummy, gsireg_parse_dummy,
+	GSIHAL_REG_FIELD_FILL_OFFSET_N(GSI_GSI_DEBUG_COUNTER_CFGn) },
+	[GSI_VER_3_0][GSI_GSI_DEBUG_COUNTERn] = {
+	gsireg_construct_dummy, gsireg_parse_dummy,
+	GSIHAL_REG_FIELD_FILL_OFFSET_N(GSI_GSI_DEBUG_COUNTERn) },
+	[GSI_VER_3_0][GSI_GSI_DEBUG_QSB_LOG_LAST_MISC_IDn] = {
+	gsireg_construct_dummy, gsireg_parse_dummy,
+	GSIHAL_REG_FIELD_FILL_OFFSET_N(GSI_GSI_DEBUG_QSB_LOG_LAST_MISC_IDn) },
+	[GSI_VER_3_0][GSI_EE_n_GSI_MCS_CODE_VER] = {
+	gsireg_construct_dummy, gsireg_parse_dummy,
+	GSIHAL_REG_FIELD_FILL_OFFSET_N(GSI_EE_n_GSI_MCS_CODE_VER) },
+	[GSI_VER_3_0][GSI_EE_n_CNTXT_INT_VEC] = {
+	gsireg_construct_dummy, gsireg_parse_dummy,
+	GSIHAL_REG_FIELD_FILL_OFFSET_N(GSI_EE_n_CNTXT_INT_VEC) },
+	[GSI_VER_3_0][GSI_GSI_PERIPH_PENDING_k] = {
+	gsireg_construct_dummy, gsireg_parse_dummy,
+	GSIHAL_REG_FIELD_FILL_OFFSET_N(GSI_GSI_PERIPH_PENDING_k) },
+	[GSI_VER_3_0][GSI_GSI_DEBUG_EVENT_PENDING_k] = {
+	gsireg_construct_dummy, gsireg_parse_dummy,
+	GSIHAL_REG_FIELD_FILL_OFFSET_N(GSI_GSI_DEBUG_EVENT_PENDING_k) },
+	[GSI_VER_3_0][GSI_GSI_DEBUG_TIMER_PENDING_k] = {
+	gsireg_construct_dummy, gsireg_parse_dummy,
+	GSIHAL_REG_FIELD_FILL_OFFSET_N(GSI_GSI_DEBUG_TIMER_PENDING_k) },
+	[GSI_VER_3_0][GSI_GSI_DEBUG_RD_WR_PENDING_k] = {
+	gsireg_construct_dummy, gsireg_parse_dummy,
+	GSIHAL_REG_FIELD_FILL_OFFSET_N(GSI_GSI_DEBUG_RD_WR_PENDING_k) },
+	[GSI_VER_3_0][GSI_GSI_DEBUG_SW_MSK_REG_n_SEC_k_RD] = {
+	gsireg_construct_dummy, gsireg_parse_dummy,
+	GSIHAL_REG_FIELD_FILL_OFFSET_N_K(GSI_GSI_DEBUG_SW_MSK_REG_n_SEC_k_RD) },
+	[GSI_VER_3_0][GSI_GSI_DEBUG_EE_n_EV_k_VP_TABLE] = {
+	gsireg_construct_dummy, gsireg_parse_dummy,
+	GSIHAL_REG_FIELD_FILL_OFFSET_N_K(GSI_GSI_DEBUG_EE_n_EV_k_VP_TABLE) },
+	[GSI_VER_3_0][GSI_EE_n_GSI_CH_k_ELEM_SIZE_SHIFT] = {
+	gsireg_construct_dummy, gsireg_parse_dummy,
+	GSIHAL_REG_FIELD_FILL_OFFSET_N_K(GSI_EE_n_GSI_CH_k_ELEM_SIZE_SHIFT) },
+	[GSI_VER_3_0][GSI_EE_n_GSI_CH_k_DB_ENG_WRITE_PTR] = {
+	gsireg_construct_dummy, gsireg_parse_dummy,
+	GSIHAL_REG_FIELD_FILL_OFFSET_N_K(GSI_EE_n_GSI_CH_k_DB_ENG_WRITE_PTR) },
+	[GSI_VER_3_0][GSI_EE_n_EV_CH_k_ELEM_SIZE_SHIFT] = {
+	gsireg_construct_dummy, gsireg_parse_dummy,
+	GSIHAL_REG_FIELD_FILL_OFFSET_N_K(GSI_EE_n_EV_CH_k_ELEM_SIZE_SHIFT) },
+	[GSI_VER_3_0][GSI_GSI_DEBUG_QSB_LOG_ERR_TRNS_ID] = {
+	gsireg_construct_dummy, gsireg_parse_dummy,
+	GSIHAL_REG_FIELD_FILL_OFFSET(GSI_GSI_DEBUG_QSB_LOG_ERR_TRNS_ID) },
+	[GSI_VER_3_0][GSI_EE_n_GSI_HW_PARAM_1] = {
+	gsireg_construct_dummy, gsireg_parse_dummy,
+	GSIHAL_REG_FIELD_FILL_OFFSET_N(GSI_EE_n_GSI_HW_PARAM_1) },
+	[GSI_VER_3_0][GSI_EE_n_CNTXT_SCRATCH_1] = {
+	gsireg_construct_dummy, gsireg_parse_dummy,
+	GSIHAL_REG_FIELD_FILL_OFFSET_N(GSI_EE_n_CNTXT_SCRATCH_1) },
+	[GSI_VER_3_0][GSI_EE_n_EV_CH_k_SCRATCH_2] = {
+	gsireg_construct_dummy, gsireg_parse_dummy,
+	GSIHAL_REG_FIELD_FILL_OFFSET_N_K(GSI_EE_n_EV_CH_k_SCRATCH_2) },
 };
 
 /*
@@ -1198,8 +1445,10 @@ u32 gsihal_read_reg_nk(enum gsihal_reg_name reg, u32 n, u32 k)
 
 	offset += gsihal_reg_objs[gsihal_ctx->gsi_ver][reg].k_ofst * k;
 	offset += gsihal_reg_objs[gsihal_ctx->gsi_ver][reg].n_ofst * n;
+
 	return gsi_readl(gsihal_ctx->base + offset);
 }
+EXPORT_SYMBOL(gsihal_read_reg_nk);
 
 /*
 * gsihal_write_reg_nk() - Write to n/k parameterized reg a raw value
