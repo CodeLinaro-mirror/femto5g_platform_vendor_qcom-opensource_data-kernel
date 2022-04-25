@@ -393,7 +393,7 @@ static ssize_t phy_off_config(struct device *dev,
 			phy_digital_loopback_config(pdata,
 						    pdata->loopback_speed, 0);
 			EMACDBG("Disable phy Loopback\n");
-			pdata->current_loopback = ENABLE_PHY_LOOPBACK;
+			pdata->current_loopback = DISABLE_LOOPBACK;
 		}
 
 		/*Backup phy related data*/
@@ -407,8 +407,8 @@ static ssize_t phy_off_config(struct device *dev,
 		}
 
 		if (pdata->phydev) {
-			if (DWC_ETH_QOS_is_phy_link_up(pdata) && (pdata->current_loopback == DISABLE_LOOPBACK)) {
-				EMACDBG("Post Link down before PHY off\n");
+			if (DWC_ETH_QOS_is_phy_link_up(pdata)) {
+				EMACERR("Post Link down before PHY off\n");
 				netif_carrier_off(ndev);
 				phy_mac_interrupt(pdata->phydev, LINK_DOWN);
 			}
@@ -422,15 +422,21 @@ static ssize_t phy_off_config(struct device *dev,
 		DWC_ETH_QOS_phy_power_on(pdata);
 		DWC_ETH_QOS_reset_phy_enable_interrupt(pdata);
 
+		if(pdata->irq_flag == 0) {
+			enable_irq(pdata->phy_irq);
+			pdata->irq_flag = 1;
+		}
+
 		if (pdata->backup_autoneg == AUTONEG_DISABLE) {
 			pdata->phydev->autoneg = pdata->backup_autoneg;
 			phy_write(pdata->phydev, MII_BMCR, pdata->backup_bmcr);
 		}
-		if (pdata->current_loopback == ENABLE_PHY_LOOPBACK) {
+		if (pdata->phy_loopback_flag == 1) {
 			/*If Phy loopback is enabled , enabled It again*/
 			phy_digital_loopback_config(pdata,
 						    pdata->loopback_speed, 1);
 			EMACDBG("Enabling Phy loopback again");
+			pdata->current_loopback = ENABLE_PHY_LOOPBACK;
 		}
 
 	} else if (config == DISABLE_PHY_AT_SUSPEND_ONLY) {
@@ -462,18 +468,26 @@ static void setup_config_registers(struct DWC_ETH_QOS_prv_data *pdata,
 		EMACDBG("IRQ so that Rx/Tx can happen before Link down\n");
 		netif_carrier_on(dev);
 		/*Disable phy interrupt by Link/Down by cable plug in/out*/
-		disable_irq(pdata->phy_irq);
+		if(pdata->irq_flag == 1) {
+			disable_irq(pdata->phy_irq);
+			pdata->irq_flag = 0;
+		}
 	} else if (mode > DISABLE_LOOPBACK &&
 			DWC_ETH_QOS_is_phy_link_up(pdata)) {
 		EMACDBG("Only disable phy irq Link is UP\n");
 		/*Since link is up no need to set Lower UP flag*/
 		/*Disable phy interrupt by Link/Down by cable plug in/out*/
-		disable_irq(pdata->phy_irq);
+		if(pdata->irq_flag == 1) {
+			disable_irq(pdata->phy_irq);
+			pdata->irq_flag = 0;
+		}
 	} else if (mode == DISABLE_LOOPBACK &&
 		!DWC_ETH_QOS_is_phy_link_up(pdata)) {
 		EMACDBG("Disable Lower Up as Link is down\n");
-		netif_carrier_off(dev);
-		enable_irq(pdata->phy_irq);
+		if(pdata->irq_flag == 0) {
+			enable_irq(pdata->phy_irq);
+			pdata->irq_flag = 1;
+		}
 	}
 
 	if (duplex)
@@ -621,7 +635,7 @@ static ssize_t loopback_handling_config(struct device *dev,
 	if (pdata->current_loopback == DISABLE_LOOPBACK &&
 	    config == ENABLE_PHY_LOOPBACK)
 		DWC_ETH_QOS_mdio_read_direct(pdata, pdata->phyaddr, MII_BMCR,
-				&pdata->backup_bmcr);
+				&pdata->bmcr_backup);
 
 	if (config == DISABLE_LOOPBACK)
 		setup_config_registers(pdata, pdata->backup_speed,
@@ -639,9 +653,11 @@ static ssize_t loopback_handling_config(struct device *dev,
 			mac_loopback_config(pdata, 0);
 			RGMII_CONFIG_2_TX_TO_RX_LOOPBACK_EN_UDFWR(0x0);
 		}
-		else if (pdata->current_loopback == ENABLE_PHY_LOOPBACK)
+		else if (pdata->current_loopback == ENABLE_PHY_LOOPBACK) {
 			phy_digital_loopback_config(pdata,
 						    pdata->backup_speed, 0);
+			pdata->phy_loopback_flag = 0;
+		}
 		break;
 	case ENABLE_IO_MACRO_LOOPBACK:
 		EMACINFO("Request to Enable IO MACRO LOOPBACK\n");
@@ -655,6 +671,8 @@ static ssize_t loopback_handling_config(struct device *dev,
 	case ENABLE_PHY_LOOPBACK:
 		EMACINFO("Request to Enable PHY LOOPBACK\n");
 		phy_digital_loopback_config(pdata, speed, 1);
+		pdata->loopback_speed = speed;
+		pdata->phy_loopback_flag = 1;
 		break;
 	default:
 		EMACINFO("Invalid Loopback=%d\n", config);
@@ -845,8 +863,8 @@ static int phy_digital_loopback_config(
 		}
 	} else if (config == 0) {
 		EMACINFO("Request for phy digital loopback disable\n");
-		if (pdata->backup_bmcr)
-			phydata = pdata->backup_bmcr;
+		if (pdata->bmcr_backup)
+			phydata = pdata->bmcr_backup;
 		else
 			phydata = 0x1140;
 	} else {
@@ -3415,6 +3433,7 @@ static int DWC_ETH_QOS_configure_netdevice(struct platform_device *pdev)
 	DWC_ETH_QOS_create_debugfs(pdata);
 	DWC_ETH_QOS_create_sysfs(pdev);
 
+	pdata->irq_flag = 1;
 	if (pdata->res_data->early_eth_en) {
 		if (pparams.is_valid_ipv4_addr)
 			ret = DWC_ETH_QOS_add_ipaddr(pdata);
