@@ -1784,10 +1784,12 @@ struct DWC_ETH_QOS_prv_data {
 	enum loopback_mode current_loopback;
 	enum phy_power_mode current_phy_mode;
 	enum current_phy_state phy_state;
+	int irq_flag;
 	/*Backup variable for phy loopback*/
 	int backup_duplex;
 	int backup_speed;
 	u32 bmcr_backup;
+	unsigned int phy_loopback_flag;
 	/*Backup variable for suspend resume*/
 	int backup_suspend_speed;
 	u32 backup_bmcr;
