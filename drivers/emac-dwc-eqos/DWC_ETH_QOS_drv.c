@@ -1913,6 +1913,274 @@ void DWC_ETH_QOS_mac2mac_adjust_link(int speed, struct DWC_ETH_QOS_prv_data *pda
 	DWC_ETH_QOS_fix_mac_speed(pdata, speed);
 }
 
+bool is_l4_proto_valid(struct l4_filter_info  *l4_filter, bool *no_port)
+{
+	if (l4_filter->l4_proto_number != IPPROTO_UDP &&
+	    l4_filter->l4_proto_number != IPPROTO_TCP) {
+		EMACERR( "L4 protocol is neither UDP nor TCP\n");
+		return false;
+	}
+
+	if (l4_filter->src_port == 0  && l4_filter->dest_port == 0)
+		*no_port = true;
+
+	EMACDBG("L4 protocol check passed\n");
+	return true;
+}
+
+bool is_ipv4_filter_valid(struct l3_l4_ipv4_filter *filter)
+{
+	bool no_l4_port = false;
+	bool no_ipv4_addr = false;
+	bool valid_filter;
+	int ipv4_addr_len = 32;
+
+	valid_filter = is_l4_proto_valid(&filter->l4_filter, &no_l4_port);
+
+	if (!valid_filter)
+		return false;
+
+	if (filter->src_addr == 0 && filter->dest_addr == 0)
+		no_ipv4_addr = true;
+
+	if (no_l4_port && no_ipv4_addr) {
+		EMACERR("NULL filter is not allowed\n");
+		return false;
+	}
+
+	if (filter->src_addr != 0 && filter->src_addr_mask >= ipv4_addr_len) {
+		EMACERR("ipv4 src addr mask is not correct\n");
+		return false;
+	}
+
+	if (filter->dest_addr != 0 && filter->dest_addr_mask >= ipv4_addr_len) {
+		EMACERR("ipv4 dest addr mask is not correct\n");
+		return false;
+	}
+
+	return true;
+}
+
+bool is_ipv6_addr_valid(struct l3_l4_ipv6_filter *filter, bool *no_ipv6_addr)
+{
+	int i, ipv6_addr_len = 128;
+
+	for (i = 0; i < 16; i++) {
+		if (filter->src_or_dest_addr[i] != 0) {
+			*no_ipv6_addr = false;
+			break;
+		}
+	}
+
+	if (*no_ipv6_addr == false && filter->src_or_dest_addr_mask >= ipv6_addr_len)
+		return false;
+
+	return true;
+}
+
+bool is_ipv6_filter_valid(struct l3_l4_ipv6_filter *filter)
+{
+	bool valid;
+	bool no_ipv6_addr = true;
+	bool no_l4_port = false;
+
+	valid = is_ipv6_addr_valid(filter, &no_ipv6_addr);
+
+	if (!valid)
+		return false;
+
+	valid = is_l4_proto_valid(&filter->l4_filter, &no_l4_port);
+
+	if (!valid)
+		return false;
+
+	if (no_ipv6_addr && no_l4_port) {
+		EMACERR("NULL filter is not allowed\n");
+		return false;
+	}
+
+	return true;
+}
+
+static void add_ipv6_filter(struct l3_l4_ipv6_filter *filter, int cur_filter_num)
+{
+	EMACDBG("program L3 ipv6 filter\n");
+	bool no_ipv6_addr = true;
+
+	/* Enable DMA channel mapping */
+	MAC_L3L4CR_DMCHEN_UDFWR(cur_filter_num, true);
+
+	/* enable L3 protocol */
+	MAC_L3L4CR_L3PEN0_UDFWR(cur_filter_num, 0x1);
+
+	is_ipv6_addr_valid(filter, &no_ipv6_addr);
+	if (!no_ipv6_addr) {
+		EMACDBG("programming ipv6 address\n");
+
+		if (filter->src_or_dest_ip)
+			/* enable L3 src addr */
+			MAC_L3L4CR_L3SAM0_UDFWR(cur_filter_num, true);
+		else
+			/* enable L3 dest addr */
+			MAC_L3L4CR_L3DAM0_UDFWR(cur_filter_num, true);
+
+		/* write L3 mask */
+		MAC_L3L4CR_L3HSBM0_UDFWR(cur_filter_num, filter->src_or_dest_addr_mask & 0x1f);
+
+		/* continue writing L3 mask */
+		MAC_L3L4CR_L3HDBM0_UDFWR(cur_filter_num, (filter->src_or_dest_addr_mask & 0x60) >> 5);
+
+		/* write L3 addr */
+		MAC_L3A3R_L3A30_UDFWR(cur_filter_num,
+				      filter->src_or_dest_addr[0] << 24 |
+				      filter->src_or_dest_addr[1] << 16 |
+				      filter->src_or_dest_addr[2] << 8 |
+				      filter->src_or_dest_addr[3]);
+		MAC_L3A2R_L3A20_UDFWR(cur_filter_num,
+				      filter->src_or_dest_addr[4] << 24 |
+				      filter->src_or_dest_addr[5] << 16 |
+				      filter->src_or_dest_addr[6] << 8 |
+				      filter->src_or_dest_addr[7]);
+		MAC_L3A1R_L3A10_UDFWR(cur_filter_num,
+				      filter->src_or_dest_addr[8] << 24 |
+				      filter->src_or_dest_addr[9] << 16 |
+				      filter->src_or_dest_addr[10] << 8 |
+				      filter->src_or_dest_addr[11]);
+
+		MAC_L3A0R_L3A00_UDFWR(cur_filter_num,
+				      filter->src_or_dest_addr[12] << 24 |
+				      filter->src_or_dest_addr[13] << 16 |
+				      filter->src_or_dest_addr[14] << 8 |
+				      filter->src_or_dest_addr[15]);
+
+	}
+}
+
+static void add_ipv4_filter(struct l3_l4_ipv4_filter *filter, int cur_filter_num)
+{
+	EMACDBG("program L3 ipv4 filter\n");
+
+	/* Enable DMA channel mapping */
+	MAC_L3L4CR_DMCHEN_UDFWR(cur_filter_num, true);
+
+	/* enable L3 protocol */
+	MAC_L3L4CR_L3PEN0_UDFWR(cur_filter_num, 0x0);
+
+	if (filter->src_addr) {
+		EMACDBG("programming ipv4 src addr\n");
+
+                /* enable L3 src addr */
+		MAC_L3L4CR_L3SAM0_UDFWR(cur_filter_num, true);
+
+		/* write L3 src mask */
+		MAC_L3L4CR_L3HSBM0_UDFWR(cur_filter_num, filter->src_addr_mask);
+
+		/* write L3 src addr */
+		MAC_L3A0R_L3A00_UDFWR(cur_filter_num, filter->src_addr);
+	}
+
+	if (filter->dest_addr) {
+		EMACDBG("programming ipv4 dest addr\n");
+
+                /* enable L3 dest addr */
+		MAC_L3L4CR_L3DAM0_UDFWR(cur_filter_num, true);
+
+		/* write L3 dest mask */
+		MAC_L3L4CR_L3HDBM0_UDFWR(cur_filter_num,
+					 filter->dest_addr_mask);
+
+		/* write L3 dest addr */
+		MAC_L3A1R_L3A10_UDFWR(cur_filter_num,
+				      filter->dest_addr);
+	}
+}
+
+static void add_l4_filter(struct l4_filter_info *filter, int cur_filter_num)
+{
+	EMACDBG("program L4 filter\n");
+
+	/* Enable DMA channel mapping */
+	MAC_L3L4CR_DMCHEN_UDFWR(cur_filter_num, true);
+
+	/* program L4 protocol */
+	if (filter->l4_proto_number == IPPROTO_TCP)
+		MAC_L3L4CR_L4PEN0_UDFWR(cur_filter_num, 0x0);
+	else if (filter->l4_proto_number == IPPROTO_UDP) {
+		MAC_L3L4CR_L4PEN0_UDFWR(cur_filter_num, 0x1);
+		EMACDBG("entered IPPROTO_UDP bit programming");
+	}
+
+	if (filter->src_port) {
+		EMACDBG("program L4 src port info\n");
+
+		/* enable L4 src port */
+		MAC_L3L4CR_L4SPM0_UDFWR(cur_filter_num, true);
+
+		/* write L4 src port */
+		MAC_L4AR_L4SP0_UDFWR(cur_filter_num, filter->src_port);
+	}
+
+	if (filter->dest_port) {
+		EMACDBG("program L4 dest port info\n");
+
+		/* enable L4 dest port */
+		MAC_L3L4CR_L4DPM0_UDFWR(cur_filter_num, true);
+
+		/* write L4 dest port */
+		MAC_L4AR_L4DP0_UDFWR(cur_filter_num, filter->dest_port);
+	}
+}
+
+static int DWC_ETH_QOS_add_ptp_filters(struct DWC_ETH_QOS_prv_data *pdata)
+{
+	struct l3_l4_ipv4_filter *filter;
+	int cur_filter_num = 0, i, ret = 0;
+	int ptp_rx_filter_chn_num = 1;
+
+	filter = kzalloc(sizeof(struct l3_l4_ipv4_filter), GFP_KERNEL);
+	if (!filter) {
+		EMACERR("cannot allocate ipv4 filter\n");
+		return -ENOMEM;
+	}
+
+	if (!pdata->num_l3_l4_filters) {
+		/* installing first filter */
+		EMACDBG("installing first filter\n");
+
+		/* enable dynamic mapping */
+		MTL_RQDCM0R_RXQ0DADMACH_UDFWR(0x1);
+
+		/* Enable L3/L4 filtering */
+		MAC_MPFR_IPFE_UDFWR(0x1);
+		MAC_MPFR_RA_UDFWR(0x1);
+	}
+
+	/* Add PTP over UDP filter */
+	filter->l4_filter.l4_proto_number = IPPROTO_UDP;
+
+	/* Add filter rules to receive PTP messages */
+	for (i = PTP_UDP_PORT1; i <= PTP_UDP_PORT2; i++) {
+
+		if (pdata->num_l3_l4_filters == pdata->l3_l4_filters_limit) {
+			EMACERR("no more L3/L4 filters can be added\n");
+			kfree(filter);
+			return -EOPNOTSUPP;
+		}
+
+		pdata->num_l3_l4_filters++;
+		cur_filter_num = pdata->num_l3_l4_filters - 1;
+		filter->l4_filter.dest_port = i;
+
+		/* Write DMA channel number for matched filter */
+		MAC_L3L4CR_DMCHN_UDFWR(cur_filter_num, ptp_rx_filter_chn_num);
+
+		add_l4_filter(&filter->l4_filter, cur_filter_num);
+	}
+
+	kfree(filter);
+	return ret;
+}
+
 /*!
  * \brief API to open a device for data transmission & reception.
  *
@@ -2021,6 +2289,10 @@ static int DWC_ETH_QOS_open(struct net_device *dev)
 		dwc_eth_qos_res_data.mac2mac_link = 1;
 		netif_carrier_on(dev);
 	}
+
+	if (DWC_ETH_QOS_add_ptp_filters(pdata))
+		EMACERR("Failed to add PTP over UDP filters\n");
+
 	EMACDBG("<--DWC_ETH_QOS_open\n");
 
 	return ret;
@@ -6320,139 +6592,12 @@ static int DWC_ETH_QOS_handle_prv_ioctl_ipa(struct DWC_ETH_QOS_prv_data *pdata,
 		return ret;
 }
 
-
-bool is_l4_proto_valid(struct l4_filter_info  *l4_filter, bool *no_port)
-{
-	if (l4_filter->l4_proto_number != IPPROTO_UDP &&
-	    l4_filter->l4_proto_number != IPPROTO_TCP) {
-		EMACERR( "L4 protocol is neither UDP nor TCP\n");
-		return false;
-	}
-
-	if (l4_filter->src_port == 0  && l4_filter->dest_port == 0)
-		*no_port = true;
-
-	EMACDBG("L4 protocol check passed\n");
-	return true;
-}
-
-bool is_ipv4_filter_valid(struct l3_l4_ipv4_filter *filter)
-{
-	bool no_l4_port = false;
-	bool no_ipv4_addr = false;
-	bool valid_filter;
-
-	valid_filter = is_l4_proto_valid(&filter->l4_filter, &no_l4_port);
-
-	if (!valid_filter)
-		return false;
-
-	if (filter->src_addr == 0 && filter->dest_addr == 0)
-		no_ipv4_addr = true;
-
-	if (no_l4_port && no_ipv4_addr) {
-		EMACERR("NULL filter is not allowed\n");
-		return false;
-	}
-
-	if (filter->src_addr != 0 && filter->src_addr_mask >= 32) {
-		EMACERR("ipv4 src addr mask is not correct\n");
-		return false;
-	}
-
-	if (filter->dest_addr != 0 && filter->dest_addr_mask >= 32) {
-		EMACERR("ipv4 dest addr mask is not correct\n");
-		return false;
-	}
-
-	return true;
-}
-
-
-bool is_ipv6_addr_valid(struct l3_l4_ipv6_filter *filter, bool *no_ipv6_addr)
-{
-	int i;
-
-	for (i = 0; i < 16; i++) {
-		if (filter->src_or_dest_addr[i] != 0) {
-			*no_ipv6_addr = false;
-			break;
-		}
-	}
-
-	if (*no_ipv6_addr == false && filter->src_or_dest_addr_mask >= 128)
-		return false;
-
-	return true;
-}
-
-bool is_ipv6_filter_valid(struct l3_l4_ipv6_filter *filter)
-{
-	bool valid;
-	bool no_ipv6_addr = true;
-	bool no_l4_port = false;
-
-	valid = is_ipv6_addr_valid(filter, &no_ipv6_addr);
-
-	if (!valid)
-		return false;
-
-	valid = is_l4_proto_valid(&filter->l4_filter, &no_l4_port);
-
-	if (!valid)
-		return false;
-
-	if (no_ipv6_addr && no_l4_port) {
-		EMACERR("NULL filter is not allowed\n");
-		return false;
-	}
-
-	return true;
-}
-
-
-void program_l4_filter(struct l4_filter_info *filter, int cur_filter_num)
-{
-
-	if ((filter->src_port) || (filter->dest_port)) {
-		EMACDBG("program L4 filter\n");
-
-		/* program L4 protocol */
-		if (filter->l4_proto_number == IPPROTO_TCP)
-			MAC_L3L4CR_L4PEN0_UDFWR(cur_filter_num, 0x0);
-		else if (filter->l4_proto_number == IPPROTO_UDP)
-			MAC_L3L4CR_L4PEN0_UDFWR(cur_filter_num, 0x1);
-	}
-
-	if (filter->src_port) {
-		EMACDBG("program L4 src port info\n");
-
-		/* enable L4 src port */
-		MAC_L3L4CR_L4SPM0_UDFWR(cur_filter_num, true);
-
-		/* write L4 src port */
-		MAC_L4AR_L4SP0_UDFWR(cur_filter_num, filter->src_port);
-	}
-
-	if (filter->dest_port) {
-		EMACDBG("program L4 dest port info\n");
-
-		/* enable L4 dest port */
-		MAC_L3L4CR_L4DPM0_UDFWR(cur_filter_num, true);
-
-		/* write L4 dest port */
-		MAC_L4AR_L4DP0_UDFWR(cur_filter_num, filter->dest_port);
-	}
-
-}
-
 static int DWC_ETH_QOS_handle_prv_ioctl_filter_ipv4(struct DWC_ETH_QOS_prv_data *pdata,
 						    struct ifreq *ifr)
 {
 	struct l3_l4_ipv4_filter *filter;
-	int ret = 0;
+	int ret = 0, cur_filter_num = 0;
 	unsigned long missing;
-	int cur_filter_num;
 	char ipv4_src_str[24];
 	char ipv4_dest_str[24];
 
@@ -6512,60 +6657,27 @@ static int DWC_ETH_QOS_handle_prv_ioctl_filter_ipv4(struct DWC_ETH_QOS_prv_data 
 	pdata->num_l3_l4_filters++;
 	cur_filter_num = pdata->num_l3_l4_filters - 1;
 
-	/* Enable DMA channel mapping */
-	MAC_L3L4CR_DMCHEN_UDFWR(cur_filter_num, true);
-
 	/* Write DMA channel number for matched filter */
 	MAC_L3L4CR_DMCHN_UDFWR(cur_filter_num, L3_L4_Rx_Filter_Chan_Num);
 
-	if ((filter->src_addr) || (filter->dest_addr))
-		/* enable L3 protocol */
-		MAC_L3L4CR_L3PEN0_UDFWR(cur_filter_num, 0x0);
+	if (filter->src_addr || filter->dest_addr)
+		add_ipv4_filter(filter, cur_filter_num);
 
-	if (filter->src_addr) {
-		EMACDBG("programming ipv4 src addr\n");
+	if (filter->l4_filter.src_port || filter->l4_filter.dest_port)
+		add_l4_filter(&filter->l4_filter, cur_filter_num);
 
-                /* enable L3 src addr */
-		MAC_L3L4CR_L3SAM0_UDFWR(cur_filter_num, true);
-
-		/* write L3 src mask */
-		MAC_L3L4CR_L3HSBM0_UDFWR(cur_filter_num, filter->src_addr_mask);
-
-		/* write L3 src addr */
-		MAC_L3A0R_L3A00_UDFWR(cur_filter_num, filter->src_addr);
-	}
-
-	if (filter->dest_addr) {
-		EMACDBG("programming ipv4 dest addr\n");
-
-                /* enable L3 dest addr */
-		MAC_L3L4CR_L3DAM0_UDFWR(cur_filter_num, true);
-
-		/* write L3 dest mask */
-		MAC_L3L4CR_L3HDBM0_UDFWR(cur_filter_num,
-					 filter->dest_addr_mask);
-
-		/* write L3 dest addr */
-		MAC_L3A1R_L3A10_UDFWR(cur_filter_num,
-				      filter->dest_addr);
-	}
-
-	program_l4_filter(&filter->l4_filter, cur_filter_num);
+	kfree(filter);
 
 	return ret;
-
 }
-
 
 static int DWC_ETH_QOS_handle_prv_ioctl_filter_ipv6(struct DWC_ETH_QOS_prv_data *pdata,
 						    struct ifreq *ifr)
 {
 	struct l3_l4_ipv6_filter *filter;
-	int ret = 0;
+	int ret = 0, cur_filter_num = 0;
 	unsigned long missing;
-	int cur_filter_num;
 	char ipv6_str[64];
-	bool no_ipv6_addr = true;
 
 	EMACDBG("entering ipv6 filter handler\n");
 
@@ -6584,7 +6696,6 @@ static int DWC_ETH_QOS_handle_prv_ioctl_filter_ipv6(struct DWC_ETH_QOS_prv_data 
 		EMACERR("cannot allocate ipv6 filter\n");
 		return -ENOMEM;
 	}
-
 
 	missing = copy_from_user(filter, ifr->ifr_ifru.ifru_data,
 				 sizeof(struct l3_l4_ipv6_filter));
@@ -6614,12 +6725,6 @@ static int DWC_ETH_QOS_handle_prv_ioctl_filter_ipv6(struct DWC_ETH_QOS_prv_data 
 	pdata->num_l3_l4_filters++;
 	cur_filter_num = pdata->num_l3_l4_filters - 1;
 
-	/* Enable DMA channel mapping */
-	MAC_L3L4CR_DMCHEN_UDFWR(cur_filter_num, true);
-
-	/* Write DMA channel number for matched filter */
-	MAC_L3L4CR_DMCHN_UDFWR(cur_filter_num, L3_L4_Rx_Filter_Chan_Num);
-
 	snprintf(ipv6_str, sizeof(ipv6_str), "%pI6", filter->src_or_dest_addr);
 
 	EMACDBG("is src address = %d\n", filter->src_or_dest_ip);
@@ -6629,56 +6734,18 @@ static int DWC_ETH_QOS_handle_prv_ioctl_filter_ipv6(struct DWC_ETH_QOS_prv_data 
 	EMACDBG("ipv6 L4 src port = %d\n", filter->l4_filter.src_port);
 	EMACDBG("ipv6 L4 dest port = %d\n", filter->l4_filter.dest_port);
 
-	/* enable L3 protocol */
-	MAC_L3L4CR_L3PEN0_UDFWR(cur_filter_num, 0x1);
+	/* Write DMA channel number for matched filter */
+	MAC_L3L4CR_DMCHN_UDFWR(cur_filter_num, L3_L4_Rx_Filter_Chan_Num);
 
-	is_ipv6_addr_valid(filter, &no_ipv6_addr);
-	if (!no_ipv6_addr) {
-		EMACDBG("programming ipv6 address\n");
+	add_ipv6_filter(filter, cur_filter_num);
+		
+	if (filter->l4_filter.src_port || filter->l4_filter.dest_port)
+		add_l4_filter(&filter->l4_filter, cur_filter_num);
 
-		if (filter->src_or_dest_ip)
-			/* enable L3 src addr */
-			MAC_L3L4CR_L3SAM0_UDFWR(cur_filter_num, true);
-		else
-			/* enable L3 dest addr */
-			MAC_L3L4CR_L3DAM0_UDFWR(cur_filter_num, true);
-
-		/* write L3 mask */
-		MAC_L3L4CR_L3HSBM0_UDFWR(cur_filter_num, filter->src_or_dest_addr_mask & 0x1f);
-
-		/* continue writing L3 mask */
-		MAC_L3L4CR_L3HDBM0_UDFWR(cur_filter_num, (filter->src_or_dest_addr_mask & 0x60) >> 5);
-
-		/* write L3 addr */
-		MAC_L3A3R_L3A30_UDFWR(cur_filter_num,
-				      filter->src_or_dest_addr[0] << 24 |
-				      filter->src_or_dest_addr[1] << 16 |
-				      filter->src_or_dest_addr[2] << 8 |
-				      filter->src_or_dest_addr[3]);
-		MAC_L3A2R_L3A20_UDFWR(cur_filter_num,
-				      filter->src_or_dest_addr[4] << 24 |
-				      filter->src_or_dest_addr[5] << 16 |
-				      filter->src_or_dest_addr[6] << 8 |
-				      filter->src_or_dest_addr[7]);
-		MAC_L3A1R_L3A10_UDFWR(cur_filter_num,
-				      filter->src_or_dest_addr[8] << 24 |
-				      filter->src_or_dest_addr[9] << 16 |
-				      filter->src_or_dest_addr[10] << 8 |
-				      filter->src_or_dest_addr[11]);
-
-		MAC_L3A0R_L3A00_UDFWR(cur_filter_num,
-				      filter->src_or_dest_addr[12] << 24 |
-				      filter->src_or_dest_addr[13] << 16 |
-				      filter->src_or_dest_addr[14] << 8 |
-				      filter->src_or_dest_addr[15]);
-
-	}
-
-	program_l4_filter(&filter->l4_filter, cur_filter_num);
+	kfree(filter);
 
 	return ret;
 }
-
 
 /*!
  * \brief Driver IOCTL routine

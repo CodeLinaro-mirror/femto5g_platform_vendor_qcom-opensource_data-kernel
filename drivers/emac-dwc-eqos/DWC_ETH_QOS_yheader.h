@@ -1722,6 +1722,10 @@ struct l3_l4_ipv6_filter {
 	struct l4_filter_info l4_filter;
 };
 
+enum ptp_l4_dst_port {
+	PTP_UDP_PORT1 = 319,
+	PTP_UDP_PORT2 = 320,
+};
 
 struct DWC_ETH_QOS_prv_data {
 	struct net_device *dev;
