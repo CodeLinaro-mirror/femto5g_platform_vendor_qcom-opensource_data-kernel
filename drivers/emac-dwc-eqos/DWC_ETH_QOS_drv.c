@@ -599,7 +599,8 @@ static void DWC_ETH_QOS_restart_dev(struct DWC_ETH_QOS_prv_data *pdata,
 	 */
 	hw_if->init(pdata);
 
-	DWC_ETH_QOS_restart_phy(pdata);
+	if(!dwc_eth_qos_res_data.mac2mac_en)
+		DWC_ETH_QOS_restart_phy(pdata);
 
 	netif_wake_subqueue(pdata->dev, qinx);
 
@@ -791,6 +792,11 @@ void DWC_ETH_QOS_handle_phy_interrupt(struct DWC_ETH_QOS_prv_data *pdata)
 	int phy_intr_status = 0;
 	int micrel_intr_status = 0;
 	EMACDBG("Enter\n");
+
+	if (dwc_eth_qos_res_data.mac2mac_en) {
+		EMACERR("%s: Phy is not registered\n", pdata->dev->name);
+		return -ENODEV;
+	}
 
 	if ((pdata->phydev->phy_id & pdata->phydev->drv->phy_id_mask) == MICREL_PHY_ID) {
 		DWC_ETH_QOS_mdio_read_direct(
@@ -1884,6 +1890,29 @@ static void DWC_ETH_QOS_reset_eth_stats(struct DWC_ETH_QOS_prv_data *pdata)
 	memset(&pdata->mmc, 0, sizeof(struct DWC_ETH_QOS_mmc_counters));
 }
 
+void DWC_ETH_QOS_mac2mac_adjust_link(int speed, struct DWC_ETH_QOS_prv_data *pdata)
+{
+	struct hw_if_struct *hw_if = &pdata->hw_if;
+
+	switch (speed) {
+		case SPEED_1000:
+			hw_if->set_gmii_speed();
+			break;
+		case SPEED_100:
+			hw_if->set_mii_speed_100();
+			break;
+		case SPEED_10:
+			hw_if->set_mii_speed_10();
+			break;
+		default:
+			speed = SPEED_UNKNOWN;
+			EMACDBG("unknown speed\n");
+			break;
+	}
+	pdata->speed = speed;
+	DWC_ETH_QOS_fix_mac_speed(pdata, speed);
+}
+
 /*!
  * \brief API to open a device for data transmission & reception.
  *
@@ -1987,6 +2016,11 @@ static int DWC_ETH_QOS_open(struct net_device *dev)
 	netif_tx_disable(dev);
 #endif /* end of DWC_ETH_QOS_CONFIG_PGTEST */
 
+	if(dwc_eth_qos_res_data.mac2mac_en) {
+		DWC_ETH_QOS_mac2mac_adjust_link(dwc_eth_qos_res_data.mac2mac_rgmii_speed, pdata);
+		dwc_eth_qos_res_data.mac2mac_link = 1;
+		netif_carrier_on(dev);
+	}
 	EMACDBG("<--DWC_ETH_QOS_open\n");
 
 	return ret;
@@ -2030,8 +2064,10 @@ static int DWC_ETH_QOS_close(struct net_device *dev)
 		pdata->eee_active = 0;
 	}
 
-	if (pdata->phydev)
-		phy_stop(pdata->phydev);
+	if(!dwc_eth_qos_res_data.mac2mac_en) {
+		if (pdata->phydev)
+			phy_stop(pdata->phydev);
+	}
 
 #ifndef DWC_ETH_QOS_CONFIG_PGTEST
 	/* Stop SW TX before DMA TX in HW */
@@ -2065,7 +2101,8 @@ static int DWC_ETH_QOS_close(struct net_device *dev)
 	/* issue software reset to device */
 	hw_if->exit();
 
-    DWC_ETH_QOS_restart_phy(pdata);
+	if(!dwc_eth_qos_res_data.mac2mac_en)
+		DWC_ETH_QOS_restart_phy(pdata);
 
 	desc_if->tx_free_mem(pdata);
 	desc_if->rx_free_mem(pdata);

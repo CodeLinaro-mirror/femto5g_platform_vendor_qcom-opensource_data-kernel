@@ -1643,6 +1643,10 @@ struct DWC_ETH_QOS_res_data {
 	bool early_eth_en;
 	bool phyad_change;
 	bool pps_lpass_conn_en;
+	/*mac2mac parameters */
+	int mac2mac_rgmii_speed;
+	bool mac2mac_en;
+	int mac2mac_link;
 };
 
 enum mac_err_type {
@@ -2063,6 +2067,7 @@ struct emac_emb_smmu_cb_ctx {
 };
 
 extern struct emac_emb_smmu_cb_ctx emac_emb_smmu_ctx;
+extern struct DWC_ETH_QOS_res_data dwc_eth_qos_res_data;
 
 #define GET_MEM_PDEV_DEV (emac_emb_smmu_ctx.valid ? \
 			&emac_emb_smmu_ctx.smmu_pdev->dev : &pdata->pdev->dev)
@@ -2082,6 +2087,9 @@ void DWC_ETH_QOS_get_pdata(struct DWC_ETH_QOS_prv_data *pdata);
 int create_debug_files(void);
 void remove_debug_files(void);
 
+extern void DWC_ETH_QOS_fix_mac_speed(struct DWC_ETH_QOS_prv_data *pdata,
+						unsigned int speed);
+void DWC_ETH_QOS_mac2mac_adjust_link(int speed, struct DWC_ETH_QOS_prv_data *pdata);
 bool DWC_ETH_QOS_is_phy_link_up(struct DWC_ETH_QOS_prv_data *pdata);
 void DWC_ETH_QOS_set_clk_and_bus_config(struct DWC_ETH_QOS_prv_data *pdata, int speed);
 int DWC_ETH_QOS_mdio_register(struct net_device *dev);

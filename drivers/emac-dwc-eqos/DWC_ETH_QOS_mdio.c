@@ -77,9 +77,11 @@ INT DWC_ETH_QOS_mdio_read_direct(struct DWC_ETH_QOS_prv_data *pdata,
 
 	DBGPR_MDIO("--> DWC_ETH_QOS_mdio_read_direct\n");
 
-	if (pdata->phy_state == PHY_IS_OFF) {
-		EMACDBG("Phy is in off state reading is not possible\n");
-		return -EOPNOTSUPP;
+	if(!dwc_eth_qos_res_data.mac2mac_en) {
+		if (pdata->phy_state == PHY_IS_OFF) {
+			EMACDBG("Phy is in off state reading is not possible\n");
+			return -EOPNOTSUPP;
+		}
 	}
 
 	if (hw_if->read_phy_regs) {
@@ -124,9 +126,11 @@ INT DWC_ETH_QOS_mdio_write_direct(struct DWC_ETH_QOS_prv_data *pdata,
 
 	DBGPR_MDIO("--> DWC_ETH_QOS_mdio_write_direct\n");
 
-	if (pdata->phy_state == PHY_IS_OFF) {
-		EMACDBG("Phy is in off state writing is not possible\n");
-		return -EOPNOTSUPP;
+	if(!dwc_eth_qos_res_data.mac2mac_en) {
+		if (pdata->phy_state == PHY_IS_OFF) {
+			EMACDBG("Phy is in off state writing is not possible\n");
+			return -EOPNOTSUPP;
+		}
 	}
 
 	if (hw_if->write_phy_regs) {
@@ -244,9 +248,11 @@ static INT DWC_ETH_QOS_mdio_read(struct mii_bus *bus, int phyaddr, int phyreg)
 	DBGPR_MDIO("--> DWC_ETH_QOS_mdio_read: phyaddr = %d, phyreg = %d\n",
 		   phyaddr, phyreg);
 
-	if (pdata->phy_state == PHY_IS_OFF) {
-		EMACDBG("Phy is in off state reading is not possible\n");
-		return -EOPNOTSUPP;
+	if(!dwc_eth_qos_res_data.mac2mac_en) {
+		if (pdata->phy_state == PHY_IS_OFF) {
+			EMACDBG("Phy is in off state reading is not possible\n");
+			return -EOPNOTSUPP;
+		}
 	}
 
 	if (hw_if->read_phy_regs)
@@ -284,9 +290,11 @@ static INT DWC_ETH_QOS_mdio_write(struct mii_bus *bus, int phyaddr, int phyreg,
 
 	DBGPR_MDIO("--> DWC_ETH_QOS_mdio_write\n");
 
-	if (pdata->phy_state == PHY_IS_OFF) {
-		EMACDBG("Phy is in off state writing is not possible\n");
-		return -EOPNOTSUPP;
+	if(!dwc_eth_qos_res_data.mac2mac_en) {
+		if (pdata->phy_state == PHY_IS_OFF) {
+			EMACDBG("Phy is in off state writing is not possible\n");
+			return -EOPNOTSUPP;
+		}
 	}
 
 	if (hw_if->write_phy_regs) {
@@ -816,6 +824,7 @@ int DWC_ETH_QOS_configure_io_macro_dll_settings(
 	/* For RGMII ID mode with internal delay*/
 	if (pdata->io_macro_phy_intf == RGMII_MODE && !pdata->io_macro_tx_mode_non_id) {
 		EMACDBG("Initialize and configure SDCC DLL\n");
+
 		ret = DWC_ETH_QOS_rgmii_io_macro_sdcdc_init(pdata);
 		if (ret < 0) {
 			EMACERR("DLL init failed \n");
@@ -1084,8 +1093,12 @@ bool DWC_ETH_QOS_is_phy_link_up(struct DWC_ETH_QOS_prv_data *pdata)
 	 * So, phydev->link is 1 even on booup with no PHY connected.
 	 * phydev->link is valid only after adjust_link is called once.
 	 * Use (pdata->oldlink != -1) to indicate phy link is not up */
-	return pdata->always_on_phy ? 1 :
-		((pdata->oldlink != -1) && pdata->phydev && pdata->phydev->link);
+	if(dwc_eth_qos_res_data.mac2mac_en) {
+		return true;
+	} else {
+		return pdata->always_on_phy ? 1 :
+			((pdata->oldlink != -1) && pdata->phydev && pdata->phydev->link);
+	}
 }
 
 /*!

@@ -458,6 +458,12 @@ static void DWC_ETH_QOS_get_pauseparam(struct net_device *dev,
 
 	DBGPR("-->DWC_ETH_QOS_get_pauseparam\n");
 
+	if (dwc_eth_qos_res_data.mac2mac_en) {
+		EMACERR("%s: %s: PHY is not registered\n",
+			__func__, dev->name);
+		return -ENODEV;
+	}
+
 	pause->rx_pause = 0;
 	pause->tx_pause = 0;
 
@@ -507,6 +513,12 @@ static int DWC_ETH_QOS_set_pauseparam(struct net_device *dev,
 	int new_pause = DWC_ETH_QOS_FLOW_CTRL_OFF;
 	unsigned int data;
 	int ret = 0;
+
+	if (dwc_eth_qos_res_data.mac2mac_en) {
+		EMACERR("%s: %s: PHY is not registered\n",
+			__func__, dev->name);
+		return -ENODEV;
+	}
 
 	DBGPR(
 		"%s autoneg = %d tx_pause = %d rx_pause = %d\n",
@@ -647,6 +659,12 @@ static int DWC_ETH_QOS_getsettings(struct net_device *dev,
 
 	DBGPR("-->DWC_ETH_QOS_getsettings\n");
 
+	if (dwc_eth_qos_res_data.mac2mac_en) {
+		EMACERR("%s: %s: PHY is not registered\n",
+			__func__, dev->name);
+		return -ENODEV;
+	}
+
 	if (pdata->hw_feat.pcs_sel) {
 		if (!pdata->pcs_link) {
 			ethtool_cmd_speed_set(cmd, SPEED_UNKNOWN);
@@ -761,6 +779,12 @@ static int DWC_ETH_QOS_setsettings(struct net_device *dev,
 
 	EMACDBG("-->DWC_ETH_QOS_setsettings\n");
 
+	if (dwc_eth_qos_res_data.mac2mac_en) {
+		EMACERR("%s: %s: PHY is not registered\n",
+			__func__, dev->name);
+		return -ENODEV;
+	}
+
 	cmd_speed = ethtool_cmd_speed(cmd);
 	EMACDBG("speed: %u cmd->autoneg: %d\n", cmd_speed, cmd->autoneg);
 	if (pdata->hw_feat.pcs_sel) {
@@ -831,6 +855,12 @@ static void DWC_ETH_QOS_get_wol(struct net_device *dev,
 
 	DBGPR("-->DWC_ETH_QOS_get_wol\n");
 
+	if (dwc_eth_qos_res_data.mac2mac_en) {
+		EMACERR("%s: %s: PHY is not registered\n",
+			__func__, dev->name);
+		return -ENODEV;
+	}
+
 	phy_ethtool_get_wol(pdata->phydev, wol);
 
 	spin_lock_irq(&pdata->lock);
@@ -865,8 +895,8 @@ static int DWC_ETH_QOS_set_wol(struct net_device *dev,
 	u32 emac_wol_support = WAKE_MAGIC | WAKE_UCAST;
 	int ret = 0;
 
-	if (!pdata->phydev) {
-		pr_err("%s: Phy is not registered\n", dev->name);
+	if (dwc_eth_qos_res_data.mac2mac_en || !pdata->phydev) {
+		EMACERR("%s: Phy is not registered\n", dev->name);
 		return -ENODEV;
 	}
 
@@ -1165,13 +1195,15 @@ static void DWC_ETH_QOS_get_ethtool_stats(
 	}
 
 	/* update phy reg read val*/
-	DWC_ETH_QOS_ethtool_phyregs_read(pdata);
+	if(!dwc_eth_qos_res_data.mac2mac_en) {
+		DWC_ETH_QOS_ethtool_phyregs_read(pdata);
 
-	for (i = 0; i < DWC_ETH_QOS_PHYREGS_READ_LEN; i++) {
-		char *p = (char *)pdata +
-				DWC_ETH_QOS_phyregs_strings[i].stat_offset;
-		data[j++] = (DWC_ETH_QOS_phyregs_strings[i].sizeof_stat ==
-				sizeof(u64)) ? (*(u64 *)p) : (*(u32 *)p);
+		for (i = 0; i < DWC_ETH_QOS_PHYREGS_READ_LEN; i++) {
+			char *p = (char *)pdata +
+					DWC_ETH_QOS_phyregs_strings[i].stat_offset;
+			data[j++] = (DWC_ETH_QOS_phyregs_strings[i].sizeof_stat ==
+					sizeof(u64)) ? (*(u64 *)p) : (*(u32 *)p);
+		}
 	}
 	DBGPR("<--DWC_ETH_QOS_get_ethtool_stats\n");
 }
