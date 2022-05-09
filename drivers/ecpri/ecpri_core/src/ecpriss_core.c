@@ -1,0 +1,677 @@
+/* SPDX-License-Identifier: GPL-2.0-only
+ * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ */
+
+#include "ecpriss_core.h"
+#include "ecpriss_netlink.h"
+#include "ecpriss_workqueue.h"
+
+extern struct ecpri_dma_ecpri_ss_ops dma_ecpri_ss_driver_ops;
+extern struct eth_ecpriss_ops mtip_ecpri_ops;
+
+#define ECPRISS_CORE_IPC_LOG_PAGES   50
+#define ECPRISS_CORE_LOCK() mutex_lock(&ecpriss_pdata->ecpriss_mutex_lock);
+#define ECPRISS_CORE_UNLOCK() mutex_unlock(&ecpriss_pdata->ecpriss_mutex_lock);
+
+/* Compile time flag for pre integration with DMA and ETH */
+#define PRE_INT                       1
+
+#define MAX_NUM_FLOW 120
+void ecpriss_eth_topology_cb(void);
+void ecpriss_dma_events_cb(void *user_data, enum ecpri_dma_event_type);
+void ecpriss_dma_endp_cb(void * user_data);
+
+
+void ecpriss_eth_events_cb(eth_ecpriss_event_e event_type,
+		eth_ecpriss_link_event_params_s *link_event_params);
+
+void ecpriss_dma_ecpri_ss_log_msg_cb(void *user_data, const char *fmt, ...);
+
+ecpriss_core_private_s 	pdata;
+ecpriss_core_private_s *ecpriss_pdata= &pdata;
+ecpriss_xbar_ctx_s    	xbar_ctx_g;
+ecpriss_qudp_ctx_s     	qudp_ctx_g;
+
+
+ecpriss_core_callback_flags_s      callback_flag_g;
+struct ecpri_dma_endp_mapping      dma_endp_g;
+eth_ecpriss_topology_root_s        eth_link_params_g;
+/* void                                   *ecpriss_core_logbuf_g; */
+ecpri_events_workqueue_params_s           events_workqueue_g;
+ecpri_interrupt_workqueue_params_s        interrupts_workqueue_g;
+eth_ecpriss_topology_ready_cb             eth_topology_ready_cb;
+eth_ecpriss_interface_events_cb           eth_interface_events_cb;
+struct ecpri_dma_ecpri_ss_register_params dma_ready_info;
+eth_ecpriss_link_event_params_s           link_event_params;
+/* ecpriss_stats_s                           stats_g; */
+
+
+
+/* DEbug Useful Data */
+
+typedef struct {
+
+	int tx_flow_cnt;
+	int rx_flow_cnt;
+	ecpriss_flow_tx_cfg_s  tx_cfg[MAX_NUM_FLOW];
+	ecpriss_flow_rx_cfg_s  rx_cfg[MAX_NUM_FLOW];
+
+}ecpri_flow_cfg;
+
+ecpri_flow_cfg gecpri_flow_cfg = {0};
+
+static int ecpriss_core_remove(struct platform_device *pdev)
+{
+	return 0;
+}
+
+static int ecpriss_core_suspend(struct device *dev)
+{
+	return 0;
+}
+
+static int ecpriss_core_resume(struct device *dev)
+{
+	return 0;
+}
+
+/* Calls XBAR RX/TX and QUDP RX/TX depending on the msg_id of the packets */
+void ecpriss_process_packet(ecpriss_packet_payload_s *packet)
+{
+	int ret=0;
+	do{
+		if(packet == NULL) {
+			ret = -ENOMEM;
+			break;
+		}
+
+		pr_err("ecpriss_process_packet and packet dir %d", packet->dir);
+
+		if(packet->dir == ECPRISS_PACKET_UL) {
+
+			ecpriss_flow_tx_cfg_s *flow_tx =
+				&packet->flow_cfg.flow_tx_cfg;
+
+			memcpy(
+			&gecpri_flow_cfg.tx_cfg[
+			gecpri_flow_cfg.tx_flow_cnt % MAX_NUM_FLOW
+			] , flow_tx , sizeof(ecpriss_flow_tx_cfg_s));
+
+			gecpri_flow_cfg.tx_flow_cnt++;
+
+			pr_err(
+			"ecpriss_process_packet:UL SRC %d , Port Index %d " ,
+			flow_tx->src , flow_tx->port_index);
+
+			switch((int)flow_tx->src){
+				case ECPRISS_ROUTE_SRC_OC:
+
+
+					ret =
+					ecpriss_qudp_fh_tx_hdr_ins_cfg(
+							flow_tx->port_index,
+							&flow_tx->qudp_tx_cfg);
+					if(ret < 0) {
+						break;
+					}
+					/* Todo:Validate if L2/L3 index passed
+					 by QUDP is valid 
+					*/
+					ret = ecpriss_xbar_oc_rx_lut(
+							flow_tx->port_index,
+							flow_tx);
+					if(ret < 0){
+						break;
+					}
+					/* Todo:Stats to be added and
+					   context update */
+					break;
+				case ECPRISS_ROUTE_SRC_C2C:
+				case ECPRISS_ROUTE_SRC_L2:
+				default:
+					break;
+			}
+		}
+		else if (packet->dir == ECPRISS_PACKET_DL) {
+
+			ecpriss_flow_rx_cfg_s *flow_rx =
+				&packet->flow_cfg.flow_rx_cfg;
+
+			memcpy(&gecpri_flow_cfg.rx_cfg[
+				gecpri_flow_cfg.rx_flow_cnt % MAX_NUM_FLOW],
+				flow_rx , sizeof(ecpriss_flow_rx_cfg_s));
+			gecpri_flow_cfg.rx_flow_cnt++;
+
+			pr_err(
+			"ecpriss_process_packet:DL SRC %d , Port Index %d " ,
+			flow_rx->src , flow_rx->port_index);
+			/* Todo:Make another function and return */
+			switch(flow_rx->src) {
+				case ECPRISS_ROUTE_SRC_FH:
+					ret = ecpriss_qudp_fh_rx_filter_cfg(
+							flow_rx->port_index,
+							&flow_rx->qudp_rx_cfg);
+					if(ret < 0) {
+						break;
+					}
+
+					ret = ecpriss_xbar_fh_rx_lut(
+							flow_rx->port_index,
+							flow_rx);
+					if(ret < 0) {
+						break;
+					}
+					/* Stats to be added and context update */
+					break;
+				case ECPRISS_ROUTE_SRC_C2C:
+				default:
+					break;
+			}
+		}
+	}while (0);
+	return;
+}
+
+/* Make into a single struct -> last 3 args, else it slows the program */
+static void ecpriss_eth_cpy_params(ecpriss_qudp_port_cfg_s       *port_cfg,
+		eth_ecpriss_topology_root_s    *eth_params,
+		uint8_t                        port_index,
+		uint8_t                        num_links,
+		uint8_t                        topology_idx)
+{
+	uint8_t j;
+	eth_ecpriss_port_params_s *port_params = NULL;
+
+	if(port_cfg == NULL || eth_params == NULL) {
+		return;
+	}
+	port_params =
+	&eth_params->topology_params[topology_idx].port_params[port_index];
+
+	for(j = 0;j<num_links;j++) {
+		memcpy(&port_cfg->eth_cfg.link_params[j],
+				&port_params->link_params[j],
+				sizeof(port_cfg->eth_cfg.link_params[j]));
+	}
+	return;
+}
+
+
+
+void ecpriss_eth_topology_init(void)
+{
+	int ret = 0;
+	int i,j;
+	eth_ecpriss_dev_mode_e device_mode;
+	uint8_t port_index;
+	uint8_t num_links;
+
+	ecpriss_qudp_port_cfg_s      *port_cfg_local;
+
+	do {
+		ret = (mtip_ecpri_ops.eth_ecpriss_get_topology)(&device_mode,
+				&eth_link_params_g);
+		if(ret < 0) {
+			break;
+		}
+
+		for(i=0;i<eth_link_params_g.num_unique_port_types;i++) {
+			if(eth_link_params_g.topology_params[i].port_type ==
+					ETH_ECPRISS_PORT_TYPE_FH) {
+				ecpriss_pdata->qudp_ctx->num_ports =
+				eth_link_params_g.topology_params[i].num_ports;
+				for(j=0;j<ecpriss_pdata->qudp_ctx->num_ports;j++){
+					port_index =
+					eth_link_params_g.topology_params[i].port_params[j].port_index;
+					port_cfg_local =
+						&ecpriss_pdata->qudp_ctx->fh_port_cfg[port_index];
+					num_links =
+						eth_link_params_g.topology_params[i].port_params[j].num_links;
+					ecpriss_eth_cpy_params(port_cfg_local,
+							&eth_link_params_g,
+							port_index,
+							num_links,
+							i);
+				}
+			}
+			else if(eth_link_params_g.topology_params[i].port_type ==
+					ETH_ECPRISS_PORT_TYPE_C2C) {
+				ecpriss_pdata->qudp_ctx->num_ports =
+					eth_link_params_g.topology_params[i].num_ports;
+				for(j=0;j<ecpriss_pdata->qudp_ctx->num_ports;j++) {
+					port_index =
+						eth_link_params_g.topology_params[i].port_params[j].port_index;
+					port_cfg_local =
+						&ecpriss_pdata->qudp_ctx->c2c_port_cfg[port_index];
+					num_links =
+						eth_link_params_g.topology_params[i].port_params[j].num_links;
+					ecpriss_eth_cpy_params(port_cfg_local,
+							&eth_link_params_g,
+							port_index,
+							num_links,
+							i);
+				}
+			}
+			else if(eth_link_params_g.topology_params[i].port_type ==
+					ETH_ECPRISS_PORT_TYPE_L2) {
+				ecpriss_pdata->qudp_ctx->num_ports =
+					eth_link_params_g.topology_params[i].num_ports;
+				for(j=0;j<ecpriss_pdata->qudp_ctx->num_ports;j++) {
+					port_index =
+						eth_link_params_g.topology_params[i].port_params[j].port_index;
+					port_cfg_local =
+						&ecpriss_pdata->qudp_ctx->fh_port_cfg[port_index];
+					num_links =
+						eth_link_params_g.topology_params[i].port_params[j].num_links;
+					ecpriss_eth_cpy_params(port_cfg_local,
+							&eth_link_params_g,
+							port_index,
+							num_links,
+							i);
+				}
+			}
+		}
+	}while (0);
+
+	ecpriss_pdata->eth_topology_params->eth_topology_init_done = 1;
+
+	return;
+}
+
+
+void ecpriss_eth_event_processing(void)
+{
+	ecpriss_eth_topology_init();
+	return;
+}
+
+
+void ecpriss_eth_topology_init_wq(struct work_struct *work)
+{
+	ECPRISS_CORE_LOCK();
+	ecpriss_eth_topology_init();
+	ECPRISS_CORE_UNLOCK();
+	return;
+}
+
+
+static int ecpriss_dma_endp_config(void)
+{
+
+	int ret = 0;
+	int i,j;
+
+	memset(&dma_endp_g , 0 , sizeof(dma_endp_g));
+
+	do{
+		ret = (dma_ecpri_ss_driver_ops.ecpri_dma_ecpri_ss_get_endp_mapping)(&dma_endp_g);
+		if(ret < 0) {
+			break;
+		}
+
+		ecpriss_pdata->dev_mode = (ecpriss_dev_mode_e)dma_endp_g.flv;
+		ecpriss_pdata->xbar_ctx->num_of_port_types = dma_endp_g.num_of_port_types;
+
+		for(i=0;i<dma_endp_g.num_of_port_types;i++) {
+			if(dma_endp_g.topology_params[i].port_type ==
+					ECPRI_DMA_ENDP_STREAM_DEST_FH) {
+				for(j=0;j<dma_endp_g.topology_params[i].num_of_ports;j++) {
+					memcpy(&ecpriss_pdata->xbar_ctx->fh_port_cfg.dma_port_cfg[j],
+							&dma_endp_g.topology_params[i].dma_port_param[j],
+							sizeof(struct ecpri_dma_port_params));
+				}
+			}
+			else if(dma_endp_g.topology_params[i].port_type ==
+					ECPRI_DMA_ENDP_STREAM_DEST_C2C) {
+				for(j=0;j<dma_endp_g.topology_params[i].num_of_ports;j++) {
+					memcpy(&ecpriss_pdata->xbar_ctx->c2c_port_cfg.dma_port_cfg[j],
+							&dma_endp_g.topology_params[i].dma_port_param[j],
+							sizeof(struct ecpri_dma_port_params));
+				}
+			}
+			else if (dma_endp_g.topology_params[i].port_type ==
+					ECPRI_DMA_ENDP_STREAM_DEST_L2) {
+				for(j=0;j<dma_endp_g.topology_params[i].num_of_ports;j++) {
+					memcpy(&ecpriss_pdata->xbar_ctx->l2_port_cfg.dma_port_cfg[j],
+							&dma_endp_g.topology_params[i].dma_port_param[j],
+							sizeof(struct ecpri_dma_port_params));
+				}
+			}
+			else if(dma_endp_g.topology_params[i].port_type ==
+					ECPRI_DMA_ENDP_STREAM_DEST_FH_EXCEPTION) {
+				for(j=0;j<dma_endp_g.topology_params[i].num_of_ports;j++) {
+					memcpy(&ecpriss_pdata->xbar_ctx->fh_exception_port_cfg.dma_port_cfg[j],
+							&dma_endp_g.topology_params[i].dma_port_param[j],
+							sizeof(struct ecpri_dma_port_params));
+				}
+			}
+		}
+	}while (0);
+
+					/* Set the non ecpri LUT Cfg */
+
+					ecpriss_xbar_non_ecpri_lut_cfg();
+
+					return ret;
+}
+
+void ecpriss_dma_event_processing_wq(struct work_struct *work)
+{
+	if(work == NULL) {
+		return;
+	}
+	ECPRISS_CORE_LOCK();
+	ecpriss_dma_endp_config();
+	ECPRISS_CORE_UNLOCK();
+	return;
+}
+void ecpriss_dma_events_cb(void *user_data, enum ecpri_dma_event_type evt)
+{
+	return;
+}
+
+
+void ecpriss_eth_topology_cb(void)
+{
+	int ret=0;
+	struct workqueue_struct *ecpriss_wq = NULL;
+	struct work_struct *ecpriss_work = NULL;
+	do {
+
+		ecpriss_pdata->callback_flag->eth_link_callback_rcvd = 1;
+		ecpriss_wq =
+		ecpriss_pdata->events_workqueue->kernel_events_workqueue;
+		ecpriss_work =
+	ecpriss_pdata->events_workqueue->ecpriss_eth_topology_events_rdy_work;
+		ret = ecpriss_queue_work(ecpriss_wq,
+				ecpriss_work);
+		if(ret < 0) {
+			pr_err("Queue work failed\n");
+			break;
+		}
+	} while (0);
+	return;
+}
+
+void ecpriss_eth_events_cb(eth_ecpriss_event_e event_type,
+		eth_ecpriss_link_event_params_s *link_event_params)
+{
+	int ret = 0;
+	struct workqueue_struct *ecpriss_wq;
+	struct work_struct *ecpriss_work;
+
+	pr_err("ecpriss_eth_events_cb event received %d", event_type);
+
+
+	do{
+		if(link_event_params == NULL) {
+
+		}
+		ecpriss_wq =
+		ecpriss_pdata->events_workqueue->kernel_events_workqueue;
+		ecpriss_work =
+		ecpriss_pdata->events_workqueue->ecpriss_eth_events_rdy_work;
+		ret = ecpriss_queue_work(ecpriss_wq,
+				ecpriss_work);
+		if(ret < 0) {
+			pr_err("Queue work failed\n");
+			break;
+		}
+
+	} while (0);
+	return;
+}
+
+void ecpriss_dma_endp_cb(void * userdata)
+{
+	int ret =0;
+	struct workqueue_struct    *ecpriss_wq;
+	struct work_struct         *ecpriss_work;
+	do{
+		ecpriss_pdata->callback_flag->dma_callback_rcvd = 1;
+		ecpriss_wq =
+		ecpriss_pdata->events_workqueue->kernel_events_workqueue;
+		ecpriss_work =
+		ecpriss_pdata->events_workqueue->ecpriss_dma_events_rdy_work;
+		ret = ecpriss_queue_work(ecpriss_wq,
+				ecpriss_work);
+		if(ret < 0) {
+			pr_err("Queue work failed\n");
+			break;
+		}
+	}while (0);
+	return;
+}
+
+
+
+void ecpriss_eth_event_processing_wq(struct work_struct *work)
+{
+	ecpriss_eth_event_processing();
+}
+
+
+
+void ecpriss_dma_ecpri_ss_log_msg_cb(void *user_data, const char *fmt, ...)
+{
+	return ;
+}
+
+static int ecpriss_core_data_init(void)
+{
+	/*1. Initialize all the tables and data strucutres
+	  2. Create the netlink socket
+	  */
+	int ret = 0;
+	ecpriss_pdata->dev_mode = (ecpriss_dev_mode_e)ECPRI_HW_FLAVOR_RU;
+	ecpriss_pdata->callback_flag = &callback_flag_g;
+	ecpriss_pdata->dma_endp = &dma_endp_g;
+	ecpriss_pdata->eth_topology_params = &eth_link_params_g;
+	ecpriss_pdata->events_workqueue = &events_workqueue_g;
+	ecpriss_pdata->interrupts_workqueue = &interrupts_workqueue_g;
+
+	ecpriss_pdata->qudp_ctx = &qudp_ctx_g;
+	ecpriss_pdata->xbar_ctx = &xbar_ctx_g;
+
+	ecpriss_pdata->qudp_ctx->ecpriss_qudp_hal_ctx =
+		qudp_ctx_g.ecpriss_qudp_hal_ctx;
+	ecpriss_pdata->xbar_ctx->ecpriss_xbar_hal = xbar_ctx_g.ecpriss_xbar_hal;
+
+	/* ecpriss_pdata->stats = &stats_g; */
+
+	eth_topology_ready_cb = &ecpriss_eth_topology_cb;
+	eth_interface_events_cb = &ecpriss_eth_events_cb;
+	do {
+		ret = ecpriss_initialize_workq();
+		if(ret < 0) {
+			pr_err("Work queue init failed\n");
+			break;
+		}
+		pr_info("eCPRI core Work queue Inited\n");
+
+		ret = ecpriss_netlink_socket_create();
+		if(ret < 0) {
+			pr_err("Netlink socket initialization failed\n");
+			break;
+		}
+		pr_info("eCPRI Netlink Socket(NETLINK_ECPRI family) Created\n");
+
+	} while (0);
+	return ret;
+}
+
+
+static int ecpriss_core_register_callbacks(void)
+{
+	/*
+	   1. Register for callback with Ethernet and update state
+	   2. Register callback with DMA and update state
+	   3. Register callback with MACSEC and SSR update state
+	   */
+
+
+
+	int ret = 0;
+	bool ready = 0;
+	bool *is_ready = &ready;
+	do{
+		ret = (mtip_ecpri_ops.eth_ecpriss_register_ready_cb)
+			(eth_topology_ready_cb, is_ready);
+
+		if (ret < 0) {
+			break;
+		}
+
+		ret = (mtip_ecpri_ops.eth_ecpriss_register_events_cb)
+			(eth_interface_events_cb);
+
+		if (ret < 0) {
+			break;
+		}
+
+		if(*is_ready == true) {
+
+			ecpriss_eth_topology_init();
+		}
+
+		ready = 0;
+
+
+		dma_ready_info.notify_ready = &ecpriss_dma_endp_cb;
+		dma_ready_info.dma_event_notify = &ecpriss_dma_events_cb;
+		dma_ready_info.log_msg = &ecpriss_dma_ecpri_ss_log_msg_cb;
+
+		ret = (dma_ecpri_ss_driver_ops.ecpri_dma_ecpri_ss_register)
+			(&dma_ready_info,is_ready);
+		if (ret < 0) {
+			break;
+		}
+
+		if(*is_ready == true &&
+		(ecpriss_pdata->callback_flag->dma_callback_rcvd == 0)) {
+
+			ret = ecpriss_dma_endp_config();
+
+			if(ret < 0) {
+				break;
+			}
+		}
+	}while (0);
+	return ret;
+}
+
+static int ecpriss_core_init(struct platform_device *pdev)
+{
+	/*1. Initialize ECPRISS private data struct
+	  2. Register for the callbacks with the external modules such as
+	  EMAC,DMA and MACSEC
+	  4. Flow manager init, Initialize the flow tables and the
+	  nfapi tables (In user space)
+	  5. Initialize XBAR by calling in ecpriss_xbar_init()
+	  -->Dependency DMA endpoints
+	  6. Initialize all the QUDP instances based on the topology
+	  -->Dependency on eemac topology */
+
+	int ret = 0;
+
+	do{
+
+		if(pdev == NULL) {
+			ret = -ENOMEM;
+			break;
+		}
+		memset(ecpriss_pdata,0,sizeof(ecpriss_core_private_s));
+
+		ret = ecpriss_core_data_init();
+		if(ret < 0) {
+			pr_err("Initialization of pdata failed\n");
+			break;
+		}
+
+		ret = ecpriss_xbar_cold_init(&pdev->dev);
+		if(ret < 0) {
+			pr_err("XBAR cold init failed\n");
+			break;
+		}
+
+		ret = ecpriss_core_register_callbacks();
+		if(ret < 0) {
+			pr_err("Callback registrations failed\n");
+			break;
+		}
+
+		ret = ecpriss_qudp_init(&pdev->dev);
+		if(ret < 0) {
+			pr_err("QUDP initialization failed\n");
+			break;
+		}
+
+		pr_err("QUDP init complete\n");
+
+		ecpriss_pdata->ecpri_state = ECPRI_CORE_INIT;
+
+	}while (0);
+	return ret;
+}
+
+static int ecpriss_core_probe(struct platform_device *pdev)
+{
+	int ret = 0;
+	pr_err("ecpriss_core_probe(): Start \n");
+	if(pdev == NULL) {
+		ret = -ENOMEM;
+	}
+	ecpriss_core_init(pdev);
+	pr_debug("ecpriss_core_probe(): End\n");
+	/*Clean up for init failure.*/
+	return ret;
+}
+
+static const struct of_device_id ecpriss_core_dt_match[] = {
+	{ .compatible = "qcom,ecpriss_core" },
+	{ },
+};
+
+MODULE_DEVICE_TABLE(of, ecpriss_core_dt_match);
+
+static const struct dev_pm_ops ecpriss_core_pm_ops = {
+	.suspend = ecpriss_core_suspend,
+	.resume = ecpriss_core_resume,
+};
+
+static struct platform_driver ecpriss_core_driver = {
+	.driver = {
+		.name = "ecpriss_core",
+		.owner = THIS_MODULE,
+		.of_match_table = ecpriss_core_dt_match,
+		.pm = &ecpriss_core_pm_ops,
+	},
+	.probe = ecpriss_core_probe,
+	.remove = ecpriss_core_remove,
+};
+
+
+static int __init ecpriss_core_module_init(void)
+{
+	/* ecpriss_pdata->ecpriss_core_logbuf =
+	ipc_log_context_create(ECPRISS_CORE_IPC_LOG_PAGES,
+		"ecpriss_core", 0);
+	if (ecpriss_pdata->ecpriss_core_logbuf == NULL)
+	pr_debug(
+	"failed to create log context for ECPRISS_SS driver\n"); */
+	pr_err("ecpriss_core_module_init():Start \n"); 
+	return platform_driver_register(&ecpriss_core_driver);
+}
+
+static void __exit ecpriss_core_module_exit(void)
+{
+	if (ecpriss_pdata->netlink_socket) {
+		netlink_kernel_release(ecpriss_pdata->netlink_socket);
+	}
+	/* del_timer(&g_timer); */
+}
+
+
+MODULE_LICENSE("GPL");
+module_init(ecpriss_core_module_init);
+module_exit(ecpriss_core_module_exit);

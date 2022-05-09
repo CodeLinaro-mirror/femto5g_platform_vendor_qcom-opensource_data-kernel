@@ -1,0 +1,50 @@
+
+DATACSMKERNELTOP = $(ROOTDIR)datacsm-kernel/drivers/
+ECPRIDRVTOP = $(DATACSMKERNELTOP)/ecpri/ecpri_core
+
+LINUX_INC +=	-Iinclude/linux
+
+CDEFINES +=	-DANI_LITTLE_BYTE_ENDIAN \
+	-DANI_LITTLE_BIT_ENDIAN \
+	-DDOT11F_LITTLE_ENDIAN_HOST \
+	-DANI_COMPILER_TYPE_GCC \
+	-DANI_OS_TYPE_ANDROID=6 \
+	-DPTT_SOCK_SVC_ENABLE \
+	-Wall\
+	-Werror\
+	-D__linux__
+
+KBUILD_CPPFLAGS += $(CDEFINES)
+
+ccflags-y += $(LINUX_INC)
+ccflags-y += -I$(DATACSMKERNELTOP)/include/
+ccflags-y += -I$(ECPRIDRVTOP)/inc/
+ccflags-y += -I$(ECPRIDRVTOP)/inc/hal
+
+
+ifeq ($(call cc-option-yn, -Wmaybe-uninitialized),y)
+EXTRA_CFLAGS += -Wmaybe-uninitialized
+endif
+
+ifeq ($(call cc-option-yn, -Wheader-guard),y)
+EXTRA_CFLAGS += -Wheader-guard
+endif
+
+ifneq ($(MODNAME), qdsp6v2)
+CHIP_NAME ?= $(MODNAME)
+CDEFINES += -DMULTI_IF_NAME=\"$(CHIP_NAME)\"
+endif
+
+######### CONFIG_LASSEN_ECPRI ########
+obj-$(CONFIG_ECPRI_CORE) += ecpri_core.o
+ecpri_core-$(CONFIG_ECPRI_CORE) += \
+	    src/ecpriss_core.o \
+        src/utilities/ecpriss_netlink.o \
+		src/ecpriss_qudp/ecpriss_qudp.o \
+		src/ecpriss_qudp/ecpriss_qudp_hal.o \
+		src/ecpriss_xbar/ecpriss_xbar.o \
+		src/ecpriss_xbar/ecpriss_xbar_hal.o \
+		src/utilities/ecpriss_workqueue.o \
+
+CDEFINES += -DBUILD_TIMESTAMP=\"$(shell date -u +'%Y-%m-%dT%H:%M:%SZ')\"
+
