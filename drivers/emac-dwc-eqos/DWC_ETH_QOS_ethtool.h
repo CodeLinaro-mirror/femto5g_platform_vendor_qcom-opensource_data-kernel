@@ -48,6 +48,8 @@
 
 #define __DWC_ETH_QOS_ETHTOOL_H__
 
+static int DWC_ETH_QOS_if_running(struct net_device *dev);
+
 static void DWC_ETH_QOS_get_pauseparam(struct net_device *dev,
 				       struct ethtool_pauseparam *pause);
 static int DWC_ETH_QOS_set_pauseparam(struct net_device *dev,
