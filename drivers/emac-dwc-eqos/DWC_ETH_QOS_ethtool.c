@@ -401,6 +401,14 @@ static const struct ethtool_ops DWC_ETH_QOS_ethtool_ops_always_on_phy = {
        .get_sset_count = DWC_ETH_QOS_get_sset_count,
 };
 
+
+static int DWC_ETH_QOS_if_running(struct net_device *dev)
+{
+        if (!netif_running(dev))
+                return -EBUSY;
+        return 0;
+}
+
 static const struct ethtool_ops DWC_ETH_QOS_ethtool_ops = {
 	.get_link = ethtool_op_get_link,
 	.get_pauseparam = DWC_ETH_QOS_get_pauseparam,
@@ -417,6 +425,7 @@ static const struct ethtool_ops DWC_ETH_QOS_ethtool_ops = {
 #ifdef DWC_ETH_QOS_CONFIG_PTP
 	.get_ts_info = DWC_ETH_QOS_get_ts_info,
 #endif /* end of DWC_ETH_QOS_CONFIG_PTP */
+	.begin = DWC_ETH_QOS_if_running,
 };
 
 struct ethtool_ops *DWC_ETH_QOS_get_ethtool_ops(
