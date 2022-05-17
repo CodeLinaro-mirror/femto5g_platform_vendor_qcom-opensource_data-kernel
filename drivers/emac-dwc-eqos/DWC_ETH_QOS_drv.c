@@ -1877,6 +1877,13 @@ static void DWC_ETH_QOS_default_rx_confs(struct DWC_ETH_QOS_prv_data *pdata)
 	DBGPR("<--DWC_ETH_QOS_default_rx_confs\n");
 }
 
+static void DWC_ETH_QOS_reset_eth_stats(struct DWC_ETH_QOS_prv_data *pdata)
+{
+	memset(&pdata->xstats, 0, sizeof(struct DWC_ETH_QOS_extra_stats));
+	memset(&pdata->ipa_stats, 0, sizeof(struct DWC_ETH_QOS_ipa_stats));
+	memset(&pdata->mmc, 0, sizeof(struct DWC_ETH_QOS_mmc_counters));
+}
+
 /*!
  * \brief API to open a device for data transmission & reception.
  *
@@ -2074,6 +2081,8 @@ static int DWC_ETH_QOS_close(struct net_device *dev)
 #endif /* end of DWC_ETH_QOS_CONFIG_PGTEST */
 
 	DBGPR("<--DWC_ETH_QOS_close\n");
+
+	DWC_ETH_QOS_reset_eth_stats(pdata);
 
 	return Y_SUCCESS;
 }
