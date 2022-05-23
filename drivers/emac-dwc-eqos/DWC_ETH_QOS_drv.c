@@ -2708,7 +2708,7 @@ static int DWC_ETH_QOS_start_xmit(struct sk_buff *skb, struct net_device *dev)
 	if (!tso)
 		int_mod = DWC_ETH_QOS_cal_int_mod(skb, eth_type, pdata);
 
-	if (eth_type == ETH_P_IP || eth_type == ETH_P_IPV6)
+	if (!(skb_shinfo(skb)->tx_flags & SKBTX_IN_PROGRESS) && (eth_type == ETH_P_IP || eth_type == ETH_P_IPV6))
 		skb_orphan(skb);
 	/* configure required descriptor fields for transmission */
 	hw_if->pre_xmit(pdata, qinx, int_mod);
