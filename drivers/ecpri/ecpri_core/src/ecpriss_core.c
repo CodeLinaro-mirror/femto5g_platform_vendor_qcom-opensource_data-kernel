@@ -27,6 +27,7 @@ void ecpriss_eth_events_cb(eth_ecpriss_event_e event_type,
 
 void ecpriss_dma_ecpri_ss_log_msg_cb(void *user_data, const char *fmt, ...);
 
+ecpri_clock sys_clock;
 ecpriss_core_private_s 	pdata;
 ecpriss_core_private_s *ecpriss_pdata= &pdata;
 ecpriss_xbar_ctx_s    	xbar_ctx_g;
@@ -559,6 +560,108 @@ static int ecpriss_core_register_callbacks(void)
 	}while (0);
 	return ret;
 }
+static int ecpriss_clock_init(struct device *dev)
+{
+	int ret = 0;
+	sys_clock.ecpri_cg = devm_clk_get(dev,"ecpri_cg");
+	if (!sys_clock.ecpri_cg){
+		pr_err("Failed to get ecpri_cg\n");
+		return -ENOMEM;
+	}
+	sys_clock.ecpri_fr = devm_clk_get(dev,"ecpri_fr");
+	if (!sys_clock.ecpri_fr){
+		pr_err("Failed to get ecpri_fr \n");
+		return -ENOMEM;
+	}
+	sys_clock.ecpri_eth_100G_fh0 = devm_clk_get(dev,"ecpri_eth_100G_fh0");
+	if (!sys_clock.ecpri_eth_100G_fh0){
+		pr_err("Failed to get ecpri_eth_100G_fh0\n");
+		return -ENOMEM;
+	}
+	sys_clock.ecpri_eth_100G_fh1 = devm_clk_get(dev,"ecpri_eth_100G_fh1");
+	if (!sys_clock.ecpri_eth_100G_fh1){
+		pr_err("Failed to get ecpri_eth_100G_fh1\n");
+		return -ENOMEM;
+	}
+	sys_clock.ecpri_eth_100G_fh2 = devm_clk_get(dev,"ecpri_eth_100G_fh2");
+	if (!sys_clock.ecpri_eth_100G_fh2){
+		pr_err("Failed to get ecpri_eth_100G_fh2\n");
+		return -ENOMEM;
+	}
+	sys_clock.ecpri_eth_100G_c2c0 = devm_clk_get(dev,"ecpri_eth_100G_c2c0");
+	if (!sys_clock.ecpri_eth_100G_c2c0){
+		pr_err("Failed to get ecpri_eth_100G_c2c0\n");
+		return -ENOMEM;
+	}
+	sys_clock.ecpri_eth_100G_c2c1 = devm_clk_get(dev,"ecpri_eth_100G_c2c1");
+	if (!sys_clock.ecpri_eth_100G_c2c1){
+		pr_err("Failed to get ecpri_eth_100G_c2c1\n");
+		return -ENOMEM;
+	}
+	sys_clock.ecpri_eth_100G_dbg_c2c = devm_clk_get(dev,"ecpri_eth_100G_dbg_c2c");
+	if (!sys_clock.ecpri_eth_100G_dbg_c2c){
+		pr_err("Failed to get ecpri_eth_100G_dbg_c2c\n");
+		return -ENOMEM;
+	}
+	sys_clock.ecpri_oran_div2 = devm_clk_get(dev,"ecpri_oran_div2");
+	if (!sys_clock.ecpri_oran_div2){
+		pr_err("Failed to get ecpri_oran_div2\n");
+		return -ENOMEM;
+	}
+	sys_clock.ecpri_mss_oran = devm_clk_get(dev,"ecpri_mss_oran");
+	if (!sys_clock.ecpri_mss_oran){
+		pr_err("Failed to get ecpri_mss_oran\n");
+		return -ENOMEM;
+	}
+
+	ret = clk_prepare_enable(sys_clock.ecpri_cg);
+	if (ret){
+		pr_err("Failed to vote ecpri_cg \n");
+        }
+
+	clk_set_rate(sys_clock.ecpri_cg, ECPRI_CG_CLK_NOM_MAX);
+
+	ret = clk_prepare_enable(sys_clock.ecpri_fr);
+	if (ret){
+		pr_err("Failed to vote ecpri_fr\n");
+        }
+	ret = clk_prepare_enable(sys_clock.ecpri_eth_100G_fh0);
+	if (ret){
+		pr_err("Failed to vote ecpri_eth_100G_fh0\n");
+        }
+	ret = clk_prepare_enable(sys_clock.ecpri_eth_100G_fh1);
+	if (ret){
+		pr_err("Failed to vote ecpri_eth_100G_fh1\n");
+        }
+	ret = clk_prepare_enable(sys_clock.ecpri_eth_100G_fh2);
+	if (ret){
+		pr_err("Failed to vote ecpri_eth_100G_fh2\n");
+        }
+	ret = clk_prepare_enable(sys_clock.ecpri_eth_100G_c2c0);
+	if (ret){
+		pr_err("Failed to vote ecpri_eth_100G_c2c0\n");
+        }
+	ret = clk_prepare_enable(sys_clock.ecpri_eth_100G_c2c1);
+	if (ret){
+		pr_err("Failed to vote ecpri_eth_100G_c2c1\n");
+        }
+	ret = clk_prepare_enable(sys_clock.ecpri_eth_100G_dbg_c2c);
+	if (ret){
+		pr_err("Failed to vote ecpri_eth_100G_dbg_c2c\n");
+        }
+	ret = clk_prepare_enable(sys_clock.ecpri_oran_div2);
+	if (ret){
+		pr_err("Failed to vote ecpri_oran_div2\n");
+        }
+	ret = clk_prepare_enable(sys_clock.ecpri_mss_oran);
+	if (ret){
+		pr_err("Failed to vote ecpri_mss_oran\n");
+        }
+
+	clk_set_rate(sys_clock.ecpri_mss_oran, ECPRI_MSS_ORAN_NOM_MAX);
+
+	return 0;
+}
 
 static int ecpriss_core_init(struct platform_device *pdev)
 {
@@ -581,6 +684,12 @@ static int ecpriss_core_init(struct platform_device *pdev)
 			break;
 		}
 		memset(ecpriss_pdata,0,sizeof(ecpriss_core_private_s));
+
+		ret = ecpriss_clock_init(&pdev->dev);
+		if(ret < 0) {
+			pr_err("Initialization of clock failed\n");
+			break;
+		}
 
 		ret = ecpriss_core_data_init();
 		if(ret < 0) {
