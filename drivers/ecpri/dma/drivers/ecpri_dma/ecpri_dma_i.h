@@ -358,6 +358,7 @@ struct ecpri_dma_exception_replenish_work_wrap {
 };
 
 struct ecpri_dma_clks {
+	struct clk* gcc_aggre_noc_ecpri_dma;
 	struct clk* gcc_ecpri_noc_ahb;
 	struct clk* gcc_ecpri_ahb;
 	struct clk* gcc_ecpri_xo;
@@ -368,6 +369,12 @@ struct ecpri_dma_clks {
 	struct clk* dma_fast_div2_clk;
 	struct clk* dma_fast_div2_noc_clk;
 	struct clk* dma_nfapi_axi_clk;
+};
+
+struct ecpri_dma_icc_paths {
+	struct icc_path* dma_to_ddr;
+	struct icc_path* gsi_to_ddr;
+	struct icc_path* appss_to_dma;
 };
 
  /**
@@ -447,6 +454,7 @@ struct ecpri_dma_context {
 	struct workqueue_struct *ecpri_dma_exception_wq;
 	struct ecpri_dma_exception_stats exception_stats;
 	struct ecpri_dma_clks clks;
+	struct ecpri_dma_icc_paths icc_paths;
 };
 
 /**

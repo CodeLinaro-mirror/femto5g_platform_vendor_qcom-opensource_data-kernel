@@ -1776,6 +1776,13 @@ int ecpri_dma_hw_init(void)
 
 	/* Get Clocks */
 	DMADBG("Started getting clocks\n");
+	ecpri_dma_ctx->clks.gcc_aggre_noc_ecpri_dma = devm_clk_get(ecpri_dma_ctx->pdev,
+		"gcc_aggre_noc_ecpri_dma");
+	if (!ecpri_dma_ctx->clks.gcc_aggre_noc_ecpri_dma) {
+		DMAERR("Failed to get gcc_aggre_noc_ecpri_dma\n");
+		return -ENOMEM;
+	}
+
 	ecpri_dma_ctx->clks.gcc_ecpri_noc_ahb = devm_clk_get(ecpri_dma_ctx->pdev,
 		"gcc_ecpri_noc_ahb");
 	if (!ecpri_dma_ctx->clks.gcc_ecpri_noc_ahb) {
@@ -1849,6 +1856,12 @@ int ecpri_dma_hw_init(void)
 	/* Vote clocks */
 	DMADBG("Started clocks vote\n");
 
+	ret = clk_prepare_enable(ecpri_dma_ctx->clks.gcc_aggre_noc_ecpri_dma);
+	if (ret)
+	{
+		DMAERR("Failed to vote gcc_aggre_noc_ecpri_dma\n");
+	}
+
 	ret = clk_prepare_enable(ecpri_dma_ctx->clks.gcc_ecpri_noc_ahb);
 	if (ret)
 	{
@@ -1911,6 +1924,32 @@ int ecpri_dma_hw_init(void)
 	{
 		DMAERR("Failed to vote dma_nfapi_axi_clk\n");
 	}
+
+	/* get ICC */
+
+	ecpri_dma_ctx->icc_paths.dma_to_ddr =
+		of_icc_get(ecpri_dma_ctx->pdev, "dma_to_ddr");
+	if (!ecpri_dma_ctx->icc_paths.dma_to_ddr) {
+		DMAERR("Failed to get dma_to_ddr icc path\n");
+		return -ENOMEM;
+	}
+	ecpri_dma_ctx->icc_paths.gsi_to_ddr =
+		of_icc_get(ecpri_dma_ctx->pdev, "gsi_to_ddr");
+	if (!ecpri_dma_ctx->icc_paths.gsi_to_ddr) {
+		DMAERR("Failed to get gsi_to_ddr icc path\n");
+		return -ENOMEM;
+	}
+	ecpri_dma_ctx->icc_paths.appss_to_dma =
+		of_icc_get(ecpri_dma_ctx->pdev, "appss_to_dma");
+	if (!ecpri_dma_ctx->icc_paths.appss_to_dma) {
+		DMAERR("Failed to get appss_to_dma icc path\n");
+		return -ENOMEM;
+	}
+
+	/* set ICC BW */
+	icc_set_bw(ecpri_dma_ctx->icc_paths.dma_to_ddr, 0, MBps_to_icc(6400));
+	icc_set_bw(ecpri_dma_ctx->icc_paths.gsi_to_ddr, 0, MBps_to_icc(6400));
+	icc_set_bw(ecpri_dma_ctx->icc_paths.appss_to_dma, 0, MBps_to_icc(6400));
 
 	/* Read eCPRI HW Params 0 and make sure we have access to the registers */
 	ecpri_dma_hal_read_reg_fields(ECPRI_HW_PARAMS_0, &hw_params_0);
