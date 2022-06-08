@@ -87,22 +87,22 @@ ecpri_dma_mhi_client_test_mapping
 		.second_dest_endp_id = 58
 	},
 	[ECPRI_DMA_VM_IDS_VM1] = {
-		.first_src_endp_id = 22,
-		.second_src_endp_id = 23,
-		.first_dest_endp_id = 59,
-		.second_dest_endp_id = 60
+		.first_src_endp_id = 23,
+		.second_src_endp_id = 24,
+		.first_dest_endp_id = 60,
+		.second_dest_endp_id = 61
 	},
 	[ECPRI_DMA_VM_IDS_VM2] = {
-		.first_src_endp_id = 24,
-		.second_src_endp_id = 25,
-		.first_dest_endp_id = 61,
-		.second_dest_endp_id = 62
-	},
-	[ECPRI_DMA_VM_IDS_VM3] = {
 		.first_src_endp_id = 26,
 		.second_src_endp_id = 27,
 		.first_dest_endp_id = 63,
 		.second_dest_endp_id = 64
+	},
+	[ECPRI_DMA_VM_IDS_VM3] = {
+		.first_src_endp_id = 29,
+		.second_src_endp_id = 30,
+		.first_dest_endp_id = 66,
+		.second_dest_endp_id = 67
 	}
 };
 
@@ -579,7 +579,7 @@ static void ecpri_dma_mhi_client_test_free_mmio_space(int idx)
 		mhi_client_test_suite_ctx[idx]->ch_ctx_array.virt_base,
 		mhi_client_test_suite_ctx[idx]->ch_ctx_array.phys_base);
 
-	dma_free_coherent(ecpri_dma_ctx->pdev,
+	dma_free_coherent(((struct gsi_ctx*)ecpri_dma_ctx->gsi_dev_hdl)->dev,
 		mhi_client_test_suite_ctx[idx]->msi.size,
 		mhi_client_test_suite_ctx[idx]->msi.virt_base,
 		mhi_client_test_suite_ctx[idx]->msi.phys_base);
@@ -603,7 +603,8 @@ static int ecpri_dma_mhi_client_test_alloc_mmio_space(int idx)
 
 	/* Allocate MSI */
 	msi->size = 4; // Mocks DB register
-	msi->virt_base = dma_alloc_coherent(ecpri_dma_ctx->pdev, msi->size,
+	msi->virt_base = dma_alloc_coherent(
+		((struct gsi_ctx*)ecpri_dma_ctx->gsi_dev_hdl)->dev, msi->size,
 		&msi->phys_base, GFP_KERNEL);
 	if (!msi->virt_base) {
 		DMA_UT_ERR("no mem for msi\n");
@@ -774,7 +775,6 @@ static void ecpri_dma_mhi_client_test_free_src_dest_buffers(int idx)
 	struct ecpri_dma_mem_buffer* dest_buffer;
 
 	DMA_UT_DBG("deallocating buffers \n");
-	usleep_range(1000, 2000);
 
 	src_buffer = &mhi_client_test_suite_ctx[idx]->src_buffer;
 	dest_buffer = &mhi_client_test_suite_ctx[idx]->dest_buffer;
@@ -902,7 +902,7 @@ static void  ecpri_dma_mhi_client_test_destroy_channel_context(
 	dev_xfer_ring_idx = host_ch_id - ECPRI_DMA_MHI_TEST_FIRST_HW_CH_ID;
 
 	if (transfer_ring_bufs[dev_xfer_ring_idx].phys_base) {
-		dma_free_coherent(ecpri_dma_ctx->pdev,
+		dma_free_coherent(((struct gsi_ctx*)ecpri_dma_ctx->gsi_dev_hdl)->dev,
 			transfer_ring_bufs[dev_xfer_ring_idx].size,
 			transfer_ring_bufs[dev_xfer_ring_idx].virt_base,
 			transfer_ring_bufs[dev_xfer_ring_idx].phys_base);
@@ -910,7 +910,7 @@ static void  ecpri_dma_mhi_client_test_destroy_channel_context(
 	}
 
 	if (event_ring_bufs[dev_ev_ring_idx].phys_base) {
-		dma_free_coherent(ecpri_dma_ctx->pdev,
+		dma_free_coherent(((struct gsi_ctx*)ecpri_dma_ctx->gsi_dev_hdl)->dev,
 			event_ring_bufs[dev_ev_ring_idx].size,
 			event_ring_bufs[dev_ev_ring_idx].virt_base,
 			event_ring_bufs[dev_ev_ring_idx].phys_base);
@@ -974,7 +974,8 @@ static int ecpri_dma_mhi_client_test_config_channel_context(
 			event_ring_size *
 			sizeof(struct gsi_xfer_compl_evt);
 		event_ring_bufs[dev_ev_ring_idx].virt_base =
-			dma_alloc_coherent(ecpri_dma_ctx->pdev,
+			dma_alloc_coherent(
+				((struct gsi_ctx*)ecpri_dma_ctx->gsi_dev_hdl)->dev,
 				event_ring_bufs[dev_ev_ring_idx].size,
 				&event_ring_bufs[dev_ev_ring_idx].phys_base,
 				GFP_KERNEL);
@@ -1003,13 +1004,14 @@ static int ecpri_dma_mhi_client_test_config_channel_context(
 		transfer_ring_size *
 		sizeof(struct gsi_tre);
 	transfer_ring_bufs[dev_xfer_ring_idx].virt_base =
-		dma_alloc_coherent(ecpri_dma_ctx->pdev,
+		dma_alloc_coherent(
+			((struct gsi_ctx*)ecpri_dma_ctx->gsi_dev_hdl)->dev,
 			transfer_ring_bufs[dev_xfer_ring_idx].size,
 			&transfer_ring_bufs[dev_xfer_ring_idx].phys_base,
 			GFP_KERNEL);
 	if (!transfer_ring_bufs[dev_xfer_ring_idx].virt_base) {
 		DMA_UT_ERR("no mem for xfer ring buf\n");
-		dma_free_coherent(ecpri_dma_ctx->pdev,
+		dma_free_coherent(((struct gsi_ctx*)ecpri_dma_ctx->gsi_dev_hdl)->dev,
 			event_ring_bufs[dev_ev_ring_idx].size,
 			event_ring_bufs[dev_ev_ring_idx].virt_base,
 			event_ring_bufs[dev_ev_ring_idx].phys_base);
@@ -1754,7 +1756,6 @@ static int ecpri_dma_mhi_client_test_utils_create_params_and_init(
 
 	DMA_UT_DBG("=============================== Init for VF_ID %d SUCCESS"
 		" =============================== \n", function->vf_id);
-	usleep_range(1000, 2000);
 	return ret;
 }
 
@@ -1858,7 +1859,7 @@ static int ecpri_dma_mhi_test_q_transfer_re(
 	u32 avail_ev;
 	u32 next_wp_ofst;
 
-	DMA_UT_DBG("Entry\n");
+	DMA_UT_DBG("Entry for host CH  id %d ee %d\n", host_ch_id, ee);
 
 	p_mmio = (struct ecpri_dma_mhi_mmio_register_set*)mmio->virt_base;
 	host_channels = (struct ecpri_dma_mhi_host_ch_ctx*)
@@ -1944,6 +1945,8 @@ static int ecpri_dma_mhi_test_q_transfer_re(
 		ee, device_ch_idx,
 		host_channels[host_ch_id].wp);
 
+	DMA_UT_DBG("exit\n");
+
 	return 0;
 }
 
@@ -1996,7 +1999,8 @@ static int ecpri_dma_mhi_test_loopback_data_transfer(int idx,
 	struct ecpri_dma_mhi_host_ch_ctx* host_channels;
 	struct ecpri_dma_mhi_host_ev_ctx* host_events;
 
-	DMA_UT_DBG("Entry\n");
+	DMA_UT_DBG("Entry  host_src_ch_id%d  host_dest_ch_id %d ee %d\n",
+		host_src_ch_id, host_dest_ch_id, ee);
 
 	mmio = &mhi_client_test_suite_ctx[idx]->mmio_buf;
 	p_mmio = (struct ecpri_dma_mhi_mmio_register_set*)mmio->virt_base;
@@ -2865,7 +2869,6 @@ static int ecpri_dma_mhi_client_test_suite_connect_endp_all(void* priv) {
 
 		DMA_UT_DBG("FINISHED TEST FOR VF_ID %d\n",
 			ctx->function.vf_id);
-		usleep_range(1000, 2000);
 	}
 
 	/* Run for PF only */
@@ -2957,12 +2960,21 @@ static int
 ecpri_dma_mhi_client_test_suite_hw_ch_vm_single_packet_single_buffer(void* priv)
 {
 	int ret = 0;
-	int idx;
+	int idx, i;
 	enum ecpri_dma_ees ee;
 	u8 vf_id = ECPRI_DMA_VM_IDS_VM0;
 
 	struct ecpri_dma_mhi_client_context* mhi_dma_ctx = NULL;
 	struct ecpri_dma_mhi_client_test_suite_context* ctx = NULL;
+
+	for (i = 0; i < ECPRI_DMA_SMMU_CB_MAX; i++)
+	{
+		if (ecpri_dma_ctx->s1_bypass_arr[i] != true)
+		{
+			DMA_UT_ERR("SMMU must be bypassed for MHI HW CHs testing\n");
+			return -EINVAL;
+		}
+	}
 
 	DMA_UT_DBG("Start HW CH VM%d\n", vf_id);
 	ctx = mhi_client_test_suite_ctx[vf_id];
@@ -3106,11 +3118,20 @@ static int
 ecpri_dma_mhi_client_test_suite_hw_ch_all_single_packet_single_buffer(void* priv)
 {
 	int ret = 0;
-	int idx;
+	int idx, i;
 	int test_i;
 	enum ecpri_dma_ees ee;
 	struct ecpri_dma_mhi_client_test_suite_context* ctx = NULL;
 	struct ecpri_dma_mhi_client_context* mhi_dma_ctx = NULL;
+
+	for (i = 0; i < ECPRI_DMA_SMMU_CB_MAX; i++)
+	{
+		if (ecpri_dma_ctx->s1_bypass_arr[i] != true)
+		{
+			DMA_UT_ERR("SMMU must be bypassed for MHI HW CHs testing\n");
+			return -EINVAL;
+		}
+	}
 
 	/* Run tests only for VMs */
 	for (test_i = 0; test_i < ECPRI_DMA_MHI_CLIENT_FUNCTION_NUM - 1; test_i++)
@@ -3275,7 +3296,6 @@ ecpri_dma_mhi_client_test_suite_hw_ch_all_single_packet_single_buffer(void* priv
 		}
 
 		DMA_UT_DBG("Finished HW CH VM %d\n", test_i);
-		usleep_range(1000, 2000);
 	}
 
 	/* Cleanup */
@@ -3392,5 +3412,5 @@ DMA_UT_DEFINE_SUITE_START(mhi_client, "MHI Client suite",
 			"via loopback from SRC to DEST. Test will compare "
 			"the content of the recevied packet.",
 			ecpri_dma_mhi_client_test_suite_hw_ch_all_single_packet_single_buffer,
-			true, ECPRI_HW_V1_0, ECPRI_HW_MAX),
+			false, ECPRI_HW_V1_0, ECPRI_HW_MAX),
 } DMA_UT_DEFINE_SUITE_END(mhi_client);

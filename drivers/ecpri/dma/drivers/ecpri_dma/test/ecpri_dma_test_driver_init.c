@@ -398,13 +398,27 @@ static int ecpri_dma_test_driver_init_gsi_hw(void *priv)
 					"ENDP ee isn't configured correctly");
 				return -EFAULT;
 			}
-			if (cntx0_hw.chtype_dir != endp_map[i].dir) {
-				DMA_UT_LOG(
-					"ENDP %d direction isn't configured correctly\n",
-					i);
-				DMA_UT_TEST_FAIL_REPORT(
-					"ENDP direction isn't configured correctly");
-				return -EFAULT;
+			if (endp_map[i].dir == ECPRI_DMA_ENDP_DIR_SRC)
+			{
+				if (cntx0_hw.chtype_dir != GSI_CHAN_DIR_TO_GSI) {
+					DMA_UT_LOG(
+						"ENDP %d direction isn't configured correctly\n",
+						i);
+					DMA_UT_TEST_FAIL_REPORT(
+						"ENDP direction isn't configured correctly");
+					return -EFAULT;
+				}
+			}
+			else
+			{
+				if (cntx0_hw.chtype_dir != GSI_CHAN_DIR_FROM_GSI) {
+					DMA_UT_LOG(
+						"ENDP %d direction isn't configured correctly\n",
+						i);
+					DMA_UT_TEST_FAIL_REPORT(
+						"ENDP direction isn't configured correctly");
+					return -EFAULT;
+				}
 			}
 			/* CH is valid therefor expected to be at least allocated */
 			if (cntx0_hw.chstate == GSI_CHAN_STATE_NOT_ALLOCATED) {
