@@ -1245,9 +1245,10 @@ static int ecpri_dma_mhi_dma_sync_memcpy(
 			ret = -EPERM;
 			goto fail_poll_rx;
 		}
-
+		spin_unlock_irqrestore(&memcpy_ctx->sync_lock, flags);
 		usleep_range(ECPRI_DMA_MHI_POLLING_MIN_SLEEP_RX,
 			ECPRI_DMA_MHI_POLLING_MAX_SLEEP_RX);
+		spin_lock_irqsave(&memcpy_ctx->sync_lock, flags);
 	}
 	memcpy_ctx->loop_counter = 0;
 
@@ -2133,10 +2134,8 @@ static int ecpri_dma_mhi_client_connect_internal(
 	struct mhi_dma_function_params function)
 {
 	int ret;
-	unsigned long flags;
 	union __packed gsi_channel_scratch ch_scratch;
 	struct ecpri_dma_moderation_config mod_cfg;
-	spin_lock_irqsave(&ctx->lock, flags);
 
 	mod_cfg.moderation_counter_threshold = channel->int_modc;
 	mod_cfg.moderation_timer_threshold = channel->int_modt;
@@ -2206,7 +2205,6 @@ fail_start_endp:
 fail_write_scratch:
 fail_al_endp:
 success:
-	spin_unlock_irqrestore(&ctx->lock, flags);
 	return ret;
 }
 

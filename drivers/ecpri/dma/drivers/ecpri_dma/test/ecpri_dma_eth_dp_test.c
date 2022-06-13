@@ -91,7 +91,6 @@ struct ecpri_dma_eth_client_test_suite_context {
 	u32 ready_cb_user_data;
 	u32 rx_received_irq_in_poll;
 	ecpri_dma_eth_conn_hdl_t hdl;
-	enum ecpri_dma_notify_mode expected_mode;
 	struct ecpri_dma_eth_client_connection* connection;
 	struct completion ready_received;
 	u32 num_irq_received[ECPRI_DMA_ETH_CLIENT_UT_ENDP_DIR_MAX];
@@ -394,19 +393,13 @@ static int ecpri_dma_eth_dp_test_util_prepare_test_data(int num_of_pkts,
 			}
 
 			tx_pkts[i]->buffs[j]->virt_base =
-				dma_alloc_coherent(ecpri_dma_ctx->pdev,
-					ECPRI_DMA_ETH_CLIENT_UT_TEST_TX_BUFF_SIZE,
-					&(tx_pkts[i]->buffs[j]->phys_base),
+				kzalloc(ECPRI_DMA_ETH_CLIENT_UT_TEST_TX_BUFF_SIZE,
 					GFP_KERNEL);
 			if (!tx_pkts[i]->buffs[j]->virt_base) {
 				DMA_UT_LOG("failed to alloc buffer\n");
 				kfree(tx_pkts[i]->buffs[j]);
 
 				for (j--; j >= 0; j--) {
-					dma_free_coherent(ecpri_dma_ctx->pdev,
-						tx_pkts[i]->buffs[j]->size,
-						tx_pkts[i]->buffs[j]->virt_base,
-						tx_pkts[i]->buffs[j]->phys_base);
 					kfree(tx_pkts[i]->buffs[j]->virt_base);
 					kfree(tx_pkts[i]->buffs[j]);
 				}
@@ -433,10 +426,7 @@ static int ecpri_dma_eth_dp_test_util_prepare_test_data(int num_of_pkts,
 fail_alloc:
 	for (i--; i >= 0; i--) {
 		for (j = 0; j < num_of_buffs; j++) {
-			dma_free_coherent(ecpri_dma_ctx->pdev,
-				tx_pkts[i]->buffs[j]->size,
-				tx_pkts[i]->buffs[j]->virt_base,
-				tx_pkts[i]->buffs[j]->phys_base);
+			kfree(tx_pkts[i]->buffs[j]->virt_base);
 			kfree(tx_pkts[i]->buffs[j]);
 		}
 		kfree(tx_pkts[i]->buffs);
@@ -520,9 +510,7 @@ static int ecpri_dma_eth_dp_test_util_prepare_test_large_data(
 	}
 
 	tx_pkts[0]->buffs[0]->virt_base =
-		dma_alloc_coherent(ecpri_dma_ctx->pdev,
-			ECPRI_DMA_ETH_CLIENT_UT_TEST_LARGE_BUFFER_SIZE,
-			&(tx_pkts[0]->buffs[0]->phys_base),
+		kzalloc(ECPRI_DMA_ETH_CLIENT_UT_TEST_LARGE_BUFFER_SIZE,
 			GFP_KERNEL);
 	if (!tx_pkts[0]->buffs[0]->virt_base) {
 		DMA_UT_LOG("failed to alloc buffer\n");
@@ -576,10 +564,7 @@ static void ecpri_dma_eth_dp_test_util_destroy_test_data(
 	num_of_buffs = single_buffer ? 1 : ECPRI_DMA_ETH_CLIENT_UT_TEST_MAX_BUFFS;
 	for (i = 0; i < num_of_pkts; i++) {
 		for (j = 0; j < num_of_buffs; j++) {
-			dma_free_coherent(ecpri_dma_ctx->pdev,
-				tx_pkts[i]->buffs[j]->size,
-				tx_pkts[i]->buffs[j]->virt_base,
-				tx_pkts[i]->buffs[j]->phys_base);
+			kfree(tx_pkts[i]->buffs[j]->virt_base);
 			kfree(tx_pkts[i]->buffs[j]);
 		}
 		kfree(tx_pkts[i]->buffs);
@@ -945,10 +930,7 @@ static int ecpri_dma_eth_dp_test_util_verify_rx(ecpri_dma_eth_conn_hdl_t hdl,
 					sent_pkt_idx++;
 					if (num_of_pkts_sent == sent_pkt_idx)
 					{
-						dma_free_coherent(ecpri_dma_ctx->pdev,
-							rx_pkts[i]->pkt->buffs[0]->size,
-							rx_pkts[i]->pkt->buffs[0]->virt_base,
-							rx_pkts[i]->pkt->buffs[0]->phys_base);
+						kfree(rx_pkts[i]->pkt->buffs[0]->virt_base);
 						kfree(rx_pkts[i]->pkt->buffs[0]);
 						kfree(rx_pkts[i]->pkt->buffs);
 						kfree(rx_pkts[i]->pkt);
@@ -1023,10 +1005,7 @@ static int ecpri_dma_eth_dp_test_util_verify_rx(ecpri_dma_eth_conn_hdl_t hdl,
 				}
 			}
 
-			dma_free_coherent(ecpri_dma_ctx->pdev,
-				rx_pkts[i]->pkt->buffs[0]->size,
-				rx_pkts[i]->pkt->buffs[0]->virt_base,
-				rx_pkts[i]->pkt->buffs[0]->phys_base);
+			kfree(rx_pkts[i]->pkt->buffs[0]->virt_base);
 			kfree(rx_pkts[i]->pkt->buffs[0]);
 			kfree(rx_pkts[i]->pkt->buffs);
 			kfree(rx_pkts[i]->pkt);
@@ -1095,14 +1074,6 @@ static int ecpri_dma_eth_dp_test_util_verify_rx_large_data(
 		DMA_UT_LOG("Test failed due to invalid connection or connection"
 			   " handle:%x, ENDP ID:%d\n", hdl,
 			connection->rx_endp_ctx->endp_id);
-		return -EFAULT;
-	}
-
-	if (connection->rx_notify_mode != expected_mode) {
-		DMA_UT_LOG("Test failed due to Handle Mode mismatch,"
-			"expected: %d, received: %d\n",
-			eth_client_test_suite_ctx.expected_mode,
-			connection->rx_notify_mode);
 		return -EFAULT;
 	}
 
@@ -1329,9 +1300,7 @@ int ecpri_dma_eth_dp_test_util_rx_replenish(u32 num_to_replenish)
 		eth_client_test_suite_ctx.rx_pkts[*i]->num_of_buffers = 1;
 
 		eth_client_test_suite_ctx.rx_pkts[*i]->buffs[0]->virt_base =
-			dma_alloc_coherent(ecpri_dma_ctx->pdev,
-				ECPRI_DMA_ETH_CLIENT_UT_TEST_BUFF_SIZE,
-				&(eth_client_test_suite_ctx.rx_pkts[*i]->buffs[0]->phys_base),
+			kzalloc(ECPRI_DMA_ETH_CLIENT_UT_TEST_BUFF_SIZE,
 				GFP_KERNEL);
 		if (!eth_client_test_suite_ctx.rx_pkts[*i]->buffs[0]->virt_base) {
 			DMA_UT_LOG("failed to alloc buffer\n");
@@ -1389,10 +1358,7 @@ fail_alloc:
 	/* An allocation failed, free memory backwards */
 	while (rem_to_repelnish < num_to_replenish) {
 		*i = (*i - 1) % ECPRI_DMA_ETH_CLIENT_UT_NUM_OF_BUFFS_IN_RING;
-		dma_free_coherent(ecpri_dma_ctx->pdev,
-			eth_client_test_suite_ctx.rx_pkts[*i]->buffs[0]->size,
-			eth_client_test_suite_ctx.rx_pkts[*i]->buffs[0]->virt_base,
-			eth_client_test_suite_ctx.rx_pkts[*i]->buffs[0]->phys_base);
+		kfree(eth_client_test_suite_ctx.rx_pkts[*i]->buffs[0]->virt_base);
 		kfree(eth_client_test_suite_ctx.rx_pkts[*i]->buffs[0]);
 		kfree(eth_client_test_suite_ctx.rx_pkts[*i]->buffs);
 		kfree(eth_client_test_suite_ctx.rx_pkts[*i]);
@@ -1521,15 +1487,6 @@ static int ecpri_dma_eth_dp_test_suite_setup(void **ppriv)
 	int ret = 0;
 	DMA_UT_DBG("Start Setup\n");
 
-	if (ecpri_dma_ctx->hw_flavor != ECPRI_HW_FLAVOR_DU_PCIE) {
-		DMA_UT_LOG(
-			"DP testing requires DU-PCIE flavo, "
-			"Parsed DTSi HW flavor: %d\n",
-			ecpri_dma_ctx->hw_flavor);
-		DMA_UT_TEST_FAIL_REPORT("failed due to wrong flavor");
-		return -EFAULT;
-	}
-
 	memset(&eth_client_test_suite_ctx, 0,
 		sizeof(eth_client_test_suite_ctx));
 
@@ -1584,10 +1541,7 @@ static int ecpri_dma_eth_dp_test_suite_teardown(void *priv)
 	{
 		if (ecpri_dma_get_ctx_hw_ver() != ECPRI_HW_V1_0) {
 			for (i = 0; i < ECPRI_DMA_ETH_CLIENT_UT_NUM_OF_BUFFS_IN_RING; i++) {
-				dma_free_coherent(ecpri_dma_ctx->pdev,
-					eth_client_test_suite_ctx.rx_pkts[i]->buffs[0]->size,
-					eth_client_test_suite_ctx.rx_pkts[i]->buffs[0]->virt_base,
-					eth_client_test_suite_ctx.rx_pkts[i]->buffs[0]->phys_base);
+				kfree(eth_client_test_suite_ctx.rx_pkts[i]->buffs[0]->virt_base);
 				kfree(eth_client_test_suite_ctx.rx_pkts[i]->buffs[0]);
 				kfree(eth_client_test_suite_ctx.rx_pkts[i]->buffs);
 				kfree(eth_client_test_suite_ctx.rx_pkts[i]);
@@ -2247,7 +2201,7 @@ static int ecpri_dma_eth_dp_test_suite_chains_large_payload(void *priv) {
 	   processed correctly */
 	ret = ecpri_dma_eth_dp_test_util_verify_rx_large_data(
 		eth_client_test_suite_ctx.hdl, num_of_pkts_to_send, tx_pkts, rx_pkts,
-		ECPRI_DMA_NOTIFY_MODE_POLL);
+		ECPRI_DMA_NOTIFY_MODE_IRQ);
 
 	if (ecpri_dma_get_ctx_hw_ver() != ECPRI_HW_V1_0) {
 		ret = ecpri_dma_eth_dp_test_util_rx_replenish(

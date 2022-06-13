@@ -63,6 +63,36 @@ struct ecpri_dma_dp_test_suite_context {
 
 struct ecpri_dma_dp_test_suite_context dp_test_suite_ctx;
 
+static void ecpri_dma_test_dump_packet(char* buf, int len)
+{
+	int payload_len = len;
+	int num_dumps;
+	int i;
+	int index = 0;
+
+	DMA_UT_LOG("dumping buff of length: %d\n", len);
+
+	if (payload_len > 0) {
+		num_dumps = payload_len / 8;
+
+		if (num_dumps > 8) {
+			num_dumps = 8;
+		}
+
+		for (i = 0; i < num_dumps; ++i) {
+			DMA_UT_LOG("buff: %d, %x:%x:%x:%x:%x:%x:%x:%x\n", i,
+				buf[index + 0], buf[index + 1],
+				buf[index + 2], buf[index + 3],
+				buf[index + 4], buf[index + 5],
+				buf[index + 6], buf[index + 7]);
+			index += 8;
+			if (index + 8 > len) {
+				break;
+			}
+		}
+	}
+}
+
 static int ecpri_dma_dp_test_setup_dma_endps(enum ecpri_dma_endp_dir dir,
 	bool enable_loopback)
 {
@@ -248,10 +278,7 @@ int ecpri_dma_dp_test_rx_replenish(struct ecpri_dma_endp_context *endp,
 		dp_test_suite_ctx.rx_pkts[*i]->num_of_buffers = 1;
 
 		dp_test_suite_ctx.rx_pkts[*i]->buffs[0]->virt_base =
-			dma_alloc_coherent(ecpri_dma_ctx->pdev,
-				ECPRI_DMA_DP_TEST_BUFF_SIZE,
-				&(dp_test_suite_ctx.rx_pkts[*i]->buffs[0]->phys_base),
-				GFP_KERNEL);
+			kzalloc(ECPRI_DMA_DP_TEST_BUFF_SIZE, GFP_KERNEL);
 		if (!dp_test_suite_ctx.rx_pkts[*i]->buffs[0]->virt_base) {
 			DMA_UT_LOG("failed to alloc buffer\n");
 			kfree(dp_test_suite_ctx.rx_pkts[*i]->buffs[0]);
@@ -304,10 +331,7 @@ fail_alloc:
 	/* An allocation failed, free memory backwards */
 	while (rem_to_repelnish < num_to_replenish) {
 		*i = (*i - 1) % ECPRI_DMA_DP_TEST_RING_LEN;
-		dma_free_coherent(ecpri_dma_ctx->pdev,
-			dp_test_suite_ctx.rx_pkts[*i]->buffs[0]->size,
-			dp_test_suite_ctx.rx_pkts[*i]->buffs[0]->virt_base,
-			dp_test_suite_ctx.rx_pkts[*i]->buffs[0]->phys_base);
+		kfree(dp_test_suite_ctx.rx_pkts[*i]->buffs[0]->virt_base);
 		kfree(dp_test_suite_ctx.rx_pkts[*i]->buffs[0]);
 		kfree(dp_test_suite_ctx.rx_pkts[*i]->buffs);
 		kfree(dp_test_suite_ctx.rx_pkts[*i]);
@@ -332,9 +356,6 @@ static void ecpri_dma_dp_test_rx_client_notify_comp(
 	if (ret) {
 		DMA_UT_LOG("Failed to get current Rx test ENDP mode\n");
 	}
-
-	DMA_UT_LOG("Got IRQ on Rx test while in polling mode\n");
-	dp_test_suite_ctx.rx_received_irq_in_poll++;
 
 	dp_test_suite_ctx.num_irq_received[ECPRI_DMA_ENDP_DIR_DEST]++;
 	complete(&dp_test_suite_ctx.irq_received[ECPRI_DMA_ENDP_DIR_DEST]);
@@ -446,14 +467,6 @@ static int ecpri_dma_test_dp_suite_setup(void **ppriv)
 {
 	int ret = 0;
 	DMA_UT_DBG("Start Setup\n");
-
-	if (ecpri_dma_ctx->hw_flavor != ECPRI_HW_FLAVOR_DU_PCIE) {
-		DMA_UT_LOG(
-			"DP testing requires RU flavo, Parsed DTSi HW flavor: %d\n",
-			ecpri_dma_ctx->hw_flavor);
-		DMA_UT_TEST_FAIL_REPORT("failed due to wrong flavor");
-		return -EFAULT;
-	}
 	memset(&dp_test_suite_ctx, 0, sizeof(dp_test_suite_ctx));
 
 	init_completion(
@@ -502,10 +515,7 @@ static int ecpri_dma_test_dp_suite_teardown(void *priv)
 
 	if (ecpri_dma_get_ctx_hw_ver() != ECPRI_HW_V1_0) {
 		for (i = 0; i < ECPRI_DMA_DP_TEST_NUM_OF_BUFFS_IN_RING; i++) {
-			dma_free_coherent(ecpri_dma_ctx->pdev,
-				dp_test_suite_ctx.rx_pkts[i]->buffs[0]->size,
-				dp_test_suite_ctx.rx_pkts[i]->buffs[0]->virt_base,
-				dp_test_suite_ctx.rx_pkts[i]->buffs[0]->phys_base);
+			kfree(dp_test_suite_ctx.rx_pkts[i]->buffs[0]->virt_base);
 			kfree(dp_test_suite_ctx.rx_pkts[i]->buffs[0]);
 			kfree(dp_test_suite_ctx.rx_pkts[i]->buffs);
 			kfree(dp_test_suite_ctx.rx_pkts[i]);
@@ -587,19 +597,12 @@ static int ecpri_dma_test_dp_suite_prepare_test_data(
 			}
 
 			tx_pkts[i]->buffs[j]->virt_base =
-				dma_alloc_coherent(ecpri_dma_ctx->pdev,
-					ECPRI_DMA_DP_TEST_TX_BUFF_SIZE,
-					&(tx_pkts[i]->buffs[j]->phys_base),
-					GFP_KERNEL);
+				kzalloc(ECPRI_DMA_DP_TEST_TX_BUFF_SIZE, GFP_KERNEL);
 			if (!tx_pkts[i]->buffs[j]->virt_base) {
 				DMA_UT_LOG("failed to alloc buffer\n");
 				kfree(tx_pkts[i]->buffs[j]);
 
 				for (j--; j >= 0; j--) {
-					dma_free_coherent(ecpri_dma_ctx->pdev,
-						tx_pkts[i]->buffs[j]->size,
-						tx_pkts[i]->buffs[j]->virt_base,
-						tx_pkts[i]->buffs[j]->phys_base);
 					kfree(tx_pkts[i]->buffs[j]->virt_base);
 					kfree(tx_pkts[i]->buffs[j]);
 				}
@@ -626,10 +629,7 @@ static int ecpri_dma_test_dp_suite_prepare_test_data(
 fail_alloc:
 	for (i--; i >= 0; i--) {
 		for (j = 0; j < num_of_buffs; j++) {
-			dma_free_coherent(ecpri_dma_ctx->pdev,
-				tx_pkts[i]->buffs[j]->size,
-				tx_pkts[i]->buffs[j]->virt_base,
-				tx_pkts[i]->buffs[j]->phys_base);
+			kfree(tx_pkts[i]->buffs[j]->virt_base);
 			kfree(tx_pkts[i]->buffs[j]);
 		}
 		kfree(tx_pkts[i]->buffs);
@@ -651,10 +651,7 @@ static void ecpri_dma_test_dp_suite_destroy_test_data(
 	num_of_buffs = single_buffer ? 1 : ECPRI_DMA_DP_TEST_MAX_BUFFS;
 	for (i=0; i < num_of_pkts; i++) {
 		for (j = 0; j < num_of_buffs; j++) {
-			dma_free_coherent(ecpri_dma_ctx->pdev,
-				tx_pkts[i]->buffs[j]->size,
-				tx_pkts[i]->buffs[j]->virt_base,
-				tx_pkts[i]->buffs[j]->phys_base);
+			kfree(tx_pkts[i]->buffs[j]->virt_base);
 			kfree(tx_pkts[i]->buffs[j]);
 		}
 		kfree(tx_pkts[i]->buffs);
@@ -741,7 +738,14 @@ static int ecpri_dma_test_dp_suite_verify_rx(
 					rx_pkts[i]->pkt->buffs[0]->virt_base,
 					curr_pkt_recv_size)) {
 					DMA_UT_LOG(
-						"Test failed due to buffers don't match");
+						"Test failed due to buffers don't match i= %d\n",i);
+					DMA_UT_LOG("tx buff:\n");
+						ecpri_dma_test_dump_packet(tx_buff_to_compare,
+							curr_pkt_recv_size);
+					DMA_UT_LOG("rx buff:\n");
+						ecpri_dma_test_dump_packet(
+							rx_pkts[i]->pkt->buffs[0]->virt_base,
+							curr_pkt_recv_size);
 					return -EFAULT;
 				}
 				tx_buff_to_compare =
@@ -757,7 +761,14 @@ static int ecpri_dma_test_dp_suite_verify_rx(
 					rx_pkts[i]->pkt->buffs[0]->virt_base,
 					curr_pkt_recv_size)) {
 					DMA_UT_LOG(
-						"Test failed due to buffers don't match");
+						"Test failed due to buffers don't match i= %d\n",i);
+					DMA_UT_LOG("tx buff:\n");
+						ecpri_dma_test_dump_packet(tx_buff_to_compare,
+							curr_pkt_recv_size);
+					DMA_UT_LOG("rx buff:\n");
+						ecpri_dma_test_dump_packet(
+							rx_pkts[i]->pkt->buffs[0]->virt_base,
+							curr_pkt_recv_size);
 					return -EFAULT;
 				}
 				sent_pkt_buff_idx++;
@@ -767,10 +778,7 @@ static int ecpri_dma_test_dp_suite_verify_rx(
 					sent_pkt_idx++;
 					if (num_of_pkts_sent == sent_pkt_idx)
 					{
-						dma_free_coherent(ecpri_dma_ctx->pdev,
-							rx_pkts[i]->pkt->buffs[0]->size,
-							rx_pkts[i]->pkt->buffs[0]->virt_base,
-							rx_pkts[i]->pkt->buffs[0]->phys_base);
+						kfree(rx_pkts[i]->pkt->buffs[0]->virt_base);
 						kfree(rx_pkts[i]->pkt->buffs[0]);
 						kfree(rx_pkts[i]->pkt->buffs);
 						kfree(rx_pkts[i]->pkt);
@@ -800,7 +808,14 @@ static int ecpri_dma_test_dp_suite_verify_rx(
 							rx_buff_to_compare,
 							curr_pkt_recv_size)) {
 							DMA_UT_LOG(
-								"Test failed due to buffers don't match");
+								"Test failed due to buffers don't match i= %d\n",i);
+							DMA_UT_LOG("tx buff:\n");
+								ecpri_dma_test_dump_packet(tx_buff_to_compare,
+									curr_pkt_recv_size);
+							DMA_UT_LOG("rx buff:\n");
+								ecpri_dma_test_dump_packet(
+									rx_buff_to_compare,
+									curr_pkt_recv_size);
 							return -EFAULT;
 						}
 						tx_buff_to_compare =
@@ -817,7 +832,14 @@ static int ecpri_dma_test_dp_suite_verify_rx(
 							rx_buff_to_compare,
 							tx_buff_size)) {
 							DMA_UT_LOG(
-								"Test failed due to buffers don't match");
+								"Test failed due to buffers don't match i= %d\n",i);
+							DMA_UT_LOG("tx buff:\n");
+								ecpri_dma_test_dump_packet(tx_buff_to_compare,
+									curr_pkt_recv_size);
+							DMA_UT_LOG("rx buff:\n");
+								ecpri_dma_test_dump_packet(
+									rx_buff_to_compare,
+									curr_pkt_recv_size);
 							return -EFAULT;
 						}
 
@@ -845,10 +867,7 @@ static int ecpri_dma_test_dp_suite_verify_rx(
 				}
 			}
 
-			dma_free_coherent(ecpri_dma_ctx->pdev,
-				rx_pkts[i]->pkt->buffs[0]->size,
-				rx_pkts[i]->pkt->buffs[0]->virt_base,
-				rx_pkts[i]->pkt->buffs[0]->phys_base);
+			kfree(rx_pkts[i]->pkt->buffs[0]->virt_base);
 			kfree(rx_pkts[i]->pkt->buffs[0]);
 			kfree(rx_pkts[i]->pkt->buffs);
 			kfree(rx_pkts[i]->pkt);
