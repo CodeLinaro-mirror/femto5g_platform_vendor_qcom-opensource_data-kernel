@@ -1,0 +1,55 @@
+DATACSMKERNELTOP = $(ROOTDIR)datacsm-kernel/drivers/
+MTIPDRVTOP = $(DATACSMKERNELTOP)/mtip/
+
+LINUX_INC +=	-Iinclude/linux
+
+CDEFINES +=	-DANI_LITTLE_BYTE_ENDIAN \
+	-DANI_LITTLE_BIT_ENDIAN \
+	-DDOT11F_LITTLE_ENDIAN_HOST \
+	-DANI_COMPILER_TYPE_GCC \
+	-DANI_OS_TYPE_ANDROID=6 \
+	-DPTT_SOCK_SVC_ENABLE \
+	-Wall\
+	-Werror\
+	-D__linux__
+
+KBUILD_CPPFLAGS += $(CDEFINES)
+
+ccflags-y += $(LINUX_INC)
+ccflags-y += -I$(DATACSMKERNELTOP)/include/
+
+
+ifeq ($(call cc-option-yn, -Wmaybe-uninitialized),y)
+EXTRA_CFLAGS += -Wmaybe-uninitialized
+endif
+
+ifeq ($(call cc-option-yn, -Wheader-guard),y)
+EXTRA_CFLAGS += -Wheader-guard
+endif
+
+ifneq ($(MODNAME), qdsp6v2)
+CHIP_NAME ?= $(MODNAME)
+CDEFINES += -DMULTI_IF_NAME=\"$(CHIP_NAME)\"
+endif
+
+######### CONFIG_LASSEN_MTIP ########
+obj-$(CONFIG_LASSEN_MTIP) += lassen_mtip.o
+lassen_mtip-y += mtip_main.o
+lassen_mtip-y += mtip_platform.o
+lassen_mtip-y += mtip_device.o
+lassen_mtip-y += mtip_dma.o
+lassen_mtip-y += mtip_workq.o
+lassen_mtip-y += mtip_hashmap.o
+lassen_mtip-y += mtip_client.o
+lassen_mtip-y += mtip_ethtool.o
+lassen_mtip-y += mtip_mac.o
+lassen_mtip-y += mtip_macstats.o
+lassen_mtip-y += mtip_ptp.o
+lassen_mtip-y += mtip_clocks.o
+lassen_mtip-y += mtip_dut.o
+lassen_mtip-y += mtip_mdio.o
+lassen_mtip-y += mtip_pcs.o
+lassen_mtip-y += mtip_phy.o
+
+CDEFINES += -DBUILD_TIMESTAMP=\"$(shell date -u +'%Y-%m-%dT%H:%M:%SZ')\"
+

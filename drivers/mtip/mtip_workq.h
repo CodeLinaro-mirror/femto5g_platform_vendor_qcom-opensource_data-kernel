@@ -1,0 +1,49 @@
+//SPDX-License-Identifier: GPL-2.0-only
+/*
+ * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ */ 
+
+#ifndef _MTIP_WORKQ_H
+#define _MTIP_WORKQ_H
+
+#include <linux/slab.h>
+#include <linux/list.h>
+#include <linux/mutex.h>
+#include <linux/kernel.h>
+#include <linux/workqueue.h>
+
+// enumeration of the list of tasks handled by the workq
+typedef enum {
+   MTIP_WORKQ_TASK_NOP = 0,
+   MTIP_WORKQ_TASK_INDICATE_READY = 50,
+   MTIP_WORKQ_TASK_INDICATE_EVENT = 51,
+   MTIP_WORKQ_TASK_SET_RX_MODE = 99,
+   MTIP_WORKQ_TASK_REPLENISH_RX_BUFFERS = 100,
+   MTIP_WORKQ_TASK_TX_COMP_CB = 101,
+   MTIP_WORKQ_TASK_PROCESS_TIMESTAMP = 150,
+   MTIP_WORKQ_TASK_PROCESS_LINK_STATE = 151,
+   MTIP_WORKQ_TASK_MAX
+} mtip_workq_task_e;
+
+struct mtip_workq_node
+{
+   struct list_head list;
+   unsigned int     work_type;
+   void*            work_ptr;
+};
+
+struct mtip_workq_list
+{
+   struct list_head head;
+   unsigned int count;
+   spinlock_t lock;
+};
+
+/*
+ * mtip workq related functions
+ */
+int mtip_queue_work(unsigned int work_type, void* work_ptr);
+int mtip_initialize_workq(void);
+int mtip_destroy_workq(void);
+
+#endif // _MTIP_WORKQ_H
