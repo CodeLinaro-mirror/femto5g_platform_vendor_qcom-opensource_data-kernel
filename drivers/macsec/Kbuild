@@ -1,0 +1,41 @@
+
+DATACSMKERNELTOP = $(ROOTDIR)datacsm-kernel/drivers/
+MACSECDRVTOP = $(DATACSMKERNELTOP)/macsec
+
+LINUX_INC +=	-Iinclude/linux \
+		-Iinclude/linux/drm
+
+CDEFINES +=	-DANI_LITTLE_BYTE_ENDIAN \
+	-DANI_LITTLE_BIT_ENDIAN \
+	-DDOT11F_LITTLE_ENDIAN_HOST \
+	-DANI_COMPILER_TYPE_GCC \
+	-DANI_OS_TYPE_ANDROID=6 \
+	-DPTT_SOCK_SVC_ENABLE \
+	-Wall\
+	-Werror\
+	-D__linux__
+
+KBUILD_CPPFLAGS += $(CDEFINES)
+
+ccflags-y += $(LINUX_INC)
+ccflags-y+= -I$(DATACSMKERNELTOP)/include/
+
+ifeq ($(call cc-option-yn, -Wmaybe-uninitialized),y)
+EXTRA_CFLAGS += -Wmaybe-uninitialized
+endif
+
+ifeq ($(call cc-option-yn, -Wheader-guard),y)
+EXTRA_CFLAGS += -Wheader-guard
+endif
+
+ifneq ($(MODNAME), qdsp6v2)
+CHIP_NAME ?= $(MODNAME)
+CDEFINES += -DMULTI_IF_NAME=\"$(CHIP_NAME)\"
+endif
+
+######### CONFIG_LASSEN_MACSEC ########
+obj-$(CONFIG_LASSEN_MACSEC) += lassen_macsec.o
+lassen_macsec-y += macsec_main.o
+
+CDEFINES += -DBUILD_TIMESTAMP=\"$(shell date -u +'%Y-%m-%dT%H:%M:%SZ')\"
+
