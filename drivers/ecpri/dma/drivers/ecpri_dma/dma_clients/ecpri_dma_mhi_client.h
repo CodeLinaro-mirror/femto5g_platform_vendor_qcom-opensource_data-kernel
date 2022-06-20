@@ -43,6 +43,8 @@
 #define ECPRI_DMA_MHI_HOST_ADDR_COND(addr, ctx) \
 	((ctx->is_over_pcie)?(ECPRI_DMA_MHI_HOST_ADDR(addr)):(addr))
 
+#define ECPRI_DMA_VIRTUL_VFID_CFG(vf_num) (0x4 | vf_num)
+
 enum ecpri_dma_mhi_dma_dir {
 	ECPRI_DMA_MHI_DMA_TO_HOST,
 	ECPRI_DMA_MHI_DMA_FROM_HOST,
@@ -225,6 +227,7 @@ struct ecpri_dma_mhi_xfer_wrapper {
 	void (*user_cb)(void *user1);
 	void *user_data;
 	struct list_head link;
+	struct mhi_dma_function_params function;
 };
 
 /**

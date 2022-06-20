@@ -1766,6 +1766,30 @@ static void  ecpri_dma_gsi_ev_err_cb(struct gsi_evt_err_notify* notify)
 	}
 }
 
+static enum ecpri_dma_vm_ids ecpri_dma_ee_to_vmid(enum ecpri_dma_ees ee)
+{
+	switch (ee)
+	{
+	case ECPRI_DMA_EE_VM0:
+		return ECPRI_DMA_VM_IDS_VM0;
+		break;
+	case ECPRI_DMA_EE_VM1:
+		return ECPRI_DMA_VM_IDS_VM1;
+		break;
+	case ECPRI_DMA_EE_VM2:
+		return ECPRI_DMA_VM_IDS_VM2;
+		break;
+	case ECPRI_DMA_EE_VM3:
+		return ECPRI_DMA_VM_IDS_VM3;
+		break;
+	default:
+		return ECPRI_DMA_VM_IDS_NONE;
+		break;
+	}
+
+	return ECPRI_DMA_VM_IDS_NONE;
+}
+
 /**
  * ecpri_dma_hw_init() - initialize DMA HW according to HPG
  */
@@ -2066,6 +2090,9 @@ int ecpri_dma_setup_dma_endps(const struct dma_gsi_ep_config *endp_map)
 	ecpri_hwio_def_ecpri_dma_exception_channel_u exception_ch = { 0 };
 	ecpri_hwio_def_ecpri_endp_cfg_aggr_n_u cfg_aggr = { 0 };
 	ecpri_hwio_def_ecpri_endp_nfapi_reassembly_cfg_n_u reassembly_cfg = { 0	};
+	ecpri_hwio_def_ecpri_gsi_ee_vfid_n_u gsi_vfid = { 0 };
+	ecpri_hwio_def_ecpri_endp_cfg_vfid_n_u endp_vfid = { 0 };
+	enum ecpri_dma_vm_ids vfid = ECPRI_DMA_VM_IDS_NONE;
 
 	if (!endp_map)
 		return -EINVAL;
@@ -2093,6 +2120,25 @@ int ecpri_dma_setup_dma_endps(const struct dma_gsi_ep_config *endp_map)
 					endp_cfg_dest.def.use_dest_cfg = 1;
 					endp_cfg_dest.def.dest_mem_channel =
 						endp_map[i].dest;
+					vfid = ecpri_dma_ee_to_vmid(endp_map[i].ee);
+					if (vfid == ECPRI_DMA_VM_IDS_NONE)
+					{
+						gsi_vfid.def.vfid = 0;
+						endp_vfid.def.vfid = 0;
+					}
+					else
+					{
+						gsi_vfid.def.vfid =
+							ECPRI_DMA_VIRTUL_VFID_CFG(vfid);
+						endp_vfid.def.vfid =
+							ECPRI_DMA_VIRTUL_VFID_CFG(vfid);
+					}
+					ecpri_dma_hal_write_reg_n(
+						ECPRI_ENDP_CFG_VFID_n, i,
+						endp_vfid.value);
+					ecpri_dma_hal_write_reg_n(
+						ECPRI_GSI_EE_VFID_n, endp_map[i].ee,
+						gsi_vfid.value);
 					ecpri_dma_hal_write_reg_n(
 						ECPRI_ENDP_CFG_DEST_n, i,
 						endp_cfg_dest.value);
@@ -2123,6 +2169,25 @@ int ecpri_dma_setup_dma_endps(const struct dma_gsi_ep_config *endp_map)
 			case ECPRI_DMA_ENDP_DIR_DEST:
 				switch (endp_map[i].stream_mode) {
 				case ECPRI_DMA_ENDP_STREAM_MODE_M2M:
+					vfid = ecpri_dma_ee_to_vmid(endp_map[i].ee);
+					if (vfid == ECPRI_DMA_VM_IDS_NONE)
+					{
+						gsi_vfid.def.vfid = 0;
+						endp_vfid.def.vfid = 0;
+					}
+					else
+					{
+						gsi_vfid.def.vfid =
+							ECPRI_DMA_VIRTUL_VFID_CFG(vfid);
+						endp_vfid.def.vfid =
+							ECPRI_DMA_VIRTUL_VFID_CFG(vfid);
+					}
+					ecpri_dma_hal_write_reg_n(
+						ECPRI_ENDP_CFG_VFID_n, i,
+						endp_vfid.value);
+					ecpri_dma_hal_write_reg_n(
+						ECPRI_GSI_EE_VFID_n, endp_map[i].ee,
+						gsi_vfid.value);
 					break;
 				case ECPRI_DMA_ENDP_STREAM_MODE_S2M:
 					if (endp_map[i].is_nfapi) {
