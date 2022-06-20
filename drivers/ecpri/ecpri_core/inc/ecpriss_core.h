@@ -22,6 +22,7 @@
 #include <linux/atomic.h>
 #include <linux/fs.h>
 #include <linux/interrupt.h>
+#include <linux/clk.h>
 
 #include "ecpri_dma_ecpri_ss.h"
 #include "eth_ecpriss_iface.h"
@@ -32,6 +33,12 @@
 #define ECPRI_DMA_RING_PER_PORT_MAX 4
 
 #define ENABLE_ECPRI_TEST    1
+
+#define ECPRI_CLK_FREQ(x) (x * 1000 * 1000UL)
+
+/* ECPRI clock */
+#define ECPRI_CG_CLK_NOM_MAX (ECPRI_CLK_FREQ(466.50))
+#define ECPRI_MSS_ORAN_NOM_MAX (ECPRI_CLK_FREQ(500))
 
 typedef enum
 {
@@ -122,7 +129,18 @@ typedef struct ecpri_interrupt_events_workqueue_params
 	struct workqueue_struct     *ecpriss_interrupts_workq;
 }ecpri_interrupt_workqueue_params_s;
 
-
+typedef struct ecpriss_core_clock {
+	struct clk* ecpri_cg;
+	struct clk* ecpri_fr;
+	struct clk* ecpri_eth_100G_fh0;
+	struct clk* ecpri_eth_100G_fh1;
+	struct clk* ecpri_eth_100G_fh2;
+	struct clk* ecpri_eth_100G_c2c0;
+	struct clk* ecpri_eth_100G_c2c1;
+	struct clk* ecpri_eth_100G_dbg_c2c;
+	struct clk* ecpri_oran_div2 ;
+	struct clk* ecpri_mss_oran;
+}ecpri_clock;
 
 /**
  * struct ecpri_dma_endp_cfg - DMA endpoint configurations
