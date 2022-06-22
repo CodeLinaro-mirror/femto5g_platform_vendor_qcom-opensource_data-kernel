@@ -11,53 +11,138 @@
 
 struct ecpri_dma_eth_client_endp_mapping
 	eth_client_endp_map[ECPRI_HW_MAX][ECPRI_HW_FLAVOR_MAX]
-[ECPRI_DMA_ETH_CLIENT_MAX_CONNTECTIONS] = {
+	[ECPRI_DMA_ETH_CLIENT_MAX_CONNTECTIONS] = {
+	/* V1 */
 	/* RU Connections */
-	[ECPRI_HW_V1_0][ECPRI_HW_FLAVOR_RU][0]       = { true, 0,  37 },
-	[ECPRI_HW_V1_0][ECPRI_HW_FLAVOR_RU][1]       = { true, 1,  38 },
-	[ECPRI_HW_V1_0][ECPRI_HW_FLAVOR_RU][2]       = { true, 2,  39 },
-	[ECPRI_HW_V1_0][ECPRI_HW_FLAVOR_RU][3]       = { true, 3,  40 },
-	[ECPRI_HW_V1_0][ECPRI_HW_FLAVOR_RU][4]       = { true, 4,  41 },
-	[ECPRI_HW_V1_0][ECPRI_HW_FLAVOR_RU][5]       = { true, 5,  42 },
-	[ECPRI_HW_V1_0][ECPRI_HW_FLAVOR_RU][6]       = { true, 6,  43 },
-	[ECPRI_HW_V1_0][ECPRI_HW_FLAVOR_RU][7]       = { true, 7,  44 },
-	[ECPRI_HW_V1_0][ECPRI_HW_FLAVOR_RU][8]       = { true, 8,  45 },
-	[ECPRI_HW_V1_0][ECPRI_HW_FLAVOR_RU][9]       = { true, 9,  46 },
-	[ECPRI_HW_V1_0][ECPRI_HW_FLAVOR_RU][10]      = { true, 10, 47 },
-	[ECPRI_HW_V1_0][ECPRI_HW_FLAVOR_RU][11]      = { true, 11, 48 },
-	[ECPRI_HW_V1_0][ECPRI_HW_FLAVOR_RU][12]      = { true, 14, 51 },
-	[ECPRI_HW_V1_0][ECPRI_HW_FLAVOR_RU][13]      = { true, 15, 52 },
+	[ECPRI_HW_V1_0][ECPRI_HW_FLAVOR_RU][0]       = { true, {0, 0},  {37, 0} },
+	[ECPRI_HW_V1_0][ECPRI_HW_FLAVOR_RU][1]       = { true, {1, 0},  {38, 0} },
+	[ECPRI_HW_V1_0][ECPRI_HW_FLAVOR_RU][2]       = { true, {2, 0},  {39, 0} },
+	[ECPRI_HW_V1_0][ECPRI_HW_FLAVOR_RU][3]       = { true, {3, 0},  {40, 0} },
+	[ECPRI_HW_V1_0][ECPRI_HW_FLAVOR_RU][4]       = { true, {4, 0},  {41, 0} },
+	[ECPRI_HW_V1_0][ECPRI_HW_FLAVOR_RU][5]       = { true, {5, 0},  {42, 0} },
+	[ECPRI_HW_V1_0][ECPRI_HW_FLAVOR_RU][6]       = { true, {6, 0},  {43, 0} },
+	[ECPRI_HW_V1_0][ECPRI_HW_FLAVOR_RU][7]       = { true, {7, 0},  {44, 0} },
+	[ECPRI_HW_V1_0][ECPRI_HW_FLAVOR_RU][8]       = { true, {8, 0},  {45, 0} },
+	[ECPRI_HW_V1_0][ECPRI_HW_FLAVOR_RU][9]       = { true, {9, 0},  {46, 0} },
+	[ECPRI_HW_V1_0][ECPRI_HW_FLAVOR_RU][10]      = { true, {10, 0}, {47, 0} },
+	[ECPRI_HW_V1_0][ECPRI_HW_FLAVOR_RU][11]      = { true, {11, 0}, {48, 0} },
+	[ECPRI_HW_V1_0][ECPRI_HW_FLAVOR_RU][12]      = { true, {14, 0}, {51, 0} },
+	[ECPRI_HW_V1_0][ECPRI_HW_FLAVOR_RU][13]      = { true, {15, 0}, {52, 0} },
+
 	/* DU-PCIe Connections */
-	[ECPRI_HW_V1_0][ECPRI_HW_FLAVOR_DU_PCIE][0]  = { true, 0,  37 },
-	[ECPRI_HW_V1_0][ECPRI_HW_FLAVOR_DU_PCIE][1]  = { true, 1,  38 },
-	[ECPRI_HW_V1_0][ECPRI_HW_FLAVOR_DU_PCIE][2]  = { true, 2,  39 },
-	[ECPRI_HW_V1_0][ECPRI_HW_FLAVOR_DU_PCIE][3]  = { true, 3,  40 },
-	[ECPRI_HW_V1_0][ECPRI_HW_FLAVOR_DU_PCIE][4]  = { true, 4,  41 },
-	[ECPRI_HW_V1_0][ECPRI_HW_FLAVOR_DU_PCIE][5]  = { true, 5,  42 },
-	[ECPRI_HW_V1_0][ECPRI_HW_FLAVOR_DU_PCIE][6]  = { true, 6,  43 },
-	[ECPRI_HW_V1_0][ECPRI_HW_FLAVOR_DU_PCIE][7]  = { true, 7,  44 },
-	[ECPRI_HW_V1_0][ECPRI_HW_FLAVOR_DU_PCIE][8]  = { true, 8,  45 },
-	[ECPRI_HW_V1_0][ECPRI_HW_FLAVOR_DU_PCIE][9]  = { true, 9,  46 },
-	[ECPRI_HW_V1_0][ECPRI_HW_FLAVOR_DU_PCIE][10] = { true, 10, 47 },
-	[ECPRI_HW_V1_0][ECPRI_HW_FLAVOR_DU_PCIE][11] = { true, 11, 48 },
-	[ECPRI_HW_V1_0][ECPRI_HW_FLAVOR_DU_PCIE][12] = { true, 34, 72 },
+	[ECPRI_HW_V1_0][ECPRI_HW_FLAVOR_DU_PCIE][0]  = { true, {0, 0},  {37, 0} },
+	[ECPRI_HW_V1_0][ECPRI_HW_FLAVOR_DU_PCIE][1]  = { true, {1, 0},  {38, 0} },
+	[ECPRI_HW_V1_0][ECPRI_HW_FLAVOR_DU_PCIE][2]  = { true, {2, 0},  {39, 0} },
+	[ECPRI_HW_V1_0][ECPRI_HW_FLAVOR_DU_PCIE][3]  = { true, {3, 0},  {40, 0} },
+	[ECPRI_HW_V1_0][ECPRI_HW_FLAVOR_DU_PCIE][4]  = { true, {4, 0},  {41, 0} },
+	[ECPRI_HW_V1_0][ECPRI_HW_FLAVOR_DU_PCIE][5]  = { true, {5, 0},  {42, 0} },
+	[ECPRI_HW_V1_0][ECPRI_HW_FLAVOR_DU_PCIE][6]  = { true, {6, 0},  {43, 0} },
+	[ECPRI_HW_V1_0][ECPRI_HW_FLAVOR_DU_PCIE][7]  = { true, {7, 0},  {44, 0} },
+	[ECPRI_HW_V1_0][ECPRI_HW_FLAVOR_DU_PCIE][8]  = { true, {8, 0},  {45, 0} },
+	[ECPRI_HW_V1_0][ECPRI_HW_FLAVOR_DU_PCIE][9]  = { true, {9, 0},  {46, 0} },
+	[ECPRI_HW_V1_0][ECPRI_HW_FLAVOR_DU_PCIE][10] = { true, {10, 0}, {47, 0} },
+	[ECPRI_HW_V1_0][ECPRI_HW_FLAVOR_DU_PCIE][11] = { true, {11, 0}, {48, 0} },
+	[ECPRI_HW_V1_0][ECPRI_HW_FLAVOR_DU_PCIE][12] = { true, {34, 0}, {72, 0} },
+
 	/* DU-L2 Connections */
-	[ECPRI_HW_V1_0][ECPRI_HW_FLAVOR_DU_L2][0]    = { true, 0,  37 },
-	[ECPRI_HW_V1_0][ECPRI_HW_FLAVOR_DU_L2][1]    = { true, 1,  38 },
-	[ECPRI_HW_V1_0][ECPRI_HW_FLAVOR_DU_L2][2]    = { true, 2,  39 },
-	[ECPRI_HW_V1_0][ECPRI_HW_FLAVOR_DU_L2][3]    = { true, 3,  40 },
-	[ECPRI_HW_V1_0][ECPRI_HW_FLAVOR_DU_L2][4]    = { true, 4,  41 },
-	[ECPRI_HW_V1_0][ECPRI_HW_FLAVOR_DU_L2][5]    = { true, 5,  42 },
-	[ECPRI_HW_V1_0][ECPRI_HW_FLAVOR_DU_L2][6]    = { true, 6,  43 },
-	[ECPRI_HW_V1_0][ECPRI_HW_FLAVOR_DU_L2][7]    = { true, 7,  44 },
-	[ECPRI_HW_V1_0][ECPRI_HW_FLAVOR_DU_L2][8]    = { true, 8,  45 },
-	[ECPRI_HW_V1_0][ECPRI_HW_FLAVOR_DU_L2][9]    = { true, 9,  46 },
-	[ECPRI_HW_V1_0][ECPRI_HW_FLAVOR_DU_L2][10]   = { true, 10, 47 },
-	[ECPRI_HW_V1_0][ECPRI_HW_FLAVOR_DU_L2][11]   = { true, 11, 48 },
-	[ECPRI_HW_V1_0][ECPRI_HW_FLAVOR_DU_L2][12]   = { true, 20, 57 },
+	[ECPRI_HW_V1_0][ECPRI_HW_FLAVOR_DU_L2][0]    = { true, {0, 0},  {37, 0} },
+	[ECPRI_HW_V1_0][ECPRI_HW_FLAVOR_DU_L2][1]    = { true, {1, 0},  {38, 0} },
+	[ECPRI_HW_V1_0][ECPRI_HW_FLAVOR_DU_L2][2]    = { true, {2, 0},  {39, 0} },
+	[ECPRI_HW_V1_0][ECPRI_HW_FLAVOR_DU_L2][3]    = { true, {3, 0},  {40, 0} },
+	[ECPRI_HW_V1_0][ECPRI_HW_FLAVOR_DU_L2][4]    = { true, {4, 0},  {41, 0} },
+	[ECPRI_HW_V1_0][ECPRI_HW_FLAVOR_DU_L2][5]    = { true, {5, 0},  {42, 0} },
+	[ECPRI_HW_V1_0][ECPRI_HW_FLAVOR_DU_L2][6]    = { true, {6, 0},  {43, 0} },
+	[ECPRI_HW_V1_0][ECPRI_HW_FLAVOR_DU_L2][7]    = { true, {7, 0},  {44, 0} },
+	[ECPRI_HW_V1_0][ECPRI_HW_FLAVOR_DU_L2][8]    = { true, {8, 0},  {45, 0} },
+	[ECPRI_HW_V1_0][ECPRI_HW_FLAVOR_DU_L2][9]    = { true, {9, 0},  {46, 0} },
+	[ECPRI_HW_V1_0][ECPRI_HW_FLAVOR_DU_L2][10]   = { true, {10, 0}, {47, 0} },
+	[ECPRI_HW_V1_0][ECPRI_HW_FLAVOR_DU_L2][11]   = { true, {11, 0}, {48, 0} },
+	[ECPRI_HW_V1_0][ECPRI_HW_FLAVOR_DU_L2][12]   = { true, {20, 0}, {57, 0} },
+
+	/* V2 */
+	/* RU Connections */
+	[ECPRI_HW_V2_0][ECPRI_HW_FLAVOR_RU][0]       = { true, {0, 0},  {37, 0} },
+	[ECPRI_HW_V2_0][ECPRI_HW_FLAVOR_RU][1]       = { true, {1, 0},  {38, 0} },
+	[ECPRI_HW_V2_0][ECPRI_HW_FLAVOR_RU][2]       = { true, {2, 0},  {39, 0} },
+	[ECPRI_HW_V2_0][ECPRI_HW_FLAVOR_RU][3]       = { true, {3, 0},  {40, 0} },
+	[ECPRI_HW_V2_0][ECPRI_HW_FLAVOR_RU][4]       = { true, {4, 0},  {41, 0} },
+	[ECPRI_HW_V2_0][ECPRI_HW_FLAVOR_RU][5]       = { true, {5, 0},  {42, 0} },
+	[ECPRI_HW_V2_0][ECPRI_HW_FLAVOR_RU][6]       = { true, {6, 0},  {43, 0} },
+	[ECPRI_HW_V2_0][ECPRI_HW_FLAVOR_RU][7]       = { true, {7, 0},  {44, 0} },
+	[ECPRI_HW_V2_0][ECPRI_HW_FLAVOR_RU][8]       = { true, {8, 0},  {45, 0} },
+	[ECPRI_HW_V2_0][ECPRI_HW_FLAVOR_RU][9]       = { true, {9, 0},  {46, 0} },
+	[ECPRI_HW_V2_0][ECPRI_HW_FLAVOR_RU][10]      = { true, {10, 0}, {47, 0} },
+	[ECPRI_HW_V2_0][ECPRI_HW_FLAVOR_RU][11]      = { true, {11, 0}, {48, 0} },
+	[ECPRI_HW_V2_0][ECPRI_HW_FLAVOR_RU][12]      = { true, {14, 0}, {51, 0} },
+	[ECPRI_HW_V2_0][ECPRI_HW_FLAVOR_RU][13]      = { true, {15, 0}, {52, 0} },
+
+	/* DU-L2 Connections */
+	[ECPRI_HW_V2_0][ECPRI_HW_FLAVOR_DU_L2][0]    = { true, {0, 0},  {37, 0} },
+	[ECPRI_HW_V2_0][ECPRI_HW_FLAVOR_DU_L2][1]    = { true, {1, 0},  {38, 0} },
+	[ECPRI_HW_V2_0][ECPRI_HW_FLAVOR_DU_L2][2]    = { true, {2, 0},  {39, 0} },
+	[ECPRI_HW_V2_0][ECPRI_HW_FLAVOR_DU_L2][3]    = { true, {3, 0},  {40, 0} },
+	[ECPRI_HW_V2_0][ECPRI_HW_FLAVOR_DU_L2][4]    = { true, {4, 0},  {41, 0} },
+	[ECPRI_HW_V2_0][ECPRI_HW_FLAVOR_DU_L2][5]    = { true, {5, 0},  {42, 0} },
+	[ECPRI_HW_V2_0][ECPRI_HW_FLAVOR_DU_L2][6]    = { true, {6, 0},  {43, 0} },
+	[ECPRI_HW_V2_0][ECPRI_HW_FLAVOR_DU_L2][7]    = { true, {7, 0},  {44, 0} },
+	[ECPRI_HW_V2_0][ECPRI_HW_FLAVOR_DU_L2][8]    = { true, {8, 0},  {45, 0} },
+	[ECPRI_HW_V2_0][ECPRI_HW_FLAVOR_DU_L2][9]    = { true, {9, 0},  {46, 0} },
+	[ECPRI_HW_V2_0][ECPRI_HW_FLAVOR_DU_L2][10]   = { true, {10, 0}, {47, 0} },
+	[ECPRI_HW_V2_0][ECPRI_HW_FLAVOR_DU_L2][11]   = { true, {11, 0}, {48, 0} },
+	[ECPRI_HW_V2_0][ECPRI_HW_FLAVOR_DU_L2][12]   = { true, {20, 0}, {57, 0} },
+
+	/* DU-PCIe 4x9 Connections */
+	[ECPRI_HW_V2_0][ECPRI_HW_FLAVOR_DU_PCIE_4_X_9][0] = { true, {0, 0}, {37, 0} },
+	[ECPRI_HW_V2_0][ECPRI_HW_FLAVOR_DU_PCIE_4_X_9][1] = { true, {1, 0}, {38, 0} },
+	[ECPRI_HW_V2_0][ECPRI_HW_FLAVOR_DU_PCIE_4_X_9][2] = { true, {2, 0}, {39, 0} },
+	[ECPRI_HW_V2_0][ECPRI_HW_FLAVOR_DU_PCIE_4_X_9][3] =
+		{ true, {21, 0}, {ECPRI_DMA_ENDP_INVALID, 0} },
+	[ECPRI_HW_V2_0][ECPRI_HW_FLAVOR_DU_PCIE_4_X_9][4] = { true, {23, 0}, {59, 0}},
+	[ECPRI_HW_V2_0][ECPRI_HW_FLAVOR_DU_PCIE_4_X_9][5]
+	= { true, {ECPRI_DMA_ENDP_INVALID, 1}, {71, 1} },
+
+	/* DU-PCIe 5x6 Connections */
+	[ECPRI_HW_V2_0][ECPRI_HW_FLAVOR_DU_PCIE_5_X_6][0] = { true, {0, 0}, {37, 0} },
+	[ECPRI_HW_V2_0][ECPRI_HW_FLAVOR_DU_PCIE_5_X_6][1] = { true, {1, 0}, {38, 0} },
+	[ECPRI_HW_V2_0][ECPRI_HW_FLAVOR_DU_PCIE_5_X_6][2] = { true, {2, 0}, {39, 0} },
+	[ECPRI_HW_V2_0][ECPRI_HW_FLAVOR_DU_PCIE_5_X_6][3] =
+		{ true, {21, 0}, {ECPRI_DMA_ENDP_INVALID, 0} },
+	[ECPRI_HW_V2_0][ECPRI_HW_FLAVOR_DU_PCIE_5_X_6][4] = { true, {23, 0}, {59, 0}},
+	[ECPRI_HW_V2_0][ECPRI_HW_FLAVOR_DU_PCIE_5_X_6][5] =
+		{ true, {ECPRI_DMA_ENDP_INVALID, 1}, {69, 1} },
+
+	/* DU-PCIe 3x12 Connections */
+	[ECPRI_HW_V2_0][ECPRI_HW_FLAVOR_DU_PCIE_3_X_12][0] = { true, {0, 0}, {37, 0}},
+	[ECPRI_HW_V2_0][ECPRI_HW_FLAVOR_DU_PCIE_3_X_12][1] = { true, {1, 0}, {38, 0}},
+	[ECPRI_HW_V2_0][ECPRI_HW_FLAVOR_DU_PCIE_3_X_12][2] = { true, {2, 0}, {39, 0}},
+	[ECPRI_HW_V2_0][ECPRI_HW_FLAVOR_DU_PCIE_3_X_12][3]
+		= { true, {21, 0}, {ECPRI_DMA_ENDP_INVALID, 0} },
+	[ECPRI_HW_V2_0][ECPRI_HW_FLAVOR_DU_PCIE_3_X_12][4] = {true, {23, 0}, {59, 0}},
+	[ECPRI_HW_V2_0][ECPRI_HW_FLAVOR_DU_PCIE_3_X_12][5]
+		= { true, {ECPRI_DMA_ENDP_INVALID, 1}, {65, 1} },
 };
 
 struct ecpri_dma_eth_client_context *ecpri_dma_eth_client_ctx = NULL;
+
+static void ecpri_dma_eth_client_endps_mapping(
+	struct ecpri_dma_eth_client_endp_mapping* current_map)
+{
+	int cnct_id = 0;
+
+	/* Endpoints mapping */
+	for (cnct_id = 0;
+		cnct_id < ECPRI_DMA_ETH_CLIENT_MAX_CONNTECTIONS; cnct_id++) {
+		if (current_map[cnct_id].valid) {
+			ecpri_dma_eth_client_ctx->connections[cnct_id].tx_endp_ctx =
+				&ecpri_dma_ctx->endp_ctx[current_map[cnct_id].tx_endp.gsi_id]
+				[current_map[cnct_id].tx_endp.endp_id];
+
+			ecpri_dma_eth_client_ctx->connections[cnct_id].rx_endp_ctx =
+				&ecpri_dma_ctx->endp_ctx[current_map[cnct_id].rx_endp.gsi_id]
+				[current_map[cnct_id].rx_endp.endp_id];
+		}
+	}
+}
 
 static struct ecpri_dma_eth_client_connection*
 ecpri_dma_eth_client_get_conn_from_hdl (ecpri_dma_eth_conn_hdl_t hdl) {
@@ -72,9 +157,9 @@ ecpri_dma_eth_client_get_conn_from_hdl (ecpri_dma_eth_conn_hdl_t hdl) {
 
 static void ecpri_dma_eth_client_register_ready(void *user_data)
 {
-	int i = 0;
 	u32 hw_ver = ecpri_dma_get_ctx_hw_ver();
 	u32 hw_flavor = ecpri_dma_get_ctx_hw_flavor();
+
 	struct ecpri_dma_eth_client_endp_mapping *current_map =
 		&eth_client_endp_map[hw_ver][hw_flavor][0];
 
@@ -88,20 +173,9 @@ static void ecpri_dma_eth_client_register_ready(void *user_data)
 	ecpri_dma_eth_client_ctx->link_to_endp_mapping = current_map;
 
 	/* Endpoints mapping */
-	for (i = 0; i < ECPRI_DMA_ETH_CLIENT_MAX_CONNTECTIONS; i++) {
-		if (current_map[i].valid) {
-			ecpri_dma_eth_client_ctx->connections[i].tx_endp_ctx =
-				&ecpri_dma_ctx
-					 ->endp_ctx[current_map[i].tx_endp_id];
-
-			ecpri_dma_eth_client_ctx->connections[i].rx_endp_ctx =
-				&ecpri_dma_ctx
-					 ->endp_ctx[current_map[i].rx_endp_id];
-		}
-	}
+	ecpri_dma_eth_client_endps_mapping(current_map);
 
 	ecpri_dma_eth_client_ctx->is_eth_ready = true;
-
 	ecpri_dma_eth_client_ctx->ready_cb(user_data);
 
 	mutex_lock(&ecpri_dma_eth_client_ctx->lock);
@@ -259,9 +333,10 @@ int ecpri_dma_eth_client_destroy(void)
 int ecpri_dma_eth_register(struct ecpri_dma_eth_register_params *ready_info,
 	bool *is_dma_ready)
 {
-	int ret = 0, i = 0;
+	int ret = 0;
 	bool ready = false;
 	u32 hw_ver = 0, hw_flavor = 0;
+
 	struct ecpri_dma_eth_client_endp_mapping *current_map = NULL;
 
 	DMADBG_LOW("Begin\n");
@@ -341,7 +416,7 @@ int ecpri_dma_eth_register(struct ecpri_dma_eth_register_params *ready_info,
 				return ret;
 			}
 		}
-	} 
+	}
 
 	if (ready) {
 		hw_ver = ecpri_dma_get_ctx_hw_ver();
@@ -351,19 +426,7 @@ int ecpri_dma_eth_register(struct ecpri_dma_eth_register_params *ready_info,
 		ecpri_dma_eth_client_ctx->link_to_endp_mapping = current_map;
 
 		/* Endpoints mapping */
-		for (i = 0; i < ECPRI_DMA_ETH_CLIENT_MAX_CONNTECTIONS; i++) {
-			if (current_map[i].valid) {
-				ecpri_dma_eth_client_ctx->connections[i]
-					.tx_endp_ctx =
-					&ecpri_dma_ctx->endp_ctx
-						 [current_map[i].tx_endp_id];
-
-				ecpri_dma_eth_client_ctx->connections[i]
-					.rx_endp_ctx =
-					&ecpri_dma_ctx->endp_ctx
-						 [current_map[i].rx_endp_id];
-			}
-		}
+		ecpri_dma_eth_client_endps_mapping(current_map);
 
 		ecpri_dma_eth_client_ctx->is_eth_ready = true;
 	}
@@ -436,27 +499,35 @@ int ecpri_dma_eth_connect_endpoints(
 
 	ret = ecpri_dma_alloc_endp(
 		ecpri_dma_eth_client_ctx->
-		link_to_endp_mapping[params->link_index].tx_endp_id,
+		link_to_endp_mapping[params->link_index].tx_endp.gsi_id,
+		ecpri_dma_eth_client_ctx->
+		link_to_endp_mapping[params->link_index].tx_endp.endp_id,
 		params->tx_ring_length, &params->tx_mod_cfg, false,
 		&dma_eth_client_tx_comp_hdlr);
 
 	if (ret != 0) {
-		DMAERR("Unable to allocate Tx ENDP, ENDP ID:%d\n",
+		DMAERR("Unable to allocate Tx ENDP, ENDP ID:%d, GSI ID %d\n",
 			ecpri_dma_eth_client_ctx->
-			link_to_endp_mapping[params->link_index].tx_endp_id);
+			link_to_endp_mapping[params->link_index].tx_endp.endp_id,
+			ecpri_dma_eth_client_ctx->
+			link_to_endp_mapping[params->link_index].tx_endp.gsi_id);
 		return ret;
 	}
 
 	ret = ecpri_dma_alloc_endp(
 		ecpri_dma_eth_client_ctx->
-		link_to_endp_mapping[params->link_index].rx_endp_id,
+		link_to_endp_mapping[params->link_index].rx_endp.gsi_id,
+		ecpri_dma_eth_client_ctx->
+		link_to_endp_mapping[params->link_index].rx_endp.endp_id,
 		params->rx_ring_length, &rx_mod_cfg, false,
 		&dma_eth_client_rx_comp_hdlr);
 
 	if (ret != 0) {
-		DMAERR("Unable to allocate Rx ENDP, ENDP ID:%d\n",
+		DMAERR("Unable to allocate Rx ENDP, ENDP ID:%d, GSI ID %d\n",
 			ecpri_dma_eth_client_ctx->
-			link_to_endp_mapping[params->link_index].rx_endp_id);
+			link_to_endp_mapping[params->link_index].rx_endp.endp_id,
+			ecpri_dma_eth_client_ctx->
+			link_to_endp_mapping[params->link_index].rx_endp.gsi_id);
 		return ret;
 	}
 
@@ -464,7 +535,7 @@ int ecpri_dma_eth_connect_endpoints(
 	if (ret != 0) {
 		DMAERR("Unable to enable Tx endpoint, ENDP ID:%d\n",
 			ecpri_dma_eth_client_ctx->
-			link_to_endp_mapping[params->link_index].tx_endp_id);
+			link_to_endp_mapping[params->link_index].tx_endp.endp_id);
 		return -EINVAL;
 	}
 
@@ -472,7 +543,7 @@ int ecpri_dma_eth_connect_endpoints(
 	if (ret != 0) {
 		DMAERR("Unable to enable Rx endpoint, ENDP ID:%d\n",
 			ecpri_dma_eth_client_ctx->
-			link_to_endp_mapping[params->link_index].rx_endp_id);
+			link_to_endp_mapping[params->link_index].rx_endp.endp_id);
 		return -EINVAL;
 	}
 

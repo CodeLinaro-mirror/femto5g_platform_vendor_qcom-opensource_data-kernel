@@ -9,9 +9,6 @@
 #include <linux/types.h>
 /* Defines & Enums */
 
-/* Max ENDP ID for eCPRI DMA */
-#define ECPRI_DMA_ENDP_NUM_MAX 74
-
 /**
  * max size of the name of the resource
  */
@@ -25,7 +22,8 @@
 enum ecpri_hw_ver {
 	ECPRI_HW_NONE = 0,
 	ECPRI_HW_V1_0 = 1,
-	ECPRI_HW_MAX = 2,
+	ECPRI_HW_V2_0 = 2,
+	ECPRI_HW_MAX = 3,
 };
 
 /**
@@ -34,12 +32,18 @@ enum ecpri_hw_ver {
  * @ECPRI_HW_FLAVOR_RU: eCPRI hardware flavor RU
  * @ECPRI_HW_FLAVOR_DU_PCIE: eCPRI hardware flavor DU - PCIe
  * @ECPRI_HW_FLAVOR_DU_L2: eCPRI hardware flavor DU - L2
+ * ECPRI_HW_FLAVOR_DU_PCIE_4_X_9: eCPRI hardware flavor DU_PCIE_4_X_9
+ * ECPRI_HW_FLAVOR_DU_PCIE_5_X_6: eCPRI hardware flavor DU_PCIE_5_X_6
+ * ECPRI_HW_FLAVOR_DU_PCIE_3_X_12: eCPRI hardware flavor DU_PCIE_3_X_12
  */
 enum ecpri_hw_flavor {
 	ECPRI_HW_FLAVOR_NONE = 0,
 	ECPRI_HW_FLAVOR_RU = 1,
 	ECPRI_HW_FLAVOR_DU_PCIE = 2,
 	ECPRI_HW_FLAVOR_DU_L2 = 3,
+	ECPRI_HW_FLAVOR_DU_PCIE_4_X_9 = 4,
+	ECPRI_HW_FLAVOR_DU_PCIE_5_X_6 = 5,
+	ECPRI_HW_FLAVOR_DU_PCIE_3_X_12 = 6,
 	ECPRI_HW_FLAVOR_MAX,
 };
 
@@ -75,21 +79,41 @@ enum ecpri_dma_endp_stream_dest {
  * enum ecpri_dma_ees - DMA Execution environments
  */
 enum ecpri_dma_ees {
-	ECPRI_DMA_EE_AP = 0,
-	ECPRI_DMA_EE_Q6 = 1,
+	ECPRI_DMA_EE_AP  = 0,
+	ECPRI_DMA_EE_Q6  = 1,
 	ECPRI_DMA_EE_VM0 = 2,
 	ECPRI_DMA_EE_VM1 = 3,
 	ECPRI_DMA_EE_VM2 = 4,
 	ECPRI_DMA_EE_VM3 = 5,
-	ECPRI_DMA_EE_PF = 6,
+	ECPRI_DMA_EE_PF  = 6,
+	ECPRI_DMA_EE_VF1 = 2,
+	ECPRI_DMA_EE_VF2 = 3,
+	ECPRI_DMA_EE_VF3 = 4,
+	ECPRI_DMA_EE_VF4 = 5,
+	ECPRI_DMA_EE_VF5 = 6,
+	ECPRI_DMA_EE_VFA = 2,
+	ECPRI_DMA_EE_VFB = 3,
+	ECPRI_DMA_EE_VFC = 4,
+	ECPRI_DMA_EE_VFD = 5,
+	ECPRI_DMA_EE_VFE = 6,
 };
 
 enum ecpri_dma_vm_ids {
 	ECPRI_DMA_VM_IDS_VM0 = 0,
-	ECPRI_DMA_VM_IDS_VM1 = 1,
-	ECPRI_DMA_VM_IDS_VM2 = 2,
-	ECPRI_DMA_VM_IDS_VM3 = 3,
-	ECPRI_DMA_VM_IDS_MAX = 4,
+	ECPRI_DMA_VM_IDS_VM1,
+	ECPRI_DMA_VM_IDS_VM2,
+	ECPRI_DMA_VM_IDS_VM3,
+	ECPRI_DMA_VM_IDS_VF1,
+	ECPRI_DMA_VM_IDS_VF2,
+	ECPRI_DMA_VM_IDS_VF3,
+	ECPRI_DMA_VM_IDS_VF4,
+	ECPRI_DMA_VM_IDS_VF5,
+	ECPRI_DMA_VM_IDS_VFA,
+	ECPRI_DMA_VM_IDS_VFB,
+	ECPRI_DMA_VM_IDS_VFC,
+	ECPRI_DMA_VM_IDS_VFD,
+	ECPRI_DMA_VM_IDS_VFE,
+	ECPRI_DMA_VM_IDS_MAX,
 	ECPRI_DMA_VM_IDS_NONE = ECPRI_DMA_VM_IDS_MAX,
 };
 

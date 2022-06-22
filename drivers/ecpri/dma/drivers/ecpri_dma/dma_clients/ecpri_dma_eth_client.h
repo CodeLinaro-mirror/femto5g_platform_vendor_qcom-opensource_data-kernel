@@ -17,6 +17,7 @@
 #define ECPRI_DMA_ETH_CLIENT_MAX_FH_CONNTECTIONS 12
 #define ECPRI_DMA_ETH_CLIENT_MAX_C2C_CONNTECTIONS 2
 #define ECPRI_DMA_ETH_CLIENT_MAX_L2_CONNTECTIONS 1
+
 #define ECPRI_DMA_ETH_CLIENT_MAX_CONNTECTIONS ( \
                                 ECPRI_DMA_ETH_CLIENT_MAX_FH_CONNTECTIONS + \
                                 ECPRI_DMA_ETH_CLIENT_MAX_C2C_CONNTECTIONS + \
@@ -51,17 +52,17 @@ struct ecpri_dma_eth_client_connection {
 };
 
 /*
-* ecpri_dma_eth_client_endp_mapping - ENDPs mapping per connection
+* ecpri_dma_eth_client_endp_mapping - ENDPs mapping per connection and GSI
 * NOTE: Should be updated per driver change
 *
 * @valid: Is channel valid
-* @tx_endp_id: TX ENDP of the connection
-* @rx_endp_id: RX ENDP of the connection
+* @tx_endp: TX ENDP ID and GSI ID of the connection
+* @rx_endp: RX ENDP ID and GSI ID of the connection
 */
 struct ecpri_dma_eth_client_endp_mapping {
     bool valid;
-    u32 tx_endp_id;
-    u32 rx_endp_id;
+    struct ecpri_dma_endp_gsi_tuple tx_endp;
+    struct ecpri_dma_endp_gsi_tuple rx_endp;
 };
 
 /**
@@ -89,8 +90,8 @@ struct ecpri_dma_eth_client_context {
     bool is_eth_notified_ready;
     struct idr idr;
     spinlock_t idr_lock;
-    struct ecpri_dma_eth_client_connection
-	    connections[ECPRI_DMA_ETH_CLIENT_MAX_CONNTECTIONS];
+    struct ecpri_dma_eth_client_connection connections
+        [ECPRI_DMA_ETH_CLIENT_MAX_CONNTECTIONS];
     struct ecpri_dma_eth_client_endp_mapping *link_to_endp_mapping;
 
     ecpri_dma_ready_cb ready_cb;

@@ -25,6 +25,9 @@
 #define ECPRI_DMA_DP_UT_SRC_ENDP_ID 0
 #define ECPRI_DMA_DP_UT_DEST_ENDP_ID 37
 
+/* GSI ID for loopback */
+#define ECPRI_DMA_DP_UT_GSI_ID 0
+
 /* Define for test endp IRQ timer moderation */
 #define ECPRI_DMA_DP_TEST_ENDP_MODT 0
 
@@ -97,6 +100,7 @@ static int ecpri_dma_dp_test_setup_dma_endps(enum ecpri_dma_endp_dir dir,
 	bool enable_loopback)
 {
 	int endp_id;
+	int gsi_id = ECPRI_DMA_DP_UT_GSI_ID;
 	ecpri_hwio_def_ecpri_endp_cfg_destn_u endp_cfg_dest = { 0 };
 	ecpri_hwio_def_ecpri_endp_cfg_xbarn_u endp_cfg_xbar = { 0 };
 	ecpri_hwio_def_ecpri_endp_gsi_cfg_n_u endp_gsi_cfg = { 0 };
@@ -111,8 +115,8 @@ static int ecpri_dma_dp_test_setup_dma_endps(enum ecpri_dma_endp_dir dir,
 	else
 		endp_id = ECPRI_DMA_DP_UT_DEST_ENDP_ID;
 
-	if (!ecpri_dma_ctx->endp_map[endp_id].valid ||
-		ecpri_dma_ctx->endp_map[endp_id].is_exception)
+	if (!ecpri_dma_ctx->endp_map[gsi_id][endp_id].valid ||
+		ecpri_dma_ctx->endp_map[gsi_id][endp_id].is_exception)
 		return -EINVAL;
 
 	/* Configure test SRC ENDP to loopback into test DEST ENDP*/
@@ -128,7 +132,7 @@ static int ecpri_dma_dp_test_setup_dma_endps(enum ecpri_dma_endp_dir dir,
 
 	if (enable_loopback)
 	{
-		switch (ecpri_dma_ctx->endp_map[endp_id].dir) {
+		switch (ecpri_dma_ctx->endp_map[gsi_id][endp_id].dir) {
 		case ECPRI_DMA_ENDP_DIR_SRC:
 			/* Set SRC to M2M mode*/
 			endp_cfg_dest.def.use_dest_cfg = 1;
@@ -156,13 +160,13 @@ static int ecpri_dma_dp_test_setup_dma_endps(enum ecpri_dma_endp_dir dir,
 		}
 	}
 	else {
-		switch (ecpri_dma_ctx->endp_map[endp_id].dir) {
+		switch (ecpri_dma_ctx->endp_map[gsi_id][endp_id].dir) {
 		case ECPRI_DMA_ENDP_DIR_SRC:
-			switch (ecpri_dma_ctx->endp_map[endp_id].stream_mode) {
+			switch (ecpri_dma_ctx->endp_map[gsi_id][endp_id].stream_mode) {
 			case ECPRI_DMA_ENDP_STREAM_MODE_M2M:
 				endp_cfg_dest.def.use_dest_cfg = 1;
 				endp_cfg_dest.def.dest_mem_channel =
-					ecpri_dma_ctx->endp_map[endp_id].dest;
+					ecpri_dma_ctx->endp_map[gsi_id][endp_id].dest;
 				ecpri_dma_hal_write_reg_n(
 					ECPRI_ENDP_CFG_DEST_n, endp_id,
 					endp_cfg_dest.value);
@@ -170,13 +174,13 @@ static int ecpri_dma_dp_test_setup_dma_endps(enum ecpri_dma_endp_dir dir,
 			case ECPRI_DMA_ENDP_STREAM_MODE_M2S:
 				endp_cfg_dest.def.use_dest_cfg = 0;
 				endp_cfg_xbar.def.dest_stream =
-					ecpri_dma_ctx->endp_map[endp_id].dest;
+					ecpri_dma_ctx->endp_map[gsi_id][endp_id].dest;
 				endp_cfg_xbar.def.xbar_tid =
-					ecpri_dma_ctx->endp_map[endp_id].tid.value;
+					ecpri_dma_ctx->endp_map[gsi_id][endp_id].tid.value;
 				//TODO: Below are required for nFAPI
 				//endp_cfg_xbar.xbar_user = Get from Core driver, need API
 				endp_cfg_xbar.def.l2_segmentation_en =
-					ecpri_dma_ctx->endp_map[endp_id].is_nfapi ? 1 : 0;
+					ecpri_dma_ctx->endp_map[gsi_id][endp_id].is_nfapi ? 1 : 0;
 				ecpri_dma_hal_write_reg_n(
 					ECPRI_ENDP_CFG_DEST_n, endp_id,
 					endp_cfg_dest.value);
@@ -185,25 +189,26 @@ static int ecpri_dma_dp_test_setup_dma_endps(enum ecpri_dma_endp_dir dir,
 					endp_cfg_xbar.value);
 				break;
 			default:
-				DMAERR("SRC ENDP %d isn't M2M or S2M, address = 0x%px\n",
-					endp_id, &ecpri_dma_ctx->endp_map[endp_id]);
+				DMAERR("SRC ENDP %d, GSI ID %d isn't M2M or S2M,"
+					"address = 0x%px\n", endp_id, gsi_id,
+					&ecpri_dma_ctx->endp_map[gsi_id][endp_id]);
 				return -EINVAL;
 				break;
 			}
 			break;
 		case ECPRI_DMA_ENDP_DIR_DEST:
-			switch (ecpri_dma_ctx->endp_map[endp_id].stream_mode) {
+			switch (ecpri_dma_ctx->endp_map[gsi_id][endp_id].stream_mode) {
 			case ECPRI_DMA_ENDP_STREAM_MODE_M2M:
 				break;
 			case ECPRI_DMA_ENDP_STREAM_MODE_S2M:
-				if (ecpri_dma_ctx->endp_map[endp_id].is_nfapi) {
+				if (ecpri_dma_ctx->endp_map[gsi_id][endp_id].is_nfapi) {
 					memset(&cfg_aggr, 0,
 						sizeof(cfg_aggr));
 					memset(&reassembly_cfg, 0,
 						sizeof(reassembly_cfg));
 					cfg_aggr.def.aggr_type = 1;
 					reassembly_cfg.def.vm_id =
-						ecpri_dma_ctx->endp_map[endp_id]
+						ecpri_dma_ctx->endp_map[gsi_id][endp_id]
 						.nfapi_dest_vm_id;
 					ecpri_dma_hal_write_reg_n(
 						ECPRI_ENDP_CFG_AGGR_n,
@@ -214,8 +219,9 @@ static int ecpri_dma_dp_test_setup_dma_endps(enum ecpri_dma_endp_dir dir,
 				}
 				break;
 			default:
-				DMAERR("DEST ENDP %d isn't M2M or S2M, address = 0x%px\n",
-					endp_id, &ecpri_dma_ctx->endp_map[endp_id]);
+				DMAERR("DEST ENDP %d, GSI ID %d isn't M2M or S2M,"
+					"address = 0x%px\n", endp_id, gsi_id,
+					&ecpri_dma_ctx->endp_map[gsi_id][endp_id]);
 				return -EINVAL;
 				break;
 			}
@@ -396,10 +402,10 @@ static int ecpri_dma_create_test_endp(enum ecpri_dma_endp_dir dir)
 	mod_cfg.moderation_timer_threshold =
 		ECPRI_DMA_DP_TEST_ENDP_MODT;
 
-	ep = &ecpri_dma_ctx->endp_ctx[endp_id];
+	ep = &ecpri_dma_ctx->endp_ctx[ECPRI_DMA_DP_UT_GSI_ID][endp_id];
 
-	ret = ecpri_dma_alloc_endp(endp_id, ECPRI_DMA_DP_TEST_RING_LEN,
-		&mod_cfg, false, notify);
+	ret = ecpri_dma_alloc_endp(ECPRI_DMA_DP_UT_GSI_ID, endp_id,
+		ECPRI_DMA_DP_TEST_RING_LEN, &mod_cfg, false, notify);
 	if (ret) {
 		DMA_UT_LOG("Failed to allocte test ENDP %d\n", endp_id);
 		goto fail_gen;
@@ -436,6 +442,8 @@ static void ecpri_dma_destroy_test_endp(enum ecpri_dma_endp_dir dir)
 {
 	int ret = 0;
 	int endp_id;
+	int gsi_id = ECPRI_DMA_DP_UT_GSI_ID;
+
 	struct ecpri_dma_endp_context *endp_cfg = NULL;
 
 	if (dir == ECPRI_DMA_ENDP_DIR_SRC)
@@ -443,23 +451,26 @@ static void ecpri_dma_destroy_test_endp(enum ecpri_dma_endp_dir dir)
 	else
 		endp_id = ECPRI_DMA_DP_UT_DEST_ENDP_ID;
 
-	endp_cfg = &ecpri_dma_ctx->endp_ctx[endp_id];
+	endp_cfg = &ecpri_dma_ctx->endp_ctx[gsi_id][endp_id];
 
 	ret = ecpri_dma_stop_endp(endp_cfg);
 	if (ret != GSI_STATUS_SUCCESS) {
-		DMA_UT_LOG("Stop ENDP %d failed with code %d\n", endp_id, ret);
+		DMA_UT_LOG("Stop ENDP %d, GSI ID %d failed with code %d\n",
+			endp_id, gsi_id, ret);
 		return;
 	}
 
 	ret = ecpri_dma_reset_endp(endp_cfg);
 	if (ret != GSI_STATUS_SUCCESS) {
-		DMA_UT_LOG("Reset ENDP %d failed with code %d\n", endp_id, ret);
+		DMA_UT_LOG("Reset ENDP %d, GSI ID %d failed with code %d\n",
+			endp_id, gsi_id, ret);
 		return;
 	}
 
 	ret = ecpri_dma_dealloc_endp(endp_cfg);
 	if (ret != GSI_STATUS_SUCCESS) {
-		DMA_UT_LOG("Dealloc ENDP %d failed with code %d\n", endp_id, ret);
+		DMA_UT_LOG("Dealloc ENDP %d, GSI ID %d failed with code %d\n",
+			endp_id, gsi_id, ret);
 	}
 }
 
@@ -699,7 +710,8 @@ static int ecpri_dma_test_dp_suite_verify_rx(
 	void* rx_buff_to_compare = NULL;
 	struct ecpri_dma_endp_context* rx_endp = NULL;
 
-	rx_endp = &ecpri_dma_ctx->endp_ctx[ECPRI_DMA_DP_UT_DEST_ENDP_ID];
+	rx_endp = &ecpri_dma_ctx->
+		endp_ctx[ECPRI_DMA_DP_UT_GSI_ID][ECPRI_DMA_DP_UT_DEST_ENDP_ID];
 	*total_rx_buffs_to_replenish = 0;
 
 	if (expecting_irq)
@@ -947,8 +959,10 @@ static int ecpri_dma_test_dp_suite_single_pkt_single_buffer(void *priv)
 
 	DMA_UT_LOG("Start single packet single buffer test\n");
 
-	tx_endp = &ecpri_dma_ctx->endp_ctx[ECPRI_DMA_DP_UT_SRC_ENDP_ID];
-	rx_endp = &ecpri_dma_ctx->endp_ctx[ECPRI_DMA_DP_UT_DEST_ENDP_ID];
+	rx_endp = &ecpri_dma_ctx->
+		endp_ctx[ECPRI_DMA_DP_UT_GSI_ID][ECPRI_DMA_DP_UT_DEST_ENDP_ID];
+	tx_endp = &ecpri_dma_ctx->
+		endp_ctx[ECPRI_DMA_DP_UT_GSI_ID][ECPRI_DMA_DP_UT_SRC_ENDP_ID];
 
 	/* Provide mocked pointers to allocated space for data and credit packets */
 	res = ecpri_dma_test_dp_suite_prepare_test_data(num_of_pkts, single_buffer,
@@ -1037,8 +1051,10 @@ static int ecpri_dma_test_dp_suite_single_pkt_mult_buffer(void *priv)
 
 	DMA_UT_LOG("Start single packet multiple buffer test\n");
 
-	tx_endp = &ecpri_dma_ctx->endp_ctx[ECPRI_DMA_DP_UT_SRC_ENDP_ID];
-	rx_endp = &ecpri_dma_ctx->endp_ctx[ECPRI_DMA_DP_UT_DEST_ENDP_ID];
+	tx_endp = &ecpri_dma_ctx->
+		endp_ctx[ECPRI_DMA_DP_UT_GSI_ID][ECPRI_DMA_DP_UT_SRC_ENDP_ID];
+	rx_endp = &ecpri_dma_ctx->
+		endp_ctx[ECPRI_DMA_DP_UT_GSI_ID][ECPRI_DMA_DP_UT_DEST_ENDP_ID];
 
 	res = ecpri_dma_test_dp_suite_prepare_test_data(num_of_pkts, single_buffer,
 		&tx_pkts, &rx_pkts);
@@ -1122,8 +1138,10 @@ static int ecpri_dma_test_dp_suite_mult_pkt_single_buffer(void *priv)
 
 	DMA_UT_LOG("Start multiple packet singel buffer test\n");
 
-	tx_endp = &ecpri_dma_ctx->endp_ctx[ECPRI_DMA_DP_UT_SRC_ENDP_ID];
-	rx_endp = &ecpri_dma_ctx->endp_ctx[ECPRI_DMA_DP_UT_DEST_ENDP_ID];
+	tx_endp = &ecpri_dma_ctx->
+		endp_ctx[ECPRI_DMA_DP_UT_GSI_ID][ECPRI_DMA_DP_UT_SRC_ENDP_ID];
+	rx_endp = &ecpri_dma_ctx->
+		endp_ctx[ECPRI_DMA_DP_UT_GSI_ID][ECPRI_DMA_DP_UT_DEST_ENDP_ID];
 
 	res = ecpri_dma_test_dp_suite_prepare_test_data(
 		num_of_pkts_to_send, single_buffer, &tx_pkts, &rx_pkts);
@@ -1209,8 +1227,10 @@ static int ecpri_dma_test_dp_suite_mult_pkt_mult_buffer(void *priv)
 
 	DMA_UT_LOG("Start multiple packet multiple buffer test\n");
 
-	tx_endp = &ecpri_dma_ctx->endp_ctx[ECPRI_DMA_DP_UT_SRC_ENDP_ID];
-	rx_endp = &ecpri_dma_ctx->endp_ctx[ECPRI_DMA_DP_UT_DEST_ENDP_ID];
+	tx_endp = &ecpri_dma_ctx->
+		endp_ctx[ECPRI_DMA_DP_UT_GSI_ID][ECPRI_DMA_DP_UT_SRC_ENDP_ID];
+	rx_endp = &ecpri_dma_ctx->
+		endp_ctx[ECPRI_DMA_DP_UT_GSI_ID][ECPRI_DMA_DP_UT_DEST_ENDP_ID];
 
 	res = ecpri_dma_test_dp_suite_prepare_test_data(
 		num_of_pkts_to_send, single_buffer, &tx_pkts, &rx_pkts);
@@ -1298,8 +1318,10 @@ static int ecpri_dma_test_dp_suite_wrap_around_single_buffer(void *priv)
 
 	DMA_UT_LOG("Start wrap around singel buffer test\n");
 
-	tx_endp = &ecpri_dma_ctx->endp_ctx[ECPRI_DMA_DP_UT_SRC_ENDP_ID];
-	rx_endp = &ecpri_dma_ctx->endp_ctx[ECPRI_DMA_DP_UT_DEST_ENDP_ID];
+	tx_endp = &ecpri_dma_ctx->
+		endp_ctx[ECPRI_DMA_DP_UT_GSI_ID][ECPRI_DMA_DP_UT_SRC_ENDP_ID];
+	rx_endp = &ecpri_dma_ctx->
+		endp_ctx[ECPRI_DMA_DP_UT_GSI_ID][ECPRI_DMA_DP_UT_DEST_ENDP_ID];
 
 	res = ecpri_dma_test_dp_suite_prepare_test_data(
 		num_of_iter * num_of_pkts_to_send, single_buffer, &tx_pkts, &rx_pkts);
@@ -1402,8 +1424,10 @@ static int ecpri_dma_test_dp_suite_wrap_around_mult_buffer(void *priv)
 
 	DMA_UT_LOG("Start wrap around mult buffer test\n");
 
-	tx_endp = &ecpri_dma_ctx->endp_ctx[ECPRI_DMA_DP_UT_SRC_ENDP_ID];
-	rx_endp = &ecpri_dma_ctx->endp_ctx[ECPRI_DMA_DP_UT_DEST_ENDP_ID];
+	tx_endp = &ecpri_dma_ctx->
+		endp_ctx[ECPRI_DMA_DP_UT_GSI_ID][ECPRI_DMA_DP_UT_SRC_ENDP_ID];
+	rx_endp = &ecpri_dma_ctx->
+		endp_ctx[ECPRI_DMA_DP_UT_GSI_ID][ECPRI_DMA_DP_UT_DEST_ENDP_ID];
 
 	res = ecpri_dma_test_dp_suite_prepare_test_data(
 		num_of_iter * num_of_pkts_to_send, single_buffer, &tx_pkts, &rx_pkts);

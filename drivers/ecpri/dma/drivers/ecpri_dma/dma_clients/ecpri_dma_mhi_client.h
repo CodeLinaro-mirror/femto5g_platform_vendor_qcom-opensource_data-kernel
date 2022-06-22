@@ -17,7 +17,7 @@
 
 
 #define ECPRI_DMA_MHI_DMA_MAX_PKT_SZ              0x1FFFFF
-#define ECPRI_DMA_MHI_VIRTUAL_FUNCTION_NUM        (4)
+#define ECPRI_DMA_MHI_VIRTUAL_FUNCTION_NUM        (ECPRI_DMA_VM_IDS_MAX)
 #define ECPRI_DMA_MHI_MAX_HW_CHANNELS		      (4)
 #define ECPRI_DMA_MHI_INVALID_CH_ID			      (-1)
 #define ECPRI_DMA_MHI_INVALID_ENDP_ID			  (-1)
@@ -45,9 +45,20 @@
 
 #define ECPRI_DMA_VIRTUL_VFID_CFG(vf_num) (0x4 | vf_num)
 
+struct ecpri_dma_mhi_ee_gsi_tuple {
+	enum ecpri_dma_ees ee_id;
+	enum ecpri_dma_gsi_id gsi_id;
+};
+
 enum ecpri_dma_mhi_dma_dir {
 	ECPRI_DMA_MHI_DMA_TO_HOST,
 	ECPRI_DMA_MHI_DMA_FROM_HOST,
+};
+
+enum ecpri_dma_mhi_dma_context_type {
+	ECPRI_DMA_MHI_DMA_CLIENT_CTX = 0,
+	ECPRI_DMA_MHI_DMA_MEMCPY_CTX = 1,
+	ECPRI_DMA_MHI_DMA_INVALID_CTX = 2,
 };
 
 enum ecpri_dma_mhi_state {

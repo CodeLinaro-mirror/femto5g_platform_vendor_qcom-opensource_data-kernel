@@ -21,13 +21,13 @@
 
 //TODO: Complete documentation of functions below
 int ecpri_dma_get_endp_mapping(enum ecpri_hw_ver ver, enum ecpri_hw_flavor flv,
-    const struct dma_gsi_ep_config **endp_mapping);
+    const struct dma_gsi_ep_config ***endp_mapping);
 int ecpri_dma_get_port_mapping(enum ecpri_hw_ver ver, enum ecpri_hw_flavor flv,
-			       struct ecpri_dma_endp_mapping *endp_map);
+    struct ecpri_dma_endp_mapping *endp_map);
 int ecpri_dma_enable_dma_endp(struct ecpri_dma_endp_context *ep);
 int ecpri_dma_disable_dma_endp(struct ecpri_dma_endp_context *ep);
-int ecpri_dma_setup_dma_endps(const struct dma_gsi_ep_config *endp_map);
-int ecpri_dma_enable_dma_endps(const struct dma_gsi_ep_config *endp_map);
+int ecpri_dma_setup_dma_endps(const struct dma_gsi_ep_config **endp_map);
+int ecpri_dma_enable_dma_endps(const struct dma_gsi_ep_config **endp_map);
 irq_handler_t ecpri_dma_get_isr(void);
 const char *ecpri_dma_get_version_string(enum ecpri_hw_ver ver);
 bool ecpri_dma_is_ready(void);

@@ -52,6 +52,7 @@ struct ecpri_dma_mhi_client_test_vf_id_mapping {
 	u32 second_src_endp_id;
 	u32 first_dest_endp_id;
 	u32 second_dest_endp_id;
+	u32 gsi_id;
 };
 
 static const int ecpri_dma_mhi_client_test_ev_id_map
@@ -84,25 +85,29 @@ ecpri_dma_mhi_client_test_mapping
 		.first_src_endp_id = 20,
 		.second_src_endp_id = 21,
 		.first_dest_endp_id = 57,
-		.second_dest_endp_id = 58
+		.second_dest_endp_id = 58,
+		.gsi_id = ECPRI_DMA_GSI_ID_0
 	},
 	[ECPRI_DMA_VM_IDS_VM1] = {
 		.first_src_endp_id = 23,
 		.second_src_endp_id = 24,
 		.first_dest_endp_id = 60,
-		.second_dest_endp_id = 61
+		.second_dest_endp_id = 61,
+		.gsi_id = ECPRI_DMA_GSI_ID_0
 	},
 	[ECPRI_DMA_VM_IDS_VM2] = {
 		.first_src_endp_id = 26,
 		.second_src_endp_id = 27,
 		.first_dest_endp_id = 63,
-		.second_dest_endp_id = 64
+		.second_dest_endp_id = 64,
+		.gsi_id = ECPRI_DMA_GSI_ID_0
 	},
 	[ECPRI_DMA_VM_IDS_VM3] = {
 		.first_src_endp_id = 29,
 		.second_src_endp_id = 30,
 		.first_dest_endp_id = 66,
-		.second_dest_endp_id = 67
+		.second_dest_endp_id = 67,
+		.gsi_id = ECPRI_DMA_GSI_ID_0
 	}
 };
 
@@ -381,8 +386,7 @@ static void ecpri_dma_mhi_test_poll_for_start(
 }
 
 static int ecpri_dma_mhi_client_test_util_setup_dma_endps(
-	int src_endp_id,
-	int dest_endp_id,
+	int src_endp_id, int dest_endp_id, u32 gsi_id,
 	bool enable_loopback)
 {
 	ecpri_hwio_def_ecpri_endp_cfg_destn_u endp_cfg_dest = { 0 };
@@ -390,13 +394,13 @@ static int ecpri_dma_mhi_client_test_util_setup_dma_endps(
 	ecpri_hwio_def_ecpri_endp_cfg_aggr_n_u cfg_aggr = { 0 };
 	ecpri_hwio_def_ecpri_endp_nfapi_reassembly_cfg_n_u reassembly_cfg = { 0 };
 
-	if (!ecpri_dma_ctx->endp_map)
+	if (!ecpri_dma_ctx->endp_map[gsi_id])
 		return -EINVAL;
 
-	if (!ecpri_dma_ctx->endp_map[src_endp_id].valid ||
-		ecpri_dma_ctx->endp_map[src_endp_id].is_exception ||
-		!ecpri_dma_ctx->endp_map[dest_endp_id].valid ||
-		ecpri_dma_ctx->endp_map[dest_endp_id].is_exception)
+	if (!ecpri_dma_ctx->endp_map[gsi_id][src_endp_id].valid ||
+		ecpri_dma_ctx->endp_map[gsi_id][src_endp_id].is_exception ||
+		!ecpri_dma_ctx->endp_map[gsi_id][dest_endp_id].valid ||
+		ecpri_dma_ctx->endp_map[gsi_id][dest_endp_id].is_exception)
 		return -EINVAL;
 
 	/* Configure test SRC ENDP to loopback into test DEST ENDP */
@@ -434,11 +438,11 @@ static int ecpri_dma_mhi_client_test_util_setup_dma_endps(
 	}
 	else {
 		/* SRC */
-		switch (ecpri_dma_ctx->endp_map[src_endp_id].stream_mode) {
+		switch (ecpri_dma_ctx->endp_map[gsi_id][src_endp_id].stream_mode) {
 		case ECPRI_DMA_ENDP_STREAM_MODE_M2M:
 			endp_cfg_dest.def.use_dest_cfg = 1;
 			endp_cfg_dest.def.dest_mem_channel =
-				ecpri_dma_ctx->endp_map[src_endp_id].dest;
+				ecpri_dma_ctx->endp_map[gsi_id][src_endp_id].dest;
 			ecpri_dma_hal_write_reg_n(
 				ECPRI_ENDP_CFG_DEST_n, src_endp_id,
 				endp_cfg_dest.value);
@@ -446,13 +450,13 @@ static int ecpri_dma_mhi_client_test_util_setup_dma_endps(
 		case ECPRI_DMA_ENDP_STREAM_MODE_M2S:
 			endp_cfg_dest.def.use_dest_cfg = 0;
 			endp_cfg_xbar.def.dest_stream =
-				ecpri_dma_ctx->endp_map[src_endp_id].dest;
+				ecpri_dma_ctx->endp_map[gsi_id][src_endp_id].dest;
 			endp_cfg_xbar.def.xbar_tid =
-				ecpri_dma_ctx->endp_map[src_endp_id].tid.value;
+				ecpri_dma_ctx->endp_map[gsi_id][src_endp_id].tid.value;
 			//TODO: Below are required for nFAPI
 			//endp_cfg_xbar.xbar_user = Get from Core driver, need API
 			endp_cfg_xbar.def.l2_segmentation_en =
-				ecpri_dma_ctx->endp_map[src_endp_id].is_nfapi ? 1 : 0;
+				ecpri_dma_ctx->endp_map[gsi_id][src_endp_id].is_nfapi ? 1 : 0;
 			ecpri_dma_hal_write_reg_n(
 				ECPRI_ENDP_CFG_DEST_n, src_endp_id,
 				endp_cfg_dest.value);
@@ -462,24 +466,24 @@ static int ecpri_dma_mhi_client_test_util_setup_dma_endps(
 			break;
 		default:
 			DMA_UT_ERR("SRC ENDP %d isn't M2M or S2M, address = 0x%px\n",
-				src_endp_id, &ecpri_dma_ctx->endp_map[src_endp_id]);
+				src_endp_id, &ecpri_dma_ctx->endp_map[gsi_id][src_endp_id]);
 			return -EINVAL;
 			break;
 		}
 
 		/* DEST */
-		switch (ecpri_dma_ctx->endp_map[dest_endp_id].stream_mode) {
+		switch (ecpri_dma_ctx->endp_map[gsi_id][dest_endp_id].stream_mode) {
 		case ECPRI_DMA_ENDP_STREAM_MODE_M2M:
 			break;
 		case ECPRI_DMA_ENDP_STREAM_MODE_S2M:
-			if (ecpri_dma_ctx->endp_map[dest_endp_id].is_nfapi) {
+			if (ecpri_dma_ctx->endp_map[gsi_id][dest_endp_id].is_nfapi) {
 				memset(&cfg_aggr, 0,
 					sizeof(cfg_aggr));
 				memset(&reassembly_cfg, 0,
 					sizeof(reassembly_cfg));
 				cfg_aggr.def.aggr_type = 1;
 				reassembly_cfg.def.vm_id =
-					ecpri_dma_ctx->endp_map[dest_endp_id]
+					ecpri_dma_ctx->endp_map[gsi_id][dest_endp_id]
 					.nfapi_dest_vm_id;
 				ecpri_dma_hal_write_reg_n(
 					ECPRI_ENDP_CFG_AGGR_n,
@@ -491,7 +495,7 @@ static int ecpri_dma_mhi_client_test_util_setup_dma_endps(
 			break;
 		default:
 			DMA_UT_ERR("DEST ENDP %d isn't M2M or S2M, address = 0x%px\n",
-				dest_endp_id, &ecpri_dma_ctx->endp_map[dest_endp_id]);
+				dest_endp_id, &ecpri_dma_ctx->endp_map[gsi_id][dest_endp_id]);
 			return -EINVAL;
 			break;
 		}
@@ -1038,11 +1042,9 @@ static int ecpri_dma_mhi_client_test_config_channel_context(
 
 static int ecpri_dma_mhi_client_test_verify_connect(
 	struct mhi_dma_function_params* function,
-	u32 src_endp_id,
-	u32 dest_endp_id,
-	u32 dev_src_ch_id,
-	u32 dev_dest_ch_id,
-	int idx)
+	u32 src_endp_id, u32 dest_endp_id,
+	u32 dev_src_ch_id, u32 dev_dest_ch_id,
+	u32 gsi_id, int idx)
 {
 	int ret = 0;
 	struct ecpri_dma_endp_context* src_endp = NULL;
@@ -1057,7 +1059,7 @@ static int ecpri_dma_mhi_client_test_verify_connect(
 		return -EFAULT;
 	}
 
-	src_endp = &ecpri_dma_ctx->endp_ctx[src_endp_id];
+	src_endp = &ecpri_dma_ctx->endp_ctx[gsi_id][src_endp_id];
 	/* Verify SRC endp is enabled */
 	if (!src_endp->valid) {
 		DMA_UT_ERR("SRC endp %d for VM%d failed\n", src_endp_id, function->vf_id);
@@ -1094,7 +1096,7 @@ static int ecpri_dma_mhi_client_test_verify_connect(
 		return -EFAULT;
 	}
 
-	dest_endp = &ecpri_dma_ctx->endp_ctx[dest_endp_id];
+	dest_endp = &ecpri_dma_ctx->endp_ctx[gsi_id][dest_endp_id];
 	/* Verify DEST endp is enabled */
 	if (!dest_endp->valid) {
 		DMA_UT_ERR("DEST endp %d for VM%d\n",
@@ -1804,6 +1806,7 @@ static int ecpri_dma_mhi_client_test_utils_create_params_and_init(
 * @dev_dest_ch_id: Device DEST channel ID
 * @src_endp_id: SRC endp ID
 * @dest_endp_id: DEST nedp ID
+* @gsi_id: GSI ID
 *
 */
 static int ecpri_dma_mhi_utils_connect_and_verify_endps(
@@ -1813,7 +1816,7 @@ static int ecpri_dma_mhi_utils_connect_and_verify_endps(
 	u32* src_disc_clnt_hdl,
 	u32* dest_disc_clnt_hdl,
 	int idx, int dev_src_ch_id, int dev_dest_ch_id,
-	int src_endp_id, int dest_endp_id)
+	int src_endp_id, int dest_endp_id, u32 gsi_id)
 {
 	int ret = 0;
 
@@ -1854,12 +1857,8 @@ static int ecpri_dma_mhi_utils_connect_and_verify_endps(
 	/* Verify matching ENDPs & CHs */
 	DMA_UT_DBG("First SRC & DEST ENDP verification\n");
 	ret = ecpri_dma_mhi_client_test_verify_connect(
-		function,
-		src_endp_id,
-		dest_endp_id,
-		dev_src_ch_id,
-		dev_dest_ch_id,
-		idx);
+		function, src_endp_id, dest_endp_id,
+		dev_src_ch_id, dev_dest_ch_id, gsi_id, idx);
 	if (ret != 0) {
 		DMA_UT_ERR("Verification for VF_ID %d has failed\n",
 			function->vf_id);
@@ -2786,7 +2785,8 @@ static int ecpri_dma_mhi_client_test_suite_connect_endp_vm(void* priv)
 		ECPRI_DMA_MHI_TEST_FRST_SRC_CHANNEL_ID,
 		ECPRI_DMA_MHI_TEST_FRST_DEST_CHANNEL_ID,
 		ecpri_dma_mhi_client_test_mapping[idx].first_src_endp_id,
-		ecpri_dma_mhi_client_test_mapping[idx].first_dest_endp_id);
+		ecpri_dma_mhi_client_test_mapping[idx].first_dest_endp_id,
+		ecpri_dma_mhi_client_test_mapping[idx].gsi_id);
 	if (ret != 0) {
 		DMA_UT_ERR("VF_ID %d / IDX %d failed", ctx->function.vf_id, idx);
 		DMA_UT_TEST_FAIL_REPORT("Connect_endp for has failed\n");
@@ -2885,7 +2885,8 @@ static int ecpri_dma_mhi_client_test_suite_connect_endp_all(void* priv) {
 			ECPRI_DMA_MHI_TEST_FRST_SRC_CHANNEL_ID,
 			ECPRI_DMA_MHI_TEST_FRST_DEST_CHANNEL_ID,
 			ecpri_dma_mhi_client_test_mapping[test_i].first_src_endp_id,
-			ecpri_dma_mhi_client_test_mapping[test_i].first_dest_endp_id);
+			ecpri_dma_mhi_client_test_mapping[test_i].first_dest_endp_id,
+			ecpri_dma_mhi_client_test_mapping[test_i].gsi_id);
 		if (ret != 0) {
 			DMA_UT_ERR("VF_ID %d / IDX %d failed", ctx->function.vf_id, test_i);
 			DMA_UT_TEST_FAIL_REPORT("Connect_endp has failed\n");
@@ -2900,7 +2901,8 @@ static int ecpri_dma_mhi_client_test_suite_connect_endp_all(void* priv) {
 			ECPRI_DMA_MHI_TEST_SCND_SRC_CHANNEL_ID,
 			ECPRI_DMA_MHI_TEST_SCND_DEST_CHANNEL_ID,
 			ecpri_dma_mhi_client_test_mapping[test_i].second_src_endp_id,
-			ecpri_dma_mhi_client_test_mapping[test_i].second_dest_endp_id);
+			ecpri_dma_mhi_client_test_mapping[test_i].second_dest_endp_id,
+			ecpri_dma_mhi_client_test_mapping[test_i].gsi_id);
 		if (ret != 0) {
 			DMA_UT_ERR("Connect endp for VF_ID %d / IDX %d has failed\n",
 				ctx->function.vf_id, test_i);
@@ -3047,10 +3049,10 @@ ecpri_dma_mhi_client_test_suite_hw_ch_vm_single_packet_single_buffer(void* priv)
 
 	/* Create loop-back */
 	ret = ecpri_dma_mhi_client_test_util_setup_dma_endps(
-		ecpri_dma_mhi_client_test_mapping[
-			idx].first_src_endp_id,
-		ecpri_dma_mhi_client_test_mapping[
-			idx].first_dest_endp_id, true);
+		ecpri_dma_mhi_client_test_mapping[idx].first_src_endp_id,
+		ecpri_dma_mhi_client_test_mapping[idx].first_dest_endp_id,
+		ecpri_dma_mhi_client_test_mapping[idx].gsi_id,
+		true);
 	if (ret != 0) {
 		DMA_UT_ERR("VF_ID %d / IDX %d failed"
 			" SRC ENDP ID %d, DEST ENDP ID %d\n", ctx->function.vf_id, idx,
@@ -3068,7 +3070,8 @@ ecpri_dma_mhi_client_test_suite_hw_ch_vm_single_packet_single_buffer(void* priv)
 		ECPRI_DMA_MHI_TEST_FRST_SRC_CHANNEL_ID,
 		ECPRI_DMA_MHI_TEST_FRST_DEST_CHANNEL_ID,
 		ecpri_dma_mhi_client_test_mapping[idx].first_src_endp_id,
-		ecpri_dma_mhi_client_test_mapping[idx].first_dest_endp_id);
+		ecpri_dma_mhi_client_test_mapping[idx].first_dest_endp_id,
+		ecpri_dma_mhi_client_test_mapping[idx].gsi_id);
 	if (ret != 0) {
 		DMA_UT_ERR("VF_ID %d / IDX %d failed\n", ctx->function.vf_id, idx);
 		DMA_UT_TEST_FAIL_REPORT("Connect_endp has failed\n");
@@ -3097,10 +3100,9 @@ ecpri_dma_mhi_client_test_suite_hw_ch_vm_single_packet_single_buffer(void* priv)
 
 	/* Reset loopback at the end of the test*/
 	ret = ecpri_dma_mhi_client_test_util_setup_dma_endps(
-		ecpri_dma_mhi_client_test_mapping[
-			idx].first_src_endp_id,
-		ecpri_dma_mhi_client_test_mapping[
-			idx].first_dest_endp_id, false);
+		ecpri_dma_mhi_client_test_mapping[idx].first_src_endp_id,
+		ecpri_dma_mhi_client_test_mapping[idx].first_dest_endp_id,
+		ecpri_dma_mhi_client_test_mapping[idx].gsi_id, false);
 	if (ret != 0) {
 		DMA_UT_ERR("VF_ID %d / IDX %d failed"
 			" SRC ENDP ID %d, DEST ENDP ID %d\n", ctx->function.vf_id, idx,
@@ -3207,10 +3209,9 @@ ecpri_dma_mhi_client_test_suite_hw_ch_all_single_packet_single_buffer(void* priv
 
 		/* Create loop-back */
 		ret = ecpri_dma_mhi_client_test_util_setup_dma_endps(
-			ecpri_dma_mhi_client_test_mapping[
-				idx].first_src_endp_id,
-			ecpri_dma_mhi_client_test_mapping[
-				idx].first_dest_endp_id, true);
+			ecpri_dma_mhi_client_test_mapping[idx].first_src_endp_id,
+			ecpri_dma_mhi_client_test_mapping[idx].first_dest_endp_id,
+			ecpri_dma_mhi_client_test_mapping[idx].gsi_id, true);
 		if (ret != 0) {
 			DMA_UT_ERR("VF_ID %d / IDX %d failed"
 				" SRC ENDP ID %d, DEST ENDP ID %d\n", ctx->function.vf_id, idx,
@@ -3221,10 +3222,9 @@ ecpri_dma_mhi_client_test_suite_hw_ch_all_single_packet_single_buffer(void* priv
 		}
 
 		ret = ecpri_dma_mhi_client_test_util_setup_dma_endps(
-			ecpri_dma_mhi_client_test_mapping[
-				idx].second_src_endp_id,
-			ecpri_dma_mhi_client_test_mapping[
-				idx].second_dest_endp_id, true);
+			ecpri_dma_mhi_client_test_mapping[idx].second_src_endp_id,
+			ecpri_dma_mhi_client_test_mapping[idx].second_dest_endp_id,
+			ecpri_dma_mhi_client_test_mapping[idx].gsi_id, true);
 		if (ret != 0) {
 			DMA_UT_ERR("VF_ID %d / IDX %d failed"
 				" SRC ENDP ID %d, DEST ENDP ID %d\n", ctx->function.vf_id, idx,
@@ -3242,7 +3242,8 @@ ecpri_dma_mhi_client_test_suite_hw_ch_all_single_packet_single_buffer(void* priv
 			ECPRI_DMA_MHI_TEST_FRST_SRC_CHANNEL_ID,
 			ECPRI_DMA_MHI_TEST_FRST_DEST_CHANNEL_ID,
 			ecpri_dma_mhi_client_test_mapping[idx].first_src_endp_id,
-			ecpri_dma_mhi_client_test_mapping[idx].first_dest_endp_id);
+			ecpri_dma_mhi_client_test_mapping[idx].first_dest_endp_id,
+			ecpri_dma_mhi_client_test_mapping[idx].gsi_id);
 		if (ret != 0) {
 			DMA_UT_ERR("VF_ID %d / IDX %d failed\n", ctx->function.vf_id, idx);
 			DMA_UT_TEST_FAIL_REPORT("Connect_endp has failed\n");
@@ -3257,7 +3258,8 @@ ecpri_dma_mhi_client_test_suite_hw_ch_all_single_packet_single_buffer(void* priv
 			ECPRI_DMA_MHI_TEST_SCND_SRC_CHANNEL_ID,
 			ECPRI_DMA_MHI_TEST_SCND_DEST_CHANNEL_ID,
 			ecpri_dma_mhi_client_test_mapping[idx].second_src_endp_id,
-			ecpri_dma_mhi_client_test_mapping[idx].second_dest_endp_id);
+			ecpri_dma_mhi_client_test_mapping[idx].second_dest_endp_id,
+			ecpri_dma_mhi_client_test_mapping[idx].gsi_id);
 		if (ret != 0) {
 			DMA_UT_ERR("VF_ID %d / IDX %d failed\n", ctx->function.vf_id, idx);
 			DMA_UT_TEST_FAIL_REPORT("Connect_endp has failed\n");
@@ -3307,10 +3309,9 @@ ecpri_dma_mhi_client_test_suite_hw_ch_all_single_packet_single_buffer(void* priv
 
 		/* Reset loopback at the end of the test*/
 		ret = ecpri_dma_mhi_client_test_util_setup_dma_endps(
-			ecpri_dma_mhi_client_test_mapping[
-				idx].second_src_endp_id,
-			ecpri_dma_mhi_client_test_mapping[
-				idx].second_dest_endp_id, false);
+			ecpri_dma_mhi_client_test_mapping[idx].second_src_endp_id,
+			ecpri_dma_mhi_client_test_mapping[idx].second_dest_endp_id,
+			ecpri_dma_mhi_client_test_mapping[idx].gsi_id, false);
 		if (ret != 0) {
 			DMA_UT_ERR("VF_ID %d / IDX %d failed"
 				" SRC ENDP ID %d, DEST ENDP ID %d\n", ctx->function.vf_id, idx,
@@ -3321,10 +3322,9 @@ ecpri_dma_mhi_client_test_suite_hw_ch_all_single_packet_single_buffer(void* priv
 		}
 
 		ret = ecpri_dma_mhi_client_test_util_setup_dma_endps(
-			ecpri_dma_mhi_client_test_mapping[
-				idx].first_src_endp_id,
-			ecpri_dma_mhi_client_test_mapping[
-				idx].first_dest_endp_id, false);
+			ecpri_dma_mhi_client_test_mapping[idx].first_src_endp_id,
+			ecpri_dma_mhi_client_test_mapping[idx].first_dest_endp_id,
+			ecpri_dma_mhi_client_test_mapping[idx].gsi_id, false);
 		if (ret != 0) {
 			DMA_UT_ERR("VF_ID %d / IDX %d failed"
 				" SRC ENDP ID %d, DEST ENDP ID %d\n", ctx->function.vf_id, idx,

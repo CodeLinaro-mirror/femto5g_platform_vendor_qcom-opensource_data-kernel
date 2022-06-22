@@ -28,7 +28,6 @@
  *                              with eCPRI SS driver logging API
  * @log_msg_user_data:          userdata for ecpri_ss_core logging API
  *
- *
  */
 struct ecpri_dma_ss_core_context {
     spinlock_t lock;
