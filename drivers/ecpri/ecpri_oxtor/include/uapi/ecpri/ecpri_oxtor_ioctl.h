@@ -10,6 +10,8 @@
 /* 30*4, 30 cmds on each ring */
 #define ECPRI_OXTOR_TEST_CFG_MAX 120
 #define NUM_OF_CMDS 1
+
+
 typedef enum
 {
 	ECPRI_OXTOR_IOCTL_CMD_TEST,
@@ -53,15 +55,15 @@ typedef enum
  */
 typedef struct
 {
-	u16 pcid;
+	uint16_t pcid;
 	/*link_id = port_type(2bits) + port_idx(2bits) + link idx (2bits) */
 	ecpri_oxtor_core_linkid_port_type_e port_type;
 	ecpri_oxtor_core_linkid_port_idx_e  port_idx;
 	ecpri_oxtor_core_linkid_idx_e       link_idx;
 	/*Tx OC intf id*/
-	u32 tx_oc_link_id;
+	uint32_t tx_oc_link_id;
 	/*Rx OC intf id*/
-	u32 rx_oc_link_id;
+	uint32_t rx_oc_link_id;
 
 } ecpri_oxtor_core_flow_cfg_s;
 
@@ -72,17 +74,17 @@ typedef struct
 typedef struct
 {
 	/*Current device id*/
-	u32 xu_id;
+	uint32_t xu_id;
 	/*eCPRI pkt_len*/
-	u16 pkt_len;
+	uint16_t pkt_len;
 	/*Inter pkt delay*/
-	u16 inter_pkt_delay;
+	uint16_t inter_pkt_delay;
 	/*eCPRI payload init data*/
-	u32  init_data;
+	uint32_t  init_data;
 	/*eCPRI MSG type*/
-	u8 ecpri_msg_type;
+	uint8_t ecpri_msg_type;
 	/*Wrap mode enabled*/
-	u8 ring_wrap_en;
+	uint8_t ring_wrap_en;
 } ecpri_oxtor_core_pkt_cmd_cfg_s;
 
 /**
@@ -103,7 +105,7 @@ typedef struct
 
 typedef struct
 {
-	u32 dummy;
+	uint32_t dummy;
 } ecpri_oxtor_core_rx_cfg_s;
 
 /**
@@ -114,7 +116,7 @@ typedef struct
 	/*Test mode*/
 	ecpri_oxtor_core_test_mode_e test_mode;
 	/*Num Tx cmds*/
-	u32 num_cmds;
+	uint32_t num_cmds;
 	/* Tx cmd cfg*/
 	ecpri_oxtor_core_tx_cmd_cfg_s *tx_cmd_cfg;
 	/* Rx cmd cfg*/
@@ -132,14 +134,14 @@ typedef enum
 typedef struct
 {
 	ecpri_oxtor_start_test_s start_test_mode;
-	u8 num_cmds;
-	u32 tx_oc_link_id;
+	uint8_t num_cmds;
+	uint32_t tx_oc_link_id;
 } ecpri_oxtor_start_cfg_s;
 
 typedef struct
 {
-	u32 rx_count[4];
-	u32 tx_count[4];
+	uint32_t rx_count[4];
+	uint32_t tx_count[4];
 } ecpri_oxtor_stats_s;
 /*---------------------------------------------------------------------------
  * Macros and definitions
@@ -148,7 +150,7 @@ typedef struct
 #define IOCTL_BASE	'W'
 #define ECPRI_OXTOR_IOCTL_CONFIG _IOW(IOCTL_BASE, 'a', ecpri_oxtor_core_cfg_s *)
 #define ECPRI_OXTOR_IOCTL_START	_IOW(IOCTL_BASE, 'b', ecpri_oxtor_start_cfg_s *)
-#define ECPRI_OXTOR_IOCTL_RESET _IOW(IOCTL_BASE, 'c', u32 *)
+#define ECPRI_OXTOR_IOCTL_RESET _IOW(IOCTL_BASE, 'c', uint32_t *)
 #define ECPRI_OXTOR_IOCTL_GET_STATS _IOR(IOCTL_BASE, 'd', ecpri_oxtor_stats_s *)
 
 

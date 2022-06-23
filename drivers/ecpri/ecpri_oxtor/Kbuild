@@ -18,8 +18,10 @@ KBUILD_CPPFLAGS += $(CDEFINES)
 
 ccflags-y += $(LINUX_INC)
 ccflags-y += -I$(DATACSMKERNELTOP)/include/
-ccflags-y += -I$(ECPRIOXTOR)/inc/
+ccflags-y += -I$(ECPRIOXTOR)/include/
+ccflags-y += -I$(ECPRIOXTOR)/include/uapi/ecpri/
 
+header-y += $(ECPRIOXTOR)/include/uapi/ecpri/ecpriss_flow.h
 
 ifeq ($(call cc-option-yn, -Wmaybe-uninitialized),y)
 EXTRA_CFLAGS += -Wmaybe-uninitialized

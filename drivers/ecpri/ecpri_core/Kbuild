@@ -18,9 +18,11 @@ KBUILD_CPPFLAGS += $(CDEFINES)
 
 ccflags-y += $(LINUX_INC)
 ccflags-y += -I$(DATACSMKERNELTOP)/include/
-ccflags-y += -I$(ECPRIDRVTOP)/inc/
-ccflags-y += -I$(ECPRIDRVTOP)/inc/hal
+ccflags-y += -I$(ECPRIDRVTOP)/include/
+ccflags-y += -I$(ECPRIDRVTOP)/include/uapi/ecpri/
+ccflags-y += -I$(ECPRIDRVTOP)/include/hal
 
+header-y += $(ECPRIDRVTOP)/include/uapi/ecpri/ecpriss_flow.h
 
 ifeq ($(call cc-option-yn, -Wmaybe-uninitialized),y)
 EXTRA_CFLAGS += -Wmaybe-uninitialized
