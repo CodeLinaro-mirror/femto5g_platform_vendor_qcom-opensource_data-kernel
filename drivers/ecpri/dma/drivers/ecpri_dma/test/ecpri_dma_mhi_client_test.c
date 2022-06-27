@@ -354,7 +354,7 @@ static int ecpri_dma_mhi_client_test_utils_invoke_start_dma(
 {
 	int ret = 0;
 	DMA_UT_DBG("Invoking the mhi_start\n");
-	ret = mhi_dma_start(*function, start_params);
+	ret = ecpri_dma_mhi_driver_ops.mhi_dma_start(*function, start_params);
 	if (ret) {
 		DMA_UT_ERR("mhi_start failed ret = %d\n", ret);
 		DMA_UT_TEST_FAIL_REPORT("Fail to start MHI");
@@ -1424,7 +1424,7 @@ static int ecpri_dma_mhi_client_test_utils_invoke_init(
 		ECPRI_DMA_MHI_TEST_EXPECTED_CH_EV_MASK_VMS;
 
 	DMA_UT_DBG("Running mhi_dma_init\n");
-	ret = mhi_dma_init(function, init_params, out_params);
+	ret = ecpri_dma_mhi_driver_ops.mhi_dma_init(function, init_params, out_params);
 	if (ret) {
 		DMA_UT_ERR("mhi_dma_init failed, RETURN CODE: %d\n", ret);
 		DMA_UT_TEST_FAIL_REPORT("mhi_dma_init failed\n");
@@ -1833,7 +1833,7 @@ static int ecpri_dma_mhi_utils_connect_and_verify_endps(
 		ECPRI_DMA_MHI_TEST_BUFF_SIZE, dev_dest_ch_id);
 
 	/*Connect SRC ENDP */
-	ret = mhi_dma_connect_endp(*function,
+	ret = ecpri_dma_mhi_driver_ops.mhi_dma_connect_endp(*function,
 		src_conn_params,
 		src_disc_clnt_hdl);
 	if (ret != 0) {
@@ -1843,7 +1843,7 @@ static int ecpri_dma_mhi_utils_connect_and_verify_endps(
 	}
 
 	/* Connect DEST ENDP*/
-	ret = mhi_dma_connect_endp(*function,
+	ret = ecpri_dma_mhi_driver_ops.mhi_dma_connect_endp(*function,
 		dest_conn_params,
 		dest_disc_clnt_hdl);
 	if (ret != 0) {
@@ -2164,7 +2164,7 @@ static int ecpri_dma_mhi_client_test_suite_utils_disconnect_endps(
 		}
 	}
 	else {
-		ret = mhi_dma_disconnect_endp(*function,
+		ret = ecpri_dma_mhi_driver_ops.mhi_dma_disconnect_endp(*function,
 			frst_src_disc_params);
 		if (ret != 0) {
 			DMA_UT_ERR("Unable to disconnect FIRST SRC, ret = %d\n",
@@ -2172,7 +2172,7 @@ static int ecpri_dma_mhi_client_test_suite_utils_disconnect_endps(
 			return -EPERM;
 		}
 
-		ret = mhi_dma_disconnect_endp(*function,
+		ret = ecpri_dma_mhi_driver_ops.mhi_dma_disconnect_endp(*function,
 			frst_dest_disc_params);
 		if (ret != 0) {
 			DMA_UT_ERR("Unable to disconnect FIRST DEST, ret = %d\n",
@@ -2180,7 +2180,7 @@ static int ecpri_dma_mhi_client_test_suite_utils_disconnect_endps(
 			return -EPERM;
 		}
 
-		ret = mhi_dma_disconnect_endp(*function,
+		ret = ecpri_dma_mhi_driver_ops.mhi_dma_disconnect_endp(*function,
 			second_src_disc_params);
 		if (ret != 0) {
 			DMA_UT_ERR("Unable to disconnect SECOND SRC, ret = %d\n",
@@ -2188,7 +2188,7 @@ static int ecpri_dma_mhi_client_test_suite_utils_disconnect_endps(
 			return -EPERM;
 		}
 
-		ret = mhi_dma_disconnect_endp(*function,
+		ret = ecpri_dma_mhi_driver_ops.mhi_dma_disconnect_endp(*function,
 			second_dest_disc_params);
 		if (ret != 0) {
 			DMA_UT_ERR("Unable to disconnect SECOND DEST, ret = %d\n",
@@ -2243,7 +2243,7 @@ static int ecpri_dma_mhi_client_test_suite_mhi_init(void* priv)
 	}
 
 	/* Clean Up */
-	mhi_dma_destroy(function);
+	ecpri_dma_mhi_driver_ops.mhi_dma_destroy(function);
 
 	if (ecpri_dma_mhi_client_ctx[idx] != NULL) {
 		DMA_UT_ERR("IDX %d\n", idx);
@@ -2301,7 +2301,7 @@ static int ecpri_dma_mhi_client_test_suite_mhi_init_all_vms(void* priv)
 	}
 
 	for (test_i = 0; test_i < ECPRI_DMA_MHI_CLIENT_FUNCTION_NUM; test_i++) {
-		mhi_dma_destroy(function[test_i]);
+		ecpri_dma_mhi_driver_ops.mhi_dma_destroy(function[test_i]);
 	}
 
 	return ret;
@@ -2327,13 +2327,13 @@ static int ecpri_dma_mhi_client_test_suite_vm_memcpy_init(void* priv)
 	}
 
 	/* Invoke memcpy_init */
-	ret = mhi_dma_memcpy_init(function);
+	ret = ecpri_dma_mhi_driver_ops.mhi_dma_memcpy_init(function);
 	if (ret != 0) {
 		DMA_UT_TEST_FAIL_REPORT("Failed to init memcpy\n");
 		return -EFAULT;
 	}
 
-	ret = mhi_dma_memcpy_enable(function);
+	ret = ecpri_dma_mhi_driver_ops.mhi_dma_memcpy_enable(function);
 	if (ret != 0) {
 		DMA_UT_ERR("Failed to enable memcpy\n");
 		ret = -EFAULT;
@@ -2358,13 +2358,13 @@ static int ecpri_dma_mhi_client_test_suite_vm_memcpy_init(void* priv)
 	}
 
 fail_memcpy_enable:
-	ret = mhi_dma_memcpy_disable(function);
+	ret = ecpri_dma_mhi_driver_ops.mhi_dma_memcpy_disable(function);
 	if (ret != 0) {
 		DMA_UT_ERR("Unable to disable memcpy\n");
 		ret = -EPERM;
 	}
 fail:
-	mhi_dma_memcpy_destroy(function);
+	ecpri_dma_mhi_driver_ops.mhi_dma_memcpy_destroy(function);
 
 	return ret;
 }
@@ -2389,13 +2389,13 @@ static int ecpri_dma_mhi_client_test_suite_pf_memcpy_init(void* priv)
 	}
 
 	/* Invoke memcpy_init */
-	ret = mhi_dma_memcpy_init(function);
+	ret = ecpri_dma_mhi_driver_ops.mhi_dma_memcpy_init(function);
 	if (ret != 0) {
 		DMA_UT_TEST_FAIL_REPORT("Failed to init memcpy\n");
 		return -EFAULT;
 	}
 
-	ret = mhi_dma_memcpy_enable(function);
+	ret = ecpri_dma_mhi_driver_ops.mhi_dma_memcpy_enable(function);
 	if (ret != 0) {
 		DMA_UT_ERR("Failed to enable memcpy\n");
 		ret = -EFAULT;
@@ -2420,13 +2420,13 @@ static int ecpri_dma_mhi_client_test_suite_pf_memcpy_init(void* priv)
 	}
 
 fail_memcpy_enable:
-	ret = mhi_dma_memcpy_disable(function);
+	ret = ecpri_dma_mhi_driver_ops.mhi_dma_memcpy_disable(function);
 	if (ret != 0) {
 		DMA_UT_ERR("Unable to disable memcpy\n");
 		ret = -EPERM;
 	}
 fail:
-	mhi_dma_memcpy_destroy(function);
+	ecpri_dma_mhi_driver_ops.mhi_dma_memcpy_destroy(function);
 
 	return ret;
 }
@@ -2447,7 +2447,7 @@ static int ecpri_dma_mhi_client_test_suite_memcpy_init_all_vms_pf(void* priv)
 
 	/* Run tests 4 for VMs: [0, 3] and PF: 4*/
 	for (test_i = 0; test_i < ECPRI_DMA_MHI_CLIENT_FUNCTION_NUM; test_i++) {
-		ret = mhi_dma_memcpy_init(function[test_i]);
+		ret = ecpri_dma_mhi_driver_ops.mhi_dma_memcpy_init(function[test_i]);
 		if (ret != 0) {
 			DMA_UT_ERR("Memcopy_init failed for,"
 				"FUNCTION TYPE: %d, VF_ID: %d\n",
@@ -2456,7 +2456,7 @@ static int ecpri_dma_mhi_client_test_suite_memcpy_init_all_vms_pf(void* priv)
 			goto fail_init;
 		}
 
-		ret = mhi_dma_memcpy_enable(function[test_i]);
+		ret = ecpri_dma_mhi_driver_ops.mhi_dma_memcpy_enable(function[test_i]);
 		if (ret != 0) {
 			DMA_UT_ERR("Failed to enable memcpy for,"
 				"FUNCTION TYPE: %d, VF_ID: %d\n",
@@ -2486,7 +2486,7 @@ static int ecpri_dma_mhi_client_test_suite_memcpy_init_all_vms_pf(void* priv)
 fail_enable:
 	/* Disable all initialized memcpy so far */
 	for (j = 0; j < test_i; j++) {
-		ret = mhi_dma_memcpy_disable(function[j]);
+		ret = ecpri_dma_mhi_driver_ops.mhi_dma_memcpy_disable(function[j]);
 		if (ret != 0) {
 			DMA_UT_ERR("Unable to disable memcpy\n");
 			return -EPERM;
@@ -2496,7 +2496,7 @@ fail_enable:
 fail_init:
 	/* Destroy all initialized memcpy so far */
 	for (j = 0; j < test_i; j++) {
-		mhi_dma_memcpy_destroy(function[j]);
+		ecpri_dma_mhi_driver_ops.mhi_dma_memcpy_destroy(function[j]);
 	}
 
 	return ret;
@@ -2523,7 +2523,7 @@ static int ecpri_dma_mhi_client_test_suite_vm_memcpy_pf_sync(void* priv)
 		return ret;
 	}
 
-	ret = mhi_dma_memcpy_init(function);
+	ret = ecpri_dma_mhi_driver_ops.mhi_dma_memcpy_init(function);
 	if (ret != 0) {
 		DMA_UT_ERR("Memcopy_init failed for,"
 			"FUNCTION TYPE: %d, VF_ID: %d\n",
@@ -2533,7 +2533,7 @@ static int ecpri_dma_mhi_client_test_suite_vm_memcpy_pf_sync(void* priv)
 	}
 
 	/* Invoke mhi_dma_enable */
-	ret = mhi_dma_memcpy_enable(function);
+	ret = ecpri_dma_mhi_driver_ops.mhi_dma_memcpy_enable(function);
 	if (ret != 0) {
 		DMA_UT_ERR("mhi_dma_enable failed, ret %d\n", ret);
 		DMA_UT_TEST_FAIL_REPORT("mhi_dma_enable failed");
@@ -2570,7 +2570,7 @@ static int ecpri_dma_mhi_client_test_suite_vm_memcpy_pf_sync(void* priv)
 		src_buffer.virt_base = pkt_content;
 
 	/* invoke memcpy_sync */
-	ret = mhi_dma_sync_memcpy(
+	ret = ecpri_dma_mhi_driver_ops.mhi_dma_sync_memcpy(
 		(u64)mhi_client_test_suite_ctx[ECPRI_DMA_MHI_PF_ID]->
 		dest_buffer.phys_base,
 		(u64)mhi_client_test_suite_ctx[ECPRI_DMA_MHI_PF_ID]->
@@ -2599,7 +2599,7 @@ static int ecpri_dma_mhi_client_test_suite_vm_memcpy_pf_sync(void* priv)
 	ecpri_dma_mhi_client_test_free_src_dest_buffers(idx);
 
 fail:
-	ret = mhi_dma_memcpy_disable(function);
+	ret = ecpri_dma_mhi_driver_ops.mhi_dma_memcpy_disable(function);
 	if (ret != 0) {
 		DMA_UT_ERR("mhi_dma_enable failed, ret %d\n", ret);
 		DMA_UT_TEST_FAIL_REPORT("mhi_dma_enable failed");
@@ -2607,7 +2607,7 @@ fail:
 	}
 
 fail_enable:
-	mhi_dma_memcpy_destroy(function);
+	ecpri_dma_mhi_driver_ops.mhi_dma_memcpy_destroy(function);
 
 fail_init:
 
@@ -2633,7 +2633,7 @@ static int ecpri_dma_mhi_client_test_suite_vm_memcpy_pf_async(void* priv)
 		return ret;
 	}
 
-	ret = mhi_dma_memcpy_init(function);
+	ret = ecpri_dma_mhi_driver_ops.mhi_dma_memcpy_init(function);
 	if (ret != 0) {
 		DMA_UT_ERR("Memcopy_init failed for,"
 			"FUNCTION TYPE: %d, VF_ID: %d\n",
@@ -2644,7 +2644,7 @@ static int ecpri_dma_mhi_client_test_suite_vm_memcpy_pf_async(void* priv)
 	}
 
 	/* Invoke mhi_dma_enable */
-	ret = mhi_dma_memcpy_enable(function);
+	ret = ecpri_dma_mhi_driver_ops.mhi_dma_memcpy_enable(function);
 	if (ret != 0) {
 		DMA_UT_ERR("mhi_dma_enable failed, ret %d\n", ret);
 		DMA_UT_TEST_FAIL_REPORT("mhi_dma_enable failed\n");
@@ -2669,7 +2669,7 @@ static int ecpri_dma_mhi_client_test_suite_vm_memcpy_pf_async(void* priv)
 		pkt_content;
 
 	/* invoke memcpy_async */
-	ret = mhi_dma_async_memcpy(
+	ret = ecpri_dma_mhi_driver_ops.mhi_dma_async_memcpy(
 		(u64)mhi_client_test_suite_ctx[ECPRI_DMA_MHI_PF_ID]->
 		dest_buffer.phys_base,
 		(u64)mhi_client_test_suite_ctx[ECPRI_DMA_MHI_PF_ID]->
@@ -2714,14 +2714,14 @@ static int ecpri_dma_mhi_client_test_suite_vm_memcpy_pf_async(void* priv)
 	ecpri_dma_mhi_client_test_free_src_dest_buffers(idx);
 
 fail:
-	ret = mhi_dma_memcpy_disable(function);
+	ret = ecpri_dma_mhi_driver_ops.mhi_dma_memcpy_disable(function);
 	if (ret != 0) {
 		DMA_UT_DBG("mhi_dma_memcpy_disable failed, ret %d\n", ret);
 		ret = -EFAULT;
 	}
 
 fail_enable:
-	mhi_dma_memcpy_destroy(function);
+	ecpri_dma_mhi_driver_ops.mhi_dma_memcpy_destroy(function);
 
 fail_init:
 
@@ -2813,7 +2813,7 @@ static int ecpri_dma_mhi_client_test_suite_connect_endp_vm(void* priv)
 		}
 	}
 	else {
-		ret = mhi_dma_disconnect_endp(ctx->function,
+		ret = ecpri_dma_mhi_driver_ops.mhi_dma_disconnect_endp(ctx->function,
 			&ctx->frst_dest_disc_params);
 		if (ret != 0) {
 			DMA_UT_ERR("Disconnect endp for DEST, VF_ID %d has failed\n",
@@ -2821,7 +2821,7 @@ static int ecpri_dma_mhi_client_test_suite_connect_endp_vm(void* priv)
 			return -EPERM;
 		}
 
-		ret = mhi_dma_disconnect_endp(ctx->function,
+		ret = ecpri_dma_mhi_driver_ops.mhi_dma_disconnect_endp(ctx->function,
 			&ctx->frst_src_disc_params);
 		if (ret != 0) {
 			DMA_UT_ERR("Disconnect endp for SRC, VF_ID %d has failed\n",
@@ -2830,7 +2830,7 @@ static int ecpri_dma_mhi_client_test_suite_connect_endp_vm(void* priv)
 		}
 	}
 
-	mhi_dma_destroy(ctx->function);
+	ecpri_dma_mhi_driver_ops.mhi_dma_destroy(ctx->function);
 
 	vf_id++;
 	vf_id = vf_id % ECPRI_DMA_MHI_VIRTUAL_FUNCTION_NUM;
@@ -2953,7 +2953,7 @@ static int ecpri_dma_mhi_client_test_suite_connect_endp_all(void* priv) {
 		ECPRI_DMA_MHI_TEST_FRST_SRC_CHANNEL_ID);
 
 	/*Connect_endp for SRC ENDP - expected to fail*/
-	ret = mhi_dma_connect_endp(ctx->function,
+	ret = ecpri_dma_mhi_driver_ops.mhi_dma_connect_endp(ctx->function,
 		&ctx->frst_src_conn_params,
 		&ctx->frst_src_disc_params.clnt_hdl);
 	if (ret != -EINVAL) {
@@ -2962,7 +2962,7 @@ static int ecpri_dma_mhi_client_test_suite_connect_endp_all(void* priv) {
 		return -EPERM;
 	}
 
-	mhi_dma_destroy(ctx->function);
+	ecpri_dma_mhi_driver_ops.mhi_dma_destroy(ctx->function);
 
 	ret = 0;
 
@@ -2984,12 +2984,12 @@ static int ecpri_dma_mhi_client_test_suite_connect_endp_all(void* priv) {
 		}
 
 		/* Destroy dma per VM */
-		mhi_dma_destroy(ctx->function);
+		ecpri_dma_mhi_driver_ops.mhi_dma_destroy(ctx->function);
 	}
 
 	/* Destroy dma for PF */
 	ctx = mhi_client_test_suite_ctx[test_i];
-	mhi_dma_destroy(ctx->function);
+	ecpri_dma_mhi_driver_ops.mhi_dma_destroy(ctx->function);
 
 	return ret;
 }
@@ -3129,7 +3129,7 @@ ecpri_dma_mhi_client_test_suite_hw_ch_vm_single_packet_single_buffer(void* priv)
 		}
 	}
 	else {
-		ret = mhi_dma_disconnect_endp(ctx->function,
+		ret = ecpri_dma_mhi_driver_ops.mhi_dma_disconnect_endp(ctx->function,
 			&ctx->frst_src_disc_params);
 		if (ret != 0) {
 			DMA_UT_ERR("Disconnect endp for SRC, VF_ID %d has failed\n",
@@ -3137,7 +3137,7 @@ ecpri_dma_mhi_client_test_suite_hw_ch_vm_single_packet_single_buffer(void* priv)
 			return -EPERM;
 		}
 
-		ret = mhi_dma_disconnect_endp(ctx->function,
+		ret = ecpri_dma_mhi_driver_ops.mhi_dma_disconnect_endp(ctx->function,
 			&ctx->frst_dest_disc_params);
 		if (ret != 0) {
 			DMA_UT_ERR("Disconnect endp for SRC, VF_ID %d has failed\n",
@@ -3146,7 +3146,7 @@ ecpri_dma_mhi_client_test_suite_hw_ch_vm_single_packet_single_buffer(void* priv)
 		}
 	}
 
-	mhi_dma_destroy(ctx->function);
+	ecpri_dma_mhi_driver_ops.mhi_dma_destroy(ctx->function);
 
 	DMA_UT_DBG("Finished HW CH VM%d\n", vf_id);
 
@@ -3354,7 +3354,7 @@ ecpri_dma_mhi_client_test_suite_hw_ch_all_single_packet_single_buffer(void* priv
 			return -EPERM;
 		}
 
-		mhi_dma_destroy(ctx->function);
+		ecpri_dma_mhi_driver_ops.mhi_dma_destroy(ctx->function);
 	}
 
 	return ret;
