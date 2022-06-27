@@ -74,6 +74,8 @@ int mtip_dut_get_tx_delay(int index)
                  return 0x10;
               case 3:
                  return 0x10;
+               case 15:
+                  return 0x10;
               default:
                  return 0;
            }

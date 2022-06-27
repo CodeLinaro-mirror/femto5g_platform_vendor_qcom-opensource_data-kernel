@@ -67,7 +67,7 @@
 #define MTIP_TX_PACKET_AVAILABILITY_THRESHOLD     10
 
 #define MTIP_TSC_OFFSET_VAL          0x00000013  // TSC OFFSET REGISTER VALUE TO BE SET AFTER BRING UP IS COMPLETE
-
+#define MTIP_DEBUG_ETH_LINK_INDEX     15
 /*
  * Information related to the devices in the device tree
  */
