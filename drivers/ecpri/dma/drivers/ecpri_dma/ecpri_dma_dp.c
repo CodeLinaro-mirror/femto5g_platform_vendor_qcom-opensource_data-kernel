@@ -43,6 +43,7 @@ int ecpri_dma_dp_exception_replenish(struct ecpri_dma_endp_context *endp,
 	int ret = 0;
 	int i = 0;
 	struct ecpri_dma_pkt **pkts;
+	unsigned long flags;
 
 	if (!endp || !endp->valid || !endp->gsi_ep_cfg->is_exception) {
 		DMAERR("Exception ENDP isn't valid");
@@ -57,7 +58,7 @@ int ecpri_dma_dp_exception_replenish(struct ecpri_dma_endp_context *endp,
 
 	memset(pkts, 0, sizeof(*pkts) * num_to_replenish);
 
-	spin_lock_bh(&endp->spinlock);
+	spin_lock_irqsave(&endp->spinlock, flags);
 	for (i = 0; i < num_to_replenish; i++) {
 		pkts[i] = kmem_cache_zalloc(
 			endp->available_exception_pkts_cache, GFP_NOWAIT);
@@ -111,7 +112,7 @@ int ecpri_dma_dp_exception_replenish(struct ecpri_dma_endp_context *endp,
 	}
 
 	/* transmit takes the spinlock, so need to free it here */
-	spin_unlock_bh(&endp->spinlock);
+	spin_unlock_irqrestore(&endp->spinlock, flags);
 
 	ret = ecpri_dma_dp_transmit(endp, pkts, num_to_replenish, true);
 	if (ret) {
@@ -141,7 +142,7 @@ fail_alloc:
 		kmem_cache_free(endp->available_exception_pkts_cache, pkts[i]);
 	}
 
-	spin_unlock_bh(&endp->spinlock);
+	spin_unlock_irqrestore(&endp->spinlock, flags);
 
 	kfree(pkts);
 	return ret;
@@ -377,6 +378,7 @@ void ecpri_dma_tasklet_transmit_done(unsigned long data)
 	u32 num_of_completed, completed_pkt_index = 0;
 	int i = 0;
 	int dma_dir = 0;
+	unsigned long flags;
 
 	endp = (struct ecpri_dma_endp_context *)data;
 	num_of_completed = atomic_read(&endp->xmit_eot_cnt);
@@ -394,7 +396,7 @@ void ecpri_dma_tasklet_transmit_done(unsigned long data)
 		ecpri_dma_assert();
 	}
 
-	spin_lock_bh(&endp->spinlock);
+	spin_lock_irqsave(&endp->spinlock, flags);
 	curr_pkt_wrapper = list_first_entry(&endp->outstanding_pkt_list,
 				 struct ecpri_dma_outstanding_pkt_wrapper, link);
 
@@ -426,7 +428,7 @@ void ecpri_dma_tasklet_transmit_done(unsigned long data)
 		completed_pkt_index++;
 	}
 
-	spin_unlock_bh(&endp->spinlock);
+	spin_unlock_irqrestore(&endp->spinlock, flags);
 
 	/* Notify client on all completed packets */
 	if (endp->notify_comp != NULL) {
@@ -438,7 +440,7 @@ void ecpri_dma_tasklet_transmit_done(unsigned long data)
 	}
 
 	/* Free allocated entry */
-	spin_lock_bh(&endp->spinlock);
+	spin_lock_irqsave(&endp->spinlock, flags);
 	list_for_each_safe(pos, n, &endp->completed_pkt_list)
 	{
 		curr_pkt_wrapper = list_entry(pos,
@@ -456,7 +458,7 @@ void ecpri_dma_tasklet_transmit_done(unsigned long data)
 		}
 		endp->curr_completed_num--;
 	}
-	spin_unlock_bh(&endp->spinlock);
+	spin_unlock_irqrestore(&endp->spinlock, flags);
 
 	kfree(comp_pkts_arr);
 }
@@ -572,13 +574,14 @@ int ecpri_dma_dp_rx_poll(struct ecpri_dma_endp_context *endp, u32 budget,
 	struct ecpri_dma_outstanding_pkt_wrapper *curr_pkt_wrapper;
 	struct list_head *pos, *n;
 	struct gsi_chan_xfer_notify notify[ECPRI_DMA_DP_MAX_DESC];
+	unsigned long flags;
 
 	if (!endp || !endp->valid || !budget || !pkts || !actual_num) {
 		DMAERR("Invalid parameters\n");
 		return -EINVAL;
 	}
 
-	spin_lock_bh(&endp->spinlock);
+	spin_lock_irqsave(&endp->spinlock, flags);
 	/* Begin polling the GSI event */
 	while (rem_budget && !is_poll_empty) {
 		ret = gsi_poll_n_channel(endp->gsi_chan_hdl, notify,
@@ -660,7 +663,7 @@ int ecpri_dma_dp_rx_poll(struct ecpri_dma_endp_context *endp, u32 budget,
 		}
 		endp->curr_completed_num--;
 	}
-	spin_unlock_bh(&endp->spinlock);
+	spin_unlock_irqrestore(&endp->spinlock, flags);
 
 	*actual_num = i;
 
@@ -670,24 +673,25 @@ int ecpri_dma_dp_rx_poll(struct ecpri_dma_endp_context *endp, u32 budget,
 int ecpri_dma_dp_commit(struct ecpri_dma_endp_context *endp)
 {
 	int ret;
+	unsigned long flags;
 
 	if (!endp || !endp->valid) {
 		DMAERR("Invalid parameters\n");
 		return -EINVAL;
 	}
 
-	spin_lock_bh(&endp->spinlock);
+	spin_lock_irqsave(&endp->spinlock, flags);
 
 	ret = gsi_queue_xfer(endp->gsi_chan_hdl, 0, NULL,
 			     true);
 	if (ret != GSI_STATUS_SUCCESS) {
 		DMAERR("GSI xfer failed, ENDP ID%x\n", endp->endp_id);
-		spin_unlock_bh(&endp->spinlock);
+		spin_unlock_irqrestore(&endp->spinlock, flags);
 		return -EFAULT;
 	}
 
 	/* Release spinlock before returning from commit function */
-	spin_unlock_bh(&endp->spinlock);
+	spin_unlock_irqrestore(&endp->spinlock, flags);
 
 	return 0;
 }
@@ -703,6 +707,7 @@ int ecpri_dma_dp_transmit(struct ecpri_dma_endp_context *endp,
 	int ret;
 	int dma_dir;
 	u32 total_bytes = 0;
+	unsigned long flags;
 
 	if (!endp || !endp->valid || !pkts || num_of_pkts == 0) {
 		DMAERR("Invalid parameters\n");
@@ -716,11 +721,11 @@ int ecpri_dma_dp_transmit(struct ecpri_dma_endp_context *endp,
 	else
 		dma_dir = DMA_FROM_DEVICE;
 
-	spin_lock_bh(&endp->spinlock);
+	spin_lock_irqsave(&endp->spinlock, flags);
 
 	if (unlikely(atomic_read(&endp->disconnect_in_progress))) {
 		DMAERR("Pipe disconnect in progress dropping the packet\n");
-		spin_unlock_bh(&endp->spinlock);
+		spin_unlock_irqrestore(&endp->spinlock, flags);
 		return -EFAULT;
 	}
 
@@ -728,7 +733,7 @@ int ecpri_dma_dp_transmit(struct ecpri_dma_endp_context *endp,
 		/* Verify all packets have chains smaller than TLV fifo size */
 		if (pkts[i]->num_of_buffers > endp->gsi_ep_cfg->dma_if_tlv) {
 			DMAERR("Chain too long for one packet, discarding all\n");
-			spin_unlock_bh(&endp->spinlock);
+			spin_unlock_irqrestore(&endp->spinlock, flags);
 			return -EFAULT;
 		}
 
@@ -736,7 +741,7 @@ int ecpri_dma_dp_transmit(struct ecpri_dma_endp_context *endp,
 		if (gsi_xfer_index + pkts[i]->num_of_buffers >
 		    ECPRI_DMA_DP_MAX_DESC) {
 			DMAERR("Too many buffers for one transmit, discarding all\n");
-			spin_unlock_bh(&endp->spinlock);
+			spin_unlock_irqrestore(&endp->spinlock, flags);
 			return -EFAULT;
 		}
 
@@ -758,7 +763,7 @@ int ecpri_dma_dp_transmit(struct ecpri_dma_endp_context *endp,
 			}
 			if (!pkt_wrapper) {
 				DMAERR("failed to alloc packet wrapper\n");
-				spin_unlock_bh(&endp->spinlock);
+				spin_unlock_irqrestore(&endp->spinlock, flags);
 				return -ENOMEM;
 			}
 			memset(pkt_wrapper, 0, sizeof(*pkt_wrapper));
@@ -804,7 +809,7 @@ int ecpri_dma_dp_transmit(struct ecpri_dma_endp_context *endp,
 	endp->total_bytes_sent += total_bytes;
 
 	/* Release spinlock before returning from transmit function */
-	spin_unlock_bh(&endp->spinlock);
+	spin_unlock_irqrestore(&endp->spinlock, flags);
 
 	DMADBG("Transmit finished\n");
 
@@ -829,6 +834,6 @@ fail_handling:
 		kmem_cache_free(endp->available_outstanding_pkts_cache,
 				pkt_wrapper);
 	}
-	spin_unlock_bh(&endp->spinlock);
+	spin_unlock_irqrestore(&endp->spinlock, flags);
 	return -EFAULT;
 }

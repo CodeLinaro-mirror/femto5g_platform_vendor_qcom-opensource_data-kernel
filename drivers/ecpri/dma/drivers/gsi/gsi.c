@@ -1705,11 +1705,6 @@ int gsi_dealloc_evt_ring(unsigned long evt_ring_hdl)
 		return -GSI_STATUS_UNSUPPORTED_OP;
 	}
 
-	if (ctx->props.intr == GSI_INTR_MSI) {
-		GSIERR("Interrupt dereg for msi_irq = %d\n", ctx->props.msi_irq);
-		devm_free_irq(gsi_ctx->dev, ctx->props.msi_irq, ctx);
-	}
-
 	down(&gsi_ctx->sem);
 	reinit_completion(&ctx->compl);
 	ev_ch_cmd.chid = ctx->id;

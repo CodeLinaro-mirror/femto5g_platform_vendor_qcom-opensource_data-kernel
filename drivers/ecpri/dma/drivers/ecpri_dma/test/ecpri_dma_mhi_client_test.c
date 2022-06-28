@@ -340,7 +340,7 @@ static inline int ecpri_dma_mhi_client_test_get_funct_ctx_idx(
 		*(idx) = (ECPRI_DMA_MHI_CLIENT_FUNCTION_NUM - 1);
 	}
 	else {
-		DMAERR("Unexpected function type, type: %d, vf_id: %d\n",
+		DMA_UT_ERR("Unexpected function type, type: %d, vf_id: %d\n",
 			function->function_type, function->vf_id);
 		ret = -EINVAL;
 	}
@@ -356,7 +356,7 @@ static int ecpri_dma_mhi_client_test_utils_invoke_start_dma(
 	DMA_UT_DBG("Invoking the mhi_start\n");
 	ret = mhi_dma_start(*function, start_params);
 	if (ret) {
-		DMA_UT_DBG("mhi_start failed ret = %d\n", ret);
+		DMA_UT_ERR("mhi_start failed ret = %d\n", ret);
 		DMA_UT_TEST_FAIL_REPORT("Fail to start MHI");
 		return ret;
 	}
@@ -461,7 +461,7 @@ static int ecpri_dma_mhi_client_test_util_setup_dma_endps(
 				endp_cfg_xbar.value);
 			break;
 		default:
-			DMAERR("SRC ENDP %d isn't M2M or S2M, address = 0x%px\n",
+			DMA_UT_ERR("SRC ENDP %d isn't M2M or S2M, address = 0x%px\n",
 				src_endp_id, &ecpri_dma_ctx->endp_map[src_endp_id]);
 			return -EINVAL;
 			break;
@@ -490,7 +490,7 @@ static int ecpri_dma_mhi_client_test_util_setup_dma_endps(
 			}
 			break;
 		default:
-			DMAERR("DEST ENDP %d isn't M2M or S2M, address = 0x%px\n",
+			DMA_UT_ERR("DEST ENDP %d isn't M2M or S2M, address = 0x%px\n",
 				dest_endp_id, &ecpri_dma_ctx->endp_map[dest_endp_id]);
 			return -EINVAL;
 			break;
@@ -539,7 +539,7 @@ static inline int ecpri_dma_mhi_client_test_get_ee_index(
 			*(ee_idx) = ECPRI_DMA_EE_VM3;
 			break;
 		default:
-			DMAERR("Unexpected function type, type: %d, vf_id: %d\n",
+			DMA_UT_ERR("Unexpected function type, type: %d, vf_id: %d\n",
 				function.function_type, function.vf_id);
 			ret = -EINVAL;
 			break;
@@ -550,7 +550,7 @@ static inline int ecpri_dma_mhi_client_test_get_ee_index(
 		*(ee_idx) = ECPRI_DMA_EE_PF;
 	}
 	else {
-		DMAERR("Unexpected function type, type: %d, vf_id: %d\n",
+		DMA_UT_ERR("Unexpected function type, type: %d, vf_id: %d\n",
 			function.function_type, function.vf_id);
 		ret = -EINVAL;
 	}
@@ -564,7 +564,7 @@ static void ecpri_dma_mhi_client_test_free_mmio_space(int idx)
 	DMA_UT_DBG("Free MMIO Space enter\n");
 
 	if (!mhi_client_test_suite_ctx[idx]) {
-		DMAERR("MHI test context is not initialised, idx: %d\n",
+		DMA_UT_ERR("MHI test context is not initialised, idx: %d\n",
 			idx);
 		return;
 	}
@@ -807,7 +807,7 @@ static void ecpri_dma_mhi_client_test_cb(void* priv,
 		if (ecpri_dma_mhi_client_test_utils_invoke_start_dma(
 			&mhi_client_test_suite_ctx[idx]->function,
 			&mhi_client_test_suite_ctx[idx]->start_params) != 0) {
-			DMAERR("Start for VF_ID %d has failed\n",
+			DMA_UT_ERR("Start for VF_ID %d has failed\n",
 				mhi_client_test_suite_ctx[idx]->function.vf_id);
 			break;
 		}
@@ -858,7 +858,7 @@ static inline int ecpri_dma_mhi_client_test_utils_get_ee_index(
 			*(ee_idx) = ECPRI_DMA_EE_VM3;
 			break;
 		default:
-			DMAERR("Unexpected function type, type: %d, vf_id: %d\n",
+			DMA_UT_ERR("Unexpected function type, type: %d, vf_id: %d\n",
 				function.function_type, function.vf_id);
 			ret = -EINVAL;
 			break;
@@ -869,7 +869,7 @@ static inline int ecpri_dma_mhi_client_test_utils_get_ee_index(
 		*(ee_idx) = ECPRI_DMA_EE_PF;
 	}
 	else {
-		DMAERR("Unexpected function type, type: %d, vf_id: %d\n",
+		DMA_UT_ERR("Unexpected function type, type: %d, vf_id: %d\n",
 			function.function_type, function.vf_id);
 		ret = -EINVAL;
 	}
@@ -937,12 +937,14 @@ static int ecpri_dma_mhi_client_test_config_channel_context(
 	DMA_UT_DBG("Entry\n");
 
 	if (host_ch_id < ECPRI_DMA_MHI_TEST_FIRST_HW_CH_ID) {
-		DMA_UT_DBG("host_ch_id invalid %d\n", host_ch_id);
+		DMA_UT_ERR("Host %d\n", host_ch_id);
+		DMA_UT_TEST_FAIL_REPORT("host_ch_id invalid\n");
 		return -EFAULT;
 	}
 
 	if (host_ev_id < ECPRI_DMA_MHI_TEST_FIRST_EVENT_RING_ID) {
-		DMA_UT_DBG("host_ev_id invalid %d\n", host_ev_id);
+		DMA_UT_ERR("Host %d\n", host_ev_id);
+		DMA_UT_TEST_FAIL_REPORT("host_ev_id invalid\n");
 		return -EFAULT;
 	}
 
@@ -962,8 +964,8 @@ static int ecpri_dma_mhi_client_test_config_channel_context(
 	DMA_UT_DBG("dev_xfer_ring_idx: %u host_ev_id: %u\n",
 		dev_xfer_ring_idx, host_ev_id);
 	if (transfer_ring_bufs[dev_xfer_ring_idx].virt_base) {
-		DMA_UT_ERR("dev_xfer_ring_idx %d is already allocated\n",
-			dev_xfer_ring_idx);
+		DMA_UT_ERR("dev_xfer_ring_idx %d\n", dev_xfer_ring_idx);
+		DMA_UT_TEST_FAIL_REPORT("dev_xfer_ring_idx is already allocated\n");
 		return -EFAULT;
 	}
 
@@ -1049,18 +1051,17 @@ static int ecpri_dma_mhi_client_test_verify_connect(
 
 	mhi_dma_ctx = ecpri_dma_mhi_client_ctx[idx];
 	if (!mhi_dma_ctx) {
-		DMA_UT_DBG("Test failed due to "
-			"context for the VM%d isn't initialized\n",
-			function->vf_id);
+		DMA_UT_ERR("VF_ID %d  failed\n", function->vf_id);
+		DMA_UT_TEST_FAIL_REPORT("Test failed due to "
+			"context isn't initialized\n");
 		return -EFAULT;
 	}
 
 	src_endp = &ecpri_dma_ctx->endp_ctx[src_endp_id];
 	/* Verify SRC endp is enabled */
 	if (!src_endp->valid) {
-		DMA_UT_DBG("Test failed due to "
-			"SRC endp %d for VM%d isn't enabled\n",
-			src_endp_id, function->vf_id);
+		DMA_UT_ERR("SRC endp %d for VM%d failed\n", src_endp_id, function->vf_id);
+		DMA_UT_TEST_FAIL_REPORT("Test failed due to SRC endp isn't enabled\n");
 		return -EFAULT;
 	}
 
@@ -1069,34 +1070,37 @@ static int ecpri_dma_mhi_client_test_verify_connect(
 		channels[mhi_client_test_suite_ctx[idx]->
 		channel_ids[dev_src_ch_id]].state !=
 		ECPRI_DMA_HW_MHI_CHANNEL_STATE_RUN) {
-		DMA_UT_DBG("Test failed due to "
-			"SRC endp %d for VM %d isn't running. State received: %d"
-			" dev_src_ch_id %d, test_channel_id %d\n",
+		DMA_UT_ERR("SRC endp %d for VM%d,"
+			"dev_src_ch_id %d, test_channel_id %d failed\n",
 			src_endp_id, function->vf_id, mhi_dma_ctx->
 			channels[mhi_client_test_suite_ctx[idx]->
 			channel_ids[dev_src_ch_id]].state,
 			dev_src_ch_id,
 			mhi_client_test_suite_ctx[idx]->
 			channel_ids[dev_src_ch_id]);
+		DMA_UT_TEST_FAIL_REPORT("Test failed due to "
+			"SRC endp isn't running\n");
 		return -EFAULT;
 	}
 
 	/* Verify SRC endp's channel state */
 	if (gsi_get_chan_state(src_endp->gsi_chan_hdl) !=
 		GSI_CHAN_STATE_STARTED) {
-		DMA_UT_DBG("Test failed due to "
-			"SRC endp %d for VM%d channel %d isn't started\n",
+		DMA_UT_ERR("SRC endp %d for VM%d channel %d\n",
 			src_endp_id, function->vf_id,
 			mhi_client_test_suite_ctx[idx]->channel_ids[dev_src_ch_id]);
+		DMA_UT_TEST_FAIL_REPORT("Test failed due to "
+			"SRC endp isn't started\n");
 		return -EFAULT;
 	}
 
 	dest_endp = &ecpri_dma_ctx->endp_ctx[dest_endp_id];
 	/* Verify DEST endp is enabled */
 	if (!dest_endp->valid) {
-		DMA_UT_DBG("Test failed due to "
-			"DEST endp %d for VM%d isn't enabled\n",
+		DMA_UT_ERR("DEST endp %d for VM%d\n",
 			dest_endp_id, function->vf_id);
+		DMA_UT_TEST_FAIL_REPORT("Test failed due to DEST endp"
+			" isn't enabled\n");
 		return -EFAULT;
 	}
 
@@ -1105,20 +1109,22 @@ static int ecpri_dma_mhi_client_test_verify_connect(
 		channels[mhi_client_test_suite_ctx[idx]->
 		channel_ids[dev_dest_ch_id]].state !=
 		ECPRI_DMA_HW_MHI_CHANNEL_STATE_RUN) {
-		DMA_UT_DBG("Test failed due to "
-			"DEST endp %d for VM%d isn't running\n",
+		DMA_UT_ERR("DEST endp %d for VM%d\n",
 			dest_endp_id, function->vf_id);
+		DMA_UT_TEST_FAIL_REPORT("Test failed due to "
+			"DEST endp isn't running\n");
 		return -EFAULT;
 	}
 
 	/* Verify DEST endp's channel state */
 	if (gsi_get_chan_state(dest_endp->gsi_chan_hdl) !=
 		GSI_CHAN_STATE_STARTED) {
-		DMA_UT_DBG("Test failed due to "
-			"DEST endp %d for VM%d channel %d isn't started\n",
+		DMA_UT_ERR("DEST endp %d for VM%d channel %d\n",
 			dest_endp_id, function->vf_id,
 			mhi_client_test_suite_ctx[idx]->
 			channel_ids[dev_dest_ch_id]);
+		DMA_UT_TEST_FAIL_REPORT("Test failed due to "
+			"DEST endp isn't started\n");
 		return -EFAULT;
 	}
 
@@ -1420,7 +1426,8 @@ static int ecpri_dma_mhi_client_test_utils_invoke_init(
 	DMA_UT_DBG("Running mhi_dma_init\n");
 	ret = mhi_dma_init(function, init_params, out_params);
 	if (ret) {
-		DMA_UT_DBG("mhi_dma_init failed, RETURN CODE: %d\n", ret);
+		DMA_UT_ERR("mhi_dma_init failed, RETURN CODE: %d\n", ret);
+		DMA_UT_TEST_FAIL_REPORT("mhi_dma_init failed\n");
 		return ret;
 	}
 
@@ -1429,7 +1436,7 @@ static int ecpri_dma_mhi_client_test_utils_invoke_init(
 		out_params->ev_db_fwd_msk !=
 		expected_mask)
 	{
-		DMA_UT_DBG(
+		DMA_UT_ERR(
 			"mhi_dma_init out params unexpected mask. "
 			"expected:0x%x got ch 0x%x ev: 0x%x\n",
 			expected_mask,
@@ -1441,8 +1448,9 @@ static int ecpri_dma_mhi_client_test_utils_invoke_init(
 
 	ret = ecpri_dma_mhi_client_test_utils_get_ee_index(function, &ee_idx);
 	if (ret) {
-		DMA_UT_DBG("get_ee_index failed, RETURN CODE: %d\n",
-			ret);
+		DMA_UT_ERR(
+			"Return code %d\n", ret);
+		DMA_UT_TEST_FAIL_REPORT("get_ee_index failed\n");
 		return ret;
 	}
 
@@ -1456,7 +1464,7 @@ static int ecpri_dma_mhi_client_test_utils_invoke_init(
 		out_params->ev_db_fwd_base !=
 		ev_db_base)
 	{
-		DMA_UT_DBG(
+		DMA_UT_ERR(
 			"mhi_dma_init out params unexpected db base."
 			"expected ch:0x%x expected ev:0x%x got ch 0x%x ev: 0x%x\n",
 			ch_db_base,
@@ -1471,7 +1479,7 @@ static int ecpri_dma_mhi_client_test_utils_invoke_init(
 	ecpri_dma_mhi_test_poll_for_start(idx, &timeout);
 	if (timeout)
 	{
-		DMA_UT_DBG("timeout waiting for start event");
+		DMA_UT_ERR("timeout waiting for start event");
 		DMA_UT_TEST_FAIL_REPORT("failed waiting for start state");
 		return -ETIME;
 	}
@@ -1499,14 +1507,15 @@ static int ecpri_dma_mhi_client_test_utils_check_driver_state(
 	/* Check DMA driver state matches the expectations */
 	mhi_dma_ctx = ecpri_dma_mhi_client_ctx[idx];
 	if (!mhi_dma_ctx) {
-		DMA_UT_DBG("Test failed due to "
-			"context for the VM%d isn't initialized\n",
+		DMA_UT_ERR("VM ID: %d\n",
 			function->vf_id);
+		DMA_UT_TEST_FAIL_REPORT("Test failed due to "
+			"context isn't initialized\n");
 		return -EFAULT;
 	}
 	if (mhi_dma_ctx->notify_cb
 		!= init_params->notify) {
-		DMA_UT_DBG("Test failed due to "
+		DMA_UT_TEST_FAIL_REPORT("Test failed due to "
 			"mismatch of ready cb address\n");
 		return -EFAULT;
 	}
@@ -1514,68 +1523,78 @@ static int ecpri_dma_mhi_client_test_utils_check_driver_state(
 	/* Check that MHI mock MSI info and DMA driver info the same */
 	if (mhi_dma_ctx->msi_config.addr_low
 		!= init_params->msi.addr_low) {
-		DMA_UT_DBG("Test failed due to "
-			"mismatch of MSI adrr_low parameter,"
-			"Context addr_low: %d,"
+		DMA_UT_ERR("Context addr_low: %d,"
 			"Test addr_low: %d\n",
 			mhi_dma_ctx->msi_config.addr_low,
 			init_params->msi.addr_low);
+		DMA_UT_TEST_FAIL_REPORT("Test failed due to "
+			"mismatch of MSI adrr_low parameter\n");
 		return -EFAULT;
 	}
 
 	if (mhi_dma_ctx->msi_config.addr_hi
 		!= init_params->msi.addr_hi) {
-		DMA_UT_DBG("Test failed due to "
-			"mismatch of MSI adrr_low parameter,"
+		DMA_UT_ERR("Test failed due to "
+			"mismatch of MSI adrr_hi parameter,"
 			"Context addr_hi: %d,"
 			"Test addr_hi: %d\n",
 			mhi_dma_ctx->msi_config.addr_hi,
 			init_params->msi.addr_hi);
+		DMA_UT_TEST_FAIL_REPORT("Test failed due to "
+			"mismatch of MSI adrr_hi parameter");
 		return -EFAULT;
 	}
 
 	if (mhi_dma_ctx->msi_config.data
 		!= init_params->msi.data) {
-		DMA_UT_DBG("Test failed due to "
-			"mismatch of MSI adrr_low parameter,"
+		DMA_UT_ERR("Test failed due to "
+			"mismatch of MSI data parameter,"
 			"Context data: %X,"
 			"Test data: %X\n",
 			mhi_dma_ctx->msi_config.data,
 			init_params->msi.data);
+		DMA_UT_TEST_FAIL_REPORT("Test failed due to "
+			"mismatch of MSI data parameter");
 		return -EFAULT;
 	}
 
 	if (mhi_dma_ctx->msi_config.mask
 		!= init_params->msi.mask) {
-		DMA_UT_DBG("Test failed due to "
-			"mismatch of MSI adrr_low parameter,"
+		DMA_UT_ERR("Test failed due to "
+			"mismatch of MSI mask parameter,"
 			"Context mask: %X,"
 			"Test mask: %X\n",
 			mhi_dma_ctx->msi_config.mask,
 			init_params->msi.mask);
+		DMA_UT_TEST_FAIL_REPORT("Test failed due to "
+			"mismatch of MSI mask parameter");
 		return -EFAULT;
 	}
 
 	/* Check that MHI mock ch array and ev array */
 	if (ecpri_dma_mhi_client_ctx[idx]->channel_context_array_addr !=
 		mhi_client_test_suite_ctx[idx]->ch_ctx_array.phys_base) {
-		DMA_UT_DBG("Test failed due to "
+		DMA_UT_ERR("Test failed due to "
 			"mismatch channel_context_array_addr,"
 			"Driver has: %X,"
 			"Test has: %X\n",
 			ecpri_dma_mhi_client_ctx[idx]->channel_context_array_addr,
 			&mhi_client_test_suite_ctx[idx]->ch_ctx_array.phys_base);
+		DMA_UT_TEST_FAIL_REPORT("Test failed due to "
+			"mismatch channel_context_array_addr");
 		return -EFAULT;
 	}
 
 	if (ecpri_dma_mhi_client_ctx[idx]->event_context_array_addr !=
 		mhi_client_test_suite_ctx[idx]->ev_ctx_array.phys_base) {
-		DMA_UT_DBG("Test failed due to "
+		DMA_UT_ERR("Test failed due to "
 			"mismatch event_context_array_addr,"
 			"Driver has: %X,"
 			"Test has: %X\n",
 			ecpri_dma_mhi_client_ctx[idx]->channel_context_array_addr,
 			&mhi_client_test_suite_ctx[idx]->ch_ctx_array.phys_base);
+		DMA_UT_TEST_FAIL_REPORT("Test failed due to "
+			"mismatch event_context_array_addr");
 		return -EFAULT;
 	}
 	return ret;
@@ -1591,57 +1610,71 @@ static int ecpri_dma_mhi_client_test_utils_check_memcpy_init_state(
 	/* Check DMA driver state matches the expectations */
 	memcpy_ctx = ecpri_dma_mhi_memcpy_ctx[idx];
 	if (!memcpy_ctx) {
-		DMA_UT_DBG("Test failed due to "
+		DMA_UT_ERR("Test failed due to "
 			"context for the VM%d isn't initialized\n",
 			function->vf_id);
+		DMA_UT_TEST_FAIL_REPORT("Test failed due to "
+			"context isn't initialized");
 		return -EFAULT;
 	}
 
 	if (memcpy_ctx->destroy_pending != false) {
-		DMA_UT_DBG("Test failed due to "
+		DMA_UT_ERR("Test failed due to "
 			"memcpy_ctx->destroy_pending %d, VF_ID%d\n",
 			memcpy_ctx->destroy_pending, function->vf_id);
+		DMA_UT_TEST_FAIL_REPORT("Test failed due to "
+			"memcpy_ctx->destroy_pending");
 		return -EFAULT;
 	}
 	DMA_UT_DBG("Checking memcpy_ctx->destroy_pending - OK\n");
 
 	/* Each successful memcpy_init increases ref_count */
 	if (atomic_read(&memcpy_ctx->ref_count) != 1) {
-		DMA_UT_DBG("Test failed due to "
+		DMA_UT_ERR("Test failed due to "
 			"memcpy_ctx->ref_count %d, VF_ID%d\n",
 			atomic_read(&memcpy_ctx->ref_count), function->vf_id);
+		DMA_UT_TEST_FAIL_REPORT("Test failed due to "
+			"memcpy_ctx->ref_count");
 		return -EFAULT;
 	}
 	DMA_UT_DBG("Checking memcpy_ctx->ref_count - OK\n");
 
 	if (atomic_read(&memcpy_ctx->async_pending) != 0) {
-		DMA_UT_DBG("Test failed due to "
+		DMA_UT_ERR("Test failed due to "
 			"memcpy_ctx->async_pending %d, VF_ID%d\n",
 			atomic_read(&memcpy_ctx->async_pending), function->vf_id);
+		DMA_UT_TEST_FAIL_REPORT("Test failed due to "
+			"memcpy_ctx->async_pending");
 		return -EFAULT;
 	}
 	DMA_UT_DBG("Checking memcpy_ctx->async_pending - OK\n");
 
 	if (atomic_read(&memcpy_ctx->sync_pending) != 0) {
-		DMA_UT_DBG("Test failed due to "
+		DMA_UT_ERR("Test failed due to "
 			"memcpy_ctx->sync_pending %d, VF_ID%d\n",
 			atomic_read(&memcpy_ctx->sync_pending), function->vf_id);
+		DMA_UT_TEST_FAIL_REPORT("Test failed due to "
+			"memcpy_ctx->sync_pending");
 		return -EFAULT;
 	}
 	DMA_UT_DBG("Checking memcpy_ctx->sync_pending - OK\n");
 
 	if (atomic_read(&memcpy_ctx->sync_total) != 0) {
-		DMA_UT_DBG("Test failed due to "
+		DMA_UT_ERR("Test failed due to "
 			"memcpy_ctx->sync_total %d, VF_ID%d\n",
 			atomic_read(&memcpy_ctx->sync_total), function->vf_id);
+		DMA_UT_TEST_FAIL_REPORT("Test failed due to "
+			"memcpy_ctx->sync_total");
 		return -EFAULT;
 	}
 	DMA_UT_DBG("Checking memcpy_ctx->sync_total - OK\n");
 
 	if (atomic_read(&memcpy_ctx->async_total) != 0) {
-		DMA_UT_DBG("Test failed due to "
+		DMA_UT_ERR("Test failed due to "
 			"memcpy_ctx->async_total %d, VF_ID%d\n",
 			atomic_read(&memcpy_ctx->async_total), function->vf_id);
+		DMA_UT_TEST_FAIL_REPORT("Test failed due to "
+			"memcpy_ctx->async_total");
 		return -EFAULT;
 	}
 	DMA_UT_DBG("Checking memcpy_ctx->async_total - OK\n");
@@ -1703,7 +1736,7 @@ static inline int ecpri_dma_mhi_test_get_func_idx(
 	ret = ecpri_dma_mhi_client_test_get_funct_ctx_idx(function, idx);
 
 	if (ret != 0) {
-		DMAERR("Function params are invalid,"
+		DMA_UT_ERR("Function params are invalid,"
 			"function type: %d, vf_id: %d\n",
 			function->function_type, function->vf_id);
 		return -EINVAL;
@@ -1750,7 +1783,7 @@ static int ecpri_dma_mhi_client_test_utils_create_params_and_init(
 	ret = ecpri_dma_mhi_client_test_utils_invoke_init(
 		*function, init_params, out_params, idx);
 	if (ret != 0) {
-		DMAERR("Init for VF_ID %d - Failed\n", function->vf_id);
+		DMA_UT_ERR("Init for VF_ID %d - Failed\n", function->vf_id);
 		return -EPERM;
 	}
 
@@ -1804,7 +1837,7 @@ static int ecpri_dma_mhi_utils_connect_and_verify_endps(
 		src_conn_params,
 		src_disc_clnt_hdl);
 	if (ret != 0) {
-		DMAERR("Connect endp for SRC, VF_ID %d has failed\n",
+		DMA_UT_ERR("Connect endp for SRC, VF_ID %d has failed\n",
 			function->vf_id);
 		return -EPERM;
 	}
@@ -1814,7 +1847,7 @@ static int ecpri_dma_mhi_utils_connect_and_verify_endps(
 		dest_conn_params,
 		dest_disc_clnt_hdl);
 	if (ret != 0) {
-		DMAERR("Connect endp for DEST, VF_ID %d has failed\n",
+		DMA_UT_ERR("Connect endp for DEST, VF_ID %d has failed\n",
 			function->vf_id);
 		return -EPERM;
 	}
@@ -1829,7 +1862,7 @@ static int ecpri_dma_mhi_utils_connect_and_verify_endps(
 		dev_dest_ch_id,
 		idx);
 	if (ret != 0) {
-		DMAERR("Verification for VF_ID %d has failed\n",
+		DMA_UT_ERR("Verification for VF_ID %d has failed\n",
 			function->vf_id);
 		return -EPERM;
 	}
@@ -2100,7 +2133,7 @@ static int ecpri_dma_mhi_client_test_suite_utils_disconnect_endps(
 		ret = ecpri_dma_mhi_driver_ops.mhi_dma_disconnect_endp(*function,
 			frst_src_disc_params);
 		if (ret != 0) {
-			DMAERR("Unable to disconnect FIRST SRC, ret = %d\n",
+			DMA_UT_ERR("Unable to disconnect FIRST SRC, ret = %d\n",
 				ret);
 			return -EPERM;
 		}
@@ -2108,7 +2141,7 @@ static int ecpri_dma_mhi_client_test_suite_utils_disconnect_endps(
 		ret = ecpri_dma_mhi_driver_ops.mhi_dma_disconnect_endp(*function,
 			frst_dest_disc_params);
 		if (ret != 0) {
-			DMAERR("Unable to disconnect FIRST DEST, ret = %d\n",
+			DMA_UT_ERR("Unable to disconnect FIRST DEST, ret = %d\n",
 				ret);
 			return -EPERM;
 		}
@@ -2117,7 +2150,7 @@ static int ecpri_dma_mhi_client_test_suite_utils_disconnect_endps(
 		ret = ecpri_dma_mhi_driver_ops.mhi_dma_disconnect_endp(*function,
 			second_src_disc_params);
 		if (ret != 0) {
-			DMAERR("Unable to disconnect SECOND SRC, ret = %d\n",
+			DMA_UT_ERR("Unable to disconnect SECOND SRC, ret = %d\n",
 				ret);
 			return -EPERM;
 		}
@@ -2125,7 +2158,7 @@ static int ecpri_dma_mhi_client_test_suite_utils_disconnect_endps(
 		ret = ecpri_dma_mhi_driver_ops.mhi_dma_disconnect_endp(*function,
 			second_dest_disc_params);
 		if (ret != 0) {
-			DMAERR("Unable to disconnect SECOND DEST, ret = %d\n",
+			DMA_UT_ERR("Unable to disconnect SECOND DEST, ret = %d\n",
 				ret);
 			return -EPERM;
 		}
@@ -2134,7 +2167,7 @@ static int ecpri_dma_mhi_client_test_suite_utils_disconnect_endps(
 		ret = mhi_dma_disconnect_endp(*function,
 			frst_src_disc_params);
 		if (ret != 0) {
-			DMAERR("Unable to disconnect FIRST SRC, ret = %d\n",
+			DMA_UT_ERR("Unable to disconnect FIRST SRC, ret = %d\n",
 				ret);
 			return -EPERM;
 		}
@@ -2142,7 +2175,7 @@ static int ecpri_dma_mhi_client_test_suite_utils_disconnect_endps(
 		ret = mhi_dma_disconnect_endp(*function,
 			frst_dest_disc_params);
 		if (ret != 0) {
-			DMAERR("Unable to disconnect FIRST DEST, ret = %d\n",
+			DMA_UT_ERR("Unable to disconnect FIRST DEST, ret = %d\n",
 				ret);
 			return -EPERM;
 		}
@@ -2150,7 +2183,7 @@ static int ecpri_dma_mhi_client_test_suite_utils_disconnect_endps(
 		ret = mhi_dma_disconnect_endp(*function,
 			second_src_disc_params);
 		if (ret != 0) {
-			DMAERR("Unable to disconnect SECOND SRC, ret = %d\n",
+			DMA_UT_ERR("Unable to disconnect SECOND SRC, ret = %d\n",
 				ret);
 			return -EPERM;
 		}
@@ -2158,7 +2191,7 @@ static int ecpri_dma_mhi_client_test_suite_utils_disconnect_endps(
 		ret = mhi_dma_disconnect_endp(*function,
 			second_dest_disc_params);
 		if (ret != 0) {
-			DMAERR("Unable to disconnect SECOND DEST, ret = %d\n",
+			DMA_UT_ERR("Unable to disconnect SECOND DEST, ret = %d\n",
 				ret);
 			return -EPERM;
 		}
@@ -2195,7 +2228,8 @@ static int ecpri_dma_mhi_client_test_suite_mhi_init(void* priv)
 	ret = ecpri_dma_mhi_client_test_utils_create_params_and_init(
 		&function, &init_params, &out_params, &start_params);
 	if (ret != 0) {
-		DMA_UT_DBG("Test for VF_ID %d has failed\n", function.vf_id);
+		DMA_UT_ERR("VF_ID %d\n", function.vf_id);
+		DMA_UT_TEST_FAIL_REPORT("Test has failed\n");
 		return -EFAULT;
 	}
 
@@ -2203,18 +2237,17 @@ static int ecpri_dma_mhi_client_test_suite_mhi_init(void* priv)
 	ret = ecpri_dma_mhi_client_test_utils_check_driver_state(
 		idx, &init_params, mhi_dma_ctx, &function);
 	if (ret != 0) {
-		DMAERR("Driver state for VF_ID %d / IDX %d has failed\n",
+		DMA_UT_ERR("Driver state for VF_ID %d / IDX %d has failed\n",
 			function.vf_id, idx);
 		return -EPERM;
 	}
 
 	/* Clean Up */
 	mhi_dma_destroy(function);
-	mhi_dma_memcpy_destroy(function);
 
 	if (ecpri_dma_mhi_client_ctx[idx] != NULL) {
-		DMA_UT_DBG("MHI ctx for idx %d was not freed\n",
-			idx);
+		DMA_UT_ERR("IDX %d\n", idx);
+		DMA_UT_TEST_FAIL_REPORT("MHI ctx was not freed\n");
 		return -EFAULT;
 	}
 
@@ -2245,7 +2278,8 @@ static int ecpri_dma_mhi_client_test_suite_mhi_init_all_vms(void* priv)
 			&function[test_i], &init_params[test_i], &out_params[test_i],
 			&start_params[test_i]);
 		if (ret != 0) {
-			DMA_UT_DBG("Test for VF_ID %d has failed\n", function[test_i].vf_id);
+			DMA_UT_ERR("VF_ID %d\n", function[test_i].vf_id);
+			DMA_UT_TEST_FAIL_REPORT("Test has failed\n");
 			return -EFAULT;
 		}
 	}
@@ -2257,7 +2291,7 @@ static int ecpri_dma_mhi_client_test_suite_mhi_init_all_vms(void* priv)
 		ret = ecpri_dma_mhi_client_test_utils_check_driver_state(
 			test_i, &init_params[test_i], mhi_dma_ctx, &function[test_i]);
 		if (ret != 0) {
-			DMAERR("Driver state for VF_ID %d / IDX %d has failed\n",
+			DMA_UT_ERR("Driver state for VF_ID %d / IDX %d has failed\n",
 				function[test_i].vf_id, test_i);
 			return -EPERM;
 		}
@@ -2268,7 +2302,6 @@ static int ecpri_dma_mhi_client_test_suite_mhi_init_all_vms(void* priv)
 
 	for (test_i = 0; test_i < ECPRI_DMA_MHI_CLIENT_FUNCTION_NUM; test_i++) {
 		mhi_dma_destroy(function[test_i]);
-		mhi_dma_memcpy_destroy(function[test_i]);
 	}
 
 	return ret;
@@ -2296,19 +2329,19 @@ static int ecpri_dma_mhi_client_test_suite_vm_memcpy_init(void* priv)
 	/* Invoke memcpy_init */
 	ret = mhi_dma_memcpy_init(function);
 	if (ret != 0) {
-		DMAERR("Failed to init memcpy\n");
+		DMA_UT_TEST_FAIL_REPORT("Failed to init memcpy\n");
 		return -EFAULT;
 	}
 
 	ret = mhi_dma_memcpy_enable(function);
 	if (ret != 0) {
-		DMAERR("Failed to enable memcpy\n");
+		DMA_UT_ERR("Failed to enable memcpy\n");
 		ret = -EFAULT;
 		goto fail;
 	}
 
 	if (!ecpri_dma_mhi_memcpy_ctx[idx]) {
-		DMAERR("memcpy_ctx for idx: %d, and"
+		DMA_UT_ERR("memcpy_ctx for idx: %d, and"
 			"function type: %d, vf_id: %d is not initialised\n",
 			function.function_type, function.vf_id);
 		ret = -EINVAL;
@@ -2319,7 +2352,7 @@ static int ecpri_dma_mhi_client_test_suite_vm_memcpy_init(void* priv)
 	ret = ecpri_dma_mhi_client_test_utils_check_memcpy_init_state(
 		idx, memcpy_ctx, &function);
 	if (ret != 0) {
-		DMAERR("Driver state for VF_ID %d / IDX %d has failed\n",
+		DMA_UT_ERR("Driver state for VF_ID %d / IDX %d has failed\n",
 			function.vf_id, idx);
 		ret = -EPERM;
 	}
@@ -2327,11 +2360,12 @@ static int ecpri_dma_mhi_client_test_suite_vm_memcpy_init(void* priv)
 fail_memcpy_enable:
 	ret = mhi_dma_memcpy_disable(function);
 	if (ret != 0) {
-		DMAERR("Unable to disable memcpy\n");
+		DMA_UT_ERR("Unable to disable memcpy\n");
 		ret = -EPERM;
 	}
 fail:
 	mhi_dma_memcpy_destroy(function);
+
 	return ret;
 }
 
@@ -2357,19 +2391,19 @@ static int ecpri_dma_mhi_client_test_suite_pf_memcpy_init(void* priv)
 	/* Invoke memcpy_init */
 	ret = mhi_dma_memcpy_init(function);
 	if (ret != 0) {
-		DMAERR("Failed to init memcpy\n");
+		DMA_UT_TEST_FAIL_REPORT("Failed to init memcpy\n");
 		return -EFAULT;
 	}
 
 	ret = mhi_dma_memcpy_enable(function);
 	if (ret != 0) {
-		DMAERR("Failed to enable memcpy\n");
+		DMA_UT_ERR("Failed to enable memcpy\n");
 		ret = -EFAULT;
 		goto fail;
 	}
 
 	if (!ecpri_dma_mhi_memcpy_ctx[idx]) {
-		DMAERR("memcpy_ctx for idx: %d, and"
+		DMA_UT_ERR("memcpy_ctx for idx: %d, and"
 			"function type: %d, vf_id: %d is not initialised\n",
 			function.function_type, function.vf_id);
 		ret = -EINVAL;
@@ -2380,7 +2414,7 @@ static int ecpri_dma_mhi_client_test_suite_pf_memcpy_init(void* priv)
 	ret = ecpri_dma_mhi_client_test_utils_check_memcpy_init_state(
 		idx, memcpy_ctx, &function);
 	if (ret != 0) {
-		DMAERR("Driver state for VF_ID %d / IDX %d has failed\n",
+		DMA_UT_ERR("Driver state for VF_ID %d / IDX %d has failed\n",
 			function.vf_id, idx);
 		ret = -EPERM;
 	}
@@ -2388,11 +2422,12 @@ static int ecpri_dma_mhi_client_test_suite_pf_memcpy_init(void* priv)
 fail_memcpy_enable:
 	ret = mhi_dma_memcpy_disable(function);
 	if (ret != 0) {
-		DMAERR("Unable to disable memcpy\n");
+		DMA_UT_ERR("Unable to disable memcpy\n");
 		ret = -EPERM;
 	}
 fail:
 	mhi_dma_memcpy_destroy(function);
+
 	return ret;
 }
 
@@ -2414,7 +2449,7 @@ static int ecpri_dma_mhi_client_test_suite_memcpy_init_all_vms_pf(void* priv)
 	for (test_i = 0; test_i < ECPRI_DMA_MHI_CLIENT_FUNCTION_NUM; test_i++) {
 		ret = mhi_dma_memcpy_init(function[test_i]);
 		if (ret != 0) {
-			DMA_UT_DBG("Memcopy_init failed for,"
+			DMA_UT_ERR("Memcopy_init failed for,"
 				"FUNCTION TYPE: %d, VF_ID: %d\n",
 				function[test_i].function_type,
 				function[test_i].vf_id);
@@ -2423,7 +2458,7 @@ static int ecpri_dma_mhi_client_test_suite_memcpy_init_all_vms_pf(void* priv)
 
 		ret = mhi_dma_memcpy_enable(function[test_i]);
 		if (ret != 0) {
-			DMAERR("Failed to enable memcpy for,"
+			DMA_UT_ERR("Failed to enable memcpy for,"
 				"FUNCTION TYPE: %d, VF_ID: %d\n",
 				function[test_i].function_type,
 				function[test_i].vf_id);
@@ -2439,7 +2474,7 @@ static int ecpri_dma_mhi_client_test_suite_memcpy_init_all_vms_pf(void* priv)
 		ret = ecpri_dma_mhi_client_test_utils_check_memcpy_init_state(
 			test_i, mhi_memcpy_ctx, &function[test_i]);
 		if (ret != 0) {
-			DMAERR("Driver state for VF_ID %d / IDX %d has failed\n",
+			DMA_UT_ERR("Driver state for VF_ID %d / IDX %d has failed\n",
 				function[test_i].vf_id, test_i);
 			return -EPERM;
 		}
@@ -2453,7 +2488,7 @@ fail_enable:
 	for (j = 0; j < test_i; j++) {
 		ret = mhi_dma_memcpy_disable(function[j]);
 		if (ret != 0) {
-			DMAERR("Unable to disable memcpy\n");
+			DMA_UT_ERR("Unable to disable memcpy\n");
 			return -EPERM;
 		}
 	}
@@ -2490,7 +2525,7 @@ static int ecpri_dma_mhi_client_test_suite_vm_memcpy_pf_sync(void* priv)
 
 	ret = mhi_dma_memcpy_init(function);
 	if (ret != 0) {
-		DMA_UT_DBG("Memcopy_init failed for,"
+		DMA_UT_ERR("Memcopy_init failed for,"
 			"FUNCTION TYPE: %d, VF_ID: %d\n",
 			function.function_type,
 			function.vf_id);
@@ -2500,7 +2535,8 @@ static int ecpri_dma_mhi_client_test_suite_vm_memcpy_pf_sync(void* priv)
 	/* Invoke mhi_dma_enable */
 	ret = mhi_dma_memcpy_enable(function);
 	if (ret != 0) {
-		DMA_UT_DBG("mhi_dma_enable failed, ret %d\n", ret);
+		DMA_UT_ERR("mhi_dma_enable failed, ret %d\n", ret);
+		DMA_UT_TEST_FAIL_REPORT("mhi_dma_enable failed");
 		ret = -EFAULT;
 		goto fail_enable;
 	}
@@ -2512,7 +2548,7 @@ static int ecpri_dma_mhi_client_test_suite_vm_memcpy_pf_sync(void* priv)
 	ret = ecpri_dma_mhi_client_test_utils_check_memcpy_init_state(
 		idx, mhi_memcpy_ctx, &function);
 	if (ret != 0) {
-		DMAERR("Driver state for VF_ID %d / IDX %d has failed\n",
+		DMA_UT_ERR("Driver state for VF_ID %d / IDX %d has failed\n",
 			function.vf_id, idx);
 		ret = -EPERM;
 		goto fail;
@@ -2524,7 +2560,7 @@ static int ecpri_dma_mhi_client_test_suite_vm_memcpy_pf_sync(void* priv)
 	/* Allocate packets and buffers */
 	ret = ecpri_dma_mhi_client_test_alloc_src_dest_buffers(ECPRI_DMA_MHI_PF_ID);
 	if (ret != 0) {
-		DMAERR("Failed to allocate buffers, ret %d\n", ret);
+		DMA_UT_ERR("Failed to allocate buffers, ret %d\n", ret);
 		ret = -EFAULT;
 		goto fail;
 	}
@@ -2542,7 +2578,7 @@ static int ecpri_dma_mhi_client_test_suite_vm_memcpy_pf_sync(void* priv)
 		sizeof(u32),
 		function);
 	if (ret != 0) {
-		DMAERR("Failed sync_memcpy, ret %d\n", ret);
+		DMA_UT_ERR("Failed sync_memcpy, ret %d\n", ret);
 		ret = -EFAULT;
 		goto fail;
 	}
@@ -2554,7 +2590,7 @@ static int ecpri_dma_mhi_client_test_suite_vm_memcpy_pf_sync(void* priv)
 		dest_buffer.virt_base,
 		mhi_client_test_suite_ctx[ECPRI_DMA_MHI_PF_ID]->
 		dest_buffer.size)) {
-		DMAERR("Buffers don't match, ret %d\n", ret);
+		DMA_UT_ERR("Buffers don't match, ret %d\n", ret);
 		ret = -EFAULT;
 		goto fail;
 	}
@@ -2565,7 +2601,8 @@ static int ecpri_dma_mhi_client_test_suite_vm_memcpy_pf_sync(void* priv)
 fail:
 	ret = mhi_dma_memcpy_disable(function);
 	if (ret != 0) {
-		DMA_UT_DBG("mhi_dma_enable failed, ret %d\n", ret);
+		DMA_UT_ERR("mhi_dma_enable failed, ret %d\n", ret);
+		DMA_UT_TEST_FAIL_REPORT("mhi_dma_enable failed");
 		ret = -EFAULT;
 	}
 
@@ -2598,17 +2635,19 @@ static int ecpri_dma_mhi_client_test_suite_vm_memcpy_pf_async(void* priv)
 
 	ret = mhi_dma_memcpy_init(function);
 	if (ret != 0) {
-		DMA_UT_DBG("Memcopy_init failed for,"
+		DMA_UT_ERR("Memcopy_init failed for,"
 			"FUNCTION TYPE: %d, VF_ID: %d\n",
 			function.function_type,
 			function.vf_id);
+		DMA_UT_TEST_FAIL_REPORT("Memcopy_init failed\n");
 		goto fail_init;
 	}
 
 	/* Invoke mhi_dma_enable */
 	ret = mhi_dma_memcpy_enable(function);
 	if (ret != 0) {
-		DMA_UT_DBG("mhi_dma_enable failed, ret %d\n", ret);
+		DMA_UT_ERR("mhi_dma_enable failed, ret %d\n", ret);
+		DMA_UT_TEST_FAIL_REPORT("mhi_dma_enable failed\n");
 		ret = -EFAULT;
 		goto fail_enable;
 	}
@@ -2616,7 +2655,8 @@ static int ecpri_dma_mhi_client_test_suite_vm_memcpy_pf_async(void* priv)
 	/* Allocate packets and buffers */
 	ret = ecpri_dma_mhi_client_test_alloc_src_dest_buffers(ECPRI_DMA_MHI_PF_ID);
 	if (ret != 0) {
-		DMAERR("Failed to allocate buffers, ret %d\n", ret);
+		DMA_UT_ERR("Failed to allocate buffers, ret %d\n", ret);
+		DMA_UT_TEST_FAIL_REPORT("Failed to allocate buffers\n");
 		ret = -EFAULT;
 		goto fail;
 	}
@@ -2639,7 +2679,7 @@ static int ecpri_dma_mhi_client_test_suite_vm_memcpy_pf_async(void* priv)
 		&ecpri_dma_mhi_client_test_async_comp_cb,
 		&mhi_client_test_suite_ctx[ECPRI_DMA_MHI_PF_ID]->async_user_data);
 	if (ret != 0) {
-		DMAERR("Failed async_memcpy, ret %d\n", ret);
+		DMA_UT_ERR("Failed async_memcpy, ret %d\n", ret);
 		ret = -EFAULT;
 		goto fail;
 	}
@@ -2665,7 +2705,7 @@ static int ecpri_dma_mhi_client_test_suite_vm_memcpy_pf_async(void* priv)
 		dest_buffer.virt_base,
 		mhi_client_test_suite_ctx[ECPRI_DMA_MHI_PF_ID]->
 		dest_buffer.size)) {
-		DMAERR("Buffers don't match, ret %d\n", ret);
+		DMA_UT_ERR("Buffers don't match, ret %d\n", ret);
 		ret = -EFAULT;
 		goto fail;
 	}
@@ -2714,7 +2754,8 @@ static int ecpri_dma_mhi_client_test_suite_connect_endp_vm(void* priv)
 		&ctx->function, &ctx->init_params,
 		&ctx->out_params, &ctx->start_params);
 	if (ret != 0) {
-		DMA_UT_DBG("Test for VF_ID %d has failed\n", ctx->function.vf_id);
+		DMA_UT_ERR("VF_ID %d failed", ctx->function.vf_id);
+		DMA_UT_TEST_FAIL_REPORT("Test has failed\n");
 		return -EFAULT;
 	}
 
@@ -2722,7 +2763,7 @@ static int ecpri_dma_mhi_client_test_suite_connect_endp_vm(void* priv)
 	ret = ecpri_dma_mhi_client_test_utils_check_driver_state(
 		idx, &ctx->init_params, mhi_dma_ctx, &ctx->function);
 	if (ret != 0) {
-		DMAERR("Driver state for VF_ID %d / IDX %d has failed\n",
+		DMA_UT_ERR("Driver state for VF_ID %d / IDX %d has failed\n",
 			ctx->function.vf_id, idx);
 		return -EPERM;
 	}
@@ -2748,8 +2789,8 @@ static int ecpri_dma_mhi_client_test_suite_connect_endp_vm(void* priv)
 		ecpri_dma_mhi_client_test_mapping[idx].first_src_endp_id,
 		ecpri_dma_mhi_client_test_mapping[idx].first_dest_endp_id);
 	if (ret != 0) {
-		DMAERR("Connect_endp for VF_ID %d / IDX %d has failed\n",
-			ctx->function.vf_id, idx);
+		DMA_UT_ERR("VF_ID %d / IDX %d failed", ctx->function.vf_id, idx);
+		DMA_UT_TEST_FAIL_REPORT("Connect_endp for has failed\n");
 		return -EFAULT;
 	}
 
@@ -2758,7 +2799,7 @@ static int ecpri_dma_mhi_client_test_suite_connect_endp_vm(void* priv)
 		ret = ecpri_dma_mhi_driver_ops.mhi_dma_disconnect_endp(ctx->function,
 			&ctx->frst_dest_disc_params);
 		if (ret != 0) {
-			DMAERR("Disconnect endp for DEST, VF_ID %d has failed\n",
+			DMA_UT_ERR("Disconnect endp for DEST, VF_ID %d has failed\n",
 				ctx->function.vf_id);
 			return -EPERM;
 		}
@@ -2766,7 +2807,7 @@ static int ecpri_dma_mhi_client_test_suite_connect_endp_vm(void* priv)
 		ret = ecpri_dma_mhi_driver_ops.mhi_dma_disconnect_endp(ctx->function,
 			&ctx->frst_src_disc_params);
 		if (ret != 0) {
-			DMAERR("Disconnect endp for SRC, VF_ID %d has failed\n",
+			DMA_UT_ERR("Disconnect endp for SRC, VF_ID %d has failed\n",
 				ctx->function.vf_id);
 			return -EPERM;
 		}
@@ -2775,7 +2816,7 @@ static int ecpri_dma_mhi_client_test_suite_connect_endp_vm(void* priv)
 		ret = mhi_dma_disconnect_endp(ctx->function,
 			&ctx->frst_dest_disc_params);
 		if (ret != 0) {
-			DMAERR("Disconnect endp for DEST, VF_ID %d has failed\n",
+			DMA_UT_ERR("Disconnect endp for DEST, VF_ID %d has failed\n",
 				ctx->function.vf_id);
 			return -EPERM;
 		}
@@ -2783,17 +2824,17 @@ static int ecpri_dma_mhi_client_test_suite_connect_endp_vm(void* priv)
 		ret = mhi_dma_disconnect_endp(ctx->function,
 			&ctx->frst_src_disc_params);
 		if (ret != 0) {
-			DMAERR("Disconnect endp for SRC, VF_ID %d has failed\n",
+			DMA_UT_ERR("Disconnect endp for SRC, VF_ID %d has failed\n",
 				ctx->function.vf_id);
 			return -EPERM;
 		}
 	}
 
 	mhi_dma_destroy(ctx->function);
-	mhi_dma_memcpy_destroy(ctx->function);
 
 	vf_id++;
 	vf_id = vf_id % ECPRI_DMA_MHI_VIRTUAL_FUNCTION_NUM;
+
 	return 0;
 }
 
@@ -2821,8 +2862,8 @@ static int ecpri_dma_mhi_client_test_suite_connect_endp_all(void* priv) {
 			&ctx->function, &ctx->init_params,
 			&ctx->out_params, &ctx->start_params);
 		if (ret != 0) {
-			DMA_UT_DBG("Test for VF_ID %d has failed\n",
-				ctx->function.vf_id);
+			DMA_UT_ERR("VF_ID %d failed", ctx->function.vf_id);
+			DMA_UT_TEST_FAIL_REPORT("Test has failed\n");
 			return -EFAULT;
 		}
 
@@ -2832,7 +2873,7 @@ static int ecpri_dma_mhi_client_test_suite_connect_endp_all(void* priv) {
 		ret = ecpri_dma_mhi_client_test_utils_check_driver_state(
 			test_i, &ctx->init_params, mhi_dma_ctx, &ctx->function);
 		if (ret != 0) {
-			DMAERR("Driver state for VF_ID %d / IDX %d has failed\n",
+			DMA_UT_ERR("Driver state for VF_ID %d / IDX %d has failed\n",
 				ctx->function.vf_id, test_i);
 			return -EPERM;
 		}
@@ -2847,8 +2888,8 @@ static int ecpri_dma_mhi_client_test_suite_connect_endp_all(void* priv) {
 			ecpri_dma_mhi_client_test_mapping[test_i].first_src_endp_id,
 			ecpri_dma_mhi_client_test_mapping[test_i].first_dest_endp_id);
 		if (ret != 0) {
-			DMAERR("Connect_endp for VF_ID %d / IDX %d has failed\n",
-				ctx->function.vf_id, test_i);
+			DMA_UT_ERR("VF_ID %d / IDX %d failed", ctx->function.vf_id, test_i);
+			DMA_UT_TEST_FAIL_REPORT("Connect_endp has failed\n");
 			return -EFAULT;
 		}
 
@@ -2862,7 +2903,7 @@ static int ecpri_dma_mhi_client_test_suite_connect_endp_all(void* priv) {
 			ecpri_dma_mhi_client_test_mapping[test_i].second_src_endp_id,
 			ecpri_dma_mhi_client_test_mapping[test_i].second_dest_endp_id);
 		if (ret != 0) {
-			DMAERR("Connect endp for VF_ID %d / IDX %d has failed\n",
+			DMA_UT_ERR("Connect endp for VF_ID %d / IDX %d has failed\n",
 				ctx->function.vf_id, test_i);
 			return -EPERM;
 		}
@@ -2875,7 +2916,7 @@ static int ecpri_dma_mhi_client_test_suite_connect_endp_all(void* priv) {
 	DMA_UT_DBG("Starting PF check Test_id %d(%d)\n",
 		test_i, ECPRI_DMA_MHI_PF_ID);
 	if (test_i != ECPRI_DMA_MHI_PF_ID) {
-		DMA_UT_DBG("Wrong test_id\n");
+		DMA_UT_TEST_FAIL_REPORT("Wrong test_id\n");
 		return -EFAULT;
 	}
 
@@ -2890,8 +2931,8 @@ static int ecpri_dma_mhi_client_test_suite_connect_endp_all(void* priv) {
 		&ctx->function, &ctx->init_params,
 		&ctx->out_params, &ctx->start_params);
 	if (ret != 0) {
-		DMA_UT_DBG("Test for VF_ID %d has failed\n",
-			ctx->function.vf_id);
+		DMA_UT_ERR("VF_ID %d failed", ctx->function.vf_id);
+		DMA_UT_TEST_FAIL_REPORT("Test has failed\n");
 		return -EFAULT;
 	}
 
@@ -2899,7 +2940,7 @@ static int ecpri_dma_mhi_client_test_suite_connect_endp_all(void* priv) {
 	ret = ecpri_dma_mhi_client_test_utils_check_driver_state(
 		test_i, &ctx->init_params, mhi_dma_ctx, &ctx->function);
 	if (ret != 0) {
-		DMAERR("Driver state for VF_ID %d / IDX %d has failed\n",
+		DMA_UT_ERR("Driver state for VF_ID %d / IDX %d has failed\n",
 			ctx->function.vf_id, test_i);
 		return -EPERM;
 	}
@@ -2916,7 +2957,7 @@ static int ecpri_dma_mhi_client_test_suite_connect_endp_all(void* priv) {
 		&ctx->frst_src_conn_params,
 		&ctx->frst_src_disc_params.clnt_hdl);
 	if (ret != -EINVAL) {
-		DMAERR("PF expected to fail, ret = %d\n",
+		DMA_UT_ERR("PF expected to fail, ret = %d\n",
 			ret);
 		return -EPERM;
 	}
@@ -2937,20 +2978,18 @@ static int ecpri_dma_mhi_client_test_suite_connect_endp_all(void* priv) {
 			&ctx->second_src_disc_params, &ctx->second_dest_disc_params
 		);
 		if (ret != 0) {
-			DMAERR("Unable to disconnect ret = %d\n",
+			DMA_UT_ERR("Unable to disconnect ret = %d\n",
 				ret);
 			return -EPERM;
 		}
 
 		/* Destroy dma per VM */
 		mhi_dma_destroy(ctx->function);
-		mhi_dma_memcpy_destroy(ctx->function);
 	}
 
 	/* Destroy dma for PF */
 	ctx = mhi_client_test_suite_ctx[test_i];
 	mhi_dma_destroy(ctx->function);
-	mhi_dma_memcpy_destroy(ctx->function);
 
 	return ret;
 }
@@ -2993,7 +3032,8 @@ ecpri_dma_mhi_client_test_suite_hw_ch_vm_single_packet_single_buffer(void* priv)
 		&ctx->function, &ctx->init_params,
 		&ctx->out_params, &ctx->start_params);
 	if (ret != 0) {
-		DMA_UT_DBG("Test for VF_ID %d has failed\n", ctx->function.vf_id);
+		DMA_UT_ERR("VF_ID %dfailed", ctx->function.vf_id);
+		DMA_UT_TEST_FAIL_REPORT("Test has failed\n");
 		return -EFAULT;
 	}
 
@@ -3001,7 +3041,7 @@ ecpri_dma_mhi_client_test_suite_hw_ch_vm_single_packet_single_buffer(void* priv)
 	ret = ecpri_dma_mhi_client_test_utils_check_driver_state(
 		idx, &ctx->init_params, mhi_dma_ctx, &ctx->function);
 	if (ret != 0) {
-		DMAERR("Driver state for VF_ID %d / IDX %d has failed\n",
+		DMA_UT_ERR("Driver state for VF_ID %d / IDX %d has failed\n",
 			ctx->function.vf_id, idx);
 		return -EPERM;
 	}
@@ -3013,11 +3053,11 @@ ecpri_dma_mhi_client_test_suite_hw_ch_vm_single_packet_single_buffer(void* priv)
 		ecpri_dma_mhi_client_test_mapping[
 			idx].first_dest_endp_id, true);
 	if (ret != 0) {
-		DMAERR("Loopback configuration for VF_ID %d / IDX %d has failed"
-			" SRC ENDP ID %d, DEST ENDP ID %d\n",
-			ctx->function.vf_id, idx,
+		DMA_UT_ERR("VF_ID %d / IDX %d failed"
+			" SRC ENDP ID %d, DEST ENDP ID %d\n", ctx->function.vf_id, idx,
 			ecpri_dma_mhi_client_test_mapping[idx].first_src_endp_id,
 			ecpri_dma_mhi_client_test_mapping[idx].first_dest_endp_id);
+		DMA_UT_TEST_FAIL_REPORT("Loopback configuration failed");
 		return -EFAULT;
 	}
 
@@ -3031,15 +3071,15 @@ ecpri_dma_mhi_client_test_suite_hw_ch_vm_single_packet_single_buffer(void* priv)
 		ecpri_dma_mhi_client_test_mapping[idx].first_src_endp_id,
 		ecpri_dma_mhi_client_test_mapping[idx].first_dest_endp_id);
 	if (ret != 0) {
-		DMAERR("Connect_endp for VF_ID %d / IDX %d has failed\n",
-			ctx->function.vf_id, idx);
+		DMA_UT_ERR("VF_ID %d / IDX %d failed\n", ctx->function.vf_id, idx);
+		DMA_UT_TEST_FAIL_REPORT("Connect_endp has failed\n");
 		return -EFAULT;
 	}
 
 	ret = ecpri_dma_mhi_client_test_get_ee_index(ctx->function, &ee);
 	if (ret != 0) {
-		DMAERR("Get EE index for VF_ID %d / IDX %d has failed\n",
-			ctx->function.vf_id, idx);
+		DMA_UT_ERR("VF_ID %d / IDX %d failed\n", ctx->function.vf_id, idx);
+		DMA_UT_TEST_FAIL_REPORT("Get EE index has failed\n");
 		return -EFAULT;
 	}
 
@@ -3048,11 +3088,11 @@ ecpri_dma_mhi_client_test_suite_hw_ch_vm_single_packet_single_buffer(void* priv)
 		ecpri_dma_mhi_client_test_host_ch_id_map[0],
 		ecpri_dma_mhi_client_test_host_ch_id_map[1], ee);
 	if (ret != 0) {
-		DMAERR("Transfer for VF_ID %d / IDX %d has failed"
-			" SRC ENDP ID %d, DEST ENDP ID %d\n",
-			ctx->function.vf_id, idx,
+		DMA_UT_ERR("VF_ID %d / IDX %d failed"
+			" SRC ENDP ID %d, DEST ENDP ID %d\n", ctx->function.vf_id, idx,
 			ecpri_dma_mhi_client_test_mapping[idx].first_src_endp_id,
 			ecpri_dma_mhi_client_test_mapping[idx].first_dest_endp_id);
+		DMA_UT_TEST_FAIL_REPORT("Transfer has failed");
 		return -EFAULT;
 	}
 
@@ -3063,11 +3103,11 @@ ecpri_dma_mhi_client_test_suite_hw_ch_vm_single_packet_single_buffer(void* priv)
 		ecpri_dma_mhi_client_test_mapping[
 			idx].first_dest_endp_id, false);
 	if (ret != 0) {
-		DMAERR("Loopback configuration for VF_ID %d / IDX %d has failed"
-			" SRC ENDP ID %d, DEST ENDP ID %d\n",
-			ctx->function.vf_id, idx,
+		DMA_UT_ERR("VF_ID %d / IDX %d failed"
+			" SRC ENDP ID %d, DEST ENDP ID %d\n", ctx->function.vf_id, idx,
 			ecpri_dma_mhi_client_test_mapping[idx].first_src_endp_id,
 			ecpri_dma_mhi_client_test_mapping[idx].first_dest_endp_id);
+		DMA_UT_TEST_FAIL_REPORT("Loopback configuration has failed\n");
 		return -EFAULT;
 	}
 
@@ -3075,7 +3115,7 @@ ecpri_dma_mhi_client_test_suite_hw_ch_vm_single_packet_single_buffer(void* priv)
 		ret = ecpri_dma_mhi_driver_ops.mhi_dma_disconnect_endp(ctx->function,
 			&ctx->frst_src_disc_params);
 		if (ret != 0) {
-			DMAERR("Disconnect endp for SRC, VF_ID %d has failed\n",
+			DMA_UT_ERR("Disconnect endp for SRC, VF_ID %d has failed\n",
 				ctx->function.vf_id);
 			return -EPERM;
 		}
@@ -3083,7 +3123,7 @@ ecpri_dma_mhi_client_test_suite_hw_ch_vm_single_packet_single_buffer(void* priv)
 		ret = ecpri_dma_mhi_driver_ops.mhi_dma_disconnect_endp(ctx->function,
 			&ctx->frst_dest_disc_params);
 		if (ret != 0) {
-			DMAERR("Disconnect endp for SRC, VF_ID %d has failed\n",
+			DMA_UT_ERR("Disconnect endp for SRC, VF_ID %d has failed\n",
 				ctx->function.vf_id);
 			return -EPERM;
 		}
@@ -3092,7 +3132,7 @@ ecpri_dma_mhi_client_test_suite_hw_ch_vm_single_packet_single_buffer(void* priv)
 		ret = mhi_dma_disconnect_endp(ctx->function,
 			&ctx->frst_src_disc_params);
 		if (ret != 0) {
-			DMAERR("Disconnect endp for SRC, VF_ID %d has failed\n",
+			DMA_UT_ERR("Disconnect endp for SRC, VF_ID %d has failed\n",
 				ctx->function.vf_id);
 			return -EPERM;
 		}
@@ -3100,14 +3140,13 @@ ecpri_dma_mhi_client_test_suite_hw_ch_vm_single_packet_single_buffer(void* priv)
 		ret = mhi_dma_disconnect_endp(ctx->function,
 			&ctx->frst_dest_disc_params);
 		if (ret != 0) {
-			DMAERR("Disconnect endp for SRC, VF_ID %d has failed\n",
+			DMA_UT_ERR("Disconnect endp for SRC, VF_ID %d has failed\n",
 				ctx->function.vf_id);
 			return -EPERM;
 		}
 	}
 
 	mhi_dma_destroy(ctx->function);
-	mhi_dma_memcpy_destroy(ctx->function);
 
 	DMA_UT_DBG("Finished HW CH VM%d\n", vf_id);
 
@@ -3153,7 +3192,8 @@ ecpri_dma_mhi_client_test_suite_hw_ch_all_single_packet_single_buffer(void* priv
 			&ctx->function, &ctx->init_params,
 			&ctx->out_params, &ctx->start_params);
 		if (ret != 0) {
-			DMA_UT_DBG("Test for VF_ID %d has failed\n", ctx->function.vf_id);
+			DMA_UT_ERR("VF_ID %d / IDX %d failed\n", ctx->function.vf_id);
+			DMA_UT_TEST_FAIL_REPORT("Test has failed\n");
 			return -EFAULT;
 		}
 
@@ -3161,8 +3201,8 @@ ecpri_dma_mhi_client_test_suite_hw_ch_all_single_packet_single_buffer(void* priv
 		ret = ecpri_dma_mhi_client_test_utils_check_driver_state(
 			idx, &ctx->init_params, mhi_dma_ctx, &ctx->function);
 		if (ret != 0) {
-			DMAERR("Driver state for VF_ID %d / IDX %d has failed\n",
-				ctx->function.vf_id, idx);
+			DMA_UT_ERR("VF_ID %d / IDX %d failed\n", ctx->function.vf_id, idx);
+			DMA_UT_ERR("Driver state has failed\n");
 			return -EPERM;
 		}
 
@@ -3173,11 +3213,11 @@ ecpri_dma_mhi_client_test_suite_hw_ch_all_single_packet_single_buffer(void* priv
 			ecpri_dma_mhi_client_test_mapping[
 				idx].first_dest_endp_id, true);
 		if (ret != 0) {
-			DMAERR("Loopback configuration for VF_ID %d / IDX %d has failed"
-				" SRC ENDP ID %d, DEST ENDP ID %d\n",
-				ctx->function.vf_id, idx,
+			DMA_UT_ERR("VF_ID %d / IDX %d failed"
+				" SRC ENDP ID %d, DEST ENDP ID %d\n", ctx->function.vf_id, idx,
 				ecpri_dma_mhi_client_test_mapping[idx].first_src_endp_id,
 				ecpri_dma_mhi_client_test_mapping[idx].first_dest_endp_id);
+			DMA_UT_TEST_FAIL_REPORT("Loopback configuration has failed\n");
 			return -EFAULT;
 		}
 
@@ -3187,11 +3227,11 @@ ecpri_dma_mhi_client_test_suite_hw_ch_all_single_packet_single_buffer(void* priv
 			ecpri_dma_mhi_client_test_mapping[
 				idx].second_dest_endp_id, true);
 		if (ret != 0) {
-			DMAERR("Loopback configuration for VF_ID %d / IDX %d has failed"
-				" SRC ENDP ID %d, DEST ENDP ID %d\n",
-				ctx->function.vf_id, idx,
+			DMA_UT_ERR("VF_ID %d / IDX %d failed"
+				" SRC ENDP ID %d, DEST ENDP ID %d\n", ctx->function.vf_id, idx,
 				ecpri_dma_mhi_client_test_mapping[idx].second_src_endp_id,
 				ecpri_dma_mhi_client_test_mapping[idx].second_dest_endp_id);
+			DMA_UT_TEST_FAIL_REPORT("Loopback configuration has failed\n");
 			return -EFAULT;
 		}
 
@@ -3205,8 +3245,8 @@ ecpri_dma_mhi_client_test_suite_hw_ch_all_single_packet_single_buffer(void* priv
 			ecpri_dma_mhi_client_test_mapping[idx].first_src_endp_id,
 			ecpri_dma_mhi_client_test_mapping[idx].first_dest_endp_id);
 		if (ret != 0) {
-			DMAERR("Connect_endp for VF_ID %d / IDX %d has failed\n",
-				ctx->function.vf_id, idx);
+			DMA_UT_ERR("VF_ID %d / IDX %d failed\n", ctx->function.vf_id, idx);
+			DMA_UT_TEST_FAIL_REPORT("Connect_endp has failed\n");
 			return -EFAULT;
 		}
 
@@ -3220,15 +3260,15 @@ ecpri_dma_mhi_client_test_suite_hw_ch_all_single_packet_single_buffer(void* priv
 			ecpri_dma_mhi_client_test_mapping[idx].second_src_endp_id,
 			ecpri_dma_mhi_client_test_mapping[idx].second_dest_endp_id);
 		if (ret != 0) {
-			DMAERR("Connect_endp for VF_ID %d / IDX %d has failed\n",
-				ctx->function.vf_id, idx);
+			DMA_UT_ERR("VF_ID %d / IDX %d failed\n", ctx->function.vf_id, idx);
+			DMA_UT_TEST_FAIL_REPORT("Connect_endp has failed\n");
 			return -EFAULT;
 		}
 
 		ret = ecpri_dma_mhi_client_test_get_ee_index(ctx->function, &ee);
 		if (ret != 0) {
-			DMAERR("Get EE index for VF_ID %d / IDX %d has failed\n",
-				ctx->function.vf_id, idx);
+			DMA_UT_ERR("VF_ID %d / IDX %d failed\n", ctx->function.vf_id, idx);
+			DMA_UT_TEST_FAIL_REPORT("Get EE index has failed\n");
 			return -EFAULT;
 		}
 
@@ -3239,13 +3279,13 @@ ecpri_dma_mhi_client_test_suite_hw_ch_all_single_packet_single_buffer(void* priv
 			ecpri_dma_mhi_client_test_host_ch_id_map[
 				ECPRI_DMA_MHI_TEST_FRST_DEST_CHANNEL_ID], ee);
 		if (ret != 0) {
-			DMAERR("Transfer for VF_ID %d / IDX %d has failed"
-				" SRC CH ID %d, DEST CH ID %d\n",
-				ctx->function.vf_id, idx,
+			DMA_UT_ERR("VF_ID %d / IDX %d failed"
+				" SRC CH ID %d, DEST CH ID %d\n", ctx->function.vf_id, idx,
 				ecpri_dma_mhi_client_test_host_ch_id_map[
 					ECPRI_DMA_MHI_TEST_FRST_SRC_CHANNEL_ID],
 				ecpri_dma_mhi_client_test_host_ch_id_map[
 					ECPRI_DMA_MHI_TEST_FRST_DEST_CHANNEL_ID]);
+			DMA_UT_TEST_FAIL_REPORT("Transfer has failed\n");
 			return -EFAULT;
 		}
 
@@ -3256,13 +3296,13 @@ ecpri_dma_mhi_client_test_suite_hw_ch_all_single_packet_single_buffer(void* priv
 			ecpri_dma_mhi_client_test_host_ch_id_map[
 				ECPRI_DMA_MHI_TEST_SCND_DEST_CHANNEL_ID], ee);
 		if (ret != 0) {
-			DMAERR("Transfer for VF_ID %d / IDX %d has failed"
-				" SRC CH ID %d, DEST CH ID %d\n",
-				ctx->function.vf_id, idx,
+			DMA_UT_ERR("VF_ID %d / IDX %d failed"
+				" SRC CH ID %d, DEST CH ID %d\n", ctx->function.vf_id, idx,
 				ecpri_dma_mhi_client_test_host_ch_id_map[
 					ECPRI_DMA_MHI_TEST_SCND_SRC_CHANNEL_ID],
 				ecpri_dma_mhi_client_test_host_ch_id_map[
 					ECPRI_DMA_MHI_TEST_SCND_DEST_CHANNEL_ID]);
+			DMA_UT_TEST_FAIL_REPORT("Transfer has failed\n");
 			return -EFAULT;
 		}
 
@@ -3273,11 +3313,11 @@ ecpri_dma_mhi_client_test_suite_hw_ch_all_single_packet_single_buffer(void* priv
 			ecpri_dma_mhi_client_test_mapping[
 				idx].second_dest_endp_id, false);
 		if (ret != 0) {
-			DMAERR("Loopback configuration for VF_ID %d / IDX %d has failed"
-				" SRC ENDP ID %d, DEST ENDP ID %d\n",
-				ctx->function.vf_id, idx,
+			DMA_UT_ERR("VF_ID %d / IDX %d failed"
+				" SRC ENDP ID %d, DEST ENDP ID %d\n", ctx->function.vf_id, idx,
 				ecpri_dma_mhi_client_test_mapping[idx].second_src_endp_id,
 				ecpri_dma_mhi_client_test_mapping[idx].second_dest_endp_id);
+			DMA_UT_TEST_FAIL_REPORT("Loopback configuration has failed\n");
 			return -EFAULT;
 		}
 
@@ -3287,11 +3327,11 @@ ecpri_dma_mhi_client_test_suite_hw_ch_all_single_packet_single_buffer(void* priv
 			ecpri_dma_mhi_client_test_mapping[
 				idx].first_dest_endp_id, false);
 		if (ret != 0) {
-			DMAERR("Loopback configuration for VF_ID %d / IDX %d has failed"
-				" SRC ENDP ID %d, DEST ENDP ID %d\n",
-				ctx->function.vf_id, idx,
+			DMA_UT_ERR("VF_ID %d / IDX %d failed"
+				" SRC ENDP ID %d, DEST ENDP ID %d\n", ctx->function.vf_id, idx,
 				ecpri_dma_mhi_client_test_mapping[idx].first_src_endp_id,
 				ecpri_dma_mhi_client_test_mapping[idx].first_dest_endp_id);
+			DMA_UT_TEST_FAIL_REPORT("Loopback configuration has failed\n");
 			return -EFAULT;
 		}
 
@@ -3309,13 +3349,12 @@ ecpri_dma_mhi_client_test_suite_hw_ch_all_single_packet_single_buffer(void* priv
 			&ctx->second_src_disc_params, &ctx->second_dest_disc_params
 		);
 		if (ret != 0) {
-			DMAERR("Unable to disconnect ret = %d\n",
+			DMA_UT_ERR("Unable to disconnect ret = %d\n",
 				ret);
 			return -EPERM;
 		}
 
 		mhi_dma_destroy(ctx->function);
-		mhi_dma_memcpy_destroy(ctx->function);
 	}
 
 	return ret;
@@ -3404,7 +3443,7 @@ DMA_UT_DEFINE_SUITE_START(mhi_client, "MHI Client suite",
 			" and send the test packet via loopback from SRC to DEST."
 			" Test will compare the content of the recevied packet.",
 			ecpri_dma_mhi_client_test_suite_hw_ch_vm_single_packet_single_buffer,
-			true, ECPRI_HW_V1_0, ECPRI_HW_MAX),
+			false, ECPRI_HW_V1_0, ECPRI_HW_MAX),
 		DMA_UT_ADD_TEST(
 			hw_ch_all,
 			"Tests will verify the HW path for all VMs and PF. "

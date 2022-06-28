@@ -69,6 +69,30 @@ ecpri_dma_mhi_function_endp_dt[ECPRI_DMA_MHI_CLIENT_FUNCTION_NUM] = {
 	}
 };
 
+static inline bool ecpri_dma_mhi_check_destroy_pending(
+	struct ecpri_dma_mhi_memcpy_context* memcpy_ctx)
+{
+	bool destroy_pending = false;
+	unsigned long flags;
+	unsigned long flags_sync;
+	unsigned long flags_async;
+
+	spin_lock_irqsave(&memcpy_ctx->lock, flags);
+	spin_lock_irqsave(&memcpy_ctx->async_lock, flags_async);
+	spin_lock_irqsave(&memcpy_ctx->sync_lock, flags_sync);
+
+	destroy_pending = memcpy_ctx->destroy_pending;
+
+	spin_unlock_irqrestore(&memcpy_ctx->sync_lock,
+		flags_sync);
+	spin_unlock_irqrestore(&memcpy_ctx->async_lock,
+		flags_async);
+	spin_unlock_irqrestore(&memcpy_ctx->lock,
+		flags);
+
+	return destroy_pending;
+}
+
 /**
  * ecpri_dma_mhi_get_function_context_index() -
  * Gets the VF/PF index in Global Context Array
@@ -226,13 +250,13 @@ static int ecpri_dma_mhi_dma_alloc_pkt(
 	int ret = 0;
 	struct ecpri_dma_pkt** pkt = NULL;
 
-	pkt = kzalloc(sizeof(*pkt), GFP_NOWAIT);
+	pkt = kzalloc(sizeof(*pkt), GFP_KERNEL);
 	if (!pkt) {
 		DMAERR("failed to alloc packets array \n");
 		return -ENOMEM;
 	}
 
-	pkt[0] = kzalloc(sizeof(*pkt[0]), GFP_NOWAIT);
+	pkt[0] = kzalloc(sizeof(*pkt[0]), GFP_KERNEL);
 	if (!pkt[0]) {
 		DMAERR("failed to alloc packet\n");
 		kfree(pkt);
@@ -241,7 +265,7 @@ static int ecpri_dma_mhi_dma_alloc_pkt(
 	}
 
 	pkt[0]->buffs =
-		kzalloc(sizeof(*(pkt[0]->buffs)), GFP_NOWAIT);
+		kzalloc(sizeof(*(pkt[0]->buffs)), GFP_KERNEL);
 	if (!(pkt[0]->buffs)) {
 		DMAERR("failed to alloc buffers array \n");
 		kfree(pkt[0]);
@@ -251,7 +275,7 @@ static int ecpri_dma_mhi_dma_alloc_pkt(
 	}
 
 	pkt[0]->buffs[0] = kzalloc(
-		sizeof(*(pkt[0]->buffs[0])), GFP_NOWAIT);
+		sizeof(*(pkt[0]->buffs[0])), GFP_KERNEL);
 	if (!pkt[0]->buffs[0]) {
 		DMAERR("failed to alloc dma buff wrapper\n");
 		kfree(pkt[0]->buffs);
@@ -316,6 +340,7 @@ static void ecpri_dma_mhi_wq_notify_ready(struct work_struct* work)
 static void ecpri_dma_mhi_memcpy_async_wq_cb_ready(struct work_struct* work)
 {
 	struct ecpri_dma_mhi_memcpy_context *memcpy_ctx = NULL;
+	unsigned long flags;
 	struct ecpri_dma_mhi_async_wq_work_type *async_work = container_of(
 		work, struct ecpri_dma_mhi_async_wq_work_type, work);
 
@@ -327,8 +352,74 @@ static void ecpri_dma_mhi_memcpy_async_wq_cb_ready(struct work_struct* work)
 		return;
 	}
 
+	if (ecpri_dma_mhi_check_destroy_pending(memcpy_ctx) == true) {
+		DMAERR("Memcpy destroy in progress\n");
+		return;
+	}
+
+	spin_lock_irqsave(&memcpy_ctx->async_lock, flags);
+
+	if (list_empty(
+		&memcpy_ctx->cbs_list)) {
+		DMAERR("The callback list is empty but shouldn't be\n");
+		spin_unlock_irqrestore(&memcpy_ctx->async_lock, flags);
+		return;
+	}
+
+	async_work->xfer_desc = list_first_entry(
+		&memcpy_ctx->cbs_list,
+		struct ecpri_dma_mhi_xfer_wrapper,
+		link);
+
+	list_del(&async_work->xfer_desc->link);
+
 	atomic_dec(&memcpy_ctx->async_pending);
 	atomic_inc(&memcpy_ctx->async_total);
+
+	spin_unlock_irqrestore(&memcpy_ctx->async_lock, flags);
+
+	async_work->xfer_desc->user_cb(async_work->xfer_desc->user_data);
+
+	kmem_cache_free(memcpy_ctx->xfer_wrapper_cache, async_work->xfer_desc);
+	kfree(async_work);
+}
+
+/**
+ * ecpri_dma_mhi_memcpy_async_wq_cb_ready_vms() - Notify MHI client on async comp
+ *
+ * This function is called to notify ASYNC transfer completion.
+ *
+ */
+static void ecpri_dma_mhi_memcpy_async_wq_cb_ready_vms(struct work_struct* work)
+{
+	int idx = 0, ret = 0;
+	struct ecpri_dma_mhi_memcpy_context* memcpy_ctx = NULL;
+	struct ecpri_dma_mhi_async_wq_work_type* async_work = container_of(
+		work, struct ecpri_dma_mhi_async_wq_work_type, work);
+
+	DMADBG("Begin\n");
+
+	/* Get the index of VM/PF */
+	ret = ecpri_dma_mhi_get_function_context_index(
+		async_work->xfer_desc->function, &idx);
+	if (ret != 0) {
+		DMAERR("Function params are invalid,"
+			"function type: %d, vf_id: %d\n",
+			async_work->xfer_desc->function.function_type,
+			async_work->xfer_desc->function.vf_id);
+		return;
+	}
+
+	memcpy_ctx = ecpri_dma_mhi_memcpy_ctx[idx];
+	if (!memcpy_ctx) {
+		DMAERR("Memcpy context is not initialized\n");
+		return;
+	}
+
+	if (ecpri_dma_mhi_check_destroy_pending(memcpy_ctx) == true) {
+		DMAERR("Memcpy destroy in progress\n");
+		return;
+	}
 
 	async_work->xfer_desc->user_cb(async_work->xfer_desc->user_data);
 
@@ -354,9 +445,7 @@ static void ecpri_dma_mhi_memcpy_async_notify_comp(
 {
 	int i = 0;
 	int ret = 0;
-	unsigned long flags;
 	struct ecpri_dma_mhi_memcpy_context* memcpy_ctx = NULL;
-	struct ecpri_dma_mhi_xfer_wrapper* xfer_descr = NULL;
 	struct ecpri_dma_pkt_completion_wrapper
 		async_pkts_arr[ECPRI_DMA_MHI_CLIENT_MEMCPY_ASYNC_BUDGET];
 	struct ecpri_dma_pkt_completion_wrapper*
@@ -380,6 +469,11 @@ static void ecpri_dma_mhi_memcpy_async_notify_comp(
 	memcpy_ctx = ecpri_dma_mhi_memcpy_ctx[ECPRI_DMA_MHI_PF_ID];
 	if (!memcpy_ctx) {
 		DMAERR("Memcpy context is not initialized\n");
+		return;
+	}
+
+	if (ecpri_dma_mhi_check_destroy_pending(memcpy_ctx) == true) {
+		DMAERR("Memcpy destroy in progress\n");
 		return;
 	}
 
@@ -408,36 +502,16 @@ static void ecpri_dma_mhi_memcpy_async_notify_comp(
 
 	for (i = 0; i < actual_num; i++)
 	{
-		spin_lock_irqsave(&memcpy_ctx->lock, flags);
-
-		if (list_empty(
-			&memcpy_ctx->cbs_list)) {
-			DMAERR("The callback list is empty but shouldn't be\n");
-			spin_unlock_irqrestore(&memcpy_ctx->lock, flags);
-			return;
-		}
-
-		xfer_descr = list_first_entry(
-			&memcpy_ctx->cbs_list,
-			struct ecpri_dma_mhi_xfer_wrapper,
-			link);
-
-		list_del(&xfer_descr->link);
-
-		spin_unlock_irqrestore(&memcpy_ctx->lock, flags);
-
-		/* Create notifier for driver ready */
+		/* Create notifier for ASYNC COMP */
 		work = kzalloc(sizeof(*work), GFP_NOWAIT);
 
 		if (work) {
 			INIT_WORK(&work->work,
 				  ecpri_dma_mhi_memcpy_async_wq_cb_ready);
-			work->xfer_desc = xfer_descr;
 
 			queue_work(memcpy_ctx->async_wq, &work->work);
 		} else {
 			DMAERR("Allocation error in workqueue\n");
-			spin_unlock_irqrestore(&memcpy_ctx->lock, flags);
 			ecpri_dma_assert();
 		}
 
@@ -947,7 +1021,7 @@ static int ecpri_dma_mhi_memcpy_init(
 	if (!ecpri_dma_mhi_memcpy_ctx[idx]) {
 		ecpri_dma_mhi_memcpy_ctx[idx] = kzalloc(
 			sizeof(*ecpri_dma_mhi_memcpy_ctx[0]),
-			GFP_NOWAIT);
+			GFP_KERNEL);
 		if (!ecpri_dma_mhi_memcpy_ctx[idx]) {
 			ret = -EFAULT;
 			goto fail_alloc_ctx;
@@ -957,6 +1031,11 @@ static int ecpri_dma_mhi_memcpy_init(
 		return 0;
 	}
 	memcpy_ctx = ecpri_dma_mhi_memcpy_ctx[idx];
+
+	if (ecpri_dma_mhi_check_destroy_pending(memcpy_ctx) == true) {
+		DMAERR("Memcpy destroy in progress\n");
+		return -EFAULT;
+	}
 
 	spin_lock_init(&memcpy_ctx->lock);
 	spin_lock_init(&memcpy_ctx->sync_lock);
@@ -1080,6 +1159,11 @@ static void ecpri_dma_mhi_memcpy_destroy(
 		return;
 	}
 
+	if (!ecpri_dma_mhi_check_destroy_pending(memcpy_ctx)) {
+		DMAERR("Memcpy destroy is not in progress\n");
+		return;
+	}
+
 	/* Reset endpoints */
 	ret = ecpri_dma_mhi_reset_memcpy_endps(sync_src_id,
 		sync_dest_id, async_src_id, async_dest_id);
@@ -1185,13 +1269,27 @@ static int ecpri_dma_mhi_dma_sync_memcpy(
 		return -EPERM;
 	}
 
+	if (ecpri_dma_mhi_check_destroy_pending(memcpy_ctx) == true) {
+		DMAERR("Memcpy destroy in progress\n");
+		return -EFAULT;
+	}
+
 	if (atomic_read(&memcpy_ctx->ref_count) == 0) {
 		DMAERR("Reference count is equal to zero\n");
 		return -EPERM;
 	}
 
+	/* Only single SYNC transfer allowed */
 	spin_lock_irqsave(&memcpy_ctx->sync_lock, flags);
+	while (atomic_read(&memcpy_ctx->sync_pending) > 0) {
+		spin_unlock_irqrestore(&memcpy_ctx->sync_lock, flags);
+		usleep_range(ECPRI_DMA_MHI_POLLING_MIN_SLEEP_RX,
+			ECPRI_DMA_MHI_POLLING_MAX_SLEEP_RX);
+		spin_lock_irqsave(&memcpy_ctx->sync_lock, flags);
+	}
+
 	atomic_inc(&memcpy_ctx->sync_pending);
+	spin_unlock_irqrestore(&memcpy_ctx->sync_lock, flags);
 
 	/* Allocate packets */
 	ret = ecpri_dma_mhi_dma_alloc_pkt(dest, len, &pkts_dest);
@@ -1228,7 +1326,7 @@ static int ecpri_dma_mhi_dma_sync_memcpy(
 	actual_num = 0;
 	memcpy_ctx->loop_counter = 0;
 	pkt_wrapper = kzalloc(sizeof(struct ecpri_dma_pkt_completion_wrapper),
-		GFP_NOWAIT);
+		GFP_KERNEL);
 	if (!pkt_wrapper) {
 		DMAERR("Unable to allocate pkt_wrapper\n");
 		ret = -ENOMEM;
@@ -1245,15 +1343,13 @@ static int ecpri_dma_mhi_dma_sync_memcpy(
 			ret = -EPERM;
 			goto fail_poll_rx;
 		}
-		spin_unlock_irqrestore(&memcpy_ctx->sync_lock, flags);
-		usleep_range(ECPRI_DMA_MHI_POLLING_MIN_SLEEP_RX,
-			ECPRI_DMA_MHI_POLLING_MAX_SLEEP_RX);
-		spin_lock_irqsave(&memcpy_ctx->sync_lock, flags);
 	}
 	memcpy_ctx->loop_counter = 0;
 
-	atomic_dec(&memcpy_ctx->sync_pending);
+	spin_lock_irqsave(&memcpy_ctx->sync_lock, flags);
 	atomic_inc(&memcpy_ctx->sync_total);
+	atomic_dec(&memcpy_ctx->sync_pending);
+	spin_unlock_irqrestore(&memcpy_ctx->sync_lock, flags);
 
 	ret = 0;
 	goto success;
@@ -1268,8 +1364,77 @@ success:
 fail_src_alloc:
 	ecpri_dma_mhi_dma_free_pkt(pkts_dest[0]);
 fail_dest_alloc:
-	spin_unlock_irqrestore(&memcpy_ctx->sync_lock, flags);
 	return ret;
+}
+
+static int ecpri_dma_mhi_dma_async_memcpy_vm_handling(
+	u64 dest, u64 src, int len,
+	struct mhi_dma_function_params function,
+	void (*user_cb)(void* user1),
+	void* user_param)
+{
+	int ret = 0, idx = 0;
+	struct ecpri_dma_mhi_async_wq_work_type* work = NULL;
+	struct ecpri_dma_mhi_xfer_wrapper* xfer_descr = NULL;
+	struct ecpri_dma_mhi_memcpy_context* memcpy_ctx = NULL;
+
+	/* Get the index of VM/PF */
+	ret = ecpri_dma_mhi_get_function_context_index(
+		function, &idx);
+	if (ret != 0) {
+		DMAERR("Function params are invalid,"
+			"function type: %d, vf_id: %d\n",
+			function.function_type, function.vf_id);
+		return -EINVAL;
+	}
+
+	memcpy_ctx = ecpri_dma_mhi_memcpy_ctx[idx];
+	if (!memcpy_ctx) {
+		DMAERR("Memcpy context is not initialized\n");
+		return -EPERM;
+	}
+
+	if (ecpri_dma_mhi_check_destroy_pending(memcpy_ctx) == true) {
+		DMAERR("Memcpy destroy in progress\n");
+		return -EFAULT;
+	}
+
+	xfer_descr = kmem_cache_zalloc(
+		memcpy_ctx->xfer_wrapper_cache,
+		GFP_KERNEL);
+	if (!xfer_descr) {
+		DMAERR("Allocation error\n");
+		return -ENOMEM;
+	}
+
+	xfer_descr->user_cb = user_cb;
+	xfer_descr->user_data = user_param;
+	xfer_descr->function = function;
+
+	/* Create notifier for ASYNC COMP */
+	work = kzalloc(sizeof(*work), GFP_KERNEL);
+
+	if (!work) {
+		DMAERR("Allocation error\n");
+		return -ENOMEM;
+	}
+
+	ret = ecpri_dma_mhi_dma_sync_memcpy(dest, src, len, function);
+	if (ret)
+	{
+		DMAERR("SYNC transfer failed, ret = %d\n", ret);
+		kmem_cache_free(memcpy_ctx->xfer_wrapper_cache, xfer_descr);
+		kfree(work);
+		return ret;
+	}
+
+	INIT_WORK(&work->work,
+		ecpri_dma_mhi_memcpy_async_wq_cb_ready_vms);
+	work->xfer_desc = xfer_descr;
+
+	queue_work(memcpy_ctx->async_wq, &work->work);
+
+	return 0;
 }
 
 /**
@@ -1328,6 +1493,11 @@ static int ecpri_dma_mhi_dma_async_memcpy(
 		return -EPERM;
 	}
 
+	if (ecpri_dma_mhi_check_destroy_pending(memcpy_ctx) == true) {
+		DMAERR("Memcpy destroy in progress\n");
+		return -EFAULT;
+	}
+
 	if (!user_cb) {
 		DMAERR("null pointer: user_cb\n");
 		return -EINVAL;
@@ -1335,8 +1505,9 @@ static int ecpri_dma_mhi_dma_async_memcpy(
 
 	if (function.function_type ==
 		MHI_DMA_FUNCTION_TYPE_VIRTUAL) {
-		DMAERR("No ASYNC for VM\n");
-		return -EPERM;
+		DMADBG("No ASYNC for VM, using SYNC instead\n");
+		return ecpri_dma_mhi_dma_async_memcpy_vm_handling(dest, src, len,
+			function, user_cb, user_param);
 	}
 
 	if (atomic_read(&memcpy_ctx->ref_count) == 0) {
@@ -1344,31 +1515,36 @@ static int ecpri_dma_mhi_dma_async_memcpy(
 		return -EPERM;
 	}
 
-	spin_lock_irqsave(
-		&memcpy_ctx->async_lock,
-		flags);
-
 	xfer_descr = kmem_cache_zalloc(
 		memcpy_ctx->xfer_wrapper_cache,
-		GFP_NOWAIT);
+		GFP_KERNEL);
 	if (!xfer_descr) {
-		ret = -ENOMEM;
-		goto fail_mem_alloc;
+		return -ENOMEM;
 	}
 
 	xfer_descr->user_cb = user_cb;
 	xfer_descr->user_data = user_param;
 
-	list_add_tail(&xfer_descr->link, &memcpy_ctx->cbs_list);
-
 	ret = ecpri_dma_mhi_dma_alloc_pkt(dest, len, &pkt_dest);
 	if (ret != 0) {
 		DMAERR("Unable to allocate packets for destination\n");
-		ret = -EPERM;
-		goto fail_dest_alloc;
+		return -ENOMEM;
 	}
 
+	ret = ecpri_dma_mhi_dma_alloc_pkt(src, len, &pkt_src);
+	if (ret != 0) {
+		ecpri_dma_mhi_dma_free_pkt(pkt_dest[0]);
+		DMAERR("Unable to allocate packets for source\n");
+		return -ENOMEM;
+	}
+
+	spin_lock_irqsave(
+		&memcpy_ctx->async_lock,
+		flags);
+
+	list_add_tail(&xfer_descr->link, &memcpy_ctx->cbs_list);
 	atomic_inc(&memcpy_ctx->async_pending);
+
 	ret = ecpri_dma_dp_transmit(
 		memcpy_ctx->async_dest_endp,
 		pkt_dest, 1, true);
@@ -1377,42 +1553,30 @@ static int ecpri_dma_mhi_dma_async_memcpy(
 		ret = -EPERM;
 		goto fail_dest_transmit;
 	}
-
-	ret = ecpri_dma_mhi_dma_alloc_pkt(src, len, &pkt_src);
-	if (ret != 0) {
-		DMAERR("Unable to allocate packets for source\n");
-		ret = -EPERM;
-		goto fail_src_alloc;
-	}
-
 	ret = ecpri_dma_dp_transmit(memcpy_ctx->async_src_endp,
 		pkt_src, 1, true);
 	if (ret != 0) {
 		DMAERR("Unable to transmit\n");
-		ret = -EPERM;
-		goto fail_src_transmit;
+		ecpri_dma_assert();
 	}
 
-	ret = 0;
-	goto success;
+	spin_unlock_irqrestore(&memcpy_ctx->async_lock, flags);
+	return 0;
 
-fail_src_transmit:
-	atomic_dec(&memcpy_ctx->async_pending);
-fail_src_alloc:
 fail_dest_transmit:
-	ecpri_dma_mhi_dma_free_pkt(pkt_dest[0]);
-fail_dest_alloc:
 	xfer_descr = list_last_entry(
 		&memcpy_ctx->cbs_list,
 		struct ecpri_dma_mhi_xfer_wrapper,
 		link);
-
 	list_del(&xfer_descr->link);
+	atomic_dec(&memcpy_ctx->async_pending);
+	spin_unlock_irqrestore(&memcpy_ctx->async_lock, flags);
+
 	kmem_cache_free(memcpy_ctx->xfer_wrapper_cache,
 		xfer_descr);
-fail_mem_alloc:
-success:
-	spin_unlock_irqrestore(&memcpy_ctx->async_lock, flags);
+	ecpri_dma_mhi_dma_free_pkt(pkt_dest[0]);
+	ecpri_dma_mhi_dma_free_pkt(pkt_src[0]);
+
 	return ret;
 }
 
@@ -1459,6 +1623,20 @@ static int ecpri_dma_mhi_dma_memcpy_disable(
 		return -EPERM;
 	}
 
+	if (ecpri_dma_mhi_check_destroy_pending(memcpy_ctx) == true) {
+		DMAERR("Memcpy destroy in progress\n");
+		return -EFAULT;
+	}
+
+	sync_src_id =
+		ecpri_dma_mhi_function_endp_dt[idx].sync_src_id;
+	sync_dest_id =
+		ecpri_dma_mhi_function_endp_dt[idx].sync_dest_id;
+	async_src_id =
+		ecpri_dma_mhi_function_endp_dt[idx].async_src_id;
+	async_dest_id =
+		ecpri_dma_mhi_function_endp_dt[idx].async_dest_id;
+
 	spin_lock_irqsave(&memcpy_ctx->lock,
 		flags);
 
@@ -1493,31 +1671,35 @@ static int ecpri_dma_mhi_dma_memcpy_disable(
 	spin_lock_irqsave(
 		&memcpy_ctx->sync_lock,
 		flags_sync);
-
-	sync_src_id =
-		ecpri_dma_mhi_function_endp_dt[idx].sync_src_id;
-	sync_dest_id =
-		ecpri_dma_mhi_function_endp_dt[idx].sync_dest_id;
-	async_src_id =
-		ecpri_dma_mhi_function_endp_dt[idx].async_src_id;
-	async_dest_id =
-		ecpri_dma_mhi_function_endp_dt[idx].async_dest_id;
-
-	/* Stop endpoints */
-	ret = ecpri_dma_mhi_stop_memcpy_endps(sync_src_id,
-		sync_dest_id, async_src_id, async_dest_id);
-	if (ret != 0) {
-		DMAERR("Unable to stop endp\n");
-		goto fail_stop_endp;
+	if (atomic_read(&memcpy_ctx->sync_pending) > 0) {
+		spin_unlock_irqrestore(
+			&memcpy_ctx->sync_lock,
+			flags_sync);
+		spin_unlock_irqrestore(
+			&memcpy_ctx->async_lock,
+			flags_async);
+		spin_unlock_irqrestore(
+			&memcpy_ctx->lock,
+			flags);
+		return -EFAULT;
 	}
 
-fail_stop_endp:
+	memcpy_ctx->destroy_pending = true;
+
 	spin_unlock_irqrestore(&memcpy_ctx->sync_lock,
 		flags_sync);
 	spin_unlock_irqrestore(&memcpy_ctx->async_lock,
 		flags_async);
 	spin_unlock_irqrestore(&memcpy_ctx->lock,
 		flags);
+
+	/* Stop endpoints */
+	ret = ecpri_dma_mhi_stop_memcpy_endps(sync_src_id,
+		sync_dest_id, async_src_id, async_dest_id);
+	if (ret != 0) {
+		DMAERR("Unable to stop endp\n");
+		return ret;
+	}
 
 	return ret;
 }
@@ -1596,6 +1778,11 @@ static int ecpri_dma_mhi_dma_memcpy_enable(
 	}
 
 	memcpy_ctx = ecpri_dma_mhi_memcpy_ctx[idx];
+
+	if (ecpri_dma_mhi_check_destroy_pending(memcpy_ctx) == true) {
+		DMAERR("Memcpy destroy in progress\n");
+		return -EFAULT;
+	}
 
 	if (atomic_read(&memcpy_ctx->ref_count)) {
 		atomic_inc(&memcpy_ctx->ref_count);
@@ -1715,7 +1902,7 @@ static int ecpri_dma_mhi_client_init(
 	/* Initialize context */
 	ecpri_dma_mhi_client_ctx[idx] = kzalloc(
 		sizeof(*ecpri_dma_mhi_client_ctx[0]),
-		GFP_NOWAIT);
+		GFP_KERNEL);
 	if (!ecpri_dma_mhi_client_ctx[idx]) {
 		ret = -ENOMEM;
 		goto fail_alloc_ctx;
@@ -1809,7 +1996,7 @@ static int ecpri_dma_mhi_client_init(
 		GSI_EE_n_EV_CH_k_DOORBELL_0, ee_idx, 0);
 
 	/* Create notifier for driver ready */
-	work = kzalloc(sizeof(*work), GFP_NOWAIT);
+	work = kzalloc(sizeof(*work), GFP_KERNEL);
 
 	if (work) {
 		INIT_WORK(&work->work,
@@ -1872,6 +2059,8 @@ static void ecpri_dma_mhi_destroy(
 		DMAERR("Failed to disable memcpy\n");
 		ecpri_dma_assert();
 	}
+
+	ecpri_dma_mhi_memcpy_destroy(function);
 
 	idr_destroy(&ecpri_dma_mhi_client_ctx[idx]->idr);
 
@@ -2032,7 +2221,7 @@ static int ecpri_dma_mhi_client_read_write_host(
 	mem.size = size;
 	if (pdev) {
 		mem.virt_base = dma_alloc_coherent(pdev, mem.size,
-			&mem.phys_base, GFP_NOWAIT);
+			&mem.phys_base, GFP_KERNEL);
 	}
 	else {
 		DMAERR("Platform dev is not valid");
