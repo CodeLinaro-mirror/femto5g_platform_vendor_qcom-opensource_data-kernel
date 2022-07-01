@@ -72,12 +72,35 @@ ecpri_dma_eth_client_get_conn_from_hdl (ecpri_dma_eth_conn_hdl_t hdl) {
 
 static void ecpri_dma_eth_client_register_ready(void *user_data)
 {
+	int i = 0;
+	u32 hw_ver = ecpri_dma_get_ctx_hw_ver();
+	u32 hw_flavor = ecpri_dma_get_ctx_hw_flavor();
+	struct ecpri_dma_eth_client_endp_mapping *current_map =
+		&eth_client_endp_map[hw_ver][hw_flavor][0];
+
 	DMADBG_LOW("Begin\n");
 
 	if (!ecpri_dma_eth_client_ctx || !ecpri_dma_eth_client_ctx->ready_cb) {
 		DMAERR("ETH Ready Callback is NULL\n");
 		return;
 	}
+
+	ecpri_dma_eth_client_ctx->link_to_endp_mapping = current_map;
+
+	/* Endpoints mapping */
+	for (i = 0; i < ECPRI_DMA_ETH_CLIENT_MAX_CONNTECTIONS; i++) {
+		if (current_map[i].valid) {
+			ecpri_dma_eth_client_ctx->connections[i].tx_endp_ctx =
+				&ecpri_dma_ctx
+					 ->endp_ctx[current_map[i].tx_endp_id];
+
+			ecpri_dma_eth_client_ctx->connections[i].rx_endp_ctx =
+				&ecpri_dma_ctx
+					 ->endp_ctx[current_map[i].rx_endp_id];
+		}
+	}
+
+	ecpri_dma_eth_client_ctx->is_eth_ready = true;
 
 	ecpri_dma_eth_client_ctx->ready_cb(user_data);
 
@@ -189,12 +212,6 @@ static void ecpri_dma_eth_client_conn_hdl_remove(ecpri_dma_eth_conn_hdl_t hdl) {
 
 int ecpri_dma_eth_client_init(void)
 {
-	int i;
-	u32 hw_ver = ecpri_dma_get_ctx_hw_ver();
-	u32 hw_flavor = ecpri_dma_get_ctx_hw_flavor();
-	struct ecpri_dma_eth_client_endp_mapping *current_map =
-		&eth_client_endp_map[hw_ver][hw_flavor][0];
-
 	DMADBG("eCPRI DMA ETH Client init\n");
 
 	/* Check if the context was already initialized */
@@ -211,18 +228,6 @@ int ecpri_dma_eth_client_init(void)
 	mutex_init(&ecpri_dma_eth_client_ctx->lock);
 	ecpri_dma_eth_client_ctx->is_eth_ready = false;
 	ecpri_dma_eth_client_ctx->is_eth_notified_ready = false;
-	ecpri_dma_eth_client_ctx->link_to_endp_mapping = current_map;
-
-	/* Endpoints mapping */
-	for (i = 0; i < ECPRI_DMA_ETH_CLIENT_MAX_CONNTECTIONS; i++) {
-		if (current_map[i].valid) {
-			ecpri_dma_eth_client_ctx->connections[i].tx_endp_ctx =
-				&ecpri_dma_ctx->endp_ctx[current_map[i].tx_endp_id];
-
-			ecpri_dma_eth_client_ctx->connections[i].rx_endp_ctx =
-				&ecpri_dma_ctx->endp_ctx[current_map[i].rx_endp_id];
-		}
-	}
 
 	idr_init(&ecpri_dma_eth_client_ctx->idr);
 	spin_lock_init(&ecpri_dma_eth_client_ctx->idr_lock);
@@ -254,8 +259,10 @@ int ecpri_dma_eth_client_destroy(void)
 int ecpri_dma_eth_register(struct ecpri_dma_eth_register_params *ready_info,
 	bool *is_dma_ready)
 {
-	int ret = 0;
+	int ret = 0, i = 0;
 	bool ready = false;
+	u32 hw_ver = 0, hw_flavor = 0;
+	struct ecpri_dma_eth_client_endp_mapping *current_map = NULL;
 
 	DMADBG_LOW("Begin\n");
 
@@ -277,8 +284,6 @@ int ecpri_dma_eth_register(struct ecpri_dma_eth_register_params *ready_info,
 		DMAERR("Failed to init ETH client\n");
 		return ret;
 	}
-
-	ecpri_dma_eth_client_ctx->is_eth_ready = true;
 
 	/* Register callbacks*/
 	ecpri_dma_eth_client_ctx->ready_cb
@@ -336,6 +341,31 @@ int ecpri_dma_eth_register(struct ecpri_dma_eth_register_params *ready_info,
 				return ret;
 			}
 		}
+	} 
+
+	if (ready) {
+		hw_ver = ecpri_dma_get_ctx_hw_ver();
+		hw_flavor = ecpri_dma_get_ctx_hw_flavor();
+		current_map = &eth_client_endp_map[hw_ver][hw_flavor][0];
+
+		ecpri_dma_eth_client_ctx->link_to_endp_mapping = current_map;
+
+		/* Endpoints mapping */
+		for (i = 0; i < ECPRI_DMA_ETH_CLIENT_MAX_CONNTECTIONS; i++) {
+			if (current_map[i].valid) {
+				ecpri_dma_eth_client_ctx->connections[i]
+					.tx_endp_ctx =
+					&ecpri_dma_ctx->endp_ctx
+						 [current_map[i].tx_endp_id];
+
+				ecpri_dma_eth_client_ctx->connections[i]
+					.rx_endp_ctx =
+					&ecpri_dma_ctx->endp_ctx
+						 [current_map[i].rx_endp_id];
+			}
+		}
+
+		ecpri_dma_eth_client_ctx->is_eth_ready = true;
 	}
 
 	*(is_dma_ready) = ready;
