@@ -757,7 +757,7 @@ static int mtip_platform_validate_dt_lane_config(struct mtip_port_device_info* p
         port_speed +=  lane_speed_gbps * link->num_lanes;
     }
 
-    if (port_speed >= 100)
+    if (port_speed > 100)
     {
         CSMLOGERR("Total port_speed %d exceeds 100Gbps\n", port_speed);
         return -1;
@@ -1004,6 +1004,8 @@ static int mtip_platform_setup(void)
        // initialize the PCS of the ports
        for (i = 0; i < platform_driver_priv->devices.num_port_phandles; ++i)
        {
+           CSMLOGINFO("Initializing RSFEC and PHY for port: %d\n", i);
+
            // initialize the RSFEC of the port
            mtip_rsfec_initialize(&platform_driver_priv->devices.port_devices[i]);
 
@@ -1143,16 +1145,14 @@ static int mtip_platform_setup(void)
           }
           else
           {
+              // this is the default for the target
+              // initialize the PCS for the link
+              mtip_pcs_config_pcs(i);
+
               if (mtip_loopback_mode == MTIP_MODE_LOOPBACK)
               {
                   // enable pcs loopback on the link
                   mtip_pcs_enable_loopback(i);
-              }
-              else
-              {
-                  // this is the default for the target
-                  // initialize the PCS for the link
-                  mtip_pcs_config_pcs(i);
               }
           }
 
@@ -1251,11 +1251,12 @@ int mtip_platform_convert_lane_speed_to_gbps(enum eth_phy_iface_phy_lane_speed_e
 
     case PHY_LANE_SPEED_10G:
         {
-            return 25;
+            return 10;
         }
+        break;
     case PHY_LANE_SPEED_25G:
         {
-            return 10;
+            return 25;
         }
         break;
     default:
