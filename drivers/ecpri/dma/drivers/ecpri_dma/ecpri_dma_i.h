@@ -80,7 +80,7 @@ do {\
 
 #define DMADBG(fmt, args...) \
 	do { \
-		pr_err(DRV_NAME " %s:%d " fmt, __func__, __LINE__, ## args);\
+		pr_debug(DRV_NAME " %s:%d " fmt, __func__, __LINE__, ## args);\
 		if (ecpri_dma_ctx) { \
 			DMA_IPC_LOGGING(ecpri_dma_ctx->logbuf, \
 				DRV_NAME " %s:%d " fmt, ## args); \
@@ -91,7 +91,7 @@ do {\
 
 #define DMADBG_LOW(fmt, args...) \
 	do { \
-		pr_err(DRV_NAME " %s:%d " fmt, __func__, __LINE__, ##args);\
+		pr_debug(DRV_NAME " %s:%d " fmt, __func__, __LINE__, ##args);\
 		if (ecpri_dma_ctx) \
 			DMA_IPC_LOGGING(ecpri_dma_ctx->logbuf_low, \
 				DRV_NAME " %s:%d " fmt, ## args); \
