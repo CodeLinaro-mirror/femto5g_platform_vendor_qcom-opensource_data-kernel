@@ -50,6 +50,7 @@
 #include "mtip_ethtool.h"
 #include "mtip_client.h"
 #include "mtip_ptp.h"
+#include "mtip_debug_eth.h"
 
 int macsec_eth_set_macsec_ops(const struct macsec_ops* rb_macsec_ops)
 {
@@ -440,6 +441,10 @@ static int mtip_start_xmit(struct sk_buff *skb, struct net_device *netdev)
    link_index = priv->link_index;
    hdl = platform_driver_priv->mtip_links[link_index]->dma_hdl;
 
+   if(priv->link_index == MTIP_DEBUG_ETH_LINK_INDEX){
+      return mtip_debug_eth_start_xmit(skb, netdev);
+   }
+
    if (mtip_loopback_mode != MTIP_MODE_DEFAULT)
    {
        switch (hdl)
@@ -742,23 +747,25 @@ static int mtip_open(struct net_device *netdev)
        phylink_start(priv->phylink);
    }
 
-   // start the pipe
-   mtip_start_dma_pipe(netdev, hdl);
+   if(hdl){
+      // start the pipe
+      mtip_start_dma_pipe(netdev, hdl);
 
-   // set the netdev MAC address from the HW
-    mtip_set_netdev_hw_mac_addr(netdev, link_index);
+      // set the netdev MAC address from the HW
+       mtip_set_netdev_hw_mac_addr(netdev, link_index);
 
-   /*
-    * enable napi
-    */
-   napi_enable(&(platform_driver_priv->mtip_links[link_index]->napi));
+      /*
+       * enable napi
+       */
+      napi_enable(&(platform_driver_priv->mtip_links[link_index]->napi));
 
-   /* 
-    * Start the interface's transmit queue 
-    * (allowing it to accept packets for transmission) 
-    * once it is ready to start sending data. 
-    */
-   netif_start_queue(netdev);
+      /* 
+       * Start the interface's transmit queue 
+       * (allowing it to accept packets for transmission) 
+       * once it is ready to start sending data. 
+       */
+      netif_start_queue(netdev);
+   }
 
    /*
     * set the ethtool ops
@@ -798,16 +805,18 @@ static int mtip_close(struct net_device *netdev)
        phylink_disconnect_phy(priv->phylink);
    }
 
-   // stop the pipe
-   mtip_stop_dma_pipe(hdl);
+   if(hdl){
+      // stop the pipe
+      mtip_stop_dma_pipe(hdl);
 
-   /*
-    * disable napi
-    */
-   napi_disable(&(platform_driver_priv->mtip_links[link_index]->napi));
+      /*
+       * disable napi
+       */
+      napi_disable(&(platform_driver_priv->mtip_links[link_index]->napi));
 
-   /* release ports, irq and such -- like fops->close */
-   netif_stop_queue(netdev);
+      /* release ports, irq and such -- like fops->close */
+      netif_stop_queue(netdev);
+   }
 
    CSMLOGERR("Stopping netdev queue\n");
 

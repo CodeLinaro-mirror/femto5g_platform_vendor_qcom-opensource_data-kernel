@@ -56,6 +56,7 @@ MODULE_LICENSE("GPL v2");
 #include "mtip_client.h"
 #include "mtip_phy.h"
 #include "mtip_dut.h"
+#include "mtip_debug_eth.h"
 
 /* Global variables of the driver */
 struct mtip_platform_driver_priv* platform_driver_priv = NULL;
@@ -234,7 +235,7 @@ int mtip_lookup_real_link_number_by_link_index(u32 link_index, u32* link_number)
 		*link_number = 0;
 		break;
 	case 15:
-		*link_number = 1;
+		*link_number = 2;
 		break;
 	default:
         CSMLOGERR("invalid link_index: %d\n", link_index);
@@ -341,6 +342,8 @@ int mtip_register_platform_driver(void)
       CSMLOGERR("platform_driver_register for link with error: %d\n", ret);
       return ret;
    }
+
+   mtip_debug_eth_register_platform_driver();
 
    return ret;
 }
