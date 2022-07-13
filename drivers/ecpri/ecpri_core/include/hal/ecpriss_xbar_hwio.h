@@ -44,6 +44,8 @@
 	out_dword(HWIO_ECPRI_XBAR_XBAR_CFG_ADDR(x),v)
 #define HWIO_ECPRI_XBAR_XBAR_CFG_OUTM(x,m,v) \
 	out_dword_masked_ns(HWIO_ECPRI_XBAR_XBAR_CFG_ADDR(x),m,v,HWIO_ECPRI_XBAR_XBAR_CFG_IN(x))
+#define HWIO_ECPRI_XBAR_XBAR_CFG_AXIS_ARB_FIX_EN_BMSK                                      0x200
+#define HWIO_ECPRI_XBAR_XBAR_CFG_AXIS_ARB_FIX_EN_SHFT                                          9
 #define HWIO_ECPRI_XBAR_XBAR_CFG_TPDM_EN_BMSK                                              0x100
 #define HWIO_ECPRI_XBAR_XBAR_CFG_TPDM_EN_SHFT                                                  8
 #define HWIO_ECPRI_XBAR_XBAR_CFG_XBAR_CNT_CLR_EN_BMSK                                       0x80

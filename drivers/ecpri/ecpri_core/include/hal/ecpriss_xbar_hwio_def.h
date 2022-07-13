@@ -36,6 +36,7 @@ typedef struct
 	uint32_t xbar_cnt_en : 1;
 	uint32_t xbar_cnt_clr_en : 1;
 	uint32_t tpdm_en : 1;
+	uint32_t axis_arb_fix_en : 1;
 	uint32_t reserved0 : 23;
 } ecpri_xbar_hwio_def_ecpri_xbar_xbar_cfg_s;
 
