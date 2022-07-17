@@ -146,7 +146,9 @@ int macsec_platform_probe(struct platform_device *pdev) {
 
 	printk("macsec_platform_probe called\n");
 
-	printk("write bypass value to 164-I \n");
+    macsec_clock_enablement(pdev);
+
+    printk("write bypass value to 164-I \n");
 
 	macsec_base = ioremap(0x2290FE00, 4);
 	printk("macsec base = %x\n", macsec_base);
@@ -220,7 +222,6 @@ int macsec_platform_probe(struct platform_device *pdev) {
 	val = ioread32(macsec_base);
 	printk("read val = %x\n", val);
 
-	macsec_clock_enablement(pdev);
 	return 0;
 }
 

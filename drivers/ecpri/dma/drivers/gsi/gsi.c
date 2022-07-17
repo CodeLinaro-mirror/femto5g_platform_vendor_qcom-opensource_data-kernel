@@ -4145,7 +4145,7 @@ static int __init gsi_init(void)
 out:
 	return ret;
 }
-arch_initcall(gsi_init);
+subsys_initcall(gsi_init);
 
 /*
  * Module exit.

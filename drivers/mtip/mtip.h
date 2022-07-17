@@ -36,7 +36,7 @@
 #define MTIP_LOOPBACK_SWAP_ADDRESSES
 
 /* Dump the contents of Tx and Rx skbs */
-#define MTIP_DUMP_PACKETS
+//#define MTIP_DUMP_PACKETS
 
 /* Setting the modes of the driver */
 #define MTIP_MODE_DEFAULT          0   // This is the default mode with no loopback

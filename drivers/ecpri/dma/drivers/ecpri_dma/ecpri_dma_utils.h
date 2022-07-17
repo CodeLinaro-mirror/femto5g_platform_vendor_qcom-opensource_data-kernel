@@ -9,6 +9,10 @@
 #include "ecpri_dma_ecpri_ss.h"
 #include "ecpri_dma_i.h"
 
+#define ECPRI_DMA_DEFAULT_PORT_ID 0
+#define ECPRI_DMA_L2_PORT_ID 2
+#define ECPRI_DMA_TLV_TRSHLD 7
+
 #define ECPRI_DMA_GSI_CHANNEL_STOP_MAX_RETRY 10
 #define ECPRI_DMA_GSI_CHANNEL_STOP_SLEEP_MIN_USEC (3000)
 #define ECPRI_DMA_GSI_CHANNEL_STOP_SLEEP_MAX_USEC (5000)

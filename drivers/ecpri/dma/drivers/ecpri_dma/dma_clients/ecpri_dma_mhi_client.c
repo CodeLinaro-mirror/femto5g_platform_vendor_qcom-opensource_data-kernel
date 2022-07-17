@@ -1032,11 +1032,6 @@ static int ecpri_dma_mhi_memcpy_init(
 	}
 	memcpy_ctx = ecpri_dma_mhi_memcpy_ctx[idx];
 
-	if (ecpri_dma_mhi_check_destroy_pending(memcpy_ctx) == true) {
-		DMAERR("Memcpy destroy in progress\n");
-		return -EFAULT;
-	}
-
 	spin_lock_init(&memcpy_ctx->lock);
 	spin_lock_init(&memcpy_ctx->sync_lock);
 	spin_lock_init(&memcpy_ctx->async_lock);

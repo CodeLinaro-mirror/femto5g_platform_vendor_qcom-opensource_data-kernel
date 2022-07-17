@@ -533,6 +533,7 @@ void mtip_mac_wrapper_pcs_mode_control(struct mtip_port_device_info* port_device
     u32 lane;
     u32 csr_cfg = 0;
     u32 pcs_mode_set = 0;
+    u32 serdes_mux_cfg = 0;
     void __iomem* wrapper_base_addr = port_device->wrapper_base_addr;
 
     for (i = 0; i < port_device->num_link_phandles; ++i) 
@@ -549,6 +550,10 @@ void mtip_mac_wrapper_pcs_mode_control(struct mtip_port_device_info* port_device
             {
             case PHY_LANE_SPEED_25G:
                 {
+                    // this needs a proper fix
+                    pcs_mode_set = 0x0000;
+                    csr_cfg = 0x3C00;
+                    serdes_mux_cfg = 0x400;
                 }
                 break;
             case PHY_LANE_SPEED_10G:
@@ -563,6 +568,8 @@ void mtip_mac_wrapper_pcs_mode_control(struct mtip_port_device_info* port_device
         }
     }
 
+    CSMLOGINFO("Setting CSR: 0%x, PCS Mode: 0x%x, MUX CFG: 0x%x\n", csr_cfg, pcs_mode_set, serdes_mux_cfg);
+
     // set the mac wrapper csr cfg
     iowrite32(csr_cfg,
               wrapper_base_addr + MTIP_MAC_WRAPPER_CSR_CONFIG_OFFSET);
@@ -570,6 +577,10 @@ void mtip_mac_wrapper_pcs_mode_control(struct mtip_port_device_info* port_device
     // set the mac wrapper pcs mode set
     iowrite32(pcs_mode_set,
               wrapper_base_addr + MTIP_MAC_WRAPPER_PCS_MODE_SET_OFFSET);
+
+    // set the serdes mux cfg register
+    iowrite32(serdes_mux_cfg,
+              wrapper_base_addr + MTIP_MAC_WRAPPER_SERDES_MUX_CFG_OFFSET);
 
     return;
 }

@@ -84,6 +84,7 @@ static void mtip_workq_handler(struct work_struct *w)
           {
               run_mtip_process_link_state(work_ptr);
           }
+          break;
       default:
          {
             CSMLOGERR("Unknown task type: %d\n", work_type);
