@@ -360,7 +360,10 @@ static int mtip_module_init(void)
    // tx_delay parameter
 	for (i = 0; i < (sizeof mtip_tx_delay / sizeof (int)); i++)
 	{
-		CSMLOGINFO("mtip_tx_delay[%d] = %d\n", i, mtip_tx_delay[i]);
+        if (mtip_tx_delay[i] != 0) 
+        {
+            CSMLOGINFO("mtip_tx_delay[%d] = %d\n", i, mtip_tx_delay[i]);
+        }
 	}
 	CSMLOGINFO("mtip_tx_delay module params set for %d\n", mtip_tx_delay_argc);
 
@@ -371,7 +374,10 @@ static int mtip_module_init(void)
     // rx_delay parameter
     for (i = 0; i < (sizeof mtip_rx_delay / sizeof (int)); i++)
     {
-        CSMLOGINFO("mtip_rx_delay[%d] = %d\n", i, mtip_rx_delay[i]);
+        if (mtip_rx_delay[i] != 0) 
+        {
+            CSMLOGINFO("mtip_rx_delay[%d] = %d\n", i, mtip_rx_delay[i]);
+        }
     }
     CSMLOGINFO("mtip_rx_delay module params set for %d\n", mtip_rx_delay_argc);
 

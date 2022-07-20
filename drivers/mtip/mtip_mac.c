@@ -267,11 +267,15 @@ void mtip_mac_get_mac_address_by_device(u32 port_device_index, u32 link_device_i
    u32 upper = 0;
    void __iomem *mac_ioaddr;
    u32 link_index;
+   const char* link_name;
 
    mtip_lookup_link_index_by_device(&link_index, port_device_index, link_device_index);
 
    // lookup the mac_ioadr for the port and link
    mac_ioaddr = platform_driver_priv->devices.port_devices[port_device_index].link_devices[link_device_index].mac_ioaddr;
+
+   // the link name
+   link_name = platform_driver_priv->devices.port_devices[port_device_index].link_devices[link_device_index].link_name;
 
    // read the lower bits
    lower = ioread32(mac_ioaddr + MTIP_MAC_MAC_ADDR_0);
@@ -288,7 +292,8 @@ void mtip_mac_get_mac_address_by_device(u32 port_device_index, u32 link_device_i
    sa_data[4] = (upper) & 0xFF;
    sa_data[5] = (upper >> 8) & 0xFF;
 
-   CSMLOGINFO("Retrieved the MAC address of link index: %d, upper: 0x%x, lower: 0x%x\n", link_index, upper, lower);
+   CSMLOGDBG("Retrieved the MAC address of link index: %d, name: %s,  %x:%x:%x:%x:%x:%x \n", link_index, link_name, 
+              sa_data[0], sa_data[1], sa_data[2], sa_data[3], sa_data[4], sa_data[5]);
 }
 
 void mtip_mac_set_mac_address_by_device(u32 port_device_index, u32 link_device_index, uint8_t sa_data[]) 
@@ -297,8 +302,12 @@ void mtip_mac_set_mac_address_by_device(u32 port_device_index, u32 link_device_i
     u32 upper = 0;
     void __iomem *mac_ioaddr;
     u32 link_index;
+    const char* link_name;
 
     mtip_lookup_link_index_by_device(&link_index, port_device_index, link_device_index);
+
+    // the link name
+    link_name = platform_driver_priv->devices.port_devices[port_device_index].link_devices[link_device_index].link_name;
 
     // lookup the mac_ioadr for the port and link
     mac_ioaddr = platform_driver_priv->devices.port_devices[port_device_index].link_devices[link_device_index].mac_ioaddr;
@@ -313,7 +322,8 @@ void mtip_mac_set_mac_address_by_device(u32 port_device_index, u32 link_device_i
     // write the upper bits
     iowrite32(upper, platform_driver_priv->devices.port_devices[port_device_index].link_devices[link_device_index].mac_ioaddr + MTIP_MAC_MAC_ADDR_1);
 
-    CSMLOGINFO("Set the MAC address for link index: %d to upper: 0x%x, lower: 0x%x\n", link_index, upper, lower);
+    CSMLOGINFO("Set the MAC address for link index: %d, name: %s,  %x:%x:%x:%x:%x:%x \n", link_index, link_name, 
+               sa_data[0], sa_data[1], sa_data[2], sa_data[3], sa_data[4], sa_data[5]);
 }
 
 int mtip_mac_set_promisc_mode(struct mtip_netdev_priv *priv, bool mode)
