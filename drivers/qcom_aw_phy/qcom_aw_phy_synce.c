@@ -1,0 +1,247 @@
+/* SPDX-License-Identifier: GPL-2.0-only
+ * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ */
+
+/**
+  @file qcom_aw_phy_synce.c
+  @brief Interface file between AW PHY and SyncE application.
+
+  This file contains interface handling betwen AW PHY driver and
+  SyncE application.
+*/
+
+#include "qcom_aw_phy_main.h"
+#include "qcom_aw_phy_mtip_if.h"
+#include "qcom_aw_phy_synce.h"
+#include "qcom_aw_phy_utils.h"
+#include "qcom_aw_phy_gnl.h"
+#include "eth_phy_iface.h"
+#include "aw_c_api/aw_alphacore.h"
+#include "aw_c_api/aw_driver_sim.h"
+
+/*-------------------------------------------------------------------
+* qcom_aw_phy_synce_notify_phy_lane_state_change
+
+* @phy_inst: PHY Instance type(FH/C2C/Debug)
+* @lane_num: PHY Lane number.
+
+* Description: This function notifies lane state change to .SyncE application.
+------------------------------------------------------------------- */
+void qcom_aw_phy_synce_notify_phy_lane_state_change() {
+
+  struct qcom_aw_phy_config *phy_config_info = NULL;
+  enum qcom_aw_phy_instance_enum phy_inst_type = QCOM_AW_PHY_INST_FH0;
+  struct qcom_aw_phy_inst_config *phy_inst_info = NULL;
+  enum eth_phy_iface_phy_lane_num_enum lane_num;
+  enum qcom_aw_phy_synce_lane_id synce_lane_num;
+  struct qcom_aw_phy_synce_lane_status lane_status[MAX_PHY_SYNCE_LANES];
+  enum local_error_enum local_err_val = LOCAL_ERROR_INVALID;
+
+  phy_config_info = qcom_aw_phy_get_config_info();
+  if (!phy_config_info) {
+    local_err_val = LOCAL_ERROR_0;
+    goto func_exit;
+  }
+
+  memset(lane_status, 0,
+         sizeof(struct qcom_aw_phy_synce_lane_status) * MAX_PHY_SYNCE_LANES);
+
+  for (phy_inst_type = QCOM_AW_PHY_INST_FH0;
+       phy_inst_type <= QCOM_AW_PHY_INST_L2; phy_inst_type++) {
+
+    phy_inst_info = &phy_config_info->phy_inst_config_info[phy_inst_type];
+    if (phy_inst_info->valid && phy_inst_info->link_status) {
+      for (lane_num = PHY_LANE_0; lane_num < PHY_LANE_MAX; lane_num++) {
+        if (phy_inst_info->lane_params[lane_num].lane_config.lane_enabled) {
+          synce_lane_num = (phy_inst_type * PHY_LANE_MAX) + lane_num;
+          lane_status[synce_lane_num].lane_status = true;
+          lane_status[synce_lane_num].lane_speed =
+              phy_inst_info->lane_params[lane_num].lane_config.lane_speed;
+        }
+      }
+    }
+  }
+
+  // Send netlink message with lane_status for all lanes
+  qcom_aw_phy_gnl_lane_status_change(lane_status);
+
+func_exit:
+  QCOM_AW_PHY_LOG_ERR("qcom_aw_phy_synce_notify_phy_lane_state_change, "
+                      "local error %d",
+                      local_err_val);
+
+  return;
+}
+
+/*-------------------------------------------------------------------
+* qcom_aw_phy_synce_notify_snr_valid_change
+
+* @phy_inst: PHY Instance type(FH/C2C/Debug)
+* @lane_num: PHY Lane number.
+
+* Description: This function notifies SNR valid change to .SyncE application.
+------------------------------------------------------------------- */
+void qcom_aw_phy_synce_notify_snr_valid_change(
+    enum qcom_aw_phy_instance_enum phy_inst,
+    enum eth_phy_iface_phy_lane_num_enum lane_num, bool valid) {
+
+  struct qcom_aw_phy_synce_snr_valid_change snr_valid_info = {0};
+  enum local_error_enum local_err_val = LOCAL_ERROR_INVALID;
+
+  if (!QCOM_AW_PHY_INST_VALID(phy_inst) || !QCOM_AW_PHY_LANE_VALID(lane_num)) {
+    local_err_val = LOCAL_ERROR_0;
+    goto func_exit;
+  }
+
+  snr_valid_info.lane_id = (phy_inst * PHY_LANE_MAX) + lane_num;
+  snr_valid_info.snr_valid_status = valid;
+
+  // Send netlink message with SNR valid status for this lane
+  qcom_aw_phy_gnl_snr_valid_change(snr_valid_info);
+
+func_exit:
+  QCOM_AW_PHY_LOG_ERR(
+      "qcom_aw_phy_synce_notify_snr_valid_change, local error %d",
+      local_err_val);
+  return;
+}
+
+/*-------------------------------------------------------------------
+* aw_phy_synce_set_snr_threshold
+
+* @phy_inst: PHY Instance type(FH/C2C/Debug)
+* @lane_num: PHY Lane number.
+
+* Description: This function sets the valid SNR threshold.
+------------------------------------------------------------------- */
+int qcom_aw_phy_synce_set_snr_threshold(
+    enum qcom_aw_phy_instance_enum phy_inst,
+    enum eth_phy_iface_phy_lane_num_enum lane_num, int snr_low_val,
+    int snr_high_val) {
+  struct qcom_aw_phy_config *phy_config_info = NULL;
+  struct qcom_aw_phy_inst_config *phy_inst_info = NULL;
+  struct qcom_aw_phy_lane_speed_config config;
+  mss_access_t mss = {.phy_offset = 0, .lane_offset = 0};
+  u32 nrz_mode = 0;
+  enum local_error_enum local_err_val = LOCAL_ERROR_INVALID;
+  int ret_val = 0;
+
+  if (!QCOM_AW_PHY_INST_VALID(phy_inst) || !QCOM_AW_PHY_LANE_VALID(lane_num)) {
+    ret_val = EINVAL;
+    local_err_val = LOCAL_ERROR_0;
+    goto func_exit;
+  }
+
+  phy_config_info = qcom_aw_phy_get_config_info();
+  if (!phy_config_info) {
+    ret_val = EINVAL;
+    local_err_val = LOCAL_ERROR_1;
+    goto func_exit;
+  }
+
+  phy_inst_info = &phy_config_info->phy_inst_config_info[phy_inst];
+  if (phy_inst_info->valid == false) {
+    ret_val = EINVAL;
+    local_err_val = LOCAL_ERROR_2;
+    goto func_exit;
+  }
+
+  /* Setup PHY and lane offsets */
+  mss.phy_offset = phy_inst_info->base_addr;
+  pmd_set_lane(&mss, lane_num);
+
+  qcom_aw_phy_get_lane_speed_config(
+      phy_inst_info->lane_params[lane_num].lane_config.lane_speed, &config);
+  if (config.mod_tech == QCOM_AW_PHY_MOD_TECH_NRZ) {
+    nrz_mode = 1;
+  }
+
+  pmd_write_field(&mss, RX_SNR_REG4_ADDR,
+                  RX_SNR_REG4_VLD_HYS_THRESH_LOW_NT_MASK,
+                  RX_SNR_REG4_VLD_HYS_THRESH_LOW_NT_OFFSET, snr_low_val);
+  pmd_write_field(&mss, RX_SNR_REG5_ADDR,
+                  RX_SNR_REG5_VLD_HYS_THRESH_HIGH_NT_MASK,
+                  RX_SNR_REG5_VLD_HYS_THRESH_HIGH_NT_OFFSET, snr_high_val);
+
+  aw_pmd_snr_mon_enable_set(&mss, nrz_mode, 1);
+  aw_pmd_snr_vld_enable_set(&mss, 1);
+
+func_exit:
+  QCOM_AW_PHY_LOG_INFO("snr_low_val = %d, snr_high_val = %d, "
+                       "ret_val %d, local error %d",
+                       snr_low_val, snr_high_val, ret_val, local_err_val);
+
+  return ret_val;
+}
+
+/*-------------------------------------------------------------------
+* aw_phy_synce_get_current_snr_val
+
+* @phy_inst: PHY Instance type(FH/C2C/Debug)
+* @lane_num: PHY Lane number.
+
+* Description: This function gets the current SNR value of the passed lane.
+------------------------------------------------------------------- */
+int qcom_aw_phy_synce_get_current_snr_val(
+    enum qcom_aw_phy_instance_enum phy_inst,
+    enum eth_phy_iface_phy_lane_num_enum lane_num, int *snr_val) {
+  struct qcom_aw_phy_config *phy_config_info = NULL;
+  struct qcom_aw_phy_inst_config *phy_inst_info = NULL;
+  struct qcom_aw_phy_lane_speed_config config;
+  mss_access_t mss = {.phy_offset = 0, .lane_offset = 0};
+  enum local_error_enum local_err_val = LOCAL_ERROR_INVALID;
+  int ret_val = 0;
+
+  if (!QCOM_AW_PHY_INST_VALID(phy_inst) || !QCOM_AW_PHY_LANE_VALID(lane_num)) {
+    ret_val = EINVAL;
+    local_err_val = LOCAL_ERROR_0;
+    goto func_exit;
+  }
+
+  phy_config_info = qcom_aw_phy_get_config_info();
+  if (!phy_config_info) {
+    ret_val = EINVAL;
+    local_err_val = LOCAL_ERROR_1;
+    goto func_exit;
+  }
+
+  phy_inst_info = &phy_config_info->phy_inst_config_info[phy_inst];
+  if (phy_inst_info->valid == false) {
+    ret_val = EINVAL;
+    local_err_val = LOCAL_ERROR_2;
+    goto func_exit;
+  }
+
+  /* Setup PHY and lane offsets */
+  mss.phy_offset = phy_inst_info->base_addr;
+  pmd_set_lane(&mss, lane_num);
+
+  qcom_aw_phy_get_lane_speed_config(
+      phy_inst_info->lane_params[lane_num].lane_config.lane_speed, &config);
+
+  memset(snr_val, 0, sizeof(int) * 3);
+
+  if (config.mod_tech == QCOM_AW_PHY_MOD_TECH_NRZ) {
+    pmd_read_field(&mss, RX_SNR_RDREG13_ADDR,
+                   RX_SNR_RDREG13_MON_NRZ_EYE_NT_MASK,
+                   RX_SNR_RDREG13_MON_NRZ_EYE_NT_OFFSET, &snr_val[0]);
+  } else if (config.mod_tech == QCOM_AW_PHY_MOD_TECH_PAM4) {
+
+    pmd_read_field(&mss, RX_SNR_RDREG10_ADDR, RX_SNR_RDREG10_MON_EYE0_NT_MASK,
+                   RX_SNR_RDREG10_MON_EYE0_NT_OFFSET, &snr_val[0]);
+
+    pmd_read_field(&mss, RX_SNR_RDREG11_ADDR, RX_SNR_RDREG11_MON_EYE1_NT_MASK,
+                   RX_SNR_RDREG11_MON_EYE1_NT_OFFSET, &snr_val[1]);
+
+    pmd_read_field(&mss, RX_SNR_RDREG12_ADDR, RX_SNR_RDREG12_MON_EYE2_NT_MASK,
+                   RX_SNR_RDREG12_MON_EYE2_NT_OFFSET, &snr_val[2]);
+  }
+
+func_exit:
+  QCOM_AW_PHY_LOG_INFO("mod_tech %d, snr0 = %d, snr1 = %d, snr2 = %d"
+                       "ret_val %d, local error %d",
+                       config.mod_tech, snr_val[0], snr_val[1], snr_val[2],
+                       ret_val, local_err_val);
+
+  return ret_val;
+}
