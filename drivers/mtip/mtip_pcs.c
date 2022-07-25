@@ -173,6 +173,8 @@ static void mtip_pcs_reset_all_vl_registers(struct mtip_link_device_info* link_d
     int index = 0;
     void __iomem *pcs_ioaddr = link_device->pcs_ioaddr;
 
+    CSMLOGINFO("Resetting all PCS VL registers\n");
+
     for (index = 0; index < 20; ++index) 
     {
         // reset the VL register
@@ -181,6 +183,8 @@ static void mtip_pcs_reset_all_vl_registers(struct mtip_link_device_info* link_d
 
         iowrite32(0x0,
                   pcs_ioaddr + MTIP_PCS_VENDOR_VL0_1_OFFSET + index*MTIP_PCS_VENDOR_VLn_OFFSET);
+
+        CSMLOGINFO("done with index: %d\n", index);
     }
     return;
 }

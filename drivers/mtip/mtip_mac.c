@@ -61,6 +61,9 @@ static irqreturn_t mtip_mac_interrupt_handler(int irq, void *devptr)
    u32 link_index;
    u64 timestamp;
    bool found = false;
+   bool handled = false;
+
+   CSMLOGINFO("Got an interrupt!\n");
 
    // check if this an interrupt that needs to be handled
    for (i = 0; i < platform_driver_priv->devices.num_port_phandles; ++i) 
@@ -90,40 +93,67 @@ static irqreturn_t mtip_mac_interrupt_handler(int irq, void *devptr)
    {
        if ((summary & 0x01) == 0x1)
        {
+           CSMLOGINFO("Got an interrupt! on port type %d, link: %d\n", portptr->port_type, i);
+
            // the bit for link i is set
            // there is an interrupt pending
            mtip_lookup_link_index_by_real_port_and_link(&link_index, portptr->port_type, i);
 
            int_status = mtip_mac_get_interrupt_status(link_index);
 
+           CSMLOGINFO("Interrupt status 0x%x for link: %d with link_index: %d\n", int_status, i, link_index);
+
            if ((int_status & MTIP_MAC_INTERRUPT_PTP_TX_INTR) != 0)
            {
                // there is a PTP interrupt pending
                timestamp = mtip_mac_read_timestamp(link_index);
 
+               CSMLOGINFO("Tx Timestamp %d read for link: %d with link_index: %d\n", timestamp, i, link_index);
+
                // post a job to workqueue to process this timestamp
                post_mtip_process_timestamp(link_index, timestamp);
+
+               // clear the interrupt
+               mtip_mac_clear_interrupts(link_index, MTIP_MAC_INTERRUPT_PTP_TX_INTR);
+
+               handled = true;
            }
            if ((int_status & MTIP_MAC_INTERRUPT_LINK_DOWN_INTR) != 0)
            {
                // got a link down interrupt for link index
                post_mtip_process_link_state(link_index, false);
+
+               // clear the interrupt
+               mtip_mac_clear_interrupts(link_index, MTIP_MAC_INTERRUPT_LINK_DOWN_INTR);
+
+               handled = true;
            }
            if ((int_status & MTIP_MAC_INTERRUPT_LINK_UP_INTR) != 0) 
            {
                // got a link up interrupt for link index
                post_mtip_process_link_state(link_index, true);
+
+               // clear the interrupt
+               mtip_mac_clear_interrupts(link_index, MTIP_MAC_INTERRUPT_LINK_UP_INTR);
+
+               handled = true;
            }
 
-           // clear the interrupt
-           mtip_mac_clear_interrupts(link_index);
        }
 
        summary = summary >> 1;
    }
 
-   // set as handled
-   return IRQ_HANDLED;
+   if (handled == true) 
+   {
+       // set as handled
+       return IRQ_HANDLED;
+   }
+   else
+   {
+       // set as not handled
+       return IRQ_NONE;
+   }
 }
 
 static int mtip_mac_read_version(struct mtip_netdev_priv *priv) {
@@ -623,7 +653,7 @@ void mtip_mac_wrapper_register_irq(struct device *dev, unsigned int irq,
 {
    int irqret;
 
-   CSMLOGINFO("Registering IRQ %d for MAC Wrapper\n", irq);
+   CSMLOGINFO("Registering IRQ %d, %s for MAC Wrapper\n", irq, dev_name);
 
    irqret = devm_request_irq(dev, irq, (irq_handler_t)mtip_mac_interrupt_handler, IRQF_SHARED | IRQF_TRIGGER_RISING, dev_name, devptr);
    if (irqret) {
@@ -742,9 +772,9 @@ u32 mtip_mac_get_interrupt_status(u32 link_index)
     return read_val;
 }
 
-void mtip_mac_clear_interrupts(u32 link_index)
+void mtip_mac_clear_interrupts(u32 link_index, u32 int_to_clear)
 {
-    u32 write_val = 0;
+    u32 write_val = int_to_clear;
     void __iomem *wrapper_base_addr;
     u32 port_device_index;
     u32 link_device_index;

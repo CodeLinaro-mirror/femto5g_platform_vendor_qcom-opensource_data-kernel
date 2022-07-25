@@ -180,6 +180,8 @@ void run_mtip_tx_comp_cb(void* work_ptr)
 
       skb = (struct sk_buff*)pkt->user_data;
 
+      CSMLOGINFO("Tx comp for hdl: %d, skb->data: 0x%lx\n", hdl, (unsigned long)skb->data);
+
       // store the netdev
       netdev = skb->dev;
       priv = netdev_priv(netdev);
@@ -190,7 +192,7 @@ void run_mtip_tx_comp_cb(void* work_ptr)
       // check if this skb needs HW timestamping
       if ((skb_shinfo(skb)->tx_flags & SKBTX_IN_PROGRESS)  != 0)
       {
-          CSMLOGDBG("Tx comp cb for packet needing HW_TSTAMP\n");
+          CSMLOGINFO("Tx comp cb for packet needing HW_TSTAMP\n");
 
           // this packet needs to be timestamped
           // acquire the ptp lock
@@ -377,6 +379,30 @@ int mtip_napi_poll(struct napi_struct *napi_ptr, int budget)
        case 4:
           actual_handle = 3;
           break;
+       case 5:
+          actual_handle = 6;
+          break;
+       case 6:
+          actual_handle = 5;
+          break;
+       case 7:
+          actual_handle = 8;
+          break;
+       case 8:
+          actual_handle = 7;
+          break;
+       case 9:
+          actual_handle = 10;
+          break;
+       case 10:
+          actual_handle = 9;
+          break;
+       case 11:
+          actual_handle = 12;
+          break;
+       case 12:
+          actual_handle = 11;
+          break;
        }
 #endif
    }
@@ -461,11 +487,35 @@ static int mtip_start_xmit(struct sk_buff *skb, struct net_device *netdev)
        case 4:
           other_hdl = 3;
           break;
+       case 5:
+          other_hdl = 6;
+          break;
+       case 6:
+          other_hdl = 5;
+          break;
+       case 7:
+          other_hdl = 8;
+          break;
+       case 8:
+          other_hdl = 7;
+          break;
+       case 9:
+          other_hdl = 10;
+          break;
+       case 10:
+          other_hdl = 9;
+          break;
+       case 11:
+          other_hdl = 12;
+          break;
+       case 12:
+          other_hdl = 11;
+          break;
        }
 
        if (mtip_lookup_link_index_by_handle(other_hdl, &other_link_index) < 0)
        {
-          CSMLOGERR("did not find other link index\n");
+          CSMLOGERR("did not find other link index for hdl: %d\n", other_hdl);
 
           // free the skb
           dev_kfree_skb(skb);
@@ -503,7 +553,7 @@ static int mtip_start_xmit(struct sk_buff *skb, struct net_device *netdev)
    // check if this packet needs timestamping
    if ((skb_shinfo(skb)->tx_flags & SKBTX_HW_TSTAMP) != 0)
    {
-       CSMLOGDBG("Tx packet needing HW_TSTAMP");
+       CSMLOGINFO("Tx packet needing HW_TSTAMP skb->data: 0x%lx\n", (unsigned long)skb->data);
 
        // set the flag to in progress
        skb_shinfo(skb)->tx_flags |= SKBTX_IN_PROGRESS;

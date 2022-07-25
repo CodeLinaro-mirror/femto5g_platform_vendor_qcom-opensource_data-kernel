@@ -1030,8 +1030,9 @@ static int mtip_platform_setup(void)
      // register for MAC wrapper IRQ
      mtip_mac_wrapper_register_irq(&platform_driver_priv->devices.port_devices[i].port_pdev->dev, 
                                     platform_driver_priv->devices.port_devices[i].wrapper_irq, 
-                                    NULL, 
+                                    DRV_NAME, 
                                     (void *)&platform_driver_priv->devices.port_devices[i]);
+
      if (mtip_rumi_platform == 0) 
      {
          // set the mac wrapper pcs mode control
@@ -1159,6 +1160,9 @@ static int mtip_platform_setup(void)
                   // enable pcs loopback on the link
                   mtip_pcs_enable_loopback(i);
               }
+
+              // set the MAC interrupt mask
+              mtip_mac_set_interrupt_mask(i);
           }
 
           // add the mtip_napi_rx
