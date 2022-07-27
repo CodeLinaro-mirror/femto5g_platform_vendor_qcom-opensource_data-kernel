@@ -88,6 +88,7 @@ enum gsi_debug_test_bus_selector {
 };
 
 #define __ECPRI_DMA_CONCATENATE(A, B) A ## B
+
 #define ECPRI_DMA_CONCATENATE(A, B) __ECPRI_DMA_CONCATENATE(A, B)
 
 /*
@@ -104,18 +105,95 @@ enum gsi_debug_test_bus_selector {
 #define GEN_MAX_n(reg_name) \
   HWIO_ ## reg_name ## _MAXn
 
+#define GEN_V2_MAX_n(reg_name) \
+  HWIO_ ## reg_name ## _V2_MAXn
+
+#define GEN_ARR_SIZE_n(reg_name) \
+	GEN_V2_MAX_n(reg_name) + 1
+
+#define GEN_GSI_MAX_n(reg_name) \
+  HWIO_ ## reg_name ## _MAXn
+
+#define GEN_GSI_MAX_k(reg_name) \
+  HWIO_ ## reg_name ## _MAXk
+
 /*
 * a macro to generate a number of MAX n + 1 allowed in a register
+* who has suffix of _n in V2.
+*/
+#define GEN_GSI_ARR_SIZE_n(reg_name) \
+	GEN_GSI_MAX_n(reg_name) + 1
+
+/*
+* a macro to generate a number of MAX m allowed in a register
+* who has suffix of _m
+*/
+#define GEN_GSI_m_CH_n_MAXm(reg_name) \
+  HWIO_ ## reg_name ## _V2_GSI_m_CH_n_MAXm
+
+/*
+* a macro to generate a number of MAX n allowed in a register
 * who has suffix of _n
 */
-#define GEN_ARR_SIZE_n(reg_name) \
-	GEN_MAX_n(reg_name) + 1
+#define GEN_GSI_m_CH_n_MAXn(reg_name) \
+  HWIO_ ## reg_name ## _V2_GSI_m_CH_n_MAXn
+
+/*
+* a macro to generate a number of MAX m allowed in a register
+* who has suffix of _m
+*/
+#define GEN_GSI_m_REG_n_MAXm(reg_name) \
+  HWIO_ ## reg_name ## _V2_GSI_m_REG_n_MAXm
+
+/*
+* a macro to generate a number of MAX n allowed in a register
+* who has suffix of _n
+*/
+#define GEN_GSI_m_REG_n_MAXn(reg_name) \
+  HWIO_ ## reg_name ## _V2_GSI_m_REG_n_MAXn
+
+/*
+* a macro to generate a number of MAX m + 1 allowed in a register
+* who has suffix of _m
+*/
+#define GEN_GSI_m_REG_n_ARR_SIZE_m(reg_name) \
+	GEN_GSI_m_REG_n_MAXm(reg_name) + 1
+
+#define GEN_GSI_m_REG_n_ARR_SIZE_n(reg_name) \
+	GEN_GSI_m_REG_n_MAXn(reg_name) + 1
+
+#define GEN_GSI_m_CH_n_ARR_SIZE_m(reg_name) \
+	GEN_GSI_m_CH_n_MAXm(reg_name) + 1
+
+#define GEN_GSI_m_CH_n_ARR_SIZE_n(reg_name) \
+	GEN_GSI_m_CH_n_MAXn(reg_name) + 1
+
+/*
+* a macro to generate a number of MAX n allowed in a register
+* and add the suffix _n
+*/
+#define GEN_MAX_SUFFIX_n(reg_name) \
+  HWIO_ ## reg_name ## _n_MAXn
+
+/*
+* a macro to generate a number of MAX m and MAX n allowed in a register
+* and add the suffix _n
+*/
+#define GEN_MAX_SUFFIX_n(reg_name) \
+  HWIO_ ## reg_name ## _n_MAXn
+
+/*
+* a macro to generate a number of MAX n + 1 allowed in a register
+* and add the suffix _n
+*/
+#define GEN_ARR_SIZE_SUFFIX_n(reg_name) \
+	GEN_MAX_SUFFIX_n(reg_name) + 1
 
 /*
 * a macro to generate a number of MAX k + 1 allowed in a register
 * who has suffix of _k
 */
-#define GEN_ARR_SIZE_k(reg_name) \
+#define GEN_GSI_ARR_SIZE_k(reg_name) \
 	GEN_MAX_k(reg_name) + 1
 
 /*
@@ -130,7 +208,8 @@ enum gsi_debug_test_bus_selector {
 
 #define GEN_REGS_ARRAY_2D(struct_name, reg_name) \
 	struct ECPRI_DMA_CONCATENATE(struct_name, _arr) { \
-		struct_name arr[GEN_MAX_n(reg_name) + 1][GEN_MAX_k(reg_name) + 1]; \
+		struct_name arr[GEN_GSI_MAX_n(reg_name) + 1] \
+						[GEN_GSI_MAX_k(reg_name) + 1]; \
 	}
 
 static u32 ecpri_dma_reg_save_gsi_test_bus_selector_array[] = {

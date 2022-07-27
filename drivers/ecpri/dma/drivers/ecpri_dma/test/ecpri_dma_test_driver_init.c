@@ -138,18 +138,18 @@ static int ecpri_dma_test_driver_init_dma_paths(void *priv)
 {
 	int endp_id = 0, gsi_id = 0;
 	const struct dma_gsi_ep_config **endp_map;
-	ecpri_hwio_def_ecpri_endp_cfg_destn_u endp_cfg_dest = { 0 };
-	ecpri_hwio_def_ecpri_endp_cfg_destn_u endp_cfg_dest_hw = { 0 };
-	ecpri_hwio_def_ecpri_endp_cfg_xbarn_u endp_cfg_xbar = { 0 };
-	ecpri_hwio_def_ecpri_endp_cfg_xbarn_u endp_cfg_xbar_hw = { 0 };
-	ecpri_hwio_def_ecpri_dma_exception_channel_u exception_ch = { 0 };
-	ecpri_hwio_def_ecpri_dma_exception_channel_u exception_ch_hw = { 0 };
-	ecpri_hwio_def_ecpri_endp_cfg_aggr_n_u cfg_aggr = { 0 };
-	ecpri_hwio_def_ecpri_endp_cfg_aggr_n_u cfg_aggr_hw = { 0 };
-	ecpri_hwio_def_ecpri_endp_nfapi_reassembly_cfg_n_u nfapi_cfg = { 0 };
-	ecpri_hwio_def_ecpri_endp_nfapi_reassembly_cfg_n_u nfapi_cfg_hw = { 0 };
-	ecpri_hwio_def_ecpri_endp_gsi_cfg_n_u endp_gsi_cfg = { 0 };
-	ecpri_hwio_def_ecpri_endp_gsi_cfg_n_u endp_gsi_cfg_hw = { 0 };
+	ecpri_hwio_def_ecpri_endp_cfg_dest_gsi_m_ch_n_u endp_cfg_dest = { 0 };
+	ecpri_hwio_def_ecpri_endp_cfg_dest_gsi_m_ch_n_u endp_cfg_dest_hw = { 0 };
+	truct ecpri_hwio_def_ecpri_endp_cfg_xbar_fields endp_cfg_xbar = { 0 };
+	ecpri_hwio_def_ecpri_endp_cfg_xbar_u endp_cfg_xbar_hw = { 0 };
+	struct ecpri_dma_ecpri_endp_exception_channel_fields exception_ch = { 0 };
+	struct ecpri_dma_ecpri_endp_exception_channel_fields exception_ch_hw = { 0 };
+	ecpri_hwio_def_ecpri_endp_cfg_aggr_gsi_m_ch_n_u cfg_aggr = { 0 };
+	ecpri_hwio_def_ecpri_endp_cfg_aggr_gsi_m_ch_n_u cfg_aggr_hw = { 0 };
+	ecpri_hwio_def_ecpri_endp_nfapi_reassembly_cfg_gsi_m_ch_n_u nfapi_cfg = { 0 };
+	ecpri_hwio_def_ecpri_endp_nfapi_reassembly_cfg_gsi_m_ch_n_u nfapi_cfg_hw = { 0 };
+	ecpri_hwio_def_ecpri_endp_gsi_cfg_gsi_m_ch_n_u endp_gsi_cfg = { 0 };
+	ecpri_hwio_def_ecpri_endp_gsi_cfg_gsi_m_ch_n_u endp_gsi_cfg_hw = { 0 };
 
 	DMA_UT_LOG("Start DMA HW registers verification\n");
 
@@ -166,8 +166,8 @@ static int ecpri_dma_test_driver_init_dma_paths(void *priv)
 			memset(&endp_gsi_cfg, 0, sizeof(endp_gsi_cfg));
 			memset(&endp_gsi_cfg_hw, 0, sizeof(endp_gsi_cfg_hw));
 
-			endp_gsi_cfg_hw.value = ecpri_dma_hal_read_reg_n(
-				ECPRI_ENDP_GSI_CFG_n, endp_id);
+			endp_gsi_cfg_hw.value = ecpri_dma_hal_read_reg_mn(
+				ECPRI_ENDP_GSI_CFG, gsi_id, endp_id);
 
 			if (endp_map[gsi_id][endp_id].valid) {
 				/* Verify ENDP is enabled */
@@ -185,13 +185,14 @@ static int ecpri_dma_test_driver_init_dma_paths(void *priv)
 					/* Verify ENDP is configured as exception */
 					memset(&exception_ch, 0, sizeof(exception_ch));
 					memset(&exception_ch_hw, 0, sizeof(exception_ch_hw));
-					exception_ch.def.enable = 1;
-					exception_ch.def.channel = endp_id;
+					exception_ch.enable = 1;
+					exception_ch.gid = gsi_id;
+					exception_ch.channel = endp_id;
 
-					exception_ch_hw.value = ecpri_dma_hal_read_reg(
-						ECPRI_DMA_EXCEPTION_CHANNEL);
+					ecpri_dma_hal_read_reg_fields(ECPRI_DMA_EXCEPTION_CHANNEL,
+						&exception_ch_hw);
 
-					if (exception_ch.value != exception_ch_hw.value) {
+					if (exception_ch.channel != exception_ch_hw.channel) {
 						DMA_UT_LOG(
 							"ENDP %d is expected to be exception ENDP\n",
 							endp_id);
@@ -228,8 +229,8 @@ static int ecpri_dma_test_driver_init_dma_paths(void *priv)
 						endp_cfg_dest.def.dest_mem_channel =
 							endp_map[gsi_id][endp_id].dest;
 
-						endp_cfg_dest_hw.value = ecpri_dma_hal_read_reg_n(
-							ECPRI_ENDP_CFG_DEST_n, endp_id);
+						endp_cfg_dest_hw.value = ecpri_dma_hal_read_reg_mn(
+							ECPRI_ENDP_CFG_DEST, gsi_id, endp_id);
 
 						if (endp_cfg_dest.value != endp_cfg_dest_hw.value) {
 							DMA_UT_LOG(
@@ -244,19 +245,19 @@ static int ecpri_dma_test_driver_init_dma_paths(void *priv)
 
 					case ECPRI_DMA_ENDP_STREAM_MODE_M2S:
 						endp_cfg_dest.def.use_dest_cfg = 0;
-						endp_cfg_xbar.def.dest_stream =
-							endp_map[gsi_id][endp_id].dest;
-						endp_cfg_xbar.def.xbar_tid =
-							endp_map[gsi_id][endp_id].tid.value;
+						endp_cfg_xbar.dest_stream =
+							ecpri_dma_ctx->endp_map[gsi_id][endp_id].dest;
+						endp_cfg_xbar.xbar_tid =
+							ecpri_dma_ctx->endp_map[gsi_id][endp_id].tid.value;
 						//TODO: Below are required for nFAPI
 						//endp_cfg_xbar.xbar_user = Get from Core driver, need API
-						endp_cfg_xbar.def.l2_segmentation_en =
+						endp_cfg_xbar.l2_segmentation_en =
 							endp_map[gsi_id][endp_id].is_nfapi ? 1 : 0;
 
-						endp_cfg_dest_hw.value = ecpri_dma_hal_read_reg_n(
-							ECPRI_ENDP_CFG_DEST_n, endp_id);
-						endp_cfg_xbar_hw.value = ecpri_dma_hal_read_reg_n(
-							ECPRI_ENDP_CFG_XBAR_n, endp_id);
+						endp_cfg_dest_hw.value = ecpri_dma_hal_read_reg_mn(
+							ECPRI_ENDP_CFG_DEST, gsi_id, endp_id);
+						endp_cfg_xbar_hw.value = ecpri_dma_hal_read_reg_mn(
+							ECPRI_ENDP_CFG_XBAR, gsi_id, endp_id);
 
 						if (endp_cfg_dest.value != endp_cfg_dest_hw.value) {
 							DMA_UT_LOG(
@@ -302,10 +303,10 @@ static int ecpri_dma_test_driver_init_dma_paths(void *priv)
 								endp_map[gsi_id][endp_id]
 								.nfapi_dest_vm_id;
 
-							cfg_aggr_hw.value = ecpri_dma_hal_read_reg_n(
-								ECPRI_ENDP_CFG_AGGR_n, endp_id);
-							nfapi_cfg_hw.value = ecpri_dma_hal_read_reg_n(
-								ECPRI_ENDP_NFAPI_REASSEMBLY_CFG_n, endp_id);
+							cfg_aggr_hw.value = ecpri_dma_hal_read_reg_mn(
+								ECPRI_ENDP_CFG_AGGR, gsi_id, endp_id);
+							nfapi_cfg_hw.value = ecpri_dma_hal_read_reg_mn(
+								ECPRI_ENDP_NFAPI_REASSEMBLY_CFG, gsi_id, endp_id);
 
 							if (cfg_aggr.value != cfg_aggr_hw.value) {
 								DMA_UT_LOG(

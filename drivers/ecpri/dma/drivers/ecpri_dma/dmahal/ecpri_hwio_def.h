@@ -33,7 +33,8 @@ typedef struct {
 	u32 total_channels_n : 8;
 	u32 src_channel_n : 8;
 	u32 dst_channel_n : 8;
-	u32 reserved0 : 8;
+	u32 uc_enable : 1;
+	u32 reserved0 : 7;
 } ecpri_hwio_def_ecpri_hw_params_0_s;
 
 /* Union definition of register */
@@ -41,6 +42,32 @@ typedef union {
 	ecpri_hwio_def_ecpri_hw_params_0_s def;
 	u32 value;
 } ecpri_hwio_def_ecpri_hw_params_0_u;
+
+
+/*===========================================================================*/
+/*!
+@brief Bit Field definition of register: ECPRI_HW_PARAMS_1
+*/
+/*===========================================================================*/
+/* Structure definition of register */
+typedef struct
+{
+	u32 qmb_max_outst_wr : 7;
+	u32 reserved0 : 1;
+	u32 qmb_max_outst_rd : 7;
+	u32 reserved1 : 1;
+	u32 gsi_ees_n : 4;
+	u32 nfapi_reassembly_ctx_num : 8;
+	u32 reserved2 : 4;
+} ecpri_hwio_def_ecpri_hw_params_1_s;
+
+/* Union definition of register */
+typedef union
+{
+	ecpri_hwio_def_ecpri_hw_params_1_s def;
+	u32 value;
+} ecpri_hwio_def_ecpri_hw_params_1_u;
+
 
 /*===========================================================================*/
 /*!
@@ -58,11 +85,24 @@ typedef struct {
 	u32 reserved2 : 4;
 } ecpri_hwio_def_ecpri_hw_params_2_s;
 
+/*===========================================================================*/
+/*!
+@brief Bit Field definition of register: ECPRI_HW_PARAMS_2_V2
+*/
+/*===========================================================================*/
+/* Structure definition of register */
+typedef struct {
+	u32 tlv_fifo_size : 12;
+	u32 reserved0 : 20;
+} ecpri_hwio_def_ecpri_hw_params_2_v2_s;
+
 /* Union definition of register */
 typedef union {
-	ecpri_hwio_def_ecpri_hw_params_2_s def;
+	ecpri_hwio_def_ecpri_hw_params_2_s def_v1;
+	ecpri_hwio_def_ecpri_hw_params_2_v2_s def_v2;
 	u32 value;
 } ecpri_hwio_def_ecpri_hw_params_2_u;
+
 
 /*===========================================================================*/
 /*!
@@ -93,7 +133,10 @@ typedef struct {
 	u32 cgc_open_gsi_if : 1;
 	u32 cgc_open_ack_manager : 1;
 	u32 cgc_open_nro : 1;
-	u32 reserved0 : 29;
+	u32 reserved0 : 1;
+	u32 cgc_open_nso : 1;
+	u32 cgc_open_dma : 1;
+	u32 reserved1 : 26;
 } ecpri_hwio_def_ecpri_clkon_cfg_s;
 
 /* Union definition of register */
@@ -229,6 +272,7 @@ typedef struct {
 
 /* Union definition of register */
 typedef union {
+
 	ecpri_hwio_def_ecpri_qtime_smp_s def;
 	u32 value;
 } ecpri_hwio_def_ecpri_qtime_smp_u;
@@ -245,6 +289,7 @@ typedef struct {
 
 /* Union definition of register */
 typedef union {
+
 	ecpri_hwio_def_ecpri_qtime_lsb_s def;
 	u32 value;
 } ecpri_hwio_def_ecpri_qtime_lsb_u;
@@ -446,11 +491,13 @@ typedef union {
 /*===========================================================================*/
 /* Structure definition of register */
 typedef struct {
+
 	u32 timestamp : 32;
 } ecpri_hwio_def_ecpri_nfapi_reassembly_fec_3_s;
 
 /* Union definition of register */
 typedef union {
+
 	ecpri_hwio_def_ecpri_nfapi_reassembly_fec_3_s def;
 	u32 value;
 } ecpri_hwio_def_ecpri_nfapi_reassembly_fec_3_u;
@@ -465,7 +512,7 @@ typedef struct {
 	u32 channel_id : 8;
 	u32 reserved0 : 8;
 	u32 context_id : 8;
-	u32 reserved1 : 8;
+	u32 gsi_id : 8;
 } ecpri_hwio_def_ecpri_nfapi_reassembly_fec_4_s;
 
 /* Union definition of register */
@@ -736,10 +783,18 @@ typedef union {
 /*===========================================================================*/
 /* Structure definition of register */
 typedef struct {
-	u32 ecpri_gsi_aos_fsm_idle : 1;
-	u32 ecpri_gsi_if_idle : 1;
-	u32 ecpri_gsi_idle : 1;
-	u32 reserved0 : 29;
+	u32 ecpri_gsi_0_aos_fsm_idle : 1;
+	u32 ecpri_gsi_0_if_idle : 1;
+	u32 ecpri_gsi_0_idle : 1;
+	u32 reserved0 : 5;
+	u32 ecpri_gsi_1_aos_fsm_idle : 1;
+	u32 ecpri_gsi_1_if_idle : 1;
+	u32 ecpri_gsi_1_idle : 1;
+	u32 reserved1 : 5;
+	u32 ecpri_gsi_2_aos_fsm_idle : 1;
+	u32 ecpri_gsi_2_if_idle : 1;
+	u32 ecpri_gsi_2_idle : 1;
+	u32 reserved2 : 13;
 } ecpri_hwio_def_ecpri_state_gsi_if_s;
 
 /* Union definition of register */
@@ -750,278 +805,279 @@ typedef union {
 
 /*===========================================================================*/
 /*!
-@brief Bit Field definition of register: ECPRI_STATE_GSI_TLV_FIFO_EMPTY_n
+@brief Bit Field definition of register: ECPRI_STATE_GSI_TLV_FIFO_EMPTY_GSI_m_REG_n
 */
 /*===========================================================================*/
 /* Structure definition of register */
 typedef struct {
 	u32 channel_fifo_empty : 32;
-} ecpri_hwio_def_ecpri_state_gsi_tlv_fifo_empty_n_s;
+} ecpri_hwio_def_ecpri_state_gsi_tlv_fifo_empty_gsi_m_reg_n_s;
 
 /* Union definition of register */
 typedef union {
-	ecpri_hwio_def_ecpri_state_gsi_tlv_fifo_empty_n_s def;
+	ecpri_hwio_def_ecpri_state_gsi_tlv_fifo_empty_gsi_m_reg_n_s def;
 	u32 value;
-} ecpri_hwio_def_ecpri_state_gsi_tlv_fifo_empty_n_u;
+} ecpri_hwio_def_ecpri_state_gsi_tlv_fifo_empty_gsi_m_reg_n_u;
 
 /*===========================================================================*/
 /*!
-@brief Bit Field definition of register: ECPRI_STATE_GSI_AOS_FIFO_EMPTY_n
+@brief Bit Field definition of register: ECPRI_STATE_GSI_AOS_FIFO_EMPTY_GSI_m_REG_n
 */
 /*===========================================================================*/
 /* Structure definition of register */
 typedef struct {
 	u32 channel_fifo_empty : 32;
-} ecpri_hwio_def_ecpri_state_gsi_aos_fifo_empty_n_s;
+} ecpri_hwio_def_ecpri_state_gsi_aos_fifo_empty_gsi_m_reg_n_s;
 
 /* Union definition of register */
 typedef union {
-	ecpri_hwio_def_ecpri_state_gsi_aos_fifo_empty_n_s def;
+	ecpri_hwio_def_ecpri_state_gsi_aos_fifo_empty_gsi_m_reg_n_s def;
 	u32 value;
-} ecpri_hwio_def_ecpri_state_gsi_aos_fifo_empty_n_u;
+} ecpri_hwio_def_ecpri_state_gsi_aos_fifo_empty_gsi_m_reg_n_u;
 
 /*===========================================================================*/
 /*!
-@brief Bit Field definition of register: ECPRI_YELLOW_MARKER_BELOW_n
+@brief Bit Field definition of register: ECPRI_YELLOW_MARKER_BELOW_GSI_m_REG_n
 */
 /*===========================================================================*/
 /* Structure definition of register */
 typedef struct {
 	u32 endpoints : 32;
-} ecpri_hwio_def_ecpri_yellow_marker_below_n_s;
+} ecpri_hwio_def_ecpri_yellow_marker_below_gsi_m_reg_n_s;
 
 /* Union definition of register */
 typedef union {
-	ecpri_hwio_def_ecpri_yellow_marker_below_n_s def;
+	ecpri_hwio_def_ecpri_yellow_marker_below_gsi_m_reg_n_s def;
 	u32 value;
-} ecpri_hwio_def_ecpri_yellow_marker_below_n_u;
+} ecpri_hwio_def_ecpri_yellow_marker_below_gsi_m_reg_n_u;
 
 /*===========================================================================*/
 /*!
-@brief Bit Field definition of register: ECPRI_YELLOW_MARKER_BELOW_EN_n
+@brief Bit Field definition of register: ECPRI_YELLOW_MARKER_BELOW_EN_GSI_m_REG_n
 */
 /*===========================================================================*/
 /* Structure definition of register */
 typedef struct {
 	u32 endpoints : 32;
-} ecpri_hwio_def_ecpri_yellow_marker_below_en_n_s;
+} ecpri_hwio_def_ecpri_yellow_marker_below_en_gsi_m_reg_n_s;
 
 /* Union definition of register */
 typedef union {
-	ecpri_hwio_def_ecpri_yellow_marker_below_en_n_s def;
+	ecpri_hwio_def_ecpri_yellow_marker_below_en_gsi_m_reg_n_s def;
 	u32 value;
-} ecpri_hwio_def_ecpri_yellow_marker_below_en_n_u;
+} ecpri_hwio_def_ecpri_yellow_marker_below_en_gsi_m_reg_n_u;
 
 /*===========================================================================*/
 /*!
-@brief Bit Field definition of register: ECPRI_YELLOW_MARKER_BELOW_CLR_n
+@brief Bit Field definition of register: ECPRI_YELLOW_MARKER_BELOW_CLR_GSI_m_REG_n
 */
 /*===========================================================================*/
 /* Structure definition of register */
 typedef struct {
 	u32 endpoints : 32;
-} ecpri_hwio_def_ecpri_yellow_marker_below_clr_n_s;
+} ecpri_hwio_def_ecpri_yellow_marker_below_clr_gsi_m_reg_n_s;
 
 /* Union definition of register */
 typedef union {
-	ecpri_hwio_def_ecpri_yellow_marker_below_clr_n_s def;
+	ecpri_hwio_def_ecpri_yellow_marker_below_clr_gsi_m_reg_n_s def;
 	u32 value;
-} ecpri_hwio_def_ecpri_yellow_marker_below_clr_n_u;
+} ecpri_hwio_def_ecpri_yellow_marker_below_clr_gsi_m_reg_n_u;
 
 /*===========================================================================*/
 /*!
-@brief Bit Field definition of register: ECPRI_RED_MARKER_BELOW_n
+@brief Bit Field definition of register: ECPRI_RED_MARKER_BELOW_GSI_m_REG_n
 */
 /*===========================================================================*/
 /* Structure definition of register */
 typedef struct {
 	u32 endpoints : 32;
-} ecpri_hwio_def_ecpri_red_marker_below_n_s;
+} ecpri_hwio_def_ecpri_red_marker_below_gsi_m_reg_n_s;
 
 /* Union definition of register */
 typedef union {
-	ecpri_hwio_def_ecpri_red_marker_below_n_s def;
+	ecpri_hwio_def_ecpri_red_marker_below_gsi_m_reg_n_s def;
 	u32 value;
-} ecpri_hwio_def_ecpri_red_marker_below_n_u;
+} ecpri_hwio_def_ecpri_red_marker_below_gsi_m_reg_n_u;
 
 /*===========================================================================*/
 /*!
-@brief Bit Field definition of register: ECPRI_RED_MARKER_BELOW_EN_n
+@brief Bit Field definition of register: ECPRI_RED_MARKER_BELOW_EN_GSI_m_REG_n
 */
 /*===========================================================================*/
 /* Structure definition of register */
 typedef struct {
 	u32 endpoints : 32;
-} ecpri_hwio_def_ecpri_red_marker_below_en_n_s;
+} ecpri_hwio_def_ecpri_red_marker_below_en_gsi_m_reg_n_s;
 
 /* Union definition of register */
 typedef union {
-	ecpri_hwio_def_ecpri_red_marker_below_en_n_s def;
+	ecpri_hwio_def_ecpri_red_marker_below_en_gsi_m_reg_n_s def;
 	u32 value;
-} ecpri_hwio_def_ecpri_red_marker_below_en_n_u;
+} ecpri_hwio_def_ecpri_red_marker_below_en_gsi_m_reg_n_u;
 
 /*===========================================================================*/
 /*!
-@brief Bit Field definition of register: ECPRI_RED_MARKER_BELOW_CLR_n
+@brief Bit Field definition of register: ECPRI_RED_MARKER_BELOW_CLR_GSI_m_REG_n
 */
 /*===========================================================================*/
 /* Structure definition of register */
 typedef struct {
 	u32 endpoints : 32;
-} ecpri_hwio_def_ecpri_red_marker_below_clr_n_s;
+} ecpri_hwio_def_ecpri_red_marker_below_clr_gsi_m_reg_n_s;
 
 /* Union definition of register */
 typedef union {
-	ecpri_hwio_def_ecpri_red_marker_below_clr_n_s def;
+	ecpri_hwio_def_ecpri_red_marker_below_clr_gsi_m_reg_n_s def;
 	u32 value;
-} ecpri_hwio_def_ecpri_red_marker_below_clr_n_u;
+} ecpri_hwio_def_ecpri_red_marker_below_clr_gsi_m_reg_n_u;
 
 /*===========================================================================*/
 /*!
-@brief Bit Field definition of register: ECPRI_YELLOW_MARKER_SHADOW_n
+@brief Bit Field definition of register: ECPRI_YELLOW_MARKER_SHADOW_GSI_m_REG_n
 */
 /*===========================================================================*/
 /* Structure definition of register */
 typedef struct {
 	u32 endpoints : 32;
-} ecpri_hwio_def_ecpri_yellow_marker_shadow_n_s;
+} ecpri_hwio_def_ecpri_yellow_marker_shadow_gsi_m_reg_n_s;
 
 /* Union definition of register */
 typedef union {
-	ecpri_hwio_def_ecpri_yellow_marker_shadow_n_s def;
+	ecpri_hwio_def_ecpri_yellow_marker_shadow_gsi_m_reg_n_s def;
 	u32 value;
-} ecpri_hwio_def_ecpri_yellow_marker_shadow_n_u;
+} ecpri_hwio_def_ecpri_yellow_marker_shadow_gsi_m_reg_n_u;
 
 /*===========================================================================*/
 /*!
-@brief Bit Field definition of register: ECPRI_RED_MARKER_SHADOW_n
+@brief Bit Field definition of register: ECPRI_RED_MARKER_SHADOW_GSI_m_REG_n
 */
 /*===========================================================================*/
 /* Structure definition of register */
 typedef struct {
 	u32 endpoints : 32;
-} ecpri_hwio_def_ecpri_red_marker_shadow_n_s;
+} ecpri_hwio_def_ecpri_red_marker_shadow_gsi_m_reg_n_s;
 
 /* Union definition of register */
 typedef union {
-	ecpri_hwio_def_ecpri_red_marker_shadow_n_s def;
+	ecpri_hwio_def_ecpri_red_marker_shadow_gsi_m_reg_n_s def;
 	u32 value;
-} ecpri_hwio_def_ecpri_red_marker_shadow_n_u;
+} ecpri_hwio_def_ecpri_red_marker_shadow_gsi_m_reg_n_u;
 
 /*===========================================================================*/
 /*!
-@brief Bit Field definition of register: ECPRI_YELLOW_MARKER_ABOVE_n
+@brief Bit Field definition of register: ECPRI_YELLOW_MARKER_ABOVE_GSI_m_REG_n
 */
 /*===========================================================================*/
 /* Structure definition of register */
 typedef struct {
 	u32 endpoints : 32;
-} ecpri_hwio_def_ecpri_yellow_marker_above_n_s;
+} ecpri_hwio_def_ecpri_yellow_marker_above_gsi_m_reg_n_s;
 
 /* Union definition of register */
 typedef union {
-	ecpri_hwio_def_ecpri_yellow_marker_above_n_s def;
+	ecpri_hwio_def_ecpri_yellow_marker_above_gsi_m_reg_n_s def;
 	u32 value;
-} ecpri_hwio_def_ecpri_yellow_marker_above_n_u;
+} ecpri_hwio_def_ecpri_yellow_marker_above_gsi_m_reg_n_u;
 
 /*===========================================================================*/
 /*!
-@brief Bit Field definition of register: ECPRI_YELLOW_MARKER_ABOVE_EN_n
+@brief Bit Field definition of register: ECPRI_YELLOW_MARKER_ABOVE_EN_GSI_m_REG_n
 */
 /*===========================================================================*/
 /* Structure definition of register */
 typedef struct {
 	u32 endpoints : 32;
-} ecpri_hwio_def_ecpri_yellow_marker_above_en_n_s;
+} ecpri_hwio_def_ecpri_yellow_marker_above_en_gsi_m_reg_n_s;
 
 /* Union definition of register */
 typedef union {
-	ecpri_hwio_def_ecpri_yellow_marker_above_en_n_s def;
+	ecpri_hwio_def_ecpri_yellow_marker_above_en_gsi_m_reg_n_s def;
 	u32 value;
-} ecpri_hwio_def_ecpri_yellow_marker_above_en_n_u;
+} ecpri_hwio_def_ecpri_yellow_marker_above_en_gsi_m_reg_n_u;
 
 /*===========================================================================*/
 /*!
-@brief Bit Field definition of register: ECPRI_YELLOW_MARKER_ABOVE_CLR_n
+@brief Bit Field definition of register: ECPRI_YELLOW_MARKER_ABOVE_CLR_GSI_m_REG_n
 */
 /*===========================================================================*/
 /* Structure definition of register */
 typedef struct {
 	u32 endpoints : 32;
-} ecpri_hwio_def_ecpri_yellow_marker_above_clr_n_s;
+} ecpri_hwio_def_ecpri_yellow_marker_above_clr_gsi_m_reg_n_s;
 
 /* Union definition of register */
 typedef union {
-	ecpri_hwio_def_ecpri_yellow_marker_above_clr_n_s def;
+	ecpri_hwio_def_ecpri_yellow_marker_above_clr_gsi_m_reg_n_s def;
 	u32 value;
-} ecpri_hwio_def_ecpri_yellow_marker_above_clr_n_u;
+} ecpri_hwio_def_ecpri_yellow_marker_above_clr_gsi_m_reg_n_u;
 
 /*===========================================================================*/
 /*!
-@brief Bit Field definition of register: ECPRI_RED_MARKER_ABOVE_n
+@brief Bit Field definition of register: ECPRI_RED_MARKER_ABOVE_GSI_m_REG_n
 */
 /*===========================================================================*/
 /* Structure definition of register */
 typedef struct {
 	u32 endpoints : 32;
-} ecpri_hwio_def_ecpri_red_marker_above_n_s;
+} ecpri_hwio_def_ecpri_red_marker_above_gsi_m_reg_n_s;
 
 /* Union definition of register */
 typedef union {
-	ecpri_hwio_def_ecpri_red_marker_above_n_s def;
+	ecpri_hwio_def_ecpri_red_marker_above_gsi_m_reg_n_s def;
 	u32 value;
-} ecpri_hwio_def_ecpri_red_marker_above_n_u;
+} ecpri_hwio_def_ecpri_red_marker_above_gsi_m_reg_n_u;
 
 /*===========================================================================*/
 /*!
-@brief Bit Field definition of register: ECPRI_RED_MARKER_ABOVE_EN_n
+@brief Bit Field definition of register: ECPRI_RED_MARKER_ABOVE_EN_GSI_m_REG_n
 */
 /*===========================================================================*/
 /* Structure definition of register */
 typedef struct {
 	u32 endpoints : 32;
-} ecpri_hwio_def_ecpri_red_marker_above_en_n_s;
+} ecpri_hwio_def_ecpri_red_marker_above_en_gsi_m_reg_n_s;
 
 /* Union definition of register */
 typedef union {
-	ecpri_hwio_def_ecpri_red_marker_above_en_n_s def;
+	ecpri_hwio_def_ecpri_red_marker_above_en_gsi_m_reg_n_s def;
 	u32 value;
-} ecpri_hwio_def_ecpri_red_marker_above_en_n_u;
+} ecpri_hwio_def_ecpri_red_marker_above_en_gsi_m_reg_n_u;
 
 /*===========================================================================*/
 /*!
-@brief Bit Field definition of register: ECPRI_RED_MARKER_ABOVE_CLR_n
+@brief Bit Field definition of register: ECPRI_RED_MARKER_ABOVE_CLR_GSI_m_REG_n
 */
 /*===========================================================================*/
 /* Structure definition of register */
 typedef struct {
 	u32 endpoints : 32;
-} ecpri_hwio_def_ecpri_red_marker_above_clr_n_s;
+} ecpri_hwio_def_ecpri_red_marker_above_clr_gsi_m_reg_n_s;
 
 /* Union definition of register */
 typedef union {
-	ecpri_hwio_def_ecpri_red_marker_above_clr_n_s def;
+	ecpri_hwio_def_ecpri_red_marker_above_clr_gsi_m_reg_n_s def;
 	u32 value;
-} ecpri_hwio_def_ecpri_red_marker_above_clr_n_u;
+} ecpri_hwio_def_ecpri_red_marker_above_clr_gsi_m_reg_n_u;
 
 /*===========================================================================*/
 /*!
-@brief Bit Field definition of register: ECPRI_ENDP_CFG_DESTn
+@brief Bit Field definition of register: ECPRI_ENDP_CFG_DEST_GSI_m_CH_n
 */
 /*===========================================================================*/
 /* Structure definition of register */
 typedef struct {
 	u32 dest_mem_channel : 8;
 	u32 arb_weight : 4;
-	u32 reserved0 : 19;
+	u32 loopback_gid : 2;
+	u32 reserved0 : 17;
 	u32 use_dest_cfg : 1;
-} ecpri_hwio_def_ecpri_endp_cfg_destn_s;
+} ecpri_hwio_def_ecpri_endp_cfg_dest_gsi_m_ch_n_s;
 
 /* Union definition of register */
 typedef union {
-	ecpri_hwio_def_ecpri_endp_cfg_destn_s def;
+	ecpri_hwio_def_ecpri_endp_cfg_dest_gsi_m_ch_n_s def;
 	u32 value;
-} ecpri_hwio_def_ecpri_endp_cfg_destn_u;
+} ecpri_hwio_def_ecpri_endp_cfg_dest_gsi_m_ch_n_u;
 
 /*===========================================================================*/
 /*!
@@ -1036,34 +1092,52 @@ typedef struct {
 	u32 xbar_tuser : 20;
 	u32 reserved1 : 3;
 	u32 l2_segmentation_en : 1;
-} ecpri_hwio_def_ecpri_endp_cfg_xbarn_s;
-
-/* Union definition of register */
-typedef union {
-	ecpri_hwio_def_ecpri_endp_cfg_xbarn_s def;
-	u32 value;
-} ecpri_hwio_def_ecpri_endp_cfg_xbarn_u;
+} ecpri_hwio_def_ecpri_endp_cfg_xbar_s;
 
 /*===========================================================================*/
 /*!
-@brief Bit Field definition of register: ECPRI_ENDP_CFG_AGGR_n
+@brief Bit Field definition of register: ECPRI_ENDP_CFG_XBAR_GSI_m_CH_n
+*/
+/*===========================================================================*/
+/* Structure definition of register */
+typedef struct {
+	u32 dest_stream : 2;
+	u32 reserved0 : 2;
+	u32 xbar_tid : 4;
+	u32 xbar_tuser : 20;
+	u32 reserved1 : 1;
+	u32 loopback_en : 1;
+	u32 pre_hdr_en : 1;
+	u32 nfapi_without_offload : 1;
+} ecpri_hwio_def_ecpri_endp_cfg_xbar_gsi_m_ch_n_s;
+
+/* Union definition of register */
+typedef union {
+	ecpri_hwio_def_ecpri_endp_cfg_xbar_s def_v1;
+	ecpri_hwio_def_ecpri_endp_cfg_xbar_gsi_m_ch_n_s def_v2;
+	u32 value;
+} ecpri_hwio_def_ecpri_endp_cfg_xbar_u;
+
+/*===========================================================================*/
+/*!
+@brief Bit Field definition of register: ECPRI_ENDP_CFG_AGGR_GSI_m_CH_n
 */
 /*===========================================================================*/
 /* Structure definition of register */
 typedef struct {
 	u32 aggr_type : 1;
 	u32 reserved0 : 31;
-} ecpri_hwio_def_ecpri_endp_cfg_aggr_n_s;
+} ecpri_hwio_def_ecpri_endp_cfg_aggr_gsi_m_ch_n_s;
 
 /* Union definition of register */
 typedef union {
-	ecpri_hwio_def_ecpri_endp_cfg_aggr_n_s def;
+	ecpri_hwio_def_ecpri_endp_cfg_aggr_gsi_m_ch_n_s def;
 	u32 value;
-} ecpri_hwio_def_ecpri_endp_cfg_aggr_n_u;
+} ecpri_hwio_def_ecpri_endp_cfg_aggr_gsi_m_ch_n_u;
 
 /*===========================================================================*/
 /*!
-@brief Bit Field definition of register: ECPRI_ENDP_GSI_CFG_n
+@brief Bit Field definition of register: ECPRI_ENDP_GSI_CFG_GSI_m_CH_n
 */
 /*===========================================================================*/
 /* Structure definition of register */
@@ -1071,18 +1145,20 @@ typedef struct {
 	u32 endp_en : 1;
 	u32 reserved0 : 7;
 	u32 endp_flush : 1;
-	u32 reserved1 : 23;
-} ecpri_hwio_def_ecpri_endp_gsi_cfg_n_s;
+	u32 reserved1 : 3;
+	u32 low_latency_en : 1;
+	u32 reserved2 : 19;
+} ecpri_hwio_def_ecpri_endp_gsi_cfg_gsi_m_ch_n_s;
 
 /* Union definition of register */
 typedef union {
-	ecpri_hwio_def_ecpri_endp_gsi_cfg_n_s def;
+	ecpri_hwio_def_ecpri_endp_gsi_cfg_gsi_m_ch_n_s def;
 	u32 value;
-} ecpri_hwio_def_ecpri_endp_gsi_cfg_n_u;
+} ecpri_hwio_def_ecpri_endp_gsi_cfg_gsi_m_ch_n_u;
 
 /*===========================================================================*/
 /*!
-@brief Bit Field definition of register: ECPRI_ENDP_YELLOW_RED_MARKER_CFG_n
+@brief Bit Field definition of register: ECPRI_ENDP_YELLOW_RED_MARKER_CFG_GSI_m_CH_n
 */
 /*===========================================================================*/
 /* Structure definition of register */
@@ -1091,34 +1167,34 @@ typedef struct {
 	u32 ecpri_yellow_marker_cfg : 6;
 	u32 reserved1 : 10;
 	u32 ecpri_red_marker_cfg : 6;
-} ecpri_hwio_def_ecpri_endp_yellow_red_marker_cfg_n_s;
+} ecpri_hwio_def_ecpri_endp_yellow_red_marker_cfg_gsi_m_ch_n_s;
 
 /* Union definition of register */
 typedef union {
-	ecpri_hwio_def_ecpri_endp_yellow_red_marker_cfg_n_s def;
+	ecpri_hwio_def_ecpri_endp_yellow_red_marker_cfg_gsi_m_ch_n_s def;
 	u32 value;
-} ecpri_hwio_def_ecpri_endp_yellow_red_marker_cfg_n_u;
+} ecpri_hwio_def_ecpri_endp_yellow_red_marker_cfg_gsi_m_ch_n_u;
 
 /*===========================================================================*/
 /*!
-@brief Bit Field definition of register: ECPRI_ENDP_INIT_CTRL_STATUS_n
+@brief Bit Field definition of register: ECPRI_ENDP_INIT_CTRL_STATUS_GSI_m_CH_n
 */
 /*===========================================================================*/
 /* Structure definition of register */
 typedef struct {
 	u32 channel_state : 2;
 	u32 reserved0 : 30;
-} ecpri_hwio_def_ecpri_endp_init_ctrl_status_n_s;
+} ecpri_hwio_def_ecpri_endp_init_ctrl_status_gsi_m_ch_n_s;
 
 /* Union definition of register */
 typedef union {
-	ecpri_hwio_def_ecpri_endp_init_ctrl_status_n_s def;
+	ecpri_hwio_def_ecpri_endp_init_ctrl_status_gsi_m_ch_n_s def;
 	u32 value;
-} ecpri_hwio_def_ecpri_endp_init_ctrl_status_n_u;
+} ecpri_hwio_def_ecpri_endp_init_ctrl_status_gsi_m_ch_n_u;
 
 /*===========================================================================*/
 /*!
-@brief Bit Field definition of register: ECPRI_ENDP_AXI_ATTR_n
+@brief Bit Field definition of register: ECPRI_ENDP_AXI_ATTR_GSI_m_CH_n
 */
 /*===========================================================================*/
 /* Structure definition of register */
@@ -1127,30 +1203,30 @@ typedef struct {
 	u32 nosnoop : 1;
 	u32 tph : 2;
 	u32 reserved0 : 28;
-} ecpri_hwio_def_ecpri_endp_axi_attr_n_s;
+} ecpri_hwio_def_ecpri_endp_axi_attr_gsi_m_ch_n_s;
 
 /* Union definition of register */
 typedef union {
-	ecpri_hwio_def_ecpri_endp_axi_attr_n_s def;
+	ecpri_hwio_def_ecpri_endp_axi_attr_gsi_m_ch_n_s def;
 	u32 value;
-} ecpri_hwio_def_ecpri_endp_axi_attr_n_u;
+} ecpri_hwio_def_ecpri_endp_axi_attr_gsi_m_ch_n_u;
 
 /*===========================================================================*/
 /*!
-@brief Bit Field definition of register: ECPRI_ENDP_NFAPI_REASSEMBLY_CFG_n
+@brief Bit Field definition of register: ECPRI_ENDP_NFAPI_REASSEMBLY_CFG_GSI_m_CH_n
 */
 /*===========================================================================*/
 /* Structure definition of register */
 typedef struct {
 	u32 vm_id : 2;
 	u32 reserved0 : 30;
-} ecpri_hwio_def_ecpri_endp_nfapi_reassembly_cfg_n_s;
+} ecpri_hwio_def_ecpri_endp_nfapi_reassembly_cfg_gsi_m_ch_n_s;
 
 /* Union definition of register */
 typedef union {
-	ecpri_hwio_def_ecpri_endp_nfapi_reassembly_cfg_n_s def;
+	ecpri_hwio_def_ecpri_endp_nfapi_reassembly_cfg_gsi_m_ch_n_s def;
 	u32 value;
-} ecpri_hwio_def_ecpri_endp_nfapi_reassembly_cfg_n_u;
+} ecpri_hwio_def_ecpri_endp_nfapi_reassembly_cfg_gsi_m_ch_n_u;
 
 /*===========================================================================*/
 /*!
@@ -1247,7 +1323,7 @@ typedef union {
 
 /*===========================================================================*/
 /*!
-@brief Bit Field definition of register: ECPRI_DST_ACKMNGR_CMDQ_STATUS
+@brief Bit Field definition of register: ECPRI_DST_ACKMNGR_CMDQ_STATUS_GSI_m
 */
 /*===========================================================================*/
 /* Structure definition of register */
@@ -1255,50 +1331,101 @@ typedef struct {
 	u32 cmdq_full : 1;
 	u32 cmdq_depth : 8;
 	u32 reserved0 : 23;
-} ecpri_hwio_def_ecpri_dst_ackmngr_cmdq_status_s;
+} ecpri_hwio_def_ecpri_dst_ackmngr_cmdq_status_gsi_m_s;
 
 /* Union definition of register */
 typedef union {
-	ecpri_hwio_def_ecpri_dst_ackmngr_cmdq_status_s def;
+	ecpri_hwio_def_ecpri_dst_ackmngr_cmdq_status_gsi_m_s def;
 	u32 value;
-} ecpri_hwio_def_ecpri_dst_ackmngr_cmdq_status_u;
+} ecpri_hwio_def_ecpri_dst_ackmngr_cmdq_status_gsi_m_u;
 
 /*===========================================================================*/
 /*!
-@brief Bit Field definition of register: ECPRI_DST_ACKMNGR_CMDQ_STATUS_EMPTY_n
+@brief Bit Field definition of register: ECPRI_SRC_ACKMNGR_CMDQ_STATUS_GSI_m
+*/
+/*===========================================================================*/
+/* Structure definition of register */
+typedef struct {
+	u32 cmdq_full : 1;
+	u32 cmdq_depth : 7;
+	u32 reserved0 : 24;
+} ecpri_hwio_def_ecpri_src_ackmngr_cmdq_status_gsi_m_s;
+
+/* Union definition of register */
+typedef union {
+	ecpri_hwio_def_ecpri_src_ackmngr_cmdq_status_gsi_m_s def;
+	u32 value;
+} ecpri_hwio_def_ecpri_src_ackmngr_cmdq_status_gsi_m_u;
+
+/*===========================================================================*/
+/*!
+@brief Bit Field definition of register: ECPRI_DST_ACKMNGR_CMDQ_STATUS_EMPTY_GSI_m_REG_n
 */
 /*===========================================================================*/
 /* Structure definition of register */
 typedef struct {
 	u32 cmdq_empty : 32;
-} ecpri_hwio_def_ecpri_dst_ackmngr_cmdq_status_empty_n_s;
+} ecpri_hwio_def_ecpri_dst_ackmngr_cmdq_status_empty_gsi_m_reg_n_s;
 
 /* Union definition of register */
 typedef union {
-	ecpri_hwio_def_ecpri_dst_ackmngr_cmdq_status_empty_n_s def;
+	ecpri_hwio_def_ecpri_dst_ackmngr_cmdq_status_empty_gsi_m_reg_n_s def;
 	u32 value;
-} ecpri_hwio_def_ecpri_dst_ackmngr_cmdq_status_empty_n_u;
+} ecpri_hwio_def_ecpri_dst_ackmngr_cmdq_status_empty_gsi_m_reg_n_u;
 
 /*===========================================================================*/
 /*!
-@brief Bit Field definition of register: ECPRI_DST_ACKMNGR_CMDQ_COUNT_n
+@brief Bit Field definition of register: ECPRI_DST_ACKMNGR_CMDQ_COUNT_GSI_m_CH_n
 */
 /*===========================================================================*/
 /* Structure definition of register */
 typedef struct {
 	u32 fifo_count : 8;
 	u32 reserved0 : 24;
-} ecpri_hwio_def_ecpri_dst_ackmngr_cmdq_count_n_s;
+} ecpri_hwio_def_ecpri_dst_ackmngr_cmdq_count_gsi_m_ch_n_s;
 
 /* Union definition of register */
 typedef union {
-	ecpri_hwio_def_ecpri_dst_ackmngr_cmdq_count_n_s def;
+	ecpri_hwio_def_ecpri_dst_ackmngr_cmdq_count_gsi_m_ch_n_s def;
 	u32 value;
-} ecpri_hwio_def_ecpri_dst_ackmngr_cmdq_count_n_u;
+} ecpri_hwio_def_ecpri_dst_ackmngr_cmdq_count_gsi_m_ch_n_u;
 
 /*===========================================================================*/
 /*!
-@brief Bit Field definition of register: ECPRI_GSI_TLV_FIFO_STATUS_n
+@brief Bit Field definition of register: ECPRI_SRC_ACKMNGR_CMDQ_STATUS_EMPTY_GSI_m_REG_n
+*/
+/*===========================================================================*/
+/* Structure definition of register */
+typedef struct {
+	u32 cmdq_empty : 32;
+} ecpri_hwio_def_ecpri_src_ackmngr_cmdq_status_empty_gsi_m_reg_n_s;
+
+/* Union definition of register */
+typedef union {
+	ecpri_hwio_def_ecpri_src_ackmngr_cmdq_status_empty_gsi_m_reg_n_s def;
+	u32 value;
+} ecpri_hwio_def_ecpri_src_ackmngr_cmdq_status_empty_gsi_m_reg_n_u;
+
+/*===========================================================================*/
+/*!
+@brief Bit Field definition of register: ECPRI_SRC_ACKMNGR_CMDQ_COUNT_GSI_m_CH_n
+*/
+/*===========================================================================*/
+/* Structure definition of register */
+typedef struct {
+	u32 fifo_count : 8;
+	u32 reserved0 : 24;
+} ecpri_hwio_def_ecpri_src_ackmngr_cmdq_count_gsi_m_ch_n_s;
+
+/* Union definition of register */
+typedef union {
+	ecpri_hwio_def_ecpri_src_ackmngr_cmdq_count_gsi_m_ch_n_s def;
+	u32 value;
+} ecpri_hwio_def_ecpri_src_ackmngr_cmdq_count_gsi_m_ch_n_u;
+
+/*===========================================================================*/
+/*!
+@brief Bit Field definition of register: ECPRI_GSI_TLV_FIFO_STATUS_GSI_m_CH_n
 */
 /*===========================================================================*/
 /* Structure definition of register */
@@ -1310,17 +1437,17 @@ typedef struct {
 	u32 fifo_full : 1;
 	u32 fifo_head_is_bubble : 1;
 	u32 reserved0 : 12;
-} ecpri_hwio_def_ecpri_gsi_tlv_fifo_status_n_s;
+} ecpri_hwio_def_ecpri_gsi_tlv_fifo_status_gsi_m_ch_n_s;
 
 /* Union definition of register */
 typedef union {
-	ecpri_hwio_def_ecpri_gsi_tlv_fifo_status_n_s def;
+	ecpri_hwio_def_ecpri_gsi_tlv_fifo_status_gsi_m_ch_n_s def;
 	u32 value;
-} ecpri_hwio_def_ecpri_gsi_tlv_fifo_status_n_u;
+} ecpri_hwio_def_ecpri_gsi_tlv_fifo_status_gsi_m_ch_n_u;
 
 /*===========================================================================*/
 /*!
-@brief Bit Field definition of register: ECPRI_GSI_AOS_FIFO_STATUS_n
+@brief Bit Field definition of register: ECPRI_GSI_AOS_FIFO_STATUS_GSI_m_CH_n
 */
 /*===========================================================================*/
 /* Structure definition of register */
@@ -1332,47 +1459,47 @@ typedef struct {
 	u32 fifo_full : 1;
 	u32 fifo_head_is_bubble : 1;
 	u32 reserved0 : 12;
-} ecpri_hwio_def_ecpri_gsi_aos_fifo_status_n_s;
+} ecpri_hwio_def_ecpri_gsi_aos_fifo_status_gsi_m_ch_n_s;
 
 /* Union definition of register */
 typedef union {
-	ecpri_hwio_def_ecpri_gsi_aos_fifo_status_n_s def;
+	ecpri_hwio_def_ecpri_gsi_aos_fifo_status_gsi_m_ch_n_s def;
 	u32 value;
-} ecpri_hwio_def_ecpri_gsi_aos_fifo_status_n_u;
+} ecpri_hwio_def_ecpri_gsi_aos_fifo_status_gsi_m_ch_n_u;
 
 /*===========================================================================*/
 /*!
-@brief Bit Field definition of register: ECPRI_ENDP_GSI_CONS_BYTES_TLV_n
+@brief Bit Field definition of register: ECPRI_ENDP_GSI_CONS_BYTES_TLV_GSI_m_CH_n
 */
 /*===========================================================================*/
 /* Structure definition of register */
 typedef struct {
 	u32 cons_bytes : 21;
 	u32 reserved0 : 11;
-} ecpri_hwio_def_ecpri_endp_gsi_cons_bytes_tlv_n_s;
+} ecpri_hwio_def_ecpri_endp_gsi_cons_bytes_tlv_gsi_m_ch_n_s;
 
 /* Union definition of register */
 typedef union {
-	ecpri_hwio_def_ecpri_endp_gsi_cons_bytes_tlv_n_s def;
+	ecpri_hwio_def_ecpri_endp_gsi_cons_bytes_tlv_gsi_m_ch_n_s def;
 	u32 value;
-} ecpri_hwio_def_ecpri_endp_gsi_cons_bytes_tlv_n_u;
+} ecpri_hwio_def_ecpri_endp_gsi_cons_bytes_tlv_gsi_m_ch_n_u;
 
 /*===========================================================================*/
 /*!
-@brief Bit Field definition of register: ECPRI_ENDP_GSI_CONS_BYTES_AOS_n
+@brief Bit Field definition of register: ECPRI_ENDP_GSI_CONS_BYTES_AOS_GSI_m_CH_n
 */
 /*===========================================================================*/
 /* Structure definition of register */
 typedef struct {
 	u32 cons_bytes : 21;
 	u32 reserved0 : 11;
-} ecpri_hwio_def_ecpri_endp_gsi_cons_bytes_aos_n_s;
+} ecpri_hwio_def_ecpri_endp_gsi_cons_bytes_aos_gsi_m_ch_n_s;
 
 /* Union definition of register */
 typedef union {
-	ecpri_hwio_def_ecpri_endp_gsi_cons_bytes_aos_n_s def;
+	ecpri_hwio_def_ecpri_endp_gsi_cons_bytes_aos_gsi_m_ch_n_s def;
 	u32 value;
-} ecpri_hwio_def_ecpri_endp_gsi_cons_bytes_aos_n_u;
+} ecpri_hwio_def_ecpri_endp_gsi_cons_bytes_aos_gsi_m_ch_n_u;
 
 /*===========================================================================*/
 /*!
@@ -1461,7 +1588,7 @@ typedef struct {
 typedef union {
 	ecpri_hwio_def_ecpri_dma_stream_ctrl_s def;
 	u32 value;
-} ecpri_hwio_def_ecpri_dma_stream_ctrl_u;
+} ecpri_hwio_def_ecpri_stream_ctrl_u;
 
 /*===========================================================================*/
 /*!
@@ -1572,9 +1699,23 @@ typedef struct {
 	u32 reserved0 : 16;
 } ecpri_hwio_def_ecpri_dma_testbus_ctrl_s;
 
+/*===========================================================================*/
+/*!
+@brief Bit Field definition of register: ECPRI_DMA_TESTBUS_CTRL_V2
+*/
+/*===========================================================================*/
+/* Structure definition of register */
+typedef struct {
+	u32 sel : 9;
+	u32 reserved0 : 7;
+	u32 sel_internal : 8;
+	u32 reserved1 : 8;
+} ecpri_hwio_def_ecpri_dma_testbus_ctrl_v2_s;
+
 /* Union definition of register */
 typedef union {
-	ecpri_hwio_def_ecpri_dma_testbus_ctrl_s def;
+	ecpri_hwio_def_ecpri_dma_testbus_ctrl_s def_v1;
+	ecpri_hwio_def_ecpri_dma_testbus_ctrl_v2_s def_v2;
 	u32 value;
 } ecpri_hwio_def_ecpri_dma_testbus_ctrl_u;
 
@@ -1689,9 +1830,24 @@ typedef struct {
 	u32 reserved0 : 23;
 } ecpri_hwio_def_ecpri_dma_exception_channel_s;
 
+/*===========================================================================*/
+/*!
+@brief Bit Field definition of register: ECPRI_DMA_EXCEPTION_CHANNEL_V2
+*/
+/*===========================================================================*/
+/* Structure definition of register */
+typedef struct {
+	u32 channel : 8;
+	u32 gid : 2;
+	u32 reserved0 : 6;
+	u32 enable : 1;
+	u32 reserved1 : 15;
+} ecpri_hwio_def_ecpri_dma_exception_channel_v2_s;
+
 /* Union definition of register */
 typedef union {
-	ecpri_hwio_def_ecpri_dma_exception_channel_s def;
+	ecpri_hwio_def_ecpri_dma_exception_channel_s def_v1;
+	ecpri_hwio_def_ecpri_dma_exception_channel_v2_s def_v2;
 	u32 value;
 } ecpri_hwio_def_ecpri_dma_exception_channel_u;
 
@@ -1713,9 +1869,27 @@ typedef struct {
 	u32 dst_channel : 8;
 } ecpri_hwio_def_ecpri_dpl_trig_ctrl_n_s;
 
+/*===========================================================================*/
+/*!
+@brief Bit Field definition of register: ECPRI_DPL_TRIG_CTRL_n_V2
+*/
+/*===========================================================================*/
+/* Structure definition of register */
+typedef struct {
+	u32 b_enable : 1;
+	u32 b_width : 5;
+	u32 b_location : 5;
+	u32 a_enable : 1;
+	u32 a_width : 5;
+	u32 a_location : 5;
+	u32 dst_channel : 8;
+	u32 dst_gid : 2;
+} ecpri_hwio_def_ecpri_dpl_trig_ctrl_n_v2_s;
+
 /* Union definition of register */
 typedef union {
-	ecpri_hwio_def_ecpri_dpl_trig_ctrl_n_s def;
+	ecpri_hwio_def_ecpri_dpl_trig_ctrl_n_s def_v1;
+	ecpri_hwio_def_ecpri_dpl_trig_ctrl_n_v2_s def_v2;
 	u32 value;
 } ecpri_hwio_def_ecpri_dpl_trig_ctrl_n_u;
 
@@ -1760,13 +1934,13 @@ typedef union {
 typedef struct {
 	u32 cnt : 24;
 	u32 reserved0 : 8;
-} ecpri_hwio_def_ecpri_dma_pkt_drop_full_s;
+} ecpri_hwio_def_ecpri_pkt_drop_full_s;
 
 /* Union definition of register */
 typedef union {
-	ecpri_hwio_def_ecpri_dma_pkt_drop_full_s def;
+	ecpri_hwio_def_ecpri_pkt_drop_full_s def;
 	u32 value;
-} ecpri_hwio_def_ecpri_dma_pkt_drop_full_u;
+} ecpri_hwio_def_ecpri_pkt_drop_full_u;
 
 /*===========================================================================*/
 /*!
@@ -1777,33 +1951,31 @@ typedef union {
 typedef struct {
 	u32 cnt : 24;
 	u32 reserved0 : 8;
-} ecpri_hwio_def_ecpri_dma_pkt_drop_re_empty_s;
+} ecpri_hwio_def_ecpri_pkt_drop_re_empty_s;
 
 /* Union definition of register */
 typedef union {
-	ecpri_hwio_def_ecpri_dma_pkt_drop_re_empty_s def;
+	ecpri_hwio_def_ecpri_pkt_drop_re_empty_s def;
 	u32 value;
-} ecpri_hwio_def_ecpri_dma_pkt_drop_re_empty_u;
+} ecpri_hwio_def_ecpri_pkt_drop_re_empty_u;
 
 /*===========================================================================*/
 /*!
-@brief Bit Field definition of register: ECPRI_DMA_DPL_CFG
+@brief Bit Field definition of register: ECPRI_STATUS_PKT_DROP_TLV_FIFO_EMPTY
 */
 /*===========================================================================*/
 /* Structure definition of register */
 typedef struct {
-	u32 dpl_mtu : 8;
-	u32 dpl_select : 4;
-	u32 reserved0 : 2;
-	u32 dpl_flush_pkt : 2;
-	u32 reserved1 : 16;
-} ecpri_hwio_def_ecpri_dma_dpl_cfg_s;
+	u32 cnt : 24;
+	u32 reserved0 : 8;
+} ecpri_hwio_def_ecpri_status_pkt_drop_tlv_fifo_empty_s;
 
 /* Union definition of register */
 typedef union {
-	ecpri_hwio_def_ecpri_dma_dpl_cfg_s def;
+	ecpri_hwio_def_ecpri_status_pkt_drop_tlv_fifo_empty_s def;
 	u32 value;
-} ecpri_hwio_def_ecpri_dma_dpl_cfg_u;
+} ecpri_hwio_def_ecpri_status_pkt_drop_tlv_fifo_empty_u;
+
 
 /*===========================================================================*/
 /*!
@@ -1816,15 +1988,33 @@ typedef struct {
 	u32 reserved0 : 2;
 	u32 record_rate : 4;
 	u32 record_channel : 8;
-	u32 record_src : 2;
+	u32 record_gid : 2;
 	u32 record_en : 1;
 	u32 reserved1 : 1;
 	u32 unit_en : 12;
 } ecpri_hwio_def_ecpri_dma_tpdm_cfg_s;
 
+/*===========================================================================*/
+/*!
+  @brief Bit Field definition of register: ECPRI_DMA_TPDM_CFG_V2
+*/
+/*===========================================================================*/
+/* Structure definition of register */
+typedef struct
+{
+	u32 reserved0 : 4;
+	u32 record_rate : 4;
+	u32 record_channel : 8;
+	u32 record_gid : 2;
+	u32 record_en : 1;
+	u32 reserved1 : 1;
+	u32 unit_en : 12;
+} ecpri_hwio_def_ecpri_dma_tpdm_cfg_v2_s;
+
 /* Union definition of register */
 typedef union {
-	ecpri_hwio_def_ecpri_dma_tpdm_cfg_s def;
+	ecpri_hwio_def_ecpri_dma_tpdm_cfg_s def_v1;
+	ecpri_hwio_def_ecpri_dma_tpdm_cfg_v2_s def_v2;
 	u32 value;
 } ecpri_hwio_def_ecpri_dma_tpdm_cfg_u;
 
@@ -1885,19 +2075,19 @@ typedef union {
 
 /*===========================================================================*/
 /*!
-@brief Bit Field definition of register: ECPRI_NSO_JUMBO_PKT_EN_n
+@brief Bit Field definition of register: ECPRI_NSO_JUMBO_PKT_EN_GSI_m_REG_n
 */
 /*===========================================================================*/
 /* Structure definition of register */
 typedef struct {
 	u32 jumbo_pkt_en : 32;
-} ecpri_hwio_def_ecpri_nso_jumbo_pkt_en_n_s;
+} ecpri_hwio_def_ecpri_nso_jumbo_pkt_en_gsi_m_reg_n_s;
 
 /* Union definition of register */
 typedef union {
-	ecpri_hwio_def_ecpri_nso_jumbo_pkt_en_n_s def;
+	ecpri_hwio_def_ecpri_nso_jumbo_pkt_en_gsi_m_reg_n_s def;
 	u32 value;
-} ecpri_hwio_def_ecpri_nso_jumbo_pkt_en_n_u;
+} ecpri_hwio_def_ecpri_nso_jumbo_pkt_en_gsi_m_reg_n_u;
 
 /*===========================================================================*/
 /*!
@@ -1914,7 +2104,8 @@ typedef struct {
 	u32 dst_id_type : 1;
 	u32 dst_id : 7;
 	u32 pkt_id : 8;
-	u32 reserved0 : 5;
+	u32 gsi_id : 2;
+	u32 reserved0 : 3;
 } ecpri_hwio_def_ecpri_nso_len_err_status_1_s;
 
 /* Union definition of register */
@@ -1989,9 +2180,26 @@ typedef struct {
 	u32 nfapi_hdr_valid : 1;
 } ecpri_hwio_def_ecpri_nso_dbg_cntxt_n_info_1_s;
 
+/*===========================================================================*/
+/*!
+@brief Bit Field definition of register: ECPRI_NSO_DBG_CNTXT_n_INFO_1_V2
+*/
+/*===========================================================================*/
+/* Structure definition of register */
+typedef struct {
+	u32 eng_state : 3;
+	u32 src_id : 7;
+	u32 size : 14;
+	u32 num_of_sectors : 4;
+	u32 last : 1;
+	u32 msg_too_long : 1;
+	u32 gsi_id : 2;
+} ecpri_hwio_def_ecpri_nso_dbg_cntxt_n_info_1_v2_s;
+
 /* Union definition of register */
 typedef union {
-	ecpri_hwio_def_ecpri_nso_dbg_cntxt_n_info_1_s def;
+	ecpri_hwio_def_ecpri_nso_dbg_cntxt_n_info_1_s def_v1;
+	ecpri_hwio_def_ecpri_nso_dbg_cntxt_n_info_1_v2_s def_v2;
 	u32 value;
 } ecpri_hwio_def_ecpri_nso_dbg_cntxt_n_info_1_u;
 
@@ -2004,7 +2212,9 @@ typedef union {
 typedef struct {
 	u32 nfapi_remaining_len : 24;
 	u32 eng_state : 3;
-	u32 reserved0 : 5;
+	u32 nfapi_hdr_valid : 1;
+	u32 jumbo_pkt_en : 1;
+	u32 reserved0 : 3;
 } ecpri_hwio_def_ecpri_nso_dbg_cntxt_n_info_2_s;
 
 /* Union definition of register */
@@ -2033,21 +2243,40 @@ typedef union {
 
 /*===========================================================================*/
 /*!
-@brief Bit Field definition of register: ECPRI_DPL_CFG_n
+@brief Bit Field definition of register: ECPRI_DMA_DPL_CFG
 */
 /*===========================================================================*/
 /* Structure definition of register */
 typedef struct {
-	u32 record_size : 9;
-	u32 record_enable : 1;
-	u32 reserved0 : 22;
-} ecpri_hwio_def_ecpri_dpl_cfg_n_s;
+	u32 dpl_mtu : 8;
+	u32 dpl_select : 4;
+	u32 reserved0 : 2;
+	u32 dpl_flush_pkt : 2;
+	u32 reserved1 : 16;
+} ecpri_hwio_def_ecpri_dpl_cfg_s;
+
+/*===========================================================================*/
+/*!
+@brief Bit Field definition of register: ECPRI_DMA_DPL_CFG_V2
+*/
+/*===========================================================================*/
+/* Structure definition of register */
+typedef struct {
+	u32 dpl_mtu : 8;
+	u32 dpl_select : 4;
+	u32 reserved0 : 8;
+	u32 dpl_tre_mirror_en : 1;
+	u32 reserved1 : 8;
+	u32 dpl_flush_clr : 1;
+	u32 dpl_flush_pkt : 2;
+} ecpri_hwio_def_ecpri_dma_dpl_cfg_v2_s;
 
 /* Union definition of register */
 typedef union {
-	ecpri_hwio_def_ecpri_dpl_cfg_n_s def;
+	ecpri_hwio_def_ecpri_dpl_cfg_s def_v1;
+	ecpri_hwio_def_ecpri_dma_dpl_cfg_v2_s def_v2;
 	u32 value;
-} ecpri_hwio_def_ecpri_dpl_cfg_n_u;
+} ecpri_hwio_def_ecpri_dma_dpl_cfg_u;
 
 /*===========================================================================*/
 /*!
@@ -2127,7 +2356,9 @@ typedef struct {
 	u32 xbar_rx_pkt_drop_type_2_irq : 1;
 	u32 xbar_rx_pkt_drop_type_3_irq : 1;
 	u32 xbar_rx_pkt_drop_type_4_irq : 1;
-	u32 reserved0 : 14;
+	u32 lte_pkt_drop_type_1_irq : 1;
+	u32 lte_pkt_drop_type_2_irq : 1;
+	u32 reserved0 : 12;
 } ecpri_hwio_def_ecpri_irq_stts_ee_n_s;
 
 /* Union definition of register */
@@ -2161,7 +2392,9 @@ typedef struct {
 	u32 xbar_rx_pkt_drop_type_2_irq_en : 1;
 	u32 xbar_rx_pkt_drop_type_3_irq_en : 1;
 	u32 xbar_rx_pkt_drop_type_4_irq_en : 1;
-	u32 reserved0 : 14;
+	u32 lte_pkt_drop_type_1_irq_en : 1;
+	u32 lte_pkt_drop_type_2_irq_en : 1;
+	u32 reserved0 : 12;
 } ecpri_hwio_def_ecpri_irq_en_ee_n_s;
 
 /* Union definition of register */
@@ -2195,7 +2428,9 @@ typedef struct {
 	u32 xbar_rx_pkt_drop_type_2_irq_clr : 1;
 	u32 xbar_rx_pkt_drop_type_3_irq_clr : 1;
 	u32 xbar_rx_pkt_drop_type_4_irq_clr : 1;
-	u32 reserved0 : 14;
+	u32 lte_pkt_drop_type_1_irq_clr : 1;
+	u32 lte_pkt_drop_type_2_irq_clr : 1;
+	u32 reserved0 : 12;
 } ecpri_hwio_def_ecpri_irq_clr_ee_n_s;
 
 /* Union definition of register */
@@ -2206,7 +2441,7 @@ typedef union {
 
 /*===========================================================================*/
 /*!
-@brief Bit Field definition of register: ECPRI_ENDP_GSI_IF_FIFO_CFG_TLV_n
+@brief Bit Field definition of register: ECPRI_ENDP_CFG_TLV_FIFO_GSI_m_CH_n
 */
 /*===========================================================================*/
 /* Structure definition of register */
@@ -2215,17 +2450,17 @@ typedef struct {
 	u32 reserved0 : 4;
 	u32 fifo_size : 8;
 	u32 reserved1 : 8;
-} ecpri_hwio_def_ecpri_endp_gsi_if_fifo_cfg_tlv_n_s;
+} ecpri_hwio_def_ecpri_endp_cfg_tlv_fifo_gsi_m_ch_n_s;
 
 /* Union definition of register */
 typedef union {
-	ecpri_hwio_def_ecpri_endp_gsi_if_fifo_cfg_tlv_n_s def;
+	ecpri_hwio_def_ecpri_endp_cfg_tlv_fifo_gsi_m_ch_n_s def;
 	u32 value;
-} ecpri_hwio_def_ecpri_endp_gsi_if_fifo_cfg_tlv_n_u;
+} ecpri_hwio_def_ecpri_endp_cfg_tlv_fifo_gsi_m_ch_n_u;
 
 /*===========================================================================*/
 /*!
-@brief Bit Field definition of register: ECPRI_ENDP_GSI_IF_FIFO_CFG_AOS_n
+@brief Bit Field definition of register: ECPRI_ENDP_CFG_AOS_FIFO_GSI_m_CH_n
 */
 /*===========================================================================*/
 /* Structure definition of register */
@@ -2234,47 +2469,3199 @@ typedef struct {
 	u32 reserved0 : 4;
 	u32 fifo_size : 8;
 	u32 reserved1 : 8;
-} ecpri_hwio_def_ecpri_endp_gsi_if_fifo_cfg_aos_n_s;
+} ecpri_hwio_def_ecpri_endp_cfg_aos_fifo_gsi_m_ch_n_s;
 
 /* Union definition of register */
 typedef union {
-	ecpri_hwio_def_ecpri_endp_gsi_if_fifo_cfg_aos_n_s def;
+	ecpri_hwio_def_ecpri_endp_cfg_aos_fifo_gsi_m_ch_n_s def;
 	u32 value;
-} ecpri_hwio_def_ecpri_endp_gsi_if_fifo_cfg_aos_n_u;
+} ecpri_hwio_def_ecpri_endp_cfg_aos_fifo_gsi_m_ch_n_u;
 
 /*===========================================================================*/
 /*!
-@brief Bit Field definition of register: ECPRI_ENDP_CFG_VFID_n
+@brief Bit Field definition of register: ECPRI_ENDP_CFG_VFID_GSI_m_CH_n
 */
 /*===========================================================================*/
 /* Structure definition of register */
 typedef struct {
-	u32 vfid : 3;
-	u32 reserved0 : 29;
-} ecpri_hwio_def_ecpri_endp_cfg_vfid_n_s;
+	u32 vfid : 5;
+	u32 vf_active : 1;
+	u32 reserved0 : 26;
+} ecpri_hwio_def_ecpri_endp_cfg_vfid_gsi_m_ch_n_s;
 
 /* Union definition of register */
 typedef union {
-	ecpri_hwio_def_ecpri_endp_cfg_vfid_n_s def;
+	ecpri_hwio_def_ecpri_endp_cfg_vfid_gsi_m_ch_n_s def;
 	u32 value;
-} ecpri_hwio_def_ecpri_endp_cfg_vfid_n_u;
+} ecpri_hwio_def_ecpri_endp_cfg_vfid_gsi_m_ch_n_u;
 
 /*===========================================================================*/
 /*!
-@brief Bit Field definition of register: ECPRI_GSI_EE_VFID_n
+@brief Bit Field definition of register: ECPRI_GSI_EE_VFID_GSI_m_EE_n
 */
 /*===========================================================================*/
 /* Structure definition of register */
 typedef struct {
-	u32 vfid : 3;
-	u32 reserved0 : 29;
-} ecpri_hwio_def_ecpri_gsi_ee_vfid_n_s;
+	u32 vfid : 5;
+	u32 vf_active : 1;
+	u32 reserved0 : 26;
+} ecpri_hwio_def_ecpri_gsi_ee_vfid_gsi_m_ee_n_s;
 
 /* Union definition of register */
 typedef union {
-	ecpri_hwio_def_ecpri_gsi_ee_vfid_n_s def;
+	ecpri_hwio_def_ecpri_gsi_ee_vfid_gsi_m_ee_n_s def;
 	u32 value;
-} ecpri_hwio_def_ecpri_gsi_ee_vfid_n_u;
+} ecpri_hwio_def_ecpri_gsi_ee_vfid_gsi_m_ee_n_u;
+
+/*===========================================================================*/
+/*!
+@brief Bit Field definition of register: ECPRI_STATUS_LTE_PKT_DROP_FULL
+*/
+/*===========================================================================*/
+/* Structure definition of register */
+typedef struct
+{
+	u32 cnt : 24;
+	u32 reserved0 : 8;
+} ecpri_hwio_def_ecpri_status_lte_pkt_drop_full_s;
+
+/* Union definition of register */
+typedef union
+{
+	ecpri_hwio_def_ecpri_status_lte_pkt_drop_full_s def;
+	u32 value;
+} ecpri_hwio_def_ecpri_status_lte_pkt_drop_full_u;
+
+/*===========================================================================*/
+/*!
+@brief Bit Field definition of register: ECPRI_STATUS_LTE_PKT_DROP_TLV_FIFO_EMPTY
+*/
+/*===========================================================================*/
+/* Structure definition of register */
+typedef struct
+{
+	u32 cnt : 24;
+	u32 reserved0 : 8;
+} ecpri_hwio_def_ecpri_status_lte_pkt_drop_tlv_fifo_empty_s;
+
+/* Union definition of register */
+typedef union
+{
+	ecpri_hwio_def_ecpri_status_lte_pkt_drop_tlv_fifo_empty_s def;
+	u32 value;
+} ecpri_hwio_def_ecpri_status_lte_pkt_drop_tlv_fifo_empty_u;
+
+/*===========================================================================*/
+/*!
+@brief Bit Field definition of register: ECPRI_LTE_LATENCY_BUFFER_WORD
+*/
+/*===========================================================================*/
+/* Structure definition of register */
+typedef struct
+{
+	u32 cnt : 13;
+	u32 reserved0 : 19;
+} ecpri_hwio_def_ecpri_lte_latency_buffer_word_s;
+
+/* Union definition of register */
+typedef union
+{
+	ecpri_hwio_def_ecpri_lte_latency_buffer_word_s def;
+	u32 value;
+} ecpri_hwio_def_ecpri_lte_latency_buffer_word_u;
+
+/*----------------------------------------------------------------------------
+ * MODULE: ECPRI_DMA1_THROTTLE_THROTTLE_0_THROTTLE_0_THROTTLE
+ *--------------------------------------------------------------------------*/
+
+ /*===========================================================================*/
+ /*!
+ @brief Bit Field definition of register: ECPRI_DMA1_THROTTLE_THROTTLE_0_CNTRL
+ */
+ /*===========================================================================*/
+ /* Structure definition of register */
+typedef struct
+{
+	u32 throttle_en : 1;
+	u32 reserved0 : 7;
+	u32 threshold_level_0_en : 1;
+	u32 threshold_level_1_en : 1;
+	u32 threshold_level_2_en : 1;
+	u32 threshold_level_3_en : 1;
+	u32 threshold_level_4_en : 1;
+	u32 threshold_level_5_en : 1;
+	u32 threshold_level_6_en : 1;
+	u32 threshold_level_7_en : 1;
+	u32 reserved1 : 16;
+} ecpri_hwio_def_ecpri_dma1_throttle_throttle_0_cntrl_s;
+
+/* Union definition of register */
+typedef union
+{
+	ecpri_hwio_def_ecpri_dma1_throttle_throttle_0_cntrl_s def;
+	u32 value;
+} ecpri_hwio_def_ecpri_dma1_throttle_throttle_0_cntrl_u;
+
+/*===========================================================================*/
+/*!
+@brief Bit Field definition of register: ECPRI_DMA1_THROTTLE_THROTTLE_0_CGC_CNTRL
+*/
+/*===========================================================================*/
+/* Structure definition of register */
+typedef struct
+{
+	u32 throttle_cgc_en : 1;
+	u32 reserved0 : 31;
+} ecpri_hwio_def_ecpri_dma1_throttle_throttle_0_cgc_cntrl_s;
+
+/* Union definition of register */
+typedef union
+{
+	ecpri_hwio_def_ecpri_dma1_throttle_throttle_0_cgc_cntrl_s def;
+	u32 value;
+} ecpri_hwio_def_ecpri_dma1_throttle_throttle_0_cgc_cntrl_u;
+
+/*===========================================================================*/
+/*!
+@brief Bit Field definition of register: ECPRI_DMA1_THROTTLE_THROTTLE_0_RESET_CNTRL
+*/
+/*===========================================================================*/
+/* Structure definition of register */
+typedef struct
+{
+	u32 core_sw_reset : 1;
+	u32 reserved0 : 31;
+} ecpri_hwio_def_ecpri_dma1_throttle_throttle_0_reset_cntrl_s;
+
+/* Union definition of register */
+typedef union
+{
+	ecpri_hwio_def_ecpri_dma1_throttle_throttle_0_reset_cntrl_s def;
+	u32 value;
+} ecpri_hwio_def_ecpri_dma1_throttle_throttle_0_reset_cntrl_u;
+
+/*===========================================================================*/
+/*!
+@brief Bit Field definition of register: ECPRI_DMA1_THROTTLE_THROTTLE_0_CONFIG
+*/
+/*===========================================================================*/
+/* Structure definition of register */
+typedef struct
+{
+	u32 throttle_cntrl_max_skew : 3;
+	u32 reserved0 : 29;
+} ecpri_hwio_def_ecpri_dma1_throttle_throttle_0_config_s;
+
+/* Union definition of register */
+typedef union
+{
+	ecpri_hwio_def_ecpri_dma1_throttle_throttle_0_config_s def;
+	u32 value;
+} ecpri_hwio_def_ecpri_dma1_throttle_throttle_0_config_u;
+
+/*===========================================================================*/
+/*!
+@brief Bit Field definition of register: ECPRI_DMA1_THROTTLE_THROTTLE_0_GRANT_PERIOD
+*/
+/*===========================================================================*/
+/* Structure definition of register */
+typedef struct
+{
+	u32 grant_period : 14;
+	u32 reserved0 : 18;
+} ecpri_hwio_def_ecpri_dma1_throttle_throttle_0_grant_period_s;
+
+/* Union definition of register */
+typedef union
+{
+	ecpri_hwio_def_ecpri_dma1_throttle_throttle_0_grant_period_s def;
+	u32 value;
+} ecpri_hwio_def_ecpri_dma1_throttle_throttle_0_grant_period_u;
+
+/*===========================================================================*/
+/*!
+@brief Bit Field definition of register: ECPRI_DMA1_THROTTLE_THROTTLE_0_GRANT_COUNT
+*/
+/*===========================================================================*/
+/* Structure definition of register */
+typedef struct
+{
+	u32 grant_count : 16;
+	u32 reserved0 : 16;
+} ecpri_hwio_def_ecpri_dma1_throttle_throttle_0_grant_count_s;
+
+/* Union definition of register */
+typedef union
+{
+	ecpri_hwio_def_ecpri_dma1_throttle_throttle_0_grant_count_s def;
+	u32 value;
+} ecpri_hwio_def_ecpri_dma1_throttle_throttle_0_grant_count_u;
+
+/*===========================================================================*/
+/*!
+@brief Bit Field definition of register: ECPRI_DMA1_THROTTLE_THROTTLE_0_THRESHOLD_00
+*/
+/*===========================================================================*/
+/* Structure definition of register */
+typedef struct
+{
+	u32 threshold_level_7 : 16;
+	u32 threshold_level_6 : 16;
+} ecpri_hwio_def_ecpri_dma1_throttle_throttle_0_threshold_00_s;
+
+/* Union definition of register */
+typedef union
+{
+	ecpri_hwio_def_ecpri_dma1_throttle_throttle_0_threshold_00_s def;
+	u32 value;
+} ecpri_hwio_def_ecpri_dma1_throttle_throttle_0_threshold_00_u;
+
+/*===========================================================================*/
+/*!
+@brief Bit Field definition of register: ECPRI_DMA1_THROTTLE_THROTTLE_0_THRESHOLD_01
+*/
+/*===========================================================================*/
+/* Structure definition of register */
+typedef struct
+{
+	u32 threshold_level_5 : 16;
+	u32 threshold_level_4 : 16;
+} ecpri_hwio_def_ecpri_dma1_throttle_throttle_0_threshold_01_s;
+
+/* Union definition of register */
+typedef union
+{
+	ecpri_hwio_def_ecpri_dma1_throttle_throttle_0_threshold_01_s def;
+	u32 value;
+} ecpri_hwio_def_ecpri_dma1_throttle_throttle_0_threshold_01_u;
+
+/*===========================================================================*/
+/*!
+@brief Bit Field definition of register: ECPRI_DMA1_THROTTLE_THROTTLE_0_THRESHOLD_02
+*/
+/*===========================================================================*/
+/* Structure definition of register */
+typedef struct
+{
+	u32 threshold_level_3 : 16;
+	u32 threshold_level_2 : 16;
+} ecpri_hwio_def_ecpri_dma1_throttle_throttle_0_threshold_02_s;
+
+/* Union definition of register */
+typedef union
+{
+	ecpri_hwio_def_ecpri_dma1_throttle_throttle_0_threshold_02_s def;
+	u32 value;
+} ecpri_hwio_def_ecpri_dma1_throttle_throttle_0_threshold_02_u;
+
+/*===========================================================================*/
+/*!
+@brief Bit Field definition of register: ECPRI_DMA1_THROTTLE_THROTTLE_0_THRESHOLD_03
+*/
+/*===========================================================================*/
+/* Structure definition of register */
+typedef struct
+{
+	u32 threshold_level_1 : 16;
+	u32 threshold_level_0 : 16;
+} ecpri_hwio_def_ecpri_dma1_throttle_throttle_0_threshold_03_s;
+
+/* Union definition of register */
+typedef union
+{
+	ecpri_hwio_def_ecpri_dma1_throttle_throttle_0_threshold_03_s def;
+	u32 value;
+} ecpri_hwio_def_ecpri_dma1_throttle_throttle_0_threshold_03_u;
+
+/*===========================================================================*/
+/*!
+@brief Bit Field definition of register: ECPRI_DMA1_THROTTLE_THROTTLE_0_PEAK_ACCUM_CREDIT
+*/
+/*===========================================================================*/
+/* Structure definition of register */
+typedef struct
+{
+	u32 peak_accum_credit : 20;
+	u32 reserved0 : 12;
+} ecpri_hwio_def_ecpri_dma1_throttle_throttle_0_peak_accum_credit_s;
+
+/* Union definition of register */
+typedef union
+{
+	ecpri_hwio_def_ecpri_dma1_throttle_throttle_0_peak_accum_credit_s def;
+	u32 value;
+} ecpri_hwio_def_ecpri_dma1_throttle_throttle_0_peak_accum_credit_u;
+
+/*===========================================================================*/
+/*!
+@brief Bit Field definition of register: ECPRI_DMA1_THROTTLE_THROTTLE_0_DEBUG_CNTL
+*/
+/*===========================================================================*/
+/* Structure definition of register */
+typedef struct
+{
+	u32 debug_en : 1;
+	u32 reserved0 : 7;
+	u32 debug_sel : 4;
+	u32 reserved1 : 20;
+} ecpri_hwio_def_ecpri_dma1_throttle_throttle_0_debug_cntl_s;
+
+/* Union definition of register */
+typedef union
+{
+	ecpri_hwio_def_ecpri_dma1_throttle_throttle_0_debug_cntl_s def;
+	u32 value;
+} ecpri_hwio_def_ecpri_dma1_throttle_throttle_0_debug_cntl_u;
+
+/*===========================================================================*/
+/*!
+@brief Bit Field definition of register: ECPRI_DMA1_THROTTLE_THROTTLE_0_DEBUG_READBACK
+*/
+/*===========================================================================*/
+/* Structure definition of register */
+typedef struct
+{
+	u32 debug_bus_readback : 32;
+} ecpri_hwio_def_ecpri_dma1_throttle_throttle_0_debug_readback_s;
+
+/* Union definition of register */
+typedef union
+{
+	ecpri_hwio_def_ecpri_dma1_throttle_throttle_0_debug_readback_s def;
+	u32 value;
+} ecpri_hwio_def_ecpri_dma1_throttle_throttle_0_debug_readback_u;
+
+/*===========================================================================*/
+/*!
+@brief Bit Field definition of register: ECPRI_DMA1_THROTTLE_THROTTLE_0_CONFIG_CLK_CONTROL
+*/
+/*===========================================================================*/
+/* Structure definition of register */
+typedef struct
+{
+	u32 throttle_bwmon_cfg_access_clkon_cntr : 8;
+	u32 reserved0 : 24;
+} ecpri_hwio_def_ecpri_dma1_throttle_throttle_0_config_clk_control_s;
+
+/* Union definition of register */
+typedef union
+{
+	ecpri_hwio_def_ecpri_dma1_throttle_throttle_0_config_clk_control_s def;
+	u32 value;
+} ecpri_hwio_def_ecpri_dma1_throttle_throttle_0_config_clk_control_u;
+
+/*===========================================================================*/
+/*!
+@brief Bit Field definition of register: ECPRI_DMA1_THROTTLE_THROTTLE_0_SPARE_REGS
+*/
+/*===========================================================================*/
+/* Structure definition of register */
+typedef struct
+{
+	u32 spare_reg_bit_0 : 1;
+	u32 spare_reg_bit_1 : 1;
+	u32 spare_reg_bit_2 : 1;
+	u32 spare_reg_bit_3 : 1;
+	u32 spare_reg_bit_4 : 1;
+	u32 spare_reg_bit_5 : 1;
+	u32 spare_reg_bit_6 : 1;
+	u32 spare_reg_bit_7 : 1;
+	u32 spare_reg_bit_8 : 1;
+	u32 spare_reg_bit_9 : 1;
+	u32 spare_reg_bit_10 : 1;
+	u32 spare_reg_bit_11 : 1;
+	u32 spare_reg_bit_12 : 1;
+	u32 spare_reg_bit_13 : 1;
+	u32 spare_reg_bit_14 : 1;
+	u32 spare_reg_bit_15 : 1;
+	u32 spare_reg_bit_16 : 1;
+	u32 spare_reg_bit_17 : 1;
+	u32 spare_reg_bit_18 : 1;
+	u32 spare_reg_bit_19 : 1;
+	u32 spare_reg_bit_20 : 1;
+	u32 spare_reg_bit_21 : 1;
+	u32 spare_reg_bit_22 : 1;
+	u32 spare_reg_bit_23 : 1;
+	u32 spare_reg_bit_24 : 1;
+	u32 spare_reg_bit_25 : 1;
+	u32 spare_reg_bit_26 : 1;
+	u32 spare_reg_bit_27 : 1;
+	u32 spare_reg_bit_28 : 1;
+	u32 spare_reg_bit_29 : 1;
+	u32 spare_reg_bit_30 : 1;
+	u32 spare_reg_bit_31 : 1;
+} ecpri_hwio_def_ecpri_dma1_throttle_throttle_0_spare_regs_s;
+
+/* Union definition of register */
+typedef union
+{
+	ecpri_hwio_def_ecpri_dma1_throttle_throttle_0_spare_regs_s def;
+	u32 value;
+} ecpri_hwio_def_ecpri_dma1_throttle_throttle_0_spare_regs_u;
+
+/*----------------------------------------------------------------------------
+ * MODULE: ECPRI_DMA1_THROTTLE_BWMON_BWMON_BWMON_1_2
+ *--------------------------------------------------------------------------*/
+
+ /*===========================================================================*/
+ /*!
+ @brief Bit Field definition of register: ECPRI_DMA1_THROTTLE_BWMON_GLOBAL_INTERRUPT_STATUS
+ */
+ /*===========================================================================*/
+ /* Structure definition of register */
+typedef struct
+{
+	u32 global_intr_status : 1;
+	u32 reserved0 : 31;
+} ecpri_hwio_def_ecpri_dma1_throttle_bwmon_global_interrupt_status_s;
+
+/* Union definition of register */
+typedef union
+{
+	ecpri_hwio_def_ecpri_dma1_throttle_bwmon_global_interrupt_status_s def;
+	u32 value;
+} ecpri_hwio_def_ecpri_dma1_throttle_bwmon_global_interrupt_status_u;
+
+/*===========================================================================*/
+/*!
+@brief Bit Field definition of register: ECPRI_DMA1_THROTTLE_BWMON_GLOBAL_INTERRUPT_CLEAR
+*/
+/*===========================================================================*/
+/* Structure definition of register */
+typedef struct
+{
+	u32 global_intr_clear : 1;
+	u32 reserved0 : 31;
+} ecpri_hwio_def_ecpri_dma1_throttle_bwmon_global_interrupt_clear_s;
+
+/* Union definition of register */
+typedef union
+{
+	ecpri_hwio_def_ecpri_dma1_throttle_bwmon_global_interrupt_clear_s def;
+	u32 value;
+} ecpri_hwio_def_ecpri_dma1_throttle_bwmon_global_interrupt_clear_u;
+
+/*===========================================================================*/
+/*!
+@brief Bit Field definition of register: ECPRI_DMA1_THROTTLE_BWMON_GLOBAL_INTERRUPT_ENABLE
+*/
+/*===========================================================================*/
+/* Structure definition of register */
+typedef struct
+{
+	u32 global_intr_enable : 1;
+	u32 reserved0 : 31;
+} ecpri_hwio_def_ecpri_dma1_throttle_bwmon_global_interrupt_enable_s;
+
+/* Union definition of register */
+typedef union
+{
+	ecpri_hwio_def_ecpri_dma1_throttle_bwmon_global_interrupt_enable_s def;
+	u32 value;
+} ecpri_hwio_def_ecpri_dma1_throttle_bwmon_global_interrupt_enable_u;
+
+/*===========================================================================*/
+/*!
+@brief Bit Field definition of register: ECPRI_DMA1_THROTTLE_BWMON_INTERRUPT_STATUS
+*/
+/*===========================================================================*/
+/* Structure definition of register */
+typedef struct
+{
+	u32 bwmon_threshold_crossed : 1;
+	u32 bwmon_overflow : 1;
+	u32 reserved0 : 2;
+	u32 bwmon2_zone0_threshold_crossed : 1;
+	u32 bwmon2_zone1_threshold_crossed : 1;
+	u32 bwmon2_zone2_threshold_crossed : 1;
+	u32 bwmon2_zone3_threshold_crossed : 1;
+	u32 reserved1 : 24;
+} ecpri_hwio_def_ecpri_dma1_throttle_bwmon_interrupt_status_s;
+
+/* Union definition of register */
+typedef union
+{
+	ecpri_hwio_def_ecpri_dma1_throttle_bwmon_interrupt_status_s def;
+	u32 value;
+} ecpri_hwio_def_ecpri_dma1_throttle_bwmon_interrupt_status_u;
+
+/*===========================================================================*/
+/*!
+@brief Bit Field definition of register: ECPRI_DMA1_THROTTLE_BWMON_INTERRUPT_CLEAR
+*/
+/*===========================================================================*/
+/* Structure definition of register */
+typedef struct
+{
+	u32 bwmon_threshold_crossed : 1;
+	u32 bwmon_overflow : 1;
+	u32 reserved0 : 2;
+	u32 bwmon2_zone0_threshold_crossed : 1;
+	u32 bwmon2_zone1_threshold_crossed : 1;
+	u32 bwmon2_zone2_threshold_crossed : 1;
+	u32 bwmon2_zone3_threshold_crossed : 1;
+	u32 reserved1 : 24;
+} ecpri_hwio_def_ecpri_dma1_throttle_bwmon_interrupt_clear_s;
+
+/* Union definition of register */
+typedef union
+{
+	ecpri_hwio_def_ecpri_dma1_throttle_bwmon_interrupt_clear_s def;
+	u32 value;
+} ecpri_hwio_def_ecpri_dma1_throttle_bwmon_interrupt_clear_u;
+
+/*===========================================================================*/
+/*!
+@brief Bit Field definition of register: ECPRI_DMA1_THROTTLE_BWMON_INTERRUPT_ENABLE
+*/
+/*===========================================================================*/
+/* Structure definition of register */
+typedef struct
+{
+	u32 bwmon_threshold_crossed : 1;
+	u32 bwmon_overflow : 1;
+	u32 reserved0 : 2;
+	u32 bwmon2_zone0_threshold_crossed : 1;
+	u32 bwmon2_zone1_threshold_crossed : 1;
+	u32 bwmon2_zone2_threshold_crossed : 1;
+	u32 bwmon2_zone3_threshold_crossed : 1;
+	u32 reserved1 : 24;
+} ecpri_hwio_def_ecpri_dma1_throttle_bwmon_interrupt_enable_s;
+
+/* Union definition of register */
+typedef union
+{
+	ecpri_hwio_def_ecpri_dma1_throttle_bwmon_interrupt_enable_s def;
+	u32 value;
+} ecpri_hwio_def_ecpri_dma1_throttle_bwmon_interrupt_enable_u;
+
+/*===========================================================================*/
+/*!
+@brief Bit Field definition of register: ECPRI_DMA1_THROTTLE_BWMON_CORE_CLOCKON_CONTROL
+*/
+/*===========================================================================*/
+/* Structure definition of register */
+typedef struct
+{
+	u32 bwmon2_core_clkon_disable : 1;
+	u32 bwmon2_core_clkon_hysteresis : 4;
+	u32 bwmon_cfg_access_clkon_cntr : 8;
+	u32 reserved0 : 19;
+} ecpri_hwio_def_ecpri_dma1_throttle_bwmon_core_clockon_control_s;
+
+/* Union definition of register */
+typedef union
+{
+	ecpri_hwio_def_ecpri_dma1_throttle_bwmon_core_clockon_control_s def;
+	u32 value;
+} ecpri_hwio_def_ecpri_dma1_throttle_bwmon_core_clockon_control_u;
+
+/*===========================================================================*/
+/*!
+@brief Bit Field definition of register: ECPRI_DMA1_THROTTLE_BWMON_BWMON_CGC_CNTRL
+*/
+/*===========================================================================*/
+/* Structure definition of register */
+typedef struct
+{
+	u32 bwmon_clock_en_cntrl : 1;
+	u32 bwmon2_hw_cgc_mode : 1;
+	u32 bwmon2_clock_en_cntrl : 1;
+	u32 reserved0 : 29;
+} ecpri_hwio_def_ecpri_dma1_throttle_bwmon_bwmon_cgc_cntrl_s;
+
+/* Union definition of register */
+typedef union
+{
+	ecpri_hwio_def_ecpri_dma1_throttle_bwmon_bwmon_cgc_cntrl_s def;
+	u32 value;
+} ecpri_hwio_def_ecpri_dma1_throttle_bwmon_bwmon_cgc_cntrl_u;
+
+/*===========================================================================*/
+/*!
+@brief Bit Field definition of register: ECPRI_DMA1_THROTTLE_BWMON_BWMON_SW_RESET
+*/
+/*===========================================================================*/
+/* Structure definition of register */
+typedef struct
+{
+	u32 bwmon_sw_reset : 1;
+	u32 bwmon2_sw_reset : 1;
+	u32 reserved0 : 30;
+} ecpri_hwio_def_ecpri_dma1_throttle_bwmon_bwmon_sw_reset_s;
+
+/* Union definition of register */
+typedef union
+{
+	ecpri_hwio_def_ecpri_dma1_throttle_bwmon_bwmon_sw_reset_s def;
+	u32 value;
+} ecpri_hwio_def_ecpri_dma1_throttle_bwmon_bwmon_sw_reset_u;
+
+/*===========================================================================*/
+/*!
+@brief Bit Field definition of register: ECPRI_DMA1_THROTTLE_BWMON_BWMON_ENABLE
+*/
+/*===========================================================================*/
+/* Structure definition of register */
+typedef struct
+{
+	u32 enable : 1;
+	u32 reserved0 : 3;
+	u32 scaling_factor : 1;
+	u32 reserved1 : 3;
+	u32 match_filter : 1;
+	u32 reserved2 : 7;
+	u32 throttle_offset : 5;
+	u32 throttle_offset_back_pressure : 5;
+	u32 reserved3 : 5;
+	u32 clear_on_intr : 1;
+} ecpri_hwio_def_ecpri_dma1_throttle_bwmon_bwmon_enable_s;
+
+/* Union definition of register */
+typedef union
+{
+	ecpri_hwio_def_ecpri_dma1_throttle_bwmon_bwmon_enable_s def;
+	u32 value;
+} ecpri_hwio_def_ecpri_dma1_throttle_bwmon_bwmon_enable_u;
+
+/*===========================================================================*/
+/*!
+@brief Bit Field definition of register: ECPRI_DMA1_THROTTLE_BWMON_BWMON_CLEAR
+*/
+/*===========================================================================*/
+/* Structure definition of register */
+typedef struct
+{
+	u32 clear : 1;
+	u32 reserved0 : 31;
+} ecpri_hwio_def_ecpri_dma1_throttle_bwmon_bwmon_clear_s;
+
+/* Union definition of register */
+typedef union
+{
+	ecpri_hwio_def_ecpri_dma1_throttle_bwmon_bwmon_clear_s def;
+	u32 value;
+} ecpri_hwio_def_ecpri_dma1_throttle_bwmon_bwmon_clear_u;
+
+/*===========================================================================*/
+/*!
+@brief Bit Field definition of register: ECPRI_DMA1_THROTTLE_BWMON_BWMON_BYTE_COUNT
+*/
+/*===========================================================================*/
+/* Structure definition of register */
+typedef struct
+{
+	u32 byte_count : 32;
+} ecpri_hwio_def_ecpri_dma1_throttle_bwmon_bwmon_byte_count_s;
+
+/* Union definition of register */
+typedef union
+{
+	ecpri_hwio_def_ecpri_dma1_throttle_bwmon_bwmon_byte_count_s def;
+	u32 value;
+} ecpri_hwio_def_ecpri_dma1_throttle_bwmon_bwmon_byte_count_u;
+
+/*===========================================================================*/
+/*!
+@brief Bit Field definition of register: ECPRI_DMA1_THROTTLE_BWMON_BWMON_THRESHOLD
+*/
+/*===========================================================================*/
+/* Structure definition of register */
+typedef struct
+{
+	u32 threshold : 32;
+} ecpri_hwio_def_ecpri_dma1_throttle_bwmon_bwmon_threshold_s;
+
+/* Union definition of register */
+typedef union
+{
+	ecpri_hwio_def_ecpri_dma1_throttle_bwmon_bwmon_threshold_s def;
+	u32 value;
+} ecpri_hwio_def_ecpri_dma1_throttle_bwmon_bwmon_threshold_u;
+
+/*===========================================================================*/
+/*!
+@brief Bit Field definition of register: ECPRI_DMA1_THROTTLE_BWMON_BWMON_MID_MASK
+*/
+/*===========================================================================*/
+/* Structure definition of register */
+typedef struct
+{
+	u32 mask : 16;
+	u32 reserved0 : 16;
+} ecpri_hwio_def_ecpri_dma1_throttle_bwmon_bwmon_mid_mask_s;
+
+/* Union definition of register */
+typedef union
+{
+	ecpri_hwio_def_ecpri_dma1_throttle_bwmon_bwmon_mid_mask_s def;
+	u32 value;
+} ecpri_hwio_def_ecpri_dma1_throttle_bwmon_bwmon_mid_mask_u;
+
+/*===========================================================================*/
+/*!
+@brief Bit Field definition of register: ECPRI_DMA1_THROTTLE_BWMON_BWMON_MID_MATCH
+*/
+/*===========================================================================*/
+/* Structure definition of register */
+typedef struct
+{
+	u32 match : 16;
+	u32 reserved0 : 16;
+} ecpri_hwio_def_ecpri_dma1_throttle_bwmon_bwmon_mid_match_s;
+
+/* Union definition of register */
+typedef union
+{
+	ecpri_hwio_def_ecpri_dma1_throttle_bwmon_bwmon_mid_match_s def;
+	u32 value;
+} ecpri_hwio_def_ecpri_dma1_throttle_bwmon_bwmon_mid_match_u;
+
+/*===========================================================================*/
+/*!
+@brief Bit Field definition of register: ECPRI_DMA1_THROTTLE_BWMON_BWMON2_ENABLE
+*/
+/*===========================================================================*/
+/* Structure definition of register */
+typedef struct
+{
+	u32 enable : 1;
+	u32 reserved0 : 15;
+	u32 throttle_offset : 5;
+	u32 reserved1 : 10;
+	u32 early_intr_en : 1;
+} ecpri_hwio_def_ecpri_dma1_throttle_bwmon_bwmon2_enable_s;
+
+/* Union definition of register */
+typedef union
+{
+	ecpri_hwio_def_ecpri_dma1_throttle_bwmon_bwmon2_enable_s def;
+	u32 value;
+} ecpri_hwio_def_ecpri_dma1_throttle_bwmon_bwmon2_enable_u;
+
+/*===========================================================================*/
+/*!
+@brief Bit Field definition of register: ECPRI_DMA1_THROTTLE_BWMON_BWMON2_CLEAR
+*/
+/*===========================================================================*/
+/* Structure definition of register */
+typedef struct
+{
+	u32 clear : 1;
+	u32 clear_all : 1;
+	u32 reserved0 : 30;
+} ecpri_hwio_def_ecpri_dma1_throttle_bwmon_bwmon2_clear_s;
+
+/* Union definition of register */
+typedef union
+{
+	ecpri_hwio_def_ecpri_dma1_throttle_bwmon_bwmon2_clear_s def;
+	u32 value;
+} ecpri_hwio_def_ecpri_dma1_throttle_bwmon_bwmon2_clear_u;
+
+/*===========================================================================*/
+/*!
+@brief Bit Field definition of register: ECPRI_DMA1_THROTTLE_BWMON_BWMON2_SAMPLING_WINDOW
+*/
+/*===========================================================================*/
+/* Structure definition of register */
+typedef struct
+{
+	u32 reg : 24;
+	u32 reserved0 : 8;
+} ecpri_hwio_def_ecpri_dma1_throttle_bwmon_bwmon2_sampling_window_s;
+
+/* Union definition of register */
+typedef union
+{
+	ecpri_hwio_def_ecpri_dma1_throttle_bwmon_bwmon2_sampling_window_s def;
+	u32 value;
+} ecpri_hwio_def_ecpri_dma1_throttle_bwmon_bwmon2_sampling_window_u;
+
+/*===========================================================================*/
+/*!
+@brief Bit Field definition of register: ECPRI_DMA1_THROTTLE_BWMON_BWMON2_BYTE_COUNT_THRESHOLD_HIGH
+*/
+/*===========================================================================*/
+/* Structure definition of register */
+typedef struct
+{
+	u32 reg : 16;
+	u32 reserved0 : 16;
+} ecpri_hwio_def_ecpri_dma1_throttle_bwmon_bwmon2_byte_count_threshold_high_s;
+
+/* Union definition of register */
+typedef union
+{
+	ecpri_hwio_def_ecpri_dma1_throttle_bwmon_bwmon2_byte_count_threshold_high_s def;
+	u32 value;
+} ecpri_hwio_def_ecpri_dma1_throttle_bwmon_bwmon2_byte_count_threshold_high_u;
+
+/*===========================================================================*/
+/*!
+@brief Bit Field definition of register: ECPRI_DMA1_THROTTLE_BWMON_BWMON2_BYTE_COUNT_THRESHOLD_MEDIUM
+*/
+/*===========================================================================*/
+/* Structure definition of register */
+typedef struct
+{
+	u32 reg : 16;
+	u32 reserved0 : 16;
+} ecpri_hwio_def_ecpri_dma1_throttle_bwmon_bwmon2_byte_count_threshold_medium_s;
+
+/* Union definition of register */
+typedef union
+{
+	ecpri_hwio_def_ecpri_dma1_throttle_bwmon_bwmon2_byte_count_threshold_medium_s def;
+	u32 value;
+} ecpri_hwio_def_ecpri_dma1_throttle_bwmon_bwmon2_byte_count_threshold_medium_u;
+
+/*===========================================================================*/
+/*!
+@brief Bit Field definition of register: ECPRI_DMA1_THROTTLE_BWMON_BWMON2_BYTE_COUNT_THRESHOLD_LOW
+*/
+/*===========================================================================*/
+/* Structure definition of register */
+typedef struct
+{
+	u32 reg : 16;
+	u32 reserved0 : 16;
+} ecpri_hwio_def_ecpri_dma1_throttle_bwmon_bwmon2_byte_count_threshold_low_s;
+
+/* Union definition of register */
+typedef union
+{
+	ecpri_hwio_def_ecpri_dma1_throttle_bwmon_bwmon2_byte_count_threshold_low_s def;
+	u32 value;
+} ecpri_hwio_def_ecpri_dma1_throttle_bwmon_bwmon2_byte_count_threshold_low_u;
+
+/*===========================================================================*/
+/*!
+@brief Bit Field definition of register: ECPRI_DMA1_THROTTLE_BWMON_BWMON2_ZONE_ACTIONS
+*/
+/*===========================================================================*/
+/* Structure definition of register */
+typedef struct
+{
+	u32 zone0 : 8;
+	u32 zone1 : 8;
+	u32 zone2 : 8;
+	u32 zone3 : 8;
+} ecpri_hwio_def_ecpri_dma1_throttle_bwmon_bwmon2_zone_actions_s;
+
+/* Union definition of register */
+typedef union
+{
+	ecpri_hwio_def_ecpri_dma1_throttle_bwmon_bwmon2_zone_actions_s def;
+	u32 value;
+} ecpri_hwio_def_ecpri_dma1_throttle_bwmon_bwmon2_zone_actions_u;
+
+/*===========================================================================*/
+/*!
+@brief Bit Field definition of register: ECPRI_DMA1_THROTTLE_BWMON_BWMON2_ZONE_COUNT_THRESHOLD
+*/
+/*===========================================================================*/
+/* Structure definition of register */
+typedef struct
+{
+	u32 zone0 : 8;
+	u32 zone1 : 8;
+	u32 zone2 : 8;
+	u32 zone3 : 8;
+} ecpri_hwio_def_ecpri_dma1_throttle_bwmon_bwmon2_zone_count_threshold_s;
+
+/* Union definition of register */
+typedef union
+{
+	ecpri_hwio_def_ecpri_dma1_throttle_bwmon_bwmon2_zone_count_threshold_s def;
+	u32 value;
+} ecpri_hwio_def_ecpri_dma1_throttle_bwmon_bwmon2_zone_count_threshold_u;
+
+/*===========================================================================*/
+/*!
+@brief Bit Field definition of register: ECPRI_DMA1_THROTTLE_BWMON_BWMON2_BYTE_COUNT
+*/
+/*===========================================================================*/
+/* Structure definition of register */
+typedef struct
+{
+	u32 current_byte_count : 16;
+	u32 reserved0 : 12;
+	u32 current_zone : 2;
+	u32 reserved1 : 2;
+} ecpri_hwio_def_ecpri_dma1_throttle_bwmon_bwmon2_byte_count_s;
+
+/* Union definition of register */
+typedef union
+{
+	ecpri_hwio_def_ecpri_dma1_throttle_bwmon_bwmon2_byte_count_s def;
+	u32 value;
+} ecpri_hwio_def_ecpri_dma1_throttle_bwmon_bwmon2_byte_count_u;
+
+/*===========================================================================*/
+/*!
+@brief Bit Field definition of register: ECPRI_DMA1_THROTTLE_BWMON_BWMON2_WINDOW_TIMER
+*/
+/*===========================================================================*/
+/* Structure definition of register */
+typedef struct
+{
+	u32 current_window_timer : 24;
+	u32 reserved0 : 8;
+} ecpri_hwio_def_ecpri_dma1_throttle_bwmon_bwmon2_window_timer_s;
+
+/* Union definition of register */
+typedef union
+{
+	ecpri_hwio_def_ecpri_dma1_throttle_bwmon_bwmon2_window_timer_s def;
+	u32 value;
+} ecpri_hwio_def_ecpri_dma1_throttle_bwmon_bwmon2_window_timer_u;
+
+/*===========================================================================*/
+/*!
+@brief Bit Field definition of register: ECPRI_DMA1_THROTTLE_BWMON_BWMON2_ZONE_COUNT
+*/
+/*===========================================================================*/
+/* Structure definition of register */
+typedef struct
+{
+	u32 zone0 : 8;
+	u32 zone1 : 8;
+	u32 zone2 : 8;
+	u32 zone3 : 8;
+} ecpri_hwio_def_ecpri_dma1_throttle_bwmon_bwmon2_zone_count_s;
+
+/* Union definition of register */
+typedef union
+{
+	ecpri_hwio_def_ecpri_dma1_throttle_bwmon_bwmon2_zone_count_s def;
+	u32 value;
+} ecpri_hwio_def_ecpri_dma1_throttle_bwmon_bwmon2_zone_count_u;
+
+/*===========================================================================*/
+/*!
+@brief Bit Field definition of register: ECPRI_DMA1_THROTTLE_BWMON_BWMON2_ZONEn_MAX_BYTE_COUNT
+*/
+/*===========================================================================*/
+/* Structure definition of register */
+typedef struct
+{
+	u32 reg : 16;
+	u32 reserved0 : 16;
+} ecpri_hwio_def_ecpri_dma1_throttle_bwmon_bwmon2_zonen_max_byte_count_s;
+
+/* Union definition of register */
+typedef union
+{
+	ecpri_hwio_def_ecpri_dma1_throttle_bwmon_bwmon2_zonen_max_byte_count_s def;
+	u32 value;
+} ecpri_hwio_def_ecpri_dma1_throttle_bwmon_bwmon2_zonen_max_byte_count_u;
+
+/*===========================================================================*/
+/*!
+@brief Bit Field definition of register: ECPRI_DMA1_THROTTLE_BWMON_BWMON_PID_MASK
+*/
+/*===========================================================================*/
+/* Structure definition of register */
+typedef struct
+{
+	u32 mask : 5;
+	u32 reserved0 : 27;
+} ecpri_hwio_def_ecpri_dma1_throttle_bwmon_bwmon_pid_mask_s;
+
+/* Union definition of register */
+typedef union
+{
+	ecpri_hwio_def_ecpri_dma1_throttle_bwmon_bwmon_pid_mask_s def;
+	u32 value;
+} ecpri_hwio_def_ecpri_dma1_throttle_bwmon_bwmon_pid_mask_u;
+
+/*===========================================================================*/
+/*!
+@brief Bit Field definition of register: ECPRI_DMA1_THROTTLE_BWMON_BWMON_PID_MATCH
+*/
+/*===========================================================================*/
+/* Structure definition of register */
+typedef struct
+{
+	u32 match : 5;
+	u32 reserved0 : 27;
+} ecpri_hwio_def_ecpri_dma1_throttle_bwmon_bwmon_pid_match_s;
+
+/* Union definition of register */
+typedef union
+{
+	ecpri_hwio_def_ecpri_dma1_throttle_bwmon_bwmon_pid_match_s def;
+	u32 value;
+} ecpri_hwio_def_ecpri_dma1_throttle_bwmon_bwmon_pid_match_u;
+
+/*===========================================================================*/
+/*!
+@brief Bit Field definition of register: ECPRI_DMA1_THROTTLE_BWMON_BWMON_BID_MASK
+*/
+/*===========================================================================*/
+/* Structure definition of register */
+typedef struct
+{
+	u32 mask : 3;
+	u32 reserved0 : 29;
+} ecpri_hwio_def_ecpri_dma1_throttle_bwmon_bwmon_bid_mask_s;
+
+/* Union definition of register */
+typedef union
+{
+	ecpri_hwio_def_ecpri_dma1_throttle_bwmon_bwmon_bid_mask_s def;
+	u32 value;
+} ecpri_hwio_def_ecpri_dma1_throttle_bwmon_bwmon_bid_mask_u;
+
+/*===========================================================================*/
+/*!
+@brief Bit Field definition of register: ECPRI_DMA1_THROTTLE_BWMON_BWMON_BID_MATCH
+*/
+/*===========================================================================*/
+/* Structure definition of register */
+typedef struct
+{
+	u32 match : 3;
+	u32 reserved0 : 29;
+} ecpri_hwio_def_ecpri_dma1_throttle_bwmon_bwmon_bid_match_s;
+
+/* Union definition of register */
+typedef union
+{
+	ecpri_hwio_def_ecpri_dma1_throttle_bwmon_bwmon_bid_match_s def;
+	u32 value;
+} ecpri_hwio_def_ecpri_dma1_throttle_bwmon_bwmon_bid_match_u;
+
+/*===========================================================================*/
+/*!
+@brief Bit Field definition of register: ECPRI_DMA1_THROTTLE_BWMON_STATS_COUNTER_INTERRUPT_STATUS
+*/
+/*===========================================================================*/
+/* Structure definition of register */
+typedef struct
+{
+	u32 bwmon_reject_period_expired : 1;
+	u32 bwmon_stats_cntr_saturated : 1;
+	u32 reserved0 : 30;
+} ecpri_hwio_def_ecpri_dma1_throttle_bwmon_stats_counter_interrupt_status_s;
+
+/* Union definition of register */
+typedef union
+{
+	ecpri_hwio_def_ecpri_dma1_throttle_bwmon_stats_counter_interrupt_status_s def;
+	u32 value;
+} ecpri_hwio_def_ecpri_dma1_throttle_bwmon_stats_counter_interrupt_status_u;
+
+/*===========================================================================*/
+/*!
+@brief Bit Field definition of register: ECPRI_DMA1_THROTTLE_BWMON_STATS_COUNTER_INTERRUPT_CLEAR
+*/
+/*===========================================================================*/
+/* Structure definition of register */
+typedef struct
+{
+	u32 bwmon_reject_period_expired : 1;
+	u32 bwmon_stats_cntr_saturated : 1;
+	u32 reserved0 : 30;
+} ecpri_hwio_def_ecpri_dma1_throttle_bwmon_stats_counter_interrupt_clear_s;
+
+/* Union definition of register */
+typedef union
+{
+	ecpri_hwio_def_ecpri_dma1_throttle_bwmon_stats_counter_interrupt_clear_s def;
+	u32 value;
+} ecpri_hwio_def_ecpri_dma1_throttle_bwmon_stats_counter_interrupt_clear_u;
+
+/*===========================================================================*/
+/*!
+@brief Bit Field definition of register: ECPRI_DMA1_THROTTLE_BWMON_STATS_COUNTER_INTERRUPT_ENABLE
+*/
+/*===========================================================================*/
+/* Structure definition of register */
+typedef struct
+{
+	u32 bwmon_reject_period_expired : 1;
+	u32 bwmon_stats_cntr_saturated : 1;
+	u32 reserved0 : 30;
+} ecpri_hwio_def_ecpri_dma1_throttle_bwmon_stats_counter_interrupt_enable_s;
+
+/* Union definition of register */
+typedef union
+{
+	ecpri_hwio_def_ecpri_dma1_throttle_bwmon_stats_counter_interrupt_enable_s def;
+	u32 value;
+} ecpri_hwio_def_ecpri_dma1_throttle_bwmon_stats_counter_interrupt_enable_u;
+
+/*===========================================================================*/
+/*!
+@brief Bit Field definition of register: ECPRI_DMA1_THROTTLE_BWMON_BWMON_REJECT_COUNTERS_ENABLE
+*/
+/*===========================================================================*/
+/* Structure definition of register */
+typedef struct
+{
+	u32 counters_en : 1;
+	u32 alen_en : 1;
+	u32 capture : 1;
+	u32 reserved0 : 29;
+} ecpri_hwio_def_ecpri_dma1_throttle_bwmon_bwmon_reject_counters_enable_s;
+
+/* Union definition of register */
+typedef union
+{
+	ecpri_hwio_def_ecpri_dma1_throttle_bwmon_bwmon_reject_counters_enable_s def;
+	u32 value;
+} ecpri_hwio_def_ecpri_dma1_throttle_bwmon_bwmon_reject_counters_enable_u;
+
+/*===========================================================================*/
+/*!
+@brief Bit Field definition of register: ECPRI_DMA1_THROTTLE_BWMON_BWMON_REJECT_PERIOD
+*/
+/*===========================================================================*/
+/* Structure definition of register */
+typedef struct
+{
+	u32 period : 14;
+	u32 reserved0 : 18;
+} ecpri_hwio_def_ecpri_dma1_throttle_bwmon_bwmon_reject_period_s;
+
+/* Union definition of register */
+typedef union
+{
+	ecpri_hwio_def_ecpri_dma1_throttle_bwmon_bwmon_reject_period_s def;
+	u32 value;
+} ecpri_hwio_def_ecpri_dma1_throttle_bwmon_bwmon_reject_period_u;
+
+/*===========================================================================*/
+/*!
+@brief Bit Field definition of register: ECPRI_DMA1_THROTTLE_BWMON_BWMON_ACCEPT_COUNT
+*/
+/*===========================================================================*/
+/* Structure definition of register */
+typedef struct
+{
+	u32 accept_count : 32;
+} ecpri_hwio_def_ecpri_dma1_throttle_bwmon_bwmon_accept_count_s;
+
+/* Union definition of register */
+typedef union
+{
+	ecpri_hwio_def_ecpri_dma1_throttle_bwmon_bwmon_accept_count_s def;
+	u32 value;
+} ecpri_hwio_def_ecpri_dma1_throttle_bwmon_bwmon_accept_count_u;
+
+/*===========================================================================*/
+/*!
+@brief Bit Field definition of register: ECPRI_DMA1_THROTTLE_BWMON_BWMON_REJECT_COUNT
+*/
+/*===========================================================================*/
+/* Structure definition of register */
+typedef struct
+{
+	u32 reject_count : 32;
+} ecpri_hwio_def_ecpri_dma1_throttle_bwmon_bwmon_reject_count_s;
+
+/* Union definition of register */
+typedef union
+{
+	ecpri_hwio_def_ecpri_dma1_throttle_bwmon_bwmon_reject_count_s def;
+	u32 value;
+} ecpri_hwio_def_ecpri_dma1_throttle_bwmon_bwmon_reject_count_u;
+
+/*===========================================================================*/
+/*!
+@brief Bit Field definition of register: ECPRI_DMA1_THROTTLE_BWMON_BWMON_IDLE_COUNT
+*/
+/*===========================================================================*/
+/* Structure definition of register */
+typedef struct
+{
+	u32 idle_count : 32;
+} ecpri_hwio_def_ecpri_dma1_throttle_bwmon_bwmon_idle_count_s;
+
+/* Union definition of register */
+typedef union
+{
+	ecpri_hwio_def_ecpri_dma1_throttle_bwmon_bwmon_idle_count_s def;
+	u32 value;
+} ecpri_hwio_def_ecpri_dma1_throttle_bwmon_bwmon_idle_count_u;
+
+/*===========================================================================*/
+/*!
+@brief Bit Field definition of register: ECPRI_DMA1_THROTTLE_BWMON_BWMON_INTR_TARGET
+*/
+/*===========================================================================*/
+/* Structure definition of register */
+typedef struct
+{
+	u32 secondary_target_select : 1;
+	u32 reserved0 : 31;
+} ecpri_hwio_def_ecpri_dma1_throttle_bwmon_bwmon_intr_target_s;
+
+/* Union definition of register */
+typedef union
+{
+	ecpri_hwio_def_ecpri_dma1_throttle_bwmon_bwmon_intr_target_s def;
+	u32 value;
+} ecpri_hwio_def_ecpri_dma1_throttle_bwmon_bwmon_intr_target_u;
+
+/*===========================================================================*/
+/*!
+@brief Bit Field definition of register: ECPRI_DMA1_THROTTLE_BWMON_BWMON_DEBUG_CNTL
+*/
+/*===========================================================================*/
+/* Structure definition of register */
+typedef struct
+{
+	u32 debug_en : 1;
+	u32 reserved0 : 7;
+	u32 debug_sel : 4;
+	u32 reserved1 : 20;
+} ecpri_hwio_def_ecpri_dma1_throttle_bwmon_bwmon_debug_cntl_s;
+
+/* Union definition of register */
+typedef union
+{
+	ecpri_hwio_def_ecpri_dma1_throttle_bwmon_bwmon_debug_cntl_s def;
+	u32 value;
+} ecpri_hwio_def_ecpri_dma1_throttle_bwmon_bwmon_debug_cntl_u;
+
+/*===========================================================================*/
+/*!
+@brief Bit Field definition of register: ECPRI_DMA1_THROTTLE_BWMON_BWMON_DEBUG_READBACK
+*/
+/*===========================================================================*/
+/* Structure definition of register */
+typedef struct
+{
+	u32 debug_bus_readback : 32;
+} ecpri_hwio_def_ecpri_dma1_throttle_bwmon_bwmon_debug_readback_s;
+
+/* Union definition of register */
+typedef union
+{
+	ecpri_hwio_def_ecpri_dma1_throttle_bwmon_bwmon_debug_readback_s def;
+	u32 value;
+} ecpri_hwio_def_ecpri_dma1_throttle_bwmon_bwmon_debug_readback_u;
+
+/*----------------------------------------------------------------------------
+ * MODULE: ECPRI_DMA0_THROTTLE_THROTTLE_0_THROTTLE_0_THROTTLE
+ *--------------------------------------------------------------------------*/
+
+ /*===========================================================================*/
+ /*!
+ @brief Bit Field definition of register: ECPRI_DMA0_THROTTLE_THROTTLE_0_CNTRL
+ */
+ /*===========================================================================*/
+ /* Structure definition of register */
+typedef struct
+{
+	u32 throttle_en : 1;
+	u32 reserved0 : 7;
+	u32 threshold_level_0_en : 1;
+	u32 threshold_level_1_en : 1;
+	u32 threshold_level_2_en : 1;
+	u32 threshold_level_3_en : 1;
+	u32 threshold_level_4_en : 1;
+	u32 threshold_level_5_en : 1;
+	u32 threshold_level_6_en : 1;
+	u32 threshold_level_7_en : 1;
+	u32 reserved1 : 16;
+} ecpri_hwio_def_ecpri_dma0_throttle_throttle_0_cntrl_s;
+
+/* Union definition of register */
+typedef union
+{
+	ecpri_hwio_def_ecpri_dma0_throttle_throttle_0_cntrl_s def;
+	u32 value;
+} ecpri_hwio_def_ecpri_dma0_throttle_throttle_0_cntrl_u;
+
+/*===========================================================================*/
+/*!
+@brief Bit Field definition of register: ECPRI_DMA0_THROTTLE_THROTTLE_0_CGC_CNTRL
+*/
+/*===========================================================================*/
+/* Structure definition of register */
+typedef struct
+{
+	u32 throttle_cgc_en : 1;
+	u32 reserved0 : 31;
+} ecpri_hwio_def_ecpri_dma0_throttle_throttle_0_cgc_cntrl_s;
+
+/* Union definition of register */
+typedef union
+{
+	ecpri_hwio_def_ecpri_dma0_throttle_throttle_0_cgc_cntrl_s def;
+	u32 value;
+} ecpri_hwio_def_ecpri_dma0_throttle_throttle_0_cgc_cntrl_u;
+
+/*===========================================================================*/
+/*!
+@brief Bit Field definition of register: ECPRI_DMA0_THROTTLE_THROTTLE_0_RESET_CNTRL
+*/
+/*===========================================================================*/
+/* Structure definition of register */
+typedef struct
+{
+	u32 core_sw_reset : 1;
+	u32 reserved0 : 31;
+} ecpri_hwio_def_ecpri_dma0_throttle_throttle_0_reset_cntrl_s;
+
+/* Union definition of register */
+typedef union
+{
+	ecpri_hwio_def_ecpri_dma0_throttle_throttle_0_reset_cntrl_s def;
+	u32 value;
+} ecpri_hwio_def_ecpri_dma0_throttle_throttle_0_reset_cntrl_u;
+
+/*===========================================================================*/
+/*!
+@brief Bit Field definition of register: ECPRI_DMA0_THROTTLE_THROTTLE_0_CONFIG
+*/
+/*===========================================================================*/
+/* Structure definition of register */
+typedef struct
+{
+	u32 throttle_cntrl_max_skew : 3;
+	u32 reserved0 : 29;
+} ecpri_hwio_def_ecpri_dma0_throttle_throttle_0_config_s;
+
+/* Union definition of register */
+typedef union
+{
+	ecpri_hwio_def_ecpri_dma0_throttle_throttle_0_config_s def;
+	u32 value;
+} ecpri_hwio_def_ecpri_dma0_throttle_throttle_0_config_u;
+
+/*===========================================================================*/
+/*!
+@brief Bit Field definition of register: ECPRI_DMA0_THROTTLE_THROTTLE_0_GRANT_PERIOD
+*/
+/*===========================================================================*/
+/* Structure definition of register */
+typedef struct
+{
+	u32 grant_period : 14;
+	u32 reserved0 : 18;
+} ecpri_hwio_def_ecpri_dma0_throttle_throttle_0_grant_period_s;
+
+/* Union definition of register */
+typedef union
+{
+	ecpri_hwio_def_ecpri_dma0_throttle_throttle_0_grant_period_s def;
+	u32 value;
+} ecpri_hwio_def_ecpri_dma0_throttle_throttle_0_grant_period_u;
+
+/*===========================================================================*/
+/*!
+@brief Bit Field definition of register: ECPRI_DMA0_THROTTLE_THROTTLE_0_GRANT_COUNT
+*/
+/*===========================================================================*/
+/* Structure definition of register */
+typedef struct
+{
+	u32 grant_count : 16;
+	u32 reserved0 : 16;
+} ecpri_hwio_def_ecpri_dma0_throttle_throttle_0_grant_count_s;
+
+/* Union definition of register */
+typedef union
+{
+	ecpri_hwio_def_ecpri_dma0_throttle_throttle_0_grant_count_s def;
+	u32 value;
+} ecpri_hwio_def_ecpri_dma0_throttle_throttle_0_grant_count_u;
+
+/*===========================================================================*/
+/*!
+@brief Bit Field definition of register: ECPRI_DMA0_THROTTLE_THROTTLE_0_THRESHOLD_00
+*/
+/*===========================================================================*/
+/* Structure definition of register */
+typedef struct
+{
+	u32 threshold_level_7 : 16;
+	u32 threshold_level_6 : 16;
+} ecpri_hwio_def_ecpri_dma0_throttle_throttle_0_threshold_00_s;
+
+/* Union definition of register */
+typedef union
+{
+	ecpri_hwio_def_ecpri_dma0_throttle_throttle_0_threshold_00_s def;
+	u32 value;
+} ecpri_hwio_def_ecpri_dma0_throttle_throttle_0_threshold_00_u;
+
+/*===========================================================================*/
+/*!
+@brief Bit Field definition of register: ECPRI_DMA0_THROTTLE_THROTTLE_0_THRESHOLD_01
+*/
+/*===========================================================================*/
+/* Structure definition of register */
+typedef struct
+{
+	u32 threshold_level_5 : 16;
+	u32 threshold_level_4 : 16;
+} ecpri_hwio_def_ecpri_dma0_throttle_throttle_0_threshold_01_s;
+
+/* Union definition of register */
+typedef union
+{
+	ecpri_hwio_def_ecpri_dma0_throttle_throttle_0_threshold_01_s def;
+	u32 value;
+} ecpri_hwio_def_ecpri_dma0_throttle_throttle_0_threshold_01_u;
+
+/*===========================================================================*/
+/*!
+@brief Bit Field definition of register: ECPRI_DMA0_THROTTLE_THROTTLE_0_THRESHOLD_02
+*/
+/*===========================================================================*/
+/* Structure definition of register */
+typedef struct
+{
+	u32 threshold_level_3 : 16;
+	u32 threshold_level_2 : 16;
+} ecpri_hwio_def_ecpri_dma0_throttle_throttle_0_threshold_02_s;
+
+/* Union definition of register */
+typedef union
+{
+	ecpri_hwio_def_ecpri_dma0_throttle_throttle_0_threshold_02_s def;
+	u32 value;
+} ecpri_hwio_def_ecpri_dma0_throttle_throttle_0_threshold_02_u;
+
+/*===========================================================================*/
+/*!
+@brief Bit Field definition of register: ECPRI_DMA0_THROTTLE_THROTTLE_0_THRESHOLD_03
+*/
+/*===========================================================================*/
+/* Structure definition of register */
+typedef struct
+{
+	u32 threshold_level_1 : 16;
+	u32 threshold_level_0 : 16;
+} ecpri_hwio_def_ecpri_dma0_throttle_throttle_0_threshold_03_s;
+
+/* Union definition of register */
+typedef union
+{
+	ecpri_hwio_def_ecpri_dma0_throttle_throttle_0_threshold_03_s def;
+	u32 value;
+} ecpri_hwio_def_ecpri_dma0_throttle_throttle_0_threshold_03_u;
+
+/*===========================================================================*/
+/*!
+@brief Bit Field definition of register: ECPRI_DMA0_THROTTLE_THROTTLE_0_PEAK_ACCUM_CREDIT
+*/
+/*===========================================================================*/
+/* Structure definition of register */
+typedef struct
+{
+	u32 peak_accum_credit : 20;
+	u32 reserved0 : 12;
+} ecpri_hwio_def_ecpri_dma0_throttle_throttle_0_peak_accum_credit_s;
+
+/* Union definition of register */
+typedef union
+{
+	ecpri_hwio_def_ecpri_dma0_throttle_throttle_0_peak_accum_credit_s def;
+	u32 value;
+} ecpri_hwio_def_ecpri_dma0_throttle_throttle_0_peak_accum_credit_u;
+
+/*===========================================================================*/
+/*!
+@brief Bit Field definition of register: ECPRI_DMA0_THROTTLE_THROTTLE_0_DEBUG_CNTL
+*/
+/*===========================================================================*/
+/* Structure definition of register */
+typedef struct
+{
+	u32 debug_en : 1;
+	u32 reserved0 : 7;
+	u32 debug_sel : 4;
+	u32 reserved1 : 20;
+} ecpri_hwio_def_ecpri_dma0_throttle_throttle_0_debug_cntl_s;
+
+/* Union definition of register */
+typedef union
+{
+	ecpri_hwio_def_ecpri_dma0_throttle_throttle_0_debug_cntl_s def;
+	u32 value;
+} ecpri_hwio_def_ecpri_dma0_throttle_throttle_0_debug_cntl_u;
+
+/*===========================================================================*/
+/*!
+@brief Bit Field definition of register: ECPRI_DMA0_THROTTLE_THROTTLE_0_DEBUG_READBACK
+*/
+/*===========================================================================*/
+/* Structure definition of register */
+typedef struct
+{
+	u32 debug_bus_readback : 32;
+} ecpri_hwio_def_ecpri_dma0_throttle_throttle_0_debug_readback_s;
+
+/* Union definition of register */
+typedef union
+{
+	ecpri_hwio_def_ecpri_dma0_throttle_throttle_0_debug_readback_s def;
+	u32 value;
+} ecpri_hwio_def_ecpri_dma0_throttle_throttle_0_debug_readback_u;
+
+/*===========================================================================*/
+/*!
+@brief Bit Field definition of register: ECPRI_DMA0_THROTTLE_THROTTLE_0_CONFIG_CLK_CONTROL
+*/
+/*===========================================================================*/
+/* Structure definition of register */
+typedef struct
+{
+	u32 throttle_bwmon_cfg_access_clkon_cntr : 8;
+	u32 reserved0 : 24;
+} ecpri_hwio_def_ecpri_dma0_throttle_throttle_0_config_clk_control_s;
+
+/* Union definition of register */
+typedef union
+{
+	ecpri_hwio_def_ecpri_dma0_throttle_throttle_0_config_clk_control_s def;
+	u32 value;
+} ecpri_hwio_def_ecpri_dma0_throttle_throttle_0_config_clk_control_u;
+
+/*===========================================================================*/
+/*!
+@brief Bit Field definition of register: ECPRI_DMA0_THROTTLE_THROTTLE_0_SPARE_REGS
+*/
+/*===========================================================================*/
+/* Structure definition of register */
+typedef struct
+{
+	u32 spare_reg_bit_0 : 1;
+	u32 spare_reg_bit_1 : 1;
+	u32 spare_reg_bit_2 : 1;
+	u32 spare_reg_bit_3 : 1;
+	u32 spare_reg_bit_4 : 1;
+	u32 spare_reg_bit_5 : 1;
+	u32 spare_reg_bit_6 : 1;
+	u32 spare_reg_bit_7 : 1;
+	u32 spare_reg_bit_8 : 1;
+	u32 spare_reg_bit_9 : 1;
+	u32 spare_reg_bit_10 : 1;
+	u32 spare_reg_bit_11 : 1;
+	u32 spare_reg_bit_12 : 1;
+	u32 spare_reg_bit_13 : 1;
+	u32 spare_reg_bit_14 : 1;
+	u32 spare_reg_bit_15 : 1;
+	u32 spare_reg_bit_16 : 1;
+	u32 spare_reg_bit_17 : 1;
+	u32 spare_reg_bit_18 : 1;
+	u32 spare_reg_bit_19 : 1;
+	u32 spare_reg_bit_20 : 1;
+	u32 spare_reg_bit_21 : 1;
+	u32 spare_reg_bit_22 : 1;
+	u32 spare_reg_bit_23 : 1;
+	u32 spare_reg_bit_24 : 1;
+	u32 spare_reg_bit_25 : 1;
+	u32 spare_reg_bit_26 : 1;
+	u32 spare_reg_bit_27 : 1;
+	u32 spare_reg_bit_28 : 1;
+	u32 spare_reg_bit_29 : 1;
+	u32 spare_reg_bit_30 : 1;
+	u32 spare_reg_bit_31 : 1;
+} ecpri_hwio_def_ecpri_dma0_throttle_throttle_0_spare_regs_s;
+
+/* Union definition of register */
+typedef union
+{
+	ecpri_hwio_def_ecpri_dma0_throttle_throttle_0_spare_regs_s def;
+	u32 value;
+} ecpri_hwio_def_ecpri_dma0_throttle_throttle_0_spare_regs_u;
+
+/*----------------------------------------------------------------------------
+ * MODULE: ECPRI_DMA0_THROTTLE_BWMON_BWMON_BWMON_1_2
+ *--------------------------------------------------------------------------*/
+
+ /*===========================================================================*/
+ /*!
+ @brief Bit Field definition of register: ECPRI_DMA0_THROTTLE_BWMON_GLOBAL_INTERRUPT_STATUS
+ */
+ /*===========================================================================*/
+ /* Structure definition of register */
+typedef struct
+{
+	u32 global_intr_status : 1;
+	u32 reserved0 : 31;
+} ecpri_hwio_def_ecpri_dma0_throttle_bwmon_global_interrupt_status_s;
+
+/* Union definition of register */
+typedef union
+{
+	ecpri_hwio_def_ecpri_dma0_throttle_bwmon_global_interrupt_status_s def;
+	u32 value;
+} ecpri_hwio_def_ecpri_dma0_throttle_bwmon_global_interrupt_status_u;
+
+/*===========================================================================*/
+/*!
+@brief Bit Field definition of register: ECPRI_DMA0_THROTTLE_BWMON_GLOBAL_INTERRUPT_CLEAR
+*/
+/*===========================================================================*/
+/* Structure definition of register */
+typedef struct
+{
+	u32 global_intr_clear : 1;
+	u32 reserved0 : 31;
+} ecpri_hwio_def_ecpri_dma0_throttle_bwmon_global_interrupt_clear_s;
+
+/* Union definition of register */
+typedef union
+{
+	ecpri_hwio_def_ecpri_dma0_throttle_bwmon_global_interrupt_clear_s def;
+	u32 value;
+} ecpri_hwio_def_ecpri_dma0_throttle_bwmon_global_interrupt_clear_u;
+
+/*===========================================================================*/
+/*!
+@brief Bit Field definition of register: ECPRI_DMA0_THROTTLE_BWMON_GLOBAL_INTERRUPT_ENABLE
+*/
+/*===========================================================================*/
+/* Structure definition of register */
+typedef struct
+{
+	u32 global_intr_enable : 1;
+	u32 reserved0 : 31;
+} ecpri_hwio_def_ecpri_dma0_throttle_bwmon_global_interrupt_enable_s;
+
+/* Union definition of register */
+typedef union
+{
+	ecpri_hwio_def_ecpri_dma0_throttle_bwmon_global_interrupt_enable_s def;
+	u32 value;
+} ecpri_hwio_def_ecpri_dma0_throttle_bwmon_global_interrupt_enable_u;
+
+/*===========================================================================*/
+/*!
+@brief Bit Field definition of register: ECPRI_DMA0_THROTTLE_BWMON_INTERRUPT_STATUS
+*/
+/*===========================================================================*/
+/* Structure definition of register */
+typedef struct
+{
+	u32 bwmon_threshold_crossed : 1;
+	u32 bwmon_overflow : 1;
+	u32 reserved0 : 2;
+	u32 bwmon2_zone0_threshold_crossed : 1;
+	u32 bwmon2_zone1_threshold_crossed : 1;
+	u32 bwmon2_zone2_threshold_crossed : 1;
+	u32 bwmon2_zone3_threshold_crossed : 1;
+	u32 reserved1 : 24;
+} ecpri_hwio_def_ecpri_dma0_throttle_bwmon_interrupt_status_s;
+
+/* Union definition of register */
+typedef union
+{
+	ecpri_hwio_def_ecpri_dma0_throttle_bwmon_interrupt_status_s def;
+	u32 value;
+} ecpri_hwio_def_ecpri_dma0_throttle_bwmon_interrupt_status_u;
+
+/*===========================================================================*/
+/*!
+@brief Bit Field definition of register: ECPRI_DMA0_THROTTLE_BWMON_INTERRUPT_CLEAR
+*/
+/*===========================================================================*/
+/* Structure definition of register */
+typedef struct
+{
+	u32 bwmon_threshold_crossed : 1;
+	u32 bwmon_overflow : 1;
+	u32 reserved0 : 2;
+	u32 bwmon2_zone0_threshold_crossed : 1;
+	u32 bwmon2_zone1_threshold_crossed : 1;
+	u32 bwmon2_zone2_threshold_crossed : 1;
+	u32 bwmon2_zone3_threshold_crossed : 1;
+	u32 reserved1 : 24;
+} ecpri_hwio_def_ecpri_dma0_throttle_bwmon_interrupt_clear_s;
+
+/* Union definition of register */
+typedef union
+{
+	ecpri_hwio_def_ecpri_dma0_throttle_bwmon_interrupt_clear_s def;
+	u32 value;
+} ecpri_hwio_def_ecpri_dma0_throttle_bwmon_interrupt_clear_u;
+
+/*===========================================================================*/
+/*!
+@brief Bit Field definition of register: ECPRI_DMA0_THROTTLE_BWMON_INTERRUPT_ENABLE
+*/
+/*===========================================================================*/
+/* Structure definition of register */
+typedef struct
+{
+	u32 bwmon_threshold_crossed : 1;
+	u32 bwmon_overflow : 1;
+	u32 reserved0 : 2;
+	u32 bwmon2_zone0_threshold_crossed : 1;
+	u32 bwmon2_zone1_threshold_crossed : 1;
+	u32 bwmon2_zone2_threshold_crossed : 1;
+	u32 bwmon2_zone3_threshold_crossed : 1;
+	u32 reserved1 : 24;
+} ecpri_hwio_def_ecpri_dma0_throttle_bwmon_interrupt_enable_s;
+
+/* Union definition of register */
+typedef union
+{
+	ecpri_hwio_def_ecpri_dma0_throttle_bwmon_interrupt_enable_s def;
+	u32 value;
+} ecpri_hwio_def_ecpri_dma0_throttle_bwmon_interrupt_enable_u;
+
+/*===========================================================================*/
+/*!
+@brief Bit Field definition of register: ECPRI_DMA0_THROTTLE_BWMON_CORE_CLOCKON_CONTROL
+*/
+/*===========================================================================*/
+/* Structure definition of register */
+typedef struct
+{
+	u32 bwmon2_core_clkon_disable : 1;
+	u32 bwmon2_core_clkon_hysteresis : 4;
+	u32 bwmon_cfg_access_clkon_cntr : 8;
+	u32 reserved0 : 19;
+} ecpri_hwio_def_ecpri_dma0_throttle_bwmon_core_clockon_control_s;
+
+/* Union definition of register */
+typedef union
+{
+	ecpri_hwio_def_ecpri_dma0_throttle_bwmon_core_clockon_control_s def;
+	u32 value;
+} ecpri_hwio_def_ecpri_dma0_throttle_bwmon_core_clockon_control_u;
+
+/*===========================================================================*/
+/*!
+@brief Bit Field definition of register: ECPRI_DMA0_THROTTLE_BWMON_BWMON_CGC_CNTRL
+*/
+/*===========================================================================*/
+/* Structure definition of register */
+typedef struct
+{
+	u32 bwmon_clock_en_cntrl : 1;
+	u32 bwmon2_hw_cgc_mode : 1;
+	u32 bwmon2_clock_en_cntrl : 1;
+	u32 reserved0 : 29;
+} ecpri_hwio_def_ecpri_dma0_throttle_bwmon_bwmon_cgc_cntrl_s;
+
+/* Union definition of register */
+typedef union
+{
+	ecpri_hwio_def_ecpri_dma0_throttle_bwmon_bwmon_cgc_cntrl_s def;
+	u32 value;
+} ecpri_hwio_def_ecpri_dma0_throttle_bwmon_bwmon_cgc_cntrl_u;
+
+/*===========================================================================*/
+/*!
+@brief Bit Field definition of register: ECPRI_DMA0_THROTTLE_BWMON_BWMON_SW_RESET
+*/
+/*===========================================================================*/
+/* Structure definition of register */
+typedef struct
+{
+	u32 bwmon_sw_reset : 1;
+	u32 bwmon2_sw_reset : 1;
+	u32 reserved0 : 30;
+} ecpri_hwio_def_ecpri_dma0_throttle_bwmon_bwmon_sw_reset_s;
+
+/* Union definition of register */
+typedef union
+{
+	ecpri_hwio_def_ecpri_dma0_throttle_bwmon_bwmon_sw_reset_s def;
+	u32 value;
+} ecpri_hwio_def_ecpri_dma0_throttle_bwmon_bwmon_sw_reset_u;
+
+/*===========================================================================*/
+/*!
+@brief Bit Field definition of register: ECPRI_DMA0_THROTTLE_BWMON_BWMON_ENABLE
+*/
+/*===========================================================================*/
+/* Structure definition of register */
+typedef struct
+{
+	u32 enable : 1;
+	u32 reserved0 : 3;
+	u32 scaling_factor : 1;
+	u32 reserved1 : 3;
+	u32 match_filter : 1;
+	u32 reserved2 : 7;
+	u32 throttle_offset : 5;
+	u32 throttle_offset_back_pressure : 5;
+	u32 reserved3 : 5;
+	u32 clear_on_intr : 1;
+} ecpri_hwio_def_ecpri_dma0_throttle_bwmon_bwmon_enable_s;
+
+/* Union definition of register */
+typedef union
+{
+	ecpri_hwio_def_ecpri_dma0_throttle_bwmon_bwmon_enable_s def;
+	u32 value;
+} ecpri_hwio_def_ecpri_dma0_throttle_bwmon_bwmon_enable_u;
+
+/*===========================================================================*/
+/*!
+@brief Bit Field definition of register: ECPRI_DMA0_THROTTLE_BWMON_BWMON_CLEAR
+*/
+/*===========================================================================*/
+/* Structure definition of register */
+typedef struct
+{
+	u32 clear : 1;
+	u32 reserved0 : 31;
+} ecpri_hwio_def_ecpri_dma0_throttle_bwmon_bwmon_clear_s;
+
+/* Union definition of register */
+typedef union
+{
+	ecpri_hwio_def_ecpri_dma0_throttle_bwmon_bwmon_clear_s def;
+	u32 value;
+} ecpri_hwio_def_ecpri_dma0_throttle_bwmon_bwmon_clear_u;
+
+/*===========================================================================*/
+/*!
+@brief Bit Field definition of register: ECPRI_DMA0_THROTTLE_BWMON_BWMON_BYTE_COUNT
+*/
+/*===========================================================================*/
+/* Structure definition of register */
+typedef struct
+{
+	u32 byte_count : 32;
+} ecpri_hwio_def_ecpri_dma0_throttle_bwmon_bwmon_byte_count_s;
+
+/* Union definition of register */
+typedef union
+{
+	ecpri_hwio_def_ecpri_dma0_throttle_bwmon_bwmon_byte_count_s def;
+	u32 value;
+} ecpri_hwio_def_ecpri_dma0_throttle_bwmon_bwmon_byte_count_u;
+
+/*===========================================================================*/
+/*!
+@brief Bit Field definition of register: ECPRI_DMA0_THROTTLE_BWMON_BWMON_THRESHOLD
+*/
+/*===========================================================================*/
+/* Structure definition of register */
+typedef struct
+{
+	u32 threshold : 32;
+} ecpri_hwio_def_ecpri_dma0_throttle_bwmon_bwmon_threshold_s;
+
+/* Union definition of register */
+typedef union
+{
+	ecpri_hwio_def_ecpri_dma0_throttle_bwmon_bwmon_threshold_s def;
+	u32 value;
+} ecpri_hwio_def_ecpri_dma0_throttle_bwmon_bwmon_threshold_u;
+
+/*===========================================================================*/
+/*!
+@brief Bit Field definition of register: ECPRI_DMA0_THROTTLE_BWMON_BWMON_MID_MASK
+*/
+/*===========================================================================*/
+/* Structure definition of register */
+typedef struct
+{
+	u32 mask : 16;
+	u32 reserved0 : 16;
+} ecpri_hwio_def_ecpri_dma0_throttle_bwmon_bwmon_mid_mask_s;
+
+/* Union definition of register */
+typedef union
+{
+	ecpri_hwio_def_ecpri_dma0_throttle_bwmon_bwmon_mid_mask_s def;
+	u32 value;
+} ecpri_hwio_def_ecpri_dma0_throttle_bwmon_bwmon_mid_mask_u;
+
+/*===========================================================================*/
+/*!
+@brief Bit Field definition of register: ECPRI_DMA0_THROTTLE_BWMON_BWMON_MID_MATCH
+*/
+/*===========================================================================*/
+/* Structure definition of register */
+typedef struct
+{
+	u32 match : 16;
+	u32 reserved0 : 16;
+} ecpri_hwio_def_ecpri_dma0_throttle_bwmon_bwmon_mid_match_s;
+
+/* Union definition of register */
+typedef union
+{
+	ecpri_hwio_def_ecpri_dma0_throttle_bwmon_bwmon_mid_match_s def;
+	u32 value;
+} ecpri_hwio_def_ecpri_dma0_throttle_bwmon_bwmon_mid_match_u;
+
+/*===========================================================================*/
+/*!
+@brief Bit Field definition of register: ECPRI_DMA0_THROTTLE_BWMON_BWMON2_ENABLE
+*/
+/*===========================================================================*/
+/* Structure definition of register */
+typedef struct
+{
+	u32 enable : 1;
+	u32 reserved0 : 15;
+	u32 throttle_offset : 5;
+	u32 reserved1 : 10;
+	u32 early_intr_en : 1;
+} ecpri_hwio_def_ecpri_dma0_throttle_bwmon_bwmon2_enable_s;
+
+/* Union definition of register */
+typedef union
+{
+	ecpri_hwio_def_ecpri_dma0_throttle_bwmon_bwmon2_enable_s def;
+	u32 value;
+} ecpri_hwio_def_ecpri_dma0_throttle_bwmon_bwmon2_enable_u;
+
+/*===========================================================================*/
+/*!
+@brief Bit Field definition of register: ECPRI_DMA0_THROTTLE_BWMON_BWMON2_CLEAR
+*/
+/*===========================================================================*/
+/* Structure definition of register */
+typedef struct
+{
+	u32 clear : 1;
+	u32 clear_all : 1;
+	u32 reserved0 : 30;
+} ecpri_hwio_def_ecpri_dma0_throttle_bwmon_bwmon2_clear_s;
+
+/* Union definition of register */
+typedef union
+{
+	ecpri_hwio_def_ecpri_dma0_throttle_bwmon_bwmon2_clear_s def;
+	u32 value;
+} ecpri_hwio_def_ecpri_dma0_throttle_bwmon_bwmon2_clear_u;
+
+/*===========================================================================*/
+/*!
+@brief Bit Field definition of register: ECPRI_DMA0_THROTTLE_BWMON_BWMON2_SAMPLING_WINDOW
+*/
+/*===========================================================================*/
+/* Structure definition of register */
+typedef struct
+{
+	u32 reg : 24;
+	u32 reserved0 : 8;
+} ecpri_hwio_def_ecpri_dma0_throttle_bwmon_bwmon2_sampling_window_s;
+
+/* Union definition of register */
+typedef union
+{
+	ecpri_hwio_def_ecpri_dma0_throttle_bwmon_bwmon2_sampling_window_s def;
+	u32 value;
+} ecpri_hwio_def_ecpri_dma0_throttle_bwmon_bwmon2_sampling_window_u;
+
+/*===========================================================================*/
+/*!
+@brief Bit Field definition of register: ECPRI_DMA0_THROTTLE_BWMON_BWMON2_BYTE_COUNT_THRESHOLD_HIGH
+*/
+/*===========================================================================*/
+/* Structure definition of register */
+typedef struct
+{
+	u32 reg : 16;
+	u32 reserved0 : 16;
+} ecpri_hwio_def_ecpri_dma0_throttle_bwmon_bwmon2_byte_count_threshold_high_s;
+
+/* Union definition of register */
+typedef union
+{
+	ecpri_hwio_def_ecpri_dma0_throttle_bwmon_bwmon2_byte_count_threshold_high_s def;
+	u32 value;
+} ecpri_hwio_def_ecpri_dma0_throttle_bwmon_bwmon2_byte_count_threshold_high_u;
+
+/*===========================================================================*/
+/*!
+@brief Bit Field definition of register: ECPRI_DMA0_THROTTLE_BWMON_BWMON2_BYTE_COUNT_THRESHOLD_MEDIUM
+*/
+/*===========================================================================*/
+/* Structure definition of register */
+typedef struct
+{
+	u32 reg : 16;
+	u32 reserved0 : 16;
+} ecpri_hwio_def_ecpri_dma0_throttle_bwmon_bwmon2_byte_count_threshold_medium_s;
+
+/* Union definition of register */
+typedef union
+{
+	ecpri_hwio_def_ecpri_dma0_throttle_bwmon_bwmon2_byte_count_threshold_medium_s def;
+	u32 value;
+} ecpri_hwio_def_ecpri_dma0_throttle_bwmon_bwmon2_byte_count_threshold_medium_u;
+
+/*===========================================================================*/
+/*!
+@brief Bit Field definition of register: ECPRI_DMA0_THROTTLE_BWMON_BWMON2_BYTE_COUNT_THRESHOLD_LOW
+*/
+/*===========================================================================*/
+/* Structure definition of register */
+typedef struct
+{
+	u32 reg : 16;
+	u32 reserved0 : 16;
+} ecpri_hwio_def_ecpri_dma0_throttle_bwmon_bwmon2_byte_count_threshold_low_s;
+
+/* Union definition of register */
+typedef union
+{
+	ecpri_hwio_def_ecpri_dma0_throttle_bwmon_bwmon2_byte_count_threshold_low_s def;
+	u32 value;
+} ecpri_hwio_def_ecpri_dma0_throttle_bwmon_bwmon2_byte_count_threshold_low_u;
+
+/*===========================================================================*/
+/*!
+@brief Bit Field definition of register: ECPRI_DMA0_THROTTLE_BWMON_BWMON2_ZONE_ACTIONS
+*/
+/*===========================================================================*/
+/* Structure definition of register */
+typedef struct
+{
+	u32 zone0 : 8;
+	u32 zone1 : 8;
+	u32 zone2 : 8;
+	u32 zone3 : 8;
+} ecpri_hwio_def_ecpri_dma0_throttle_bwmon_bwmon2_zone_actions_s;
+
+/* Union definition of register */
+typedef union
+{
+	ecpri_hwio_def_ecpri_dma0_throttle_bwmon_bwmon2_zone_actions_s def;
+	u32 value;
+} ecpri_hwio_def_ecpri_dma0_throttle_bwmon_bwmon2_zone_actions_u;
+
+/*===========================================================================*/
+/*!
+@brief Bit Field definition of register: ECPRI_DMA0_THROTTLE_BWMON_BWMON2_ZONE_COUNT_THRESHOLD
+*/
+/*===========================================================================*/
+/* Structure definition of register */
+typedef struct
+{
+	u32 zone0 : 8;
+	u32 zone1 : 8;
+	u32 zone2 : 8;
+	u32 zone3 : 8;
+} ecpri_hwio_def_ecpri_dma0_throttle_bwmon_bwmon2_zone_count_threshold_s;
+
+/* Union definition of register */
+typedef union
+{
+	ecpri_hwio_def_ecpri_dma0_throttle_bwmon_bwmon2_zone_count_threshold_s def;
+	u32 value;
+} ecpri_hwio_def_ecpri_dma0_throttle_bwmon_bwmon2_zone_count_threshold_u;
+
+/*===========================================================================*/
+/*!
+@brief Bit Field definition of register: ECPRI_DMA0_THROTTLE_BWMON_BWMON2_BYTE_COUNT
+*/
+/*===========================================================================*/
+/* Structure definition of register */
+typedef struct
+{
+	u32 current_byte_count : 16;
+	u32 reserved0 : 12;
+	u32 current_zone : 2;
+	u32 reserved1 : 2;
+} ecpri_hwio_def_ecpri_dma0_throttle_bwmon_bwmon2_byte_count_s;
+
+/* Union definition of register */
+typedef union
+{
+	ecpri_hwio_def_ecpri_dma0_throttle_bwmon_bwmon2_byte_count_s def;
+	u32 value;
+} ecpri_hwio_def_ecpri_dma0_throttle_bwmon_bwmon2_byte_count_u;
+
+/*===========================================================================*/
+/*!
+@brief Bit Field definition of register: ECPRI_DMA0_THROTTLE_BWMON_BWMON2_WINDOW_TIMER
+*/
+/*===========================================================================*/
+/* Structure definition of register */
+typedef struct
+{
+	u32 current_window_timer : 24;
+	u32 reserved0 : 8;
+} ecpri_hwio_def_ecpri_dma0_throttle_bwmon_bwmon2_window_timer_s;
+
+/* Union definition of register */
+typedef union
+{
+	ecpri_hwio_def_ecpri_dma0_throttle_bwmon_bwmon2_window_timer_s def;
+	u32 value;
+} ecpri_hwio_def_ecpri_dma0_throttle_bwmon_bwmon2_window_timer_u;
+
+/*===========================================================================*/
+/*!
+@brief Bit Field definition of register: ECPRI_DMA0_THROTTLE_BWMON_BWMON2_ZONE_COUNT
+*/
+/*===========================================================================*/
+/* Structure definition of register */
+typedef struct
+{
+	u32 zone0 : 8;
+	u32 zone1 : 8;
+	u32 zone2 : 8;
+	u32 zone3 : 8;
+} ecpri_hwio_def_ecpri_dma0_throttle_bwmon_bwmon2_zone_count_s;
+
+/* Union definition of register */
+typedef union
+{
+	ecpri_hwio_def_ecpri_dma0_throttle_bwmon_bwmon2_zone_count_s def;
+	u32 value;
+} ecpri_hwio_def_ecpri_dma0_throttle_bwmon_bwmon2_zone_count_u;
+
+/*===========================================================================*/
+/*!
+@brief Bit Field definition of register: ECPRI_DMA0_THROTTLE_BWMON_BWMON2_ZONEn_MAX_BYTE_COUNT
+*/
+/*===========================================================================*/
+/* Structure definition of register */
+typedef struct
+{
+	u32 reg : 16;
+	u32 reserved0 : 16;
+} ecpri_hwio_def_ecpri_dma0_throttle_bwmon_bwmon2_zonen_max_byte_count_s;
+
+/* Union definition of register */
+typedef union
+{
+	ecpri_hwio_def_ecpri_dma0_throttle_bwmon_bwmon2_zonen_max_byte_count_s def;
+	u32 value;
+} ecpri_hwio_def_ecpri_dma0_throttle_bwmon_bwmon2_zonen_max_byte_count_u;
+
+/*===========================================================================*/
+/*!
+@brief Bit Field definition of register: ECPRI_DMA0_THROTTLE_BWMON_BWMON_PID_MASK
+*/
+/*===========================================================================*/
+/* Structure definition of register */
+typedef struct
+{
+	u32 mask : 5;
+	u32 reserved0 : 27;
+} ecpri_hwio_def_ecpri_dma0_throttle_bwmon_bwmon_pid_mask_s;
+
+/* Union definition of register */
+typedef union
+{
+	ecpri_hwio_def_ecpri_dma0_throttle_bwmon_bwmon_pid_mask_s def;
+	u32 value;
+} ecpri_hwio_def_ecpri_dma0_throttle_bwmon_bwmon_pid_mask_u;
+
+/*===========================================================================*/
+/*!
+@brief Bit Field definition of register: ECPRI_DMA0_THROTTLE_BWMON_BWMON_PID_MATCH
+*/
+/*===========================================================================*/
+/* Structure definition of register */
+typedef struct
+{
+	u32 match : 5;
+	u32 reserved0 : 27;
+} ecpri_hwio_def_ecpri_dma0_throttle_bwmon_bwmon_pid_match_s;
+
+/* Union definition of register */
+typedef union
+{
+	ecpri_hwio_def_ecpri_dma0_throttle_bwmon_bwmon_pid_match_s def;
+	u32 value;
+} ecpri_hwio_def_ecpri_dma0_throttle_bwmon_bwmon_pid_match_u;
+
+/*===========================================================================*/
+/*!
+@brief Bit Field definition of register: ECPRI_DMA0_THROTTLE_BWMON_BWMON_BID_MASK
+*/
+/*===========================================================================*/
+/* Structure definition of register */
+typedef struct
+{
+	u32 mask : 3;
+	u32 reserved0 : 29;
+} ecpri_hwio_def_ecpri_dma0_throttle_bwmon_bwmon_bid_mask_s;
+
+/* Union definition of register */
+typedef union
+{
+	ecpri_hwio_def_ecpri_dma0_throttle_bwmon_bwmon_bid_mask_s def;
+	u32 value;
+} ecpri_hwio_def_ecpri_dma0_throttle_bwmon_bwmon_bid_mask_u;
+
+/*===========================================================================*/
+/*!
+@brief Bit Field definition of register: ECPRI_DMA0_THROTTLE_BWMON_BWMON_BID_MATCH
+*/
+/*===========================================================================*/
+/* Structure definition of register */
+typedef struct
+{
+	u32 match : 3;
+	u32 reserved0 : 29;
+} ecpri_hwio_def_ecpri_dma0_throttle_bwmon_bwmon_bid_match_s;
+
+/* Union definition of register */
+typedef union
+{
+	ecpri_hwio_def_ecpri_dma0_throttle_bwmon_bwmon_bid_match_s def;
+	u32 value;
+} ecpri_hwio_def_ecpri_dma0_throttle_bwmon_bwmon_bid_match_u;
+
+/*===========================================================================*/
+/*!
+@brief Bit Field definition of register: ECPRI_DMA0_THROTTLE_BWMON_STATS_COUNTER_INTERRUPT_STATUS
+*/
+/*===========================================================================*/
+/* Structure definition of register */
+typedef struct
+{
+	u32 bwmon_reject_period_expired : 1;
+	u32 bwmon_stats_cntr_saturated : 1;
+	u32 reserved0 : 30;
+} ecpri_hwio_def_ecpri_dma0_throttle_bwmon_stats_counter_interrupt_status_s;
+
+/* Union definition of register */
+typedef union
+{
+	ecpri_hwio_def_ecpri_dma0_throttle_bwmon_stats_counter_interrupt_status_s def;
+	u32 value;
+} ecpri_hwio_def_ecpri_dma0_throttle_bwmon_stats_counter_interrupt_status_u;
+
+/*===========================================================================*/
+/*!
+@brief Bit Field definition of register: ECPRI_DMA0_THROTTLE_BWMON_STATS_COUNTER_INTERRUPT_CLEAR
+*/
+/*===========================================================================*/
+/* Structure definition of register */
+typedef struct
+{
+	u32 bwmon_reject_period_expired : 1;
+	u32 bwmon_stats_cntr_saturated : 1;
+	u32 reserved0 : 30;
+} ecpri_hwio_def_ecpri_dma0_throttle_bwmon_stats_counter_interrupt_clear_s;
+
+/* Union definition of register */
+typedef union
+{
+	ecpri_hwio_def_ecpri_dma0_throttle_bwmon_stats_counter_interrupt_clear_s def;
+	u32 value;
+} ecpri_hwio_def_ecpri_dma0_throttle_bwmon_stats_counter_interrupt_clear_u;
+
+/*===========================================================================*/
+/*!
+@brief Bit Field definition of register: ECPRI_DMA0_THROTTLE_BWMON_STATS_COUNTER_INTERRUPT_ENABLE
+*/
+/*===========================================================================*/
+/* Structure definition of register */
+typedef struct
+{
+	u32 bwmon_reject_period_expired : 1;
+	u32 bwmon_stats_cntr_saturated : 1;
+	u32 reserved0 : 30;
+} ecpri_hwio_def_ecpri_dma0_throttle_bwmon_stats_counter_interrupt_enable_s;
+
+/* Union definition of register */
+typedef union
+{
+	ecpri_hwio_def_ecpri_dma0_throttle_bwmon_stats_counter_interrupt_enable_s def;
+	u32 value;
+} ecpri_hwio_def_ecpri_dma0_throttle_bwmon_stats_counter_interrupt_enable_u;
+
+/*===========================================================================*/
+/*!
+@brief Bit Field definition of register: ECPRI_DMA0_THROTTLE_BWMON_BWMON_REJECT_COUNTERS_ENABLE
+*/
+/*===========================================================================*/
+/* Structure definition of register */
+typedef struct
+{
+	u32 counters_en : 1;
+	u32 alen_en : 1;
+	u32 capture : 1;
+	u32 reserved0 : 29;
+} ecpri_hwio_def_ecpri_dma0_throttle_bwmon_bwmon_reject_counters_enable_s;
+
+/* Union definition of register */
+typedef union
+{
+	ecpri_hwio_def_ecpri_dma0_throttle_bwmon_bwmon_reject_counters_enable_s def;
+	u32 value;
+} ecpri_hwio_def_ecpri_dma0_throttle_bwmon_bwmon_reject_counters_enable_u;
+
+/*===========================================================================*/
+/*!
+@brief Bit Field definition of register: ECPRI_DMA0_THROTTLE_BWMON_BWMON_REJECT_PERIOD
+*/
+/*===========================================================================*/
+/* Structure definition of register */
+typedef struct
+{
+	u32 period : 14;
+	u32 reserved0 : 18;
+} ecpri_hwio_def_ecpri_dma0_throttle_bwmon_bwmon_reject_period_s;
+
+/* Union definition of register */
+typedef union
+{
+	ecpri_hwio_def_ecpri_dma0_throttle_bwmon_bwmon_reject_period_s def;
+	u32 value;
+} ecpri_hwio_def_ecpri_dma0_throttle_bwmon_bwmon_reject_period_u;
+
+/*===========================================================================*/
+/*!
+@brief Bit Field definition of register: ECPRI_DMA0_THROTTLE_BWMON_BWMON_ACCEPT_COUNT
+*/
+/*===========================================================================*/
+/* Structure definition of register */
+typedef struct
+{
+	u32 accept_count : 32;
+} ecpri_hwio_def_ecpri_dma0_throttle_bwmon_bwmon_accept_count_s;
+
+/* Union definition of register */
+typedef union
+{
+	ecpri_hwio_def_ecpri_dma0_throttle_bwmon_bwmon_accept_count_s def;
+	u32 value;
+} ecpri_hwio_def_ecpri_dma0_throttle_bwmon_bwmon_accept_count_u;
+
+/*===========================================================================*/
+/*!
+@brief Bit Field definition of register: ECPRI_DMA0_THROTTLE_BWMON_BWMON_REJECT_COUNT
+*/
+/*===========================================================================*/
+/* Structure definition of register */
+typedef struct
+{
+	u32 reject_count : 32;
+} ecpri_hwio_def_ecpri_dma0_throttle_bwmon_bwmon_reject_count_s;
+
+/* Union definition of register */
+typedef union
+{
+	ecpri_hwio_def_ecpri_dma0_throttle_bwmon_bwmon_reject_count_s def;
+	u32 value;
+} ecpri_hwio_def_ecpri_dma0_throttle_bwmon_bwmon_reject_count_u;
+
+/*===========================================================================*/
+/*!
+@brief Bit Field definition of register: ECPRI_DMA0_THROTTLE_BWMON_BWMON_IDLE_COUNT
+*/
+/*===========================================================================*/
+/* Structure definition of register */
+typedef struct
+{
+	u32 idle_count : 32;
+} ecpri_hwio_def_ecpri_dma0_throttle_bwmon_bwmon_idle_count_s;
+
+/* Union definition of register */
+typedef union
+{
+	ecpri_hwio_def_ecpri_dma0_throttle_bwmon_bwmon_idle_count_s def;
+	u32 value;
+} ecpri_hwio_def_ecpri_dma0_throttle_bwmon_bwmon_idle_count_u;
+
+/*===========================================================================*/
+/*!
+@brief Bit Field definition of register: ECPRI_DMA0_THROTTLE_BWMON_BWMON_INTR_TARGET
+*/
+/*===========================================================================*/
+/* Structure definition of register */
+typedef struct
+{
+	u32 secondary_target_select : 1;
+	u32 reserved0 : 31;
+} ecpri_hwio_def_ecpri_dma0_throttle_bwmon_bwmon_intr_target_s;
+
+/* Union definition of register */
+typedef union
+{
+	ecpri_hwio_def_ecpri_dma0_throttle_bwmon_bwmon_intr_target_s def;
+	u32 value;
+} ecpri_hwio_def_ecpri_dma0_throttle_bwmon_bwmon_intr_target_u;
+
+/*===========================================================================*/
+/*!
+@brief Bit Field definition of register: ECPRI_DMA0_THROTTLE_BWMON_BWMON_DEBUG_CNTL
+*/
+/*===========================================================================*/
+/* Structure definition of register */
+typedef struct
+{
+	u32 debug_en : 1;
+	u32 reserved0 : 7;
+	u32 debug_sel : 4;
+	u32 reserved1 : 20;
+} ecpri_hwio_def_ecpri_dma0_throttle_bwmon_bwmon_debug_cntl_s;
+
+/* Union definition of register */
+typedef union
+{
+	ecpri_hwio_def_ecpri_dma0_throttle_bwmon_bwmon_debug_cntl_s def;
+	u32 value;
+} ecpri_hwio_def_ecpri_dma0_throttle_bwmon_bwmon_debug_cntl_u;
+
+/*===========================================================================*/
+/*!
+@brief Bit Field definition of register: ECPRI_DMA0_THROTTLE_BWMON_BWMON_DEBUG_READBACK
+*/
+/*===========================================================================*/
+/* Structure definition of register */
+typedef struct
+{
+	u32 debug_bus_readback : 32;
+} ecpri_hwio_def_ecpri_dma0_throttle_bwmon_bwmon_debug_readback_s;
+
+/* Union definition of register */
+typedef union
+{
+	ecpri_hwio_def_ecpri_dma0_throttle_bwmon_bwmon_debug_readback_s def;
+	u32 value;
+} ecpri_hwio_def_ecpri_dma0_throttle_bwmon_bwmon_debug_readback_u;
+
+/*===========================================================================*/
+/*!
+@brief Bit Field definition of register: ECPRI_RAM_FIFO_CONTENT_LINE_l_WORD_n
+*/
+/*===========================================================================*/
+/* Structure definition of register */
+typedef struct {
+	u32 value : 32;
+} ecpri_hwio_def_ecpri_ram_fifo_content_line_l_word_n_s;
+
+/* Union definition of register */
+typedef union {
+	ecpri_hwio_def_ecpri_ram_fifo_content_line_l_word_n_s def;
+	u32 value;
+} ecpri_hwio_def_ecpri_ram_fifo_content_line_l_word_n_u;
+
+/*===========================================================================*/
+/*!
+@brief Bit Field definition of register: ECPRI_SNIFFER_CTRL1
+*/
+/*===========================================================================*/
+/* Structure definition of register */
+typedef struct {
+	u32 mem_base_addr : 31;
+	u32 reserved0 : 1;
+} ecpri_hwio_def_ecpri_sniffer_ctrl1_s;
+
+/* Union definition of register */
+typedef union {
+	ecpri_hwio_def_ecpri_sniffer_ctrl1_s def;
+	u32 value;
+} ecpri_hwio_def_ecpri_sniffer_ctrl1_u;
+
+/*===========================================================================*/
+/*!
+@brief Bit Field definition of register: ECPRI_SNIFFER_CTRL2
+*/
+/*===========================================================================*/
+/* Structure definition of register */
+typedef struct {
+	u32 channel : 8;
+	u32 gid : 2;
+	u32 num_ot : 6;
+	u32 mem_size : 11;
+	u32 reserved0 : 4;
+	u32 enable : 1;
+} ecpri_hwio_def_ecpri_sniffer_ctrl2_s;
+
+/* Union definition of register */
+typedef union {
+	ecpri_hwio_def_ecpri_sniffer_ctrl2_s def;
+	u32 value;
+} ecpri_hwio_def_ecpri_sniffer_ctrl2_u;
+
+/*===========================================================================*/
+/*!
+@brief Bit Field definition of register: ECPRI_SNIFFER_STAT
+*/
+/*===========================================================================*/
+/* Structure definition of register */
+typedef struct {
+	u32 write_ptr : 21;
+	u32 num_ot : 6;
+	u32 reserved0 : 2;
+	u32 wrapp_bit : 1;
+	u32 state : 2;
+} ecpri_hwio_def_ecpri_sniffer_stat_s;
+
+/* Union definition of register */
+typedef union {
+	ecpri_hwio_def_ecpri_sniffer_stat_s def;
+	u32 value;
+} ecpri_hwio_def_ecpri_sniffer_stat_u;
+
+/*===========================================================================*/
+/*!
+@brief Bit Field definition of register: ECPRI_LTE_DEBUG_CFG
+*/
+/*===========================================================================*/
+/* Structure definition of register */
+typedef struct {
+	u32 watermark_en : 1;
+	u32 watermark_clr_en : 1;
+	u32 reserved0 : 30;
+} ecpri_hwio_def_ecpri_lte_debug_cfg_s;
+
+/* Union definition of register */
+typedef union {
+	ecpri_hwio_def_ecpri_lte_debug_cfg_s def;
+	u32 value;
+} ecpri_hwio_def_ecpri_lte_debug_cfg_u;
+
+/*===========================================================================*/
+/*!
+@brief Bit Field definition of register: ECPRI_LTE_WATERMARKS
+*/
+/*===========================================================================*/
+/* Structure definition of register */
+typedef struct {
+	u32 lte_latency_buffer : 13;
+	u32 lte_ddh_cmd_buffer : 10;
+	u32 lte_txm_cmd_fifo : 4;
+	u32 reserved0 : 5;
+} ecpri_hwio_def_ecpri_lte_watermarks_s;
+
+/* Union definition of register */
+typedef union {
+	ecpri_hwio_def_ecpri_lte_watermarks_s def;
+	u32 value;
+} ecpri_hwio_def_ecpri_lte_watermarks_u;
+
+/*===========================================================================*/
+/*!
+@brief Bit Field definition of register: ECPRI_STATUS_XBAR_FH_PORT_RX
+*/
+/*===========================================================================*/
+/* Structure definition of register */
+typedef struct {
+	u32 pkt_rx_cnt_rx0 : 10;
+	u32 pkt_rx_cnt_rx1 : 10;
+	u32 pkt_rx_cnt_rx2 : 10;
+	u32 reserved0 : 2;
+} ecpri_hwio_def_ecpri_status_xbar_fh_port_rx_s;
+
+/* Union definition of register */
+typedef union {
+	ecpri_hwio_def_ecpri_status_xbar_fh_port_rx_s def;
+	u32 value;
+} ecpri_hwio_def_ecpri_status_xbar_fh_port_rx_u;
+
+/*===========================================================================*/
+/*!
+@brief Bit Field definition of register: ECPRI_STATUS_XBAR_FH_PORT_TX
+*/
+/*===========================================================================*/
+/* Structure definition of register */
+typedef struct {
+	u32 pkt_tx_cnt : 10;
+	u32 reserved0 : 22;
+} ecpri_hwio_def_ecpri_status_xbar_fh_port_tx_s;
+
+/* Union definition of register */
+typedef union {
+	ecpri_hwio_def_ecpri_status_xbar_fh_port_tx_s def;
+	u32 value;
+} ecpri_hwio_def_ecpri_status_xbar_fh_port_tx_u;
+
+/*===========================================================================*/
+/*!
+@brief Bit Field definition of register: ECPRI_STATUS_XBAR_C2C_PORT_RX
+*/
+/*===========================================================================*/
+/* Structure definition of register */
+typedef struct {
+	u32 pkt_rx_cnt_rx0 : 10;
+	u32 pkt_rx_cnt_rx1 : 10;
+	u32 pkt_rx_cnt_rx2 : 10;
+	u32 reserved0 : 2;
+} ecpri_hwio_def_ecpri_status_xbar_c2c_port_rx_s;
+
+/* Union definition of register */
+typedef union {
+	ecpri_hwio_def_ecpri_status_xbar_c2c_port_rx_s def;
+	u32 value;
+} ecpri_hwio_def_ecpri_status_xbar_c2c_port_rx_u;
+
+/*===========================================================================*/
+/*!
+@brief Bit Field definition of register: ECPRI_STATUS_XBAR_C2C_PORT_TX
+*/
+/*===========================================================================*/
+/* Structure definition of register */
+typedef struct {
+	u32 pkt_tx_cnt : 10;
+	u32 reserved0 : 22;
+} ecpri_hwio_def_ecpri_status_xbar_c2c_port_tx_s;
+
+/* Union definition of register */
+typedef union {
+	ecpri_hwio_def_ecpri_status_xbar_c2c_port_tx_s def;
+	u32 value;
+} ecpri_hwio_def_ecpri_status_xbar_c2c_port_tx_u;
+
+/*===========================================================================*/
+/*!
+@brief Bit Field definition of register: ECPRI_STATUS_GSI0_A
+*/
+/*===========================================================================*/
+/* Structure definition of register */
+typedef struct {
+	u32 tre_cnt : 10;
+	u32 pkt_cnt : 10;
+	u32 frag_cnt : 10;
+	u32 reserved0 : 2;
+} ecpri_hwio_def_ecpri_status_gsi0_a_s;
+
+/* Union definition of register */
+typedef union {
+	ecpri_hwio_def_ecpri_status_gsi0_a_s def;
+	u32 value;
+} ecpri_hwio_def_ecpri_status_gsi0_a_u;
+
+/*===========================================================================*/
+/*!
+@brief Bit Field definition of register: ECPRI_STATUS_GSI0_B
+*/
+/*===========================================================================*/
+/* Structure definition of register */
+typedef struct {
+	u32 src_aos_cnt : 10;
+	u32 dst_aos_cnt : 10;
+	u32 reserved0 : 12;
+} ecpri_hwio_def_ecpri_status_gsi0_b_s;
+
+/* Union definition of register */
+typedef union {
+	ecpri_hwio_def_ecpri_status_gsi0_b_s def;
+	u32 value;
+} ecpri_hwio_def_ecpri_status_gsi0_b_u;
+
+/*===========================================================================*/
+/*!
+@brief Bit Field definition of register: ECPRI_STATUS_GSI1_A
+*/
+/*===========================================================================*/
+/* Structure definition of register */
+typedef struct {
+	u32 tre_cnt : 10;
+	u32 pkt_cnt : 10;
+	u32 frag_cnt : 10;
+	u32 reserved0 : 2;
+} ecpri_hwio_def_ecpri_status_gsi1_a_s;
+
+/* Union definition of register */
+typedef union {
+	ecpri_hwio_def_ecpri_status_gsi1_a_s def;
+	u32 value;
+} ecpri_hwio_def_ecpri_status_gsi1_a_u;
+
+/*===========================================================================*/
+/*!
+@brief Bit Field definition of register: ECPRI_STATUS_GSI1_B
+*/
+/*===========================================================================*/
+/* Structure definition of register */
+typedef struct {
+	u32 src_aos_cnt : 10;
+	u32 dst_aos_cnt : 10;
+	u32 reserved0 : 12;
+} ecpri_hwio_def_ecpri_status_gsi1_b_s;
+
+/* Union definition of register */
+typedef union {
+	ecpri_hwio_def_ecpri_status_gsi1_b_s def;
+	u32 value;
+} ecpri_hwio_def_ecpri_status_gsi1_b_u;
+
+/*===========================================================================*/
+/*!
+@brief Bit Field definition of register: ECPRI_STATUS_GSI2_A
+*/
+/*===========================================================================*/
+/* Structure definition of register */
+typedef struct {
+	u32 tre_cnt : 10;
+	u32 pkt_cnt : 10;
+	u32 frag_cnt : 10;
+	u32 reserved0 : 2;
+} ecpri_hwio_def_ecpri_status_gsi2_a_s;
+
+/* Union definition of register */
+typedef union {
+	ecpri_hwio_def_ecpri_status_gsi2_a_s def;
+	u32 value;
+} ecpri_hwio_def_ecpri_status_gsi2_a_u;
+
+/*===========================================================================*/
+/*!
+@brief Bit Field definition of register: ECPRI_STATUS_GSI2_B
+*/
+/*===========================================================================*/
+/* Structure definition of register */
+typedef struct {
+	u32 src_aos_cnt : 10;
+	u32 dst_aos_cnt : 10;
+	u32 reserved0 : 12;
+} ecpri_hwio_def_ecpri_status_gsi2_b_s;
+
+/* Union definition of register */
+typedef union {
+	ecpri_hwio_def_ecpri_status_gsi2_b_s def;
+	u32 value;
+} ecpri_hwio_def_ecpri_status_gsi2_b_u;
+
+/*===========================================================================*/
+/*!
+@brief Bit Field definition of register: ECPRI_INTERFACE_DDH_DF
+*/
+/*===========================================================================*/
+/* Structure definition of register */
+typedef struct {
+	u32 size : 14;
+	u32 gsi : 2;
+	u32 channel : 7;
+	u32 reserved0 : 1;
+	u32 dst_type : 1;
+	u32 reserved1 : 3;
+	u32 empty : 1;
+	u32 reserved2 : 3;
+} ecpri_hwio_def_ecpri_interface_ddh_df_s;
+
+/* Union definition of register */
+typedef union {
+	ecpri_hwio_def_ecpri_interface_ddh_df_s def;
+	u32 value;
+} ecpri_hwio_def_ecpri_interface_ddh_df_u;
+
+/*===========================================================================*/
+/*!
+@brief Bit Field definition of register: ECPRI_INTERFACE_DF_C2C
+*/
+/*===========================================================================*/
+/* Structure definition of register */
+typedef struct {
+	u32 size : 14;
+	u32 gsi : 2;
+	u32 channel : 7;
+	u32 reserved0 : 1;
+	u32 dst_type : 1;
+	u32 reserved1 : 3;
+	u32 empty : 1;
+	u32 reserved2 : 3;
+} ecpri_hwio_def_ecpri_interface_df_c2c_s;
+
+/* Union definition of register */
+typedef union {
+	ecpri_hwio_def_ecpri_interface_df_c2c_s def;
+	u32 value;
+} ecpri_hwio_def_ecpri_interface_df_c2c_u;
+
+/*===========================================================================*/
+/*!
+@brief Bit Field definition of register: ECPRI_INTERFACE_DF_NSO
+*/
+/*===========================================================================*/
+/* Structure definition of register */
+typedef struct {
+	u32 size : 14;
+	u32 gsi : 2;
+	u32 channel : 7;
+	u32 reserved0 : 1;
+	u32 dst_type : 1;
+	u32 reserved1 : 3;
+	u32 empty : 1;
+	u32 reserved2 : 3;
+} ecpri_hwio_def_ecpri_interface_df_nso_s;
+
+/* Union definition of register */
+typedef union {
+	ecpri_hwio_def_ecpri_interface_df_nso_s def;
+	u32 value;
+} ecpri_hwio_def_ecpri_interface_df_nso_u;
+
+/*===========================================================================*/
+/*!
+@brief Bit Field definition of register: ECPRI_INTERFACE_DF_FH
+*/
+/*===========================================================================*/
+/* Structure definition of register */
+typedef struct {
+	u32 size : 14;
+	u32 gsi : 2;
+	u32 channel : 7;
+	u32 reserved0 : 1;
+	u32 dst_type : 1;
+	u32 reserved1 : 3;
+	u32 empty : 1;
+	u32 reserved2 : 3;
+} ecpri_hwio_def_ecpri_interface_df_fh_s;
+
+/* Union definition of register */
+typedef union {
+	ecpri_hwio_def_ecpri_interface_df_fh_s def;
+	u32 value;
+} ecpri_hwio_def_ecpri_interface_df_fh_u;
+
+/*===========================================================================*/
+/*!
+@brief Bit Field definition of register: ECPRI_INTERFACE_DF_TXM
+*/
+/*===========================================================================*/
+/* Structure definition of register */
+typedef struct {
+	u32 size : 14;
+	u32 gsi : 2;
+	u32 channel : 7;
+	u32 reserved0 : 1;
+	u32 dst_type : 1;
+	u32 reserved1 : 3;
+	u32 empty : 1;
+	u32 reserved2 : 3;
+} ecpri_hwio_def_ecpri_interface_df_txm_s;
+
+/* Union definition of register */
+typedef union {
+	ecpri_hwio_def_ecpri_interface_df_txm_s def;
+	u32 value;
+} ecpri_hwio_def_ecpri_interface_df_txm_u;
+
+/*===========================================================================*/
+/*!
+@brief Bit Field definition of register: ECPRI_INTERFACE_DDH_TXM
+*/
+/*===========================================================================*/
+/* Structure definition of register */
+typedef struct {
+	u32 size : 14;
+	u32 gsi : 2;
+	u32 channel : 7;
+	u32 reserved0 : 1;
+	u32 dst_type : 1;
+	u32 reserved1 : 3;
+	u32 empty : 1;
+	u32 reserved2 : 3;
+} ecpri_hwio_def_ecpri_interface_ddh_txm_s;
+
+/* Union definition of register */
+typedef union {
+	ecpri_hwio_def_ecpri_interface_ddh_txm_s def;
+	u32 value;
+} ecpri_hwio_def_ecpri_interface_ddh_txm_u;
+
+/*===========================================================================*/
+/*!
+@brief Bit Field definition of register: ECPRI_DMA_XBAR_RX_PORT_DPL_STATUS
+*/
+/*===========================================================================*/
+/* Structure definition of register */
+typedef struct {
+	u32 drop_channel : 8;
+	u32 drop_gsi : 2;
+	u32 reserved0 : 6;
+	u32 drop_count : 8;
+	u32 port_sel_act : 3;
+	u32 reserved1 : 5;
+} ecpri_hwio_def_ecpri_xbar_rx_port_dpl_status_s;
+
+/* Union definition of register */
+typedef union {
+	ecpri_hwio_def_ecpri_xbar_rx_port_dpl_status_s def;
+	u32 value;
+} ecpri_hwio_def_ecpri_xbar_rx_port_dpl_status_u;
+
+/*===========================================================================*/
+/*!
+@brief Bit Field definition of register: ECPRI_STATUS_XBAR_RX_PORT_m
+*/
+/*===========================================================================*/
+/* Structure definition of register */
+typedef struct {
+	u32 drop_channel : 8;
+	u32 drop_gsi : 2;
+	u32 reserved0 : 6;
+	u32 drop_count : 8;
+	u32 reserved1 : 8;
+} ecpri_hwio_def_ecpri_status_xbar_rx_port_m_s;
+
+/* Union definition of register */
+typedef union {
+	ecpri_hwio_def_ecpri_status_xbar_rx_port_m_s def;
+	u32 value;
+} ecpri_hwio_def_ecpri_status_xbar_rx_port_m_u;
+
+/*===========================================================================*/
+/*!
+@brief Bit Field definition of register: ECPRI_STATUS_XBAR_RX_DROP
+*/
+/*===========================================================================*/
+/* Structure definition of register */
+typedef struct {
+	u32 port : 6;
+	u32 reserved0 : 1;
+	u32 clr : 1;
+	u32 reserved1 : 24;
+} ecpri_hwio_def_ecpri_status_xbar_rx_drop_s;
+
+/* Union definition of register */
+typedef union {
+	ecpri_hwio_def_ecpri_status_xbar_rx_drop_s def;
+	u32 value;
+} ecpri_hwio_def_ecpri_status_xbar_rx_drop_u;
+
+/*===========================================================================*/
+/*!
+@brief Bit Field definition of register: ECPRI_ENDP_DPL_CFG_GSI_m_CH_n
+*/
+/*===========================================================================*/
+/* Structure definition of register */
+typedef struct {
+	u32 record_size : 9;
+	u32 record_enable : 1;
+	u32 reserved0 : 22;
+} ecpri_hwio_def_ecpri_endp_dpl_cfg_gsi_m_ch_n_s;
+
+/* Union definition of register */
+typedef union {
+	ecpri_hwio_def_ecpri_endp_dpl_cfg_gsi_m_ch_n_s def;
+	u32 value;
+} ecpri_hwio_def_ecpri_endp_dpl_cfg_gsi_m_ch_n_u;
+
+/*===========================================================================*/
+/*!
+@brief Bit Field definition of register: ECPRI_ENDP_LTE_CFG_GSI_m_CH_n
+*/
+/*===========================================================================*/
+/* Structure definition of register */
+typedef struct {
+	u32 is_lte : 1;
+	u32 reserved0 : 31;
+} ecpri_hwio_def_ecpri_endp_lte_cfg_gsi_m_ch_n_s;
+
+/* Union definition of register */
+typedef union {
+	ecpri_hwio_def_ecpri_endp_lte_cfg_gsi_m_ch_n_s def;
+	u32 value;
+} ecpri_hwio_def_ecpri_endp_lte_cfg_gsi_m_ch_n_u;
+
+/*===========================================================================*/
+/*!
+@brief Bit Field definition of register: ECPRI_SDH_PREFETCH_LSB_GSI_m_CH_n
+*/
+/*===========================================================================*/
+/* Structure definition of register */
+typedef struct {
+	u32 addr_31_0 : 32;
+} ecpri_hwio_def_ecpri_sdh_prefetch_lsb_gsi_m_ch_n_s;
+
+/* Union definition of register */
+typedef union {
+	ecpri_hwio_def_ecpri_sdh_prefetch_lsb_gsi_m_ch_n_s def;
+	u32 value;
+} ecpri_hwio_def_ecpri_sdh_prefetch_lsb_gsi_m_ch_n_u;
+
+/*===========================================================================*/
+/*!
+@brief Bit Field definition of register: ECPRI_SDH_PREFETCH_MSB_GSI_m_CH_n
+*/
+/*===========================================================================*/
+/* Structure definition of register */
+typedef struct {
+	u32 length : 21;
+	u32 redirect : 1;
+	u32 mirror : 1;
+	u32 chain : 1;
+	u32 addr_38_32 : 7;
+	u32 addr_40 : 1;
+} ecpri_hwio_def_ecpri_sdh_prefetch_msb_gsi_m_ch_n_s;
+
+/* Union definition of register */
+typedef union {
+	ecpri_hwio_def_ecpri_sdh_prefetch_msb_gsi_m_ch_n_s def;
+	u32 value;
+} ecpri_hwio_def_ecpri_sdh_prefetch_msb_gsi_m_ch_n_u;
+
+/*===========================================================================*/
+/*!
+@brief Bit Field definition of register: ECPRI_RATE_LIMITER
+*/
+/*===========================================================================*/
+/* Structure definition of register */
+typedef struct {
+	u32 fh : 8;
+	u32 l2 : 8;
+	u32 c2c : 8;
+	u32 reserved0 : 8;
+} ecpri_hwio_def_ecpri_rate_limiter_s;
+
+/* Union definition of register */
+typedef union {
+	ecpri_hwio_def_ecpri_rate_limiter_s def;
+	u32 value;
+} ecpri_hwio_def_ecpri_rate_limiter_u;
+
+/*===========================================================================*/
+/*!
+@brief Bit Field definition of register: ECPRI_STATUS_PKT_DROP_FULL
+*/
+/*===========================================================================*/
+/* Structure definition of register */
+typedef struct {
+	u32 cnt : 24;
+	u32 reserved0 : 8;
+} ecpri_hwio_def_ecpri_status_pkt_drop_full_s;
+
+/* Union definition of register */
+typedef union {
+	ecpri_hwio_def_ecpri_status_pkt_drop_full_s def;
+	u32 value;
+} ecpri_hwio_def_ecpri_status_pkt_drop_full_u;
+
+/*===========================================================================*/
+/*!
+@brief Bit Field definition of register: ECPRI_DPL_MONITOR_CFG
+*/
+/*===========================================================================*/
+/* Structure definition of register */
+typedef struct {
+	u32 enable : 1;
+	u32 reserved0 : 31;
+} ecpri_hwio_def_ecpri_dpl_monitor_cfg_s;
+
+/* Union definition of register */
+typedef union {
+	ecpri_hwio_def_ecpri_dpl_monitor_cfg_s def;
+	u32 value;
+} ecpri_hwio_def_ecpri_dpl_monitor_cfg_u;
+
+/*===========================================================================*/
+/*!
+@brief Bit Field definition of register: ECPRI_DPL_MONITOR_CNT_0
+*/
+/*===========================================================================*/
+/* Structure definition of register */
+typedef struct {
+	u32 cnt : 8;
+	u32 reserved0 : 24;
+} ecpri_hwio_def_ecpri_dpl_monitor_cnt_0_s;
+
+/* Union definition of register */
+typedef union {
+	ecpri_hwio_def_ecpri_dpl_monitor_cnt_0_s def;
+	u32 value;
+} ecpri_hwio_def_ecpri_dpl_monitor_cnt_0_u;
+
+/*===========================================================================*/
+/*!
+@brief Bit Field definition of register: ECPRI_DPL_MONITOR_CNT_1
+*/
+/*===========================================================================*/
+/* Structure definition of register */
+typedef struct {
+	u32 cnt : 8;
+	u32 reserved0 : 24;
+} ecpri_hwio_def_ecpri_dpl_monitor_cnt_1_s;
+
+/* Union definition of register */
+typedef union {
+	ecpri_hwio_def_ecpri_dpl_monitor_cnt_1_s def;
+	u32 value;
+} ecpri_hwio_def_ecpri_dpl_monitor_cnt_1_u;
+
+/*===========================================================================*/
+/*!
+@brief Bit Field definition of register: ECPRI_REDIRECT_CHANNEL
+*/
+/*===========================================================================*/
+/* Structure definition of register */
+typedef struct {
+	u32 channel : 8;
+	u32 gid : 2;
+	u32 xbar_rx_port : 2;
+	u32 reserved0 : 20;
+} ecpri_hwio_def_ecpri_redirect_channel_s;
+
+/* Union definition of register */
+typedef union {
+	ecpri_hwio_def_ecpri_redirect_channel_s def;
+	u32 value;
+} ecpri_hwio_def_ecpri_redirect_channel_u;
+
+/*===========================================================================*/
+/*!
+@brief Bit Field definition of register: ECPRI_STATUS_DST_DROP_PKT_GSI_m_REG_n
+*/
+/*===========================================================================*/
+/* Structure definition of register */
+typedef struct {
+	u32 drop : 32;
+} ecpri_hwio_def_ecpri_status_dst_drop_pkt_gsi_m_reg_n_s;
+
+/* Union definition of register */
+typedef union {
+	ecpri_hwio_def_ecpri_status_dst_drop_pkt_gsi_m_reg_n_s def;
+	u32 value;
+} ecpri_hwio_def_ecpri_status_dst_drop_pkt_gsi_m_reg_n_u;
+
+/*===========================================================================*/
+/*!
+@brief Bit Field definition of register: ECPRI_STATUS_DST_DROP_PKT_CLEAR
+*/
+/*===========================================================================*/
+/* Structure definition of register */
+typedef struct {
+	u32 clr_reg : 6;
+	u32 clr_all : 1;
+	u32 reserved0 : 25;
+} ecpri_hwio_def_ecpri_status_dst_drop_pkt_clear_s;
+
+/* Union definition of register */
+typedef union {
+	ecpri_hwio_def_ecpri_status_dst_drop_pkt_clear_s def;
+	u32 value;
+} ecpri_hwio_def_ecpri_status_dst_drop_pkt_clear_u;
+
+/*===========================================================================*/
+/*!
+@brief Bit Field definition of register: ECPRI_UNIT_CLK_ENABLE
+*/
+/*===========================================================================*/
+/* Structure definition of register */
+typedef struct {
+	u32 gsi_1_en : 1;
+	u32 gsi_2_en : 1;
+	u32 lte_en : 1;
+	u32 nfapi_en : 1;
+	u32 reserved0 : 28;
+} ecpri_hwio_def_ecpri_unit_clk_enable_s;
+
+/* Union definition of register */
+typedef union {
+	ecpri_hwio_def_ecpri_unit_clk_enable_s def;
+	u32 value;
+} ecpri_hwio_def_ecpri_unit_clk_enable_u;
+
+/*===========================================================================*/
+/*!
+@brief Bit Field definition of register: ECPRI_LTE_CFG
+*/
+/*===========================================================================*/
+/* Structure definition of register */
+typedef struct {
+	u32 lte_max_qmb_outstandings : 8;
+	u32 lte_ar_weigth : 4;
+	u32 lte_fifo_threshold : 13;
+	u32 reserved0 : 7;
+} ecpri_hwio_def_ecpri_lte_cfg_s;
+
+/* Union definition of register */
+typedef union {
+	ecpri_hwio_def_ecpri_lte_cfg_s def;
+	u32 value;
+} ecpri_hwio_def_ecpri_lte_cfg_u;
 
 
 #endif /* __ECPRI_HWIO_DEF_H__ */

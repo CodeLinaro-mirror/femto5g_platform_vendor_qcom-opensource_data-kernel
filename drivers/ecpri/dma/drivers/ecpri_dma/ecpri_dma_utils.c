@@ -8244,6 +8244,7 @@ int ecpri_dma_hw_init(void)
 
 	/* Read eCPRI HW Params 0 and make sure we have access to the registers */
 	ecpri_dma_hal_read_reg_fields(ECPRI_HW_PARAMS_0, &hw_params_0);
+
 	DMADBG("ECPRI_HW_PARAMS_0 DST=%u SRC=%u TOTAL=%u\n",
 	       hw_params_0.dst_channel_n, hw_params_0.src_channel_n,
 	       hw_params_0.total_channels_n);
@@ -8359,14 +8360,16 @@ int ecpri_dma_get_endp_mapping(enum ecpri_hw_ver ver, enum ecpri_hw_flavor flv,
 	return 0;
 }
 
-int ecpri_dma_setup_dma_endps(const struct dma_gsi_ep_config** endp_map)
+int ecpri_dma_setup_dma_endps(const struct dma_gsi_ep_config **endp_map)
 {
-	int endp_id = 0, gsi_id = 0;
-	ecpri_hwio_def_ecpri_endp_cfg_destn_u endp_cfg_dest = { 0 };
-	ecpri_hwio_def_ecpri_endp_cfg_xbarn_u endp_cfg_xbar = { 0 };
-	ecpri_hwio_def_ecpri_dma_exception_channel_u exception_ch = { 0 };
-	ecpri_hwio_def_ecpri_endp_cfg_aggr_n_u cfg_aggr = { 0 };
-	ecpri_hwio_def_ecpri_endp_nfapi_reassembly_cfg_n_u reassembly_cfg = { 0 };
+	int endp_id = 0;
+	int gsi_id = 0;
+	ecpri_hwio_def_ecpri_endp_cfg_dest_gsi_m_ch_n_u endp_cfg_dest = { 0 };
+	struct ecpri_dma_ecpri_endp_cfg_xbar_fields endp_cfg_xbar = { 0 };
+	struct ecpri_dma_ecpri_endp_exception_channel_fields exception_ch = { 0 };
+	ecpri_hwio_def_ecpri_endp_cfg_aggr_gsi_m_ch_n_u cfg_aggr = { 0 };
+	ecpri_hwio_def_ecpri_endp_nfapi_reassembly_cfg_gsi_m_ch_n_u
+		reassembly_cfg = { 0 };
 
 	if (!endp_map)
 		return -EINVAL;
@@ -8377,12 +8380,13 @@ int ecpri_dma_setup_dma_endps(const struct dma_gsi_ep_config** endp_map)
 
 				if (endp_map[gsi_id][endp_id].is_exception) {
 					memset(&exception_ch, 0, sizeof(exception_ch));
-					exception_ch.def.enable = 1;
-					exception_ch.def.channel = endp_id;
+					exception_ch.enable = 1;
+					exception_ch.gid = gsi_id;
+					exception_ch.channel = endp_id;
 
-					ecpri_dma_hal_write_reg(
+					ecpri_dma_hal_write_reg_fields(
 						ECPRI_DMA_EXCEPTION_CHANNEL,
-						exception_ch.value);
+						&exception_ch);
 				}
 
 				switch (endp_map[gsi_id][endp_id].dir) {
@@ -8396,26 +8400,26 @@ int ecpri_dma_setup_dma_endps(const struct dma_gsi_ep_config** endp_map)
 						endp_cfg_dest.def.use_dest_cfg = 1;
 						endp_cfg_dest.def.dest_mem_channel =
 							endp_map[gsi_id][endp_id].dest;
-						ecpri_dma_hal_write_reg_n(
-							ECPRI_ENDP_CFG_DEST_n, endp_id,
+						ecpri_dma_hal_write_reg_mn(
+							ECPRI_ENDP_CFG_DEST, gsi_id, endp_id,
 							endp_cfg_dest.value);
 						break;
 					case ECPRI_DMA_ENDP_STREAM_MODE_M2S:
 						endp_cfg_dest.def.use_dest_cfg = 0;
-						endp_cfg_xbar.def.dest_stream =
+						endp_cfg_xbar.dest_stream =
 							endp_map[gsi_id][endp_id].dest;
-						endp_cfg_xbar.def.xbar_tid =
+						endp_cfg_xbar.xbar_tid =
 							endp_map[gsi_id][endp_id].tid.value;
 						//TODO: Below are required for nFAPI
 						//endp_cfg_xbar.xbar_user = Get from Core driver, need API
-						endp_cfg_xbar.def.l2_segmentation_en =
+						endp_cfg_xbar.l2_segmentation_en =
 							endp_map[gsi_id][endp_id].is_nfapi ? 1 : 0;
-						ecpri_dma_hal_write_reg_n(
-							ECPRI_ENDP_CFG_DEST_n, endp_id,
+						ecpri_dma_hal_write_reg_mn(
+							ECPRI_ENDP_CFG_DEST, gsi_id, endp_id,
 							endp_cfg_dest.value);
-						ecpri_dma_hal_write_reg_n(
-							ECPRI_ENDP_CFG_XBAR_n, endp_id,
-							endp_cfg_xbar.value);
+						ecpri_dma_hal_write_reg_mn_fields(
+							ECPRI_ENDP_CFG_XBAR, gsi_id, endp_id,
+							&endp_cfg_xbar);
 						break;
 					default:
 						DMADBG("SRC ENDP %d isn't M2M or S2M, address = 0x%px\n",
@@ -8437,10 +8441,11 @@ int ecpri_dma_setup_dma_endps(const struct dma_gsi_ep_config** endp_map)
 							reassembly_cfg.def.vm_id =
 								endp_map[gsi_id][endp_id]
 								.nfapi_dest_vm_id;
-							ecpri_dma_hal_write_reg_n(
-								ECPRI_ENDP_CFG_AGGR_n, endp_id, cfg_aggr.value);
-							ecpri_dma_hal_write_reg_n(
-								ECPRI_ENDP_NFAPI_REASSEMBLY_CFG_n,
+							ecpri_dma_hal_write_reg_mn(
+								ECPRI_ENDP_CFG_AGGR, gsi_id,
+								endp_id, cfg_aggr.value);
+							ecpri_dma_hal_write_reg_mn(
+								ECPRI_ENDP_NFAPI_REASSEMBLY_CFG, gsi_id,
 								endp_id, reassembly_cfg.value);
 						}
 						break;
@@ -8463,30 +8468,30 @@ int ecpri_dma_setup_dma_endps(const struct dma_gsi_ep_config** endp_map)
 
 int ecpri_dma_enable_dma_endp(struct ecpri_dma_endp_context *ep)
 {
-	ecpri_hwio_def_ecpri_endp_gsi_cfg_n_u endp_gsi_cfg = { 0 };
+	ecpri_hwio_def_ecpri_endp_gsi_cfg_gsi_m_ch_n_u endp_gsi_cfg = { 0 };
 
 	if (!ep || !ep->valid)
 		return -EINVAL;
 
 	memset(&endp_gsi_cfg, 0, sizeof(endp_gsi_cfg));
 	endp_gsi_cfg.def.endp_en = 1;
-	ecpri_dma_hal_write_reg_n(
-		ECPRI_ENDP_GSI_CFG_n, ep->endp_id, endp_gsi_cfg.value);
+	ecpri_dma_hal_write_reg_mn(
+		ECPRI_ENDP_GSI_CFG, ep->gsi_id, ep->endp_id, endp_gsi_cfg.value);
 
 	return 0;
 }
 
 int ecpri_dma_disable_dma_endp(struct ecpri_dma_endp_context *ep)
 {
-	ecpri_hwio_def_ecpri_endp_gsi_cfg_n_u endp_gsi_cfg = { 0 };
+	ecpri_hwio_def_ecpri_endp_gsi_cfg_gsi_m_ch_n_u endp_gsi_cfg = { 0 };
 
 	if (!ep)
 		return -EINVAL;
 
 	memset(&endp_gsi_cfg, 0, sizeof(endp_gsi_cfg));
 	endp_gsi_cfg.def.endp_en = 0;
-	ecpri_dma_hal_write_reg_n(
-		ECPRI_ENDP_GSI_CFG_n, ep->endp_id, endp_gsi_cfg.value);
+	ecpri_dma_hal_write_reg_mn(
+		ECPRI_ENDP_GSI_CFG, ep->gsi_id, ep->endp_id, endp_gsi_cfg.value);
 
 	return 0;
 }
@@ -8494,7 +8499,7 @@ int ecpri_dma_disable_dma_endp(struct ecpri_dma_endp_context *ep)
 int ecpri_dma_enable_dma_endps(const struct dma_gsi_ep_config **endp_map)
 {
 	int endp_id = 0, gsi_id = 0;
-	ecpri_hwio_def_ecpri_endp_gsi_cfg_n_u endp_gsi_cfg = { 0 };
+	ecpri_hwio_def_ecpri_endp_gsi_cfg_gsi_m_ch_n_u endp_gsi_cfg = { 0 };
 
 	if (!endp_map)
 		return -EINVAL;
@@ -8505,8 +8510,8 @@ int ecpri_dma_enable_dma_endps(const struct dma_gsi_ep_config **endp_map)
 
 				memset(&endp_gsi_cfg, 0, sizeof(endp_gsi_cfg));
 				endp_gsi_cfg.def.endp_en = 1;
-				ecpri_dma_hal_write_reg_n(
-					ECPRI_ENDP_GSI_CFG_n, endp_id, endp_gsi_cfg.value);
+				ecpri_dma_hal_write_reg_mn(
+					ECPRI_ENDP_GSI_CFG, gsi_id, endp_id, endp_gsi_cfg.value);
 			}
 		}
 	}
@@ -8763,7 +8768,7 @@ int ecpri_dma_gsi_release_channel(struct ecpri_dma_endp_context *ep)
 	enum gsi_status gsi_res;
 	enum ecpri_dma_notify_mode mode;
 	int ret = 0;
-	ecpri_hwio_def_ecpri_endp_gsi_cfg_n_u endp_gsi_cfg = { 0 };
+	ecpri_hwio_def_ecpri_endp_gsi_cfg_gsi_m_ch_n_u endp_gsi_cfg = { 0 };
 	struct device* gsi_dev =
 		((struct gsi_ctx*)ecpri_dma_ctx->gsi_dev_hdl)->dev;
 
@@ -8792,8 +8797,8 @@ int ecpri_dma_gsi_release_channel(struct ecpri_dma_endp_context *ep)
 	if (ep->gsi_ep_cfg->dir == ECPRI_DMA_ENDP_DIR_DEST)
 	{
 		endp_gsi_cfg.def.endp_en = 1;
-		ecpri_dma_hal_write_reg_n(
-			ECPRI_ENDP_GSI_CFG_n, ep->endp_id, endp_gsi_cfg.value);
+		ecpri_dma_hal_write_reg_mn(
+			ECPRI_ENDP_GSI_CFG, ep->gsi_id, ep->endp_id, endp_gsi_cfg.value);
 	}
 
 	gsi_res = gsi_dealloc_channel(ep->gsi_chan_hdl);

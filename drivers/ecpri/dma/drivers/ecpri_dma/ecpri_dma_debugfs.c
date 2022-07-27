@@ -70,16 +70,16 @@ static ssize_t ecpri_dma_write_ep_reg(struct file *file, const char __user *buf,
  *
  * Returns the number of characters printed
  */
-int ecpri_dma_read_ep_reg_n(char *buf, int max_len, int endp)
+int ecpri_dma_read_ep_reg_n(char *buf, int max_len, int gsi_id, int endp)
 {
 	return scnprintf(
 		dbg_buff, DMA_MAX_MSG_LEN,
 		"ECPRI_DMA_ECPRI_ENDP_CFG_DEST_%u=0x%x\n"
 		"ECPRI_DMA_ECPRI_ENDP_CFG_XBAR_%u=0x%x\n"
 		"ECPRI_DMA_ECPRI_ENDP_GSI_CFG_%u=0x%x\n",
-		endp, ecpri_dma_hal_read_reg_n(ECPRI_ENDP_CFG_DEST_n, endp),
-		endp, ecpri_dma_hal_read_reg_n(ECPRI_ENDP_CFG_XBAR_n, endp),
-		endp, ecpri_dma_hal_read_reg_n(ECPRI_ENDP_GSI_CFG_n, endp));
+		endp, ecpri_dma_hal_read_reg_mn(ECPRI_ENDP_CFG_DEST, gsi_id, endp),
+		endp, ecpri_dma_hal_read_reg_mn(ECPRI_ENDP_CFG_XBAR, gsi_id, endp),
+		endp, ecpri_dma_hal_read_reg_mn(ECPRI_ENDP_GSI_CFG, gsi_id, endp));
 }
 
 static ssize_t ecpri_dma_read_ep_reg(struct file *file, char __user *ubuf,
@@ -103,8 +103,8 @@ static ssize_t ecpri_dma_read_ep_reg(struct file *file, char __user *ubuf,
 	}
 	pos = *ppos;
 	for (i = start_idx; i < end_idx; i++) {
-
-		nbytes = ecpri_dma_read_ep_reg_n(dbg_buff, DMA_MAX_MSG_LEN, i);
+		// TODO: Handle the gsi_id in this function
+		nbytes = ecpri_dma_read_ep_reg_n(dbg_buff, DMA_MAX_MSG_LEN, 0, i);
 
 		*ppos = pos;
 		ret = simple_read_from_buffer(ubuf, count, ppos, dbg_buff,

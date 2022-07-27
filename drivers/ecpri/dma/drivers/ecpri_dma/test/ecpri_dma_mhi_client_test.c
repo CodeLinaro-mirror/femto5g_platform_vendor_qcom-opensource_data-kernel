@@ -389,10 +389,11 @@ static int ecpri_dma_mhi_client_test_util_setup_dma_endps(
 	int src_endp_id, int dest_endp_id, u32 gsi_id,
 	bool enable_loopback)
 {
-	ecpri_hwio_def_ecpri_endp_cfg_destn_u endp_cfg_dest = { 0 };
-	ecpri_hwio_def_ecpri_endp_cfg_xbarn_u endp_cfg_xbar = { 0 };
-	ecpri_hwio_def_ecpri_endp_cfg_aggr_n_u cfg_aggr = { 0 };
-	ecpri_hwio_def_ecpri_endp_nfapi_reassembly_cfg_n_u reassembly_cfg = { 0 };
+	ecpri_hwio_def_ecpri_endp_cfg_dest_gsi_m_ch_n_u endp_cfg_dest = { 0 };
+	struct ecpri_dma_ecpri_endp_cfg_xbar_fields endp_cfg_xbar = { 0 };
+	ecpri_hwio_def_ecpri_endp_cfg_aggr_gsi_m_ch_n_u cfg_aggr = { 0 };
+	ecpri_hwio_def_ecpri_endp_nfapi_reassembly_cfg_gsi_m_ch_n_u
+		reassembly_cfg = { 0 };
 
 	if (!ecpri_dma_ctx->endp_map[gsi_id])
 		return -EINVAL;
@@ -410,11 +411,11 @@ static int ecpri_dma_mhi_client_test_util_setup_dma_endps(
 	memset(&reassembly_cfg, 0, sizeof(reassembly_cfg));
 
 	/* First disable ENDPs */
-	ecpri_dma_hal_write_reg_n(
-		ECPRI_ENDP_GSI_CFG_n, src_endp_id, 0);
+	ecpri_dma_hal_write_reg_mn(
+		ECPRI_ENDP_GSI_CFG, gsi_id, src_endp_id, 0);
 
-	ecpri_dma_hal_write_reg_n(
-		ECPRI_ENDP_GSI_CFG_n, dest_endp_id, 0);
+	ecpri_dma_hal_write_reg_mn(
+		ECPRI_ENDP_GSI_CFG, gsi_id, dest_endp_id, 0);
 
 	if (enable_loopback)
 	{
@@ -422,18 +423,18 @@ static int ecpri_dma_mhi_client_test_util_setup_dma_endps(
 		endp_cfg_dest.def.use_dest_cfg = 1;
 		endp_cfg_dest.def.dest_mem_channel =
 			dest_endp_id;
-		ecpri_dma_hal_write_reg_n(
-			ECPRI_ENDP_CFG_DEST_n, src_endp_id,
+		ecpri_dma_hal_write_reg_mn(
+			ECPRI_ENDP_CFG_DEST, gsi_id, src_endp_id,
 			endp_cfg_dest.value);
-		ecpri_dma_hal_write_reg_n(
-			ECPRI_ENDP_CFG_XBAR_n, src_endp_id,
-			endp_cfg_xbar.value);
+		ecpri_dma_hal_write_reg_mn_fields(
+			ECPRI_ENDP_CFG_XBAR, gsi_id, src_endp_id,
+			&endp_cfg_xbar);
 		/* DEST */
-		ecpri_dma_hal_write_reg_n(
-			ECPRI_ENDP_CFG_AGGR_n,
+		ecpri_dma_hal_write_reg_mn(
+			ECPRI_ENDP_CFG_AGGR, gsi_id,
 			dest_endp_id, cfg_aggr.value);
-		ecpri_dma_hal_write_reg_n(
-			ECPRI_ENDP_NFAPI_REASSEMBLY_CFG_n,
+		ecpri_dma_hal_write_reg_mn(
+			ECPRI_ENDP_NFAPI_REASSEMBLY_CFG, gsi_id,
 			dest_endp_id, reassembly_cfg.value);
 	}
 	else {
@@ -443,26 +444,26 @@ static int ecpri_dma_mhi_client_test_util_setup_dma_endps(
 			endp_cfg_dest.def.use_dest_cfg = 1;
 			endp_cfg_dest.def.dest_mem_channel =
 				ecpri_dma_ctx->endp_map[gsi_id][src_endp_id].dest;
-			ecpri_dma_hal_write_reg_n(
-				ECPRI_ENDP_CFG_DEST_n, src_endp_id,
+			ecpri_dma_hal_write_reg_mn(
+				ECPRI_ENDP_CFG_DEST, gsi_id, src_endp_id,
 				endp_cfg_dest.value);
 			break;
 		case ECPRI_DMA_ENDP_STREAM_MODE_M2S:
 			endp_cfg_dest.def.use_dest_cfg = 0;
-			endp_cfg_xbar.def.dest_stream =
-				ecpri_dma_ctx->endp_map[gsi_id][src_endp_id].dest;
-			endp_cfg_xbar.def.xbar_tid =
-				ecpri_dma_ctx->endp_map[gsi_id][src_endp_id].tid.value;
+			endp_cfg_xbar.dest_stream =
+				ecpri_dma_ctx->endp_map[gsi_id][endp_id].dest;
+			endp_cfg_xbar.xbar_tid =
+				ecpri_dma_ctx->endp_map[gsi_id][endp_id].tid.value;
 			//TODO: Below are required for nFAPI
 			//endp_cfg_xbar.xbar_user = Get from Core driver, need API
-			endp_cfg_xbar.def.l2_segmentation_en =
+			endp_cfg_xbar.def_v1.l2_segmentation_en =
 				ecpri_dma_ctx->endp_map[gsi_id][src_endp_id].is_nfapi ? 1 : 0;
-			ecpri_dma_hal_write_reg_n(
-				ECPRI_ENDP_CFG_DEST_n, src_endp_id,
+			ecpri_dma_hal_write_reg_mn(
+				ECPRI_ENDP_CFG_DEST, gsi_id, src_endp_id,
 				endp_cfg_dest.value);
-			ecpri_dma_hal_write_reg_n(
-				ECPRI_ENDP_CFG_XBAR_n, src_endp_id,
-				endp_cfg_xbar.value);
+			ecpri_dma_hal_write_reg_mn_fields(
+				ECPRI_ENDP_CFG_XBAR, gsi_id, src_endp_id,
+				&endp_cfg_xbar);
 			break;
 		default:
 			DMA_UT_ERR("SRC ENDP %d isn't M2M or S2M, address = 0x%px\n",
@@ -485,11 +486,11 @@ static int ecpri_dma_mhi_client_test_util_setup_dma_endps(
 				reassembly_cfg.def.vm_id =
 					ecpri_dma_ctx->endp_map[gsi_id][dest_endp_id]
 					.nfapi_dest_vm_id;
-				ecpri_dma_hal_write_reg_n(
-					ECPRI_ENDP_CFG_AGGR_n,
+				ecpri_dma_hal_write_reg_mn(
+					ECPRI_ENDP_CFG_AGGR, gsi_id,
 					dest_endp_id, cfg_aggr.value);
-				ecpri_dma_hal_write_reg_n(
-					ECPRI_ENDP_NFAPI_REASSEMBLY_CFG_n,
+				ecpri_dma_hal_write_reg_mn(
+					ECPRI_ENDP_NFAPI_REASSEMBLY_CFG, gsi_id,
 					dest_endp_id, reassembly_cfg.value);
 			}
 			break;
@@ -502,11 +503,11 @@ static int ecpri_dma_mhi_client_test_util_setup_dma_endps(
 	}
 
 	/* Re-enable ENDPs */
-	ecpri_dma_hal_write_reg_n(
-		ECPRI_ENDP_GSI_CFG_n, src_endp_id, 1);
+	ecpri_dma_hal_write_reg_mn(
+		ECPRI_ENDP_GSI_CFG, gsi_id, src_endp_id, 1);
 
-	ecpri_dma_hal_write_reg_n(
-		ECPRI_ENDP_GSI_CFG_n, dest_endp_id, 1);
+	ecpri_dma_hal_write_reg_mn(
+		ECPRI_ENDP_GSI_CFG, gsi_id, dest_endp_id, 1);
 
 	return 0;
 }

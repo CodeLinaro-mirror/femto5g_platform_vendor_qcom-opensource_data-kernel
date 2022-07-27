@@ -533,6 +533,67 @@ struct ecpri_dma_ready_cb_wrapper {
 	struct ecpri_dma_ready info;
 };
 
+struct ecpri_dma_ecpri_endp_cfg_xbar_fields {
+	u32 dest_stream;
+	u32 xbar_tid;
+	u32 xbar_tuser;
+	u32 l2_segmentation_en;
+	u32 loopback_en;
+	u32 pre_hdr_en;
+	u32 nfapi_without_offload;
+};
+
+struct ecpri_dma_ecpri_testbus_ctrl_fields {
+	u32 sel;
+	u32 sel_internal;
+};
+
+struct ecpri_dma_ecpri_endp_exception_channel_fields {
+	u32 channel;
+	u32 gid;
+	u32 enable;
+};
+
+struct ecpri_dma_ecpri_dpl_trig_ctrl_fields {
+	u32 b_enable;
+	u32 b_width;
+	u32 b_location;
+	u32 a_enable;
+	u32 a_width;
+	u32 a_location;
+	u32 dst_channel;
+	u32 dst_gid;
+};
+
+struct ecpri_dma_ecpri_dpl_cfg_fields {
+	u32 dpl_mtu;
+	u32 dpl_select;
+	u32 dpl_tre_mirror_en;
+	u32 dpl_flush_clr;
+	u32 dpl_flush_pkt;
+};
+
+struct ecpri_dma_ecpri_tpdm_cfg_fields {
+	u32 record_type;
+	u32 record_rate;
+	u32 record_channel;
+	u32 record_gid;
+	u32 record_en;
+	u32 unit_en;
+};
+
+struct ecpri_dma_ecpri_nso_dbg_cntxt_info_1_fields {
+	u32 eng_state;
+	u32 src_id;
+	u32 size;
+	u32 num_of_sectors;
+	u32 last;
+	u32 msg_too_long;
+	u32 gsi_id;
+	u32 jumbo_pkt_en;
+	u32 nfapi_hdr_valid;
+};
+
 /** Functions **/
 
 typedef void (*client_notify_comp)(
