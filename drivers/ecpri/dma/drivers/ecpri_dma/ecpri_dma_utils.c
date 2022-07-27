@@ -17,6 +17,20 @@
 #include "gsi.h"
 #include "ecpri_gsi_hwio.h"
 
+
+#define ECPRI_DMA_PREPARE_AND_ENABLE_CLK(clk) do { \
+ecpri_dma_ctx->clks.clk = devm_clk_get(ecpri_dma_ctx->pdev, #clk); \
+	if (!ecpri_dma_ctx->clks.clk) { \
+		DMAERR("Failed to get %s\n", #clk); \
+		return -EFAULT; \
+	} \
+	if (clk_prepare_enable(ecpri_dma_ctx->clks.clk)) \
+	{ \
+		DMAERR("Failed to vote %s\n", #clk); \
+		return -EFAULT; \
+	} \
+}while (0)
+
 /* NOTE: The following and MHI,ETH static const arrays should be updated
 *        per driver version
 */
@@ -3079,160 +3093,34 @@ static void qcom_aw_phy_setup_clocks(){
  */
 int ecpri_dma_hw_init(void)
 {
-	int ret = 0;
 	ecpri_hwio_def_ecpri_hw_params_0_s hw_params_0 = { 0 };
 
 	/* Get Clocks */
 	DMADBG("Started getting clocks\n");
-	ecpri_dma_ctx->clks.gcc_aggre_noc_ecpri_dma = devm_clk_get(ecpri_dma_ctx->pdev,
-		"gcc_aggre_noc_ecpri_dma");
-	if (!ecpri_dma_ctx->clks.gcc_aggre_noc_ecpri_dma) {
-		DMAERR("Failed to get gcc_aggre_noc_ecpri_dma\n");
-		return -ENOMEM;
-	}
-
-	ecpri_dma_ctx->clks.gcc_ecpri_noc_ahb = devm_clk_get(ecpri_dma_ctx->pdev,
-		"gcc_ecpri_noc_ahb");
-	if (!ecpri_dma_ctx->clks.gcc_ecpri_noc_ahb) {
-		DMAERR("Failed to get gcc_ecpri_noc_ahb\n");
-		return -ENOMEM;
-	}
-
-	ecpri_dma_ctx->clks.gcc_ecpri_ahb = devm_clk_get(ecpri_dma_ctx->pdev,
-		"gcc_ecpri_ahb");
-	if (!ecpri_dma_ctx->clks.gcc_ecpri_ahb) {
-		DMAERR("Failed to get gcc_ecpri_ahb\n");
-		return -ENOMEM;
-	}
-
-	ecpri_dma_ctx->clks.gcc_ecpri_xo = devm_clk_get(ecpri_dma_ctx->pdev,
-		"gcc_ecpri_xo");
-	if (!ecpri_dma_ctx->clks.gcc_ecpri_xo) {
-		DMAERR("Failed to get gcc_ecpri_xo\n");
-		return -ENOMEM;
-	}
-
-	ecpri_dma_ctx->clks.ecpri_cg_clk = devm_clk_get(ecpri_dma_ctx->pdev,
-		"ecpri_cg_clk");
-	if (!ecpri_dma_ctx->clks.ecpri_cg_clk) {
-		DMAERR("Failed to get ecpri_cg_clk\n");
-		return -ENOMEM;
-	}
-
-	ecpri_dma_ctx->clks.dma_clk = devm_clk_get(ecpri_dma_ctx->pdev, "dma_clk");
-	if (!ecpri_dma_ctx->clks.dma_clk) {
-		DMAERR("Failed to get dma_clk\n");
-		return -ENOMEM;
-	}
-
-	ecpri_dma_ctx->clks.dma_noc_clk = devm_clk_get(ecpri_dma_ctx->pdev,
-		"dma_noc_clk");
-	if (!ecpri_dma_ctx->clks.dma_noc_clk) {
-		DMAERR("Failed to get dma_noc_clk\n");
-		return -ENOMEM;
-	}
-
-	ecpri_dma_ctx->clks.dma_fast_clk = devm_clk_get(ecpri_dma_ctx->pdev,
-		"dma_fast_clk");
-	if (!ecpri_dma_ctx->clks.dma_fast_clk) {
-		DMAERR("Failed to get dma_fast_clk\n");
-		return -ENOMEM;
-	}
-
-	ecpri_dma_ctx->clks.dma_fast_div2_clk = devm_clk_get(ecpri_dma_ctx->pdev,
-		"dma_fast_div2_clk");
-	if (!ecpri_dma_ctx->clks.dma_fast_div2_clk) {
-		DMAERR("Failed to get dma_fast_div2_clk\n");
-		return -ENOMEM;
-	}
-
-	ecpri_dma_ctx->clks.dma_fast_div2_noc_clk = devm_clk_get(
-		ecpri_dma_ctx->pdev,
-		"dma_fast_div2_noc_clk");
-	if (!ecpri_dma_ctx->clks.dma_fast_div2_noc_clk) {
-		DMAERR("Failed to get dma_fast_div2_noc_clk\n");
-		return -ENOMEM;
-	}
-
-	ecpri_dma_ctx->clks.dma_nfapi_axi_clk = devm_clk_get(ecpri_dma_ctx->pdev,
-		"dma_nfapi_axi_clk");
-	if (!ecpri_dma_ctx->clks.dma_nfapi_axi_clk) {
-		DMAERR("Failed to get dma_nfapi_axi_clk\n");
-		return -ENOMEM;
-	}
-
-	/* Vote clocks */
-	DMADBG("Started clocks vote\n");
-
-	ret = clk_prepare_enable(ecpri_dma_ctx->clks.gcc_aggre_noc_ecpri_dma);
-	if (ret)
-	{
-		DMAERR("Failed to vote gcc_aggre_noc_ecpri_dma\n");
-	}
-
-	ret = clk_prepare_enable(ecpri_dma_ctx->clks.gcc_ecpri_noc_ahb);
-	if (ret)
-	{
-		DMAERR("Failed to vote gcc_ecpri_noc_ahb\n");
-	}
-
-	ret = clk_prepare_enable(ecpri_dma_ctx->clks.gcc_ecpri_ahb);
-	if (ret)
-	{
-		DMAERR("Failed to vote gcc_ecpri_ahb\n");
-	}
-
-	ret = clk_prepare_enable(ecpri_dma_ctx->clks.gcc_ecpri_xo);
-	if (ret)
-	{
-		DMAERR("Failed to vote gcc_ecpri_xo\n");
-	}
-
-	ret = clk_prepare_enable(ecpri_dma_ctx->clks.ecpri_cg_clk);
-	if (ret)
-	{
-		DMAERR("Failed to vote dma_clk\n");
-	}
+	ECPRI_DMA_PREPARE_AND_ENABLE_CLK(gcc_qmip_ecpri_dma0);
+	ECPRI_DMA_PREPARE_AND_ENABLE_CLK(gcc_qmip_ecpri_dma1);
+	ECPRI_DMA_PREPARE_AND_ENABLE_CLK(gcc_qmip_ecpri_gsi);
+	ECPRI_DMA_PREPARE_AND_ENABLE_CLK(gcc_ddrss_ecpri_dma);
+	ECPRI_DMA_PREPARE_AND_ENABLE_CLK(gcc_aggre_noc_ecpri_gsi);
+	ECPRI_DMA_PREPARE_AND_ENABLE_CLK(gcc_aggre_noc_ecpri_dma);
+	ECPRI_DMA_PREPARE_AND_ENABLE_CLK(gcc_ecpri_noc_ahb);
+	ECPRI_DMA_PREPARE_AND_ENABLE_CLK(gcc_ecpri_ahb);
+	ECPRI_DMA_PREPARE_AND_ENABLE_CLK(gcc_ecpri_xo);
+	ECPRI_DMA_PREPARE_AND_ENABLE_CLK(ecpri_cc_ecpri_fr);
+	ECPRI_DMA_PREPARE_AND_ENABLE_CLK(ecpri_cg_clk);
+	ECPRI_DMA_PREPARE_AND_ENABLE_CLK(dma_clk);
+	ECPRI_DMA_PREPARE_AND_ENABLE_CLK(dma_noc_clk);
+	ECPRI_DMA_PREPARE_AND_ENABLE_CLK(dma_fast_clk);
+	ECPRI_DMA_PREPARE_AND_ENABLE_CLK(dma_fast_div2_clk);
+	ECPRI_DMA_PREPARE_AND_ENABLE_CLK(dma_fast_div2_noc_clk);
+	ECPRI_DMA_PREPARE_AND_ENABLE_CLK(dma_nfapi_axi_clk);
+	clk_set_rate(ecpri_dma_ctx->clks.gcc_aggre_noc_ecpri_dma,
+		ECPRI_DMA_CLK_NOM_MAX);
+	clk_set_rate(ecpri_dma_ctx->clks.gcc_aggre_noc_ecpri_gsi,
+		ECPRI_GSI_FAST_DIV2_CLK_NOM_MAX);
 	clk_set_rate(ecpri_dma_ctx->clks.ecpri_cg_clk, ECPRI_DMA_CLK_NOM_MAX);
-
-	ret = clk_prepare_enable(ecpri_dma_ctx->clks.dma_clk);
-	if (ret)
-	{
-		DMAERR("Failed to vote dma_clk\n");
-	}
 	clk_set_rate(ecpri_dma_ctx->clks.dma_clk, ECPRI_DMA_CLK_NOM_MAX);
-
-	ret = clk_prepare_enable(ecpri_dma_ctx->clks.dma_noc_clk);
-	if (ret)
-	{
-		DMAERR("Failed to vote dma_noc_clk\n");
-	}
-
-	ret = clk_prepare_enable(ecpri_dma_ctx->clks.dma_fast_clk);
-	if (ret)
-	{
-		DMAERR("Failed to vote dma_fast_clk\n");
-	}
 	clk_set_rate(ecpri_dma_ctx->clks.dma_fast_clk, ECPRI_GSI_FAST_CLK_NOM_MAX);
-
-	ret = clk_prepare_enable(ecpri_dma_ctx->clks.dma_fast_div2_clk);
-	if (ret)
-	{
-		DMAERR("Failed to vote dma_fast_div2_clk\n");
-	}
-
-	ret = clk_prepare_enable(ecpri_dma_ctx->clks.dma_fast_div2_noc_clk);
-	if (ret)
-	{
-		DMAERR("Failed to vote dma_fast_div2_noc_clk\n");
-	}
-
-	ret = clk_prepare_enable(ecpri_dma_ctx->clks.dma_nfapi_axi_clk);
-	if (ret)
-	{
-		DMAERR("Failed to vote dma_nfapi_axi_clk\n");
-	}
-
 
 	/* get ICC */
 
