@@ -94,6 +94,30 @@ void mtip_dma_rx_comp_cb(void *user_data, ecpri_dma_eth_conn_hdl_t hdl)
        case 4:
           used_handle = 3;
           break;
+       case 5:
+          used_handle = 6;
+          break;
+       case 6:
+          used_handle = 5;
+          break;
+       case 7:
+          used_handle = 8;
+          break;
+       case 8:
+          used_handle = 7;
+          break;
+       case 9:
+          used_handle = 10;
+          break;
+       case 10:
+          used_handle = 9;
+          break;
+       case 11:
+          used_handle = 12;
+          break;
+       case 12:
+          used_handle = 11;
+          break;
        }
 #endif
    }
@@ -609,6 +633,30 @@ int mtip_dma_poll_rx_packets(struct net_device *netdev, struct napi_struct *napi
           break;
        case 4:
           actual_handle = 3;
+          break;
+       case 5:
+          actual_handle = 6;
+          break;
+       case 6:
+          actual_handle = 5;
+          break;
+       case 7:
+          actual_handle = 8;
+          break;
+       case 8:
+          actual_handle = 7;
+          break;
+       case 9:
+          actual_handle = 10;
+          break;
+       case 10:
+          actual_handle = 9;
+          break;
+       case 11:
+          actual_handle = 12;
+          break;
+       case 12:
+          actual_handle = 11;
           break;
        }
 #endif
