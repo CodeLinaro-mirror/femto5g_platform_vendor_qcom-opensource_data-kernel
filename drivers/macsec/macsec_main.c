@@ -140,87 +140,102 @@ static int macsec_clock_enablement(struct platform_device *pdev)
 	return ret;
 }
 
+int macsec_platform_set_bypass(unsigned int base_address)
+{
+    void __iomem *macsec_base;
+    uint32_t val;
+
+    printk("write bypass value to 164-I \n");
+
+    macsec_base = ioremap(base_address + 0x0FE00, 4);
+    printk("macsec base = %x\n", macsec_base);
+    iowrite32(0x1, macsec_base);
+
+    macsec_base = ioremap(base_address + 0x0FE04, 4);
+    printk("macsec base = %x\n", macsec_base);
+    iowrite32(0x1, macsec_base);
+
+    macsec_base = ioremap(base_address + 0x0FE08, 4);
+    printk("macsec base = %x\n", macsec_base);
+    iowrite32(0x1, macsec_base);
+
+    macsec_base = ioremap(base_address + 0x0FE0C, 4);
+    printk("macsec base = %x\n", macsec_base);
+    iowrite32(0x1, macsec_base);
+
+    printk("write bypass value to 164-E \n");
+
+    macsec_base = ioremap(base_address + 0x4FE00, 4);
+    printk("macsec base = %x\n", macsec_base);
+    iowrite32(0x1, macsec_base);
+
+    macsec_base = ioremap(base_address + 0x4FE04, 4);
+    printk("macsec base = %x\n", macsec_base);
+    iowrite32(0x1, macsec_base);
+
+    macsec_base = ioremap(base_address + 0x4FE08, 4);
+    printk("macsec base = %x\n", macsec_base);
+    iowrite32(0x1, macsec_base);
+
+    macsec_base = ioremap(base_address + 0x4FE0C, 4);
+    printk("macsec base = %x\n", macsec_base);
+    iowrite32(0x1, macsec_base);
+
+    printk("write bypass value to 163-I \n");
+
+    macsec_base = ioremap(base_address + 0x8FE00, 4);
+    printk("macsec base = %x\n", macsec_base);
+    iowrite32(0x1, macsec_base);
+
+    macsec_base = ioremap(base_address + 0x8FE04, 4);
+    printk("macsec base = %x\n", macsec_base);
+    iowrite32(0x1, macsec_base);
+
+    macsec_base = ioremap(base_address + 0x8FE08, 4);
+    printk("macsec base = %x\n", macsec_base);
+    iowrite32(0x1, macsec_base);
+
+    macsec_base = ioremap(base_address + 0x8FE0C, 4);
+    printk("macsec base = %x\n", macsec_base);
+    iowrite32(0x1, macsec_base);
+
+    printk("write bypass value to 163-E \n");
+
+    macsec_base = ioremap(base_address + 0x9FE00, 4);
+    printk("macsec base = %x\n", macsec_base);
+    iowrite32(0x1, macsec_base);
+
+    macsec_base = ioremap(base_address + 0x9FE04, 4);
+    printk("macsec base = %x\n", macsec_base);
+    iowrite32(0x1, macsec_base);
+
+    macsec_base = ioremap(base_address + 0x9FE08, 4);
+    printk("macsec base = %x\n", macsec_base);
+    iowrite32(0x1, macsec_base);
+
+    macsec_base = ioremap(base_address + 0x9FE0C, 4);
+    printk("macsec base = %x\n", macsec_base);
+    iowrite32(0x1, macsec_base);
+
+    val = ioread32(macsec_base);
+    printk("read val = %x\n", val);
+
+    return 0;
+}
+
 int macsec_platform_probe(struct platform_device *pdev) {
-	void __iomem *macsec_base;
-	uint32_t val;
 
 	printk("macsec_platform_probe called\n");
 
     macsec_clock_enablement(pdev);
 
-    printk("write bypass value to 164-I \n");
+    macsec_platform_set_bypass(0x22900000);
 
-	macsec_base = ioremap(0x2290FE00, 4);
-	printk("macsec base = %x\n", macsec_base);
-	iowrite32(0x1, macsec_base);
+    macsec_platform_set_bypass(0x23700000);
 
-	macsec_base = ioremap(0x2290FE04, 4);
-	printk("macsec base = %x\n", macsec_base);
-	iowrite32(0x1, macsec_base);
+    macsec_platform_set_bypass(0x24500000);
 
-	macsec_base = ioremap(0x2290FE08, 4);
-	printk("macsec base = %x\n", macsec_base);
-	iowrite32(0x1, macsec_base);
-
-	macsec_base = ioremap(0x2290FE0C, 4);
-	printk("macsec base = %x\n", macsec_base);
-	iowrite32(0x1, macsec_base);
-
-	printk("write bypass value to 164-E \n");
-
-	macsec_base = ioremap(0x2294FE00, 4);
-	printk("macsec base = %x\n", macsec_base);
-	iowrite32(0x1, macsec_base);
-
-	macsec_base = ioremap(0x2294FE04, 4);
-	printk("macsec base = %x\n", macsec_base);
-	iowrite32(0x1, macsec_base);
-
-	macsec_base = ioremap(0x2294FE08, 4);
-	printk("macsec base = %x\n", macsec_base);
-	iowrite32(0x1, macsec_base);
-
-	macsec_base = ioremap(0x2294FE0C, 4);
-	printk("macsec base = %x\n", macsec_base);
-	iowrite32(0x1, macsec_base);
-
-	printk("write bypass value to 163-I \n");
-
-	macsec_base = ioremap(0x2298FE00, 4);
-	printk("macsec base = %x\n", macsec_base);
-	iowrite32(0x1, macsec_base);
-
-	macsec_base = ioremap(0x2298FE04, 4);
-	printk("macsec base = %x\n", macsec_base);
-	iowrite32(0x1, macsec_base);
-
-	macsec_base = ioremap(0x2298FE08, 4);
-	printk("macsec base = %x\n", macsec_base);
-	iowrite32(0x1, macsec_base);
-
-	macsec_base = ioremap(0x2298FE0C, 4);
-	printk("macsec base = %x\n", macsec_base);
-	iowrite32(0x1, macsec_base);
-
-	printk("write bypass value to 163-E \n");
-	macsec_base = ioremap(0x2299FE00, 4);
-	printk("macsec base = %x\n", macsec_base);
-	iowrite32(0x1, macsec_base);
-
-	macsec_base = ioremap(0x2299FE04, 4);
-	printk("macsec base = %x\n", macsec_base);
-	iowrite32(0x1, macsec_base);
-
-	macsec_base = ioremap(0x2299FE08, 4);
-	printk("macsec base = %x\n", macsec_base);
-	iowrite32(0x1, macsec_base);
-
-	macsec_base = ioremap(0x2299FE0C, 4);
-	printk("macsec base = %x\n", macsec_base);
-	iowrite32(0x1, macsec_base);
-
-	val = ioread32(macsec_base);
-	printk("read val = %x\n", val);
+    macsec_platform_set_bypass(0x25300000);
 
 	return 0;
 }
