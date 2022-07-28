@@ -360,10 +360,16 @@ struct ecpri_dma_exception_replenish_work_wrap {
 };
 
 struct ecpri_dma_clks {
+	struct clk* gcc_qmip_ecpri_dma0;
+	struct clk* gcc_qmip_ecpri_dma1;
+	struct clk* gcc_qmip_ecpri_gsi;
+	struct clk* gcc_ddrss_ecpri_dma;
+	struct clk* gcc_aggre_noc_ecpri_gsi;
 	struct clk* gcc_aggre_noc_ecpri_dma;
 	struct clk* gcc_ecpri_noc_ahb;
 	struct clk* gcc_ecpri_ahb;
 	struct clk* gcc_ecpri_xo;
+	struct clk* ecpri_cc_ecpri_fr;
 	struct clk* ecpri_cg_clk;
 	struct clk* dma_clk;
 	struct clk* dma_noc_clk;
