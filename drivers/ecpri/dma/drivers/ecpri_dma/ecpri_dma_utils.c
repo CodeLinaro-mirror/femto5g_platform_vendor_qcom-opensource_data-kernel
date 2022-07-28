@@ -1722,14 +1722,70 @@ static const struct ecpri_dma_endp_mapping ecpri_dma_port_mapping
 
 #ifdef ECPRI_DMA_RESET_WA_ENABLE
 
-// FW interrupt entry points (IEP) initialization
-#define GSI_UC_IEP_DEF(iep_name, iep_offset)    {#iep_name, iep_offset}
+#define MTIP_CLK_FREQ(x) (x * 1000 * 1000UL)
+#define MTIP_GCC_APB_CLK_MAX_NOM (MTIP_CLK_FREQ(100))
+#define MTIP_GCC_SNOC_AXI_CLK_MAX_NOM (MTIP_CLK_FREQ(200))
+#define MTIP_ECPRI_FF_CLK_MAX_NOM (MTIP_CLK_FREQ(402))
+#define MTIP_ECPRI_MAC_HM_REF_CLK_MAX_NOM (MTIP_CLK_FREQ(699))
 
-#define GSI_MAX_IEP_NAME_LEN        50
-#define GSI_MAX_NUMBER_OF_IEPS      19
+#define MACSEC_CLK_FREQ(x) (x * 1000 * 1000UL)
+
+#define MACSEC_CLK_NOM_MAX (MACSEC_CLK_FREQ(200.0))
+
+
+#define ECPRI_CLK_FREQ(x) (x * 1000 * 1000UL)
+
+/* ECPRI clock */
+#define ECPRI_CG_CLK_NOM_MAX (ECPRI_CLK_FREQ(466.50))
+#define ECPRI_MSS_ORAN_NOM_MAX (ECPRI_CLK_FREQ(500))
+
+
+struct clk* macsec_c2c_clk = NULL;
+struct clk* macsec_fh0_clk = NULL;
+struct clk* macsec_fh1_clk = NULL;
+struct clk* macsec_fh2_clk = NULL;
+
+typedef struct ecpriss_core_clock {
+	struct clk* ecpri_cg;
+	struct clk* ecpri_fr;
+	struct clk* ecpri_eth_100G_fh0;
+	struct clk* ecpri_eth_100G_fh1;
+	struct clk* ecpri_eth_100G_fh2;
+	struct clk* ecpri_eth_100G_c2c0;
+	struct clk* ecpri_eth_100G_c2c1;
+	struct clk* ecpri_eth_100G_dbg_c2c;
+	struct clk* ecpri_oran_div2;
+	struct clk* ecpri_mss_oran;
+}ecpri_clock;
+
+ecpri_clock sys_clock;
+
+struct clk* cxo_clk = NULL;
+
+// FW interrupt entry points (IEP) initialization
+#define GSI_UC_IEP_DEF(iep_name, iep_offset) {#iep_name, iep_offset}
+
+#define GSI_MAX_IEP_NAME_LEN 50
+#define GSI_MAX_NUMBER_OF_IEPS 19
 
 #define GCC_ECPRI_AHB_CHCR_OFFSET (0x2a008)
 #define ECPRI_CC_CLK_CTL_TOP_ECPRI_CC_ECPRI_SS_BCR_OFFSET (0x1000)
+
+#define GCC_ECPRI_AHB_CBCR_OFFSET (0x2a008)
+#define ECPRI_CC_CLK_CTL_TOP_ECPRI_CC_ECPRI_SS_BCR_OFFSET (0x1000)
+#define GCC_ETH_WRAPPER_BCR_OFFSET (0x29000)
+#define GCC_ETH_100G_FH_HM_APB_0_CBCR_OFFSET (0x29004)
+#define GCC_ETH_100G_FH_HM_APB_1_CBCR_OFFSET (0x29008)
+#define GCC_ETH_100G_FH_HM_APB_2_CBCR_OFFSET (0x2900C)
+#define GCC_ETH_100G_C2C_HM_APB_CBCR_OFFSET (0x29010)
+#define GCC_ETH_DBG_C2C_HM_APB_CBCR_OFFSET (0x29014)
+
+
+#define ECPRI_CC_CLK_CTL_TOP_ECPRI_CC_ETH_FH0_BCR_OFFSET  0x00
+#define ECPRI_CC_CLK_CTL_TOP_ECPRI_CC_ETH_FH1_BCR_OFFSET  0x38
+#define ECPRI_CC_CLK_CTL_TOP_ECPRI_CC_ETH_FH2_BCR_OFFSET  0x70
+#define ECPRI_CC_CLK_CTL_TOP_ECPRI_CC_ETH_DEBUG_BCR_OFFSET 0xD4
+#define ECPRI_CC_CLK_CTL_TOP_ECPRI_CC_ETH_C2C_BCR_OFFSET   0xA8
 
 typedef struct GSI_MCS_IEP
 {
@@ -1740,48 +1796,48 @@ typedef struct GSI_MCS_IEP
 #define GSI_IEP_MAP(iepName) { "GSI_IRAM_PTR_" #iepName , HWIO_GSI_GSI_IRAM_PTR_##iepName##_OFFS }
 
 static GSI_MCS_IEP iep[GSI_MAX_NUMBER_OF_IEPS] = {
-	GSI_UC_IEP_DEF(GSI_IRAM_PTR_CH_CMD, 1),
-	GSI_UC_IEP_DEF(GSI_IRAM_PTR_CH_DB, 2),
-	GSI_UC_IEP_DEF(GSI_IRAM_PTR_CH_DIS_COMP, 3),
-	GSI_UC_IEP_DEF(GSI_IRAM_PTR_CH_EMPTY, 4),
-	GSI_UC_IEP_DEF(GSI_IRAM_PTR_EE_GENERIC_CMD, 5),
-	GSI_UC_IEP_DEF(GSI_IRAM_PTR_EV_DB, 14),
-	GSI_UC_IEP_DEF(GSI_IRAM_PTR_EVENT_GEN_COMP, 6),
-	GSI_UC_IEP_DEF(GSI_IRAM_PTR_INT_MOD_STOPED, 7),
-	GSI_UC_IEP_DEF(GSI_IRAM_PTR_INT_NOTIFY_MCS, 19),
-	GSI_UC_IEP_DEF(GSI_IRAM_PTR_MSI_DB, 18),
-	GSI_UC_IEP_DEF(GSI_IRAM_PTR_NEW_RE, 11),
-	GSI_UC_IEP_DEF(GSI_IRAM_PTR_PERIPH_IF_TLV_IN_0, 8),
-	GSI_UC_IEP_DEF(GSI_IRAM_PTR_PERIPH_IF_TLV_IN_1, 10),
-	GSI_UC_IEP_DEF(GSI_IRAM_PTR_PERIPH_IF_TLV_IN_2, 9),
-	GSI_UC_IEP_DEF(GSI_IRAM_PTR_READ_ENG_COMP, 12),
-	GSI_UC_IEP_DEF(GSI_IRAM_PTR_TIMER_EXPIRED, 13),
-	GSI_UC_IEP_DEF(GSI_IRAM_PTR_TLV_CH_NOT_FULL, 17),
-	GSI_UC_IEP_DEF(GSI_IRAM_PTR_UC_GP_INT, 15),
-	GSI_UC_IEP_DEF(GSI_IRAM_PTR_WRITE_ENG_COMP, 16)
+GSI_UC_IEP_DEF(GSI_IRAM_PTR_CH_CMD, 1),
+GSI_UC_IEP_DEF(GSI_IRAM_PTR_CH_DB, 2),
+GSI_UC_IEP_DEF(GSI_IRAM_PTR_CH_DIS_COMP, 3),
+GSI_UC_IEP_DEF(GSI_IRAM_PTR_CH_EMPTY, 4),
+GSI_UC_IEP_DEF(GSI_IRAM_PTR_EE_GENERIC_CMD, 5),
+GSI_UC_IEP_DEF(GSI_IRAM_PTR_EV_DB, 14),
+GSI_UC_IEP_DEF(GSI_IRAM_PTR_EVENT_GEN_COMP, 6),
+GSI_UC_IEP_DEF(GSI_IRAM_PTR_INT_MOD_STOPED, 7),
+GSI_UC_IEP_DEF(GSI_IRAM_PTR_INT_NOTIFY_MCS, 19),
+GSI_UC_IEP_DEF(GSI_IRAM_PTR_MSI_DB, 18),
+GSI_UC_IEP_DEF(GSI_IRAM_PTR_NEW_RE, 11),
+GSI_UC_IEP_DEF(GSI_IRAM_PTR_PERIPH_IF_TLV_IN_0, 8),
+GSI_UC_IEP_DEF(GSI_IRAM_PTR_PERIPH_IF_TLV_IN_1, 10),
+GSI_UC_IEP_DEF(GSI_IRAM_PTR_PERIPH_IF_TLV_IN_2, 9),
+GSI_UC_IEP_DEF(GSI_IRAM_PTR_READ_ENG_COMP, 12),
+GSI_UC_IEP_DEF(GSI_IRAM_PTR_TIMER_EXPIRED, 13),
+GSI_UC_IEP_DEF(GSI_IRAM_PTR_TLV_CH_NOT_FULL, 17),
+GSI_UC_IEP_DEF(GSI_IRAM_PTR_UC_GP_INT, 15),
+GSI_UC_IEP_DEF(GSI_IRAM_PTR_WRITE_ENG_COMP, 16)
 };
 
 // here we store register offset in place of IEP offset.
 static GSI_MCS_IEP iepRegMap[] = {
-	GSI_IEP_MAP(CH_CMD),
-	GSI_IEP_MAP(CH_DB),
-	GSI_IEP_MAP(CH_DIS_COMP),
-	GSI_IEP_MAP(CH_EMPTY),
-	GSI_IEP_MAP(EE_GENERIC_CMD),
-	GSI_IEP_MAP(EVENT_GEN_COMP),
-	GSI_IEP_MAP(INT_MOD_STOPED),
-	GSI_IEP_MAP(PERIPH_IF_TLV_IN_0),
-	GSI_IEP_MAP(PERIPH_IF_TLV_IN_2),
-	GSI_IEP_MAP(PERIPH_IF_TLV_IN_1),
-	GSI_IEP_MAP(NEW_RE),
-	GSI_IEP_MAP(READ_ENG_COMP),
-	GSI_IEP_MAP(TIMER_EXPIRED),
-	GSI_IEP_MAP(EV_DB),
-	GSI_IEP_MAP(UC_GP_INT),
-	GSI_IEP_MAP(WRITE_ENG_COMP),
-	GSI_IEP_MAP(TLV_CH_NOT_FULL),
-	GSI_IEP_MAP(INT_NOTIFY_MCS),
-	GSI_IEP_MAP(MSI_DB),
+GSI_IEP_MAP(CH_CMD),
+GSI_IEP_MAP(CH_DB),
+GSI_IEP_MAP(CH_DIS_COMP),
+GSI_IEP_MAP(CH_EMPTY),
+GSI_IEP_MAP(EE_GENERIC_CMD),
+GSI_IEP_MAP(EVENT_GEN_COMP),
+GSI_IEP_MAP(INT_MOD_STOPED),
+GSI_IEP_MAP(PERIPH_IF_TLV_IN_0),
+GSI_IEP_MAP(PERIPH_IF_TLV_IN_2),
+GSI_IEP_MAP(PERIPH_IF_TLV_IN_1),
+GSI_IEP_MAP(NEW_RE),
+GSI_IEP_MAP(READ_ENG_COMP),
+GSI_IEP_MAP(TIMER_EXPIRED),
+GSI_IEP_MAP(EV_DB),
+GSI_IEP_MAP(UC_GP_INT),
+GSI_IEP_MAP(WRITE_ENG_COMP),
+GSI_IEP_MAP(TLV_CH_NOT_FULL),
+GSI_IEP_MAP(INT_NOTIFY_MCS),
+GSI_IEP_MAP(MSI_DB),
 };
 
 static void __iomem* gsi_base;
@@ -1862,7 +1918,7 @@ static void ecpri_dma_gsi_setup_ch_and_pipes(void)
 	for (i = 0; i < ecpri_dma_ctx->ecpri_dma_num_endps; i++) {
 		gsi_ep_info_cfg = &endp_map[i];
 		/*DMAERR("for ep %d gsi_ep_info_cfg=%px\n",
-			i, gsi_ep_info_cfg);*/
+		i, gsi_ep_info_cfg);*/
 		if (!gsi_ep_info_cfg || !gsi_ep_info_cfg->valid)
 			continue;
 		reg_val = ((gsi_ep_info_cfg->dma_if_tlv << 16) & 0x00FF0000);
@@ -1879,7 +1935,7 @@ static void ecpri_dma_gsi_setup_ch_and_pipes(void)
 	for (i = 0; i < ecpri_dma_ctx->ecpri_dma_num_endps; i++) {
 		gsi_ep_info_cfg = &endp_map[i];
 		/*DMAERR("for ep %d gsi_ep_info_cfg=%px\n",
-			i, gsi_ep_info_cfg);*/
+		i, gsi_ep_info_cfg);*/
 		if (!gsi_ep_info_cfg || !gsi_ep_info_cfg->valid)
 			continue;
 
@@ -1895,7 +1951,7 @@ static void ecpri_dma_gsi_setup_ch_and_pipes(void)
 	for (i = 0; i < ecpri_dma_ctx->ecpri_dma_num_endps; i++) {
 		gsi_ep_info_cfg = &endp_map[i];
 		/*DMAERR("for ep %d gsi_ep_info_cfg=%px\n",
-			i, gsi_ep_info_cfg);*/
+		i, gsi_ep_info_cfg);*/
 		if (!gsi_ep_info_cfg || !gsi_ep_info_cfg->valid)
 			continue;
 
@@ -1928,10 +1984,84 @@ static void ecpri_dma_gsi_setup_ch_and_pipes(void)
 
 	DMAERR("registers setup Done\n");
 }
+#define ECPRI_CC_CLK_CTL_TOP_ECPRI_CC_ETH_FH0_BCR (0x288000)
+#define ECPRI_CC_CLK_CTL_TOP_ECPRI_CC_ETH_FH1_BCR (0x288038)
+#define ECPRI_CC_CLK_CTL_TOP_ECPRI_CC_ETH_FH2_BCR (0x288070)
+#define ECPRI_CC_CLK_CTL_TOP_ECPRI_CC_ETH_DEBUG_BCR (0x2880D4)
+
+void ecpri_dma_reset_ecpri_eth(void)
+{
+	DMAERR("Eth and ECPRI Reset WA\n");
+
+	// Hold ethSS Block on Reset  
+	writel_relaxed(0x1, gcc_base +
+		GCC_ETH_WRAPPER_BCR_OFFSET);
+	//GCC_ETH_WRAPPER_BCR: set to 0x1 (BLK_ARES ENABLE)
+	usleep_range(5000, 10000);
+
+	writel_relaxed(0x1, ecpri_cc_base +
+		ECPRI_CC_CLK_CTL_TOP_ECPRI_CC_ETH_FH0_BCR_OFFSET); //FH0
+	usleep_range(5000, 10000);
+
+	writel_relaxed(0x1, ecpri_cc_base +
+		ECPRI_CC_CLK_CTL_TOP_ECPRI_CC_ETH_FH1_BCR_OFFSET); //FH1
+	usleep_range(5000, 10000);
+
+	writel_relaxed(0x1, ecpri_cc_base +
+		ECPRI_CC_CLK_CTL_TOP_ECPRI_CC_ETH_FH2_BCR_OFFSET); //FH2
+	usleep_range(5000, 10000);
+
+	writel_relaxed(0x1,ecpri_cc_base +
+		ECPRI_CC_CLK_CTL_TOP_ECPRI_CC_ETH_DEBUG_BCR_OFFSET); //DBG
+	usleep_range(5000, 10000);
+
+	writel_relaxed(0x1,ecpri_cc_base +
+		ECPRI_CC_CLK_CTL_TOP_ECPRI_CC_ETH_C2C_BCR_OFFSET); //C2C
+	usleep_range(5000, 10000);
+
+	//reset the ecpri block
+	writel_relaxed(0x1, ecpri_cc_base +
+		ECPRI_CC_CLK_CTL_TOP_ECPRI_CC_ECPRI_SS_BCR_OFFSET);
+	writel_relaxed(0x5, gcc_base +
+		GCC_ECPRI_AHB_CBCR_OFFSET);
+	usleep_range(100000, 400000);
+	writel_relaxed(0x1, gcc_base +
+		GCC_ECPRI_AHB_CBCR_OFFSET);
+	writel_relaxed(0x0, ecpri_cc_base +
+		ECPRI_CC_CLK_CTL_TOP_ECPRI_CC_ECPRI_SS_BCR_OFFSET);
+
+
+	// Release EthSS block
+	writel_relaxed(0x0, ecpri_cc_base +
+		ECPRI_CC_CLK_CTL_TOP_ECPRI_CC_ETH_FH0_BCR_OFFSET);
+	//ECPRI_CC_CLK_CTL_TOP_ECPRI_CC_ETH_FH0_BCR[BLK_ARES, NO RESET]
+	usleep_range(5000, 10000);
+
+	writel_relaxed(0x0,ecpri_cc_base +
+		ECPRI_CC_CLK_CTL_TOP_ECPRI_CC_ETH_FH1_BCR_OFFSET); //FH1
+	usleep_range(5000, 10000);
+
+	writel_relaxed(0x0, ecpri_cc_base +
+		ECPRI_CC_CLK_CTL_TOP_ECPRI_CC_ETH_FH2_BCR_OFFSET); //FH2
+	usleep_range(5000, 10000);
+
+	writel_relaxed(0x0, ecpri_cc_base +
+		ECPRI_CC_CLK_CTL_TOP_ECPRI_CC_ETH_DEBUG_BCR_OFFSET); //DBG
+	usleep_range(5000, 10000);
+
+	writel_relaxed(0x0, ecpri_cc_base +
+		ECPRI_CC_CLK_CTL_TOP_ECPRI_CC_ETH_C2C_BCR_OFFSET); //C2C
+	usleep_range(5000, 10000);
+
+
+	writel_relaxed(0x0, gcc_base + GCC_ETH_WRAPPER_BCR_OFFSET);
+	//GCC_ETH_WRAPPER_BCR: set to 0x0 (BLK_ARES DISABLE)
+	usleep_range(5000, 10000);
+}
 
 static void ecpri_dma_reset_ecpri_block(void)
 {
-	u32 reg_val, reset_reg_val, value, i;
+	u32 value, i;
 	//Available in DTSi, for WA hard code this, ECPRI_GSI address and size
 	gsi_base = ioremap(0x9004000, 0xFC000);
 	BUG_ON(!gsi_base);
@@ -1945,19 +2075,7 @@ static void ecpri_dma_reset_ecpri_block(void)
 	DMADBG("gcc_base: %px\n", gcc_base);
 	DMADBG("ecpri_cc_base: %px\n", ecpri_cc_base);
 
-	//Reset DMA and GSI
-	writel_relaxed(1,
-		ecpri_cc_base + ECPRI_CC_CLK_CTL_TOP_ECPRI_CC_ECPRI_SS_BCR_OFFSET);
-	reg_val = readl_relaxed(gcc_base + GCC_ECPRI_AHB_CHCR_OFFSET);
-	usleep_range(100000, 400000);
-	reset_reg_val = reg_val | 0x4;
-	writel_relaxed(reset_reg_val, gcc_base + GCC_ECPRI_AHB_CHCR_OFFSET);
-	usleep_range(100000, 400000);
-	writel_relaxed(reg_val, gcc_base + GCC_ECPRI_AHB_CHCR_OFFSET);
-	usleep_range(100000, 400000);
-	writel_relaxed(0,
-		ecpri_cc_base + ECPRI_CC_CLK_CTL_TOP_ECPRI_CC_ECPRI_SS_BCR_OFFSET);
-
+	ecpri_dma_reset_ecpri_eth();
 	ecpri_dma_gsi_setup_ch_and_pipes();
 
 	for (i = 0; i < GSI_MAX_NUMBER_OF_IEPS; i++) {
@@ -2002,8 +2120,6 @@ static void ecpri_dma_reset_ecpri_block(void)
 
 	DMAERR("eCPRI Block reset Done\n");
 }
-
-
 
 #endif
 
@@ -2069,6 +2185,893 @@ static void  ecpri_dma_gsi_ev_err_cb(struct gsi_evt_err_notify* notify)
 	default:
 		DMAERR("Unexpected err evt: %d\n", notify->evt_id);
 	}
+}
+
+  static int mtip_clocks_enable_clock(struct device* dev, const char* id, struct clk** clk)
+{
+	int ret;
+	struct clk* pclk = NULL;
+	*clk = NULL;
+
+	pclk = devm_clk_get(dev, id);
+
+	if (!pclk) {
+		DMAERR("Failed to get %s\n", id);
+		return -ENOMEM;
+	}
+	ret = clk_prepare_enable(pclk);
+	if (ret)
+	{
+		DMAERR("Failed to vote %s\n", id);
+		*clk = NULL;
+		return ret;
+	}
+	*clk = pclk;
+	return 0;
+}
+
+static int mtip_clocks_setup_gcc_clocks(void)
+{
+	int ret;
+
+	struct clk* pclk;
+	struct device *dev = ecpri_dma_ctx->pdev;
+
+	DMADBG("setting up GCC clocks\n");
+
+	// enable GCC clocks
+	ret = mtip_clocks_enable_clock(dev, "GCC_C2C_HM_APB_CLK", &pclk);
+	if (ret)
+	{
+		DMAERR("Failed to vote GCC_C2C_HM_APB_CLK\n");
+	}
+	else
+	{
+		clk_set_rate(pclk, MTIP_GCC_APB_CLK_MAX_NOM);
+	}
+
+
+	ret = mtip_clocks_enable_clock(dev, "GCC_FH_HM_APB_0_CLK", &pclk);
+	if (ret)
+	{
+		DMAERR("Failed to vote GCC_FH_HM_APB_0_CLK\n");
+	}
+	else
+	{
+		clk_set_rate(pclk, MTIP_GCC_APB_CLK_MAX_NOM);
+	}
+
+
+	ret = mtip_clocks_enable_clock(dev, "GCC_FH_HM_APB_1_CLK", &pclk);
+	if (ret)
+	{
+		DMAERR("Failed to vote GCC_FH_HM_APB_1_CLK\n");
+	}
+	else
+	{
+		clk_set_rate(pclk, MTIP_GCC_APB_CLK_MAX_NOM);
+	}
+
+
+	ret = mtip_clocks_enable_clock(dev, "GCC_FH_HM_APB_2_CLK", &pclk);
+	if (ret)
+	{
+		DMAERR("Failed to vote GCC_FH_HM_APB_2_CLK\n");
+	}
+	else
+	{
+		clk_set_rate(pclk, MTIP_GCC_APB_CLK_MAX_NOM);
+	}
+
+
+	ret = mtip_clocks_enable_clock(dev, "GCC_ETH_DBG_C2C_HM_APB_CLK", &pclk);
+	if (ret)
+	{
+		DMAERR("Failed to vote GCC_ETH_DBG_C2C_HM_APB_CLK\n");
+	}
+	else
+	{
+		clk_set_rate(pclk, MTIP_GCC_APB_CLK_MAX_NOM);
+	}
+
+
+	ret = mtip_clocks_enable_clock(dev, "GCC_ETH_DBG_SNOC_AXI_CLK", &pclk);
+	if (ret)
+	{
+		DMAERR("Failed to vote GCC_ETH_DBG_SNOC_AXI_CLK\n");
+	}
+	else
+	{
+		clk_set_rate(pclk, MTIP_GCC_SNOC_AXI_CLK_MAX_NOM);
+	}
+
+
+	return ret;
+}
+
+static int mtip_clocks_setup_c2c_clocks(void)
+{
+	int ret;
+
+	struct clk* pclk;
+	struct device *dev = ecpri_dma_ctx->pdev;
+
+	DMADBG("setting up C2C clocks\n");
+
+	// enable C2C clocks
+	ret = mtip_clocks_enable_clock(dev, "ECPRI_CC_C2C_0_HM_FF_0_CLK", &pclk);
+	if (ret)
+	{
+		DMAERR("Failed to vote ECPRI_CC_C2C_0_HM_FF_0_CLK\n");
+	}
+	else
+	{
+		clk_set_rate(pclk, MTIP_ECPRI_FF_CLK_MAX_NOM);
+	}
+
+
+	ret = mtip_clocks_enable_clock(dev, "ECPRI_CC_C2C_0_HM_FF_1_CLK", &pclk);
+	if (ret)
+	{
+		DMAERR("Failed to vote ECPRI_CC_C2C_0_HM_FF_1_CLK\n");
+	}
+	else
+	{
+		clk_set_rate(pclk, MTIP_ECPRI_FF_CLK_MAX_NOM);
+	}
+
+
+	ret = mtip_clocks_enable_clock(dev, "ECPRI_CC_MAC_C2C_HM_REF_CLK", &pclk);
+	if (ret)
+	{
+		DMAERR("Failed to vote ECPRI_CC_MAC_C2C_HM_REF_CLK\n");
+	}
+	else
+	{
+		clk_set_rate(pclk, MTIP_ECPRI_MAC_HM_REF_CLK_MAX_NOM);
+	}
+
+
+	ret = mtip_clocks_enable_clock(dev, "ECPRI_CC_C2C_HM_FF_0_DIV_CLK_SRC", &pclk);
+	if (ret)
+	{
+		DMAERR("Failed to vote ECPRI_CC_C2C_HM_FF_0_DIV_CLK_SRC\n");
+	}
+	else
+	{
+		
+	}
+
+
+	ret = mtip_clocks_enable_clock(dev, "ECPRI_CC_C2C_HM_FF_1_DIV_CLK_SRC", &pclk);
+	if (ret)
+	{
+		DMAERR("Failed to vote ECPRI_CC_C2C_HM_FF_1_DIV_CLK_SRC\n");
+	}
+
+
+	return ret;
+}
+
+static int mtip_clocks_setup_dbg_clocks(void)
+{
+	int ret;
+	
+	struct clk* pclk;
+	struct device *dev = ecpri_dma_ctx->pdev;
+
+	DMADBG("setting up DBG clocks\n");
+
+	// enable DBG clocks
+	ret = mtip_clocks_enable_clock(dev, "ECPRI_CC_DBG_C2C_HM_FF_0_CLK", &pclk);
+	if (ret)
+	{
+		DMAERR("Failed to vote ECPRI_CC_DBG_C2C_HM_FF_0_CLK\n");
+	}
+	else
+	{
+		clk_set_rate(pclk, MTIP_ECPRI_FF_CLK_MAX_NOM);
+	}
+
+
+	ret = mtip_clocks_enable_clock(dev, "ECPRI_CC_DBG_C2C_HM_FF_1_CLK", &pclk);
+	if (ret)
+	{
+		DMAERR("Failed to vote ECPRI_CC_DBG_C2C_HM_FF_1_CLK\n");
+	}
+	else
+	{
+		clk_set_rate(pclk, MTIP_ECPRI_FF_CLK_MAX_NOM);
+	}
+
+
+	ret = mtip_clocks_enable_clock(dev, "ECPRI_CC_MAC_DBG_C2C_HM_REF_CLK", &pclk);
+	if (ret)
+	{
+		DMAERR("Failed to vote ECPRI_CC_MAC_DBG_C2C_HM_REF_CLK\n");
+	}
+	else
+	{
+		clk_set_rate(pclk, MTIP_ECPRI_MAC_HM_REF_CLK_MAX_NOM);
+	}
+
+
+	ret = mtip_clocks_enable_clock(dev, "ECPRI_CC_DBG_C2C_HM_FF_0_DIV_CLK_SRC", &pclk);
+	if (ret)
+	{
+		DMAERR("Failed to vote ECPRI_CC_DBG_C2C_HM_FF_0_DIV_CLK_SRC\n");
+	}
+
+
+	ret = mtip_clocks_enable_clock(dev, "ECPRI_CC_DBG_C2C_HM_FF_1_DIV_CLK_SRC", &pclk);
+	if (ret)
+	{
+		DMAERR("Failed to vote ECPRI_CC_DBG_C2C_HM_FF_1_DIV_CLK_SRC\n");
+	}
+	
+
+	return ret;
+}
+
+static int mtip_clocks_setup_fh0_clocks(void)
+{
+	int ret;
+
+	struct clk* pclk;
+	struct device *dev = ecpri_dma_ctx->pdev;
+
+	DMADBG("setting up FH0 clocks\n");
+
+	// enable FH0 clocks
+	ret = mtip_clocks_enable_clock(dev, "ECPRI_CC_FH_0_HM_FF_0_CLK", &pclk);
+	if (ret)
+	{
+		DMAERR("Failed to vote ECPRI_CC_FH_0_HM_FF_0_CLK\n");
+	}
+	else
+	{
+		clk_set_rate(pclk, MTIP_ECPRI_FF_CLK_MAX_NOM);
+	}
+
+
+	ret = mtip_clocks_enable_clock(dev, "ECPRI_CC_FH_0_HM_FF_1_CLK", &pclk);
+	if (ret)
+	{
+		DMAERR("Failed to vote ECPRI_CC_FH_0_HM_FF_1_CLK\n");
+	}
+	else
+	{
+		clk_set_rate(pclk, MTIP_ECPRI_FF_CLK_MAX_NOM);
+	}
+
+
+	ret = mtip_clocks_enable_clock(dev, "ECPRI_CC_FH_0_HM_FF_2_CLK", &pclk);
+	if (ret)
+	{
+		DMAERR("Failed to vote ECPRI_CC_FH_0_HM_FF_2_CLK\n");
+	}
+	else
+	{
+		clk_set_rate(pclk, MTIP_ECPRI_FF_CLK_MAX_NOM);
+	}
+	
+
+	ret = mtip_clocks_enable_clock(dev, "ECPRI_CC_FH_0_HM_FF_3_CLK", &pclk);
+	if (ret)
+	{
+		DMAERR("Failed to vote ECPRI_CC_FH_0_HM_FF_3_CLK\n");
+	}
+	else
+	{
+		clk_set_rate(pclk, MTIP_ECPRI_FF_CLK_MAX_NOM);
+	}
+	
+
+	ret = mtip_clocks_enable_clock(dev, "ECPRI_CC_MAC_FH0_HM_REF_CLK", &pclk);
+	if (ret)
+	{
+		DMAERR("Failed to vote ECPRI_CC_MAC_FH0_HM_REF_CLK\n");
+	}
+	else
+	{
+		clk_set_rate(pclk, MTIP_ECPRI_MAC_HM_REF_CLK_MAX_NOM);
+	}
+
+
+	ret = mtip_clocks_enable_clock(dev, "ECPRI_CC_FH_0_HM_FF_0_DIV_CLK_SRC", &pclk);
+	if (ret)
+	{
+		DMAERR("Failed to vote ECPRI_CC_FH_0_HM_FF_0_DIV_CLK_SRC\n");
+	}
+
+
+	ret = mtip_clocks_enable_clock(dev, "ECPRI_CC_FH_0_HM_FF_1_DIV_CLK_SRC", &pclk);
+	if (ret)
+	{
+		DMAERR("Failed to vote ECPRI_CC_FH_0_HM_FF_1_DIV_CLK_SRC\n");
+	}
+
+
+	ret = mtip_clocks_enable_clock(dev, "ECPRI_CC_FH_0_HM_FF_2_DIV_CLK_SRC", &pclk);
+	if (ret)
+	{
+		DMAERR("Failed to vote ECPRI_CC_FH_0_HM_FF_2_DIV_CLK_SRC\n");
+	}
+
+
+	ret = mtip_clocks_enable_clock(dev, "ECPRI_CC_FH_0_HM_FF_3_DIV_CLK_SRC", &pclk);
+	if (ret)
+	{
+		DMAERR("Failed to vote ECPRI_CC_FH_0_HM_FF_3_DIV_CLK_SRC\n");
+	}
+
+
+	return ret;
+}
+
+static int mtip_clocks_setup_fh1_clocks(void)
+{
+	int ret;
+
+	struct clk* pclk;
+	struct device *dev = ecpri_dma_ctx->pdev;
+
+	DMADBG("setting up FH1 clocks\n");
+
+	// enable FH1 clocks
+	ret = mtip_clocks_enable_clock(dev, "ECPRI_CC_FH_1_HM_FF_0_CLK", &pclk);
+	if (ret)
+	{
+		DMAERR("Failed to vote ECPRI_CC_FH_1_HM_FF_0_CLK\n");
+	}
+	else
+	{
+		clk_set_rate(pclk, MTIP_ECPRI_FF_CLK_MAX_NOM);
+	}
+
+
+	ret = mtip_clocks_enable_clock(dev, "ECPRI_CC_FH_1_HM_FF_1_CLK", &pclk);
+	if (ret)
+	{
+		DMAERR("Failed to vote ECPRI_CC_FH_1_HM_FF_1_CLK\n");
+	}
+	else
+	{
+		clk_set_rate(pclk, MTIP_ECPRI_FF_CLK_MAX_NOM);
+	}
+	
+
+	ret = mtip_clocks_enable_clock(dev, "ECPRI_CC_FH_1_HM_FF_2_CLK", &pclk);
+	if (ret)
+	{
+		DMAERR("Failed to vote ECPRI_CC_FH_1_HM_FF_2_CLK\n");
+	}
+	else
+	{
+		clk_set_rate(pclk, MTIP_ECPRI_FF_CLK_MAX_NOM);
+	}
+
+
+	ret = mtip_clocks_enable_clock(dev, "ECPRI_CC_FH_1_HM_FF_3_CLK", &pclk);
+	if (ret)
+	{
+		DMAERR("Failed to vote ECPRI_CC_FH_1_HM_FF_3_CLK\n");
+	}
+	else
+	{
+		clk_set_rate(pclk, MTIP_ECPRI_FF_CLK_MAX_NOM);
+	}
+
+
+	ret = mtip_clocks_enable_clock(dev, "ECPRI_CC_MAC_FH1_HM_REF_CLK", &pclk);
+	if (ret)
+	{
+		DMAERR("Failed to vote ECPRI_CC_MAC_FH1_HM_REF_CLK\n");
+	}
+	else
+	{
+		clk_set_rate(pclk, MTIP_ECPRI_MAC_HM_REF_CLK_MAX_NOM);
+	}
+
+
+	ret = mtip_clocks_enable_clock(dev, "ECPRI_CC_FH_1_HM_FF_0_DIV_CLK_SRC", &pclk);
+	if (ret)
+	{
+		DMAERR("Failed to vote ECPRI_CC_FH_1_HM_FF_0_DIV_CLK_SRC\n");
+	}
+	
+
+	ret = mtip_clocks_enable_clock(dev, "ECPRI_CC_FH_1_HM_FF_1_DIV_CLK_SRC", &pclk);
+	if (ret)
+	{
+		DMAERR("Failed to vote ECPRI_CC_FH_1_HM_FF_1_DIV_CLK_SRC\n");
+	}
+
+
+	ret = mtip_clocks_enable_clock(dev, "ECPRI_CC_FH_1_HM_FF_2_DIV_CLK_SRC", &pclk);
+	if (ret)
+	{
+		DMAERR("Failed to vote ECPRI_CC_FH_1_HM_FF_2_DIV_CLK_SRC\n");
+	}
+	
+
+	ret = mtip_clocks_enable_clock(dev, "ECPRI_CC_FH_1_HM_FF_3_DIV_CLK_SRC", &pclk);
+	if (ret)
+	{
+		DMAERR("Failed to vote ECPRI_CC_FH_1_HM_FF_3_DIV_CLK_SRC\n");
+	}
+	
+
+	return ret;
+}
+
+static int mtip_clocks_setup_fh2_clocks(void)
+{
+	int ret;
+
+	struct clk* pclk;
+	struct device *dev = ecpri_dma_ctx->pdev;
+
+	DMADBG("setting up FH2 clocks\n");
+
+	// enable FH1 clocks
+	ret = mtip_clocks_enable_clock(dev, "ECPRI_CC_FH_2_HM_FF_0_CLK", &pclk);
+	if (ret)
+	{
+		DMAERR("Failed to vote ECPRI_CC_FH_2_HM_FF_0_CLK\n");
+	}
+	else
+	{
+		clk_set_rate(pclk, MTIP_ECPRI_FF_CLK_MAX_NOM);
+	}
+
+
+	ret = mtip_clocks_enable_clock(dev, "ECPRI_CC_FH_2_HM_FF_1_CLK", &pclk);
+	if (ret)
+	{
+		DMAERR("Failed to vote ECPRI_CC_FH_2_HM_FF_1_CLK\n");
+	}
+	else
+	{
+		clk_set_rate(pclk, MTIP_ECPRI_FF_CLK_MAX_NOM);
+	}
+
+
+	ret = mtip_clocks_enable_clock(dev, "ECPRI_CC_FH_2_HM_FF_2_CLK", &pclk);
+	if (ret)
+	{
+		DMAERR("Failed to vote ECPRI_CC_FH_2_HM_FF_2_CLK\n");
+	}
+	else
+	{
+		clk_set_rate(pclk, MTIP_ECPRI_FF_CLK_MAX_NOM);
+	}
+
+
+	ret = mtip_clocks_enable_clock(dev, "ECPRI_CC_FH_2_HM_FF_3_CLK", &pclk);
+	if (ret)
+	{
+		DMAERR("Failed to vote ECPRI_CC_FH_2_HM_FF_3_CLK\n");
+	}
+	else
+	{
+		clk_set_rate(pclk, MTIP_ECPRI_FF_CLK_MAX_NOM);
+	}
+
+
+	ret = mtip_clocks_enable_clock(dev, "ECPRI_CC_MAC_FH2_HM_REF_CLK", &pclk);
+	if (ret)
+	{
+		DMAERR("Failed to vote ECPRI_CC_MAC_FH2_HM_REF_CLK\n");
+	}
+	else
+	{
+		clk_set_rate(pclk, MTIP_ECPRI_MAC_HM_REF_CLK_MAX_NOM);
+	}
+
+	ret = mtip_clocks_enable_clock(dev, "ECPRI_CC_FH_2_HM_FF_0_DIV_CLK_SRC", &pclk);
+	if (ret)
+	{
+		DMAERR("Failed to vote ECPRI_CC_FH_2_HM_FF_0_DIV_CLK_SRC\n");
+	}
+
+
+	ret = mtip_clocks_enable_clock(dev, "ECPRI_CC_FH_2_HM_FF_1_DIV_CLK_SRC", &pclk);
+	if (ret)
+	{
+		DMAERR("Failed to vote ECPRI_CC_FH_2_HM_FF_1_DIV_CLK_SRC\n");
+	}
+
+
+	ret = mtip_clocks_enable_clock(dev, "ECPRI_CC_FH_2_HM_FF_2_DIV_CLK_SRC", &pclk);
+	if (ret)
+	{
+		DMAERR("Failed to vote ECPRI_CC_FH_2_HM_FF_2_DIV_CLK_SRC\n");
+	}
+
+
+	ret = mtip_clocks_enable_clock(dev, "ECPRI_CC_FH_2_HM_FF_3_DIV_CLK_SRC", &pclk);
+	if (ret)
+	{
+		DMAERR("Failed to vote ECPRI_CC_FH_2_HM_FF_3_DIV_CLK_SRC\n");
+	}
+
+
+	return ret;
+}
+
+/*
+ * mtip_clocks_setup_clocks
+ */
+void mtip_clocks_setup_clocks(void)
+{
+	DMADBG("MTIP started getting clocks\n");
+
+	mtip_clocks_setup_gcc_clocks();
+
+	mtip_clocks_setup_c2c_clocks();
+
+	mtip_clocks_setup_dbg_clocks();
+
+	mtip_clocks_setup_fh0_clocks();
+
+	mtip_clocks_setup_fh1_clocks();
+
+	mtip_clocks_setup_fh2_clocks();
+
+	return;
+}   
+
+static int macsec_clock_enablement()
+{
+	int ret;
+
+	/* Get Clocks */
+	printk("macsec started getting clocks\n");
+
+	macsec_c2c_clk = devm_clk_get(ecpri_dma_ctx->pdev, "macsec_c2c_clk");
+	if (!macsec_c2c_clk) {
+		printk("Failed to get macsec_c2c_clk\n");
+		return -ENOMEM;
+	}
+
+	macsec_fh0_clk = devm_clk_get(ecpri_dma_ctx->pdev, "macsec_fh0_clk");
+	if (!macsec_fh0_clk) {
+		printk("Failed to get macsec_fh0_clk\n");
+		return -ENOMEM;
+	}
+
+	macsec_fh1_clk = devm_clk_get(ecpri_dma_ctx->pdev, "macsec_fh1_clk");
+	if (!macsec_fh1_clk) {
+		printk("Failed to get macsec_fh1_clk\n");
+		return -ENOMEM;
+	}
+
+	macsec_fh2_clk = devm_clk_get(ecpri_dma_ctx->pdev, "macsec_fh2_clk");
+	if (!macsec_fh2_clk) {
+		printk("Failed to get macsec_fh2_clk\n");
+		return -ENOMEM;
+	}
+
+	/* Vote clocks */
+	printk("macsec started clocks vote\n");
+
+	ret = clk_prepare_enable(macsec_c2c_clk);
+	if (ret)
+	{
+		printk("Failed to vote macsec_c2c_clk\n");
+	}
+	else
+	{
+		clk_set_rate(macsec_c2c_clk, MACSEC_CLK_NOM_MAX);
+	}
+
+	ret = clk_prepare_enable(macsec_fh0_clk);
+	if (ret)
+	{
+		printk("Failed to vote macsec_fh0_clk\n");
+	}
+	else
+	{
+		clk_set_rate(macsec_fh0_clk, MACSEC_CLK_NOM_MAX);
+	}
+
+	ret = clk_prepare_enable(macsec_fh1_clk);
+	if (ret)
+	{
+		printk("Failed to vote macsec_fh1_clk\n");
+	}
+	else
+	{
+		clk_set_rate(macsec_fh1_clk, MACSEC_CLK_NOM_MAX);
+	}
+
+	ret = clk_prepare_enable(macsec_fh2_clk);
+	if (ret)
+	{
+		printk("Failed to vote macsec_fh2_clk\n");
+	}
+	else
+	{
+		clk_set_rate(macsec_fh2_clk, MACSEC_CLK_NOM_MAX);
+	}
+
+	return ret;
+}
+
+
+static int ecpriss_clock_init()
+{
+	int ret = 0;
+	sys_clock.ecpri_cg = devm_clk_get(ecpri_dma_ctx->pdev,"ecpri_cg");
+	if (!sys_clock.ecpri_cg){
+		pr_err("Failed to get ecpri_cg\n");
+		return -ENOMEM;
+	}
+	sys_clock.ecpri_fr = devm_clk_get(ecpri_dma_ctx->pdev,"ecpri_fr");
+	if (!sys_clock.ecpri_fr){
+		pr_err("Failed to get ecpri_fr \n");
+		return -ENOMEM;
+	}
+	sys_clock.ecpri_eth_100G_fh0 = devm_clk_get(ecpri_dma_ctx->pdev,"ecpri_eth_100G_fh0");
+	if (!sys_clock.ecpri_eth_100G_fh0){
+		pr_err("Failed to get ecpri_eth_100G_fh0\n");
+		return -ENOMEM;
+	}
+	sys_clock.ecpri_eth_100G_fh1 = devm_clk_get(ecpri_dma_ctx->pdev,"ecpri_eth_100G_fh1");
+	if (!sys_clock.ecpri_eth_100G_fh1){
+		pr_err("Failed to get ecpri_eth_100G_fh1\n");
+		return -ENOMEM;
+	}
+	sys_clock.ecpri_eth_100G_fh2 = devm_clk_get(ecpri_dma_ctx->pdev,"ecpri_eth_100G_fh2");
+	if (!sys_clock.ecpri_eth_100G_fh2){
+		pr_err("Failed to get ecpri_eth_100G_fh2\n");
+		return -ENOMEM;
+	}
+	sys_clock.ecpri_eth_100G_c2c0 = devm_clk_get(ecpri_dma_ctx->pdev,"ecpri_eth_100G_c2c0");
+	if (!sys_clock.ecpri_eth_100G_c2c0){
+		pr_err("Failed to get ecpri_eth_100G_c2c0\n");
+		return -ENOMEM;
+	}
+	sys_clock.ecpri_eth_100G_c2c1 = devm_clk_get(ecpri_dma_ctx->pdev,"ecpri_eth_100G_c2c1");
+	if (!sys_clock.ecpri_eth_100G_c2c1){
+		pr_err("Failed to get ecpri_eth_100G_c2c1\n");
+		return -ENOMEM;
+	}
+	sys_clock.ecpri_eth_100G_dbg_c2c = devm_clk_get(ecpri_dma_ctx->pdev,"ecpri_eth_100G_dbg_c2c");
+	if (!sys_clock.ecpri_eth_100G_dbg_c2c){
+		pr_err("Failed to get ecpri_eth_100G_dbg_c2c\n");
+		return -ENOMEM;
+	}
+	sys_clock.ecpri_oran_div2 = devm_clk_get(ecpri_dma_ctx->pdev,"ecpri_oran_div2");
+	if (!sys_clock.ecpri_oran_div2){
+		pr_err("Failed to get ecpri_oran_div2\n");
+		return -ENOMEM;
+	}
+	sys_clock.ecpri_mss_oran = devm_clk_get(ecpri_dma_ctx->pdev,"ecpri_mss_oran");
+	if (!sys_clock.ecpri_mss_oran){
+		pr_err("Failed to get ecpri_mss_oran\n");
+		return -ENOMEM;
+	}
+
+	ret = clk_prepare_enable(sys_clock.ecpri_cg);
+	if (ret){
+		pr_err("Failed to vote ecpri_cg \n");
+        }
+
+	clk_set_rate(sys_clock.ecpri_cg, ECPRI_CG_CLK_NOM_MAX);
+
+	ret = clk_prepare_enable(sys_clock.ecpri_fr);
+	if (ret){
+		pr_err("Failed to vote ecpri_fr\n");
+        }
+	ret = clk_prepare_enable(sys_clock.ecpri_eth_100G_fh0);
+	if (ret){
+		pr_err("Failed to vote ecpri_eth_100G_fh0\n");
+        }
+	ret = clk_prepare_enable(sys_clock.ecpri_eth_100G_fh1);
+	if (ret){
+		pr_err("Failed to vote ecpri_eth_100G_fh1\n");
+        }
+	ret = clk_prepare_enable(sys_clock.ecpri_eth_100G_fh2);
+	if (ret){
+		pr_err("Failed to vote ecpri_eth_100G_fh2\n");
+        }
+	ret = clk_prepare_enable(sys_clock.ecpri_eth_100G_c2c0);
+	if (ret){
+		pr_err("Failed to vote ecpri_eth_100G_c2c0\n");
+        }
+	ret = clk_prepare_enable(sys_clock.ecpri_eth_100G_c2c1);
+	if (ret){
+		pr_err("Failed to vote ecpri_eth_100G_c2c1\n");
+        }
+	ret = clk_prepare_enable(sys_clock.ecpri_eth_100G_dbg_c2c);
+	if (ret){
+		pr_err("Failed to vote ecpri_eth_100G_dbg_c2c\n");
+        }
+	ret = clk_prepare_enable(sys_clock.ecpri_oran_div2);
+	if (ret){
+		pr_err("Failed to vote ecpri_oran_div2\n");
+        }
+	ret = clk_prepare_enable(sys_clock.ecpri_mss_oran);
+	if (ret){
+		pr_err("Failed to vote ecpri_mss_oran\n");
+        }
+
+	clk_set_rate(sys_clock.ecpri_mss_oran, ECPRI_MSS_ORAN_NOM_MAX);
+
+	return 0;
+}
+
+
+static void qcom_aw_phy_enable_clock(struct device* dev,
+                                                const char* id,
+                                                const char* mux_id,
+                                                bool is_sram_clk){
+	struct clk     *clk = NULL, *mux_clk = NULL;
+
+	/* Fetch the MUX clock */
+	mux_clk = devm_clk_get(dev, mux_id);
+	if (IS_ERR_OR_NULL(mux_clk)) {
+		DMAERR("Failed to get %s, error %d",
+		                    mux_id, PTR_ERR(mux_clk));
+		return;
+	}
+
+	/* Prepare/enable the MUX clock */
+	if (clk_prepare_enable(mux_clk)){
+		DMAERR("Failed to prepare/enable %s", mux_id);
+		return;
+	}
+
+	/* Set the parent clock */
+	if(clk_set_parent(mux_clk, cxo_clk)){
+		DMAERR("Failed to set parent clock for %s", mux_id);
+		return;
+	}
+
+	/* Fetch the clock */
+	clk = devm_clk_get(dev, id);
+	if (IS_ERR_OR_NULL(clk)) {
+		DMAERR("Failed to get %s, error %d",
+		                    id, PTR_ERR(clk));
+		return;
+	}
+
+	/* Prepare/enable the clock */
+	if (clk_prepare_enable(clk)){
+		DMAERR("Failed to prepare/enable %s", id);
+		return;
+	}
+
+	return;
+}
+
+
+static void qcom_aw_phy_setup_clocks(){
+
+#ifdef FEATURE_QCOM_AW_RUMI_SW
+	return;
+#endif /* FEATURE_QCOM_AW_RUMI_SW */
+
+	DMADBG("qcom_aw_phy_setup_clocks");
+
+	// Fetch the input clock
+	cxo_clk = devm_clk_get(ecpri_dma_ctx->pdev, "RPMH_CXO_CLK");
+	if (IS_ERR_OR_NULL(cxo_clk)) {
+		DMAERR("Failed to get input clock, error %d",
+		                    PTR_ERR(cxo_clk));
+		return;
+	}
+
+	if (clk_prepare_enable(cxo_clk)){
+		DMAERR("Failed to prepare/enable input clock ");
+		return;
+	}
+
+	// FH0 PHY Clocks
+	qcom_aw_phy_enable_clock(ecpri_dma_ctx->pdev, "ECPRI_CC_PHY0_LANE0_RX_CLK",
+	                         "ECPRI_CC_PHY0_LANE0_RX_CLK_SRC", false);
+	qcom_aw_phy_enable_clock(ecpri_dma_ctx->pdev, "ECPRI_CC_PHY0_LANE0_TX_CLK",
+	                         "ECPRI_CC_PHY0_LANE0_TX_CLK_SRC", false);
+	qcom_aw_phy_enable_clock(ecpri_dma_ctx->pdev, "ECPRI_CC_PHY0_LANE1_RX_CLK",
+	                         "ECPRI_CC_PHY0_LANE1_RX_CLK_SRC", false);
+	qcom_aw_phy_enable_clock(ecpri_dma_ctx->pdev, "ECPRI_CC_PHY0_LANE1_TX_CLK",
+	                         "ECPRI_CC_PHY0_LANE1_TX_CLK_SRC", false);
+	qcom_aw_phy_enable_clock(ecpri_dma_ctx->pdev, "ECPRI_CC_PHY0_LANE2_RX_CLK",
+	                         "ECPRI_CC_PHY0_LANE2_RX_CLK_SRC", false);
+	qcom_aw_phy_enable_clock(ecpri_dma_ctx->pdev, "ECPRI_CC_PHY0_LANE2_TX_CLK",
+	                         "ECPRI_CC_PHY0_LANE2_TX_CLK_SRC", false);
+	qcom_aw_phy_enable_clock(ecpri_dma_ctx->pdev, "ECPRI_CC_PHY0_LANE3_RX_CLK",
+	                         "ECPRI_CC_PHY0_LANE3_RX_CLK_SRC", false);
+	qcom_aw_phy_enable_clock(ecpri_dma_ctx->pdev, "ECPRI_CC_PHY0_LANE3_TX_CLK",
+	                         "ECPRI_CC_PHY0_LANE3_TX_CLK_SRC", false);
+
+	// FH1 PHY Clocks
+	qcom_aw_phy_enable_clock(ecpri_dma_ctx->pdev, "ECPRI_CC_PHY1_LANE0_RX_CLK",
+	                         "ECPRI_CC_PHY1_LANE0_RX_CLK_SRC", false);
+	qcom_aw_phy_enable_clock(ecpri_dma_ctx->pdev, "ECPRI_CC_PHY1_LANE0_TX_CLK",
+	                         "ECPRI_CC_PHY1_LANE0_TX_CLK_SRC", false);
+	qcom_aw_phy_enable_clock(ecpri_dma_ctx->pdev, "ECPRI_CC_PHY1_LANE1_RX_CLK",
+	                         "ECPRI_CC_PHY1_LANE1_RX_CLK_SRC", false);
+	qcom_aw_phy_enable_clock(ecpri_dma_ctx->pdev, "ECPRI_CC_PHY1_LANE1_TX_CLK",
+	                         "ECPRI_CC_PHY1_LANE1_TX_CLK_SRC", false);
+	qcom_aw_phy_enable_clock(ecpri_dma_ctx->pdev, "ECPRI_CC_PHY1_LANE2_RX_CLK",
+	                         "ECPRI_CC_PHY1_LANE2_RX_CLK_SRC", false);
+	qcom_aw_phy_enable_clock(ecpri_dma_ctx->pdev, "ECPRI_CC_PHY1_LANE2_TX_CLK",
+	                         "ECPRI_CC_PHY1_LANE2_TX_CLK_SRC", false);
+	qcom_aw_phy_enable_clock(ecpri_dma_ctx->pdev, "ECPRI_CC_PHY1_LANE3_RX_CLK",
+	                         "ECPRI_CC_PHY1_LANE3_RX_CLK_SRC", false);
+	qcom_aw_phy_enable_clock(ecpri_dma_ctx->pdev, "ECPRI_CC_PHY1_LANE3_TX_CLK",
+	                         "ECPRI_CC_PHY1_LANE3_TX_CLK_SRC", false);
+
+	// FH2 PHY Clocks
+	qcom_aw_phy_enable_clock(ecpri_dma_ctx->pdev, "ECPRI_CC_PHY1_LANE0_RX_CLK",
+	                         "ECPRI_CC_PHY1_LANE0_RX_CLK_SRC", false);
+	qcom_aw_phy_enable_clock(ecpri_dma_ctx->pdev, "ECPRI_CC_PHY1_LANE0_TX_CLK",
+	                         "ECPRI_CC_PHY1_LANE0_TX_CLK_SRC", false);
+	qcom_aw_phy_enable_clock(ecpri_dma_ctx->pdev, "ECPRI_CC_PHY1_LANE1_RX_CLK",
+	                         "ECPRI_CC_PHY1_LANE1_RX_CLK_SRC", false);
+	qcom_aw_phy_enable_clock(ecpri_dma_ctx->pdev, "ECPRI_CC_PHY1_LANE1_TX_CLK",
+	                         "ECPRI_CC_PHY1_LANE1_TX_CLK_SRC", false);
+	qcom_aw_phy_enable_clock(ecpri_dma_ctx->pdev, "ECPRI_CC_PHY1_LANE2_RX_CLK",
+	                         "ECPRI_CC_PHY1_LANE2_RX_CLK_SRC", false);
+	qcom_aw_phy_enable_clock(ecpri_dma_ctx->pdev, "ECPRI_CC_PHY1_LANE2_TX_CLK",
+	                         "ECPRI_CC_PHY1_LANE2_TX_CLK_SRC", false);
+	qcom_aw_phy_enable_clock(ecpri_dma_ctx->pdev, "ECPRI_CC_PHY1_LANE3_RX_CLK",
+	                         "ECPRI_CC_PHY1_LANE3_RX_CLK_SRC", false);
+	qcom_aw_phy_enable_clock(ecpri_dma_ctx->pdev, "ECPRI_CC_PHY1_LANE3_TX_CLK",
+	                         "ECPRI_CC_PHY1_LANE3_TX_CLK_SRC", false);
+
+	// L2 PHY Clocks
+	qcom_aw_phy_enable_clock(ecpri_dma_ctx->pdev, "ECPRI_CC_PHY2_LANE0_RX_CLK",
+	                         "ECPRI_CC_PHY2_LANE0_RX_CLK_SRC", false);
+	qcom_aw_phy_enable_clock(ecpri_dma_ctx->pdev, "ECPRI_CC_PHY2_LANE0_TX_CLK",
+	                         "ECPRI_CC_PHY2_LANE0_TX_CLK_SRC", false);
+	qcom_aw_phy_enable_clock(ecpri_dma_ctx->pdev, "ECPRI_CC_PHY2_LANE1_RX_CLK",
+	                         "ECPRI_CC_PHY2_LANE1_RX_CLK_SRC", false);
+	qcom_aw_phy_enable_clock(ecpri_dma_ctx->pdev, "ECPRI_CC_PHY2_LANE1_TX_CLK",
+	                         "ECPRI_CC_PHY2_LANE1_TX_CLK_SRC", false);
+	qcom_aw_phy_enable_clock(ecpri_dma_ctx->pdev, "ECPRI_CC_PHY2_LANE2_RX_CLK",
+	                         "ECPRI_CC_PHY2_LANE2_RX_CLK_SRC", false);
+	qcom_aw_phy_enable_clock(ecpri_dma_ctx->pdev, "ECPRI_CC_PHY2_LANE2_TX_CLK",
+	                         "ECPRI_CC_PHY2_LANE2_TX_CLK_SRC", false);
+	qcom_aw_phy_enable_clock(ecpri_dma_ctx->pdev, "ECPRI_CC_PHY2_LANE3_RX_CLK",
+	                         "ECPRI_CC_PHY2_LANE3_RX_CLK_SRC", false);
+	qcom_aw_phy_enable_clock(ecpri_dma_ctx->pdev, "ECPRI_CC_PHY2_LANE3_TX_CLK",
+	                         "ECPRI_CC_PHY2_LANE3_TX_CLK_SRC", false);
+
+	// Debug PHY Clocks
+	qcom_aw_phy_enable_clock(ecpri_dma_ctx->pdev, "ECPRI_CC_PHY3_LANE0_RX_CLK",
+	                         "ECPRI_CC_PHY3_LANE0_RX_CLK_SRC", false);
+	qcom_aw_phy_enable_clock(ecpri_dma_ctx->pdev, "ECPRI_CC_PHY3_LANE0_TX_CLK",
+	                         "ECPRI_CC_PHY3_LANE0_TX_CLK_SRC", false);
+	qcom_aw_phy_enable_clock(ecpri_dma_ctx->pdev, "ECPRI_CC_PHY3_LANE1_RX_CLK",
+	                         "ECPRI_CC_PHY3_LANE1_RX_CLK_SRC", false);
+	qcom_aw_phy_enable_clock(ecpri_dma_ctx->pdev, "ECPRI_CC_PHY3_LANE1_TX_CLK",
+	                         "ECPRI_CC_PHY3_LANE1_TX_CLK_SRC", false);
+	qcom_aw_phy_enable_clock(ecpri_dma_ctx->pdev, "ECPRI_CC_PHY3_LANE2_RX_CLK",
+	                         "ECPRI_CC_PHY3_LANE2_RX_CLK_SRC", false);
+	qcom_aw_phy_enable_clock(ecpri_dma_ctx->pdev, "ECPRI_CC_PHY3_LANE2_TX_CLK",
+	                         "ECPRI_CC_PHY3_LANE2_TX_CLK_SRC", false);
+	qcom_aw_phy_enable_clock(ecpri_dma_ctx->pdev, "ECPRI_CC_PHY3_LANE3_RX_CLK",
+	                         "ECPRI_CC_PHY3_LANE3_RX_CLK_SRC", false);
+	qcom_aw_phy_enable_clock(ecpri_dma_ctx->pdev, "ECPRI_CC_PHY3_LANE3_TX_CLK",
+	                         "ECPRI_CC_PHY3_LANE3_TX_CLK_SRC", false);
+
+	// SRAM clocks
+	qcom_aw_phy_enable_clock(ecpri_dma_ctx->pdev, "ECPRI_CC_ETH_PHY_0_OCK_SRAM_CLK",
+	                         "ECPRI_CC_ETH_PHY_0_OCK_SRAM_MUX_CLK_SRC", true);
+	qcom_aw_phy_enable_clock(ecpri_dma_ctx->pdev, "ECPRI_CC_ETH_PHY_1_OCK_SRAM_CLK",
+	                         "ECPRI_CC_ETH_PHY_1_OCK_SRAM_MUX_CLK_SRC", true);
+	qcom_aw_phy_enable_clock(ecpri_dma_ctx->pdev, "ECPRI_CC_ETH_PHY_2_OCK_SRAM_CLK",
+	                         "ECPRI_CC_ETH_PHY_2_OCK_SRAM_MUX_CLK_SRC", true);
+	qcom_aw_phy_enable_clock(ecpri_dma_ctx->pdev, "ECPRI_CC_ETH_PHY_3_OCK_SRAM_CLK",
+	                         "ECPRI_CC_ETH_PHY_3_OCK_SRAM_MUX_CLK_SRC", true);
+	qcom_aw_phy_enable_clock(ecpri_dma_ctx->pdev, "ECPRI_CC_ETH_PHY_4_OCK_SRAM_CLK",
+	                         "ECPRI_CC_ETH_PHY_4_OCK_SRAM_MUX_CLK_SRC", true);
+
+	return;
 }
 
 /**
@@ -2230,6 +3233,7 @@ int ecpri_dma_hw_init(void)
 		DMAERR("Failed to vote dma_nfapi_axi_clk\n");
 	}
 
+
 	/* get ICC */
 
 	ecpri_dma_ctx->icc_paths.dma_to_ddr =
@@ -2264,6 +3268,10 @@ int ecpri_dma_hw_init(void)
 	if (hw_params_0.total_channels_n == 0)
 		return -EFAULT;
 
+	mtip_clocks_setup_clocks();
+	macsec_clock_enablement();
+	ecpriss_clock_init();
+	qcom_aw_phy_setup_clocks();
 #ifdef ECPRI_DMA_RESET_WA_ENABLE
 	/* Reset eCPRI block for SMMU issue WA */
 	ecpri_dma_reset_ecpri_block();
