@@ -51,6 +51,7 @@
 #include "mtip_client.h"
 #include "mtip_ptp.h"
 #include "mtip_debug_eth.h"
+#include "mtip_phy.h"
 
 int macsec_eth_set_macsec_ops(const struct macsec_ops* rb_macsec_ops)
 {
@@ -537,10 +538,12 @@ static int mtip_start_xmit(struct sk_buff *skb, struct net_device *netdev)
        }
 
        // check that both links are in OPEN state
-       if ((platform_driver_priv->mtip_links[link_index]->state != MTIP_LINK_STATE_OPEN) || 
-           (platform_driver_priv->mtip_links[other_link_index]->state != MTIP_LINK_STATE_OPEN))
+       if ((platform_driver_priv->mtip_links[link_index]->state != MTIP_LINK_STATE_OPEN &&
+            platform_driver_priv->mtip_links[link_index]->state != MTIP_LINK_STATE_UP) || 
+           (platform_driver_priv->mtip_links[other_link_index]->state != MTIP_LINK_STATE_OPEN &&
+            platform_driver_priv->mtip_links[other_link_index]->state != MTIP_LINK_STATE_UP))
        {
-          CSMLOGERR("Waiting for both interfaces to open... dropping\n");
+          CSMLOGERR("Waiting for both interfaces to be open/up... dropping\n");
 
           // free the skb
           dev_kfree_skb(skb);
@@ -788,13 +791,19 @@ static int mtip_open(struct net_device *netdev)
    if (mtip_loopback_mode == MTIP_MODE_DEFAULT)
    {
        // Configure phylib in poll mode
-       priv->phydev->irq = PHY_POLL;
+       //priv->phydev->irq = PHY_POLL;
 
        // PHYLINK-PHY binding and PHY bringup
-       phylink_connect_phy(priv->phylink, priv->phydev);
+       //phylink_connect_phy(priv->phylink, priv->phydev);
 
        // Start the PHYLINK
-       phylink_start(priv->phylink);
+       //phylink_start(priv->phylink);
+   }
+
+   if (mtip_loopback_mode == MTIP_MODE_DEFAULT || 
+       mtip_loopback_mode == MTIP_MODE_PHY_LOOPBACK){
+      // bring up the phy
+      mtip_phy_bringup_phy(link_index);
    }
 
    if(hdl){
@@ -851,8 +860,14 @@ static int mtip_close(struct net_device *netdev)
    if (mtip_loopback_mode == MTIP_MODE_DEFAULT)
    {
        /* Stop and disconnect the PHY */
-       phylink_stop(priv->phylink);
-       phylink_disconnect_phy(priv->phylink);
+       //phylink_stop(priv->phylink);
+       //phylink_disconnect_phy(priv->phylink);
+   }
+
+   if (mtip_loopback_mode == MTIP_MODE_DEFAULT || 
+       mtip_loopback_mode == MTIP_MODE_PHY_LOOPBACK){
+      // teardown the phy
+      mtip_phy_teardown_phy(link_index);
    }
 
    if(hdl){
@@ -1029,7 +1044,7 @@ enum mtip_link_state_enum mtip_get_link_state_by_device(u32 port_device_index, u
     u32 link_index;
     mtip_lookup_link_index_by_device(&link_index, port_device_index, link_device_index);
 
-    CSMLOGINFO("Getting link state of link index: %d\n", link_index);
+    CSMLOGDBG("Getting link state of link index: %d\n", link_index);
 
     if (platform_driver_priv->mtip_links[link_index] == NULL) {
         return MTIP_LINK_STATE_INIT;
