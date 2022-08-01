@@ -2917,38 +2917,13 @@ static int ecpriss_clock_init()
 	return 0;
 }
 
-
-static void qcom_aw_phy_enable_clock(struct device* dev,
-                                                const char* id,
-                                                const char* mux_id,
-                                                bool is_sram_clk){
-	struct clk     *clk = NULL, *mux_clk = NULL;
-
-	/* Fetch the MUX clock */
-	mux_clk = devm_clk_get(dev, mux_id);
-	if (IS_ERR_OR_NULL(mux_clk)) {
-		DMAERR("Failed to get %s, error %d",
-		                    mux_id, PTR_ERR(mux_clk));
-		return;
-	}
-
-	/* Prepare/enable the MUX clock */
-	if (clk_prepare_enable(mux_clk)){
-		DMAERR("Failed to prepare/enable %s", mux_id);
-		return;
-	}
-
-	/* Set the parent clock */
-	if(clk_set_parent(mux_clk, cxo_clk)){
-		DMAERR("Failed to set parent clock for %s", mux_id);
-		return;
-	}
+static void qcom_aw_phy_enable_clock(struct device *dev, const char *id) {
+  struct clk *clk = NULL;
 
 	/* Fetch the clock */
 	clk = devm_clk_get(dev, id);
 	if (IS_ERR_OR_NULL(clk)) {
-		DMAERR("Failed to get %s, error %d",
-		                    id, PTR_ERR(clk));
+		DMAERR("Failed to get %s, error %d", id, PTR_ERR(clk));
 		return;
 	}
 
@@ -2961,8 +2936,9 @@ static void qcom_aw_phy_enable_clock(struct device* dev,
 	return;
 }
 
-
 static void qcom_aw_phy_setup_clocks(){
+
+	struct device *dev = ecpri_dma_ctx->pdev;
 
 #ifdef FEATURE_QCOM_AW_RUMI_SW
 	return;
@@ -2970,120 +2946,70 @@ static void qcom_aw_phy_setup_clocks(){
 
 	DMADBG("qcom_aw_phy_setup_clocks");
 
-	// Fetch the input clock
-	cxo_clk = devm_clk_get(ecpri_dma_ctx->pdev, "RPMH_CXO_CLK");
-	if (IS_ERR_OR_NULL(cxo_clk)) {
-		DMAERR("Failed to get input clock, error %d",
-		                    PTR_ERR(cxo_clk));
-		return;
-	}
-
-	if (clk_prepare_enable(cxo_clk)){
-		DMAERR("Failed to prepare/enable input clock ");
-		return;
-	}
+	// GCC Clocks
+	qcom_aw_phy_enable_clock(dev, "GCC_C2C_HM_APB_CLK");
+	qcom_aw_phy_enable_clock(dev, "GCC_FH_HM_APB_0_CLK");
+	qcom_aw_phy_enable_clock(dev, "GCC_FH_HM_APB_1_CLK");
+	qcom_aw_phy_enable_clock(dev, "GCC_FH_HM_APB_2_CLK");
+	qcom_aw_phy_enable_clock(dev, "GCC_ETH_DBG_C2C_HM_APB_CLK");
+	qcom_aw_phy_enable_clock(dev, "GCC_ETH_DBG_SNOC_AXI_CLK");
 
 	// FH0 PHY Clocks
-	qcom_aw_phy_enable_clock(ecpri_dma_ctx->pdev, "ECPRI_CC_PHY0_LANE0_RX_CLK",
-	                         "ECPRI_CC_PHY0_LANE0_RX_CLK_SRC", false);
-	qcom_aw_phy_enable_clock(ecpri_dma_ctx->pdev, "ECPRI_CC_PHY0_LANE0_TX_CLK",
-	                         "ECPRI_CC_PHY0_LANE0_TX_CLK_SRC", false);
-	qcom_aw_phy_enable_clock(ecpri_dma_ctx->pdev, "ECPRI_CC_PHY0_LANE1_RX_CLK",
-	                         "ECPRI_CC_PHY0_LANE1_RX_CLK_SRC", false);
-	qcom_aw_phy_enable_clock(ecpri_dma_ctx->pdev, "ECPRI_CC_PHY0_LANE1_TX_CLK",
-	                         "ECPRI_CC_PHY0_LANE1_TX_CLK_SRC", false);
-	qcom_aw_phy_enable_clock(ecpri_dma_ctx->pdev, "ECPRI_CC_PHY0_LANE2_RX_CLK",
-	                         "ECPRI_CC_PHY0_LANE2_RX_CLK_SRC", false);
-	qcom_aw_phy_enable_clock(ecpri_dma_ctx->pdev, "ECPRI_CC_PHY0_LANE2_TX_CLK",
-	                         "ECPRI_CC_PHY0_LANE2_TX_CLK_SRC", false);
-	qcom_aw_phy_enable_clock(ecpri_dma_ctx->pdev, "ECPRI_CC_PHY0_LANE3_RX_CLK",
-	                         "ECPRI_CC_PHY0_LANE3_RX_CLK_SRC", false);
-	qcom_aw_phy_enable_clock(ecpri_dma_ctx->pdev, "ECPRI_CC_PHY0_LANE3_TX_CLK",
-	                         "ECPRI_CC_PHY0_LANE3_TX_CLK_SRC", false);
+	qcom_aw_phy_enable_clock(dev, "ECPRI_CC_PHY0_LANE0_RX_CLK");
+	qcom_aw_phy_enable_clock(dev, "ECPRI_CC_PHY0_LANE0_TX_CLK");
+	qcom_aw_phy_enable_clock(dev, "ECPRI_CC_PHY0_LANE1_RX_CLK");
+	qcom_aw_phy_enable_clock(dev, "ECPRI_CC_PHY0_LANE1_TX_CLK");
+	qcom_aw_phy_enable_clock(dev, "ECPRI_CC_PHY0_LANE2_RX_CLK");
+	qcom_aw_phy_enable_clock(dev, "ECPRI_CC_PHY0_LANE2_TX_CLK");
+	qcom_aw_phy_enable_clock(dev, "ECPRI_CC_PHY0_LANE3_RX_CLK");
+	qcom_aw_phy_enable_clock(dev, "ECPRI_CC_PHY0_LANE3_TX_CLK");
 
 	// FH1 PHY Clocks
-	qcom_aw_phy_enable_clock(ecpri_dma_ctx->pdev, "ECPRI_CC_PHY1_LANE0_RX_CLK",
-	                         "ECPRI_CC_PHY1_LANE0_RX_CLK_SRC", false);
-	qcom_aw_phy_enable_clock(ecpri_dma_ctx->pdev, "ECPRI_CC_PHY1_LANE0_TX_CLK",
-	                         "ECPRI_CC_PHY1_LANE0_TX_CLK_SRC", false);
-	qcom_aw_phy_enable_clock(ecpri_dma_ctx->pdev, "ECPRI_CC_PHY1_LANE1_RX_CLK",
-	                         "ECPRI_CC_PHY1_LANE1_RX_CLK_SRC", false);
-	qcom_aw_phy_enable_clock(ecpri_dma_ctx->pdev, "ECPRI_CC_PHY1_LANE1_TX_CLK",
-	                         "ECPRI_CC_PHY1_LANE1_TX_CLK_SRC", false);
-	qcom_aw_phy_enable_clock(ecpri_dma_ctx->pdev, "ECPRI_CC_PHY1_LANE2_RX_CLK",
-	                         "ECPRI_CC_PHY1_LANE2_RX_CLK_SRC", false);
-	qcom_aw_phy_enable_clock(ecpri_dma_ctx->pdev, "ECPRI_CC_PHY1_LANE2_TX_CLK",
-	                         "ECPRI_CC_PHY1_LANE2_TX_CLK_SRC", false);
-	qcom_aw_phy_enable_clock(ecpri_dma_ctx->pdev, "ECPRI_CC_PHY1_LANE3_RX_CLK",
-	                         "ECPRI_CC_PHY1_LANE3_RX_CLK_SRC", false);
-	qcom_aw_phy_enable_clock(ecpri_dma_ctx->pdev, "ECPRI_CC_PHY1_LANE3_TX_CLK",
-	                         "ECPRI_CC_PHY1_LANE3_TX_CLK_SRC", false);
+	qcom_aw_phy_enable_clock(dev, "ECPRI_CC_PHY1_LANE0_RX_CLK");
+	qcom_aw_phy_enable_clock(dev, "ECPRI_CC_PHY1_LANE0_TX_CLK");
+	qcom_aw_phy_enable_clock(dev, "ECPRI_CC_PHY1_LANE1_RX_CLK");
+	qcom_aw_phy_enable_clock(dev, "ECPRI_CC_PHY1_LANE1_TX_CLK");
+	qcom_aw_phy_enable_clock(dev, "ECPRI_CC_PHY1_LANE2_RX_CLK");
+	qcom_aw_phy_enable_clock(dev, "ECPRI_CC_PHY1_LANE2_TX_CLK");
+	qcom_aw_phy_enable_clock(dev, "ECPRI_CC_PHY1_LANE3_RX_CLK");
+	qcom_aw_phy_enable_clock(dev, "ECPRI_CC_PHY1_LANE3_TX_CLK");
 
 	// FH2 PHY Clocks
-	qcom_aw_phy_enable_clock(ecpri_dma_ctx->pdev, "ECPRI_CC_PHY1_LANE0_RX_CLK",
-	                         "ECPRI_CC_PHY1_LANE0_RX_CLK_SRC", false);
-	qcom_aw_phy_enable_clock(ecpri_dma_ctx->pdev, "ECPRI_CC_PHY1_LANE0_TX_CLK",
-	                         "ECPRI_CC_PHY1_LANE0_TX_CLK_SRC", false);
-	qcom_aw_phy_enable_clock(ecpri_dma_ctx->pdev, "ECPRI_CC_PHY1_LANE1_RX_CLK",
-	                         "ECPRI_CC_PHY1_LANE1_RX_CLK_SRC", false);
-	qcom_aw_phy_enable_clock(ecpri_dma_ctx->pdev, "ECPRI_CC_PHY1_LANE1_TX_CLK",
-	                         "ECPRI_CC_PHY1_LANE1_TX_CLK_SRC", false);
-	qcom_aw_phy_enable_clock(ecpri_dma_ctx->pdev, "ECPRI_CC_PHY1_LANE2_RX_CLK",
-	                         "ECPRI_CC_PHY1_LANE2_RX_CLK_SRC", false);
-	qcom_aw_phy_enable_clock(ecpri_dma_ctx->pdev, "ECPRI_CC_PHY1_LANE2_TX_CLK",
-	                         "ECPRI_CC_PHY1_LANE2_TX_CLK_SRC", false);
-	qcom_aw_phy_enable_clock(ecpri_dma_ctx->pdev, "ECPRI_CC_PHY1_LANE3_RX_CLK",
-	                         "ECPRI_CC_PHY1_LANE3_RX_CLK_SRC", false);
-	qcom_aw_phy_enable_clock(ecpri_dma_ctx->pdev, "ECPRI_CC_PHY1_LANE3_TX_CLK",
-	                         "ECPRI_CC_PHY1_LANE3_TX_CLK_SRC", false);
+	qcom_aw_phy_enable_clock(dev, "ECPRI_CC_PHY2_LANE0_RX_CLK");
+	qcom_aw_phy_enable_clock(dev, "ECPRI_CC_PHY2_LANE0_TX_CLK");
+	qcom_aw_phy_enable_clock(dev, "ECPRI_CC_PHY2_LANE1_RX_CLK");
+	qcom_aw_phy_enable_clock(dev, "ECPRI_CC_PHY2_LANE1_TX_CLK");
+	qcom_aw_phy_enable_clock(dev, "ECPRI_CC_PHY2_LANE2_RX_CLK");
+	qcom_aw_phy_enable_clock(dev, "ECPRI_CC_PHY2_LANE2_TX_CLK");
+	qcom_aw_phy_enable_clock(dev, "ECPRI_CC_PHY2_LANE3_RX_CLK");
+	qcom_aw_phy_enable_clock(dev, "ECPRI_CC_PHY2_LANE3_TX_CLK");
 
 	// L2 PHY Clocks
-	qcom_aw_phy_enable_clock(ecpri_dma_ctx->pdev, "ECPRI_CC_PHY2_LANE0_RX_CLK",
-	                         "ECPRI_CC_PHY2_LANE0_RX_CLK_SRC", false);
-	qcom_aw_phy_enable_clock(ecpri_dma_ctx->pdev, "ECPRI_CC_PHY2_LANE0_TX_CLK",
-	                         "ECPRI_CC_PHY2_LANE0_TX_CLK_SRC", false);
-	qcom_aw_phy_enable_clock(ecpri_dma_ctx->pdev, "ECPRI_CC_PHY2_LANE1_RX_CLK",
-	                         "ECPRI_CC_PHY2_LANE1_RX_CLK_SRC", false);
-	qcom_aw_phy_enable_clock(ecpri_dma_ctx->pdev, "ECPRI_CC_PHY2_LANE1_TX_CLK",
-	                         "ECPRI_CC_PHY2_LANE1_TX_CLK_SRC", false);
-	qcom_aw_phy_enable_clock(ecpri_dma_ctx->pdev, "ECPRI_CC_PHY2_LANE2_RX_CLK",
-	                         "ECPRI_CC_PHY2_LANE2_RX_CLK_SRC", false);
-	qcom_aw_phy_enable_clock(ecpri_dma_ctx->pdev, "ECPRI_CC_PHY2_LANE2_TX_CLK",
-	                         "ECPRI_CC_PHY2_LANE2_TX_CLK_SRC", false);
-	qcom_aw_phy_enable_clock(ecpri_dma_ctx->pdev, "ECPRI_CC_PHY2_LANE3_RX_CLK",
-	                         "ECPRI_CC_PHY2_LANE3_RX_CLK_SRC", false);
-	qcom_aw_phy_enable_clock(ecpri_dma_ctx->pdev, "ECPRI_CC_PHY2_LANE3_TX_CLK",
-	                         "ECPRI_CC_PHY2_LANE3_TX_CLK_SRC", false);
+	qcom_aw_phy_enable_clock(dev, "ECPRI_CC_PHY3_LANE0_RX_CLK");
+	qcom_aw_phy_enable_clock(dev, "ECPRI_CC_PHY3_LANE0_TX_CLK");
+	qcom_aw_phy_enable_clock(dev, "ECPRI_CC_PHY3_LANE1_RX_CLK");
+	qcom_aw_phy_enable_clock(dev, "ECPRI_CC_PHY3_LANE1_TX_CLK");
+	qcom_aw_phy_enable_clock(dev, "ECPRI_CC_PHY3_LANE2_RX_CLK");
+	qcom_aw_phy_enable_clock(dev, "ECPRI_CC_PHY3_LANE2_TX_CLK");
+	qcom_aw_phy_enable_clock(dev, "ECPRI_CC_PHY3_LANE3_RX_CLK");
+	qcom_aw_phy_enable_clock(dev, "ECPRI_CC_PHY3_LANE3_TX_CLK");
 
 	// Debug PHY Clocks
-	qcom_aw_phy_enable_clock(ecpri_dma_ctx->pdev, "ECPRI_CC_PHY3_LANE0_RX_CLK",
-	                         "ECPRI_CC_PHY3_LANE0_RX_CLK_SRC", false);
-	qcom_aw_phy_enable_clock(ecpri_dma_ctx->pdev, "ECPRI_CC_PHY3_LANE0_TX_CLK",
-	                         "ECPRI_CC_PHY3_LANE0_TX_CLK_SRC", false);
-	qcom_aw_phy_enable_clock(ecpri_dma_ctx->pdev, "ECPRI_CC_PHY3_LANE1_RX_CLK",
-	                         "ECPRI_CC_PHY3_LANE1_RX_CLK_SRC", false);
-	qcom_aw_phy_enable_clock(ecpri_dma_ctx->pdev, "ECPRI_CC_PHY3_LANE1_TX_CLK",
-	                         "ECPRI_CC_PHY3_LANE1_TX_CLK_SRC", false);
-	qcom_aw_phy_enable_clock(ecpri_dma_ctx->pdev, "ECPRI_CC_PHY3_LANE2_RX_CLK",
-	                         "ECPRI_CC_PHY3_LANE2_RX_CLK_SRC", false);
-	qcom_aw_phy_enable_clock(ecpri_dma_ctx->pdev, "ECPRI_CC_PHY3_LANE2_TX_CLK",
-	                         "ECPRI_CC_PHY3_LANE2_TX_CLK_SRC", false);
-	qcom_aw_phy_enable_clock(ecpri_dma_ctx->pdev, "ECPRI_CC_PHY3_LANE3_RX_CLK",
-	                         "ECPRI_CC_PHY3_LANE3_RX_CLK_SRC", false);
-	qcom_aw_phy_enable_clock(ecpri_dma_ctx->pdev, "ECPRI_CC_PHY3_LANE3_TX_CLK",
-	                         "ECPRI_CC_PHY3_LANE3_TX_CLK_SRC", false);
+	qcom_aw_phy_enable_clock(dev, "ECPRI_CC_PHY4_LANE0_RX_CLK");
+	qcom_aw_phy_enable_clock(dev, "ECPRI_CC_PHY4_LANE0_TX_CLK");
+	qcom_aw_phy_enable_clock(dev, "ECPRI_CC_PHY4_LANE1_RX_CLK");
+	qcom_aw_phy_enable_clock(dev, "ECPRI_CC_PHY4_LANE1_TX_CLK");
+	qcom_aw_phy_enable_clock(dev, "ECPRI_CC_PHY4_LANE2_RX_CLK");
+	qcom_aw_phy_enable_clock(dev, "ECPRI_CC_PHY4_LANE2_TX_CLK");
+	qcom_aw_phy_enable_clock(dev, "ECPRI_CC_PHY4_LANE3_RX_CLK");
+	qcom_aw_phy_enable_clock(dev, "ECPRI_CC_PHY4_LANE3_TX_CLK");
 
 	// SRAM clocks
-	qcom_aw_phy_enable_clock(ecpri_dma_ctx->pdev, "ECPRI_CC_ETH_PHY_0_OCK_SRAM_CLK",
-	                         "ECPRI_CC_ETH_PHY_0_OCK_SRAM_MUX_CLK_SRC", true);
-	qcom_aw_phy_enable_clock(ecpri_dma_ctx->pdev, "ECPRI_CC_ETH_PHY_1_OCK_SRAM_CLK",
-	                         "ECPRI_CC_ETH_PHY_1_OCK_SRAM_MUX_CLK_SRC", true);
-	qcom_aw_phy_enable_clock(ecpri_dma_ctx->pdev, "ECPRI_CC_ETH_PHY_2_OCK_SRAM_CLK",
-	                         "ECPRI_CC_ETH_PHY_2_OCK_SRAM_MUX_CLK_SRC", true);
-	qcom_aw_phy_enable_clock(ecpri_dma_ctx->pdev, "ECPRI_CC_ETH_PHY_3_OCK_SRAM_CLK",
-	                         "ECPRI_CC_ETH_PHY_3_OCK_SRAM_MUX_CLK_SRC", true);
-	qcom_aw_phy_enable_clock(ecpri_dma_ctx->pdev, "ECPRI_CC_ETH_PHY_4_OCK_SRAM_CLK",
-	                         "ECPRI_CC_ETH_PHY_4_OCK_SRAM_MUX_CLK_SRC", true);
+	qcom_aw_phy_enable_clock(dev, "ECPRI_CC_ETH_PHY_0_OCK_SRAM_CLK");
+	qcom_aw_phy_enable_clock(dev, "ECPRI_CC_ETH_PHY_1_OCK_SRAM_CLK");
+	qcom_aw_phy_enable_clock(dev, "ECPRI_CC_ETH_PHY_2_OCK_SRAM_CLK");
+	qcom_aw_phy_enable_clock(dev, "ECPRI_CC_ETH_PHY_3_OCK_SRAM_CLK");
+	qcom_aw_phy_enable_clock(dev, "ECPRI_CC_ETH_PHY_4_OCK_SRAM_CLK");
 
 	return;
 }
