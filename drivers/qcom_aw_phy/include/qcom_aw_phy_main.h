@@ -188,10 +188,9 @@ struct qcom_aw_phy_lane_speed_config{
 };
 
 struct qcom_aw_phy_config* qcom_aw_phy_get_config_info(void);
-enum qcom_aw_phy_loopback_mode_enum 
-                               qcom_aw_phy_get_loopback_mode(void);
-void qcom_aw_phy_set_loopback_mode(
-                                      enum qcom_aw_phy_loopback_mode_enum mode);
+enum qcom_aw_phy_loopback_mode_enum qcom_aw_phy_get_loopback_mode(void);
+void qcom_aw_phy_set_loopback_mode(enum qcom_aw_phy_loopback_mode_enum mode);
+int qcom_aw_phy_get_polarity_flag(void);
 
 #ifdef FEATURE_QCOM_AW_TEST_SYS_FS
 void qcom_aw_phy_setup_sysfs(void);

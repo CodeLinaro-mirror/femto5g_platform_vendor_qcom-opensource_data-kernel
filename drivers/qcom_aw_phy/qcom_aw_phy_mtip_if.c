@@ -505,6 +505,11 @@ int qcom_aw_phy_bringup(enum mtip_port_type_enum port_type,
     /* Set the lane offset */
     pmd_set_lane(&mss, lane);
 
+    if(qcom_aw_phy_get_polarity_flag()){
+      aw_pmd_tx_polarity_set(&mss, 1);
+      aw_pmd_rx_polarity_set(&mss, 1);
+    }
+
     /* Lane Isolation */
     aw_err_val = aw_pmd_isolate_lane_set(&mss, 1);
     if (aw_err_val != AW_ERR_CODE_NONE) {

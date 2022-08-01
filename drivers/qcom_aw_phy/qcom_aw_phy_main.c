@@ -29,6 +29,9 @@
 #define QCOM_AW_PHY_DRV_MAIN_NAME "qcom-aw-phy-main"
 #define QCOM_AW_PHY_DRV_INST_NAME "qcom-aw-phy-inst"
 
+#define REF_CLK_MODE_SILABS       0
+#define REF_CLK_MODE_OSCILLATOR   1
+
 /* Module parameters */
 static enum qcom_aw_phy_loopback_mode_enum qcom_aw_phy_loopback_mode;
 
@@ -37,6 +40,17 @@ static struct qcom_aw_phy_config qcom_aw_phy_config_info;
 
 /* Global to cache CXO clock reference */
 struct clk *cxo_clk = NULL;
+
+int qcom_aw_phy_ref_clk_mode = 0;
+module_param(qcom_aw_phy_ref_clk_mode, int,
+                  S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP);
+MODULE_PARM_DESC(qcom_aw_phy_ref_clk_mode, "PHY REF clock mode");
+
+int qcom_aw_phy_toggle_polarity = 0;
+module_param(qcom_aw_phy_toggle_polarity, int,
+             S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP);
+MODULE_PARM_DESC(qcom_aw_phy_toggle_polarity,
+                 "Toggle PHY TX/RX polarity");
 
 /*-------------------------------------------------------------------
 * Function Definitions
@@ -67,6 +81,15 @@ enum qcom_aw_phy_loopback_mode_enum qcom_aw_phy_get_loopback_mode(void) {
 ------------------------------------------------------------------- */
 void qcom_aw_phy_set_loopback_mode(enum qcom_aw_phy_loopback_mode_enum mode) {
   qcom_aw_phy_loopback_mode = mode;
+}
+
+/*------------------------------------------------------------------------
+* qcom_aw_phy_get_polarity_flag
+
+* Description: This function returns the polarity toggle flag for AW PHY.
+----------------------------------------------------------------------- */
+int qcom_aw_phy_get_polarity_flag(void) {
+  return qcom_aw_phy_toggle_polarity;
 }
 
 /*-------------------------------------------------------------------
@@ -419,25 +442,47 @@ static void qcom_aw_phy_enable_ref_clk_propagation(
                   DIG_SOC_CMN_OVRD_ICTL_REF_LS_ENA_A_MASK,
                   DIG_SOC_CMN_OVRD_ICTL_REF_LS_ENA_A_OFFSET, 1);
 
-  if (phy_inst_info->phy_inst == QCOM_AW_PHY_INST_DEBUG)
-    reg_val = 0x4;
-  else
-    reg_val = 0x1;
+  if(qcom_aw_phy_ref_clk_mode == REF_CLK_MODE_OSCILLATOR){
+    if (phy_inst_info->phy_inst == QCOM_AW_PHY_INST_DEBUG)
+      reg_val = 0x4;
+    else
+      reg_val = 0x1;
+  }
+  else{
+    if (phy_inst_info->phy_inst == QCOM_AW_PHY_INST_FH0)
+      reg_val = 0x4;
+    else
+      reg_val = 0x3;
+  }
 
   pmd_write_field(&mss, DIG_SOC_CMN_OVRD_ADDR,
                   DIG_SOC_CMN_OVRD_ICTL_LSREF_SELECT_NT_MASK,
                   DIG_SOC_CMN_OVRD_ICTL_LSREF_SELECT_NT_OFFSET, reg_val);
 
-  if (phy_inst_info->phy_inst == QCOM_AW_PHY_INST_FH0)
-    reg_val = 0x0;
-  else if (phy_inst_info->phy_inst == QCOM_AW_PHY_INST_DEBUG)
-    reg_val = 0x3;
-  else
-    reg_val = 0x1;
+  if(qcom_aw_phy_ref_clk_mode == REF_CLK_MODE_OSCILLATOR){
+    if (phy_inst_info->phy_inst == QCOM_AW_PHY_INST_FH0)
+      reg_val = 0x0;
+    else if (phy_inst_info->phy_inst == QCOM_AW_PHY_INST_DEBUG)
+      reg_val = 0x3;
+    else
+      reg_val = 0x1;
 
-  pmd_write_field(&mss, DIG_SOC_CMN_OVRD_ADDR,
-                  DIG_SOC_CMN_OVRD_ICTL_L2R0_LSREF_SELECT_NT_MASK,
-                  DIG_SOC_CMN_OVRD_ICTL_L2R0_LSREF_SELECT_NT_OFFSET, reg_val);
+    pmd_write_field(&mss, DIG_SOC_CMN_OVRD_ADDR,
+                    DIG_SOC_CMN_OVRD_ICTL_L2R0_LSREF_SELECT_NT_MASK,
+                    DIG_SOC_CMN_OVRD_ICTL_L2R0_LSREF_SELECT_NT_OFFSET, reg_val);
+  }
+  else{
+    if (phy_inst_info->phy_inst == QCOM_AW_PHY_INST_FH0)
+      reg_val = 0x3;
+    else if (phy_inst_info->phy_inst == QCOM_AW_PHY_INST_DEBUG)
+      reg_val = 0x0;
+    else
+      reg_val = 0x1;
+
+    pmd_write_field(&mss, DIG_SOC_CMN_OVRD_ADDR,
+                    DIG_SOC_CMN_OVRD_ICTL_R2L0_LSREF_SELECT_NT_MASK,
+                    DIG_SOC_CMN_OVRD_ICTL_R2L0_LSREF_SELECT_NT_OFFSET, reg_val);
+  }
 
 func_exit:
   QCOM_AW_PHY_LOG_ERR("%s: local error %d", __func__, local_err_val);
@@ -526,6 +571,10 @@ static void qcom_aw_phy_hw_init() {
   }
   // Reference clock propagation using PHY internal registers
   else {
+
+    QCOM_AW_PHY_LOG_INFO("REF clock in mode %d (0-silabs, 1- osc)",
+                         qcom_aw_phy_ref_clk_mode);
+
     for (phy_inst_type = QCOM_AW_PHY_INST_FH0;
          phy_inst_type < QCOM_AW_PHY_INST_MAX; phy_inst_type++) {
       phy_inst_info = &phy_config_info->phy_inst_config_info[phy_inst_type];
@@ -545,7 +594,7 @@ static void qcom_aw_phy_hw_init() {
 
       mss.phy_offset = phy_inst_info->base_addr;
 
-      pmd_write_field(&mss, RXMFSM_SCRATCH_REG7_ADDR, 
+      pmd_write_field(&mss, RXMFSM_SCRATCH_REG7_ADDR,
                       RXMFSM_SCRATCH_REG7_RXMFSM_SCRATCH7_MASK,
                       RXMFSM_SCRATCH_REG7_RXMFSM_SCRATCH7_OFFSET, 0xFF);
 
@@ -643,38 +692,40 @@ static int qcom_aw_phy_inst_probe(struct platform_device *pdev) {
 
   if (phy_inst_type == QCOM_AW_PHY_INST_FH0) {
 
-    if (of_property_read_bool(pdev->dev.of_node, "vdd-supply")) {
-      qcom_aw_phy_config_info.ldo16_supply =
-          devm_regulator_get(&pdev->dev, "vdd");
-      if (IS_ERR(qcom_aw_phy_config_info.ldo16_supply)) {
-        QCOM_AW_PHY_LOG_ERR("Cannot get <%s>\n", "ld016");
-        return PTR_ERR(qcom_aw_phy_config_info.ldo16_supply);
+    if(qcom_aw_phy_ref_clk_mode == REF_CLK_MODE_OSCILLATOR){
+      if (of_property_read_bool(pdev->dev.of_node, "vdd-supply")) {
+        qcom_aw_phy_config_info.ldo16_supply =
+                                            devm_regulator_get(&pdev->dev, "vdd");
+        if (IS_ERR(qcom_aw_phy_config_info.ldo16_supply)) {
+          QCOM_AW_PHY_LOG_ERR("Cannot get <%s>\n", "ld016");
+          return PTR_ERR(qcom_aw_phy_config_info.ldo16_supply);
+        }
+
+        ret_val = regulator_set_load(qcom_aw_phy_config_info.ldo16_supply, 10000);
+        if (ret_val) {
+          QCOM_AW_PHY_LOG_ERR("Can not set Regulator Load <%s>\n", "ldo16");
+        }
+
+        ret_val = regulator_set_voltage(qcom_aw_phy_config_info.ldo16_supply,
+                                        1800000, 1800000);
+        if (ret_val) {
+          QCOM_AW_PHY_LOG_ERR("Can not set Regulator Voltage enable <%s>\n",
+                              "ldo16");
+        }
+
+        ret_val = regulator_enable(qcom_aw_phy_config_info.ldo16_supply);
+        if (ret_val) {
+          QCOM_AW_PHY_LOG_ERR("Can not enable <%s>\n", "ldo16");
+          goto func_exit;
+        }
+
+        QCOM_AW_PHY_LOG_INFO("Enabled <%s>\n", "ldo16");
       }
 
-      ret_val = regulator_set_load(qcom_aw_phy_config_info.ldo16_supply, 10000);
-      if (ret_val) {
-        QCOM_AW_PHY_LOG_ERR("Can not set Regulator Load <%s>\n", "ldo16");
-      }
-
-      ret_val = regulator_set_voltage(qcom_aw_phy_config_info.ldo16_supply,
-                                      1800000, 1800000);
-      if (ret_val) {
-        QCOM_AW_PHY_LOG_ERR("Can not set Regulator Voltage enable <%s>\n",
-                             "ldo16");
-      }
-
-      ret_val = regulator_enable(qcom_aw_phy_config_info.ldo16_supply);
-      if (ret_val) {
-        QCOM_AW_PHY_LOG_ERR("Can not enable <%s>\n", "ldo16");
-        goto func_exit;
-      }
-
-      QCOM_AW_PHY_LOG_INFO("Enabled <%s>\n", "ldo16");
+      pinctrl = devm_pinctrl_get_select_default(&pdev->dev);
+      if (IS_ERR(pinctrl))
+        QCOM_AW_PHY_LOG_ERR("No default pinctrl found\n");
     }
-
-    pinctrl = devm_pinctrl_get_select_default(&pdev->dev);
-    if (IS_ERR(pinctrl))
-      QCOM_AW_PHY_LOG_ERR("No default pinctrl found\n");
 
     tcsr_resource = platform_get_resource_byname(pdev, IORESOURCE_MEM, "tcsr");
     if (!tcsr_resource) {
