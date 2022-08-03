@@ -341,6 +341,7 @@ static long ecpri_oxtor_core_ioctl_hdlr(struct file *filp, unsigned int cmd,
 	ecpri_oxtor_core_cfg_s var;
 	ecpri_oxtor_start_cfg_s data;
 	u32 reset_ring_id;
+	u32 ring_id = 0;
 	ecpri_oxtor_core_tx_cmd_cfg_s *bck;
 	ecpri_oxtor_tx_ring_config_s wrap_cfg;
 	u8 wrap_en[4];
@@ -552,6 +553,19 @@ static long ecpri_oxtor_core_ioctl_hdlr(struct file *filp, unsigned int cmd,
 
 		/* This should be called just after RESET command */
 		case ECPRI_OXTOR_IOCTL_GET_STATS :
+
+			for(ring_id = 0 ; ring_id <4; ring_id++){
+
+				ecpri_oxtor_tx_get_status(ring_id);
+
+				stats_data.tx_count[ring_id] =
+				ecpri_oxtor_tx_get_stats(ring_id);
+
+				stats_data.rx_count[ring_id] =
+				ecpri_oxtor_rx_get_stats(ring_id);
+
+			}
+
 			if(copy_to_user((ecpri_oxtor_stats_s *)arg, &stats_data,
 						sizeof(stats_data))){
 				pr_err("copy_to_user_failed in ioctls\n");
