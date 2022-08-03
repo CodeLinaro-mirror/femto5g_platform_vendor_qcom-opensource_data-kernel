@@ -55,11 +55,9 @@ typedef struct aw_an_cfg_s {
 
 } aw_an_cfg_t;
 
-/** Structure to define wall clock mode parameters
- */
 typedef struct aw_dwell_params_s {
-    uint32_t aw_measure_time;  /** Measurement time in terms of seconds */
-    uint32_t rx_data_rate;     /** RX rate */
+  uint32_t aw_measure_time;
+  uint32_t rx_data_rate;
 } aw_dwell_params_t;
 
 typedef struct digref_struct {
@@ -67,15 +65,12 @@ typedef struct digref_struct {
   double lsref_freq_mhz;
 
   int digref_data_sel;
-
   int digref_clock_sel;
 
   double tx_rate;
-
   double rx_rate;
 
   uint32_t tx_width;
-
   uint32_t rx_width;
 
   int num_adc;
@@ -85,7 +80,6 @@ typedef struct digref_struct {
   double bwidth_hz;
 
   double rx_vco_freq_ghz;
-
   double tx_vco_freq_ghz;
 
   uint32_t scaler_en;
@@ -234,12 +228,6 @@ typedef struct aw_dcdiq_data_s {
   uint32_t iq;
 } aw_dcdiq_data_t;
 
-typedef struct aw_version_e {
-  uint32_t version_major;
-  uint32_t version_minor;
-  uint32_t version_patch;
-} aw_version_t;
-
 typedef struct vga_opt_s {
 
   uint32_t en;
@@ -351,7 +339,7 @@ typedef enum aw_bist_pattern_e {
   AW_HALF_RATE_CLOCK = 13,
   AW_QUARTER_RATE_CLOCK = 14,
   AW_PATT_32_1S_32_0S = 15,
-  AW_BIST_PATTERN_MAX = 16
+  AW_BIST_PATTERN_MAX
 } aw_bist_pattern_t;
 
 typedef enum aw_bist_mode_e {
@@ -415,28 +403,6 @@ typedef enum aw_rx_ffe_tap_count_e {
   AW_FFE_ALL_TAPS_ENABLED = 3
 } aw_rx_ffe_tap_count_t;
 
-typedef struct aw_adc_temp_s {
-  float vc;
-  float vb;
-  float bg1;
-  float bg2;
-} aw_adc_temp_data_t;
-
-typedef struct aw_adc_temp_calibration_s {
-  aw_adc_temp_data_t data_1;
-  aw_adc_temp_data_t data_2;
-  float temp_1;
-  float temp_2;
-} aw_adc_temp_calibration_t;
-
-typedef enum aw_atest_adc_temp_method_e {
-  AW_ATEST_ADC_1_POINT_SUPPLY_SENSITIVE_METHOD,
-  AW_ATEST_ADC_1_POINT_SUPPLY_INSENSITIVE_METHOD,
-  AW_ATEST_ADC_2_POINT_SUPPLY_SENSITIVE_METHOD,
-  AW_ATEST_ADC_2_POINT_SUPPLY_INSENSITIVE_METHOD,
-  AW_ATEST_ADC_MAX_METHOD
-} aw_adc_temp_method_t;
-
 uint32_t aw_width_decoder(uint32_t width_encoded);
 
 int aw_pmd_anlt_logical_lane_num_set(mss_access_t *mss, uint32_t logical_lane,
@@ -457,6 +423,11 @@ int aw_pmd_anlt_auto_neg_start_set(mss_access_t *mss, uint32_t start);
 
 int aw_pmd_anlt_auto_neg_status_complete_get(mss_access_t *mss,
                                              uint32_t *an_complete);
+
+int aw_pmd_anlt_auto_neg_next_page_set(mss_access_t *mss, uint64_t an_tx_np);
+
+int aw_pmd_anlt_auto_neg_next_page_oui_compare_set(mss_access_t *mss,
+                                                   uint32_t np_expected_oui);
 
 int aw_pmd_anlt_link_training_en_set(mss_access_t *mss, uint32_t en);
 
@@ -511,26 +482,11 @@ int aw_pmd_tx_pam4_precoder_enable_set(mss_access_t *mss, uint32_t gray_en,
 
 int aw_pmd_rx_pam4_precoder_override_set(mss_access_t *mss, uint32_t en);
 
-int aw_pmd_rx_pam4_precoder_enable_set(mss_access_t *mss, uint32_t gray_en,
-                                       uint32_t plusd_en);
-
 int aw_pmd_remote_loopback_set(mss_access_t *mss,
                                uint32_t remote_loopback_enable);
 
 int aw_pmd_analog_loopback_set(mss_access_t *mss,
                                uint32_t analog_loopback_enable);
-
-int aw_pmd_tx_postdiv_loopback_ena_set(mss_access_t *mss, uint8_t postdiv_loopback_ena);
-
-int aw_pmd_tx_postdiv_loopback_ena_get(mss_access_t *mss, uint8_t *postdiv_loopback_ena);
-
-int aw_pmd_fes_loopback_set(mss_access_t *mss, uint32_t fes_loopback_enable);
-
-int aw_pmd_fes_loopback_get(mss_access_t *mss, uint32_t *fes_loopback_enable);
-
-int aw_pmd_analog_loopback_txfir_set(mss_access_t *mss, aw_analog_loopback_txfir_config_t *nes_txfir_cfg);
-
-int aw_pmd_analog_loopback_txfir_get(mss_access_t *mss, aw_analog_loopback_txfir_config_t *nes_txfir_cfg);
 
 int aw_pmd_tx_polarity_set(mss_access_t *mss, uint32_t tx_pol_flip);
 
@@ -540,15 +496,16 @@ int aw_pmd_rx_dfe_adapt_set(mss_access_t *mss, uint32_t dfe_adapt_enable);
 
 int aw_pmd_rxeq_prbs_set(mss_access_t *mss, uint32_t prbs_en);
 
-int aw_pmd_pll_lock_cycle_set(mss_access_t *mss, uint32_t val);
+int aw_pmd_rxeq_prbs_get(mss_access_t *mss, uint32_t *prbs_en);
 
 int aw_pmd_fep_data_set(mss_access_t *mss, uint32_t datapath_en);
 
 int aw_pmd_fep_clock_set(mss_access_t *mss, uint8_t clock_en);
 
 int aw_pmd_rx_chk_config_set(mss_access_t *mss, aw_bist_pattern_t pattern,
-                             aw_bist_mode_t mode, uint64_t udp,
-                             uint32_t lock_thresh, uint32_t timer_thresh);
+                             aw_bist_mode_t mode, uint64_t udp_63_0,
+                             uint64_t udp_127_64, uint32_t lock_thresh,
+                             uint32_t timer_thresh);
 
 int aw_pmd_rx_chk_en_set(mss_access_t *mss, uint32_t enable);
 
@@ -561,10 +518,10 @@ int aw_pmd_rx_chk_err_count_state_get(mss_access_t *mss, uint64_t *err_count,
 int aw_pmd_rx_chk_err_count_state_clear(mss_access_t *mss);
 
 int aw_pmd_tx_gen_config_set(mss_access_t *mss, aw_bist_pattern_t pattern,
-                             uint64_t user_defined_pattern);
+                             uint64_t udp_63_0, uint64_t udp_127_64);
 
 int aw_pmd_tx_gen_config_get(mss_access_t *mss, aw_bist_pattern_t *pattern,
-                             uint64_t *user_defined_pattern);
+                             uint64_t *udp_63_0, uint64_t *udp_127_64);
 
 int aw_pmd_tx_gen_en_set(mss_access_t *mss, uint32_t enable);
 
@@ -572,16 +529,6 @@ int aw_pmd_tx_gen_err_inject_config_set(mss_access_t *mss, uint64_t err_pattern,
                                         uint32_t err_rate);
 
 int aw_pmd_tx_gen_err_inject_en_set(mss_access_t *mss, uint32_t enable);
-
-int aw_pmd_gen_tx_swap_msb_lsb_set(mss_access_t *mss, uint32_t enable);
-
-int aw_pmd_gen_tx_swap_msb_lsb_get(mss_access_t *mss, uint32_t *enable);
-
-int aw_pmd_gen_rx_swap_msb_lsb_set(mss_access_t *mss, uint32_t enable);
-
-int aw_pmd_gen_rx_swap_msb_lsb_get(mss_access_t *mss, uint32_t *enable);
-
-int c_load_hexfile(mss_access_t *mss, char *fileName);
 
 int aw_pmd_ock_pcs_clk_b_gate_set(mss_access_t *mss, uint32_t enable);
 
@@ -743,12 +690,6 @@ typedef enum {
 
 int aw_pmd_nep_loopback_set(mss_access_t *mss, uint32_t nep_loopback_enable);
 
-int aw_pmd_rx_burst_mode_config_set(mss_access_t *mss, uint32_t pam_mode, uint32_t burst_threshold, uint32_t burst_mode);
-
-int aw_pmd_rx_burst_mode_config_get(mss_access_t *mss, uint32_t *pam_mode, uint32_t *burst_threshold, uint32_t *burst_mode);
-
-int aw_pmd_rx_burst_err_cnt_get(mss_access_t *mss , uint32_t *burst_err_cnt);
-
 int aw_pmd_anlt_ms_per_ck_set(mss_access_t *mss, uint32_t ms_per_ck);
 
 int aw_pmd_anlt_fastsim_timer_set(mss_access_t *mss);
@@ -775,7 +716,5 @@ int aw_pmd_snr_mon_enable_set(mss_access_t *mss, uint32_t nrz_mode,
 int aw_pmd_snr_vld_enable_set(mss_access_t *mss, uint32_t vld_enable);
 
 int aw_pmd_rx_cdr_lock_get(mss_access_t *mss, uint32_t *rx_cdr_lock);
-
-int aw_pmd_rx_cdr_offset_get(mss_access_t *mss, uint32_t *cdr_offset, uint32_t *cdr_dir);
 
 #endif
