@@ -269,7 +269,7 @@ static void ecpri_dma_notify_dma_ready(void)
 	}
 
 	/* Trigger Q6 init without QMI */
-	spare_reg.value = 1;
+	spare_reg.value = ecpri_dma_get_ctx_hw_flavor();
 	ecpri_dma_hal_write_reg(
 		ECPRI_SPARE_REG, spare_reg.value);
 
