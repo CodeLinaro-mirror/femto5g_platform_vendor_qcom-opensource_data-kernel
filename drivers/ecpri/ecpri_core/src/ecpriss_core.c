@@ -5,6 +5,7 @@
 #include "ecpriss_core.h"
 #include "ecpriss_netlink.h"
 #include "ecpriss_workqueue.h"
+#include "ecpriss_debugfs.h"
 
 extern struct ecpri_dma_ecpri_ss_ops dma_ecpri_ss_driver_ops;
 extern struct eth_ecpriss_ops mtip_ecpri_ops;
@@ -731,6 +732,10 @@ static int ecpriss_core_probe(struct platform_device *pdev)
 		ret = -ENOMEM;
 	}
 	ecpriss_core_init(pdev);
+	/*
+	 * Debug FS Init
+	 */
+	setup_debugfs_directory();
 	pr_debug("ecpriss_core_probe(): End\n");
 	/*Clean up for init failure.*/
 	return ret;

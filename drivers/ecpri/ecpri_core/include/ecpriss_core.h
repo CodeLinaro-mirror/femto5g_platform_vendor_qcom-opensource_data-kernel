@@ -29,6 +29,7 @@
 #include "ecpriss_xbar.h"
 #include "ecpriss_qudp.h"
 #include "ecpriss_flow.h"
+#include "ecpriss_debugfs.h"
 
 #define ECPRI_DMA_RING_PER_PORT_MAX 4
 
@@ -168,6 +169,7 @@ typedef struct ecpriss_core_private_s {
 	ecpriss_dev_mode_e                    dev_mode;
 	ecpriss_qudp_ctx_s                   *qudp_ctx;
 	ecpriss_xbar_ctx_s                   *xbar_ctx;
+	ecpriss_config_stats_s                cfg_stats;
 	struct mutex                          ecpriss_mutex_lock;
 } ecpriss_core_private_s;
 

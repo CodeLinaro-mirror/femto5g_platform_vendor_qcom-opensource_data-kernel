@@ -14,7 +14,6 @@
 #define BYTE_SHIFT                     8
 #define MSB_SHIFT                      32
 
-
 static int qudp_irq_mapping[QUDP_IRQ_MAX]=
 {
 	[ECPRISS_UDP_C2C_IRQ_PORT0]=491,
@@ -25,17 +24,382 @@ static int qudp_irq_mapping[QUDP_IRQ_MAX]=
 	[ECPRISS_UDP_L2_IRQ]=496
 };
 
+void ecpriss_qudp_clear_stats(uint32_t port_index, uint32_t link_index)
+{
+	ecpriss_qudp_hal_write_reg_mn(
+		ECPRISS_QUDP_FH_RAMS ,
+		ECPRI_UDP_FH_EGRESS_NUM_UDP_PACKETS_LSB_PORT_p_LINK_n,
+		port_index, link_index,0);
+
+	ecpriss_qudp_hal_write_reg_mn(ECPRISS_QUDP_FH_RAMS,
+		ECPRI_UDP_FH_EGRESS_NUM_UDP_PACKETS_MSB_PORT_p_LINK_n,
+		port_index, link_index,0);
+
+	ecpriss_qudp_hal_write_reg_mn(
+		ECPRISS_QUDP_FH_RAMS,
+		ECPRI_UDP_FH_EGRESS_NUM_ETH_ONLY_PACKETS_LSB_PORT_p_LINK_n,
+		port_index, link_index,0);
+	ecpriss_qudp_hal_write_reg_mn(
+		ECPRISS_QUDP_FH_RAMS,
+		ECPRI_UDP_FH_EGRESS_NUM_ETH_ONLY_PACKETS_MSB_PORT_p_LINK_n,
+		port_index, link_index,0);
+
+	ecpriss_qudp_hal_write_reg_mn(
+		ECPRISS_QUDP_FH_RAMS,
+		ECPRI_UDP_FH_EGRESS_NUM_BYPASSED_PACKETS_LSB_PORT_p_LINK_n,
+		port_index, link_index,0);
+	ecpriss_qudp_hal_write_reg_mn(
+		ECPRISS_QUDP_FH_RAMS,
+		ECPRI_UDP_FH_EGRESS_NUM_BYPASSED_PACKETS_MSB_PORT_p_LINK_n,
+		port_index, link_index,0);
+
+	ecpriss_qudp_hal_write_reg_mn(
+		ECPRISS_QUDP_FH_RAMS,
+		ECPRI_UDP_FH_EGRESS_MTU_ERR_PACKETS_LSB_PORT_p_LINK_n,
+		port_index, link_index,0);
+	ecpriss_qudp_hal_write_reg_mn(ECPRISS_QUDP_FH_RAMS,
+		ECPRI_UDP_FH_EGRESS_MTU_ERR_PACKETS_MSB_PORT_p_LINK_n,
+		port_index, link_index,0);
+
+	ecpriss_qudp_hal_write_reg_mn(
+		ECPRISS_QUDP_FH_RAMS,
+		ECPRI_UDP_FH_INGRESS_NUM_UDP_PACKETS_LSB_PORT_p_LINK_n,
+		port_index, link_index,0);
+	ecpriss_qudp_hal_write_reg_mn(
+		ECPRISS_QUDP_FH_RAMS,
+		ECPRI_UDP_FH_INGRESS_NUM_UDP_PACKETS_MSB_PORT_p_LINK_n,
+		port_index, link_index,0);
+
+	ecpriss_qudp_hal_write_reg_mn(
+		ECPRISS_QUDP_FH_RAMS,
+		ECPRI_UDP_FH_INGRESS_NUM_NON_UDP_PACKETS_LSB_PORT_p_LINK_n,
+		port_index, link_index,0);
+	ecpriss_qudp_hal_write_reg_mn(
+		ECPRISS_QUDP_FH_RAMS,
+		ECPRI_UDP_FH_INGRESS_NUM_NON_UDP_PACKETS_MSB_PORT_p_LINK_n,
+		port_index, link_index,0);
+
+	ecpriss_qudp_hal_write_reg_mn(
+		ECPRISS_QUDP_FH_RAMS,
+		ECPRI_UDP_FH_INGRESS_FCS_ERR_PACKETS_LSB_PORT_p_LINK_n,
+		port_index, link_index,0);
+	ecpriss_qudp_hal_write_reg_mn(
+		ECPRISS_QUDP_FH_RAMS,
+		ECPRI_UDP_FH_INGRESS_FCS_ERR_PACKETS_MSB_PORT_p_LINK_n,
+		port_index, link_index,0);
+
+	ecpriss_qudp_hal_write_reg_mn(
+		ECPRISS_QUDP_FH_RAMS,
+		ECPRI_UDP_FH_INGRESS_IPV4_CS_ERROR_PACKETS_LSB_PORT_p_LINK_n,
+		port_index, link_index,0);
+	ecpriss_qudp_hal_write_reg_mn(
+		ECPRISS_QUDP_FH_RAMS,
+		ECPRI_UDP_FH_INGRESS_IPV4_CS_ERROR_PACKETS_MSB_PORT_p_LINK_n,
+		port_index, link_index,0);
+
+	ecpriss_qudp_hal_write_reg_mn(
+		ECPRISS_QUDP_FH_RAMS,
+		ECPRI_UDP_FH_INGRESS_UDP_CS_ERROR_PACKETS_LSB_PORT_p_LINK_n,
+		port_index, link_index,0);
+	ecpriss_qudp_hal_write_reg_mn(
+		ECPRISS_QUDP_FH_RAMS,
+		ECPRI_UDP_FH_INGRESS_UDP_CS_ERROR_PACKETS_MSB_PORT_p_LINK_n,
+		port_index, link_index,0);
+
+	ecpriss_qudp_hal_write_reg_mn(
+		ECPRISS_QUDP_FH_RAMS,
+		ECPRI_UDP_FH_INGRESS_VLAN_FILTERED_PACKETS_LSB_PORT_p_LINK_n,
+		port_index, link_index,0);
+	ecpriss_qudp_hal_write_reg_mn(
+		ECPRISS_QUDP_FH_RAMS,
+		ECPRI_UDP_FH_INGRESS_VLAN_FILTERED_PACKETS_MSB_PORT_p_LINK_n,
+		port_index, link_index,0);
+
+	ecpriss_qudp_hal_write_reg_mn(
+		ECPRISS_QUDP_FH_RAMS,
+		ECPRI_UDP_FH_INGRESS_SEC_ERR_PACKETS_LSB_PORT_p_LINK_n,
+		port_index, link_index,0);
+	ecpriss_qudp_hal_write_reg_mn(
+		ECPRISS_QUDP_FH_RAMS,
+		ECPRI_UDP_FH_INGRESS_SEC_ERR_PACKETS_MSB_PORT_p_LINK_n,
+		port_index, link_index,0);
+
+	ecpriss_qudp_hal_write_reg_mn(
+		ECPRISS_QUDP_FH_RAMS,
+		ECPRI_UDP_FH_INGRESS_IP_LEN_ERR_PACKETS_LSB_PORT_p_LINK_n,
+		port_index, link_index,0);
+	ecpriss_qudp_hal_write_reg_mn(ECPRISS_QUDP_FH_RAMS,
+		ECPRI_UDP_FH_INGRESS_IP_LEN_ERR_PACKETS_MSB_PORT_p_LINK_n,
+		port_index, link_index,0);
+
+	ecpriss_qudp_hal_write_reg_mn(
+		ECPRISS_QUDP_FH_RAMS,
+		ECPRI_UDP_FH_INGRESS_IP_FILTERED_PACKETS_LSB_PORT_p_LINK_n,
+		port_index, link_index,0);
+	ecpriss_qudp_hal_write_reg_mn(
+		ECPRISS_QUDP_FH_RAMS,
+		ECPRI_UDP_FH_INGRESS_IP_FILTERED_PACKETS_MSB_PORT_p_LINK_n,
+		port_index, link_index,0);
+
+}
+void debug_qudp_egress_config(void)
+{
+	int32_t fh_index = 0;
+	int32_t egress_table_index = 0;
+
+	for(fh_index = 0; fh_index < NUM_OF_FHP; fh_index++){
+
+		for(egress_table_index = 0; egress_table_index < NUM_EGRESS_ENTRY; egress_table_index++){
+			pr_err("SRC udp_ports[%d][%d]: 0x%x\n",fh_index,egress_table_index,ecpriss_pdata->cfg_stats.qudp_cfg.egress.udp_ports[fh_index][egress_table_index].src);
+			pr_err("DST udp_ports[%d][%d]: 0x%x\n",fh_index,egress_table_index,ecpriss_pdata->cfg_stats.qudp_cfg.egress.udp_ports[fh_index][egress_table_index].dst);
+			pr_err("VLAN vlan_ethertype[%d][%d]: 0x%x\n",fh_index,egress_table_index,ecpriss_pdata->cfg_stats.qudp_cfg.egress.vlan_ethertype[fh_index][egress_table_index].vlan_data);
+			pr_err("EtherType vlan_ethertype[%d][%d]: 0x%x\n",fh_index,egress_table_index,ecpriss_pdata->cfg_stats.qudp_cfg.egress.vlan_ethertype[fh_index][egress_table_index].ethertype);
+			pr_err("Eth_DST0_port eth_dst0_port[%d][%d]: 0x%x\n",fh_index,egress_table_index,ecpriss_pdata->cfg_stats.qudp_cfg.egress.eth_dst0_port[fh_index][egress_table_index].value);
+			pr_err("DST_MSB eth_src1_dst1_port[%d][%d]: 0x%x\n",fh_index,egress_table_index,ecpriss_pdata->cfg_stats.qudp_cfg.egress.eth_src1_dst1_port[fh_index][egress_table_index].dst_msb);
+			pr_err("SRC_MSB eth_src1_dst1_port[%d][%d]: 0x%x\n",fh_index,egress_table_index,ecpriss_pdata->cfg_stats.qudp_cfg.egress.eth_src1_dst1_port[fh_index][egress_table_index].src_msb);
+			pr_err("ETH_src0 eth_src0_port[%d][%d]: 0x%x\n",fh_index,egress_table_index,ecpriss_pdata->cfg_stats.qudp_cfg.egress.eth_src0_port[fh_index][egress_table_index].value);
+			pr_err("DST IP addr0 ip_addr0[%d][%d]: 0x%x\n",fh_index,egress_table_index,ecpriss_pdata->cfg_stats.qudp_cfg.egress.dst_ip_addr[fh_index][egress_table_index].ip_dst0.value);
+			pr_err("DST IP addr1 ip_addr1[%d][%d]: 0x%x\n",fh_index,egress_table_index,ecpriss_pdata->cfg_stats.qudp_cfg.egress.dst_ip_addr[fh_index][egress_table_index].ip_dst1.value);
+			pr_err("DST IP addr2 ip_addr2[%d][%d]: 0x%x\n",fh_index,egress_table_index,ecpriss_pdata->cfg_stats.qudp_cfg.egress.dst_ip_addr[fh_index][egress_table_index].ip_dst2.value);
+			pr_err("DST IP addr3 ip_addr3[%d][%d]: 0x%x\n",fh_index,egress_table_index,ecpriss_pdata->cfg_stats.qudp_cfg.egress.dst_ip_addr[fh_index][egress_table_index].ip_dst3.value);
+			pr_err("SRC IP addr0 ip_addr0[%d][%d]: 0x%x\n",fh_index,egress_table_index,ecpriss_pdata->cfg_stats.qudp_cfg.egress.src_ip_addr[fh_index][egress_table_index].ip_src0.value);
+			pr_err("SRC IP addr1 ip_addr1[%d][%d]: 0x%x\n",fh_index,egress_table_index,ecpriss_pdata->cfg_stats.qudp_cfg.egress.src_ip_addr[fh_index][egress_table_index].ip_src1.value);
+			pr_err("SRC IP addr2 ip_addr2[%d][%d]: 0x%x\n",fh_index,egress_table_index,ecpriss_pdata->cfg_stats.qudp_cfg.egress.src_ip_addr[fh_index][egress_table_index].ip_src2.value);
+			pr_err("SRC IP addr3 ip_addr3[%d][%d]: 0x%x\n",fh_index,egress_table_index,ecpriss_pdata->cfg_stats.qudp_cfg.egress.src_ip_addr[fh_index][egress_table_index].ip_src3.value);
+		}
+	}
+}
+// ecpriss_pdata->cfg_stats.qudp_cfg.egress
+void ecpriss_qudp_egress_config_stats(int32_t fh_index)
+{
+	int32_t egress_table_index = 0;
+
+	for(egress_table_index = 0; egress_table_index < NUM_EGRESS_ENTRY ; egress_table_index++)
+	{
+
+		ecpriss_qudp_hal_read_reg_mn_fields(ECPRISS_QUDP_FH_RAMS,
+				ECPRI_UDP_FH_EGRESS_UDP_PORTS_PORT_p_ENTRY_n,
+				fh_index,
+				egress_table_index,
+				&ecpriss_pdata->cfg_stats.qudp_cfg.egress.udp_ports[fh_index][egress_table_index]);
+
+		ecpriss_qudp_hal_read_reg_mn_fields(ECPRISS_QUDP_FH_RAMS,
+				ECPRI_UDP_FH_EGRESS_VLAN_ETHERTYPE_PORT_p_ENTRY_n,
+				fh_index,
+				egress_table_index,
+				&ecpriss_pdata->cfg_stats.qudp_cfg.egress.vlan_ethertype[fh_index][egress_table_index]);
+
+		ecpriss_qudp_hal_read_reg_mn_fields(ECPRISS_QUDP_FH_RAMS,
+				ECPRI_UDP_FH_EGRESS_ETH_DST0_PORT_p_ENTRY_n,
+				fh_index,
+				egress_table_index,
+				&ecpriss_pdata->cfg_stats.qudp_cfg.egress.eth_dst0_port[fh_index][egress_table_index]);
+
+		ecpriss_qudp_hal_read_reg_mn_fields(ECPRISS_QUDP_FH_RAMS,
+				ECPRI_UDP_FH_EGRESS_ETH_SRC1_DST1_PORT_p_ENTRY_n,
+				fh_index,
+				egress_table_index,
+				&ecpriss_pdata->cfg_stats.qudp_cfg.egress.eth_src1_dst1_port[fh_index][egress_table_index]);
+
+		ecpriss_qudp_hal_read_reg_mn_fields(ECPRISS_QUDP_FH_RAMS,
+				ECPRI_UDP_FH_EGRESS_ETH_SRC0_PORT_p_ENTRY_n,
+				fh_index,
+				egress_table_index,
+				&ecpriss_pdata->cfg_stats.qudp_cfg.egress.eth_src0_port[fh_index][egress_table_index]);
+
+		ecpriss_qudp_hal_read_reg_mn_fields(ECPRISS_QUDP_FH_RAMS,
+				ECPRI_UDP_FH_EGRESS_IP_DST_ADDR0_PORT_p_ENTRY_n,
+				fh_index,
+				egress_table_index,
+				&ecpriss_pdata->cfg_stats.qudp_cfg.egress.dst_ip_addr[fh_index][egress_table_index].ip_dst0);
+		ecpriss_qudp_hal_read_reg_mn_fields(ECPRISS_QUDP_FH_RAMS,
+				ECPRI_UDP_FH_EGRESS_IP_DST_ADDR1_PORT_p_ENTRY_n,
+				fh_index,
+				egress_table_index,
+				&ecpriss_pdata->cfg_stats.qudp_cfg.egress.dst_ip_addr[fh_index][egress_table_index].ip_dst1);
+		ecpriss_qudp_hal_read_reg_mn_fields(ECPRISS_QUDP_FH_RAMS,
+				ECPRI_UDP_FH_EGRESS_IP_DST_ADDR2_PORT_p_ENTRY_n,
+				fh_index,
+				egress_table_index,
+				&ecpriss_pdata->cfg_stats.qudp_cfg.egress.dst_ip_addr[fh_index][egress_table_index].ip_dst2);
+		ecpriss_qudp_hal_read_reg_mn_fields(ECPRISS_QUDP_FH_RAMS,
+				ECPRI_UDP_FH_EGRESS_IP_DST_ADDR3_PORT_p_ENTRY_n,
+				fh_index,
+				egress_table_index,
+				&ecpriss_pdata->cfg_stats.qudp_cfg.egress.dst_ip_addr[fh_index][egress_table_index].ip_dst3);
+
+		ecpriss_qudp_hal_read_reg_mn_fields(ECPRISS_QUDP_FH_RAMS,
+				ECPRI_UDP_FH_EGRESS_IP_SRC_ADDR0_PORT_p_ENTRY_n,
+				fh_index,
+				egress_table_index,
+				&ecpriss_pdata->cfg_stats.qudp_cfg.egress.src_ip_addr[fh_index][egress_table_index].ip_src0);
+		ecpriss_qudp_hal_read_reg_mn_fields(ECPRISS_QUDP_FH_RAMS,
+				ECPRI_UDP_FH_EGRESS_IP_SRC_ADDR1_PORT_p_ENTRY_n,
+				fh_index,
+				egress_table_index,
+				&ecpriss_pdata->cfg_stats.qudp_cfg.egress.src_ip_addr[fh_index][egress_table_index].ip_src1);
+		ecpriss_qudp_hal_read_reg_mn_fields(ECPRISS_QUDP_FH_RAMS,
+				ECPRI_UDP_FH_EGRESS_IP_SRC_ADDR2_PORT_p_ENTRY_n,
+				fh_index,
+				egress_table_index,
+				&ecpriss_pdata->cfg_stats.qudp_cfg.egress.src_ip_addr[fh_index][egress_table_index].ip_src2);
+		ecpriss_qudp_hal_read_reg_mn_fields(ECPRISS_QUDP_FH_RAMS,
+				ECPRI_UDP_FH_EGRESS_IP_SRC_ADDR3_PORT_p_ENTRY_n,
+				fh_index,
+				egress_table_index,
+				&ecpriss_pdata->cfg_stats.qudp_cfg.egress.src_ip_addr[fh_index][egress_table_index].ip_src3);
+	}
+	return;
+}
+
+void debug_qudp_ingress_config(void)
+{
+	int i ,j;
+
+	pr_err("Global config\n");
+
+	for(i=0; i < NUM_OF_FHP; i++){
+		pr_err("0x%x\n",ecpriss_pdata->cfg_stats.qudp_cfg.ingress.cfg.global_cfg[i]);
+		pr_err("IP_FLTR: %u\n",ecpriss_pdata->cfg_stats.qudp_cfg.ingress.cfg.global_cfg[i].enable_ip_dst_filt);
+		pr_err("UDP_CLASS: %u\n",ecpriss_pdata->cfg_stats.qudp_cfg.ingress.cfg.global_cfg[i].enable_udp_dst_class);
+		pr_err("VLAN_FLTR: %u\n",ecpriss_pdata->cfg_stats.qudp_cfg.ingress.cfg.global_cfg[i].enable_vlan_filt);
+		pr_err("MAC_FLTR: %u\n",ecpriss_pdata->cfg_stats.qudp_cfg.ingress.cfg.global_cfg[i].enable_mac_dst_check);
+	}
+	pr_err("VLAID BITS \n");
+	for(i=0; i < NUM_OF_FHP; i++){
+		pr_err("VALID VLAN[%d] 0x%x\n",i,ecpriss_pdata->cfg_stats.qudp_cfg.ingress.vbits.vlan[i].valid_bits);
+		pr_err("VLAID UDP[%d] 0x%x\n",i,ecpriss_pdata->cfg_stats.qudp_cfg.ingress.vbits.udp_clss[i].valid_bits);
+		pr_err("VLAID IP[%d] 0x%x\n",i,ecpriss_pdata->cfg_stats.qudp_cfg.ingress.vbits.ip_addr[i].valid_bits);
+		pr_err("VLAID mac[%d] 0x%x\n",i,ecpriss_pdata->cfg_stats.qudp_cfg.ingress.vbits.mac_addr[i].valid_bits);
+	}
+	for(i=0; i < NUM_OF_FHP; i++){
+		for(j=0; j<NUM_OF_FLTR; j++){
+			pr_err("vlan[%d][%d]: 0x%x\t",i,j, ecpriss_pdata->cfg_stats.qudp_cfg.ingress.cfg.vlan[i][j].value);
+			pr_err("udp[%d][%d]: 0x%x\t",i,j,ecpriss_pdata->cfg_stats.qudp_cfg.ingress.cfg.udp_clss[i][j].value);
+			pr_err("mac_lsb[%d][%d]: 0x%x\t",i,j,ecpriss_pdata->cfg_stats.qudp_cfg.ingress.cfg.mac_addr[i][j].mac_lsb);
+			pr_err("mac_msb[%d][%d]: 0x%x\t",i,j,ecpriss_pdata->cfg_stats.qudp_cfg.ingress.cfg.mac_addr[i][j].mac_msb);
+			pr_err("ip0[%d][%d]: 0x%x\t",i,j,ecpriss_pdata->cfg_stats.qudp_cfg.ingress.cfg.ip_addr[i][j].dst_ip0.value);
+			pr_err("ip1[%d][%d]: 0x%x\t",i,j,ecpriss_pdata->cfg_stats.qudp_cfg.ingress.cfg.ip_addr[i][j].dst_ip1.value);
+			pr_err("ip2[%d][%d]: 0x%x\t",i,j,ecpriss_pdata->cfg_stats.qudp_cfg.ingress.cfg.ip_addr[i][j].dst_ip2.value);
+			pr_err("ip3[%d][%d]: 0x%x\t",i,j,ecpriss_pdata->cfg_stats.qudp_cfg.ingress.cfg.ip_addr[i][j].dst_ip3.value);
+			pr_err("\n");
+		}
+	}
+
+}
+// ecpriss_pdata->cfg_stats.qudp_cfg.ingress
+void ecpriss_qudp_ingress_config_stats(int32_t fh_index)
+{
+	uint32_t flag = 1;
+	int32_t fltr_index = 0;
+
+	ecpriss_qudp_hal_read_reg_n_fields(ECPRISS_QUDP_FH,
+			ECPRI_UDP_FH_INGRESS_CONFIG_P,
+			fh_index,
+			&ecpriss_pdata->cfg_stats.qudp_cfg.ingress.cfg.global_cfg[fh_index]);
+
+	if(ecpriss_pdata->cfg_stats.qudp_cfg.ingress.cfg.global_cfg[fh_index].enable_vlan_filt){
+		ecpriss_qudp_hal_read_reg_n_fields(ECPRISS_QUDP_FH,
+				ECPRI_UDP_FH_FILT_VLAN_ADDR_PORT_p_ENTRIES_VALID_BITS,
+				fh_index,
+				&ecpriss_pdata->cfg_stats.qudp_cfg.ingress.vbits.vlan[fh_index]);
+	}
+	if(ecpriss_pdata->cfg_stats.qudp_cfg.ingress.cfg.global_cfg[fh_index].enable_udp_dst_class){
+		ecpriss_qudp_hal_read_reg_n_fields(ECPRISS_QUDP_FH,
+				ECPRI_UDP_FH_UDP_CLASSIFICATION_LIST_PORT_p_ENTRIES_VALID_BITS,
+				fh_index,
+				&ecpriss_pdata->cfg_stats.qudp_cfg.ingress.vbits.udp_clss[fh_index]);
+	}
+	if(ecpriss_pdata->cfg_stats.qudp_cfg.ingress.cfg.global_cfg[fh_index].enable_ip_dst_filt){
+		ecpriss_qudp_hal_read_reg_n_fields(ECPRISS_QUDP_FH,
+				ECPRI_UDP_FH_FILT_IP_DST_ADDR_PORT_p_ENTRIES_VALID_BITS,
+				fh_index,
+				&ecpriss_pdata->cfg_stats.qudp_cfg.ingress.vbits.ip_addr[fh_index]);
+	}
+	if(ecpriss_pdata->cfg_stats.qudp_cfg.ingress.cfg.global_cfg[fh_index].enable_mac_dst_check){
+		ecpriss_qudp_hal_read_reg_n_fields(ECPRISS_QUDP_FH,
+				ECPRI_UDP_FH_FILT_MAC_ADDRESS_PORT_p_ENTRIES_VALID_BITS,
+				fh_index,
+				&ecpriss_pdata->cfg_stats.qudp_cfg.ingress.vbits.mac_addr[fh_index]);
+	}
+	for(fltr_index = 0; fltr_index < NUM_OF_FLTR ; fltr_index ++){
+
+		flag = flag << fltr_index;
+		if(ecpriss_pdata->cfg_stats.qudp_cfg.ingress.cfg.global_cfg[fh_index].enable_vlan_filt){
+			if(ecpriss_pdata->cfg_stats.qudp_cfg.ingress.vbits.vlan[fh_index].valid_bits & flag){
+				ecpriss_qudp_hal_read_reg_mn_fields(ECPRISS_QUDP_FH_FILTER,
+						ECPRI_UDP_FH_FILT_VLAN_ADDR_PORT_p_ENTRY_n,
+						fh_index,
+						fltr_index,
+						&ecpriss_pdata->cfg_stats.qudp_cfg.ingress.cfg.vlan[fh_index][fltr_index]);
+			}
+		}
+		if(ecpriss_pdata->cfg_stats.qudp_cfg.ingress.cfg.global_cfg[fh_index].enable_ip_dst_filt){
+			if(ecpriss_pdata->cfg_stats.qudp_cfg.ingress.vbits.ip_addr[fh_index].valid_bits & flag){
+				ecpriss_qudp_hal_read_reg_mn_fields(ECPRISS_QUDP_FH_FILTER,
+						ECPRI_UDP_FH_FILT_IP_DST_ADDR0_PORT_p_ENTRY_n,
+						fh_index,
+						fltr_index,
+						&ecpriss_pdata->cfg_stats.qudp_cfg.ingress.cfg.ip_addr[fh_index][fltr_index].dst_ip0);
+
+				ecpriss_qudp_hal_read_reg_mn_fields(ECPRISS_QUDP_FH_FILTER,
+						ECPRI_UDP_FH_FILT_IP_DST_ADDR1_PORT_p_ENTRY_n,
+						fh_index,
+						fltr_index,
+						&ecpriss_pdata->cfg_stats.qudp_cfg.ingress.cfg.ip_addr[fh_index][fltr_index].dst_ip1);
+
+				ecpriss_qudp_hal_read_reg_mn_fields(ECPRISS_QUDP_FH_FILTER,
+						ECPRI_UDP_FH_FILT_IP_DST_ADDR2_PORT_p_ENTRY_n,
+						fh_index,
+						fltr_index,
+						&ecpriss_pdata->cfg_stats.qudp_cfg.ingress.cfg.ip_addr[fh_index][fltr_index].dst_ip2);
+
+				ecpriss_qudp_hal_read_reg_mn_fields(ECPRISS_QUDP_FH_FILTER,
+						ECPRI_UDP_FH_FILT_IP_DST_ADDR3_PORT_p_ENTRY_n,
+						fh_index,
+						fltr_index,
+						&ecpriss_pdata->cfg_stats.qudp_cfg.ingress.cfg.ip_addr[fh_index][fltr_index].dst_ip3);
+			}
+		}
+		if(ecpriss_pdata->cfg_stats.qudp_cfg.ingress.cfg.global_cfg[fh_index].enable_udp_dst_class){
+			if(ecpriss_pdata->cfg_stats.qudp_cfg.ingress.vbits.udp_clss[fh_index].valid_bits & flag){
+				ecpriss_qudp_hal_read_reg_mn_fields(ECPRISS_QUDP_FH_FILTER,
+						ECPRI_UDP_FH_UDP_CLASSIFICATION_LIST_PORT_p_ENTRY_n,
+						fh_index,
+						fltr_index,
+						&ecpriss_pdata->cfg_stats.qudp_cfg.ingress.cfg.udp_clss[fh_index][fltr_index]);
+			}
+		}
+		if(ecpriss_pdata->cfg_stats.qudp_cfg.ingress.cfg.global_cfg[fh_index].enable_mac_dst_check && fltr_index <= 4){
+			if(ecpriss_pdata->cfg_stats.qudp_cfg.ingress.vbits.mac_addr[fh_index].valid_bits & flag){
+				ecpriss_qudp_hal_read_reg_mn_fields(ECPRISS_QUDP_FH_FILTER,
+						ECPRI_UDP_FH_FILT_MAC_ADDRESS_LSB_PORT_p_ENTRY_n,
+						fh_index,
+						fltr_index,
+						&ecpriss_pdata->cfg_stats.qudp_cfg.ingress.cfg.mac_addr[fh_index][fltr_index].mac_lsb);
+				ecpriss_qudp_hal_read_reg_mn_fields(ECPRISS_QUDP_FH_FILTER,
+						ECPRI_UDP_FH_FILT_MAC_ADDRESS_MSB_PORT_p_ENTRY_n,
+						fh_index,
+						fltr_index,
+						&ecpriss_pdata->cfg_stats.qudp_cfg.ingress.cfg.mac_addr[fh_index][fltr_index].mac_msb);
+			}
+		}
+
+		flag = 1;
+	}
+	return;
+}
 void ecpriss_qudp_print_fh_egress_stats(uint32_t port_index, uint32_t link_index)
 {
 	uint32_t lsb_val = 0;
 	uint64_t msb_val = 0;
 	uint64_t val = 0;
-	lsb_val = ecpriss_qudp_hal_read_reg_mn(ECPRISS_QUDP_FH,
+	lsb_val = ecpriss_qudp_hal_read_reg_mn(ECPRISS_QUDP_FH_RAMS,
 			ECPRI_UDP_FH_EGRESS_NUM_UDP_PACKETS_LSB_PORT_p_LINK_n,
 			port_index,
 			link_index);
 
-	msb_val = ecpriss_qudp_hal_read_reg_mn(ECPRISS_QUDP_FH,
+	msb_val = ecpriss_qudp_hal_read_reg_mn(ECPRISS_QUDP_FH_RAMS,
 			ECPRI_UDP_FH_EGRESS_NUM_UDP_PACKETS_MSB_PORT_p_LINK_n,
 			port_index,
 			link_index);
@@ -44,11 +408,11 @@ void ecpriss_qudp_print_fh_egress_stats(uint32_t port_index, uint32_t link_index
 	ecpriss_pdata->qudp_ctx->fh_port_cfg[port_index].stats.egress_num_udp_packets[link_index] = val;
 	pr_info("ECPRI_UDP_FH_EGRESS_NUM_UDP_PACKETS : port_index :%d link_index %d value = %d\n", port_index,link_index,val);
 
-	lsb_val =ecpriss_qudp_hal_read_reg_mn(ECPRISS_QUDP_FH,
+	lsb_val =ecpriss_qudp_hal_read_reg_mn(ECPRISS_QUDP_FH_RAMS,
 			ECPRI_UDP_FH_EGRESS_NUM_ETH_ONLY_PACKETS_LSB_PORT_p_LINK_n,
 			port_index,
 			link_index);
-	msb_val = ecpriss_qudp_hal_read_reg_mn(ECPRISS_QUDP_FH,
+	msb_val = ecpriss_qudp_hal_read_reg_mn(ECPRISS_QUDP_FH_RAMS,
 			ECPRI_UDP_FH_EGRESS_NUM_ETH_ONLY_PACKETS_MSB_PORT_p_LINK_n,
 			port_index,
 			link_index);
@@ -58,11 +422,11 @@ void ecpriss_qudp_print_fh_egress_stats(uint32_t port_index, uint32_t link_index
 	pr_info("ECPRI_UDP_FH_EGRESS_NUM_ETH_ONLY_PACKETS : port_index :%d link_index %d value = %d\n", port_index,link_index,val);
 
 
-	lsb_val = ecpriss_qudp_hal_read_reg_mn(ECPRISS_QUDP_FH,
+	lsb_val = ecpriss_qudp_hal_read_reg_mn(ECPRISS_QUDP_FH_RAMS,
 			ECPRI_UDP_FH_EGRESS_NUM_BYPASSED_PACKETS_LSB_PORT_p_LINK_n,
 			port_index,
 			link_index);
-	msb_val = ecpriss_qudp_hal_read_reg_mn(ECPRISS_QUDP_FH,
+	msb_val = ecpriss_qudp_hal_read_reg_mn(ECPRISS_QUDP_FH_RAMS,
 			ECPRI_UDP_FH_EGRESS_NUM_BYPASSED_PACKETS_MSB_PORT_p_LINK_n,
 			port_index,
 			link_index);
@@ -72,11 +436,11 @@ void ecpriss_qudp_print_fh_egress_stats(uint32_t port_index, uint32_t link_index
 	pr_info("ECPRI_UDP_FH_EGRESS_NUM_BYPASSED_PACKETS : port_index :%d link_index %d value = %d\n", port_index,link_index,val);
 
 
-	lsb_val = ecpriss_qudp_hal_read_reg_mn(ECPRISS_QUDP_FH,
+	lsb_val = ecpriss_qudp_hal_read_reg_mn(ECPRISS_QUDP_FH_RAMS,
 			ECPRI_UDP_FH_EGRESS_MTU_ERR_PACKETS_LSB_PORT_p_LINK_n,
 			port_index,
 			link_index);
-	msb_val =ecpriss_qudp_hal_read_reg_mn(ECPRISS_QUDP_FH,
+	msb_val =ecpriss_qudp_hal_read_reg_mn(ECPRISS_QUDP_FH_RAMS,
 			ECPRI_UDP_FH_EGRESS_MTU_ERR_PACKETS_MSB_PORT_p_LINK_n,
 			port_index,
 			link_index);
@@ -84,7 +448,6 @@ void ecpriss_qudp_print_fh_egress_stats(uint32_t port_index, uint32_t link_index
 	val = msb_val << MSB_SHIFT | lsb_val;
 	ecpriss_pdata->qudp_ctx->fh_port_cfg[port_index].stats.egress_num_mtu_err_packets[link_index] = val;
 	pr_info("ECPRI_UDP_FH_EGRESS_MTU_ERR_PACKETS : port_index :%d link_index %d value = %d\n", port_index,link_index,val);
-
 	return;
 }
 
@@ -94,12 +457,12 @@ void ecpriss_qudp_print_fh_ingress_stats(uint32_t port_index, uint32_t link_inde
 	uint32_t lsb_val = 0;
 	uint64_t msb_val = 0;
 	uint64_t val = 0;
-	lsb_val = ecpriss_qudp_hal_read_reg_mn(ECPRISS_QUDP_FH,
+	lsb_val = ecpriss_qudp_hal_read_reg_mn(ECPRISS_QUDP_FH_RAMS,
 			ECPRI_UDP_FH_INGRESS_NUM_UDP_PACKETS_LSB_PORT_p_LINK_n,
 			port_index,
 			link_index);
 
-	msb_val = ecpriss_qudp_hal_read_reg_mn(ECPRISS_QUDP_FH,
+	msb_val = ecpriss_qudp_hal_read_reg_mn(ECPRISS_QUDP_FH_RAMS,
 			ECPRI_UDP_FH_INGRESS_NUM_UDP_PACKETS_MSB_PORT_p_LINK_n,
 			port_index,
 			link_index);
@@ -109,12 +472,12 @@ void ecpriss_qudp_print_fh_ingress_stats(uint32_t port_index, uint32_t link_inde
 	pr_info("ECPRI_UDP_FH_INGRESS_NUM_UDP_PACKETS : port_index :%d link_index %d value = %d\n", port_index,link_index,val);
 
 
-	lsb_val = ecpriss_qudp_hal_read_reg_mn(ECPRISS_QUDP_FH,
+	lsb_val = ecpriss_qudp_hal_read_reg_mn(ECPRISS_QUDP_FH_RAMS,
 			ECPRI_UDP_FH_INGRESS_NUM_NON_UDP_PACKETS_LSB_PORT_p_LINK_n,
 			port_index,
 			link_index);
 
-	msb_val = ecpriss_qudp_hal_read_reg_mn(ECPRISS_QUDP_FH,
+	msb_val = ecpriss_qudp_hal_read_reg_mn(ECPRISS_QUDP_FH_RAMS,
 			ECPRI_UDP_FH_INGRESS_NUM_NON_UDP_PACKETS_MSB_PORT_p_LINK_n,
 			port_index,
 			link_index);
@@ -123,11 +486,11 @@ void ecpriss_qudp_print_fh_ingress_stats(uint32_t port_index, uint32_t link_inde
 	ecpriss_pdata->qudp_ctx->fh_port_cfg[port_index].stats.ingress_num_non_udp_packets[link_index] = val;
 	pr_info("ECPRI_UDP_FH_INGRESS_NUM_NON_UDP_PACKETS : port_index :%d link_index %d value = %d\n", port_index,link_index,val);
 
-	lsb_val = ecpriss_qudp_hal_read_reg_mn(ECPRISS_QUDP_FH,
+	lsb_val = ecpriss_qudp_hal_read_reg_mn(ECPRISS_QUDP_FH_RAMS,
 			ECPRI_UDP_FH_INGRESS_FCS_ERR_PACKETS_LSB_PORT_p_LINK_n,
 			port_index,
 			link_index);
-	msb_val = ecpriss_qudp_hal_read_reg_mn(ECPRISS_QUDP_FH,
+	msb_val = ecpriss_qudp_hal_read_reg_mn(ECPRISS_QUDP_FH_RAMS,
 			ECPRI_UDP_FH_INGRESS_FCS_ERR_PACKETS_MSB_PORT_p_LINK_n,
 			port_index,
 			link_index);
@@ -136,11 +499,11 @@ void ecpriss_qudp_print_fh_ingress_stats(uint32_t port_index, uint32_t link_inde
 	ecpriss_pdata->qudp_ctx->fh_port_cfg[port_index].stats.ingress_num_fcs_err_packets[link_index] = val;
 	pr_info("ECPRI_UDP_FH_INGRESS_FCS_ERR_PACKETS : port_index :%d link_index %d value = %d\n", port_index,link_index,val);
 
-	lsb_val = ecpriss_qudp_hal_read_reg_mn(ECPRISS_QUDP_FH,
+	lsb_val = ecpriss_qudp_hal_read_reg_mn(ECPRISS_QUDP_FH_RAMS,
 			ECPRI_UDP_FH_INGRESS_IPV4_CS_ERROR_PACKETS_LSB_PORT_p_LINK_n,
 			port_index,
 			link_index);
-	msb_val = ecpriss_qudp_hal_read_reg_mn(ECPRISS_QUDP_FH,
+	msb_val = ecpriss_qudp_hal_read_reg_mn(ECPRISS_QUDP_FH_RAMS,
 			ECPRI_UDP_FH_INGRESS_IPV4_CS_ERROR_PACKETS_MSB_PORT_p_LINK_n,
 			port_index,
 			link_index);
@@ -149,12 +512,12 @@ void ecpriss_qudp_print_fh_ingress_stats(uint32_t port_index, uint32_t link_inde
 	ecpriss_pdata->qudp_ctx->fh_port_cfg[port_index].stats.ingress_num_ipv4_cs_err_packets[link_index] = val;
 	pr_info("ECPRI_UDP_FH_INGRESS_IPV4_CS_ERROR_PACKETS : port_index :%d link_index %d value = %d\n", port_index,link_index,val);
 
-	lsb_val = ecpriss_qudp_hal_read_reg_mn(ECPRISS_QUDP_FH,
+	lsb_val = ecpriss_qudp_hal_read_reg_mn(ECPRISS_QUDP_FH_RAMS,
 			ECPRI_UDP_FH_INGRESS_UDP_CS_ERROR_PACKETS_LSB_PORT_p_LINK_n,
 			port_index,
 			link_index);
 
-	msb_val = ecpriss_qudp_hal_read_reg_mn(ECPRISS_QUDP_FH,
+	msb_val = ecpriss_qudp_hal_read_reg_mn(ECPRISS_QUDP_FH_RAMS,
 			ECPRI_UDP_FH_INGRESS_UDP_CS_ERROR_PACKETS_MSB_PORT_p_LINK_n,
 			port_index,
 			link_index);
@@ -163,11 +526,11 @@ void ecpriss_qudp_print_fh_ingress_stats(uint32_t port_index, uint32_t link_inde
 	ecpriss_pdata->qudp_ctx->fh_port_cfg[port_index].stats.ingress_num_udp_cs_err_packets[link_index] = val;
 	pr_info("ECPRI_UDP_FH_INGRESS_UDP_CS_ERROR_PACKETS : port_index :%d link_index %d value = %d\n", port_index,link_index,val);
 
-	lsb_val = ecpriss_qudp_hal_read_reg_mn(ECPRISS_QUDP_FH,
+	lsb_val = ecpriss_qudp_hal_read_reg_mn(ECPRISS_QUDP_FH_RAMS,
 			ECPRI_UDP_FH_INGRESS_VLAN_FILTERED_PACKETS_LSB_PORT_p_LINK_n,
 			port_index,
 			link_index);
-	msb_val = ecpriss_qudp_hal_read_reg_mn(ECPRISS_QUDP_FH,
+	msb_val = ecpriss_qudp_hal_read_reg_mn(ECPRISS_QUDP_FH_RAMS,
 			ECPRI_UDP_FH_INGRESS_VLAN_FILTERED_PACKETS_MSB_PORT_p_LINK_n,
 			port_index,
 			link_index);
@@ -176,12 +539,12 @@ void ecpriss_qudp_print_fh_ingress_stats(uint32_t port_index, uint32_t link_inde
 	ecpriss_pdata->qudp_ctx->fh_port_cfg[port_index].stats.ingress_num_vlan_filtered_packets[link_index] = val;
 	pr_info("ECPRI_UDP_FH_INGRESS_VLAN_FILTERED_PACKETS : port_index :%d link_index %d value = %d\n", port_index,link_index,val);
 
-	lsb_val = ecpriss_qudp_hal_read_reg_mn(ECPRISS_QUDP_FH,
+	lsb_val = ecpriss_qudp_hal_read_reg_mn(ECPRISS_QUDP_FH_RAMS,
 			ECPRI_UDP_FH_INGRESS_SEC_ERR_PACKETS_LSB_PORT_p_LINK_n,
 			port_index,
 			link_index);
 
-	msb_val = ecpriss_qudp_hal_read_reg_mn(ECPRISS_QUDP_FH,
+	msb_val = ecpriss_qudp_hal_read_reg_mn(ECPRISS_QUDP_FH_RAMS,
 			ECPRI_UDP_FH_INGRESS_SEC_ERR_PACKETS_MSB_PORT_p_LINK_n,
 			port_index,
 			link_index);
@@ -189,17 +552,27 @@ void ecpriss_qudp_print_fh_ingress_stats(uint32_t port_index, uint32_t link_inde
 	ecpriss_pdata->qudp_ctx->fh_port_cfg[port_index].stats.ingress_num_sec_err_packets[link_index] = val;
 	pr_info("ECPRI_UDP_FH_INGRESS_SEC_ERR_PACKETS : port_index :%d link_index %d value = %d\n", port_index,link_index,val);
 
-	lsb_val = ecpriss_qudp_hal_read_reg_mn(ECPRISS_QUDP_FH,
+	lsb_val = ecpriss_qudp_hal_read_reg_mn(ECPRISS_QUDP_FH_RAMS,
 			ECPRI_UDP_FH_INGRESS_IP_LEN_ERR_PACKETS_LSB_PORT_p_LINK_n,
 			port_index,
 			link_index);
-	msb_val = ecpriss_qudp_hal_read_reg_mn(ECPRISS_QUDP_FH,
+	msb_val = ecpriss_qudp_hal_read_reg_mn(ECPRISS_QUDP_FH_RAMS,
 			ECPRI_UDP_FH_INGRESS_IP_LEN_ERR_PACKETS_MSB_PORT_p_LINK_n,
 			port_index,
 			link_index);
 	val = msb_val << MSB_SHIFT | lsb_val;
 	ecpriss_pdata->qudp_ctx->fh_port_cfg[port_index].stats.ingress_ip_len_err_packets[link_index] = val;
 	pr_info("ECPRI_UDP_FH_INGRESS_IP_LEN_ERR_PACKETS : port_index :%d link_index %d value = %d\n", port_index,link_index,val);
+
+	lsb_val = ecpriss_qudp_hal_read_reg_mn(ECPRISS_QUDP_FH_RAMS,
+			ECPRI_UDP_FH_INGRESS_IP_FILTERED_PACKETS_LSB_PORT_p_LINK_n,port_index,link_index);
+
+	msb_val = ecpriss_qudp_hal_read_reg_mn(ECPRISS_QUDP_FH_RAMS,
+			ECPRI_UDP_FH_INGRESS_IP_FILTERED_PACKETS_MSB_PORT_p_LINK_n,port_index,link_index);
+
+	val = msb_val >> MSB_SHIFT | lsb_val;
+	ecpriss_pdata->qudp_ctx->fh_port_cfg[port_index].stats.ingress_ip_filtered_packets[link_index]=val;
+	pr_info("ECPRI_UDP_FH_INGRESS_IP_FILTERED_PACKETS : port_index :%d link_index %d value = %d\n", port_index,link_index,val);
 
 	return;
 }
@@ -1175,7 +1548,16 @@ static int ecpriss_irq_init(ecpriss_qudp_interrupt_events_e qudp_irq,
 	int res= 0;
 
 	struct platform_device *pdev = NULL;
-
+	/*
+	 * c2c and l2 are not supported for now
+	 */
+	if((qudp_irq == ECPRISS_UDP_FH_IRQ_PORT0) ||
+			(qudp_irq == ECPRISS_UDP_FH_IRQ_PORT1) ||
+			(qudp_irq == ECPRISS_UDP_FH_IRQ_PORT2)){
+		pr_info("QUDP irq init\n");
+	}else{
+		return res;
+	}
 	do{
 
 		pdev = to_platform_device(dev);
@@ -1185,7 +1567,7 @@ static int ecpriss_irq_init(ecpriss_qudp_interrupt_events_e qudp_irq,
 			pr_err("ecpriss_irq_init pdev is NULL" );
 			break;
 		}
-
+		pr_info("IRQ =  %d\n", qudp_irq_mapping[qudp_irq]);
 		qudp_irq_mapping[qudp_irq] =  platform_get_irq(pdev, qudp_irq);
 
 		res = request_irq(qudp_irq_mapping[qudp_irq], ecpriss_qudp_isr, IRQF_TRIGGER_RISING, "ecpri_ss", NULL);
@@ -1203,7 +1585,7 @@ static int ecpriss_irq_init(ecpriss_qudp_interrupt_events_e qudp_irq,
 			break;
 		}
 
-		pr_err("ecpriss_irq_init Interrupt Registration Success %d" , qudp_irq_mapping[qudp_irq]);
+		pr_info("ecpriss_irq_init Interrupt Registration Success %d" , qudp_irq_mapping[qudp_irq]);
 
 	}while (0);
 	return res;

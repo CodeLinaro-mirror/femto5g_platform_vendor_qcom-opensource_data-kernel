@@ -865,7 +865,7 @@ static struct ecpriss_xbar_hal_reg_obj ecpriss_xbar_hal_reg_objs[ECPRISS_XBAR_HW
 		ecpriss_xbar_hal_reg_construct_lut_xbar_c2crx_m_dl_lut_n,
 		ecpriss_xbar_hal_reg_parse_dummy,
 		0x09300000, 0xC0000, 0x4, 0, 0, 0, 0x40000},
-	[ECPRISS_XBAR_HW_v1_0][ECPRI_XBAR_LUT_XBAR_C2CRX_m_DL_LUT_n] = {
+	[ECPRISS_XBAR_HW_v1_0][ECPRI_XBAR_LUT_XBAR_C2CRX_m_UL_LUT_n] = {
 		ecpriss_xbar_hal_reg_construct_lut_xbar_c2crx_m_ul_lut_n,
 		ecpriss_xbar_hal_reg_parse_dummy,
 		0x09300000, 0x180000, 0x4, 0, 0, 0, 0x40000},

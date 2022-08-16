@@ -42,6 +42,7 @@ obj-$(CONFIG_ECPRI_CORE) += ecpri_core.o
 ecpri_core-$(CONFIG_ECPRI_CORE) += \
 	    src/ecpriss_core.o \
         src/utilities/ecpriss_netlink.o \
+		src/utilities/ecpriss_debugfs.o \
 		src/ecpriss_qudp/ecpriss_qudp.o \
 		src/ecpriss_qudp/ecpriss_qudp_hal.o \
 		src/ecpriss_xbar/ecpriss_xbar.o \

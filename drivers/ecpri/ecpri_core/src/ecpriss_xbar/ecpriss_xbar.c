@@ -8,13 +8,70 @@
 #define ENABLE_BIT 1
 #define DISABLE_BIT 0
 
+void ecpriss_xbar_config_sats(void){
+	uint64_t val=0;
+	int fh_index;
+	int pcid_index;
+
+	ecpri_xbar_hwio_def_ecpri_xbar_lut_xbar_fhrx_m_lut_n_s xbar_fhrx_m_lut_n;
+#ifdef C2C
+	ecpri_xbar_hwio_def_ecpri_xbar_lut_xbar_c2crx_m_dl_lut_n_s xbar_c2crx_m_dl_n;
+	ecpri_xbar_hwio_def_ecpri_xbar_lut_xbar_c2crx_m_ul_lut_n_s xbar_c2crx_m_ul_n;
+#endif
+	ecpri_xbar_hwio_def_ecpri_xbar_lut_xbar_ocrx_m_lut_n_s xbar_ocrx_m_lut_n;
+	ecpri_xbar_hwio_def_ecpri_xbar_xbar_cfg_s xbar_cfg;
 
 
+	val = ecpriss_xbar_hal_read_reg_n_fields(ECPRISS_XBAR_GLOBAL, ECPRI_XBAR_XBAR_CFG,0, &xbar_cfg);
+	ecpriss_pdata->cfg_stats.xbar_cfg.global_cfg.global  = val;
+#ifdef DEBUG
+	pr_info(" ECPRI_XBAR_XBAR_CFG val = 0x%x \n",val);
+#endif
+	for(fh_index=0; fh_index < NUM_OF_FHP; fh_index++) {
+		for(pcid_index=0; pcid_index < LUT_INDEX; pcid_index++) {
+			val = ecpriss_xbar_hal_read_reg_mn_fields(ECPRISS_XBAR_LUT,
+					ECPRI_XBAR_LUT_XBAR_FHRX_m_LUT_n,
+					fh_index,
+					pcid_index,
+					&xbar_fhrx_m_lut_n);
+			ecpriss_pdata->cfg_stats.xbar_cfg.lut_cfg.fhrx[fh_index][pcid_index]  = val;
+
+#ifdef DEBUG
+			pr_info(" ECPRI_XBAR_LUT_XBAR_FHRX_m_LUT_n val = 0x%x FH_index = %d, PCID_index = %d\n",val,fh_index,pcid_index);
+#endif
+#ifdef C2C
+			val = ecpriss_xbar_hal_read_reg_mn_fields(ECPRISS_XBAR_LUT,
+					ECPRI_XBAR_LUT_XBAR_C2CRX_m_UL_LUT_n,
+					fh_index,
+					pcid_index,
+					&xbar_c2crx_m_ul_n);
+			pr_info(" ECPRI_XBAR_LUT_XBAR_C2CRX_m_UL_LUT_n, val = 0x%x FH_index = %d, PCID_index = %d\n",val,fh_index,pcid_index);
+
+			val = ecpriss_xbar_hal_read_reg_mn_fields(ECPRISS_XBAR_LUT,
+					ECPRI_XBAR_LUT_XBAR_C2CRX_m_DL_LUT_n,
+					fh_index,
+					pcid_index,
+					&xbar_c2crx_m_dl_n);
+			pr_info(" ECPRI_XBAR_LUT_XBAR_C2CRX_m_DL_LUT_n, val = 0x%x FH_index = %d, PCID_index = %d\n",val,fh_index,pcid_index);
+#endif
+			val = ecpriss_xbar_hal_read_reg_mn_fields(ECPRISS_XBAR_LUT,
+					ECPRI_XBAR_LUT_XBAR_OCRX_m_LUT_n,
+					fh_index,
+					pcid_index,
+					&xbar_ocrx_m_lut_n);
+			ecpriss_pdata->cfg_stats.xbar_cfg.lut_cfg.ocrx[fh_index][pcid_index]  = val;
+#ifdef DEBUG
+			pr_info(" ECPRI_XBAR_LUT_XBAR_OCRX_m_LUT_n, val = 0x%x FH_index = %d, PCID_index = %d\n",val,fh_index,pcid_index);
+#endif
+		}
+	}
+}
 
 void ecpriss_xbar_print_stats(void)
 {
-	uint32_t val=0;
+	uint64_t val=0;
 	int link_index;
+
 	for(link_index=0;link_index<TOTAL_LINKS;link_index++) {
 		val = ecpriss_xbar_hal_read_reg_n(ECPRISS_XBAR_GLOBAL,ECPRI_XBAR_XBAR_DBG_FHRX_PKT_CNT_n,link_index);
 		ecpriss_pdata->xbar_ctx->stats.xbar_fhrx_pkt_cnt[link_index] = val;
@@ -32,7 +89,17 @@ void ecpriss_xbar_print_stats(void)
 		pr_info("ECPRI_XBAR_XBAR_DBG_C2CTX_PKT_CNT_n val = %d link_index = %d\n",val,link_index);
 		ecpriss_pdata->xbar_ctx->stats.xbar_c2ctx_pkt_cnt[link_index] = val;
 	}
+	for(link_index=0; link_index < XBAR_LINKS; link_index++) {
 
+		val = ecpriss_xbar_hal_read_reg_n(ECPRISS_XBAR_GLOBAL, ECPRI_XBAR_XBAR_DBG_OCTX_PKT_CNT_n,link_index);
+		ecpriss_pdata->xbar_ctx->stats.xbar_octx_pkt_cnt[link_index] = val;
+		pr_info("ECPRI_XBAR_XBAR_DBG_OCTX_PKT_CNT_n val = %d link_index = %d\n",val,link_index);
+
+		val = ecpriss_xbar_hal_read_reg_n(ECPRISS_XBAR_GLOBAL, ECPRI_XBAR_XBAR_DBG_OCRX_PKT_CNT_n,link_index);
+		ecpriss_pdata->xbar_ctx->stats.xbar_ocrx_pkt_cnt[link_index] = val;
+		pr_info("ECPRI_XBAR_XBAR_DBG_OCRX_PKT_CNT_n val = %d link_index = %d\n",val,link_index);
+
+	}
 
 	val = ecpriss_xbar_hal_read_reg(ECPRISS_XBAR_GLOBAL,ECPRI_XBAR_XBAR_DBG_FHRX_DMA_PKT_CNT);
 	pr_info("ECPRI_XBAR_XBAR_DBG_FHRX_DMA_PKT_CNT val = %d\n",val);
@@ -304,15 +371,118 @@ static void ecpriss_xbar_flush(ecpriss_port_type_e    port_type,
 }
 #endif
 
+static irqreturn_t ecpriss_xbar_isr(int irq, void *ctxt)
+{
+	unsigned long flags = 0;
+	ecpri_xbar_hwio_def_ecpri_xbar_xbar_sw_irq_status_s xbar_sw_irq_status;
+	ecpri_xbar_hwio_def_ecpri_xbar_xbar_sw_irq_clr_s xbar_sw_irq_clear;
+
+	spin_lock_irqsave(&irq_lock, flags);
+
+	ecpriss_xbar_hal_read_reg_n_fields(ECPRISS_XBAR_GLOBAL,
+			ECPRI_XBAR_XBAR_SW_IRQ_STATUS, 0,&xbar_sw_irq_status);
+
+	if(xbar_sw_irq_status.octx_fh_len_err){
+		xbar_sw_irq_clear.octx_fh_len_err = 1;
+		ecpriss_pdata->xbar_ctx->interrupt_stats.octx_fh_len_err += 1;
+	}
+	if(xbar_sw_irq_status.octx_c2c_len_err){
+		xbar_sw_irq_clear.octx_c2c_len_err = 1;
+		ecpriss_pdata->xbar_ctx->interrupt_stats.octx_c2c_len_err += 1;
+	}
+	if(xbar_sw_irq_status.fhtx_c2c_overflow){
+		xbar_sw_irq_clear.fhtx_c2c_overflow = 1;
+		ecpriss_pdata->xbar_ctx->interrupt_stats.fhtx_c2c_overflow += 1;
+	}
+	if(xbar_sw_irq_status.c2ctx_fh_overflow){
+		xbar_sw_irq_clear.c2ctx_fh_overflow = 1;
+		ecpriss_pdata->xbar_ctx->interrupt_stats.c2ctx_fh_overflow += 1;
+	}
+	if(xbar_sw_irq_status.octx_fh_overflow){
+		xbar_sw_irq_clear.octx_fh_overflow = 1;
+		ecpriss_pdata->xbar_ctx->interrupt_stats.octx_fh_overflow += 1;
+	}
+	if(xbar_sw_irq_status.octx_c2c_overflow){
+		xbar_sw_irq_clear.octx_c2c_overflow = 1;
+		ecpriss_pdata->xbar_ctx->interrupt_stats.octx_c2c_overflow += 1;
+	}
+	if(xbar_sw_irq_status.fhrx_uc_pkt_pending){
+		xbar_sw_irq_clear.fhrx_uc_pkt_pending = 1;
+		ecpriss_pdata->xbar_ctx->interrupt_stats.fhrx_uc_pkt_pending += 1;
+	}
+	if(xbar_sw_irq_status.fhrx_uc_overflow){
+		xbar_sw_irq_clear.fhrx_uc_overflow = 1;
+		ecpriss_pdata->xbar_ctx->interrupt_stats.fhrx_uc_overflow += 1;
+	}
+	if(xbar_sw_irq_status.fhrx_uc_pkt_err){
+		xbar_sw_irq_clear.octx_c2c_len_err = 1;
+		ecpriss_pdata->xbar_ctx->interrupt_stats.fhrx_uc_pkt_err += 1;
+	}
+	if(xbar_sw_irq_status.fhrx_uc_pkt_drop){
+		xbar_sw_irq_clear.fhrx_uc_pkt_drop = 1;
+		ecpriss_pdata->xbar_ctx->interrupt_stats.fhrx_uc_pkt_drop += 1;
+	}
+	if(xbar_sw_irq_status.ocrx_unknown_pcid){
+		xbar_sw_irq_clear.ocrx_unknown_pcid = 1;
+		ecpriss_pdata->xbar_ctx->interrupt_stats.ocrx_unknown_pcid += 1;
+	}
+	if(xbar_sw_irq_status.fhrx_unknown_pcid){
+		xbar_sw_irq_clear.fhrx_unknown_pcid = 1;
+		ecpriss_pdata->xbar_ctx->interrupt_stats.fhrx_unknown_pcid += 1;
+	}
+	if(xbar_sw_irq_status.c2crx_unknown_pcid){
+		xbar_sw_irq_clear.c2crx_unknown_pcid = 1;
+		ecpriss_pdata->xbar_ctx->interrupt_stats.c2crx_unkown_pcid += 1;
+	}
+	ecpriss_xbar_hal_write_reg_n_fields(ECPRISS_XBAR_GLOBAL,
+			ECPRI_XBAR_XBAR_SW_IRQ_CLR , 0, &xbar_sw_irq_clear);
+	spin_unlock_irqrestore(&irq_lock, flags);
+	return IRQ_HANDLED;
+}
+
+
+
 /**
  * ecpriss_xbar_register_interrupts()
  *
  *
  * Returns:	0 on success, negative on failure
  */
-static int ecpriss_xbar_register_interrupts(void)
+static int ecpriss_xbar_register_interrupts(struct device *dev)
 {
-	//Check ipa_interrupts for reference
+	int res = 0;
+	int xbar_irq_mapping =  EXPRISS_XBAR_IRQ_MAPPING;
+	struct platform_device *pdev = NULL;
+
+	do{
+		pdev = to_platform_device(dev);
+
+		if(dev ==  NULL){
+			pr_err("ecpriss_xbar_irq_init pdev is NULL" );
+			goto err;
+		}
+		xbar_irq_mapping =  platform_get_irq(pdev, EXPRISS_XBAR_INDEX);
+		res = request_irq(xbar_irq_mapping, ecpriss_xbar_isr,
+				IRQF_TRIGGER_RISING, "ecpri_ss", NULL);
+		if (res){
+			pr_err("IRQ request failed irq=%d res=%d\n",
+					xbar_irq_mapping, res);
+			goto err;
+		}
+		res = enable_irq_wake(xbar_irq_mapping);
+		if (res){
+			pr_err("fail to enable IPA IRQ wakeup irq=%d res=%d\n",
+					xbar_irq_mapping, res);
+			goto err;
+		}
+		pr_info("XBAR interrupt id %d registered with ecpriss_irq_init Interrupt Registration Success %d\n",
+				EXPRISS_XBAR_IRQ_MAPPING,xbar_irq_mapping);
+
+	}while(0);
+
+	return 0;
+err:
+	return -1;
 	return 0;
 }
 
@@ -570,7 +740,7 @@ int ecpriss_xbar_cold_init(struct device *dev)
 #if 0
 		ecpriss_xbar_flush_init();
 #endif
-		ret = ecpriss_xbar_register_interrupts();
+		ret = ecpriss_xbar_register_interrupts(dev);
 		if(ret < 0)
 		{
 			break;
