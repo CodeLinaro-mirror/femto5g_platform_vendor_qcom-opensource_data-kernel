@@ -16,6 +16,7 @@
 #include "ecpri_oxtor_tx.h"
 #include "ecpri_oxtor_rx.h"
 #include "ecpri_oxtor_cache.h"
+#include "ecpri_oxtor_debugfs.h"
 
 #define ECPRISS_CORE_IPC_LOG_PAGES   50
 #define DEVICE_NAME "ecpri_oxtor"
@@ -590,7 +591,7 @@ static int ecpri_oxtor_core_probe(struct platform_device *pdev)
 	pr_info("ecpri_oxtor_core_probe()\n");
 	ecpri_oxtor_init(pdev);
 	pr_info("ecpri_oxtor_core_probe(): Completed\n");
-
+	setup_debugfs_directory();
 	return 0;
 }
 
