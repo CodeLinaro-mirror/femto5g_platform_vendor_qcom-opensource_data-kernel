@@ -11,5 +11,9 @@
 
 int mtip_mdio_register(struct net_device *ndev, struct device_node *np);
 
+void mtip_mdio_phy_validate(struct phylink_config *config,
+                                   unsigned long *supported,
+                                   struct phylink_link_state *state);
+
 
 #endif /* MTIP_MDIO_H */

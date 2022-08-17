@@ -788,16 +788,20 @@ static int mtip_open(struct net_device *netdev)
 
    CSMLOGINFO("mtip_open called for link_index: %d with hdl: %d\n", link_index, hdl);
 
-   if (mtip_loopback_mode == MTIP_MODE_DEFAULT)
+   // this is done only for the RUMI E2E
+   if (mtip_rumi_platform != 0) 
    {
-       // Configure phylib in poll mode
-       //priv->phydev->irq = PHY_POLL;
+       if (mtip_loopback_mode == MTIP_MODE_DEFAULT)
+       {
+           // Configure phylib in poll mode
+           priv->phydev->irq = PHY_POLL;
 
-       // PHYLINK-PHY binding and PHY bringup
-       //phylink_connect_phy(priv->phylink, priv->phydev);
+           // PHYLINK-PHY binding and PHY bringup
+           phylink_connect_phy(priv->phylink, priv->phydev);
 
-       // Start the PHYLINK
-       //phylink_start(priv->phylink);
+           // Start the PHYLINK
+           phylink_start(priv->phylink);
+       }
    }
 
    if (mtip_loopback_mode == MTIP_MODE_DEFAULT || 
@@ -857,11 +861,15 @@ static int mtip_close(struct net_device *netdev)
 
    CSMLOGINFO("mtip_close called with link_index: %d with hdl: %d\n", link_index, hdl);
 
-   if (mtip_loopback_mode == MTIP_MODE_DEFAULT)
+   // do this only for RUMI E2E
+   if (mtip_rumi_platform != 0) 
    {
-       /* Stop and disconnect the PHY */
-       //phylink_stop(priv->phylink);
-       //phylink_disconnect_phy(priv->phylink);
+       if (mtip_loopback_mode == MTIP_MODE_DEFAULT)
+       {
+           /* Stop and disconnect the PHY */
+           phylink_stop(priv->phylink);
+           phylink_disconnect_phy(priv->phylink);
+       }
    }
 
    if (mtip_loopback_mode == MTIP_MODE_DEFAULT || 

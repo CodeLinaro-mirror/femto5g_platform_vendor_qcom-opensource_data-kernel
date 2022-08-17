@@ -155,10 +155,6 @@ void mtip_mac_wrapper_register_irq(struct device *dev, unsigned int irq,
 
 void mtip_mac_wrapper_pcs_mode_control(struct mtip_port_device_info* port_device);
 
-void mtip_mac_phy_validate(struct phylink_config *config,
-                                   unsigned long *supported,
-                                   struct phylink_link_state *state);
-
 u64 mtip_mac_read_timestamp(u32 link_index);
 
 void mtip_mac_set_interrupt_mask(u32 link_index);
