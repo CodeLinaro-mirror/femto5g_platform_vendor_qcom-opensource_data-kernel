@@ -14,6 +14,7 @@
 #include <linux/of.h>
 #include <linux/phylink.h>
 #include <linux/string.h>
+#include <linux/reset.h>
 
 #include "qcom_aw_phy_main.h"
 #include "qcom_aw_phy_mtip_if.h"
@@ -151,6 +152,7 @@ static irqreturn_t qcom_aw_phy_interrupt_handler(int irq, void *devptr) {
       case QCOM_AW_PHY_AN_DONE_LANE_3:
         qcom_aw_phy_notify_an_complete(phy_inst_info->phy_inst,
                                        i - QCOM_AW_PHY_AN_DONE_LANE_0);
+        clear |= (1<<i);
         break;
 
       case QCOM_AW_PHY_AN_LINK_GOOD_LANE_0:
@@ -158,6 +160,7 @@ static irqreturn_t qcom_aw_phy_interrupt_handler(int irq, void *devptr) {
       case QCOM_AW_PHY_AN_LINK_GOOD_LANE_2:
       case QCOM_AW_PHY_AN_LINK_GOOD_LANE_3:
         // NO-OP, just to monitor the link state transition
+        clear |= (1<<i);
         break;
 
       case QCOM_AW_PHY_SNR_VALID_LANE_0:
@@ -166,18 +169,21 @@ static irqreturn_t qcom_aw_phy_interrupt_handler(int irq, void *devptr) {
       case QCOM_AW_PHY_SNR_VALID_LANE_3:
         // get the snr valid flag and feed to to this API
         qcom_aw_phy_synce_notify_snr_valid_change(
-            phy_inst_info->phy_inst, i - QCOM_AW_PHY_AN_DONE_LANE_0, true);
+            phy_inst_info->phy_inst, i - QCOM_AW_PHY_SNR_VALID_LANE_0, true);
+        clear |= (1<<i);
         break;
 
       default:
         break;
       }
     }
-
-    // clear status interrupt
-    iowrite32(clear, phy_inst_info->wrapper_base_addr +
-                         QCOM_AW_PHY_WRAPPER_INT_STATUS_CLR_REG_OFFSET);
   }
+
+  // clear status interrupt
+  iowrite32(clear, phy_inst_info->wrapper_base_addr +
+                             QCOM_AW_PHY_WRAPPER_INT_STATUS_CLR_REG_OFFSET);
+
+  clear = 0;
 
   // Handle error interrupt
   for (i = QCOM_AW_PHY_INT_ERROR_BIT_MIN; i < QCOM_AW_PHY_INT_ERROR_BIT_MAX;
@@ -193,17 +199,18 @@ static irqreturn_t qcom_aw_phy_interrupt_handler(int irq, void *devptr) {
         qcom_aw_phy_synce_notify_snr_valid_change(
             phy_inst_info->phy_inst, i - QCOM_AW_PHY_SNR_VALID_ERR_LANE_0,
             false);
+        clear |= (1<<i);
         break;
 
       default:
         break;
       }
     }
-
-    // clear error interrupt
-    iowrite32(clear, phy_inst_info->wrapper_base_addr +
-                         QCOM_AW_PHY_WRAPPER_INT_ERROR_CLR_REG_OFFSET);
   }
+
+  // clear error interrupt
+  iowrite32(clear, phy_inst_info->wrapper_base_addr +
+                            QCOM_AW_PHY_WRAPPER_INT_ERROR_CLR_REG_OFFSET);
 
 func_exit:
   QCOM_AW_PHY_LOG_INFO(
@@ -296,6 +303,27 @@ func_exit:
                        local_err_val);
 
   return;
+}
+
+/*-------------------------------------------------------------------
+* qcom_aw_phy_get_clock
+
+* @dev: platform device's dev pointer
+  @id: Clock name
+
+* Description: This function gets the PHY clocks.
+------------------------------------------------------------------- */
+static struct clk* qcom_aw_phy_get_clock(struct device *dev, const char *id) {
+  struct clk *clk = NULL;
+
+  /* Fetch the clock */
+  clk = devm_clk_get(dev, id);
+  if (IS_ERR_OR_NULL(clk)) {
+    QCOM_AW_PHY_LOG_ERR("Failed to get %s, error %d", id, PTR_ERR(clk));
+    return NULL;
+  }
+
+  return clk;
 }
 
 /*-------------------------------------------------------------------
@@ -404,6 +432,62 @@ static void qcom_aw_phy_setup_clocks(struct device *dev) {
   qcom_aw_phy_enable_clock(dev, "ECPRI_CC_ETH_PHY_2_OCK_SRAM_CLK");
   qcom_aw_phy_enable_clock(dev, "ECPRI_CC_ETH_PHY_3_OCK_SRAM_CLK");
   qcom_aw_phy_enable_clock(dev, "ECPRI_CC_ETH_PHY_4_OCK_SRAM_CLK");
+
+  return;
+}
+
+/*-------------------------------------------------------------------
+* qcom_aw_phy_setup_synce_clocks
+
+* @dev: platform device's dev pointer
+
+* Description: This function sets up PHY SyncE clocks.
+------------------------------------------------------------------- */
+static void qcom_aw_phy_setup_synce_clocks(struct device *dev) {
+
+  QCOM_AW_PHY_LOG_INFO("qcom_aw_phy_setup_synce_clocks");
+
+  qcom_aw_phy_config_info.synce_cmux_clk_src =
+         qcom_aw_phy_get_clock(dev, "ECPRI_CC_EMAC_SYNCE_CMUX_CLK_SRC");
+
+  qcom_aw_phy_config_info.synce_cmux_clk =
+             qcom_aw_phy_get_clock(dev, "ECPRI_CC_EMAC_SYNCE_CMUX_CLK");
+
+  qcom_aw_phy_config_info.synce_div_clk =
+          qcom_aw_phy_get_clock(dev, "ECPRI_CC_EMAC_SYNCE_DIV_CLK_SRC");
+
+  qcom_aw_phy_config_info.synce_phy_lane_clk[FH0_LANE_0] =
+         qcom_aw_phy_get_clock(dev, "ECPRI_CC_EMAC_SYNCE_PHY0_CLK_SRC");
+  qcom_aw_phy_config_info.synce_phy_lane_clk[FH0_LANE_1] =
+         qcom_aw_phy_get_clock(dev, "ECPRI_CC_EMAC_SYNCE_PHY1_CLK_SRC");
+  qcom_aw_phy_config_info.synce_phy_lane_clk[FH0_LANE_2] =
+         qcom_aw_phy_get_clock(dev, "ECPRI_CC_EMAC_SYNCE_PHY2_CLK_SRC");
+  qcom_aw_phy_config_info.synce_phy_lane_clk[FH0_LANE_3] =
+         qcom_aw_phy_get_clock(dev, "ECPRI_CC_EMAC_SYNCE_PHY3_CLK_SRC");
+  qcom_aw_phy_config_info.synce_phy_lane_clk[FH1_LANE_0] =
+         qcom_aw_phy_get_clock(dev, "ECPRI_CC_EMAC_SYNCE_PHY4_CLK_SRC");
+  qcom_aw_phy_config_info.synce_phy_lane_clk[FH1_LANE_1] =
+         qcom_aw_phy_get_clock(dev, "ECPRI_CC_EMAC_SYNCE_PHY5_CLK_SRC");
+  qcom_aw_phy_config_info.synce_phy_lane_clk[FH1_LANE_2] =
+         qcom_aw_phy_get_clock(dev, "ECPRI_CC_EMAC_SYNCE_PHY6_CLK_SRC");
+  qcom_aw_phy_config_info.synce_phy_lane_clk[FH1_LANE_3] =
+         qcom_aw_phy_get_clock(dev, "ECPRI_CC_EMAC_SYNCE_PHY7_CLK_SRC");
+  qcom_aw_phy_config_info.synce_phy_lane_clk[FH2_LANE_0] =
+         qcom_aw_phy_get_clock(dev, "ECPRI_CC_EMAC_SYNCE_PHY8_CLK_SRC");
+  qcom_aw_phy_config_info.synce_phy_lane_clk[FH2_LANE_1] =
+         qcom_aw_phy_get_clock(dev, "ECPRI_CC_EMAC_SYNCE_PHY9_CLK_SRC");
+  qcom_aw_phy_config_info.synce_phy_lane_clk[FH2_LANE_2] =
+         qcom_aw_phy_get_clock(dev, "ECPRI_CC_EMAC_SYNCE_PHY10_CLK_SRC");
+  qcom_aw_phy_config_info.synce_phy_lane_clk[FH2_LANE_3] =
+         qcom_aw_phy_get_clock(dev, "ECPRI_CC_EMAC_SYNCE_PHY11_CLK_SRC");
+  qcom_aw_phy_config_info.synce_phy_lane_clk[L2_LANE_0] =
+         qcom_aw_phy_get_clock(dev, "ECPRI_CC_EMAC_SYNCE_PHY12_CLK_SRC");
+  qcom_aw_phy_config_info.synce_phy_lane_clk[L2_LANE_1] =
+         qcom_aw_phy_get_clock(dev, "ECPRI_CC_EMAC_SYNCE_PHY13_CLK_SRC");
+  qcom_aw_phy_config_info.synce_phy_lane_clk[L2_LANE_2] =
+         qcom_aw_phy_get_clock(dev, "ECPRI_CC_EMAC_SYNCE_PHY14_CLK_SRC");
+  qcom_aw_phy_config_info.synce_phy_lane_clk[L2_LANE_3] =
+         qcom_aw_phy_get_clock(dev, "ECPRI_CC_EMAC_SYNCE_PHY15_CLK_SRC");
 
   return;
 }
@@ -587,6 +671,9 @@ static void qcom_aw_phy_hw_init() {
 
   mdelay(500);
 
+  // Disable SyncE ACGC output by setting SyncE MUX to no lane.
+  qcom_aw_phy_synce_set_synce_mux(LANE_NONE);
+
   for (phy_inst_type = QCOM_AW_PHY_INST_FH0;
        phy_inst_type < QCOM_AW_PHY_INST_MAX; phy_inst_type++) {
     phy_inst_info = &phy_config_info->phy_inst_config_info[phy_inst_type];
@@ -692,6 +779,7 @@ static int qcom_aw_phy_inst_probe(struct platform_device *pdev) {
 
   if (phy_inst_type == QCOM_AW_PHY_INST_FH0) {
 
+    // Enable regulator
     if(qcom_aw_phy_ref_clk_mode == REF_CLK_MODE_OSCILLATOR){
       if (of_property_read_bool(pdev->dev.of_node, "vdd-supply")) {
         qcom_aw_phy_config_info.ldo16_supply =
@@ -727,6 +815,7 @@ static int qcom_aw_phy_inst_probe(struct platform_device *pdev) {
         QCOM_AW_PHY_LOG_ERR("No default pinctrl found\n");
     }
 
+    // Read TCSR base address and apply clamp register setting
     tcsr_resource = platform_get_resource_byname(pdev, IORESOURCE_MEM, "tcsr");
     if (!tcsr_resource) {
       local_err_val = LOCAL_ERROR_2;
@@ -740,14 +829,25 @@ static int qcom_aw_phy_inst_probe(struct platform_device *pdev) {
                   TCSR_ETH_CLAMP_EN_REG_OFFSET,
               0x0);
 
-    /* Enable clocks */
+    // Fetch the ACGC reset control handle
+    qcom_aw_phy_config_info.acgc_reset_ctrl =
+                        devm_reset_control_get(&pdev->dev, "synce_acgc_reset");
+    if (IS_ERR(qcom_aw_phy_config_info.acgc_reset_ctrl)) {
+      local_err_val = LOCAL_ERROR_3;
+      goto func_exit;
+    }
+
+    /* Fetch the SyncE clocks */
+    qcom_aw_phy_setup_synce_clocks(&pdev->dev);
+
+    /* Enable PHY clocks */
     qcom_aw_phy_setup_clocks(&pdev->dev);
   }
 
   /* Read the PHY TOP address */
   phy_resource = platform_get_resource_byname(pdev, IORESOURCE_MEM, "phy-top");
   if (!phy_resource) {
-    local_err_val = LOCAL_ERROR_3;
+    local_err_val = LOCAL_ERROR_4;
     goto func_exit;
   }
 
@@ -762,7 +862,7 @@ static int qcom_aw_phy_inst_probe(struct platform_device *pdev) {
   phy_resource =
       platform_get_resource_byname(pdev, IORESOURCE_MEM, "phy-wrapper");
   if (!phy_resource) {
-    local_err_val = LOCAL_ERROR_4;
+    local_err_val = LOCAL_ERROR_5;
     goto func_exit;
   }
 
@@ -781,7 +881,7 @@ static int qcom_aw_phy_inst_probe(struct platform_device *pdev) {
   /* Get the IRQ info */
   phy_inst_info->phy_status_irq = platform_get_irq_byname(pdev, "phy-irq");
   if (phy_inst_info->phy_status_irq < 0) {
-    local_err_val = LOCAL_ERROR_5;
+    local_err_val = LOCAL_ERROR_6;
     ret_val = ENODEV;
 #ifndef FEATURE_QCOM_AW_RUMI_SW
     goto func_exit;

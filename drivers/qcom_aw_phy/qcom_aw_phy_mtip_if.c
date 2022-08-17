@@ -500,6 +500,7 @@ int qcom_aw_phy_bringup(enum mtip_port_type_enum port_type,
     pmd_set_lane(&mss, lane);
 
     if(qcom_aw_phy_get_polarity_flag()){
+      QCOM_AW_PHY_LOG_INFO("Setting TX/RX polarity !");
       aw_pmd_tx_polarity_set(&mss, 1);
       aw_pmd_rx_polarity_set(&mss, 1);
     }
@@ -526,12 +527,8 @@ int qcom_aw_phy_bringup(enum mtip_port_type_enum port_type,
       qcom_aw_phy_bringup_manual_eq_mode(&mss, lane, config);
     }
 
-    // TX BIST
-
     // Check CDR Lock
     aw_pmd_rx_check_cdr_lock(&mss, RX_CDR_TIMEOUT_US);
-
-    // RX BIST
   }
 
 func_exit:
@@ -560,6 +557,7 @@ int qcom_aw_phy_teardown(enum mtip_port_type_enum port_type,
   enum eth_phy_iface_phy_lane_num_enum lane = PHY_LANE_0;
   mss_access_t mss = {.phy_offset = 0, .lane_offset = 0};
   struct qcom_aw_phy_lane_speed_config config;
+  int poll_result;
   enum local_error_enum local_err_val = LOCAL_ERROR_INVALID;
   aw_err_code_t aw_err_val = AW_ERR_CODE_NONE;
   int ret_val = 0;
@@ -630,6 +628,17 @@ int qcom_aw_phy_teardown(enum mtip_port_type_enum port_type,
       local_err_val = LOCAL_ERROR_5;
       goto func_exit;
     }
+
+    /* Check for CDR lock de-assertion */
+    poll_result = pmd_poll_field(&mss, DIG_SOC_LANE_STAT_REG1_ADDR,
+                                 DIG_SOC_LANE_STAT_REG1_OCTL_RX_DATA_VLD_MASK,
+                                 DIG_SOC_LANE_STAT_REG1_OCTL_RX_DATA_VLD_OFFSET,
+                                 0, RX_CDR_TIMEOUT_US);
+    if (poll_result == -1) {
+      QCOM_AW_PHY_LOG_ERR("ERROR: RX CDR timed out waiting to deassert");
+    } else {
+      QCOM_AW_PHY_LOG_ERR("RX CDR deasserted\n");
+    }
   }
 
 func_exit:
@@ -644,6 +653,7 @@ int qcom_aw_phy_mac_link_status(enum mtip_port_type_enum port_type,
   struct qcom_aw_phy_config *phy_config_info = NULL;
   enum qcom_aw_phy_instance_enum phy_inst_type = QCOM_AW_PHY_INST_MAX;
   struct qcom_aw_phy_inst_config *phy_inst_info = NULL;
+  enum eth_phy_iface_phy_lane_num_enum lane_num;
   enum local_error_enum local_err_val = LOCAL_ERROR_INVALID;
   int ret_val = 0;
 
@@ -670,13 +680,18 @@ int qcom_aw_phy_mac_link_status(enum mtip_port_type_enum port_type,
     goto func_exit;
   }
 
-  phy_inst_info->link_status = status;
+  for (lane_num = PHY_LANE_0; lane_num < PHY_LANE_MAX; lane_num++) {
+    if(lanes_enabled[lane_num])
+      phy_inst_info->lane_params[lane_num].link_status = status;
+  }
 
   qcom_aw_phy_synce_notify_phy_lane_state_change();
 
 func_exit:
-  QCOM_AW_PHY_LOG_ERR("%s: returns %d with local error %d", __func__, ret_val,
-                      local_err_val);
+  QCOM_AW_PHY_LOG_ERR("%s: PHY instance %d, status %d, "
+                      "returns %d with local error %d",
+                      __func__, phy_inst_type, status,
+                      ret_val, local_err_val);
 
   return ret_val;
 }

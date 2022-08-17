@@ -394,6 +394,11 @@ int qcom_aw_phy_gnl_set_synce_mux(struct sk_buff *sender_skb,
   }
 
   // Set SyncE MUX processing
+  if(qcom_aw_phy_synce_set_synce_mux(*recv_msg)){
+    ret_val = EINVAL;
+    local_err_val = LOCAL_ERROR_4;
+    goto func_exit;
+  }
 
 func_exit:
   QCOM_AW_PHY_LOG_ERR(

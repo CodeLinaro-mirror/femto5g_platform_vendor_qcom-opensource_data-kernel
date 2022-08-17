@@ -108,6 +108,8 @@ void qcom_aw_phy_get_lane_speed_config(
     config->rate = 0;
     config->width = 4;
     config->clause = 1;
+    config->synce_cmux_clk_rate = 322265625;
+    config->synce_div_clk_src_rate = 40283203;
     config->mod_tech = QCOM_AW_PHY_MOD_TECH_NRZ;
     break;
 
@@ -115,6 +117,8 @@ void qcom_aw_phy_get_lane_speed_config(
     config->rate = 1;
     config->width = 4;
     config->clause = 2;
+    config->synce_cmux_clk_rate = 805664064;
+    config->synce_div_clk_src_rate = 50354004;
     config->mod_tech = QCOM_AW_PHY_MOD_TECH_NRZ;
     break;
 
@@ -122,6 +126,8 @@ void qcom_aw_phy_get_lane_speed_config(
     config->rate = 2;
     config->width = 6;
     config->clause = 3;
+    config->synce_cmux_clk_rate = 830078125;
+    config->synce_div_clk_src_rate = 51879883;
     config->mod_tech = QCOM_AW_PHY_MOD_TECH_PAM4;
     break;
 
@@ -129,6 +135,8 @@ void qcom_aw_phy_get_lane_speed_config(
     config->rate = 3;
     config->width = 7;
     config->clause = 4;
+    config->synce_cmux_clk_rate = 830078125;
+    config->synce_div_clk_src_rate = 51879883;
     config->mod_tech = QCOM_AW_PHY_MOD_TECH_PAM4;
     break;
 

@@ -10,6 +10,9 @@
   SyncE application.
 */
 
+#include <linux/clk.h>
+#include <linux/reset.h>
+
 #include "qcom_aw_phy_main.h"
 #include "qcom_aw_phy_mtip_if.h"
 #include "qcom_aw_phy_synce.h"
@@ -18,6 +21,8 @@
 #include "eth_phy_iface.h"
 #include "aw_c_api/aw_alphacore.h"
 #include "aw_c_api/aw_driver_sim.h"
+#include "aw_c_api/interface.h"
+
 
 /*-------------------------------------------------------------------
 * qcom_aw_phy_synce_notify_phy_lane_state_change
@@ -50,9 +55,9 @@ void qcom_aw_phy_synce_notify_phy_lane_state_change() {
        phy_inst_type <= QCOM_AW_PHY_INST_L2; phy_inst_type++) {
 
     phy_inst_info = &phy_config_info->phy_inst_config_info[phy_inst_type];
-    if (phy_inst_info->valid && phy_inst_info->link_status) {
+    if (phy_inst_info->valid) {
       for (lane_num = PHY_LANE_0; lane_num < PHY_LANE_MAX; lane_num++) {
-        if (phy_inst_info->lane_params[lane_num].lane_config.lane_enabled) {
+        if (phy_inst_info->lane_params[lane_num].link_status) {
           synce_lane_num = (phy_inst_type * PHY_LANE_MAX) + lane_num;
           lane_status[synce_lane_num].lane_status = true;
           lane_status[synce_lane_num].lane_speed =
@@ -166,6 +171,10 @@ int qcom_aw_phy_synce_set_snr_threshold(
   aw_pmd_snr_mon_enable_set(&mss, nrz_mode, 1);
   aw_pmd_snr_vld_enable_set(&mss, 1);
 
+  pmd_write_field(&mss, RX_SNR_REG7_ADDR,
+                  RX_SNR_REG7_RO_CSR_CAPTURE_A_MASK,
+                  RX_SNR_REG7_RO_CSR_CAPTURE_A_OFFSET, 1);
+
 func_exit:
   QCOM_AW_PHY_LOG_INFO("snr_low_val = %d, snr_high_val = %d, "
                        "ret_val %d, local error %d",
@@ -242,6 +251,85 @@ func_exit:
                        "ret_val %d, local error %d",
                        config.mod_tech, snr_val[0], snr_val[1], snr_val[2],
                        ret_val, local_err_val);
+
+  return ret_val;
+}
+
+/*-------------------------------------------------------------------
+* qcom_aw_phy_synce_set_synce_mux
+
+* @lane_num: Lane number for the selected RX lane clock.
+
+* Description: This function sets the SyncE MUX for the desired RX
+               lane clock.
+------------------------------------------------------------------- */
+int qcom_aw_phy_synce_set_synce_mux(
+    enum qcom_aw_phy_synce_lane_id synce_lane_num) {
+
+  struct qcom_aw_phy_config *phy_config_info = NULL;
+  enum qcom_aw_phy_instance_enum phy_inst_type = QCOM_AW_PHY_INST_MAX;
+  struct qcom_aw_phy_inst_config *phy_inst_info = NULL;
+  enum eth_phy_iface_phy_lane_num_enum phy_inst_lane_num = PHY_LANE_MAX;
+  struct qcom_aw_phy_lane_speed_config config = {0};
+  enum local_error_enum local_err_val = LOCAL_ERROR_INVALID;
+  int ret_val = 0;
+
+  phy_config_info = qcom_aw_phy_get_config_info();
+  if (!phy_config_info) {
+    ret_val = EINVAL;
+    local_err_val = LOCAL_ERROR_0;
+    goto func_exit;
+  }
+
+  if(synce_lane_num == LANE_NONE){
+    QCOM_AW_PHY_LOG_INFO("Disable ACGC output for LANE_NONE");
+    reset_control_deassert(phy_config_info->acgc_reset_ctrl);
+    return ret_val;
+  }
+
+  phy_inst_type = synce_lane_num / PHY_LANE_MAX;
+  phy_inst_lane_num = synce_lane_num % PHY_LANE_MAX;
+  if (!QCOM_AW_PHY_INST_VALID(phy_inst_type) ||
+      !QCOM_AW_PHY_LANE_VALID(phy_inst_lane_num)) {
+    ret_val = EINVAL;
+    local_err_val = LOCAL_ERROR_1;
+    goto func_exit;
+  }
+
+  phy_inst_info = &phy_config_info->phy_inst_config_info[phy_inst_type];
+  if (phy_inst_info->valid == false) {
+    ret_val = EINVAL;
+    local_err_val = LOCAL_ERROR_2;
+    goto func_exit;
+  }
+
+  // Disable SyncE ACGC output
+  QCOM_AW_PHY_LOG_ERR("Disable ACGC output");
+  reset_control_deassert(phy_config_info->acgc_reset_ctrl);
+
+  // Select division ratio
+  QCOM_AW_PHY_LOG_ERR("Select division ratio");
+  qcom_aw_phy_get_lane_speed_config(
+      phy_inst_info->lane_params[phy_inst_lane_num].lane_config.lane_speed,
+      &config);
+  clk_set_rate(phy_config_info->synce_cmux_clk,config.synce_cmux_clk_rate);
+  clk_set_rate(phy_config_info->synce_div_clk,config.synce_div_clk_src_rate);
+
+  // Select desired RX lane clock
+  QCOM_AW_PHY_LOG_ERR("Select desired RX lane clock");
+  ret_val = clk_set_parent(phy_config_info->synce_cmux_clk_src,
+                        phy_config_info->synce_phy_lane_clk[synce_lane_num]);
+  if (ret_val)
+    QCOM_AW_PHY_LOG_ERR("clk_set_parent failed ret: %d", ret_val);
+
+  // Enable SyncE ACGC output
+  QCOM_AW_PHY_LOG_ERR("Enable ACGC output");
+  reset_control_assert(phy_config_info->acgc_reset_ctrl);
+
+func_exit:
+  QCOM_AW_PHY_LOG_INFO("qcom_aw_phy_synce_set_synce_mux for lane %d"
+                       "ret_val %d, local error %d",
+                       synce_lane_num, ret_val, local_err_val);
 
   return ret_val;
 }
