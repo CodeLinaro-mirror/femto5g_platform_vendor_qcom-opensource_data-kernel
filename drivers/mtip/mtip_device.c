@@ -108,8 +108,24 @@ static void post_mtip_replenish_dma_rx_buffers(struct net_device *netdev, ecpri_
 void run_mtip_replenish_dma_rx_buffers(void* work_ptr)
 {
    int rv;
-
+   u32 tx_available;
+   u32 rx_available;
    struct mtip_replenish_dma_rx_buffers_task* taskstruct = (struct mtip_replenish_dma_rx_buffers_task*)work_ptr;
+   struct mtip_netdev_priv* priv;
+   u32 link_index;
+
+   priv = netdev_priv(taskstruct->netdev);
+
+   link_index = priv->link_index;
+
+   rv = mtip_dma_get_ring_state(taskstruct->hdl, &tx_available, &rx_available);
+
+   if (platform_driver_priv->mtip_links[link_index]->peak_rx_available < rx_available) 
+   {
+       CSMLOGINFO("peak rx_available: %d/%d\n", rx_available, MTIP_RX_RING_SIZE);
+       platform_driver_priv->mtip_links[link_index]->peak_rx_available = rx_available;
+   }
+
    rv = mtip_replenish_dma_rx_buffers(taskstruct->netdev, taskstruct->hdl, taskstruct->num_of_pkts);
 
    // free the taskstruct
@@ -129,9 +145,15 @@ void run_mtip_set_rx_mode(void* work_ptr)
    int rv;
    struct mtip_set_rx_mode_task* taskstruct = (struct mtip_set_rx_mode_task*)work_ptr;
 
-   CSMLOGINFO("setting Rx mode to %d for hdl %d\n", taskstruct->setmode, taskstruct->hdl);
+   CSMLOGDBG("setting Rx mode to %d for hdl %d\n", taskstruct->setmode, taskstruct->hdl);
 
    rv = (ecpri_dma_eth_driver_ops.ecpri_dma_eth_rx_mode_set)(taskstruct->hdl, taskstruct->setmode);
+
+   if (rv < 0) 
+   {
+       CSMLOGERR("Set Rx mode to %d failed.. reset to IRQ mode\n", taskstruct->setmode);
+       (ecpri_dma_eth_driver_ops.ecpri_dma_eth_rx_mode_set)(taskstruct->hdl, ECPRI_DMA_NOTIFY_MODE_IRQ);
+   }
 
    // free the taskstruct
    kfree(taskstruct);
@@ -170,7 +192,7 @@ void run_mtip_tx_comp_cb(void* work_ptr)
    comp_pkts = taskstruct->comp_pkts;
    num_of_completed = taskstruct->num_of_completed;
 
-   CSMLOGINFO("Tx comp callback for hdl: %d, num_of_completed: %d\n", hdl, num_of_completed);
+   CSMLOGDBG("Tx comp callback for hdl: %d, num_of_completed: %d\n", hdl, num_of_completed);
 
    // process the Tx completions
    for (i = 0; i < num_of_completed; ++i)
@@ -181,7 +203,7 @@ void run_mtip_tx_comp_cb(void* work_ptr)
 
       skb = (struct sk_buff*)pkt->user_data;
 
-      CSMLOGINFO("Tx comp for hdl: %d, skb->data: 0x%lx\n", hdl, (unsigned long)skb->data);
+      CSMLOGDBG("Tx comp for hdl: %d, skb->data: 0x%lx\n", hdl, (unsigned long)skb->data);
 
       // store the netdev
       netdev = skb->dev;
@@ -423,7 +445,7 @@ int mtip_napi_poll(struct napi_struct *napi_ptr, int budget)
    dev = platform_driver_priv->mtip_links[link_index]->dev;
    priv = netdev_priv(dev);
 
-   CSMLOGINFO("mtip_napi_poll called with budget %d for link_index %d hdl %d\n", budget, link_index, hdl);
+   CSMLOGDBG("mtip_napi_poll called with budget %d for link_index %d hdl %d\n", budget, link_index, hdl);
 
    // read the packets and push into the stack
    rv = mtip_dma_poll_rx_packets(dev, napi_ptr, hdl, budget, &npackets);

@@ -1254,14 +1254,11 @@ static int mtip_platform_setup(void)
 
           netdev = platform_driver_priv->mtip_links[i]->dev;
 
-          netdev->features = NETIF_F_SG | NETIF_F_HW_CSUM | NETIF_F_RXCSUM |
-                NETIF_F_TSO | NETIF_F_TSO6 | NETIF_F_HW_VLAN_CTAG_RX |
-                NETIF_F_HW_VLAN_CTAG_TX;
+          // the supported features and hw features
+          netdev->features = 0;
           netdev->hw_features = netdev->features;
-
-          netdev->vlan_features |= NETIF_F_SG | NETIF_F_HW_CSUM |
-                NETIF_F_TSO | NETIF_F_TSO6;
-
+          netdev->vlan_features = 0;
+          
           /* MTU range: 46 - 9194 */
           netdev->min_mtu = MTIP_MAC_MIN_ETH_FRAME_SIZE -
              (ETH_HLEN + ETH_FCS_LEN + VLAN_HLEN);

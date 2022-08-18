@@ -58,13 +58,13 @@
 
 #define MTIP_DMA_RX_PACKET_SIZE 1600 /* use buffers of size 1600 */
 
-#define MTIP_TX_RING_SIZE 100
-#define MTIP_RX_RING_SIZE 100
+#define MTIP_TX_RING_SIZE 512
+#define MTIP_RX_RING_SIZE 512
 
 #define MTIP_TX_MOD_COUNTER_THRESHOLD 1       // RECOMMENDED VALUE: 25% of RING SIZE
 #define MTIP_TX_MOD_TIMER_THRESHOLD   0       // RECOMMENDED VALUE: 10 msec
 
-#define MTIP_TX_PACKET_AVAILABILITY_THRESHOLD     10
+#define MTIP_TX_PACKET_AVAILABILITY_THRESHOLD     50
 
 #define MTIP_TSC_OFFSET_VAL          0x00000013  // TSC OFFSET REGISTER VALUE TO BE SET AFTER BRING UP IS COMPLETE
 #define MTIP_DEBUG_ETH_LINK_INDEX     15
@@ -195,6 +195,7 @@ struct mtip_link_info
    bool ptp_ts_enabled;
    struct mtip_tx_ts_list tx_ts_list;
    struct mtip_tx_ts_skb_list tx_ts_skb_list;
+   u32 peak_rx_available;
    struct mutex dev_lock;
 };
 
