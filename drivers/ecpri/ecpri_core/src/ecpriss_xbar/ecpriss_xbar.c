@@ -346,6 +346,7 @@ static void ecpriss_xbar_enable_stats(void)
 	xbar_cfg.xbar_cnt_en = ENABLE_BIT;
 	xbar_cfg.xbar_cnt_clr_en = DISABLE_BIT;
 	xbar_cfg.tpdm_en = ENABLE_BIT;
+	xbar_cfg.axis_arb_fix_en = ENABLE_BIT;
 
 	ecpriss_xbar_hal_write_reg_n_fields(ECPRISS_XBAR_GLOBAL,ECPRI_XBAR_XBAR_CFG,
 			0,

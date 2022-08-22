@@ -50,6 +50,7 @@
 #include "mtip_ethtool.h"
 #include "mtip_client.h"
 #include "mtip_ptp.h"
+#include "mtip_debug_eth.h"
 
 int macsec_eth_set_macsec_ops(const struct macsec_ops* rb_macsec_ops)
 {
@@ -179,6 +180,8 @@ void run_mtip_tx_comp_cb(void* work_ptr)
 
       skb = (struct sk_buff*)pkt->user_data;
 
+      CSMLOGINFO("Tx comp for hdl: %d, skb->data: 0x%lx\n", hdl, (unsigned long)skb->data);
+
       // store the netdev
       netdev = skb->dev;
       priv = netdev_priv(netdev);
@@ -189,7 +192,7 @@ void run_mtip_tx_comp_cb(void* work_ptr)
       // check if this skb needs HW timestamping
       if ((skb_shinfo(skb)->tx_flags & SKBTX_IN_PROGRESS)  != 0)
       {
-          CSMLOGDBG("Tx comp cb for packet needing HW_TSTAMP\n");
+          CSMLOGINFO("Tx comp cb for packet needing HW_TSTAMP\n");
 
           // this packet needs to be timestamped
           // acquire the ptp lock
@@ -376,6 +379,30 @@ int mtip_napi_poll(struct napi_struct *napi_ptr, int budget)
        case 4:
           actual_handle = 3;
           break;
+       case 5:
+          actual_handle = 6;
+          break;
+       case 6:
+          actual_handle = 5;
+          break;
+       case 7:
+          actual_handle = 8;
+          break;
+       case 8:
+          actual_handle = 7;
+          break;
+       case 9:
+          actual_handle = 10;
+          break;
+       case 10:
+          actual_handle = 9;
+          break;
+       case 11:
+          actual_handle = 12;
+          break;
+       case 12:
+          actual_handle = 11;
+          break;
        }
 #endif
    }
@@ -440,6 +467,10 @@ static int mtip_start_xmit(struct sk_buff *skb, struct net_device *netdev)
    link_index = priv->link_index;
    hdl = platform_driver_priv->mtip_links[link_index]->dma_hdl;
 
+   if(priv->link_index == MTIP_DEBUG_ETH_LINK_INDEX){
+      return mtip_debug_eth_start_xmit(skb, netdev);
+   }
+
    if (mtip_loopback_mode != MTIP_MODE_DEFAULT)
    {
        switch (hdl)
@@ -456,11 +487,35 @@ static int mtip_start_xmit(struct sk_buff *skb, struct net_device *netdev)
        case 4:
           other_hdl = 3;
           break;
+       case 5:
+          other_hdl = 6;
+          break;
+       case 6:
+          other_hdl = 5;
+          break;
+       case 7:
+          other_hdl = 8;
+          break;
+       case 8:
+          other_hdl = 7;
+          break;
+       case 9:
+          other_hdl = 10;
+          break;
+       case 10:
+          other_hdl = 9;
+          break;
+       case 11:
+          other_hdl = 12;
+          break;
+       case 12:
+          other_hdl = 11;
+          break;
        }
 
        if (mtip_lookup_link_index_by_handle(other_hdl, &other_link_index) < 0)
        {
-          CSMLOGERR("did not find other link index\n");
+          CSMLOGERR("did not find other link index for hdl: %d\n", other_hdl);
 
           // free the skb
           dev_kfree_skb(skb);
@@ -498,7 +553,7 @@ static int mtip_start_xmit(struct sk_buff *skb, struct net_device *netdev)
    // check if this packet needs timestamping
    if ((skb_shinfo(skb)->tx_flags & SKBTX_HW_TSTAMP) != 0)
    {
-       CSMLOGDBG("Tx packet needing HW_TSTAMP");
+       CSMLOGINFO("Tx packet needing HW_TSTAMP skb->data: 0x%lx\n", (unsigned long)skb->data);
 
        // set the flag to in progress
        skb_shinfo(skb)->tx_flags |= SKBTX_IN_PROGRESS;
@@ -742,23 +797,25 @@ static int mtip_open(struct net_device *netdev)
        phylink_start(priv->phylink);
    }
 
-   // start the pipe
-   mtip_start_dma_pipe(netdev, hdl);
+   if(hdl){
+      // start the pipe
+      mtip_start_dma_pipe(netdev, hdl);
 
-   // set the netdev MAC address from the HW
-    mtip_set_netdev_hw_mac_addr(netdev, link_index);
+      // set the netdev MAC address from the HW
+       mtip_set_netdev_hw_mac_addr(netdev, link_index);
 
-   /*
-    * enable napi
-    */
-   napi_enable(&(platform_driver_priv->mtip_links[link_index]->napi));
+      /*
+       * enable napi
+       */
+      napi_enable(&(platform_driver_priv->mtip_links[link_index]->napi));
 
-   /* 
-    * Start the interface's transmit queue 
-    * (allowing it to accept packets for transmission) 
-    * once it is ready to start sending data. 
-    */
-   netif_start_queue(netdev);
+      /* 
+       * Start the interface's transmit queue 
+       * (allowing it to accept packets for transmission) 
+       * once it is ready to start sending data. 
+       */
+      netif_start_queue(netdev);
+   }
 
    /*
     * set the ethtool ops
@@ -798,16 +855,18 @@ static int mtip_close(struct net_device *netdev)
        phylink_disconnect_phy(priv->phylink);
    }
 
-   // stop the pipe
-   mtip_stop_dma_pipe(hdl);
+   if(hdl){
+      // stop the pipe
+      mtip_stop_dma_pipe(hdl);
 
-   /*
-    * disable napi
-    */
-   napi_disable(&(platform_driver_priv->mtip_links[link_index]->napi));
+      /*
+       * disable napi
+       */
+      napi_disable(&(platform_driver_priv->mtip_links[link_index]->napi));
 
-   /* release ports, irq and such -- like fops->close */
-   netif_stop_queue(netdev);
+      /* release ports, irq and such -- like fops->close */
+      netif_stop_queue(netdev);
+   }
 
    CSMLOGERR("Stopping netdev queue\n");
 

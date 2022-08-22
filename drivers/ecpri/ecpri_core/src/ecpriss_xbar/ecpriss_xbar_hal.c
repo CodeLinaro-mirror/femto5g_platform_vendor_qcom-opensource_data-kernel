@@ -166,6 +166,12 @@ const char *ecpriss_xbar_hal_reg_name_str(enum ecpriss_xbar_hal_reg_name reg_nam
 			HWIO_ECPRI_XBAR_XBAR_CFG_TPDM_EN_SHFT,
 			HWIO_ECPRI_XBAR_XBAR_CFG_TPDM_EN_BMSK);
 
+	ECPRISS_HAL_SETFIELD_IN_REG(*val,
+			xbar_cfg->axis_arb_fix_en,
+			HWIO_ECPRI_XBAR_XBAR_CFG_AXIS_ARB_FIX_EN_SHFT,
+			HWIO_ECPRI_XBAR_XBAR_CFG_AXIS_ARB_FIX_EN_BMSK);
+
+
 	return;
 }
 
@@ -630,6 +636,11 @@ static void ecpriss_xbar_hal_reg_parse_xbar_cfg(enum ecpriss_xbar_hal_reg_name r
 	xbar_cfg->def.tpdm_en = ECPRISS_HAL_GETFIELD_FROM_REG(val,
 			HWIO_ECPRI_XBAR_XBAR_CFG_TPDM_EN_SHFT,
 			HWIO_ECPRI_XBAR_XBAR_CFG_TPDM_EN_BMSK);
+
+	xbar_cfg->def.axis_arb_fix_en = ECPRISS_HAL_GETFIELD_FROM_REG(val,
+			HWIO_ECPRI_XBAR_XBAR_CFG_AXIS_ARB_FIX_EN_SHFT,
+			HWIO_ECPRI_XBAR_XBAR_CFG_AXIS_ARB_FIX_EN_BMSK);
+
 
 	return;
 }

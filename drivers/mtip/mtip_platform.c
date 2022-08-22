@@ -50,6 +50,7 @@
 #include "mtip_hashmap.h"
 #include "mtip_client.h"
 #include "mtip_ptp.h"
+#include "mtip_sysfs.h"
 #include "mtip_pcs.h"
 #include "mtip_phy.h"
 #include "mtip_dut.h"
@@ -99,23 +100,26 @@ static int mtip_platform_setup_link(unsigned int port_device_index, unsigned int
    // set the link state to INIT
    platform_driver_priv->mtip_links[link_index]->state = MTIP_LINK_STATE_INIT;
 
-   // connect to the dma pipe
-   rv = mtip_connect_dma_pipe(link_index, &hdl);
+   if(link_index != MTIP_DEBUG_ETH_LINK_INDEX){
+      // connect to the dma pipe
+      rv = mtip_connect_dma_pipe(link_index, &hdl);
 
-   // HANDLE THE ERROR
-   if (rv < 0)
-   {
-      CSMLOGERR("dma connect pipe failed for link_index: %d\n", link_index);
-      goto cleanup;
+      // HANDLE THE ERROR
+      if (rv < 0)
+      {
+         CSMLOGERR("dma connect pipe failed for link_index: %d\n", link_index);
+         goto cleanup;
+      }
+
+      // set the hdl of the link
+      platform_driver_priv->mtip_links[link_index]->dma_hdl = hdl;
+
+      // add to hashmap
+      mtip_hashmap_insert(hdl, link_index);
+
+      CSMLOGINFO("connect_dma_pipe is complete with hdl: %d for link_index: %d\n", hdl, link_index);
    }
 
-   // set the hdl of the link
-   platform_driver_priv->mtip_links[link_index]->dma_hdl = hdl;
-
-   // add to hashmap
-   mtip_hashmap_insert(hdl, link_index);
-
-   CSMLOGINFO("connect_dma_pipe is complete with hdl: %d for link_index: %d\n", hdl, link_index);
    goto out;
 
 cleanup:
@@ -128,7 +132,8 @@ out:
 
 static int mtip_platform_cleanup_link(unsigned int link_index)
 {
-   if (platform_driver_priv->mtip_links[link_index] != NULL)
+   if (platform_driver_priv->mtip_links[link_index] != NULL &&
+       platform_driver_priv->mtip_links[link_index]->dma_hdl != 0)
    {
       // disconnect the pipes
       mtip_disconnect_dma_pipe(platform_driver_priv->mtip_links[link_index]->dma_hdl);
@@ -1025,8 +1030,9 @@ static int mtip_platform_setup(void)
      // register for MAC wrapper IRQ
      mtip_mac_wrapper_register_irq(&platform_driver_priv->devices.port_devices[i].port_pdev->dev, 
                                     platform_driver_priv->devices.port_devices[i].wrapper_irq, 
-                                    NULL, 
+                                    DRV_NAME, 
                                     (void *)&platform_driver_priv->devices.port_devices[i]);
+
      if (mtip_rumi_platform == 0) 
      {
          // set the mac wrapper pcs mode control
@@ -1154,6 +1160,9 @@ static int mtip_platform_setup(void)
                   // enable pcs loopback on the link
                   mtip_pcs_enable_loopback(i);
               }
+
+              // set the MAC interrupt mask
+              mtip_mac_set_interrupt_mask(i);
           }
 
           // add the mtip_napi_rx

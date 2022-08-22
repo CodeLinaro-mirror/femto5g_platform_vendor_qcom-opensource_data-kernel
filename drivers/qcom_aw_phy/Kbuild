@@ -1,0 +1,54 @@
+DATACSMKERNELTOP = $(ROOTDIR)datacsm-kernel/drivers/
+AWPHYRVTOP = $(DATACSMKERNELTOP)/qcom_aw_phy/
+
+LINUX_INC +=	-Iinclude/linux
+
+CDEFINES +=	-DANI_LITTLE_BYTE_ENDIAN \
+	-DANI_LITTLE_BIT_ENDIAN \
+	-DDOT11F_LITTLE_ENDIAN_HOST \
+	-DANI_COMPILER_TYPE_GCC \
+	-DANI_OS_TYPE_ANDROID=6 \
+	-DPTT_SOCK_SVC_ENABLE \
+	-Wall\
+	-Werror\
+	-D__linux__
+
+KBUILD_CPPFLAGS += $(CDEFINES)
+
+ccflags-y += $(LINUX_INC)
+ccflags-y += -I$(DATACSMKERNELTOP)/include/
+ccflags-y += -I$(AWPHYRVTOP)
+ccflags-y += -I$(AWPHYRVTOP)/include/
+ccflags-y += -I$(AWPHYRVTOP)/include/uapi/qcom_aw_phy/
+
+header-y += $(AWPHYRVTOP)/include/uapi/qcom_aw_phy/qcom_aw_phy_gnl_uapi.h
+
+ifeq ($(call cc-option-yn, -Wmaybe-uninitialized),y)
+EXTRA_CFLAGS += -Wmaybe-uninitialized
+endif
+
+ifeq ($(call cc-option-yn, -Wheader-guard),y)
+EXTRA_CFLAGS += -Wheader-guard
+endif
+
+ifneq ($(MODNAME), qdsp6v2)
+CHIP_NAME ?= $(MODNAME)
+CDEFINES += -DMULTI_IF_NAME=\"$(CHIP_NAME)\"
+endif
+
+######### CONFIG_LASSEN_AW_PHY ########
+obj-$(CONFIG_LASSEN_QCOM_AW_PHY) += lassen_qcom_aw_phy.o
+lassen_qcom_aw_phy-y += \
+	qcom_aw_phy_main.o \
+	qcom_aw_phy_mtip_if.o \
+	qcom_aw_phy_synce.o \
+	qcom_aw_phy_utils.o \
+	qcom_aw_phy_gnl.o \
+	qcom_aw_phy_test_sysfs.o \
+	aw_c_api/aw_alphacore.o \
+	aw_c_api/aw_driver_sim.o \
+	aw_c_api/aw_pmd_rx_dsp_get.o \
+	aw_c_api/interface.o \
+
+CDEFINES += -DBUILD_TIMESTAMP=\"$(shell date -u +'%Y-%m-%dT%H:%M:%SZ')\"
+

@@ -167,6 +167,6 @@ u32 mtip_mac_get_interrupt_mask(u32 link_index);
 u32 mtip_mac_get_interrupt_summary(struct mtip_port_device_info* port_device);
 
 u32 mtip_mac_get_interrupt_status(u32 link_index);
-void mtip_mac_clear_interrupts(u32 link_index);
+void mtip_mac_clear_interrupts(u32 link_index, u32 int_to_clear);
 
 #endif // _MTIP_MAC_H

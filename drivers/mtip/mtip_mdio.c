@@ -22,6 +22,7 @@
 #include "mtip_dut.h"
 #include "mtip.h"
 #include "mtip_logging.h"
+#include "mtip_sysfs.h"
 
 
 // PHY ID for AR8031 PHY instances
@@ -29,6 +30,7 @@
 #define PHY_ID1_MASK     0xffffffbf  // Addr 0x6
 #define PHY_ID2_MASK     0xffffffef  // Addr 0x4
 #define PHY_ID3_MASK     0xffffffbf  // Addr 0x6
+#define PHY_ID15_MASK    0xffffffef  // Addr 0x4
 
 // Command register offset and bit masks for register content
 #define MTIP_MDIO_CMD_REG          0x00000034
@@ -67,6 +69,9 @@ void mtip_mdio_link_up(struct phylink_config *config,
    // Enable TX and RX on MAC
    mtip_mac_enable_tx_rx(link_index);
 
+   if(priv->link_index == MTIP_DEBUG_ETH_LINK_INDEX)
+      mtip_sysfs_mac_link_status(true);
+
    return;
 }
 
@@ -79,6 +84,9 @@ void mtip_mdio_link_down(struct phylink_config *config, unsigned int mode,
 
    // Disable TX and RX on MAC
    mtip_mac_disable_tx_rx(link_index);
+
+   if(priv->link_index == MTIP_DEBUG_ETH_LINK_INDEX)
+      mtip_sysfs_mac_link_status(false);
 
    return;
 }
@@ -310,6 +318,9 @@ u32 mtip_mdio_get_phy_addr_mask(u32 link_index)
 
 		case 3:
 			return PHY_ID3_MASK;
+
+		case 15:
+			return PHY_ID15_MASK;
 
 		default:
 			return 0xffffffff;

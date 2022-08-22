@@ -48,6 +48,7 @@
 #include "mtip_device.h"
 #include "mtip_phy.h"
 #include "eth_phy_iface.h"
+#include "mtip_sysfs.h"
 
 struct eth_phy_iface_eth_register_params mtip_phy_eth_params;
 
@@ -131,12 +132,22 @@ static void mtip_phy_link_up(struct phylink_config *config,
                       phy_interface_t interface, int speed,
                       int duplex, bool tx_pause, bool rx_pause) 
 {
+    struct mtip_netdev_priv   *priv = netdev_priv(to_net_dev(config->dev));
+
+    if(priv->link_index == MTIP_DEBUG_ETH_LINK_INDEX)
+      mtip_sysfs_mac_link_status(true);
+
    return;
 }
 
 static void mtip_phy_link_down(struct phylink_config *config, unsigned int mode,
                                 phy_interface_t interface) 
 {
+   struct mtip_netdev_priv   *priv = netdev_priv(to_net_dev(config->dev));
+
+   if(priv->link_index == MTIP_DEBUG_ETH_LINK_INDEX)
+      mtip_sysfs_mac_link_status(false);
+
    return;
 }
 
