@@ -374,6 +374,12 @@ void ecpri_dma_tasklet_transmit_done(unsigned long data)
 	unsigned long flags;
 
 	endp = (struct ecpri_dma_endp_context *)data;
+
+	if (!endp) {
+		DMAERR("tasklet on unknown endp\n");
+		ecpri_dma_assert();
+	}
+
 	num_of_completed = atomic_read(&endp->xmit_eot_cnt);
 
 	if (endp->gsi_ep_cfg->dir == ECPRI_DMA_ENDP_DIR_SRC)
@@ -390,6 +396,12 @@ void ecpri_dma_tasklet_transmit_done(unsigned long data)
 	}
 
 	spin_lock_irqsave(&endp->spinlock, flags);
+	if (list_empty(&endp->outstanding_pkt_list))
+	{
+		spin_unlock_irqrestore(&endp->spinlock, flags);
+		return;
+	}
+
 	curr_pkt_wrapper = list_first_entry(&endp->outstanding_pkt_list,
 				 struct ecpri_dma_outstanding_pkt_wrapper, link);
 
