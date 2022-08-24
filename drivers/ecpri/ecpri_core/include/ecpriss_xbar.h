@@ -6,13 +6,25 @@
 #define ECPRISS_XBAR_H_
 
 #define TOTAL_LINKS 12
+#define XBAR_LINKS 4
+#define LUT_INDEX 255
+#define NUM_OF_FHP 3
+#define NUM_OF_FLTR 16
+#define NUM_EGRESS_ENTRY 255
 
 #include "ecpriss_xbar_hal.h"
 #include "ecpriss_flow.h"
 #include "ecpriss_core.h"
+#include "ecpriss_qudp_hwio_def.h"
 
 #define ECPRISS_MAX_PCID_ENTRIES    1024
+#define EXPRISS_XBAR_IRQ_MAPPING 497
 
+/*
+ * Index of this in device tree file
+ * ecpriss_qudp_interrupt_events_e it has index 0-5
+ */
+#define EXPRISS_XBAR_INDEX 6
 typedef enum
 {
 	ECPRI_XBAR_DEINIT,
@@ -29,6 +41,10 @@ typedef struct ecpriss_xbar_interrupt_cfg
 /**
  *
  */
+typedef struct fh_port_config
+{
+	uint64_t xbar_fhrx_lut[LUT_INDEX];
+}fh_port_config;
 typedef struct ecpriss_xbar_stats_s
 {
 	uint64_t xbar_fhrx_pkt_cnt[TOTAL_LINKS];
@@ -45,7 +61,26 @@ typedef struct ecpriss_xbar_stats_s
 	uint64_t xbar_fhtx_uc_pkt_cnt;
 	uint64_t xbar_c2crx_pkt_cnt[TOTAL_LINKS];
 	uint64_t xbar_c2ctx_pkt_cnt[TOTAL_LINKS];
+	uint64_t xbar_ocrx_pkt_cnt[XBAR_LINKS];
+	uint64_t xbar_octx_pkt_cnt[XBAR_LINKS];
+	fh_port_config xbar_fh_port[NUM_OF_FHP];
 }ecpriss_xbar_stats_s;
+
+typedef struct ecpriss_xbar_interrupt_stats{
+	uint32_t octx_fh_len_err;
+	uint32_t octx_c2c_len_err;
+	uint32_t fhtx_c2c_overflow;
+	uint32_t c2ctx_fh_overflow;
+	uint32_t octx_fh_overflow;
+	uint32_t octx_c2c_overflow;
+	uint32_t fhrx_uc_pkt_pending;
+	uint32_t fhrx_uc_overflow;
+	uint32_t fhrx_uc_pkt_err;
+	uint32_t fhrx_uc_pkt_drop;
+	uint32_t ocrx_unknown_pcid;
+	uint32_t fhrx_unknown_pcid;
+	uint32_t c2crx_unkown_pcid;
+} ecpriss_xbar_interrupt_stats_s;
 
 typedef struct ecpriss_xbar_port_cfg
 {
@@ -104,12 +139,95 @@ typedef struct ecpriss_xbar_ctx
 	ecpriss_xbar_port_cfg_s		fh_exception_port_cfg;
 	ecpriss_xbar_interrupt_cfg_s	interrupt_cfg;
 	ecpriss_xbar_stats_s		stats;
+	ecpriss_xbar_interrupt_stats_s interrupt_stats;
 	ecpriss_flow_ctx_s		flow_ctx;
 	ecpriss_xbar_hal_context_s	*ecpriss_xbar_hal;
 	bool				def_lut_cfg_done[ECPRISS_MAX_PORTS];
 }ecpriss_xbar_ctx_s;
 
+typedef struct ecpriss_xbar_global_cfg{
+	uint64_t global;
+}ecpriss_xbar_global_cfg_s;
 
+typedef struct ecpriss_xbar_lut_cfg{
+	uint64_t ocrx[NUM_OF_FHP][LUT_INDEX];
+	uint64_t fhrx[NUM_OF_FHP][LUT_INDEX];
+	uint64_t c2crxdl;
+	uint64_t c2crxul;
+}ecpriss_xbar_lut_cfg_s;
+
+typedef struct ecpriss_xbar_cfg{
+	ecpriss_xbar_global_cfg_s global_cfg;
+	ecpriss_xbar_lut_cfg_s lut_cfg;
+}ecpriss_xbar_cfg_s;
+
+typedef struct ecpriss_src_ip_addr_cfg{
+	ecpri_qudp_hwio_def_ecpri_udp_fh_egress_ip_src_addr0_port_p_entry_n_s   ip_src0;
+        ecpri_qudp_hwio_def_ecpri_udp_fh_egress_ip_src_addr1_port_p_entry_n_s   ip_src1;
+        ecpri_qudp_hwio_def_ecpri_udp_fh_egress_ip_src_addr2_port_p_entry_n_s   ip_src2;
+        ecpri_qudp_hwio_def_ecpri_udp_fh_egress_ip_src_addr3_port_p_entry_n_s   ip_src3;
+}ecpriss_src_ip_addr_cfg_s;
+
+typedef struct ecpriss_dst_ip_addr_cfg{
+        ecpri_qudp_hwio_def_ecpri_udp_fh_egress_ip_dst_addr0_port_p_entry_n_s   ip_dst0;
+        ecpri_qudp_hwio_def_ecpri_udp_fh_egress_ip_dst_addr1_port_p_entry_n_s   ip_dst1;
+        ecpri_qudp_hwio_def_ecpri_udp_fh_egress_ip_dst_addr2_port_p_entry_n_s   ip_dst2;
+        ecpri_qudp_hwio_def_ecpri_udp_fh_egress_ip_dst_addr3_port_p_entry_n_s   ip_dst3;
+}ecpriss_dst_ip_addr_cfg_s;
+
+typedef struct ecpriss_qudp_egress_cfg{
+	ecpri_qudp_hwio_def_ecpri_udp_fh_egress_udp_ports_port_p_entry_n_s udp_ports[NUM_OF_FHP][NUM_EGRESS_ENTRY];
+	ecpri_qudp_hwio_def_ecpri_udp_fh_egress_vlan_ethertype_port_p_entry_n_s  vlan_ethertype[NUM_OF_FHP][NUM_EGRESS_ENTRY];
+	ecpri_qudp_hwio_def_ecpri_udp_fh_egress_eth_dst0_port_p_entry_n_s eth_dst0_port[NUM_OF_FHP][NUM_EGRESS_ENTRY];
+        ecpri_qudp_hwio_def_ecpri_udp_fh_egress_eth_src1_dst1_port_p_entry_n_s eth_src1_dst1_port[NUM_OF_FHP][NUM_EGRESS_ENTRY];
+        ecpri_qudp_hwio_def_ecpri_udp_fh_egress_eth_src0_port_p_entry_n_s eth_src0_port[NUM_OF_FHP][NUM_EGRESS_ENTRY];
+	ecpriss_dst_ip_addr_cfg_s dst_ip_addr[NUM_OF_FHP][NUM_EGRESS_ENTRY];
+	ecpriss_src_ip_addr_cfg_s src_ip_addr[NUM_OF_FHP][NUM_EGRESS_ENTRY];
+}ecpriss_qudp_egress_cfg_s;
+
+typedef struct ecpriss_ip_addr_fltr_cfg{
+	ecpri_qudp_hwio_def_ecpri_udp_fh_filt_ip_dst_addr0_port_p_entry_n_s dst_ip0;
+	ecpri_qudp_hwio_def_ecpri_udp_fh_filt_ip_dst_addr1_port_p_entry_n_s dst_ip1;
+	ecpri_qudp_hwio_def_ecpri_udp_fh_filt_ip_dst_addr2_port_p_entry_n_s dst_ip2;
+	ecpri_qudp_hwio_def_ecpri_udp_fh_filt_ip_dst_addr3_port_p_entry_n_s dst_ip3;
+}ecpriss_ip_addr_fltr_cfg_s;
+
+typedef struct ecpriss_mac_addr_fltr_cfg{
+	ecpri_qudp_hwio_def_ecpri_udp_fh_filt_mac_address_lsb_port_p_entry_n_s mac_lsb;
+	ecpri_qudp_hwio_def_ecpri_udp_fh_filt_mac_address_msb_port_p_entry_n_s mac_msb;
+}ecpriss_mac_addr_fltr_cfg_s;
+
+
+typedef struct ecpriss_qudp_ingress_cfg_value{
+	ecpri_qudp_hwio_def_ecpri_udp_fh_ingress_config_p_s global_cfg[NUM_OF_FHP];
+	ecpri_qudp_hwio_def_ecpri_udp_fh_filt_vlan_addr_port_p_entry_n_s vlan[NUM_OF_FHP][NUM_OF_FLTR];
+	ecpri_qudp_hwio_def_ecpri_udp_fh_udp_classification_list_port_p_entry_n_s udp_clss[NUM_OF_FHP][NUM_OF_FLTR];
+	ecpriss_ip_addr_fltr_cfg_s ip_addr[NUM_OF_FHP][NUM_OF_FLTR];
+	ecpriss_mac_addr_fltr_cfg_s mac_addr[NUM_OF_FHP][NUM_OF_FLTR];
+}ecpriss_qudp_ingress_cfg_value_s;
+
+typedef struct ecpriss_qudp_ingress_cfg_valid_bits{
+	ecpri_qudp_hwio_def_ecpri_udp_fh_filt_vlan_addr_port_p_entries_valid_bits_s vlan[NUM_OF_FHP];
+	ecpri_qudp_hwio_def_ecpri_udp_fh_udp_classification_list_port_p_entries_valid_bits_s udp_clss[NUM_OF_FHP];
+	ecpri_qudp_hwio_def_ecpri_udp_fh_filt_ip_dst_addr_port_p_entries_valid_bits_s ip_addr[NUM_OF_FHP];
+	ecpri_qudp_hwio_def_ecpri_udp_fh_filt_mac_address_port_p_entries_valid_bits_s mac_addr[NUM_OF_FHP];
+}ecpriss_qudp_ingress_cfg_valid_bits_s;
+
+typedef struct ecpriss_qudp_ingress_cfg{
+	ecpriss_qudp_ingress_cfg_value_s cfg;
+	ecpriss_qudp_ingress_cfg_valid_bits_s vbits;
+}ecpriss_qudp_ingress_cfg_s;
+
+typedef struct ecpriss_qudp_cfg{
+	ecpriss_qudp_egress_cfg_s  egress;
+	ecpriss_qudp_ingress_cfg_s ingress;
+}ecpriss_qudp_cfg_s;
+
+typedef struct ecpriss_config_stats
+{
+	ecpriss_xbar_cfg_s xbar_cfg;
+	ecpriss_qudp_cfg_s qudp_cfg;
+}ecpriss_config_stats_s;
 
 int ecpriss_xbar_cold_init(struct device *dev);
 int ecpriss_xbar_fh_rx_lut(uint32_t port_index,
@@ -120,6 +238,8 @@ int ecpriss_xbar_l2_lut(void);
 int ecpriss_xbar_oc_rx_lut(uint32_t port_index,
 		ecpriss_flow_tx_cfg_s *xbar_tx_cfg);
 void ecpriss_xbar_non_ecpri_lut_cfg(void);
-
+void ecpriss_xbar_print_stats(void);
+void ecpriss_xbar_print_stats(void);
+void ecpriss_xbar_config_sats(void);
 
 #endif

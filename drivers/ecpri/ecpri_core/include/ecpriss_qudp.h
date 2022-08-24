@@ -100,6 +100,7 @@ typedef struct ecpriss_qudp_stats
 	uint64_t ingress_num_vlan_filtered_packets[ECPRISS_MAX_LINKS];
 	uint64_t ingress_num_sec_err_packets[ECPRISS_MAX_LINKS];
 	uint64_t ingress_ip_len_err_packets[ECPRISS_MAX_LINKS];
+	uint64_t ingress_ip_filtered_packets[ECPRISS_MAX_LINKS];
 }ecpriss_qudp_stats;
 
 typedef struct ecpriss_qudp_interrupt_stats
@@ -165,7 +166,10 @@ void ecpriss_qudp_print_fh_ingress_stats(uint32_t port_index,
 		uint32_t link_index);
 void ecpriss_qudp_print_fh_egress_stats(uint32_t port_index,
 		uint32_t link_index);
-
+void ecpriss_qudp_ingress_config_stats(int32_t fh_index);
+void debug_qudp_ingress_config(void);
+void ecpriss_qudp_egress_config_stats(int32_t fh_index);
+void debug_qudp_egress_config(void);
 
 void ecpriss_qudp_print_c2c_ingress_stats(uint32_t port_index,
 		uint32_t link_index);
@@ -177,5 +181,6 @@ void ecpriss_qudp_print_l2_ingress_stats(uint32_t port_index,
 		uint32_t link_index);
 void ecpriss_qudp_print_l2_egress_stats(uint32_t port_index,
 		uint32_t link_index);
-
+void ecpriss_qudp_clear_stats(uint32_t port_index,
+		uint32_t link_index);
 #endif
