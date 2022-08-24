@@ -14,6 +14,11 @@
 #include "mtip.h"
 #include "mtip_device.h"
 
+/*
+ * The offsets below apply to FH0, FH1 and FH2 and their links
+ */
+#define MTIP_MACSTATS_DATA_HI_OFFSET                                  0x00000000
+
 #define MTIP_MACSTATS_ETHERSTATSOCTETS_REG_OFFET                      0x00000100
 #define MTIP_MACSTATS_OCTETSRECEIVEDOK_REG_OFFET                      0x00000104
 #define MTIP_MACSTATS_VLANRECEIVEDOK_REG_OFFSET                       0x00000120

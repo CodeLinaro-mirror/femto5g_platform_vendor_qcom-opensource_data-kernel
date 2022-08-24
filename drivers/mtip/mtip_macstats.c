@@ -45,6 +45,22 @@
 
 #include "mtip_macstats.h"
 
+static u64 mtip_macstats_read_stat(void __iomem *macstats_base_addr, unsigned int offset)
+{
+    u64 stat = 0;
+    u32 lower;
+    u32 upper;
+
+    // read the lower 32 bits of the stat
+    lower = ioread32(macstats_base_addr + offset);
+
+    // read the upper 32 bits of the stat from DATA_HI
+    upper = ioread32(macstats_base_addr + MTIP_MACSTATS_DATA_HI_OFFSET);
+
+    stat = ((u64)upper << 32) | ((u64)lower);
+    return stat;
+}
+
 void mtip_macstats_get_stats(struct net_device *netdev, u64 *data)
 {
     struct mtip_netdev_priv* priv;
@@ -54,33 +70,42 @@ void mtip_macstats_get_stats(struct net_device *netdev, u64 *data)
     u32 port_device_index;
     u32 link_device_index;
     u32 real_link_number;
+    u32 port_type;
 
     priv = netdev_priv(netdev);
     link_index = priv->link_index;
 
     mtip_lookup_device_by_link_index(link_index, &port_device_index, &link_device_index);
 
-    mtip_lookup_real_link_number_by_link_index(link_index, &real_link_number);
+    port_type = platform_driver_priv->devices.port_devices[port_device_index].port_type;
+
+    if (port_type > 2) 
+    {
+        CSMLOGERR("Access to MACSTATS for C2C/DBG ports not supported\n");
+        return;
+    }
 
     macstats_base_addr = platform_driver_priv->devices.port_devices[port_device_index].macstats_base_addr;
 
+    mtip_lookup_real_link_number_by_link_index(link_index, &real_link_number);
+
     // the Rx stats
-    data[i] = (u64)ioread32(macstats_base_addr + real_link_number*MTIP_MACSTATS_RX_BLOCKSIZE + MTIP_MACSTATS_ETHERSTATSOCTETS_REG_OFFET);
-    data[++i] = (u64)ioread32(macstats_base_addr + real_link_number*MTIP_MACSTATS_RX_BLOCKSIZE + MTIP_MACSTATS_OCTETSRECEIVEDOK_REG_OFFET);
-    data[++i] = (u64)ioread32(macstats_base_addr + real_link_number*MTIP_MACSTATS_RX_BLOCKSIZE + MTIP_MACSTATS_VLANRECEIVEDOK_REG_OFFSET);
-    data[++i] = (u64)ioread32(macstats_base_addr + real_link_number*MTIP_MACSTATS_RX_BLOCKSIZE + MTIP_MACSTATS_INERRORS_REG_OFFET);
-    data[++i] = (u64)ioread32(macstats_base_addr + real_link_number*MTIP_MACSTATS_RX_BLOCKSIZE + MTIP_MACSTATS_INUCASTPKTS_REG_OFFET);
-    data[++i] = (u64)ioread32(macstats_base_addr + real_link_number*MTIP_MACSTATS_RX_BLOCKSIZE + MTIP_MACSTATS_INMCASTPKTS_REG_OFFET);
-    data[++i] = (u64)ioread32(macstats_base_addr + real_link_number*MTIP_MACSTATS_RX_BLOCKSIZE + MTIP_MACSTATS_INBCASTPKTS_REG_OFFET);
-    data[++i] = (u64)ioread32(macstats_base_addr + real_link_number*MTIP_MACSTATS_RX_BLOCKSIZE + MTIP_MACSTATS_ETHERSTATSDROPS_REG_OFFET);
-    data[++i] = (u64)ioread32(macstats_base_addr + real_link_number*MTIP_MACSTATS_RX_BLOCKSIZE + MTIP_MACSTATS_ETHERSTATSPKTS_REG_OFFET);
+    data[i] = mtip_macstats_read_stat(macstats_base_addr, real_link_number*MTIP_MACSTATS_RX_BLOCKSIZE + MTIP_MACSTATS_ETHERSTATSOCTETS_REG_OFFET);
+    data[++i] = mtip_macstats_read_stat(macstats_base_addr, real_link_number*MTIP_MACSTATS_RX_BLOCKSIZE + MTIP_MACSTATS_OCTETSRECEIVEDOK_REG_OFFET);
+    data[++i] = mtip_macstats_read_stat(macstats_base_addr, real_link_number*MTIP_MACSTATS_RX_BLOCKSIZE + MTIP_MACSTATS_VLANRECEIVEDOK_REG_OFFSET);
+    data[++i] = mtip_macstats_read_stat(macstats_base_addr, real_link_number*MTIP_MACSTATS_RX_BLOCKSIZE + MTIP_MACSTATS_INERRORS_REG_OFFET);
+    data[++i] = mtip_macstats_read_stat(macstats_base_addr, real_link_number*MTIP_MACSTATS_RX_BLOCKSIZE + MTIP_MACSTATS_INUCASTPKTS_REG_OFFET);
+    data[++i] = mtip_macstats_read_stat(macstats_base_addr, real_link_number*MTIP_MACSTATS_RX_BLOCKSIZE + MTIP_MACSTATS_INMCASTPKTS_REG_OFFET);
+    data[++i] = mtip_macstats_read_stat(macstats_base_addr, real_link_number*MTIP_MACSTATS_RX_BLOCKSIZE + MTIP_MACSTATS_INBCASTPKTS_REG_OFFET);
+    data[++i] = mtip_macstats_read_stat(macstats_base_addr, real_link_number*MTIP_MACSTATS_RX_BLOCKSIZE + MTIP_MACSTATS_ETHERSTATSDROPS_REG_OFFET);
+    data[++i] = mtip_macstats_read_stat(macstats_base_addr, real_link_number*MTIP_MACSTATS_RX_BLOCKSIZE + MTIP_MACSTATS_ETHERSTATSPKTS_REG_OFFET);
 
     // the Tx stats
-    data[++i] = (u64)ioread32(macstats_base_addr + real_link_number*MTIP_MACSTATS_TX_BLOCKSIZE + MTIP_MACSTATS_OCTETSTRANSMITTEDOK_REG_OFFET);
-    data[++i] = (u64)ioread32(macstats_base_addr + real_link_number*MTIP_MACSTATS_TX_BLOCKSIZE + MTIP_MACSTATS_VLANTRANSMITTEDOK_OFFET);
-    data[++i] = (u64)ioread32(macstats_base_addr + real_link_number*MTIP_MACSTATS_TX_BLOCKSIZE + MTIP_MACSTATS_OUTERRORS_REG_OFFET);
-    data[++i] = (u64)ioread32(macstats_base_addr + real_link_number*MTIP_MACSTATS_TX_BLOCKSIZE + MTIP_MACSTATS_OUTUCASTPKTS_REG_OFFET);
-    data[++i] = (u64)ioread32(macstats_base_addr + real_link_number*MTIP_MACSTATS_TX_BLOCKSIZE + MTIP_MACSTATS_OUTMCASTPKTS_REG_OFFET);
-    data[++i] = (u64)ioread32(macstats_base_addr + real_link_number*MTIP_MACSTATS_TX_BLOCKSIZE + MTIP_MACSTATS_OUTBCASTPKTS_REG_OFFET);
+    data[++i] = mtip_macstats_read_stat(macstats_base_addr, real_link_number*MTIP_MACSTATS_TX_BLOCKSIZE + MTIP_MACSTATS_OCTETSTRANSMITTEDOK_REG_OFFET);
+    data[++i] = mtip_macstats_read_stat(macstats_base_addr, real_link_number*MTIP_MACSTATS_TX_BLOCKSIZE + MTIP_MACSTATS_VLANTRANSMITTEDOK_OFFET);
+    data[++i] = mtip_macstats_read_stat(macstats_base_addr, real_link_number*MTIP_MACSTATS_TX_BLOCKSIZE + MTIP_MACSTATS_OUTERRORS_REG_OFFET);
+    data[++i] = mtip_macstats_read_stat(macstats_base_addr, real_link_number*MTIP_MACSTATS_TX_BLOCKSIZE + MTIP_MACSTATS_OUTUCASTPKTS_REG_OFFET);
+    data[++i] = mtip_macstats_read_stat(macstats_base_addr, real_link_number*MTIP_MACSTATS_TX_BLOCKSIZE + MTIP_MACSTATS_OUTMCASTPKTS_REG_OFFET);
+    data[++i] = mtip_macstats_read_stat(macstats_base_addr, real_link_number*MTIP_MACSTATS_TX_BLOCKSIZE + MTIP_MACSTATS_OUTBCASTPKTS_REG_OFFET);
 }
 
