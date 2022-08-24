@@ -512,34 +512,6 @@ void mtip_mac_finalize(void __iomem *mac_base_addr, unsigned int irq, const char
     free_irq(irq, devptr);
 }
 
-void mtip_mac_phy_validate(struct phylink_config *config,
-                           unsigned long *supported,
-                           struct phylink_link_state *state) {
-   __ETHTOOL_DECLARE_LINK_MODE_MASK(mac_supported) = { 0, };
-   __ETHTOOL_DECLARE_LINK_MODE_MASK(mask) = { 0, };
-
-   phylink_set(mac_supported, 10baseT_Full);
-   phylink_set(mac_supported, 100baseT_Full);
-   phylink_set(mac_supported, 1000baseT_Full);
-   phylink_set(mac_supported, 1000baseKX_Full);
-
-   phylink_set(mac_supported, Autoneg);
-   phylink_set(mac_supported, Pause);
-   phylink_set(mac_supported, Asym_Pause);
-   phylink_set_port_modes(mac_supported);
-
-   bitmap_and(supported, supported, mac_supported,
-              __ETHTOOL_LINK_MODE_MASK_NBITS);
-   bitmap_andnot(supported, supported, mask,
-                 __ETHTOOL_LINK_MODE_MASK_NBITS);
-   bitmap_and(state->advertising, state->advertising, mac_supported,
-              __ETHTOOL_LINK_MODE_MASK_NBITS);
-   bitmap_andnot(state->advertising, state->advertising, mask,
-                 __ETHTOOL_LINK_MODE_MASK_NBITS);
-
-   return;
-}
-
 static u32 mtip_mac_wrapper_calendar_cfg_val(struct mtip_port_device_info* port_device)
 {
     u32 cfg_val = 0;
