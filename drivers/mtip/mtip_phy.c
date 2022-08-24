@@ -192,6 +192,27 @@ int mtip_phy_teardown_phy(u32 link_index)
     return (qcom_aw_phy_driver_iface_ops.eth_phy_iface_phy_teardown)(port_type, lanes_enabled);
 }
 
+int mtip_phy_notify_link_status(u32 link_index, bool status)
+{
+    enum mtip_port_type_enum port_type;
+    bool lanes_enabled[PHY_LANE_MAX];
+    u32 port_device_index;
+    u32 link_device_index;
+
+    if (mtip_lookup_device_by_link_index(link_index, &port_device_index, &link_device_index) < 0)
+    {
+        CSMLOGERR("Unable to find device for link index: %d\n", link_index);
+        return -1;
+    }
+
+    port_type = platform_driver_priv->devices.port_devices[port_device_index].port_type;
+
+    mtip_phy_get_lanes_of_link(link_index, lanes_enabled);
+
+    // notify PHY of the link status
+    return (qcom_aw_phy_driver_iface_ops.eth_phy_iface_notify_mac_link_status)(port_type, lanes_enabled, status);
+}
+
 static void mtip_phy_phy_validate(struct phylink_config *config,
                            unsigned long *supported,
                            struct phylink_link_state *state) 

@@ -302,6 +302,9 @@ void run_mtip_process_link_state(void* work_ptr)
         // disable tx_rx on the link
         mtip_mac_disable_tx_rx(link_index);
     }
+
+    // notify phy of the link status
+    mtip_phy_notify_link_status(link_index, link_up);
 }
 
 static int mtip_set_mac_address(struct net_device *dev, void *addr)
