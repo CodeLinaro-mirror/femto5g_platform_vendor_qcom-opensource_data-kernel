@@ -122,7 +122,7 @@ void mtip_dma_rx_comp_cb(void *user_data, ecpri_dma_eth_conn_hdl_t hdl)
 #endif
    }
 
-   CSMLOGERR("mtip_dma_rx_comp_cb orig: %d, used hdl: %d\n", hdl, used_handle);
+   CSMLOGDBG("mtip_dma_rx_comp_cb orig: %d, used hdl: %d\n", hdl, used_handle);
 
    // get the link index
    if (mtip_lookup_link_index_by_handle(used_handle, &link_index) < 0)
@@ -412,7 +412,7 @@ int mtip_dma_send_packet(struct net_device *netdev, ecpri_dma_eth_conn_hdl_t hdl
    pkts[0]->buffs = buffs;
    pkts[0]->user_data = (void*)skb;
 
-   CSMLOGINFO("mtip_send_packet hdl %d, link: %d, skb->data: 0x%lx len: %d\n", hdl, link_index, (unsigned long)buffs[0]->virt_base, skb->len);
+   CSMLOGDBG("mtip_send_packet hdl %d, link: %d, skb->data: 0x%lx len: %d\n", hdl, link_index, (unsigned long)buffs[0]->virt_base, skb->len);
 
 #ifdef MTIP_DUMP_PACKETS
    mtip_dma_dump_packet(skb->data, skb->len);
@@ -464,7 +464,7 @@ static void fixup_packet(struct net_device* netdev, unsigned char* buf, struct i
    u8* dstaddr;
    u8 tmpval;
 
-   CSMLOGINFO("Fixing up_packet len %d buf: 0x%lx\n", packetlen, (unsigned long)buf);
+   CSMLOGERR("Fixing up_packet len %d buf: 0x%lx\n", packetlen, (unsigned long)buf);
 
    // get the interface IP address
    netdevaddr = inet_select_addr(netdev, 0, RT_SCOPE_UNIVERSE);
@@ -567,17 +567,19 @@ static int mtip_dma_process_packet(struct net_device *netdev,
        // set the timestamp in the skb
        mtip_ptp_set_rx_timestamp(skb, nanosecs);
 
-       skb->len = size - 8;
+       skb_put(skb, size - 8);
+       //skb->len = size - 8;
    }
    else
    {
        // normal packet
        // pass it to the stack
-       skb->len = size;
+       skb_put(skb, size);
+       //skb->len = size;
    }
 
    skb->protocol = eth_type_trans(skb, netdev);
-   skb->ip_summed = CHECKSUM_UNNECESSARY; // no need to verify checksum
+   //skb->ip_summed = CHECKSUM_UNNECESSARY; // no need to verify checksum
 
    spin_lock_irqsave(lock, flags);
 
@@ -702,7 +704,7 @@ int mtip_dma_poll_rx_packets(struct net_device *netdev, struct napi_struct *napi
    }
    else
    {
-      CSMLOGERR("read from hdl %d: actual read packets: %d\n", actual_handle, *npackets);
+      CSMLOGDBG("read from hdl %d: actual read packets: %d\n", actual_handle, *npackets);
 
       for (k = 0; k < *npackets; ++k)
       {
@@ -721,3 +723,11 @@ out:
    return rv;
 }
 
+int mtip_dma_get_ring_state(ecpri_dma_eth_conn_hdl_t hdl, u32* tx_available, u32* rx_available)
+{
+    int rv;
+
+    rv = (ecpri_dma_eth_driver_ops.ecpri_dma_eth_tx_ring_state)(hdl, tx_available);
+    rv = (ecpri_dma_eth_driver_ops.ecpri_dma_eth_rx_ring_state)(hdl, rx_available);
+    return rv;
+}

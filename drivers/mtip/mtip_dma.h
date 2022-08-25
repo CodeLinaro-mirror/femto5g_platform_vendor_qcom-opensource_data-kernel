@@ -34,4 +34,6 @@ bool mtip_dma_tx_available(ecpri_dma_eth_conn_hdl_t hdl);
 int mtip_dma_rx_available(ecpri_dma_eth_conn_hdl_t hdl, u32* available);
 int mtip_dma_poll_rx_packets(struct net_device *netdev, struct napi_struct *napi_ptr, ecpri_dma_eth_conn_hdl_t hdl, int budget, int* npackets);
 
+int mtip_dma_get_ring_state(ecpri_dma_eth_conn_hdl_t hdl, u32* tx_available, u32* rx_available);
+
 #endif // _MTIP_DMA_H
