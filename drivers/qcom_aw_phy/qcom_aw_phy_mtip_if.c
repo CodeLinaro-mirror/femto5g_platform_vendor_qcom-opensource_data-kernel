@@ -459,20 +459,6 @@ int qcom_aw_phy_bringup(enum mtip_port_type_enum port_type,
                        sfp_port_type);
   phy_inst_info->sfp_port_type = sfp_port_type;
 
-  /* Get the lane specific info for the provided lane */
-  if (QCOM_AW_PHY_LANE_VALID(lane)) {
-    phy_lane_params = &phy_inst_info->lane_params[lane];
-    if (phy_lane_params->lane_config.lane_enabled == false) {
-      ret_val = EINVAL;
-      local_err_val = LOCAL_ERROR_3;
-      goto func_exit;
-    }
-  } else {
-    ret_val = EINVAL;
-    local_err_val = LOCAL_ERROR_4;
-    goto func_exit;
-  }
-
   /* Setup PHY offset */
   mss.phy_offset = phy_inst_info->base_addr;
 
@@ -481,7 +467,7 @@ int qcom_aw_phy_bringup(enum mtip_port_type_enum port_type,
   aw_err_val = aw_pmd_isolate_cmn_set(&mss, 1);
   if (aw_err_val != AW_ERR_CODE_NONE) {
     ret_val = EIO;
-    local_err_val = LOCAL_ERROR_5;
+    local_err_val = LOCAL_ERROR_3;
     goto func_exit;
   }
 
@@ -490,7 +476,7 @@ int qcom_aw_phy_bringup(enum mtip_port_type_enum port_type,
       aw_pmd_iso_request_cmn_state_change(&mss, AW_CMN_P0, CMN_ACK_TIMEOUT_US);
   if (aw_err_val != AW_ERR_CODE_NONE) {
     ret_val = EIO;
-    local_err_val = LOCAL_ERROR_6;
+    local_err_val = LOCAL_ERROR_4;
     goto func_exit;
   }
 
@@ -498,6 +484,14 @@ int qcom_aw_phy_bringup(enum mtip_port_type_enum port_type,
     /* Check if lane is valid for this MAC instance */
     if (lanes_enabled[lane] == false)
       continue;
+
+  /* Get the lane specific info for the provided lane */
+    phy_lane_params = &phy_inst_info->lane_params[lane];
+    if (phy_lane_params->lane_config.lane_enabled == false) {
+      ret_val = EINVAL;
+      local_err_val = LOCAL_ERROR_5;
+      goto func_exit;
+    }
 
     QCOM_AW_PHY_LOG_INFO("%s: Bringing up lane %d on port %d!", __func__, lane,
                          port_type);
@@ -593,20 +587,6 @@ int qcom_aw_phy_teardown(enum mtip_port_type_enum port_type,
     goto func_exit;
   }
 
-  /* Get the lane specific info for the provided lane */
-  if (QCOM_AW_PHY_LANE_VALID(lane)) {
-    phy_lane_params = &phy_inst_info->lane_params[lane];
-    if (phy_lane_params->lane_config.lane_enabled == false) {
-      ret_val = EINVAL;
-      local_err_val = LOCAL_ERROR_3;
-      goto func_exit;
-    }
-  } else {
-    ret_val = EINVAL;
-    local_err_val = LOCAL_ERROR_4;
-    goto func_exit;
-  }
-
   /* Setup PHY offset */
   mss.phy_offset = phy_inst_info->base_addr;
 
@@ -614,6 +594,14 @@ int qcom_aw_phy_teardown(enum mtip_port_type_enum port_type,
     /* Check if lane is valid for this MAC instance */
     if (lanes_enabled[lane] == false)
       continue;
+
+ /* Get the lane specific info for the provided lane */
+    phy_lane_params = &phy_inst_info->lane_params[lane];
+    if (phy_lane_params->lane_config.lane_enabled == false) {
+      ret_val = EINVAL;
+      local_err_val = LOCAL_ERROR_3;
+      goto func_exit;
+    }
 
     QCOM_AW_PHY_LOG_INFO("%s: Tearing down lane %d on port %d!", __func__, lane,
                          port_type);
@@ -630,7 +618,7 @@ int qcom_aw_phy_teardown(enum mtip_port_type_enum port_type,
         &mss, AW_PD, config.rate, config.width, TX_ACK_TIMEOUT_US);
     if (aw_err_val != AW_ERR_CODE_NONE) {
       ret_val = EIO;
-      local_err_val = LOCAL_ERROR_5;
+      local_err_val = LOCAL_ERROR_4;
       goto func_exit;
     }
 
@@ -639,7 +627,7 @@ int qcom_aw_phy_teardown(enum mtip_port_type_enum port_type,
         &mss, AW_PD, config.rate, config.width, TX_ACK_TIMEOUT_US);
     if (aw_err_val != AW_ERR_CODE_NONE) {
       ret_val = EIO;
-      local_err_val = LOCAL_ERROR_6;
+      local_err_val = LOCAL_ERROR_5;
       goto func_exit;
     }
   }
