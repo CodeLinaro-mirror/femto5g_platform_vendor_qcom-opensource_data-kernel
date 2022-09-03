@@ -76,6 +76,7 @@ void mtip_dma_rx_comp_cb(void *user_data, ecpri_dma_eth_conn_hdl_t hdl)
    spinlock_t *lock;
    unsigned long flags;
    ecpri_dma_eth_conn_hdl_t used_handle = hdl;
+   enum ecpri_dma_notify_mode setmode;
 
    if (mtip_loopback_mode != MTIP_MODE_DEFAULT) 
    {
@@ -147,6 +148,12 @@ void mtip_dma_rx_comp_cb(void *user_data, ecpri_dma_eth_conn_hdl_t hdl)
          // schedule napi
          if (napi_schedule_prep(&(link->napi))) {
             __napi_schedule(&(link->napi));
+
+            // set to POLL mode
+            setmode = ECPRI_DMA_NOTIFY_MODE_POLL;
+
+            // set the rx mode to POLL
+            mtip_set_rx_mode_immediate(hdl, setmode);
          }
 
          spin_unlock_irqrestore(lock, flags);
@@ -519,6 +526,7 @@ static int mtip_dma_process_packet(struct net_device *netdev,
    unsigned long flags;
    u64 nanosecs;
    u64* nsptr;
+   int i;
 
 #ifdef MTIP_LOOPBACK_SWAP_ADDRESSES
    struct iphdr* iphdr;
@@ -605,6 +613,14 @@ static int mtip_dma_process_packet(struct net_device *netdev,
 #endif
 
    napi_gro_receive(napi_ptr, skb);
+
+   // free the container
+   for (i = 0; i < num_of_buffers; ++i) 
+   {
+       kfree(buffs[i]);
+   }
+   kfree(buffs);
+
    return rv;
 }
 
@@ -694,6 +710,9 @@ int mtip_dma_poll_rx_packets(struct net_device *netdev, struct napi_struct *napi
    }
 
    spin_unlock_irqrestore(lock, flags);
+
+   // set the number of packets to 0
+   *npackets = 0;
 
    // read the packets
    rv = (ecpri_dma_eth_driver_ops.ecpri_dma_eth_rx_poll)(actual_handle, budget, (struct ecpri_dma_pkt_completion_wrapper **)pkts, npackets);
