@@ -1254,10 +1254,20 @@ static int mtip_platform_setup(void)
 
           netdev = platform_driver_priv->mtip_links[i]->dev;
 
-          // the supported features and hw features
-          netdev->features = 0;
-          netdev->hw_features = netdev->features;
-          netdev->vlan_features = 0;
+          if (mtip_loopback_mode == MTIP_MODE_DEFAULT) 
+          {
+              // the supported features and hw features
+              netdev->hw_features = 0;
+              netdev->features = netdev->hw_features | NETIF_F_HIGHDMA;
+              netdev->vlan_features = 0;
+          }
+          else
+          {
+              // for loopback set the features
+              netdev->features = NETIF_F_HW_CSUM | NETIF_F_RXCSUM;
+              netdev->hw_features = netdev->features;
+              netdev->vlan_features |= NETIF_F_HW_CSUM;
+          }
           
           /* MTU range: 46 - 9194 */
           netdev->min_mtu = MTIP_MAC_MIN_ETH_FRAME_SIZE -
