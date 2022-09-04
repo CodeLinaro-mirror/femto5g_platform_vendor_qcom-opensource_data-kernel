@@ -467,37 +467,49 @@ int ecpri_dma_set_endp_mode(struct ecpri_dma_endp_context *endp,
 	enum ecpri_dma_notify_mode mode)
 {
 	int ret = 0;
+	unsigned long flags;
 
 	if (!endp || !endp->valid)
 		return -EINVAL;
+
+	spin_lock_irqsave(&endp->spinlock, flags);
 
 	atomic_set(&endp->curr_polling_state, mode);
 	switch (mode) {
 	case ECPRI_DMA_NOTIFY_MODE_IRQ:
 		ret = gsi_config_channel_mode(endp->gsi_chan_hdl,
-					      GSI_CHAN_MODE_CALLBACK);
+			GSI_CHAN_MODE_CALLBACK);
 		if ((ret != GSI_STATUS_SUCCESS) &&
-		    !atomic_read(&endp->curr_polling_state)) {
+			(ret != -GSI_STATUS_UNSUPPORTED_OP) &&
+			!atomic_read(&endp->curr_polling_state)) {
 			DMAERR("Failed to switch to intr mode %d ch_id %d\n",
-			       endp->curr_polling_state, endp->gsi_chan_hdl);
+				endp->curr_polling_state, endp->gsi_chan_hdl);
+			spin_unlock_irqrestore(&endp->spinlock, flags);
+			return ret;
 		}
 		break;
 	case ECPRI_DMA_NOTIFY_MODE_POLL:
 		ret = gsi_config_channel_mode(endp->gsi_chan_hdl,
-					      GSI_CHAN_MODE_POLL);
+			GSI_CHAN_MODE_POLL);
 		if ((ret != GSI_STATUS_SUCCESS) &&
-		    atomic_read(&endp->curr_polling_state)) {
+			(ret != -GSI_STATUS_UNSUPPORTED_OP) &&
+			atomic_read(&endp->curr_polling_state)) {
 			DMAERR("Failed to switch to poll mode %d ch_id %d\n",
-			       endp->curr_polling_state, endp->gsi_chan_hdl);
+				endp->curr_polling_state, endp->gsi_chan_hdl);
+			spin_unlock_irqrestore(&endp->spinlock, flags);
+			return ret;
 		}
 		break;
 	default:
 		DMAERR("Invalid ENDP Notify mode recieved\n");
-		ret = -EINVAL;
+		spin_unlock_irqrestore(&endp->spinlock, flags);
+		return -EINVAL;
 		break;
 	}
 
-	return ret;
+
+	spin_unlock_irqrestore(&endp->spinlock, flags);
+	return 0;
 }
 
 int ecpri_dma_get_endp_mode(struct ecpri_dma_endp_context *endp,

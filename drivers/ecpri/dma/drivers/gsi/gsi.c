@@ -83,10 +83,11 @@ static union __packed gsi_channel_scratch __gsi_update_mhi_channel_scratch(
 
 static struct gsi_chan_ctx* __gsi_get_ch_ctx_from_hdl(u32 hdl) {
 	struct gsi_chan_ctx* ch_ctx;
+	unsigned long flags;
 
-	spin_lock(&gsi_ctx->ch_idr_lock);
+	spin_lock_irqsave(&gsi_ctx->ch_idr_lock, flags);
 	ch_ctx = idr_find(&gsi_ctx->ch_idr, hdl);
-	spin_unlock(&gsi_ctx->ch_idr_lock);
+	spin_unlock_irqrestore(&gsi_ctx->ch_idr_lock, flags);
 
 	return ch_ctx;
 }
@@ -94,13 +95,14 @@ static struct gsi_chan_ctx* __gsi_get_ch_ctx_from_hdl(u32 hdl) {
 static u32 __gsi_alloc_ch_hdl(void* ptr)
 {
 	u32 hdl;
+	unsigned long flags;
 
 	idr_preload(GFP_KERNEL);
 
-	spin_lock(&gsi_ctx->ch_idr_lock);
+	spin_lock_irqsave(&gsi_ctx->ch_idr_lock, flags);
 	hdl = idr_alloc(&gsi_ctx->ch_idr, ptr, GSI_MIN_HDL_ID, 0,
 		GFP_NOWAIT);
-	spin_unlock(&gsi_ctx->ch_idr_lock);
+	spin_unlock_irqrestore(&gsi_ctx->ch_idr_lock, flags);
 
 	idr_preload_end();
 
@@ -108,17 +110,19 @@ static u32 __gsi_alloc_ch_hdl(void* ptr)
 }
 
 static void __gsi_remove_ch_hdl(u32 hdl) {
-	spin_lock(&gsi_ctx->ch_idr_lock);
+	unsigned long flags;
+	spin_lock_irqsave(&gsi_ctx->ch_idr_lock, flags);
 	idr_remove(&gsi_ctx->ch_idr, hdl);
-	spin_unlock(&gsi_ctx->ch_idr_lock);
+	spin_unlock_irqrestore(&gsi_ctx->ch_idr_lock, flags);
 }
 
 static struct gsi_evt_ctx* __gsi_get_ev_ctx_from_hdl(u32 hdl) {
 	struct gsi_evt_ctx* ev_ctx;
+	unsigned long flags;
 
-	spin_lock(&gsi_ctx->ev_idr_lock);
+	spin_lock_irqsave(&gsi_ctx->ev_idr_lock, flags);
 	ev_ctx = idr_find(&gsi_ctx->ev_idr, hdl);
-	spin_unlock(&gsi_ctx->ev_idr_lock);
+	spin_unlock_irqrestore(&gsi_ctx->ev_idr_lock, flags);
 
 	return ev_ctx;
 }
@@ -126,13 +130,14 @@ static struct gsi_evt_ctx* __gsi_get_ev_ctx_from_hdl(u32 hdl) {
 static u32 __gsi_alloc_ev_hdl(void* ptr)
 {
 	u32 hdl;
+	unsigned long flags;
 
 	idr_preload(GFP_KERNEL);
 
-	spin_lock(&gsi_ctx->ev_idr_lock);
+	spin_lock_irqsave(&gsi_ctx->ev_idr_lock, flags);
 	hdl = idr_alloc(&gsi_ctx->ev_idr, ptr, GSI_MIN_HDL_ID, 0,
 		GFP_NOWAIT);
-	spin_unlock(&gsi_ctx->ev_idr_lock);
+	spin_unlock_irqrestore(&gsi_ctx->ev_idr_lock, flags);
 
 	idr_preload_end();
 
@@ -140,9 +145,10 @@ static u32 __gsi_alloc_ev_hdl(void* ptr)
 }
 
 static void __gsi_remove_ev_hdl(u32 hdl) {
-	spin_lock(&gsi_ctx->ev_idr_lock);
+	unsigned long flags;
+	spin_lock_irqsave(&gsi_ctx->ev_idr_lock, flags);
 	idr_remove(&gsi_ctx->ev_idr, hdl);
-	spin_unlock(&gsi_ctx->ev_idr_lock);
+	spin_unlock_irqrestore(&gsi_ctx->ev_idr_lock, flags);
 }
 
 static void __gsi_config_type_irq(int ee, u32 mask, u32 val)
