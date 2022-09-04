@@ -370,7 +370,6 @@ void ecpri_dma_tasklet_transmit_done(unsigned long data)
 	struct list_head *pos, *n;
 	u32 num_of_completed, completed_pkt_index = 0;
 	int i = 0;
-	int dma_dir = 0;
 	unsigned long flags;
 
 	endp = (struct ecpri_dma_endp_context *)data;
@@ -381,11 +380,6 @@ void ecpri_dma_tasklet_transmit_done(unsigned long data)
 	}
 
 	num_of_completed = atomic_read(&endp->xmit_eot_cnt);
-
-	if (endp->gsi_ep_cfg->dir == ECPRI_DMA_ENDP_DIR_SRC)
-		dma_dir = DMA_TO_DEVICE;
-	else
-		dma_dir = DMA_FROM_DEVICE;
 
 	comp_pkts_arr =
 		kzalloc(sizeof(struct ecpri_dma_pkt_completion_wrapper *) *
@@ -417,7 +411,8 @@ void ecpri_dma_tasklet_transmit_done(unsigned long data)
 			for (i = 0; i < pkt->num_of_buffers; i++) {
 				dma_unmap_single(ecpri_dma_ctx->pdev,
 					pkt->buffs[i]->phys_base,
-					pkt->buffs[i]->size, dma_dir);
+					pkt->buffs[i]->size, DMA_TO_DEVICE);
+				pkt->buffs[i]->phys_base = 0;
 			}
 		}
 
@@ -653,6 +648,14 @@ int ecpri_dma_dp_rx_poll(struct ecpri_dma_endp_context *endp, u32 budget,
 		pkts[i]->comp_code = curr_pkt_wrapper->comp_pkt.comp_code;
 		pkts[i]->pkt = curr_pkt_wrapper->comp_pkt.pkt;
 		pkts[i]->pkt->buffs[0]->size = curr_pkt_wrapper->bytes_xfered;
+		/* Unmapping is only required for ETH S2M ENDPs */
+		if (endp->gsi_ep_cfg->stream_mode != ECPRI_DMA_ENDP_STREAM_MODE_M2M)
+		{
+			dma_unmap_single(ecpri_dma_ctx->pdev,
+				pkts[i]->pkt->buffs[0]->phys_base,
+				pkts[i]->pkt->buffs[0]->size, DMA_FROM_DEVICE);
+			pkts[i]->pkt->buffs[0]->phys_base = 0;
+		}
 		i++;
 
 		/* Free completed packet wrappers*/
@@ -829,6 +832,7 @@ fail_handling:
 			dma_unmap_single(ecpri_dma_ctx->pdev,
 				pkts[k]->buffs[j]->phys_base,
 				pkts[k]->buffs[j]->size, dma_dir);
+			pkts[k]->buffs[j]->phys_base = 0;
 		}
 
 		/* Remove from list */
