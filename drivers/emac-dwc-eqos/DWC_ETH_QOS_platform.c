@@ -2148,6 +2148,7 @@ static int DWC_ETH_QOS_panic_notifier(struct notifier_block *this,
 		unsigned long event, void *ptr)
 {
 	u32 size_iomacro_regs;
+	int reg_val;
 
 	if (gDWC_ETH_QOS_prv_data) {
 		size_iomacro_regs = DWC_ETH_QOS_rgmii_io_macro_num_of_regs(gDWC_ETH_QOS_prv_data->emac_hw_version_type)*4;
@@ -2170,6 +2171,24 @@ static int DWC_ETH_QOS_panic_notifier(struct notifier_block *this,
 				memcpy(gDWC_ETH_QOS_prv_data->rgmii_reg_base_address, dwc_rgmii_io_csr_base_addr,
 					size_iomacro_regs);
 		}
+
+		DMA_CHTDR_CURTDESAPTR_UDFRD(0, reg_val);
+		EMACERR("EMAC_DMA_CH0_CURRENT_APP_TXDESC = %#x\n", reg_val);
+		DMA_CHRDR_CURRDESAPTR_UDFRD(0, reg_val);
+		EMACERR("EMAC_DMA_CH0_CURRENT_APP_RXDESC = %#x\n", reg_val);
+		DMA_CHTBAR_CURTBUFAPTR_UDFRD(0, reg_val);
+		EMACERR("EMAC_DMA_CH0_CURRENT_APP_TXBUFFER = %#x\n", reg_val);
+		DMA_CHRBAR_CURRBUFAPTR_UDFRD(0, reg_val);
+		EMACERR("EMAC_DMA_CH0_CURRENT_APP_RXBUFFER = %#x\n", reg_val);
+		DMA_CHTDR_CURTDESAPTR_UDFRD(1, reg_val);
+                EMACERR("EMAC_DMA_CH1_CURRENT_APP_TXDESC = %#x\n", reg_val);
+                DMA_CHRDR_CURRDESAPTR_UDFRD(1, reg_val);
+                EMACERR("EMAC_DMA_CH1_CURRENT_APP_RXDESC = %#x\n", reg_val);
+                DMA_CHTBAR_CURTBUFAPTR_UDFRD(1, reg_val);
+                EMACERR("EMAC_DMA_CH1_CURRENT_APP_TXBUFFER = %#x\n", reg_val);
+                DMA_CHRBAR_CURRBUFAPTR_UDFRD(1, reg_val);
+                EMACERR("EMAC_DMA_CH1_CURRENT_APP_RXBUFFER = %#x\n", reg_val);
+
 	}
 	return NOTIFY_DONE;
 }

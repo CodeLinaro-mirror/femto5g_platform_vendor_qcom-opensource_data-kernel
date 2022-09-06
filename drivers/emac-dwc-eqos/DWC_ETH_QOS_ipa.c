@@ -1019,7 +1019,7 @@ static int DWC_ETH_QOS_ipa_offload_connect(struct DWC_ETH_QOS_prv_data *pdata, b
 	int ret = 0;
 	int i = 0;
 	u32 reg_val;
-
+	bool disconn_flag = false;
 
 	EMACDBG("%s - begin\n", __func__);
 
@@ -1155,7 +1155,8 @@ static int DWC_ETH_QOS_ipa_offload_connect(struct DWC_ETH_QOS_prv_data *pdata, b
 		EMACERR("Err to set BW: IPA_RM_RESOURCE_ETHERNET_PROD err:%d\n",
 				ret);
 		ret = -1;
-		goto mem_free;
+		disconn_flag = true;
+		goto ipa_disconn;
 	}
 
 	profile.client = IPA_CLIENT_ETHERNET_CONS;
@@ -1164,7 +1165,8 @@ static int DWC_ETH_QOS_ipa_offload_connect(struct DWC_ETH_QOS_prv_data *pdata, b
 		EMACERR("Err to set BW: IPA_RM_RESOURCE_ETHERNET_CONS err:%d\n",
 				ret);
 		ret = -1;
-		goto mem_free;
+		disconn_flag = true;
+		goto ipa_disconn;
 	}
 
 	if (!user_resume) {
@@ -1174,6 +1176,16 @@ static int DWC_ETH_QOS_ipa_offload_connect(struct DWC_ETH_QOS_prv_data *pdata, b
 	else
 		EMACDBG("IPA offload connect event can't be sent due to user triggered event\n");
 
+ipa_disconn:
+	if(disconn_flag) {
+		if (pdata->prv_ipa.ipa_offload_conn) {
+			if( DWC_ETH_QOS_ipa_offload_disconnect(pdata) )
+				EMACERR("IPA Offload Disconnect Failed \n");
+			else
+				EMACDBG("IPA Offload Disconnect Successfully \n");
+			pdata->prv_ipa.ipa_offload_conn = false;
+		}
+        }
 mem_free:
 	if (rx_setup_info.data_buff_list) {
 		kfree(rx_setup_info.data_buff_list);
@@ -1207,7 +1219,7 @@ mem_free:
 	}
 
 	EMACDBG("%s - end \n", __func__);
-	return 0;
+	return ret;
 }
 
 /**
