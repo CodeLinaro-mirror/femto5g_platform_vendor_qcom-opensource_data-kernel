@@ -37,14 +37,6 @@ struct mtip_replenish_dma_rx_buffers_task
 };
 void run_mtip_replenish_dma_rx_buffers(void* work_ptr);
 
-struct mtip_set_rx_mode_task
-{
-   ecpri_dma_eth_conn_hdl_t  hdl;
-   enum ecpri_dma_notify_mode setmode;
-};
-void post_mtip_set_rx_mode(ecpri_dma_eth_conn_hdl_t hdl, enum ecpri_dma_notify_mode setmode);
-void run_mtip_set_rx_mode(void* work_ptr);
-
 struct mtip_tx_comp_cb_task
 {
     void *user_data;
@@ -63,6 +55,11 @@ struct mtip_process_link_state_task
 
 void post_mtip_process_link_state(u32 link_index, bool link_up);
 void run_mtip_process_link_state(void* work_ptr);
+
+/*
+ * Immediate tasks
+ */
+void mtip_set_rx_mode_immediate(ecpri_dma_eth_conn_hdl_t hdl, enum ecpri_dma_notify_mode setmode);
 
 /*
  * Functions exposed by mtip_device
