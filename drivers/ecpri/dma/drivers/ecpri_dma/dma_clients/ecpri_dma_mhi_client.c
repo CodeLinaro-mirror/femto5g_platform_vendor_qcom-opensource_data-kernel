@@ -213,7 +213,7 @@ static void ecpri_dma_mhi_get_l2_ch_bitmap(
 {
 	int i;
 
-	DMADBG("Begin\n");
+	DMAERR("Begin\n");
 
 	*bitmap = 0;
 
@@ -344,7 +344,7 @@ static void ecpri_dma_mhi_memcpy_async_wq_cb_ready(struct work_struct* work)
 	struct ecpri_dma_mhi_async_wq_work_type *async_work = container_of(
 		work, struct ecpri_dma_mhi_async_wq_work_type, work);
 
-	DMADBG("Begin\n");
+	DMAERR("Begin\n");
 
 	memcpy_ctx = ecpri_dma_mhi_memcpy_ctx[ECPRI_DMA_MHI_PF_ID];
 	if (!memcpy_ctx) {
@@ -1937,14 +1937,14 @@ static int ecpri_dma_mhi_client_init(
 		goto fail_create_wq;
 	}
 
-	ret = ecpri_dma_mhi_memcpy_init(function);
+	ret = mhi_dma_memcpy_init(function);
 	if (ret != 0) {
 		DMAERR("Failed to init memcpy\n");
 		ret = -EFAULT;
 		goto fail_memcpy_init;
 	}
 
-	ret = ecpri_dma_mhi_dma_memcpy_enable(function);
+	ret = mhi_dma_memcpy_enable(function);
 	if (ret != 0) {
 		DMAERR("Failed to enable memcpy\n");
 		ret = -EFAULT;
@@ -2332,7 +2332,6 @@ static int ecpri_dma_mhi_client_connect_internal(
 	}
 
 	ch_scratch.mhi.is_over_pcie = channel->is_over_pcie;
-	ch_scratch.mhi.skip_overflow_ev = !!channel->disable_overflow_event;
 	ret = gsi_write_channel_scratch(channel->endp_ctx->gsi_chan_hdl,
 		ch_scratch);
 	if (ret != 0) {
@@ -2474,8 +2473,7 @@ static int ecpri_dma_mhi_dma_connect_endp(
 	}
 
 	channel->channel_id = ch_idx;
-	channel->event_id = channel->ch_ctx_host.erindex -
-		ecpri_dma_mhi_client_ctx[idx]->first_ev;
+	channel->event_id = channel->ch_ctx_host.erindex;
 	ret = ecpri_dma_mhi_get_ee_index(function, &ee_idx);
 	if (ret != 0) {
 		DMAERR("Unable to translate VF/PF to EE index\n");
@@ -2491,9 +2489,6 @@ static int ecpri_dma_mhi_dma_connect_endp(
 	}
 
 	channel->endp_ctx = endp_ctx;
-	channel->endp_ctx->disable_overflow_event =
-		channel->ch_ctx_host.disableovrflw;
-	channel->disable_overflow_event = channel->ch_ctx_host.disableovrflw;
 	channel->endp_ctx->is_endp_mhi_l2 = true;
 	channel->endp_ctx->is_over_pcie =
 		ecpri_dma_mhi_client_ctx[idx]->is_over_pcie;
@@ -2635,7 +2630,7 @@ int ecpri_dma_mhi_client_update_mstate(struct mhi_dma_function_params function,
 	int idx = 0;
 	unsigned long flags;
 
-	DMADBG("Begin\n");
+	DMAERR("Begin\n");
 
 	/* Function params validity check */
 	ret = ecpri_dma_mhi_get_function_context_index(function, &idx);
@@ -2659,53 +2654,6 @@ int ecpri_dma_mhi_client_update_mstate(struct mhi_dma_function_params function,
 	return 0;
 }
 
-static dma_addr_t ecpri_dma_mhi_client_map_buffer(void* virt, size_t size,
-	enum dma_data_direction dir)
-{
-	dma_addr_t phys;
-	DMADBG("Begin\n");
-
-	phys = dma_map_single(ecpri_dma_ctx->pdev, virt, size, dir);
-	if (dma_mapping_error(ecpri_dma_ctx->pdev, phys)) {
-		DMAERR("failed to do dma map.\n");
-		ecpri_dma_assert();
-	}
-
-	return phys;
-}
-
-static void ecpri_dma_mhi_client_unmap_buffer(dma_addr_t phys, size_t size,
-	enum dma_data_direction dir)
-{
-	DMADBG("Begin\n");
-	dma_unmap_single(ecpri_dma_ctx->pdev, phys, size, dir);
-}
-
-static void *ecpri_dma_mhi_client_alloc_buffer(size_t size,
-	dma_addr_t* phys, gfp_t gfp)
-{
-	DMADBG("Begin\n");
-	return  dma_alloc_coherent(ecpri_dma_ctx->pdev, size, phys, gfp);
-}
-
-static void ecpri_dma_mhi_client_free_buffer(size_t size, void* virt,
-	dma_addr_t phys)
-{
-	DMADBG("Begin\n");
-	dma_free_coherent(ecpri_dma_ctx->pdev, size, virt, phys);
-}
-
-static int ecpri_dma_mhi_client_resume(struct mhi_dma_function_params function)
-{
-	return -EPERM;
-}
-
-static int ecpri_dma_mhi_client_suspend(
-	struct mhi_dma_function_params function, bool force)
-{
-	return -EPERM;
-}
-
 /* API exposed structure */
 const struct mhi_dma_ops ecpri_dma_mhi_driver_ops = {
 	.mhi_dma_register_ready_cb = ecpri_dma_mhi_client_ready_cb,
@@ -2720,16 +2668,122 @@ const struct mhi_dma_ops ecpri_dma_mhi_driver_ops = {
 	.mhi_dma_async_memcpy = ecpri_dma_mhi_dma_async_memcpy,
 	.mhi_dma_memcpy_enable = ecpri_dma_mhi_dma_memcpy_enable,
 	.mhi_dma_memcpy_disable = ecpri_dma_mhi_dma_memcpy_disable,
-	.mhi_dma_map_buffer = ecpri_dma_mhi_client_map_buffer,
-	.mhi_dma_unmap_buffer = ecpri_dma_mhi_client_unmap_buffer,
-	.mhi_dma_alloc_buffer = ecpri_dma_mhi_client_alloc_buffer,
-	.mhi_dma_free_buffer = ecpri_dma_mhi_client_free_buffer,
-	.mhi_dma_update_mstate = ecpri_dma_mhi_client_update_mstate,
-	.mhi_dma_resume = ecpri_dma_mhi_client_resume,
-	.mhi_dma_suspend = ecpri_dma_mhi_client_suspend,
 };
 
-int ecpri_dma_mhi_provide_ops()
+inline int
+mhi_dma_register_ready_cb(void (*mhi_ready_cb)(void *user_data),
+			  void *user_data)
 {
-	return mhi_dma_provide_ops(&ecpri_dma_mhi_driver_ops);
+	return ecpri_dma_mhi_driver_ops.mhi_dma_register_ready_cb(mhi_ready_cb,
+								  user_data);
 }
+EXPORT_SYMBOL(mhi_dma_register_ready_cb);
+
+inline int mhi_dma_init(struct mhi_dma_function_params function,
+	struct mhi_dma_init_params* params, struct mhi_dma_init_out* out)
+{
+	return ecpri_dma_mhi_driver_ops.mhi_dma_init(function, params, out);
+}
+EXPORT_SYMBOL(mhi_dma_init);
+
+inline int mhi_dma_start(struct mhi_dma_function_params function,
+				struct mhi_dma_start_params *params)
+{
+	return ecpri_dma_mhi_driver_ops.mhi_dma_start(function, params);
+}
+EXPORT_SYMBOL(mhi_dma_start);
+
+inline int mhi_dma_connect_endp(struct mhi_dma_function_params function,
+				       struct mhi_dma_connect_params *in,
+				       u32 *clnt_hdl)
+{
+	return ecpri_dma_mhi_driver_ops.mhi_dma_connect_endp(function, in,
+							      clnt_hdl);
+}
+EXPORT_SYMBOL(mhi_dma_connect_endp);
+
+inline int
+mhi_dma_disconnect_endp(struct mhi_dma_function_params function,
+			struct mhi_dma_disconnect_params *in)
+{
+	enum ecpri_hw_ver hw_ver = ecpri_dma_get_ctx_hw_ver();
+
+	if (hw_ver == ECPRI_HW_V1_0)
+		return -EPERM;
+
+	return ecpri_dma_mhi_driver_ops.mhi_dma_disconnect_endp(function, in);
+}
+EXPORT_SYMBOL(mhi_dma_disconnect_endp);
+
+inline int mhi_dma_suspend(struct mhi_dma_function_params function,
+				  bool force)
+{
+	return -EPERM;
+}
+
+int mhi_dma_resume(struct mhi_dma_function_params function)
+{
+	return -EPERM;
+}
+EXPORT_SYMBOL(mhi_dma_resume);
+
+inline int mhi_dma_update_mstate(struct mhi_dma_function_params function,
+					enum mhi_dma_mstate mstate_info)
+{
+
+	//TODO: add mhi_dma_update_mstate to ops structure in mhi_dma.h as it's
+	// currently missing
+
+	return ecpri_dma_mhi_client_update_mstate(function,mstate_info);
+}
+EXPORT_SYMBOL(mhi_dma_update_mstate);
+
+inline void mhi_dma_destroy(struct mhi_dma_function_params function)
+{
+	ecpri_dma_mhi_driver_ops.mhi_dma_destroy(function);
+}
+EXPORT_SYMBOL(mhi_dma_destroy);
+
+inline int mhi_dma_memcpy_init(struct mhi_dma_function_params function)
+{
+	return ecpri_dma_mhi_driver_ops.mhi_dma_memcpy_init(function);
+}
+EXPORT_SYMBOL(mhi_dma_memcpy_init);
+
+inline void
+mhi_dma_memcpy_destroy(struct mhi_dma_function_params function)
+{
+	ecpri_dma_mhi_driver_ops.mhi_dma_memcpy_destroy(function);
+}
+EXPORT_SYMBOL(mhi_dma_memcpy_destroy);
+
+inline int mhi_dma_memcpy_enable(struct mhi_dma_function_params function)
+{
+	return ecpri_dma_mhi_driver_ops.mhi_dma_memcpy_enable(function);
+}
+EXPORT_SYMBOL(mhi_dma_memcpy_enable);
+
+inline int
+mhi_dma_memcpy_disable(struct mhi_dma_function_params function)
+{
+	return ecpri_dma_mhi_driver_ops.mhi_dma_memcpy_disable(function);
+}
+EXPORT_SYMBOL(mhi_dma_memcpy_disable);
+
+inline int mhi_dma_sync_memcpy(u64 dest, u64 src, int len,
+				      struct mhi_dma_function_params function)
+{
+	return ecpri_dma_mhi_driver_ops.mhi_dma_sync_memcpy(dest, src, len,
+							    function);
+}
+EXPORT_SYMBOL(mhi_dma_sync_memcpy);
+
+inline int mhi_dma_async_memcpy(u64 dest, u64 src, int len,
+				       struct mhi_dma_function_params function,
+				       void (*user_cb)(void *user1),
+				       void *user_param)
+{
+	return ecpri_dma_mhi_driver_ops.mhi_dma_async_memcpy(dest, src, len,
+							    function, user_cb, user_param);
+}
+EXPORT_SYMBOL(mhi_dma_async_memcpy);

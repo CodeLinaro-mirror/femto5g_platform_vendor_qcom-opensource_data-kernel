@@ -309,7 +309,6 @@ struct ecpri_dma_endp_context {
 	u32 page_order;
 	bool use_msi;
 	bool is_over_pcie;
-	bool disable_overflow_event;
 	bool is_endp_mhi_l2;
 	bool eventless_endp;
 	struct list_head outstanding_pkt_list;
