@@ -364,11 +364,10 @@ void ecpri_dma_tasklet_transmit_done(unsigned long data)
 {
 	struct ecpri_dma_endp_context *endp;
 	struct ecpri_dma_outstanding_pkt_wrapper *curr_pkt_wrapper;
-	struct ecpri_dma_outstanding_pkt_wrapper *next_pkt_wrapper;
 	struct ecpri_dma_pkt_completion_wrapper **comp_pkts_arr;
 	struct ecpri_dma_pkt *pkt;
 	struct list_head *pos, *n;
-	u32 num_of_completed, completed_pkt_index = 0;
+	u32 num_of_completed = 0, completed_pkt_index = 0;
 	int i = 0;
 	unsigned long flags;
 
@@ -380,6 +379,8 @@ void ecpri_dma_tasklet_transmit_done(unsigned long data)
 	}
 
 	num_of_completed = atomic_read(&endp->xmit_eot_cnt);
+	if (num_of_completed == 0)
+		return;
 
 	comp_pkts_arr =
 		kzalloc(sizeof(struct ecpri_dma_pkt_completion_wrapper *) *
@@ -390,18 +391,20 @@ void ecpri_dma_tasklet_transmit_done(unsigned long data)
 	}
 
 	spin_lock_irqsave(&endp->spinlock, flags);
-	if (list_empty(&endp->outstanding_pkt_list))
-	{
-		spin_unlock_irqrestore(&endp->spinlock, flags);
-		return;
-	}
 
-	curr_pkt_wrapper = list_first_entry(&endp->outstanding_pkt_list,
-				 struct ecpri_dma_outstanding_pkt_wrapper, link);
+	if(!list_empty(&endp->outstanding_pkt_list))
+		curr_pkt_wrapper = list_first_entry(&endp->outstanding_pkt_list,
+			struct ecpri_dma_outstanding_pkt_wrapper, link);
 
 	while (!list_empty(&endp->outstanding_pkt_list) &&
-	       curr_pkt_wrapper->xfer_done &&
-	       atomic_add_unless(&endp->xmit_eot_cnt, -1, 0)) {
+		completed_pkt_index < num_of_completed &&
+		curr_pkt_wrapper &&
+		curr_pkt_wrapper->xfer_done &&
+		atomic_add_unless(&endp->xmit_eot_cnt, -1, 0)) {
+
+		curr_pkt_wrapper = list_first_entry(&endp->outstanding_pkt_list,
+			struct ecpri_dma_outstanding_pkt_wrapper, link);
+
 		/* Perform unmapping using SMMU */
 		pkt = curr_pkt_wrapper->comp_pkt.pkt;
 
@@ -419,16 +422,20 @@ void ecpri_dma_tasklet_transmit_done(unsigned long data)
 		/*	Remove completed packet wrapper from endp list and prepare
 				the completed packets array for the client */
 		comp_pkts_arr[completed_pkt_index] = &curr_pkt_wrapper->comp_pkt;
-		next_pkt_wrapper = list_next_entry(curr_pkt_wrapper, link);
 		list_move_tail(&curr_pkt_wrapper->link, &endp->completed_pkt_list);
+
 		endp->curr_outstanding_num--;
 		endp->curr_completed_num++;
-
-		curr_pkt_wrapper = next_pkt_wrapper;
 		completed_pkt_index++;
 	}
 
 	spin_unlock_irqrestore(&endp->spinlock, flags);
+
+	if(completed_pkt_index == 0)
+	{
+		kfree(comp_pkts_arr);
+		return;
+	}
 
 	/* Notify client on all completed packets */
 	if (endp->notify_comp != NULL) {
