@@ -40,8 +40,6 @@
 #define CONFIG_ECPRI_DMA_UT (1)
 #endif
 
-#define ECPRI_DMA_RESET_WA_ENABLE (1)
-
 #define DRV_NAME "ecpri-dma"
 
 extern struct ecpri_dma_context *ecpri_dma_ctx;
@@ -309,6 +307,7 @@ struct ecpri_dma_endp_context {
 	u32 page_order;
 	bool use_msi;
 	bool is_over_pcie;
+	bool disable_overflow_event;
 	bool is_endp_mhi_l2;
 	bool eventless_endp;
 	struct list_head outstanding_pkt_list;

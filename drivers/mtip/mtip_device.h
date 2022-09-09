@@ -19,6 +19,8 @@ struct mtip_netdev_priv {
    spinlock_t lock;
    void __iomem           *mac_ioaddr;
    u64 hashtablebits;
+
+   // these are used only for RUMI E2E
    struct phy_device      *phydev;
    struct phylink         *phylink;
    struct phylink_config   phylink_config;

@@ -91,8 +91,36 @@ void mtip_mdio_link_down(struct phylink_config *config, unsigned int mode,
    return;
 }
 
+void mtip_mdio_phy_validate(struct phylink_config *config,
+                           unsigned long *supported,
+                           struct phylink_link_state *state) {
+   __ETHTOOL_DECLARE_LINK_MODE_MASK(mac_supported) = { 0, };
+   __ETHTOOL_DECLARE_LINK_MODE_MASK(mask) = { 0, };
+
+   phylink_set(mac_supported, 10baseT_Full);
+   phylink_set(mac_supported, 100baseT_Full);
+   phylink_set(mac_supported, 1000baseT_Full);
+   phylink_set(mac_supported, 1000baseKX_Full);
+
+   phylink_set(mac_supported, Autoneg);
+   phylink_set(mac_supported, Pause);
+   phylink_set(mac_supported, Asym_Pause);
+   phylink_set_port_modes(mac_supported);
+
+   bitmap_and(supported, supported, mac_supported,
+              __ETHTOOL_LINK_MODE_MASK_NBITS);
+   bitmap_andnot(supported, supported, mask,
+                 __ETHTOOL_LINK_MODE_MASK_NBITS);
+   bitmap_and(state->advertising, state->advertising, mac_supported,
+              __ETHTOOL_LINK_MODE_MASK_NBITS);
+   bitmap_andnot(state->advertising, state->advertising, mask,
+                 __ETHTOOL_LINK_MODE_MASK_NBITS);
+
+   return;
+}
+
 static const struct phylink_mac_ops mtip_phylink_mac_ops = {
-	.validate = mtip_mac_phy_validate,
+	.validate = mtip_mdio_phy_validate,
 	.mac_config = mtip_dut_iomacro_config,
 	.mac_link_up = mtip_mdio_link_up,
 	.mac_link_down = mtip_mdio_link_down,

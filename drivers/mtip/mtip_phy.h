@@ -22,5 +22,6 @@ int mtip_phy_setup_phy(struct mtip_port_device_info* port_device);
 
 int mtip_phy_bringup_phy(u32 link_index);
 int mtip_phy_teardown_phy(u32 link_index);
+int mtip_phy_notify_link_status(u32 link_index, bool status);
 
 #endif // _MTIP_PHY_H

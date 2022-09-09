@@ -43,7 +43,6 @@ int ecpri_dma_dp_exception_replenish(struct ecpri_dma_endp_context *endp,
 	int ret = 0;
 	int i = 0;
 	struct ecpri_dma_pkt **pkts;
-	unsigned long flags;
 
 	if (!endp || !endp->valid || !endp->gsi_ep_cfg->is_exception) {
 		DMAERR("Exception ENDP isn't valid");
@@ -58,7 +57,6 @@ int ecpri_dma_dp_exception_replenish(struct ecpri_dma_endp_context *endp,
 
 	memset(pkts, 0, sizeof(*pkts) * num_to_replenish);
 
-	spin_lock_irqsave(&endp->spinlock, flags);
 	for (i = 0; i < num_to_replenish; i++) {
 		pkts[i] = kmem_cache_zalloc(
 			endp->available_exception_pkts_cache, GFP_NOWAIT);
@@ -111,9 +109,6 @@ int ecpri_dma_dp_exception_replenish(struct ecpri_dma_endp_context *endp,
 		pkts[i]->buffs[0]->size = ECPRI_DMA_DP_EXCEPTION_BUFF_SIZE;
 	}
 
-	/* transmit takes the spinlock, so need to free it here */
-	spin_unlock_irqrestore(&endp->spinlock, flags);
-
 	ret = ecpri_dma_dp_transmit(endp, pkts, num_to_replenish, true);
 	if (ret) {
 		DMAERR("failed to replenish exception endp\n");
@@ -141,8 +136,6 @@ fail_alloc:
 		kfree(pkts[i]->buffs);
 		kmem_cache_free(endp->available_exception_pkts_cache, pkts[i]);
 	}
-
-	spin_unlock_irqrestore(&endp->spinlock, flags);
 
 	kfree(pkts);
 	return ret;
@@ -381,6 +374,12 @@ void ecpri_dma_tasklet_transmit_done(unsigned long data)
 	unsigned long flags;
 
 	endp = (struct ecpri_dma_endp_context *)data;
+
+	if (!endp) {
+		DMAERR("tasklet on unknown endp\n");
+		ecpri_dma_assert();
+	}
+
 	num_of_completed = atomic_read(&endp->xmit_eot_cnt);
 
 	if (endp->gsi_ep_cfg->dir == ECPRI_DMA_ENDP_DIR_SRC)
@@ -397,6 +396,12 @@ void ecpri_dma_tasklet_transmit_done(unsigned long data)
 	}
 
 	spin_lock_irqsave(&endp->spinlock, flags);
+	if (list_empty(&endp->outstanding_pkt_list))
+	{
+		spin_unlock_irqrestore(&endp->spinlock, flags);
+		return;
+	}
+
 	curr_pkt_wrapper = list_first_entry(&endp->outstanding_pkt_list,
 				 struct ecpri_dma_outstanding_pkt_wrapper, link);
 

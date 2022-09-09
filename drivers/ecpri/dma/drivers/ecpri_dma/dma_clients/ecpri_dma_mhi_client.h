@@ -76,7 +76,8 @@ struct ecpri_dma_mhi_host_ch_ctx {
 	u8	chstate;	/*0-7*/
 	u8	brsmode : 2;	/*8-9*/
 	u8	pollcfg : 6;	/*10-15*/
-	u16	reserved;	/*16-31*/
+	u16	disableovrflw:1;/*16 Disable generation of overflow events*/
+	u16	reserved:15;	/*17-31*/
 	u32	chtype;		/*channel type (inbound/outbound)*/
 	u32	erindex;	/*event ring index*/
 	u64	rbase;		/*ring base address in the host addr spc*/
@@ -146,7 +147,10 @@ enum ecpri_dma_hw_mhi_channel_states {
  * @channel_context_addr: Channel context address
  * @ev_context_addr: Event context address
  * @endp_ctx: DMA end point context
- * @is_over_pcie: indicates channel should transact over PCIe – Configurable by SW.
+ * @is_over_pcie: indicates channel should transact over PCIe – Configurable by
+ *					SW.
+ * @disable_overflow_event: when set overflow events are not generated on this
+ *							ch.
  * @msi_config: MSI (Message Signaled Interrupts) parameters
  *
  */
@@ -166,6 +170,7 @@ struct ecpri_dma_mhi_channel_ctx {
 	u64 ev_context_addr;
 	struct ecpri_dma_endp_context* endp_ctx;
 	bool is_over_pcie;
+	bool disable_overflow_event;
 	struct mhi_dma_msi_info* msi_config;
 };
 
@@ -302,5 +307,7 @@ struct ecpri_dma_mhi_function_endp_data {
 	int async_src_id;
 	int async_dest_id;
 };
+
+int ecpri_dma_mhi_provide_ops(void);
 
 #endif /* _ECPRI_DMA_MHI_CLIENT_H_ */

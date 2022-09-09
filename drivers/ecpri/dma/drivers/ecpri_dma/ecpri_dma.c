@@ -246,6 +246,7 @@ static void ecpri_dma_notify_dma_ready(void)
 	struct ecpri_dma_ready_cb_wrapper *entry;
 	struct ecpri_dma_ready_cb_wrapper *next;
 	ecpri_hwio_def_ecpri_spare_reg_u spare_reg;
+	int ret = 0;
 
 	DMADBG("Notify that DMA driver is ready\n");
 	mutex_lock(&ecpri_dma_ctx->lock);
@@ -269,13 +270,23 @@ static void ecpri_dma_notify_dma_ready(void)
 	}
 
 	/* Trigger Q6 init without QMI */
-	spare_reg.value = 1;
+	spare_reg.value = ecpri_dma_get_ctx_hw_flavor();
 	ecpri_dma_hal_write_reg(
 		ECPRI_SPARE_REG, spare_reg.value);
 
 	mutex_unlock(&ecpri_dma_ctx->lock);
 
 	DMADBG("Written to SPARE_REG to trigger Q6 init\n");
+
+	// If MHI is expected, provide it with MHI OPs
+	if (ecpri_dma_ctx->hw_flavor == ECPRI_HW_FLAVOR_DU_PCIE)
+	{
+		ret = ecpri_dma_mhi_provide_ops();
+		if (ret)
+		{
+			DMAERR("Failed to provide MHI driver with OPS struct\n");
+		}
+	}
 
 	DMADBG("Finished DMA ready notify\n");
 }

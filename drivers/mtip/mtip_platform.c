@@ -875,40 +875,170 @@ static int mtip_platform_set_mac_addresses_for_rumi(void)
     return 0;
 }
 
-static int mtip_platform_set_mac_addresses(void)
+static u8 mtip_platform_read_fuse_mac_info_version(void)
 {
-    u8 no_of_macs = 0;
-    uint8_t saddr[6];
-    u32 port_device_index;
-    u32 link_device_index;
-    int i;
     void __iomem *fuse_base_addr;
     u8 fuse_bit_offset;
-    u32 oui;
-    u32 nic;
-    u32 total_num_links = 0;
-    
-    // read the fuse and update the oui, nic and no of macs
-    // the oui and nic are in little endian order
-    oui = 0x00534E; // EXAMPLE
-    nic = 0x554C30; // EXAMPLE
+    u64 first_fuse_word;
+    u8 version;
 
     // the start address is
     fuse_base_addr = platform_driver_priv->devices.fuse_base_addr;
     fuse_bit_offset = platform_driver_priv->devices.fuse_bit_offset;
 
-    // check that we have sufficient addresses
-    if (no_of_macs < total_num_links)
+    CSMLOGINFO("Going to read version info from fuse: 0x%lx\n", (unsigned long)fuse_base_addr);
+
+    // read the first 64 bits
+    first_fuse_word = ioread64(fuse_base_addr);
+
+    // shift the fuse word by fuse_bit_offset
+    first_fuse_word = (first_fuse_word >> fuse_bit_offset);
+
+    // the version will be the first three bits
+    version = (u8)((first_fuse_word) & 0x7);
+
+    CSMLOGINFO("FUSE version: %d\n", version);
+
+    return version;
+}
+
+static int mtip_platform_read_fuse_version1_info(u32* oui,
+                                                  u32* start_nic,
+                                                  u8* num_macs,
+                                                  u32* start_secondary_nic,
+                                                  u8* num_secondary_macs)
+{
+    void __iomem *fuse_base_addr;
+    u8 fuse_bit_offset;
+    u64 first_fuse_word;
+    u64 second_fuse_word;
+
+    // set as default
+    *num_macs = 0;
+    *num_secondary_macs = 0;
+
+    // the start address is
+    fuse_base_addr = platform_driver_priv->devices.fuse_base_addr;
+    fuse_bit_offset = platform_driver_priv->devices.fuse_bit_offset;
+
+    // version 1 will always start at fuse_bit_offset = 0
+    if (fuse_bit_offset != 0) 
     {
-        CSMLOGERR("Number of MAC addresses in fuse: %d is less than required: %d\n", no_of_macs, total_num_links);
+        CSMLOGERR("Version 1 fuse bit offset has to be 0 not %d\n", fuse_bit_offset);
         return -1;
     }
 
-    CSMLOGINFO("Setting default MAC addresses\n");
+    // read the first 64 bits
+    first_fuse_word = ioread64(fuse_base_addr);
 
-    for (i = 0; i < MTIP_MAX_LINKS; ++i) 
+    // shift by 3 bits for version
+    first_fuse_word = (first_fuse_word >> 3);
+
+    // set the oui
+    *oui = (u32)(first_fuse_word & 0xFFFFFF);
+
+    CSMLOGINFO("VENDOR OUI is 0x%x\n", *oui);
+
+    // shift by 24 bits
+    first_fuse_word = (first_fuse_word >> 24);
+
+    // set the start_nic
+    *start_nic = (u32)(first_fuse_word & 0xFFFFFF);
+
+    CSMLOGINFO("MAC Address Start Offset is 0x%x\n", *start_nic);
+
+    // shift by 24 bits
+    first_fuse_word = (first_fuse_word >> 24);
+
+    // set the num_macs
+    *num_macs = (u8)(first_fuse_word & 0x1F);
+
+    CSMLOGINFO("Number of MAC addresses is %d\n", *num_macs);
+
+    // read the second 64 bits
+    second_fuse_word = ioread64(fuse_base_addr + sizeof(u64));
+
+    // set the secondary nic
+    *start_secondary_nic = (u32)(second_fuse_word & 0xFFFFFF);
+
+    CSMLOGINFO("Secondary MAC address offset: 0x%x\n", *start_secondary_nic);
+
+    // shift by 24 bits
+    second_fuse_word = (second_fuse_word >> 24);
+
+    // set the num secondary macs
+    *num_secondary_macs = (u8)(second_fuse_word & 0x1F);
+
+    CSMLOGINFO("Num secondary MAC Addresses: %d\n", *num_secondary_macs);
+
+    return 0;
+}
+
+static int mtip_platform_set_mac_addresses(void)
+{
+    uint8_t saddr[6];
+    u32 port_device_index;
+    u32 link_device_index;
+    int i;
+    u32 oui;
+    u32 start_nic;
+    u8 no_of_macs = 0;
+    u32 start_secondary_nic;
+    u8 num_secondary_macs = 0;
+    u8 version;
+
+    version = mtip_platform_read_fuse_mac_info_version();
+
+    // for now we only support version = 0x1
+    if (version != 0x1) 
     {
-        // for each valid link
+        CSMLOGERR("Unsupported FUSE MAC INFO version number: %d\n", version);
+
+        CSMLOGINFO("Setting default MAC addresses\n");
+
+        // the oui and nic are in little endian order
+        oui = 0x00534E; // EXAMPLE
+        start_nic = 0x554C30; // EXAMPLE
+
+        // set the MAC address for the other interfaces
+        for (i = 0; i < MTIP_MAX_LINKS; ++i) 
+        {
+            // for each valid link
+            if (platform_driver_priv->mtip_links[i] != NULL) 
+            {
+                // find the port and link numbers
+                mtip_lookup_device_by_link_index(i, &port_device_index, &link_device_index);
+
+                saddr[0] = (oui >> 16) & 0xFF;
+                saddr[1] = (oui >> 8) & 0xFF;
+                saddr[2] = (oui) & 0xFF;
+
+                saddr[3] = (start_nic >> 16) & 0xFF;
+                saddr[4] = (start_nic >> 8) & 0xFF;
+                saddr[5] = (start_nic) & 0xFF;
+
+                mtip_mac_set_mac_address_by_device(port_device_index, link_device_index, saddr);
+            }
+
+            // increment the lower bits
+            ++start_nic;
+        }
+    }
+    else
+    {
+        // read the remaining fields of fuse
+        // read the fuse and update the oui, nic and no of macs
+        mtip_platform_read_fuse_version1_info(&oui, &start_nic, &no_of_macs, &start_secondary_nic, &num_secondary_macs);
+
+        // check that we have sufficient addresses
+        if (no_of_macs < 16)
+        {
+            CSMLOGERR("Number of MAC addresses in fuse: %d is less than required: %d\n", no_of_macs, 16);
+        }
+
+        // first set the MAC address of Debug Ethernet if presennt
+        i = MTIP_MAX_LINKS - 1;
+
         if (platform_driver_priv->mtip_links[i] != NULL) 
         {
             // find the port and link numbers
@@ -918,16 +1048,41 @@ static int mtip_platform_set_mac_addresses(void)
             saddr[1] = (oui >> 8) & 0xFF;
             saddr[2] = (oui) & 0xFF;
 
-            saddr[3] = (nic >> 16) & 0xFF;
-            saddr[4] = (nic >> 8) & 0xFF;
-            saddr[5] = (nic) & 0xFF;
+            saddr[3] = (start_nic >> 16) & 0xFF;
+            saddr[4] = (start_nic >> 8) & 0xFF;
+            saddr[5] = (start_nic) & 0xFF;
 
             mtip_mac_set_mac_address_by_device(port_device_index, link_device_index, saddr);
+        }
+
+        // increment the MAC OFFSET
+        ++start_nic;
+
+        // set the MAC address for the other interfaces
+        for (i = 0; i < MTIP_MAX_LINKS - 1; ++i) 
+        {
+            // for each valid link
+            if (platform_driver_priv->mtip_links[i] != NULL) 
+            {
+                // find the port and link numbers
+                mtip_lookup_device_by_link_index(i, &port_device_index, &link_device_index);
+
+                saddr[0] = (oui >> 16) & 0xFF;
+                saddr[1] = (oui >> 8) & 0xFF;
+                saddr[2] = (oui) & 0xFF;
+
+                saddr[3] = (start_nic >> 16) & 0xFF;
+                saddr[4] = (start_nic >> 8) & 0xFF;
+                saddr[5] = (start_nic) & 0xFF;
+
+                mtip_mac_set_mac_address_by_device(port_device_index, link_device_index, saddr);
+            }
 
             // increment the lower bits
-            ++nic;
+            ++start_nic;
         }
     }
+
     return 0;
 }
 
@@ -1099,14 +1254,11 @@ static int mtip_platform_setup(void)
 
           netdev = platform_driver_priv->mtip_links[i]->dev;
 
-          netdev->features = NETIF_F_SG | NETIF_F_HW_CSUM | NETIF_F_RXCSUM |
-                NETIF_F_TSO | NETIF_F_TSO6 | NETIF_F_HW_VLAN_CTAG_RX |
-                NETIF_F_HW_VLAN_CTAG_TX;
+          // the supported features and hw features
+          netdev->features = 0;
           netdev->hw_features = netdev->features;
-
-          netdev->vlan_features |= NETIF_F_SG | NETIF_F_HW_CSUM |
-                NETIF_F_TSO | NETIF_F_TSO6;
-
+          netdev->vlan_features = 0;
+          
           /* MTU range: 46 - 9194 */
           netdev->min_mtu = MTIP_MAC_MIN_ETH_FRAME_SIZE -
              (ETH_HLEN + ETH_FCS_LEN + VLAN_HLEN);
