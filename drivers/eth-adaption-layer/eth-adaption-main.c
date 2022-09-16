@@ -15,9 +15,9 @@
  * Owner - Abhishek B Chauhan - 8/18/2020
 */
 
-#include <eth-adaption-main.h>
-#include <eth-adaption-server.h>
-#include <eth-adaption-client.h>
+#include "eth-adaption-main.h"
+#include "eth-adaption-server.h"
+#include "eth-adaption-client.h"
 #include <soc/qcom/qrtr_ethernet.h>
 #include <soc/qcom/sb_notification.h>
 #include <linux/suspend.h>
