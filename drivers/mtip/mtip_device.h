@@ -69,4 +69,6 @@ void mtip_netdevice_init(struct net_device *dev);
 
 enum mtip_link_state_enum mtip_get_link_state_by_device(u32 port_device_index, u32 link_device_index);
 
+int mtip_set_netdev_hw_mac_addr(struct net_device *netdev, u32 link_index);
+
 #endif // _MTIP_DEVICE_H

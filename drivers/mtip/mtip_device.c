@@ -368,7 +368,7 @@ static int mtip_set_mac_address(struct net_device *dev, void *addr)
    return 0;
 }
 
-static int mtip_set_netdev_hw_mac_addr(struct net_device *netdev, u32 link_index)
+int mtip_set_netdev_hw_mac_addr(struct net_device *netdev, u32 link_index)
 {
     u32 port_device_index;
     u32 link_device_index;

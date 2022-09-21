@@ -1350,6 +1350,9 @@ static int mtip_platform_setup(void)
               ret = 0;
 
               CSMLOGINFO("mtip: register netdev complete for \"%s\"\n", platform_driver_priv->mtip_links[i]->dev->name);
+
+              // set the netdev MAC address from the HW
+              mtip_set_netdev_hw_mac_addr(platform_driver_priv->mtip_links[i]->dev, i);
            }
        }
    }
