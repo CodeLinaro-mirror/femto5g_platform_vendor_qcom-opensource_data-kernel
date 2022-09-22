@@ -20,8 +20,8 @@
 
 struct dentry *list_dv[64];
 char input_string[] = TREE;
-#define MAX_STR_SIZE (NUM_OF_FHP * LUT_INDEX * LUT_INDEX)
-char max_str[NUM_OF_FHP * LUT_INDEX * LUT_INDEX];
+#define MAX_STR_SIZE (NUM_OF_FHP * 1000 * 128)
+char max_str[MAX_STR_SIZE];
 /*
  * only white listed alphbates are allowed
  * { } , _  : and 0 to 9 a to z A to Z

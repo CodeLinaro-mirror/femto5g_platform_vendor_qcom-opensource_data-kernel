@@ -7,7 +7,7 @@
 
 #define TOTAL_LINKS 12
 #define XBAR_LINKS 4
-#define LUT_INDEX 255
+#define LUT_INDEX 65535
 #define NUM_OF_FHP 3
 #define NUM_OF_FLTR 16
 #define NUM_EGRESS_ENTRY 255
@@ -17,7 +17,7 @@
 #include "ecpriss_core.h"
 #include "ecpriss_qudp_hwio_def.h"
 
-#define ECPRISS_MAX_PCID_ENTRIES    1024
+#define ECPRISS_MAX_PCID_ENTRIES 65535
 #define EXPRISS_XBAR_IRQ_MAPPING 497
 
 /*
