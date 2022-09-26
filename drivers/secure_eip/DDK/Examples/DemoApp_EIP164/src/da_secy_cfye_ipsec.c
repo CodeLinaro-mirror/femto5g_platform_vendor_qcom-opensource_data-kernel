@@ -1,0 +1,1910 @@
+/* da_secy_cfye_ipsec.c
+ *
+ * Demo Application, IPsec transform test using SecY and CfyE API.
+ */
+
+/* -------------------------------------------------------------------------- */
+/*                                                                            */
+/*   Module        : ddk164                                                   */
+/*   Version       : 3.2                                                      */
+/*   Configuration : DDK-164-IPSEC-GPL                                        */
+/*                                                                            */
+/*   Date          : 2022-Jan-10                                              */
+/*                                                                            */
+/* Copyright (c) 2008-2021 by Rambus, Inc. and/or its subsidiaries.           */
+/*                                                                            */
+/* This program is free software: you can redistribute it and/or modify       */
+/* it under the terms of the GNU General Public License as published by       */
+/* the Free Software Foundation, either version 2 of the License, or          */
+/* any later version.                                                         */
+/*                                                                            */
+/* This program is distributed in the hope that it will be useful,            */
+/* but WITHOUT ANY WARRANTY; without even the implied warranty of             */
+/* MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the               */
+/* GNU General Public License for more details.                               */
+/*                                                                            */
+/* You should have received a copy of the GNU General Public License          */
+/* along with this program. If not, see <http://www.gnu.org/licenses/>.       */
+/* -------------------------------------------------------------------------- */
+
+/*----------------------------------------------------------------------------
+ * This module uses (requires) the following interface(s):
+ */
+
+/* Default configuration */
+#include "c_da_macsec.h"
+
+#if defined(DA_IPSEC_ENABLE)
+#ifdef DA_MACSEC_USERMODE
+#include <stdlib.h>
+#include <unistd.h>  /* usleep */
+#include "api_driver164_init.h"
+#else
+#include <linux/init.h>
+#include <linux/module.h>
+#include <linux/kernel.h>       /* printk */
+#include <linux/slab.h>
+#include <asm/delay.h>          /* udelay */
+#endif
+
+#include "api_secy.h"
+
+#include "basic_defs.h"
+#include "clib.h"
+#include "log.h"
+
+/* Packet I/O API */
+#include "api_pktio.h"
+
+#include "da_internal.h"
+
+#ifdef DA_MACSEC_USE_CFYE
+#include "api_cfye.h"
+
+/*----------------------------------------------------------------------------
+ * Definitions and macros
+ */
+
+/*----------------------------------------------------------------------------
+ * Local variables
+ */
+
+
+#ifdef DA_MACSEC_MODE_INGRESS
+/* IPsec key */
+static uint8_t K1[] = {
+    0xc9, 0xdf, 0xdf, 0x40, 0x9f, 0x58, 0xf9, 0x2c,
+    0x28, 0x92, 0xd6, 0xa5, 0x21, 0x9a, 0x22, 0x08,
+    0xc1, 0x84, 0x27, 0xee, 0xc4, 0xd7, 0x1f, 0x6e,
+    0x98, 0x9c, 0x06, 0xbd, 0xf5, 0x9e, 0xc9, 0x00,
+};
+
+static uint8_t IngressSalt[] = {0x9f, 0x9c, 0xa4, 0x0f};
+
+static da_sa_params_t Transform_Params_Basic_Transform_Ingress_IPsec =
+{
+    SAB_DIRECTION_INGRESS,
+    SAB_OP_IPSEC,
+    0,
+    0, /** For IPsec, must be set to 00b. */
+    K1,
+    sizeof(K1),
+    NULL,
+    NULL,
+    IngressSalt,
+    0, /* Seq0 */
+    0,
+    128,
+    0, /* SPI Value */
+};
+
+/* IPsec source packet for Ingress */
+static const uint8_t SrcPacket_IPsec_Ingress[] =
+{
+    0x3a, 0x2a, 0x26, 0x19, 0x7f, 0x0f, 0x2a, 0x82,
+    0x7a, 0x9b, 0xfe, 0x63, 0x86, 0xdd, 0x60, 0x00,
+    0x00, 0x00, 0x03, 0x5c, 0x32, 0x54, 0x09, 0xe4,
+    0x16, 0x2d, 0x62, 0x40, 0xcb, 0xc7, 0xc1, 0x9f,
+    0x4d, 0xb3, 0xda, 0x81, 0x6d, 0x07, 0x23, 0xef,
+    0x7f, 0xdd, 0x6a, 0xb8, 0x54, 0x39, 0xfe, 0x5f,
+    0x7a, 0x08, 0x87, 0x0c, 0x06, 0x67, 0x41, 0x6b,
+    0xd0, 0x21, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00,
+    0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x19, 0x85,
+    0xe7, 0xfe, 0x27, 0xee, 0x6e, 0x10, 0x72, 0xd0,
+    0xd4, 0xb3, 0x1d, 0xe7, 0x46, 0xa6, 0xb2, 0x25,
+    0x7d, 0xf5, 0xe0, 0x85, 0x46, 0xd0, 0x5f, 0x6b,
+    0x18, 0xbb, 0x31, 0xde, 0x67, 0x2a, 0x85, 0xf5,
+    0xb5, 0x5b, 0x3e, 0xc8, 0x46, 0x44, 0xa8, 0x2c,
+    0x57, 0x98, 0x87, 0x99, 0x49, 0x79, 0xeb, 0x84,
+    0xb8, 0xb2, 0xb1, 0xa8, 0xca, 0x47, 0x65, 0x8a,
+    0x38, 0x89, 0xf8, 0xef, 0x13, 0x8c, 0xb1, 0x60,
+    0xa5, 0x3e, 0xf0, 0x5a, 0x6c, 0xc3, 0x54, 0x47,
+    0x6b, 0x66, 0xc9, 0x5a, 0x3a, 0xc4, 0x0f, 0xfc,
+    0x2a, 0x1d, 0xa1, 0x1f, 0x85, 0x19, 0x08, 0x0c,
+    0x66, 0x70, 0xad, 0x14, 0x73, 0xac, 0x8d, 0xf5,
+    0x33, 0xd1, 0xa0, 0xa8, 0x01, 0x77, 0xf1, 0x2c,
+    0x30, 0xb2, 0xdb, 0x5c, 0x9e, 0x71, 0x5e, 0x15,
+    0xa8, 0xbb, 0x41, 0x0f, 0x14, 0x51, 0x9d, 0xb8,
+    0x32, 0x3f, 0x95, 0x6b, 0xda, 0x18, 0x15, 0xa8,
+    0x21, 0x91, 0xfd, 0x03, 0x17, 0xaf, 0x44, 0xf4,
+    0x14, 0x1e, 0x58, 0xe1, 0xc2, 0xa3, 0x7f, 0x07,
+    0x73, 0xd2, 0x0d, 0xf7, 0xbc, 0x8d, 0x2c, 0x86,
+    0xe8, 0x21, 0x8f, 0xc4, 0x7f, 0x90, 0x71, 0xe9,
+    0x8a, 0x00, 0x39, 0x12, 0x81, 0x44, 0x4f, 0xe5,
+    0x91, 0xab, 0x5c, 0xb4, 0xe7, 0xe5, 0x40, 0x78,
+    0x82, 0x37, 0xba, 0x71, 0x28, 0x84, 0x44, 0x30,
+    0x50, 0x96, 0x69, 0x57, 0xc9, 0x01, 0xc5, 0xbf,
+    0x57, 0x3e, 0xd5, 0x24, 0xf2, 0x6e, 0x5c, 0x17,
+    0xbd, 0x57, 0x41, 0x6e, 0x86, 0x9f, 0xaf, 0xb3,
+    0x66, 0x53, 0xe4, 0x12, 0x2e, 0xf2, 0x90, 0xf5,
+    0xe8, 0x50, 0x7a, 0xfb, 0x7d, 0xf1, 0x23, 0x87,
+    0x06, 0xe4, 0xf7, 0x0d, 0xc8, 0x6b, 0x0b, 0x7e,
+    0xf6, 0x39, 0x15, 0xdf, 0xae, 0x4c, 0xa1, 0xfd,
+    0xb7, 0x18, 0xbc, 0xde, 0xc1, 0x0e, 0xbe, 0x80,
+    0x3b, 0xc1, 0x0b, 0x88, 0x8c, 0x5b, 0x30, 0x7d,
+    0x61, 0x6c, 0x99, 0xa0, 0xb9, 0x30, 0xba, 0x54,
+    0x70, 0x6b, 0x7c, 0xf9, 0xd6, 0x3b, 0x12, 0x25,
+    0x20, 0x57, 0x03, 0x28, 0xdd, 0xf2, 0xc9, 0x50,
+    0x28, 0x15, 0x2d, 0x71, 0xaf, 0xf9, 0x5c, 0x4d,
+    0xcd, 0x0f, 0x41, 0x0b, 0x49, 0x2e, 0x9b, 0xc4,
+    0x28, 0xcd, 0xbc, 0xe7, 0x34, 0x2a, 0x4f, 0x74,
+    0x20, 0x86, 0x9f, 0xd9, 0x94, 0x74, 0x70, 0x69,
+    0x03, 0x69, 0x0b, 0x62, 0x82, 0x0c, 0x49, 0x5f,
+    0xde, 0x18, 0xa0, 0x8b, 0xd3, 0xe8, 0xfc, 0x05,
+    0x06, 0x4f, 0x1d, 0x3a, 0x43, 0x65, 0xbf, 0xd9,
+    0xeb, 0x83, 0x46, 0x2d, 0xb7, 0x7d, 0x0d, 0xe8,
+    0x4d, 0xe7, 0x04, 0xe3, 0xdf, 0xe9, 0x7e, 0x16,
+    0x24, 0x4d, 0xe0, 0x34, 0x03, 0x54, 0xd0, 0x61,
+    0x09, 0x80, 0xea, 0xe4, 0xbd, 0x42, 0x1c, 0xed,
+    0x11, 0x94, 0x0d, 0x88, 0xb8, 0xaa, 0xce, 0xfe,
+    0xa3, 0xec, 0x13, 0x18, 0xa0, 0xe0, 0x87, 0x54,
+    0x4b, 0xa5, 0x03, 0x61, 0xb0, 0x25, 0x06, 0x71,
+    0xb0, 0x71, 0xdb, 0xe2, 0xa7, 0x4d, 0xdd, 0x7f,
+    0x05, 0x21, 0x6b, 0x5f, 0x18, 0x47, 0x4e, 0xa5,
+    0xd4, 0xb5, 0x01, 0xa5, 0x9e, 0xe1, 0x84, 0xa6,
+    0x89, 0xf2, 0x63, 0x84, 0x40, 0xe1, 0xda, 0x85,
+    0xfb, 0x47, 0x01, 0x6f, 0xa5, 0xf8, 0xbd, 0xa0,
+    0xf6, 0x84, 0x01, 0xb2, 0xd3, 0x6e, 0x49, 0xe9,
+    0xb0, 0xb3, 0xb0, 0x44, 0xec, 0x1a, 0xc1, 0xc9,
+    0xcc, 0x40, 0xbb, 0xf9, 0x7e, 0x93, 0x81, 0x71,
+    0x82, 0xbf, 0x80, 0x23, 0xad, 0x28, 0xa9, 0x79,
+    0x1c, 0xf8, 0x10, 0x31, 0x29, 0x7b, 0x12, 0xf7,
+    0x42, 0x82, 0x20, 0xc3, 0x7a, 0x5d, 0x30, 0x9f,
+    0x56, 0x5f, 0x9d, 0x3a, 0xba, 0x86, 0x59, 0x4a,
+    0xe7, 0x75, 0xb3, 0xf5, 0xaf, 0x78, 0x32, 0x4b,
+    0xc5, 0xc0, 0xce, 0x84, 0x63, 0x77, 0x4e, 0x3f,
+    0x24, 0xb4, 0x49, 0x28, 0xb1, 0xa6, 0x8d, 0xb4,
+    0x4a, 0xb3, 0x2e, 0x96, 0x35, 0x0b, 0x53, 0x6c,
+    0x4d, 0xbc, 0x9e, 0xad, 0x77, 0x16, 0x60, 0x6d,
+    0x5f, 0xa7, 0x0a, 0x3f, 0x25, 0x42, 0xd5, 0xea,
+    0x06, 0xf6, 0x67, 0x1a, 0xfa, 0x6f, 0x1e, 0x98,
+    0xd9, 0x7a, 0x8e, 0x8e, 0xe8, 0x0f, 0x2a, 0x7c,
+    0x06, 0x0f, 0x84, 0x72, 0x33, 0xfc, 0x7d, 0x91,
+    0xb5, 0x8d, 0xd8, 0xa0, 0xcf, 0xab, 0x7e, 0x71,
+    0x87, 0xd7, 0x84, 0x68, 0xaa, 0xc9, 0x74, 0x55,
+    0x1f, 0xbb, 0x49, 0x1e, 0x59, 0x77, 0xe5, 0x26,
+    0x61, 0x27, 0xfd, 0x9b, 0xa9, 0xdb, 0x26, 0x74,
+    0x2b, 0x41, 0xe9, 0xd6, 0xc4, 0xf6, 0x82, 0x28,
+    0x53, 0x81, 0x29, 0xa3, 0x54, 0x91, 0x09, 0xa4,
+    0x93, 0x8a, 0xb2, 0x42, 0x4f, 0xf3, 0x38, 0xa6,
+    0xd9, 0x09, 0xf7, 0x41, 0x1c, 0x0b, 0xe5, 0x51,
+    0x38, 0x79, 0xf4, 0x92, 0x1c, 0xa0, 0x57, 0x8c,
+    0xa6, 0xfa, 0xd0, 0x68, 0x11, 0x94, 0xe4, 0x76,
+    0x2c, 0x38, 0x9d, 0x1f, 0x72, 0x10, 0x8f, 0xca,
+    0x75, 0xb8, 0xa5, 0xcd, 0x60, 0x42, 0x66, 0xe7,
+    0xde, 0x63, 0x81, 0xdd, 0xdf, 0x74, 0xc4, 0x0e,
+    0xbd, 0xa0, 0xe4, 0x6e, 0x8a, 0xb7, 0x1c, 0xf3,
+    0xb3, 0x6f, 0x64, 0xfa, 0x7d, 0xc6, 0xde, 0x51,
+    0x5e, 0x02, 0xcd, 0xf9, 0xe9, 0x63, 0x64, 0xd3,
+    0xce, 0xc3, 0x51, 0x7e, 0x0e, 0x88, 0x6a, 0xab,
+    0x07, 0xcf, 0xf6, 0x71, 0x75, 0x1c, 0x23, 0x73,
+    0x2d, 0xda, 0xc4, 0x66, 0xef, 0xec, 0xd3, 0xed,
+    0x93, 0x0b, 0x0f, 0x44, 0x05, 0x92, 0x42, 0x17,
+    0xec, 0x8f, 0x1e, 0x49, 0xc5, 0x69, 0x89, 0x3e,
+    0x72, 0xff, 0x5e, 0x1a, 0x7f, 0x21, 0x11, 0x69,
+    0x62, 0x95, 0xc0, 0x5b, 0xa2, 0xbc, 0x96, 0x56,
+    0x53, 0x01, 0xa7, 0x93, 0xa2, 0x51, 0x09, 0x38,
+    0xe2, 0x27, 0xc1, 0xd2, 0xa1, 0xaf, 0x01, 0x67,
+    0x7e, 0x00, 0xcf, 0xf7, 0x77, 0x40, 0x14, 0x08,
+    0xc8, 0x72, 0x68, 0x35, 0x0f, 0xd2, 0xe8, 0x9f,
+    0x1c, 0x83, 0xc9, 0x20, 0x92, 0xd2, 0x96, 0x2e,
+    0x00, 0x91, 0x61, 0x37, 0x85, 0xaf, 0x1e, 0x58,
+    0x2b, 0xab, 0x7a, 0xf5, 0x8e, 0x6a, 0xdd, 0xa8,
+    0xc1, 0xe7, 0xe0, 0xe7, 0x46, 0x7c, 0x2d, 0xf4,
+    0x39, 0xf4, 0x4b, 0x8d, 0xda, 0xaa, 0xfe, 0x61,
+    0x19, 0x73, 0x0e, 0x86, 0xf2, 0xa3, 0x01, 0x50,
+    0x42, 0x82, 0xf1, 0x1e, 0xc4, 0x2b, 0x13, 0xc3,
+    0x06, 0xdb, 0xc6, 0x32, 0xe0, 0xf9, 0x52, 0xc5,
+    0x76, 0x63,
+};
+
+/* IPsec - Ingress Usecase expected packet */
+static const uint8_t DstPacket_IPsec_Ingress[] =
+{
+    0x3a, 0x2a, 0x26, 0x19, 0x7f, 0x0f, 0x2a, 0x82,
+    0x7a, 0x9b, 0xfe, 0x63, 0x99, 0x99, 0x00, 0x00,
+    0x86, 0xdd, 0x60, 0x00, 0x00, 0x00, 0x03, 0x39,
+    0x29, 0x54, 0x09, 0xe4, 0x16, 0x2d, 0x62, 0x40,
+    0xcb, 0xc7, 0xc1, 0x9f, 0x4d, 0xb3, 0xda, 0x81,
+    0x6d, 0x07, 0x23, 0xef, 0x7f, 0xdd, 0x6a, 0xb8,
+    0x54, 0x39, 0xfe, 0x5f, 0x7a, 0x08, 0x87, 0x0c,
+    0x06, 0x67, 0x60, 0x00, 0x00, 0x00, 0x03, 0x11,
+    0x17, 0x54, 0x41, 0x42, 0x43, 0x44, 0x31, 0x32,
+    0x33, 0x34, 0x35, 0x36, 0x37, 0x38, 0x39, 0x30,
+    0x41, 0x42, 0x30, 0x31, 0x32, 0x33, 0x34, 0x35,
+    0x36, 0x37, 0x38, 0x39, 0x41, 0x42, 0x43, 0x44,
+    0x45, 0x46, 0x4c, 0x5b, 0xa3, 0x26, 0x6b, 0x2e,
+    0xd3, 0xe3, 0xa3, 0x17, 0x8c, 0x4b, 0xca, 0xa1,
+    0xad, 0xf9, 0xf7, 0x73, 0xce, 0xbd, 0xbc, 0xbe,
+    0xbe, 0x50, 0x17, 0x68, 0xc1, 0x5f, 0x8f, 0xdd,
+    0x5c, 0xd3, 0x07, 0x0c, 0x7b, 0xf0, 0x89, 0x71,
+    0x39, 0x3d, 0xc4, 0x2a, 0x9d, 0xb7, 0xf3, 0xbb,
+    0xf0, 0xd7, 0x1c, 0xb1, 0x7c, 0xd1, 0x1a, 0x3b,
+    0xc9, 0x3b, 0xc5, 0x27, 0xa7, 0xd5, 0xf5, 0x8f,
+    0x99, 0xd1, 0x21, 0x4a, 0x51, 0x89, 0x1b, 0xc5,
+    0x2d, 0xc3, 0x44, 0x62, 0x39, 0x0e, 0x5d, 0xf1,
+    0x61, 0x17, 0x01, 0xfc, 0xdb, 0xa1, 0xbb, 0x89,
+    0x4b, 0x70, 0xbf, 0xa8, 0x66, 0x52, 0xda, 0x9d,
+    0xe7, 0xe9, 0x01, 0x71, 0x95, 0xfd, 0xab, 0xa5,
+    0x59, 0x1e, 0x62, 0x10, 0x6d, 0x28, 0xf5, 0x04,
+    0x72, 0xa9, 0x90, 0xf9, 0x9b, 0x46, 0x20, 0x85,
+    0x27, 0x22, 0x4b, 0xfd, 0x98, 0x2f, 0xce, 0xa7,
+    0x1e, 0xdb, 0x2a, 0x3b, 0x35, 0x79, 0xe2, 0x49,
+    0xd6, 0x98, 0x27, 0xba, 0x82, 0x8a, 0xc7, 0x66,
+    0xdd, 0xee, 0x51, 0xf6, 0xbf, 0x76, 0x36, 0xda,
+    0xa1, 0x9a, 0x20, 0x7c, 0xe2, 0x61, 0x9a, 0x34,
+    0x08, 0x98, 0x8f, 0x49, 0x53, 0xd8, 0x8c, 0xc3,
+    0x44, 0xe6, 0x68, 0xae, 0x0e, 0xeb, 0xab, 0x54,
+    0xe9, 0x71, 0x79, 0x51, 0xe2, 0x33, 0xf4, 0x03,
+    0x07, 0x95, 0xd9, 0x6e, 0xc0, 0x6d, 0x74, 0xdb,
+    0xf5, 0x73, 0x64, 0x16, 0x44, 0x1e, 0x97, 0xd2,
+    0x09, 0x77, 0x3d, 0x02, 0xdf, 0x94, 0xe2, 0x30,
+    0x4b, 0xad, 0x96, 0x48, 0xab, 0xb2, 0x59, 0x0a,
+    0xfa, 0x5e, 0x59, 0x26, 0x82, 0xe7, 0x04, 0x5d,
+    0x76, 0x68, 0xc2, 0xb7, 0x8e, 0x0d, 0xcf, 0x07,
+    0x57, 0x8a, 0xc8, 0x28, 0x0a, 0xae, 0x4a, 0x56,
+    0x12, 0xc0, 0x03, 0x28, 0x48, 0x72, 0x3a, 0x32,
+    0xae, 0x97, 0x15, 0x65, 0x23, 0x66, 0xb6, 0x72,
+    0x05, 0xab, 0x13, 0x08, 0x2c, 0x5a, 0x42, 0xec,
+    0xd6, 0x4f, 0x6e, 0x4e, 0xd2, 0xf7, 0xda, 0x96,
+    0xe1, 0x5f, 0x3a, 0xb4, 0x92, 0x54, 0x79, 0x5c,
+    0xbe, 0x9e, 0x83, 0x79, 0x0c, 0x16, 0xc3, 0x9f,
+    0x22, 0xee, 0xc5, 0xf2, 0xa8, 0xc6, 0xfa, 0x5f,
+    0xe2, 0x6b, 0x6c, 0xaf, 0xd6, 0xe5, 0x37, 0x34,
+    0x1b, 0x27, 0x03, 0xaa, 0xf0, 0x75, 0x7b, 0xef,
+    0x52, 0xaa, 0xba, 0x50, 0x28, 0x00, 0x98, 0xbe,
+    0x80, 0x2e, 0xe4, 0x24, 0x82, 0xd4, 0x24, 0x1a,
+    0xe9, 0x10, 0x35, 0xe7, 0x4f, 0x74, 0xdc, 0x2d,
+    0x4f, 0xa6, 0x46, 0x7f, 0x8b, 0xcb, 0x60, 0xa6,
+    0xf8, 0x42, 0xf5, 0x29, 0x1b, 0xee, 0x69, 0xfd,
+    0xb6, 0x64, 0x9f, 0xef, 0xa4, 0x62, 0x96, 0x65,
+    0x52, 0x7c, 0x26, 0x1b, 0xf4, 0xe2, 0x38, 0xae,
+    0x36, 0xcb, 0x73, 0xdd, 0x21, 0x7e, 0x77, 0x84,
+    0x8d, 0xae, 0x96, 0x1d, 0x34, 0x40, 0x2f, 0x81,
+    0x05, 0x97, 0x15, 0xbb, 0x8e, 0xf0, 0x65, 0x52,
+    0xf2, 0xa4, 0x9e, 0xea, 0x25, 0x93, 0x5f, 0xf3,
+    0x88, 0xc9, 0x24, 0x77, 0x74, 0xd6, 0x28, 0x16,
+    0xbd, 0xe4, 0xdc, 0xa1, 0x2c, 0x61, 0xb9, 0x18,
+    0x9a, 0xf3, 0x65, 0x13, 0xa2, 0x36, 0xa6, 0xb0,
+    0xff, 0xb1, 0x04, 0x73, 0x5e, 0x74, 0xd6, 0x3e,
+    0x78, 0xf0, 0xe1, 0xd5, 0x24, 0xf2, 0xcb, 0xbb,
+    0xa9, 0x5b, 0x3d, 0xfe, 0x7a, 0xce, 0x53, 0x58,
+    0xdd, 0xd9, 0x0c, 0x51, 0xcb, 0x21, 0xdb, 0x40,
+    0x40, 0x42, 0xe0, 0xa9, 0x79, 0xdf, 0x34, 0x86,
+    0x0b, 0x98, 0x15, 0x16, 0x36, 0xf9, 0x8b, 0xd3,
+    0x40, 0x7f, 0xaf, 0x53, 0xec, 0x98, 0xc2, 0x52,
+    0xd4, 0x02, 0x68, 0x64, 0x1d, 0xcc, 0xd8, 0x10,
+    0x4a, 0xb4, 0x71, 0x69, 0x04, 0x0b, 0x14, 0x0d,
+    0x26, 0x36, 0x67, 0x2f, 0xd2, 0xa8, 0x63, 0xf6,
+    0x10, 0x06, 0xfc, 0xd3, 0x6b, 0x21, 0xa3, 0x7f,
+    0x5a, 0xa8, 0x61, 0x86, 0x7e, 0x92, 0xf4, 0xa3,
+    0x68, 0x46, 0xdb, 0x68, 0x85, 0x34, 0x0d, 0x8d,
+    0x01, 0x15, 0xb0, 0x85, 0x65, 0xb1, 0x84, 0x0b,
+    0xf2, 0xa6, 0xe1, 0xc6, 0x7d, 0x53, 0x6f, 0x8d,
+    0xb3, 0xc2, 0xd0, 0x73, 0x17, 0x03, 0xac, 0xb4,
+    0xa5, 0x24, 0xdc, 0x67, 0xaa, 0xa3, 0x9b, 0xaf,
+    0x1e, 0x82, 0x36, 0xd7, 0x07, 0x95, 0xae, 0x35,
+    0xf1, 0x77, 0xe4, 0x4c, 0x2f, 0x68, 0xc3, 0xdf,
+    0x4f, 0x0e, 0x61, 0xed, 0xaf, 0xdb, 0xdd, 0x4e,
+    0x8c, 0x72, 0xec, 0x1a, 0x61, 0xbc, 0x66, 0x21,
+    0xe1, 0x8f, 0x0a, 0x9b, 0x5c, 0x43, 0xa9, 0x62,
+    0xab, 0x93, 0x77, 0x0a, 0x63, 0x78, 0x8e, 0x5d,
+    0x12, 0x33, 0x2f, 0x66, 0x98, 0xf8, 0x5a, 0x7c,
+    0xb1, 0xa5, 0xd6, 0x18, 0xbd, 0xda, 0xab, 0x5f,
+    0xb9, 0x57, 0xe0, 0x47, 0x54, 0x8d, 0xb2, 0xb1,
+    0x60, 0x22, 0x82, 0x4c, 0x81, 0xae, 0xf4, 0xb8,
+    0xeb, 0x4f, 0x4c, 0xdf, 0x21, 0x74, 0x7f, 0xf4,
+    0x83, 0x30, 0x3e, 0xf7, 0x9c, 0x5d, 0x14, 0x8e,
+    0xf4, 0x05, 0xfa, 0xf1, 0xe1, 0x19, 0x11, 0x38,
+    0x64, 0xe3, 0xb9, 0x77, 0xc1, 0x7a, 0x12, 0xdf,
+    0x97, 0xf6, 0xde, 0x69, 0x13, 0x73, 0xe5, 0x51,
+    0x1e, 0xe8, 0x1f, 0x20, 0x47, 0x70, 0x4e, 0xb5,
+    0xfb, 0x08, 0x27, 0x4c, 0xbc, 0x35, 0xfd, 0x02,
+    0x54, 0x7e, 0xae, 0x6e, 0x05, 0x9b, 0xd4, 0xc6,
+    0x68, 0x81, 0x78, 0x61, 0x7e, 0xbc, 0x98, 0x81,
+    0xfa, 0xf3, 0xaa, 0x99, 0x77, 0x15, 0xee, 0x54,
+    0x7a, 0x56, 0xd3, 0x6a, 0xf0, 0xf5, 0xd9, 0xff,
+    0xc1, 0x11, 0xb0, 0x4d, 0xba, 0xe0, 0xc4, 0xe2,
+    0xdf, 0x48, 0x18, 0xc1, 0xdc, 0xc6, 0x08, 0x6c,
+    0xbb, 0x65, 0x71, 0x4a, 0xed, 0xe8, 0xb8, 0x6c,
+    0x6b, 0xe4, 0xce, 0x17, 0x04, 0x2b, 0x25, 0x1f,
+    0x87, 0xce, 0xf5, 0xe9, 0x42, 0x63, 0x83, 0x29,
+    0x84, 0x41, 0xb8, 0xba, 0xe2, 0xeb, 0x1a, 0xa2,
+    0x7a, 0xd3, 0x64, 0x18, 0x1f, 0x32, 0xcd, 0x2b,
+    0x0a, 0xa5, 0xac,
+};
+#endif /* End of DA_MACSEC_MODE_INGRESS */
+
+#ifdef DA_MACSEC_MODE_EGRESS
+/* IPsec key */
+static uint8_t K2[] = {
+    0x20, 0x93, 0xef, 0xfa, 0xf0, 0x84, 0x7a, 0x84,
+    0xaa, 0x74, 0xd5, 0x08, 0xfa, 0x07, 0xcb, 0x9e,
+    0x91, 0x7d, 0x48, 0xbe, 0x21, 0xe9, 0xad, 0xbd,
+    0x81, 0x03, 0x45, 0x4f, 0x9c, 0x6e, 0xbc, 0xb2,
+};
+
+static uint8_t SCI2[] = {
+    0xfa, 0xd4, 0xd3, 0x40, 0x00, 0x00, 0x00, 0x0,
+};
+
+static uint8_t EgressSalt[] = {0xdc, 0x53, 0x54, 0x69};
+
+static da_sa_params_t Transform_Params_Basic_Transform_Egress_IPsec =
+{
+    SAB_DIRECTION_EGRESS,   /* SA Builder Direction */
+    SAB_OP_IPSEC,           /* SA Builder Operation */
+    0,                      /* flags */
+    0,                      /* AN */
+    K2,                     /* IPsec key */
+    sizeof(K2),             /* Size of the key */
+    SCI2,                   /* SCI_p */
+    NULL,                   /* SSCI_p */
+    EgressSalt,             /* Salt_p*/
+    0,                      /* Sequence number Lo. */
+    0,                      /* Sequence number High */
+    0,                      /* Seq Mask*/
+    0x40d3d4fa,             /* SPI value */
+};
+
+/* IPsec Egress usecase source packet */
+static const uint8_t SrcPacket_IPsec_Egress[] =
+{
+    0x3e, 0xda, 0x80, 0xea, 0x72, 0x22, 0x68, 0xb1,
+    0x3c, 0x4c, 0xc6, 0x5a, 0x99, 0x99, 0x00, 0x00,
+    0x86, 0xdd, 0x60, 0x00, 0x00, 0x00, 0x03, 0xc2,
+    0x29, 0x54, 0xea, 0x27, 0xe1, 0x61, 0xe3, 0x1f,
+    0x4f, 0xcf, 0x32, 0x8b, 0x4b, 0x02, 0x1c, 0xd7,
+    0x88, 0x08, 0x37, 0xb0, 0x4b, 0x76, 0x65, 0xa4,
+    0x6d, 0x06, 0xfb, 0x00, 0x4e, 0x4f, 0x08, 0xa3,
+    0xeb, 0xad, 0x60, 0x00, 0x00, 0x00, 0x03, 0x9a,
+    0x17, 0x54, 0x41, 0x42, 0x43, 0x44, 0x31, 0x32,
+    0x33, 0x34, 0x35, 0x36, 0x37, 0x38, 0x39, 0x30,
+    0x41, 0x42, 0x30, 0x31, 0x32, 0x33, 0x34, 0x35,
+    0x36, 0x37, 0x38, 0x39, 0x41, 0x42, 0x43, 0x44,
+    0x45, 0x46, 0xeb, 0x9e, 0xaa, 0x7f, 0x96, 0x39,
+    0x2c, 0xfd, 0xcc, 0x6a, 0x99, 0xba, 0x92, 0xeb,
+    0xe5, 0xe8, 0xd0, 0xfb, 0xe4, 0x60, 0x48, 0x1e,
+    0xab, 0x77, 0x8f, 0xfb, 0x74, 0x6b, 0x4c, 0x5b,
+    0x65, 0xba, 0x0a, 0xe6, 0xf1, 0x02, 0x88, 0xd8,
+    0x83, 0xca, 0x71, 0xe2, 0x60, 0xae, 0xc2, 0x0f,
+    0x08, 0xb7, 0xa4, 0x16, 0x19, 0x6e, 0x79, 0xfe,
+    0xe0, 0x3f, 0xdd, 0x63, 0x75, 0x03, 0xab, 0x83,
+    0x4d, 0x9a, 0xa6, 0x9c, 0x50, 0x06, 0x16, 0x73,
+    0x00, 0x7f, 0xbf, 0x06, 0x0c, 0xce, 0x3b, 0xb7,
+    0x0f, 0x33, 0x50, 0x60, 0xfc, 0xdc, 0x18, 0xb4,
+    0xdd, 0xd9, 0xd9, 0x8b, 0xd2, 0xa3, 0xfe, 0x11,
+    0x94, 0x56, 0x71, 0x80, 0x68, 0x45, 0x9b, 0xad,
+    0x4e, 0x29, 0xd6, 0x27, 0x0c, 0xe0, 0x1c, 0x9a,
+    0x11, 0x92, 0xf3, 0x84, 0x63, 0x5f, 0x3d, 0xe2,
+    0x86, 0x4a, 0xb9, 0x99, 0xa8, 0x98, 0x92, 0x59,
+    0x40, 0xab, 0x1d, 0x0b, 0x52, 0xb0, 0x3d, 0x3d,
+    0x7e, 0x40, 0x9b, 0xae, 0x50, 0x2d, 0x3f, 0x7b,
+    0x9f, 0x4b, 0x6f, 0x3f, 0x6a, 0x68, 0x06, 0xa9,
+    0xe1, 0x91, 0x88, 0xcd, 0x6a, 0x6d, 0x8c, 0x49,
+    0xdf, 0x8c, 0x2b, 0xf9, 0x1d, 0xf7, 0x3e, 0x19,
+    0x6c, 0x47, 0xf0, 0x9d, 0x02, 0xf1, 0xb9, 0x62,
+    0xd1, 0xc3, 0xdb, 0xa3, 0x38, 0x12, 0x49, 0x7f,
+    0x2e, 0x35, 0x48, 0x3f, 0x21, 0x40, 0x5a, 0x05,
+    0xee, 0x35, 0xa9, 0xbc, 0xd9, 0x22, 0xff, 0xdd,
+    0x9d, 0x00, 0x99, 0x22, 0xc5, 0xc4, 0x25, 0xa6,
+    0x32, 0xc7, 0x27, 0x7b, 0x80, 0x52, 0xf3, 0xb1,
+    0xb4, 0x96, 0xb5, 0x2c, 0x0c, 0xcd, 0x94, 0x6c,
+    0x4a, 0x20, 0x4b, 0x7b, 0xe7, 0x8b, 0xca, 0x5c,
+    0x9a, 0x2f, 0xb4, 0x36, 0x3d, 0x00, 0xc0, 0x26,
+    0x6d, 0x47, 0xda, 0xdc, 0xde, 0x45, 0x3f, 0x82,
+    0xbc, 0xcd, 0x9f, 0x3b, 0x13, 0x06, 0x50, 0x73,
+    0x02, 0x54, 0x19, 0xcf, 0xe5, 0x4a, 0xfb, 0x9e,
+    0x41, 0xf7, 0x26, 0xa2, 0xe6, 0xb2, 0x35, 0xaf,
+    0x66, 0x1d, 0xaf, 0x51, 0xf2, 0xd1, 0xb7, 0xa7,
+    0xe2, 0x3e, 0x43, 0x9f, 0xd5, 0xd0, 0x49, 0x5e,
+    0xe4, 0xa3, 0xa4, 0x11, 0x01, 0x48, 0xee, 0xee,
+    0x19, 0x7b, 0x84, 0xc0, 0xf1, 0x9f, 0xaa, 0x15,
+    0xec, 0x4b, 0xcb, 0x30, 0x21, 0xb1, 0xcc, 0x34,
+    0xa8, 0x4d, 0x17, 0x0e, 0x2b, 0x36, 0x1a, 0x50,
+    0xc1, 0xd0, 0xb2, 0xc2, 0xeb, 0xd8, 0x14, 0xe7,
+    0xd4, 0x98, 0x73, 0x11, 0xdb, 0xd5, 0xce, 0x14,
+    0x08, 0xd9, 0x38, 0x8f, 0xbf, 0xc9, 0x17, 0x75,
+    0xe5, 0xf1, 0xb5, 0xa9, 0x56, 0x48, 0xda, 0xa9,
+    0xe7, 0x3c, 0x3d, 0x61, 0xb2, 0x95, 0xcf, 0x28,
+    0xed, 0x53, 0xff, 0xe2, 0x62, 0x2e, 0x24, 0xfa,
+    0x81, 0x22, 0xb5, 0x05, 0x32, 0xa6, 0xfd, 0x74,
+    0x55, 0x76, 0x36, 0x9c, 0x60, 0x0f, 0x86, 0x90,
+    0x00, 0xa8, 0xae, 0x0b, 0x60, 0x85, 0x1d, 0xb0,
+    0x02, 0x95, 0x01, 0x1a, 0x4b, 0x05, 0x4d, 0x7f,
+    0xe5, 0xc1, 0xe5, 0x6b, 0x1e, 0x32, 0xf3, 0x84,
+    0xe3, 0x99, 0x9e, 0xc6, 0x3a, 0xa4, 0x9f, 0xd8,
+    0x1b, 0x66, 0x28, 0x8b, 0x79, 0xc4, 0x96, 0xe6,
+    0x67, 0xb7, 0x93, 0x2d, 0x8d, 0x34, 0x12, 0x5d,
+    0x43, 0xd1, 0x11, 0x6f, 0x2e, 0x9d, 0xa7, 0x2a,
+    0x3b, 0xf0, 0x00, 0x68, 0x18, 0xe7, 0xe3, 0x28,
+    0xc5, 0x4c, 0x34, 0x87, 0x80, 0x80, 0xcf, 0x6f,
+    0xf8, 0xe7, 0x20, 0x5e, 0x6a, 0x1b, 0x71, 0x26,
+    0x27, 0x79, 0xed, 0x75, 0xd9, 0x48, 0x9e, 0x45,
+    0x91, 0xa4, 0x48, 0x53, 0xce, 0xa1, 0x8e, 0x2f,
+    0x5b, 0xcd, 0x94, 0x3f, 0x6b, 0xbd, 0xed, 0x01,
+    0x03, 0x11, 0xad, 0xfd, 0xf1, 0x7a, 0xaa, 0xd7,
+    0xb6, 0x30, 0xed, 0xf4, 0xfa, 0x21, 0x76, 0x73,
+    0x29, 0xb1, 0x30, 0x1e, 0x6d, 0x15, 0xa1, 0x36,
+    0x6a, 0xd8, 0x09, 0xa0, 0xd9, 0xc4, 0x81, 0x3a,
+    0xa1, 0xeb, 0x50, 0x0b, 0x1c, 0x6c, 0x46, 0x85,
+    0x1e, 0x80, 0xce, 0x30, 0xb5, 0xcf, 0xfa, 0x0d,
+    0x06, 0x4b, 0x2f, 0x6c, 0xbe, 0x2b, 0xe8, 0x43,
+    0xd0, 0x67, 0x7e, 0x7d, 0x6f, 0x15, 0x1c, 0x1a,
+    0x3d, 0xde, 0xc1, 0xbf, 0xe2, 0x4e, 0xaa, 0xe1,
+    0x9e, 0x5f, 0x36, 0xed, 0x28, 0xe2, 0x31, 0x68,
+    0x9c, 0x1c, 0x06, 0xb0, 0x4e, 0x73, 0xd6, 0x52,
+    0x53, 0x2a, 0x7d, 0xcf, 0x27, 0x98, 0x2c, 0x78,
+    0xed, 0x25, 0x07, 0x5f, 0xa7, 0x03, 0xc7, 0x52,
+    0xed, 0x0f, 0xdb, 0x76, 0xc4, 0x95, 0x11, 0x3b,
+    0xaa, 0xed, 0x08, 0xaa, 0x8d, 0xa6, 0x37, 0xbb,
+    0xf0, 0x24, 0xc4, 0x80, 0x57, 0xc8, 0x1e, 0xbc,
+    0x28, 0xa0, 0xb3, 0xf5, 0x81, 0x01, 0xf9, 0x32,
+    0xd3, 0x3d, 0xbd, 0xc4, 0x5e, 0xfd, 0xa9, 0x8c,
+    0x8b, 0xc2, 0x48, 0x12, 0xaa, 0xdc, 0xc9, 0x31,
+    0xa5, 0x81, 0x94, 0xb0, 0x8e, 0x6f, 0xb4, 0xd8,
+    0x88, 0x1e, 0xf9, 0x50, 0xb7, 0x9a, 0xf5, 0xd1,
+    0xac, 0x6b, 0xca, 0xfe, 0x78, 0x91, 0x3b, 0xb9,
+    0x2b, 0x67, 0xf4, 0xde, 0x64, 0xc8, 0x5d, 0xbe,
+    0xdb, 0x50, 0x62, 0x2e, 0x52, 0xdc, 0xc9, 0x96,
+    0x10, 0x4b, 0x10, 0x9d, 0xad, 0x2b, 0x17, 0x05,
+    0x5d, 0xd6, 0x1c, 0xaa, 0xdd, 0x92, 0xd0, 0x02,
+    0x41, 0xd7, 0x26, 0x0b, 0xab, 0xb5, 0xee, 0x07,
+    0x48, 0x2b, 0x72, 0x29, 0x11, 0xd5, 0x3e, 0x64,
+    0xb7, 0x09, 0xf7, 0x4d, 0x2e, 0x95, 0xd3, 0xff,
+    0x45, 0xa8, 0x2c, 0x4f, 0x0e, 0xce, 0xc9, 0x07,
+    0x7d, 0x7f, 0x2a, 0x2b, 0x52, 0xe3, 0x52, 0xb4,
+    0xa1, 0xad, 0xbd, 0x25, 0xca, 0xdf, 0x6a, 0x35,
+    0xed, 0x77, 0x3a, 0x3c, 0xca, 0x97, 0x4c, 0xe1,
+    0x7b, 0xa9, 0x31, 0xb8, 0xe3, 0x3e, 0xd9, 0xde,
+    0xf8, 0x55, 0x68, 0x4b, 0xbf, 0xbc, 0xea, 0x74,
+    0xfc, 0x9a, 0x7b, 0xa0, 0x6a, 0x09, 0x26, 0xac,
+    0x83, 0x46, 0x09, 0xe6, 0x46, 0x6c, 0x47, 0xb5,
+    0x53, 0xe0, 0x1f, 0x1d, 0x56, 0xda, 0x2d, 0x2a,
+    0x08, 0x51, 0x45, 0x70, 0xbe, 0x93, 0x6f, 0x8a,
+    0x1f, 0x06, 0x4e, 0xc2, 0x69, 0x4b, 0xb3, 0x09,
+    0x03, 0xb2, 0xf0, 0x63, 0x62, 0x38, 0x9b, 0x31,
+    0x47, 0x67, 0x83, 0x7d, 0x89, 0x0c, 0xa7, 0x9f,
+    0xd2, 0x90, 0x35, 0xc8, 0xf5, 0x6f, 0x40, 0xd5,
+    0x11, 0xba, 0x65, 0x6d, 0x17, 0x32, 0xa5, 0x6d,
+    0xca, 0x8d, 0x48, 0x88, 0xf5, 0x99, 0x36, 0x22,
+    0xdc, 0xc8, 0x1e, 0xcd, 0x08, 0x34, 0x8e, 0x5d,
+    0xd3, 0xd0, 0x15, 0x11, 0x36, 0x85, 0x7d, 0x29,
+    0x26, 0xfb, 0x22, 0x9c, 0x97, 0xf5, 0x74, 0xb4,
+    0xd0, 0x1c, 0x35, 0xdd, 0x5d, 0xbe, 0x3a, 0xc7,
+    0xb8, 0x9d, 0x19, 0xa2, 0xbe, 0xbc, 0x28, 0xee,
+    0x6a, 0x9f, 0x75, 0x53, 0x04, 0x93, 0x4b, 0xeb,
+    0x55, 0x07, 0xb3, 0x21, 0x6f, 0xf3, 0x35, 0xe5,
+    0x19, 0x87, 0x35, 0x6f, 0x0f, 0x6c, 0xbe, 0x0b,
+    0x21, 0x48, 0xe2, 0xe4, 0xed, 0x79, 0x73, 0x4a,
+    0xa9, 0x1f, 0xde, 0x43,
+};
+
+/* IPsec Use case Egress Expected packet */
+static const uint8_t DstPacket_IPsec_Egress[] =
+{
+    0x3e, 0xda, 0x80, 0xea, 0x72, 0x22, 0x68, 0xb1,
+    0x3c, 0x4c, 0xc6, 0x5a, 0x86, 0xdd, 0x60, 0x00,
+    0x00, 0x00, 0x03, 0xe4, 0x32, 0x54, 0xea, 0x27,
+    0xe1, 0x61, 0xe3, 0x1f, 0x4f, 0xcf, 0x32, 0x8b,
+    0x4b, 0x02, 0x1c, 0xd7, 0x88, 0x08, 0x37, 0xb0,
+    0x4b, 0x76, 0x65, 0xa4, 0x6d, 0x06, 0xfb, 0x00,
+    0x4e, 0x4f, 0x08, 0xa3, 0xeb, 0xad, 0x40, 0xd3,
+    0xd4, 0xfa, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00,
+    0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x1c, 0xb0,
+    0xec, 0x6b, 0x2a, 0x1a, 0x06, 0xa0, 0x00, 0xa8,
+    0x2f, 0x47, 0x16, 0x1c, 0x0c, 0xe2, 0x14, 0x63,
+    0x96, 0x45, 0x8c, 0xac, 0xca, 0x09, 0xb6, 0xb5,
+    0xb8, 0x7e, 0x49, 0xed, 0xa2, 0x91, 0x9b, 0xc0,
+    0xff, 0x94, 0x3b, 0x05, 0xeb, 0xc7, 0xeb, 0x88,
+    0x73, 0x7d, 0xe4, 0xd8, 0xaf, 0x3a, 0x16, 0x46,
+    0xbd, 0xea, 0xed, 0xd2, 0x28, 0x53, 0xbc, 0xc5,
+    0xd6, 0x62, 0x7d, 0x08, 0xdf, 0xe9, 0x84, 0x05,
+    0xb4, 0x1f, 0x9a, 0x05, 0x52, 0x33, 0x07, 0x27,
+    0x53, 0x4f, 0x2f, 0x54, 0xac, 0x89, 0x6f, 0xe2,
+    0xc6, 0x83, 0x4a, 0x39, 0xaa, 0x34, 0xb3, 0x7e,
+    0xa3, 0x2b, 0xe6, 0xad, 0x26, 0xc9, 0xcf, 0x6d,
+    0x1a, 0xe9, 0xdf, 0x3c, 0xee, 0x4b, 0x6f, 0xc7,
+    0x35, 0x6c, 0x33, 0x62, 0x3c, 0x80, 0xfc, 0x78,
+    0xbd, 0xfa, 0x5f, 0x77, 0x30, 0x23, 0x84, 0xd7,
+    0xb6, 0x99, 0x9c, 0x08, 0x98, 0x65, 0xf7, 0xf2,
+    0xe3, 0x53, 0xa8, 0x45, 0x9e, 0x82, 0x86, 0x46,
+    0x15, 0x61, 0x0e, 0xfc, 0x22, 0xcb, 0x8f, 0xd5,
+    0x4c, 0x21, 0xe3, 0xef, 0xdb, 0x03, 0xc1, 0xfe,
+    0x64, 0x15, 0x85, 0x15, 0xa6, 0x9d, 0x95, 0xac,
+    0xb5, 0xfa, 0x36, 0x90, 0x64, 0x62, 0xa1, 0x50,
+    0xcd, 0x8b, 0x81, 0x62, 0x7d, 0xd4, 0xec, 0xdc,
+    0x6c, 0x4f, 0x17, 0x00, 0x3c, 0x8f, 0x40, 0xd6,
+    0x74, 0x32, 0x2b, 0xe5, 0x0b, 0x48, 0xbb, 0x25,
+    0x38, 0x1e, 0x83, 0xce, 0x46, 0x1f, 0x3f, 0x48,
+    0xb9, 0xad, 0xfe, 0x36, 0x0f, 0xa5, 0x9e, 0x62,
+    0xa7, 0x52, 0x49, 0x24, 0x8e, 0x7a, 0x2d, 0xdc,
+    0x7e, 0xff, 0x08, 0x61, 0x08, 0x13, 0x72, 0x15,
+    0xd0, 0x14, 0xe0, 0xc5, 0x4b, 0xc6, 0x4a, 0x5d,
+    0xe6, 0x45, 0x25, 0x99, 0xcf, 0xda, 0x59, 0x4b,
+    0xdc, 0xbb, 0xbd, 0x8a, 0xc9, 0x24, 0x80, 0x64,
+    0x9f, 0x44, 0x08, 0x33, 0x2d, 0xf6, 0xe2, 0x52,
+    0xf2, 0x40, 0xe1, 0xe9, 0x48, 0xaa, 0x6f, 0x5e,
+    0x4a, 0x5a, 0xc9, 0xc4, 0xa0, 0xf6, 0x2f, 0xbb,
+    0xfc, 0x7e, 0x75, 0x5c, 0x75, 0xda, 0x04, 0x7f,
+    0x4c, 0xb2, 0x2e, 0x18, 0x4b, 0xff, 0xe4, 0xf3,
+    0x55, 0xd3, 0x0b, 0x24, 0x85, 0x08, 0xcc, 0x8e,
+    0xc8, 0x8c, 0xc3, 0x02, 0x93, 0xaf, 0x59, 0xd9,
+    0x6e, 0xd4, 0x05, 0x77, 0x06, 0x5c, 0x86, 0x08,
+    0x8c, 0x5e, 0xef, 0xaf, 0x3c, 0x76, 0x45, 0x8e,
+    0xb9, 0x66, 0x8a, 0xe2, 0x5e, 0x2d, 0xf3, 0xa2,
+    0xb8, 0x8d, 0x56, 0x41, 0xc3, 0xea, 0x84, 0xf2,
+    0x4b, 0x08, 0x43, 0x4a, 0x9c, 0xa8, 0x07, 0xa5,
+    0x45, 0x85, 0x49, 0xba, 0xc3, 0x11, 0x48, 0xe9,
+    0xf6, 0x4c, 0x60, 0xde, 0xc6, 0x73, 0xc9, 0x89,
+    0xcf, 0x85, 0x5b, 0x79, 0x11, 0x8f, 0xd8, 0x0b,
+    0xe2, 0x32, 0xe1, 0x28, 0xdb, 0x63, 0x1a, 0x7b,
+    0x2f, 0xb7, 0x7b, 0x42, 0x68, 0xc4, 0x15, 0x02,
+    0x1e, 0xdc, 0x71, 0xcb, 0x02, 0x63, 0xa8, 0xde,
+    0xf8, 0x7d, 0x07, 0xc2, 0xa4, 0x39, 0x61, 0x15,
+    0xf1, 0x13, 0xc3, 0x70, 0x1e, 0x98, 0x60, 0xe9,
+    0x1e, 0xe3, 0xa1, 0xc8, 0x28, 0x5c, 0xec, 0x6a,
+    0x18, 0x7b, 0x36, 0x6c, 0x5a, 0xce, 0xb6, 0xeb,
+    0x8c, 0xb8, 0x9b, 0xa3, 0x3f, 0xea, 0x06, 0x19,
+    0x4f, 0x56, 0x2c, 0xee, 0x92, 0x74, 0x90, 0x92,
+    0x25, 0xc1, 0xb7, 0xcc, 0x83, 0x06, 0xbf, 0x44,
+    0x0b, 0x18, 0x8d, 0x93, 0xf6, 0x57, 0x0b, 0x12,
+    0x85, 0x7d, 0xac, 0xa6, 0x9b, 0xa1, 0xe1, 0xef,
+    0xd6, 0x7d, 0x60, 0x77, 0xee, 0xf0, 0x8e, 0x23,
+    0xc2, 0x6b, 0x56, 0xf9, 0x95, 0xe4, 0x89, 0x2a,
+    0xc6, 0x43, 0xa2, 0xe4, 0xf0, 0x27, 0x4c, 0x09,
+    0xb7, 0x71, 0xc2, 0x52, 0x7d, 0xd2, 0x19, 0x7e,
+    0x61, 0xd7, 0xc7, 0x90, 0x95, 0xaa, 0x9f, 0xbd,
+    0xf5, 0x4f, 0x09, 0x47, 0x29, 0x04, 0x67, 0xb4,
+    0xd8, 0xa0, 0x70, 0x4e, 0x33, 0xc5, 0xf1, 0xe0,
+    0xdf, 0xed, 0x87, 0x28, 0xf5, 0x38, 0x08, 0xce,
+    0x10, 0xef, 0x70, 0x9f, 0x99, 0xdd, 0x85, 0xe6,
+    0x2a, 0xdc, 0xee, 0x97, 0x51, 0x20, 0x1e, 0xe6,
+    0xcd, 0x3d, 0x2f, 0x07, 0xff, 0xf9, 0x6a, 0x53,
+    0x98, 0xac, 0xcd, 0x4e, 0x6f, 0x04, 0xa7, 0x9b,
+    0xc1, 0x70, 0x64, 0xa3, 0xbd, 0xc4, 0xc7, 0xe5,
+    0x74, 0xdb, 0xac, 0xa0, 0x7e, 0xc1, 0x5b, 0x99,
+    0x22, 0x16, 0x44, 0x6c, 0x82, 0xb7, 0xd3, 0xd2,
+    0xe7, 0x51, 0x9a, 0x80, 0xf9, 0xb4, 0x47, 0x70,
+    0x9a, 0x7b, 0x48, 0xb2, 0x61, 0x12, 0x4a, 0xaf,
+    0xba, 0x99, 0x20, 0xd3, 0xb0, 0xb8, 0xb5, 0x81,
+    0xd7, 0x77, 0x39, 0x94, 0xd1, 0xa2, 0x38, 0x71,
+    0xf9, 0xd4, 0xbb, 0x95, 0xf4, 0xc4, 0xb4, 0x60,
+    0x2f, 0x77, 0xfe, 0xcf, 0xe0, 0x93, 0x58, 0x4f,
+    0x0f, 0x04, 0xbd, 0x97, 0xc3, 0xaf, 0x53, 0x7e,
+    0x65, 0x3c, 0x4b, 0xdc, 0x6a, 0x9a, 0xea, 0x01,
+    0xe2, 0xf1, 0xd2, 0x59, 0xb2, 0xd8, 0x4b, 0xd2,
+    0x0b, 0xd1, 0xd1, 0xda, 0xb4, 0x5d, 0x1c, 0xdc,
+    0xb1, 0xf6, 0x90, 0x9c, 0xf9, 0x49, 0x66, 0x5e,
+    0x1b, 0xa0, 0x8b, 0x67, 0x67, 0xf0, 0x7d, 0xb2,
+    0x2a, 0xdb, 0xcc, 0x54, 0x9e, 0xa0, 0xe8, 0x93,
+    0x14, 0xb5, 0xa7, 0x5d, 0x03, 0x68, 0x5c, 0xec,
+    0x04, 0xdd, 0xd7, 0x5e, 0xd9, 0x83, 0x33, 0x6a,
+    0x27, 0x61, 0xec, 0x45, 0xaf, 0xbf, 0x2c, 0x64,
+    0xbc, 0x14, 0x42, 0xe0, 0x69, 0x23, 0xb9, 0x32,
+    0xa1, 0x55, 0xfb, 0x04, 0xeb, 0x21, 0xc8, 0xfc,
+    0x4b, 0x65, 0x39, 0x8d, 0x07, 0x3d, 0xe9, 0x58,
+    0xd8, 0x08, 0x8b, 0xfc, 0xdc, 0x34, 0x9a, 0x8c,
+    0xd7, 0x7b, 0x66, 0xa6, 0x04, 0xb3, 0xe0, 0x21,
+    0x69, 0xd3, 0x2a, 0x5a, 0x3c, 0x2d, 0x1f, 0x7f,
+    0x91, 0x83, 0x59, 0x7c, 0xf4, 0xf7, 0xe4, 0x76,
+    0x73, 0xf1, 0x8d, 0xe7, 0xcf, 0x45, 0xf9, 0xb7,
+    0x2c, 0x6a, 0xc4, 0x8f, 0x71, 0xa0, 0x01, 0x06,
+    0x22, 0xef, 0x47, 0x33, 0x58, 0x4d, 0xd3, 0xc9,
+    0xfb, 0x2a, 0x4e, 0x59, 0x47, 0xb7, 0xcd, 0x2e,
+    0xf5, 0x62, 0xf6, 0xc4, 0x95, 0xde, 0xf0, 0x31,
+    0x38, 0x1b, 0xd9, 0x7d, 0xa5, 0x82, 0xf2, 0x3e,
+    0x57, 0x40, 0x05, 0x3f, 0x5a, 0x80, 0x9a, 0xe6,
+    0x50, 0x6c, 0x33, 0xb5, 0xcc, 0x9b, 0x7d, 0x51,
+    0x35, 0xc5, 0x0b, 0xaf, 0x68, 0x95, 0xf5, 0x8f,
+    0x46, 0x30, 0x30, 0x40, 0x08, 0xe6, 0xa9, 0x30,
+    0x54, 0xaa, 0x12, 0x92, 0x16, 0x77, 0xc8, 0xf1,
+    0x8b, 0x26, 0xf2, 0x84, 0x52, 0x96, 0x36, 0x0b,
+    0x05, 0x08, 0xa4, 0x34, 0xcb, 0xe7, 0x61, 0x08,
+    0x72, 0x6e, 0x8b, 0x2d, 0xce, 0x94, 0x93, 0x60,
+    0xbc, 0xb1, 0xca, 0xa9, 0x82, 0xeb, 0x1d, 0xb8,
+    0x76, 0x61, 0xd0, 0x42, 0x89, 0x0b, 0x38, 0x23,
+    0x95, 0xc3, 0x40, 0xc7, 0xbe, 0x0e, 0xf2, 0xb2,
+    0x57, 0x9a, 0xef, 0x75, 0xb8, 0x26, 0x47, 0x6b,
+    0xcf, 0x0b, 0x91, 0x12, 0x95, 0x32, 0xac, 0x6a,
+    0x8a, 0x7d, 0x9e, 0xce, 0xe7, 0x25, 0xa1, 0xb7,
+    0xaf, 0xbf, 0xb0, 0x50, 0xf8, 0x67, 0x43, 0x06,
+    0xad, 0x29, 0xdd, 0xdb, 0xbf, 0x19, 0x0b, 0x73,
+    0xdf, 0x0a, 0x98, 0x9b, 0xb9, 0x97, 0xa2, 0xc3,
+    0x3a, 0xa5, 0x10, 0xe8, 0xa4, 0x60, 0xbe, 0xae,
+    0x4b, 0x7c, 0xd7, 0x58, 0xe8, 0xb7, 0x5d, 0x4d,
+    0xeb, 0xb1, 0x22, 0x96, 0xed, 0x55, 0x88, 0x43,
+    0x2e, 0x8a,
+};
+#endif /* DA_MACSEC_MODE_EGRESS */
+
+/*----------------------------------------------------------------------------
+ * Local Functions
+ */
+
+/*----------------------------------------------------------------------------
+ * MaskUnusedChBits
+ *
+ * Masks the Most Significant Channel bits.
+ */
+
+static void
+MaskUnusedChBits(
+    CfyE_Ch_Mask_t *const ChMask_p,
+    const uint16_t ChannelCount)
+{
+    uint8_t i, k = 0;
+    uint32_t val = 0;
+
+    if (0 == ChannelCount) return;
+
+    k = (ChannelCount + 31) / 32;
+
+    /** Get the Channel Mask representing the higher channels */
+    val = ChMask_p->ch_bitmask[k - 1];
+
+    ChMask_p->ch_bitmask[k - 1] = MASK_UNUSED_CH_BITS(ChannelCount, val);
+
+    for (i = k; i < CFYE_CHANNEL_WORDS; i++)
+        ChMask_p->ch_bitmask[i] = 0;
+}
+
+
+/*----------------------------------------------------------------------------
+ * da_secy_cfye_IPsec_transform
+ */
+bool
+da_secy_cfye_IPsec_transform(
+        bool fVerbose,
+        bool fIngress)
+{
+    unsigned int vPort = 0;
+    unsigned int Channel = 0;
+    unsigned int MTTIndex = 0;
+
+    SecY_Status_t SecY_Rc;
+    SecY_SAHandle_t SecY_SAHandle;
+    CfyE_Status_t CfyE_Rc;
+    CfyE_vPortHandle_t CfyE_vPortHandle = CfyE_vPortHandle_NULL;
+    CfyE_RuleHandle_t CfyE_RuleHandle = CfyE_RuleHandle_NULL;
+
+    unsigned int PktByteCount;
+    unsigned int ExpectedPktByteCount;
+    uint8_t * InputPktHostAddress = NULL;
+    uint8_t * ProcessedPktHostAddress = NULL;
+    uint8_t * ExpectedPktHostAddress = NULL;
+    bool fSuccess = false;
+
+    Log_FormattedMessage("DA_IPSEC: Starting test for %sgress\n",
+                         fIngress ? "in" : "e");
+
+    if (fVerbose)
+    {
+        Log_FormattedMessage("DA_IPSEC: Perform Transform for IPsec\n");
+    }
+
+    SecY_SAHandle = SecY_SAHandle_NULL;
+
+#ifndef DA_MACSEC_MODE_INGRESS
+    if (fIngress)
+        return false;
+#endif
+
+#ifndef DA_MACSEC_MODE_EGRESS
+    if (!fIngress)
+        return false;
+#endif
+
+#if defined(DA_MACSEC_MODE_EGRESS) && defined(DA_MACSEC_MODE_INGRESS)
+    #error "Not supported combination"
+#endif
+    {
+        CfyE_Init_t Settings;
+
+        Log_FormattedMessage("DA_IPSEC: Initializing CfyE\n");
+
+        ZEROINIT(Settings);
+        Settings.MTTCountFrameThrLo = 1;
+
+        CfyE_Rc = CfyE_Device_Init(CFYE_DEVICE_ID,
+                                   fIngress ? CFYE_ROLE_INGRESS :
+                                              CFYE_ROLE_EGRESS,
+                                   &Settings);
+        if (CfyE_Rc != CFYE_STATUS_OK)
+        {
+            LOG_CRIT("DA_IPSEC: CfyE could not be initialized, error=%d\n",
+                     CfyE_Rc);
+            return false;
+        }
+
+        Log_FormattedMessage("DA_IPSEC: CfyE is initialized successfully\n");
+    }
+
+    /* CfyE_Device_Limits */
+    {
+        CfyE_Status_t CfyE_Rc;
+        CfyE_Device_Limits_t Device_Limits;
+
+        CfyE_Rc = CfyE_Device_Limits_Get(CFYE_DEVICE_ID,
+                                             &Device_Limits);
+        if (CfyE_Rc != CFYE_STATUS_OK)
+        {
+            LOG_CRIT("CfyE_Device_Limits returned error %d\n", CfyE_Rc);
+            return false;
+        }
+
+
+        if (Device_Limits.fIPsec)
+        {
+            Log_FormattedMessage("IPsec is supported on this HW\n");
+        }
+        else
+        {
+            Log_FormattedMessage("IPsec is not\n"
+                                 "supported on this HW version, skipping.\n");
+                CfyE_Device_Uninit(CFYE_DEVICE_ID);
+                return true;
+        }
+    }
+
+    {
+        SecY_Settings_t Settings;
+
+        Log_FormattedMessage("DA_IPSEC: Initializing SecY\n");
+
+        ZEROINIT(Settings);
+
+        /* Non-matching SA flow packet processing rules */
+        /* Default rule is to drop non-matching SA packets */
+        Settings.DropBypass.DropType = SECY_SA_DROP_INTERNAL;
+        Settings.IngressHdrEtype = 0x9999;
+
+#if defined(DA_MACSEC_MODE_EGRESS) && defined(DA_MACSEC_MODE_INGRESS)
+        SecY_Rc = SecY_Device_Init(SECY_DEVICE_ID,
+                                   SECY_ROLE_EGRESS_INGRESS,
+                                   &Settings);
+#else
+        SecY_Rc = SecY_Device_Init(SECY_DEVICE_ID,
+                                   fIngress ? SECY_ROLE_INGRESS :
+                                              SECY_ROLE_EGRESS,
+                                   &Settings);
+#endif
+        if (SecY_Rc != SECY_STATUS_OK)
+        {
+            LOG_CRIT("DA_IPSEC: SecY could not be initialized, error=%d\n",
+                     SecY_Rc);
+            return false;
+        }
+
+        Log_FormattedMessage("DA_IPSEC: SecY is initialized successfully\n");
+    }
+
+    {
+        /* Put the channel in IPsec mode on the SecY device. set egress IPsec
+         * port
+         */
+        SecY_Device_Params_t DeviceConf;
+        SecY_ChannelConf_t ChannelConf;
+        SecY_Channel_t ChannelParams;
+
+        ZEROINIT(ChannelConf);
+        ZEROINIT(DeviceConf);
+        ZEROINIT(ChannelParams);
+
+        /* Get the original channel configuration, avoid disturbing other
+           settings, like SegTAG parser config */
+        SecY_Rc = SecY_Channel_Config_Get(SECY_DEVICE_ID, Channel, &ChannelParams);
+        if (SecY_Rc != SECY_STATUS_OK)
+        {
+            LOG_CRIT("DA_IPSEC: SecY Device config not read, error=%d\n",
+                     SecY_Rc);
+            return false;
+        }
+
+        ChannelParams.ChannelId = Channel;
+        ChannelParams.fIPsec = true; /* IPsec mode */
+
+        ChannelConf.Params.ChannelCount = 1;
+        ChannelConf.Params.Channel_p = &ChannelParams;
+
+        DeviceConf.ChConf_p = &ChannelConf;
+
+        Log_FormattedMessage("DA_IPSEC: Configuring SecY device\n");
+
+        SecY_Rc = SecY_Device_Update(SECY_DEVICE_ID, &DeviceConf);
+
+        if (SecY_Rc != SECY_STATUS_OK)
+        {
+            LOG_CRIT("DA_IPSEC: SecYDevice could not be configured, error=%d\n",
+                     SecY_Rc);
+            return false;
+        }
+
+        Log_FormattedMessage("DA_IPSEC: SecY Device configured successfully\n");
+    }
+
+    if (fVerbose)
+    {
+        Log_FormattedMessage("DA_IPSEC: Preparing packet(s)\n");
+    }
+
+    /* Install vPort to use with SA */
+    {
+        CfyE_vPort_t vPortParams;
+
+        ZEROINIT(vPortParams);
+
+#ifdef DA_MACSEC_MODE_EGRESS
+        vPortParams.PktExtension = 1;
+#endif
+
+        CfyE_Rc = CfyE_vPort_Add(CFYE_DEVICE_ID,
+                                 &CfyE_vPortHandle,
+                                 &vPortParams,
+                                 CYFE_MODE_IPSEC);
+
+        if (CfyE_Rc != CFYE_STATUS_OK)
+        {
+            LOG_CRIT("DA_IPSEC: Failed, CfyE_vPort_Add()=%d\n", CfyE_Rc);
+            goto error_exit;
+        }
+
+        /* Now get vPort index to use when installing SA */
+        CfyE_vPortIndex_Get(CfyE_vPortHandle, &vPort);
+
+        if (fVerbose)
+        {
+            Log_FormattedMessage("DA_IPSEC: vPort %u added\n", vPort);
+        }
+    }
+
+    /* Install an SA with transform record */
+    {
+        SecY_SA_t SA_Params;
+        uint32_t SAWordCount = 0;
+
+        ZEROINIT(SA_Params);
+
+#ifdef DA_MACSEC_MODE_INGRESS
+        if (fIngress)
+        {
+            SA_Params.ActionType = SECY_SA_ACTION_IPSEC_INGRESS;
+            SA_Params.DropType = SECY_SA_DROP_CRC_ERROR;
+            SA_Params.DestPort = SECY_PORT_CONTROLLED;
+
+            SA_Params.Params.IPsecIngress.fRetainPad = false;
+            SA_Params.Params.IPsecIngress.fPadCheck = true;
+            SA_Params.Params.IPsecIngress.fIgHdrInsert = true;
+
+            SA_Params.Params.IPsecIngress.fReplayProtect   = true;
+            SA_Params.Params.IPsecIngress.fConfProtect     = true;
+            SA_Params.Params.IPsecIngress.fPadNotValidDrop = true;
+            SA_Params.Params.IPsecIngress.fPadLenFailDrop  = true;
+            SA_Params.Params.IPsecIngress.fUpdateIP  = true;
+            SA_Params.Params.IPsecIngress.fUpdateTTL = false;
+
+            Transform_Params_Basic_Transform_Ingress_IPsec.flags = 1 << 12;
+
+            SA_Params.TransformRecord_p =
+                da_macsec_build_sa(&Transform_Params_Basic_Transform_Ingress_IPsec,
+                                   &SAWordCount);
+
+            SA_Params.SA_WordCount = SAWordCount;
+        }
+#endif /* DA_MACSEC_MODE_INGRESS */
+
+#ifdef DA_MACSEC_MODE_EGRESS
+        if (!fIngress)
+        {
+            SA_Params.ActionType = SECY_SA_ACTION_IPSEC_EGRESS;
+            SA_Params.DropType = SECY_SA_DROP_INTERNAL;
+            SA_Params.DestPort = SECY_PORT_COMMON;
+
+            SA_Params.Params.IPsecEgress.fRollOverMode = true;
+            SA_Params.Params.IPsecEgress.fEncrAuth = true;
+            SA_Params.Params.IPsecEgress.CryptoAlg = 7;
+            SA_Params.Params.IPsecEgress.fReplayCheck = false;
+            SA_Params.Params.IPsecEgress.fIgHdrInsert = false;
+
+            SA_Params.Params.IPsecEgress.fUpdateUDP = true;
+            SA_Params.Params.IPsecEgress.fUpdateIP = true;
+            SA_Params.Params.IPsecEgress.fNAT_UDP = false;
+            SA_Params.Params.IPsecEgress.fOuterIPHdr = true;
+            SA_Params.Params.IPsecEgress.fConfProtect = true;
+            SA_Params.Params.IPsecEgress.fProtectFrames = true;
+
+            SA_Params.TransformRecord_p =
+                da_macsec_build_sa(&Transform_Params_Basic_Transform_Egress_IPsec,
+                                   &SAWordCount);
+
+            SA_Params.SA_WordCount = SAWordCount;
+        }
+#endif /* DA_MACSEC_MODE_EGRESS */
+
+        SecY_Rc = SecY_SA_Add(SECY_DEVICE_ID, vPort, &SecY_SAHandle, &SA_Params);
+        if (SecY_Rc != SECY_STATUS_OK)
+        {
+            LOG_CRIT("DA_IPSEC: Failed, SecY_SA_Add()=%d\n", SecY_Rc);
+            goto error_exit_init;
+        }
+
+        if (fVerbose)
+        {
+            Log_FormattedMessage("DA_IPSEC: Transform 32-bit word count %d\n",
+                                 SA_Params.SA_WordCount);
+            Log_HexDump32("DA_IPSEC: Transform data",
+                          0,
+                          SA_Params.TransformRecord_p,
+                          SA_Params.SA_WordCount);
+        }
+
+        if (SA_Params.TransformRecord_p)
+        {
+            da_macsec_free(SA_Params.TransformRecord_p);
+        }
+
+        if (fVerbose)
+        {
+            Log_FormattedMessage("DA_IPSEC: SA with Transform Record added\n");
+        }
+    }
+
+    /* Install parsers settings for SecTAG and IPsec ports */
+    {
+        CfyE_Device_t DeviceParams;
+        CfyE_HeaderParser_t HeaderParams;
+        CfyE_Device_Control_t DeviceCtrl;
+        CfyE_IPSEC_Parser_t IPsecParserParams;
+        CfyE_EgressHeader_t EgressHdrParams;
+        CfyE_Device_Exceptions_t DevExceptions;
+
+        ZEROINIT(DeviceParams);
+        ZEROINIT(HeaderParams);
+        ZEROINIT(DeviceCtrl);
+        ZEROINIT(IPsecParserParams);
+        ZEROINIT(EgressHdrParams);
+        ZEROINIT(DevExceptions);
+
+        DevExceptions.DropAction = CFYE_DO_NOT_DROP;
+        DevExceptions.ECCDropAction = CFYE_DROP_CRC_ERROR;
+        DeviceCtrl.fIPsec = true; /* Enable IPsec Mode */
+        DeviceCtrl.Exceptions_p = &DevExceptions;
+
+        IPsecParserParams.fParseIP     = true; /* Mandatory for both the directions */
+        IPsecParserParams.fParseUDP    = false;
+        IPsecParserParams.fParseNAT    = false;
+
+        IPsecParserParams.fParseESP    = true; /* Mandatory for Ingress */
+
+        IPsecParserParams.fParseIKE    = false;
+        IPsecParserParams.fParseNATIKE = false;
+        IPsecParserParams.fParseNATKeepAlive = false;
+        IPsecParserParams.fVerifyUDPChkSum = false;
+        IPsecParserParams.fMACDACheck = false;
+
+#ifdef DA_MACSEC_MODE_EGRESS
+        EgressHdrParams.EgressHeaderEtype = 0x9999;
+        EgressHdrParams.fEnable = true;
+
+        HeaderParams.EgressHeader_p = &EgressHdrParams;
+#endif
+
+        HeaderParams.IPsec_Parser_p = &IPsecParserParams;
+
+        DeviceParams.HeaderParser_p = &HeaderParams;
+        DeviceParams.Control_p = &DeviceCtrl;
+
+        CfyE_Rc = CfyE_Device_Update(CFYE_DEVICE_ID,
+                                     Channel,
+                                     &DeviceParams);
+        if (CfyE_Rc != CFYE_STATUS_OK)
+        {
+            LOG_CRIT("DA_IPSEC: Failed, CfyE_Device_Update()=%d\n", CfyE_Rc);
+            goto error_exit_init;
+        }
+
+        {
+            CfyE_Device_t DeviceCfg;
+            CfyE_Statistics_Control_t StatsParams;
+            CfyE_Device_Control_t DevCtrl;
+            CfyE_Device_Exceptions_t DevExceptions;
+
+            CfyE_ControlPacket_t CP;
+            uint8_t EtherAddr[16][6];
+
+            CfyE_HeaderParser_t HeaderParser;
+            CfyE_SecTAG_Parser_t SecTAG_Parser;
+            CfyE_VLAN_Parser_t VLAN_Parser;
+
+            CfyE_EOPConf_t EOPParams;
+            CfyE_ECCConf_t ECCParams;
+            unsigned int j;
+
+            ZEROINIT(DeviceCfg);
+            ZEROINIT(DevCtrl);
+            ZEROINIT(EtherAddr);
+            ZEROINIT(CP);
+            ZEROINIT(HeaderParser);
+
+            DeviceCfg.Control_p = &DevCtrl;
+            DevCtrl.Exceptions_p = &DevExceptions;
+
+            /* Make all Ethernet address fields in CP structure point to
+               valid buffers */
+            for (j=0; j<8; j++)
+                CP.MAC_DA_ET_Rules[j].MAC_DA_p = EtherAddr[j];
+
+            CP.MAC_DA_ET_Range[0].Range.MAC_DA_Start_p = EtherAddr[8];
+            CP.MAC_DA_ET_Range[0].Range.MAC_DA_End_p = EtherAddr[9];
+            CP.MAC_DA_ET_Range[1].Range.MAC_DA_Start_p = EtherAddr[10];
+            CP.MAC_DA_ET_Range[1].Range.MAC_DA_End_p = EtherAddr[11];
+            CP.MAC_DA_Range.MAC_DA_Start_p = EtherAddr[12];
+            CP.MAC_DA_Range.MAC_DA_End_p = EtherAddr[13];
+            CP.MAC_DA_44Bit_Const_p = EtherAddr[14];
+            CP.MAC_DA_48Bit_Const_p = EtherAddr[15];
+            DeviceCfg.CP_p = &CP;
+
+            DeviceCfg.HeaderParser_p = &HeaderParser;
+            HeaderParser.SecTAG_Parser_p = &SecTAG_Parser;
+            HeaderParser.VLAN_Parser_p = &VLAN_Parser;
+
+            DeviceCfg.StatControl_p = &StatsParams;
+            DeviceCfg.EOPConf_p = &EOPParams;
+            DeviceCfg.ECCConf_p = &ECCParams;
+
+            CfyE_Rc = CfyE_Device_Config_Get(CFYE_DEVICE_ID,
+                                             Channel,
+                                             &DeviceCfg);
+            if (CfyE_Rc != CFYE_STATUS_OK)
+            {
+                LOG_CRIT("TEST_MACSEC: Failed, CfyE_Device_Config_Get()=%d\n",
+                         CfyE_Rc);
+                return false;
+            }
+
+            Log_FormattedMessage("DA_IPSEC: DeviceCfg.Control_p->fIPsec : %d\n",
+                                 DeviceCfg.Control_p->fIPsec);
+        }
+    }
+
+    if (fIngress) /* Install rule and MTT */
+    {
+        CfyE_Rule_t RuleParams;
+        CfyE_MTT_t MTTParams;
+        unsigned int MaxCfyEChannels = 0;
+        uint16_t i = 0;
+
+        ZEROINIT(RuleParams);
+        ZEROINIT(MTTParams);
+
+        RuleParams.Policy.vPortHandle = CfyE_vPortHandle;
+        LOG_CRIT("vPortHandle: 0x%p\n", RuleParams.Policy.vPortHandle);
+
+        RuleParams.Key.PacketType = CFYE_RULE_PKT_TYPE_IPSEC;
+        RuleParams.Key.NumTags = 0;
+        RuleParams.Key.ChannelID = Channel;
+
+        RuleParams.Data[0] = 0x19262a3a;
+        RuleParams.Data[1] = 0xf7f;
+        RuleParams.Data[2] = 0x416bd021;
+        RuleParams.Data[4] = 0;
+
+        RuleParams.Mask.PacketType = CFYE_RULE_PKT_TYPE_MASK; /* Exact match on all these fields. */
+        RuleParams.Mask.NumTags = CFYE_RULE_NUMTAGS_MASK;
+        RuleParams.Mask.ChannelID = CFYE_RULE_CHANNEL_ID_MASK;
+
+        RuleParams.DataMask[0] = 0xffffffff; /* Match on IP address */
+        RuleParams.DataMask[1] = 0xffff;
+        RuleParams.DataMask[2] = 0xffffffff;
+        RuleParams.DataMask[3] = 0xf;
+
+        MTTParams.Key.ChannelMask.ch_bitmask[Channel / 32] = 1 << (Channel % 32);
+        MaskUnusedChBits(&MTTParams.Mask.ChannelMask, MaxCfyEChannels);
+
+        MTTParams.Key.fIPv6 = true;
+        MTTParams.Key.TagLabel1 = 0;
+        MTTParams.Key.TagLabel2 = 0;
+        MTTParams.Key.fPacketType = 0;
+
+        MTTParams.IPAddr[0] = 0x870c0667;
+        MTTParams.IPAddr[1] = 0xfe5f7a08;
+        MTTParams.IPAddr[2] = 0x6ab85439;
+        MTTParams.IPAddr[3] = 0x23ef7fdd;
+
+        for (i = 0; i < ((MaxCfyEChannels + 31)/ 32); i++)
+            MTTParams.Mask.ChannelMask.ch_bitmask[i] = 0xffffffff; /* accept on only 1 channel */
+
+        MaskUnusedChBits(&MTTParams.Mask.ChannelMask, MaxCfyEChannels);
+
+        MTTParams.Mask.fIPv6 = true;
+        MTTParams.Mask.TagLabel1 = 0;
+        MTTParams.Mask.TagLabel2 = 0;
+        MTTParams.Mask.fPacketType = true;
+
+        MTTParams.IPAddrMask[0] = 0xffffffff;
+        MTTParams.IPAddrMask[1] = 0xffffffff;
+        MTTParams.IPAddrMask[2] = 0xffffffff;
+        MTTParams.IPAddrMask[3] = 0xffffffff;
+
+        CfyE_Rc = CfyE_Device_Limits(CFYE_DEVICE_ID,
+                                     &MaxCfyEChannels,
+                                     NULL,
+                                     NULL);
+
+        if (CfyE_Rc != CFYE_STATUS_OK)
+        {
+            LOG_CRIT("CfyE_Device_Limits returned error %d\n", CfyE_Rc);
+            return CfyE_Rc;
+        }
+
+        LOG_CRIT("vPortHandle: 0x%p\n", RuleParams.Policy.vPortHandle);
+
+        CfyE_Rc = CfyE_Rule_Add(CFYE_DEVICE_ID, CfyE_vPortHandle,
+                                &CfyE_RuleHandle, &RuleParams);
+        if (CfyE_Rc != CFYE_STATUS_OK)
+        {
+            LOG_CRIT("DA_IPSEC: Failed, CfyE_Rule_Add()=%d\n", CfyE_Rc);
+            goto error_exit;
+        }
+
+        CfyE_Rc = CfyE_Rule_Enable(CFYE_DEVICE_ID, CfyE_RuleHandle, true);
+        if (CfyE_Rc != CFYE_STATUS_OK)
+        {
+            LOG_CRIT("DA_IPSEC: Failed, CfyE_Rule_Enable()=%d\n", CfyE_Rc);
+            goto error_exit;
+        }
+
+        if (fVerbose)
+        {
+            Log_FormattedMessage("DA_IPSEC: Rule enabled\n");
+        }
+
+        CfyE_Rc = CfyE_MTT_Update(CFYE_DEVICE_ID, MTTIndex, &MTTParams);
+        if (CfyE_Rc != CFYE_STATUS_OK)
+        {
+            LOG_CRIT("DA_IPSEC: Failed, CfyE_Rule_Add()=%d\n", CfyE_Rc);
+            goto error_exit;
+        }
+
+        CfyE_Rc = CfyE_MTT_Enable(CFYE_DEVICE_ID, MTTIndex, true);
+        if (CfyE_Rc != CFYE_STATUS_OK)
+        {
+            LOG_CRIT("DA_IPSEC: Failed, CfyE_MTT_Enable()=%d\n", CfyE_Rc);
+            goto error_exit;
+        }
+
+        if (fVerbose)
+        {
+            Log_FormattedMessage("DA_IPSEC: MTT entry enabled\n");
+        }
+    }
+
+    /* Allocate packet buffers */
+    InputPktHostAddress = da_macsec_malloc(PKT_BUFFER_BYTE_COUNT);
+    if (InputPktHostAddress == NULL)
+    {
+        LOG_CRIT("DA_IPSEC: Failed, packet buffer allocation\n");
+        goto error_exit;
+    }
+
+    ProcessedPktHostAddress = da_macsec_malloc(PKT_BUFFER_BYTE_COUNT);
+    if (ProcessedPktHostAddress == NULL)
+    {
+        LOG_CRIT("DA_IPSEC: Failed, packet buffer allocation\n");
+        goto error_exit;
+    }
+
+    ExpectedPktHostAddress = da_macsec_malloc(PKT_BUFFER_BYTE_COUNT);
+    if (ExpectedPktHostAddress == NULL)
+    {
+        LOG_CRIT("DA_IPSEC: Failed, packet buffer allocation\n");
+        goto error_exit;
+    }
+
+    if (fVerbose)
+    {
+        Log_FormattedMessage("DA_IPSEC: Packet buffers allocated\n");
+    }
+
+    /* At this point the Engine is ready to accept packets and
+       perform classification and processing autonomously */
+    if (fVerbose)
+    {
+        Log_FormattedMessage("DA_IPSEC: Ready to process packets\n");
+    }
+
+    /* Packet processing */
+    {
+        PktIO_Packet_Status_In_t PktStatusIn;
+        PktIO_Packet_Status_Out_t PktStatusOut;
+        int RetCode;
+        unsigned int ByteCount;
+
+#ifdef DA_MACSEC_MODE_INGRESS
+        if (fIngress)
+        {
+            /* Input packet */
+            PktByteCount = sizeof(SrcPacket_IPsec_Ingress);
+            memcpy(InputPktHostAddress,
+                   SrcPacket_IPsec_Ingress,
+                   PktByteCount);
+
+            if (fVerbose)
+            {
+                Log_FormattedMessage("DA_IPSEC: "
+                                     "Process input packet of size %d\n",
+                                     PktByteCount);
+                Log_HexDump("Input packet",
+                            0,
+                            SrcPacket_IPsec_Ingress,
+                            PktByteCount);
+            }
+
+            /* Expected packet */
+            ExpectedPktByteCount = sizeof(DstPacket_IPsec_Ingress);
+            memcpy(ExpectedPktHostAddress,
+                   DstPacket_IPsec_Ingress,
+                   ExpectedPktByteCount);
+        }
+#endif /* DA_MACSEC_MODE_INGRESS */
+
+#ifdef DA_MACSEC_MODE_EGRESS
+        if (!fIngress)
+        {
+            /* Input packet */
+            PktByteCount = sizeof(SrcPacket_IPsec_Egress);
+            memcpy(InputPktHostAddress,
+                   SrcPacket_IPsec_Egress,
+                   PktByteCount);
+
+            if (fVerbose)
+            {
+                Log_FormattedMessage("DA_IPSEC: "
+                                     "Process input packet of size %d\n",
+                                     PktByteCount);
+                Log_HexDump("Input packet",
+                            0,
+                            SrcPacket_IPsec_Egress,
+                            PktByteCount);
+            }
+
+            /* Expected packet */
+            ExpectedPktByteCount = sizeof(DstPacket_IPsec_Egress);
+            memcpy(ExpectedPktHostAddress,
+                   DstPacket_IPsec_Egress,
+                   ExpectedPktByteCount);
+        }
+#endif /* DA_MACSEC_MODE_EGRESS */
+
+        /* Fill in the status data structure */
+        ZEROINIT(PktStatusIn);
+
+        PktStatusIn.SecTAGOffset = 34;  /* = 12 (first MAC addresses) + */
+                                        /*   10 (MPLS Etype + 2 labels) + */
+                                        /*   12 (second MAC addresses) bytes */
+
+        RetCode = PktIO_Packet_Put(InputPktHostAddress,
+                                   PktByteCount,
+                                   &PktStatusIn,
+                                   Channel,
+                                   fIngress ? PKTIO_PACKET_DIRECTION_INGRESS :
+                                              PKTIO_PACKET_DIRECTION_EGRESS);
+        if (RetCode != 0)
+        {
+            LOG_CRIT("DA_IPSEC: PktIO_Packet_Put error %d\n", RetCode);
+            goto error_exit;
+        }
+
+        if (fVerbose)
+        {
+            Log_FormattedMessage("DA_IPSEC: Packet submitted\n");
+        }
+
+        /* Fill in the status data structure */
+        ZEROINIT(PktStatusOut);
+
+        /* Receive the processed packet */
+        if (da_macsec_get_one(fIngress,
+                              ProcessedPktHostAddress,
+                              &ByteCount,
+                              &PktStatusOut,
+                              Channel) == 0 &&
+            PktStatusOut.PacketStatusMask == 0)
+        {
+            LOG_CRIT("DA_IPSEC: Error obtaining result packet\n");
+            goto error_exit;
+        }
+
+        if (fVerbose)
+        {
+            Log_FormattedMessage("DA_IPSEC: PktIO_Packet_Get Size/"
+                                 "StatusMask/Channel/vPort/SAIndex/SCIndex"
+                                 "/RuleIndex: %d/0x%X/%d/%d/%d/%d/%d\n",
+                                 ByteCount,
+                                 PktStatusOut.PacketStatusMask,
+                                 Channel,
+                                 PktStatusOut.vPort,
+                                 PktStatusOut.SAIndex,
+                                 PktStatusOut.SCIndex,
+                                 PktStatusOut.RuleIndex);
+            Log_HexDump("Result packet",
+                        0,
+                        ProcessedPktHostAddress,
+                        ByteCount);
+        }
+
+        /* Compare the received packet with the expected. They must match. */
+        if ( ByteCount != ExpectedPktByteCount)
+        {
+            LOG_CRIT("DA_IPSEC: Packet sizes differ expected=%d, received=%d\n",
+                     ExpectedPktByteCount,
+                     ByteCount);
+            Log_HexDump("Expected packet",
+                        0,
+                        ExpectedPktHostAddress,
+                        ExpectedPktByteCount);
+            goto error_exit;
+        }
+
+        if (memcmp(ProcessedPktHostAddress,
+                   ExpectedPktHostAddress,
+                   ExpectedPktByteCount) != 0)
+        {
+            LOG_CRIT("DA_IPSEC: Contents of packets differ size=%d\n",
+                     ExpectedPktByteCount);
+            Log_HexDump("Expected packet",
+                        0,
+                        ExpectedPktHostAddress,
+                        ExpectedPktByteCount);
+            goto error_exit;
+        }
+        else
+        {
+            LOG_CRIT("DA_IPSEC: Expected and Results packet matches\n");
+        }
+
+#ifdef DA_MACSEC_MODE_INGRESS
+        if (fIngress)
+        {
+            /* Read the TCAM and MTT hit statistics counters */
+            /* Note: It is assumed that the rule is inserted at the first index (0) */
+            {
+                CfyE_Statistics_TCAM_t TCAMStat;
+                CfyE_Statistics_MTT_t MTTStat;
+
+                ZEROINIT(TCAMStat);
+
+                CfyE_Rc = CfyE_Statistics_TCAM_Get(CFYE_DEVICE_ID, 0, &TCAMStat, true);
+                if (CfyE_Rc != CFYE_STATUS_OK)
+                {
+                    LOG_CRIT("DA_IPSEC: Failed, CfyE_TCAM_Statistics_Get)=%d\n",
+                             CfyE_Rc);
+                    goto error_exit;
+                }
+
+                Log_FormattedMessage("DA_IPSEC: TCAM0 counter = %u\n",
+                                     TCAMStat.Counter.Lo);
+
+                if (TCAMStat.Counter.Lo == 0)
+                {
+                    LOG_CRIT("DA_IPSEC: Failed, "
+                             "TCAM0 counter should be not zero\n");
+                    goto error_exit;
+                }
+
+                CfyE_Rc = CfyE_Statistics_MTT_Get(CFYE_DEVICE_ID, MTTIndex, &MTTStat, true);
+                if (CfyE_Rc != CFYE_STATUS_OK)
+                {
+                    LOG_CRIT("DA_IPSEC: Failed, CfyE_MTT_Statistics_Get)=%d\n",
+                             CfyE_Rc);
+                    goto error_exit;
+                }
+
+                Log_FormattedMessage("DA_IPSEC: MTT counter = %u\n",
+                                     MTTStat.Counter.Lo);
+
+                if (MTTStat.Counter.Lo == 0)
+                {
+                     LOG_CRIT("DA_IPSEC: Failed, "
+                             "MTT counter should be not zero\n");
+                    goto error_exit;
+                }
+            }
+
+            {
+                uint32_t summary;
+
+                CfyE_Rc = CfyE_Statistics_Summary_MTT_Read(CFYE_DEVICE_ID, &summary);
+                if (CfyE_Rc != CFYE_STATUS_OK)
+                {
+                    LOG_CRIT("DA_IPSEC: Failed, CfyE_Summary_MTT_Read)=%d\n",
+                             CfyE_Rc);
+                    goto error_exit;
+                }
+                Log_FormattedMessage("DA_IPSEC: MTT0 summary = 0x%08x\n",summary);
+                if (summary != 1u << MTTIndex)
+                {
+                    LOG_CRIT("DA_IPSEC: Failed, "
+                             "Unexpected MTT summary\n");
+                    goto error_exit;
+                }
+            }
+
+            {
+                SecY_SA_Stat_IPsec_I_t SAStats;
+
+                ZEROINIT(SAStats);
+
+                /* Read the SA ingress statistics counters, */
+                /* request device synchronization before reading out the statistics */
+                SecY_Rc = SecY_SA_Statistics_IPsec_I_Get(SECY_DEVICE_ID,
+                                                   SecY_SAHandle,
+                                                   &SAStats,
+                                                   true);
+                if (SecY_Rc != SECY_STATUS_OK)
+                {
+                    LOG_CRIT("DA_IPSEC: Failed, SecY_SA_Statistics_IPsec_I_Get()=%d\n",
+                             SecY_Rc);
+                    goto error_exit;
+                }
+
+                /* Assume that any counters are less than 2^32, so we can just display */
+                /* the low halves of the 64-bit counters */
+                Log_FormattedMessage("DA_IPSEC:Ingress SA Statistics:\n"
+                                     "\tInOctetsDecrypted:  %u\n"
+                                     "\tInOctetsValidated:  %u\n"
+                                     "\tInPktsPadNotValid:  %u\n"
+                                     "\tnPktsPadLenF a i l: %u\n"
+                                     "\tInPktsLate:         %u\n"
+                                     "\tInPktsNotUsingSA:   %u\n"
+                                     "\tInPktsNotValid:     %u\n"
+                                     "\tInPktsOK:           %u\n"
+                                     "\tInPktsNotUsingSA:   %u\n"
+                                     "\tInPktsPadDummy:     %u\n",
+                                     SAStats.InOctetsDecrypted.Lo,
+                                     SAStats.InOctetsValidated.Lo,
+                                     SAStats.InPktsPadNotValid.Lo,
+                                     SAStats.InPktsPadLenFail.Lo,
+                                     SAStats.InPktsLate.Lo,
+                                     SAStats.InPktsNotUsingSA.Lo,
+                                     SAStats.InPktsNotValid.Lo,
+                                     SAStats.InPktsOK.Lo,
+                                     SAStats.InPktsNotUsingSA.Lo,
+                                     SAStats.InPktsPadDummy.Lo);
+
+                if ((SAStats.InOctetsDecrypted.Lo != 825) ||
+                    (SAStats.InOctetsValidated.Lo != 0) ||
+                    (SAStats.InPktsPadNotValid.Lo != 0) ||
+                    (SAStats.InPktsPadLenFail.Lo != 0) ||
+                    (SAStats.InPktsLate.Lo != 0) ||
+                    (SAStats.InPktsNotUsingSA.Lo != 0) ||
+                    (SAStats.InPktsNotValid.Lo != 0) ||
+                    (SAStats.InPktsOK.Lo != 1) ||
+                    (SAStats.InPktsNotUsingSA.Lo != 0) ||
+                    (SAStats.InPktsPadDummy.Lo != 0))
+                {
+                    LOG_CRIT("DA_IPSEC: Failed, SA statistics check:\n"
+                             "\tInOctetsDecrypted = %u, expected 0\n"
+                             "\tInOctetsValidated = %u, expected 0\n"
+                             "\tInPktsPadNotValid = %u, expected 0\n"
+                             "\tInPktsPadLenF a i l = %u, expected 0\n"
+                             "\tInPktsLate = %u, expected 0\n"
+                             "\tInPktsNotUsingSA =%u, expected 0\n"
+                             "\tInPktsNotValid =%u, expected 0\n"
+                             "\tInPktsOK =%u, expected 1\n"
+                             "\tInPktsNotUsingSA =%u, expected 0\n"
+                             "\tInPktsPadDummy =%u, expected 0\n",
+                             SAStats.InOctetsDecrypted.Lo,
+                             SAStats.InOctetsValidated.Lo,
+                             SAStats.InPktsPadNotValid.Lo,
+                             SAStats.InPktsPadLenFail.Lo,
+                             SAStats.InPktsLate.Lo,
+                             SAStats.InPktsNotUsingSA.Lo,
+                             SAStats.InPktsNotValid.Lo,
+                             SAStats.InPktsOK.Lo,
+                             SAStats.InPktsNotUsingSA.Lo,
+                             SAStats.InPktsPadDummy.Lo);
+                    goto error_exit;
+                }
+            }
+
+            {
+                SecY_SecY_Stat_IPsec_I_t SecYStats;
+
+                ZEROINIT(SecYStats);
+
+                /* Read the SecY ingress statistics counters. */
+                /* Sync with the SecY device to get the exact counters values */
+                SecY_Rc = SecY_SecY_Statistics_IPsec_I_Get(SECY_DEVICE_ID,
+                                                           vPort,
+                                                           &SecYStats,
+                                                           true);
+                if (SecY_Rc != SECY_STATUS_OK)
+                {
+                    LOG_CRIT("DA_IPSEC: Failed, SecY_SecY_Statistics_I_Get()=%d\n",
+                             SecY_Rc);
+                    goto error_exit;
+                }
+
+                /* Assume that any counters are less than 2^32, so we can just display */
+                /* the low halves of the 64-bit counters */
+                Log_FormattedMessage(
+                        "DA_IPSEC: Ingress SecY(%d) Statistics:\n"
+                        "\tTransform E r r o r Packets Counter:    %u\n"
+                        "\tIngress Late Header Packets Counter:    %u\n"
+                        "\tIngress IP Mismatch Packets Counter:    %u\n"
+                        "\tIngress SA Not in Use Packets Counter:  %u\n",
+                        vPort,
+                        SecYStats.InPktsTransformError.Lo,
+                        SecYStats.InPktsLateHdr.Lo,
+                        SecYStats.InPktsIPMismatch.Lo,
+                        SecYStats.InPktsSANotInUse.Lo);
+
+                if ((SecYStats.InPktsTransformError.Lo != 0) ||
+                    (SecYStats.InPktsLateHdr.Lo != 0) ||
+                    (SecYStats.InPktsIPMismatch.Lo != 0) ||
+                    (SecYStats.InPktsSANotInUse.Lo != 0))
+                {
+                    LOG_CRIT("DA_IPSEC: Failed, SecY statistics check:\n"
+                             "\tInPktsTransformError=%u, expected 0\n"
+                             "\tInPktsLateHdr=%u, expected 0\n"
+                             "\tInPktsIPMismatch=%u, expected 0\n"
+                             "\tInPktsSANotInUse=%u, expected 0\n",
+                             SecYStats.InPktsTransformError.Lo,
+                             SecYStats.InPktsLateHdr.Lo,
+                             SecYStats.InPktsIPMismatch.Lo,
+                             SecYStats.InPktsSANotInUse.Lo);
+                    goto error_exit;
+                }
+            }
+
+            {
+                SecY_Ifc_Stat_I_t IfcStats;
+
+                ZEROINIT(IfcStats);
+
+                /* Read the IFC/IFC1 ingress statistics counters. */
+                /* Sync with the SecY device to get the exact counters values */
+                SecY_Rc = SecY_Ifc_Statistics_I_Get(SECY_DEVICE_ID,
+                                                    vPort,
+                                                    &IfcStats,
+                                                    true);
+                if (SecY_Rc != SECY_STATUS_OK)
+                {
+                    LOG_CRIT("DA_IPSEC: Failed, SecY_Ifc_Statistics_I_Get()=%d\n",
+                             SecY_Rc);
+                    goto error_exit;
+                }
+
+                /* Assume that any counters are less than 2^32, so we can just display */
+                /* the low halves of the 64-bit counters */
+                Log_FormattedMessage(
+                    "DA_IPSEC: Ingress IFC/IFC1(%d) Statistics:\n"
+                    "\tUncontrolled Counters:\n"
+                    "\t  Octects:             %u\n"
+                    "\t  Packets Unicast:     %u\n"
+                    "\t  Packets Multicast:   %u\n"
+                    "\t  Packets Broadcast:   %u\n"
+                    "\tControlled Counters:\n"
+                    "\t  Octects:             %u\n"
+                    "\t  Packets Unicast:     %u\n"
+                    "\t  Packets Multicast:   %u\n"
+                    "\t  Packets Broadcast:   %u\n",
+                    vPort,
+                    IfcStats.InOctetsUncontrolled.Lo,
+                    IfcStats.InPktsUnicastUncontrolled.Lo,
+                    IfcStats.InPktsMulticastUncontrolled.Lo,
+                    IfcStats.InPktsBroadcastUncontrolled.Lo,
+                    IfcStats.InOctetsControlled.Lo,
+                    IfcStats.InPktsUnicastControlled.Lo,
+                    IfcStats.InPktsMulticastControlled.Lo,
+                    IfcStats.InPktsBroadcastControlled.Lo);
+
+                if ((IfcStats.InOctetsUncontrolled.Lo != 914) ||
+                    (IfcStats.InPktsUnicastUncontrolled.Lo != 1) ||
+                    (IfcStats.InPktsMulticastUncontrolled.Lo != 0) ||
+                    (IfcStats.InPktsBroadcastUncontrolled.Lo != 0) ||
+                    (IfcStats.InOctetsControlled.Lo != 879) ||
+                    (IfcStats.InPktsUnicastControlled.Lo != 1) ||
+                    (IfcStats.InPktsMulticastControlled.Lo != 0) ||
+                    (IfcStats.InPktsBroadcastControlled.Lo != 0))
+                {
+                    LOG_CRIT("DA_IPSEC: Failed, IFC/IFC1 statistics check:\n"
+                             "\tInOctetsUncontrolled=%u, expected 132\n"
+                             "\tInPktsUnicastUncontrolled=%u, expected 0\n"
+                             "\tInPktsMulticastUncontrolled=%u, expected 1\n"
+                             "\tInPktsBroadcastUncontrolled=%u, expected 0\n"
+                             "\tInOctetsControlled=%u, expected 100\n"
+                             "\tInPktsUnicastControlled=%u, expected 0\n"
+                             "\tInPktsMulticastControlled=%u, expected 1\n"
+                             "\tInPktsBroadcastControlled=%u, expected 0\n",
+                             IfcStats.InOctetsUncontrolled.Lo,
+                             IfcStats.InPktsUnicastUncontrolled.Lo,
+                             IfcStats.InPktsMulticastUncontrolled.Lo,
+                             IfcStats.InPktsBroadcastUncontrolled.Lo,
+                             IfcStats.InOctetsControlled.Lo,
+                             IfcStats.InPktsUnicastControlled.Lo,
+                             IfcStats.InPktsMulticastControlled.Lo,
+                             IfcStats.InPktsBroadcastControlled.Lo);
+                    goto error_exit;
+                }
+            }
+        }
+#endif /* DA_MACSEC_MODE_INGRESS */
+
+#ifdef DA_MACSEC_MODE_EGRESS
+        if (!fIngress)
+        {
+            {
+                SecY_SA_Stat_E_t SAStats;
+
+                ZEROINIT(SAStats);
+
+                /* Read out egress SA statistics, */
+                /* request device synchronization before reading out statistics */
+                SecY_Rc = SecY_SA_Statistics_E_Get(SECY_DEVICE_ID,
+                                                   SecY_SAHandle,
+                                                   &SAStats,
+                                                   true);
+                if (SecY_Rc != SECY_STATUS_OK)
+                {
+                    LOG_CRIT("DA_IPSEC: Failed, SecY_SA_Statistics_E_Get()=%d\n",
+                             SecY_Rc);
+                    goto error_exit;
+                }
+
+                /* Assume that any counters are less than 2^32, so we can just display */
+                /* the low halves of the 64-bit counters */
+                Log_FormattedMessage("DA_IPSEC: Egress SA Statistics:\n"
+                                     "\tOutOctetsEncryptedProtected: %u\n"
+                                     "\tOutPktsEncryptedProtected:   %u\n"
+                                     "\tOutPktsTooLong:              %u\n"
+                                     "\tOutPktsSANotInUse:           %u\n",
+                                     SAStats.OutOctetsEncryptedProtected.Lo,
+                                     SAStats.OutPktsEncryptedProtected.Lo,
+                                     SAStats.OutPktsTooLong.Lo,
+                                     SAStats.OutPktsSANotInUse.Lo);
+
+                if ((SAStats.OutOctetsEncryptedProtected.Lo != 962) ||
+                    (SAStats.OutPktsEncryptedProtected.Lo != 1) ||
+                    (SAStats.OutPktsTooLong.Lo != 0) ||
+                    (SAStats.OutPktsSANotInUse.Lo != 0))
+                {
+                    LOG_CRIT("DA_IPSEC: Failed, SA statistics check:\n"
+                             "\tOutOctetsEncryptedProtected=%u, expected 962,\n"
+                             "\tOutPktsEncryptedProtected=%u, expected 1\n"
+                             "\tOutPktsTooLong=%u, expected 0\n"
+                             "\tOutPktsSANotInUse=%u, expected 0\n",
+                             SAStats.OutOctetsEncryptedProtected.Lo,
+                             SAStats.OutPktsEncryptedProtected.Lo,
+                             SAStats.OutPktsTooLong.Lo,
+                             SAStats.OutPktsSANotInUse.Lo);
+                    goto error_exit;
+                }
+            }
+
+            {
+                SecY_SecY_Stat_IPsec_E_t SecYStats;
+
+                ZEROINIT(SecYStats);
+
+                /* Read the SecY ingress statistics counters. */
+                /* Sync with the SecY device to get the exact counters values */
+                SecY_Rc = SecY_SecY_Statistics_IPsec_E_Get(SECY_DEVICE_ID,
+                                                     vPort,
+                                                     &SecYStats,
+                                                     true);
+                if (SecY_Rc != SECY_STATUS_OK)
+                {
+                    LOG_CRIT("DA_IPSEC: Failed, SecY_SecY_Statistics_E_Get()=%d\n",
+                             SecY_Rc);
+                    goto error_exit;
+                }
+
+                /* Assume that any counters are less than 2^32, so we can just display */
+                /* the low halves of the 64-bit counters */
+                Log_FormattedMessage(
+                    "DA_IPSEC: Egress SecY(%d) Statistics:\n"
+                    "\tTransform E r r o r Packets Counter: %u\n"
+                    "\tEgress Untagged Packets Counter:     %u\n"
+                    "\tEgress SANotInUse Packets Counter:   %u\n",
+                    vPort,
+                    SecYStats.OutPktsTransformError.Lo,
+                    SecYStats.OutPktsUntagged.Lo,
+                    SecYStats.OutPktsSANotInUse.Lo);
+
+                if ((SecYStats.OutPktsTransformError.Lo != 0) ||
+                    (SecYStats.OutPktsUntagged.Lo != 0) ||
+                    (SecYStats.OutPktsSANotInUse.Lo != 0))
+                {
+                    LOG_CRIT("DA_IPSEC: Failed, SecY statistics check:\n"
+                             "\tOutPktsTransformError=%u, expected 0\n"
+                             "\tOutPktsUntagged=%u, expected 0\n"
+                             "\tOutPktsSANotInUse=%u, expected 0\n",
+                             SecYStats.OutPktsTransformError.Lo,
+                             SecYStats.OutPktsUntagged.Lo,
+                             SecYStats.OutPktsSANotInUse.Lo);
+                    goto error_exit;
+                }
+            }
+
+            {
+                SecY_Ifc_Stat_E_t IfcStats;
+
+                ZEROINIT(IfcStats);
+
+                /* Read the IFC/IFC1 ingress statistics counters. */
+                /* Sync with the SecY device to get the exact counters values */
+                SecY_Rc = SecY_Ifc_Statistics_E_Get(SECY_DEVICE_ID,
+                                                    vPort,
+                                                    &IfcStats,
+                                                    true);
+                if (SecY_Rc != SECY_STATUS_OK)
+                {
+                    LOG_CRIT("DA_IPSEC: Failed, SecY_Ifc_Statistics_E_Get()=%d\n",
+                             SecY_Rc);
+                    goto error_exit;
+                }
+
+                /* Assume that any counters are less than 2^32, so we can just display */
+                /* the low halves of the 64-bit counters */
+                Log_FormattedMessage(
+                    "DA_IPSEC: Egress IFC/IFC1(%d) Statistics:\n"
+                    "\tCommon Counters:\n"
+                    "\t  Octects:             %u\n"
+                    "\tUncontrolled Counters:\n"
+                    "\t  Octects:             %u\n"
+                    "\t  Packets Unicast:     %u\n"
+                    "\t  Packets Multicast:   %u\n"
+                    "\t  Packets Broadcast:   %u\n"
+                    "\tControlled Counters:\n"
+                    "\t  Octects:             %u\n"
+                    "\t  Packets Unicast:     %u\n"
+                    "\t  Packets Multicast:   %u\n"
+                    "\t  Packets Broadcast:   %u\n",
+                    vPort,
+                    IfcStats.OutOctetsCommon.Lo,
+                    IfcStats.OutOctetsUncontrolled.Lo,
+                    IfcStats.OutPktsUnicastUncontrolled.Lo,
+                    IfcStats.OutPktsMulticastUncontrolled.Lo,
+                    IfcStats.OutPktsBroadcastUncontrolled.Lo,
+                    IfcStats.OutOctetsControlled.Lo,
+                    IfcStats.OutPktsUnicastControlled.Lo,
+                    IfcStats.OutPktsMulticastControlled.Lo,
+                    IfcStats.OutPktsBroadcastControlled.Lo);
+
+                if ((IfcStats.OutOctetsCommon.Lo != 1050) ||
+                    (IfcStats.OutOctetsUncontrolled.Lo != 0) ||
+                    (IfcStats.OutPktsUnicastUncontrolled.Lo != 0) ||
+                    (IfcStats.OutPktsMulticastUncontrolled.Lo != 0) ||
+                    (IfcStats.OutPktsBroadcastUncontrolled.Lo != 0) ||
+                    (IfcStats.OutOctetsControlled.Lo != 1016) ||
+                    (IfcStats.OutPktsUnicastControlled.Lo != 1) ||
+                    (IfcStats.OutPktsMulticastControlled.Lo != 0) ||
+                    (IfcStats.OutPktsBroadcastControlled.Lo != 0))
+                {
+                    LOG_CRIT("DA_IPSEC: Failed, IFC/IFC1 statistics check:\n"
+                             "\tOutOctetsCommon=%u, expected 1050\n"
+                             "\tOutOctetsUncontrolled=%u, expected 0\n"
+                             "\tOutPktsUnicastUncontrolled=%u, expected 0\n"
+                             "\tOutPktsMulticastUncontrolled=%u, expected 0\n"
+                             "\tOutPktsBroadcastUncontrolled=%u, expected 0\n"
+                             "\tOutOctetsControlled=%u, expected 1016\n"
+                             "\tOutPktsUnicastControlled=%u, expected 1\n"
+                             "\tOutPktsMulticastControlled=%u, expected 0\n"
+                             "\tOutPktsBroadcastControlled=%u, expected 0\n",
+                             IfcStats.OutOctetsCommon.Lo,
+                             IfcStats.OutOctetsUncontrolled.Lo,
+                             IfcStats.OutPktsUnicastUncontrolled.Lo,
+                             IfcStats.OutPktsMulticastUncontrolled.Lo,
+                             IfcStats.OutPktsBroadcastUncontrolled.Lo,
+                             IfcStats.OutOctetsControlled.Lo,
+                             IfcStats.OutPktsUnicastControlled.Lo,
+                             IfcStats.OutPktsMulticastControlled.Lo,
+                             IfcStats.OutPktsBroadcastControlled.Lo);
+                    goto error_exit;
+                }
+            }
+        }
+#endif /* DA_MACSEC_MODE_EGRESS */
+    }
+
+    if (fVerbose)
+    {
+        Log_FormattedMessage("DA_IPSEC: Finished processing packets\n");
+    }
+
+
+    /* If we made it to here, consider this run a success. Any jump */
+    /* to one of the error labels below will skip "success = true" */
+    fSuccess = true;
+
+error_exit:
+#ifdef DA_MACSEC_MODE_INGRESS
+    CfyE_Rc = CfyE_Rule_Disable(CFYE_DEVICE_ID, CfyE_RuleHandle, true);
+    if (CfyE_Rc != CFYE_STATUS_OK)
+    {
+        LOG_CRIT("DA_IPSEC: Failed, CfyE_Rule_Disable()=%d\n", CfyE_Rc);
+        fSuccess = false;
+    }
+
+    CfyE_Rc = CfyE_Rule_Remove(CFYE_DEVICE_ID, CfyE_RuleHandle);
+    if (CfyE_Rc != CFYE_STATUS_OK)
+    {
+        LOG_CRIT("DA_IPSEC: Failed, CfyE_Rule_Remove()=%d\n", CfyE_Rc);
+        fSuccess = false;
+    }
+
+    /* Remove MTT entry */
+    CfyE_Rc = CfyE_MTT_Disable(CFYE_DEVICE_ID, MTTIndex, true);
+    if (CfyE_Rc != CFYE_STATUS_OK)
+    {
+        LOG_CRIT("DA_IPSEC: Failed, CfyE_MTT_Disable()=%d\n", CfyE_Rc);
+        fSuccess = false;
+    }
+#endif
+
+    /* Remove vPort */
+    CfyE_Rc = CfyE_vPort_Remove(CFYE_DEVICE_ID, CfyE_vPortHandle);
+    if (CfyE_Rc != CFYE_STATUS_OK)
+    {
+        LOG_CRIT("DA_IPSEC: Failed, CfyE_vPort_Remove()=%d\n", CfyE_Rc);
+        fSuccess = false;
+    }
+
+    /* Remove SA */
+    SecY_Rc = SecY_SA_Remove(SECY_DEVICE_ID, SecY_SAHandle);
+    if (SecY_Rc != SECY_STATUS_OK)
+    {
+        LOG_CRIT("DA_IPSEC: Failed, SecY_SA_Remove()=%d\n", SecY_Rc);
+        fSuccess = false;
+    }
+
+    /* Remove the buffers occupied by the packets */
+    if (InputPktHostAddress)
+    {
+        da_macsec_free(InputPktHostAddress);
+    }
+
+    if (ProcessedPktHostAddress)
+    {
+        da_macsec_free(ProcessedPktHostAddress);
+    }
+
+    if (ExpectedPktHostAddress)
+    {
+        da_macsec_free(ExpectedPktHostAddress);
+    }
+
+error_exit_init:
+
+    SecY_Device_Uninit(SECY_DEVICE_ID);
+    CfyE_Device_Uninit(SECY_DEVICE_ID);
+
+    return fSuccess;
+}
+
+#endif /* DA_MACSEC_USE_CFYE */
+#endif /* DA_IPSEC_ENABLE */
+
+/* end of file da_secy_cfye_ipsec.c */
