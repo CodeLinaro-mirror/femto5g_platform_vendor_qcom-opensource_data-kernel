@@ -2226,6 +2226,7 @@ int ecpriss_qudp_fh_tx_hdr_ins_cfg(uint32_t               port_index,
 		ip_opts.calc_udp_cs = tx_cfg->ip_hdr.udp_chksum_en;
 		ip_opts.is_ipsec = tx_cfg->ip_hdr.ipsec_en;
 		ip_opts.rsvd = tx_cfg->ip_hdr.rsvd;
+		ip_opts.ip_type = tx_cfg->ip_hdr.ip_type;
 
 
 		ecpriss_qudp_hal_write_reg_mn_fields(ECPRISS_QUDP_FH_RAMS,

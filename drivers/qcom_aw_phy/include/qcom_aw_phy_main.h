@@ -197,6 +197,10 @@ void qcom_aw_phy_setup_sysfs(void);
 void qcom_aw_phy_del_sysfs(void);
 ssize_t qcom_aw_phy_set_attr(struct file *file, const char __user *buf,
                                       size_t count, loff_t *ppos) ;
+ssize_t qcom_aw_phy_get_attr(struct file *file, char __user *buf,
+                             size_t count, loff_t *ppos) ;
+ssize_t qcom_aw_phy_get_prbs_result(struct file *file, char __user *buf,
+                                    size_t count, loff_t *ppos);
 #endif /* FEATURE_QCOM_AW_TEST_SYS_FS */
 
 #endif /* QCOM_AW_PHY_MAIN_H */

@@ -364,13 +364,11 @@ void ecpri_dma_tasklet_transmit_done(unsigned long data)
 {
 	struct ecpri_dma_endp_context *endp;
 	struct ecpri_dma_outstanding_pkt_wrapper *curr_pkt_wrapper;
-	struct ecpri_dma_outstanding_pkt_wrapper *next_pkt_wrapper;
 	struct ecpri_dma_pkt_completion_wrapper **comp_pkts_arr;
 	struct ecpri_dma_pkt *pkt;
 	struct list_head *pos, *n;
-	u32 num_of_completed, completed_pkt_index = 0;
+	u32 num_of_completed = 0, completed_pkt_index = 0;
 	int i = 0;
-	int dma_dir = 0;
 	unsigned long flags;
 
 	endp = (struct ecpri_dma_endp_context *)data;
@@ -381,11 +379,8 @@ void ecpri_dma_tasklet_transmit_done(unsigned long data)
 	}
 
 	num_of_completed = atomic_read(&endp->xmit_eot_cnt);
-
-	if (endp->gsi_ep_cfg->dir == ECPRI_DMA_ENDP_DIR_SRC)
-		dma_dir = DMA_TO_DEVICE;
-	else
-		dma_dir = DMA_FROM_DEVICE;
+	if (num_of_completed == 0)
+		return;
 
 	comp_pkts_arr =
 		kzalloc(sizeof(struct ecpri_dma_pkt_completion_wrapper *) *
@@ -396,18 +391,20 @@ void ecpri_dma_tasklet_transmit_done(unsigned long data)
 	}
 
 	spin_lock_irqsave(&endp->spinlock, flags);
-	if (list_empty(&endp->outstanding_pkt_list))
-	{
-		spin_unlock_irqrestore(&endp->spinlock, flags);
-		return;
-	}
 
-	curr_pkt_wrapper = list_first_entry(&endp->outstanding_pkt_list,
-				 struct ecpri_dma_outstanding_pkt_wrapper, link);
+	if(!list_empty(&endp->outstanding_pkt_list))
+		curr_pkt_wrapper = list_first_entry(&endp->outstanding_pkt_list,
+			struct ecpri_dma_outstanding_pkt_wrapper, link);
 
 	while (!list_empty(&endp->outstanding_pkt_list) &&
-	       curr_pkt_wrapper->xfer_done &&
-	       atomic_add_unless(&endp->xmit_eot_cnt, -1, 0)) {
+		completed_pkt_index < num_of_completed &&
+		curr_pkt_wrapper &&
+		curr_pkt_wrapper->xfer_done &&
+		atomic_add_unless(&endp->xmit_eot_cnt, -1, 0)) {
+
+		curr_pkt_wrapper = list_first_entry(&endp->outstanding_pkt_list,
+			struct ecpri_dma_outstanding_pkt_wrapper, link);
+
 		/* Perform unmapping using SMMU */
 		pkt = curr_pkt_wrapper->comp_pkt.pkt;
 
@@ -417,23 +414,28 @@ void ecpri_dma_tasklet_transmit_done(unsigned long data)
 			for (i = 0; i < pkt->num_of_buffers; i++) {
 				dma_unmap_single(ecpri_dma_ctx->pdev,
 					pkt->buffs[i]->phys_base,
-					pkt->buffs[i]->size, dma_dir);
+					pkt->buffs[i]->size, DMA_TO_DEVICE);
+				pkt->buffs[i]->phys_base = 0;
 			}
 		}
 
 		/*	Remove completed packet wrapper from endp list and prepare
 				the completed packets array for the client */
 		comp_pkts_arr[completed_pkt_index] = &curr_pkt_wrapper->comp_pkt;
-		next_pkt_wrapper = list_next_entry(curr_pkt_wrapper, link);
 		list_move_tail(&curr_pkt_wrapper->link, &endp->completed_pkt_list);
+
 		endp->curr_outstanding_num--;
 		endp->curr_completed_num++;
-
-		curr_pkt_wrapper = next_pkt_wrapper;
 		completed_pkt_index++;
 	}
 
 	spin_unlock_irqrestore(&endp->spinlock, flags);
+
+	if(completed_pkt_index == 0)
+	{
+		kfree(comp_pkts_arr);
+		return;
+	}
 
 	/* Notify client on all completed packets */
 	if (endp->notify_comp != NULL) {
@@ -476,33 +478,35 @@ int ecpri_dma_set_endp_mode(struct ecpri_dma_endp_context *endp,
 	if (!endp || !endp->valid)
 		return -EINVAL;
 
-	atomic_set(&endp->curr_polling_state, mode);
 	switch (mode) {
 	case ECPRI_DMA_NOTIFY_MODE_IRQ:
 		ret = gsi_config_channel_mode(endp->gsi_chan_hdl,
-					      GSI_CHAN_MODE_CALLBACK);
+			GSI_CHAN_MODE_CALLBACK);
 		if ((ret != GSI_STATUS_SUCCESS) &&
-		    !atomic_read(&endp->curr_polling_state)) {
+			(ret != -GSI_STATUS_UNSUPPORTED_OP)) {
 			DMAERR("Failed to switch to intr mode %d ch_id %d\n",
-			       endp->curr_polling_state, endp->gsi_chan_hdl);
+				endp->curr_polling_state, endp->gsi_chan_hdl);
+			return ret;
 		}
 		break;
 	case ECPRI_DMA_NOTIFY_MODE_POLL:
 		ret = gsi_config_channel_mode(endp->gsi_chan_hdl,
-					      GSI_CHAN_MODE_POLL);
+			GSI_CHAN_MODE_POLL);
 		if ((ret != GSI_STATUS_SUCCESS) &&
-		    atomic_read(&endp->curr_polling_state)) {
+			(ret != -GSI_STATUS_UNSUPPORTED_OP)) {
 			DMAERR("Failed to switch to poll mode %d ch_id %d\n",
-			       endp->curr_polling_state, endp->gsi_chan_hdl);
+				endp->curr_polling_state, endp->gsi_chan_hdl);
+			return ret;
 		}
 		break;
 	default:
 		DMAERR("Invalid ENDP Notify mode recieved\n");
-		ret = -EINVAL;
+		return -EINVAL;
 		break;
 	}
+	atomic_set(&endp->curr_polling_state, mode);
 
-	return ret;
+	return 0;
 }
 
 int ecpri_dma_get_endp_mode(struct ecpri_dma_endp_context *endp,
@@ -653,6 +657,14 @@ int ecpri_dma_dp_rx_poll(struct ecpri_dma_endp_context *endp, u32 budget,
 		pkts[i]->comp_code = curr_pkt_wrapper->comp_pkt.comp_code;
 		pkts[i]->pkt = curr_pkt_wrapper->comp_pkt.pkt;
 		pkts[i]->pkt->buffs[0]->size = curr_pkt_wrapper->bytes_xfered;
+		/* Unmapping is only required for ETH S2M ENDPs */
+		if (endp->gsi_ep_cfg->stream_mode != ECPRI_DMA_ENDP_STREAM_MODE_M2M)
+		{
+			dma_unmap_single(ecpri_dma_ctx->pdev,
+				pkts[i]->pkt->buffs[0]->phys_base,
+				pkts[i]->pkt->buffs[0]->size, DMA_FROM_DEVICE);
+			pkts[i]->pkt->buffs[0]->phys_base = 0;
+		}
 		i++;
 
 		/* Free completed packet wrappers*/
@@ -829,6 +841,7 @@ fail_handling:
 			dma_unmap_single(ecpri_dma_ctx->pdev,
 				pkts[k]->buffs[j]->phys_base,
 				pkts[k]->buffs[j]->size, dma_dir);
+			pkts[k]->buffs[j]->phys_base = 0;
 		}
 
 		/* Remove from list */

@@ -379,7 +379,7 @@ ssize_t sysfs_show_saddr(struct kobject *kobj, struct kobj_attribute *attr,
     val = snprintf(buf, sizeof(L2_show_value), "%s", L2_show_value);
   } else if (!strncmp(kobj->name, "L3_Info", Kobj_Name_L3_Info_Size)) {
     for (i = 0; i <= L3_size; i++) {
-      snprintf(tmp_L3[i], sizeof(L3.saddr), "%d", L3.saddr[L3_size - i]);
+      snprintf(tmp_L3[i], sizeof(L3.saddr), "%d", L3.saddr[i]);
       strlcat(L3_show_value, tmp_L3[i], sizeof(L3_show_value));
       if (i != L3_size)
         strlcat(L3_show_value, ".", sizeof(L3_show_value));
@@ -414,7 +414,7 @@ ssize_t sysfs_store_saddr(struct kobject *kobj, struct kobj_attribute *attr,
 
   CSMLOGINFO(KERN_INFO " Reading - sysfs store func...%s \n", kobj->name);
   if (!strncmp(kobj->name, "L2_Info", Kobj_Name_L2_Info_Size)) {
-    strlcpy(token_string, buf, MIN(sizeof(token_string), sizeof(buf)));
+    strlcpy(token_string, buf, MIN(sizeof(token_string), strlen(buf)+1));
     token = mtip_sysfs_strtok(token_string, L2_seps);
     while (token != NULL) {
       sscanf(token, "%x", &var);
@@ -438,7 +438,7 @@ ssize_t sysfs_store_saddr(struct kobject *kobj, struct kobj_attribute *attr,
       iowrite32(prev_val, debug_port_base_address + L2_SA_ADDR_HI_ARRAY[index]);
     }
   } else if (!strncmp(kobj->name, "L3_Info", Kobj_Name_L3_Info_Size)) {
-    strlcpy(token_string, buf, MIN(sizeof(token_string), sizeof(buf)));
+    strlcpy(token_string, buf, MIN(sizeof(token_string), strlen(buf)+1));
     token = mtip_sysfs_strtok(token_string, L3_seps);
     while (token != NULL) {
       sscanf(token, "%d", &var);
@@ -486,7 +486,7 @@ ssize_t sysfs_show_daddr(struct kobject *kobj, struct kobj_attribute *attr,
     val = snprintf(buf, sizeof(L2_show_value), "%s", L2_show_value);
   } else if (!strncmp(kobj->name, "L3_Info", Kobj_Name_L3_Info_Size)) {
     for (i = 0; i <= L3_size; i++) {
-      snprintf(tmp_L3[i], sizeof(L3.daddr), "%d", L3.daddr[L3_size - i]);
+      snprintf(tmp_L3[i], sizeof(L3.daddr), "%d", L3.daddr[i]);
       strlcat(L3_show_value, tmp_L3[i], sizeof(L3_show_value));
       if (i != L3_size)
         strlcat(L3_show_value, ".", sizeof(L3_show_value));
@@ -522,7 +522,7 @@ ssize_t sysfs_store_daddr(struct kobject *kobj, struct kobj_attribute *attr,
 
   CSMLOGINFO(KERN_INFO " Reading - sysfs store func...%s \n", kobj->name);
   if (!strncmp(kobj->name, "L2_Info", Kobj_Name_L2_Info_Size)) {
-    strlcpy(token_string, buf, MIN(sizeof(token_string), sizeof(buf)));
+    strlcpy(token_string, buf, MIN(sizeof(token_string), strlen(buf)+1));
     token = mtip_sysfs_strtok(token_string, L2_seps);
     while (token != NULL) {
       sscanf(token, "%x", &var);
@@ -539,7 +539,7 @@ ssize_t sysfs_store_daddr(struct kobject *kobj, struct kobj_attribute *attr,
       iowrite32(upper_DA, debug_port_base_address + L2_DA_ADDR_HI_ARRAY[index]);
     }
   } else if (!strncmp(kobj->name, "L3_Info", Kobj_Name_L3_Info_Size)) {
-    strlcpy(token_string, buf, MIN(sizeof(token_string), sizeof(buf)));
+    strlcpy(token_string, buf, MIN(sizeof(token_string), strlen(buf)+1));
     token = mtip_sysfs_strtok(token_string, L3_seps);
     while (token != NULL) {
       sscanf(token, "%d", &var);
@@ -588,7 +588,8 @@ ssize_t sysfs_store_sport(struct kobject *kobj, struct kobj_attribute *attr,
   for (index = 0; index < MAX_PACKET_FIFO_COUNT; index++) {
     val = (u32)ioread32(debug_port_base_address + UDP_SP_DP_ARRAY[index]);
     val &= (~(GENMASK(15, 0)));
-    val |= ((data & GENMASK(15, 0)));
+    val |= ((data & GENMASK(15, 8))>>8);
+    val |= ((data & GENMASK(7, 0))<<8);
     iowrite32(val, debug_port_base_address + UDP_SP_DP_ARRAY[index]);
   }
   return -1;
@@ -627,7 +628,8 @@ ssize_t sysfs_store_dport(struct kobject *kobj, struct kobj_attribute *attr,
   for (index = 0; index < MAX_PACKET_FIFO_COUNT; index++) {
     val = (u32)ioread32(debug_port_base_address + UDP_SP_DP_ARRAY[index]);
     val &= (~(GENMASK(31, 16)));
-    val |= ((data & GENMASK(15, 0)) << 16);
+    val |= ((data & GENMASK(15, 8))<< 8);
+    val |= ((data & GENMASK(7, 0))<< 24);
     iowrite32(val, debug_port_base_address + UDP_SP_DP_ARRAY[index]);
   }
   return -1;

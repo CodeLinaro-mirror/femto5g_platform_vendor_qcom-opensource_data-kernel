@@ -126,37 +126,25 @@ void run_mtip_replenish_dma_rx_buffers(void* work_ptr)
        platform_driver_priv->mtip_links[link_index]->peak_rx_available = rx_available;
    }
 
-   rv = mtip_replenish_dma_rx_buffers(taskstruct->netdev, taskstruct->hdl, taskstruct->num_of_pkts);
-
-   // free the taskstruct
-   kfree(taskstruct);
-}
-
-void post_mtip_set_rx_mode(ecpri_dma_eth_conn_hdl_t hdl, enum ecpri_dma_notify_mode setmode)
-{
-   struct mtip_set_rx_mode_task* taskstruct = kmalloc(sizeof(struct mtip_set_rx_mode_task), GFP_ATOMIC);
-   taskstruct->hdl = hdl;
-   taskstruct->setmode = setmode;
-   mtip_queue_work(MTIP_WORKQ_TASK_SET_RX_MODE, taskstruct);
-}
-
-void run_mtip_set_rx_mode(void* work_ptr)
-{
-   int rv;
-   struct mtip_set_rx_mode_task* taskstruct = (struct mtip_set_rx_mode_task*)work_ptr;
-
-   CSMLOGDBG("setting Rx mode to %d for hdl %d\n", taskstruct->setmode, taskstruct->hdl);
-
-   rv = (ecpri_dma_eth_driver_ops.ecpri_dma_eth_rx_mode_set)(taskstruct->hdl, taskstruct->setmode);
-
-   if (rv < 0) 
+   if (rx_available > 1) 
    {
-       CSMLOGERR("Set Rx mode to %d failed.. reset to IRQ mode\n", taskstruct->setmode);
-       (ecpri_dma_eth_driver_ops.ecpri_dma_eth_rx_mode_set)(taskstruct->hdl, ECPRI_DMA_NOTIFY_MODE_IRQ);
+       rv = mtip_replenish_dma_rx_buffers(taskstruct->netdev, taskstruct->hdl, rx_available - 1);
    }
 
    // free the taskstruct
    kfree(taskstruct);
+}
+
+void mtip_set_rx_mode_immediate(ecpri_dma_eth_conn_hdl_t hdl, enum ecpri_dma_notify_mode setmode)
+{
+    int rv;
+
+    rv = (ecpri_dma_eth_driver_ops.ecpri_dma_eth_rx_mode_set)(hdl, setmode);
+
+    if (rv < 0) 
+    {
+        CSMLOGDBG("Set Rx mode of hdl: %d to %d failed.. %d\n", hdl, setmode, rv);
+    }
 }
 
 void post_mtip_tx_comp_cb(void *user_data, ecpri_dma_eth_conn_hdl_t hdl, struct ecpri_dma_pkt_completion_wrapper **comp_pkts, u32 num_of_completed)
@@ -188,6 +176,12 @@ void run_mtip_tx_comp_cb(void* work_ptr)
    bool free_skb = true;
    u64 nanosecs;
 
+   if (taskstruct == NULL) 
+   {
+       CSMLOGERR("taskstruct is NULL\n");
+       return;
+   }
+
    hdl = taskstruct->hdl;
    comp_pkts = taskstruct->comp_pkts;
    num_of_completed = taskstruct->num_of_completed;
@@ -201,7 +195,19 @@ void run_mtip_tx_comp_cb(void* work_ptr)
       comp = comp_pkts[i];
       pkt = comp->pkt;
 
+      if (pkt == NULL)
+      {
+          CSMLOGERR("Got a NULL pkt\n");
+          goto out;
+      }
+
       skb = (struct sk_buff*)pkt->user_data;
+
+      if (skb == NULL)
+      {
+          CSMLOGERR("Got a NULL skb\n");
+          goto out;
+      }
 
       CSMLOGDBG("Tx comp for hdl: %d, skb->data: 0x%lx\n", hdl, (unsigned long)skb->data);
 
@@ -279,9 +285,6 @@ void run_mtip_tx_comp_cb(void* work_ptr)
    // free the container of comp_pkts
    kfree(comp_pkts);
 
-   // free the taskstruct
-   kfree(taskstruct);
-
    // check if there is space for at least one packet
    // should be true since we just got a comp cb
    if (mtip_dma_tx_available(hdl) == true)
@@ -294,6 +297,10 @@ void run_mtip_tx_comp_cb(void* work_ptr)
          netif_wake_queue(netdev);
       }
    }
+
+out:
+   // free the taskstruct
+   kfree(taskstruct);
 }
 
 void post_mtip_process_link_state(u32 link_index, bool link_up)
@@ -325,8 +332,11 @@ void run_mtip_process_link_state(void* work_ptr)
         mtip_mac_disable_tx_rx(link_index);
     }
 
-    // notify phy of the link status
-    mtip_phy_notify_link_status(link_index, link_up);
+    if (mtip_loopback_mode != MTIP_MODE_LOOPBACK) 
+    {
+        // notify phy of the link status
+        mtip_phy_notify_link_status(link_index, link_up);
+    }
 }
 
 static int mtip_set_mac_address(struct net_device *dev, void *addr)
@@ -358,7 +368,7 @@ static int mtip_set_mac_address(struct net_device *dev, void *addr)
    return 0;
 }
 
-static int mtip_set_netdev_hw_mac_addr(struct net_device *netdev, u32 link_index)
+int mtip_set_netdev_hw_mac_addr(struct net_device *netdev, u32 link_index)
 {
     u32 port_device_index;
     u32 link_device_index;
@@ -460,16 +470,14 @@ int mtip_napi_poll(struct napi_struct *napi_ptr, int budget)
    if (npackets < budget) {
       napi_complete(napi_ptr);
 
+      setmode = ECPRI_DMA_NOTIFY_MODE_IRQ;
+
       // set the rx mode to IRQ
-      post_mtip_set_rx_mode(actual_handle, setmode);
+      mtip_set_rx_mode_immediate(actual_handle, setmode);
    }
    else
    {
-      // we can remain in POLL
-      setmode = ECPRI_DMA_NOTIFY_MODE_POLL;
-
-      // set the rx modE
-      post_mtip_set_rx_mode(actual_handle, setmode);
+      CSMLOGINFO("Remaining in POLL mode\n");
    }
 
    // replenish the rx buffers for the packets processed

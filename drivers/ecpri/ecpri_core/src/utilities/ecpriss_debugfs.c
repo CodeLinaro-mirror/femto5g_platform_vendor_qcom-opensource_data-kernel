@@ -20,8 +20,8 @@
 
 struct dentry *list_dv[64];
 char input_string[] = TREE;
-#define MAX_STR_SIZE (NUM_OF_FHP * LUT_INDEX * LUT_INDEX)
-char max_str[NUM_OF_FHP * LUT_INDEX * LUT_INDEX];
+#define MAX_STR_SIZE (NUM_OF_FHP * 1000 * 128)
+char max_str[MAX_STR_SIZE];
 /*
  * only white listed alphbates are allowed
  * { } , _  : and 0 to 9 a to z A to Z
@@ -661,8 +661,16 @@ static ssize_t config_val_from_registers_qudp_egress_src_ip_addr(char __user *bu
 		ecpriss_qudp_egress_config_stats(fh_index);
 
 		for(egress_table_index = 0; egress_table_index < NUM_EGRESS_ENTRY; egress_table_index++){
-
-			if(ecpriss_pdata->cfg_stats.qudp_cfg.egress.src_ip_addr[fh_index][egress_table_index].ip_src0.value){
+			/*
+			 * If it is an ipv4 address then only ip_src0 should be a non zero address i.e 0xce80001:0:0:0.
+			 * For it is IPV6 any field can be zero i.e fe80:0:0:325
+			 * To display it correctly we should print all four fields
+			 * IF any of field is non zero, print all fields.
+			 */
+			if(ecpriss_pdata->cfg_stats.qudp_cfg.egress.src_ip_addr[fh_index][egress_table_index].ip_src0.value ||
+					ecpriss_pdata->cfg_stats.qudp_cfg.egress.src_ip_addr[fh_index][egress_table_index].ip_src1.value ||
+					ecpriss_pdata->cfg_stats.qudp_cfg.egress.src_ip_addr[fh_index][egress_table_index].ip_src2.value ||
+					ecpriss_pdata->cfg_stats.qudp_cfg.egress.src_ip_addr[fh_index][egress_table_index].ip_src3.value){
 
 				RESET_STR(index_str);
 				scnprintf(index_str, TEMP_STR_MIN_SIZE, "%u", egress_table_index);
@@ -682,9 +690,6 @@ static ssize_t config_val_from_registers_qudp_egress_src_ip_addr(char __user *bu
 				strlcat(max_str, temp_stat_val_str,
 						max_str_size);
 
-			}
-
-			if(ecpriss_pdata->cfg_stats.qudp_cfg.egress.src_ip_addr[fh_index][egress_table_index].ip_src1.value){
 
 				scnprintf(temp_stat_val_str, TEMP_STAT_VAL_STR_MAX_SIZE, "0x%x",
 						ecpriss_pdata->cfg_stats.qudp_cfg.egress.src_ip_addr[fh_index][egress_table_index].ip_src1.value);
@@ -693,9 +698,6 @@ static ssize_t config_val_from_registers_qudp_egress_src_ip_addr(char __user *bu
 				strlcat(max_str, temp_stat_val_str,
 						max_str_size);
 
-			}
-
-			if(ecpriss_pdata->cfg_stats.qudp_cfg.egress.src_ip_addr[fh_index][egress_table_index].ip_src2.value){
 
 				scnprintf(temp_stat_val_str, TEMP_STAT_VAL_STR_MAX_SIZE, "0x%x",
 						ecpriss_pdata->cfg_stats.qudp_cfg.egress.src_ip_addr[fh_index][egress_table_index].ip_src2.value);
@@ -704,9 +706,7 @@ static ssize_t config_val_from_registers_qudp_egress_src_ip_addr(char __user *bu
 				strlcat(max_str, temp_stat_val_str,
 						max_str_size);
 
-			}
 
-			if(ecpriss_pdata->cfg_stats.qudp_cfg.egress.src_ip_addr[fh_index][egress_table_index].ip_src3.value){
 
 				scnprintf(temp_stat_val_str, TEMP_STAT_VAL_STR_MAX_SIZE, "0x%x",
 						ecpriss_pdata->cfg_stats.qudp_cfg.egress.src_ip_addr[fh_index][egress_table_index].ip_src3.value);
@@ -755,7 +755,10 @@ static ssize_t config_val_from_registers_qudp_egress_dst_ip_addr(char __user *bu
 
 		for(egress_table_index = 0; egress_table_index < NUM_EGRESS_ENTRY; egress_table_index++){
 
-			if(ecpriss_pdata->cfg_stats.qudp_cfg.egress.dst_ip_addr[fh_index][egress_table_index].ip_dst0.value){
+			if(ecpriss_pdata->cfg_stats.qudp_cfg.egress.dst_ip_addr[fh_index][egress_table_index].ip_dst0.value ||
+				ecpriss_pdata->cfg_stats.qudp_cfg.egress.dst_ip_addr[fh_index][egress_table_index].ip_dst1.value ||
+				ecpriss_pdata->cfg_stats.qudp_cfg.egress.dst_ip_addr[fh_index][egress_table_index].ip_dst2.value ||
+				ecpriss_pdata->cfg_stats.qudp_cfg.egress.dst_ip_addr[fh_index][egress_table_index].ip_dst3.value ){
 
 				RESET_STR(index_str);
 				scnprintf(index_str, TEMP_STR_MIN_SIZE, "%u", egress_table_index);
@@ -775,9 +778,6 @@ static ssize_t config_val_from_registers_qudp_egress_dst_ip_addr(char __user *bu
 				strlcat(max_str, temp_stat_val_str,
 						max_str_size);
 
-			}
-
-			if(ecpriss_pdata->cfg_stats.qudp_cfg.egress.dst_ip_addr[fh_index][egress_table_index].ip_dst1.value){
 
 				scnprintf(temp_stat_val_str, TEMP_STAT_VAL_STR_MAX_SIZE, "0x%x",
 						ecpriss_pdata->cfg_stats.qudp_cfg.egress.dst_ip_addr[fh_index][egress_table_index].ip_dst1.value);
@@ -786,20 +786,12 @@ static ssize_t config_val_from_registers_qudp_egress_dst_ip_addr(char __user *bu
 				strlcat(max_str, temp_stat_val_str,
 						max_str_size);
 
-			}
-
-			if(ecpriss_pdata->cfg_stats.qudp_cfg.egress.dst_ip_addr[fh_index][egress_table_index].ip_dst2.value){
-
 				scnprintf(temp_stat_val_str, TEMP_STAT_VAL_STR_MAX_SIZE, "0x%x",
 						ecpriss_pdata->cfg_stats.qudp_cfg.egress.dst_ip_addr[fh_index][egress_table_index].ip_dst2.value);
 
 				strlcat(max_str, ":", max_str_size);
 				strlcat(max_str, temp_stat_val_str,
 						max_str_size);
-
-			}
-
-			if(ecpriss_pdata->cfg_stats.qudp_cfg.egress.dst_ip_addr[fh_index][egress_table_index].ip_dst3.value){
 
 				scnprintf(temp_stat_val_str, TEMP_STAT_VAL_STR_MAX_SIZE, "0x%x",
 						ecpriss_pdata->cfg_stats.qudp_cfg.egress.dst_ip_addr[fh_index][egress_table_index].ip_dst3.value);

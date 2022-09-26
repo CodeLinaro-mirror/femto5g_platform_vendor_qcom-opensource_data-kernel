@@ -81,94 +81,77 @@ static int ecpriss_core_resume(struct device *dev)
 void ecpriss_process_packet(ecpriss_packet_payload_s *packet)
 {
 	int ret=0;
+	ecpriss_flow_rx_cfg_s *flow_rx = NULL;
+	ecpriss_flow_tx_cfg_s *flow_tx = NULL;
+
 	do{
 		if(packet == NULL) {
 			ret = -ENOMEM;
 			break;
 		}
 
-		pr_err("ecpriss_process_packet and packet dir %d", packet->dir);
+		flow_tx = &packet->flow_cfg.flow_tx_cfg;
 
-		if(packet->dir == ECPRISS_PACKET_UL) {
+		pr_err(
+				"ecpriss_process_packet:UL SRC %d,PortIndex %d " ,
+				flow_tx->src , flow_tx->port_index);
 
-			ecpriss_flow_tx_cfg_s *flow_tx =
-				&packet->flow_cfg.flow_tx_cfg;
+		switch((int)flow_tx->src){
+			case ECPRISS_ROUTE_SRC_OC:
 
-			memcpy(
-			&gecpri_flow_cfg.tx_cfg[
-			gecpri_flow_cfg.tx_flow_cnt % MAX_NUM_FLOW
-			] , flow_tx , sizeof(ecpriss_flow_tx_cfg_s));
+				memcpy(
+						&gecpri_flow_cfg.tx_cfg[
+						gecpri_flow_cfg.tx_flow_cnt % MAX_NUM_FLOW
+						], flow_tx, sizeof(ecpriss_flow_tx_cfg_s));
 
-			gecpri_flow_cfg.tx_flow_cnt++;
-
-			pr_err(
-			"ecpriss_process_packet:UL SRC %d , Port Index %d " ,
-			flow_tx->src , flow_tx->port_index);
-
-			switch((int)flow_tx->src){
-				case ECPRISS_ROUTE_SRC_OC:
+				gecpri_flow_cfg.tx_flow_cnt++;
 
 
-					ret =
+				ret =
 					ecpriss_qudp_fh_tx_hdr_ins_cfg(
 							flow_tx->port_index,
 							&flow_tx->qudp_tx_cfg);
-					if(ret < 0) {
-						break;
-					}
-					/* Todo:Validate if L2/L3 index passed
-					 by QUDP is valid 
-					*/
-					ret = ecpriss_xbar_oc_rx_lut(
-							flow_tx->port_index,
-							flow_tx);
-					if(ret < 0){
-						break;
-					}
-					/* Todo:Stats to be added and
-					   context update */
+				if(ret < 0) {
 					break;
-				case ECPRISS_ROUTE_SRC_C2C:
-				case ECPRISS_ROUTE_SRC_L2:
-				default:
+				}
+
+				ret = ecpriss_xbar_oc_rx_lut(
+						flow_tx->port_index,
+						flow_tx);
+
+				if(ret < 0){
 					break;
-			}
-		}
-		else if (packet->dir == ECPRISS_PACKET_DL) {
+				}
 
-			ecpriss_flow_rx_cfg_s *flow_rx =
-				&packet->flow_cfg.flow_rx_cfg;
+				break;
 
-			memcpy(&gecpri_flow_cfg.rx_cfg[
-				gecpri_flow_cfg.rx_flow_cnt % MAX_NUM_FLOW],
-				flow_rx , sizeof(ecpriss_flow_rx_cfg_s));
-			gecpri_flow_cfg.rx_flow_cnt++;
+			case ECPRISS_ROUTE_SRC_FH:
 
-			pr_err(
-			"ecpriss_process_packet:DL SRC %d , Port Index %d " ,
-			flow_rx->src , flow_rx->port_index);
-			/* Todo:Make another function and return */
-			switch(flow_rx->src) {
-				case ECPRISS_ROUTE_SRC_FH:
-					ret = ecpriss_qudp_fh_rx_filter_cfg(
-							flow_rx->port_index,
-							&flow_rx->qudp_rx_cfg);
-					if(ret < 0) {
-						break;
-					}
+				flow_rx = &packet->flow_cfg.flow_rx_cfg;
+				memcpy(&gecpri_flow_cfg.rx_cfg[
+						gecpri_flow_cfg.rx_flow_cnt % MAX_NUM_FLOW],
+						flow_rx , sizeof(ecpriss_flow_rx_cfg_s));
+				gecpri_flow_cfg.rx_flow_cnt++;
 
-					ret = ecpriss_xbar_fh_rx_lut(
-							flow_rx->port_index,
-							flow_rx);
-					if(ret < 0) {
-						break;
-					}
-					/* Stats to be added and context update */
+
+
+				ret = ecpriss_qudp_fh_rx_filter_cfg(
+						flow_rx->port_index,
+						&flow_rx->qudp_rx_cfg);
+				if(ret < 0) {
 					break;
-				case ECPRISS_ROUTE_SRC_C2C:
-				default:
+				}
+
+				ret = ecpriss_xbar_fh_rx_lut(
+						flow_rx->port_index,
+						flow_rx);
+				if(ret < 0) {
 					break;
-			}
+				}
+				break;
+			default:
+				break;
+
 		}
 	}while (0);
 	return;
@@ -773,7 +756,7 @@ static int __init ecpriss_core_module_init(void)
 	if (ecpriss_pdata->ecpriss_core_logbuf == NULL)
 	pr_debug(
 	"failed to create log context for ECPRISS_SS driver\n"); */
-	pr_err("ecpriss_core_module_init():Start \n"); 
+	pr_err("ecpriss_core_module_init():Start \n");
 	return platform_driver_register(&ecpriss_core_driver);
 }
 
