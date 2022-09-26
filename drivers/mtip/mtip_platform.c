@@ -366,6 +366,7 @@ int mtip_port_probe(struct platform_device *pdev)
     bool all_ports_probed = false;
     struct resource dev_resource;
     u32             dut_base_regs[2];
+    u32             sfp_phandle;
 
     CSMLOGINFO("mtip_port_probe called of device \"%s\"\n", pdev->name);
 
@@ -449,6 +450,18 @@ int mtip_port_probe(struct platform_device *pdev)
        port_device.dut_base_addr = devm_ioremap_resource(&pdev->dev, &dev_resource);
 
        CSMLOGINFO("ioremap of resource done: 0x%lx\n", port_device.dut_base_addr);
+   }
+
+   // read the sfp phandle
+   if (of_property_read_u32_index(pdev->dev.of_node, "sfp", 0, &sfp_phandle) >= 0)
+   {
+       CSMLOGERR("Port found sfp_phandle: %d\n", sfp_phandle);
+       port_device.sfp_phandle = sfp_phandle;
+   }
+   else
+   {
+       CSMLOGERR("Port failed to find sfp_phandle\n");
+       port_device.sfp_phandle = -1;
    }
 
    // get the number of links
@@ -1171,6 +1184,9 @@ static int mtip_platform_setup(void)
 
            // setup the phy of the port
            mtip_phy_setup_phy(&platform_driver_priv->devices.port_devices[i]);
+
+           // setup phylink for the port
+           mtip_phy_create_phylink(&platform_driver_priv->devices.port_devices[i]);
        }
    }
 
