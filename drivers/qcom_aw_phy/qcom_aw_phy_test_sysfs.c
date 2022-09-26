@@ -60,7 +60,8 @@ enum qcom_aw_phy_debug_fs_cmd{
   BIST_ERROR_COUNT,
   ENABLE_TX_BIST,
   RX_CDR_CHECKER,
-  ENABLE_RX_BIST
+  ENABLE_RX_BIST,
+  CHECK_PRBS_ALL_LANES
 };
 
 int                                        qcom_aw_phy_attr_val;
@@ -77,9 +78,10 @@ aw_bist_pattern_t                      bist_pattern = AW_PRBS31;
 int                                    measure_time = 1;
 int                                    inject_error_count = 0;
 uint64_t                               user_data = 0;
-uint32_t                               err_count_overflow;
-uint64_t                               err_count = 0;
-uint64_t                               ber = 0;
+uint32_t                               err_count_overflow[12] = {0};
+uint64_t                               err_count[12] = {0};
+uint64_t                               ber[12] = {0};
+bool                                   check_prbs_all_lanes = false;
 
 extern struct eth_phy_iface_ops qcom_aw_phy_driver_iface_ops;
 
@@ -138,7 +140,8 @@ char help_menu[] = {
 23,x	Sets the number of errors 'x' to be injected from TX BIST generator. Default is 0.\n\
 24,x	Enables/disables TX BIST generator based on value 'x' (0-disable/1-enable)\n\
 25		Checks RX CDR lock on RX PHY and lane set with options 18 and 19 respectively.\n\
-26,x	Enables/disables RX BIST checker based on value 'x' (0-disable/1-enable)\n"};
+26,x	Enables/disables RX BIST checker based on value 'x' (0-disable/1-enable)\n\
+27,x	Flag to configure if PRBS needs to be validated for all lanes\n"};
 
 void qcom_aw_phy_setup_sysfs() {
 
@@ -174,12 +177,37 @@ void qcom_aw_phy_an_complete_cb(enum mtip_port_type_enum port_type,
 
 ssize_t qcom_aw_phy_get_prbs_result(struct file *file, char __user *buf,
                                     size_t count, loff_t *ppos){
-  char dbg_buf[100];
-  int nbytes = 0;
+  char dbg_buf[1500] = {0};
+  int nbytes = 0, i, j, min, max, min_port, max_port, lane_index;
 
-  nbytes = scnprintf(dbg_buf, 100, "error count = %lu\n"
-                     "error overflow count = %d\nber = %lu\n",
-                     err_count, err_count_overflow, ber);
+  if(rx_bist_lane_num != PHY_LANE_MAX){
+    min = rx_bist_lane_num;
+    max = rx_bist_lane_num;
+  }
+  else{
+    min = PHY_LANE_0;
+    max = PHY_LANE_3;
+  }
+
+  if(check_prbs_all_lanes == false){
+    min_port = rx_bist_phy_inst;
+    max_port = rx_bist_phy_inst;
+  }
+  else{
+    min_port = QCOM_AW_PHY_INST_FH0;
+    max_port = QCOM_AW_PHY_INST_FH2;
+  }
+
+  for (j = min_port; j <= max_port; j++) {
+    for (i = min; i <= max; i++) {
+      lane_index = (j*PHY_LANE_MAX) + i;
+      nbytes += scnprintf(dbg_buf + strlen(dbg_buf), 120,
+                          "Port %d, Lane %d, error count = %lu, "
+                          "error overflow count = %d, ber = %lu\n",
+                          j, i, err_count[lane_index],
+                          err_count_overflow[lane_index], ber[lane_index]);
+    }
+  }
 
   return simple_read_from_buffer(buf, count, ppos, dbg_buf, nbytes);
 }
@@ -194,7 +222,8 @@ ssize_t qcom_aw_phy_set_attr(struct file *file, const char __user *buf,
   struct eth_phy_iface_eth_register_params ready_info;
   bool is_phy_ready;
   struct eth_phy_iface_phy_lane_config lane_config[PHY_LANE_MAX];
-  int i = 0, min = 0, max = 0;
+  int i = 0, j = 0, k = 0;
+  int min = 0, max = 0, min_port = 0, max_port = 0, lane_index = 0;
   bool lanes_enabled[PHY_LANE_MAX] = {true, true, true, true};
   struct qcom_aw_phy_synce_snr_valid_change snr_valid_info;
   char *token;
@@ -207,7 +236,6 @@ ssize_t qcom_aw_phy_set_attr(struct file *file, const char __user *buf,
   mss_access_t tx_mss = {.phy_offset = 0, .lane_offset = 0};
   int enable_flag = 0;
   uint32_t err_cnt_55_32, err_cnt_31_0;
-  uint32_t dwell_loop;
   bool error = false;
 
   memset(token_string, 0, sizeof(token_string));
@@ -447,8 +475,6 @@ ssize_t qcom_aw_phy_set_attr(struct file *file, const char __user *buf,
       QCOM_AW_PHY_LOG_ERR("Configuring TX BIST, enabled = %d", enable_flag);
 
       phy_config_info = qcom_aw_phy_get_config_info();
-      phy_inst_info = &phy_config_info->phy_inst_config_info[tx_bist_phy_inst];
-      mss.phy_offset = phy_inst_info->base_addr;
 
       if(tx_bist_lane_num != PHY_LANE_MAX){
         min = tx_bist_lane_num;
@@ -459,21 +485,33 @@ ssize_t qcom_aw_phy_set_attr(struct file *file, const char __user *buf,
         max = PHY_LANE_3;
       }
 
-      for (i = min; i <= max; i++) {
-
-        QCOM_AW_PHY_LOG_ERR("TX BIST for lane %d", i);
-
-        pmd_set_lane(&mss, i);
-
-        if(enable_flag){
-          aw_pmd_tx_gen_config_set(&mss, bist_pattern, user_data, user_data);
-          aw_pmd_gen_tx_en_set(&mss, 1);
-        }
-        else{
-          aw_pmd_gen_tx_en_set(&mss, 0);
-        }
+      if(check_prbs_all_lanes == false){
+        min_port = tx_bist_phy_inst;
+        max_port = tx_bist_phy_inst;
+      }
+      else{
+        min_port = QCOM_AW_PHY_INST_FH0;
+        max_port = QCOM_AW_PHY_INST_FH2;
       }
 
+      for (j = min_port; j <= max_port; j++) {
+
+        phy_inst_info = &phy_config_info->phy_inst_config_info[j];
+        mss.phy_offset = phy_inst_info->base_addr;
+        QCOM_AW_PHY_LOG_ERR("TX BIST for port %d", j);
+
+        for (i = min; i <= max; i++) {
+          QCOM_AW_PHY_LOG_ERR("TX BIST for lane %d", i);
+          pmd_set_lane(&mss, i);
+          if(enable_flag){
+            aw_pmd_tx_gen_config_set(&mss, bist_pattern, user_data, user_data);
+            aw_pmd_gen_tx_en_set(&mss, 1);
+          }
+          else{
+            aw_pmd_gen_tx_en_set(&mss, 0);
+          }
+        }
+      }
       break;
 
     case RX_CDR_CHECKER:
@@ -492,15 +530,6 @@ ssize_t qcom_aw_phy_set_attr(struct file *file, const char __user *buf,
       QCOM_AW_PHY_LOG_ERR("Configuring RX BIST, enabled = %d", enable_flag);
 
       phy_config_info = qcom_aw_phy_get_config_info();
-      phy_inst_info = &phy_config_info->phy_inst_config_info[rx_bist_phy_inst];
-      mss.phy_offset = phy_inst_info->base_addr;
-
-      tx_phy_inst_info = &phy_config_info->phy_inst_config_info[tx_bist_phy_inst];
-      tx_mss.phy_offset = tx_phy_inst_info->base_addr;
-
-      err_count = 0;
-      err_count_overflow = 0;
-      ber = 0;
 
       if(rx_bist_lane_num != PHY_LANE_MAX){
         min = rx_bist_lane_num;
@@ -511,32 +540,35 @@ ssize_t qcom_aw_phy_set_attr(struct file *file, const char __user *buf,
         max = PHY_LANE_3;
       }
 
-      for (i = min; i <= max; i++) {
+      if(check_prbs_all_lanes == false){
+        min_port = rx_bist_phy_inst;
+        max_port = rx_bist_phy_inst;
+      }
+      else{
+        min_port = QCOM_AW_PHY_INST_FH0;
+        max_port = QCOM_AW_PHY_INST_FH2;
+      }
 
-        QCOM_AW_PHY_LOG_ERR("RX BIST checker for lane %d", i);
+      if(enable_flag){
 
-        pmd_set_lane(&mss, i);
+        for (j = min_port; j <= max_port; j++) {
+          phy_inst_info = &phy_config_info->phy_inst_config_info[j];
+          mss.phy_offset = phy_inst_info->base_addr;
+          QCOM_AW_PHY_LOG_ERR("RX BIST for port %d", j);
 
-        if(tx_bist_lane_num != PHY_LANE_MAX)
-          pmd_set_lane(&tx_mss, tx_bist_lane_num);
-        else
-          pmd_set_lane(&tx_mss, i);
+          for (i = min; i <= max; i++) {
+            QCOM_AW_PHY_LOG_ERR("RX BIST checker for lane %d", i);
+            pmd_set_lane(&mss, i);
 
-        if(enable_flag){
-          aw_pmd_rx_chk_config_set(&mss, bist_pattern, AW_DWELL,
-                                   user_data, user_data, 2, 2000);
-          aw_pmd_rx_chk_en_set(&mss, 1);
-
-          CHECK(pmd_write_field(&mss, RX_DATABIST_TOP_REG1_ADDR,
-                                RX_DATABIST_TOP_REG1_BIST_ENABLE_A_MASK,
-                                RX_DATABIST_TOP_REG1_BIST_ENABLE_A_OFFSET, 0));
-
-          CHECK(pmd_write_field(&mss, RX_DATABIST_TOP_REG1_ADDR,
-                                RX_DATABIST_TOP_REG1_BIST_ENABLE_A_MASK,
-                                RX_DATABIST_TOP_REG1_BIST_ENABLE_A_OFFSET, 1));
-
-          for (dwell_loop = 0; dwell_loop < measure_time; dwell_loop++) {
-
+            aw_pmd_rx_chk_config_set(&mss, bist_pattern, AW_DWELL,
+                                     user_data, user_data, 2, 2000);
+            aw_pmd_rx_chk_en_set(&mss, 1);
+            CHECK(pmd_write_field(&mss, RX_DATABIST_TOP_REG1_ADDR,
+                                  RX_DATABIST_TOP_REG1_BIST_ENABLE_A_MASK,
+                                  RX_DATABIST_TOP_REG1_BIST_ENABLE_A_OFFSET, 0));
+            CHECK(pmd_write_field(&mss, RX_DATABIST_TOP_REG1_ADDR,
+                                  RX_DATABIST_TOP_REG1_BIST_ENABLE_A_MASK,
+                                  RX_DATABIST_TOP_REG1_BIST_ENABLE_A_OFFSET, 1));
             CHECK(pmd_write_field(&mss, RX_DATABIST_TOP_REG1_ADDR,
                                   RX_DATABIST_TOP_REG1_ERROR_CNT_CLR_A_MASK,
                                   RX_DATABIST_TOP_REG1_ERROR_CNT_CLR_A_OFFSET, 0));
@@ -546,11 +578,31 @@ ssize_t qcom_aw_phy_set_attr(struct file *file, const char __user *buf,
             CHECK(pmd_write_field(&mss, RX_DATABIST_TOP_REG1_ADDR,
                                   RX_DATABIST_TOP_REG1_ERROR_CNT_CLR_A_MASK,
                                   RX_DATABIST_TOP_REG1_ERROR_CNT_CLR_A_OFFSET, 0));
+          }
+        }
 
-            USR_SLEEP(1000000);
+        USR_SLEEP(1000000 * measure_time);
+
+        for (j = min_port; j <= max_port; j++) {
+          phy_inst_info = &phy_config_info->phy_inst_config_info[j];
+          mss.phy_offset = phy_inst_info->base_addr;
+          QCOM_AW_PHY_LOG_ERR("RX BIST for port %d", j);
+          if(check_prbs_all_lanes == false)
+            tx_phy_inst_info = &phy_config_info->phy_inst_config_info[tx_bist_phy_inst];
+          else
+            tx_phy_inst_info = &phy_config_info->phy_inst_config_info[j];
+          tx_mss.phy_offset = tx_phy_inst_info->base_addr;
+
+          for (i = min; i <= max; i++) {
+            QCOM_AW_PHY_LOG_ERR("RX BIST checker for lane %d", i);
+            pmd_set_lane(&mss, i);
+            if(tx_bist_lane_num != PHY_LANE_MAX)
+              pmd_set_lane(&tx_mss, tx_bist_lane_num);
+            else
+              pmd_set_lane(&tx_mss, i);
 
             if(inject_error_count > 0){
-              for (i= 0; i<inject_error_count; i++) {
+              for (k = 0; k < inject_error_count; k++) {
                 udelay(1);
                 aw_pmd_tx_gen_err_inject_en_set(&tx_mss,1);
                 udelay(1);
@@ -558,32 +610,53 @@ ssize_t qcom_aw_phy_set_attr(struct file *file, const char __user *buf,
               }
             }
 
+            lane_index = (j*PHY_LANE_MAX) + i;
+            err_count[lane_index] = 0;
+            err_count_overflow[lane_index] = 0;
+            ber[lane_index] = 0;
+
             CHECK(pmd_read_field(&mss, RX_DATABIST_TOP_RDREG3_ADDR,
-                                 RX_DATABIST_TOP_RDREG3_ERROR_CNT_55T32_NT_MASK,
-                                 RX_DATABIST_TOP_RDREG3_ERROR_CNT_55T32_NT_OFFSET,
-                                 &err_cnt_55_32));
+                  RX_DATABIST_TOP_RDREG3_ERROR_CNT_55T32_NT_MASK,
+                  RX_DATABIST_TOP_RDREG3_ERROR_CNT_55T32_NT_OFFSET,
+                  &err_cnt_55_32));
             CHECK(pmd_read_field(&mss, RX_DATABIST_TOP_RDREG2_ADDR,
-                                 RX_DATABIST_TOP_RDREG2_ERROR_CNT_NT_MASK,
-                                 RX_DATABIST_TOP_RDREG2_ERROR_CNT_NT_OFFSET,
-                                 &err_cnt_31_0));
-            err_count += (uint64_t)err_cnt_55_32 << 32 | (uint64_t)err_cnt_31_0;
+                  RX_DATABIST_TOP_RDREG2_ERROR_CNT_NT_MASK,
+                  RX_DATABIST_TOP_RDREG2_ERROR_CNT_NT_OFFSET,
+                  &err_cnt_31_0));
+            err_count[lane_index] += (uint64_t)err_cnt_55_32 << 32 | (uint64_t)err_cnt_31_0;
             CHECK(pmd_read_check_field(
                   &mss, RX_DATABIST_TOP_RDREG1_ADDR,
                   RX_DATABIST_TOP_RDREG1_ERROR_CNT_OVERFLOW_NT_MASK,
                   RX_DATABIST_TOP_RDREG1_ERROR_CNT_OVERFLOW_NT_OFFSET, RD_EQ,
-                  &err_count_overflow, 0, 0));
-
-            ber += (uint64_t)err_count / (measure_time * 25);
-            QCOM_AW_PHY_LOG_ERR("err_count = %lu\n", err_count);
-            QCOM_AW_PHY_LOG_ERR("err_count_overflow = %d\n", err_count_overflow);
-            QCOM_AW_PHY_LOG_ERR("ber = %lu\n", ber);
+                  &err_count_overflow[lane_index], 0, 0));
+            ber[lane_index] += (uint64_t)err_count[lane_index] / (measure_time * 25);
+            QCOM_AW_PHY_LOG_ERR("err_count = %lu\n", err_count[lane_index]);
+            QCOM_AW_PHY_LOG_ERR("err_count_overflow = %d\n", err_count_overflow[lane_index]);
+            QCOM_AW_PHY_LOG_ERR("ber = %lu\n", ber[lane_index]);
           }
         }
-        else{
-          aw_pmd_rx_chk_en_set(&mss, 0);
+      }
+      else{
+        for (j = min_port; j <= max_port; j++) {
+          phy_inst_info = &phy_config_info->phy_inst_config_info[j];
+          mss.phy_offset = phy_inst_info->base_addr;
+          QCOM_AW_PHY_LOG_ERR("RX BIST for port %d", j);
+
+          for (i = min; i <= max; i++) {
+            QCOM_AW_PHY_LOG_ERR("Disabling RX BIST for lane %d", i);
+            pmd_set_lane(&mss, i);
+            aw_pmd_rx_chk_en_set(&mss, 0);
+          }
         }
       }
 
+      break;
+
+    case CHECK_PRBS_ALL_LANES:
+      token = qcom_aw_phy_strtok(NULL, ',', &save_ptr);
+      sscanf(token, "%d", &enable_flag);
+      QCOM_AW_PHY_LOG_ERR("Checking PRBS for all lanes = %d", enable_flag);
+      check_prbs_all_lanes = enable_flag;
       break;
 
     default:
