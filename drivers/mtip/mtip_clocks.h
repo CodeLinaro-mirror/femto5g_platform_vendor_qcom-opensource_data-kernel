@@ -22,7 +22,7 @@
 
 #define MTIP_CLOCKS_NUM_GCC_CLOCKS                 6
 #define MTIP_CLOCKS_NUM_ECPRICC_C2C_CLOCKS         5
-#define MTIP_CLOCKS_NUM_ECPRICC_DBG_CLOCKS         5
+#define MTIP_CLOCKS_NUM_ECPRICC_DBG_CLOCKS         6
 #define MTIP_CLOCKS_NUM_ECPRICC_FH_CLOCKS          9
 
 struct mtip_clocks_clock_struct
