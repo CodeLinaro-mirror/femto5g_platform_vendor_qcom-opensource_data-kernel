@@ -1819,7 +1819,10 @@ int ecpriss_qudp_init(struct device *dev)
 		{
 			break;
 		}
-
+		
+		ecpriss_qudp_fh_egress_cfg_reset(0);
+		ecpriss_qudp_fh_egress_cfg_reset(1);
+		ecpriss_qudp_fh_egress_cfg_reset(2);
 
 		for(port_type=0;port_type < ECPRISS_PORT_TYPE_MAX;port_type++)
 		{
@@ -2242,6 +2245,127 @@ int ecpriss_qudp_fh_tx_hdr_ins_cfg(uint32_t               port_index,
 	return 0;
 }
 
+int ecpriss_qudp_fh_egress_cfg_reset(int32_t port_index)
+{
+	int32_t egress_table_index = 0;
+
+	ecpri_qudp_hwio_def_ecpri_udp_fh_egress_eth_dst0_port_p_entry_n_s       eth_dst0_port = {0};
+	ecpri_qudp_hwio_def_ecpri_udp_fh_egress_eth_src1_dst1_port_p_entry_n_s  eth_src1_dst1_port = {0};
+	ecpri_qudp_hwio_def_ecpri_udp_fh_egress_eth_src0_port_p_entry_n_s       eth_src0_port = {0};
+	ecpri_qudp_hwio_def_ecpri_udp_fh_egress_vlan_ethertype_port_p_entry_n_s vlan_ethertype_port = {0};
+	ecpri_qudp_hwio_def_ecpri_udp_fh_egress_vport_misc_port_p_entry_n_s     vport_misc_port = {0};
+	ecpri_qudp_hwio_def_ecpri_udp_fh_egress_ip_src_addr0_port_p_entry_n_s   ip_src0 = {0};
+	ecpri_qudp_hwio_def_ecpri_udp_fh_egress_ip_src_addr1_port_p_entry_n_s   ip_src1 = {0};
+	ecpri_qudp_hwio_def_ecpri_udp_fh_egress_ip_src_addr2_port_p_entry_n_s   ip_src2 = {0};
+	ecpri_qudp_hwio_def_ecpri_udp_fh_egress_ip_src_addr3_port_p_entry_n_s   ip_src3 = {0};
+	ecpri_qudp_hwio_def_ecpri_udp_fh_egress_ip_dst_addr0_port_p_entry_n_s   ip_dst0 = {0};
+	ecpri_qudp_hwio_def_ecpri_udp_fh_egress_ip_dst_addr1_port_p_entry_n_s   ip_dst1 = {0};
+	ecpri_qudp_hwio_def_ecpri_udp_fh_egress_ip_dst_addr2_port_p_entry_n_s   ip_dst2 = {0};
+	ecpri_qudp_hwio_def_ecpri_udp_fh_egress_ip_dst_addr3_port_p_entry_n_s   ip_dst3 = {0};
+	ecpri_qudp_hwio_def_ecpri_udp_fh_egress_udp_ports_port_p_entry_n_s      udp_port = {0};
+	ecpri_qudp_hwio_def_ecpri_udp_fh_egress_sa_tag_ip_tos_misc_port_p_entry_n_s  ip_opts = {0};
+
+	if(port_index > 3)
+		return 0;
+
+	for(egress_table_index = 0; egress_table_index < NUM_EGRESS_ENTRY ; egress_table_index++)
+	{
+
+		/* 4 LSB goes to this eth_dst0_port */
+
+		ecpriss_qudp_hal_write_reg_mn_fields(ECPRISS_QUDP_FH_RAMS,
+				ECPRI_UDP_FH_EGRESS_ETH_DST0_PORT_p_ENTRY_n,
+				port_index,
+				egress_table_index,
+				&eth_dst0_port);
+
+		ecpriss_qudp_hal_write_reg_mn_fields(ECPRISS_QUDP_FH_RAMS,
+				ECPRI_UDP_FH_EGRESS_ETH_SRC1_DST1_PORT_p_ENTRY_n,
+				port_index,
+				egress_table_index,
+				&eth_src1_dst1_port);
+
+		ecpriss_qudp_hal_write_reg_mn_fields(ECPRISS_QUDP_FH_RAMS,
+				ECPRI_UDP_FH_EGRESS_ETH_SRC0_PORT_p_ENTRY_n,
+				port_index,
+				egress_table_index,
+				&eth_src0_port);
+
+		ecpriss_qudp_hal_write_reg_mn_fields(ECPRISS_QUDP_FH_RAMS,
+				ECPRI_UDP_FH_EGRESS_VLAN_ETHERTYPE_PORT_p_ENTRY_n,
+				port_index,
+				egress_table_index,
+				&vlan_ethertype_port);
+
+		ecpriss_qudp_hal_write_reg_mn_fields(ECPRISS_QUDP_FH_RAMS,
+				ECPRI_UDP_FH_EGRESS_VPORT_MISC_PORT_p_ENTRY_n,
+				port_index,
+				egress_table_index,
+				&vport_misc_port);
+
+		ecpriss_qudp_hal_write_reg_mn_fields(ECPRISS_QUDP_FH_RAMS,
+				ECPRI_UDP_FH_EGRESS_IP_SRC_ADDR0_PORT_p_ENTRY_n,
+				port_index,
+				egress_table_index,
+				&ip_src0);
+
+		ecpriss_qudp_hal_write_reg_mn_fields(ECPRISS_QUDP_FH_RAMS,
+				ECPRI_UDP_FH_EGRESS_IP_DST_ADDR0_PORT_p_ENTRY_n,
+				port_index,
+				egress_table_index,
+				&ip_dst0);
+
+		ecpriss_qudp_hal_write_reg_mn_fields(ECPRISS_QUDP_FH_RAMS,
+				ECPRI_UDP_FH_EGRESS_IP_SRC_ADDR1_PORT_p_ENTRY_n,
+				port_index,
+				egress_table_index,
+				&ip_src1);
+
+		ecpriss_qudp_hal_write_reg_mn_fields(ECPRISS_QUDP_FH_RAMS,
+				ECPRI_UDP_FH_EGRESS_IP_SRC_ADDR2_PORT_p_ENTRY_n,
+				port_index,
+				egress_table_index,
+				&ip_src2);
+
+		ecpriss_qudp_hal_write_reg_mn_fields(ECPRISS_QUDP_FH_RAMS,
+				ECPRI_UDP_FH_EGRESS_IP_SRC_ADDR3_PORT_p_ENTRY_n,
+				port_index,
+				egress_table_index,
+				&ip_src3);
+
+		ecpriss_qudp_hal_write_reg_mn_fields(ECPRISS_QUDP_FH_RAMS,
+				ECPRI_UDP_FH_EGRESS_IP_DST_ADDR1_PORT_p_ENTRY_n,
+				port_index,
+				egress_table_index,
+				&ip_dst1);
+
+		ecpriss_qudp_hal_write_reg_mn_fields(ECPRISS_QUDP_FH_RAMS,
+				ECPRI_UDP_FH_EGRESS_IP_DST_ADDR2_PORT_p_ENTRY_n,
+				port_index,
+				egress_table_index,
+				&ip_dst2);
+
+		ecpriss_qudp_hal_write_reg_mn_fields(ECPRISS_QUDP_FH_RAMS,
+				ECPRI_UDP_FH_EGRESS_IP_DST_ADDR3_PORT_p_ENTRY_n,
+				port_index,
+				egress_table_index,
+				&ip_dst3);
+
+		ecpriss_qudp_hal_write_reg_mn_fields(ECPRISS_QUDP_FH_RAMS,
+				ECPRI_UDP_FH_EGRESS_UDP_PORTS_PORT_p_ENTRY_n,
+				port_index,
+				egress_table_index,
+				&udp_port);
+
+		ecpriss_qudp_hal_write_reg_mn_fields(ECPRISS_QUDP_FH_RAMS,
+				ECPRI_UDP_FH_EGRESS_SA_TAG_IP_TOS_MISC_PORT_p_ENTRY_n,
+				port_index,
+				egress_table_index,
+				&ip_opts);
+
+	}
+	return 0;
+}
 
 
 
