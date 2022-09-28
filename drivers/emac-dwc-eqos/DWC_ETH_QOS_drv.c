@@ -2023,9 +2023,6 @@ static int DWC_ETH_QOS_close(struct net_device *dev)
 		pdata->eee_active = 0;
 	}
 
-	if (pdata->phydev)
-		phy_stop(pdata->phydev);
-
 #ifndef DWC_ETH_QOS_CONFIG_PGTEST
 	/* Stop SW TX before DMA TX in HW */
 	netif_tx_disable(dev);
@@ -2058,7 +2055,10 @@ static int DWC_ETH_QOS_close(struct net_device *dev)
 	/* issue software reset to device */
 	hw_if->exit();
 
-    DWC_ETH_QOS_restart_phy(pdata);
+	if (pdata->phydev)
+		phy_stop(pdata->phydev);
+
+	DWC_ETH_QOS_restart_phy(pdata);
 
 	desc_if->tx_free_mem(pdata);
 	desc_if->rx_free_mem(pdata);

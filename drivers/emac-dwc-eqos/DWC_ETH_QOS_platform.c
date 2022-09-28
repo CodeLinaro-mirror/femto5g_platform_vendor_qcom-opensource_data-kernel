@@ -863,9 +863,15 @@ static int phy_digital_loopback_config(
 		}
 	} else if (config == 0) {
 		EMACINFO("Request for phy digital loopback disable\n");
-		if (pdata->bmcr_backup)
+		if (pdata->bmcr_backup) {
+			if(!pdata->phy_intr_en) {
+				if(pdata->phydev->state == PHY_HALTED)
+					pdata->backup_bmcr |= LINK_DOWN_STATE;
+				else
+					pdata->backup_bmcr &= ~LINK_DOWN_STATE;
+			}
 			phydata = pdata->bmcr_backup;
-		else
+		} else
 			phydata = 0x1140;
 	} else {
 		EMACERR("Invalid option\n");
