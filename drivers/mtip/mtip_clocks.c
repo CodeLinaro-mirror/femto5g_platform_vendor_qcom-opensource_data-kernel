@@ -269,6 +269,14 @@ static int mtip_clocks_setup_dbg_clocks(void)
     platform_driver_priv->clocks.ecpricc_dbg_clocks[index] = pclk;
     ++index;
 
+    ret = mtip_clocks_enable_clock(dev, "ECPRI_CC_MSS_EMAC_CLK", &pclk);
+    if (ret)
+    {
+        CSMLOGERR("Failed to vote ECPRI_CC_MSS_EMAC_CLK\n");
+    }
+    platform_driver_priv->clocks.ecpricc_dbg_clocks[index] = pclk;
+    ++index;
+
     return ret;
 }
 
