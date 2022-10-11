@@ -805,21 +805,34 @@ static int mtip_change_mtu(struct net_device *netdev, int new_mtu)
    struct mtip_netdev_priv *priv;
    spinlock_t *lock;
    u32 link_index;
+   int mplane_mtu;
    
    priv = (struct mtip_netdev_priv*)netdev_priv(netdev);
    lock = &(priv->lock);
    link_index = priv->link_index;
 
-   CSMLOGINFO("mtip_change_mtu called for link index: %d\n", link_index);
+   CSMLOGINFO("mtip_change_mtu called for link index: %d, new_mtu: %d\n", link_index, new_mtu);
 
    /* check ranges */
    if ((new_mtu < MTIP_MIN_MTU_SIZE) || (new_mtu > MTIP_MAX_MTU_SIZE))
       return -EINVAL;
 
+   /* Restrict the M Plane MTU to MAX FOR MPLANE */
+   mplane_mtu = new_mtu;
+   if (mplane_mtu > MTIP_MAX_MPLANE_MTU_SIZE) 
+   {
+       mplane_mtu = MTIP_MAX_MPLANE_MTU_SIZE;
+   }
+
    spin_lock_irqsave(lock, flags);
-   netdev->mtu = new_mtu;
-   mtip_mac_set_frame_length(priv, new_mtu);
+
+   // set the netdev MTU
+   netdev->mtu = mplane_mtu;
+
    spin_unlock_irqrestore(lock, flags);
+
+   // set the frame length in the hardware
+   mtip_mac_set_frame_length(priv, new_mtu);
 
    /* Send update to clients */
    post_mtip_client_send_event(ETH_ECPRISS_EVENT_UP, link_index);
