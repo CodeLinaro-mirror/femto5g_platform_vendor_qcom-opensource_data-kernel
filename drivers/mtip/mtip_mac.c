@@ -120,25 +120,45 @@ static irqreturn_t mtip_mac_interrupt_handler(int irq, void *devptr)
            }
            if ((int_status & MTIP_MAC_INTERRUPT_LINK_DOWN_INTR) != 0)
            {
-               // got a link down interrupt for link index
-               post_mtip_process_link_state(link_index, false);
+               // check if the LINK_UP_INTR is also set
+               if ((int_status & MTIP_MAC_INTERRUPT_LINK_UP_INTR) != 0) 
+               {
+                   // LINK_UP also set
+                   // ignore both
+                   handled = true;
+               }
+               else
+               {
+                   // got a link down interrupt for link index
+                   post_mtip_process_link_state(link_index, false);
+
+                   handled = true;
+               }
 
                // clear the interrupt
                mtip_mac_clear_interrupts(link_index, MTIP_MAC_INTERRUPT_LINK_DOWN_INTR);
-
-               handled = true;
            }
            if ((int_status & MTIP_MAC_INTERRUPT_LINK_UP_INTR) != 0) 
            {
-               // got a link up interrupt for link index
-               post_mtip_process_link_state(link_index, true);
+               // check if LINK_DOWN is set
+               if ((int_status & MTIP_MAC_INTERRUPT_LINK_DOWN_INTR) != 0)
+               {
+                   // LINK_DOWN also set
+                   // ignore both
+
+                   handled = true;
+               }
+               else
+               {
+                   // got a link up interrupt for link index
+                   post_mtip_process_link_state(link_index, true);
+
+                   handled = true;
+               }
 
                // clear the interrupt
                mtip_mac_clear_interrupts(link_index, MTIP_MAC_INTERRUPT_LINK_UP_INTR);
-
-               handled = true;
            }
-
        }
 
        summary = summary >> 1;

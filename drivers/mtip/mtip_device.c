@@ -316,6 +316,7 @@ void run_mtip_process_link_state(void* work_ptr)
     struct mtip_process_link_state_task* taskstruct = (struct mtip_process_link_state_task*)work_ptr;
     u32 link_index = taskstruct->link_index;
     bool link_up = taskstruct->link_up;
+    struct net_device *dev = platform_driver_priv->mtip_links[link_index]->dev;
 
     if (link_up)
     {
@@ -323,13 +324,30 @@ void run_mtip_process_link_state(void* work_ptr)
 
         // enable tx_rx on the link
         mtip_mac_enable_tx_rx(link_index);
+
+        // wake queues
+        netif_tx_wake_all_queues(dev);
+
+        // carrier is on
+        if (!netif_carrier_ok(dev)) {
+ 			netif_carrier_on(dev);
+ 			netdev_info(dev, "Link is Up\n");
+ 		}
     }
     else
     {
         CSMLOGINFO("Processing LINK_DOWN for link_index: %d\n", link_index);
 
+        // stop the queues
+        netif_tx_stop_all_queues(platform_driver_priv->mtip_links[link_index]->dev);
+
         // disable tx_rx on the link
         mtip_mac_disable_tx_rx(link_index);
+
+		if (netif_carrier_ok(dev)) {
+ 			netif_carrier_off(dev);
+ 			netdev_info(dev, "Link is Down\n");
+ 		}
     }
 
     if (mtip_loopback_mode != MTIP_MODE_LOOPBACK) 
@@ -337,6 +355,9 @@ void run_mtip_process_link_state(void* work_ptr)
         // notify phy of the link status
         mtip_phy_notify_link_status(link_index, link_up);
     }
+
+    // free the taskstruct
+    kfree(taskstruct);
 }
 
 static int mtip_set_mac_address(struct net_device *dev, void *addr)
@@ -926,6 +947,7 @@ static int mtip_close(struct net_device *netdev)
 
    CSMLOGERR("Stopping netdev queue\n");
 
+   // set the link state to CLOSE
    platform_driver_priv->mtip_links[link_index]->state = MTIP_LINK_STATE_CLOSE;
 
    /* Send update to clients */
