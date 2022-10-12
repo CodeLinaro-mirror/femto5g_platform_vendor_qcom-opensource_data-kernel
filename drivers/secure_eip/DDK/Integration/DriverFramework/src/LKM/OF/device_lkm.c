@@ -8,7 +8,7 @@
 
 /*****************************************************************************
 * Copyright (c) 2010-2021 by Rambus, Inc. and/or its subsidiaries.
-*
+* Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.  
 * This program is free software: you can redistribute it and/or modify
 * it under the terms of the GNU General Public License as published by
 * the Free Software Foundation, either version 2 of the License, or
@@ -117,8 +117,7 @@ static const Device_Admin_Static_t HWPALLib_Devices_Static[] =
 static Device_Admin_t * HWPALLib_Devices_p [HWPAL_DEVICE_COUNT];
 
 /* Global administration data */
-static Device_Global_Admin_t HWPALLib_Device_Global;
-
+Device_Global_Admin_t HWPALLib_Device_Global[DRIVER_MAX_NOF_EIP164_DEVICES];
 
 /*----------------------------------------------------------------------------
  * HWPAL_Hexdump
@@ -303,7 +302,7 @@ Device_Internal_Admin_Get(void)
 Device_Global_Admin_t *
 Device_Internal_Admin_Global_Get(void)
 {
-    return &HWPALLib_Device_Global;
+    return &HWPALLib_Device_Global[0];
 }
 
 
@@ -328,7 +327,51 @@ Device_Internal_Free(
     kfree(Ptr);
 }
 
+#ifdef CONFIG_LASSEN_SECURE_EIP
+int
+Device_Internal_Initialize(
+        void * CustomInitData_p)
 
+{
+  int i;
+
+  for(i = 0; i < HWPAL_DEVICE_COUNT; i++)
+    if (HWPALLib_Devices_p[i])
+    {
+       LOG_INFO("%s: mapped device '%s', "
+                " DeviceNR %d ,"
+                "virt base addr 0x%p, "
+                "start byte offset 0x%x, "
+                "last byte offset 0x%x\n",
+                __func__,
+                HWPALLib_Devices_p[i]->DevName,
+                HWPALLib_Devices_p[i]->DeviceNr,
+                HWPALLib_Device_Global[0].Platform.MappedBaseAddr_p,
+                HWPALLib_Devices_p[i]->FirstOfs,
+                HWPALLib_Devices_p[i]->LastOfs);
+    }
+
+  return 0;
+}
+
+void 
+  Device_SetPlatform(uint32_t __iomem * BaseAddr_p,uint32_t  device_id)
+{
+
+  LOG_CRIT("Device_SetPlatform called");
+
+  if ( device_id >= DRIVER_MAX_NOF_EIP164_DEVICES ) 
+  {
+    LOG_CRIT("Invalid port id received, return without setting platform. Fatal");
+    return;
+  }
+
+  HWPALLib_Device_Global[device_id].Platform.MappedBaseAddr_p = BaseAddr_p;
+
+}
+
+
+#else
 /*-----------------------------------------------------------------------------
  * Device_Internal_Initialize
  */
@@ -375,11 +418,11 @@ Device_Internal_Initialize(
     }
 #endif
 
-    HWPALLib_Device_Global.Platform.MappedBaseAddr_p
+    HWPALLib_Device_Global[0].Platform.MappedBaseAddr_p
                                         = LKM_MappedBaseAddr_Get();
-    HWPALLib_Device_Global.Platform.Platform_Device_p
+    HWPALLib_Device_Global[0].Platform.Platform_Device_p
                                         = LKM_DeviceSpecific_Get();
-    HWPALLib_Device_Global.Platform.PhysBaseAddr
+    HWPALLib_Device_Global[0].Platform.PhysBaseAddr
                                         = LKM_PhysBaseAddr_Get();
 
     for(i = 0; i < HWPAL_DEVICE_COUNT; i++)
@@ -391,7 +434,7 @@ Device_Internal_Initialize(
                      "last byte offset 0x%x\n",
                      __func__,
                      HWPALLib_Devices_p[i]->DevName,
-                     HWPALLib_Device_Global.Platform.MappedBaseAddr_p,
+                     HWPALLib_Device_Global[0].Platform.MappedBaseAddr_p,
                      HWPALLib_Devices_p[i]->FirstOfs,
                      HWPALLib_Devices_p[i]->LastOfs);
         }
@@ -422,7 +465,7 @@ Device_Internal_Initialize(
 
     return 0;
 }
-
+#endif
 
 /*-----------------------------------------------------------------------------
  * Device_Internal_UnInitialize
@@ -512,7 +555,7 @@ Device_GetReference(
     /* There exists only one reference for this implementation */
     IDENTIFIER_NOT_USED(Device);
 
-    if (!HWPALLib_Device_Global.fInitialized)
+    if (!HWPALLib_Device_Global[0].fInitialized)
     {
         LOG_CRIT("%s: failed, not initialized\n", __func__);
         return NULL;
@@ -520,7 +563,7 @@ Device_GetReference(
 
     /* Return the platform device reference */
     /* (pointer to the Linux device structure) */
-    DevReference = &HWPALLib_Device_Global.Platform.Platform_Device_p->dev;
+    DevReference = &HWPALLib_Device_Global[0].Platform.Platform_Device_p->dev;
 
     if (Data_p)
         Data_p->PhysAddr = NULL;
@@ -565,7 +608,7 @@ Device_Read32Check(
     Device_Admin_t * Device_p;
     uint32_t Value = 0;
 
-    if (!HWPALLib_Device_Global.fInitialized)
+    if (!HWPALLib_Device_Global[0].fInitialized)
     {
         LOG_CRIT("%s: failed, not initialized\n", __func__);
         return DEVICE_RW_PARAM_ERROR;
@@ -607,10 +650,10 @@ Device_Read32Check(
         DeviceByteOffset = Device_RemapDeviceAddress(DeviceByteOffset);
 
 #ifdef HWPAL_DEVICE_DIRECT_MEMIO
-        Value = *(uint32_t *)(uintptr_t)(HWPALLib_Device_Global.Platform.MappedBaseAddr_p +
+        Value = *(uint32_t *)(uintptr_t)(HWPALLib_Device_Global[Device_p->DeviceNr].Platform.MappedBaseAddr_p +
                                                 (DeviceByteOffset / 4));
 #else
-        Value = ioread32(HWPALLib_Device_Global.Platform.MappedBaseAddr_p +
+        Value = ioread32(HWPALLib_Device_Global[Device_p->DeviceNr].Platform.MappedBaseAddr_p +
                                                 (DeviceByteOffset / 4));
 #endif
 
@@ -670,7 +713,7 @@ Device_Write32(
     Device_Admin_t * Device_p;
     uint32_t Value = ValueIn;
 
-    if (!HWPALLib_Device_Global.fInitialized)
+    if (!HWPALLib_Device_Global[0].fInitialized)
     {
         LOG_CRIT("%s: failed, not initialized\n", __func__);
         return DEVICE_RW_PARAM_ERROR;
@@ -727,11 +770,11 @@ Device_Write32(
 #endif
 
 #ifdef HWPAL_DEVICE_DIRECT_MEMIO
-        *(uint32_t *)(uintptr_t)(HWPALLib_Device_Global.Platform.MappedBaseAddr_p +
+        *(uint32_t *)(uintptr_t)(HWPALLib_Device_Global[Device_p->DeviceNr].Platform.MappedBaseAddr_p +
                                         (DeviceByteOffset / 4)) = Value;
 #else
         iowrite32(Value,
-                  HWPALLib_Device_Global.Platform.MappedBaseAddr_p +
+                  HWPALLib_Device_Global[Device_p->DeviceNr].Platform.MappedBaseAddr_p +
                                                   (DeviceByteOffset / 4));
 #endif
 
@@ -755,7 +798,7 @@ Device_Read32Array(
     Device_Admin_t * Device_p;
     unsigned int DeviceByteOffset;
 
-    if (!HWPALLib_Device_Global.fInitialized)
+    if (!HWPALLib_Device_Global[0].fInitialized)
     {
         LOG_CRIT("%s: failed, not initialized\n", __func__);
         return DEVICE_RW_PARAM_ERROR;
@@ -811,10 +854,10 @@ Device_Read32Array(
 
 #ifdef HWPAL_DEVICE_DIRECT_MEMIO
             Value =
-               *(uint32_t*)(uintptr_t)(HWPALLib_Device_Global.Platform.MappedBaseAddr_p +
+               *(uint32_t*)(uintptr_t)(HWPALLib_Device_Global[Device_p->DeviceNr].Platform.MappedBaseAddr_p +
                                                 (RemappedOffset / 4));
 #else
-            Value = ioread32(HWPALLib_Device_Global.Platform.MappedBaseAddr_p +
+            Value = ioread32(HWPALLib_Device_Global[Device_p->DeviceNr].Platform.MappedBaseAddr_p +
                                                 (RemappedOffset / 4));
 #endif
 
@@ -863,7 +906,7 @@ Device_Write32Array(
     if (MemorySrc_p == NULL || Count <= 0)
         return DEVICE_RW_PARAM_ERROR;
 
-    if (!HWPALLib_Device_Global.fInitialized)
+    if (!HWPALLib_Device_Global[0].fInitialized)
     {
         LOG_CRIT("%s: failed, not initialized\n", __func__);
         return DEVICE_RW_PARAM_ERROR;
@@ -945,10 +988,10 @@ Device_Write32Array(
 #endif
 
 #ifdef HWPAL_DEVICE_DIRECT_MEMIO
-            *(uint32_t*)(uintptr_t)(HWPALLib_Device_Global.Platform.MappedBaseAddr_p +
+            *(uint32_t*)(uintptr_t)(HWPALLib_Device_Global[Device_p->DeviceNr].Platform.MappedBaseAddr_p +
                                             (RemappedOffset / 4)) = Value;
 #else
-            iowrite32(Value, HWPALLib_Device_Global.Platform.MappedBaseAddr_p +
+            iowrite32(Value, HWPALLib_Device_Global[Device_p->DeviceNr].Platform.MappedBaseAddr_p +
                                                 (RemappedOffset / 4));
 #endif
 

@@ -1,0 +1,91 @@
+
+
+DATACSMKERNELTOP = $(ROOTDIR)datacsm-kernel/drivers/
+SECURE_EIP_TOP = $(DATACSMKERNELTOP)/secure_eip
+
+ccflags-y += -I$(DATACSMKERNELTOP)/include/
+
+obj-$(CONFIG_LASSEN_SECURE_EIP) += lassen_secure_eip.o
+
+ccflags-y += -DCONFIG_LASSEN_SECURE_EIP
+ccflags-y += -DSECURE_MACSEC_DEBUG
+ccflags-y += -Wno-error
+ccflags-y += -I$(SECURE_EIP_TOP)/cs
+ccflags-y += -I$(SECURE_EIP_TOP)/DDK/Kit/EIP163/incl
+ccflags-y += -I$(SECURE_EIP_TOP)/DDK/Kit/EIP164/incl
+ccflags-y += -I$(SECURE_EIP_TOP)/DDK/Kit/EIP164/src
+ccflags-y += -I$(SECURE_EIP_TOP)/DDK/Kit/EIP201/incl
+ccflags-y += -I$(SECURE_EIP_TOP)/DDK/Kit/EIP217/src
+ccflags-y += -I$(SECURE_EIP_TOP)/DDK/Kit/SABuilder_MACsec/incl
+ccflags-y += -I$(SECURE_EIP_TOP)/DDK/Kit/SABuilder_MACsec/Example_AES/incl
+
+ccflags-y += -I$(SECURE_EIP_TOP)/DDK/Integration/Adapter_PktIO/incl
+ccflags-y += -I$(SECURE_EIP_TOP)/DDK/Integration/Adapter_PktIO/src
+
+ccflags-y += -I$(SECURE_EIP_TOP)/DDK/Kit/DriverFramework/Basic_Defs_API/incl
+ccflags-y += -I$(SECURE_EIP_TOP)/DDK/Kit/DriverFramework/Device_API/incl
+ccflags-y += -I$(SECURE_EIP_TOP)/DDK/Kit/DriverFramework/CLib_Abstraction_API/incl
+ccflags-y += -I$(SECURE_EIP_TOP)/DDK/Kit/Log/incl
+ccflags-y += -I$(SECURE_EIP_TOP)/DDK/Kit/Log/src/printk
+
+ccflags-y += -I$(SECURE_EIP_TOP)/DDK/Kit/List/incl
+
+ccflags-y += -I$(SECURE_EIP_TOP)/macsec
+
+ccflags-y += -I$(SECURE_EIP_TOP)/DDK/Integration/DriverFramework/src
+ccflags-y += -I$(SECURE_EIP_TOP)/DDK/Integration/DriverFramework/src/LKM/OF
+ccflags-y += -I$(SECURE_EIP_TOP)/DDK/Integration/DriverFramework/src/UMDevXS
+ccflags-y += -I$(SECURE_EIP_TOP)/DDK/Integration/Adapter_EIP163/incl
+ccflags-y += -I$(SECURE_EIP_TOP)/DDK/Integration/Adapter_EIP164/incl
+ccflags-y += -I$(SECURE_EIP_TOP)/DDK/Integration/Adapter_EIP164/src
+ccflags-y += -I$(SECURE_EIP_TOP)/DDK/Integration/Adapter_EIP164/src/lkm
+ccflags-y += -I$(SECURE_EIP_TOP)/DDK/Integration/DriverFramework/src/LKM
+
+ccflags-y += -I$(SECURE_EIP_TOP)/
+
+lassen_secure_eip-y += DDK/Kit/EIP163/src/eip163.o
+lassen_secure_eip-y += DDK/Kit/EIP164/src/eip164_device.o
+lassen_secure_eip-y += DDK/Kit/EIP164/src/eip164_rules.o 
+lassen_secure_eip-y += DDK/Kit/EIP164/src/eip164_secy.o
+lassen_secure_eip-y += DDK/Kit/EIP201/src/eip201.o
+
+lassen_secure_eip-y += DDK/Kit/SABuilder_MACsec/src/sa_builder_eip164.o
+lassen_secure_eip-y += DDK/Kit/SABuilder_MACsec/src/sa_builder_macsec.o
+lassen_secure_eip-y += DDK/Kit/SABuilder_MACsec/Example_AES/src/aes.o
+
+lassen_secure_eip-y += DDK/Kit/List/src/list.o
+lassen_secure_eip-y += DDK/Kit/Log/src/log.o
+
+lassen_secure_eip-y += DDK/Integration/DriverFramework/src/LKM/OF/device_lkm.o
+lassen_secure_eip-y += DDK/Integration/DriverFramework/src/LKM/OF/lkm.o
+lassen_secure_eip-y += DDK/Integration/DriverFramework/src/device_generic.o
+
+lassen_secure_eip-y += DDK/Integration/Adapter_EIP164/src/adapter_debug.o
+lassen_secure_eip-y += DDK/Integration/Adapter_EIP164/src/adapter_init_support.o
+lassen_secure_eip-y += DDK/Integration/Adapter_EIP164/src/adapter_init_warmboot.o
+lassen_secure_eip-y += DDK/Integration/Adapter_EIP164/src/adapter_lock_internal.o
+lassen_secure_eip-y += DDK/Integration/Adapter_EIP164/src/adapter_memxs.o
+lassen_secure_eip-y += DDK/Integration/Adapter_EIP164/src/adapter_secy.o
+lassen_secure_eip-y += DDK/Integration/Adapter_EIP164/src/adapter_secy_ext.o
+lassen_secure_eip-y += DDK/Integration/Adapter_EIP164/src/adapter_secy_sa.o
+lassen_secure_eip-y += DDK/Integration/Adapter_EIP164/src/adapter_secy_stats.o
+lassen_secure_eip-y += DDK/Integration/Adapter_EIP164/src/adapter_secy_support.o
+lassen_secure_eip-y += DDK/Integration/Adapter_EIP164/src/adapter_secy_warmboot.o
+lassen_secure_eip-y += DDK/Integration/Adapter_EIP164/src/adapter_warmboot.o
+lassen_secure_eip-y += DDK/Integration/Adapter_EIP164/src/adapter_warmboot_support.o
+
+lassen_secure_eip-y += DDK/Integration/Adapter_EIP164/src/FPGA/adapter_init.o
+lassen_secure_eip-y += DDK/Integration/Adapter_EIP164/src/lkm/adapter_interrupts.o
+lassen_secure_eip-y += DDK/Integration/Adapter_EIP164/src/lkm/adapter_sleep.o
+lassen_secure_eip-y += DDK/Integration/Adapter_EIP164/src/lkm/adapter_lock.o
+
+lassen_secure_eip-y += DDK/Integration/Adapter_EIP163/src/adapter_cfye.o
+lassen_secure_eip-y += DDK/Integration/Adapter_EIP163/src/adapter_cfye_ext.o
+lassen_secure_eip-y += DDK/Integration/Adapter_EIP163/src/adapter_cfye_rule.o
+lassen_secure_eip-y += DDK/Integration/Adapter_EIP163/src/adapter_cfye_stats.o
+lassen_secure_eip-y += DDK/Integration/Adapter_EIP163/src/adapter_cfye_support.o
+lassen_secure_eip-y += DDK/Integration/Adapter_EIP163/src/adapter_cfye_vport.o
+lassen_secure_eip-y += DDK/Integration/Adapter_EIP163/src/adapter_cfye_warmboot.o
+
+lassen_secure_eip-y += eip_macsec.o
+lassen_secure_eip-y += eip_main.o
