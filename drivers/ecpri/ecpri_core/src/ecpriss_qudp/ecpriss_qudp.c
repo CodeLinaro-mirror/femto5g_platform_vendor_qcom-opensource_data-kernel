@@ -7,8 +7,8 @@
 
 
 
-#define ECPRISS_ETH_QUDP_MTU_SIZE_V4   1468
-#define ECPRISS_ETH_QUDP_MTU_SIZE_V6   1448
+#define ECPRISS_ETH_QUDP_MTU_SIZE_V4   9000 
+#define ECPRISS_ETH_QUDP_MTU_SIZE_V6   9000 
 #define ECPRISS_QUDP_REG_FIELD_ENABLE  1
 #define ENABLE_FILTER                  1
 #define BYTE_SHIFT                     8
