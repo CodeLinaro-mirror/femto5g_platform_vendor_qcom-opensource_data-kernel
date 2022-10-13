@@ -185,4 +185,7 @@ void ecpriss_qudp_print_l2_egress_stats(uint32_t port_index,
 		uint32_t link_index);
 void ecpriss_qudp_clear_stats(uint32_t port_index,
 		uint32_t link_index);
+
+void ecpriss_qudp_set_ecpriss_filt_enable_info(int val);
+int ecpriss_qudp_get_ecpriss_filt_enable_info(void);
 #endif

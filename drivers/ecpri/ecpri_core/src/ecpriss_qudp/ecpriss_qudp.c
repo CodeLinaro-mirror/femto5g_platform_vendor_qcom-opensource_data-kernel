@@ -6,6 +6,8 @@
 //#include "ecpriss_qudp_hal.h"
 
 
+volatile int ecpriss_filtering_enabled = 0;
+
 
 #define ECPRISS_ETH_QUDP_MTU_SIZE_V4   9000 
 #define ECPRISS_ETH_QUDP_MTU_SIZE_V6   9000 
@@ -955,8 +957,6 @@ static int ecpriss_qudp_ingress_modify_cfg(uint32_t port_index,
 
 	if(field & ECPRISS_QUDP_RX_CFG_FLTR_MASK_IP_DADDR)
 	{
-		ingress_cfg.enable_ip_dst_filt = 1;
-
 		memset(&ip_dst_valid_bit ,0, sizeof(ip_dst_valid_bit));
 
 
@@ -964,7 +964,15 @@ static int ecpriss_qudp_ingress_modify_cfg(uint32_t port_index,
 				ECPRI_UDP_FH_FILT_IP_DST_ADDR_PORT_p_ENTRIES_VALID_BITS,
 				port_index, &ip_dst_valid_bit);
 
-		ip_dst_valid_bit.valid_bits |= 1UL << filtnum;
+
+		if(ecpriss_filtering_enabled){
+			ingress_cfg.enable_ip_dst_filt = 1;
+			ip_dst_valid_bit.valid_bits |= 1 << filtnum;
+		}else{
+			ingress_cfg.enable_ip_dst_filt = 0;
+			ip_dst_valid_bit.valid_bits = 0;
+
+		}
 
 		ecpriss_qudp_hal_write_reg_n_fields(ECPRISS_QUDP_FH,
 				ECPRI_UDP_FH_FILT_IP_DST_ADDR_PORT_p_ENTRIES_VALID_BITS,
@@ -991,7 +999,6 @@ static int ecpriss_qudp_ingress_modify_cfg(uint32_t port_index,
 
 	if(field & ECPRISS_QUDP_RX_CFG_FLTR_MASK_VLAN)
 	{
-		ingress_cfg.enable_vlan_filt = 1;
 
 		memset(&vlan_id ,0, sizeof(vlan_id));
 
@@ -1000,8 +1007,15 @@ static int ecpriss_qudp_ingress_modify_cfg(uint32_t port_index,
 				port_index,
 				&vlan_id);
 
-		vlan_id.valid_bits  |= 1UL << filtnum;
 
+		if(ecpriss_filtering_enabled){
+			ingress_cfg.enable_vlan_filt = 1;
+			vlan_id.valid_bits  |= 1 << filtnum;
+
+		}else{
+			ingress_cfg.enable_vlan_filt = 0;
+			vlan_id.valid_bits  = 0;
+		}
 
 		ecpriss_qudp_hal_write_reg_n_fields(ECPRISS_QUDP_FH,
 				ECPRI_UDP_FH_FILT_VLAN_ADDR_PORT_p_ENTRIES_VALID_BITS,
@@ -2114,8 +2128,8 @@ int ecpriss_qudp_fh_tx_hdr_ins_cfg(uint32_t               port_index,
 				&eth_src0_port);
 
 		vlan_ethertype_port.ethertype = tx_cfg->eth_hdr.orig_ethertype;
-		vlan_ethertype_port.vlan_data = tx_cfg->eth_hdr.vlan_data;
 
+		vlan_ethertype_port.vlan_data = tx_cfg->eth_hdr.vlan_data;
 
 		ecpriss_qudp_hal_write_reg_mn_fields(ECPRISS_QUDP_FH_RAMS,
 				ECPRI_UDP_FH_EGRESS_VLAN_ETHERTYPE_PORT_p_ENTRY_n,
@@ -2124,7 +2138,9 @@ int ecpriss_qudp_fh_tx_hdr_ins_cfg(uint32_t               port_index,
 				&vlan_ethertype_port);
 
 		vport_misc_port.vport = tx_cfg->eth_hdr.vport;
+
 		vport_misc_port.has_vlan = tx_cfg->eth_hdr.is_vlan;
+
 		vport_misc_port.vport_action = tx_cfg->eth_hdr.vport_action;
 
 		ecpriss_qudp_hal_write_reg_mn_fields(ECPRISS_QUDP_FH_RAMS,
@@ -2365,6 +2381,15 @@ int ecpriss_qudp_fh_egress_cfg_reset(int32_t port_index)
 
 	}
 	return 0;
+}
+int ecpriss_qudp_get_ecpriss_filt_enable_info(void)
+{
+	return ecpriss_filtering_enabled;
+}
+
+void ecpriss_qudp_set_ecpriss_filt_enable_info(int val)
+{
+	ecpriss_filtering_enabled = val;
 }
 
 

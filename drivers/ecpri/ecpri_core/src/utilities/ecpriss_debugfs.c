@@ -116,6 +116,47 @@ typedef enum config_param{
 	GLOBAL_CFG
 }cfg_prm_u;
 
+static ssize_t config_val_from_qudp_ecpriss_filt(char __user *buf, int fh_index, size_t *count, loff_t *ppos)
+{
+	int isvlanfiltenabled = 0;
+	static int data_size = 0;
+	int ret_val = 0;
+
+	if(*ppos == 0 ) {
+
+		memset(max_str,0,sizeof(max_str));
+
+		isvlanfiltenabled = ecpriss_qudp_get_ecpriss_filt_enable_info();
+
+		if(isvlanfiltenabled) {
+			strlcat(max_str, "1\n", MAX_STR_SIZE);
+		}else{
+			strlcat(max_str, "0\n", MAX_STR_SIZE);
+		}
+		data_size = strlen(max_str);
+	}
+
+	if(*ppos  >= MAX_STR_SIZE)
+		return 0;
+
+	if( *ppos + *count > data_size)
+		*count =  data_size - *ppos;
+
+	ret_val = copy_to_user(buf,(max_str + *ppos), *count);
+	return data_size;
+}
+
+static ssize_t config_val_to_qudp_ecpriss_filt(const char __user *buf, int fh_index, size_t *count, loff_t *ppos)
+{
+	int val = -1;
+
+	if(kstrtouint_from_user(buf, *count, TEMP_STR_MAX_SIZE, &val))
+		return -EFAULT;
+
+	ecpriss_qudp_set_ecpriss_filt_enable_info(val);
+
+	return *count;
+}
 static ssize_t config_val_from_registers_qudp_ingress_mac_addr(char __user *buf, int fh_index, size_t *count, loff_t *ppos)
 {
 	char fh_str[TEMP_STR_MAX_SIZE];
@@ -2895,6 +2936,34 @@ static ssize_t cfg_value_from_qudp_ingress_mac_addr_fh2(struct file *file, char 
 	return count;
 
 }
+
+static ssize_t cfg_value_from_qudp_ecpriss_filt(struct file *file, char __user *buf,
+		size_t count, loff_t *ppos)
+{
+	uint32_t len;
+
+	len = config_val_from_qudp_ecpriss_filt(buf, 2 , &count , ppos);
+	if((*ppos + count) > len){
+		count = len - *ppos;
+	}
+	*ppos += count;
+	return count;
+
+}
+
+static ssize_t cfg_value_to_qudp_ecpriss_filt(struct file *file, const  char __user *buf,
+		size_t count, loff_t *ppos)
+{
+	uint32_t len;
+
+	len = config_val_to_qudp_ecpriss_filt(buf, 2 , &count , ppos);
+	if((*ppos + count) > len){
+		count = len - *ppos;
+	}
+	*ppos += count;
+	return count;
+
+}
 static struct file_operations stats_fh_ops_00 = {
 	.read = stats_value_from_registers_fh_00,
 };
@@ -3104,7 +3173,10 @@ static struct file_operations qudp_ingress_mac_addr_fh2 = {
 	.read = cfg_value_from_qudp_ingress_mac_addr_fh2,
 };
 
-
+static struct file_operations qudp_ecpriss_filt_config = {
+	.read = cfg_value_from_qudp_ecpriss_filt,
+	.write = cfg_value_to_qudp_ecpriss_filt,
+};
 
 static struct file_operations dummy;
 
@@ -3205,6 +3277,10 @@ static struct file_operations *file_name_to_wrapper(char *filename)
 	else if (!strncmp(filename, "fh:interrupts:23", FH_WRAPPER_SIZE))
 	{
 		return &error_fh_ops_23;
+	}
+	else if (!strncmp(filename, "ecpriss_filt", XBAR_WRAPPER_SIZE))
+	{
+		return &qudp_ecpriss_filt_config;
 	}
 	else if (!strncmp(filename, "xb:stats", XBAR_WRAPPER_SIZE))
 	{
