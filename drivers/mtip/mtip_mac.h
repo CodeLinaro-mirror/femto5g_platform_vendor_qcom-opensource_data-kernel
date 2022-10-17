@@ -78,6 +78,8 @@
 #define MTIP_MAC_WRAPPER_PCS_MODE_SET_OFFSET             0x00000010
 #define MTIP_MAC_WRAPPER_SERDES_MUX_CFG_OFFSET           0x0000004C
 
+#define MTIP_MAC_WRAPPER_CORE_STATUS_REG_OFFSET          0x00000004
+
 // MAC Wrapper Register values
 #define MTIP_MAC_WRAPPER_CALENDAR_CFG_REG_VAL            0x00001111
 #define MTIP_MAC_WRAPPER_TX_AMF_CFG_REG_VAL              0x1E1E1E1E
@@ -164,5 +166,6 @@ u32 mtip_mac_get_interrupt_summary(struct mtip_port_device_info* port_device);
 
 u32 mtip_mac_get_interrupt_status(u32 link_index);
 void mtip_mac_clear_interrupts(u32 link_index, u32 int_to_clear);
+bool mtip_mac_wrapper_get_link_status(u32 link_index);
 
 #endif // _MTIP_MAC_H

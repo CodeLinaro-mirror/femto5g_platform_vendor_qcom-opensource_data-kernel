@@ -111,6 +111,28 @@ func_exit:
   return;
 }
 
+void qcom_aw_phy_synce_handle_snr_valid_change(
+  struct work_struct *work){
+  struct delayed_work *delayed_work_item = to_delayed_work(work);
+  struct qcom_aw_phy_work_q_params *wq_params =
+     container_of(delayed_work_item, struct qcom_aw_phy_work_q_params, wq_item);
+
+  if(!wq_params)
+    QCOM_AW_PHY_LOG_ERR("Invalid work queue structure!");
+
+  QCOM_AW_PHY_LOG_ERR("SNR valid %d rcvd for PHY %d lane %d",
+                      (bool)wq_params->user_data, wq_params->phy_inst,
+                      wq_params->lane_num);
+
+  qcom_aw_phy_synce_notify_snr_valid_change(wq_params->phy_inst,
+                                            wq_params->lane_num,
+                                            (bool)wq_params->user_data);
+
+  kfree(wq_params);
+  return;
+}
+
+
 /*-------------------------------------------------------------------
 * aw_phy_synce_set_snr_threshold
 

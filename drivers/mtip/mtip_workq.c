@@ -28,6 +28,8 @@ static DECLARE_WORK(mtip_workq, mtip_workq_handler);
 
 static struct mtip_workq_list* mtip_workq_head = NULL;
 
+struct workqueue_struct *delayed_wq;
+
 static void mtip_workq_handler(struct work_struct *w)
 {
    int i;
@@ -137,6 +139,8 @@ int mtip_initialize_workq(void)
          retval = -ENOMEM;
          goto cleanup;
       }
+
+      delayed_wq = create_singlethread_workqueue("mtip_delayed_workq");
    }
    goto out;
 
@@ -163,6 +167,8 @@ int mtip_destroy_workq(void)
          kfree(mtip_workq_head);
          mtip_workq_head = NULL;
       }
+
+      destroy_workqueue(delayed_wq);
    }
    return 0;
 }
@@ -280,5 +286,11 @@ int mtip_workq_list_pop(unsigned int* work_type, void** work_ptr)
       kfree(tmp);
    }
    return rv;
+}
+
+int mtip_workq_queue_delayed_work(struct mtip_delayed_work_q_params *wq_params)
+{
+   queue_delayed_work(delayed_wq, &wq_params->wq_item, msecs_to_jiffies(10000));
+   return 0;
 }
 

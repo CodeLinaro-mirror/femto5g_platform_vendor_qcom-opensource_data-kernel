@@ -36,6 +36,7 @@ struct qcom_aw_phy_mtip_if_info {
 	eth_phy_iface_phy_ready_cb    ready_cb;
 	void                         *ready_cb_user_data;
 	eth_phy_iface_an_complete_cb  an_complete_cb;
+	eth_phy_iface_cdr_lock_cb     cdr_lock_success;
 };
 
 /*-------------------------------------------------------------------
@@ -68,5 +69,9 @@ void qcom_aw_phy_mtip_if_init(void);
 void qcom_aw_phy_notify_an_complete(
                                 enum qcom_aw_phy_instance_enum phy_inst,
                                 enum eth_phy_iface_phy_lane_num_enum lane_num);
+
+void qcom_aw_phy_handle_an_complete(struct work_struct *work);
+
+void qcom_aw_phy_retry_lane_bring_up(struct work_struct *work);
 
 #endif /* QCOM_AW_PHY_MTIP_IF_H */
