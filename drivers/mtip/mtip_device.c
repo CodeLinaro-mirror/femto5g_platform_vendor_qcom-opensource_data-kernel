@@ -52,6 +52,7 @@
 #include "mtip_ptp.h"
 #include "mtip_debug_eth.h"
 #include "mtip_phy.h"
+#include "mtip_sysfs.h"
 
 int macsec_eth_set_macsec_ops(const struct macsec_ops* rb_macsec_ops)
 {
@@ -328,6 +329,11 @@ void run_mtip_process_link_state(void* work_ptr)
         // wake queues
         netif_tx_wake_all_queues(dev);
 
+        if(link_index == MTIP_DEBUG_ETH_LINK_INDEX)
+        {
+           mtip_sysfs_mac_link_status(true);
+        }
+
         // carrier is on
         if (!netif_carrier_ok(dev)) {
  			netif_carrier_on(dev);
@@ -343,6 +349,11 @@ void run_mtip_process_link_state(void* work_ptr)
 
         // disable tx_rx on the link
         mtip_mac_disable_tx_rx(link_index);
+
+        if(link_index == MTIP_DEBUG_ETH_LINK_INDEX)
+        {
+            mtip_sysfs_mac_link_status(false);
+        }
 
 		if (netif_carrier_ok(dev)) {
  			netif_carrier_off(dev);
@@ -833,6 +844,8 @@ static int mtip_open(struct net_device *netdev)
    struct mtip_netdev_priv* priv;
    u32 link_index;
    ecpri_dma_eth_conn_hdl_t hdl;
+   u32 real_port_number;
+   int sfp_port_type;
 
    priv = netdev_priv(netdev);
 
@@ -857,11 +870,29 @@ static int mtip_open(struct net_device *netdev)
            phylink_start(priv->phylink);
        }
    }
+   else
+   {
+       if (mtip_loopback_mode == MTIP_MODE_DEFAULT || 
+           mtip_loopback_mode == MTIP_MODE_PHY_LOOPBACK)
+       {
+           // check if the corresponding port is in LINK_UP state
+           mtip_lookup_real_port_number_by_link_index(link_index, &real_port_number);
 
-   if (mtip_loopback_mode == MTIP_MODE_DEFAULT || 
-       mtip_loopback_mode == MTIP_MODE_PHY_LOOPBACK){
-      // bring up the phy
-      mtip_phy_bringup_phy(link_index);
+           if (platform_driver_priv->mtip_ports[real_port_number]->port_state == MTIP_PORT_STATE_CONNECTED)
+           {
+               // get the sfp port type
+               sfp_port_type = platform_driver_priv->mtip_ports[real_port_number]->sfp_port_type;
+
+               // bring up the phy
+              mtip_phy_bringup_phy(link_index, sfp_port_type);
+
+              CSMLOGINFO("phy bringup done for link: %d\n", link_index);
+           }
+           else
+           {
+               CSMLOGINFO("Port: %d of link index: %d is not in CONNECTED state\n", real_port_number, link_index);
+           }
+       }
    }
 
    if(hdl){
@@ -925,11 +956,16 @@ static int mtip_close(struct net_device *netdev)
            phylink_disconnect_phy(priv->phylink);
        }
    }
+   else
+   {
+       if (mtip_loopback_mode == MTIP_MODE_DEFAULT || 
+           mtip_loopback_mode == MTIP_MODE_PHY_LOOPBACK)
+       {
+          // teardown the phy
+          mtip_phy_teardown_phy(link_index);
 
-   if (mtip_loopback_mode == MTIP_MODE_DEFAULT || 
-       mtip_loopback_mode == MTIP_MODE_PHY_LOOPBACK){
-      // teardown the phy
-      mtip_phy_teardown_phy(link_index);
+          CSMLOGINFO("phy teardown done for link: %d\n", link_index);
+       }
    }
 
    if(hdl){

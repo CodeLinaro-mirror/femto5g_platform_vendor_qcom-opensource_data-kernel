@@ -129,6 +129,9 @@ struct mtip_port_device_info
    // Base address for emulation DUT(FH instance)
    void __iomem          *dut_base_addr;
 
+   // sfp phandle
+   int                  sfp_phandle;
+
    // consolidate port lane configuration
    struct eth_phy_iface_phy_lane_config lane_config[PHY_LANE_MAX];
 
@@ -183,6 +186,7 @@ enum mtip_link_state_enum
    MTIP_LINK_STATE_MAX
 };
 
+// information relevant to each link
 struct mtip_link_info
 {
    enum mtip_link_state_enum state;
@@ -197,6 +201,30 @@ struct mtip_link_info
    struct mtip_tx_ts_skb_list tx_ts_skb_list;
    u32 peak_rx_available;
    struct mutex dev_lock;
+};
+
+/*
+ * mtip_port_state enum
+ */
+enum mtip_port_state_enum
+{
+   MTIP_PORT_STATE_INIT = 0,
+   MTIP_PORT_STATE_CONNECTED,
+   MTIP_PORT_STATE_DISCONNECTED,
+   MTIP_PORT_STATE_MAX
+};
+
+// information relevant to each port
+struct mtip_port_info
+{
+    // the phylink related to the port
+    struct phylink         *phylink;
+    struct phylink_config   phylink_config;
+    enum mtip_port_state_enum port_state;
+    struct net_device* port_dummy_ndev;
+    u32                sfp_phandle;
+    u32                sfp_port_type;
+    spinlock_t lock;
 };
 
 // platform struct private
@@ -214,6 +242,9 @@ struct mtip_platform_driver_priv
 
    // information stored for each active link including netdev structs etc
    struct mtip_link_info* mtip_links[MTIP_MAX_LINKS];
+
+   // information stored for each active port
+   struct mtip_port_info * mtip_ports[MTIP_MAX_PORTS];
 
    // dma ready state
    bool dma_is_ready;
@@ -237,9 +268,6 @@ struct mtip_platform_driver_priv
 // extern declarations
 extern struct mtip_platform_driver_priv* platform_driver_priv;
 
-// this is the extern to connect to dma driver
-extern struct ecpri_dma_eth_ops ecpri_dma_eth_driver_ops;
-
 // this is the extern controlling loopback mode
 extern int mtip_loopback_mode;
 
@@ -256,5 +284,6 @@ int mtip_lookup_device_by_link_index(u32 link_index, u32* port_device_index, u32
 
 int mtip_lookup_link_index_by_real_port_and_link(u32* link_index, u32 real_port_number, u32 real_link_number);
 int mtip_lookup_real_link_number_by_link_index(u32 link_index, u32* link_number);
+int mtip_lookup_real_port_number_by_link_index(u32 link_index, u32* port_number);
 
 #endif // _MTIP_H

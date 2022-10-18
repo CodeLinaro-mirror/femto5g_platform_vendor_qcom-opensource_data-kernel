@@ -245,6 +245,49 @@ int mtip_lookup_real_link_number_by_link_index(u32 link_index, u32* link_number)
 	return ret;
 }
 
+/*
+ * lookup the real port number from the link index 
+ */
+int mtip_lookup_real_port_number_by_link_index(u32 link_index, u32* port_number)
+{
+    int ret = 0;
+
+    switch (link_index) 
+    {
+    case 0:
+    case 1:
+    case 2:
+    case 3:
+        *port_number = MTIP_PORT_TYPE_FH_0;
+        break;
+    case 4:
+    case 5:
+    case 6:
+    case 7:
+        *port_number = MTIP_PORT_TYPE_FH_1;
+        break;
+    case 8:
+    case 9:
+    case 10:
+    case 11:
+        *port_number = MTIP_PORT_TYPE_FH_2;
+        break;
+    case 12:
+        *port_number = MTIP_PORT_TYPE_L2;
+        break;
+    case 15:
+        *port_number = MTIP_PORT_TYPE_DEBUG;
+        break;
+    case 14:
+    case 13:
+    default:
+        CSMLOGERR("invalid link_index: %d\n", link_index);
+        ret = -1;
+        break;
+    }
+    return ret;
+}
+
 static const struct of_device_id mtip_mac_link_match[] = {
     { .compatible = "mtip-mac-link", },
     { }
