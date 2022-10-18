@@ -22,6 +22,7 @@ ccflags-y += -I$(AWPHYRVTOP)/include/
 ccflags-y += -I$(AWPHYRVTOP)/include/uapi/qcom_aw_phy/
 
 header-y += $(AWPHYRVTOP)/include/uapi/qcom_aw_phy/qcom_aw_phy_gnl_uapi.h
+header-y += $(AWPHYRVTOP)/include/uapi/qcom_aw_phy/qcom_prbs_aw_phy_gnl_uapi.h
 
 ifeq ($(call cc-option-yn, -Wmaybe-uninitialized),y)
 EXTRA_CFLAGS += -Wmaybe-uninitialized
@@ -41,6 +42,7 @@ obj-$(CONFIG_LASSEN_QCOM_AW_PHY) += lassen_qcom_aw_phy.o
 lassen_qcom_aw_phy-y += \
 	qcom_aw_phy_main.o \
 	qcom_aw_phy_mtip_if.o \
+	qcom_aw_phy_prbs.o \
 	qcom_aw_phy_synce.o \
 	qcom_aw_phy_utils.o \
 	qcom_aw_phy_gnl.o \
