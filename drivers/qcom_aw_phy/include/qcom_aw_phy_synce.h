@@ -33,6 +33,8 @@ void qcom_aw_phy_synce_notify_snr_valid_change(
                                  enum qcom_aw_phy_instance_enum phy_inst,
                                  enum eth_phy_iface_phy_lane_num_enum lane_num,
                                  bool valid);
+void qcom_aw_phy_synce_handle_snr_valid_change(
+                                 struct work_struct *work);
 int qcom_aw_phy_synce_set_snr_threshold(
                                  enum qcom_aw_phy_instance_enum phy_inst,
                                  enum eth_phy_iface_phy_lane_num_enum lane_num,

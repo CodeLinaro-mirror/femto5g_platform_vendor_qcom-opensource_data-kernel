@@ -49,6 +49,8 @@
 #include "mtip_phy.h"
 #include "eth_phy_iface.h"
 #include "mtip_mac.h"
+#include "mtip_workq.h"
+#include "mtip_sysfs.h"
 
 struct eth_phy_iface_eth_register_params mtip_phy_eth_params;
 
@@ -77,6 +79,73 @@ static void mtip_phy_an_complete_cb(enum mtip_port_type_enum port_type, enum eth
     return;
 }
 
+static int mtip_phy_get_link_index_for_phy_lane(
+    enum mtip_port_type_enum port_type, enum eth_phy_iface_phy_lane_num_enum lane_num)
+{
+    int i,j;
+    u32 num_lanes;
+
+    for(i = 0; i < MTIP_MAX_LINKS_PER_PORT; i++){
+      num_lanes = platform_driver_priv->devices.port_devices[port_type].link_devices[i].num_lanes;
+      for (j = 0; j < num_lanes; j++){
+        if(platform_driver_priv->devices.port_devices[port_type].link_devices[i].lanes[j] == lane_num)
+          return platform_driver_priv->devices.port_devices[port_type].link_devices[i].link_index;
+      }
+    }
+
+    return -1;
+}
+
+static void mtip_phy_cdr_lock_cb(enum mtip_port_type_enum port_type, enum eth_phy_iface_phy_lane_num_enum lane_num)
+{
+    int link_index = -1;
+    struct mtip_delayed_work_q_params *wq_params;
+    struct net_device *dev;
+
+    CSMLOGERR("CDR lock success for port: %d, lane %d\n", port_type, lane_num);
+
+    link_index = mtip_phy_get_link_index_for_phy_lane(port_type, lane_num);
+    if(link_index == -1)
+      CSMLOGERR("Index not found\n");
+
+    if(mtip_mac_wrapper_get_link_status(link_index) == false){
+      wq_params = kmalloc(sizeof(struct mtip_delayed_work_q_params),
+                          GFP_KERNEL);
+      if(!wq_params)
+        CSMLOGERR("Malloc failed!");
+      else{
+        INIT_DELAYED_WORK(&wq_params->wq_item,
+                          mtip_phy_retry_phy_bringup);
+        wq_params->port_type = port_type;
+        wq_params->link_index = link_index;
+        mtip_workq_queue_delayed_work(wq_params);
+      }
+    }
+    else{
+      mtip_mac_enable_tx_rx(link_index);
+
+      if(link_index == MTIP_DEBUG_ETH_LINK_INDEX)
+      {
+        mtip_sysfs_mac_link_status(true);
+      }
+
+      dev = platform_driver_priv->mtip_links[link_index]->dev;
+
+      // wake queues
+      netif_tx_wake_all_queues(dev);
+
+      if (!netif_carrier_ok(dev)) {
+        netif_carrier_on(dev);
+        netdev_info(dev, "Link is Up\n");
+      }
+
+      mtip_phy_notify_link_status(link_index, true);
+    }
+
+    return;
+}
+
+
 int mtip_phy_register_eth(void)
 {
     int res = 0;
@@ -84,6 +153,7 @@ int mtip_phy_register_eth(void)
     mtip_phy_eth_params.notify_an_complete = mtip_phy_an_complete_cb;
     mtip_phy_eth_params.userdata_ready = NULL;
     mtip_phy_eth_params.notify_ready = mtip_phy_ready_cb;
+    mtip_phy_eth_params.cdr_lock_success = mtip_phy_cdr_lock_cb;
 
     // register with the PHY
     res = (qcom_aw_phy_driver_iface_ops.eth_phy_iface_eth_register)(&mtip_phy_eth_params, &is_ready);
@@ -151,6 +221,51 @@ static void mtip_phy_get_lanes_of_link(u32 link_index, bool lanes_enabled[PHY_LA
     return;
 }
 
+void mtip_phy_retry_phy_bringup(struct work_struct *work)
+{
+    struct delayed_work *delayed_work_item = to_delayed_work(work);
+    struct mtip_delayed_work_q_params *wq_params =
+        container_of(delayed_work_item, struct mtip_delayed_work_q_params, wq_item);
+    struct net_device *dev;
+
+    if(platform_driver_priv->mtip_links[wq_params->link_index]->state == 
+                                                          MTIP_LINK_STATE_CLOSE)
+      goto func_exit;
+
+    if(mtip_mac_wrapper_get_link_status(wq_params->link_index) == true){
+      mtip_mac_enable_tx_rx(wq_params->link_index);
+
+      if(wq_params->link_index == MTIP_DEBUG_ETH_LINK_INDEX)
+      {
+        mtip_sysfs_mac_link_status(true);
+      }
+
+      dev = platform_driver_priv->mtip_links[wq_params->link_index]->dev;
+
+      // wake queues
+      netif_tx_wake_all_queues(dev);
+
+      if (!netif_carrier_ok(dev)) {
+        netif_carrier_on(dev);
+        netdev_info(dev, "Link is Up\n");
+      }
+
+      mtip_phy_notify_link_status(wq_params->link_index, true);
+      goto func_exit;
+    }
+
+    CSMLOGINFO("mtip_phy_retry_phy_bringup with link: %d, port_type: %d\n",
+               wq_params->link_index, wq_params->port_type);
+
+    mtip_phy_teardown_phy(wq_params->link_index);
+    mtip_phy_bringup_phy(wq_params->link_index,
+         platform_driver_priv->mtip_ports[wq_params->port_type]->sfp_port_type);
+
+func_exit:
+    kfree(wq_params);
+    return;
+}
+
 int mtip_phy_bringup_phy(u32 link_index, int sfp_port_type)
 {
     enum mtip_port_type_enum port_type;
@@ -171,7 +286,7 @@ int mtip_phy_bringup_phy(u32 link_index, int sfp_port_type)
     mtip_phy_get_lanes_of_link(link_index, lanes_enabled);
 
     // bringup the phy for the specified lanes
-    return (qcom_aw_phy_driver_iface_ops.eth_phy_iface_phy_bringup)(port_type, lanes_enabled, sfp_port_type); 
+    return (qcom_aw_phy_driver_iface_ops.eth_phy_iface_phy_bringup)(port_type, lanes_enabled, sfp_port_type);
 }
 
 int mtip_phy_teardown_phy(u32 link_index)
@@ -180,6 +295,8 @@ int mtip_phy_teardown_phy(u32 link_index)
     bool lanes_enabled[PHY_LANE_MAX];
     u32 port_device_index;
     u32 link_device_index;
+    int ret_val = 0;
+    struct net_device *dev;
 
     if (mtip_lookup_device_by_link_index(link_index, &port_device_index, &link_device_index) < 0)
     {
@@ -192,7 +309,29 @@ int mtip_phy_teardown_phy(u32 link_index)
     mtip_phy_get_lanes_of_link(link_index, lanes_enabled);
 
     // teardown the phy for the specified lanes
-    return (qcom_aw_phy_driver_iface_ops.eth_phy_iface_phy_teardown)(port_type, lanes_enabled);
+    ret_val = (qcom_aw_phy_driver_iface_ops.eth_phy_iface_phy_teardown)(port_type, lanes_enabled);
+
+    // stop the queues
+    netif_tx_stop_all_queues(platform_driver_priv->mtip_links[link_index]->dev);
+    
+    // disable tx_rx on the link
+    mtip_mac_disable_tx_rx(link_index);
+    
+    if(link_index == MTIP_DEBUG_ETH_LINK_INDEX)
+    {
+      mtip_sysfs_mac_link_status(false);
+    }
+
+    dev = platform_driver_priv->mtip_links[link_index]->dev;
+
+    if (netif_carrier_ok(dev)) {
+      netif_carrier_off(dev);
+      netdev_info(dev, "Link is Down\n");
+    }
+
+    mtip_phy_notify_link_status(link_index, false);
+
+    return ret_val;
 }
 
 int mtip_phy_notify_link_status(u32 link_index, bool status)

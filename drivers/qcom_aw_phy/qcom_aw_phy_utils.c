@@ -239,7 +239,6 @@ void qcom_aw_phy_dump_registers(void) {
   mss_access_t mss = {.phy_offset = 0, .lane_offset = 0};
   enum eth_phy_iface_phy_lane_num_enum lane = PHY_LANE_0;
   enum local_error_enum local_err_val = LOCAL_ERROR_INVALID;
-  int i = 0;
   void __iomem *temp_addr;
 
   QCOM_AW_PHY_LOG_INFO("qcom_aw_phy_dump_registers!");
@@ -278,29 +277,6 @@ void qcom_aw_phy_dump_registers(void) {
                      QCOM_AW_PHY_WRAPPER_PHY_ICTL_CMN_CFG_OFFSET, value);
       kernel_write(file, line, len, &pos);
     }
-  }
-
-  QCOM_AW_PHY_LOG_ERR("Capturing TCSR ");
-  memset(line, 0, sizeof(line));
-  len = snprintf(line, sizeof(line), "\nTCSR\n");
-  kernel_write(file, line, len, &pos);
-
-  for (i = TCSR_FH0_ICTL_REF_CML_LS_REG_OFFSET;
-       i <= TCSR_C2C_DBG_ICTL_REF_CML_LS_REG_OFFSET; i = i + 0x10) {
-    temp_addr = phy_config_info->tcsr_base_addr + i;
-    sv_read_csr(temp_addr, &value);
-    memset(line, 0, sizeof(line));
-    len = snprintf(line, sizeof(line), "0x%x,0x%x\n", i, value);
-    kernel_write(file, line, len, &pos);
-  }
-
-  for (i = TCSR_FH0_ICTL_REF_LS_MUX_SEL_REG_OFFSET;
-       i <= TCSR_C2C_DBG_ICTL_REF_LS_MUX_SEL_REG_OFFSET; i = i + 0x10) {
-    temp_addr = phy_config_info->tcsr_base_addr + i;
-    sv_read_csr(temp_addr, &value);
-    memset(line, 0, sizeof(line));
-    len = snprintf(line, sizeof(line), "0x%x,0x%x\n", i, value);
-    kernel_write(file, line, len, &pos);
   }
 
   for (phy_inst_type = QCOM_AW_PHY_INST_FH0;

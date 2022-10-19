@@ -21,6 +21,9 @@
 
 struct qcom_aw_phy_mtip_if_info qcom_aw_phy_mtip_if_info_s = {0};
 
+#define MAX_RETRY_COUNT 5
+static int cdr_lock_retry_timer[MAX_RETRY_COUNT] = {5, 10, 15, 20, 25};
+
 /*-------------------------------------------------------------------
 * Function Definitions
 ------------------------------------------------------------------- */
@@ -99,6 +102,9 @@ int qcom_aw_phy_mtip_register(
   /* Register AN complete callback */
   qcom_aw_phy_mtip_if_info_s.an_complete_cb = ready_info->notify_an_complete;
 
+  /* Register CDR lock success callback */
+  qcom_aw_phy_mtip_if_info_s.cdr_lock_success = ready_info->cdr_lock_success;
+
   mutex_unlock(&qcom_aw_phy_mtip_if_info_s.lock);
 
 func_exit:
@@ -163,6 +169,12 @@ int qcom_aw_phy_setup(
       // Set the lane as enabled and lane speed config.
       phy_lane_params = &phy_inst_info->lane_params[i];
       phy_lane_params->lane_config = lane_config[i];
+
+      // Initialize the lock
+      mutex_init(&phy_inst_info->lane_lock[i]);
+
+      // Initialize the retry counter and retry timer values
+      phy_inst_info->cdr_lock_retry_counter[i] = 0;
 
       QCOM_AW_PHY_LOG_INFO("%s: Port %d has lane %d enabled with speed %d",
                            __func__, port_type, i, lane_config[i].lane_speed);
@@ -397,7 +409,7 @@ int qcom_aw_phy_bringup_manual_eq_mode(
     aw_pmd_analog_loopback_set(mss, 1);
   }
 
-  mdelay(5000);
+  mdelay(500);
 
   // RX Equalization - Check aw_eq_type_e enum
   aw_pmd_rx_equalize(mss, AW_EQ_FULL_DIR, RX_LINKEVAL_FULL_TIMEOUT_US);
@@ -428,6 +440,7 @@ int qcom_aw_phy_bringup(enum mtip_port_type_enum port_type,
   enum eth_phy_iface_phy_lane_num_enum lane = PHY_LANE_0;
   mss_access_t mss = {.phy_offset = 0, .lane_offset = 0};
   struct qcom_aw_phy_lane_speed_config config;
+  struct qcom_aw_phy_work_q_params *wq_params = NULL;
   enum local_error_enum local_err_val = LOCAL_ERROR_INVALID;
   aw_err_code_t aw_err_val = AW_ERR_CODE_NONE;
   int ret_val = 0;
@@ -458,6 +471,7 @@ int qcom_aw_phy_bringup(enum mtip_port_type_enum port_type,
   QCOM_AW_PHY_LOG_INFO("%s: MAC Port %d has sfp port %d", __func__, port_type,
                        sfp_port_type);
   phy_inst_info->sfp_port_type = sfp_port_type;
+  phy_inst_info->bring_up_status = true;
 
   /* Setup PHY offset */
   mss.phy_offset = phy_inst_info->base_addr;
@@ -496,6 +510,8 @@ int qcom_aw_phy_bringup(enum mtip_port_type_enum port_type,
     QCOM_AW_PHY_LOG_INFO("%s: Bringing up lane %d on port %d!", __func__, lane,
                          port_type);
 
+    mutex_lock(&phy_inst_info->lane_lock[lane]);
+
     /* Set the lane offset */
     pmd_set_lane(&mss, lane);
 
@@ -528,7 +544,35 @@ int qcom_aw_phy_bringup(enum mtip_port_type_enum port_type,
     }
 
     // Check CDR Lock
-    aw_pmd_rx_check_cdr_lock(&mss, RX_CDR_TIMEOUT_US);
+    if(AW_ERR_CODE_POLL_TIMEOUT == 
+                             aw_pmd_rx_check_cdr_lock(&mss, RX_CDR_TIMEOUT_US)){
+      QCOM_AW_PHY_LOG_ERR("Retry count %d, TBD after %d sec as CDR lock failed",
+                          phy_inst_info->cdr_lock_retry_counter[lane] + 1,
+                          cdr_lock_retry_timer\
+                                 [phy_inst_info->cdr_lock_retry_counter[lane]]);
+
+      wq_params = kmalloc(sizeof(struct qcom_aw_phy_work_q_params),
+                          GFP_KERNEL);
+      if(!wq_params)
+        QCOM_AW_PHY_LOG_ERR("Malloc failed!");
+      else{
+        INIT_DELAYED_WORK(&wq_params->wq_item,
+                          qcom_aw_phy_retry_lane_bring_up);
+        wq_params->phy_inst = phy_inst_info->phy_inst;
+        wq_params->lane_num = lane;
+        wq_params->user_data = (void*)false;
+        queue_delayed_work(phy_config_info->wq, &wq_params->wq_item,
+                           msecs_to_jiffies(1000 * cdr_lock_retry_timer\
+                                [phy_inst_info->cdr_lock_retry_counter[lane]]));
+        if(phy_inst_info->cdr_lock_retry_counter[lane] < (MAX_RETRY_COUNT-1))
+          phy_inst_info->cdr_lock_retry_counter[lane]++;
+      }
+    }
+    else{
+      qcom_aw_phy_mtip_if_info_s.cdr_lock_success(port_type, lane);
+    }
+
+    mutex_unlock(&phy_inst_info->lane_lock[lane]);
   }
 
 func_exit:
@@ -604,6 +648,8 @@ int qcom_aw_phy_teardown(enum mtip_port_type_enum port_type,
     QCOM_AW_PHY_LOG_INFO("%s: Tearing down lane %d on port %d!", __func__, lane,
                          port_type);
 
+    mutex_lock(&phy_inst_info->lane_lock[lane]);
+
     /* Set the lane offset */
     pmd_set_lane(&mss, lane);
 
@@ -639,7 +685,23 @@ int qcom_aw_phy_teardown(enum mtip_port_type_enum port_type,
     } else {
       QCOM_AW_PHY_LOG_ERR("RX CDR deasserted\n");
     }
+
+    // Reset the retry counters
+    phy_inst_info->cdr_lock_retry_counter[lane] = 0;
+
+    mutex_unlock(&phy_inst_info->lane_lock[lane]);
   }
+
+  /* Common Lane tear down */
+  aw_err_val =
+      aw_pmd_iso_request_cmn_state_change(&mss, AW_CMN_PD, CMN_ACK_TIMEOUT_US);
+  if (aw_err_val != AW_ERR_CODE_NONE) {
+    ret_val = EIO;
+    local_err_val = LOCAL_ERROR_7;
+    goto func_exit;
+  }
+
+  phy_inst_info->bring_up_status = false;
 
 func_exit:
   QCOM_AW_PHY_LOG_ERR("%s: returns %d with local error %d and aw_error %d",
@@ -715,6 +777,148 @@ void qcom_aw_phy_notify_an_complete(
   mac_port_type = qcom_aw_phy_inst_to_mac_port(phy_inst);
 
   qcom_aw_phy_mtip_if_info_s.an_complete_cb(mac_port_type, lane_num);
+}
+
+void qcom_aw_phy_handle_an_complete(struct work_struct *work){
+  struct delayed_work *delayed_work_item = to_delayed_work(work);
+  struct qcom_aw_phy_work_q_params *wq_params =
+     container_of(delayed_work_item, struct qcom_aw_phy_work_q_params, wq_item);
+
+  if(!wq_params)
+    QCOM_AW_PHY_LOG_ERR("Invalid work queue structure!");
+
+  QCOM_AW_PHY_LOG_ERR("AN done rcvd for PHY %d lane %d",
+                      wq_params->phy_inst, wq_params->lane_num);
+
+  qcom_aw_phy_notify_an_complete(wq_params->phy_inst, wq_params->lane_num);
+
+  kfree(wq_params);
+  return;
+}
+
+void qcom_aw_phy_retry_lane_bring_up(struct work_struct *work){
+  struct delayed_work *delayed_work_item = to_delayed_work(work);
+  struct qcom_aw_phy_work_q_params *wq_params =
+     container_of(delayed_work_item, struct qcom_aw_phy_work_q_params, wq_item);
+  struct qcom_aw_phy_config *phy_config_info = NULL;
+  struct qcom_aw_phy_inst_config *phy_inst_info = NULL;
+  enum eth_phy_iface_phy_lane_num_enum lane = PHY_LANE_0;
+  mss_access_t mss = {.phy_offset = 0, .lane_offset = 0};
+  aw_txfir_config_t txfir_cfg;
+  int cdr_lock_status = 0;
+  enum local_error_enum local_err_val = LOCAL_ERROR_INVALID;
+  int ret_val = 0;
+
+  /* Ignore for loopback mode */
+  if (qcom_aw_phy_get_loopback_mode() != QCOM_AW_PHY_NO_LB){
+    ret_val = EINVAL;
+    local_err_val = LOCAL_ERROR_0;
+    goto func_exit;
+  }
+
+  if(!wq_params){
+    ret_val = EINVAL;
+    local_err_val = LOCAL_ERROR_1;
+    goto func_exit;
+  }
+
+  phy_config_info = qcom_aw_phy_get_config_info();
+  if (!phy_config_info) {
+    ret_val = EINVAL;
+    local_err_val = LOCAL_ERROR_2;
+    goto func_exit;
+  }
+
+  /* Get the PHY instance info for the passed instance type */
+  phy_inst_info = &phy_config_info->phy_inst_config_info[wq_params->phy_inst];
+  if (phy_inst_info->valid == false) {
+    ret_val = EINVAL;
+    local_err_val = LOCAL_ERROR_3;
+    goto func_exit;
+  }
+
+  if(phy_inst_info->bring_up_status == false) {
+    ret_val = EINVAL;
+    local_err_val = LOCAL_ERROR_4;
+    goto func_exit;
+  }
+
+  QCOM_AW_PHY_LOG_ERR("Retry queued to bring up PHY %d lane %d, "
+                      "is interrupt trigger = %d",
+                      wq_params->phy_inst, wq_params->lane_num,
+                      (bool)wq_params->user_data);
+
+  lane = wq_params->lane_num;
+
+  mutex_lock(&phy_inst_info->lane_lock[lane]);
+
+  /* Setup PHY offset */
+  mss.phy_offset = phy_inst_info->base_addr;
+  /* Set the lane offset */
+  pmd_set_lane(&mss, lane);
+
+  cdr_lock_status = aw_pmd_rx_check_cdr_lock(&mss, RX_CDR_TIMEOUT_US);
+  QCOM_AW_PHY_LOG_ERR("Current CDR lock status %d, PCS link status %d",
+                      (cdr_lock_status == AW_ERR_CODE_NONE) ? 1 : 0,
+                      phy_inst_info->lane_params[lane].link_status);
+
+  if(phy_inst_info->lane_params[lane].link_status == false){
+
+    // TX FIR Config
+    txfir_cfg.CM2 = 0;
+    txfir_cfg.C0 = 60;
+    txfir_cfg.C1 = 0;
+    txfir_cfg.main_or_max = 1;
+    aw_pmd_txfir_config_set(&mss, &txfir_cfg);
+
+    /* Disabling DFE Adaptations EXT loopback */
+    aw_pmd_rx_dfe_adapt_set(&mss, 0);
+
+    mdelay(500);
+
+    // RX Equalization - Check aw_eq_type_e enum
+    aw_pmd_rx_equalize(&mss, AW_EQ_FULL_DIR, RX_LINKEVAL_FULL_TIMEOUT_US);
+
+    cdr_lock_status = aw_pmd_rx_check_cdr_lock(&mss, RX_CDR_TIMEOUT_US);
+
+    if(true == (bool)wq_params->user_data){
+      QCOM_AW_PHY_LOG_ERR("Don't retry for interrupt trigger");
+    }
+    else{
+      // Check CDR Lock
+      if(cdr_lock_status == AW_ERR_CODE_POLL_TIMEOUT){
+        QCOM_AW_PHY_LOG_ERR("Retry count %d, TBD after %d sec, CDR lock failed",
+                            phy_inst_info->cdr_lock_retry_counter[lane] + 1,
+                            cdr_lock_retry_timer\
+                                 [phy_inst_info->cdr_lock_retry_counter[lane]]);
+        wq_params->user_data = (void*)false;
+        queue_delayed_work(phy_config_info->wq, &wq_params->wq_item,
+                           msecs_to_jiffies(1000 * cdr_lock_retry_timer\
+                                [phy_inst_info->cdr_lock_retry_counter[lane]]));
+        if(phy_inst_info->cdr_lock_retry_counter[lane] < (MAX_RETRY_COUNT-1))
+          phy_inst_info->cdr_lock_retry_counter[lane]++;
+
+        mutex_unlock(&phy_inst_info->lane_lock[lane]);
+        return;
+      }
+    }
+
+    if(cdr_lock_status == AW_ERR_CODE_NONE){
+      qcom_aw_phy_mtip_if_info_s.cdr_lock_success(
+                          qcom_aw_phy_inst_to_mac_port(phy_inst_info->phy_inst),
+                          lane);
+    }
+  }
+
+  mutex_unlock(&phy_inst_info->lane_lock[lane]);
+
+func_exit:
+  QCOM_AW_PHY_LOG_ERR("%s: returns %d with local error %d",
+                      __func__, ret_val, local_err_val);
+
+  kfree(wq_params);
+
+  return;
 }
 
 /* API exposed structure */
