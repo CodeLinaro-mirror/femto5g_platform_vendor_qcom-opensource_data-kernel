@@ -54,7 +54,10 @@
 
 // the range of supported MTU sizes
 #define MTIP_MIN_MTU_SIZE  68
-#define MTIP_MAX_MTU_SIZE  1536
+#define MTIP_MAX_MTU_SIZE  65535
+
+// the max size of MTU for M Plane
+#define MTIP_MAX_MPLANE_MTU_SIZE 1536
 
 #define MTIP_DMA_RX_PACKET_SIZE 1600 /* use buffers of size 1600 */
 
