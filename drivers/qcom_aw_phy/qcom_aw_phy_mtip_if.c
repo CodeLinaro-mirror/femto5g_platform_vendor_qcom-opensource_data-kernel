@@ -79,13 +79,6 @@ int qcom_aw_phy_mtip_register(
 
   mutex_lock(&qcom_aw_phy_mtip_if_info_s.lock);
 
-  if (qcom_aw_phy_mtip_if_info_s.is_ready_notified) {
-    ret_val = 0;
-    local_err_val = LOCAL_ERROR_1;
-    mutex_unlock(&qcom_aw_phy_mtip_if_info_s.lock);
-    goto func_exit;
-  }
-
   qcom_aw_phy_mtip_if_info_s.is_mac_drv_ready = true;
 
   *is_phy_ready = qcom_aw_phy_mtip_if_info_s.is_phy_drv_ready;
