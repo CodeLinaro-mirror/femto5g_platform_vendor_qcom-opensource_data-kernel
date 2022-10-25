@@ -120,25 +120,45 @@ static irqreturn_t mtip_mac_interrupt_handler(int irq, void *devptr)
            }
            if ((int_status & MTIP_MAC_INTERRUPT_LINK_DOWN_INTR) != 0)
            {
-               // got a link down interrupt for link index
-               post_mtip_process_link_state(link_index, false);
+               // check if the LINK_UP_INTR is also set
+               if ((int_status & MTIP_MAC_INTERRUPT_LINK_UP_INTR) != 0) 
+               {
+                   // LINK_UP also set
+                   // ignore both
+                   handled = true;
+               }
+               else
+               {
+                   // got a link down interrupt for link index
+                   post_mtip_process_link_state(link_index, false);
+
+                   handled = true;
+               }
 
                // clear the interrupt
                mtip_mac_clear_interrupts(link_index, MTIP_MAC_INTERRUPT_LINK_DOWN_INTR);
-
-               handled = true;
            }
            if ((int_status & MTIP_MAC_INTERRUPT_LINK_UP_INTR) != 0) 
            {
-               // got a link up interrupt for link index
-               post_mtip_process_link_state(link_index, true);
+               // check if LINK_DOWN is set
+               if ((int_status & MTIP_MAC_INTERRUPT_LINK_DOWN_INTR) != 0)
+               {
+                   // LINK_DOWN also set
+                   // ignore both
+
+                   handled = true;
+               }
+               else
+               {
+                   // got a link up interrupt for link index
+                   post_mtip_process_link_state(link_index, true);
+
+                   handled = true;
+               }
 
                // clear the interrupt
                mtip_mac_clear_interrupts(link_index, MTIP_MAC_INTERRUPT_LINK_UP_INTR);
-
-               handled = true;
            }
-
        }
 
        summary = summary >> 1;
@@ -772,5 +792,30 @@ void mtip_mac_clear_interrupts(u32 link_index, u32 int_to_clear)
     iowrite32(write_val,
               wrapper_base_addr + real_link_number*MTIP_MAC_WRAPPER_INTERRUPT_OFFSET + MTIP_MAC_WRAPPER_INTERRUPT_CLR_REG_OFFSET);
     return;
+}
+
+bool mtip_mac_wrapper_get_link_status(u32 link_index)
+{
+    u32 read_val = 0;
+    void __iomem *wrapper_base_addr;
+    u32 port_device_index;
+    u32 link_device_index;
+
+    mtip_lookup_device_by_link_index(link_index, &port_device_index, &link_device_index);
+
+    // For Debug ETH, 2nd link index to be monitored instead of 1st
+    if(port_device_index == MTIP_PORT_TYPE_DEBUG)
+      link_device_index += 1;
+
+    wrapper_base_addr = platform_driver_priv->devices.port_devices[port_device_index].wrapper_base_addr;
+
+    read_val = (u32)ioread32(wrapper_base_addr + MTIP_MAC_WRAPPER_CORE_STATUS_REG_OFFSET);
+    CSMLOGERR("mtip_mac_wrapper_get_link_status, core status = %d, for port %d, link %d",
+               read_val, port_device_index, link_device_index);
+
+    if (((read_val & GENMASK(9,6)) >> 6) & (1 << link_device_index))
+      return true;
+
+    return false;
 }
 

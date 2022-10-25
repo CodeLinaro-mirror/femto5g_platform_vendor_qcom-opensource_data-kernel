@@ -318,4 +318,11 @@
 		ecpriss_xbar_tx_cfg_s  xbar_tx_cfg;
 	} ecpriss_flow_tx_cfg_s;
 
+	typedef struct
+	{
+		ecpriss_route_src_e		src;
+		ecpriss_core_flow_route_id_e  flow_route;
+		ecpriss_flow_dir_e            flow_dir;
+	} ecpriss_flow_route_dir_s;
+
 #endif /* ECPRI_FLOW_H */

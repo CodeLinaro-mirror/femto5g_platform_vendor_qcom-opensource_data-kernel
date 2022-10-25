@@ -71,11 +71,14 @@
 #define LS_MUX_SEL_NT_OFFSET      0x0
 #define LS_MUX_SEL_NT_MASK        0x7
 
-
 /* PHY status interrupt bit positions */
 enum qcom_aw_phy_int_status_bit_enum{
-	QCOM_AW_PHY_INT_STATUS_BIT_MIN       = 4,
-	QCOM_AW_PHY_AN_DONE_LANE_0           = QCOM_AW_PHY_INT_STATUS_BIT_MIN,
+	QCOM_AW_PHY_INT_STATUS_BIT_MIN       = 0,
+	QCOM_AW_PHY_RX_SIGNAL_DETECT_LANE_0  = QCOM_AW_PHY_INT_STATUS_BIT_MIN,
+	QCOM_AW_PHY_RX_SIGNAL_DETECT_LANE_1  = 1,
+	QCOM_AW_PHY_RX_SIGNAL_DETECT_LANE_2  = 2,
+	QCOM_AW_PHY_RX_SIGNAL_DETECT_LANE_3  = 3,
+	QCOM_AW_PHY_AN_DONE_LANE_0           = 4,
 	QCOM_AW_PHY_AN_DONE_LANE_1           = 5,
 	QCOM_AW_PHY_AN_DONE_LANE_2           = 6,
 	QCOM_AW_PHY_AN_DONE_LANE_3           = 7,
@@ -148,9 +151,31 @@ enum qcom_aw_phy_mod_tech_enum {
 	QCOM_AW_PHY_MOD_TECH_MAX
 };
 
+enum qcom_aw_phy_synce_lane_id{
+	LANE_NONE  = -1,
+	FH0_LANE_0 =  0,
+	FH0_LANE_1,
+	FH0_LANE_2,
+	FH0_LANE_3,
+	FH1_LANE_0,
+	FH1_LANE_1,
+	FH1_LANE_2,
+	FH1_LANE_3,
+	FH2_LANE_0,
+	FH2_LANE_1,
+	FH2_LANE_2,
+	FH2_LANE_3,
+	L2_LANE_0,
+	L2_LANE_1,
+	L2_LANE_2,
+	L2_LANE_3,
+	MAX_PHY_SYNCE_LANES
+};
+
 /* Lane Params - Lane specific information */
 struct qcom_aw_lane_params{
 	struct eth_phy_iface_phy_lane_config   lane_config;
+	bool                                   link_status;
 	uint32_t                               snr_valid_intr;
 	uint32_t                               an_link_good_intr;
 	uint32_t                               an_done_intr;
@@ -167,7 +192,9 @@ struct qcom_aw_phy_inst_config{
 	int                               phy_status_irq;
 	uint8_t                           num_lanes;
 	struct qcom_aw_lane_params        lane_params[PHY_LANE_MAX];
-	bool                              link_status;
+	struct mutex                      lane_lock[PHY_LANE_MAX];
+	uint8_t                           cdr_lock_retry_counter[PHY_LANE_MAX];
+	bool                              bring_up_status;
 	int                               sfp_port_type;
 };
 
@@ -177,6 +204,12 @@ struct qcom_aw_phy_config{
 	void __iomem                    *tcsr_base_addr;
 	struct qcom_aw_phy_inst_config   phy_inst_config_info[QCOM_AW_PHY_INST_MAX];
 	struct regulator                *ldo16_supply;
+	struct reset_control            *acgc_reset_ctrl;
+	struct clk                      *synce_cmux_clk_src;
+	struct clk                      *synce_cmux_clk;
+	struct clk                      *synce_div_clk;
+	struct clk                      *synce_phy_lane_clk[MAX_PHY_SYNCE_LANES];
+	struct workqueue_struct         *wq;
 };
 
 /* PHY lane speed config - Rate, width, LTCS clause, Modulation technique*/
@@ -185,6 +218,16 @@ struct qcom_aw_phy_lane_speed_config{
 	uint32_t                         width;
 	uint32_t                         clause;
 	enum qcom_aw_phy_mod_tech_enum   mod_tech;
+	unsigned long                    synce_cmux_clk_rate;
+	unsigned long                    synce_div_clk_src_rate;
+};
+
+/* Work structure to be passed to work queue for deferred processing */
+struct qcom_aw_phy_work_q_params{
+	struct delayed_work                    wq_item;
+	enum qcom_aw_phy_instance_enum         phy_inst;
+	enum eth_phy_iface_phy_lane_num_enum   lane_num;
+	void                                  *user_data;
 };
 
 struct qcom_aw_phy_config* qcom_aw_phy_get_config_info(void);

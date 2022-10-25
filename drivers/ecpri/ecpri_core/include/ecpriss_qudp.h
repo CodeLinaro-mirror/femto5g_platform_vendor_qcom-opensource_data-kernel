@@ -162,6 +162,8 @@ int ecpriss_qudp_fh_tx_hdr_ins_cfg(uint32_t               port_index,
 int ecpriss_qudp_fh_rx_filter_cfg(uint32_t               port_index,
 		ecpriss_qudp_rx_cfg_s *rx_cfg);
 
+int ecpriss_qudp_fh_egress_cfg_reset(int32_t port_index);
+
 void ecpriss_qudp_print_fh_ingress_stats(uint32_t port_index,
 		uint32_t link_index);
 void ecpriss_qudp_print_fh_egress_stats(uint32_t port_index,
@@ -183,4 +185,7 @@ void ecpriss_qudp_print_l2_egress_stats(uint32_t port_index,
 		uint32_t link_index);
 void ecpriss_qudp_clear_stats(uint32_t port_index,
 		uint32_t link_index);
+
+void ecpriss_qudp_set_ecpriss_filt_enable_info(int val);
+int ecpriss_qudp_get_ecpriss_filt_enable_info(void);
 #endif

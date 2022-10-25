@@ -69,8 +69,7 @@ static int mtip_debug_eth_irq_init(struct platform_device *pdev) {
 
     INIT_WORK(&mtip_debug_eth_work, mtip_sysfs_isr_work_thread);
 
-    // Change this read later
-    debug_irq = platform_get_irq(pdev, 0);
+    debug_irq = platform_get_irq_byname(pdev, "debug-irq");
 
     res = request_irq(debug_irq, mtip_debug_eth_irq_isr, IRQF_TRIGGER_RISING,
                       "debug_irq", NULL);
@@ -99,8 +98,8 @@ int mtip_debug_eth_probe(struct platform_device *pdev) {
   void __iomem *addr;
   struct resource dev_resource;
   bool fuse_enabled = true;
-  // u32 fuse_val;
-  // int ethernet_trace_disabled = 8;
+  u32 fuse_val;
+  int ethernet_trace_disabled = 8;
 
   CSMLOGINFO("mtip_debug_eth_probe called for device \"%s\"", pdev->name);
 
@@ -114,13 +113,12 @@ int mtip_debug_eth_probe(struct platform_device *pdev) {
     dev_resource.flags = IORESOURCE_MEM;
     dev_resource.parent = dev_resource.child = dev_resource.sibling = NULL;
     addr = devm_ioremap_resource(&pdev->dev, &dev_resource);
-    // fuse_val = (u32)ioread32(addr);
-    // CSMLOGERR("fuse val is %d",fuse_val);
-    // if (fuse_val & (1 << ethernet_trace_disabled))
-    // {
-    //	  CSMLOGERR("fuse val is %d",fuse_val);
-    //	  fuse_enabled = false;
-    // }
+    fuse_val = (u32)ioread32(addr);
+    CSMLOGERR("fuse val is %d",fuse_val);
+    if (fuse_val & (1 << ethernet_trace_disabled))
+    {
+	    fuse_enabled = false;
+     }
   }
 
   if (fuse_enabled) {

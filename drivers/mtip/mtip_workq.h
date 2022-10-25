@@ -11,6 +11,7 @@
 #include <linux/mutex.h>
 #include <linux/kernel.h>
 #include <linux/workqueue.h>
+#include "eth_phy_iface.h"
 
 // enumeration of the list of tasks handled by the workq
 typedef enum {
@@ -38,11 +39,20 @@ struct mtip_workq_list
    spinlock_t lock;
 };
 
+/* Work structure to be passed to work queue for deferred processing */
+struct mtip_delayed_work_q_params{
+   struct delayed_work                    wq_item;
+   enum mtip_port_type_enum               port_type;
+   u32                                    link_index;
+   void                                  *user_data;
+};
+
 /*
  * mtip workq related functions
  */
 int mtip_queue_work(unsigned int work_type, void* work_ptr);
 int mtip_initialize_workq(void);
 int mtip_destroy_workq(void);
+int mtip_workq_queue_delayed_work(struct mtip_delayed_work_q_params *wq_params);
 
 #endif // _MTIP_WORKQ_H

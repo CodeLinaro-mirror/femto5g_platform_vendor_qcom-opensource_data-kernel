@@ -52,6 +52,7 @@
 #include "mtip_ptp.h"
 #include "mtip_debug_eth.h"
 #include "mtip_phy.h"
+#include "mtip_sysfs.h"
 
 int macsec_eth_set_macsec_ops(const struct macsec_ops* rb_macsec_ops)
 {
@@ -316,6 +317,7 @@ void run_mtip_process_link_state(void* work_ptr)
     struct mtip_process_link_state_task* taskstruct = (struct mtip_process_link_state_task*)work_ptr;
     u32 link_index = taskstruct->link_index;
     bool link_up = taskstruct->link_up;
+    struct net_device *dev = platform_driver_priv->mtip_links[link_index]->dev;
 
     if (link_up)
     {
@@ -323,13 +325,40 @@ void run_mtip_process_link_state(void* work_ptr)
 
         // enable tx_rx on the link
         mtip_mac_enable_tx_rx(link_index);
+
+        // wake queues
+        netif_tx_wake_all_queues(dev);
+
+        if(link_index == MTIP_DEBUG_ETH_LINK_INDEX)
+        {
+           mtip_sysfs_mac_link_status(true);
+        }
+
+        // carrier is on
+        if (!netif_carrier_ok(dev)) {
+ 			netif_carrier_on(dev);
+ 			netdev_info(dev, "Link is Up\n");
+ 		}
     }
     else
     {
         CSMLOGINFO("Processing LINK_DOWN for link_index: %d\n", link_index);
 
+        // stop the queues
+        netif_tx_stop_all_queues(platform_driver_priv->mtip_links[link_index]->dev);
+
         // disable tx_rx on the link
         mtip_mac_disable_tx_rx(link_index);
+
+        if(link_index == MTIP_DEBUG_ETH_LINK_INDEX)
+        {
+            mtip_sysfs_mac_link_status(false);
+        }
+
+		if (netif_carrier_ok(dev)) {
+ 			netif_carrier_off(dev);
+ 			netdev_info(dev, "Link is Down\n");
+ 		}
     }
 
     if (mtip_loopback_mode != MTIP_MODE_LOOPBACK) 
@@ -337,6 +366,9 @@ void run_mtip_process_link_state(void* work_ptr)
         // notify phy of the link status
         mtip_phy_notify_link_status(link_index, link_up);
     }
+
+    // free the taskstruct
+    kfree(taskstruct);
 }
 
 static int mtip_set_mac_address(struct net_device *dev, void *addr)
@@ -784,21 +816,34 @@ static int mtip_change_mtu(struct net_device *netdev, int new_mtu)
    struct mtip_netdev_priv *priv;
    spinlock_t *lock;
    u32 link_index;
+   int mplane_mtu;
    
    priv = (struct mtip_netdev_priv*)netdev_priv(netdev);
    lock = &(priv->lock);
    link_index = priv->link_index;
 
-   CSMLOGINFO("mtip_change_mtu called for link index: %d\n", link_index);
+   CSMLOGINFO("mtip_change_mtu called for link index: %d, new_mtu: %d\n", link_index, new_mtu);
 
    /* check ranges */
    if ((new_mtu < MTIP_MIN_MTU_SIZE) || (new_mtu > MTIP_MAX_MTU_SIZE))
       return -EINVAL;
 
+   /* Restrict the M Plane MTU to MAX FOR MPLANE */
+   mplane_mtu = new_mtu;
+   if (mplane_mtu > MTIP_MAX_MPLANE_MTU_SIZE) 
+   {
+       mplane_mtu = MTIP_MAX_MPLANE_MTU_SIZE;
+   }
+
    spin_lock_irqsave(lock, flags);
-   netdev->mtu = new_mtu;
-   mtip_mac_set_frame_length(priv, new_mtu);
+
+   // set the netdev MTU
+   netdev->mtu = mplane_mtu;
+
    spin_unlock_irqrestore(lock, flags);
+
+   // set the frame length in the hardware
+   mtip_mac_set_frame_length(priv, new_mtu);
 
    /* Send update to clients */
    post_mtip_client_send_event(ETH_ECPRISS_EVENT_UP, link_index);
@@ -812,6 +857,8 @@ static int mtip_open(struct net_device *netdev)
    struct mtip_netdev_priv* priv;
    u32 link_index;
    ecpri_dma_eth_conn_hdl_t hdl;
+   u32 real_port_number;
+   int sfp_port_type;
 
    priv = netdev_priv(netdev);
 
@@ -836,11 +883,29 @@ static int mtip_open(struct net_device *netdev)
            phylink_start(priv->phylink);
        }
    }
+   else
+   {
+       if (mtip_loopback_mode == MTIP_MODE_DEFAULT || 
+           mtip_loopback_mode == MTIP_MODE_PHY_LOOPBACK)
+       {
+           // check if the corresponding port is in LINK_UP state
+           mtip_lookup_real_port_number_by_link_index(link_index, &real_port_number);
 
-   if (mtip_loopback_mode == MTIP_MODE_DEFAULT || 
-       mtip_loopback_mode == MTIP_MODE_PHY_LOOPBACK){
-      // bring up the phy
-      mtip_phy_bringup_phy(link_index);
+           if (platform_driver_priv->mtip_ports[real_port_number]->port_state == MTIP_PORT_STATE_CONNECTED)
+           {
+               // get the sfp port type
+               sfp_port_type = platform_driver_priv->mtip_ports[real_port_number]->sfp_port_type;
+
+               // bring up the phy
+              mtip_phy_bringup_phy(link_index, sfp_port_type);
+
+              CSMLOGINFO("phy bringup done for link: %d\n", link_index);
+           }
+           else
+           {
+               CSMLOGINFO("Port: %d of link index: %d is not in CONNECTED state\n", real_port_number, link_index);
+           }
+       }
    }
 
    if(hdl){
@@ -904,11 +969,16 @@ static int mtip_close(struct net_device *netdev)
            phylink_disconnect_phy(priv->phylink);
        }
    }
+   else
+   {
+       if (mtip_loopback_mode == MTIP_MODE_DEFAULT || 
+           mtip_loopback_mode == MTIP_MODE_PHY_LOOPBACK)
+       {
+          // teardown the phy
+          mtip_phy_teardown_phy(link_index);
 
-   if (mtip_loopback_mode == MTIP_MODE_DEFAULT || 
-       mtip_loopback_mode == MTIP_MODE_PHY_LOOPBACK){
-      // teardown the phy
-      mtip_phy_teardown_phy(link_index);
+          CSMLOGINFO("phy teardown done for link: %d\n", link_index);
+       }
    }
 
    if(hdl){
@@ -926,6 +996,7 @@ static int mtip_close(struct net_device *netdev)
 
    CSMLOGERR("Stopping netdev queue\n");
 
+   // set the link state to CLOSE
    platform_driver_priv->mtip_links[link_index]->state = MTIP_LINK_STATE_CLOSE;
 
    /* Send update to clients */

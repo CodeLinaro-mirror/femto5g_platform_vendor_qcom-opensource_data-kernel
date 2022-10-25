@@ -12,27 +12,6 @@
 #ifndef QCOM_AW_PHY_SYNCE_H
 #define QCOM_AW_PHY_SYNCE_H
 
-enum qcom_aw_phy_synce_lane_id{
-	LANE_NONE  = -1,
-	FH0_LANE_0 =  0,
-	FH0_LANE_1,
-	FH0_LANE_2,
-	FH0_LANE_3,
-	FH1_LANE_0,
-	FH1_LANE_1,
-	FH1_LANE_2,
-	FH1_LANE_3,
-	FH2_LANE_0,
-	FH2_LANE_1,
-	FH2_LANE_2,
-	FH2_LANE_3,
-	L2_LANE_0,
-	L2_LANE_1,
-	L2_LANE_2,
-	L2_LANE_3,
-	MAX_PHY_SYNCE_LANES
-};
-
 struct qcom_aw_phy_synce_lane_status{
 	bool                                       lane_status;
 	enum eth_phy_iface_phy_lane_speed_enum     lane_speed;
@@ -49,12 +28,13 @@ struct qcom_aw_phy_snr_threshold_info {
 	int                                        high_val;
 };
 
-
 void qcom_aw_phy_synce_notify_phy_lane_state_change(void);
 void qcom_aw_phy_synce_notify_snr_valid_change(
                                  enum qcom_aw_phy_instance_enum phy_inst,
                                  enum eth_phy_iface_phy_lane_num_enum lane_num,
                                  bool valid);
+void qcom_aw_phy_synce_handle_snr_valid_change(
+                                 struct work_struct *work);
 int qcom_aw_phy_synce_set_snr_threshold(
                                  enum qcom_aw_phy_instance_enum phy_inst,
                                  enum eth_phy_iface_phy_lane_num_enum lane_num,
@@ -63,5 +43,7 @@ int qcom_aw_phy_synce_get_current_snr_val(
                                  enum qcom_aw_phy_instance_enum phy_inst,
                                  enum eth_phy_iface_phy_lane_num_enum lane_num,
                                  int *snr_val);
+int qcom_aw_phy_synce_set_synce_mux(
+                                 enum qcom_aw_phy_synce_lane_id lane_num);
 
 #endif /* QCOM_AW_PHY_SYNCE_H */

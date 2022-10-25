@@ -273,6 +273,10 @@
 					,xbar:global_config \
 				} \
 			} \
+			gcfg \
+			{ \
+				,ecpriss_filt \
+			} \
 		} \
 	} \
 } \

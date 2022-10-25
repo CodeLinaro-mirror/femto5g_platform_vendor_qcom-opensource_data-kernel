@@ -123,8 +123,6 @@ static int ecpri_oxtor_tx_stop(u32 ring_id, u32 timeout_ms)
 	/* TODO: Mayank, need to take care of timer mechanism */
 	/* VVDRV_ecpri_timer timer; */
 	u32 curr_wr_idx;
-	u32 curr_rd_idx;
-	u32 elapsed_ms;
 	ecpri_oxtor_tx_ring_s *ring_ptr = NULL;
 
 	ring_ptr= &ecpri_oxtor_tx_ring_cnxt.ring_arr[ring_id];
@@ -157,34 +155,6 @@ static int ecpri_oxtor_tx_stop(u32 ring_id, u32 timeout_ms)
 		 * indxes must be equal */
 		curr_wr_idx = 0;
 	}
-
-	/* ECPRI_ASSERT(0 == timer.Start()); */
-	/* wait for the read and the write index will be equal with timeout */
-	elapsed_ms = 0;
-	while (elapsed_ms <= timeout_ms)
-	{
-	/* read only the read index because the write is not changing by hw */
-	/* if not in wrappign mode its enough that read and write are equal */
-		ecpriss_oxtor_hal_read_reg_n_fields(
-		ECPRI_ORAN_XTOR_TX_n_DATA_IDXS_REG, ring_id,
-		(void *)&data_idxs_reg_s);
-
-		curr_rd_idx = data_idxs_reg_s.rd_idx;
-		if (curr_rd_idx == curr_wr_idx)
-		{
-			return 0;
-		}
-		/*
-		 * Mayak I dont know if this is correct but
-		 * if it is not done it is going to be a infinite while loop
-		 * elapsed_ms ++;
-		 */
-
-		/* ECPRI_ASSERT(0 == timer.GetElapsed_ms(&elapsed_ms)); */
-	}
-
-	/* ECPRI_ERROR_STACK_MSG(-1, "ring stop timed out: %llu [ms]",
-	 * timeout_ms); */
 
 	return 0;
 
