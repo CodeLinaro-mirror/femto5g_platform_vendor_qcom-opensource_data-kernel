@@ -56,7 +56,7 @@ static void mtip_pcs_set_vendor_pcs_mode(struct mtip_link_device_info* link_devi
     {
     case PHY_LANE_SPEED_25G:
         {
-            vendor_pcs_mode = MTIP_PCS_VENDOR_PCS_ENA_CLAUSE49_BIT | MTIP_PCS_VENDOR_PCS_DISABLE_MLD_BIT | MTIP_PCS_VENDOR_PCS_HI_BER25_BIT; 
+            vendor_pcs_mode = MTIP_PCS_VENDOR_PCS_ENA_CLAUSE49_BIT | MTIP_PCS_VENDOR_PCS_DISABLE_MLD_BIT | MTIP_PCS_VENDOR_PCS_HI_BER25_BIT;
         }
         break;
     case PHY_LANE_SPEED_10G:
@@ -292,4 +292,55 @@ int mtip_rsfec_initialize(struct mtip_port_device_info* port_device)
     return 0;
 }
 
+// enable RSFEC for 25G mode
+// set the VENDOR PCS MODE to DISABLE MLD
+void mtip_pcs_enable_rsfec_for_25g_mode(struct mtip_link_device_info* link_device)
+{
+    void __iomem *pcs_ioaddr = link_device->pcs_ioaddr;
+    u32 vendor_pcs_mode = 0;
+    u32 marker_counter = 0;
+
+    // set PCS_VENDOR_PCS_MODE [DISABLE_MLD] = 0
+    vendor_pcs_mode = MTIP_PCS_VENDOR_PCS_ENA_CLAUSE49_BIT | MTIP_PCS_VENDOR_PCS_HI_BER25_BIT; 
+
+    CSMLOGINFO("Setting VENDOR_PCS_MODE to: 0x%x\n", vendor_pcs_mode);
+
+    // set the vendor pcs mode register
+    iowrite32(vendor_pcs_mode,
+              pcs_ioaddr + MTIP_PCS_VENDOR_PCS_MODE_OFFSET);
+
+    // set PCS_VENDOR_VL_INTLVL marker_counter = 0x4FFF
+    marker_counter = 0x4FFF;
+
+    // set the vendor vl intvl register
+    iowrite32(marker_counter,
+              pcs_ioaddr + MTIP_PCS_VENDOR_VL_INTVL_OFFSET);
+    return;
+}
+
+// disable RSFEC for 25G mode
+// reset the VENDOR PCS MODE
+void mtip_pcs_disable_rsfec_for_25g_mode(struct mtip_link_device_info* link_device)
+{
+    void __iomem *pcs_ioaddr = link_device->pcs_ioaddr;
+    u32 vendor_pcs_mode = 0;
+    u32 marker_counter = 0;
+
+    // set PCS_VENDOR_PCS_MODE [DISABLE_MLD] = 1
+    vendor_pcs_mode = MTIP_PCS_VENDOR_PCS_ENA_CLAUSE49_BIT | MTIP_PCS_VENDOR_PCS_DISABLE_MLD_BIT | MTIP_PCS_VENDOR_PCS_HI_BER25_BIT; 
+
+    CSMLOGINFO("Setting VENDOR_PCS_MODE to: 0x%x\n", vendor_pcs_mode);
+
+    // set the vendor pcs mode register
+    iowrite32(vendor_pcs_mode,
+              pcs_ioaddr + MTIP_PCS_VENDOR_PCS_MODE_OFFSET);
+
+    // set PCS_VENDOR_VL_INTLVL marker_counter = 0
+    marker_counter = 0x0;
+
+    // set the vendor vl intvl register
+    iowrite32(marker_counter,
+              pcs_ioaddr + MTIP_PCS_VENDOR_VL_INTVL_OFFSET);
+    return;
+}
 

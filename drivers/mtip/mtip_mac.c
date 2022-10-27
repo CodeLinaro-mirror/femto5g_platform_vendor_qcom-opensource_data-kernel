@@ -583,7 +583,7 @@ void mtip_mac_wrapper_pcs_mode_control(struct mtip_port_device_info* port_device
             case PHY_LANE_SPEED_25G:
                 {
                     // this needs a proper fix
-                    pcs_mode_set = 0x0000;
+                    pcs_mode_set = MTIP_MAC_WRAPPER_PCS_MODE_25G_RSFEC_DISABLE_VAL;
                     csr_cfg = 0x3C00;
                     serdes_mux_cfg = 0x400;
                 }
@@ -817,5 +817,39 @@ bool mtip_mac_wrapper_get_link_status(u32 link_index)
       return true;
 
     return false;
+}
+
+// enable RSFEC for 25G mode
+// set the MAC WRAPPER PCS MODE for the port
+void mtip_mac_wrapper_enable_rsfec_for_25g_mode(struct mtip_port_device_info* port_device)
+{
+    // PCS_MODE_SET to 0x3F
+    u32 pcs_mode_set = MTIP_MAC_WRAPPER_PCS_MODE_25G_RSFEC_ENABLE_VAL;
+    void __iomem* wrapper_base_addr = port_device->wrapper_base_addr;
+
+    CSMLOGINFO("Setting PCS Mode: 0x%x\n", pcs_mode_set);
+
+    // set the mac wrapper pcs mode set
+    iowrite32(pcs_mode_set,
+              wrapper_base_addr + MTIP_MAC_WRAPPER_PCS_MODE_SET_OFFSET);
+
+    return;
+}
+
+// disable RSFEC for 25G mode
+// reset the MAC WRAPPER PCS MODE for the port
+void mtip_mac_wrapper_disable_rsfec_for_25g_mode(struct mtip_port_device_info* port_device)
+{
+    // PCS_MODE_SET to 0x0
+    u32 pcs_mode_set = MTIP_MAC_WRAPPER_PCS_MODE_25G_RSFEC_DISABLE_VAL;
+    void __iomem* wrapper_base_addr = port_device->wrapper_base_addr;
+
+    CSMLOGINFO("Setting PCS Mode: 0x%x\n", pcs_mode_set);
+
+    // set the mac wrapper pcs mode set
+    iowrite32(pcs_mode_set,
+              wrapper_base_addr + MTIP_MAC_WRAPPER_PCS_MODE_SET_OFFSET);
+
+    return;
 }
 

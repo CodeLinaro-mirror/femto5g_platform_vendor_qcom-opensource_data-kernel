@@ -83,6 +83,8 @@
 // MAC Wrapper Register values
 #define MTIP_MAC_WRAPPER_CALENDAR_CFG_REG_VAL            0x00001111
 #define MTIP_MAC_WRAPPER_TX_AMF_CFG_REG_VAL              0x1E1E1E1E
+#define MTIP_MAC_WRAPPER_PCS_MODE_25G_RSFEC_ENABLE_VAL   0x0000003F
+#define MTIP_MAC_WRAPPER_PCS_MODE_25G_RSFEC_DISABLE_VAL  0x00000000
 
 #define MTIP_MAC_WRAPPER_CSR_SIGNAL_DET_BASE             0
 #define MTIP_MAC_WRAPPER_CSR_SD_8X_EN_BASE               4
@@ -167,5 +169,9 @@ u32 mtip_mac_get_interrupt_summary(struct mtip_port_device_info* port_device);
 u32 mtip_mac_get_interrupt_status(u32 link_index);
 void mtip_mac_clear_interrupts(u32 link_index, u32 int_to_clear);
 bool mtip_mac_wrapper_get_link_status(u32 link_index);
+
+// functions to enable/disable rsfec for 25g mode
+void mtip_mac_wrapper_enable_rsfec_for_25g_mode(struct mtip_port_device_info* port_device);
+void mtip_mac_wrapper_disable_rsfec_for_25g_mode(struct mtip_port_device_info* port_device);
 
 #endif // _MTIP_MAC_H
