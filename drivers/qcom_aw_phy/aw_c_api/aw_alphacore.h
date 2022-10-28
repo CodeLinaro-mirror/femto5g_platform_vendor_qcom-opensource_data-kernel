@@ -9,8 +9,8 @@
 #include "aw_alphacore_atest_defines.h"
 #include "aw_alphacore_csr_defines.h"
 #include "aw_alphacore_ip_defines.h"
+#include "aw_alphacore_vfield_defines.h"
 #include "aw_driver_sim.h"
-#include "aw_pmd_vfields.h"
 
 #define CHECK(x)                                                               \
   do {                                                                         \
@@ -37,27 +37,17 @@ typedef enum aw_err_code_e {
 } aw_err_code_t;
 #endif
 
+typedef enum vref_vals_e { vref = 700, vref2 = 350 } vref_vals_t;
+
 #define NULL_CHECK(x)                                                          \
   do {                                                                         \
     if (x == NULL)                                                             \
       return AW_ERR_CODE_INVALID_ARG_VALUE;                                    \
   } while (0)
 
-typedef struct aw_an_cfg_s {
-
-  uint32_t lt_polynomial_sel_c92;
-
-  uint32_t lt_polynomial_sel_c136;
-
-  uint32_t lt_seed_11b;
-
-  uint32_t lt_seed_13b;
-
-} aw_an_cfg_t;
-
 typedef struct aw_dwell_params_s {
   uint32_t aw_measure_time;
-  uint32_t rx_data_rate;
+  uint64_t rx_data_rate;
 } aw_dwell_params_t;
 
 typedef struct digref_struct {
@@ -88,6 +78,13 @@ typedef struct digref_struct {
 
 } aw_digref_t;
 
+typedef struct aw_an_newdef_s {
+  uint32_t lane_num_u;
+  uint32_t lt_sel_u;
+  uint32_t pam_u;
+  uint32_t timer_sel_u;
+} aw_an_newdef_t;
+
 typedef struct tx_hbridge_s {
   uint32_t msb;
   uint32_t lsb;
@@ -96,6 +93,17 @@ typedef struct tx_hbridge_s {
   uint8_t bias_adj_en;
   uint8_t rlm_ovr_en;
 } tx_hbridge_t;
+
+typedef struct aw_an_spec_s {
+  uint32_t an_def_spec_width[28];
+  uint32_t an_def_spec_rate[28];
+
+  uint32_t an_def_an_rate;
+
+  aw_an_newdef_t newdef1;
+  aw_an_newdef_t newdef2;
+  aw_an_newdef_t newdef3;
+} aw_an_spec_t;
 
 typedef struct aw_lt_status_s {
   uint32_t lt_running;
@@ -183,6 +191,8 @@ typedef enum aw_pll_pstatus_e {
 
 typedef uint32_t aw_ffe_t[AW_FFE_NUM_TAPS];
 
+typedef int aw_ffe_signed_t[AW_FFE_NUM_TAPS];
+
 typedef struct aw_thresholds_s {
 
   uint32_t eh;
@@ -208,15 +218,22 @@ typedef struct aw_slicers_s {
 } aw_slicers_t;
 
 typedef struct aw_dsp_param_s {
-
-  uint32_t dc_offset;
-
-  uint32_t dfe;
-  aw_ffe_t ffe;
-  aw_ffe_t pre_ffe;
-  aw_ffe_t pre_dfe_ffe;
-  aw_thresholds_t thresholds;
-  aw_slicers_t slicers;
+    uint32_t dc_offset;
+    uint32_t dfe;
+    aw_ffe_t ffe;
+    aw_ffe_signed_t s_ffe;
+    aw_ffe_t pre_ffe;
+    aw_ffe_signed_t s_pre_ffe;
+    aw_ffe_t pre_dfe_ffe;
+    aw_ffe_signed_t s_pre_dfe_ffe;
+    aw_ffe_t pre_ffe_ctle0;
+    aw_ffe_t pre_ffe_ctle1;
+    aw_ffe_t pre_ffe_ctle2;
+    aw_ffe_t pre_ffe_ctle3;
+    aw_ffe_t pre_ffe_ctle4;
+    aw_ffe_t pre_ffe_ctle5;
+    aw_thresholds_t thresholds;
+    aw_slicers_t slicers;
 } aw_dsp_param_t;
 
 typedef struct aw_dcdiq_data_s {
@@ -369,13 +386,6 @@ typedef enum aw_pstate_e {
 
 typedef enum aw_cmn_pstate_e { AW_CMN_PD = 0, AW_CMN_P0 = 1 } aw_cmn_pstate_t;
 
-typedef struct aw_an_newdef_s {
-  uint32_t lane_num_u;
-  uint32_t lt_sel_u;
-  uint32_t pam_u;
-  uint32_t timer_sel_u;
-} aw_an_newdef_t;
-
 typedef enum aw_rx_roaming_mode_e {
   AW_NO_ROAMING = 0,
   AW_BANK1_ROAMING = 1,
@@ -384,17 +394,6 @@ typedef enum aw_rx_roaming_mode_e {
   AW_RESET_DEFAULT_ROAMING_MODE = 4,
   AW_MANUAL_WINDOW_SELECT = 5
 } aw_rx_roaming_mode_t;
-
-typedef struct aw_an_spec_s {
-  uint32_t an_def_spec_width[28];
-  uint32_t an_def_spec_rate[28];
-
-  uint32_t an_def_an_rate;
-
-  aw_an_newdef_t newdef1;
-  aw_an_newdef_t newdef2;
-  aw_an_newdef_t newdef3;
-} aw_an_spec_t;
 
 typedef enum aw_rx_ffe_tap_count_e {
   AW_FFE_11_TAPS = 0,
@@ -411,8 +410,6 @@ int aw_pmd_anlt_logical_lane_num_set(mss_access_t *mss, uint32_t logical_lane,
 int aw_pmd_anlt_auto_neg_adv_ability_set(mss_access_t *mss,
                                          uint32_t *adv_ability,
                                          uint32_t *fec_ability, uint32_t nonce);
-int aw_pmd_anlt_link_training_prbs_seed_set(mss_access_t *mss, uint32_t clause,
-                                            uint32_t logical_lane);
 
 int aw_pmd_anlt_auto_neg_config_set(mss_access_t *mss,
                                     uint32_t status_check_disable,
@@ -431,15 +428,10 @@ int aw_pmd_anlt_auto_neg_next_page_oui_compare_set(mss_access_t *mss,
 
 int aw_pmd_anlt_link_training_en_set(mss_access_t *mss, uint32_t en);
 
+int aw_pmd_anlt_link_training_reset(mss_access_t *mss);
+
 int aw_pmd_anlt_link_training_config_set(mss_access_t *mss, uint32_t width,
                                          uint32_t clause, uint32_t mod);
-
-int aw_pmd_isolate_lane_set(mss_access_t *mss, uint32_t en);
-
-int aw_pmd_isolate_lane_tx_set(mss_access_t *mss, uint32_t en);
-
-int aw_pmd_isolate_lane_rx_set(mss_access_t *mss, uint32_t en);
-int aw_pmd_isolate_lane_txrx_set(mss_access_t *mss, uint32_t en);
 
 int aw_pmd_anlt_link_training_init_preset_set(mss_access_t *mss,
                                               uint32_t clause, uint32_t init[],
@@ -451,9 +443,10 @@ int aw_pmd_anlt_link_training_min_max_set(mss_access_t *mss, uint32_t pre1_max,
                                           uint32_t pre1_min, uint32_t main_min,
                                           uint32_t post1_min);
 
-int aw_pmd_anlt_link_training_start_set(mss_access_t *mss, uint32_t start);
+int aw_pmd_anlt_link_training_prbs_seed_set(mss_access_t *mss, uint32_t clause,
+                                            uint32_t logical_lane);
 
-int aw_pmd_anlt_link_training_start_get(mss_access_t *mss, uint32_t *start);
+int aw_pmd_anlt_link_training_start_set(mss_access_t *mss, uint32_t start);
 
 int aw_pmd_anlt_link_training_status_get(mss_access_t *mss,
                                          uint32_t *lt_running,
@@ -461,11 +454,11 @@ int aw_pmd_anlt_link_training_status_get(mss_access_t *mss,
                                          uint32_t *lt_training_failure,
                                          uint32_t *lt_rx_ready);
 
+int aw_pmd_anlt_link_training_timeout_enable_set(mss_access_t *mss,
+                                                 uint32_t enable);
+
 int aw_pmd_refclk_termination_set(mss_access_t *mss,
                                   aw_refclk_term_mode_t lsrefbuf_term_mode);
-
-int aw_pmd_refclk_termination_get(mss_access_t *mss,
-                                  aw_refclk_term_mode_t *lsrefbuf_term_mode);
 
 int aw_pmd_rx_termination_set(mss_access_t *mss,
                               aw_acc_term_mode_t acc_term_mode);
@@ -473,7 +466,8 @@ int aw_pmd_rx_termination_set(mss_access_t *mss,
 int aw_pmd_force_signal_detect_config_set(mss_access_t *mss,
                                           aw_force_sigdet_mode_t sigdet_mode);
 
-int aw_pmd_txfir_config_set(mss_access_t *mss, aw_txfir_config_t *txfir_cfg);
+int aw_pmd_txfir_config_set(mss_access_t *mss, aw_txfir_config_t *txfir_cfg,
+                            uint32_t fir_ovr_enable);
 
 int aw_pmd_tx_pam4_precoder_override_set(mss_access_t *mss, uint32_t en);
 
@@ -485,8 +479,14 @@ int aw_pmd_rx_pam4_precoder_override_set(mss_access_t *mss, uint32_t en);
 int aw_pmd_remote_loopback_set(mss_access_t *mss,
                                uint32_t remote_loopback_enable);
 
+int aw_pmd_tx_dcd_iq_cal(mss_access_t *mss, uint32_t enable_d);
+
+int aw_pmd_fep_data_set(mss_access_t *mss, uint32_t datapath_en);
+
 int aw_pmd_analog_loopback_set(mss_access_t *mss,
                                uint32_t analog_loopback_enable);
+
+int aw_pmd_fep_clock_set(mss_access_t *mss, uint8_t clock_en);
 
 int aw_pmd_tx_polarity_set(mss_access_t *mss, uint32_t tx_pol_flip);
 
@@ -495,12 +495,6 @@ int aw_pmd_rx_polarity_set(mss_access_t *mss, uint32_t rx_pol_flip);
 int aw_pmd_rx_dfe_adapt_set(mss_access_t *mss, uint32_t dfe_adapt_enable);
 
 int aw_pmd_rxeq_prbs_set(mss_access_t *mss, uint32_t prbs_en);
-
-int aw_pmd_rxeq_prbs_get(mss_access_t *mss, uint32_t *prbs_en);
-
-int aw_pmd_fep_data_set(mss_access_t *mss, uint32_t datapath_en);
-
-int aw_pmd_fep_clock_set(mss_access_t *mss, uint8_t clock_en);
 
 int aw_pmd_rx_chk_config_set(mss_access_t *mss, aw_bist_pattern_t pattern,
                              aw_bist_mode_t mode, uint64_t udp_63_0,
@@ -520,9 +514,6 @@ int aw_pmd_rx_chk_err_count_state_clear(mss_access_t *mss);
 int aw_pmd_tx_gen_config_set(mss_access_t *mss, aw_bist_pattern_t pattern,
                              uint64_t udp_63_0, uint64_t udp_127_64);
 
-int aw_pmd_tx_gen_config_get(mss_access_t *mss, aw_bist_pattern_t *pattern,
-                             uint64_t *udp_63_0, uint64_t *udp_127_64);
-
 int aw_pmd_tx_gen_en_set(mss_access_t *mss, uint32_t enable);
 
 int aw_pmd_tx_gen_err_inject_config_set(mss_access_t *mss, uint64_t err_pattern,
@@ -530,43 +521,10 @@ int aw_pmd_tx_gen_err_inject_config_set(mss_access_t *mss, uint64_t err_pattern,
 
 int aw_pmd_tx_gen_err_inject_en_set(mss_access_t *mss, uint32_t enable);
 
-int aw_pmd_ock_pcs_clk_b_gate_set(mss_access_t *mss, uint32_t enable);
-
-int aw_pmd_ock_pcs_clk_b_gate_get(mss_access_t *mss, uint32_t *enable);
-
-int aw_pmd_tx_disable_pin_override_set(mss_access_t *mss,
-                                       uint32_t override_enable);
-
-int aw_pmd_tx_preset_get(mss_access_t *mss, aw_state_rate_t *tx_rate_preset,
-                         aw_training_mode_t *tx_training_mode);
-
-int aw_pmd_rx_preset_get(mss_access_t *mss, aw_state_rate_t *rx_rate_preset,
-                         aw_training_mode_t *rx_training_mode);
-
 int aw_pmd_pll_lock_min_set(mss_access_t *mss, uint32_t val);
 
 int aw_pmd_pll_lock_get(mss_access_t *mss, uint32_t *pll_lock,
                         uint32_t check_en, uint32_t expected_val);
-
-int aw_pmd_pll_pwrdn_get(mss_access_t *mss, aw_pll_pstatus_t *pll_pwrdn_status);
-
-int aw_pmd_lane_map_set(mss_access_t *mss, uint32_t const *tx_lane_map_arr,
-                        uint32_t const *rx_lane_map_arr);
-
-int aw_pmd_lane_map_get(mss_access_t *mss, uint32_t *tx_lane_map_arr,
-                        uint32_t *rx_lane_map_arr);
-
-int aw_pmd_uc_ucode_crc_clear(mss_access_t *mss);
-
-int aw_pmd_uc_ucode_pmi_load(mss_access_t *mss, uint32_t **ucode_arr,
-                             uint32_t size);
-
-int aw_pmd_uc_ucode_mdio_load(mss_access_t *mss, uint32_t **ucode_arr,
-                              uint32_t ucode_len);
-
-int aw_pmd_uc_ucode_crc_verify(mss_access_t *mss, uint32_t expected_crc);
-
-int aw_pmd_iso_ref_ls_en_set(mss_access_t *mss, uint32_t value);
 
 int aw_pmd_iso_cmn_pstate_set(mss_access_t *mss, uint32_t value);
 
@@ -621,6 +579,12 @@ int aw_pmd_isolate_cmn_set(mss_access_t *mss, uint32_t en);
 int aw_pmd_isolate_cmn_get(mss_access_t *mss, uint32_t *en);
 
 int aw_pmd_isolate_lane_set(mss_access_t *mss, uint32_t en);
+
+int aw_pmd_isolate_lane_tx_set(mss_access_t *mss, uint32_t en);
+
+int aw_pmd_isolate_lane_rx_set(mss_access_t *mss, uint32_t en);
+
+int aw_pmd_isolate_lane_txrx_set(mss_access_t *mss, uint32_t en);
 
 int aw_pmd_isolate_lane_get(mss_access_t *mss, uint32_t *en);
 
@@ -692,8 +656,6 @@ int aw_pmd_nep_loopback_set(mss_access_t *mss, uint32_t nep_loopback_enable);
 
 int aw_pmd_anlt_ms_per_ck_set(mss_access_t *mss, uint32_t ms_per_ck);
 
-int aw_pmd_anlt_fastsim_timer_set(mss_access_t *mss);
-
 int aw_pmd_anlt_auto_neg_link_status_ovr_enable(mss_access_t *mss, uint32_t en);
 
 int aw_pmd_link_training_without_an_config_set(mss_access_t *mss,
@@ -714,6 +676,8 @@ int aw_pmd_snr_mon_enable_set(mss_access_t *mss, uint32_t nrz_mode,
                               uint32_t mon_enable);
 
 int aw_pmd_snr_vld_enable_set(mss_access_t *mss, uint32_t vld_enable);
+
+int aw_tc_sm_conv(uint32_t v, uint32_t i);
 
 int aw_pmd_rx_cdr_lock_get(mss_access_t *mss, uint32_t *rx_cdr_lock);
 

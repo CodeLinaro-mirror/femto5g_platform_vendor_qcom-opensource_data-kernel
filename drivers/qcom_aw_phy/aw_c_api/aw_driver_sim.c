@@ -140,6 +140,12 @@ int pmd_read_addr(mss_access_t *mss, uint32_t addr, uint32_t *rdval) {
     final_addr = trans_addr + mss->lane_offset + mss->phy_offset;
   }
 
+  if (addr >= LANE_BROADCAST && addr < SRAM_OFFSET) {
+    QCOM_AW_PHY_LOG_DBG("[pmd_read_addr]: Cannot read register while mss.lane_offset has "
+           "lane broadcast set.\n");
+    return 1;
+  }
+
   read_csr(final_addr, rdval);
   QCOM_AW_PHY_LOG_DBG("[pmd_read_addr]: Reading addr offset: 0x%x, val = %d\n",
                       addr_offset, *rdval);
