@@ -25,6 +25,10 @@ ifeq ($(KVER),$(filter 5.4%,$(KVER)))
 ccflags-y += -DISKERNEL5_4
 endif
 
+ifeq ($(KVER),$(filter 5.15%,$(KVER)))
+ccflags-y += -DISKERNEL5_4 -DISKERNEL5_15
+endif
+
 gsb-objs := \
 	generic_sw_bridge_main.o
 all:

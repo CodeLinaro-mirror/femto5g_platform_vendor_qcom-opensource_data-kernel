@@ -38,8 +38,14 @@ static DECLARE_WAIT_QUEUE_HEAD(wq);
 
 static struct proc_dir_entry* proc_file = NULL;
 static struct proc_dir_entry* proc_file_drop_pkts = NULL;
-static struct file_operations proc_file_ops;
-static struct file_operations proc_file_drop_pkts_ops;
+#ifdef ISKERNEL5_15
+	static struct proc_ops proc_ops;
+	static struct proc_ops proc_drop_pkts_ops;
+#else
+	static struct file_operations proc_file_ops;
+	static struct file_operations proc_file_drop_pkts_ops;
+#endif
+
 int gsb_enable_ipc_low;
 bool gsb_drop_pkts;
 #define MAX_PROC_SIZE 10
@@ -137,65 +143,6 @@ static void suspend_task(struct work_struct *work)
 }
 
 static struct timer_list INACTIVITY_TIMER;
-
-static void dump_pkt(char* if_name, void *base, u32 size)
-{
-	if (dynamic_debug)
-	{
-		int i;
-		u32 *cur = (u32 *)base;
-		u8 *byt;
-		DYN_DEBUG("Printing %u bytes from %s\n", size, if_name);
-		for (i = 0; i < size / 4; i++) {
-			byt = (u8 *)(cur + i);
-			DYN_DEBUG("%2d %08x   %02x %02x %02x %02x\n", i, *(cur + i),
-					byt[0], byt[1], byt[2], byt[3]);
-		}
-		DYN_DEBUG("END\n");
-	}
-}
-
-static void dump_skb_util(const struct sk_buff *skb)
-{
-	char buffer[PACKET_DUMP_BUFFER];
-	unsigned int len, printlen;
-	int i, buffloc = 0;
-	if (skb == NULL || skb->dev == NULL || skb->dev->name == NULL)
-	{
-		DEBUG_ERROR("Cannot dump this packet\n");
-		return;
-	}
-	DEBUG_TRACE("dumping packet.....\n");
-	DUMP_PACKET("[%s] - PKT skb->len=%d skb->head=%pK skb->data=%pK\n",
-			skb->dev->name, skb->len, (void *)skb->head, (void *)skb->data);
-	DUMP_PACKET("[%s] - PKT skb->tail=%pK skb->end=%pK\n",
-			skb->dev->name,  skb_tail_pointer(skb), skb_end_pointer(skb));
-	printlen = PACKET_MP_PRINT_LEN;
-	if (skb->len > 0) len = skb->len;
-	else len = ((unsigned int)(uintptr_t)skb->end) -
-			((unsigned int)(uintptr_t)skb->data);
-
-	DUMP_PACKET("[%s]- PKT len: %d, printing first %d bytes\n",
-			skb->dev->name, len, printlen);
-
-	memset(buffer, 0, sizeof(buffer));
-	for (i = 0; (i < printlen) && (i < len); i++)
-	{
-		if ((i % 16) == 0)
-		{
-			DUMP_PACKET("[%s]- PKT %s\n", skb->dev->name, buffer);
-			memset(buffer, 0, sizeof(buffer));
-			buffloc = 0;
-			buffloc += snprintf(&buffer[buffloc],
-						sizeof(buffer) - buffloc, "%04X:",
-						i);
-		}
-
-		buffloc += snprintf(&buffer[buffloc], sizeof(buffer) - buffloc,
-					" %02x", skb->data[i]);
-	}
-	DUMP_PACKET("[%s]- PKT%s\n", skb->dev->name, buffer);
-}
 
 static void schedule_inactivity_timer(const unsigned int time_in_ms)
 {
@@ -343,44 +290,6 @@ static void remove_padding(struct sk_buff *skb, bool ipv4, bool ipv6)
 }
 
 
-static void release_pending_packets_exp(struct gsb_if_info *if_info)
-{
-	struct sk_buff *skb;
-	struct if_ipa_ctx *pipa_ctx = if_info->if_ipa;
-	int retval = 0;
-
-
-	spin_lock_bh(&if_info->flow_ctrl_lock);
-	while (if_info->pend_queue.qlen)
-	{
-		skb = __skb_dequeue(&if_info->pend_queue);
-		if (IS_ERR_OR_NULL(skb))
-		{
-			DEBUG_ERROR("null skb\n");
-			BUG();
-			break;
-		}
-
-		IPC_TRACE_LOW("tagging skb with string %s, skbp= %pK\n", skb->cb, skb);
-		strlcpy(skb->cb, "loop", ((sizeof(skb->cb)) / (sizeof(skb->cb[0]))));
-		skb->protocol = eth_type_trans(skb, skb->dev);
-		//Send Packet to NW stack
-		retval = netif_rx_ni(skb);
-		if (retval != NET_RX_SUCCESS)
-		{
-			DEBUG_ERROR("ERROR sending to nw stack %d\n", retval);
-
-			pipa_ctx->stats.exp_if_disconnected_fail++;
-		}
-		else
-		{
-			pipa_ctx->stats.exp_if_disconnected++;
-		}
-	}
-	spin_unlock_bh(&if_info->flow_ctrl_lock);
-}
-
-
 static void flush_pending_packets(struct gsb_if_info *if_info)
 {
 	DEBUG_INFO("Flush %d Pending UL Packets \n", if_info->pend_queue.qlen);
@@ -411,9 +320,6 @@ static  ssize_t gsb_read_stats(struct file *file,
 	uint64_t schedule_cnt = 0;
 	uint64_t idle_cnt = 0;
 	uint64_t pending_wde = 0;
-	u16 wake_ref_cnt;
-	uint64_t inactivity_sceduled = 0;
-	uint64_t inactivity_cancelled = 0;
 	bool is_suspended;
 	char file_name[PATH_MAX];
 	struct gsb_ctx *pgsb_ctx = __gc;
@@ -835,29 +741,6 @@ static int add_entry_to_ht(struct gsb_if_info *info)
 	return 0;
 }
 
-static void display_cache(void)
-{
-	struct gsb_if_info *curr;
-	struct hlist_node *tmp;
-	int bkt;
-	struct gsb_ctx *pgsb_ctx = __gc;
-	if (NULL == pgsb_ctx)
-		{
-		DEBUG_ERROR("Context is NULL\n");
-		return;
-		}
-
-	hash_for_each_safe(pgsb_ctx->cache_htable_list, bkt, tmp, curr, cache_ht_node)
-	{
-		DEBUG_INFO("gsb iface %s,iface type %d,low wm %d,high wm %d,bw reqd %d\n\n",
-				curr->if_name,
-				curr->user_config.if_type,
-				curr->user_config.if_low_watermark,
-				curr->user_config.if_high_watermark,
-				curr->user_config.bw_reqd_in_mb);
-	}
-}
-
 static void gsb_recv_ipa_notification_cb(void *priv, enum ipa_dp_evt_type evt,
 					 unsigned long data)
 {
@@ -1165,7 +1048,12 @@ static int gsb_bind_if_to_ipa_bridge(struct gsb_if_info *if_info)
 
 	params_ptr->wakeup_request = (void *)&gsb_wakeup_cb;
 
+#ifdef ISKERNEL5_15
+	retval = ipa_bridge_init(&params_ptr->info, &if_info->handle);
+#else
 	retval = ipa_bridge_init(params_ptr, &if_info->handle);
+#endif
+
 	if (retval != 0)
 	{
 		DEBUG_ERROR("Couldnt initialize ipa bridge Driver\n");
@@ -1256,8 +1144,13 @@ static long gsb_ioctl(struct file *filp,
 		if (result > 0  )
 		{
 			retval = -EFAULT;
+#ifdef ISKERNEL5_15
+			DEBUG_ERROR("issue with copying buffer from user space bytes %ld payl %d\n",
+					result, payload_size);
+#else
 			DEBUG_ERROR("issue with copying buffer from user space bytes %d payl %d\n",
 					result, payload_size);
+#endif
 			break;
 		}
 
@@ -1738,8 +1631,11 @@ static int gsb_device_event(struct notifier_block *this, unsigned long event, vo
 			return NOTIFY_DONE;
 		}
 	}
-
+#ifdef ISKERNEL5_15
+	IPC_INFO_LOW("event 0x%lX received for iface %s\n", event, dev->name);
+#else
 	IPC_INFO_LOW("event 0x%X received for iface %s\n", event, dev->name);
+#endif
 
 	switch (event)
 	{
@@ -2129,7 +2025,6 @@ static ssize_t gsb_proc_write_cb(struct file *file,const char *buf,size_t count,
 
 {
 	int tmp = 0;
-
 	memset(tmp_buff,0, sizeof(tmp_buff));
 	if(count > MAX_PROC_SIZE)
 		count = MAX_PROC_SIZE;
@@ -2172,14 +2067,23 @@ static ssize_t gsb_proc_write_cb(struct file *file,const char *buf,size_t count,
 static ssize_t gsb_drop_pkts_write_cb(struct file *file,
 							const char *buf, size_t count,loff_t *data )
 {
+#ifdef ISKERNEL5_15
+	int tmp = 0;
+#else
 	bool tmp = 0;
-
+#endif
 	memset(tmp_buff,0, sizeof(tmp_buff));
 	if(count > MAX_PROC_SIZE)
 		count = MAX_PROC_SIZE;
 	if(copy_from_user(tmp_buff, buf, count))
 		return -EFAULT;
+
+#ifdef ISKERNEL5_15
+	if (sscanf(tmp_buff, "%d", &tmp) < 0)
+#else
 	if (sscanf(tmp_buff, "%du", &tmp) < 0)
+#endif
+
 		pr_err("sscanf failed\n");
 	else {
 			gsb_drop_pkts = tmp;
@@ -2207,8 +2111,37 @@ static int __init gsb_init_module(void)
 	else
 		pr_info("IPC logging has been enabled for GSB\n");
 
+#ifdef ISKERNEL5_15
 	//define proc file and operations
-	memset(&proc_file_ops, 0, sizeof(struct file_operations));
+	memset(&proc_ops,
+				0, sizeof(struct proc_ops));
+	//proc_opss.owner = THIS_MODULE;
+	proc_ops.proc_read =  gsb_proc_read_cb;
+	proc_ops.proc_write = gsb_proc_write_cb;
+
+
+	if((proc_file = proc_create("gsb_proc_entry", 0, NULL,
+		&proc_ops)) == NULL) {
+		pr_err(" error creating proc entry!\n");
+		return -EINVAL;
+	}
+
+	memset(&proc_drop_pkts_ops,
+				0, sizeof(struct proc_ops));
+	//proc_file_drop_pkts_ops.owner = THIS_MODULE;
+	proc_drop_pkts_ops.proc_read = gsb_drop_pkts_read_cb;
+	proc_drop_pkts_ops.proc_write = gsb_drop_pkts_write_cb;
+
+
+	if((proc_file_drop_pkts = proc_create("gsb_drop_pkts", 0, NULL,
+		&proc_drop_pkts_ops)) == NULL) {
+		pr_err("gsb: error creating proc entry\n");
+		return -EINVAL;
+	}
+#else
+	//define proc file and operations
+	memset(&proc_file_ops, 
+				0, sizeof(struct file_operations));
 	proc_file_ops.owner = THIS_MODULE;
 	proc_file_ops.read =  gsb_proc_read_cb;
 	proc_file_ops.write = gsb_proc_write_cb;
@@ -2217,9 +2150,8 @@ static int __init gsb_init_module(void)
 		pr_err(" error creating proc entry!\n");
 		return -EINVAL;
 	}
-
 	memset(&proc_file_drop_pkts_ops,
-				0, sizeof(struct file_operations));
+							0, sizeof(struct file_operations));
 	proc_file_drop_pkts_ops.owner = THIS_MODULE;
 	proc_file_drop_pkts_ops.read = gsb_drop_pkts_read_cb;
 	proc_file_drop_pkts_ops.write = gsb_drop_pkts_write_cb;
@@ -2228,6 +2160,8 @@ static int __init gsb_init_module(void)
 		pr_err("gsb: error creating proc entry\n");
 		return -EINVAL;
 	}
+#endif
+
 	pgsb_ctx = kzalloc(sizeof(struct gsb_ctx), GFP_KERNEL);
 	if (pgsb_ctx == NULL)
 	{
@@ -2257,7 +2191,10 @@ static int __init gsb_init_module(void)
 	spin_lock_init(&pgsb_ctx->gsb_lock);
 	pgsb_ctx->gsb_lock_acquired = false;
 
-#ifdef ISKERNEL5_4
+#ifdef ISKERNEL5_15
+	memcpy(&pgsb_ctx->gsb_wake_src, wakeup_source_create("gsb_wake_source"), sizeof(pgsb_ctx->gsb_wake_src));
+
+#elif ISKERNEL5_4
 	memcpy(&pgsb_ctx->gsb_wake_src, wakeup_source_create("gsb_wake_source"), sizeof(&pgsb_ctx->gsb_wake_src));
 #else
 	wakeup_source_init(&pgsb_ctx->gsb_wake_src, "gsb_wake_source");
