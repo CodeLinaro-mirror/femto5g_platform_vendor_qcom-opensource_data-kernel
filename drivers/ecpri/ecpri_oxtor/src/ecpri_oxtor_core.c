@@ -151,8 +151,21 @@ static int ecpri_oxtor_core_init(void)
 	return 0;
 }
 
+/*
+function to enable bits of kbyte_cnt_control register
+*/
 
+ int ecpri_oxtor_kb_cnt_ctl_register_write(int clear, int enable)
+{
+	ecpri_oran_xtor_hwio_def_ecpri_oran_xtor_rx_kbyte_cnt_ctl_s reg_obj_s;
+	reg_obj_s.clr = clear;
+	reg_obj_s.en = enable;
+	pr_err("function: ecpri_oxtor_kb_cnt_ctl_register_write: clear=%d, enable=%d\n",clear,enable);
+	ecpriss_oxtor_hal_write_reg_n_fields(ECPRI_OXTOR_REG_TYPE_BASE,
+	ECPRI_ORAN_XTOR_RX_KBYTE_CNT_CTL ,0, &reg_obj_s);
+	return 0;
 
+}
 
 static int ecpri_oxtor_init(struct platform_device *pdev)
 {
@@ -339,6 +352,12 @@ static int ecpri_oxtor_core_validate_config(ecpri_oxtor_core_cfg_s *var)
 static long ecpri_oxtor_core_ioctl_hdlr(struct file *filp, unsigned int cmd,
 		unsigned long arg)
 {
+	ecpri_oran_xtor_hwio_def_ecpri_oran_xtor_rx_kbyte_cnt_qtimer_delta_0_s bw_timer_delta_lsb;
+	ecpri_oran_xtor_hwio_def_ecpri_oran_xtor_rx_kbyte_cnt_qtimer_delta_1_s bw_timer_delta_msb;
+   	u32 tx_kbyte_received = 0;
+	uint64_t timer_value = 0;
+	uint64_t qtimer_bw_time_sec = 0;
+	ecpri_oxtor_bw_rx_kbyte_val_s rx_kbyte_cnt;
 	ecpri_oxtor_core_cfg_s var;
 	ecpri_oxtor_start_cfg_s data;
 	u32 reset_ring_id;
@@ -591,6 +610,71 @@ static long ecpri_oxtor_core_ioctl_hdlr(struct file *filp, unsigned int cmd,
 					&ecpri_oxtor_core_cntxt,
 					sizeof(ecpri_oxtor_core_cntxt_s));
 			g_cache.cache_index++;
+			break;
+
+		case ECPRI_OXTOR_IOCTL_BANDWIDTH_ENABLE:
+			ecpri_oxtor_kb_cnt_ctl_register_write(BW_CNT_CLEAR_SET, BW_CNT_DISABLE);
+			ecpri_oxtor_kb_cnt_ctl_register_write(BW_CNT_CLEAR_RESET, BW_CNT_ENABLE);
+			pr_info("KB_CNT_REG clear bit set to 1 followed by enable bit set to 1\n");
+			break;
+
+		case ECPRI_OXTOR_IOCTL_BANDWIDTH_DISABLE:
+			pr_info("stop_bw_cal: setting enable bit to 0 for stopping Qtimer\n");
+			ecpri_oxtor_kb_cnt_ctl_register_write(BW_CNT_CLEAR_RESET, BW_CNT_DISABLE);
+			pr_info("Enable bit of KBYTE_CNT_CTL register set to 0\n");
+			break;
+
+
+
+		case ECPRI_OXTOR_IOCTL_GET_BANDWIDTH :
+			memset(&rx_kbyte_cnt,0,sizeof(rx_kbyte_cnt));
+			for( i = 0;i<4;i++)
+			{
+				tx_kbyte_received = ecpri_oxtor_tx_get_bandwidth(i);
+				if(tx_kbyte_received == -1)
+				{
+					pr_err("Ring_ptr for ring id %d is NULL\n",i);
+					rx_kbyte_cnt.rx_kbyte[i] = -1;
+					goto IOCTL_RET;
+				}
+				else
+					rx_kbyte_cnt.rx_kbyte[i] = tx_kbyte_received;
+			}
+			pr_info("ring_id  KB_CNT");
+
+			for(i = 0; i < 4; i++){
+				pr_info("0x0%x 0x0%x\n",i,
+						rx_kbyte_cnt.rx_kbyte[i]);
+			}
+			pr_info("End of the table");
+
+
+			memset(&bw_timer_delta_lsb,0,sizeof(bw_timer_delta_lsb));
+			ecpriss_oxtor_hal_read_reg_n_fields(ECPRI_ORAN_XTOR_RX_KBYTE_CNT_QTIMER_DELTA_0,0, (void*)&bw_timer_delta_lsb);
+
+
+			memset(&bw_timer_delta_msb,0,sizeof(bw_timer_delta_msb));
+			ecpriss_oxtor_hal_read_reg_n_fields(ECPRI_ORAN_XTOR_RX_KBYTE_CNT_QTIMER_DELTA_1,0, (void*)&bw_timer_delta_msb);
+
+
+			pr_info("time register lsb value (clock diff) = 0x0%x \n",bw_timer_delta_lsb.qtimer_lsb);
+			pr_info("time register msb value =0x0%x\n",bw_timer_delta_msb.qtimer_msb);
+			timer_value |=bw_timer_delta_msb.qtimer_msb;
+			timer_value = timer_value << 32;
+			timer_value |= bw_timer_delta_lsb.qtimer_lsb;
+
+			qtimer_bw_time_sec = timer_value / ECPRI_OXTOR_QTIMER_FREQ_HZ;
+			rx_kbyte_cnt.timer_val = qtimer_bw_time_sec;
+
+			pr_info("bw_timer_value in seconds = %lld",qtimer_bw_time_sec);
+			pr_info("timer value = 0x0%x\n",timer_value);
+
+			IOCTL_RET: if(copy_to_user((ecpri_oxtor_bw_rx_kbyte_val_s *)arg, &rx_kbyte_cnt,
+						sizeof(rx_kbyte_cnt))){
+				pr_err("copy_to_user_failed in ioctls\n");
+				return 0;
+			}
+
 			break;
 
 		default:

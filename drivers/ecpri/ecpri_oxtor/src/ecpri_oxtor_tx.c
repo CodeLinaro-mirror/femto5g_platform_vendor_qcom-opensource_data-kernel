@@ -474,6 +474,27 @@ static int ecpri_oxtor_tx_stop_reset(u32 ring_id )
 }
 #endif
 
+int ecpri_oxtor_tx_get_bandwidth(u32 ring_id)
+{
+	u32 temp_stat_val = 0;
+	ecpri_oxtor_tx_ring_s *ring_ptr = NULL;
+
+	ring_ptr= &ecpri_oxtor_tx_ring_cnxt.ring_arr[ring_id];
+
+	if(ring_ptr == NULL)
+	{
+		pr_err("Null value\n");
+		return -1;
+	}
+
+
+	ecpriss_oxtor_hal_read_reg_n_fields(ECPRI_ORAN_XTOR_RX_n_KBYTE_CNT_REG, ring_id, (void*)&temp_stat_val);
+
+	pr_info("KB_count for ring_id %d is  %d\n",ring_id,temp_stat_val);
+
+    return temp_stat_val;
+
+}
 int ecpri_oxtor_tx_get_status(u32 ring_id)
 {
 	ecpri_oxtor_tx_ring_s *ring_ptr = NULL;

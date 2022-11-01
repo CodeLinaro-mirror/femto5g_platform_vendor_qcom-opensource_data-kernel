@@ -129,5 +129,6 @@ int ecpri_oxtor_tx_ctl_reg_cfg(const ecpri_oxtor_tx_ring_config_s* cfg ,
 		u32 ring_id);
 int ecpri_oxtor_tx_get_status(u32 ring_id);
 int ecpri_oxtor_tx_get_stats(u32 ring_id);
+int ecpri_oxtor_tx_get_bandwidth(u32 ring_id);
 
 #endif /* ECPRI_OXTOR_TX_H_ */

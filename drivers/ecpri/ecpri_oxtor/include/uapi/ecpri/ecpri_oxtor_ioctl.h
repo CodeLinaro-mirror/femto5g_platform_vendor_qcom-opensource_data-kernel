@@ -143,6 +143,19 @@ typedef struct
 	uint32_t rx_count[4];
 	uint32_t tx_count[4];
 } ecpri_oxtor_stats_s;
+
+typedef struct
+{
+	uint32_t  rx_kbyte[4];
+	uint64_t timer_val;
+}ecpri_oxtor_bw_rx_kbyte_val_s;
+
+typedef struct
+{
+	uint32_t  oxtor_bw_val[4];
+}ecpri_oxtor_bw_val_s;
+
+
 /*---------------------------------------------------------------------------
  * Macros and definitions
  *--------------------------------------------------------------------------*/
@@ -152,6 +165,8 @@ typedef struct
 #define ECPRI_OXTOR_IOCTL_START	_IOW(IOCTL_BASE, 'b', ecpri_oxtor_start_cfg_s *)
 #define ECPRI_OXTOR_IOCTL_RESET _IOW(IOCTL_BASE, 'c', uint32_t *)
 #define ECPRI_OXTOR_IOCTL_GET_STATS _IOR(IOCTL_BASE, 'd', ecpri_oxtor_stats_s *)
-
+#define ECPRI_OXTOR_IOCTL_BANDWIDTH_ENABLE _IOR(IOCTL_BASE, 'e',uint32_t *)
+#define ECPRI_OXTOR_IOCTL_BANDWIDTH_DISABLE _IOR(IOCTL_BASE, 'f', uint32_t *)
+#define ECPRI_OXTOR_IOCTL_GET_BANDWIDTH _IOR(IOCTL_BASE, 'g', ecpri_oxtor_bw_val_s *)
 
 #endif /* ECPRI_OXTOR_IOCTL_H_ */
