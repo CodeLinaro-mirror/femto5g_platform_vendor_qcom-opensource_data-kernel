@@ -6,37 +6,31 @@
 #include <linux/random.h>
 #include <linux/delay.h>
 #include "aw_alphacore.h"
+#include "aw_alphacore_vfield_defines.h"
 #include "aw_pmd_rx_dsp_get.h"
-#include "aw_pmd_vfields.h"
 
+const char aw_library_version[] = "1.0.10";
 
-#if defined(C_API_COVERAGE_ENABLE)
-#include "execinfo.h"
-#include "stdio.h"
-
-void __cyg_profile_func_enter(void *func, void *caller)
-    __attribute__((no_instrument_function));
-
-void __cyg_profile_func_enter(void *func, void *caller) {
-
-  (void)caller;
-  (void)func;
-  FILE *fptr;
-  fptr = fopen("backtrace_dump.log", "a");
-  fprintf(fptr, "\n===================API BTRACE START===================\n");
-  int nptrs;
-  void *buffer[1024];
-  char **bt_syms;
-  nptrs = backtrace(buffer, 1024);
-  bt_syms = backtrace_symbols(buffer, nptrs);
-  fprintf(fptr, "%s\n", bt_syms[1]);
-  free(bt_syms);
-  fprintf(fptr, "\n===================API BTRACE END====================\n");
-  fclose(fptr);
+uint32_t power(uint32_t x, uint32_t n)
+{
+    uint32_t i = 0, ret = 1;
+ 
+    for (i = 0; i < n; i++) {
+        ret = ret * x;
+    }
+ 
+    return ret;
 }
-#endif
 
-const char aw_library_version[] = "1.0.7";
+int aw_tc_sm_conv(uint32_t v, uint32_t i) {
+    int final_val;
+    if(v >= power(2,i-1)) {
+        final_val = v - power(2,i);
+    } else {
+        final_val = v;
+    }
+    return final_val;
+}
 
 uint32_t aw_width_decoder(uint32_t width_encoded) {
   uint32_t width = 128;
@@ -270,6 +264,20 @@ int aw_pmd_anlt_link_training_preset_check_set(mss_access_t *mss,
   return AW_ERR_CODE_NONE;
 }
 
+int aw_pmd_anlt_link_training_reset(mss_access_t *mss) {
+  aw_pmd_anlt_link_training_en_set(mss, 0);
+  aw_pmd_anlt_link_training_start_set(mss, 0);
+
+  CHECK(pmd_write_field(mss, ETH_LT_CTRL_ADDR,
+                        ETH_LT_CTRL_LT_MR_RESTART_TRAINING_MASK,
+                        ETH_LT_CTRL_LT_MR_RESTART_TRAINING_OFFSET, 1));
+  CHECK(pmd_write_field(mss, ETH_LT_CTRL_ADDR,
+                        ETH_LT_CTRL_LT_MR_RESTART_TRAINING_MASK,
+                        ETH_LT_CTRL_LT_MR_RESTART_TRAINING_OFFSET, 0));
+
+  return AW_ERR_CODE_NONE;
+}
+
 int aw_pmd_anlt_link_training_config_set(mss_access_t *mss, uint32_t width,
                                          uint32_t clause, uint32_t mod) {
 
@@ -280,6 +288,7 @@ int aw_pmd_anlt_link_training_config_set(mss_access_t *mss, uint32_t width,
   CHECK(pmd_write_field(mss, ETH_LT_SETTINGS_ADDR,
                         ETH_LT_SETTINGS_LT_REG_FINAL_MOD_MASK,
                         ETH_LT_SETTINGS_LT_REG_FINAL_MOD_OFFSET, mod));
+
   if (clause >= 3) {
     CHECK(pmd_write_field(mss, ETH_LT_SETTINGS_ADDR,
                           ETH_LT_SETTINGS_LT_REG_TRAINING_MOD_MASK,
@@ -543,7 +552,8 @@ int aw_pmd_force_signal_detect_config_set(mss_access_t *mss,
   }
 }
 
-int aw_pmd_txfir_config_set(mss_access_t *mss, aw_txfir_config_t *txfir_cfg){
+int aw_pmd_txfir_config_set(mss_access_t *mss, aw_txfir_config_t *txfir_cfg,
+                            uint32_t fir_ovr_enable) {
   uint32_t cm3_mask = 0x7;
   uint32_t cm2_mask = 0x7;
   uint32_t cm1_mask = 0x1F;
@@ -558,6 +568,39 @@ int aw_pmd_txfir_config_set(mss_access_t *mss, aw_txfir_config_t *txfir_cfg){
         max_ele = txfir_cfg->C0;
   }
 
+  if (txfir_cfg->CM3 > 7) {
+    USR_PRINTF(
+        "ERROR: Exceeds max, CM3 (%d) must be less than or equal to 7 \n",
+        txfir_cfg->CM3);
+    return AW_ERR_CODE_INVALID_ARG_VALUE;
+  } else if (txfir_cfg->CM2 > 7) {
+    USR_PRINTF(
+        "ERROR: Exceeds max, CM2 (%d) must be less than or equal to 7 \n",
+        txfir_cfg->CM2);
+    return AW_ERR_CODE_INVALID_ARG_VALUE;
+  } else if (txfir_cfg->CM1 > 24) {
+    USR_PRINTF(
+        "ERROR: Exceeds max, CM1 (%d) must be less than or equal to  24 \n",
+        txfir_cfg->CM1);
+    return AW_ERR_CODE_INVALID_ARG_VALUE;
+  } else if (txfir_cfg->C0 > 64) {
+    USR_PRINTF(
+        "ERROR: Exceeds max, C0 (%d) must be less than or equal to 64 \n",
+        txfir_cfg->C0);
+    return AW_ERR_CODE_INVALID_ARG_VALUE;
+  } else if (txfir_cfg->C1 > 24) {
+    USR_PRINTF(
+        "ERROR: Exceeds max, C1 (%d) must be less than or equal to 24 \n",
+        txfir_cfg->C1);
+    return AW_ERR_CODE_INVALID_ARG_VALUE;
+  } else if (max_ele > 64) {
+    USR_PRINTF("ERROR: Exceeds max, parameters must be less than or equal to "
+               "64, current value is %d. CM3:%d CM2:%d CM1:%d C0:%d C1:%d \n",
+               max_ele, txfir_cfg->CM3, txfir_cfg->CM2, txfir_cfg->CM1,
+               txfir_cfg->C0, txfir_cfg->C1);
+    return AW_ERR_CODE_INVALID_ARG_VALUE;
+  }
+
   fir = ((txfir_cfg->C1 & c1_mask) << 17);
   fir = fir + ((max_ele & max_mask) << 11);
   fir = fir + ((txfir_cfg->CM1 & cm1_mask) << 6);
@@ -565,7 +608,7 @@ int aw_pmd_txfir_config_set(mss_access_t *mss, aw_txfir_config_t *txfir_cfg){
   fir = fir + (txfir_cfg->CM3 & cm3_mask);
 
   CHECK(pmd_write_field(mss, FIR_ADDR, FIR_OVR_EN_A_MASK, FIR_OVR_EN_A_OFFSET,
-                        1));
+                        fir_ovr_enable));
   CHECK(pmd_write_field(mss, FIR_ADDR, FIR_VAL_A_MASK, FIR_VAL_A_OFFSET, fir));
 
   return AW_ERR_CODE_NONE;
@@ -616,7 +659,8 @@ int aw_pmd_rx_pam4_precoder_enable_set(mss_access_t *mss, uint32_t gray_en,
 int aw_pmd_remote_loopback_set(mss_access_t *mss,
                                uint32_t remote_loopback_enable) {
 
-  *mss = *mss;
+  (void)*mss;
+  (void)remote_loopback_enable;
   USR_PRINTF(
       "ERROR: aw_pmd_remote_loopback_set - function implementation has been "
       "deprecated, use aw_pmd_fep_clock_set & aw_pmd_fep_dat_set\n");
@@ -738,6 +782,7 @@ int aw_pmd_tx_dcd_iq_cal(mss_access_t *mss, uint32_t enable_d) {
       TX_DATAPATH_REG1_FEP_LOOPBACK_ENABLE_A_OFFSET, enable_d));
   return AW_ERR_CODE_NONE;
 }
+
 int aw_pmd_fep_clock_set(mss_access_t *mss, uint8_t clock_en) {
   CHECK(pmd_write_field(mss, TX_LOOPBACK_CNTRL_ADDR,
                         TX_LOOPBACK_CNTRL_ENA_NT_MASK,
@@ -803,17 +848,6 @@ int aw_pmd_fes_loopback_set(mss_access_t *mss, uint32_t fes_loopback_enable) {
   CHECK(pmd_write_field(
       mss, LOOPBACK_CNTRL_ADDR, LOOPBACK_CNTRL_TX_FES_LOOPBACK_ENA_NT_MASK,
       LOOPBACK_CNTRL_TX_FES_LOOPBACK_ENA_NT_OFFSET, fes_loopback_enable));
-  return AW_ERR_CODE_NONE;
-}
-
-int aw_pmd_analog_loopback_txfir_set(
-    mss_access_t *mss, aw_analog_loopback_txfir_config_t *nes_txfir_cfg) {
-
-  uint32_t fir_val;
-  fir_val =
-      ((nes_txfir_cfg->nes_post1 & 0xF) << 4) | ((nes_txfir_cfg->nes_c0) & 0xF);
-  CHECK(pmd_write_field(mss, TX_ADDR, TX_NES_LOOPBACK_FIR_A_MASK,
-                        TX_NES_LOOPBACK_FIR_A_OFFSET, fir_val));
   return AW_ERR_CODE_NONE;
 }
 
@@ -1018,23 +1052,25 @@ int aw_pmd_rx_chk_err_count_state_get(mss_access_t *mss, uint64_t *err_count,
   uint32_t err_cnt_55_32;
   uint32_t err_cnt_31_0;
   uint32_t err_code;
-
+  uint32_t bist_enable;
   CHECK(pmd_read_field(mss, RX_DATABIST_TOP_REG1_ADDR,
                        RX_DATABIST_TOP_REG1_BIST_MODE_NT_MASK,
                        RX_DATABIST_TOP_REG1_BIST_MODE_NT_OFFSET, &bist_mode));
-
+  err_code = 0;
   if (bist_mode == 1) {
-    uint32_t bist_enable;
     CHECK(pmd_read_field(
         mss, RX_DATABIST_TOP_REG1_ADDR, RX_DATABIST_TOP_REG1_BIST_ENABLE_A_MASK,
         RX_DATABIST_TOP_REG1_BIST_ENABLE_A_OFFSET, &bist_enable));
     if (bist_enable == 1) {
-      *err_count_done = 0;
-      *err_count = 0;
-      *err_count_overflown = 0;
-      err_code = 1;
+      CHECK(pmd_read_check_field(
+          mss, RX_DATABIST_TOP_RDREG1_ADDR,
+          RX_DATABIST_TOP_RDREG1_ERROR_CNT_OVERFLOW_NT_MASK,
+          RX_DATABIST_TOP_RDREG1_ERROR_CNT_OVERFLOW_NT_OFFSET, RD_EQ,
+          err_count_overflown, 0, 0));
+      if (*err_count_overflown) {
+        err_code = 1;
+        USR_PRINTF("ERROR: BIST error counter overflown.");
     } else {
-      *err_count_done = 1;
       CHECK(pmd_read_field(mss, RX_DATABIST_TOP_RDREG3_ADDR,
                            RX_DATABIST_TOP_RDREG3_ERROR_CNT_55T32_NT_MASK,
                            RX_DATABIST_TOP_RDREG3_ERROR_CNT_55T32_NT_OFFSET,
@@ -1044,25 +1080,17 @@ int aw_pmd_rx_chk_err_count_state_get(mss_access_t *mss, uint64_t *err_count,
                            RX_DATABIST_TOP_RDREG2_ERROR_CNT_NT_OFFSET,
                            &err_cnt_31_0));
       *err_count = (uint64_t)err_cnt_55_32 << 32 | (uint64_t)err_cnt_31_0;
-      CHECK(pmd_read_check_field(
-          mss, RX_DATABIST_TOP_RDREG1_ADDR,
-          RX_DATABIST_TOP_RDREG1_ERROR_CNT_OVERFLOW_NT_MASK,
-          RX_DATABIST_TOP_RDREG1_ERROR_CNT_OVERFLOW_NT_OFFSET, RD_EQ,
-          err_count_overflown, 0, 0));
-      err_code = 0;
+      }
+      *err_count_done = 1;
+    } else {
+      err_code = 2;
+      USR_PRINTF("ERROR: BIST is not enabled.");
     }
   } else {
     CHECK(pmd_read_check_field(mss, RX_DATABIST_TOP_RDREG1_ADDR,
                                RX_DATABIST_TOP_RDREG1_ERROR_CNT_DONE_NT_MASK,
                                RX_DATABIST_TOP_RDREG1_ERROR_CNT_DONE_NT_OFFSET,
                                RD_EQ, err_count_done, 1, 0));
-    if (!err_count_done) {
-      *err_count_done = 0;
-      *err_count = 0;
-      *err_count_overflown = 0;
-      err_code = 2;
-    } else {
-      *err_count_done = 1;
       CHECK(pmd_read_field(mss, RX_DATABIST_TOP_RDREG3_ADDR,
                            RX_DATABIST_TOP_RDREG3_ERROR_CNT_55T32_NT_MASK,
                            RX_DATABIST_TOP_RDREG3_ERROR_CNT_55T32_NT_OFFSET,
@@ -1077,10 +1105,14 @@ int aw_pmd_rx_chk_err_count_state_get(mss_access_t *mss, uint64_t *err_count,
           RX_DATABIST_TOP_RDREG1_ERROR_CNT_OVERFLOW_NT_MASK,
           RX_DATABIST_TOP_RDREG1_ERROR_CNT_OVERFLOW_NT_OFFSET, RD_EQ,
           err_count_overflown, 0, 0));
-      err_code = 0;
+    if (*err_count_done == 0) {
+      *err_count_overflown = 0;
+      USR_PRINTF("RX BIST timer has not completed yet.");
+    } else {
+      *err_count_done = 1;
     }
   }
-  if (err_code == 1 || err_code == 2) {
+  if (err_code != 0) {
     return AW_ERR_CODE_FUNC_FAILURE;
   } else {
     return AW_ERR_CODE_NONE;
@@ -1167,7 +1199,6 @@ int aw_pmd_tx_gen_config_set(mss_access_t *mss, aw_bist_pattern_t pattern,
     CHECK(pmd_write_field(
         mss, TX_DATAPATH_REG2_ADDR, TX_DATAPATH_REG2_PATTERN_SEL_NT_MASK,
         TX_DATAPATH_REG2_PATTERN_SEL_NT_OFFSET, AW_USER_DEFINED_PATTERN));
-
     CHECK(pmd_write_field(mss, TX_DATAPATH_REG11_ADDR,
                           TX_DATAPATH_REG11_UDP_PATTERN_127_96_NT_MASK,
                           TX_DATAPATH_REG11_UDP_PATTERN_127_96_NT_OFFSET,
@@ -1199,7 +1230,6 @@ int aw_pmd_tx_gen_err_inject_config_set(mss_access_t *mss, uint64_t err_pattern,
 
   uint32_t err_pattern_31_0 = err_pattern & 0xFFFFFFFF;
   uint32_t err_pattern_63_32 = err_pattern >> 32 & 0xFFFFFFFF;
-
   CHECK(pmd_write_field(mss, TX_DATAPATH_REG15_ADDR,
                         TX_DATAPATH_REG15_ERROR_PATTERN_63_32_NT_MASK,
                         TX_DATAPATH_REG15_ERROR_PATTERN_63_32_NT_OFFSET,
@@ -1840,7 +1870,7 @@ int aw_pmd_rx_check_bist(mss_access_t *mss, aw_bist_mode_t bist_mode,
       if (expected_errors == -1) {
         CHECK(pmd_read_check_field(
             mss, RX_DATABIST_TOP_RDREG3_ADDR,
-                             RX_DATABIST_TOP_RDREG3_ERROR_CNT_55T32_NT_MASK,
+            RX_DATABIST_TOP_RDREG3_ERROR_CNT_55T32_NT_MASK,
             RX_DATABIST_TOP_RDREG3_ERROR_CNT_55T32_NT_OFFSET, RD_EQ,
             &err_cnt_55_32, 0, 0));
         CHECK(pmd_read_field(mss, RX_DATABIST_TOP_RDREG2_ADDR,
@@ -1879,9 +1909,9 @@ int aw_pmd_rx_check_bist(mss_access_t *mss, aw_bist_mode_t bist_mode,
   }
   if (bist_mode == AW_DWELL) {
 
-	  USR_PRINTF ("AW_DWELL (wallclock) running...\n");
-	  err_count = 0;
-	  ber = 0;
+    USR_PRINTF("AW_DWELL (wallclock) running...\n");
+    err_count = 0;
+    ber = 0;
 
     CHECK(pmd_write_field(mss, RX_DATABIST_TOP_REG1_ADDR,
                           RX_DATABIST_TOP_REG1_BIST_ENABLE_A_MASK,
@@ -1904,7 +1934,7 @@ int aw_pmd_rx_check_bist(mss_access_t *mss, aw_bist_mode_t bist_mode,
                             RX_DATABIST_TOP_REG1_ERROR_CNT_CLR_A_MASK,
                             RX_DATABIST_TOP_REG1_ERROR_CNT_CLR_A_OFFSET, 0));
 
-		  USR_SLEEP(1000000);
+      USR_SLEEP(1000000);
       CHECK(pmd_read_field(mss, RX_DATABIST_TOP_RDREG3_ADDR,
                            RX_DATABIST_TOP_RDREG3_ERROR_CNT_55T32_NT_MASK,
                            RX_DATABIST_TOP_RDREG3_ERROR_CNT_55T32_NT_OFFSET,
@@ -1913,20 +1943,20 @@ int aw_pmd_rx_check_bist(mss_access_t *mss, aw_bist_mode_t bist_mode,
                            RX_DATABIST_TOP_RDREG2_ERROR_CNT_NT_MASK,
                            RX_DATABIST_TOP_RDREG2_ERROR_CNT_NT_OFFSET,
                            &err_cnt_31_0));
-		  err_count += (uint64_t) err_cnt_55_32 << 32 | (uint64_t) err_cnt_31_0;
+      err_count += (uint64_t)err_cnt_55_32 << 32 | (uint64_t)err_cnt_31_0;
       CHECK(pmd_read_check_field(
           mss, RX_DATABIST_TOP_RDREG1_ADDR,
           RX_DATABIST_TOP_RDREG1_ERROR_CNT_OVERFLOW_NT_MASK,
           RX_DATABIST_TOP_RDREG1_ERROR_CNT_OVERFLOW_NT_OFFSET, RD_EQ,
           &err_count_overflow, 0, 0));
 
-      ber += (uint32_t)err_count / 
+      ber += (uint32_t)err_count /
              (dwell_params->aw_measure_time * dwell_params->rx_data_rate);
-		  USR_PRINTF("err_count = %lu\n", err_count);
-		  USR_PRINTF("err_count_overflow = %d\n", err_count_overflow);
-		  USR_PRINTF("ber = %e\n", ber);
-	  }
-	  return AW_ERR_CODE_NONE;
+      USR_PRINTF("err_count = %lu\n", err_count);
+      USR_PRINTF("err_count_overflow = %d\n", err_count_overflow);
+      USR_PRINTF("ber = %e\n", ber);
+    }
+    return AW_ERR_CODE_NONE;
   }
 
   return AW_ERR_CODE_FUNC_FAILURE;
@@ -1979,7 +2009,6 @@ int aw_pmd_eqeval_incdec_get(mss_access_t *mss, uint32_t *incdec) {
                        DIG_SOC_LANE_STAT_REG3_OCTL_RX_LINKEVAL_DIR_MASK,
                        DIG_SOC_LANE_STAT_REG3_OCTL_RX_LINKEVAL_DIR_OFFSET,
                        incdec));
-
   return AW_ERR_CODE_NONE;
 }
 
@@ -1987,6 +2016,7 @@ int aw_pmd_rx_equalize(mss_access_t *mss, aw_eq_type_t eq_type,
                        uint32_t timeout_us) {
   int poll_result;
   uint32_t incdec;
+
   aw_pmd_eqeval_type_set(mss, eq_type);
   //aw_pmd_rxeq_prbs_set(mss, 1);
   aw_pmd_eqeval_req_set(mss, 1);
