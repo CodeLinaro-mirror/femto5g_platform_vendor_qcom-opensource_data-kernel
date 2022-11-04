@@ -804,7 +804,7 @@ bool mtip_mac_wrapper_get_link_status(u32 link_index)
     mtip_lookup_device_by_link_index(link_index, &port_device_index, &link_device_index);
 
     // For Debug ETH, 2nd link index to be monitored instead of 1st
-    if(port_device_index == MTIP_PORT_TYPE_DEBUG)
+    if(platform_driver_priv->devices.port_devices[port_device_index].port_type == MTIP_PORT_TYPE_DEBUG)
       link_device_index += 1;
 
     wrapper_base_addr = platform_driver_priv->devices.port_devices[port_device_index].wrapper_base_addr;

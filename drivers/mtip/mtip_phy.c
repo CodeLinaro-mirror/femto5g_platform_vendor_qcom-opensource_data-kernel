@@ -82,14 +82,18 @@ static void mtip_phy_an_complete_cb(enum mtip_port_type_enum port_type, enum eth
 static int mtip_phy_get_link_index_for_phy_lane(
     enum mtip_port_type_enum port_type, enum eth_phy_iface_phy_lane_num_enum lane_num)
 {
-    int i,j;
+    int i,j,k;
     u32 num_lanes;
 
-    for(i = 0; i < MTIP_MAX_LINKS_PER_PORT; i++){
-      num_lanes = platform_driver_priv->devices.port_devices[port_type].link_devices[i].num_lanes;
-      for (j = 0; j < num_lanes; j++){
-        if(platform_driver_priv->devices.port_devices[port_type].link_devices[i].lanes[j] == lane_num)
-          return platform_driver_priv->devices.port_devices[port_type].link_devices[i].link_index;
+    for(i = 0; i < MTIP_MAX_PORTS; i++){
+      if(platform_driver_priv->devices.port_devices[i].port_type == port_type){
+        for(j = 0; j < MTIP_MAX_LINKS_PER_PORT; j++){
+          num_lanes = platform_driver_priv->devices.port_devices[i].link_devices[j].num_lanes;
+          for (k = 0; k < num_lanes; k++){
+            if(platform_driver_priv->devices.port_devices[i].link_devices[j].lanes[k] == lane_num)
+              return platform_driver_priv->devices.port_devices[i].link_devices[j].link_index;
+          }
+        }
       }
     }
 
@@ -105,8 +109,10 @@ static void mtip_phy_cdr_lock_cb(enum mtip_port_type_enum port_type, enum eth_ph
     CSMLOGERR("CDR lock success for port: %d, lane %d\n", port_type, lane_num);
 
     link_index = mtip_phy_get_link_index_for_phy_lane(port_type, lane_num);
-    if(link_index == -1)
+    if(link_index == -1){
       CSMLOGERR("Index not found\n");
+      return;
+    }
 
     if(mtip_mac_wrapper_get_link_status(link_index) == false){
       wq_params = kmalloc(sizeof(struct mtip_delayed_work_q_params),
