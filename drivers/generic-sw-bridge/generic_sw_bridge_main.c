@@ -321,14 +321,17 @@ static  ssize_t gsb_read_stats(struct file *file,
 	uint64_t idle_cnt = 0;
 	uint64_t pending_wde = 0;
 	bool is_suspended;
-	char file_name[PATH_MAX];
+	char *file_name;
 	struct gsb_ctx *pgsb_ctx = __gc;
 	struct gsb_if_info *if_info = NULL;
 	char *raw_path = NULL;
+	file_name = kzalloc(PATH_MAX, GFP_KERNEL);
+	if (!file_name) return -ENOMEM;
 
 	if (IS_ERR_OR_NULL(pgsb_ctx))
 	{
 		DEBUG_ERROR("NULL GSB Context passed\n");
+		kfree(file_name);
 		return ret_cnt;
 	}
 
@@ -337,6 +340,7 @@ static  ssize_t gsb_read_stats(struct file *file,
 	if (IS_ERR_OR_NULL(raw_path))
 	{
 		DEBUG_ERROR("NULL path found\n");
+		kfree(file_name);
 		return ret_cnt;
 	}
 
@@ -348,6 +352,7 @@ static  ssize_t gsb_read_stats(struct file *file,
 	if (IS_ERR_OR_NULL(if_info))
 	{
 		DEBUG_ERROR("Device not found\n");
+		kfree(file_name);
 		return ret_cnt;
 	}
 
@@ -355,6 +360,7 @@ static  ssize_t gsb_read_stats(struct file *file,
 	{
 		IPC_WARN_LOW("if %s not connected to IPA bridge yet\n",
 				if_info->if_name);
+		kfree(file_name);
 		return ret_cnt;
 	}
 
@@ -362,17 +368,23 @@ static  ssize_t gsb_read_stats(struct file *file,
 	if (if_info == NULL)
 	{
 		DEBUG_ERROR("Could not find if node for stats\n");
+		kfree(file_name);
 		return ret_cnt;
 	}
 
 	if (!if_info->is_debugfs_init)
 	{
 		DEBUG_ERROR("debugfs not initialized for %s\n", if_info->if_name);
+		kfree(file_name);
 		return ret_cnt;
 	}
 
 	buf = kzalloc(MAX_BUFF_LEN, GFP_KERNEL);
-	if (!buf) return -ENOMEM;
+	if (!buf)
+	{
+		kfree(file_name);
+		return -ENOMEM;
+	}
 	pgsb_ctx->mem_alloc_read_stats_buffer++;
 
 	/* stats buffer*/
@@ -485,6 +497,7 @@ static  ssize_t gsb_read_stats(struct file *file,
 	ret_cnt = simple_read_from_buffer(user_buf, count, ppos, buf, len);
 	kfree(buf);
 	pgsb_ctx->mem_alloc_read_stats_buffer--;
+	kfree(file_name);
 	return ret_cnt;
 }
 
