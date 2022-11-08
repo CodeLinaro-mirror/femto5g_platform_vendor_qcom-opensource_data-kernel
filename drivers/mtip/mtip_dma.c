@@ -1,6 +1,6 @@
 //SPDX-License-Identifier: GPL-2.0-only
 /*
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  */ 
 
 #include <linux/init.h>
@@ -528,11 +528,13 @@ static int mtip_dma_process_packet(struct net_device *netdev,
    u64* tsptr;
    int i;
    struct iphdr* iphdr;
+   struct mtip_security_device *sec_dev;
 
    priv = netdev_priv(netdev);
 
    link_index = priv->link_index;
    lock = &(priv->lock);
+   sec_dev = priv->sec_dev;
 
    num_of_buffers = pkt->num_of_buffers;
    buffs = (struct ecpri_dma_mem_buffer **)pkt->buffs;
@@ -620,6 +622,14 @@ static int mtip_dma_process_packet(struct net_device *netdev,
    // dump the contents of the modified packet
    mtip_dma_dump_packet(base, size);
 #endif
+
+   if (sec_dev && sec_dev->ops && sec_dev->ops->fixup_rx_skb) {
+      if (sec_dev->ops->fixup_rx_skb(skb)) {
+         ++(platform_driver_priv->mtip_links[link_index]->net_stats.rx_errors);
+         dev_kfree_skb_any(skb);
+         goto out;
+      }
+   }
 
    napi_gro_receive(napi_ptr, skb);
 
