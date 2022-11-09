@@ -56,6 +56,8 @@ struct eth_phy_iface_eth_register_params mtip_phy_eth_params;
 
 extern struct eth_phy_iface_ops qcom_aw_phy_driver_iface_ops;
 
+extern int qsfp_eth_get_link_type(u32 qsfp_phandle, u8* link_info);
+
 static void mtip_phy_ready_cb(void *user_data)
 {
     CSMLOGINFO("Got the PHY ready cb\n");
@@ -493,8 +495,12 @@ static void mtip_phy_link_up(struct phylink_config *config,
     current_state = platform_driver_priv->mtip_ports[real_port_number]->port_state;
 
     // ask the qsfp driver for the port type
-    //qsfp_eth_get_link_type(sfp_phandle, &sfp_port_type);
+    qsfp_eth_get_link_type(sfp_phandle, &sfp_port_type);
+
+    CSMLOGINFO("sfp_port_type %d, associated with port %d", sfp_port_type, real_port_number);
+
     // TBD
+    // deal with the phy_port_type as appropriate
 
     // update the sfp port type
     platform_driver_priv->mtip_ports[real_port_number]->sfp_port_type = sfp_port_type;
