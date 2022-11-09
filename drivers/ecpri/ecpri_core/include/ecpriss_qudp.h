@@ -101,6 +101,16 @@ typedef struct ecpriss_qudp_stats
 	uint64_t ingress_num_sec_err_packets[ECPRISS_MAX_LINKS];
 	uint64_t ingress_ip_len_err_packets[ECPRISS_MAX_LINKS];
 	uint64_t ingress_ip_filtered_packets[ECPRISS_MAX_LINKS];
+	uint32_t fh_egress_udp_watermark_port_p_aligner_output_fifo;
+	uint32_t fh_egress_udp_watermark_port_p_cs_update_fifo;
+	uint32_t fh_egress_udp_watermark_port_p_cs_calc_fifo;
+	uint32_t fh_egress_udp_watermark_port_p_hdri_output_fifo;
+	uint32_t fh_egress_udp_watermark_port_p_hdri_cfg_index_fifo;
+	uint32_t fh_egress_udp_watermark_port_p_pkt_fifo;
+	uint32_t fh_ingress_udp_watermark_port_p_link_n_ptp_timestamp_fifo[ECPRISS_MAX_LINKS];
+	uint32_t fh_ingress_udp_watermark_port_p_link_n_pkt_handler_sync_fifos[ECPRISS_MAX_LINKS];
+	uint32_t fh_ingress_udp_watermark_port_p_link_n_cmd_fifo[ECPRISS_MAX_LINKS];
+	uint32_t fh_ingress_udp_watermark_port_p_link_n_pkt_fifo[ECPRISS_MAX_LINKS];
 }ecpriss_qudp_stats;
 
 typedef struct ecpriss_qudp_interrupt_stats
