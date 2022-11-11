@@ -1061,11 +1061,7 @@ static int gsb_bind_if_to_ipa_bridge(struct gsb_if_info *if_info)
 
 	params_ptr->wakeup_request = (void *)&gsb_wakeup_cb;
 
-#ifdef ISKERNEL5_15
-	retval = ipa_bridge_init(&params_ptr->info, &if_info->handle);
-#else
 	retval = ipa_bridge_init(params_ptr, &if_info->handle);
-#endif
 
 	if (retval != 0)
 	{
