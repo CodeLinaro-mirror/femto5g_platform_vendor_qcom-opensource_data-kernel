@@ -307,6 +307,8 @@ int qcom_aw_phy_bringup_lt_mode(mss_access_t *mss,
     goto func_exit;
   }
 
+  aw_pmd_rx_background_adapt_enable_set(mss, 1);
+
   aw_pmd_gen_tx_en_set(mss, 0);
   aw_pmd_rx_chk_en_set(mss, 0);
   aw_pmd_anlt_link_training_en_set(mss, 1);
@@ -379,6 +381,8 @@ int qcom_aw_phy_bringup_manual_eq_mode(
     goto func_exit;
   }
 
+  aw_pmd_rx_background_adapt_enable_set(mss, 1);
+
   /* Configuration for Near End Parallel Loopback mode */
   if (qcom_aw_phy_get_loopback_mode() == QCOM_AW_PHY_NEAR_END_PARALLEL_LB) {
     QCOM_AW_PHY_LOG_INFO("Configuring PHY for near end parallel LB");
@@ -393,9 +397,6 @@ int qcom_aw_phy_bringup_manual_eq_mode(
   txfir_cfg.main_or_max = 1;
   aw_pmd_txfir_config_set(mss, &txfir_cfg, 1);
 
-  /* Disabling DFE Adaptations EXT loopback */
-  aw_pmd_rx_dfe_adapt_set(mss, 0);
-
   /* Configuration for Near End Serial Loopback mode */
   if (qcom_aw_phy_get_loopback_mode() == QCOM_AW_PHY_NEAR_END_SERIAL_LB) {
     QCOM_AW_PHY_LOG_INFO("Configuring PHY for near end serial LB");
@@ -406,6 +407,8 @@ int qcom_aw_phy_bringup_manual_eq_mode(
 
   // RX Equalization - Check aw_eq_type_e enum
   aw_pmd_rx_equalize(mss, AW_EQ_FULL_DIR, RX_LINKEVAL_FULL_TIMEOUT_US);
+
+  mdelay(500);
 
 func_exit:
   QCOM_AW_PHY_LOG_ERR("%s: returns %d with local error %d and aw_error %d",
@@ -864,13 +867,12 @@ void qcom_aw_phy_retry_lane_bring_up(struct work_struct *work){
     txfir_cfg.main_or_max = 1;
     aw_pmd_txfir_config_set(&mss, &txfir_cfg, 1);
 
-    /* Disabling DFE Adaptations EXT loopback */
-    aw_pmd_rx_dfe_adapt_set(&mss, 0);
-
     mdelay(500);
 
     // RX Equalization - Check aw_eq_type_e enum
     aw_pmd_rx_equalize(&mss, AW_EQ_FULL_DIR, RX_LINKEVAL_FULL_TIMEOUT_US);
+
+    mdelay(500);
 
     cdr_lock_status = aw_pmd_rx_check_cdr_lock(&mss, RX_CDR_TIMEOUT_US);
 
