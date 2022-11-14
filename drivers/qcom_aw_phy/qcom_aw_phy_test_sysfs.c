@@ -175,11 +175,6 @@ void qcom_aw_phy_an_complete_cb(enum mtip_port_type_enum port_type,
                       lane_num);
 }
 
-void qcom_aw_phy_cdr_lock_cb(enum mtip_port_type_enum port_type,
-                                enum eth_phy_iface_phy_lane_num_enum lane_num) {
-  QCOM_AW_PHY_LOG_ERR("CDR lock success port %d, lane %d", port_type,
-                      lane_num);
-}
 ssize_t qcom_aw_phy_get_prbs_result(struct file *file, char __user *buf,
                                     size_t count, loff_t *ppos){
   char dbg_buf[1500] = {0};
@@ -261,7 +256,6 @@ ssize_t qcom_aw_phy_set_attr(struct file *file, const char __user *buf,
       ready_info.notify_ready = qcom_aw_phy_ready_cb;
       ready_info.userdata_ready = NULL;
       ready_info.notify_an_complete = qcom_aw_phy_an_complete_cb;
-      ready_info.cdr_lock_success = qcom_aw_phy_cdr_lock_cb;
       qcom_aw_phy_driver_iface_ops.eth_phy_iface_eth_register(&ready_info,
                                                               &is_phy_ready);
       QCOM_AW_PHY_LOG_ERR("is_phy_ready %d", is_phy_ready);
