@@ -335,14 +335,18 @@ static inline int ecpri_dma_mhi_client_test_get_funct_ctx_idx(
 	int* idx)
 {
 	int ret = 0;
+	int max_vf_id =
+		ecpri_dma_get_ctx_hw_ver() == ECPRI_HW_V1_0 ?
+		ECPRI_DMA_VM_IDS_MAX_V1 : ECPRI_DMA_VM_IDS_MAX;
+
 	if (function->function_type ==
 		MHI_DMA_FUNCTION_TYPE_VIRTUAL &&
-		function->vf_id < ECPRI_DMA_MHI_CLIENT_FUNCTION_NUM - 1) {
+		function->vf_id < max_vf_id) {
 		*(idx) = function->vf_id;
 	}
 	else if (function->function_type ==
 		MHI_DMA_FUNCTION_TYPE_PHYSICAL) {
-		*(idx) = (ECPRI_DMA_MHI_CLIENT_FUNCTION_NUM - 1);
+		*(idx) = ECPRI_DMA_MHI_PF_ID;
 	}
 	else {
 		DMA_UT_ERR("Unexpected function type, type: %d, vf_id: %d\n",
@@ -395,13 +399,13 @@ static int ecpri_dma_mhi_client_test_util_setup_dma_endps(
 	ecpri_hwio_def_ecpri_endp_nfapi_reassembly_cfg_gsi_m_ch_n_u
 		reassembly_cfg = { 0 };
 
-	if (!ecpri_dma_ctx->endp_map[gsi_id])
+	if (!(*ecpri_dma_ctx->endp_map)[gsi_id])
 		return -EINVAL;
 
-	if (!ecpri_dma_ctx->endp_map[gsi_id][src_endp_id].valid ||
-		ecpri_dma_ctx->endp_map[gsi_id][src_endp_id].is_exception ||
-		!ecpri_dma_ctx->endp_map[gsi_id][dest_endp_id].valid ||
-		ecpri_dma_ctx->endp_map[gsi_id][dest_endp_id].is_exception)
+	if (!(*ecpri_dma_ctx->endp_map)[gsi_id][src_endp_id].valid ||
+		(*ecpri_dma_ctx->endp_map)[gsi_id][src_endp_id].is_exception ||
+		!(*ecpri_dma_ctx->endp_map)[gsi_id][dest_endp_id].valid ||
+		(*ecpri_dma_ctx->endp_map)[gsi_id][dest_endp_id].is_exception)
 		return -EINVAL;
 
 	/* Configure test SRC ENDP to loopback into test DEST ENDP */
@@ -439,11 +443,11 @@ static int ecpri_dma_mhi_client_test_util_setup_dma_endps(
 	}
 	else {
 		/* SRC */
-		switch (ecpri_dma_ctx->endp_map[gsi_id][src_endp_id].stream_mode) {
+		switch ((*ecpri_dma_ctx->endp_map)[gsi_id][src_endp_id].stream_mode) {
 		case ECPRI_DMA_ENDP_STREAM_MODE_M2M:
 			endp_cfg_dest.def.use_dest_cfg = 1;
 			endp_cfg_dest.def.dest_mem_channel =
-				ecpri_dma_ctx->endp_map[gsi_id][src_endp_id].dest;
+				(*ecpri_dma_ctx->endp_map)[gsi_id][src_endp_id].dest;
 			ecpri_dma_hal_write_reg_mn(
 				ECPRI_ENDP_CFG_DEST, gsi_id, src_endp_id,
 				endp_cfg_dest.value);
@@ -451,13 +455,13 @@ static int ecpri_dma_mhi_client_test_util_setup_dma_endps(
 		case ECPRI_DMA_ENDP_STREAM_MODE_M2S:
 			endp_cfg_dest.def.use_dest_cfg = 0;
 			endp_cfg_xbar.dest_stream =
-				ecpri_dma_ctx->endp_map[gsi_id][endp_id].dest;
+				(*ecpri_dma_ctx->endp_map)[gsi_id][src_endp_id].dest;
 			endp_cfg_xbar.xbar_tid =
-				ecpri_dma_ctx->endp_map[gsi_id][endp_id].tid.value;
+				(*ecpri_dma_ctx->endp_map)[gsi_id][src_endp_id].tid.value;
 			//TODO: Below are required for nFAPI
 			//endp_cfg_xbar.xbar_user = Get from Core driver, need API
-			endp_cfg_xbar.def_v1.l2_segmentation_en =
-				ecpri_dma_ctx->endp_map[gsi_id][src_endp_id].is_nfapi ? 1 : 0;
+			endp_cfg_xbar.l2_segmentation_en =
+				(*ecpri_dma_ctx->endp_map)[gsi_id][src_endp_id].is_nfapi ? 1 : 0;
 			ecpri_dma_hal_write_reg_mn(
 				ECPRI_ENDP_CFG_DEST, gsi_id, src_endp_id,
 				endp_cfg_dest.value);
@@ -467,24 +471,24 @@ static int ecpri_dma_mhi_client_test_util_setup_dma_endps(
 			break;
 		default:
 			DMA_UT_ERR("SRC ENDP %d isn't M2M or S2M, address = 0x%px\n",
-				src_endp_id, &ecpri_dma_ctx->endp_map[gsi_id][src_endp_id]);
+				src_endp_id, &(*ecpri_dma_ctx->endp_map)[gsi_id][src_endp_id]);
 			return -EINVAL;
 			break;
 		}
 
 		/* DEST */
-		switch (ecpri_dma_ctx->endp_map[gsi_id][dest_endp_id].stream_mode) {
+		switch ((*ecpri_dma_ctx->endp_map)[gsi_id][dest_endp_id].stream_mode) {
 		case ECPRI_DMA_ENDP_STREAM_MODE_M2M:
 			break;
 		case ECPRI_DMA_ENDP_STREAM_MODE_S2M:
-			if (ecpri_dma_ctx->endp_map[gsi_id][dest_endp_id].is_nfapi) {
+			if ((*ecpri_dma_ctx->endp_map)[gsi_id][dest_endp_id].is_nfapi) {
 				memset(&cfg_aggr, 0,
 					sizeof(cfg_aggr));
 				memset(&reassembly_cfg, 0,
 					sizeof(reassembly_cfg));
 				cfg_aggr.def.aggr_type = 1;
 				reassembly_cfg.def.vm_id =
-					ecpri_dma_ctx->endp_map[gsi_id][dest_endp_id]
+					(*ecpri_dma_ctx->endp_map)[gsi_id][dest_endp_id]
 					.nfapi_dest_vm_id;
 				ecpri_dma_hal_write_reg_mn(
 					ECPRI_ENDP_CFG_AGGR, gsi_id,
@@ -496,7 +500,7 @@ static int ecpri_dma_mhi_client_test_util_setup_dma_endps(
 			break;
 		default:
 			DMA_UT_ERR("DEST ENDP %d isn't M2M or S2M, address = 0x%px\n",
-				dest_endp_id, &ecpri_dma_ctx->endp_map[gsi_id][dest_endp_id]);
+				dest_endp_id, &(*ecpri_dma_ctx->endp_map)[gsi_id][dest_endp_id]);
 			return -EINVAL;
 			break;
 		}
@@ -526,9 +530,13 @@ static inline int ecpri_dma_mhi_client_test_get_ee_index(
 	enum ecpri_dma_ees* ee_idx)
 {
 	int ret = 0;
+	int max_vf_id =
+		ecpri_dma_get_ctx_hw_ver() == ECPRI_HW_V1_0 ?
+		ECPRI_DMA_VM_IDS_MAX_V1 : ECPRI_DMA_VM_IDS_MAX;
+
 	if (function.function_type ==
 		MHI_DMA_FUNCTION_TYPE_VIRTUAL &&
-		function.vf_id < ECPRI_DMA_MHI_CLIENT_FUNCTION_NUM - 1) {
+		function.vf_id < max_vf_id) {
 		switch (function.vf_id)
 		{
 		case ECPRI_DMA_VM_IDS_VM0:
@@ -845,9 +853,13 @@ static inline int ecpri_dma_mhi_client_test_utils_get_ee_index(
 	enum ecpri_dma_ees* ee_idx)
 {
 	int ret = 0;
+	int max_vf_id =
+		ecpri_dma_get_ctx_hw_ver() == ECPRI_HW_V1_0 ?
+		ECPRI_DMA_VM_IDS_MAX_V1 : ECPRI_DMA_VM_IDS_MAX;
+
 	if (function.function_type ==
 		MHI_DMA_FUNCTION_TYPE_VIRTUAL &&
-		function.vf_id < ECPRI_DMA_MHI_CLIENT_FUNCTION_NUM - 1) {
+		function.vf_id < max_vf_id) {
 		switch (function.vf_id)
 		{
 		case ECPRI_DMA_VM_IDS_VM0:
@@ -1315,7 +1327,7 @@ static int ecpri_dma_mhi_client_test_suite_setup(void** ppriv)
 	int i;
 	int j;
 	int ret = 0;
-	int vms_num = ECPRI_DMA_MHI_TEST_FUNCTIONS_TO_RUN;
+	int vms_num = ECPRI_DMA_MHI_CLIENT_FUNCTION_NUM;
 
 	DMA_UT_DBG("Start Setup for %d VM(s)\n", vms_num);
 
@@ -1377,7 +1389,7 @@ fail_alloc_ctx:
 static int ecpri_dma_mhi_client_test_suite_teardown(void* priv)
 {
 	int i;
-	int vms_num = ECPRI_DMA_MHI_TEST_FUNCTIONS_TO_RUN;
+	int vms_num = ECPRI_DMA_MHI_CLIENT_FUNCTION_NUM;
 
 	DMA_UT_DBG("Start Teardown for %d VM(s)\n", vms_num);
 
@@ -1457,10 +1469,10 @@ static int ecpri_dma_mhi_client_test_utils_invoke_init(
 		return ret;
 	}
 
-	ch_db_base = gsihal_get_reg_nk_addr(
-		GSI_EE_n_GSI_CH_k_DOORBELL_0, ee_idx, 0);
-	ev_db_base = gsihal_get_reg_nk_addr(
-		GSI_EE_n_EV_CH_k_DOORBELL_0, ee_idx, 0);
+	ch_db_base = gsihal_get_reg_pnk_addr(
+		GSI_EE_n_GSI_CH_k_DOORBELL_0, 0, ee_idx, 0);
+	ev_db_base = gsihal_get_reg_pnk_addr(
+		GSI_EE_n_EV_CH_k_DOORBELL_0, 0, ee_idx, 0);
 
 	if (out_params->ch_db_fwd_base !=
 		ch_db_base ||
@@ -1689,9 +1701,13 @@ static void ecpri_dma_mhi_client_test_utils_create_all_functions(
 	struct mhi_dma_function_params* function)
 {
 	int i;
-	for (i = 0; i < ECPRI_DMA_MHI_CLIENT_FUNCTION_NUM; i++)
+	int max_vf_id =
+		ecpri_dma_get_ctx_hw_ver() == ECPRI_HW_V1_0 ?
+		ECPRI_DMA_VM_IDS_MAX_V1 : ECPRI_DMA_VM_IDS_MAX;
+
+	for (i = 0; i < max_vf_id; i++)
 	{
-		if (i < ECPRI_DMA_MHI_CLIENT_FUNCTION_NUM - 1) {
+		if (i < max_vf_id) {
 			function[i].function_type =
 				MHI_DMA_FUNCTION_TYPE_VIRTUAL;
 			function[i].vf_id = ECPRI_DMA_VM_IDS_VM0 + i;
@@ -1878,7 +1894,7 @@ static int ecpri_dma_mhi_test_q_transfer_re(
 	struct ecpri_dma_mem_buffer ev_ring_bufs[],
 	u8 host_ch_id,
 	struct ecpri_dma_mem_buffer buffer,
-	enum ecpri_dma_ees ee)
+	enum ecpri_dma_ees ee, int gsi_id)
 {
 	struct gsi_tre* curr_re;
 	struct ecpri_dma_mhi_mmio_register_set* p_mmio;
@@ -1972,9 +1988,9 @@ static int ecpri_dma_mhi_test_q_transfer_re(
 		host_channels[host_ch_id].rbase + next_wp_ofst;
 
 	/* Ring CH DB */
-	gsihal_write_reg_nk(
+	gsihal_write_reg_pnk(
 		GSI_EE_n_GSI_CH_k_DOORBELL_0,
-		ee, device_ch_idx,
+		gsi_id, ee, device_ch_idx,
 		host_channels[host_ch_id].wp);
 
 	DMA_UT_DBG("exit\n");
@@ -2014,7 +2030,7 @@ static void ecpri_dma_mhi_test_check_msi_intr(int both,
  * Sends data using loopback.
  */
 static int ecpri_dma_mhi_test_loopback_data_transfer(int idx,
-	int host_src_ch_id, int host_dest_ch_id, enum ecpri_dma_ees ee)
+	int host_src_ch_id, int host_dest_ch_id, enum ecpri_dma_ees ee, int gsi_id)
 {
 	u64 dest_orig_rp;
 	u64 dest_new_rp;
@@ -2064,7 +2080,7 @@ static int ecpri_dma_mhi_test_loopback_data_transfer(int idx,
 		mhi_client_test_suite_ctx[idx]->xfer_ring_bufs,
 		mhi_client_test_suite_ctx[idx]->ev_ring_bufs,
 		host_dest_ch_id,
-		mhi_client_test_suite_ctx[idx]->dest_buffer, ee);
+		mhi_client_test_suite_ctx[idx]->dest_buffer, ee, gsi_id);
 	if (ret) {
 		DMA_UT_DBG("q_transfer_re failed %d\n", ret);
 		DMA_UT_TEST_FAIL_REPORT("fail DEST q xfer re");
@@ -2079,7 +2095,7 @@ static int ecpri_dma_mhi_test_loopback_data_transfer(int idx,
 		mhi_client_test_suite_ctx[idx]->xfer_ring_bufs,
 		mhi_client_test_suite_ctx[idx]->ev_ring_bufs,
 		host_src_ch_id,
-		mhi_client_test_suite_ctx[idx]->src_buffer, ee);
+		mhi_client_test_suite_ctx[idx]->src_buffer, ee, gsi_id);
 	if (ret) {
 		DMA_UT_DBG("q_transfer_re failed %d\n", ret);
 		DMA_UT_TEST_FAIL_REPORT("fail SRC q xfer re");
@@ -2264,6 +2280,9 @@ static int ecpri_dma_mhi_client_test_suite_mhi_init_all_vms(void* priv)
 	struct mhi_dma_init_out out_params[ECPRI_DMA_MHI_CLIENT_FUNCTION_NUM];
 	struct mhi_dma_start_params start_params[ECPRI_DMA_MHI_CLIENT_FUNCTION_NUM];
 	struct ecpri_dma_mhi_client_context* mhi_dma_ctx = NULL;
+	int max_vf_id =
+		ecpri_dma_get_ctx_hw_ver() == ECPRI_HW_V1_0 ?
+		ECPRI_DMA_VM_IDS_MAX_V1 : ECPRI_DMA_VM_IDS_MAX;
 
 	DMA_UT_DBG("Start MHI Init for all VMs\n");
 	DMA_UT_DBG("Preparing function params\n");
@@ -2271,8 +2290,8 @@ static int ecpri_dma_mhi_client_test_suite_mhi_init_all_vms(void* priv)
 	/* Create function params */
 	ecpri_dma_mhi_client_test_utils_create_all_functions(function);
 
-	/* Run tests for all 4 VMs: [0, 3] and PF */
-	for (test_i = 0; test_i < ECPRI_DMA_MHI_CLIENT_FUNCTION_NUM; test_i++) {
+	/* Run tests for all VMs and PF */
+	for (test_i = 0; test_i < max_vf_id; test_i++) {
 		ret = ecpri_dma_mhi_client_test_utils_create_params_and_init(
 			&function[test_i], &init_params[test_i], &out_params[test_i],
 			&start_params[test_i]);
@@ -2284,7 +2303,7 @@ static int ecpri_dma_mhi_client_test_suite_mhi_init_all_vms(void* priv)
 	}
 
 	/* Compare driver states for all VMs/PF */
-	for (test_i = 0; test_i < ECPRI_DMA_MHI_CLIENT_FUNCTION_NUM; test_i++) {
+	for (test_i = 0; test_i < max_vf_id; test_i++) {
 		DMA_UT_DBG("Starting DMA driver check for VF_ID %d\n",
 			function[test_i].vf_id);
 		ret = ecpri_dma_mhi_client_test_utils_check_driver_state(
@@ -2299,7 +2318,7 @@ static int ecpri_dma_mhi_client_test_suite_mhi_init_all_vms(void* priv)
 			function[test_i].vf_id);
 	}
 
-	for (test_i = 0; test_i < ECPRI_DMA_MHI_CLIENT_FUNCTION_NUM; test_i++) {
+	for (test_i = 0; test_i < max_vf_id; test_i++) {
 		ecpri_dma_mhi_driver_ops.mhi_dma_destroy(function[test_i]);
 	}
 
@@ -2437,6 +2456,9 @@ static int ecpri_dma_mhi_client_test_suite_memcpy_init_all_vms_pf(void* priv)
 	int test_i;
 	struct mhi_dma_function_params function[ECPRI_DMA_MHI_CLIENT_FUNCTION_NUM];
 	struct ecpri_dma_mhi_memcpy_context* mhi_memcpy_ctx = NULL;
+	int max_vf_id =
+		ecpri_dma_get_ctx_hw_ver() == ECPRI_HW_V1_0 ?
+		ECPRI_DMA_VM_IDS_MAX_V1 : ECPRI_DMA_VM_IDS_MAX;
 
 	DMA_UT_DBG("Start MEMCPY_INIT ALL\n");
 	DMA_UT_DBG("Preparing function params\n");
@@ -2445,7 +2467,7 @@ static int ecpri_dma_mhi_client_test_suite_memcpy_init_all_vms_pf(void* priv)
 	ecpri_dma_mhi_client_test_utils_create_all_functions(function);
 
 	/* Run tests 4 for VMs: [0, 3] and PF: 4*/
-	for (test_i = 0; test_i < ECPRI_DMA_MHI_CLIENT_FUNCTION_NUM; test_i++) {
+	for (test_i = 0; test_i < max_vf_id; test_i++) {
 		ret = ecpri_dma_mhi_driver_ops.mhi_dma_memcpy_init(function[test_i]);
 		if (ret != 0) {
 			DMA_UT_ERR("Memcopy_init failed for,"
@@ -2467,7 +2489,7 @@ static int ecpri_dma_mhi_client_test_suite_memcpy_init_all_vms_pf(void* priv)
 	}
 
 	/* Compare driver states for all VMs/PF */
-	for (test_i = 0; test_i < ECPRI_DMA_MHI_CLIENT_FUNCTION_NUM; test_i++) {
+	for (test_i = 0; test_i < max_vf_id; test_i++) {
 		DMA_UT_DBG("Starting DMA driver check for VF_ID %d\n",
 			function[test_i].vf_id);
 		ret = ecpri_dma_mhi_client_test_utils_check_memcpy_init_state(
@@ -2841,12 +2863,14 @@ static int ecpri_dma_mhi_client_test_suite_connect_endp_vm(void* priv)
 static int ecpri_dma_mhi_client_test_suite_connect_endp_all(void* priv) {
 	int test_i;
 	int ret = 0;
-
 	struct ecpri_dma_mhi_client_context* mhi_dma_ctx = NULL;
 	struct ecpri_dma_mhi_client_test_suite_context* ctx = NULL;
+	int max_vf_id =
+		ecpri_dma_get_ctx_hw_ver() == ECPRI_HW_V1_0 ?
+		ECPRI_DMA_VM_IDS_MAX_V1 : ECPRI_DMA_VM_IDS_MAX;
 
 	/* Run tests for VMs only */
-	for (test_i = 0; test_i < ECPRI_DMA_MHI_CLIENT_FUNCTION_NUM - 1; test_i++)
+	for (test_i = 0; test_i < max_vf_id; test_i++)
 	{
 		ctx = mhi_client_test_suite_ctx[test_i];
 
@@ -2915,12 +2939,8 @@ static int ecpri_dma_mhi_client_test_suite_connect_endp_all(void* priv) {
 	}
 
 	/* Run for PF only */
-	DMA_UT_DBG("Starting PF check Test_id %d(%d)\n",
-		test_i, ECPRI_DMA_MHI_PF_ID);
-	if (test_i != ECPRI_DMA_MHI_PF_ID) {
-		DMA_UT_TEST_FAIL_REPORT("Wrong test_id\n");
-		return -EFAULT;
-	}
+	DMA_UT_DBG("Starting PF check Test_id %d\n", ECPRI_DMA_MHI_PF_ID);
+	test_i = ECPRI_DMA_MHI_PF_ID;
 
 	ctx = mhi_client_test_suite_ctx[test_i];
 
@@ -2969,7 +2989,7 @@ static int ecpri_dma_mhi_client_test_suite_connect_endp_all(void* priv) {
 	ret = 0;
 
 	/* Cleanup */
-	for (test_i = 0; test_i < ECPRI_DMA_MHI_CLIENT_FUNCTION_NUM - 1; test_i++)
+	for (test_i = 0; test_i < max_vf_id; test_i++)
 	{
 		ctx = mhi_client_test_suite_ctx[test_i];
 
@@ -3089,7 +3109,7 @@ ecpri_dma_mhi_client_test_suite_hw_ch_vm_single_packet_single_buffer(void* priv)
 	/* Generate, enqueue, and poll TRE  */
 	ret = ecpri_dma_mhi_test_loopback_data_transfer(idx,
 		ecpri_dma_mhi_client_test_host_ch_id_map[0],
-		ecpri_dma_mhi_client_test_host_ch_id_map[1], ee);
+		ecpri_dma_mhi_client_test_host_ch_id_map[1], ee, 0);
 	if (ret != 0) {
 		DMA_UT_ERR("VF_ID %d / IDX %d failed"
 			" SRC ENDP ID %d, DEST ENDP ID %d\n", ctx->function.vf_id, idx,
@@ -3164,6 +3184,9 @@ ecpri_dma_mhi_client_test_suite_hw_ch_all_single_packet_single_buffer(void* priv
 	enum ecpri_dma_ees ee;
 	struct ecpri_dma_mhi_client_test_suite_context* ctx = NULL;
 	struct ecpri_dma_mhi_client_context* mhi_dma_ctx = NULL;
+	int max_vf_id =
+		ecpri_dma_get_ctx_hw_ver() == ECPRI_HW_V1_0 ?
+		ECPRI_DMA_VM_IDS_MAX_V1 : ECPRI_DMA_VM_IDS_MAX;
 
 	for (i = 0; i < ECPRI_DMA_SMMU_CB_MAX; i++)
 	{
@@ -3175,7 +3198,7 @@ ecpri_dma_mhi_client_test_suite_hw_ch_all_single_packet_single_buffer(void* priv
 	}
 
 	/* Run tests only for VMs */
-	for (test_i = 0; test_i < ECPRI_DMA_MHI_CLIENT_FUNCTION_NUM - 1; test_i++)
+	for (test_i = 0; test_i < max_vf_id; test_i++)
 	{
 		DMA_UT_DBG(" Start HW CH VM %d\n", test_i);
 		ctx = mhi_client_test_suite_ctx[test_i];
@@ -3279,7 +3302,7 @@ ecpri_dma_mhi_client_test_suite_hw_ch_all_single_packet_single_buffer(void* priv
 			ecpri_dma_mhi_client_test_host_ch_id_map[
 				ECPRI_DMA_MHI_TEST_FRST_SRC_CHANNEL_ID],
 			ecpri_dma_mhi_client_test_host_ch_id_map[
-				ECPRI_DMA_MHI_TEST_FRST_DEST_CHANNEL_ID], ee);
+				ECPRI_DMA_MHI_TEST_FRST_DEST_CHANNEL_ID], ee, 0);
 		if (ret != 0) {
 			DMA_UT_ERR("VF_ID %d / IDX %d failed"
 				" SRC CH ID %d, DEST CH ID %d\n", ctx->function.vf_id, idx,
@@ -3296,7 +3319,7 @@ ecpri_dma_mhi_client_test_suite_hw_ch_all_single_packet_single_buffer(void* priv
 			ecpri_dma_mhi_client_test_host_ch_id_map[
 				ECPRI_DMA_MHI_TEST_SCND_SRC_CHANNEL_ID],
 			ecpri_dma_mhi_client_test_host_ch_id_map[
-				ECPRI_DMA_MHI_TEST_SCND_DEST_CHANNEL_ID], ee);
+				ECPRI_DMA_MHI_TEST_SCND_DEST_CHANNEL_ID], ee, 0);
 		if (ret != 0) {
 			DMA_UT_ERR("VF_ID %d / IDX %d failed"
 				" SRC CH ID %d, DEST CH ID %d\n", ctx->function.vf_id, idx,
@@ -3339,7 +3362,7 @@ ecpri_dma_mhi_client_test_suite_hw_ch_all_single_packet_single_buffer(void* priv
 	}
 
 	/* Cleanup */
-	for (test_i = 0; test_i < ECPRI_DMA_MHI_CLIENT_FUNCTION_NUM - 1; test_i++)
+	for (test_i = 0; test_i < max_vf_id; test_i++)
 	{
 		ctx = mhi_client_test_suite_ctx[test_i];
 		/* Disconnect endps */

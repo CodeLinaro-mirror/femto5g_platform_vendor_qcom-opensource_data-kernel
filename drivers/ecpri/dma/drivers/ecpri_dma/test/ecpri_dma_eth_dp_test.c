@@ -183,8 +183,8 @@ static int ecpri_dma_eth_dp_test_util_setup_dma_endps(enum ecpri_dma_endp_dir di
 	else
 		endp_id = ECPRI_DMA_ETH_CLIENT_UT_DEST_ENDP_ID;
 
-	if (!ecpri_dma_ctx->endp_map[gsi_id][endp_id].valid ||
-		ecpri_dma_ctx->endp_map[gsi_id][endp_id].is_exception)
+	if (!(*ecpri_dma_ctx->endp_map)[gsi_id][endp_id].valid ||
+		(*ecpri_dma_ctx->endp_map)[gsi_id][endp_id].is_exception)
 		return -EINVAL;
 
 	/* Configure test SRC ENDP to loopback into test DEST ENDP*/
@@ -200,7 +200,7 @@ static int ecpri_dma_eth_dp_test_util_setup_dma_endps(enum ecpri_dma_endp_dir di
 
 	if (enable_loopback)
 	{
-		switch (ecpri_dma_ctx->endp_map[gsi_id][endp_id].dir) {
+		switch ((*ecpri_dma_ctx->endp_map)[gsi_id][endp_id].dir) {
 		case ECPRI_DMA_ENDP_DIR_SRC:
 			/* Set SRC to M2M mode*/
 			endp_cfg_dest.def.use_dest_cfg = 1;
@@ -228,13 +228,13 @@ static int ecpri_dma_eth_dp_test_util_setup_dma_endps(enum ecpri_dma_endp_dir di
 		}
 	}
 	else {
-		switch (ecpri_dma_ctx->endp_map[gsi_id][endp_id].dir) {
+		switch ((*ecpri_dma_ctx->endp_map)[gsi_id][endp_id].dir) {
 		case ECPRI_DMA_ENDP_DIR_SRC:
-			switch (ecpri_dma_ctx->endp_map[gsi_id][endp_id].stream_mode) {
+			switch ((*ecpri_dma_ctx->endp_map)[gsi_id][endp_id].stream_mode) {
 			case ECPRI_DMA_ENDP_STREAM_MODE_M2M:
 				endp_cfg_dest.def.use_dest_cfg = 1;
 				endp_cfg_dest.def.dest_mem_channel =
-					ecpri_dma_ctx->endp_map[gsi_id][endp_id].dest;
+					(*ecpri_dma_ctx->endp_map)[gsi_id][endp_id].dest;
 				ecpri_dma_hal_write_reg_mn(
 					ECPRI_ENDP_CFG_DEST, gsi_id, endp_id,
 					endp_cfg_dest.value);
@@ -242,13 +242,13 @@ static int ecpri_dma_eth_dp_test_util_setup_dma_endps(enum ecpri_dma_endp_dir di
 			case ECPRI_DMA_ENDP_STREAM_MODE_M2S:
 				endp_cfg_dest.def.use_dest_cfg = 0;
 				endp_cfg_xbar.dest_stream =
-					ecpri_dma_ctx->endp_map[gsi_id][endp_id].dest;
+					(*ecpri_dma_ctx->endp_map)[gsi_id][endp_id].dest;
 				endp_cfg_xbar.xbar_tid =
-					ecpri_dma_ctx->endp_map[gsi_id][endp_id].tid.value;
+					(*ecpri_dma_ctx->endp_map)[gsi_id][endp_id].tid.value;
 				//TODO: Below are required for nFAPI
 				//endp_cfg_xbar.xbar_user = Get from Core driver, need API
 				endp_cfg_xbar.l2_segmentation_en =
-					ecpri_dma_ctx->endp_map[gsi_id][endp_id].is_nfapi ? 1 : 0;
+					(*ecpri_dma_ctx->endp_map)[gsi_id][endp_id].is_nfapi ? 1 : 0;
 				ecpri_dma_hal_write_reg_mn(
 					ECPRI_ENDP_CFG_DEST, gsi_id, endp_id,
 					endp_cfg_dest.value);
@@ -259,24 +259,24 @@ static int ecpri_dma_eth_dp_test_util_setup_dma_endps(enum ecpri_dma_endp_dir di
 			default:
 				DMAERR("SRC ENDP %d, GSI ID%d isn't M2M or S2M,"
 					"address = 0x%px\n", endp_id, gsi_id,
-					&ecpri_dma_ctx->endp_map[gsi_id][endp_id]);
+					&((*ecpri_dma_ctx->endp_map)[gsi_id][endp_id]));
 				return -EINVAL;
 				break;
 			}
 			break;
 		case ECPRI_DMA_ENDP_DIR_DEST:
-			switch (ecpri_dma_ctx->endp_map[gsi_id][endp_id].stream_mode) {
+			switch ((*ecpri_dma_ctx->endp_map)[gsi_id][endp_id].stream_mode) {
 			case ECPRI_DMA_ENDP_STREAM_MODE_M2M:
 				break;
 			case ECPRI_DMA_ENDP_STREAM_MODE_S2M:
-				if (ecpri_dma_ctx->endp_map[gsi_id][endp_id].is_nfapi) {
+				if ((*ecpri_dma_ctx->endp_map)[gsi_id][endp_id].is_nfapi) {
 					memset(&cfg_aggr, 0,
 						sizeof(cfg_aggr));
 					memset(&reassembly_cfg, 0,
 						sizeof(reassembly_cfg));
 					cfg_aggr.def.aggr_type = 1;
 					reassembly_cfg.def.vm_id =
-						ecpri_dma_ctx->endp_map[gsi_id][endp_id]
+						(*ecpri_dma_ctx->endp_map)[gsi_id][endp_id]
 						.nfapi_dest_vm_id;
 					ecpri_dma_hal_write_reg_mn(
 						ECPRI_ENDP_CFG_AGGR, gsi_id,
@@ -288,7 +288,7 @@ static int ecpri_dma_eth_dp_test_util_setup_dma_endps(enum ecpri_dma_endp_dir di
 				break;
 			default:
 				DMAERR("DEST ENDP %d isn't M2M or S2M, address = 0x%px\n",
-					endp_id, &ecpri_dma_ctx->endp_map[gsi_id][endp_id]);
+					endp_id, &((*ecpri_dma_ctx->endp_map)[gsi_id][endp_id]));
 				return -EINVAL;
 				break;
 			}

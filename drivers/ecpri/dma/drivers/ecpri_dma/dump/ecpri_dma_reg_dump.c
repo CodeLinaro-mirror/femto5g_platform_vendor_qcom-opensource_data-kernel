@@ -54,55 +54,50 @@
 	ecpri_dma_hal_write_reg(reg_name, val)
 
 
-#define READ_GSI_REG_ARR_N_K(reg_name, substruct, field_name) do {            \
-		for (n = 0; n < GEN_GSI_ARR_SIZE_n(reg_name); n++) {                      \
-			for (k = 0; k < GEN_GSI_ARR_SIZE_k(reg_name); k++) {                  \
+#define READ_GSI_REG_ARR_N_K(reg_name, substruct, field_name, gsi_id) do {	\
+		for (n = 0; n < GEN_GSI_ARR_SIZE_n(reg_name); n++) {				\
+			for (k = 0; k < GEN_GSI_ARR_SIZE_k(reg_name); k++) {			\
 					ecpri_dma_reg_save.substruct.field_name.arr[n][k].value = \
-					gsihal_read_reg_nk(reg_name, n, k);                       \
-			}													              \
-		}															          \
+					gsihal_read_reg_pnk(reg_name, gsi_id, n, k);			\
+			}																\
+		}																	\
 	} while(0)
 
-#define READ_GSI_REG_N_K(reg_name, substruct, field_name, __n, __k)		\
+#define READ_GSI_REG_N_K(reg_name, substruct, field_name, gsi_id, __n, __k)	\
+	ecpri_dma_reg_save.substruct.field_name.value =							\
+	gsihal_read_reg_pnk(reg_name, gsi_id, __n, __k)
+
+
+#define READ_GSI_REG_ARR_N(reg_name, substruct, field_name, gsi_id) do {	\
+		for (n = 0; n < GEN_GSI_ARR_SIZE_n(reg_name); n++) {				\
+				ecpri_dma_reg_save.substruct.field_name[n].value =			\
+				gsihal_read_reg_pn(reg_name, gsi_id, n);					\
+		}																	\
+	} while(0)
+
+
+#define READ_GSI_REG_ARR_K(reg_name, substruct, field_name, gsi_id) do {	\
+		for (k = 0; k < GEN_GSI_ARR_SIZE_k(reg_name); k++) {				\
+				ecpri_dma_reg_save.substruct.field_name[k].value =			\
+				gsihal_read_reg_pn(reg_name, gsi_id, k);					\
+		}																	\
+	} while(0)
+
+#define READ_GSI_REG_N(reg_name, substruct, field_name, gsi_id, __n) do {	\
+			ecpri_dma_reg_save.substruct.field_name.value =					\
+			gsihal_read_reg_pn(reg_name, gsi_id, __n);						\
+	} while(0)
+
+#define READ_GSI_REG(reg_name, substruct, field_name, gsi_id)			\
 	ecpri_dma_reg_save.substruct.field_name.value =						\
-	gsihal_read_reg_nk(reg_name, __n, __k)
+	gsihal_read_reg_p(reg_name, gsi_id)
 
+#define READ_GSI_SHRAM_REG(reg_name, substruct, field_name, gsi_id, offset) \
+	ecpri_dma_reg_save.substruct.field_name.value =							\
+	gsihal_read_reg_pn(reg_name, gsi_id, offset)
 
-#define READ_GSI_REG_ARR_N(reg_name, substruct, field_name) do {		\
-		for (n = 0; n < GEN_GSI_ARR_SIZE_n(reg_name); n++) {			\
-				ecpri_dma_reg_save.substruct.field_name[n].value =		\
-				gsihal_read_reg_n(reg_name, n);							\
-		}																\
-	} while(0)
-
-
-#define READ_GSI_REG_ARR_K(reg_name, substruct, field_name) do {		\
-		for (k = 0; k < GEN_GSI_ARR_SIZE_k(reg_name); k++) {			\
-				ecpri_dma_reg_save.substruct.field_name[k].value =		\
-				gsihal_read_reg_n(reg_name, k);							\
-		}																\
-	} while(0)
-
-#define READ_GSI_REG_N(reg_name, substruct, field_name, __n) do {		\
-			ecpri_dma_reg_save.substruct.field_name.value =				\
-			gsihal_read_reg_n(reg_name, __n);							\
-	} while(0)
-
-#define READ_GSI_REG_K(reg_name, substruct, field_name, __k) do {		\
-				ecpri_dma_reg_save.substruct.field_name.value =			\
-				gsihal_read_reg_nk(reg_name, 0, __k);					\
-	} while(0)
-
-#define READ_GSI_REG(reg_name, substruct, field_name)                   \
-	ecpri_dma_reg_save.substruct.field_name.value =                     \
-	gsihal_read_reg(reg_name)
-
-#define READ_GSI_SHRAM_REG(reg_name, substruct, field_name, offset)     \
-	ecpri_dma_reg_save.substruct.field_name.value =                     \
-	gsihal_read_reg_n(reg_name, offset)
-
-#define WRITE_GSI_REG(reg_name, val)									\
-	gsihal_write_reg(reg_name, val)
+#define WRITE_GSI_REG(reg_name, gsi_id, val)	\
+	gsihal_write_reg_p(reg_name, gsi_id, val)
 
 /* DMA registers */
 struct ecpri_dma_reg_save_dma_gen_s {
@@ -748,7 +743,7 @@ struct ecpri_dma_reg_save_gsi_fifo_status_s {
 /* Main reg save struct */
 struct ecpri_dma_regs_save_hierarchy_s {
 	struct dma_regs_save_hierarchy_s dma;
-	struct gsi_regs_save_hierarchy_s gsi;
+	struct gsi_regs_save_hierarchy_s gsi[ECPRI_DMA_GSI_NUM_MAX];
 	struct ecpri_dma_reg_save_gsi_fifo_status_s
 		gsi_fifo_status[ECPRI_DMA_GSI_NUM_MAX][ECPRI_DMA_ENDP_NUM_MAX];
 };
@@ -887,7 +882,6 @@ void ecpri_dma_save_registers(void) {
 		dma.dbg, ecpri_dst_ackmngr_cmdq_status);
 
 	/* DMA endps */
-	// TODO: Update names with M_N and N
 	for (gsi_id = 0; gsi_id < ECPRI_DMA_GSI_NUM_MAX; gsi_id++) {
 		for (endp_id = 0; endp_id < ECPRI_DMA_ENDP_NUM_MAX; endp_id++) {
 			READ_DMA_REG_N_K(ECPRI_ENDP_CFG_DEST,
@@ -1046,332 +1040,334 @@ void ecpri_dma_save_registers(void) {
 		dma.markers, ecpri_red_marker_above_mn);
 	READ_DMA_REG_ARR_GSI_M_REG_N(ECPRI_RED_MARKER_ABOVE_EN,
 		dma.markers, ecpri_red_marker_above_en_mn);
-
-
+	
 	/* Save GSI registers */
-	ecpri_dma_reg_save.gsi.fw_ver =
-		gsihal_read_reg_n(GSI_GSI_INST_RAM_n,
-			ECPRI_DMA_REG_SAVE_FW_VER_ROW);
-
-	/* gen */
-	READ_GSI_REG(GSI_GSI_CFG, gsi.gen, gsi_cfg);
-	READ_GSI_REG(GSI_GSI_REE_CFG, gsi.gen, gsi_ree_cfg);
-	READ_GSI_REG_ARR_N(GSI_GSI_INST_RAM_n, gsi.gen, gsi_inst_ram_n);
-
-	/* gen_ee */
-	for (ee = 0; ee < ECPRI_DMA_MAX_EE; ee++) {
-		READ_GSI_REG_N(GSI_GSI_MANAGER_EE_QOS_n,
-			gsi.gen_ee[ee], gsi_manager_ee_qos_n, ee);
-		READ_GSI_REG_N(GSI_EE_n_GSI_STATUS,
-			gsi.gen_ee[ee], ee_n_gsi_status, ee);
-		READ_GSI_REG_N(GSI_EE_n_GSI_HW_PARAM_0,
-			gsi.gen_ee[ee], ee_n_gsi_hw_param_0, ee);
-		READ_GSI_REG_N(GSI_EE_n_GSI_HW_PARAM_1,
-			gsi.gen_ee[ee], ee_n_gsi_hw_param_1, ee);
-		READ_GSI_REG_N(GSI_EE_n_GSI_HW_PARAM_2,
-			gsi.gen_ee[ee], ee_n_gsi_hw_param_2, ee);
-		READ_GSI_REG_N(GSI_EE_n_GSI_HW_PARAM_3,
-			gsi.gen_ee[ee], ee_n_gsi_hw_param_3, ee);
-		READ_GSI_REG_N(GSI_EE_n_GSI_HW_PARAM_4,
-			gsi.gen_ee[ee], ee_n_gsi_hw_param_4, ee);
-		READ_GSI_REG_N(GSI_EE_n_CNTXT_TYPE_IRQ,
-			gsi.gen_ee[ee], ee_n_cntxt_type_irq, ee);
-		READ_GSI_REG_N(GSI_EE_n_CNTXT_TYPE_IRQ_MSK,
-			gsi.gen_ee[ee], ee_n_cntxt_type_irq_msk, ee);
-		READ_GSI_REG_N(GSI_EE_n_CNTXT_GSI_IRQ_STTS,
-			gsi.gen_ee[ee], ee_n_cntxt_gsi_irq_stts, ee);
-		READ_GSI_REG_N(GSI_EE_n_CNTXT_GLOB_IRQ_STTS,
-			gsi.gen_ee[ee], ee_n_cntxt_glob_irq_stts, ee);
-		READ_GSI_REG_N(GSI_EE_n_ERROR_LOG,
-			gsi.gen_ee[ee], ee_n_error_log, ee);
-		READ_GSI_REG_N(GSI_EE_n_CNTXT_SCRATCH_0,
-			gsi.gen_ee[ee], ee_n_cntxt_scratch_0, ee);
-		READ_GSI_REG_N(GSI_EE_n_CNTXT_SCRATCH_1,
-			gsi.gen_ee[ee], ee_n_cntxt_scratch_1, ee);
-		READ_GSI_REG_N(GSI_EE_n_CNTXT_INTSET,
-			gsi.gen_ee[ee], ee_n_cntxt_intset, ee);
-		READ_GSI_REG_N(GSI_EE_n_CNTXT_MSI_BASE_LSB,
-			gsi.gen_ee[ee], ee_n_cntxt_msi_base_lsb, ee);
-		READ_GSI_REG_N(GSI_EE_n_CNTXT_MSI_BASE_MSB,
-			gsi.gen_ee[ee], ee_n_cntxt_msi_base_msb, ee);
-		READ_GSI_REG_N(GSI_EE_n_CNTXT_GLOB_IRQ_EN,
-			gsi.gen_ee[ee], ee_n_glob_irq_en, ee);
-		READ_GSI_REG_N(GSI_EE_n_CNTXT_GSI_IRQ_EN,
-			gsi.gen_ee[ee], ee_n_gsi_irq_en, ee);
-		READ_GSI_REG_N(GSI_EE_n_CNTXT_INT_VEC,
-			gsi.gen_ee[ee], ee_n_int_vec, ee);
-	}
-
-	READ_GSI_REG_ARR_N_K(GSI_EE_n_CNTXT_SRC_GSI_CH_IRQ_k, gsi.gen_ee[ee],
-		ee_n_cntxt_src_gsi_ch_irq_k);
-	READ_GSI_REG_ARR_N_K(GSI_EE_n_CNTXT_SRC_EV_CH_IRQ_k, gsi.gen_ee[ee],
-		ee_n_cntxt_src_ev_ch_irq_k);
-	READ_GSI_REG_ARR_N_K(GSI_EE_n_CNTXT_SRC_GSI_CH_IRQ_MSK_k, gsi.gen_ee[ee],
-		ee_n_cntxt_src_gsi_ch_irq_msk_k);
-	READ_GSI_REG_ARR_N_K(GSI_EE_n_CNTXT_SRC_EV_CH_IRQ_MSK_k, gsi.gen_ee[ee],
-		ee_n_cntxt_src_ev_ch_irq_msk_k);
-	READ_GSI_REG_ARR_N_K(GSI_EE_n_CNTXT_SRC_IEOB_IRQ_k, gsi.gen_ee[ee],
-		ee_n_cntxt_src_ieob_irq_k);
-	READ_GSI_REG_ARR_N_K(GSI_EE_n_CNTXT_SRC_IEOB_IRQ_MSK_k, gsi.gen_ee[ee],
-		ee_n_cntxt_src_ieob_irq_msk_k);
-
-	/* ch_cntxt */
-	for (ee = 0; ee < ECPRI_DMA_MAX_EE; ee++) {
-		for (k = 0; k < ECPRI_DMA_REG_SAVE_GSI_CH_MAX; k++) {
-			READ_GSI_REG_N_K(GSI_EE_n_GSI_CH_k_CNTXT_0, gsi.ch_cntxt[ee][k],
-				ee_n_gsi_ch_k_cntxt_0, ee, k);
-			READ_GSI_REG_N_K(GSI_EE_n_GSI_CH_k_CNTXT_1, gsi.ch_cntxt[ee][k],
-				ee_n_gsi_ch_k_cntxt_1, ee, k);
-			READ_GSI_REG_N_K(GSI_EE_n_GSI_CH_k_CNTXT_2, gsi.ch_cntxt[ee][k],
-				ee_n_gsi_ch_k_cntxt_2, ee, k);
-			READ_GSI_REG_N_K(GSI_EE_n_GSI_CH_k_CNTXT_3, gsi.ch_cntxt[ee][k],
-				ee_n_gsi_ch_k_cntxt_3, ee, k);
-			READ_GSI_REG_N_K(GSI_EE_n_GSI_CH_k_CNTXT_4, gsi.ch_cntxt[ee][k],
-				ee_n_gsi_ch_k_cntxt_4, ee, k);
-			READ_GSI_REG_N_K(GSI_EE_n_GSI_CH_k_CNTXT_5, gsi.ch_cntxt[ee][k],
-				ee_n_gsi_ch_k_cntxt_5, ee, k);
-			READ_GSI_REG_N_K(GSI_EE_n_GSI_CH_k_CNTXT_6, gsi.ch_cntxt[ee][k],
-				ee_n_gsi_ch_k_cntxt_6, ee, k);
-			READ_GSI_REG_N_K(GSI_EE_n_GSI_CH_k_CNTXT_7, gsi.ch_cntxt[ee][k],
-				ee_n_gsi_ch_k_cntxt_7, ee, k);
-			READ_GSI_REG_N_K(GSI_EE_n_GSI_CH_k_CNTXT_8, gsi.ch_cntxt[ee][k],
-				ee_n_gsi_ch_k_cntxt_8, ee, k);
-			READ_GSI_REG_N_K(GSI_EE_n_GSI_CH_k_RE_FETCH_READ_PTR,
-				gsi.ch_cntxt[ee][k], ee_n_gsi_ch_k_re_fetch_read_ptr, ee, k);
-			READ_GSI_REG_N_K(GSI_EE_n_GSI_CH_k_RE_FETCH_WRITE_PTR,
-				gsi.ch_cntxt[ee][k], ee_n_gsi_ch_k_re_fetch_read_ptr, ee, k);
-			READ_GSI_REG_N_K(GSI_EE_n_GSI_CH_k_QOS,
-				gsi.ch_cntxt[ee][k], ee_n_gsi_ch_k_qos, ee, k);
-			READ_GSI_REG_N_K(GSI_EE_n_GSI_CH_k_SCRATCH_0,
-				gsi.ch_cntxt[ee][k], ee_n_gsi_ch_k_scratch_0, ee, k);
-			READ_GSI_REG_N_K(GSI_EE_n_GSI_CH_k_SCRATCH_1,
-				gsi.ch_cntxt[ee][k], ee_n_gsi_ch_k_scratch_1, ee, k);
-			READ_GSI_REG_N_K(GSI_EE_n_GSI_CH_k_SCRATCH_2,
-				gsi.ch_cntxt[ee][k], ee_n_gsi_ch_k_scratch_2, ee, k);
-			READ_GSI_REG_N_K(GSI_EE_n_GSI_CH_k_SCRATCH_3,
-				gsi.ch_cntxt[ee][k], ee_n_gsi_ch_k_scratch_3, ee, k);
-			READ_GSI_REG_N_K(GSI_EE_n_GSI_CH_k_SCRATCH_4,
-				gsi.ch_cntxt[ee][k], ee_n_gsi_ch_k_scratch_4, ee, k);
-			READ_GSI_REG_N_K(GSI_EE_n_GSI_CH_k_SCRATCH_5,
-				gsi.ch_cntxt[ee][k], ee_n_gsi_ch_k_scratch_5, ee, k);
-			READ_GSI_REG_N_K(GSI_EE_n_GSI_CH_k_SCRATCH_6,
-				gsi.ch_cntxt[ee][k], ee_n_gsi_ch_k_scratch_6, ee, k);
-			READ_GSI_REG_N_K(GSI_EE_n_GSI_CH_k_SCRATCH_7,
-				gsi.ch_cntxt[ee][k], ee_n_gsi_ch_k_scratch_7, ee, k);
-			READ_GSI_REG_N_K(GSI_EE_n_GSI_CH_k_SCRATCH_8,
-				gsi.ch_cntxt[ee][k], ee_n_gsi_ch_k_scratch_8, ee, k);
-			READ_GSI_REG_N_K(GSI_EE_n_GSI_CH_k_SCRATCH_9,
-				gsi.ch_cntxt[ee][k], ee_n_gsi_ch_k_scratch_9, ee, k);
-			READ_GSI_REG_N_K(GSI_GSI_MAP_EE_n_CH_k_VP_TABLE,
-				gsi.ch_cntxt[ee][k], gsi_map_ee_n_ch_k_vp_table, ee, k);
-			READ_GSI_REG_N_K(GSI_EE_n_GSI_CH_k_DB_ENG_WRITE_PTR,
-				gsi.ch_cntxt[ee][k], gsi_ch_k_db_eng_write_ptr, ee, k);
-			READ_GSI_REG_N_K(GSI_EE_n_GSI_CH_k_CH_ALMST_EMPTY_THRSHOLD,
-				gsi.ch_cntxt[ee][k], gsi_ch_k_ch_almst_empty_thrshold, ee, k);
-
-			/* mcs_channel_scratch */
-			n = phys_ch_idx * ECPRI_DMA_REG_SAVE_BYTES_PER_CHNL_SHRAM;
-
-			READ_GSI_SHRAM_REG(GSI_GSI_SHRAM_n,
-				gsi.ch_cntxt[ee][k].mcs_channel_scratch,
-				scratch_for_seq_low,
-				n + ECPRI_GSI_OFFSET_WORDS_SCRATCH_FOR_SEQ_LOW);
-			READ_GSI_SHRAM_REG(GSI_GSI_SHRAM_n,
-				gsi.ch_cntxt[ee][k].mcs_channel_scratch,
-				scratch_for_seq_high,
-				n + ECPRI_GSI_OFFSET_WORDS_SCRATCH_FOR_SEQ_HIGH);
-		}
-	}
-
-	/* evt_cntxt */
-	for (ee = 0; ee < ECPRI_DMA_MAX_EE; ee++) {
-		for (k = 0; k < ECPRI_DMA_REG_SAVE_GSI_EV_CH_MAX; k++) {
-			READ_GSI_REG_N_K(GSI_EE_n_EV_CH_k_CNTXT_0, gsi.evt_cntxt[ee][k],
-				ee_n_ev_ch_k_cntxt_0, ee, k);
-			READ_GSI_REG_N_K(GSI_EE_n_EV_CH_k_CNTXT_1, gsi.evt_cntxt[ee][k],
-				ee_n_ev_ch_k_cntxt_1, ee, k);
-			READ_GSI_REG_N_K(GSI_EE_n_EV_CH_k_CNTXT_2, gsi.evt_cntxt[ee][k],
-				ee_n_ev_ch_k_cntxt_2, ee, k);
-			READ_GSI_REG_N_K(GSI_EE_n_EV_CH_k_CNTXT_3, gsi.evt_cntxt[ee][k],
-				ee_n_ev_ch_k_cntxt_3, ee, k);
-			READ_GSI_REG_N_K(GSI_EE_n_EV_CH_k_CNTXT_4, gsi.evt_cntxt[ee][k],
-				ee_n_ev_ch_k_cntxt_4, ee, k);
-			READ_GSI_REG_N_K(GSI_EE_n_EV_CH_k_CNTXT_5, gsi.evt_cntxt[ee][k],
-				ee_n_ev_ch_k_cntxt_5, ee, k);
-			READ_GSI_REG_N_K(GSI_EE_n_EV_CH_k_CNTXT_6, gsi.evt_cntxt[ee][k],
-				ee_n_ev_ch_k_cntxt_6, ee, k);
-			READ_GSI_REG_N_K(GSI_EE_n_EV_CH_k_CNTXT_7, gsi.evt_cntxt[ee][k],
-				ee_n_ev_ch_k_cntxt_7, ee, k);
-			READ_GSI_REG_N_K(GSI_EE_n_EV_CH_k_CNTXT_8, gsi.evt_cntxt[ee][k],
-				ee_n_ev_ch_k_cntxt_8, ee, k);
-			READ_GSI_REG_N_K(GSI_EE_n_EV_CH_k_CNTXT_9, gsi.evt_cntxt[ee][k],
-				ee_n_ev_ch_k_cntxt_9, ee, k);
-			READ_GSI_REG_N_K(GSI_EE_n_EV_CH_k_CNTXT_10, gsi.evt_cntxt[ee][k],
-				ee_n_ev_ch_k_cntxt_10, ee, k);
-			READ_GSI_REG_N_K(GSI_EE_n_EV_CH_k_CNTXT_11, gsi.evt_cntxt[ee][k],
-				ee_n_ev_ch_k_cntxt_11, ee, k);
-			READ_GSI_REG_N_K(GSI_EE_n_EV_CH_k_CNTXT_12, gsi.evt_cntxt[ee][k],
-				ee_n_ev_ch_k_cntxt_12, ee, k);
-			READ_GSI_REG_N_K(GSI_EE_n_EV_CH_k_CNTXT_13, gsi.evt_cntxt[ee][k],
-				ee_n_ev_ch_k_cntxt_13, ee, k);
-			READ_GSI_REG_N_K(GSI_EE_n_EV_CH_k_SCRATCH_0, gsi.evt_cntxt[ee][k],
-				ee_n_ev_ch_k_scratch_0, ee, k);
-			READ_GSI_REG_N_K(GSI_EE_n_EV_CH_k_SCRATCH_1, gsi.evt_cntxt[ee][k],
-				ee_n_ev_ch_k_scratch_1, ee, k);
-			READ_GSI_REG_N_K(GSI_EE_n_EV_CH_k_SCRATCH_2, gsi.evt_cntxt[ee][k],
-				ee_n_ev_ch_k_scratch_2, ee, k);
-			READ_GSI_REG_N_K(GSI_GSI_DEBUG_EE_n_EV_k_VP_TABLE,
-				gsi.evt_cntxt[ee][k], gsi_debug_ee_n_ev_k_vp_table, ee, k);
-		}
-	}
-
-	/* debug */
-	READ_GSI_REG(GSI_GSI_DEBUG_BUSY_REG,
-		gsi.debug, gsi_debug_busy_reg);
-	READ_GSI_REG(GSI_GSI_DEBUG_PC_FROM_SW,
-		gsi.debug, gsi_debug_pc_from_sw);
-	READ_GSI_REG(GSI_GSI_DEBUG_SW_STALL,
-		gsi.debug, gsi_debug_sw_stall);
-	READ_GSI_REG(GSI_GSI_DEBUG_PC_FOR_DEBUG,
-		gsi.debug, gsi_debug_pc_for_debug);
-	READ_GSI_REG(GSI_GSI_DEBUG_QSB_LOG_ERR_TRNS_ID,
-		gsi.debug, gsi_debug_qsb_log_err_trns_id);
-	READ_GSI_REG_ARR_N(GSI_GSI_DEBUG_COUNTERn,
-		gsi.debug.gsi_cnt_regs, cnt);
-
-	/* gsi_qsb_debug */
-	READ_GSI_REG(GSI_GSI_DEBUG_QSB_LOG_ERR_TRNS_ID,
-		gsi.debug.gsi_qsb_debug, gsi_debug_busy_reg);
-	READ_GSI_REG_ARR_N(GSI_GSI_DEBUG_QSB_LOG_LAST_MISC_IDn,
-		gsi.debug.gsi_qsb_debug, qsb_log_last_misc_idn);
-	READ_GSI_REG_ARR_N(GSI_GSI_DEBUG_COUNTER_CFGn,
-		gsi.debug.gsi_qsb_debug, gsi_debug_counter_cfgn);
-	READ_GSI_REG(GSI_GSI_DEBUG_REE_PREFETCH_BUF_CH_ID,
-		gsi.debug.gsi_qsb_debug, gsi_debug_ree_prefetch_buf_ch_id);
-	READ_GSI_REG(GSI_GSI_DEBUG_REE_PREFETCH_BUF_STATUS,
-		gsi.debug.gsi_qsb_debug, gsi_debug_ree_prefetch_buf_status);
-	READ_GSI_REG_ARR_K(GSI_GSI_DEBUG_EVENT_PENDING_k,
-		gsi.debug.gsi_qsb_debug, gsi_debug_event_pending_k);
-	READ_GSI_REG_ARR_K(GSI_GSI_DEBUG_TIMER_PENDING_k,
-		gsi.debug.gsi_qsb_debug, gsi_debug_timer_pending_k);
-	READ_GSI_REG_ARR_K(GSI_GSI_DEBUG_RD_WR_PENDING_k,
-		gsi.debug.gsi_qsb_debug, gsi_debug_rd_wr_pending_k);
-
-	/* GSI test bus */
-	for (i = 0;
-		i < ARRAY_SIZE(ecpri_dma_reg_save_gsi_test_bus_selector_array);
-		i++) {
-		/* Write test bus selector */
-		WRITE_GSI_REG(GSI_GSI_TEST_BUS_SEL,
-			ecpri_dma_reg_save_gsi_test_bus_selector_array[i]);
-
-		READ_GSI_REG(GSI_GSI_TEST_BUS_REG, gsi.debug.gsi_test_bus,
-			test_bus_reg[i]);
-	}
-
-	READ_GSI_REG_ARR_N(GSI_GSI_DEBUG_SW_RF_n_READ, gsi.debug, rf_read_regs);
-
-	/* QSB regs */
-	READ_GSI_REG_ARR_N(GSI_GSI_DEBUG_QSB_LOG_LAST_MISC_IDn,
-		gsi.debug.gsi_qsb_debug.gsi_debug_qsb_reg,
-		gsi_debug_qsb_log_last_misc_idn);
-
-	/* gsi_mcs_prof_regs */
-	READ_GSI_REG(GSI_GSI_MCS_PROFILING_BP_CNT_LSB,
-		gsi.debug.gsi_mcs_prof_regs, gsi_mcs_profiling_bp_cnt_lsb);
-	READ_GSI_REG(GSI_GSI_MCS_PROFILING_BP_CNT_MSB,
-		gsi.debug.gsi_mcs_prof_regs, gsi_mcs_profiling_bp_cnt_msb);
-	READ_GSI_REG(GSI_GSI_MCS_PROFILING_BP_AND_PENDING_CNT_LSB,
-		gsi.debug.gsi_mcs_prof_regs, gsi_mcs_profiling_bp_and_pending_cnt_lsb);
-	READ_GSI_REG(GSI_GSI_MCS_PROFILING_BP_AND_PENDING_CNT_MSB,
-		gsi.debug.gsi_mcs_prof_regs, gsi_mcs_profiling_bp_and_pending_cnt_msb);
-	READ_GSI_REG(GSI_GSI_MCS_PROFILING_MCS_BUSY_CNT_LSB,
-		gsi.debug.gsi_mcs_prof_regs, gsi_mcs_profiling_mcs_busy_cnt_lsb);
-	READ_GSI_REG(GSI_GSI_MCS_PROFILING_MCS_BUSY_CNT_MSB,
-		gsi.debug.gsi_mcs_prof_regs, gsi_mcs_profiling_mcs_busy_cnt_msb);
-	READ_GSI_REG(GSI_GSI_MCS_PROFILING_MCS_IDLE_CNT_LSB,
-		gsi.debug.gsi_mcs_prof_regs, gsi_mcs_profiling_mcs_idle_cnt_lsb);
-	READ_GSI_REG(GSI_GSI_MCS_PROFILING_MCS_IDLE_CNT_MSB,
-		gsi.debug.gsi_mcs_prof_regs, gsi_mcs_profiling_mcs_idle_cnt_msb);
-
-	/* gsi_iram_ptrs */
-	READ_GSI_REG(GSI_GSI_IRAM_PTR_CH_CMD,
-		gsi.debug.gsi_iram_ptrs, gsi_iram_ptr_ch_cmd);
-	READ_GSI_REG(GSI_GSI_IRAM_PTR_EE_GENERIC_CMD,
-		gsi.debug.gsi_iram_ptrs, gsi_iram_ptr_ee_generic_cmd);
-	READ_GSI_REG(GSI_GSI_IRAM_PTR_CH_DB,
-		gsi.debug.gsi_iram_ptrs, gsi_iram_ptr_ch_db);
-	READ_GSI_REG(GSI_GSI_IRAM_PTR_EV_DB,
-		gsi.debug.gsi_iram_ptrs, gsi_iram_ptr_ev_db);
-	READ_GSI_REG(GSI_GSI_IRAM_PTR_NEW_RE,
-		gsi.debug.gsi_iram_ptrs, gsi_iram_ptr_new_re);
-	READ_GSI_REG(GSI_GSI_IRAM_PTR_CH_DIS_COMP,
-		gsi.debug.gsi_iram_ptrs, gsi_iram_ptr_ch_dis_comp);
-	READ_GSI_REG(GSI_GSI_IRAM_PTR_CH_EMPTY,
-		gsi.debug.gsi_iram_ptrs, gsi_iram_ptr_ch_empty);
-	READ_GSI_REG(GSI_GSI_IRAM_PTR_TIMER_EXPIRED,
-		gsi.debug.gsi_iram_ptrs, gsi_iram_ptr_timer_expired);
-	READ_GSI_REG(GSI_GSI_IRAM_PTR_EVENT_GEN_COMP,
-		gsi.debug.gsi_iram_ptrs, gsi_iram_ptr_event_gen_comp);
-	READ_GSI_REG(GSI_GSI_IRAM_PTR_WRITE_ENG_COMP,
-		gsi.debug.gsi_iram_ptrs, gsi_iram_ptr_write_eng_comp);
-	READ_GSI_REG(GSI_GSI_IRAM_PTR_READ_ENG_COMP,
-		gsi.debug.gsi_iram_ptrs, gsi_iram_ptr_read_eng_comp);
-	READ_GSI_REG(GSI_GSI_IRAM_PTR_UC_GP_INT,
-		gsi.debug.gsi_iram_ptrs, gsi_iram_ptr_uc_gp_int);
-	READ_GSI_REG(GSI_GSI_IRAM_PTR_INT_MOD_STOPED,
-		gsi.debug.gsi_iram_ptrs, gsi_iram_ptr_int_mod_stoped);
-	READ_GSI_REG(GSI_GSI_IRAM_PTR_TLV_CH_NOT_FULL,
-		gsi.debug.gsi_iram_ptrs, gsi_iram_ptr_tlv_ch_not_full);
-	READ_GSI_REG(GSI_GSI_IRAM_PTR_MSI_DB,
-		gsi.debug.gsi_iram_ptrs, gsi_iram_ptr_msi_db);
-	READ_GSI_REG(GSI_GSI_IRAM_PTR_PERIPH_IF_TLV_IN_0,
-		gsi.debug.gsi_iram_ptrs, gsi_iram_ptr_periph_if_tlv_in_0);
-	READ_GSI_REG(GSI_GSI_IRAM_PTR_PERIPH_IF_TLV_IN_1,
-		gsi.debug.gsi_iram_ptrs, gsi_iram_ptr_periph_if_tlv_in_1);
-	READ_GSI_REG(GSI_GSI_IRAM_PTR_PERIPH_IF_TLV_IN_2,
-		gsi.debug.gsi_iram_ptrs, gsi_iram_ptr_periph_if_tlv_in_2);
-
-	/* gsi_shram_ptrs */
-	READ_GSI_REG(GSI_GSI_SHRAM_PTR_CH_CNTXT_BASE_ADDR,
-		gsi.debug.gsi_shram_ptrs, gsi_shram_ptr_ch_cntxt_base_addr);
-	READ_GSI_REG(GSI_GSI_SHRAM_PTR_EV_CNTXT_BASE_ADDR,
-		gsi.debug.gsi_shram_ptrs, gsi_shram_ptr_ev_cntxt_base_addr);
-	READ_GSI_REG(GSI_GSI_SHRAM_PTR_RE_STORAGE_BASE_ADDR,
-		gsi.debug.gsi_shram_ptrs, gsi_shram_ptr_re_storage_base_addr);
-	READ_GSI_REG(GSI_GSI_SHRAM_PTR_RE_ESC_BUF_BASE_ADDR,
-		gsi.debug.gsi_shram_ptrs, gsi_shram_ptr_re_esc_buf_base_addr);
-	READ_GSI_REG(GSI_GSI_SHRAM_PTR_EE_SCRACH_BASE_ADDR,
-		gsi.debug.gsi_shram_ptrs, gsi_shram_ptr_ee_scrach_base_addr);
-	READ_GSI_REG(GSI_GSI_SHRAM_PTR_FUNC_STACK_BASE_ADDR,
-		gsi.debug.gsi_shram_ptrs, gsi_shram_ptr_func_stack_base_addr);
-	READ_GSI_REG(GSI_GSI_SHRAM_PTR_MCS_SCRATCH_BASE_ADDR,
-		gsi.debug.gsi_shram_ptrs, gsi_shram_ptr_mcs_scratch_base_addr);
-	READ_GSI_REG(GSI_GSI_SHRAM_PTR_MCS_SCRATCH1_BASE_ADDR,
-		gsi.debug.gsi_shram_ptrs, gsi_shram_ptr_mcs_scratch1_base_addr);
-	READ_GSI_REG(GSI_GSI_SHRAM_PTR_MCS_SCRATCH2_BASE_ADDR,
-		gsi.debug.gsi_shram_ptrs, gsi_shram_ptr_mcs_scratch2_base_addr);
-	READ_GSI_REG(GSI_GSI_SHRAM_PTR_MCS_SCRATCH3_BASE_ADDR,
-		gsi.debug.gsi_shram_ptrs, gsi_shram_ptr_mcs_scratch3_base_addr);
-	READ_GSI_REG(GSI_GSI_SHRAM_PTR_CH_VP_TRANS_TABLE_BASE_ADDR,
-		gsi.debug.gsi_shram_ptrs, gsi_shram_ptr_ch_vp_trans_table_base_addr);
-	READ_GSI_REG(GSI_GSI_SHRAM_PTR_EV_VP_TRANS_TABLE_BASE_ADDR,
-		gsi.debug.gsi_shram_ptrs, gsi_shram_ptr_ev_vp_trans_table_base_addr);
-	READ_GSI_REG(GSI_GSI_SHRAM_PTR_USER_INFO_DATA_BASE_ADDR,
-		gsi.debug.gsi_shram_ptrs, gsi_shram_ptr_user_info_data_base_addr);
-	READ_GSI_REG(GSI_GSI_SHRAM_PTR_EE_CMD_FIFO_BASE_ADDR,
-		gsi.debug.gsi_shram_ptrs, gsi_shram_ptr_ee_cmd_fifo_base_addr);
-	READ_GSI_REG(GSI_GSI_SHRAM_PTR_CH_CMD_FIFO_BASE_ADDR,
-		gsi.debug.gsi_shram_ptrs, gsi_shram_ptr_ch_cmd_fifo_base_addr);
-	READ_GSI_REG(GSI_GSI_SHRAM_PTR_EVE_ED_STORAGE_BASE_ADDR,
-		gsi.debug.gsi_shram_ptrs, gsi_shram_ptr_eve_ed_storage_base_addr);
-
-	/* debug_sw_msk */
-	READ_GSI_REG_ARR_N_K(GSI_GSI_DEBUG_SW_MSK_REG_n_SEC_k_RD, gsi.debug,
-		debug_sw_msk);
-
-	/* Save FIFO Status registers */
 	for (gsi_id = 0; gsi_id < ECPRI_DMA_GSI_NUM_MAX; gsi_id++) {
+		ecpri_dma_reg_save.gsi[gsi_id].fw_ver =
+			gsihal_read_reg_pn(GSI_GSI_INST_RAM_n, gsi_id,
+				ECPRI_DMA_REG_SAVE_FW_VER_ROW);
+
+		/* gen */
+		READ_GSI_REG(GSI_GSI_CFG, gsi[gsi_id].gen, gsi_cfg, gsi_id);
+		READ_GSI_REG(GSI_GSI_REE_CFG, gsi[gsi_id].gen, gsi_ree_cfg, gsi_id);
+		READ_GSI_REG_ARR_N(GSI_GSI_INST_RAM_n, gsi[gsi_id].gen, gsi_inst_ram_n,
+			gsi_id);
+
+
+		/* gen_ee */
+		for (ee = 0; ee < ECPRI_DMA_MAX_EE; ee++) {
+			READ_GSI_REG_N(GSI_GSI_MANAGER_EE_QOS_n,
+				gsi[gsi_id].gen_ee[ee], gsi_manager_ee_qos_n, gsi_id, ee);
+			READ_GSI_REG_N(GSI_EE_n_GSI_STATUS,
+				gsi[gsi_id].gen_ee[ee], ee_n_gsi_status, gsi_id, ee);
+			READ_GSI_REG_N(GSI_EE_n_GSI_HW_PARAM_0,
+				gsi[gsi_id].gen_ee[ee], ee_n_gsi_hw_param_0, gsi_id, ee);
+			READ_GSI_REG_N(GSI_EE_n_GSI_HW_PARAM_1,
+				gsi[gsi_id].gen_ee[ee], ee_n_gsi_hw_param_1, gsi_id, ee);
+			READ_GSI_REG_N(GSI_EE_n_GSI_HW_PARAM_2,
+				gsi[gsi_id].gen_ee[ee], ee_n_gsi_hw_param_2, gsi_id, ee);
+			READ_GSI_REG_N(GSI_EE_n_GSI_HW_PARAM_3,
+				gsi[gsi_id].gen_ee[ee], ee_n_gsi_hw_param_3, gsi_id, ee);
+			READ_GSI_REG_N(GSI_EE_n_GSI_HW_PARAM_4,
+				gsi[gsi_id].gen_ee[ee], ee_n_gsi_hw_param_4, gsi_id, ee);
+			READ_GSI_REG_N(GSI_EE_n_CNTXT_TYPE_IRQ,
+				gsi[gsi_id].gen_ee[ee], ee_n_cntxt_type_irq, gsi_id, ee);
+			READ_GSI_REG_N(GSI_EE_n_CNTXT_TYPE_IRQ_MSK,
+				gsi[gsi_id].gen_ee[ee], ee_n_cntxt_type_irq_msk, gsi_id, ee);
+			READ_GSI_REG_N(GSI_EE_n_CNTXT_GSI_IRQ_STTS,
+				gsi[gsi_id].gen_ee[ee], ee_n_cntxt_gsi_irq_stts, gsi_id, ee);
+			READ_GSI_REG_N(GSI_EE_n_CNTXT_GLOB_IRQ_STTS,
+				gsi[gsi_id].gen_ee[ee], ee_n_cntxt_glob_irq_stts, gsi_id, ee);
+			READ_GSI_REG_N(GSI_EE_n_ERROR_LOG,
+				gsi[gsi_id].gen_ee[ee], ee_n_error_log, gsi_id, ee);
+			READ_GSI_REG_N(GSI_EE_n_CNTXT_SCRATCH_0,
+				gsi[gsi_id].gen_ee[ee], ee_n_cntxt_scratch_0, gsi_id, ee);
+			READ_GSI_REG_N(GSI_EE_n_CNTXT_SCRATCH_1,
+				gsi[gsi_id].gen_ee[ee], ee_n_cntxt_scratch_1, gsi_id, ee);
+			READ_GSI_REG_N(GSI_EE_n_CNTXT_INTSET,
+				gsi[gsi_id].gen_ee[ee], ee_n_cntxt_intset, gsi_id, ee);
+			READ_GSI_REG_N(GSI_EE_n_CNTXT_MSI_BASE_LSB,
+				gsi[gsi_id].gen_ee[ee], ee_n_cntxt_msi_base_lsb, gsi_id, ee);
+			READ_GSI_REG_N(GSI_EE_n_CNTXT_MSI_BASE_MSB,
+				gsi[gsi_id].gen_ee[ee], ee_n_cntxt_msi_base_msb, gsi_id, ee);
+			READ_GSI_REG_N(GSI_EE_n_CNTXT_GLOB_IRQ_EN,
+				gsi[gsi_id].gen_ee[ee], ee_n_glob_irq_en, gsi_id, ee);
+			READ_GSI_REG_N(GSI_EE_n_CNTXT_GSI_IRQ_EN,
+				gsi[gsi_id].gen_ee[ee], ee_n_gsi_irq_en, gsi_id, ee);
+			READ_GSI_REG_N(GSI_EE_n_CNTXT_INT_VEC,
+				gsi[gsi_id].gen_ee[ee], ee_n_int_vec, gsi_id, ee);
+		}
+
+		READ_GSI_REG_ARR_N_K(GSI_EE_n_CNTXT_SRC_GSI_CH_IRQ_k, gsi[gsi_id].gen_ee[ee],
+			ee_n_cntxt_src_gsi_ch_irq_k, gsi_id);
+		READ_GSI_REG_ARR_N_K(GSI_EE_n_CNTXT_SRC_EV_CH_IRQ_k, gsi[gsi_id].gen_ee[ee],
+			ee_n_cntxt_src_ev_ch_irq_k, gsi_id);
+		READ_GSI_REG_ARR_N_K(GSI_EE_n_CNTXT_SRC_GSI_CH_IRQ_MSK_k, gsi[gsi_id].gen_ee[ee],
+			ee_n_cntxt_src_gsi_ch_irq_msk_k, gsi_id);
+		READ_GSI_REG_ARR_N_K(GSI_EE_n_CNTXT_SRC_EV_CH_IRQ_MSK_k, gsi[gsi_id].gen_ee[ee],
+			ee_n_cntxt_src_ev_ch_irq_msk_k, gsi_id);
+		READ_GSI_REG_ARR_N_K(GSI_EE_n_CNTXT_SRC_IEOB_IRQ_k, gsi[gsi_id].gen_ee[ee],
+			ee_n_cntxt_src_ieob_irq_k, gsi_id);
+		READ_GSI_REG_ARR_N_K(GSI_EE_n_CNTXT_SRC_IEOB_IRQ_MSK_k, gsi[gsi_id].gen_ee[ee],
+			ee_n_cntxt_src_ieob_irq_msk_k, gsi_id);
+
+		/* ch_cntxt */
+		for (ee = 0; ee < ECPRI_DMA_MAX_EE; ee++) {
+			for (k = 0; k < ECPRI_DMA_REG_SAVE_GSI_CH_MAX; k++) {
+				READ_GSI_REG_N_K(GSI_EE_n_GSI_CH_k_CNTXT_0, gsi[gsi_id].ch_cntxt[ee][k],
+					ee_n_gsi_ch_k_cntxt_0, gsi_id, ee, k);
+				READ_GSI_REG_N_K(GSI_EE_n_GSI_CH_k_CNTXT_1, gsi[gsi_id].ch_cntxt[ee][k],
+					ee_n_gsi_ch_k_cntxt_1, gsi_id, ee, k);
+				READ_GSI_REG_N_K(GSI_EE_n_GSI_CH_k_CNTXT_2, gsi[gsi_id].ch_cntxt[ee][k],
+					ee_n_gsi_ch_k_cntxt_2, gsi_id, ee, k);
+				READ_GSI_REG_N_K(GSI_EE_n_GSI_CH_k_CNTXT_3, gsi[gsi_id].ch_cntxt[ee][k],
+					ee_n_gsi_ch_k_cntxt_3, gsi_id, ee, k);
+				READ_GSI_REG_N_K(GSI_EE_n_GSI_CH_k_CNTXT_4, gsi[gsi_id].ch_cntxt[ee][k],
+					ee_n_gsi_ch_k_cntxt_4, gsi_id, ee, k);
+				READ_GSI_REG_N_K(GSI_EE_n_GSI_CH_k_CNTXT_5, gsi[gsi_id].ch_cntxt[ee][k],
+					ee_n_gsi_ch_k_cntxt_5, gsi_id, ee, k);
+				READ_GSI_REG_N_K(GSI_EE_n_GSI_CH_k_CNTXT_6, gsi[gsi_id].ch_cntxt[ee][k],
+					ee_n_gsi_ch_k_cntxt_6, gsi_id, ee, k);
+				READ_GSI_REG_N_K(GSI_EE_n_GSI_CH_k_CNTXT_7, gsi[gsi_id].ch_cntxt[ee][k],
+					ee_n_gsi_ch_k_cntxt_7, gsi_id, ee, k);
+				READ_GSI_REG_N_K(GSI_EE_n_GSI_CH_k_CNTXT_8, gsi[gsi_id].ch_cntxt[ee][k],
+					ee_n_gsi_ch_k_cntxt_8, gsi_id, ee, k);
+				READ_GSI_REG_N_K(GSI_EE_n_GSI_CH_k_RE_FETCH_READ_PTR,
+					gsi[gsi_id].ch_cntxt[ee][k], ee_n_gsi_ch_k_re_fetch_read_ptr, gsi_id, ee, k);
+				READ_GSI_REG_N_K(GSI_EE_n_GSI_CH_k_RE_FETCH_WRITE_PTR,
+					gsi[gsi_id].ch_cntxt[ee][k], ee_n_gsi_ch_k_re_fetch_read_ptr, gsi_id, ee, k);
+				READ_GSI_REG_N_K(GSI_EE_n_GSI_CH_k_QOS,
+					gsi[gsi_id].ch_cntxt[ee][k], ee_n_gsi_ch_k_qos, gsi_id, ee, k);
+				READ_GSI_REG_N_K(GSI_EE_n_GSI_CH_k_SCRATCH_0,
+					gsi[gsi_id].ch_cntxt[ee][k], ee_n_gsi_ch_k_scratch_0, gsi_id, ee, k);
+				READ_GSI_REG_N_K(GSI_EE_n_GSI_CH_k_SCRATCH_1,
+					gsi[gsi_id].ch_cntxt[ee][k], ee_n_gsi_ch_k_scratch_1, gsi_id, ee, k);
+				READ_GSI_REG_N_K(GSI_EE_n_GSI_CH_k_SCRATCH_2,
+					gsi[gsi_id].ch_cntxt[ee][k], ee_n_gsi_ch_k_scratch_2, gsi_id, ee, k);
+				READ_GSI_REG_N_K(GSI_EE_n_GSI_CH_k_SCRATCH_3,
+					gsi[gsi_id].ch_cntxt[ee][k], ee_n_gsi_ch_k_scratch_3, gsi_id, ee, k);
+				READ_GSI_REG_N_K(GSI_EE_n_GSI_CH_k_SCRATCH_4,
+					gsi[gsi_id].ch_cntxt[ee][k], ee_n_gsi_ch_k_scratch_4, gsi_id, ee, k);
+				READ_GSI_REG_N_K(GSI_EE_n_GSI_CH_k_SCRATCH_5,
+					gsi[gsi_id].ch_cntxt[ee][k], ee_n_gsi_ch_k_scratch_5, gsi_id, ee, k);
+				READ_GSI_REG_N_K(GSI_EE_n_GSI_CH_k_SCRATCH_6,
+					gsi[gsi_id].ch_cntxt[ee][k], ee_n_gsi_ch_k_scratch_6, gsi_id, ee, k);
+				READ_GSI_REG_N_K(GSI_EE_n_GSI_CH_k_SCRATCH_7,
+					gsi[gsi_id].ch_cntxt[ee][k], ee_n_gsi_ch_k_scratch_7, gsi_id, ee, k);
+				READ_GSI_REG_N_K(GSI_EE_n_GSI_CH_k_SCRATCH_8,
+					gsi[gsi_id].ch_cntxt[ee][k], ee_n_gsi_ch_k_scratch_8, gsi_id, ee, k);
+				READ_GSI_REG_N_K(GSI_EE_n_GSI_CH_k_SCRATCH_9,
+					gsi[gsi_id].ch_cntxt[ee][k], ee_n_gsi_ch_k_scratch_9, gsi_id, ee, k);
+				READ_GSI_REG_N_K(GSI_GSI_MAP_EE_n_CH_k_VP_TABLE,
+					gsi[gsi_id].ch_cntxt[ee][k], gsi_map_ee_n_ch_k_vp_table, gsi_id, ee, k);
+				READ_GSI_REG_N_K(GSI_EE_n_GSI_CH_k_DB_ENG_WRITE_PTR,
+					gsi[gsi_id].ch_cntxt[ee][k], gsi_ch_k_db_eng_write_ptr, gsi_id, ee, k);
+				READ_GSI_REG_N_K(GSI_EE_n_GSI_CH_k_CH_ALMST_EMPTY_THRSHOLD,
+					gsi[gsi_id].ch_cntxt[ee][k], gsi_ch_k_ch_almst_empty_thrshold, gsi_id, ee, k);
+
+				/* mcs_channel_scratch */
+				n = phys_ch_idx * ECPRI_DMA_REG_SAVE_BYTES_PER_CHNL_SHRAM;
+
+				READ_GSI_SHRAM_REG(GSI_GSI_SHRAM_n,
+					gsi[gsi_id].ch_cntxt[ee][k].mcs_channel_scratch,
+					scratch_for_seq_low, gsi_id,
+					n + ECPRI_GSI_OFFSET_WORDS_SCRATCH_FOR_SEQ_LOW);
+				READ_GSI_SHRAM_REG(GSI_GSI_SHRAM_n,
+					gsi[gsi_id].ch_cntxt[ee][k].mcs_channel_scratch,
+					scratch_for_seq_high, gsi_id,
+					n + ECPRI_GSI_OFFSET_WORDS_SCRATCH_FOR_SEQ_HIGH);
+			}
+		}
+
+		/* evt_cntxt */
+		for (ee = 0; ee < ECPRI_DMA_MAX_EE; ee++) {
+			for (k = 0; k < ECPRI_DMA_REG_SAVE_GSI_EV_CH_MAX; k++) {
+				READ_GSI_REG_N_K(GSI_EE_n_EV_CH_k_CNTXT_0, gsi[gsi_id].evt_cntxt[ee][k],
+					ee_n_ev_ch_k_cntxt_0, gsi_id, ee, k);
+				READ_GSI_REG_N_K(GSI_EE_n_EV_CH_k_CNTXT_1, gsi[gsi_id].evt_cntxt[ee][k],
+					ee_n_ev_ch_k_cntxt_1, gsi_id, ee, k);
+				READ_GSI_REG_N_K(GSI_EE_n_EV_CH_k_CNTXT_2, gsi[gsi_id].evt_cntxt[ee][k],
+					ee_n_ev_ch_k_cntxt_2, gsi_id, ee, k);
+				READ_GSI_REG_N_K(GSI_EE_n_EV_CH_k_CNTXT_3, gsi[gsi_id].evt_cntxt[ee][k],
+					ee_n_ev_ch_k_cntxt_3, gsi_id, ee, k);
+				READ_GSI_REG_N_K(GSI_EE_n_EV_CH_k_CNTXT_4, gsi[gsi_id].evt_cntxt[ee][k],
+					ee_n_ev_ch_k_cntxt_4, gsi_id, ee, k);
+				READ_GSI_REG_N_K(GSI_EE_n_EV_CH_k_CNTXT_5, gsi[gsi_id].evt_cntxt[ee][k],
+					ee_n_ev_ch_k_cntxt_5, gsi_id, ee, k);
+				READ_GSI_REG_N_K(GSI_EE_n_EV_CH_k_CNTXT_6, gsi[gsi_id].evt_cntxt[ee][k],
+					ee_n_ev_ch_k_cntxt_6, gsi_id, ee, k);
+				READ_GSI_REG_N_K(GSI_EE_n_EV_CH_k_CNTXT_7, gsi[gsi_id].evt_cntxt[ee][k],
+					ee_n_ev_ch_k_cntxt_7, gsi_id, ee, k);
+				READ_GSI_REG_N_K(GSI_EE_n_EV_CH_k_CNTXT_8, gsi[gsi_id].evt_cntxt[ee][k],
+					ee_n_ev_ch_k_cntxt_8, gsi_id, ee, k);
+				READ_GSI_REG_N_K(GSI_EE_n_EV_CH_k_CNTXT_9, gsi[gsi_id].evt_cntxt[ee][k],
+					ee_n_ev_ch_k_cntxt_9, gsi_id, ee, k);
+				READ_GSI_REG_N_K(GSI_EE_n_EV_CH_k_CNTXT_10, gsi[gsi_id].evt_cntxt[ee][k],
+					ee_n_ev_ch_k_cntxt_10, gsi_id, ee, k);
+				READ_GSI_REG_N_K(GSI_EE_n_EV_CH_k_CNTXT_11, gsi[gsi_id].evt_cntxt[ee][k],
+					ee_n_ev_ch_k_cntxt_11, gsi_id, ee, k);
+				READ_GSI_REG_N_K(GSI_EE_n_EV_CH_k_CNTXT_12, gsi[gsi_id].evt_cntxt[ee][k],
+					ee_n_ev_ch_k_cntxt_12, gsi_id, ee, k);
+				READ_GSI_REG_N_K(GSI_EE_n_EV_CH_k_CNTXT_13, gsi[gsi_id].evt_cntxt[ee][k],
+					ee_n_ev_ch_k_cntxt_13, gsi_id, ee, k);
+				READ_GSI_REG_N_K(GSI_EE_n_EV_CH_k_SCRATCH_0, gsi[gsi_id].evt_cntxt[ee][k],
+					ee_n_ev_ch_k_scratch_0, gsi_id, ee, k);
+				READ_GSI_REG_N_K(GSI_EE_n_EV_CH_k_SCRATCH_1, gsi[gsi_id].evt_cntxt[ee][k],
+					ee_n_ev_ch_k_scratch_1, gsi_id, ee, k);
+				READ_GSI_REG_N_K(GSI_EE_n_EV_CH_k_SCRATCH_2, gsi[gsi_id].evt_cntxt[ee][k],
+					ee_n_ev_ch_k_scratch_2, gsi_id, ee, k);
+				READ_GSI_REG_N_K(GSI_GSI_DEBUG_EE_n_EV_k_VP_TABLE,
+					gsi[gsi_id].evt_cntxt[ee][k], gsi_debug_ee_n_ev_k_vp_table, gsi_id, ee, k);
+			}
+		}
+
+		/* debug */
+		READ_GSI_REG(GSI_GSI_DEBUG_BUSY_REG,
+			gsi[gsi_id].debug, gsi_debug_busy_reg, gsi_id);
+		READ_GSI_REG(GSI_GSI_DEBUG_PC_FROM_SW,
+			gsi[gsi_id].debug, gsi_debug_pc_from_sw, gsi_id);
+		READ_GSI_REG(GSI_GSI_DEBUG_SW_STALL,
+			gsi[gsi_id].debug, gsi_debug_sw_stall, gsi_id);
+		READ_GSI_REG(GSI_GSI_DEBUG_PC_FOR_DEBUG,
+			gsi[gsi_id].debug, gsi_debug_pc_for_debug, gsi_id);
+		READ_GSI_REG(GSI_GSI_DEBUG_QSB_LOG_ERR_TRNS_ID,
+			gsi[gsi_id].debug, gsi_debug_qsb_log_err_trns_id, gsi_id);
+		READ_GSI_REG_ARR_N(GSI_GSI_DEBUG_COUNTERn,
+			gsi[gsi_id].debug.gsi_cnt_regs, cnt, gsi_id);
+
+		/* gsi_qsb_debug */
+		READ_GSI_REG(GSI_GSI_DEBUG_QSB_LOG_ERR_TRNS_ID,
+			gsi[gsi_id].debug.gsi_qsb_debug, gsi_debug_busy_reg, gsi_id);
+		READ_GSI_REG_ARR_N(GSI_GSI_DEBUG_QSB_LOG_LAST_MISC_IDn,
+			gsi[gsi_id].debug.gsi_qsb_debug, qsb_log_last_misc_idn, gsi_id);
+		READ_GSI_REG_ARR_N(GSI_GSI_DEBUG_COUNTER_CFGn,
+			gsi[gsi_id].debug.gsi_qsb_debug, gsi_debug_counter_cfgn, gsi_id);
+		READ_GSI_REG(GSI_GSI_DEBUG_REE_PREFETCH_BUF_CH_ID,
+			gsi[gsi_id].debug.gsi_qsb_debug, gsi_debug_ree_prefetch_buf_ch_id, gsi_id);
+		READ_GSI_REG(GSI_GSI_DEBUG_REE_PREFETCH_BUF_STATUS,
+			gsi[gsi_id].debug.gsi_qsb_debug, gsi_debug_ree_prefetch_buf_status, gsi_id);
+		READ_GSI_REG_ARR_K(GSI_GSI_DEBUG_EVENT_PENDING_k,
+			gsi[gsi_id].debug.gsi_qsb_debug, gsi_debug_event_pending_k, gsi_id);
+		READ_GSI_REG_ARR_K(GSI_GSI_DEBUG_TIMER_PENDING_k,
+			gsi[gsi_id].debug.gsi_qsb_debug, gsi_debug_timer_pending_k, gsi_id);
+		READ_GSI_REG_ARR_K(GSI_GSI_DEBUG_RD_WR_PENDING_k,
+			gsi[gsi_id].debug.gsi_qsb_debug, gsi_debug_rd_wr_pending_k, gsi_id);
+
+		/* GSI test bus */
+		for (i = 0;
+			i < ARRAY_SIZE(ecpri_dma_reg_save_gsi_test_bus_selector_array);
+			i++) {
+			/* Write test bus selector */
+			WRITE_GSI_REG(GSI_GSI_TEST_BUS_SEL, gsi_id,
+				ecpri_dma_reg_save_gsi_test_bus_selector_array[i]);
+
+			READ_GSI_REG(GSI_GSI_TEST_BUS_REG, gsi[gsi_id].debug.gsi_test_bus,
+				test_bus_reg[i], gsi_id);
+		}
+
+		READ_GSI_REG_ARR_N(GSI_GSI_DEBUG_SW_RF_n_READ, gsi[gsi_id].debug,
+			rf_read_regs, gsi_id);
+
+		/* QSB regs */
+		READ_GSI_REG_ARR_N(GSI_GSI_DEBUG_QSB_LOG_LAST_MISC_IDn,
+			gsi[gsi_id].debug.gsi_qsb_debug.gsi_debug_qsb_reg,
+			gsi_debug_qsb_log_last_misc_idn, gsi_id);
+
+		/* gsi_mcs_prof_regs */
+		READ_GSI_REG(GSI_GSI_MCS_PROFILING_BP_CNT_LSB,
+			gsi[gsi_id].debug.gsi_mcs_prof_regs, gsi_mcs_profiling_bp_cnt_lsb, gsi_id);
+		READ_GSI_REG(GSI_GSI_MCS_PROFILING_BP_CNT_MSB,
+			gsi[gsi_id].debug.gsi_mcs_prof_regs, gsi_mcs_profiling_bp_cnt_msb, gsi_id);
+		READ_GSI_REG(GSI_GSI_MCS_PROFILING_BP_AND_PENDING_CNT_LSB,
+			gsi[gsi_id].debug.gsi_mcs_prof_regs, gsi_mcs_profiling_bp_and_pending_cnt_lsb, gsi_id);
+		READ_GSI_REG(GSI_GSI_MCS_PROFILING_BP_AND_PENDING_CNT_MSB,
+			gsi[gsi_id].debug.gsi_mcs_prof_regs, gsi_mcs_profiling_bp_and_pending_cnt_msb, gsi_id);
+		READ_GSI_REG(GSI_GSI_MCS_PROFILING_MCS_BUSY_CNT_LSB,
+			gsi[gsi_id].debug.gsi_mcs_prof_regs, gsi_mcs_profiling_mcs_busy_cnt_lsb, gsi_id);
+		READ_GSI_REG(GSI_GSI_MCS_PROFILING_MCS_BUSY_CNT_MSB,
+			gsi[gsi_id].debug.gsi_mcs_prof_regs, gsi_mcs_profiling_mcs_busy_cnt_msb, gsi_id);
+		READ_GSI_REG(GSI_GSI_MCS_PROFILING_MCS_IDLE_CNT_LSB,
+			gsi[gsi_id].debug.gsi_mcs_prof_regs, gsi_mcs_profiling_mcs_idle_cnt_lsb, gsi_id);
+		READ_GSI_REG(GSI_GSI_MCS_PROFILING_MCS_IDLE_CNT_MSB,
+			gsi[gsi_id].debug.gsi_mcs_prof_regs, gsi_mcs_profiling_mcs_idle_cnt_msb, gsi_id);
+
+		/* gsi_iram_ptrs */
+		READ_GSI_REG(GSI_GSI_IRAM_PTR_CH_CMD,
+			gsi[gsi_id].debug.gsi_iram_ptrs, gsi_iram_ptr_ch_cmd, gsi_id);
+		READ_GSI_REG(GSI_GSI_IRAM_PTR_EE_GENERIC_CMD,
+			gsi[gsi_id].debug.gsi_iram_ptrs, gsi_iram_ptr_ee_generic_cmd, gsi_id);
+		READ_GSI_REG(GSI_GSI_IRAM_PTR_CH_DB,
+			gsi[gsi_id].debug.gsi_iram_ptrs, gsi_iram_ptr_ch_db, gsi_id);
+		READ_GSI_REG(GSI_GSI_IRAM_PTR_EV_DB,
+			gsi[gsi_id].debug.gsi_iram_ptrs, gsi_iram_ptr_ev_db, gsi_id);
+		READ_GSI_REG(GSI_GSI_IRAM_PTR_NEW_RE,
+			gsi[gsi_id].debug.gsi_iram_ptrs, gsi_iram_ptr_new_re, gsi_id);
+		READ_GSI_REG(GSI_GSI_IRAM_PTR_CH_DIS_COMP,
+			gsi[gsi_id].debug.gsi_iram_ptrs, gsi_iram_ptr_ch_dis_comp, gsi_id);
+		READ_GSI_REG(GSI_GSI_IRAM_PTR_CH_EMPTY,
+			gsi[gsi_id].debug.gsi_iram_ptrs, gsi_iram_ptr_ch_empty, gsi_id);
+		READ_GSI_REG(GSI_GSI_IRAM_PTR_TIMER_EXPIRED,
+			gsi[gsi_id].debug.gsi_iram_ptrs, gsi_iram_ptr_timer_expired, gsi_id);
+		READ_GSI_REG(GSI_GSI_IRAM_PTR_EVENT_GEN_COMP,
+			gsi[gsi_id].debug.gsi_iram_ptrs, gsi_iram_ptr_event_gen_comp, gsi_id);
+		READ_GSI_REG(GSI_GSI_IRAM_PTR_WRITE_ENG_COMP,
+			gsi[gsi_id].debug.gsi_iram_ptrs, gsi_iram_ptr_write_eng_comp, gsi_id);
+		READ_GSI_REG(GSI_GSI_IRAM_PTR_READ_ENG_COMP,
+			gsi[gsi_id].debug.gsi_iram_ptrs, gsi_iram_ptr_read_eng_comp, gsi_id);
+		READ_GSI_REG(GSI_GSI_IRAM_PTR_UC_GP_INT,
+			gsi[gsi_id].debug.gsi_iram_ptrs, gsi_iram_ptr_uc_gp_int, gsi_id);
+		READ_GSI_REG(GSI_GSI_IRAM_PTR_INT_MOD_STOPED,
+			gsi[gsi_id].debug.gsi_iram_ptrs, gsi_iram_ptr_int_mod_stoped, gsi_id);
+		READ_GSI_REG(GSI_GSI_IRAM_PTR_TLV_CH_NOT_FULL,
+			gsi[gsi_id].debug.gsi_iram_ptrs, gsi_iram_ptr_tlv_ch_not_full, gsi_id);
+		READ_GSI_REG(GSI_GSI_IRAM_PTR_MSI_DB,
+			gsi[gsi_id].debug.gsi_iram_ptrs, gsi_iram_ptr_msi_db, gsi_id);
+		READ_GSI_REG(GSI_GSI_IRAM_PTR_PERIPH_IF_TLV_IN_0,
+			gsi[gsi_id].debug.gsi_iram_ptrs, gsi_iram_ptr_periph_if_tlv_in_0, gsi_id);
+		READ_GSI_REG(GSI_GSI_IRAM_PTR_PERIPH_IF_TLV_IN_1,
+			gsi[gsi_id].debug.gsi_iram_ptrs, gsi_iram_ptr_periph_if_tlv_in_1, gsi_id);
+		READ_GSI_REG(GSI_GSI_IRAM_PTR_PERIPH_IF_TLV_IN_2,
+			gsi[gsi_id].debug.gsi_iram_ptrs, gsi_iram_ptr_periph_if_tlv_in_2, gsi_id);
+
+		/* gsi_shram_ptrs */
+		READ_GSI_REG(GSI_GSI_SHRAM_PTR_CH_CNTXT_BASE_ADDR,
+			gsi[gsi_id].debug.gsi_shram_ptrs, gsi_shram_ptr_ch_cntxt_base_addr, gsi_id);
+		READ_GSI_REG(GSI_GSI_SHRAM_PTR_EV_CNTXT_BASE_ADDR,
+			gsi[gsi_id].debug.gsi_shram_ptrs, gsi_shram_ptr_ev_cntxt_base_addr, gsi_id);
+		READ_GSI_REG(GSI_GSI_SHRAM_PTR_RE_STORAGE_BASE_ADDR,
+			gsi[gsi_id].debug.gsi_shram_ptrs, gsi_shram_ptr_re_storage_base_addr, gsi_id);
+		READ_GSI_REG(GSI_GSI_SHRAM_PTR_RE_ESC_BUF_BASE_ADDR,
+			gsi[gsi_id].debug.gsi_shram_ptrs, gsi_shram_ptr_re_esc_buf_base_addr, gsi_id);
+		READ_GSI_REG(GSI_GSI_SHRAM_PTR_EE_SCRACH_BASE_ADDR,
+			gsi[gsi_id].debug.gsi_shram_ptrs, gsi_shram_ptr_ee_scrach_base_addr, gsi_id);
+		READ_GSI_REG(GSI_GSI_SHRAM_PTR_FUNC_STACK_BASE_ADDR,
+			gsi[gsi_id].debug.gsi_shram_ptrs, gsi_shram_ptr_func_stack_base_addr, gsi_id);
+		READ_GSI_REG(GSI_GSI_SHRAM_PTR_MCS_SCRATCH_BASE_ADDR,
+			gsi[gsi_id].debug.gsi_shram_ptrs, gsi_shram_ptr_mcs_scratch_base_addr, gsi_id);
+		READ_GSI_REG(GSI_GSI_SHRAM_PTR_MCS_SCRATCH1_BASE_ADDR,
+			gsi[gsi_id].debug.gsi_shram_ptrs, gsi_shram_ptr_mcs_scratch1_base_addr, gsi_id);
+		READ_GSI_REG(GSI_GSI_SHRAM_PTR_MCS_SCRATCH2_BASE_ADDR,
+			gsi[gsi_id].debug.gsi_shram_ptrs, gsi_shram_ptr_mcs_scratch2_base_addr, gsi_id);
+		READ_GSI_REG(GSI_GSI_SHRAM_PTR_MCS_SCRATCH3_BASE_ADDR,
+			gsi[gsi_id].debug.gsi_shram_ptrs, gsi_shram_ptr_mcs_scratch3_base_addr, gsi_id);
+		READ_GSI_REG(GSI_GSI_SHRAM_PTR_CH_VP_TRANS_TABLE_BASE_ADDR,
+			gsi[gsi_id].debug.gsi_shram_ptrs, gsi_shram_ptr_ch_vp_trans_table_base_addr, gsi_id);
+		READ_GSI_REG(GSI_GSI_SHRAM_PTR_EV_VP_TRANS_TABLE_BASE_ADDR,
+			gsi[gsi_id].debug.gsi_shram_ptrs, gsi_shram_ptr_ev_vp_trans_table_base_addr, gsi_id);
+		READ_GSI_REG(GSI_GSI_SHRAM_PTR_USER_INFO_DATA_BASE_ADDR,
+			gsi[gsi_id].debug.gsi_shram_ptrs, gsi_shram_ptr_user_info_data_base_addr, gsi_id);
+		READ_GSI_REG(GSI_GSI_SHRAM_PTR_EE_CMD_FIFO_BASE_ADDR,
+			gsi[gsi_id].debug.gsi_shram_ptrs, gsi_shram_ptr_ee_cmd_fifo_base_addr, gsi_id);
+		READ_GSI_REG(GSI_GSI_SHRAM_PTR_CH_CMD_FIFO_BASE_ADDR,
+			gsi[gsi_id].debug.gsi_shram_ptrs, gsi_shram_ptr_ch_cmd_fifo_base_addr, gsi_id);
+		READ_GSI_REG(GSI_GSI_SHRAM_PTR_EVE_ED_STORAGE_BASE_ADDR,
+			gsi[gsi_id].debug.gsi_shram_ptrs, gsi_shram_ptr_eve_ed_storage_base_addr, gsi_id);
+
+		/* debug_sw_msk */
+		READ_GSI_REG_ARR_N_K(GSI_GSI_DEBUG_SW_MSK_REG_n_SEC_k_RD, gsi[gsi_id].debug,
+			debug_sw_msk, gsi_id);
+
+		/* Save FIFO Status registers */
 		for (endp_id = 0; endp_id < ECPRI_DMA_ENDP_NUM_MAX; endp_id++) {
 			READ_DMA_REG_N_K(ECPRI_GSI_TLV_FIFO_STATUS,
 				gsi_fifo_status[gsi_id][endp_id], gsi_tlv_fifo_status_mn,

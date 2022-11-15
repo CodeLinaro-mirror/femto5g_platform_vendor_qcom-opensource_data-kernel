@@ -684,7 +684,7 @@ static const struct dma_gsi_ep_config ecpri_dma_endp_mapping
 					false, 0, false,
 					ECPRI_DMA_VM_IDS_NONE },
 		[ECPRI_HW_V1_0][ECPRI_HW_FLAVOR_DU_PCIE][ECPRI_DMA_GSI_ID_0]
-			       [59] = { true, 5, 32, 32, ECPRI_DMA_EE_VM0,
+			       [59] = { true, 5, 16, 16, ECPRI_DMA_EE_VM0,
 					GSI_SMART_PRE_FETCH, ECPRI_DMA_TLV_TRSHLD,
 					ECPRI_DMA_ENDP_DIR_DEST,
 					ECPRI_DMA_ENDP_STREAM_MODE_M2M, {{0, 0}},
@@ -705,7 +705,7 @@ static const struct dma_gsi_ep_config ecpri_dma_endp_mapping
 					false, 0, false,
 					ECPRI_DMA_VM_IDS_NONE },
 		[ECPRI_HW_V1_0][ECPRI_HW_FLAVOR_DU_PCIE][ECPRI_DMA_GSI_ID_0]
-			       [62] = { true, 5, 32, 32, ECPRI_DMA_EE_VM1,
+			       [62] = { true, 5, 16, 16, ECPRI_DMA_EE_VM1,
 					GSI_SMART_PRE_FETCH, ECPRI_DMA_TLV_TRSHLD,
 					ECPRI_DMA_ENDP_DIR_DEST,
 					ECPRI_DMA_ENDP_STREAM_MODE_M2M, {{0, 0}},
@@ -747,7 +747,7 @@ static const struct dma_gsi_ep_config ecpri_dma_endp_mapping
 					false, 0, false,
 					ECPRI_DMA_VM_IDS_NONE },
 		[ECPRI_HW_V1_0][ECPRI_HW_FLAVOR_DU_PCIE][ECPRI_DMA_GSI_ID_0]
-			       [68] = { true, 5, 32, 32, ECPRI_DMA_EE_VM3,
+			       [68] = { true, 5, 16, 16, ECPRI_DMA_EE_VM3,
 					GSI_SMART_PRE_FETCH, ECPRI_DMA_TLV_TRSHLD,
 					ECPRI_DMA_ENDP_DIR_DEST,
 					ECPRI_DMA_ENDP_STREAM_MODE_M2M, {{0, 0}},
@@ -8187,7 +8187,7 @@ static void  ecpri_dma_gsi_ev_err_cb(struct gsi_evt_err_notify* notify)
  */
 int ecpri_dma_hw_init(void)
 {
-	ecpri_hwio_def_ecpri_hw_params_0_s hw_params_0 = { 0 };
+	ecpri_hwio_def_ecpri_hw_params_0_u hw_params_0 = { 0 };
 
 	/* Get Clocks */
 	DMADBG("Started getting clocks\n");
@@ -8243,12 +8243,12 @@ int ecpri_dma_hw_init(void)
 	icc_set_bw(ecpri_dma_ctx->icc_paths.appss_to_dma, 0, MBps_to_icc(6400));
 
 	/* Read eCPRI HW Params 0 and make sure we have access to the registers */
-	ecpri_dma_hal_read_reg_fields(ECPRI_HW_PARAMS_0, &hw_params_0);
+	hw_params_0.value = ecpri_dma_hal_read_reg(ECPRI_HW_PARAMS_0);
 
 	DMADBG("ECPRI_HW_PARAMS_0 DST=%u SRC=%u TOTAL=%u\n",
-	       hw_params_0.dst_channel_n, hw_params_0.src_channel_n,
-	       hw_params_0.total_channels_n);
-	if (hw_params_0.total_channels_n == 0)
+	       hw_params_0.def.dst_channel_n, hw_params_0.def.src_channel_n,
+	       hw_params_0.def.total_channels_n);
+	if (hw_params_0.def.total_channels_n == 0)
 		return -EFAULT;
 
 	return 0;
@@ -8347,20 +8347,20 @@ int ecpri_dma_get_port_mapping(enum ecpri_hw_ver ver, enum ecpri_hw_flavor flv,
 }
 
 int ecpri_dma_get_endp_mapping(enum ecpri_hw_ver ver, enum ecpri_hw_flavor flv,
-	const struct dma_gsi_ep_config ***endp_mapping)
+	const struct dma_gsi_ep_config(**endp_mapping)[ECPRI_DMA_GSI_NUM_MAX][ECPRI_DMA_ENDP_NUM_MAX])
 {
 	if (ver <= ECPRI_HW_NONE ||
 		ver >= ECPRI_HW_MAX || flv <= ECPRI_HW_FLAVOR_NONE ||
 		ver >= ECPRI_HW_FLAVOR_MAX)
 		return -EINVAL;
 
-	*endp_mapping = (const struct dma_gsi_ep_config**)&ecpri_dma_endp_mapping
-		[ver][flv];
+	*endp_mapping = &ecpri_dma_endp_mapping[ver][flv];
 
 	return 0;
 }
 
-int ecpri_dma_setup_dma_endps(const struct dma_gsi_ep_config **endp_map)
+int ecpri_dma_setup_dma_endps(
+	const struct dma_gsi_ep_config (*endp_map)[ECPRI_DMA_GSI_NUM_MAX][ECPRI_DMA_ENDP_NUM_MAX])
 {
 	int endp_id = 0;
 	int gsi_id = 0;
@@ -8376,9 +8376,8 @@ int ecpri_dma_setup_dma_endps(const struct dma_gsi_ep_config **endp_map)
 
 	for (gsi_id = 0; gsi_id < ECPRI_DMA_GSI_NUM_MAX; gsi_id++) {
 		for (endp_id = 0; endp_id < ECPRI_DMA_ENDP_NUM_MAX; endp_id++) {
-			if (endp_map[gsi_id][endp_id].valid) {
-
-				if (endp_map[gsi_id][endp_id].is_exception) {
+			if ((*endp_map)[gsi_id][endp_id].valid) {
+				if ((*endp_map)[gsi_id][endp_id].is_exception) {
 					memset(&exception_ch, 0, sizeof(exception_ch));
 					exception_ch.enable = 1;
 					exception_ch.gid = gsi_id;
@@ -8389,17 +8388,17 @@ int ecpri_dma_setup_dma_endps(const struct dma_gsi_ep_config **endp_map)
 						&exception_ch);
 				}
 
-				switch (endp_map[gsi_id][endp_id].dir) {
+				switch ((*endp_map)[gsi_id][endp_id].dir) {
 				case ECPRI_DMA_ENDP_DIR_SRC:
 					memset(&endp_cfg_dest, 0,
 						sizeof(endp_cfg_dest));
 					memset(&endp_cfg_xbar, 0,
 						sizeof(endp_cfg_xbar));
-					switch (endp_map[gsi_id][endp_id].stream_mode) {
+					switch ((*endp_map)[gsi_id][endp_id].stream_mode) {
 					case ECPRI_DMA_ENDP_STREAM_MODE_M2M:
 						endp_cfg_dest.def.use_dest_cfg = 1;
 						endp_cfg_dest.def.dest_mem_channel =
-							endp_map[gsi_id][endp_id].dest;
+							(*endp_map)[gsi_id][endp_id].dest;
 						ecpri_dma_hal_write_reg_mn(
 							ECPRI_ENDP_CFG_DEST, gsi_id, endp_id,
 							endp_cfg_dest.value);
@@ -8407,13 +8406,13 @@ int ecpri_dma_setup_dma_endps(const struct dma_gsi_ep_config **endp_map)
 					case ECPRI_DMA_ENDP_STREAM_MODE_M2S:
 						endp_cfg_dest.def.use_dest_cfg = 0;
 						endp_cfg_xbar.dest_stream =
-							endp_map[gsi_id][endp_id].dest;
+							(*endp_map)[gsi_id][endp_id].dest;
 						endp_cfg_xbar.xbar_tid =
-							endp_map[gsi_id][endp_id].tid.value;
+							(*endp_map)[gsi_id][endp_id].tid.value;
 						//TODO: Below are required for nFAPI
 						//endp_cfg_xbar.xbar_user = Get from Core driver, need API
 						endp_cfg_xbar.l2_segmentation_en =
-							endp_map[gsi_id][endp_id].is_nfapi ? 1 : 0;
+							(*endp_map)[gsi_id][endp_id].is_nfapi ? 1 : 0;
 						ecpri_dma_hal_write_reg_mn(
 							ECPRI_ENDP_CFG_DEST, gsi_id, endp_id,
 							endp_cfg_dest.value);
@@ -8422,24 +8421,23 @@ int ecpri_dma_setup_dma_endps(const struct dma_gsi_ep_config **endp_map)
 							&endp_cfg_xbar);
 						break;
 					default:
-						DMADBG("SRC ENDP %d isn't M2M or S2M, address = 0x%px\n",
-							endp_id, &endp_map[gsi_id][endp_id]);
+						DMADBG("SRC ENDP %d isn't M2M or S2M\n", endp_id);
 						break;
 					}
 					break;
 				case ECPRI_DMA_ENDP_DIR_DEST:
-					switch (endp_map[gsi_id][endp_id].stream_mode) {
+					switch ((*endp_map)[gsi_id][endp_id].stream_mode) {
 					case ECPRI_DMA_ENDP_STREAM_MODE_M2M:
 						break;
 					case ECPRI_DMA_ENDP_STREAM_MODE_S2M:
-						if (endp_map[gsi_id][endp_id].is_nfapi) {
+						if ((*endp_map)[gsi_id][endp_id].is_nfapi) {
 							memset(&cfg_aggr, 0,
 								sizeof(cfg_aggr));
 							memset(&reassembly_cfg, 0,
 								sizeof(reassembly_cfg));
 							cfg_aggr.def.aggr_type = 1;
 							reassembly_cfg.def.vm_id =
-								endp_map[gsi_id][endp_id]
+								(*endp_map)[gsi_id][endp_id]
 								.nfapi_dest_vm_id;
 							ecpri_dma_hal_write_reg_mn(
 								ECPRI_ENDP_CFG_AGGR, gsi_id,
@@ -8450,8 +8448,7 @@ int ecpri_dma_setup_dma_endps(const struct dma_gsi_ep_config **endp_map)
 						}
 						break;
 					default:
-						DMADBG("DEST ENDP %d isn't M2M or S2M, address = 0x%px\n",
-							endp_id, &endp_map[gsi_id][endp_id]);
+						DMADBG("DEST ENDP %d isn't M2M or S2M\n", endp_id);
 						break;
 					}
 					break;
@@ -8496,7 +8493,8 @@ int ecpri_dma_disable_dma_endp(struct ecpri_dma_endp_context *ep)
 	return 0;
 }
 
-int ecpri_dma_enable_dma_endps(const struct dma_gsi_ep_config **endp_map)
+int ecpri_dma_enable_dma_endps(
+	const struct dma_gsi_ep_config (*endp_map)[ECPRI_DMA_GSI_NUM_MAX][ECPRI_DMA_ENDP_NUM_MAX])
 {
 	int endp_id = 0, gsi_id = 0;
 	ecpri_hwio_def_ecpri_endp_gsi_cfg_gsi_m_ch_n_u endp_gsi_cfg = { 0 };
@@ -8506,7 +8504,7 @@ int ecpri_dma_enable_dma_endps(const struct dma_gsi_ep_config **endp_map)
 
 	for (gsi_id = 0; gsi_id < ECPRI_DMA_GSI_NUM_MAX; gsi_id++) {
 		for (endp_id = 0; endp_id < ECPRI_DMA_ENDP_NUM_MAX; endp_id++) {
-			if (endp_map[gsi_id][endp_id].valid) {
+			if ((*endp_map)[gsi_id][endp_id].valid) {
 
 				memset(&endp_gsi_cfg, 0, sizeof(endp_gsi_cfg));
 				endp_gsi_cfg.def.endp_en = 1;
@@ -8635,6 +8633,7 @@ int ecpri_dma_gsi_setup_event_ring(struct ecpri_dma_endp_context *ep,
 		gsi_evt_ring_props.err_cb = ecpri_dma_dp_gsi_evt_ring_err_cb;
 	}
 	gsi_evt_ring_props.ee = gsi_ep_info->ee;
+	gsi_evt_ring_props.gsi_id = ep->gsi_id;
 
 	/* Send command to GSI to allocate an event channel */
 	result = gsi_alloc_evt_ring(&gsi_evt_ring_props,
@@ -8712,6 +8711,7 @@ int ecpri_dma_gsi_setup_transfer_ring(struct ecpri_dma_endp_context *ep,
 	gsi_channel_props.prefetch_mode = gsi_ep_info->prefetch_mode;
 	gsi_channel_props.empty_lvl_threshold = gsi_ep_info->prefetch_threshold;
 	gsi_channel_props.ee = gsi_ep_info->ee;
+	gsi_channel_props.gsi_id = ep->gsi_id;
 
 	gsi_channel_props.err_cb = ecpri_dma_gsi_chan_err_cb;
 	if (gsi_ep_info->dir == ECPRI_DMA_ENDP_DIR_SRC)

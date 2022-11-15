@@ -125,6 +125,15 @@ do {\
 /* Max ENDP ID for eCPRI DMA */
 #define ECPRI_DMA_ENDP_NUM_MAX 74
 
+/* Num of GSIs in HW VER 1 */
+#define ECPRI_DMA_NUM_OF_GSI_HW_VER_1_0 1
+
+/* Num of GSIs in HW VER 2 */
+#define ECPRI_DMA_NUM_OF_GSI_HW_VER_2_0 3
+
+/* Max Num of GSIs in HW */
+#define ECPRI_DMA_MAX_NUM_OF_GSI_HW ECPRI_DMA_NUM_OF_GSI_HW_VER_2_0
+
 /* Defines invalid ENDP ID for eCPRI DMA */
 #define ECPRI_DMA_ENDP_INVALID -1
 
@@ -467,7 +476,7 @@ struct ecpri_dma_context {
 	u32 pcie_intcntrlr_mem_base;
 	u32 pcie_intcntrlr_mem_size;
 	u32 ecpri_dma_irq;
-	u32 gsi_irq[ECPRI_DMA_NUM_EE];
+	u32 gsi_irq[ECPRI_DMA_MAX_NUM_OF_GSI_HW][ECPRI_DMA_NUM_EE];
 	u32 pcie_irq;
 	bool use_uefi_boot;
 	bool dma_initialization_complete;
@@ -478,7 +487,7 @@ struct ecpri_dma_context {
 	enum gsi_ver gsi_ver;
 	unsigned long gsi_dev_hdl;
 	u32 ecpri_dma_num_endps;
-	const struct dma_gsi_ep_config **endp_map;
+	const struct dma_gsi_ep_config (*endp_map)[ECPRI_DMA_GSI_NUM_MAX][ECPRI_DMA_ENDP_NUM_MAX];
 	struct ecpri_dma_endp_context
 		endp_ctx[ECPRI_DMA_GSI_NUM_MAX][ECPRI_DMA_ENDP_NUM_MAX];
 	struct ecpri_dma_endp_gsi_tuple exception_endp;
@@ -486,6 +495,7 @@ struct ecpri_dma_context {
 	struct ecpri_dma_exception_stats exception_stats;
 	struct ecpri_dma_clks clks;
 	struct ecpri_dma_icc_paths icc_paths;
+	u32 num_of_gsi;
 };
 
 /**
@@ -502,7 +512,7 @@ struct ecpri_dma_plat_drv_res {
 	u32 pcie_intcntrlr_mem_base;
 	u32 pcie_intcntrlr_mem_size;
 	u32 ecpri_dma_irq;
-	u32 gsi_irq[ECPRI_DMA_NUM_EE];
+	u32 gsi_irq[ECPRI_DMA_MAX_NUM_OF_GSI_HW][ECPRI_DMA_NUM_EE];
 	u32 pcie_irq;
 	u32 ee;
 	u32 max_num_smmu_cb;

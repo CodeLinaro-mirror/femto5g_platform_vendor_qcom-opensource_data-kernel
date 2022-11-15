@@ -33,6 +33,7 @@ static struct dentry *dent;
 static char dbg_buff[DMA_MAX_MSG_LEN + 1];
 
 static s8 ep_reg_idx;
+static s8 ep_reg_gsi_idx;
 
 
 static ssize_t ecpri_dma_read_gen_reg(struct file *file, char __user *ubuf,
@@ -48,19 +49,30 @@ static ssize_t ecpri_dma_read_gen_reg(struct file *file, char __user *ubuf,
 static ssize_t ecpri_dma_write_ep_reg(struct file *file, const char __user *buf,
 		size_t count, loff_t *ppos)
 {
-	s8 option;
+	s8 ep;
+	s8 gsi;
 	int ret;
 
-	ret = kstrtos8_from_user(buf, count, 0, &option);
+	ret = kstrtos8_from_user(buf, count, 0, &ep);
 	if (ret)
 		return ret;
 
-	if (option >= ECPRI_DMA_ENDP_NUM_MAX) {
-		DMAERR("bad endp specified %u\n", option);
+	ret = kstrtos8_from_user(buf, count, 0, &gsi);
+	if (ret)
+		return ret;
+
+	if (ep >= ecpri_dma_ctx->ecpri_dma_num_endps) {
+		DMAERR("bad endp specified %u\n", ep);
 		return count;
 	}
 
-	ep_reg_idx = option;
+	if (gsi >= ecpri_dma_ctx->num_of_gsi) {
+		DMAERR("bad gsi specified %u\n", gsi);
+		return count;
+	}
+
+	ep_reg_idx = ep;
+	ep_reg_gsi_idx = gsi;
 
 	return count;
 }
@@ -86,9 +98,9 @@ static ssize_t ecpri_dma_read_ep_reg(struct file *file, char __user *ubuf,
 		size_t count, loff_t *ppos)
 {
 	int nbytes;
-	int i;
-	int start_idx;
-	int end_idx;
+	int i, j;
+	int start_idx, gsi_id_start_index;
+	int end_idx, gsi_id_end_index;
 	int size = 0;
 	int ret;
 	loff_t pos;
@@ -97,25 +109,31 @@ static ssize_t ecpri_dma_read_ep_reg(struct file *file, char __user *ubuf,
 	if (ep_reg_idx < 0) {
 		start_idx = 0;
 		end_idx = ecpri_dma_ctx->ecpri_dma_num_endps;
+		gsi_id_start_index = 0;
+		gsi_id_end_index = ecpri_dma_ctx->num_of_gsi;
 	} else {
 		start_idx = ep_reg_idx;
 		end_idx = start_idx + 1;
+		gsi_id_start_index = ep_reg_gsi_idx;
+		gsi_id_end_index = ep_reg_gsi_idx;
 	}
 	pos = *ppos;
-	for (i = start_idx; i < end_idx; i++) {
-		// TODO: Handle the gsi_id in this function
-		nbytes = ecpri_dma_read_ep_reg_n(dbg_buff, DMA_MAX_MSG_LEN, 0, i);
+	for (j = gsi_id_start_index; j < gsi_id_end_index; j++)
+	{
+		for (i = start_idx; i < end_idx; i++) {
+			nbytes = ecpri_dma_read_ep_reg_n(dbg_buff, DMA_MAX_MSG_LEN, j, i);
 
-		*ppos = pos;
-		ret = simple_read_from_buffer(ubuf, count, ppos, dbg_buff,
-					      nbytes);
-		if (ret < 0) {
-			return ret;
+			*ppos = pos;
+			ret = simple_read_from_buffer(ubuf, count, ppos, dbg_buff,
+				nbytes);
+			if (ret < 0) {
+				return ret;
+			}
+
+			size += ret;
+			ubuf += nbytes;
+			count -= nbytes;
 		}
-
-		size += ret;
-		ubuf += nbytes;
-		count -= nbytes;
 	}
 
 	*ppos = pos + size;

@@ -396,14 +396,14 @@ static int ecpri_dma_alloc_exception_endp(void)
 
 	for (gsi_id = 0; gsi_id < ECPRI_DMA_GSI_NUM_MAX; gsi_id++) {
 		for (endp_id = 0; endp_id < ECPRI_DMA_ENDP_NUM_MAX; endp_id++) {
-			if (found_exception == true) {
-				DMAERR("One exception endp is expected\n");
-				ecpri_dma_assert();
-			}
+			if ((*ecpri_dma_ctx->endp_map)[gsi_id][endp_id].valid &&
+				(*ecpri_dma_ctx->endp_map)[gsi_id][endp_id].is_exception) {
+				if (found_exception == true) {
+					DMAERR("One exception endp is expected\n");
+					ecpri_dma_assert();
+				}
 
-			if (ecpri_dma_ctx->endp_map[gsi_id][endp_id].valid &&
-				ecpri_dma_ctx->endp_map[gsi_id][endp_id].is_exception) {
-				gsi_ep_cfg = &ecpri_dma_ctx->endp_map[gsi_id][endp_id];
+				gsi_ep_cfg = &(*ecpri_dma_ctx->endp_map)[gsi_id][endp_id];
 				ep = &ecpri_dma_ctx->endp_ctx[gsi_id][endp_id];
 				DMADBG("Exception endp is ENDP# %d\n", endp_id);
 
@@ -544,7 +544,7 @@ int ecpri_dma_alloc_endp(u32 gsi_id, int endp_id, u32 ring_length,
 		return -EINVAL;
 	}
 
-	if (!ecpri_dma_ctx->endp_map[gsi_id][endp_id].valid) {
+	if (!(*ecpri_dma_ctx->endp_map)[gsi_id][endp_id].valid) {
 		DMAERR("EP %d for GSI ID %d is not valid\n", endp_id, gsi_id);
 		return -EINVAL;
 	}
@@ -555,7 +555,7 @@ int ecpri_dma_alloc_endp(u32 gsi_id, int endp_id, u32 ring_length,
 		return -EINVAL;
 	}
 
-	gsi_ep_cfg = &ecpri_dma_ctx->endp_map[gsi_id][endp_id];
+	gsi_ep_cfg = &(*ecpri_dma_ctx->endp_map)[gsi_id][endp_id];
 	ep->gsi_ep_cfg = gsi_ep_cfg;
 
 	INIT_LIST_HEAD(&ep->available_outstanding_pkts_list);
@@ -732,7 +732,7 @@ int ecpri_dma_dealloc_endp(struct ecpri_dma_endp_context *endp_cfg)
 static int ecpri_dma_post_init(void)
 {
 	bool ready = false;
-	int result = 0, i = 0;
+	int result = 0, ee = 0, gsi_id = 0;
 	struct gsi_per_props gsi_props;
 
 	DMADBG("post_init start\n");
@@ -779,29 +779,32 @@ static int ecpri_dma_post_init(void)
 	memset(&gsi_props, 0, sizeof(gsi_props));
 	gsi_props.ver = ecpri_dma_ctx->gsi_ver;
 	gsi_props.ee = ecpri_dma_ctx->ee;
+	gsi_props.num_of_gsi = ecpri_dma_ctx->num_of_gsi;
 	gsi_props.intr = GSI_INTR_IRQ;
 	gsi_props.phys_addr = ecpri_dma_ctx->gsi_mem_base;
 	gsi_props.size = ecpri_dma_ctx->gsi_mem_size;
-	for (i = 0; i < ECPRI_DMA_NUM_EE; i++)
-	{
-		if (i == ECPRI_DMA_EE_Q6)
-			gsi_props.irq[i] = -1;
-		else
-			gsi_props.irq[i] = ecpri_dma_ctx->gsi_irq[i];
+	for (gsi_id = 0; gsi_id < ecpri_dma_ctx->num_of_gsi; gsi_id++) {
+		for (ee = 0; ee < ECPRI_DMA_NUM_EE; ee++)
+		{
+			if (ee == ECPRI_DMA_EE_Q6)
+				gsi_props.irq[gsi_id][ee] = -1;
+			else
+				gsi_props.irq[gsi_id][ee] = ecpri_dma_ctx->gsi_irq[gsi_id][ee];
 
-		switch (i) {
-		case ECPRI_DMA_EE_VM0:
-		case ECPRI_DMA_EE_VM1:
-		case ECPRI_DMA_EE_VM2:
-		case ECPRI_DMA_EE_VM3:
-			gsi_props.mhi_er_id_limits_valid[i] = true;
-			break;
-		case ECPRI_DMA_EE_AP:
-		case ECPRI_DMA_EE_Q6:
-		case ECPRI_DMA_EE_PF:
-		default:
-			gsi_props.mhi_er_id_limits_valid[i] = false;
-			break;
+			switch (ee) {
+			case ECPRI_DMA_EE_VM0:
+			case ECPRI_DMA_EE_VM1:
+			case ECPRI_DMA_EE_VM2:
+			case ECPRI_DMA_EE_VM3:
+				gsi_props.mhi_er_id_limits_valid[gsi_id][ee] = true;
+				break;
+			case ECPRI_DMA_EE_AP:
+			case ECPRI_DMA_EE_Q6:
+			case ECPRI_DMA_EE_PF:
+			default:
+				gsi_props.mhi_er_id_limits_valid[gsi_id][ee] = false;
+				break;
+			}
 		}
 	}
 	gsi_props.mhi_er_id_limits[0] = 0;
@@ -823,7 +826,7 @@ static int ecpri_dma_post_init(void)
 
 	/* Set ENDP mappings according to HW version and flavor */
 	result = ecpri_dma_get_endp_mapping(ecpri_dma_ctx->ecpri_hw_ver,
-		ecpri_dma_ctx->hw_flavor, &ecpri_dma_ctx->endp_map);
+		ecpri_dma_ctx->hw_flavor, &(ecpri_dma_ctx->endp_map));
 	if (result) {
 		DMAERR("Failed retrieving eCPRI DMA ENDP mapping\n");
 		result = -ENODEV;
@@ -884,11 +887,11 @@ fail_dmahal:
 	return result;
 }
 
-static int ecpri_dma_get_dts_configuration(struct platform_device *pdev,
-	struct ecpri_dma_plat_drv_res *dma_drv_res)
+static int ecpri_dma_get_dts_configuration(struct platform_device* pdev,
+	struct ecpri_dma_plat_drv_res* dma_drv_res)
 {
 	int result = 0;
-	struct resource *resource;
+	struct resource* resource;
 	int i = 0;
 
 	dma_drv_res->ecpri_hw_ver = ECPRI_HW_NONE;
@@ -926,7 +929,8 @@ static int ecpri_dma_get_dts_configuration(struct platform_device *pdev,
 	if (!result) {
 		DMADBG(":Read offset of DMA_CFG from DMA_WRAPPER_BASE = 0x%x\n",
 			dma_drv_res->ecpri_dma_cfg_offset);
-	} else {
+	}
+	else {
 		dma_drv_res->ecpri_dma_cfg_offset = 0;
 		DMADBG(":DMA_CFG_OFFSET not defined. Using default one\n");
 	}
@@ -959,15 +963,15 @@ static int ecpri_dma_get_dts_configuration(struct platform_device *pdev,
 		dma_drv_res->gsi_mem_base,
 		dma_drv_res->gsi_mem_size);
 
-	/* Get DMA GSI IRQ numbers */
+	/* Get DMA GSI 0 IRQ numbers */
 	resource = platform_get_resource_byname(pdev, IORESOURCE_IRQ,
 		"gsi-irq-ap");
 	if (!resource) {
 		DMAERR(":get resource failed for gsi-irq-ap\n");
 		return -ENODEV;
 	}
-	dma_drv_res->gsi_irq[ECPRI_DMA_EE_AP] = resource->start;
-	DMADBG(":gsi-irq-ap = %d\n", dma_drv_res->gsi_irq[ECPRI_DMA_EE_AP]);
+	dma_drv_res->gsi_irq[0][ECPRI_DMA_EE_AP] = resource->start;
+	DMADBG(":gsi-irq-ap = %d\n", dma_drv_res->gsi_irq[0][ECPRI_DMA_EE_AP]);
 
 	resource = platform_get_resource_byname(pdev, IORESOURCE_IRQ,
 		"gsi-irq-vm0");
@@ -975,8 +979,8 @@ static int ecpri_dma_get_dts_configuration(struct platform_device *pdev,
 		DMAERR(":get resource failed for gsi-irq-vm0\n");
 		return -ENODEV;
 	}
-	dma_drv_res->gsi_irq[ECPRI_DMA_EE_VM0] = resource->start;
-	DMADBG(":gsi-irq-vm0 = %d\n", dma_drv_res->gsi_irq[ECPRI_DMA_EE_VM0]);
+	dma_drv_res->gsi_irq[0][ECPRI_DMA_EE_VM0] = resource->start;
+	DMADBG(":gsi-irq-vm0 = %d\n", dma_drv_res->gsi_irq[0][ECPRI_DMA_EE_VM0]);
 
 	resource = platform_get_resource_byname(pdev, IORESOURCE_IRQ,
 		"gsi-irq-vm1");
@@ -984,8 +988,8 @@ static int ecpri_dma_get_dts_configuration(struct platform_device *pdev,
 		DMAERR(":get resource failed for gsi-irq-vm1\n");
 		return -ENODEV;
 	}
-	dma_drv_res->gsi_irq[ECPRI_DMA_EE_VM1] = resource->start;
-	DMADBG(":gsi-irq-vm1 = %d\n", dma_drv_res->gsi_irq[ECPRI_DMA_EE_VM1]);
+	dma_drv_res->gsi_irq[0][ECPRI_DMA_EE_VM1] = resource->start;
+	DMADBG(":gsi-irq-vm1 = %d\n", dma_drv_res->gsi_irq[0][ECPRI_DMA_EE_VM1]);
 
 	resource = platform_get_resource_byname(pdev, IORESOURCE_IRQ,
 		"gsi-irq-vm2");
@@ -993,8 +997,8 @@ static int ecpri_dma_get_dts_configuration(struct platform_device *pdev,
 		DMAERR(":get resource failed for gsi-irq-vm2\n");
 		return -ENODEV;
 	}
-	dma_drv_res->gsi_irq[ECPRI_DMA_EE_VM2] = resource->start;
-	DMADBG(":gsi-irq-vm2 = %d\n", dma_drv_res->gsi_irq[ECPRI_DMA_EE_VM2]);
+	dma_drv_res->gsi_irq[0][ECPRI_DMA_EE_VM2] = resource->start;
+	DMADBG(":gsi-irq-vm2 = %d\n", dma_drv_res->gsi_irq[0][ECPRI_DMA_EE_VM2]);
 
 	resource = platform_get_resource_byname(pdev, IORESOURCE_IRQ,
 		"gsi-irq-vm3");
@@ -1002,8 +1006,8 @@ static int ecpri_dma_get_dts_configuration(struct platform_device *pdev,
 		DMAERR(":get resource failed for gsi-irq-vm3\n");
 		return -ENODEV;
 	}
-	dma_drv_res->gsi_irq[ECPRI_DMA_EE_VM3] = resource->start;
-	DMADBG(":gsi-irq-vm3 = %d\n", dma_drv_res->gsi_irq[ECPRI_DMA_EE_VM3]);
+	dma_drv_res->gsi_irq[0][ECPRI_DMA_EE_VM3] = resource->start;
+	DMADBG(":gsi-irq-vm3 = %d\n", dma_drv_res->gsi_irq[0][ECPRI_DMA_EE_VM3]);
 
 	resource = platform_get_resource_byname(pdev, IORESOURCE_IRQ,
 		"gsi-irq-pf");
@@ -1011,8 +1015,121 @@ static int ecpri_dma_get_dts_configuration(struct platform_device *pdev,
 		DMAERR(":get resource failed for gsi-irq-pf\n");
 		return -ENODEV;
 	}
-	dma_drv_res->gsi_irq[ECPRI_DMA_EE_PF] = resource->start;
-	DMADBG(":gsi-irq-pf = %d\n", dma_drv_res->gsi_irq[ECPRI_DMA_EE_PF]);
+	dma_drv_res->gsi_irq[0][ECPRI_DMA_EE_PF] = resource->start;
+	DMADBG(":gsi-irq-pf = %d\n", dma_drv_res->gsi_irq[0][ECPRI_DMA_EE_PF]);
+
+	if (dma_drv_res->ecpri_hw_ver > ECPRI_HW_V1_0)
+	{
+		/* Get DMA GSI 1 IRQ numbers */
+		resource = platform_get_resource_byname(pdev, IORESOURCE_IRQ,
+			"gsi-1-irq-ap");
+		if (!resource) {
+			DMAERR(":get resource failed for gsi-1-irq-ap\n");
+			return -ENODEV;
+		}
+		dma_drv_res->gsi_irq[1][ECPRI_DMA_EE_AP] = resource->start;
+		DMADBG(":gsi-1-irq-ap = %d\n", dma_drv_res->gsi_irq[1][ECPRI_DMA_EE_AP]);
+
+		resource = platform_get_resource_byname(pdev, IORESOURCE_IRQ,
+			"gsi-1-irq-ee-2");
+		if (!resource) {
+			DMAERR(":get resource failed for gsi-1-irq-ee-2\n");
+			return -ENODEV;
+		}
+		dma_drv_res->gsi_irq[1][2] = resource->start;
+		DMADBG(":gsi-1-irq-ee-2 = %d\n", dma_drv_res->gsi_irq[1][2]);
+
+		resource = platform_get_resource_byname(pdev, IORESOURCE_IRQ,
+			"gsi-1-irq-ee-3");
+		if (!resource) {
+			DMAERR(":get resource failed for gsi-1-irq-ee-3\n");
+			return -ENODEV;
+		}
+		dma_drv_res->gsi_irq[1][3] = resource->start;
+		DMADBG(":gsi-1-irq-ee-3 = %d\n", dma_drv_res->gsi_irq[1][3]);
+
+		resource = platform_get_resource_byname(pdev, IORESOURCE_IRQ,
+			"gsi-1-irq-ee-4");
+		if (!resource) {
+			DMAERR(":get resource failed for gsi-1-irq-ee-4\n");
+			return -ENODEV;
+		}
+		dma_drv_res->gsi_irq[1][4] = resource->start;
+		DMADBG(":gsi-1-irq-ee4 = %d\n", dma_drv_res->gsi_irq[1][4]);
+
+		resource = platform_get_resource_byname(pdev, IORESOURCE_IRQ,
+			"gsi-1-irq-ee-5");
+		if (!resource) {
+			DMAERR(":get resource failed for gsi-2-irq-ee2\n");
+			return -ENODEV;
+		}
+		dma_drv_res->gsi_irq[1][5] = resource->start;
+		DMADBG(":gsi-1-irq-ee-5 = %d\n", dma_drv_res->gsi_irq[1][5]);
+
+		resource = platform_get_resource_byname(pdev, IORESOURCE_IRQ,
+			"gsi-1-irq-ee-6");
+		if (!resource) {
+			DMAERR(":get resource failed for gsi-1-irq-ee6\n");
+			return -ENODEV;
+		}
+		dma_drv_res->gsi_irq[1][6] = resource->start;
+		DMADBG(":gsi-1-irq-ee-6 = %d\n", dma_drv_res->gsi_irq[1][6]);
+
+		/* Get DMA GSI 2 IRQ numbers */
+		resource = platform_get_resource_byname(pdev, IORESOURCE_IRQ,
+			"gsi-2-irq-ap");
+		if (!resource) {
+			DMAERR(":get resource failed for gsi-2-irq-ap\n");
+			return -ENODEV;
+		}
+		dma_drv_res->gsi_irq[2][ECPRI_DMA_EE_AP] = resource->start;
+		DMADBG(":gsi-2-irq-ap = %d\n", dma_drv_res->gsi_irq[2][ECPRI_DMA_EE_AP]);
+
+		resource = platform_get_resource_byname(pdev, IORESOURCE_IRQ,
+			"gsi-2-irq-ee-2");
+		if (!resource) {
+			DMAERR(":get resource failed for gsi-2-irq-ee2\n");
+			return -ENODEV;
+		}
+		dma_drv_res->gsi_irq[2][2] = resource->start;
+		DMADBG(":gsi-2-irq-ee-2 = %d\n", dma_drv_res->gsi_irq[2][2]);
+
+		resource = platform_get_resource_byname(pdev, IORESOURCE_IRQ,
+			"gsi-2-irq-ee-3");
+		if (!resource) {
+			DMAERR(":get resource failed for gsi-2-irq-ee-3\n");
+			return -ENODEV;
+		}
+		dma_drv_res->gsi_irq[2][3] = resource->start;
+		DMADBG(":gsi-2-irq-ee-3 = %d\n", dma_drv_res->gsi_irq[2][3]);
+
+		resource = platform_get_resource_byname(pdev, IORESOURCE_IRQ,
+			"gsi-1-irq-ee-4");
+		if (!resource) {
+			DMAERR(":get resource failed for gsi-1-irq-ee-4\n");
+			return -ENODEV;
+		}
+		dma_drv_res->gsi_irq[2][4] = resource->start;
+		DMADBG(":gsi-2-irq-ee-4 = %d\n", dma_drv_res->gsi_irq[2][4]);
+
+		resource = platform_get_resource_byname(pdev, IORESOURCE_IRQ,
+			"gsi-2-irq-ee-5");
+		if (!resource) {
+			DMAERR(":get resource failed for gsi-2-irq-ee4\n");
+			return -ENODEV;
+		}
+		dma_drv_res->gsi_irq[2][5] = resource->start;
+		DMADBG(":gsi-2-irq-ee-5 = %d\n", dma_drv_res->gsi_irq[2][5]);
+
+		resource = platform_get_resource_byname(pdev, IORESOURCE_IRQ,
+			"gsi-2-irq-ee-6");
+		if (!resource) {
+			DMAERR(":get resource failed for gsi-2-irq-ee6\n");
+			return -ENODEV;
+		}
+		dma_drv_res->gsi_irq[2][6] = resource->start;
+		DMADBG(":gsi-2-irq-ee-6 = %d\n", dma_drv_res->gsi_irq[2][6]);
+	}
 
 	/* Get DMA IRQ number */
 	resource = platform_get_resource_byname(pdev, IORESOURCE_IRQ,
@@ -1101,6 +1218,7 @@ static enum gsi_ver ecpri_dma_get_gsi_ver(enum ecpri_hw_ver hw_ver)
 
 	switch (hw_ver) {
 	case ECPRI_HW_V1_0:
+	case ECPRI_HW_V2_0:
 		gsi_ver = GSI_VER_3_0;
 		break;
 	default:
@@ -1138,7 +1256,7 @@ static int ecpri_dma_pre_init(const struct ecpri_dma_plat_drv_res *resource_p,
 	struct platform_device *dma_pdev)
 {
 	int result = 0;
-	u32 i = 0;
+	int ee = 0, gsi_id = 0;
 
 	pr_info("DMA Driver initialization started\n");
 	if (!ecpri_dma_ctx) {
@@ -1170,8 +1288,17 @@ static int ecpri_dma_pre_init(const struct ecpri_dma_plat_drv_res *resource_p,
 	ecpri_dma_ctx->gsi_mem_base = resource_p->gsi_mem_base;
 	ecpri_dma_ctx->gsi_mem_size = resource_p->gsi_mem_size;
 	ecpri_dma_ctx->ecpri_dma_irq = resource_p->ecpri_dma_irq;
-	for (i = 0; i < ECPRI_DMA_NUM_EE; i++)
-		ecpri_dma_ctx->gsi_irq[i] = resource_p->gsi_irq[i];
+
+	if (ecpri_dma_ctx->ecpri_hw_ver >= ECPRI_HW_V2_0)
+		ecpri_dma_ctx->num_of_gsi = ECPRI_DMA_NUM_OF_GSI_HW_VER_2_0;
+	else
+		ecpri_dma_ctx->num_of_gsi = ECPRI_DMA_NUM_OF_GSI_HW_VER_1_0;
+
+	for (gsi_id = 0; gsi_id < ecpri_dma_ctx->num_of_gsi; gsi_id++)
+		for (ee = 0; ee < ECPRI_DMA_NUM_EE; ee++)
+			ecpri_dma_ctx->gsi_irq[gsi_id][ee] =
+				resource_p->gsi_irq[gsi_id][ee];
+
 	ecpri_dma_ctx->ee = resource_p->ee;
 	ecpri_dma_ctx->max_num_smmu_cb = resource_p->max_num_smmu_cb;
 	ecpri_dma_ctx->ecpri_dma_cfg_offset = resource_p->ecpri_dma_cfg_offset;
@@ -1198,17 +1325,19 @@ static int ecpri_dma_pre_init(const struct ecpri_dma_plat_drv_res *resource_p,
 		ecpri_dma_ctx->mmio,
 		resource_p->ecpri_dma_mem_size);
 
+	/* Get GSI version */
+	ecpri_dma_ctx->gsi_ver =
+		ecpri_dma_get_gsi_ver(ecpri_dma_ctx->ecpri_hw_ver);
+
 	/* setup GSI register access */
 	if (gsi_map_base(ecpri_dma_ctx->gsi_mem_base, ecpri_dma_ctx->gsi_mem_size,
-			 ecpri_dma_get_gsi_ver(ecpri_dma_ctx->ecpri_hw_ver)) != 0) {
+		ecpri_dma_ctx->gsi_ver, ecpri_dma_ctx->num_of_gsi) != 0) {
 		DMAERR("Allocation of gsi base failed\n");
 		result = -EFAULT;
 		goto fail_remap;
 	}
 
-	/* Get GSI version */
-	ecpri_dma_ctx->gsi_ver =
-		ecpri_dma_get_gsi_ver(ecpri_dma_ctx->ecpri_hw_ver);
+	
 
 	/* Init exception replenish WQ*/
 	ecpri_dma_ctx->ecpri_dma_exception_wq = create_singlethread_workqueue(

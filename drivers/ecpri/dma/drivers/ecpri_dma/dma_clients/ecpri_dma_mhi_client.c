@@ -55,6 +55,10 @@ ecpri_dma_mhi_function_map[ECPRI_DMA_VM_IDS_MAX] = {
 	[ECPRI_DMA_VM_IDS_VFE] = {ECPRI_DMA_EE_VFD, ECPRI_DMA_GSI_ID_2}
 };
 
+static const struct ecpri_dma_mhi_ee_gsi_tuple
+	ecpri_dma_mhi_physical_function_tuple =
+		{ ECPRI_DMA_EE_PF, ECPRI_DMA_GSI_ID_0 };
+
 static const struct ecpri_dma_mhi_function_endp_data
 ecpri_dma_mhi_function_endp_dt[ECPRI_HW_MAX][ECPRI_DMA_MHI_CLIENT_FUNCTION_NUM] =
 {
@@ -112,7 +116,7 @@ ecpri_dma_mhi_function_endp_dt[ECPRI_HW_MAX][ECPRI_DMA_MHI_CLIENT_FUNCTION_NUM] 
 * ecpri_dma_mhi_get_function_mapping() - Maps VF index to corresponding EE and
 * GSI ID
 */
-static void ecpri_dma_mhi_get_function_mapping(
+static int ecpri_dma_mhi_get_function_mapping(
 	struct mhi_dma_function_params function,
 	const struct ecpri_dma_mhi_ee_gsi_tuple** tuple)
 {
@@ -120,11 +124,17 @@ static void ecpri_dma_mhi_get_function_mapping(
 		function.vf_id < ECPRI_DMA_MHI_CLIENT_FUNCTION_NUM - 1) {
 		*(tuple) = &ecpri_dma_mhi_function_map[function.vf_id];
 	}
+	else if (function.function_type == MHI_DMA_FUNCTION_TYPE_PHYSICAL)
+	{
+		*(tuple) = &ecpri_dma_mhi_physical_function_tuple;
+	}
 	else {
 		DMAERR("Unexpected function type, type: %d, vf_id: %d\n",
 			function.function_type, function.vf_id);
-		return;
+		return -EINVAL;
 	}
+
+	return 0;
 }
 
 static inline void ecpri_dma_mhi_get_sync_async_endp_ids(
@@ -240,7 +250,7 @@ static inline void ecpri_dma_mhi_set_endps(int idx,
 	int sync_dest_endp_id = ECPRI_DMA_MHI_INVALID_ENDP_ID;
 	int async_src_endp_id = ECPRI_DMA_MHI_INVALID_ENDP_ID;
 	int async_dest_endp_id = ECPRI_DMA_MHI_INVALID_ENDP_ID;
-	int gsi_id = ECPRI_DMA_GSI_ID_0;
+	enum ecpri_dma_gsi_id gsi_id = ECPRI_DMA_GSI_ID_0;
 
 	ecpri_dma_mhi_get_sync_async_endp_ids(&sync_src_endp_id,
 		&sync_dest_endp_id, &async_src_endp_id, &async_dest_endp_id, idx);
@@ -262,38 +272,6 @@ static inline void ecpri_dma_mhi_set_endps(int idx,
 }
 
 /**
- * ecpri_dma_mhi_get_ee_index() - Gets the correspodning EE ID
- *
- * @function: [IN] Function parameters, type and id
- * @ee_idx:   [OUT] The EE index from map array
- *
- * Return codes: 0: success
- *		-EINVAL: Unexpected function type
- */
-static inline int ecpri_dma_mhi_get_ee_index(
-	struct mhi_dma_function_params function,
-	enum ecpri_dma_ees* ee_idx)
-{
-	int ret = 0;
-	if (function.function_type ==
-		MHI_DMA_FUNCTION_TYPE_VIRTUAL &&
-		function.vf_id < ECPRI_DMA_MHI_CLIENT_FUNCTION_NUM - 1) {
-		*(ee_idx) = ecpri_dma_mhi_function_map[function.vf_id].ee_id;
-	}
-	else if (function.function_type ==
-		MHI_DMA_FUNCTION_TYPE_PHYSICAL) {
-		*(ee_idx) = ECPRI_DMA_EE_PF;
-	}
-	else {
-		DMAERR("Unexpected function type, type: %d, vf_id: %d\n",
-			function.function_type, function.vf_id);
-		ret = -EINVAL;
-	}
-
-	return ret;
-}
-
-/**
  * ecpri_dma_mhi_get_endp_ctx() - Gets the endpoint
  * GSI configuration data, by EE ID and CH ID
  *
@@ -312,16 +290,21 @@ static int ecpri_dma_mhi_get_endp_ctx(
 	enum ecpri_dma_ees ee_idx;
 	const struct ecpri_dma_mhi_ee_gsi_tuple* func_map;
 
-	ecpri_dma_mhi_get_function_mapping(function, &func_map);
+	ret = ecpri_dma_mhi_get_function_mapping(function, &func_map);
+	if (ret)
+	{
+		DMAERR("Unknown function");
+		return ret;
+	}
 	ee_idx = func_map->ee_id;
 	gsi_id = func_map->gsi_id;
 
 	for (endp_id = 0; endp_id < ECPRI_DMA_ENDP_NUM_MAX; endp_id++)
 	{
-		if (ecpri_dma_ctx->endp_map[gsi_id][endp_id].valid &&
-			ecpri_dma_ctx->endp_map[gsi_id][endp_id].dma_gsi_chan_num ==
+		if ((*ecpri_dma_ctx->endp_map)[gsi_id][endp_id].valid &&
+			(*ecpri_dma_ctx->endp_map)[gsi_id][endp_id].dma_gsi_chan_num ==
 			channel_id &&
-			ecpri_dma_ctx->endp_map[gsi_id][endp_id].ee == ee_idx) {
+			(*ecpri_dma_ctx->endp_map)[gsi_id][endp_id].ee == ee_idx) {
 			*(endp_ctx) = &ecpri_dma_ctx->endp_ctx[gsi_id][endp_id];
 			ecpri_dma_ctx->endp_ctx[gsi_id][endp_id].gsi_id = gsi_id;
 			ecpri_dma_ctx->endp_ctx[gsi_id][endp_id].endp_id = endp_id;
@@ -336,12 +319,16 @@ static int ecpri_dma_mhi_get_endp_ctx(
 static void ecpri_dma_mhi_get_l2_ch_bitmap(
 	struct mhi_dma_function_params function, u32 idx, u32 *bitmap)
 {
-	int endp_id, gsi_id;
+	int endp_id;
+	enum ecpri_dma_gsi_id gsi_id;
 	enum ecpri_dma_ees ee_idx;
 	const struct ecpri_dma_mhi_ee_gsi_tuple* func_map;
 	enum ecpri_hw_ver hw_ver = ecpri_dma_get_ctx_hw_ver();
 
-	ecpri_dma_mhi_get_function_mapping(function, &func_map);
+	if (ecpri_dma_mhi_get_function_mapping(function, &func_map))
+	{
+		DMAERR("Unknown function");
+	}
 	ee_idx = func_map->ee_id;
 	gsi_id = func_map->gsi_id;
 
@@ -352,13 +339,13 @@ static void ecpri_dma_mhi_get_l2_ch_bitmap(
 	for (endp_id = 0; endp_id < ECPRI_DMA_ENDP_NUM_MAX; endp_id++)
 	{
 		/* Note: For V2 there is no SW Chanels in VM */
-		if (ecpri_dma_ctx->endp_map[gsi_id][endp_id].valid &&
-			ecpri_dma_ctx->endp_map[gsi_id][endp_id].ee == ee_idx &&
+		if ((*ecpri_dma_ctx->endp_map)[gsi_id][endp_id].valid &&
+			(*ecpri_dma_ctx->endp_map)[gsi_id][endp_id].ee == ee_idx &&
 			endp_id != ecpri_dma_mhi_function_endp_dt[hw_ver][idx].sync_src_id &&
 			endp_id != ecpri_dma_mhi_function_endp_dt[hw_ver][idx].sync_dest_id &&
 			endp_id != ecpri_dma_mhi_function_endp_dt[hw_ver][idx].async_src_id &&
 			endp_id != ecpri_dma_mhi_function_endp_dt[hw_ver][idx].async_dest_id){
-			*bitmap |= 1 << ecpri_dma_ctx->endp_map[gsi_id][endp_id]
+			*bitmap |= 1 << (*ecpri_dma_ctx->endp_map)[gsi_id][endp_id]
 				.dma_gsi_chan_num;
 		}
 	}
@@ -670,18 +657,23 @@ static int ecpri_dma_mhi_alloc_sync_async_endps(
 	int sync_dest_endp_id = ECPRI_DMA_MHI_INVALID_ENDP_ID;
 	int async_src_endp_id = ECPRI_DMA_MHI_INVALID_ENDP_ID;
 	int async_dest_endp_id = ECPRI_DMA_MHI_INVALID_ENDP_ID;
-	int gsi_id = ECPRI_DMA_GSI_ID_0;
-
+	enum ecpri_dma_gsi_id gsi_id = ECPRI_DMA_GSI_ID_0;
 	const struct ecpri_dma_mhi_ee_gsi_tuple* func_map;
 
-	ecpri_dma_mhi_get_function_mapping(function, &func_map);
+	ret = ecpri_dma_mhi_get_function_mapping(function, &func_map);
+	if (ret)
+	{
+		DMAERR("Unknown function");
+		return ret;
+	}
 	gsi_id = func_map->gsi_id;
 
-	ecpri_dma_mhi_get_sync_async_endp_ids(&sync_src_endp_id, &sync_src_endp_id,
+	ecpri_dma_mhi_get_sync_async_endp_ids(&sync_src_endp_id, &sync_dest_endp_id,
 		&async_src_endp_id, &async_dest_endp_id, idx);
 
 	ecpri_dma_ctx->
 		endp_ctx[gsi_id][sync_src_endp_id].eventless_endp = true;
+
 	ret = ecpri_dma_alloc_endp(gsi_id, sync_src_endp_id,
 		ECPRI_DMA_MHI_MEMCPY_RLEN, mod_cfg, false, NULL);
 	if (ret != 0) {
@@ -755,7 +747,7 @@ static int ecpri_dma_mhi_enable_mhi_memcpy_endps(int idx)
 	int sync_dest_endp_id = ECPRI_DMA_MHI_INVALID_ENDP_ID;
 	int async_src_endp_id = ECPRI_DMA_MHI_INVALID_ENDP_ID;
 	int async_dest_endp_id = ECPRI_DMA_MHI_INVALID_ENDP_ID;
-	int gsi_id = ECPRI_DMA_GSI_ID_0;
+	enum ecpri_dma_gsi_id gsi_id = ECPRI_DMA_GSI_ID_0;
 
 	ecpri_dma_mhi_get_sync_async_endp_ids(&sync_src_endp_id,
 		&sync_dest_endp_id, &async_src_endp_id, &async_dest_endp_id, idx);
@@ -830,7 +822,7 @@ static int ecpri_dma_mhi_start_memcpy_endps(int idx)
 	int sync_dest_endp_id = ECPRI_DMA_MHI_INVALID_ENDP_ID;
 	int async_src_endp_id = ECPRI_DMA_MHI_INVALID_ENDP_ID;
 	int async_dest_endp_id = ECPRI_DMA_MHI_INVALID_ENDP_ID;
-	int gsi_id = ECPRI_DMA_GSI_ID_0;
+	enum ecpri_dma_gsi_id gsi_id = ECPRI_DMA_GSI_ID_0;
 
 	ecpri_dma_mhi_get_sync_async_endp_ids(&sync_src_endp_id,
 		&sync_dest_endp_id, &async_src_endp_id, &async_dest_endp_id, idx);
@@ -905,7 +897,7 @@ static int ecpri_dma_mhi_set_memcpy_endps_mode(int idx)
 	int sync_dest_endp_id = ECPRI_DMA_MHI_INVALID_ENDP_ID;
 	int async_src_endp_id = ECPRI_DMA_MHI_INVALID_ENDP_ID;
 	int async_dest_endp_id = ECPRI_DMA_MHI_INVALID_ENDP_ID;
-	int gsi_id = ECPRI_DMA_GSI_ID_0;
+	enum ecpri_dma_gsi_id gsi_id = ECPRI_DMA_GSI_ID_0;
 
 	ecpri_dma_mhi_get_sync_async_endp_ids(&sync_src_endp_id,
 		&sync_dest_endp_id, &async_src_endp_id, &async_dest_endp_id, idx);
@@ -942,7 +934,7 @@ static int ecpri_dma_mhi_stop_memcpy_endps(int idx)
 	int sync_dest_endp_id = ECPRI_DMA_MHI_INVALID_ENDP_ID;
 	int async_src_endp_id = ECPRI_DMA_MHI_INVALID_ENDP_ID;
 	int async_dest_endp_id = ECPRI_DMA_MHI_INVALID_ENDP_ID;
-	int gsi_id = ECPRI_DMA_GSI_ID_0;
+	enum ecpri_dma_gsi_id gsi_id = ECPRI_DMA_GSI_ID_0;
 
 	ecpri_dma_mhi_get_sync_async_endp_ids(&sync_src_endp_id,
 		&sync_dest_endp_id, &async_src_endp_id, &async_dest_endp_id, idx);
@@ -1000,7 +992,7 @@ static int ecpri_dma_mhi_disable_memcpy_endps(int idx)
 	int sync_dest_endp_id = ECPRI_DMA_MHI_INVALID_ENDP_ID;
 	int async_src_endp_id = ECPRI_DMA_MHI_INVALID_ENDP_ID;
 	int async_dest_endp_id = ECPRI_DMA_MHI_INVALID_ENDP_ID;
-	int gsi_id = ECPRI_DMA_GSI_ID_0;
+	enum ecpri_dma_gsi_id gsi_id = ECPRI_DMA_GSI_ID_0;
 
 	ecpri_dma_mhi_get_sync_async_endp_ids(&sync_src_endp_id,
 		&sync_dest_endp_id, &async_src_endp_id, &async_dest_endp_id, idx);
@@ -1057,7 +1049,7 @@ static int ecpri_dma_mhi_dealloc_memcpy_endps(int idx)
 	int sync_dest_endp_id = ECPRI_DMA_MHI_INVALID_ENDP_ID;
 	int async_src_endp_id = ECPRI_DMA_MHI_INVALID_ENDP_ID;
 	int async_dest_endp_id = ECPRI_DMA_MHI_INVALID_ENDP_ID;
-	int gsi_id = ECPRI_DMA_GSI_ID_0;
+	enum ecpri_dma_gsi_id gsi_id = ECPRI_DMA_GSI_ID_0;
 
 	ecpri_dma_mhi_get_sync_async_endp_ids(&sync_src_endp_id,
 		&sync_dest_endp_id, &async_src_endp_id, &async_dest_endp_id, idx);
@@ -1115,7 +1107,7 @@ static int ecpri_dma_mhi_reset_memcpy_endps(int idx)
 	int sync_dest_endp_id = ECPRI_DMA_MHI_INVALID_ENDP_ID;
 	int async_src_endp_id = ECPRI_DMA_MHI_INVALID_ENDP_ID;
 	int async_dest_endp_id = ECPRI_DMA_MHI_INVALID_ENDP_ID;
-	int gsi_id = ECPRI_DMA_GSI_ID_0;
+	enum ecpri_dma_gsi_id gsi_id = ECPRI_DMA_GSI_ID_0;
 
 	ecpri_dma_mhi_get_sync_async_endp_ids(&sync_src_endp_id,
 		&sync_dest_endp_id, &async_src_endp_id, &async_dest_endp_id, idx);
@@ -1305,7 +1297,7 @@ static void ecpri_dma_mhi_memcpy_destroy(
 	int sync_dest_endp_id = ECPRI_DMA_MHI_INVALID_ENDP_ID;
 	int async_src_endp_id = ECPRI_DMA_MHI_INVALID_ENDP_ID;
 	int async_dest_endp_id = ECPRI_DMA_MHI_INVALID_ENDP_ID;
-	int gsi_id = ECPRI_DMA_GSI_ID_0;
+	enum ecpri_dma_gsi_id gsi_id = ECPRI_DMA_GSI_ID_0;
 
 	struct ecpri_dma_mhi_memcpy_context* memcpy_ctx = NULL;
 	const struct ecpri_dma_mhi_ee_gsi_tuple* func_map;
@@ -1332,7 +1324,11 @@ static void ecpri_dma_mhi_memcpy_destroy(
 		return;
 	}
 
-	ecpri_dma_mhi_get_function_mapping(function, &func_map);
+	ret = ecpri_dma_mhi_get_function_mapping(function, &func_map);
+	if (ret)
+	{
+		DMAERR("Unknown function");
+	}
 	gsi_id = func_map->gsi_id;
 
 	ecpri_dma_mhi_get_sync_async_endp_ids(&sync_src_endp_id,
@@ -1917,7 +1913,7 @@ static int ecpri_dma_mhi_dma_memcpy_enable(
 	int sync_dest_endp_id = ECPRI_DMA_MHI_INVALID_ENDP_ID;
 	int async_src_endp_id = ECPRI_DMA_MHI_INVALID_ENDP_ID;
 	int async_dest_endp_id = ECPRI_DMA_MHI_INVALID_ENDP_ID;
-	int gsi_id = ECPRI_DMA_GSI_ID_0;
+	enum ecpri_dma_gsi_id gsi_id = ECPRI_DMA_GSI_ID_0;
 
 	struct ecpri_dma_mhi_memcpy_context* memcpy_ctx;
 	const struct ecpri_dma_mhi_ee_gsi_tuple* func_map;
@@ -1950,7 +1946,12 @@ static int ecpri_dma_mhi_dma_memcpy_enable(
 		return 0;
 	}
 
-	ecpri_dma_mhi_get_function_mapping(function, &func_map);
+	ret = ecpri_dma_mhi_get_function_mapping(function, &func_map);
+	if (ret)
+	{
+		DMAERR("Unknown function");
+		return ret;
+	}
 	gsi_id = func_map->gsi_id;
 
 	ecpri_dma_mhi_get_sync_async_endp_ids(&sync_src_endp_id,
@@ -2018,6 +2019,7 @@ static int ecpri_dma_mhi_client_init(
 	int ret;
 	enum ecpri_dma_ees ee_idx;
 	struct ecpri_dma_mhi_wq_work_type* work = NULL;
+	const struct ecpri_dma_mhi_ee_gsi_tuple* func_map;
 
 	if (!params) {
 		DMAERR("Null params args\n");
@@ -2135,19 +2137,21 @@ static int ecpri_dma_mhi_client_init(
 		goto fail_set_state;
 	}
 
-	ret = ecpri_dma_mhi_get_ee_index(function, &ee_idx);
-	if (ret != 0) {
-		DMAERR("Unable to translate VF/PF to EE index\n");
-		return -EINVAL;
+	ret = ecpri_dma_mhi_get_function_mapping(function, &func_map);
+	if (ret)
+	{
+		DMAERR("Unknown function");
+		return ret;
 	}
+	ee_idx = func_map->ee_id;
 
 	/* Fill out param */
 	ecpri_dma_mhi_get_l2_ch_bitmap(function, idx, &out->ch_db_fwd_msk);
 	out->ev_db_fwd_msk = out->ch_db_fwd_msk;
-	out->ch_db_fwd_base = gsihal_get_reg_nk_addr(
-		GSI_EE_n_GSI_CH_k_DOORBELL_0, ee_idx, 0);
-	out->ev_db_fwd_base =gsihal_get_reg_nk_addr(
-		GSI_EE_n_EV_CH_k_DOORBELL_0, ee_idx, 0);
+	out->ch_db_fwd_base = gsihal_get_reg_pnk_addr(
+		GSI_EE_n_GSI_CH_k_DOORBELL_0, 0, ee_idx, 0);
+	out->ev_db_fwd_base =gsihal_get_reg_pnk_addr(
+		GSI_EE_n_EV_CH_k_DOORBELL_0, 0, ee_idx, 0);
 
 	/* Create notifier for driver ready */
 	work = kzalloc(sizeof(*work), GFP_KERNEL);
@@ -2270,6 +2274,8 @@ static int ecpri_dma_mhi_client_dma_start(
 	unsigned long flags;
 	unsigned long gsi_dev_hdl;
 	enum ecpri_dma_ees ee_idx;
+	u32 gsi_id;
+	const struct ecpri_dma_mhi_ee_gsi_tuple* func_map;
 
 	if (!params) {
 		DMAERR("Null params args\n");
@@ -2317,13 +2323,16 @@ static int ecpri_dma_mhi_client_dma_start(
 		return -EFAULT;
 	}
 
-	ret = ecpri_dma_mhi_get_ee_index(function, &ee_idx);
-	if (ret != 0) {
-		DMAERR("Unable to translate VF/PF to EE index\n");
-		return -EINVAL;
+	ret = ecpri_dma_mhi_get_function_mapping(function, &func_map);
+	if (ret)
+	{
+		DMAERR("Unknown function");
+		return ret;
 	}
+	ee_idx = func_map->ee_id;
+	gsi_id = func_map->gsi_id;
 
-	ret = gsi_write_device_scratch(gsi_dev_hdl, ee_idx,
+	ret = gsi_write_device_scratch(gsi_dev_hdl, gsi_id, ee_idx,
 		&ecpri_dma_mhi_client_ctx[idx]->dev_scratch);
 	if (ret != 0) {
 		DMAERR("Unable to write device scratch, idx: %d,"
@@ -2578,6 +2587,7 @@ static int ecpri_dma_mhi_dma_connect_endp(
 	struct ecpri_dma_mhi_channel_ctx* channel;
 	struct ecpri_dma_endp_context* endp_ctx;
 	u32 ch_idx = ECPRI_DMA_MHI_INVALID_CH_ID;
+	const struct ecpri_dma_mhi_ee_gsi_tuple* func_map;
 
 	if (!in) {
 		DMAERR("Null params args\n");
@@ -2638,11 +2648,13 @@ static int ecpri_dma_mhi_dma_connect_endp(
 	channel->channel_id = ch_idx;
 	channel->event_id = channel->ch_ctx_host.erindex -
 		ecpri_dma_mhi_client_ctx[idx]->first_ev;
-	ret = ecpri_dma_mhi_get_ee_index(function, &ee_idx);
-	if (ret != 0) {
-		DMAERR("Unable to translate VF/PF to EE index\n");
-		return -EINVAL;
+	ret = ecpri_dma_mhi_get_function_mapping(function, &func_map);
+	if (ret)
+	{
+		DMAERR("Unknown function");
+		return ret;
 	}
+	ee_idx = func_map->ee_id;
 
 	ret = ecpri_dma_mhi_get_endp_ctx(function, ch_idx,
 		&endp_ctx);
