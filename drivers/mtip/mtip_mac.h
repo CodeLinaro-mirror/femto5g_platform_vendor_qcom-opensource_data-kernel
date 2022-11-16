@@ -50,7 +50,7 @@
 #define MTIP_MAC_INIT_TX_IPG_LENGTH               0x0000000C
 #define MTIP_MAC_INIT_CRC_MODE                    0x0
 #define MTIP_MAC_INIT_CRC_INV_MASK                0xFFFFFFFF
-#define MTIP_MAC_INIT_XIF_MODE                    0x00000100 // TBD // WAS 0X00010100
+#define MTIP_MAC_INIT_XIF_MODE                    0x00010100
 
 #define MTIP_MAC_HASHTABLE_SIZE                   64
 
