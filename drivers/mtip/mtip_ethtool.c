@@ -45,6 +45,9 @@
 #include "mtip_device.h"
 #include "mtip_phy.h"
 #include "mtip_macstats.h"
+#include "mtip_mac.h"
+#include "mtip_pcs.h"
+
 
 static const char * const mtip_ethtool_stat_strings[] = {
     "EtherStatsOctets",
@@ -177,6 +180,91 @@ static int mtip_get_ts_info(struct net_device *ndev, struct ethtool_ts_info *inf
 	return 0;
 }
 
+int	mtip_ethtool_get_fecparam(struct net_device* netdev, struct ethtool_fecparam* pfec)
+{
+    u32 cmd = pfec->cmd;
+    struct mtip_netdev_priv *priv;
+    u32 link_index;
+
+    priv = netdev_priv(netdev);
+    link_index = priv->link_index;
+
+    // set the capable set of FECs
+    pfec->fec = ETHTOOL_FEC_OFF | ETHTOOL_FEC_RS;
+
+    // set the active fec
+    pfec->active_fec = platform_driver_priv->mtip_links[link_index]->active_fec;
+
+    CSMLOGINFO("Getting FEC parameter for link index: %d, cmd: %d", link_index, cmd);
+
+    return 0;
+}
+
+int	mtip_ethtool_set_fecparam(struct net_device* netdev, struct ethtool_fecparam* pfec)
+{
+    u32 cmd = pfec->cmd;
+    u32 active_fec = pfec->active_fec;
+    u32 fec = pfec->fec;
+    struct mtip_netdev_priv *priv;
+    u32 link_index;
+    u32 port_device_index;
+    u32 link_device_index;
+    struct mtip_port_device_info* port_device = NULL;
+    struct mtip_link_device_info* link_device = NULL;
+    int i;
+
+    priv = netdev_priv(netdev);
+    link_index = priv->link_index;
+
+    CSMLOGINFO("Setting FEC parameter for link index: %d, cmd: %d, active: %d, fec: %d", link_index, cmd, active_fec, fec);
+
+    mtip_lookup_device_by_link_index(link_index, &port_device_index, &link_device_index);
+
+    CSMLOGINFO("link index: %d, port_device: %d, link_device: %d", link_index, port_device_index, link_device_index);
+
+    // set the port_device
+    port_device = &platform_driver_priv->devices.port_devices[port_device_index];
+
+    // check the value of the active_fec
+    if (fec == ETHTOOL_FEC_OFF) 
+    {
+        // find the port corresponding to the link
+        CSMLOGINFO("Going to set FEC OFF for link_index: %d", link_index);
+
+        // turn FEC to OFF
+        mtip_mac_wrapper_disable_rsfec_for_25g_mode(port_device);
+
+        // disable rsfec in pcs
+        for (i = 0; i < port_device->num_link_phandles; ++i)
+        {
+            link_device = &port_device->link_devices[i];
+            mtip_pcs_disable_rsfec_for_25g_mode(link_device);
+        }
+    }
+    else if (fec == ETHTOOL_FEC_RS) 
+    {
+        // find the port corresponding to the link
+        CSMLOGINFO("Going to set FEC RS for link_index: %d", link_index);
+
+        // turn on RS FEC
+        mtip_mac_wrapper_enable_rsfec_for_25g_mode(port_device);
+
+        // enable rsfec in the pcs
+        for (i = 0; i < port_device->num_link_phandles; ++i)
+        {
+            link_device = &port_device->link_devices[i];
+            mtip_pcs_enable_rsfec_for_25g_mode(link_device);
+        }
+    }
+    else
+    {
+        CSMLOGERR("Unsupported FEC %d parameter for link index: %d", active_fec, link_index);
+        return -EINVAL;
+    }
+
+    return 0;
+}
+
 static const struct ethtool_ops mtip_ethtool_ops = {
    .begin = mtip_check_if_running,
    .get_drvinfo = mtip_getdrvinfo,
@@ -185,6 +273,8 @@ static const struct ethtool_ops mtip_ethtool_ops = {
    .get_ethtool_stats = mtip_ethtool_get_stats,
    .get_ts_info = mtip_get_ts_info,
    .get_link_ksettings = mtip_get_link_ksettings,
+   .get_fecparam = mtip_ethtool_get_fecparam,
+   .set_fecparam = mtip_ethtool_set_fecparam,
 };
 
 void mtip_ethtool_set_ops(struct net_device *netdev)

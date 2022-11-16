@@ -204,6 +204,9 @@ int mtip_pcs_config_pcs(u32 link_index)
     // configure the PCS of the link
     CSMLOGINFO("Configuring the PCS for link_index: %d, port_device_index: %d, link_device_index: %d\n", link_index, port_device_index, link_device_index);
 
+    // set the default active fec to OFF
+    platform_driver_priv->mtip_links[link_index]->active_fec = ETHTOOL_FEC_OFF;
+
     // reset the vl registers
     mtip_pcs_reset_all_vl_registers(&platform_driver_priv->devices.port_devices[port_device_index].link_devices[link_device_index]);
 
@@ -299,6 +302,10 @@ void mtip_pcs_enable_rsfec_for_25g_mode(struct mtip_link_device_info* link_devic
     void __iomem *pcs_ioaddr = link_device->pcs_ioaddr;
     u32 vendor_pcs_mode = 0;
     u32 marker_counter = 0;
+    u32 link_index = link_device->link_index;
+
+    // set the active fec
+    platform_driver_priv->mtip_links[link_index]->active_fec = ETHTOOL_FEC_RS;
 
     // set PCS_VENDOR_PCS_MODE [DISABLE_MLD] = 0
     vendor_pcs_mode = MTIP_PCS_VENDOR_PCS_ENA_CLAUSE49_BIT | MTIP_PCS_VENDOR_PCS_HI_BER25_BIT; 
@@ -325,6 +332,10 @@ void mtip_pcs_disable_rsfec_for_25g_mode(struct mtip_link_device_info* link_devi
     void __iomem *pcs_ioaddr = link_device->pcs_ioaddr;
     u32 vendor_pcs_mode = 0;
     u32 marker_counter = 0;
+    u32 link_index = link_device->link_index;
+
+    // set the active fec
+    platform_driver_priv->mtip_links[link_index]->active_fec = ETHTOOL_FEC_OFF;
 
     // set PCS_VENDOR_PCS_MODE [DISABLE_MLD] = 1
     vendor_pcs_mode = MTIP_PCS_VENDOR_PCS_ENA_CLAUSE49_BIT | MTIP_PCS_VENDOR_PCS_DISABLE_MLD_BIT | MTIP_PCS_VENDOR_PCS_HI_BER25_BIT; 
