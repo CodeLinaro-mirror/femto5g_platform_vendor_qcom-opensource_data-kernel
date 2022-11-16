@@ -26,6 +26,12 @@
 
 #define ECPRI_OXTOR_XU_ID_DEFAULT 0xffffffff
 
+#define ECPRI_OXTOR_QTIMER_FREQ_HZ  19200000
+#define BW_CNT_ENABLE 1
+#define BW_CNT_DISABLE 0
+#define BW_CNT_CLEAR_SET 1
+#define BW_CNT_CLEAR_RESET 0
+
 
 #undef pr_fmt
 #define pr_fmt(fmt) "::%s:%d::" fmt, __func__,__LINE__

@@ -79,13 +79,6 @@ int qcom_aw_phy_mtip_register(
 
   mutex_lock(&qcom_aw_phy_mtip_if_info_s.lock);
 
-  if (qcom_aw_phy_mtip_if_info_s.is_ready_notified) {
-    ret_val = 0;
-    local_err_val = LOCAL_ERROR_1;
-    mutex_unlock(&qcom_aw_phy_mtip_if_info_s.lock);
-    goto func_exit;
-  }
-
   qcom_aw_phy_mtip_if_info_s.is_mac_drv_ready = true;
 
   *is_phy_ready = qcom_aw_phy_mtip_if_info_s.is_phy_drv_ready;
@@ -398,7 +391,7 @@ int qcom_aw_phy_bringup_manual_eq_mode(
   txfir_cfg.C0 = 60;
   txfir_cfg.C1 = 0;
   txfir_cfg.main_or_max = 1;
-  aw_pmd_txfir_config_set(mss, &txfir_cfg);
+  aw_pmd_txfir_config_set(mss, &txfir_cfg, 1);
 
   /* Disabling DFE Adaptations EXT loopback */
   aw_pmd_rx_dfe_adapt_set(mss, 0);
@@ -869,7 +862,7 @@ void qcom_aw_phy_retry_lane_bring_up(struct work_struct *work){
     txfir_cfg.C0 = 60;
     txfir_cfg.C1 = 0;
     txfir_cfg.main_or_max = 1;
-    aw_pmd_txfir_config_set(&mss, &txfir_cfg);
+    aw_pmd_txfir_config_set(&mss, &txfir_cfg, 1);
 
     /* Disabling DFE Adaptations EXT loopback */
     aw_pmd_rx_dfe_adapt_set(&mss, 0);

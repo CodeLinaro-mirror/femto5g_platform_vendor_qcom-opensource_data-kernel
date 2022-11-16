@@ -69,4 +69,8 @@ int mtip_pcs_enable_loopback(u32 link_index);
 
 int mtip_rsfec_initialize(struct mtip_port_device_info* port_device);
 
+// functions to enable/disable rsfec for 25g mode
+void mtip_pcs_enable_rsfec_for_25g_mode(struct mtip_link_device_info* link_device);
+void mtip_pcs_disable_rsfec_for_25g_mode(struct mtip_link_device_info* link_device);
+
 #endif // _MTIP_PCS_H

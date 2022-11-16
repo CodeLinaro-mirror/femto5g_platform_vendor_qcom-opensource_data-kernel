@@ -49,12 +49,27 @@
 #include "mtip_phy.h"
 #include "eth_phy_iface.h"
 #include "mtip_mac.h"
+#include "mtip_pcs.h"
 #include "mtip_workq.h"
 #include "mtip_sysfs.h"
 
 struct eth_phy_iface_eth_register_params mtip_phy_eth_params;
 
 extern struct eth_phy_iface_ops qcom_aw_phy_driver_iface_ops;
+
+/* 
+ * qsfp_eth_get_link_type: returns sfp port type
+ * based on values defined in ethtool.h
+#define PORT_TP            0x00
+#define PORT_AUI           0x01
+#define PORT_MII           0x02
+#define PORT_FIBRE         0x03
+#define PORT_BNC           0x04
+#define PORT_DA            0x05
+#define PORT_NONE          0xef
+#define PORT_OTHER         0xff
+ */ 
+extern int qsfp_eth_get_link_type(u32 qsfp_phandle, u8* link_info);
 
 static void mtip_phy_ready_cb(void *user_data)
 {
@@ -82,14 +97,18 @@ static void mtip_phy_an_complete_cb(enum mtip_port_type_enum port_type, enum eth
 static int mtip_phy_get_link_index_for_phy_lane(
     enum mtip_port_type_enum port_type, enum eth_phy_iface_phy_lane_num_enum lane_num)
 {
-    int i,j;
+    int i,j,k;
     u32 num_lanes;
 
-    for(i = 0; i < MTIP_MAX_LINKS_PER_PORT; i++){
-      num_lanes = platform_driver_priv->devices.port_devices[port_type].link_devices[i].num_lanes;
-      for (j = 0; j < num_lanes; j++){
-        if(platform_driver_priv->devices.port_devices[port_type].link_devices[i].lanes[j] == lane_num)
-          return platform_driver_priv->devices.port_devices[port_type].link_devices[i].link_index;
+    for(i = 0; i < MTIP_MAX_PORTS; i++){
+      if(platform_driver_priv->devices.port_devices[i].port_type == port_type){
+        for(j = 0; j < MTIP_MAX_LINKS_PER_PORT; j++){
+          num_lanes = platform_driver_priv->devices.port_devices[i].link_devices[j].num_lanes;
+          for (k = 0; k < num_lanes; k++){
+            if(platform_driver_priv->devices.port_devices[i].link_devices[j].lanes[k] == lane_num)
+              return platform_driver_priv->devices.port_devices[i].link_devices[j].link_index;
+          }
+        }
       }
     }
 
@@ -105,8 +124,10 @@ static void mtip_phy_cdr_lock_cb(enum mtip_port_type_enum port_type, enum eth_ph
     CSMLOGERR("CDR lock success for port: %d, lane %d\n", port_type, lane_num);
 
     link_index = mtip_phy_get_link_index_for_phy_lane(port_type, lane_num);
-    if(link_index == -1)
+    if(link_index == -1){
       CSMLOGERR("Index not found\n");
+      return;
+    }
 
     if(mtip_mac_wrapper_get_link_status(link_index) == false){
       wq_params = kmalloc(sizeof(struct mtip_delayed_work_q_params),
@@ -457,6 +478,8 @@ static void mtip_phy_link_up(struct phylink_config *config,
     enum mtip_link_state_enum link_state;
     u8  sfp_port_type = 0;
     int sfp_phandle;
+    struct mtip_port_device_info* port_device = NULL;
+    struct mtip_link_device_info* link_device = NULL;
 
     ret = mtip_phy_find_matching_port(config, &real_port_number);
 
@@ -487,11 +510,41 @@ static void mtip_phy_link_up(struct phylink_config *config,
     current_state = platform_driver_priv->mtip_ports[real_port_number]->port_state;
 
     // ask the qsfp driver for the port type
-    //qsfp_eth_get_link_type(sfp_phandle, &sfp_port_type);
-    // TBD
+    qsfp_eth_get_link_type(sfp_phandle, &sfp_port_type);
+
+    CSMLOGINFO("sfp_port_type %d, associated with port %d", sfp_port_type, real_port_number);
 
     // update the sfp port type
     platform_driver_priv->mtip_ports[real_port_number]->sfp_port_type = sfp_port_type;
+
+    // set the port_device
+    port_device = &platform_driver_priv->devices.port_devices[real_port_number];
+
+    // deal with the phy_port_type as appropriate
+    if (sfp_port_type == PORT_FIBRE)
+    {
+        // handle the case where FIBRE is connected
+        mtip_mac_wrapper_enable_rsfec_for_25g_mode(port_device);
+
+        // enable rsfec in the pcs
+        for (i = 0; i < port_device->num_link_phandles; ++i)
+        {
+            link_device = &port_device->link_devices[i];
+            mtip_pcs_enable_rsfec_for_25g_mode(link_device);
+        }
+    }
+    else
+    {
+        // handle the case where DAC or OTHER is connected
+        mtip_mac_wrapper_disable_rsfec_for_25g_mode(port_device);
+
+        // disable rsfec in pcs
+        for (i = 0; i < port_device->num_link_phandles; ++i)
+        {
+            link_device = &port_device->link_devices[i];
+            mtip_pcs_disable_rsfec_for_25g_mode(link_device);
+        }
+    }
 
     switch (current_state) 
     {

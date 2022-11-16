@@ -21,6 +21,7 @@
 #include "qcom_aw_phy_synce.h"
 #include "qcom_aw_phy_utils.h"
 #include "qcom_aw_phy_gnl.h"
+#include "qcom_aw_phy_prbs.h"
 #include "aw_c_api/aw_alphacore.h"
 #include "aw_c_api/aw_alphacore_ip_defines.h"
 #include "aw_c_api/aw_driver_sim.h"
@@ -1017,6 +1018,7 @@ static int __init qcom_aw_phy_init(void) {
   qcom_aw_phy_mtip_if_init();
 
   qcom_aw_phy_gnl_init();
+  qcom_aw_phy_prbs_gnl_init();
 
 #ifdef FEATURE_QCOM_AW_TEST_SYS_FS
   qcom_aw_phy_setup_sysfs();
@@ -1044,6 +1046,7 @@ static void __exit qcom_aw_phy_exit(void) {
   destroy_workqueue(qcom_aw_phy_config_info.wq);
 
   qcom_aw_phy_gnl_exit();
+  qcom_aw_phy_prbs_gnl_exit();
 
 #ifdef FEATURE_QCOM_AW_TEST_SYS_FS
   qcom_aw_phy_del_sysfs();
