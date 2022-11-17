@@ -471,7 +471,7 @@ static void fixup_packet(struct net_device* netdev, unsigned char* buf, struct i
    u8* dstaddr;
    u8 tmpval;
 
-   CSMLOGERR("Fixing up_packet len %d buf: 0x%lx\n", packetlen, (unsigned long)buf);
+   CSMLOGDBG("Fixing up_packet len %d buf: 0x%lx\n", packetlen, (unsigned long)buf);
 
    // get the interface IP address
    netdevaddr = inet_select_addr(netdev, 0, RT_SCOPE_UNIVERSE);
