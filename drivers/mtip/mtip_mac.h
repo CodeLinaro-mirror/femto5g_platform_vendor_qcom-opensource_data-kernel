@@ -43,14 +43,14 @@
 #define MTIP_MAC_COMMAND_CONFIG_ENABLE_RX         0x00000002
 #define MTIP_MAC_COMMAND_CONFIG_SET_PROMISC       0x00000010
 
-#define MTIP_MAC_INIT_FRAME_LENGTH                1536
+#define MTIP_MAC_INIT_FRAME_LENGTH                9216
 #define MTIP_MAC_INIT_RX_FIFO_SECTIONS            0x00000001
 #define MTIP_MAC_INIT_TX_FIFO_SECTIONS            0x00000004
 #define MTIP_MAC_INIT_HASHTABLE_LOAD              0x0
 #define MTIP_MAC_INIT_TX_IPG_LENGTH               0x0000000C
 #define MTIP_MAC_INIT_CRC_MODE                    0x0
 #define MTIP_MAC_INIT_CRC_INV_MASK                0xFFFFFFFF
-#define MTIP_MAC_INIT_XIF_MODE                    0x00010100
+#define MTIP_MAC_INIT_XIF_MODE                    0x00010101
 
 #define MTIP_MAC_HASHTABLE_SIZE                   64
 
