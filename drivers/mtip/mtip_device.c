@@ -591,7 +591,7 @@ static int mtip_start_xmit(struct sk_buff *skb, struct net_device *netdev)
        }
 
        // check if it is a neighbor solicitation msg and drop it for now
-       if ((skb->data[0] == 0x33) && (skb->data[1] == 0x33) && (skb->data[12] == 0x86) && (skb->data[13] == 0xdd))
+       if (!mtip_loopback_enable_arp && (skb->data[0] == 0x33) && (skb->data[1] == 0x33) && (skb->data[12] == 0x86) && (skb->data[13] == 0xdd))
        {
           CSMLOGERR("Dropping neighbor solicitation msg in loopback mode\n");
 
