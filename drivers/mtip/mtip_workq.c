@@ -288,9 +288,9 @@ int mtip_workq_list_pop(unsigned int* work_type, void** work_ptr)
    return rv;
 }
 
-int mtip_workq_queue_delayed_work(struct mtip_delayed_work_q_params *wq_params)
+int mtip_workq_queue_delayed_work(struct mtip_delayed_work_q_params *wq_params, int delay_ms)
 {
-   queue_delayed_work(delayed_wq, &wq_params->wq_item, msecs_to_jiffies(10000));
+   queue_delayed_work(delayed_wq, &wq_params->wq_item, msecs_to_jiffies(delay_ms));
    return 0;
 }
 

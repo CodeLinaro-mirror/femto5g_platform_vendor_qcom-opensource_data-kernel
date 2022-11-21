@@ -71,6 +71,10 @@ extern struct eth_phy_iface_ops qcom_aw_phy_driver_iface_ops;
  */ 
 extern int qsfp_eth_get_link_type(u32 qsfp_phandle, u8* link_info);
 
+// PCS level retry delay to bring up PHY lane
+#define MTIP_PHY_RETRY_TIMER     10000
+#define MTIP_PHY_RETRY_MIN_TIMER     100
+
 static void mtip_phy_ready_cb(void *user_data)
 {
     CSMLOGINFO("Got the PHY ready cb\n");
@@ -115,13 +119,14 @@ static int mtip_phy_get_link_index_for_phy_lane(
     return -1;
 }
 
-static void mtip_phy_cdr_lock_cb(enum mtip_port_type_enum port_type, enum eth_phy_iface_phy_lane_num_enum lane_num)
+static void mtip_phy_cdr_lock_cb(enum mtip_port_type_enum port_type, enum eth_phy_iface_phy_lane_num_enum lane_num, bool status)
 {
     int link_index = -1;
     struct mtip_delayed_work_q_params *wq_params;
     struct net_device *dev;
+    int delay_ms = MTIP_PHY_RETRY_MIN_TIMER;
 
-    CSMLOGERR("CDR lock success for port: %d, lane %d\n", port_type, lane_num);
+    CSMLOGERR("CDR lock callback for port: %d, lane %d, status %d\n", port_type, lane_num, status);
 
     link_index = mtip_phy_get_link_index_for_phy_lane(port_type, lane_num);
     if(link_index == -1){
@@ -129,9 +134,12 @@ static void mtip_phy_cdr_lock_cb(enum mtip_port_type_enum port_type, enum eth_ph
       return;
     }
 
+    if(status == true)
+      delay_ms = MTIP_PHY_RETRY_TIMER;
+
     if(mtip_mac_wrapper_get_link_status(link_index) == false){
       wq_params = kmalloc(sizeof(struct mtip_delayed_work_q_params),
-                          GFP_KERNEL);
+                          GFP_ATOMIC);
       if(!wq_params)
         CSMLOGERR("Malloc failed!");
       else{
@@ -139,7 +147,7 @@ static void mtip_phy_cdr_lock_cb(enum mtip_port_type_enum port_type, enum eth_ph
                           mtip_phy_retry_phy_bringup);
         wq_params->port_type = port_type;
         wq_params->link_index = link_index;
-        mtip_workq_queue_delayed_work(wq_params);
+        mtip_workq_queue_delayed_work(wq_params, delay_ms);
       }
     }
     else{
@@ -174,7 +182,7 @@ int mtip_phy_register_eth(void)
     mtip_phy_eth_params.notify_an_complete = mtip_phy_an_complete_cb;
     mtip_phy_eth_params.userdata_ready = NULL;
     mtip_phy_eth_params.notify_ready = mtip_phy_ready_cb;
-    mtip_phy_eth_params.cdr_lock_success = mtip_phy_cdr_lock_cb;
+    mtip_phy_eth_params.cdr_lock_cb = mtip_phy_cdr_lock_cb;
 
     // register with the PHY
     res = (qcom_aw_phy_driver_iface_ops.eth_phy_iface_eth_register)(&mtip_phy_eth_params, &is_ready);
