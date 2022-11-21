@@ -272,12 +272,14 @@ int qcom_aw_phy_bringup_anlt_mode(mss_access_t *mss,
 * qcom_aw_phy_bringup_lt_mode
 
 * @mss: PHY address and offset
+* @phy_inst_info: PHY instance info pointer
 * @lane: PHY lane number
 * @config: Phy lane config
 
 * Description: This function brings up the lanes in LT mode
 ------------------------------------------------------------------- */
 int qcom_aw_phy_bringup_lt_mode(mss_access_t *mss,
+                                struct qcom_aw_phy_inst_config *phy_inst_info,
                                 enum eth_phy_iface_phy_lane_num_enum lane,
                                 struct qcom_aw_phy_lane_speed_config config) {
   uint32_t lt_running;
@@ -289,7 +291,7 @@ int qcom_aw_phy_bringup_lt_mode(mss_access_t *mss,
   aw_err_code_t aw_err_val = AW_ERR_CODE_NONE;
   int ret_val = 0;
 
-  aw_pmd_rxeq_prbs_set(mss, 0);
+  //aw_pmd_rxeq_prbs_set(mss, 0);
 
   /* TX power up */
   aw_err_val = aw_pmd_iso_request_tx_state_change(
@@ -309,6 +311,9 @@ int qcom_aw_phy_bringup_lt_mode(mss_access_t *mss,
     goto func_exit;
   }
 
+  aw_pmd_anlt_ms_per_ck_set(mss, 99999);
+  aw_pmd_anlt_link_training_timeout_enable_set(mss, 0);
+
   aw_pmd_gen_tx_en_set(mss, 0);
   aw_pmd_rx_chk_en_set(mss, 0);
   aw_pmd_anlt_link_training_en_set(mss, 1);
@@ -323,18 +328,24 @@ int qcom_aw_phy_bringup_lt_mode(mss_access_t *mss,
   aw_pmd_anlt_link_training_config_set(mss, config.width, config.clause, mod);
   aw_pmd_anlt_link_training_start_set(mss, 1);
 
-  mdelay(1000); // an_good_link_training_eval_timeout_us
+  mdelay(3000); // an_good_link_training_eval_timeout_us
 
   aw_pmd_anlt_link_training_status_get(mss, &lt_running, &lt_done,
                                        &lt_training_failure, &lt_rx_ready);
   if (lt_training_failure == 1) {
-    QCOM_AW_PHY_LOG_ERR("Failure, need to debug\n");
+    QCOM_AW_PHY_LOG_ERR("LT failed, need to debug\n");
   }
 
   if (lt_done == 0) {
     QCOM_AW_PHY_LOG_ERR("LT did not finish, try increasing iterations");
-  } else {
+  }
+  else {
     QCOM_AW_PHY_LOG_INFO("LT successful\n");
+    mdelay(500);
+    qcom_aw_phy_mtip_if_info_s.cdr_lock_cb(
+                          qcom_aw_phy_inst_to_mac_port(phy_inst_info->phy_inst),
+                          lane, true);
+    phy_inst_info->cdr_lock_cb_flag[lane] = true;
   }
 
 func_exit:
@@ -348,15 +359,20 @@ func_exit:
 * qcom_aw_phy_bringup_manual_eq_mode
 
 * @mss: PHY address and offset
+* @phy_inst_info: PHY instance info pointer
 * @lane: PHY lane number
 * @config: Phy lane config
 
 * Description: This function brings up the lanes in LT mode
 ------------------------------------------------------------------- */
 int qcom_aw_phy_bringup_manual_eq_mode(
-    mss_access_t *mss, enum eth_phy_iface_phy_lane_num_enum lane,
+    mss_access_t *mss, 
+    struct qcom_aw_phy_inst_config *phy_inst_info,
+    enum eth_phy_iface_phy_lane_num_enum lane,
     struct qcom_aw_phy_lane_speed_config config) {
   aw_txfir_config_t txfir_cfg;
+  struct qcom_aw_phy_work_q_params *wq_params = NULL;
+  struct qcom_aw_phy_config *phy_config_info = NULL;
   enum local_error_enum local_err_val = LOCAL_ERROR_INVALID;
   aw_err_code_t aw_err_val = AW_ERR_CODE_NONE;
   int ret_val = 0;
@@ -410,6 +426,46 @@ int qcom_aw_phy_bringup_manual_eq_mode(
   /* Delay before checking RX CDR lock post equalization */
   mdelay(500);
 
+  // Check CDR Lock
+  if(AW_ERR_CODE_POLL_TIMEOUT ==
+                          aw_pmd_rx_check_cdr_lock(mss, RX_CDR_TIMEOUT_US)){
+
+    phy_config_info = qcom_aw_phy_get_config_info();
+    if (!phy_config_info) {
+      ret_val = EINVAL;
+      local_err_val = LOCAL_ERROR_2;
+      goto func_exit;
+    }
+
+    QCOM_AW_PHY_LOG_ERR("Retry count %d, TBD after %d sec as CDR lock failed",
+                         phy_inst_info->cdr_lock_retry_counter[lane] + 1,
+                         cdr_lock_retry_timer\
+                               [phy_inst_info->cdr_lock_retry_counter[lane]]);
+
+    wq_params = kmalloc(sizeof(struct qcom_aw_phy_work_q_params),
+                        GFP_KERNEL);
+    if(!wq_params)
+      QCOM_AW_PHY_LOG_ERR("Malloc failed!");
+    else{
+      INIT_DELAYED_WORK(&wq_params->wq_item,
+                        qcom_aw_phy_retry_lane_bring_up);
+      wq_params->phy_inst = phy_inst_info->phy_inst;
+      wq_params->lane_num = lane;
+      wq_params->user_data = (void*)false;
+      queue_delayed_work(phy_config_info->wq, &wq_params->wq_item,
+                         msecs_to_jiffies(1000 * cdr_lock_retry_timer\
+                               [phy_inst_info->cdr_lock_retry_counter[lane]]));
+      if(phy_inst_info->cdr_lock_retry_counter[lane] < (MAX_RETRY_COUNT-1))
+        phy_inst_info->cdr_lock_retry_counter[lane]++;
+    }
+  }
+  else{
+    qcom_aw_phy_mtip_if_info_s.cdr_lock_cb(
+                          qcom_aw_phy_inst_to_mac_port(phy_inst_info->phy_inst),
+                          lane, true);
+    phy_inst_info->cdr_lock_cb_flag[lane] = true;
+  }
+
 func_exit:
   QCOM_AW_PHY_LOG_ERR("%s: returns %d with local error %d and aw_error %d",
                       __func__, ret_val, local_err_val, aw_err_val);
@@ -436,7 +492,6 @@ int qcom_aw_phy_bringup(enum mtip_port_type_enum port_type,
   enum eth_phy_iface_phy_lane_num_enum lane = PHY_LANE_0;
   mss_access_t mss = {.phy_offset = 0, .lane_offset = 0};
   struct qcom_aw_phy_lane_speed_config config;
-  struct qcom_aw_phy_work_q_params *wq_params = NULL;
   enum local_error_enum local_err_val = LOCAL_ERROR_INVALID;
   aw_err_code_t aw_err_val = AW_ERR_CODE_NONE;
   int ret_val = 0;
@@ -541,39 +596,9 @@ int qcom_aw_phy_bringup(enum mtip_port_type_enum port_type,
     if (phy_inst_info->phy_eq_mode == QCOM_AW_PHY_ANLT_MODE) {
       qcom_aw_phy_bringup_anlt_mode(&mss, lane, config);
     } else if (phy_inst_info->phy_eq_mode == QCOM_AW_PHY_LT_MODE) {
-      qcom_aw_phy_bringup_lt_mode(&mss, lane, config);
+      qcom_aw_phy_bringup_lt_mode(&mss, phy_inst_info, lane, config);
     } else if (phy_inst_info->phy_eq_mode == QCOM_AW_PHY_MANUAL_EQ_MODE) {
-      qcom_aw_phy_bringup_manual_eq_mode(&mss, lane, config);
-    }
-
-    // Check CDR Lock
-    if(AW_ERR_CODE_POLL_TIMEOUT == 
-                             aw_pmd_rx_check_cdr_lock(&mss, RX_CDR_TIMEOUT_US)){
-      QCOM_AW_PHY_LOG_ERR("Retry count %d, TBD after %d sec as CDR lock failed",
-                          phy_inst_info->cdr_lock_retry_counter[lane] + 1,
-                          cdr_lock_retry_timer\
-                                 [phy_inst_info->cdr_lock_retry_counter[lane]]);
-
-      wq_params = kmalloc(sizeof(struct qcom_aw_phy_work_q_params),
-                          GFP_ATOMIC);
-      if(!wq_params)
-        QCOM_AW_PHY_LOG_ERR("Malloc failed!");
-      else{
-        INIT_DELAYED_WORK(&wq_params->wq_item,
-                          qcom_aw_phy_retry_lane_bring_up);
-        wq_params->phy_inst = phy_inst_info->phy_inst;
-        wq_params->lane_num = lane;
-        wq_params->user_data = (void*)false;
-        queue_delayed_work(phy_config_info->wq, &wq_params->wq_item,
-                           msecs_to_jiffies(1000 * cdr_lock_retry_timer\
-                                [phy_inst_info->cdr_lock_retry_counter[lane]]));
-        if(phy_inst_info->cdr_lock_retry_counter[lane] < (MAX_RETRY_COUNT-1))
-          phy_inst_info->cdr_lock_retry_counter[lane]++;
-      }
-    }
-    else{
-      qcom_aw_phy_mtip_if_info_s.cdr_lock_cb(port_type, lane, true);
-      phy_inst_info->cdr_lock_cb_flag[lane] = true;
+      qcom_aw_phy_bringup_manual_eq_mode(&mss, phy_inst_info, lane, config);
     }
 
     mutex_unlock(&phy_inst_info->lane_lock[lane]);
@@ -853,7 +878,8 @@ void qcom_aw_phy_retry_lane_bring_up(struct work_struct *work){
 
   mutex_lock(&phy_inst_info->phy_inst_lock);
 
-  if(phy_inst_info->bring_up_status == false) {
+  if(phy_inst_info->bring_up_status == false ||
+     phy_inst_info->phy_eq_mode != QCOM_AW_PHY_MANUAL_EQ_MODE) {
     ret_val = EINVAL;
     local_err_val = LOCAL_ERROR_4;
     mutex_unlock(&phy_inst_info->phy_inst_lock);
