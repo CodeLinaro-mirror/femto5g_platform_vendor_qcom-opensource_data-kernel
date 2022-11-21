@@ -15,8 +15,8 @@
  * Owner - Abhishek B Chauhan - 8/18/2020
 */
 
-#include <eth-adaption-main.h>
-#include <eth-adaption-server.h>
+#include "eth-adaption-main.h"
+#include "eth-adaption-server.h"
 #include <soc/qcom/qrtr_ethernet.h>
 
 extern unsigned long receive_allocfree_stat;
@@ -401,7 +401,7 @@ static void eth_adaption_server_start(struct kthread_work *work)
 #endif
 		}
 	}
-	return cn;
+	return;
 
 release:
 	/* Critical section */
@@ -419,7 +419,7 @@ release:
 		atomic_set(&acquire_wakelock, 0);
 		__pm_relax(eth_ws);
 	}
-	return cn;
+	return;
 }
 
 /**
