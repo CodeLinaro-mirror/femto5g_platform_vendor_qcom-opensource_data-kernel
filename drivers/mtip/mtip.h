@@ -272,6 +272,7 @@ extern struct mtip_platform_driver_priv* platform_driver_priv;
 extern int mtip_loopback_mode;
 
 extern bool mtip_loopback_swap_addr;
+extern bool mtip_loopback_enable_arp;
 
 // this is the extern to set if we are running on a RUMI
 extern int mtip_rumi_platform;

@@ -1135,7 +1135,7 @@ void mtip_netdevice_init(struct net_device *dev)
 
    dev->netdev_ops = &mtip_netdev_ops;
 
-   if (mtip_loopback_mode != MTIP_MODE_DEFAULT)
+   if (mtip_loopback_mode != MTIP_MODE_DEFAULT && !mtip_loopback_enable_arp)
    {
        dev->header_ops = &mtip_header_ops;
 
