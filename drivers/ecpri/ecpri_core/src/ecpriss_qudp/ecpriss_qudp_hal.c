@@ -2860,7 +2860,7 @@ uint32_t ecpriss_qudp_hal_read_reg_n(ecpriss_qudp_hal_reg_type_e  reg_type,
 		return -EINVAL;
 	}
 
-	pr_info("read from %s n=%u\n",
+	pr_debug("read from %s n=%u\n",
 			ecpriss_qudp_hal_reg_name_str(reg), n);
 
 	offset = ecpriss_qudp_hal_reg_objs[ecpriss_qudp_hal_ctx.hw_type][reg].offset;
@@ -2892,7 +2892,7 @@ uint32_t ecpriss_qudp_hal_read_reg_mn(ecpriss_qudp_hal_reg_type_e  reg_type,
 		return -EINVAL;
 	}
 
-	pr_info("read %s m=%u n=%u\n",
+	pr_debug("read %s m=%u n=%u\n",
 			ecpriss_qudp_hal_reg_name_str(reg), m, n);
 	offset = ecpriss_qudp_hal_reg_objs[ecpriss_qudp_hal_ctx.hw_type][reg].offset;
 	if (offset == -1) {
@@ -2926,7 +2926,7 @@ void ecpriss_qudp_hal_write_reg_mn(ecpriss_qudp_hal_reg_type_e  reg_type,
 		return;
 	}
 
-	pr_info("write to %s m=%u n=%u val=%u\n",
+	pr_debug("write to %s m=%u n=%u val=%u\n",
 			ecpriss_qudp_hal_reg_name_str(reg), m, n, val);
 	offset = ecpriss_qudp_hal_reg_objs[ecpriss_qudp_hal_ctx.hw_type][reg].offset;
 
@@ -2965,7 +2965,7 @@ void ecpriss_qudp_hal_write_reg_mn_fields(ecpriss_qudp_hal_reg_type_e  reg_type,
 		return;
 	}
 
-	pr_info("write to %s m=%u n=%u val=%u\n",
+	pr_debug("write to %s m=%u n=%u val=%u\n",
 			ecpriss_qudp_hal_reg_name_str(reg), m, n, val);
 	offset = ecpriss_qudp_hal_reg_objs[ecpriss_qudp_hal_ctx.hw_type][reg].offset;
 
@@ -3006,7 +3006,7 @@ uint32_t ecpriss_qudp_hal_read_reg_mn_fields(ecpriss_qudp_hal_reg_type_e  reg_ty
 		return -EINVAL;
 	}
 
-	pr_info("read from %s n=%u and parse it\n",
+	pr_debug("read from %s n=%u and parse it\n",
 			ecpriss_qudp_hal_reg_name_str(reg), n);
 	offset = ecpriss_qudp_hal_reg_objs[ecpriss_qudp_hal_ctx.hw_type][reg].offset;
 	if (offset == -1) {
@@ -3046,7 +3046,7 @@ uint32_t ecpriss_qudp_hal_read_reg_n_fields(ecpriss_qudp_hal_reg_type_e  reg_typ
 		return -EINVAL;
 	}
 
-	pr_info("read from %s \n", ecpriss_qudp_hal_reg_name_str(reg), n);
+	pr_debug("read from %s \n", ecpriss_qudp_hal_reg_name_str(reg), n);
 	offset = ecpriss_qudp_hal_reg_objs[ecpriss_qudp_hal_ctx.hw_type][reg].offset;
 	if (offset == -1) {
 		pr_err("Read access to obsolete reg=%s\n",
