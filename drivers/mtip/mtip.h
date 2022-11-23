@@ -32,9 +32,6 @@
 /* if loopback is enabled then SWAP_HANDLE will swap the handle of Rx/Tx interfaces */
 #define MTIP_LOOPBACK_SWAP_HANDLE
 
-/* if loopback is enabled then SWAP_ADDRESSES will swap DA/SA */
-#define MTIP_LOOPBACK_SWAP_ADDRESSES
-
 /* Dump the contents of Tx and Rx skbs */
 //#define MTIP_DUMP_PACKETS
 
@@ -273,6 +270,8 @@ extern struct mtip_platform_driver_priv* platform_driver_priv;
 
 // this is the extern controlling loopback mode
 extern int mtip_loopback_mode;
+
+extern bool mtip_loopback_swap_addr;
 
 // this is the extern to set if we are running on a RUMI
 extern int mtip_rumi_platform;
