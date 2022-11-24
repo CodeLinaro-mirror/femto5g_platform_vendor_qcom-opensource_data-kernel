@@ -200,6 +200,7 @@ struct mtip_link_info
    struct mtip_tx_ts_list tx_ts_list;
    struct mtip_tx_ts_skb_list tx_ts_skb_list;
    u32 peak_rx_available;
+   u32 active_fec;
    struct mutex dev_lock;
 };
 
