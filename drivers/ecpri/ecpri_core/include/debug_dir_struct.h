@@ -188,6 +188,7 @@
 								,fh0:udp_classification \
 								,fh0:ip_dts_fltr \
 								,fh0:mac	\
+								,fh0:valid_bits	\
 							} \
 						} \
 						global \
@@ -215,6 +216,7 @@
 								,fh1:udp_classification \
 								,fh1:ip_dts_fltr \
 								,fh1:mac	\
+								,fh1:valid_bits	\
 							} \
 						} \
 						global \
@@ -242,6 +244,7 @@
 								,fh2:udp_classification \
 								,fh2:ip_dts_fltr \
 								,fh2:mac	\
+								,fh2:valid_bits	\
 							} \
 						} \
 						global \

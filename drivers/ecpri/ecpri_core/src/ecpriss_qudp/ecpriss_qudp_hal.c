@@ -40,6 +40,9 @@ static const char *ecpriss_qudp_hal_reg_name_to_str[ECPRISS_QUDP_REG_MAX] = {
 	"ECPRI_UDP_FH_UDP_SW_IRQ_MASK_1_PORT_P",
 	"ECPRI_UDP_FH_UDP_SW_IRQ_CLR_0_PORT_P",
 	"ECPRI_UDP_FH_UDP_SW_IRQ_CLR_1_PORT_P",
+	"ECPRI_UDP_FH_DEBUG_FEATURES_CFG",
+	"ECPRI_UDP_FH_INGRESS_UDP_WATERMARK_PORT_p_LINK_n",
+	"ECPRI_UDP_FH_EGRESS_UDP_WATERMARK_PORT_p",
 	"ECPRI_UDP_FH_ECPRI_ETHERTYPE_P",
 	"ECPRI_UDP_FH_PTP_ETHERTYPE_P",
 	"ECPRI_UDP_FH_FILT_IP_DST_ADDR0_PORT_p_ENTRY_n",
@@ -1966,6 +1969,79 @@ static void ecpriss_qudp_hal_reg_construct_udp_fh_sw_irq_clr_0_port_p(ecpriss_qu
 	return;
 }
 
+static void ecpriss_qudp_hal_reg_construct_udp_fh_debug_feature_cfg(ecpriss_qudp_hal_reg_name_e reg,
+		const void *fields,
+		uint32_t *val)
+{
+	ecpri_qudp_hwio_def_ecpri_udp_fh_debug_features_cfg_s *udp_fh_debug_feature_cfg =
+		(ecpri_qudp_hwio_def_ecpri_udp_fh_debug_features_cfg_s*) fields;
+
+	ECPRISS_HAL_SETFIELD_IN_REG(*val,
+			udp_fh_debug_feature_cfg->tpdm_en,
+			HWIO_ECPRI_UDP_FH_DEBUG_FEATURES_CFG_TPDM_EN_SHFT,
+			HWIO_ECPRI_UDP_FH_DEBUG_FEATURES_CFG_TPDM_EN_BMSK);
+
+	ECPRISS_HAL_SETFIELD_IN_REG(*val,
+			udp_fh_debug_feature_cfg->tpdm_operation_mode,
+			HWIO_ECPRI_UDP_FH_DEBUG_FEATURES_CFG_TPDM_OPERATION_MODE_SHFT,
+			HWIO_ECPRI_UDP_FH_DEBUG_FEATURES_CFG_TPDM_OPERATION_MODE_BMSK);
+
+	ECPRISS_HAL_SETFIELD_IN_REG(*val,
+			udp_fh_debug_feature_cfg->watermark_en,
+			HWIO_ECPRI_UDP_FH_DEBUG_FEATURES_CFG_WATERMARK_EN_SHFT,
+			HWIO_ECPRI_UDP_FH_DEBUG_FEATURES_CFG_WATERMARK_EN_BMSK);
+
+	ECPRISS_HAL_SETFIELD_IN_REG(*val,
+			udp_fh_debug_feature_cfg->en_clear_watermark_on_read,
+			HWIO_ECPRI_UDP_FH_DEBUG_FEATURES_CFG_EN_CLEAR_WATERMARK_ON_READ_SHFT,
+			HWIO_ECPRI_UDP_FH_DEBUG_FEATURES_CFG_EN_CLEAR_WATERMARK_ON_READ_BMSK);
+
+	ECPRISS_HAL_SETFIELD_IN_REG(*val,
+			udp_fh_debug_feature_cfg->testbus_en,
+			HWIO_ECPRI_UDP_FH_DEBUG_FEATURES_CFG_TESTBUS_EN_SHFT,
+			HWIO_ECPRI_UDP_FH_DEBUG_FEATURES_CFG_TESTBUS_EN_BMSK);
+
+	ECPRISS_HAL_SETFIELD_IN_REG(*val,
+			udp_fh_debug_feature_cfg->hw_events_en,
+			HWIO_ECPRI_UDP_FH_DEBUG_FEATURES_CFG_HW_EVENTS_EN_SHFT,
+			HWIO_ECPRI_UDP_FH_DEBUG_FEATURES_CFG_HW_EVENTS_EN_BMSK);
+	return;
+}
+
+static void ecpriss_qudp_hal_reg_parse_udp_fh_debug_feature_cfg(ecpriss_qudp_hal_reg_name_e reg,
+		void *fields,
+		uint32_t val)
+{
+	ecpri_qudp_hwio_def_ecpri_udp_fh_debug_features_cfg_s *udp_fh_debug_feature_cfg =
+		(ecpri_qudp_hwio_def_ecpri_udp_fh_debug_features_cfg_s*) fields;
+
+	udp_fh_debug_feature_cfg->tpdm_en = ECPRISS_HAL_GETFIELD_FROM_REG(val,
+			HWIO_ECPRI_UDP_FH_DEBUG_FEATURES_CFG_TPDM_EN_SHFT,
+			HWIO_ECPRI_UDP_FH_DEBUG_FEATURES_CFG_TPDM_EN_BMSK);
+
+	udp_fh_debug_feature_cfg->tpdm_operation_mode = ECPRISS_HAL_GETFIELD_FROM_REG(val,
+			HWIO_ECPRI_UDP_FH_DEBUG_FEATURES_CFG_TPDM_OPERATION_MODE_SHFT,
+			HWIO_ECPRI_UDP_FH_DEBUG_FEATURES_CFG_TPDM_OPERATION_MODE_BMSK);
+
+	udp_fh_debug_feature_cfg->watermark_en = ECPRISS_HAL_GETFIELD_FROM_REG(val,
+			HWIO_ECPRI_UDP_FH_DEBUG_FEATURES_CFG_WATERMARK_EN_SHFT,
+			HWIO_ECPRI_UDP_FH_DEBUG_FEATURES_CFG_WATERMARK_EN_BMSK);
+
+	udp_fh_debug_feature_cfg->en_clear_watermark_on_read = ECPRISS_HAL_GETFIELD_FROM_REG(val,
+			HWIO_ECPRI_UDP_FH_DEBUG_FEATURES_CFG_EN_CLEAR_WATERMARK_ON_READ_SHFT,
+			HWIO_ECPRI_UDP_FH_DEBUG_FEATURES_CFG_EN_CLEAR_WATERMARK_ON_READ_BMSK);
+
+	udp_fh_debug_feature_cfg->testbus_en = ECPRISS_HAL_GETFIELD_FROM_REG(val,
+			HWIO_ECPRI_UDP_FH_DEBUG_FEATURES_CFG_TESTBUS_EN_SHFT,
+			HWIO_ECPRI_UDP_FH_DEBUG_FEATURES_CFG_TESTBUS_EN_BMSK);
+
+	udp_fh_debug_feature_cfg->hw_events_en = ECPRISS_HAL_GETFIELD_FROM_REG(val,
+			HWIO_ECPRI_UDP_FH_DEBUG_FEATURES_CFG_HW_EVENTS_EN_SHFT,
+			HWIO_ECPRI_UDP_FH_DEBUG_FEATURES_CFG_HW_EVENTS_EN_BMSK);
+
+	return;
+}
+
 static void ecpriss_qudp_hal_reg_construct_udp_fh_sw_irq_clr_1_port_p(ecpriss_qudp_hal_reg_name_e reg,
 		const void *fields,
 		uint32_t *val)
@@ -2099,6 +2175,65 @@ static void ecpriss_qudp_hal_reg_construct_udp_fh_sw_irq_clr_1_port_p(ecpriss_qu
 }
 
 
+static void ecpriss_qudp_hal_reg_parse_udp_fh_ingress_udp_watermark_port_p_link_n(ecpriss_qudp_hal_reg_name_e reg,
+		void *fields,
+		uint32_t val)
+{
+	ecpri_qudp_hwio_def_ecpri_udp_fh_ingress_udp_watermark_port_p_link_n_s *fh_ingress_udp_watermark_port_p_link_n =
+		(ecpri_qudp_hwio_def_ecpri_udp_fh_ingress_udp_watermark_port_p_link_n_s *) fields;
+
+	fh_ingress_udp_watermark_port_p_link_n->pkt_fifo = ECPRISS_HAL_GETFIELD_FROM_REG(val,
+			HWIO_ECPRI_UDP_FH_INGRESS_UDP_WATERMARK_PORT_p_LINK_n_PKT_FIFO_SHFT,
+			HWIO_ECPRI_UDP_FH_INGRESS_UDP_WATERMARK_PORT_p_LINK_n_PKT_FIFO_BMSK);
+
+	fh_ingress_udp_watermark_port_p_link_n->cmd_fifo = ECPRISS_HAL_GETFIELD_FROM_REG(val,
+			HWIO_ECPRI_UDP_FH_INGRESS_UDP_WATERMARK_PORT_p_LINK_n_CMD_FIFO_SHFT,
+			HWIO_ECPRI_UDP_FH_INGRESS_UDP_WATERMARK_PORT_p_LINK_n_CMD_FIFO_BMSK);
+
+	fh_ingress_udp_watermark_port_p_link_n->pkt_handler_sync_fifos = ECPRISS_HAL_GETFIELD_FROM_REG(val,
+			HWIO_ECPRI_UDP_FH_INGRESS_UDP_WATERMARK_PORT_p_LINK_n_PKT_HANDLER_SYNC_FIFOS_SHFT,
+			HWIO_ECPRI_UDP_FH_INGRESS_UDP_WATERMARK_PORT_p_LINK_n_PKT_HANDLER_SYNC_FIFOS_BMSK);
+
+	fh_ingress_udp_watermark_port_p_link_n->ptp_timestamp_fifo = ECPRISS_HAL_GETFIELD_FROM_REG(val,
+			HWIO_ECPRI_UDP_FH_INGRESS_UDP_WATERMARK_PORT_p_LINK_n_PTP_TIMESTAMP_FIFO_SHFT,
+			HWIO_ECPRI_UDP_FH_INGRESS_UDP_WATERMARK_PORT_p_LINK_n_PTP_TIMESTAMP_FIFO_BMSK);
+	return;
+}
+
+static void ecpriss_qudp_hal_reg_parse_udp_fh_egress_udp_watermark_port_p(ecpriss_qudp_hal_reg_name_e reg,
+		void *fields,
+		uint32_t val)
+{
+	ecpri_qudp_hwio_def_ecpri_udp_fh_egress_udp_watermark_port_p_s *fh_egress_udp_watermark_port_p =
+		(ecpri_qudp_hwio_def_ecpri_udp_fh_egress_udp_watermark_port_p_s*) fields;
+
+	fh_egress_udp_watermark_port_p->pkt_fifo = ECPRISS_HAL_GETFIELD_FROM_REG(val,
+			HWIO_ECPRI_UDP_FH_EGRESS_UDP_WATERMARK_PORT_p_PKT_FIFO_SHFT,
+			HWIO_ECPRI_UDP_FH_EGRESS_UDP_WATERMARK_PORT_p_PKT_FIFO_BMSK);
+
+	fh_egress_udp_watermark_port_p->hdri_cfg_index_fifo =  ECPRISS_HAL_GETFIELD_FROM_REG(val,
+			HWIO_ECPRI_UDP_FH_EGRESS_UDP_WATERMARK_PORT_p_HDRI_CFG_INDEX_FIFO_SHFT,
+			HWIO_ECPRI_UDP_FH_EGRESS_UDP_WATERMARK_PORT_p_HDRI_CFG_INDEX_FIFO_BMSK);
+
+	fh_egress_udp_watermark_port_p->hdri_output_fifo = ECPRISS_HAL_GETFIELD_FROM_REG(val,
+			HWIO_ECPRI_UDP_FH_EGRESS_UDP_WATERMARK_PORT_p_HDRI_OUTPUT_FIFO_SHFT,
+			HWIO_ECPRI_UDP_FH_EGRESS_UDP_WATERMARK_PORT_p_HDRI_OUTPUT_FIFO_BMSK);
+
+	fh_egress_udp_watermark_port_p->cs_calc_fifo = ECPRISS_HAL_GETFIELD_FROM_REG(val,
+			HWIO_ECPRI_UDP_FH_EGRESS_UDP_WATERMARK_PORT_p_CS_CALC_FIFO_SHFT,
+			HWIO_ECPRI_UDP_FH_EGRESS_UDP_WATERMARK_PORT_p_CS_CALC_FIFO_BMSK);
+
+	fh_egress_udp_watermark_port_p->cs_update_fifo = ECPRISS_HAL_GETFIELD_FROM_REG(val,
+			HWIO_ECPRI_UDP_FH_EGRESS_UDP_WATERMARK_PORT_p_CS_UPDATE_FIFO_SHFT,
+			HWIO_ECPRI_UDP_FH_EGRESS_UDP_WATERMARK_PORT_p_CS_UPDATE_FIFO_BMSK);
+
+	fh_egress_udp_watermark_port_p->aligner_output_fifo = ECPRISS_HAL_GETFIELD_FROM_REG(val,
+			HWIO_ECPRI_UDP_FH_EGRESS_UDP_WATERMARK_PORT_p_ALIGNER_OUTPUT_FIFO_SHFT,
+			HWIO_ECPRI_UDP_FH_EGRESS_UDP_WATERMARK_PORT_p_ALIGNER_OUTPUT_FIFO_BMSK);
+
+	return;
+}
+
 static void ecpriss_qudp_hal_reg_parse_dummy(ecpriss_qudp_hal_reg_name_e reg,
 		void *fields,
 		uint32_t val)
@@ -2205,6 +2340,20 @@ static struct ecpriss_qudp_hal_reg_obj ecpriss_qudp_hal_reg_objs[ECPRISS_HW_MAX]
 		ecpriss_qudp_hal_reg_parse_udp_fh_sw_irq_clr_1_port_p,
 		0x09180000, 0x94C, 0x4, 0, 0, 0, 0},
 
+	[ECPRISS_HW_v1_0][ECPRI_UDP_FH_DEBUG_FEATURES_CFG] = {
+		ecpriss_qudp_hal_reg_construct_udp_fh_debug_feature_cfg,
+		ecpriss_qudp_hal_reg_parse_udp_fh_debug_feature_cfg,
+		0x09180000, 0x0568, 0x0, 0, 0, 0, 0x0},
+
+	[ECPRISS_HW_v1_0][ECPRI_UDP_FH_INGRESS_UDP_WATERMARK_PORT_p_LINK_n] = {
+		ecpriss_qudp_hal_reg_construct_dummy,
+		ecpriss_qudp_hal_reg_parse_udp_fh_ingress_udp_watermark_port_p_link_n,
+		0x09180000, 0x052c, 0x04, 0, 0, 0, 0x010},
+
+	[ECPRISS_HW_v1_0][ECPRI_UDP_FH_EGRESS_UDP_WATERMARK_PORT_p] = {
+		ecpriss_qudp_hal_reg_construct_dummy,
+		ecpriss_qudp_hal_reg_parse_udp_fh_egress_udp_watermark_port_p,
+		0x09180000, 0x055c, 0x04, 0, 0, 0, 0},
 
 	[ECPRISS_HW_v1_0][ECPRI_UDP_FH_ECPRI_ETHERTYPE_P] = {
 		ecpriss_qudp_hal_reg_construct_udp_fh_ecpri_ethertype_p,

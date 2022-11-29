@@ -419,6 +419,97 @@ static ssize_t config_val_from_registers_qudp_ingress_vlan(char __user *buf, int
 	return data_size;
 }
 
+static ssize_t config_val_from_valid_bits_filt(char __user *buf, int fh_index, size_t *count, loff_t *ppos)
+{
+	char fh_str[TEMP_STR_MAX_SIZE];
+	char temp_stat_val_str[TEMP_STAT_VAL_STR_MAX_SIZE];
+	int max_str_size = MAX_STR_SIZE;
+	int ret_val = 0;
+	static int data_size = 0;
+
+	if(*ppos == 0 )
+	{
+		memset(max_str,0,sizeof(max_str));
+
+		RESET_STR(fh_str);
+		scnprintf(fh_str, TEMP_STR_MIN_SIZE, "%u", fh_index);
+
+		ecpriss_qudp_ingress_config_stats(fh_index);
+
+
+
+		RESET_STR(temp_stat_val_str);
+		scnprintf(temp_stat_val_str, TEMP_STAT_VAL_STR_MAX_SIZE, "%x",
+				ecpriss_pdata->cfg_stats.qudp_cfg.ingress.vbits.vlan[fh_index]);
+
+		strlcat(max_str, "vlan_valid_bits_fh_",
+				max_str_size);
+		strlcat(max_str, fh_str,
+				max_str_size);
+		strlcat(max_str, ":", max_str_size);
+		strlcat(max_str, temp_stat_val_str,
+				max_str_size);
+		strlcat(max_str, "\n",
+				max_str_size);
+
+		RESET_STR(temp_stat_val_str);
+		scnprintf(temp_stat_val_str, TEMP_STAT_VAL_STR_MAX_SIZE, "%x",
+				ecpriss_pdata->cfg_stats.qudp_cfg.ingress.vbits.udp_clss[fh_index]);
+
+		strlcat(max_str, "udp_class_valid_bits_fh_",
+				max_str_size);
+		strlcat(max_str, fh_str,
+				max_str_size);
+		strlcat(max_str, ":", max_str_size);
+		strlcat(max_str, temp_stat_val_str,
+				max_str_size);
+		strlcat(max_str, "\n",
+				max_str_size);
+
+		RESET_STR(temp_stat_val_str);
+		scnprintf(temp_stat_val_str, TEMP_STAT_VAL_STR_MAX_SIZE, "%x",
+				ecpriss_pdata->cfg_stats.qudp_cfg.ingress.vbits.ip_addr[fh_index]);
+
+		strlcat(max_str, "ipaddr_valid_bits_fh_",
+				max_str_size);
+		strlcat(max_str, fh_str,
+				max_str_size);
+		strlcat(max_str, ":", max_str_size);
+		strlcat(max_str, temp_stat_val_str,
+				max_str_size);
+		strlcat(max_str, "\n",
+				max_str_size);
+#if 0
+		RESET_STR(temp_stat_val_str);
+		scnprintf(temp_stat_val_str, TEMP_STAT_VAL_STR_MAX_SIZE, "%u",
+				ecpriss_pdata->cfg_stats.qudp_cfg.ingress.vbits.mac_addr[fh_index]);
+
+		strlcat(max_str, "mac_addr_valid_bits_fh_",
+				max_str_size);
+		strlcat(max_str, fh_str,
+				max_str_size);
+		strlcat(max_str, ":", max_str_size);
+		strlcat(max_str, temp_stat_val_str,
+				max_str_size);
+		strlcat(max_str, "\n",
+				max_str_size);
+
+#endif
+
+		data_size = strlen(max_str);
+		pr_err("strlen = %u \n",data_size);
+	}
+	if(*ppos  >= max_str_size)
+		return 0;
+
+	if( *ppos + *count > data_size)
+		*count =  data_size - *ppos;
+
+	ret_val = copy_to_user(buf,(max_str + *ppos), *count);
+	return data_size;
+
+}
+
 static ssize_t config_val_from_registers_qudp_ingress_global_cfg(char __user *buf, int fh_index, size_t *count, loff_t *ppos)
 {
 	char fh_str[TEMP_STR_MAX_SIZE];
@@ -886,7 +977,7 @@ static ssize_t config_val_from_registers_qudp_egress_eth_src0_port(char __user *
 				RESET_STR(index_str);
 				scnprintf(index_str, TEMP_STR_MIN_SIZE, "%u", egress_table_index);
 				RESET_STR(temp_stat_val_str);
-				scnprintf(temp_stat_val_str, TEMP_STAT_VAL_STR_MAX_SIZE, "%u",
+				scnprintf(temp_stat_val_str, TEMP_STAT_VAL_STR_MAX_SIZE, "%x",
 						ecpriss_pdata->cfg_stats.qudp_cfg.egress.eth_src0_port[fh_index][egress_table_index].value);
 
 				strlcat(max_str, "eth_src0_port_fh_",
@@ -944,7 +1035,7 @@ static ssize_t config_val_from_registers_qudp_egress_eth_src1_dst1_port(char __u
 				RESET_STR(index_str);
 				scnprintf(index_str, TEMP_STR_MIN_SIZE, "%u", egress_table_index);
 				RESET_STR(temp_stat_val_str);
-				scnprintf(temp_stat_val_str, TEMP_STAT_VAL_STR_MAX_SIZE, "%u",
+				scnprintf(temp_stat_val_str, TEMP_STAT_VAL_STR_MAX_SIZE, "%x",
 						ecpriss_pdata->cfg_stats.qudp_cfg.egress.eth_src1_dst1_port[fh_index][egress_table_index].dst_msb);
 
 				strlcat(max_str, "eth_src1_dst1_port_dst_msb_fh_",
@@ -968,7 +1059,7 @@ static ssize_t config_val_from_registers_qudp_egress_eth_src1_dst1_port(char __u
 				RESET_STR(index_str);
 				scnprintf(index_str, TEMP_STR_MIN_SIZE, "%u", egress_table_index);
 				RESET_STR(temp_stat_val_str);
-				scnprintf(temp_stat_val_str, TEMP_STAT_VAL_STR_MAX_SIZE, "%u",
+				scnprintf(temp_stat_val_str, TEMP_STAT_VAL_STR_MAX_SIZE, "%x",
 						ecpriss_pdata->cfg_stats.qudp_cfg.egress.eth_src1_dst1_port[fh_index][egress_table_index].src_msb);
 
 				strlcat(max_str, "eth_src1_dst1_port_src_msb_fh_",
@@ -1027,7 +1118,7 @@ static ssize_t config_val_from_registers_qudp_egress_eth_dst0_port(char __user *
 				RESET_STR(index_str);
 				scnprintf(index_str, TEMP_STR_MIN_SIZE, "%u", egress_table_index);
 				RESET_STR(temp_stat_val_str);
-				scnprintf(temp_stat_val_str, TEMP_STAT_VAL_STR_MAX_SIZE, "%u",
+				scnprintf(temp_stat_val_str, TEMP_STAT_VAL_STR_MAX_SIZE, "%x",
 						ecpriss_pdata->cfg_stats.qudp_cfg.egress.eth_dst0_port[fh_index][egress_table_index].value);
 
 				strlcat(max_str, "eth_dst0_port_fh_",
@@ -1320,7 +1411,6 @@ static ssize_t stats_value_from_registers_xbar(char __user *buf)
 	char temp_stat_val_str[TEMP_STAT_VAL_STR_MAX_SIZE];
 	uint32_t temp_stat_val = 0;
 	uint32_t i = 0;
-	uint32_t j = 0;
 	uint32_t ret_val = 0;
 
 	char temp_stat_val_str_1[TEMP_STR_MAX_SIZE] =
@@ -1337,7 +1427,6 @@ static ssize_t stats_value_from_registers_xbar(char __user *buf)
 		"{xbar_ocrx_pkt_cnt_link_";
 
 	char link_id[TEMP_STR_MAX_SIZE];
-	char fh_index[TEMP_STR_MAX_SIZE];
 
 	final_stats_str =
 		(char *)kzalloc(FINAL_STATS_DYNAMIC_STR_MAX_SIZE, GFP_KERNEL);
@@ -1552,36 +1641,239 @@ static ssize_t stats_value_from_registers_xbar(char __user *buf)
 		strlcat(final_stats_str, "}\n",
 				FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
 	}
+
+
+	temp_stat_val = ecpriss_pdata->xbar_ctx->stats.xbar_ocrx_fh_buff_watermark_fh0;
+	scnprintf(temp_stat_val_str, TEMP_STAT_VAL_STR_MAX_SIZE, "%lu",
+			  temp_stat_val);
+	strlcat(final_stats_str,
+			"{xbar_ocrx_fh_buff_watermark-->fh0 :", FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
+	strlcat(final_stats_str, temp_stat_val_str,
+			FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
+	strlcat(final_stats_str, "}\n", FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
+
+	temp_stat_val = ecpriss_pdata->xbar_ctx->stats.xbar_ocrx_fh_buff_watermark_fh1;
+	scnprintf(temp_stat_val_str, TEMP_STAT_VAL_STR_MAX_SIZE, "%lu",
+			  temp_stat_val);
+	strlcat(final_stats_str,
+			"{xbar_ocrx_fh_buff_watermark-->fh1 :", FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
+	strlcat(final_stats_str, temp_stat_val_str,
+			FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
+	strlcat(final_stats_str, "}\n", FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
+
+	temp_stat_val = ecpriss_pdata->xbar_ctx->stats.xbar_ocrx_fh_buff_watermark_fh2;
+	scnprintf(temp_stat_val_str, TEMP_STAT_VAL_STR_MAX_SIZE, "%lu",
+			  temp_stat_val);
+	strlcat(final_stats_str,
+			"{xbar_ocrx_fh_buff_watermark-->fh2 :", FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
+	strlcat(final_stats_str, temp_stat_val_str,
+			FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
+	strlcat(final_stats_str, "}\n", FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
+
+
+
+	temp_stat_val = ecpriss_pdata->xbar_ctx->stats.xbar_dbg_ocrx_0_1_buff_watermark_cc0;
+	scnprintf(temp_stat_val_str, TEMP_STAT_VAL_STR_MAX_SIZE, "%lu",
+			  temp_stat_val);
+	strlcat(final_stats_str,
+			"{xbar_dbg_ocrx_0_1_buff_watermark-->cc0 :", FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
+	strlcat(final_stats_str, temp_stat_val_str,
+			FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
+	strlcat(final_stats_str, "}\n", FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
+
+	temp_stat_val = ecpriss_pdata->xbar_ctx->stats.xbar_dbg_ocrx_0_1_buff_watermark_cc1;
+	scnprintf(temp_stat_val_str, TEMP_STAT_VAL_STR_MAX_SIZE, "%lu",
+			  temp_stat_val);
+	strlcat(final_stats_str,
+			"{xbar_dbg_ocrx_0_1_buff_watermark-->cc1 :", FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
+	strlcat(final_stats_str, temp_stat_val_str,
+			FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
+	strlcat(final_stats_str, "}\n", FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
+
+
+	temp_stat_val = ecpriss_pdata->xbar_ctx->stats.xbar_dbg_ocrx_2_3_buff_watermark_cc2;
+	scnprintf(temp_stat_val_str, TEMP_STAT_VAL_STR_MAX_SIZE, "%lu",
+			  temp_stat_val);
+	strlcat(final_stats_str,
+			"{xbar_dbg_ocrx_2_3_buff_watermark-->cc2 :", FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
+	strlcat(final_stats_str, temp_stat_val_str,
+			FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
+	strlcat(final_stats_str, "}\n", FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
+
+	temp_stat_val = ecpriss_pdata->xbar_ctx->stats.xbar_dbg_ocrx_2_3_buff_watermark_cc3;
+	scnprintf(temp_stat_val_str, TEMP_STAT_VAL_STR_MAX_SIZE, "%lu",
+			  temp_stat_val);
+	strlcat(final_stats_str,
+			"{xbar_dbg_ocrx_2_3_buff_watermark-->cc3 :", FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
+	strlcat(final_stats_str, temp_stat_val_str,
+			FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
+	strlcat(final_stats_str, "}\n", FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
+
+
+
+	temp_stat_val = ecpriss_pdata->xbar_ctx->stats.octx_oc_0_1_buff_watermark_cc0;
+	scnprintf(temp_stat_val_str, TEMP_STAT_VAL_STR_MAX_SIZE, "%lu",
+			  temp_stat_val);
+	strlcat(final_stats_str,
+			"{xbar_octx_oc_0_1_buff_watermark-->cc0 :", FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
+	strlcat(final_stats_str, temp_stat_val_str,
+			FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
+	strlcat(final_stats_str, "}\n", FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
+
+
+	temp_stat_val = ecpriss_pdata->xbar_ctx->stats.octx_oc_0_1_buff_watermark_cc1;
+	scnprintf(temp_stat_val_str, TEMP_STAT_VAL_STR_MAX_SIZE, "%lu",
+			  temp_stat_val);
+	strlcat(final_stats_str,
+			"{xbar_octx_oc_0_1_buff_watermark-->cc1 :", FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
+	strlcat(final_stats_str, temp_stat_val_str,
+			FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
+	strlcat(final_stats_str, "}\n", FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
+
+
+	temp_stat_val = ecpriss_pdata->xbar_ctx->stats.octx_oc_2_3_buff_watermark_cc2;
+	scnprintf(temp_stat_val_str, TEMP_STAT_VAL_STR_MAX_SIZE, "%lu",
+			  temp_stat_val);
+	strlcat(final_stats_str,
+			"{xbar_octx_oc_2_3_buff_watermark-->cc2 :", FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
+	strlcat(final_stats_str, temp_stat_val_str,
+			FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
+	strlcat(final_stats_str, "}\n", FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
+
+	temp_stat_val = ecpriss_pdata->xbar_ctx->stats.octx_oc_2_3_buff_watermark_cc3;
+	scnprintf(temp_stat_val_str, TEMP_STAT_VAL_STR_MAX_SIZE, "%lu",
+			  temp_stat_val);
+	strlcat(final_stats_str,
+			"{xbar_octx_oc_2_3_buff_watermark-->cc3 :", FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
+	strlcat(final_stats_str, temp_stat_val_str,
+			FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
+	strlcat(final_stats_str, "}\n", FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
+
+
+	temp_stat_val = ecpriss_pdata->xbar_ctx->stats.xbar_dbg_fhrx_unknown_pcid_cnt_fhrx_0_cnt;
+	scnprintf(temp_stat_val_str, TEMP_STAT_VAL_STR_MAX_SIZE, "%lu",
+			  temp_stat_val);
+	strlcat(final_stats_str,
+			"{xbar_dbg_fhrx_unknown_pcid_cnt-->fhrx_0_cnt :", FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
+	strlcat(final_stats_str, temp_stat_val_str,
+			FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
+	strlcat(final_stats_str, "}\n", FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
+
+	temp_stat_val = ecpriss_pdata->xbar_ctx->stats.xbar_dbg_fhrx_unknown_pcid_cnt_fhrx_1_cnt;
+	scnprintf(temp_stat_val_str, TEMP_STAT_VAL_STR_MAX_SIZE, "%lu",
+			  temp_stat_val);
+	strlcat(final_stats_str,
+			"{xbar_dbg_fhrx_unknown_pcid_cnt-->fhrx_1_cnt :", FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
+	strlcat(final_stats_str, temp_stat_val_str,
+			FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
+	strlcat(final_stats_str, "}\n", FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
+
+	temp_stat_val = ecpriss_pdata->xbar_ctx->stats.xbar_dbg_fhrx_unknown_pcid_cnt_fhrx_2_cnt;
+	scnprintf(temp_stat_val_str, TEMP_STAT_VAL_STR_MAX_SIZE, "%lu",
+			  temp_stat_val);
+	strlcat(final_stats_str,
+			"{xbar_dbg_fhrx_unknown_pcid_cnt-->fhrx_2_cnt :", FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
+	strlcat(final_stats_str, temp_stat_val_str,
+			FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
+	strlcat(final_stats_str, "}\n", FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
+
+
+	temp_stat_val = ecpriss_pdata->xbar_ctx->stats.xbar_dbg_ocrx_unknown_pcid_cnt_ocrx_fh_0_cnt;
+	scnprintf(temp_stat_val_str, TEMP_STAT_VAL_STR_MAX_SIZE, "%lu",
+			  temp_stat_val);
+	strlcat(final_stats_str,
+			"{xbar_dbg_ocrx_unknown_pcid_cnt-->ocrx_fh_0_cnt :", FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
+	strlcat(final_stats_str, temp_stat_val_str,
+			FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
+	strlcat(final_stats_str, "}\n", FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
+
+	temp_stat_val = ecpriss_pdata->xbar_ctx->stats.xbar_dbg_ocrx_unknown_pcid_cnt_ocrx_fh_1_cnt;
+	scnprintf(temp_stat_val_str, TEMP_STAT_VAL_STR_MAX_SIZE, "%lu",
+			  temp_stat_val);
+	strlcat(final_stats_str,
+			"{xbar_dbg_ocrx_unknown_pcid_cnt-->ocrx_fh_1_cnt :", FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
+	strlcat(final_stats_str, temp_stat_val_str,
+			FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
+	strlcat(final_stats_str, "}\n", FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
+
+	temp_stat_val = ecpriss_pdata->xbar_ctx->stats.xbar_dbg_ocrx_unknown_pcid_cnt_ocrx_fh_2_cnt;
+	scnprintf(temp_stat_val_str, TEMP_STAT_VAL_STR_MAX_SIZE, "%lu",
+			  temp_stat_val);
+	strlcat(final_stats_str,
+			"{xbar_dbg_ocrx_unknown_pcid_cnt-->ocrx_fh_2_cnt :", FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
+	strlcat(final_stats_str, temp_stat_val_str,
+			FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
+	strlcat(final_stats_str, "}\n", FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
+
 	for (i = 0; i < NUM_OF_FHP; i++)
 	{
-		RESET_STR(fh_index);
-		scnprintf(fh_index, TEMP_STR_MIN_SIZE, "%u", i);
 
-		for (j = 0; j < LUT_INDEX; j++)
-		{
-			RESET_STR(link_id);
-			scnprintf(link_id, TEMP_STR_MIN_SIZE, "%u", j);
+		RESET_STR(link_id);
+		scnprintf(link_id, TEMP_STR_MIN_SIZE, "%u", i);
 
-			temp_stat_val =
-				ecpriss_pdata->xbar_ctx->stats.xbar_fh_port[i].xbar_fhrx_lut[j];
-			scnprintf(temp_stat_val_str, TEMP_STAT_VAL_STR_MAX_SIZE, "%lu",
-					  temp_stat_val);
+		temp_stat_val =
+			ecpriss_pdata->xbar_ctx->stats.fhrx_unknown_pcid_info_1_n[i];
+		scnprintf(temp_stat_val_str, TEMP_STAT_VAL_STR_MAX_SIZE, "%x",
+				  temp_stat_val);
 
-			strlcat(final_stats_str, "xbar_lut_fhrx_config_fh_",
-					FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
-			strlcat(final_stats_str, fh_index,
-					FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
-			strlcat(final_stats_str, "_pcid_",
-					FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
-			strlcat(final_stats_str, link_id,
-					FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
-			strlcat(final_stats_str, ":", FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
-			strlcat(final_stats_str, temp_stat_val_str,
-					FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
-			strlcat(final_stats_str, "}\n",
-					FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
-		}
+		strlcat(final_stats_str, "{fhrx_unknown_pcid_info_1_n_fh",
+				FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
+		strlcat(final_stats_str, link_id,
+				FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
+		strlcat(final_stats_str, ":", FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
+		strlcat(final_stats_str, temp_stat_val_str,
+				FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
+		strlcat(final_stats_str, "}\n",
+				FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
+
+		temp_stat_val =
+			ecpriss_pdata->xbar_ctx->stats.fhrx_unknown_pcid_info_2_n[i];
+		scnprintf(temp_stat_val_str, TEMP_STAT_VAL_STR_MAX_SIZE, "%x",
+				  temp_stat_val);
+
+		strlcat(final_stats_str, "{fhrx_unknown_pcid_info_2_n_fh",
+				FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
+		strlcat(final_stats_str, link_id,
+				FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
+		strlcat(final_stats_str, ":", FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
+		strlcat(final_stats_str, temp_stat_val_str,
+				FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
+		strlcat(final_stats_str, "}\n",
+				FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
+
+		temp_stat_val =
+			ecpriss_pdata->xbar_ctx->stats.ocrx_unknown_pcid_info_1_n[i];
+		scnprintf(temp_stat_val_str, TEMP_STAT_VAL_STR_MAX_SIZE, "%x",
+				  temp_stat_val);
+
+		strlcat(final_stats_str, "{ocrx_unknown_pcid_info_1_n_fh",
+				FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
+		strlcat(final_stats_str, link_id,
+				FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
+		strlcat(final_stats_str, ":", FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
+		strlcat(final_stats_str, temp_stat_val_str,
+				FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
+		strlcat(final_stats_str, "}\n",
+				FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
+
+		temp_stat_val =
+			ecpriss_pdata->xbar_ctx->stats.ocrx_unknown_pcid_info_2_n[i];
+		scnprintf(temp_stat_val_str, TEMP_STAT_VAL_STR_MAX_SIZE, "%x",
+				  temp_stat_val);
+
+		strlcat(final_stats_str, "{ocrx_unknown_pcid_info_2_n_fh",
+				FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
+		strlcat(final_stats_str, link_id,
+				FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
+		strlcat(final_stats_str, ":", FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
+		strlcat(final_stats_str, temp_stat_val_str,
+				FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
+		strlcat(final_stats_str, "}\n",
+				FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
+
 	}
+
+
 	ret_val = copy_to_user(buf,final_stats_str,FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
 
 	ret_val = strlen(final_stats_str);
@@ -2063,7 +2355,102 @@ static ssize_t stats_value_from_registers_fh(char __user *buf, int port, int lin
 			FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
 	strlcat(final_stats_str, "}\n", FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
 
-	pr_err("DUMINP mayank : %s \n",final_stats_str);
+
+	temp_stat_val = ecpriss_pdata->qudp_ctx->fh_port_cfg[port].stats.fh_egress_udp_watermark_port_p_pkt_fifo;
+	scnprintf(temp_stat_val_str, TEMP_STAT_VAL_STR_MAX_SIZE, "%lu",
+			  temp_stat_val);
+	strlcat(final_stats_str, "{fh_egress_udp_watermark-->pkt_fifo:",
+			FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
+	strlcat(final_stats_str, temp_stat_val_str,
+			FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
+	strlcat(final_stats_str, "}\n", FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
+
+	temp_stat_val = ecpriss_pdata->qudp_ctx->fh_port_cfg[port].stats.fh_egress_udp_watermark_port_p_hdri_cfg_index_fifo;
+	scnprintf(temp_stat_val_str, TEMP_STAT_VAL_STR_MAX_SIZE, "%lu",
+			  temp_stat_val);
+	strlcat(final_stats_str, "{fh_egress_udp_watermark-->hdri_cfg_index_fifo:",
+			FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
+	strlcat(final_stats_str, temp_stat_val_str,
+			FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
+	strlcat(final_stats_str, "}\n", FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
+
+
+	temp_stat_val = ecpriss_pdata->qudp_ctx->fh_port_cfg[port].stats.fh_egress_udp_watermark_port_p_hdri_output_fifo;
+	scnprintf(temp_stat_val_str, TEMP_STAT_VAL_STR_MAX_SIZE, "%lu",
+			  temp_stat_val);
+	strlcat(final_stats_str, "{fh_egress_udp_watermark-->hdri_output_fifo:",
+			FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
+	strlcat(final_stats_str, temp_stat_val_str,
+			FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
+	strlcat(final_stats_str, "}\n", FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
+
+
+	temp_stat_val = ecpriss_pdata->qudp_ctx->fh_port_cfg[port].stats.fh_egress_udp_watermark_port_p_cs_calc_fifo;
+	scnprintf(temp_stat_val_str, TEMP_STAT_VAL_STR_MAX_SIZE, "%lu",
+			  temp_stat_val);
+	strlcat(final_stats_str, "{fh_egress_udp_watermark-->cs_calc_fifo:",
+			FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
+	strlcat(final_stats_str, temp_stat_val_str,
+			FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
+	strlcat(final_stats_str, "}\n", FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
+
+
+	temp_stat_val = ecpriss_pdata->qudp_ctx->fh_port_cfg[port].stats.fh_egress_udp_watermark_port_p_cs_update_fifo;
+	scnprintf(temp_stat_val_str, TEMP_STAT_VAL_STR_MAX_SIZE, "%lu",
+			  temp_stat_val);
+	strlcat(final_stats_str, "{fh_egress_udp_watermark-->cs_update_fifo:",
+			FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
+	strlcat(final_stats_str, temp_stat_val_str,
+			FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
+	strlcat(final_stats_str, "}\n", FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
+
+
+	temp_stat_val = ecpriss_pdata->qudp_ctx->fh_port_cfg[port].stats.fh_egress_udp_watermark_port_p_aligner_output_fifo;
+	scnprintf(temp_stat_val_str, TEMP_STAT_VAL_STR_MAX_SIZE, "%lu",
+			  temp_stat_val);
+	strlcat(final_stats_str, "{fh_egress_udp_watermark-->aligner_output_fifo:",
+			FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
+	strlcat(final_stats_str, temp_stat_val_str,
+			FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
+	strlcat(final_stats_str, "}\n", FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
+
+
+	temp_stat_val = ecpriss_pdata->qudp_ctx->fh_port_cfg[port].stats.fh_ingress_udp_watermark_port_p_link_n_pkt_fifo[link];
+	scnprintf(temp_stat_val_str, TEMP_STAT_VAL_STR_MAX_SIZE, "%lu",
+			  temp_stat_val);
+	strlcat(final_stats_str, "{fh_ingress_udp_watermark_port-->pkt_fifo:",
+			FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
+	strlcat(final_stats_str, temp_stat_val_str,
+			FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
+	strlcat(final_stats_str, "}\n", FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
+
+	temp_stat_val = ecpriss_pdata->qudp_ctx->fh_port_cfg[port].stats.fh_ingress_udp_watermark_port_p_link_n_cmd_fifo[link];
+	scnprintf(temp_stat_val_str, TEMP_STAT_VAL_STR_MAX_SIZE, "%lu",
+			  temp_stat_val);
+	strlcat(final_stats_str, "{fh_ingress_udp_watermark_port-->cmd_fifo:",
+			FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
+	strlcat(final_stats_str, temp_stat_val_str,
+			FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
+	strlcat(final_stats_str, "}\n", FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
+
+	temp_stat_val = ecpriss_pdata->qudp_ctx->fh_port_cfg[port].stats.fh_ingress_udp_watermark_port_p_link_n_pkt_handler_sync_fifos[link];
+	scnprintf(temp_stat_val_str, TEMP_STAT_VAL_STR_MAX_SIZE, "%lu",
+			  temp_stat_val);
+	strlcat(final_stats_str, "{fh_ingress_udp_watermark_port-->pkt_handler_sync_fifos:",
+			FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
+	strlcat(final_stats_str, temp_stat_val_str,
+			FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
+	strlcat(final_stats_str, "}\n", FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
+
+
+	temp_stat_val = ecpriss_pdata->qudp_ctx->fh_port_cfg[port].stats.fh_ingress_udp_watermark_port_p_link_n_ptp_timestamp_fifo[link];
+	scnprintf(temp_stat_val_str, TEMP_STAT_VAL_STR_MAX_SIZE, "%lu",
+			  temp_stat_val);
+	strlcat(final_stats_str, "{fh_ingress_udp_watermark_port-->ptp_timestamp_fifo:",
+			FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
+	strlcat(final_stats_str, temp_stat_val_str,
+			FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
+	strlcat(final_stats_str, "}\n", FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
 
 	ret_val = copy_to_user(buf,final_stats_str,FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
 
@@ -2936,7 +3323,45 @@ static ssize_t cfg_value_from_qudp_ingress_mac_addr_fh2(struct file *file, char 
 	return count;
 
 }
+static ssize_t cfg_value_from_valid_bits_filt_fh0(struct file *file, char __user *buf,
+		size_t count, loff_t *ppos)
+{
+	uint32_t len;
 
+	len = config_val_from_valid_bits_filt(buf, 0 , &count , ppos);
+	if((*ppos + count) > len){
+		count = len - *ppos;
+	}
+	*ppos += count;
+	return count;
+
+}
+static ssize_t cfg_value_from_valid_bits_filt_fh1(struct file *file, char __user *buf,
+		size_t count, loff_t *ppos)
+{
+	uint32_t len;
+
+	len = config_val_from_valid_bits_filt(buf, 1 , &count , ppos);
+	if((*ppos + count) > len){
+		count = len - *ppos;
+	}
+	*ppos += count;
+	return count;
+
+}
+static ssize_t cfg_value_from_valid_bits_filt_fh2(struct file *file, char __user *buf,
+		size_t count, loff_t *ppos)
+{
+	uint32_t len;
+
+	len = config_val_from_valid_bits_filt(buf, 2 , &count , ppos);
+	if((*ppos + count) > len){
+		count = len - *ppos;
+	}
+	*ppos += count;
+	return count;
+
+}
 static ssize_t cfg_value_from_qudp_ecpriss_filt(struct file *file, char __user *buf,
 		size_t count, loff_t *ppos)
 {
@@ -3140,6 +3565,9 @@ static struct file_operations qudp_ingress_dst_ip_fh0 = {
 static struct file_operations qudp_ingress_mac_addr_fh0 = {
 	.read = cfg_value_from_qudp_ingress_mac_addr_fh0,
 };
+static struct file_operations qudp_ingress_fltr_valid_bits_fh0 = {
+	.read = cfg_value_from_valid_bits_filt_fh0,
+};
 
 static struct file_operations qudp_ingress_global_cfg_fh1 = {
 	.read = cfg_value_from_qudp_ingress_global_cfg_fh1,
@@ -3156,6 +3584,9 @@ static struct file_operations qudp_ingress_dst_ip_fh1 = {
 static struct file_operations qudp_ingress_mac_addr_fh1 = {
 	.read = cfg_value_from_qudp_ingress_mac_addr_fh1,
 };
+static struct file_operations qudp_ingress_fltr_valid_bits_fh1 = {
+	.read = cfg_value_from_valid_bits_filt_fh1,
+};
 
 static struct file_operations qudp_ingress_global_cfg_fh2 = {
 	.read = cfg_value_from_qudp_ingress_global_cfg_fh2,
@@ -3171,6 +3602,9 @@ static struct file_operations qudp_ingress_dst_ip_fh2 = {
 };
 static struct file_operations qudp_ingress_mac_addr_fh2 = {
 	.read = cfg_value_from_qudp_ingress_mac_addr_fh2,
+};
+static struct file_operations qudp_ingress_fltr_valid_bits_fh2 = {
+	.read = cfg_value_from_valid_bits_filt_fh2,
 };
 
 static struct file_operations qudp_ecpriss_filt_config = {
@@ -3420,6 +3854,10 @@ static struct file_operations *file_name_to_wrapper(char *filename)
 	{
 		return &qudp_ingress_mac_addr_fh0;
 	}
+	else if (!strncmp(filename, "fh0:valid_bits", XBAR_WRAPPER_SIZE))
+	{
+		return &qudp_ingress_fltr_valid_bits_fh0;
+	}
 	else if (!strncmp(filename, "fh1:config", XBAR_WRAPPER_SIZE))
 	{
 		return &qudp_ingress_global_cfg_fh1;
@@ -3439,6 +3877,10 @@ static struct file_operations *file_name_to_wrapper(char *filename)
 	else if (!strncmp(filename, "fh1:mac", XBAR_WRAPPER_SIZE))
 	{
 		return &qudp_ingress_mac_addr_fh1;
+	}
+	else if (!strncmp(filename, "fh1:valid_bits", XBAR_WRAPPER_SIZE))
+	{
+		return &qudp_ingress_fltr_valid_bits_fh1;
 	}
 
 	else if (!strncmp(filename, "fh2:config", XBAR_WRAPPER_SIZE))
@@ -3460,6 +3902,10 @@ static struct file_operations *file_name_to_wrapper(char *filename)
 	else if (!strncmp(filename, "fh2:mac", XBAR_WRAPPER_SIZE))
 	{
 		return &qudp_ingress_mac_addr_fh2;
+	}
+	else if (!strncmp(filename, "fh2:valid_bits", XBAR_WRAPPER_SIZE))
+	{
+		return &qudp_ingress_fltr_valid_bits_fh2;
 	}
 
 	else{
