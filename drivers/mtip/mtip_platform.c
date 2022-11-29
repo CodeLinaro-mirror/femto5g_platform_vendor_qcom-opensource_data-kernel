@@ -1184,9 +1184,6 @@ static int mtip_platform_setup(void)
 
            // setup the phy of the port
            mtip_phy_setup_phy(&platform_driver_priv->devices.port_devices[i]);
-
-           // setup phylink for the port
-           mtip_phy_create_phylink(&platform_driver_priv->devices.port_devices[i]);
        }
    }
 
@@ -1350,6 +1347,15 @@ static int mtip_platform_setup(void)
           CSMLOGINFO("mtip_devs[%d] = 0x%lx with link_index = %d\n", i, (unsigned long)platform_driver_priv->mtip_links[i]->dev, priv->link_index);
 
        }
+   }
+
+   if (mtip_rumi_platform == 0)
+   {
+      for (i = 0; i < platform_driver_priv->devices.num_port_phandles; ++i)
+      {
+         // setup phylink for the port
+         mtip_phy_create_phylink(&platform_driver_priv->devices.port_devices[i]);
+      }
    }
 
    // register the net devices
