@@ -287,7 +287,7 @@ ssize_t stats_value_from_registers_oxtor_rx(char __user *buf, int ring_id) {
 				FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
 		strlcat(final_stats_str, "\n", FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
 
-		pr_err("DUMPING Saptarsi : %s \n", final_stats_str);
+		pr_info("RX ring info : %s \n", final_stats_str);
 
 		ret_val = copy_to_user(buf, final_stats_str,
 							   FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
