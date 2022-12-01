@@ -41,6 +41,12 @@ struct ecpri_dma_outstanding_pkt_wrapper {
 	struct list_head link;
 };
 
+struct ecpri_dma_dynamic_vf_params {
+	bool vf_valid;
+	bool is_pf;
+	u32 vf_id;
+};
+
 /** Functions **/
 
 /**

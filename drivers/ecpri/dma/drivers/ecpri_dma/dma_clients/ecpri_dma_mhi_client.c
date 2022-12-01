@@ -357,6 +357,7 @@ static void ecpri_dma_mhi_get_l2_ch_bitmap(
  *
  * @buff_addr:  [IN] Buffer address
  * @len:        [IN] Buffer length
+ * @function:   [in] VF \ PF info
  * @pkts:       [OUT] Allocated packets data
  *
  * Return codes: 0: success
@@ -366,14 +367,23 @@ static void ecpri_dma_mhi_get_l2_ch_bitmap(
 static int ecpri_dma_mhi_dma_alloc_pkt(
 	u64 buff_addr,
 	int len,
+	struct mhi_dma_function_params function,
 	struct ecpri_dma_pkt*** pkt_ptr)
 {
 	int ret = 0;
 	struct ecpri_dma_pkt** pkt = NULL;
+	struct mhi_dma_function_params* function_ptr = NULL;
+
+	function_ptr = kzalloc(sizeof(*function_ptr), GFP_KERNEL);
+	if (!function_ptr) {
+		DMAERR("failed to alloc packets array \n");
+		return -ENOMEM;
+	}
 
 	pkt = kzalloc(sizeof(*pkt), GFP_KERNEL);
 	if (!pkt) {
 		DMAERR("failed to alloc packets array \n");
+		kfree(function_ptr);
 		return -ENOMEM;
 	}
 
@@ -381,6 +391,7 @@ static int ecpri_dma_mhi_dma_alloc_pkt(
 	if (!pkt[0]) {
 		DMAERR("failed to alloc packet\n");
 		kfree(pkt);
+		kfree(function_ptr);
 		ret = -ENOMEM;
 		goto fail_alloc;
 	}
@@ -391,6 +402,7 @@ static int ecpri_dma_mhi_dma_alloc_pkt(
 		DMAERR("failed to alloc buffers array \n");
 		kfree(pkt[0]);
 		kfree(pkt);
+		kfree(function_ptr);
 		ret = -ENOMEM;
 		goto fail_alloc;
 	}
@@ -402,6 +414,7 @@ static int ecpri_dma_mhi_dma_alloc_pkt(
 		kfree(pkt[0]->buffs);
 		kfree(pkt[0]);
 		kfree(pkt);
+		kfree(function_ptr);
 		ret = -ENOMEM;
 		goto fail_alloc;
 	}
@@ -409,6 +422,10 @@ static int ecpri_dma_mhi_dma_alloc_pkt(
 	pkt[0]->buffs[0]->phys_base = (dma_addr_t)buff_addr;
 	pkt[0]->buffs[0]->size = len;
 	pkt[0]->num_of_buffers = 1;
+	pkt[0]->user_data = function_ptr;
+
+	function_ptr->function_type = function.function_type;
+	function_ptr->vf_id = function.vf_id;
 
 	*pkt_ptr = pkt;
 
@@ -426,6 +443,7 @@ fail_alloc:
 static void ecpri_dma_mhi_dma_free_pkt(
 	struct ecpri_dma_pkt* pkts)
 {
+	kfree(pkts->user_data);
 	kfree(pkts->buffs[0]);
 	kfree(pkts->buffs);
 	kfree(pkts);
@@ -659,6 +677,7 @@ static int ecpri_dma_mhi_alloc_sync_async_endps(
 	int async_dest_endp_id = ECPRI_DMA_MHI_INVALID_ENDP_ID;
 	enum ecpri_dma_gsi_id gsi_id = ECPRI_DMA_GSI_ID_0;
 	const struct ecpri_dma_mhi_ee_gsi_tuple* func_map;
+	enum ecpri_hw_ver hw_ver = ecpri_dma_get_ctx_hw_ver();
 
 	ret = ecpri_dma_mhi_get_function_mapping(function, &func_map);
 	if (ret)
@@ -691,6 +710,14 @@ static int ecpri_dma_mhi_alloc_sync_async_endps(
 		goto fail_alloc_sync_dest;
 	}
 
+	if (hw_ver > ECPRI_HW_V1_0)
+	{
+		ecpri_dma_ctx->
+			endp_ctx[gsi_id][sync_src_endp_id].dynamic_vf_enabled = true;
+		ecpri_dma_ctx->
+			endp_ctx[gsi_id][sync_dest_endp_id].dynamic_vf_enabled = true;
+	}
+
 	/* Skip the VMs */
 	if (async_src_endp_id == ECPRI_DMA_MHI_INVALID_ENDP_ID ||
 		async_dest_endp_id == ECPRI_DMA_MHI_INVALID_ENDP_ID)
@@ -715,6 +742,14 @@ static int ecpri_dma_mhi_alloc_sync_async_endps(
 		DMAERR("Unable to allocate ASYNC_DEST ENDP, endp_id: %d\n",
 			async_dest_endp_id);
 		goto fail_alloc_async_dest;
+	}
+
+	if (hw_ver > ECPRI_HW_V1_0)
+	{
+		ecpri_dma_ctx->
+			endp_ctx[gsi_id][async_src_endp_id].dynamic_vf_enabled = true;
+		ecpri_dma_ctx->
+			endp_ctx[gsi_id][async_dest_endp_id].dynamic_vf_enabled = true;
 	}
 
 	ret = 0;
@@ -1459,14 +1494,14 @@ static int ecpri_dma_mhi_dma_sync_memcpy(
 	spin_unlock_irqrestore(&memcpy_ctx->sync_lock, flags);
 
 	/* Allocate packets */
-	ret = ecpri_dma_mhi_dma_alloc_pkt(dest, len, &pkts_dest);
+	ret = ecpri_dma_mhi_dma_alloc_pkt(dest, len, function, &pkts_dest);
 	if (ret != 0) {
 		DMAERR("Unable to allocate packets for destination\n");
 		ret = -EPERM;
 		goto fail_dest_alloc;
 	}
 
-	ret = ecpri_dma_mhi_dma_alloc_pkt(src, len, &pkts_src);
+	ret = ecpri_dma_mhi_dma_alloc_pkt(src, len, function, &pkts_src);
 	if (ret != 0) {
 		DMAERR("Unable to allocate packets for source\n");
 		ret = -EPERM;
@@ -1692,13 +1727,13 @@ static int ecpri_dma_mhi_dma_async_memcpy(
 	xfer_descr->user_cb = user_cb;
 	xfer_descr->user_data = user_param;
 
-	ret = ecpri_dma_mhi_dma_alloc_pkt(dest, len, &pkt_dest);
+	ret = ecpri_dma_mhi_dma_alloc_pkt(dest, len, function, &pkt_dest);
 	if (ret != 0) {
 		DMAERR("Unable to allocate packets for destination\n");
 		return -ENOMEM;
 	}
 
-	ret = ecpri_dma_mhi_dma_alloc_pkt(src, len, &pkt_src);
+	ret = ecpri_dma_mhi_dma_alloc_pkt(src, len, function, &pkt_src);
 	if (ret != 0) {
 		ecpri_dma_mhi_dma_free_pkt(pkt_dest[0]);
 		DMAERR("Unable to allocate packets for source\n");

@@ -312,7 +312,7 @@ struct ecpri_dma_exception_stats {
  * @tasklet: EP tasklet to handle completion notification
  * @spinlock: EP lock to sync accesses to EP resources
  * @l2_mhi_channel_ptr: Pointer to the MHI Channel CTX
- * @mask: Mask indicating number of messages assigned by the host to device
+ * @dynamic_vf_enabled: Indicating this is a memcpy ENDP with dynamic VF
  *
  */
 struct ecpri_dma_endp_context {
@@ -360,6 +360,7 @@ struct ecpri_dma_endp_context {
 	struct tasklet_struct tasklet;
 	spinlock_t spinlock;
 	void* l2_mhi_channel_ptr;
+	bool dynamic_vf_enabled;
 };
 
 /**
