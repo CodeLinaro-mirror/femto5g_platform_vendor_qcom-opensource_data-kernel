@@ -494,8 +494,6 @@ int aw_pmd_rx_polarity_set(mss_access_t *mss, uint32_t rx_pol_flip);
 
 int aw_pmd_rx_dfe_adapt_set(mss_access_t *mss, uint32_t dfe_adapt_enable);
 
-int aw_pmd_rx_background_adapt_enable_set(mss_access_t *mss, uint32_t rx_background_adapt);
-
 int aw_pmd_rxeq_prbs_set(mss_access_t *mss, uint32_t prbs_en);
 
 int aw_pmd_rx_chk_config_set(mss_access_t *mss, aw_bist_pattern_t pattern,

@@ -894,17 +894,6 @@ int aw_pmd_rx_dfe_adapt_set(mss_access_t *mss, uint32_t dfe_adapt_enable) {
   return AW_ERR_CODE_NONE;
 }
 
-int aw_pmd_rx_background_adapt_enable_set(mss_access_t *mss, uint32_t rx_background_adapt)
-{
-    if (rx_background_adapt == 1){
-        CHECK(pmd_write_field(mss, RXMFSM_CTRL_ADDR, RXMFSM_CTRL_RXMFSM_EQBK_POWER_STATE_MASK, RXMFSM_CTRL_RXMFSM_EQBK_POWER_STATE_OFFSET, 0));
-    }
-    else {
-        CHECK(pmd_write_field(mss, RXMFSM_CTRL_ADDR, RXMFSM_CTRL_RXMFSM_EQBK_POWER_STATE_MASK, RXMFSM_CTRL_RXMFSM_EQBK_POWER_STATE_OFFSET, 7));
-    }
-    return AW_ERR_CODE_NONE;
-}
-
 int aw_pmd_rxeq_prbs_set(mss_access_t *mss, uint32_t prbs_en) {
   CHECK(pmd_write_field(mss, RXEQ_PRBS_ADDR, RXEQ_PRBS_MASK, RXEQ_PRBS_OFFSET,
                         prbs_en));
