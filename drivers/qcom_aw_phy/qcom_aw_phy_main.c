@@ -238,7 +238,7 @@ static irqreturn_t qcom_aw_phy_interrupt_handler(int irq, void *devptr) {
       case QCOM_AW_PHY_SNR_VALID_ERR_LANE_2:
       case QCOM_AW_PHY_SNR_VALID_ERR_LANE_3:
         wq_params = kmalloc(sizeof(struct qcom_aw_phy_work_q_params),
-                            GFP_KERNEL);
+                            GFP_ATOMIC);
         if(!wq_params)
           QCOM_AW_PHY_LOG_ERR("Malloc failed!");
         else{
