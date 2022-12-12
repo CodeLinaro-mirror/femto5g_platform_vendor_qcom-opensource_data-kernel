@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: GPL-2.0-only
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 /**
@@ -56,6 +56,7 @@ struct eth_phy_iface_phy_lane_config
 {
 	bool                                       lane_enabled;
 	enum eth_phy_iface_phy_lane_speed_enum     lane_speed;
+	u32                                        link_index;
 };
 
 typedef void (*eth_phy_iface_phy_ready_cb)(void *user_data);

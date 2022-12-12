@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: GPL-2.0-only
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 /**
@@ -12,21 +12,7 @@
 #ifndef QCOM_AW_PHY_SYNCE_H
 #define QCOM_AW_PHY_SYNCE_H
 
-struct qcom_aw_phy_synce_lane_status{
-	bool                                       lane_status;
-	enum eth_phy_iface_phy_lane_speed_enum     lane_speed;
-};
-
-struct qcom_aw_phy_synce_snr_valid_change{
-	enum qcom_aw_phy_synce_lane_id             lane_id;
-	bool                                       snr_valid_status;
-};
-
-struct qcom_aw_phy_snr_threshold_info {
-	enum qcom_aw_phy_synce_lane_id             lane_id;
-	int                                        low_val;
-	int                                        high_val;
-};
+#define MAX_MAC_LINKS_PER_PORT 4
 
 void qcom_aw_phy_synce_notify_phy_lane_state_change(void);
 void qcom_aw_phy_synce_notify_snr_valid_change(
@@ -44,6 +30,11 @@ int qcom_aw_phy_synce_get_current_snr_val(
                                  enum eth_phy_iface_phy_lane_num_enum lane_num,
                                  int *snr_val);
 int qcom_aw_phy_synce_set_synce_mux(
-                                 enum qcom_aw_phy_synce_lane_id lane_num);
+                                 enum qcom_aw_phy_synce_lane_id lane_id);
+enum qcom_aw_phy_synce_lane_id qcom_aw_phy_synce_eth_inst_to_phy_lane_id(
+                                     enum qcom_aw_phy_synce_eth_inst eth_inst);
+enum qcom_aw_phy_synce_eth_inst qcom_aw_phy_synce_phy_lane_to_eth_inst(
+                                enum qcom_aw_phy_instance_enum phy_inst_type,
+                                enum eth_phy_iface_phy_lane_num_enum lane_num);
 
 #endif /* QCOM_AW_PHY_SYNCE_H */

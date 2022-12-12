@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: GPL-2.0-only
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 /**
@@ -170,6 +170,24 @@ enum qcom_aw_phy_synce_lane_id{
 	L2_LANE_2,
 	L2_LANE_3,
 	MAX_PHY_SYNCE_LANES
+};
+
+enum qcom_aw_phy_synce_eth_inst{
+	ETH_NONE = -1,
+	ETH00 = 0,
+	ETH01 = 1,
+	ETH02 = 2,
+	ETH03 = 3,
+	ETH10 = 4,
+	ETH11 = 5,
+	ETH12 = 6,
+	ETH13 = 7,
+	ETH20 = 8,
+	ETH21 = 9,
+	ETH22 = 10,
+	ETH23 = 11,
+	ETHL2  = 12,
+	MAX_ETH_NUM
 };
 
 /* Lane Params - Lane specific information */

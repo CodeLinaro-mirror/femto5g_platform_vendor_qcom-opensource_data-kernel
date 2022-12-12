@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: GPL-2.0-only WITH Linux-syscall-note
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 /**
@@ -18,7 +18,7 @@
 enum qcom_aw_phy_gnl_cmd_enum{
 	QCOM_AW_PHY_GNL_CMD_UNSPEC,
 	QCOM_AW_PHY_GNL_CMD_INIT_LIB,
-	QCOM_AW_PHY_GNL_CMD_PHY_LANE_STATUS_CHANGE,
+	QCOM_AW_PHY_GNL_CMD_ETH_STATUS_CHANGE,
 	QCOM_AW_PHY_GNL_CMD_SNR_VALID_CHANGE,
 	QCOM_AW_PHY_GNL_CMD_SET_SNR_THRESHOLD,
 	QCOM_AW_PHY_GNL_CMD_GET_SNR_VALUE_REQ,
@@ -32,7 +32,7 @@ enum qcom_aw_phy_gnl_cmd_enum{
 enum qcom_aw_phy_gnl_attr_enum{
 	QCOM_AW_PHY_GNL_ATTR_UNSPEC,
 	QCOM_AW_PHY_GNL_ATTR_INIT_LIB,
-	QCOM_AW_PHY_GNL_ATTR_PHY_LANE_STATUS_CHANGE,
+	QCOM_AW_PHY_GNL_ATTR_ETH_STATUS_CHANGE,
 	QCOM_AW_PHY_GNL_ATTR_SNR_VALID_CHANGE,
 	QCOM_AW_PHY_GNL_ATTR_SET_SNR_THRESHOLD,
 	QCOM_AW_PHY_GNL_ATTR_GET_SNR_VALUE_REQ,
