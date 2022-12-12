@@ -546,7 +546,7 @@ int qcom_aw_phy_bringup(enum mtip_port_type_enum port_type,
                                  [phy_inst_info->cdr_lock_retry_counter[lane]]);
 
       wq_params = kmalloc(sizeof(struct qcom_aw_phy_work_q_params),
-                          GFP_KERNEL);
+                          GFP_ATOMIC);
       if(!wq_params)
         QCOM_AW_PHY_LOG_ERR("Malloc failed!");
       else{
