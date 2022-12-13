@@ -16,15 +16,7 @@ volatile int ecpriss_filtering_enabled = 0;
 #define BYTE_SHIFT                     8
 #define MSB_SHIFT                      32
 
-static int qudp_irq_mapping[QUDP_IRQ_MAX]=
-{
-	[ECPRISS_UDP_C2C_IRQ_PORT0]=491,
-	[ECPRISS_UDP_C2C_IRQ_PORT1]=492,
-	[ECPRISS_UDP_FH_IRQ_PORT0]=493,
-	[ECPRISS_UDP_FH_IRQ_PORT1]=494,
-	[ECPRISS_UDP_FH_IRQ_PORT2]=495,
-	[ECPRISS_UDP_L2_IRQ]=496
-};
+int qudp_irq_mapping[QUDP_IRQ_MAX];
 
 void ecpriss_qudp_clear_stats(uint32_t port_index, uint32_t link_index)
 {
@@ -1625,7 +1617,6 @@ static int ecpriss_irq_init(ecpriss_qudp_interrupt_events_e qudp_irq,
 			pr_err("ecpriss_irq_init pdev is NULL" );
 			break;
 		}
-		pr_info("IRQ =  %d\n", qudp_irq_mapping[qudp_irq]);
 		qudp_irq_mapping[qudp_irq] =  platform_get_irq(pdev, qudp_irq);
 
 		res = request_irq(qudp_irq_mapping[qudp_irq], ecpriss_qudp_isr, IRQF_TRIGGER_RISING, "ecpri_ss", NULL);
@@ -1635,6 +1626,7 @@ static int ecpriss_irq_init(ecpriss_qudp_interrupt_events_e qudp_irq,
 					qudp_irq_mapping[qudp_irq], res);
 			break;
 		}
+		pr_info("IRQ =  %d\n", qudp_irq_mapping[qudp_irq]);
 
 		res = enable_irq_wake(qudp_irq_mapping[qudp_irq]);
 		if (res){

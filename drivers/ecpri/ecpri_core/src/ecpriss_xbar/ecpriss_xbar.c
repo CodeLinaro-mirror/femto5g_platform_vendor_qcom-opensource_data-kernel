@@ -536,7 +536,7 @@ static irqreturn_t ecpriss_xbar_isr(int irq, void *ctxt)
 static int ecpriss_xbar_register_interrupts(struct device *dev)
 {
 	int res = 0;
-	int xbar_irq_mapping =  EXPRISS_XBAR_IRQ_MAPPING;
+	int xbar_irq_mapping = 0;
 	struct platform_device *pdev = NULL;
 
 	do{
@@ -560,8 +560,8 @@ static int ecpriss_xbar_register_interrupts(struct device *dev)
 					xbar_irq_mapping, res);
 			goto err;
 		}
-		pr_info("XBAR interrupt id %d registered with ecpriss_irq_init Interrupt Registration Success %d\n",
-				EXPRISS_XBAR_IRQ_MAPPING,xbar_irq_mapping);
+		pr_info("XBAR interrupt id %d registered with ecpriss_irq_init Interrupt Registration Success\n",
+				xbar_irq_mapping);
 
 	}while(0);
 

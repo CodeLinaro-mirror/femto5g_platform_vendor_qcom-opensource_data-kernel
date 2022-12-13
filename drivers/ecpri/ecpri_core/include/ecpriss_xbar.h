@@ -18,11 +18,10 @@
 #include "ecpriss_qudp_hwio_def.h"
 
 #define ECPRISS_MAX_PCID_ENTRIES 65535
-#define EXPRISS_XBAR_IRQ_MAPPING 497
 
 /*
  * Index of this in device tree file
- * ecpriss_qudp_interrupt_events_e it has index 0-5
+ * ecpriss_qudp_interrupt_events_e it has index 0-6
  */
 #define EXPRISS_XBAR_INDEX 6
 typedef enum
