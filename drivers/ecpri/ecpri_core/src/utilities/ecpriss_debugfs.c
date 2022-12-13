@@ -157,6 +157,46 @@ static ssize_t config_val_to_qudp_ecpriss_filt(const char __user *buf, int fh_in
 
 	return *count;
 }
+
+static ssize_t config_val_to_global_ecpriss_stats_timeout(const char __user *buf, int fh_index, size_t *count, loff_t *ppos)
+{
+	int val = -1;
+
+	if(kstrtouint_from_user(buf, *count, 10, &val))
+		return -EFAULT;
+
+	ecpriss_core_set_stats_timeout_info(val);
+
+	return *count;
+}
+
+static ssize_t config_val_from_global_ecpriss_stats_timeout(char __user *buf, int fh_index, size_t *count, loff_t *ppos)
+{
+	int stats_timeout = 0;
+	static int data_size = 0;
+	int ret_val = 0;
+
+	if(*ppos == 0 ) {
+
+		memset(max_str,0,sizeof(max_str));
+
+		stats_timeout = ecpriss_core_get_stats_timeout_info();
+
+		scnprintf(max_str, MAX_STR_SIZE, "%d\n", stats_timeout);
+		data_size = strlen(max_str);
+	}
+
+	if(*ppos  >= MAX_STR_SIZE)
+		return 0;
+
+	if( *ppos + *count > data_size)
+		*count =  data_size - *ppos;
+
+	ret_val = copy_to_user(buf,(max_str + *ppos), *count);
+	return data_size;
+}
+
+
 static ssize_t config_val_from_registers_qudp_ingress_mac_addr(char __user *buf, int fh_index, size_t *count, loff_t *ppos)
 {
 	char fh_str[TEMP_STR_MAX_SIZE];
@@ -174,7 +214,7 @@ static ssize_t config_val_from_registers_qudp_ingress_mac_addr(char __user *buf,
 		RESET_STR(fh_str);
 		scnprintf(fh_str, TEMP_STR_MIN_SIZE, "%u", fh_index);
 
-		ecpriss_qudp_ingress_config_stats(fh_index);
+		ecpriss_qudp_ingress_config_stats_update(fh_index);
 
 		for(fltr_table_index = 0; fltr_table_index < NUM_OF_FLTR; fltr_table_index++){
 
@@ -241,7 +281,7 @@ static ssize_t config_val_from_registers_qudp_ingress_dst_ip(char __user *buf, i
 		RESET_STR(fh_str);
 		scnprintf(fh_str, TEMP_STR_MIN_SIZE, "%u", fh_index);
 
-		ecpriss_qudp_ingress_config_stats(fh_index);
+		ecpriss_qudp_ingress_config_stats_update(fh_index);
 
 		for(fltr_table_index = 0; fltr_table_index < NUM_OF_FLTR; fltr_table_index++){
 
@@ -320,7 +360,7 @@ static ssize_t config_val_from_registers_qudp_ingress_udp_clss_port(char __user 
 		RESET_STR(fh_str);
 		scnprintf(fh_str, TEMP_STR_MIN_SIZE, "%u", fh_index);
 
-		ecpriss_qudp_ingress_config_stats(fh_index);
+		ecpriss_qudp_ingress_config_stats_update(fh_index);
 
 		for(fltr_table_index = 0; fltr_table_index < NUM_OF_FLTR; fltr_table_index++){
 
@@ -378,7 +418,7 @@ static ssize_t config_val_from_registers_qudp_ingress_vlan(char __user *buf, int
 		RESET_STR(fh_str);
 		scnprintf(fh_str, TEMP_STR_MIN_SIZE, "%u", fh_index);
 
-		ecpriss_qudp_ingress_config_stats(fh_index);
+		ecpriss_qudp_ingress_config_stats_update(fh_index);
 
 		for(fltr_table_index = 0; fltr_table_index < NUM_OF_FLTR; fltr_table_index++){
 
@@ -434,7 +474,7 @@ static ssize_t config_val_from_valid_bits_filt(char __user *buf, int fh_index, s
 		RESET_STR(fh_str);
 		scnprintf(fh_str, TEMP_STR_MIN_SIZE, "%u", fh_index);
 
-		ecpriss_qudp_ingress_config_stats(fh_index);
+		ecpriss_qudp_ingress_config_stats_update(fh_index);
 
 
 
@@ -525,7 +565,7 @@ static ssize_t config_val_from_registers_qudp_ingress_global_cfg(char __user *bu
 		RESET_STR(fh_str);
 		scnprintf(fh_str, TEMP_STR_MIN_SIZE, "%u", fh_index);
 
-		ecpriss_qudp_ingress_config_stats(fh_index);
+		ecpriss_qudp_ingress_config_stats_update(fh_index);
 
 
 			scnprintf(temp_stat_val_str, TEMP_STAT_VAL_STR_MAX_SIZE, "%u",
@@ -790,7 +830,7 @@ static ssize_t config_val_from_registers_qudp_egress_src_ip_addr(char __user *bu
 		RESET_STR(fh_str);
 		scnprintf(fh_str, TEMP_STR_MIN_SIZE, "%u", fh_index);
 
-		ecpriss_qudp_egress_config_stats(fh_index);
+		ecpriss_qudp_egress_config_stats_update(fh_index);
 
 		for(egress_table_index = 0; egress_table_index < NUM_EGRESS_ENTRY; egress_table_index++){
 			/*
@@ -883,7 +923,7 @@ static ssize_t config_val_from_registers_qudp_egress_dst_ip_addr(char __user *bu
 		RESET_STR(fh_str);
 		scnprintf(fh_str, TEMP_STR_MIN_SIZE, "%u", fh_index);
 
-		ecpriss_qudp_egress_config_stats(fh_index);
+		ecpriss_qudp_egress_config_stats_update(fh_index);
 
 		for(egress_table_index = 0; egress_table_index < NUM_EGRESS_ENTRY; egress_table_index++){
 
@@ -968,7 +1008,7 @@ static ssize_t config_val_from_registers_qudp_egress_eth_src0_port(char __user *
 		RESET_STR(fh_str);
 		scnprintf(fh_str, TEMP_STR_MIN_SIZE, "%u", fh_index);
 
-		ecpriss_qudp_egress_config_stats(fh_index);
+		ecpriss_qudp_egress_config_stats_update(fh_index);
 
 		for(egress_table_index = 0; egress_table_index < NUM_EGRESS_ENTRY; egress_table_index++){
 
@@ -1026,7 +1066,7 @@ static ssize_t config_val_from_registers_qudp_egress_eth_src1_dst1_port(char __u
 		RESET_STR(fh_str);
 		scnprintf(fh_str, TEMP_STR_MIN_SIZE, "%u", fh_index);
 
-		ecpriss_qudp_egress_config_stats(fh_index);
+		ecpriss_qudp_egress_config_stats_update(fh_index);
 
 		for(egress_table_index = 0; egress_table_index < NUM_EGRESS_ENTRY; egress_table_index++){
 
@@ -1109,7 +1149,7 @@ static ssize_t config_val_from_registers_qudp_egress_eth_dst0_port(char __user *
 		RESET_STR(fh_str);
 		scnprintf(fh_str, TEMP_STR_MIN_SIZE, "%u", fh_index);
 
-		ecpriss_qudp_egress_config_stats(fh_index);
+		ecpriss_qudp_egress_config_stats_update(fh_index);
 
 		for(egress_table_index = 0; egress_table_index < NUM_EGRESS_ENTRY; egress_table_index++){
 
@@ -1168,7 +1208,7 @@ static ssize_t config_val_from_registers_qudp_egress_vlan_ethertype(char __user 
 		RESET_STR(fh_str);
 		scnprintf(fh_str, TEMP_STR_MIN_SIZE, "%u", fh_index);
 
-		ecpriss_qudp_egress_config_stats(fh_index);
+		ecpriss_qudp_egress_config_stats_update(fh_index);
 
 		for(egress_table_index = 0; egress_table_index < NUM_EGRESS_ENTRY; egress_table_index++){
 
@@ -1251,7 +1291,7 @@ static ssize_t config_val_from_registers_qudp_egress_udp_ports(char __user *buf,
 		RESET_STR(fh_str);
 		scnprintf(fh_str, TEMP_STR_MIN_SIZE, "%u", fh_index);
 
-		ecpriss_qudp_egress_config_stats(fh_index);
+		ecpriss_qudp_egress_config_stats_update(fh_index);
 
 		for(egress_table_index = 0; egress_table_index < NUM_EGRESS_ENTRY; egress_table_index++){
 
@@ -1327,7 +1367,7 @@ static ssize_t config_val_from_registers_xbar(char __user *buf, cfg_prm_u param)
 
 	memset(max_str,0,sizeof(max_str));
 
-	ecpriss_xbar_config_sats();
+	ecpriss_xbar_config_stats_update();
 	switch (param){
 		case FHRX :
 			for(fh_index=0; fh_index < NUM_OF_FHP; fh_index++) {
@@ -1438,7 +1478,6 @@ static ssize_t stats_value_from_registers_xbar(char __user *buf)
 
 	RESET_STR(temp_stat_val_str);
 	RESET_STR(link_id);
-	ecpriss_xbar_print_stats();
 
 	for (i = 0; i < TOTAL_LINKS; i++)
 	{
@@ -2054,9 +2093,6 @@ static ssize_t error_value_from_registers_fh(char __user *buf, int port, int lin
 
 	RESET_STR(temp_stat_val_str);
 
-	ecpriss_qudp_print_fh_ingress_stats(port, link);
-	ecpriss_qudp_print_fh_egress_stats(port, link);
-
 	temp_stat_val = ecpriss_pdata->qudp_ctx->fh_port_cfg[port]
 						.interrupt_stats.egress_mtu_err_packet_link[link];
 	scnprintf(temp_stat_val_str, TEMP_STAT_VAL_STR_MAX_SIZE, "%u",
@@ -2221,9 +2257,6 @@ static ssize_t stats_value_from_registers_fh(char __user *buf, int port, int lin
 	}
 
 	RESET_STR(temp_stat_val_str);
-
-	ecpriss_qudp_print_fh_ingress_stats(port, link);
-	ecpriss_qudp_print_fh_egress_stats(port, link);
 
 	temp_stat_val = ecpriss_pdata->qudp_ctx->fh_port_cfg[port]
 						.stats.egress_num_udp_packets[link];
@@ -3389,6 +3422,35 @@ static ssize_t cfg_value_to_qudp_ecpriss_filt(struct file *file, const  char __u
 	return count;
 
 }
+
+static ssize_t cfg_value_from_global_ecpriss_stats_timeout(struct file *file, char __user *buf,
+		size_t count, loff_t *ppos)
+{
+	uint32_t len;
+
+	len = config_val_from_global_ecpriss_stats_timeout(buf, 2, &count , ppos);
+	if((*ppos + count) > len){
+		count = len - *ppos;
+	}
+	*ppos += count;
+	return count;
+
+}
+
+static ssize_t cfg_value_to_global_ecpriss_stats_timeout(struct file *file, const char __user *buf,
+		size_t count, loff_t *ppos)
+{
+	uint32_t len;
+
+	len = config_val_to_global_ecpriss_stats_timeout(buf, 2, &count , ppos);
+	if((*ppos + count) > len){
+		count = len - *ppos;
+	}
+	*ppos += count;
+	return count;
+
+
+}
 static struct file_operations stats_fh_ops_00 = {
 	.read = stats_value_from_registers_fh_00,
 };
@@ -3611,6 +3673,12 @@ static struct file_operations qudp_ecpriss_filt_config = {
 	.read = cfg_value_from_qudp_ecpriss_filt,
 	.write = cfg_value_to_qudp_ecpriss_filt,
 };
+
+static struct file_operations global_stats_timeout_config = {
+	.read = cfg_value_from_global_ecpriss_stats_timeout,
+	.write = cfg_value_to_global_ecpriss_stats_timeout,
+};
+
 
 static struct file_operations dummy;
 
@@ -3907,6 +3975,11 @@ static struct file_operations *file_name_to_wrapper(char *filename)
 	{
 		return &qudp_ingress_fltr_valid_bits_fh2;
 	}
+	else if (!strncmp(filename, "ecpriss_stats_timeout", XBAR_WRAPPER_SIZE))
+	{
+		return &global_stats_timeout_config;
+	}
+
 
 	else{
 		pr_err("Invalid file name, no entry available\n");

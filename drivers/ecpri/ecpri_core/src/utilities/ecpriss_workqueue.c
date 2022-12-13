@@ -75,6 +75,12 @@ int ecpriss_initialize_workq(void)
 		INIT_WORK(&ecpriss_eth_events_rdy, ecpriss_eth_event_processing_wq);
 		ecpriss_pdata->events_workqueue->ecpriss_eth_events_rdy_work =
 			&ecpriss_eth_events_rdy;
+		INIT_WORK(&ecpriss_interrupt_events_rdy, ecpriss_interrupt_events_processing_wq);
+		ecpriss_pdata->interrupts_workqueue->ecpriss_interrupt_events_rdy_work=
+			&ecpriss_interrupt_events_rdy;
+
+
+
 	} while(0);
 
 	return ret;

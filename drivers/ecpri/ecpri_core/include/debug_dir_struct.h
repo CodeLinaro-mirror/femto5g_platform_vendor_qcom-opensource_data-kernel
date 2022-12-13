@@ -279,6 +279,7 @@
 			gcfg \
 			{ \
 				,ecpriss_filt \
+				,ecpriss_stats_timeout \
 			} \
 		} \
 	} \
