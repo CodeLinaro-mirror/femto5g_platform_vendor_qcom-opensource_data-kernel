@@ -286,11 +286,25 @@ void ecpri_dma_dp_exception_endp_notify_completion(
 static int ecpri_dma_dp_gen_gsi_xfer(struct ecpri_dma_pkt *pkt,
 	struct gsi_xfer_elem *gsi_xfer,
 	struct ecpri_dma_outstanding_pkt_wrapper *pkt_wrapper,
-	u32 *total_bytes)
+	u32 *total_bytes, int dma_dir)
 {
 	int i = 0;
 
 	for (i = 0; i < pkt->num_of_buffers; i++) {
+		if (!pkt->buffs[i]->phys_base)
+		{
+			/* Perform mapping using SMMU */
+			pkt->buffs[i]->phys_base =
+				dma_map_single(ecpri_dma_ctx->pdev,
+					pkt->buffs[i]->virt_base,
+					pkt->buffs[i]->size, dma_dir);
+			if (dma_mapping_error(ecpri_dma_ctx->pdev,
+				pkt->buffs[i]->phys_base)) {
+				DMAERR("failed to do dma map.\n");
+				return -EFAULT;
+			}
+		}
+
 		/* Set gsi_xfer fields */
 		gsi_xfer[i].addr = pkt->buffs[i]->phys_base;
 		gsi_xfer[i].len = pkt->buffs[i]->size;
@@ -724,25 +738,6 @@ int ecpri_dma_dp_transmit(struct ecpri_dma_endp_context *endp,
 	else
 		dma_dir = DMA_FROM_DEVICE;
 
-	for (i = 0; i < num_of_pkts; i++) {
-		for (j = 0; j < pkts[i]->num_of_buffers; j++) {
-			if (!pkts[i]->buffs[j]->phys_base) {
-				/* Perform mapping using SMMU */
-				pkts[i]->buffs[j]->phys_base =
-					dma_map_single(ecpri_dma_ctx->pdev,
-						pkts[i]->buffs[j]->virt_base,
-						pkts[i]->buffs[j]->size, dma_dir);
-				if (dma_mapping_error(ecpri_dma_ctx->pdev,
-					pkts[i]->buffs[j]->phys_base)) {
-					DMAERR("failed to do dma map.\n");
-					// goto fail handling, which expectes lock to be taken
-					spin_lock_irqsave(&endp->spinlock, flags);
-					goto fail_handling;
-				}
-			}
-		}
-	}
-
 	spin_lock_irqsave(&endp->spinlock, flags);
 
 	if (unlikely(atomic_read(&endp->disconnect_in_progress))) {
@@ -801,7 +796,7 @@ int ecpri_dma_dp_transmit(struct ecpri_dma_endp_context *endp,
 		/* Generate parameters for GSI transfer */
 		ret = ecpri_dma_dp_gen_gsi_xfer(pkts[i],
 						&gsi_xfer_arr[gsi_xfer_index],
-						pkt_wrapper, &total_bytes);
+						pkt_wrapper, &total_bytes, dma_dir);
 		if (ret)
 		{
 			DMAERR("Failed to generate gsi xfer for pkt %d\n", i);
