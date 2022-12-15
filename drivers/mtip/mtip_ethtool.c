@@ -47,7 +47,7 @@
 #include "mtip_macstats.h"
 #include "mtip_mac.h"
 #include "mtip_pcs.h"
-
+#include "mtip_debug_eth.h"
 
 static const char * const mtip_ethtool_stat_strings[] = {
     "EtherStatsOctets",
@@ -106,7 +106,7 @@ static void mtip_ethtool_get_stats(struct net_device *netdev, struct ethtool_sta
     mtip_macstats_get_stats(netdev, data);
 }
 
-static int mtip_check_if_running(struct net_device *dev)
+int mtip_check_if_running(struct net_device *dev)
 {
     CSMLOGINFO("ethtool: check_if_running\n");
 
@@ -115,7 +115,7 @@ static int mtip_check_if_running(struct net_device *dev)
 	return 0;
 }
 
-static void mtip_getdrvinfo(struct net_device *dev, struct ethtool_drvinfo *info)
+void mtip_getdrvinfo(struct net_device *dev, struct ethtool_drvinfo *info)
 {
     CSMLOGINFO("ethtool: getdrvinfo\n");
 
@@ -123,7 +123,7 @@ static void mtip_getdrvinfo(struct net_device *dev, struct ethtool_drvinfo *info
 	strlcpy(info->version, MTIP_MAC_DRIVER_VERSION, sizeof(info->version));
 }
 
-static int mtip_get_link_ksettings(struct net_device *dev, struct ethtool_link_ksettings *cmd)
+int mtip_get_link_ksettings(struct net_device *dev, struct ethtool_link_ksettings *cmd)
 {
     struct mtip_netdev_priv *priv;
     u32 link_index;
@@ -279,6 +279,18 @@ static const struct ethtool_ops mtip_ethtool_ops = {
 
 void mtip_ethtool_set_ops(struct net_device *netdev)
 {
+  struct mtip_netdev_priv* priv;
+  u32 link_index;
+
    CSMLOGINFO("Setting ethtool ops for netdev 0x%lx\n", (unsigned long)netdev);
-   netdev->ethtool_ops = &mtip_ethtool_ops;
+
+   priv = netdev_priv(netdev);
+   link_index = priv->link_index;
+   CSMLOGERR("Link index : %d\n",link_index);
+
+
+   if(link_index == MTIP_DEBUG_ETH_LINK_INDEX)
+      netdev->ethtool_ops = mtip_debug_eth_get_ethtool_ops();
+   else
+      netdev->ethtool_ops = &mtip_ethtool_ops;
 }

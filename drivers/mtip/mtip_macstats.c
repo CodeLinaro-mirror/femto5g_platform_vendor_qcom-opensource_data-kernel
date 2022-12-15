@@ -45,7 +45,7 @@
 
 #include "mtip_macstats.h"
 
-static u64 mtip_macstats_read_stat(void __iomem *macstats_base_addr, unsigned int offset)
+u64 mtip_macstats_read_stat(void __iomem *macstats_base_addr, unsigned int offset)
 {
     u64 stat = 0;
     u32 lower;
