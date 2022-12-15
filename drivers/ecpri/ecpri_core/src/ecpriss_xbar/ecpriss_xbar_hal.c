@@ -95,6 +95,15 @@ static const char *ecpriss_xbar_hal_reg_name_to_str[ECPRI_XBAR_XBAR_MAX+1] = {
 	"ECPRI_XBAR_XBAR_DBG_OCRX_UNKNOWN_PCID_CNT",
 	"ECPRI_XBAR_XBAR_DBG_FHRX_UNKNOWN_PCID_CNT",
 	"ECPRI_XBAR_XBAR_DBG_C2CRX_UNKNOWN_PCID_CNT",
+	"ECPRI_XBAR_XBAR_DBG_OCRX_UNKNOWN_PCID_INFO_1_n",
+	"ECPRI_XBAR_XBAR_DBG_OCRX_UNKNOWN_PCID_INFO_2_n",
+	"ECPRI_XBAR_XBAR_DBG_FHRX_UNKNOWN_PCID_INFO_1_n",
+	"ECPRI_XBAR_XBAR_DBG_FHRX_UNKNOWN_PCID_INFO_2_n",
+	"ECPRI_XBAR_XBAR_DBG_OCRX_FH_BUFF_WATERMARK",
+	"ECPRI_XBAR_XBAR_DBG_OCRX_0_1_BUFF_WATERMARK",
+	"ECPRI_XBAR_XBAR_DBG_OCRX_2_3_BUFF_WATERMARK",
+	"ECPRI_XBAR_XBAR_DBG_OCTX_OC_0_1_BUFF_WATERMARK",
+	"ECPRI_XBAR_XBAR_DBG_OCTX_OC_2_3_BUFF_WATERMARK",
 	"ECPRI_XBAR_XBAR_MAX"
 
 };
@@ -644,7 +653,124 @@ static void ecpriss_xbar_hal_reg_parse_xbar_cfg(enum ecpriss_xbar_hal_reg_name r
 
 	return;
 }
+static void ecpriss_xbar_hal_reg_parse_xbar_dbg_ocrx_unknown_pcid_cnt
+	(enum ecpriss_xbar_hal_reg_name reg, void *fields, uint32_t val)
+{
+	ecpri_xbar_hwio_def_ecpri_xbar_xbar_dbg_ocrx_unknown_pcid_cnt_s *xbar_dbg_ocrx_unknown_pcid_cnt =
+		(ecpri_xbar_hwio_def_ecpri_xbar_xbar_dbg_ocrx_unknown_pcid_cnt_s*) fields;
 
+	xbar_dbg_ocrx_unknown_pcid_cnt->ocrx_fh_0_cnt = ECPRISS_HAL_GETFIELD_FROM_REG(val,
+			HWIO_ECPRI_XBAR_XBAR_DBG_OCRX_UNKNOWN_PCID_CNT_OCRX_FH_0_CNT_SHFT,
+			HWIO_ECPRI_XBAR_XBAR_DBG_OCRX_UNKNOWN_PCID_CNT_OCRX_FH_0_CNT_BMSK);
+
+	xbar_dbg_ocrx_unknown_pcid_cnt->ocrx_fh_1_cnt = ECPRISS_HAL_GETFIELD_FROM_REG(val,
+			HWIO_ECPRI_XBAR_XBAR_DBG_OCRX_UNKNOWN_PCID_CNT_OCRX_FH_1_CNT_SHFT,
+			HWIO_ECPRI_XBAR_XBAR_DBG_OCRX_UNKNOWN_PCID_CNT_OCRX_FH_1_CNT_BMSK);
+
+	xbar_dbg_ocrx_unknown_pcid_cnt->ocrx_fh_2_cnt = ECPRISS_HAL_GETFIELD_FROM_REG(val,
+			HWIO_ECPRI_XBAR_XBAR_DBG_OCRX_UNKNOWN_PCID_CNT_OCRX_FH_2_CNT_SHFT,
+			HWIO_ECPRI_XBAR_XBAR_DBG_OCRX_UNKNOWN_PCID_CNT_OCRX_FH_2_CNT_BMSK);
+
+	return;
+}
+static void ecpriss_xbar_hal_reg_parse_xbar_dbg_fhrx_unknown_pcid_cnt
+	(enum ecpriss_xbar_hal_reg_name reg, void *fields, uint32_t val)
+{
+	ecpri_xbar_hwio_def_ecpri_xbar_xbar_dbg_fhrx_unknown_pcid_cnt_s *xbar_dbg_fhrx_unknown_pcid_cnt =
+		(ecpri_xbar_hwio_def_ecpri_xbar_xbar_dbg_fhrx_unknown_pcid_cnt_s*) fields;
+
+	xbar_dbg_fhrx_unknown_pcid_cnt->fhrx_0_cnt = ECPRISS_HAL_GETFIELD_FROM_REG(val,
+			HWIO_ECPRI_XBAR_XBAR_DBG_FHRX_UNKNOWN_PCID_CNT_FHRX_0_CNT_SHFT,
+			HWIO_ECPRI_XBAR_XBAR_DBG_FHRX_UNKNOWN_PCID_CNT_FHRX_0_CNT_BMSK);
+
+	xbar_dbg_fhrx_unknown_pcid_cnt->fhrx_1_cnt = ECPRISS_HAL_GETFIELD_FROM_REG(val,
+			HWIO_ECPRI_XBAR_XBAR_DBG_FHRX_UNKNOWN_PCID_CNT_FHRX_1_CNT_SHFT,
+			HWIO_ECPRI_XBAR_XBAR_DBG_FHRX_UNKNOWN_PCID_CNT_FHRX_1_CNT_BMSK);
+
+	xbar_dbg_fhrx_unknown_pcid_cnt->fhrx_2_cnt = ECPRISS_HAL_GETFIELD_FROM_REG(val,
+			HWIO_ECPRI_XBAR_XBAR_DBG_FHRX_UNKNOWN_PCID_CNT_FHRX_2_CNT_SHFT,
+			HWIO_ECPRI_XBAR_XBAR_DBG_FHRX_UNKNOWN_PCID_CNT_FHRX_2_CNT_BMSK);
+	return;
+}
+static void ecpriss_xbar_hal_reg_parse_xbar_dbg_ocrx_fh_buff_watermark
+	(enum ecpriss_xbar_hal_reg_name reg, void *fields, uint32_t val)
+{
+	ecpri_xbar_hwio_def_ecpri_xbar_xbar_dbg_ocrx_fh_buff_watermark_s *xbar_dbg_ocrx_fh_buff_watermark =
+		(ecpri_xbar_hwio_def_ecpri_xbar_xbar_dbg_ocrx_fh_buff_watermark_s*) fields;
+
+	xbar_dbg_ocrx_fh_buff_watermark->fh0 = ECPRISS_HAL_GETFIELD_FROM_REG(val,
+			HWIO_ECPRI_XBAR_XBAR_DBG_OCRX_FH_BUFF_WATERMARK_FH0_SHFT,
+			HWIO_ECPRI_XBAR_XBAR_DBG_OCRX_FH_BUFF_WATERMARK_FH0_BMSK);
+
+	xbar_dbg_ocrx_fh_buff_watermark->fh1 = ECPRISS_HAL_GETFIELD_FROM_REG(val,
+			HWIO_ECPRI_XBAR_XBAR_DBG_OCRX_FH_BUFF_WATERMARK_FH1_SHFT,
+			HWIO_ECPRI_XBAR_XBAR_DBG_OCRX_FH_BUFF_WATERMARK_FH1_BMSK);
+
+	xbar_dbg_ocrx_fh_buff_watermark->fh2 = ECPRISS_HAL_GETFIELD_FROM_REG(val,
+			HWIO_ECPRI_XBAR_XBAR_DBG_OCRX_FH_BUFF_WATERMARK_FH2_SHFT,
+			HWIO_ECPRI_XBAR_XBAR_DBG_OCRX_FH_BUFF_WATERMARK_FH2_BMSK);
+	return;
+}
+static void ecpriss_xbar_hal_reg_parse_xbar_dbg_ocrx_0_1_buff_watermark
+	(enum ecpriss_xbar_hal_reg_name reg, void *fields, uint32_t val)
+{
+	ecpri_xbar_hwio_def_ecpri_xbar_xbar_dbg_ocrx_0_1_buff_watermark_s *xbar_dbg_ocrx_0_1_buff_watermark =
+		(ecpri_xbar_hwio_def_ecpri_xbar_xbar_dbg_ocrx_0_1_buff_watermark_s*) fields;
+
+	xbar_dbg_ocrx_0_1_buff_watermark->cc0 = ECPRISS_HAL_GETFIELD_FROM_REG(val,
+			HWIO_ECPRI_XBAR_XBAR_DBG_OCRX_0_1_BUFF_WATERMARK_CC0_SHFT,
+			HWIO_ECPRI_XBAR_XBAR_DBG_OCRX_0_1_BUFF_WATERMARK_CC0_BMSK);
+
+	xbar_dbg_ocrx_0_1_buff_watermark->cc1 = ECPRISS_HAL_GETFIELD_FROM_REG(val,
+			HWIO_ECPRI_XBAR_XBAR_DBG_OCRX_0_1_BUFF_WATERMARK_CC1_SHFT,
+			HWIO_ECPRI_XBAR_XBAR_DBG_OCRX_0_1_BUFF_WATERMARK_CC1_BMSK);
+	return;
+}
+static void ecpriss_xbar_hal_reg_parse_xbar_dbg_ocrx_2_3_buff_watermark
+	(enum ecpriss_xbar_hal_reg_name reg, void *fields, uint32_t val)
+{
+	ecpri_xbar_hwio_def_ecpri_xbar_xbar_dbg_ocrx_2_3_buff_watermark_s *xbar_dbg_ocrx_2_3_buff_watermark =
+		(ecpri_xbar_hwio_def_ecpri_xbar_xbar_dbg_ocrx_2_3_buff_watermark_s*) fields;
+
+	xbar_dbg_ocrx_2_3_buff_watermark->cc2 = ECPRISS_HAL_GETFIELD_FROM_REG(val,
+			HWIO_ECPRI_XBAR_XBAR_DBG_OCRX_2_3_BUFF_WATERMARK_CC2_SHFT,
+			HWIO_ECPRI_XBAR_XBAR_DBG_OCRX_2_3_BUFF_WATERMARK_CC2_BMSK);
+
+	xbar_dbg_ocrx_2_3_buff_watermark->cc3 = ECPRISS_HAL_GETFIELD_FROM_REG(val,
+			HWIO_ECPRI_XBAR_XBAR_DBG_OCRX_2_3_BUFF_WATERMARK_CC3_SHFT,
+			HWIO_ECPRI_XBAR_XBAR_DBG_OCRX_2_3_BUFF_WATERMARK_CC3_BMSK);
+	return;
+}
+static void ecpriss_xbar_hal_reg_parse_xbar_dbg_octx_oc_0_1_buff_watermark
+	(enum ecpriss_xbar_hal_reg_name reg, void *fields, uint32_t val)
+{
+	ecpri_xbar_hwio_def_ecpri_xbar_xbar_dbg_octx_oc_0_1_buff_watermark_s *octx_oc_0_1_buff_watermark =
+		(ecpri_xbar_hwio_def_ecpri_xbar_xbar_dbg_octx_oc_0_1_buff_watermark_s*) fields;
+
+	octx_oc_0_1_buff_watermark->cc0 = ECPRISS_HAL_GETFIELD_FROM_REG(val,
+			HWIO_ECPRI_XBAR_XBAR_DBG_OCTX_OC_0_1_BUFF_WATERMARK_CC0_SHFT,
+			HWIO_ECPRI_XBAR_XBAR_DBG_OCTX_OC_0_1_BUFF_WATERMARK_CC0_BMSK);
+
+	octx_oc_0_1_buff_watermark->cc1 = ECPRISS_HAL_GETFIELD_FROM_REG(val,
+			HWIO_ECPRI_XBAR_XBAR_DBG_OCTX_OC_0_1_BUFF_WATERMARK_CC1_SHFT,
+			HWIO_ECPRI_XBAR_XBAR_DBG_OCTX_OC_0_1_BUFF_WATERMARK_CC1_BMSK);
+	return;
+}
+static void ecpriss_xbar_hal_reg_parse_xbar_dbg_octx_oc_2_3_buff_watermark
+	(enum ecpriss_xbar_hal_reg_name reg, void *fields, uint32_t val)
+{
+	ecpri_xbar_hwio_def_ecpri_xbar_xbar_dbg_octx_oc_2_3_buff_watermark_s *octx_oc_2_3_buff_watermark =
+		(ecpri_xbar_hwio_def_ecpri_xbar_xbar_dbg_octx_oc_2_3_buff_watermark_s*) fields;
+
+	octx_oc_2_3_buff_watermark->cc2 = ECPRISS_HAL_GETFIELD_FROM_REG(val,
+			HWIO_ECPRI_XBAR_XBAR_DBG_OCTX_OC_2_3_BUFF_WATERMARK_CC2_SHFT,
+			HWIO_ECPRI_XBAR_XBAR_DBG_OCTX_OC_2_3_BUFF_WATERMARK_CC2_BMSK);
+
+	octx_oc_2_3_buff_watermark->cc3 = ECPRISS_HAL_GETFIELD_FROM_REG(val,
+			HWIO_ECPRI_XBAR_XBAR_DBG_OCTX_OC_2_3_BUFF_WATERMARK_CC3_SHFT,
+			HWIO_ECPRI_XBAR_XBAR_DBG_OCTX_OC_2_3_BUFF_WATERMARK_CC3_BMSK);
+	return;
+}
 static void ecpriss_xbar_hal_reg_parse_dummy(enum ecpriss_xbar_hal_reg_name reg, void *fields,
 		u32 val)
 {
@@ -957,16 +1083,53 @@ static struct ecpriss_xbar_hal_reg_obj ecpriss_xbar_hal_reg_objs[ECPRISS_XBAR_HW
 		0x09220000, 0x2360, 0x4, 0, 0, 0, 0x0},
 	[ECPRISS_XBAR_HW_v1_0][ECPRI_XBAR_XBAR_DBG_OCRX_UNKNOWN_PCID_CNT] = {
 		ecpriss_xbar_hal_reg_construct_dummy,
-		ecpriss_xbar_hal_reg_parse_dummy,
+		ecpriss_xbar_hal_reg_parse_xbar_dbg_ocrx_unknown_pcid_cnt,
 		0x09220000, 0x2370, 0x0, 0, 0, 0, 0},
 	[ECPRISS_XBAR_HW_v1_0][ECPRI_XBAR_XBAR_DBG_FHRX_UNKNOWN_PCID_CNT] = {
 		ecpriss_xbar_hal_reg_construct_dummy,
-		ecpriss_xbar_hal_reg_parse_dummy,
+		ecpriss_xbar_hal_reg_parse_xbar_dbg_fhrx_unknown_pcid_cnt,
 		0x09220000, 	0x23A0, 0x0, 0, 0, 0, 0},
 	[ECPRISS_XBAR_HW_v1_0][ECPRI_XBAR_XBAR_DBG_C2CRX_UNKNOWN_PCID_CNT] = {
 		ecpriss_xbar_hal_reg_construct_dummy,
 		ecpriss_xbar_hal_reg_parse_dummy,
-		0x09220000, 0x23D0, 0x0, 0, 0, 0, 0}
+		0x09220000, 0x23D0, 0x0, 0, 0, 0, 0},
+	[ECPRISS_XBAR_HW_v1_0][ECPRI_XBAR_XBAR_DBG_OCRX_UNKNOWN_PCID_INFO_1_n] = {
+		ecpriss_xbar_hal_reg_construct_dummy,
+		ecpriss_xbar_hal_reg_parse_dummy,
+		0x09220000, 0x2374, 0x04, 0, 0, 0, 0},
+	[ECPRISS_XBAR_HW_v1_0][ECPRI_XBAR_XBAR_DBG_OCRX_UNKNOWN_PCID_INFO_2_n] = {
+		ecpriss_xbar_hal_reg_construct_dummy,
+		ecpriss_xbar_hal_reg_parse_dummy,
+		0x09220000, 0x2384, 0x04, 0, 0, 0, 0},
+	[ECPRISS_XBAR_HW_v1_0][ECPRI_XBAR_XBAR_DBG_FHRX_UNKNOWN_PCID_INFO_1_n] = {
+		ecpriss_xbar_hal_reg_construct_dummy,
+		ecpriss_xbar_hal_reg_parse_dummy,
+		0x09220000, 0x23A4, 0x04, 0, 0, 0, 0},
+	[ECPRISS_XBAR_HW_v1_0][ECPRI_XBAR_XBAR_DBG_FHRX_UNKNOWN_PCID_INFO_2_n] = {
+		ecpriss_xbar_hal_reg_construct_dummy,
+		ecpriss_xbar_hal_reg_parse_dummy,
+		0x09220000, 0x23B4, 0x04, 0, 0, 0, 0},
+	[ECPRISS_XBAR_HW_v1_0][ECPRI_XBAR_XBAR_DBG_OCRX_FH_BUFF_WATERMARK] = {
+		ecpriss_xbar_hal_reg_construct_dummy,
+		ecpriss_xbar_hal_reg_parse_xbar_dbg_ocrx_fh_buff_watermark,
+		0x09220000, 0x2838, 0x0, 0, 0, 0, 0},
+	[ECPRISS_XBAR_HW_v1_0][ECPRI_XBAR_XBAR_DBG_OCRX_0_1_BUFF_WATERMARK] = {
+		ecpriss_xbar_hal_reg_construct_dummy,
+		ecpriss_xbar_hal_reg_parse_xbar_dbg_ocrx_0_1_buff_watermark,
+		0x09220000, 0x2820, 0x0, 0, 0, 0, 0},
+	[ECPRISS_XBAR_HW_v1_0][ECPRI_XBAR_XBAR_DBG_OCRX_2_3_BUFF_WATERMARK] = {
+		ecpriss_xbar_hal_reg_construct_dummy,
+		ecpriss_xbar_hal_reg_parse_xbar_dbg_ocrx_2_3_buff_watermark,
+		0x09220000, 0x2824, 0x0, 0, 0, 0, 0},
+	[ECPRISS_XBAR_HW_v1_0][ECPRI_XBAR_XBAR_DBG_OCTX_OC_0_1_BUFF_WATERMARK] = {
+		ecpriss_xbar_hal_reg_construct_dummy,
+		ecpriss_xbar_hal_reg_parse_xbar_dbg_octx_oc_0_1_buff_watermark,
+		0x09220000, 0x2850, 0x0, 0, 0, 0, 0},
+	[ECPRISS_XBAR_HW_v1_0][ECPRI_XBAR_XBAR_DBG_OCTX_OC_2_3_BUFF_WATERMARK] = {
+		ecpriss_xbar_hal_reg_construct_dummy,
+		ecpriss_xbar_hal_reg_parse_xbar_dbg_octx_oc_2_3_buff_watermark,
+		0x09220000, 0x2854, 0x0, 0, 0, 0, 0}
+
 };
 
 

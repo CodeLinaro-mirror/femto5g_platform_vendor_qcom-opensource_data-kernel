@@ -462,7 +462,6 @@ int mtip_dma_rx_available(ecpri_dma_eth_conn_hdl_t hdl, u32* available)
    return (ecpri_dma_eth_driver_ops.ecpri_dma_eth_rx_ring_state)(hdl, available);
 }
 
-#ifdef MTIP_LOOPBACK_SWAP_ADDRESSES
 static void fixup_packet(struct net_device* netdev, unsigned char* buf, struct iphdr *ih, u32 packetlen)
 {
   	__be32 netdevaddr;
@@ -471,7 +470,7 @@ static void fixup_packet(struct net_device* netdev, unsigned char* buf, struct i
    u8* dstaddr;
    u8 tmpval;
 
-   CSMLOGERR("Fixing up_packet len %d buf: 0x%lx\n", packetlen, (unsigned long)buf);
+   CSMLOGDBG("Fixing up_packet len %d buf: 0x%lx\n", packetlen, (unsigned long)buf);
 
    // get the interface IP address
    netdevaddr = inet_select_addr(netdev, 0, RT_SCOPE_UNIVERSE);
@@ -506,7 +505,6 @@ static void fixup_packet(struct net_device* netdev, unsigned char* buf, struct i
 
    ih->check = ip_fast_csum((unsigned char *)ih, ih->ihl);
 }
-#endif
 
 static int mtip_dma_process_packet(struct net_device *netdev, 
                                    struct napi_struct *napi_ptr, 
@@ -527,10 +525,7 @@ static int mtip_dma_process_packet(struct net_device *netdev,
    u64 nanosecs;
    u64* nsptr;
    int i;
-
-#ifdef MTIP_LOOPBACK_SWAP_ADDRESSES
    struct iphdr* iphdr;
-#endif
 
    priv = netdev_priv(netdev);
 
@@ -598,13 +593,11 @@ static int mtip_dma_process_packet(struct net_device *netdev,
 
    spin_unlock_irqrestore(lock, flags);
 
-   if (mtip_loopback_mode != MTIP_MODE_DEFAULT) 
+   if (mtip_loopback_mode != MTIP_MODE_DEFAULT && mtip_loopback_swap_addr)
    {
-#ifdef MTIP_LOOPBACK_SWAP_ADDRESSES
        // fixup the packet: ONLY IF LOOPBACK IS ENABLED
        iphdr = (struct iphdr *)(base + ETH_HLEN);
        fixup_packet(netdev, base, iphdr, size);
-#endif
    }
 
 #ifdef MTIP_DUMP_PACKETS

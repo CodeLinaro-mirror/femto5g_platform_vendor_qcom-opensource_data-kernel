@@ -76,6 +76,14 @@ int mtip_loopback_mode = 0;
 module_param(mtip_loopback_mode, int, S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP);
 MODULE_PARM_DESC(mtip_loopback_mode, "Loopback mode of the driver");
 
+bool mtip_loopback_swap_addr = true;
+module_param(mtip_loopback_swap_addr, bool, S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP);
+MODULE_PARM_DESC(mtip_loopback_swap_addr, "Swap SA/DA in loopback mode operation");
+
+bool mtip_loopback_enable_arp = false;
+module_param(mtip_loopback_enable_arp, bool, S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP);
+MODULE_PARM_DESC(mtip_loopback_enable_arp, "Enable ARP in loopback mode");
+
 int mtip_rumi_platform = 0;
 module_param(mtip_rumi_platform, int, S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP);
 MODULE_PARM_DESC(mtip_rumi_platform, "Platform mode to RUMI");

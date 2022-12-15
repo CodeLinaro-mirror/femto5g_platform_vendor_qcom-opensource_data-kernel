@@ -519,6 +519,7 @@ int qcom_aw_phy_bringup(enum mtip_port_type_enum port_type,
     if (aw_err_val != AW_ERR_CODE_NONE) {
       ret_val = EIO;
       local_err_val = LOCAL_ERROR_7;
+      mutex_unlock(&phy_inst_info->lane_lock[lane]);
       goto func_exit;
     }
 
@@ -656,6 +657,7 @@ int qcom_aw_phy_teardown(enum mtip_port_type_enum port_type,
     if (aw_err_val != AW_ERR_CODE_NONE) {
       ret_val = EIO;
       local_err_val = LOCAL_ERROR_4;
+      mutex_unlock(&phy_inst_info->lane_lock[lane]);
       goto func_exit;
     }
 
@@ -665,6 +667,7 @@ int qcom_aw_phy_teardown(enum mtip_port_type_enum port_type,
     if (aw_err_val != AW_ERR_CODE_NONE) {
       ret_val = EIO;
       local_err_val = LOCAL_ERROR_5;
+      mutex_unlock(&phy_inst_info->lane_lock[lane]);
       goto func_exit;
     }
 
