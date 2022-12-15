@@ -671,13 +671,9 @@ static void mtip_configure_hashtable(struct mtip_netdev_priv *priv, u64 original
             {
                 val = 0x01;
             }
-            else
-            {
-                val = 0;
-            }
             mtip_mac_set_hashtable_entry(priv, i, val);
 
-            CSMLOGINFO("set hashtable entry: 0x%x to val: 0x%x\n", i, val);
+            CSMLOGDBG("set hashtable entry: %d to val: %d\n", i, val);
         }
         pattern = pattern << 1;
     }
@@ -721,7 +717,7 @@ static void mtip_generate_entry_address(struct netdev_hw_addr *ha, u8* entry_add
         *entry_address |= val;
     }
 
-    CSMLOGINFO("generated entry address: 0x%x\n", *entry_address);
+    CSMLOGDBG("generated entry address: 0x%x\n", *entry_address);
 }
 
 static void mtip_generate_hashtablebits(struct net_device *netdev, u64* hashtablebits)
@@ -737,19 +733,19 @@ static void mtip_generate_hashtablebits(struct net_device *netdev, u64* hashtabl
 
         mtip_generate_entry_address(ha, &entry_address);
 
-        CSMLOGINFO("entry address generated: 0x%x\n", entry_address);
+        CSMLOGDBG("entry address generated: 0x%x\n", entry_address);
 
-        pattern = 0x1;
+        pattern = 0x01;
         // set the corresponding hashtablebit to 1
-        for (i = 0; i < entry_address; ++i) {
+        for (i = 0; i < MTIP_MAC_HASHTABLE_SIZE; ++i) {
             pattern = pattern << 1;
         }
         *hashtablebits |= pattern;
 
-        CSMLOGINFO("hashtablebits: 0x%lx, pattern 0x%lx\n", *hashtablebits, pattern);
+        CSMLOGDBG("hashtablebits: 0x%x\n", hashtablebits);
     }
 
-    CSMLOGINFO("Final hashtablebits: 0x%lx\n", *hashtablebits);
+    CSMLOGDBG("Final hashtablebits: 0x%x\n", hashtablebits);
 }
 
 /* Configure Multicast and Promiscuous modes */
@@ -793,7 +789,7 @@ static void mtip_rx_mode_set(struct net_device *netdev)
             mtip_generate_hashtablebits(netdev, &hashtablebits);
         }
 
-        CSMLOGINFO("Setting up hashtable for multicast for link index: %d, original: 0x%lx, new: 0x%lx\n", link_index, priv->hashtablebits, hashtablebits);
+        CSMLOGINFO("Setting up hashtable for multicast for link index: %d, original: 0x%x, new: 0x%x\n", link_index, priv->hashtablebits, hashtablebits);
 
         // reset promisc mode
         mtip_mac_set_promisc_mode(priv, false);
