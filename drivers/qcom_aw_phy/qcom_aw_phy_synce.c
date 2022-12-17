@@ -195,10 +195,6 @@ int qcom_aw_phy_synce_set_snr_threshold(
   aw_pmd_snr_mon_enable_set(&mss, nrz_mode, 1);
   aw_pmd_snr_vld_enable_set(&mss, 1);
 
-  pmd_write_field(&mss, RX_SNR_REG7_ADDR,
-                  RX_SNR_REG7_RO_CSR_CAPTURE_A_MASK,
-                  RX_SNR_REG7_RO_CSR_CAPTURE_A_OFFSET, 1);
-
 func_exit:
   QCOM_AW_PHY_LOG_INFO("snr_low_val = %d, snr_high_val = %d, "
                        "ret_val %d, local error %d",
@@ -253,6 +249,13 @@ int qcom_aw_phy_synce_get_current_snr_val(
       phy_inst_info->lane_params[lane_num].lane_config.lane_speed, &config);
 
   memset(snr_val, 0, sizeof(int) * 3);
+
+  pmd_write_field(&mss, RX_SNR_REG7_ADDR,
+                  RX_SNR_REG7_RO_CSR_CAPTURE_A_MASK,
+                  RX_SNR_REG7_RO_CSR_CAPTURE_A_OFFSET, 1);
+  pmd_write_field(&mss, RX_SNR_REG7_ADDR,
+                  RX_SNR_REG7_RO_CSR_CAPTURE_A_MASK,
+                  RX_SNR_REG7_RO_CSR_CAPTURE_A_OFFSET, 0);
 
   if (config.mod_tech == QCOM_AW_PHY_MOD_TECH_NRZ) {
     pmd_read_field(&mss, RX_SNR_RDREG13_ADDR,
