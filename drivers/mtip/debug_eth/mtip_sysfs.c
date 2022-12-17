@@ -47,6 +47,7 @@
 
 #include "mtip.h"
 #include "mtip_client.h"
+#include "mtip_debug_eth_gnl_uapi.h"
 #include "mtip_device.h"
 #include "mtip_dma.h"
 #include "mtip_hashmap.h"
@@ -79,64 +80,64 @@ struct StreamingFifo F0 = {.status = 0,
                            .OverFlowInterrupt = 0,
                            .Threshold = 1500,
                            .Timeout = 0,
-                           .vlanID = 0};
+                           .vlanID = 1};
 struct StreamingFifo F1 = {.status = 0,
                            .flush = 0,
                            .txcount = 0,
                            .AddrRange_Start = 0x1000,
                            .AddrRange_End = 0x2000,
                            .OverFlowInterrupt = 0,
-                           .Threshold = 1000,
+                           .Threshold = 1500,
                            .Timeout = 0,
-                           .vlanID = 0};
+                           .vlanID = 2};
 struct StreamingFifo F2 = {.status = 0,
                            .flush = 0,
                            .txcount = 0,
                            .AddrRange_Start = 0x2000,
                            .AddrRange_End = 0x3000,
                            .OverFlowInterrupt = 0,
-                           .Threshold = 1000,
+                           .Threshold = 1500,
                            .Timeout = 0,
-                           .vlanID = 0};
+                           .vlanID = 3};
 struct StreamingFifo F3 = {.status = 0,
                            .flush = 0,
                            .txcount = 0,
                            .AddrRange_Start = 0x3000,
                            .AddrRange_End = 0x4000,
                            .OverFlowInterrupt = 0,
-                           .Threshold = 1000,
+                           .Threshold = 1500,
                            .Timeout = 0,
-                           .vlanID = 0};
+                           .vlanID = 4};
 struct StreamingFifo F4 = {.status = 0,
                            .flush = 0,
                            .txcount = 0,
                            .AddrRange_Start = 0x4000,
                            .AddrRange_End = 0x5000,
                            .OverFlowInterrupt = 0,
-                           .Threshold = 1000,
+                           .Threshold = 1500,
                            .Timeout = 0,
-                           .vlanID = 0};
+                           .vlanID = 5};
 struct PacketFifo F5 = {.status = 0,
                         .flush = 0,
                         .txcount = 0,
                         .AddrRange_Start = 0x5000,
                         .AddrRange_End = 0x6000,
                         .OverFlowInterrupt = 0,
-                        .vlanID = 0};
+                        .vlanID = 6};
 struct PacketFifo F6 = {.status = 0,
                         .flush = 0,
                         .txcount = 0,
                         .AddrRange_Start = 0,
                         .AddrRange_End = 0,
                         .OverFlowInterrupt = 0,
-                        .vlanID = 0};
+                        .vlanID = 7};
 struct PacketFifo F7 = {.status = 0,
                         .flush = 0,
                         .txcount = 0,
                         .AddrRange_Start = 0,
                         .AddrRange_End = 0,
                         .OverFlowInterrupt = 0,
-                        .vlanID = 0};
+                        .vlanID = 8};
 
 // Sysfs Attribute Definitions
 struct kobj_attribute enabled_attr =
@@ -223,6 +224,569 @@ void mtip_sysfs_isr_work_thread(struct work_struct *work) {
   }
 }
 
+void setup_common_params(void) {
+  int data;
+  int index;
+  int val;
+  uint8_t saddr[ETH_ALEN];
+  u32 lower_SA = 0;
+  u32 upper_SA = 0;
+  u32 prev_val = 0;
+  int i = 0;
+  u32 port_device_index;
+  u32 link_device_index;
+  unsigned int UDP_SP_DP_ARRAY[] = {DBG_UDP_SP_DP_0, DBG_UDP_SP_DP_1,
+                                    DBG_UDP_SP_DP_2};
+  unsigned int L2_SA_ADDR_HI_ARRAY[] = {
+      L2_SA_ADDR_HI_0, L2_SA_ADDR_HI_1, L2_SA_ADDR_HI_2, L2_SA_ADDR_HI_3,
+      L2_SA_ADDR_HI_4, L2_SA_ADDR_HI_5, L2_SA_ADDR_HI_6, L2_SA_ADDR_HI_7};
+  unsigned int L2_SA_ADDR_LO_ARRAY[] = {
+      L2_SA_ADDR_LO_0, L2_SA_ADDR_LO_1, L2_SA_ADDR_LO_2, L2_SA_ADDR_LO_3,
+      L2_SA_ADDR_LO_4, L2_SA_ADDR_LO_5, L2_SA_ADDR_LO_6, L2_SA_ADDR_LO_7};
+
+  // Set up default value for sport and dport
+  data = L3.sport = L3.dport = 5001;
+  for (index = 0; index < MAX_PACKET_FIFO_COUNT; index++) {
+    val = (u32)ioread32(debug_port_base_address + UDP_SP_DP_ARRAY[index]);
+    val &= (~(GENMASK(15, 0)));
+    val |= data;
+    iowrite32(val, debug_port_base_address + UDP_SP_DP_ARRAY[index]);
+  }
+
+  // Set up source MAC address
+  mtip_lookup_device_by_link_index(MTIP_DEBUG_ETH_LINK_INDEX,
+                                   &port_device_index, &link_device_index);
+  mtip_mac_get_mac_address_by_device(port_device_index, 
+                                     link_device_index, saddr);
+  for(i = 0; i < ETH_ALEN; i++)
+    L2.saddr[i] = saddr[i];
+
+  for (index = 0; index < MAX_FIFO_COUNT; index++) {
+    lower_SA = (L2.saddr[0]) | (L2.saddr[1] << 8) | (L2.saddr[2] << 16) |
+               (L2.saddr[3] << 24);
+    upper_SA = (L2.saddr[4]) | (L2.saddr[5] << 8);
+
+    // write the lower bits
+    CSMLOGINFO("Value in lowerSA is %x", lower_SA);
+    CSMLOGINFO("Value in UpperSA is %x", upper_SA);
+    iowrite32(lower_SA, debug_port_base_address + L2_SA_ADDR_LO_ARRAY[index]);
+
+    // write the upper bits
+    prev_val =
+        (u32)ioread32(debug_port_base_address + L2_SA_ADDR_HI_ARRAY[index]);
+    prev_val &= (~(GENMASK(15, 0)));
+    prev_val |= ((upper_SA & GENMASK(15, 0)));
+    iowrite32(prev_val, debug_port_base_address + L2_SA_ADDR_HI_ARRAY[index]);
+  }
+
+  return;
+}
+
+void setup_default_vlan_id(void) {
+  u32 val;
+  u32 vlan_id = 0;
+  u32 vlan_tag = 1;
+  u32 tpid = 0x8100;
+  u32 vid = 0;
+  u32 tci_val = 0;
+  u32 tpid_val = 0;
+  u32 i = 0;
+  unsigned int VLAN_TAG_ADDR_ARRAY[] = {
+      VLAN_TAG_0, VLAN_TAG_1, VLAN_TAG_2, VLAN_TAG_3, VLAN_TAG_4, VLAN_TAG_5,
+      VLAN_TAG_6, VLAN_TAG_7};
+  unsigned int L2_SA_ADDR_HI_ARRAY[] = {
+      L2_SA_ADDR_HI_0, L2_SA_ADDR_HI_1, L2_SA_ADDR_HI_2, L2_SA_ADDR_HI_3,
+      L2_SA_ADDR_HI_4, L2_SA_ADDR_HI_5, L2_SA_ADDR_HI_6, L2_SA_ADDR_HI_7};
+
+  for(i = 0; i < MAX_FIFO_COUNT; i++){
+
+    vid = i + 1;
+    tpid_val = (((tpid >> 8) & GENMASK(7, 0)) | (((tpid & GENMASK(7, 0)) << 8)));
+    tci_val = (((vid >> 8) & GENMASK(7, 0)) | (((vid & GENMASK(7, 0)) << 8)));
+    vlan_id = (tci_val << 16) | tpid_val;
+    iowrite32(vlan_id, debug_port_base_address + VLAN_TAG_ADDR_ARRAY[i]);
+
+    val = (u32)ioread32(debug_port_base_address + L2_SA_ADDR_HI_ARRAY[i]);
+    val &= (~(GENMASK(16, 16)));
+    val |= ((vlan_tag) << 16);
+    iowrite32(val, debug_port_base_address + L2_SA_ADDR_HI_ARRAY[i]);
+  }
+
+  return;
+}
+
+void setup_diag_l3_saddr(u_int8_t *l3_saddr){
+  int i = 0, val = 0;
+  unsigned int L3_IPV4_SA_ARRAY[] = {ETH_DBG_IPV4_SA_0, ETH_DBG_IPV4_SA_1,
+                                     ETH_DBG_IPV4_SA_2};
+
+  for (i = 0; i < 4; i++)
+    L3.saddr[i] = l3_saddr[i];
+
+  val = (L3.saddr[0]) | (L3.saddr[1] << 8) | (L3.saddr[2] << 16) |
+        (L3.saddr[3] << 24);
+
+  CSMLOGINFO("L3 source addr val is %x", val);
+
+  for (i = 0; i < MAX_PACKET_FIFO_COUNT; i++)
+    iowrite32(val, debug_port_base_address + L3_IPV4_SA_ARRAY[i]);
+
+  return;
+}
+
+void setup_diag_l3_daddr(u_int8_t *l3_daddr){
+
+  int i = 0, val = 0;
+  unsigned int L3_IPV4_DA_ARRAY[] = {ETH_DBG_IPV4_DA_0, ETH_DBG_IPV4_DA_1,
+                                     ETH_DBG_IPV4_DA_2};
+
+  for (i = 0; i < 4; i++)
+    L3.daddr[i] = l3_daddr[i];
+
+  val = (L3.daddr[0]) | (L3.daddr[1] << 8) | (L3.daddr[2] << 16) |
+        (L3.daddr[3] << 24);
+
+  CSMLOGINFO("L3 dest addr val is %x", val);
+
+  for (i = 0; i < MAX_PACKET_FIFO_COUNT; i++)
+    iowrite32(val, debug_port_base_address + L3_IPV4_DA_ARRAY[i]);
+
+  return;
+}
+
+void setup_diag_l2_daddr(u_int8_t *l2_daddr){
+
+  int index;
+  u32 lower_DA = 0;
+  u32 upper_DA = 0;
+  u32 prev_val = 0;
+  int i = 0;
+  unsigned int L2_DA_ADDR_HI_ARRAY[] = {
+      L2_DA_ADDR_HI_0, L2_DA_ADDR_HI_1, L2_DA_ADDR_HI_2, L2_DA_ADDR_HI_3,
+      L2_DA_ADDR_HI_4, L2_DA_ADDR_HI_5, L2_DA_ADDR_HI_6, L2_DA_ADDR_HI_7};
+  unsigned int L2_DA_ADDR_LO_ARRAY[] = {
+      L2_DA_ADDR_LO_0, L2_DA_ADDR_LO_1, L2_DA_ADDR_LO_2, L2_DA_ADDR_LO_3,
+      L2_DA_ADDR_LO_4, L2_DA_ADDR_LO_5, L2_DA_ADDR_LO_6, L2_DA_ADDR_LO_7};
+
+  for(i = 0; i < ETH_ALEN; i++)
+    L2.daddr[i] = l2_daddr[i];
+
+  for (index = 0; index < MAX_FIFO_COUNT; index++) {
+    lower_DA = (L2.daddr[0]) | (L2.daddr[1] << 8) | (L2.daddr[2] << 16) |
+               (L2.daddr[3] << 24);
+    upper_DA = (L2.daddr[4]) | (L2.daddr[5] << 8);
+
+    // write the lower bits
+    CSMLOGINFO("Value in lowerSA is %x", lower_DA);
+    CSMLOGINFO("Value in UpperSA is %x", upper_DA);
+    iowrite32(lower_DA, debug_port_base_address + L2_DA_ADDR_LO_ARRAY[index]);
+
+    // write the upper bits
+    prev_val =
+        (u32)ioread32(debug_port_base_address + L2_DA_ADDR_HI_ARRAY[index]);
+    prev_val &= (~(GENMASK(15, 0)));
+    prev_val |= ((upper_DA & GENMASK(15, 0)));
+    iowrite32(prev_val, debug_port_base_address + L2_DA_ADDR_HI_ARRAY[index]);
+  }
+
+  return;
+}
+
+void setup_diag_addr_range(u_int8_t fifo_num, u_int8_t addr_range_start,
+                           u_int8_t addr_range_end) {
+
+  pr_err("setup_diag_addr_range called with fifo_num :%d addr_range_start : %d "
+         "addr_range_end : %d \n",
+         fifo_num, addr_range_start, addr_range_end);
+
+  switch (fifo_num) {
+  case FIFO_0:
+    F0.AddrRange_Start = addr_range_start;
+    F0.AddrRange_End = addr_range_end;
+    iowrite32(F0.AddrRange_Start,
+              debug_port_base_address + STREAM_FIFO_ADDR_MIN_0);
+    iowrite32(F0.AddrRange_End,
+              debug_port_base_address + STREAM_FIFO_ADDR_MAX_0);
+    break;
+  case FIFO_1:
+    F1.AddrRange_Start = addr_range_start;
+    F1.AddrRange_End = addr_range_end;
+    iowrite32(F1.AddrRange_Start,
+              debug_port_base_address + STREAM_FIFO_ADDR_MIN_1);
+    iowrite32(F1.AddrRange_End,
+              debug_port_base_address + STREAM_FIFO_ADDR_MAX_1);
+    break;
+  case FIFO_2:
+    F2.AddrRange_Start = addr_range_start;
+    F2.AddrRange_End = addr_range_end;
+    iowrite32(F2.AddrRange_Start,
+              debug_port_base_address + STREAM_FIFO_ADDR_MIN_2);
+    iowrite32(F3.AddrRange_End,
+              debug_port_base_address + STREAM_FIFO_ADDR_MAX_2);
+    break;
+  case FIFO_3:
+    F3.AddrRange_Start = addr_range_start;
+    F3.AddrRange_End = addr_range_end;
+    iowrite32(F3.AddrRange_Start,
+              debug_port_base_address + STREAM_FIFO_ADDR_MIN_3);
+    iowrite32(F3.AddrRange_End,
+              debug_port_base_address + STREAM_FIFO_ADDR_MAX_3);
+    break;
+  case FIFO_4:
+    F4.AddrRange_Start = addr_range_start;
+    F4.AddrRange_End = addr_range_end;
+    iowrite32(F4.AddrRange_Start,
+              debug_port_base_address + STREAM_FIFO_ADDR_MIN_4);
+    iowrite32(F4.AddrRange_End,
+              debug_port_base_address + STREAM_FIFO_ADDR_MAX_4);
+    break;
+  case FIFO_5:
+    F5.AddrRange_Start = addr_range_start;
+    F5.AddrRange_End = addr_range_end;
+    iowrite32(F5.AddrRange_Start,
+              debug_port_base_address + PACKET_FIFO_ADDR_MIN);
+    iowrite32(F5.AddrRange_End, debug_port_base_address + PACKET_FIFO_ADDR_MAX);
+    break;
+  case FIFO_6:
+    F6.AddrRange_Start = addr_range_start;
+    F6.AddrRange_End = addr_range_end;
+    iowrite32(F6.AddrRange_Start,
+              debug_port_base_address + PACKET_FIFO_ADDR_MIN);
+    iowrite32(F6.AddrRange_End, debug_port_base_address + PACKET_FIFO_ADDR_MAX);
+    break;
+  case FIFO_7:
+    F7.AddrRange_Start = addr_range_start;
+    F7.AddrRange_End = addr_range_end;
+    iowrite32(F7.AddrRange_Start,
+              debug_port_base_address + PACKET_FIFO_ADDR_MIN);
+    iowrite32(F7.AddrRange_End, debug_port_base_address + PACKET_FIFO_ADDR_MAX);
+    break;
+  default:
+    CSMLOGERR("Fifo num should be < 8 \n");
+    break;
+  }
+}
+void setup_diag_port(u_int8_t src_port, u_int8_t dest_port) {
+  int data;
+  int index;
+  int val;
+  unsigned int UDP_SP_DP_ARRAY[] = {DBG_UDP_SP_DP_0, DBG_UDP_SP_DP_1,
+                                    DBG_UDP_SP_DP_2};
+  pr_err("setup_diag_port called with src_port :%d dest_port : %d \n", src_port,
+         dest_port);
+
+  L3.sport = src_port;
+  data = L3.sport;
+  for (index = 0; index < MAX_PACKET_FIFO_COUNT; index++) {
+    val = (u32)ioread32(debug_port_base_address + UDP_SP_DP_ARRAY[index]);
+    val &= (~(GENMASK(15, 0)));
+    val |= ((data & GENMASK(15, 8)) >> 8);
+    val |= ((data & GENMASK(7, 0)) << 8);
+    iowrite32(val, debug_port_base_address + UDP_SP_DP_ARRAY[index]);
+  }
+
+  L3.dport = dest_port;
+  data = L3.dport;
+  for (index = 0; index < MAX_PACKET_FIFO_COUNT; index++) {
+    val = (u32)ioread32(debug_port_base_address + UDP_SP_DP_ARRAY[index]);
+    val &= (~(GENMASK(31, 16)));
+    val |= ((data & GENMASK(15, 8)) << 8);
+    val |= ((data & GENMASK(7, 0)) << 24);
+    iowrite32(val, debug_port_base_address + UDP_SP_DP_ARRAY[index]);
+  }
+}
+
+void setup_diag_flush(u_int8_t fifo_num) {
+
+  int val = -1;
+
+  pr_err("setup_diag_flush called with fifo_num :%d \n", fifo_num);
+
+  switch (fifo_num) {
+  case FIFO_0:
+    F0.flush = 1;
+    break;
+  case FIFO_1:
+    F1.flush = 1;
+    break;
+  case FIFO_2:
+    F2.flush = 1;
+    break;
+  case FIFO_3:
+    F3.flush = 1;
+    break;
+  case FIFO_4:
+    F4.flush = 1;
+    break;
+  case FIFO_5:
+    F5.flush = 1;
+    break;
+  case FIFO_6:
+    F6.flush = 1;
+    break;
+  case FIFO_7:
+    F7.flush = 1;
+    break;
+  default:
+    CSMLOGERR("Fifo num should be < 8 \n");
+    break;
+  }
+
+  sysfs_store_flush_register_set(fifo_num,&val);
+}
+
+void setup_diag_threshold(u_int8_t fifo_num, u_int8_t threshold) {
+
+  int value = 0;
+  unsigned int fifo_registers[] = {
+      STREAM_FIFO_THRESHOLD_0, STREAM_FIFO_THRESHOLD_1, STREAM_FIFO_THRESHOLD_2,
+      STREAM_FIFO_THRESHOLD_3, STREAM_FIFO_THRESHOLD_4};
+
+  pr_err("setup_diag_threshold called with fifo_num :%d threshold : %d \n",
+         fifo_num, threshold);
+
+  if (threshold <= MAXIMUM_PACKET_SIZE) {
+    value |= ((threshold / BYTE_PER_WATERMARK_UNIT) & GENMASK(15, 0));
+
+    switch (fifo_num) {
+    case FIFO_0:
+      F0.Threshold = threshold;
+      break;
+    case FIFO_1:
+      F1.Threshold = threshold;
+      break;
+    case FIFO_2:
+      F2.Threshold = threshold;
+      break;
+    case FIFO_3:
+      F3.Threshold = threshold;
+      break;
+    case FIFO_4:
+      F4.Threshold = threshold;
+      break;
+    default:
+      CSMLOGERR("Threshold not available for fifo : %d \n", fifo_num);
+      break;
+    }
+
+    iowrite32(value, debug_port_base_address + fifo_registers[fifo_num]);
+  }
+}
+
+void setup_diag_timeout(u_int8_t fifo_num, u_int8_t timeout) {
+
+  unsigned int STREAM_TIMEOUT_ARRAY[] = {F0.Timeout, F1.Timeout, F2.Timeout,
+                                         F3.Timeout, F4.Timeout};
+  unsigned int stream_fifo_registers[] = {
+      STREAM_FIFO_TIMER_0, STREAM_FIFO_TIMER_1, STREAM_FIFO_TIMER_2,
+      STREAM_FIFO_TIMER_3, STREAM_FIFO_TIMER_4};
+
+  pr_err("setup_diag_timeout called with fifo_num :%d timeout : %d \n",
+         fifo_num, timeout);
+
+  switch (fifo_num) {
+  case FIFO_0:
+    F0.Timeout = timeout;
+    break;
+  case FIFO_1:
+    F1.Timeout = timeout;
+    break;
+  case FIFO_2:
+    F2.Timeout = timeout;
+    break;
+  case FIFO_3:
+    F3.Timeout = timeout;
+    break;
+  case FIFO_4:
+    F4.Timeout = timeout;
+    break;
+  default:
+    CSMLOGERR("Timeout not available for fifo : %d \n", fifo_num);
+    break;
+  }
+
+  iowrite32(STREAM_TIMEOUT_ARRAY[fifo_num],
+            debug_port_base_address + stream_fifo_registers[fifo_num]);
+}
+
+void setup_diag_vlanID_register_set(u_int16_t vlanID, u_int32_t reg1,
+                                    u_int32_t reg2) {
+  u_int32_t val;
+  u_int32_t vlan_id = 0;
+  u_int32_t vlan_tag = 1;
+  u_int32_t tpid = 0x8100;
+  u_int32_t vid = 0;
+  u_int32_t tci_val = 0;
+  u_int32_t tpid_val = 0;
+
+  vid = vlanID;
+
+  // tpid_val = tpid;
+  tpid_val = (((tpid >> 8) & GENMASK(7, 0)) | (((tpid & GENMASK(7, 0)) << 8)));
+  tci_val = (((vid >> 8) & GENMASK(7, 0)) | (((vid & GENMASK(7, 0)) << 8)));
+
+  vlan_id = (tci_val << 16) | tpid_val;
+
+  iowrite32(vlan_id, debug_port_base_address + reg1);
+
+  val = (u32)ioread32(debug_port_base_address + reg2);
+  val &= (~(GENMASK(16, 16)));
+  val |= ((vlan_tag) << 16);
+
+  iowrite32(val, debug_port_base_address + reg2);
+}
+void setup_diag_vlanID(u_int8_t fifo_num, u_int16_t vlanID) {
+
+  switch (fifo_num) {
+
+  case FIFO_0:
+    setup_diag_vlanID_register_set(vlanID, VLAN_TAG_0, L2_SA_ADDR_HI_0);
+    F0.vlanID = vlanID;
+    break;
+  case FIFO_1:
+    setup_diag_vlanID_register_set(vlanID, VLAN_TAG_1, L2_SA_ADDR_HI_1);
+    F1.vlanID = vlanID;
+    break;
+  case FIFO_2:
+    setup_diag_vlanID_register_set(vlanID, VLAN_TAG_2, L2_SA_ADDR_HI_2);
+    F2.vlanID = vlanID;
+    break;
+  case FIFO_3:
+    setup_diag_vlanID_register_set(vlanID, VLAN_TAG_3, L2_SA_ADDR_HI_3);
+    F3.vlanID = vlanID;
+    break;
+  case FIFO_4:
+    setup_diag_vlanID_register_set(vlanID, VLAN_TAG_4, L2_SA_ADDR_HI_4);
+    F4.vlanID = vlanID;
+    break;
+  case FIFO_5:
+    setup_diag_vlanID_register_set(vlanID, VLAN_TAG_5, L2_SA_ADDR_HI_5);
+    F5.vlanID = vlanID;
+    break;
+  case FIFO_6:
+    setup_diag_vlanID_register_set(vlanID, VLAN_TAG_6, L2_SA_ADDR_HI_6);
+    F6.vlanID = vlanID;
+    break;
+  case FIFO_7:
+    setup_diag_vlanID_register_set(vlanID, VLAN_TAG_7, L2_SA_ADDR_HI_7);
+    F7.vlanID = vlanID;
+    break;
+  default:
+    CSMLOGERR("Fifo num should be < 8");
+    break;
+  }
+}
+
+mtip_debug_eth_gnl_params get_diag_result(u_int8_t fifo_num) {
+
+  mtip_debug_eth_gnl_params mtip_debug_eth_gnl_params_tbl;
+  int i = 0;
+
+  mtip_debug_eth_gnl_params_tbl.fifo_num = fifo_num;
+
+  for (i = 0; i < 4; i++) {
+    mtip_debug_eth_gnl_params_tbl.source_l3_addr[i] = L3.saddr[i];
+    mtip_debug_eth_gnl_params_tbl.dest_l3_addr[i] = L3.daddr[i];
+  }
+  for (i = 0; i < 6; i++) {
+    mtip_debug_eth_gnl_params_tbl.source_l2_addr[i] = L2.saddr[i];
+    mtip_debug_eth_gnl_params_tbl.dest_l2_addr[i] = L2.daddr[i];
+  }
+  mtip_debug_eth_gnl_params_tbl.source_port = L3.sport;
+  mtip_debug_eth_gnl_params_tbl.dest_port = L3.dport;
+
+  switch (fifo_num) {
+  case FIFO_0:
+    F0.txcount = (int)ioread32(debug_port_base_address + STREAM_PKT_CNT_0);
+    mtip_debug_eth_gnl_params_tbl.addr_range_start = F0.AddrRange_Start;
+    mtip_debug_eth_gnl_params_tbl.addr_range_end = F0.AddrRange_End;
+    mtip_debug_eth_gnl_params_tbl.flush = F0.flush;
+    mtip_debug_eth_gnl_params_tbl.threshold = F0.Threshold;
+    mtip_debug_eth_gnl_params_tbl.timeout = F0.Timeout;
+    mtip_debug_eth_gnl_params_tbl.vlanID = F0.vlanID;
+    mtip_debug_eth_gnl_params_tbl.status = F0.status;
+    mtip_debug_eth_gnl_params_tbl.txcount = F0.txcount;
+
+    break;
+  case FIFO_1:
+    F1.txcount = (int)ioread32(debug_port_base_address + STREAM_PKT_CNT_1);
+    mtip_debug_eth_gnl_params_tbl.addr_range_start = F1.AddrRange_Start;
+    mtip_debug_eth_gnl_params_tbl.addr_range_end = F1.AddrRange_End;
+    mtip_debug_eth_gnl_params_tbl.flush = F1.flush;
+    mtip_debug_eth_gnl_params_tbl.threshold = F1.Threshold;
+    mtip_debug_eth_gnl_params_tbl.timeout = F1.Timeout;
+    mtip_debug_eth_gnl_params_tbl.vlanID = F1.vlanID;
+    mtip_debug_eth_gnl_params_tbl.status = F1.status;
+    mtip_debug_eth_gnl_params_tbl.txcount = F1.txcount;
+    break;
+  case FIFO_2:
+    F2.txcount = (int)ioread32(debug_port_base_address + STREAM_PKT_CNT_2);
+    mtip_debug_eth_gnl_params_tbl.addr_range_start = F2.AddrRange_Start;
+    mtip_debug_eth_gnl_params_tbl.addr_range_end = F2.AddrRange_End;
+    mtip_debug_eth_gnl_params_tbl.flush = F2.flush;
+    mtip_debug_eth_gnl_params_tbl.threshold = F2.Threshold;
+    mtip_debug_eth_gnl_params_tbl.timeout = F2.Timeout;
+    mtip_debug_eth_gnl_params_tbl.vlanID = F2.vlanID;
+    mtip_debug_eth_gnl_params_tbl.status = F2.status;
+    mtip_debug_eth_gnl_params_tbl.txcount = F2.txcount;
+    break;
+  case FIFO_3:
+    F3.txcount = (int)ioread32(debug_port_base_address + STREAM_PKT_CNT_3);
+    mtip_debug_eth_gnl_params_tbl.addr_range_start = F3.AddrRange_Start;
+    mtip_debug_eth_gnl_params_tbl.addr_range_end = F3.AddrRange_End;
+    mtip_debug_eth_gnl_params_tbl.flush = F3.flush;
+    mtip_debug_eth_gnl_params_tbl.threshold = F3.Threshold;
+    mtip_debug_eth_gnl_params_tbl.timeout = F3.Timeout;
+    mtip_debug_eth_gnl_params_tbl.vlanID = F3.vlanID;
+    mtip_debug_eth_gnl_params_tbl.status = F3.status;
+    mtip_debug_eth_gnl_params_tbl.txcount = F3.txcount;
+    break;
+  case FIFO_4:
+    F4.txcount = (int)ioread32(debug_port_base_address + STREAM_PKT_CNT_4);
+    mtip_debug_eth_gnl_params_tbl.addr_range_start = F4.AddrRange_Start;
+    mtip_debug_eth_gnl_params_tbl.addr_range_end = F4.AddrRange_End;
+    mtip_debug_eth_gnl_params_tbl.flush = F4.flush;
+    mtip_debug_eth_gnl_params_tbl.threshold = F4.Threshold;
+    mtip_debug_eth_gnl_params_tbl.timeout = F4.Timeout;
+    mtip_debug_eth_gnl_params_tbl.vlanID = F4.vlanID;
+    mtip_debug_eth_gnl_params_tbl.status = F4.status;
+    mtip_debug_eth_gnl_params_tbl.txcount = F4.txcount;
+    break;
+  case FIFO_5:
+    F5.txcount = (int)ioread32(debug_port_base_address + PACKET_FIFO1_PKT_CNT);
+    mtip_debug_eth_gnl_params_tbl.addr_range_start = F5.AddrRange_Start;
+    mtip_debug_eth_gnl_params_tbl.addr_range_end = F5.AddrRange_End;
+    mtip_debug_eth_gnl_params_tbl.flush = F5.flush;
+    mtip_debug_eth_gnl_params_tbl.vlanID = F5.vlanID;
+    mtip_debug_eth_gnl_params_tbl.status = F5.status;
+    mtip_debug_eth_gnl_params_tbl.txcount = F5.txcount;
+    break;
+  case FIFO_6:
+    F6.txcount = (int)ioread32(debug_port_base_address + PACKET_FIFO2_PKT_CNT);
+    mtip_debug_eth_gnl_params_tbl.addr_range_start = F6.AddrRange_Start;
+    mtip_debug_eth_gnl_params_tbl.addr_range_end = F6.AddrRange_End;
+    mtip_debug_eth_gnl_params_tbl.flush = F6.flush;
+    mtip_debug_eth_gnl_params_tbl.vlanID = F6.vlanID;
+    mtip_debug_eth_gnl_params_tbl.status = F6.status;
+    mtip_debug_eth_gnl_params_tbl.txcount = F6.txcount;
+    break;
+  case FIFO_7:
+    F7.txcount = (int)ioread32(debug_port_base_address + PACKET_FIFO3_PKT_CNT);
+    mtip_debug_eth_gnl_params_tbl.addr_range_start = F7.AddrRange_Start;
+    mtip_debug_eth_gnl_params_tbl.addr_range_end = F7.AddrRange_End;
+    mtip_debug_eth_gnl_params_tbl.flush = F7.flush;
+    mtip_debug_eth_gnl_params_tbl.vlanID = F7.vlanID;
+    mtip_debug_eth_gnl_params_tbl.status = F7.status;
+    mtip_debug_eth_gnl_params_tbl.txcount = F7.txcount;
+    break;
+  default:
+    CSMLOGERR("Fifo num should be < 8 \n");
+    break;
+  }
+
+  return mtip_debug_eth_gnl_params_tbl;
+}
+
 int setup_sysfs(void __iomem *addr, struct device *dev) {
   // setup the sysfs filesystem
   int index;
@@ -271,7 +835,13 @@ int setup_sysfs(void __iomem *addr, struct device *dev) {
     setup_AXI_Address_Range(index);
   }
 
-  return -1;
+  // Setup common L2/L3 params
+  setup_common_params();
+
+  // Set default VLAN IDs
+  setup_default_vlan_id();
+
+  return 0;
 }
 
 /*
