@@ -1,7 +1,7 @@
 //SPDX-License-Identifier: GPL-2.0-only
 
 /*
-* Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+* Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
 */
 
 /*
@@ -20,9 +20,30 @@
 #include "macsec_eth.h"
 #include "eip_macsec.h"
 
-
+/* ETHSS_FHx_MACSEC_WRAPPER_CSR Init sequence offsets and recommended values*/
+#define MACSEC_WRAPPER_CFG_REG_OFFSET    0x000A8000
 #define WRAPPER_MACSEC_BYPASS_REG_OFFSET 0x000A8028
-#define EIP_WRAPPER_BYPASS_EN BIT(0)
+#define MCSC_AMF_CFG_REG                 0x000A8030
+#define MCSC_CALENDAR_CFG_REG            0x000A8310
+#define MCSC_EIP218_AMF_CFG_REG          0x000A8314
+#define ETHSS_FH0_EIP218_0_CONTROL       0x000A0000
+#define ETHSS_FH0_EIP218_1_CONTROL       0x000A0020
+#define ETHSS_FH0_EIP218_2_CONTROL       0x000A0040
+#define ETHSS_FH0_EIP218_3_CONTROL       0x000A0060
+
+#define RATE_CTRL_BUF_EN 0x1
+/* Setting TX_AMF_VAL to 0x10 and RX_AMF_VAL 0x00 */
+#define AMF_CFG_REG_VAL 0x1000
+
+#define ALL_CH_RR_EN BIT(0)|BIT(4)|BIT(8)|BIT(12)
+/* Set All channels AMF value to fifo max 16*/
+#define ALL_EIP218_AMF_VAL 0x10101010
+
+#define EIP218_CONTROL_IFG_BYTES ( 0xA << 8)
+#define EIP218_CONTROL_MODULO_8  ( 0x0 << 4)
+#define EIP218_CONTROL_MODE_SELECT 0x1
+#define EIP_WRAPPER_BYPASS_DISABLE 0x1
+#define EIP_WRAPPER_BYPASS_ENABLE 0x0
 
 extern void
 Device_SetPlatform(uint32_t __iomem * BaseAddr_p, uint32_t device_id);
@@ -80,8 +101,7 @@ static int eip_enable_clock(struct platform_device *pdev, uint32_t port_id)
 	return ret;
 }
 
-static int eip_device_init(bool fVerbose, bool fIngress,
-			    unsigned int device_id)
+static int eip_device_init(bool fVerbose, bool fIngress, unsigned int device_id)
 {
 	int rc;
 	CfyE_Init_t CfyE_Settings;
@@ -98,8 +118,8 @@ static int eip_device_init(bool fVerbose, bool fIngress,
 	ZEROINIT(CfyE_Settings);
 
 	rc = CfyE_Device_Init(device_id,
-				   fIngress ? CFYE_ROLE_INGRESS :
-				   CFYE_ROLE_EGRESS, &CfyE_Settings);
+			      fIngress ? CFYE_ROLE_INGRESS :
+			      CFYE_ROLE_EGRESS, &CfyE_Settings);
 	if (rc != CFYE_STATUS_OK) {
 		LOG_CRIT
 		    ("DA_MACSEC: CfyE could not be initialized, error=%d\n",
@@ -118,8 +138,8 @@ static int eip_device_init(bool fVerbose, bool fIngress,
 	SecY_Settings.DropBypass.DropType = SECY_SA_DROP_PKT_ERROR;
 
 	rc = SecY_Device_Init(device_id,
-				   fIngress ? SECY_ROLE_INGRESS :
-				   SECY_ROLE_EGRESS, &SecY_Settings);
+			      fIngress ? SECY_ROLE_INGRESS :
+			      SECY_ROLE_EGRESS, &SecY_Settings);
 
 	if (rc != SECY_STATUS_OK) {
 		LOG_CRIT
@@ -148,7 +168,7 @@ static int eip_port_init(uint32_t port_id)
 		LOG_CRIT("Ingress Init config failed, return;");
 		return -1;
 	};
-	if (eip_device_init(true, false, egress_device)< 0) {
+	if (eip_device_init(true, false, egress_device) < 0) {
 		LOG_CRIT("Egress Init config failed, return;");
 		return -1;
 
@@ -189,7 +209,7 @@ static int eip_port_deinit(uint32_t port_id)
 		return -1;
 	}
 
-	if (eip_device_deinit(true, false, egress_device) <0) {
+	if (eip_device_deinit(true, false, egress_device) < 0) {
 		/* capture error */
 		LOG_CRIT("%s: failed uninit for egress device %d", __func__,
 			 egress_device);
@@ -199,19 +219,95 @@ static int eip_port_deinit(uint32_t port_id)
 	return 0;
 }
 
-static inline void wrapper_bypass_set(u32 port_id, u32 enable_val)
+static inline void wrapper_bypass_set(u32 port_id, bool enable)
+{
+	u32 enable_val;
+
+	enable_val = enable ? EIP_WRAPPER_BYPASS_ENABLE : EIP_WRAPPER_BYPASS_DISABLE;
+	writel(enable_val, eip_device_platform_data[port_id].eip_base +
+	       WRAPPER_MACSEC_BYPASS_REG_OFFSET);
+	pr_info(" eip_main: wrapper bypass ddr = 0x%x, val = %d \n",
+		eip_device_platform_data[port_id].eip_base +
+		WRAPPER_MACSEC_BYPASS_REG_OFFSET, enable_val);
+}
+
+static inline void macsec_wrapper_init_config(u32 port_id)
 {
 
 	u32 val;
 
-	val = readl(eip_device_platform_data[port_id].eip_base +
-		    WRAPPER_MACSEC_BYPASS_REG_OFFSET);
-	val = val | enable_val;
+	val = RATE_CTRL_BUF_EN;
 	writel(val, eip_device_platform_data[port_id].eip_base +
-	       WRAPPER_MACSEC_BYPASS_REG_OFFSET);
-	pr_err(" eip_main: wrapper bypass ddr = 0x%x, val = %d \n",
+	       MACSEC_WRAPPER_CFG_REG_OFFSET);
+	pr_info(" eip_main: MACSEC_WRAPPER_CFG_REG  ddr = 0x%x, val = %d \n",
+		eip_device_platform_data[port_id].eip_base +
+		MACSEC_WRAPPER_CFG_REG_OFFSET, val);
+
+	val = AMF_CFG_REG_VAL;
+	writel(val, eip_device_platform_data[port_id].eip_base +
+	       MCSC_AMF_CFG_REG);
+	pr_info(" eip_main: MCSC_AMF_CFG_REG  ddr = 0x%x, val = %d \n",
+		eip_device_platform_data[port_id].eip_base +
+		MCSC_AMF_CFG_REG, val);
+
+	val = ALL_CH_RR_EN;
+	writel(val, eip_device_platform_data[port_id].eip_base +
+	       MCSC_CALENDAR_CFG_REG);
+	pr_info(" eip_main: MCSC_CALENDAR_CFG_REG  ddr = 0x%x, val = %d \n",
+		eip_device_platform_data[port_id].eip_base +
+		MCSC_CALENDAR_CFG_REG, val);
+
+	val = ALL_EIP218_AMF_VAL;
+	writel(val, eip_device_platform_data[port_id].eip_base +
+	       MCSC_EIP218_AMF_CFG_REG);
+	pr_info(" eip_main: MCSC_EIP218_AMF_CFG_REG  ddr = 0x%x, val = %d \n",
+		eip_device_platform_data[port_id].eip_base +
+		MCSC_EIP218_AMF_CFG_REG, val);
+
+	val =
+	    EIP218_CONTROL_IFG_BYTES | EIP218_CONTROL_MODULO_8 |
+	    EIP218_CONTROL_MODE_SELECT;
+	writel(val,
 	       eip_device_platform_data[port_id].eip_base +
-	       WRAPPER_MACSEC_BYPASS_REG_OFFSET, val);
+	       ETHSS_FH0_EIP218_0_CONTROL);
+	pr_info
+	    (" eip_main: ETHSS_FH0_EIP218_0_CONTROL  ddr = 0x%x, val = %d \n",
+	     eip_device_platform_data[port_id].eip_base +
+	     ETHSS_FH0_EIP218_0_CONTROL, val);
+
+	val =
+	    EIP218_CONTROL_IFG_BYTES | EIP218_CONTROL_MODULO_8 |
+	    EIP218_CONTROL_MODE_SELECT;
+	writel(val,
+	       eip_device_platform_data[port_id].eip_base +
+	       ETHSS_FH0_EIP218_1_CONTROL);
+	pr_info
+	    (" eip_main: ETHSS_FH0_EIP218_1_CONTROL  ddr = 0x%x, val = %d \n",
+	     eip_device_platform_data[port_id].eip_base +
+	     ETHSS_FH0_EIP218_1_CONTROL, val);
+
+	val =
+	    EIP218_CONTROL_IFG_BYTES | EIP218_CONTROL_MODULO_8 |
+	    EIP218_CONTROL_MODE_SELECT;
+	writel(val,
+	       eip_device_platform_data[port_id].eip_base +
+	       ETHSS_FH0_EIP218_2_CONTROL);
+	pr_info
+	    (" eip_main: ETHSS_FH0_EIP218_2_CONTROL  ddr = 0x%x, val = %d \n",
+	     eip_device_platform_data[port_id].eip_base +
+	     ETHSS_FH0_EIP218_2_CONTROL, val);
+
+	val =
+	    EIP218_CONTROL_IFG_BYTES | EIP218_CONTROL_MODULO_8 |
+	    EIP218_CONTROL_MODE_SELECT;
+	writel(val,
+	       eip_device_platform_data[port_id].eip_base +
+	       ETHSS_FH0_EIP218_3_CONTROL);
+	pr_info
+	    (" eip_main: ETHSS_FH0_EIP218_3_CONTROL  ddr = 0x%x, val = %d \n",
+	     eip_device_platform_data[port_id].eip_base +
+	     ETHSS_FH0_EIP218_3_CONTROL, val);
+
 }
 
 static int eip_probe(struct platform_device *pdev)
@@ -282,7 +378,8 @@ static int eip_probe(struct platform_device *pdev)
 	Device_SetPlatform(eip_device_platform_data[port_id].eip_base,
 			   eip_device_platform_data[port_id].egress_device_id);
 
-	wrapper_bypass_set(port_id, EIP_WRAPPER_BYPASS_EN);
+	macsec_wrapper_init_config(port_id);
+	wrapper_bypass_set(port_id, false);
 
 	ret = eip_port_init(port_id);
 	if (ret < 0) {
@@ -301,6 +398,7 @@ static int eip_remove(struct platform_device *pdev)
 
 	LOG_CRIT("eip_main: Currently not supported ");
 
+	wrapper_bypass_set(port_id, true);
 	ret = eip_port_deinit(port_id);
 	if (!ret)
 		LOG_CRIT("eip_main: Device %d uniniatlized succesfully",
