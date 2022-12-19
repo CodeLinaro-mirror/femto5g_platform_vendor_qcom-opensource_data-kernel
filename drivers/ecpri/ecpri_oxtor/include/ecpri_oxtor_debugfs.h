@@ -25,7 +25,7 @@
 #define TEMP_STR_MIN_SIZE (16)
 #define RESET_STR(str) memset(str, 0, sizeof(str))
 #define RESET_VAL(val) val = 0
-#define FH_WRAPPER_SIZE (12)
+#define FH_WRAPPER_SIZE (32)
 #define XBAR_WRAPPER_SIZE (9)
 
 int setup_debugfs_directory(void);
