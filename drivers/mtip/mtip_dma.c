@@ -538,8 +538,11 @@ static int mtip_dma_process_packet(struct net_device *netdev,
    // we expect to receive the entire packet in one buffer
    if (num_of_buffers != 1)
    {
-      CSMLOGDBG("num_of_buffers %d != 1.... dropping\n", num_of_buffers);
-      return -1;
+      CSMLOGERR("num_of_buffers %d != 1.... dropping\n", num_of_buffers);
+
+      // free up the data structs and return for now
+      rv = -1;
+      goto out;
    }
 
    base = buffs[0]->virt_base;
@@ -555,7 +558,9 @@ static int mtip_dma_process_packet(struct net_device *netdev,
        // dump the contents of the modified packet
        mtip_dma_dump_packet(base, size);
 #endif
-       return -1;
+       // free up the data structs and return for now
+       rv = -1;
+       goto out;
    }
 
    CSMLOGDBG("Rx packet received status code: %d\n", status_code);
@@ -607,12 +612,15 @@ static int mtip_dma_process_packet(struct net_device *netdev,
 
    napi_gro_receive(napi_ptr, skb);
 
+out:
    // free the container
    for (i = 0; i < num_of_buffers; ++i) 
    {
        kfree(buffs[i]);
    }
    kfree(buffs);
+
+   kfree(pkt);
 
    return rv;
 }
