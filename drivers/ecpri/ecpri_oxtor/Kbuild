@@ -44,5 +44,3 @@ ecpri_oxtor-$(CONFIG_ECPRI_OXTOR) += \
 		src/ecpri_oxtor_rx.o \
 		src/ecpri_oxtor_debugfs.o
 
-CDEFINES += -DBUILD_TIMESTAMP=\"$(shell date -u +'%Y-%m-%dT%H:%M:%SZ')\"
-

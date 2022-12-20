@@ -54,5 +54,3 @@ lassen_mtip-y += mtip_phy.o
 lassen_mtip-y += debug_eth/mtip_debug_eth.o
 lassen_mtip-y += debug_eth/mtip_sysfs.o
 
-CDEFINES += -DBUILD_TIMESTAMP=\"$(shell date -u +'%Y-%m-%dT%H:%M:%SZ')\"
-

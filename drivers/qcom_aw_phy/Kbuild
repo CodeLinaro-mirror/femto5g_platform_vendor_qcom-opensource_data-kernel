@@ -52,5 +52,3 @@ lassen_qcom_aw_phy-y += \
 	aw_c_api/aw_pmd_rx_dsp_get.o \
 	aw_c_api/interface.o \
 
-CDEFINES += -DBUILD_TIMESTAMP=\"$(shell date -u +'%Y-%m-%dT%H:%M:%SZ')\"
-

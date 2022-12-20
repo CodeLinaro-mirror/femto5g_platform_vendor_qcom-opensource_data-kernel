@@ -37,5 +37,3 @@ endif
 obj-$(CONFIG_LASSEN_MACSEC) += lassen_macsec.o
 lassen_macsec-y += macsec_main.o
 
-CDEFINES += -DBUILD_TIMESTAMP=\"$(shell date -u +'%Y-%m-%dT%H:%M:%SZ')\"
-
