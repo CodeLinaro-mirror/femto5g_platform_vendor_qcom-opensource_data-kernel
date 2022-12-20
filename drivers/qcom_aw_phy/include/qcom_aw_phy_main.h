@@ -194,7 +194,9 @@ struct qcom_aw_phy_inst_config{
 	struct qcom_aw_lane_params        lane_params[PHY_LANE_MAX];
 	struct mutex                      lane_lock[PHY_LANE_MAX];
 	uint8_t                           cdr_lock_retry_counter[PHY_LANE_MAX];
+	bool                              cdr_lock_cb_flag[PHY_LANE_MAX];
 	bool                              bring_up_status;
+	struct mutex                      phy_inst_lock;
 	int                               sfp_port_type;
 };
 

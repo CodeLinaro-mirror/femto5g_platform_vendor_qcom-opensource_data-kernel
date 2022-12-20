@@ -36,7 +36,7 @@ struct qcom_aw_phy_mtip_if_info {
 	eth_phy_iface_phy_ready_cb    ready_cb;
 	void                         *ready_cb_user_data;
 	eth_phy_iface_an_complete_cb  an_complete_cb;
-	eth_phy_iface_cdr_lock_cb     cdr_lock_success;
+	eth_phy_iface_cdr_lock_cb     cdr_lock_cb;
 };
 
 /*-------------------------------------------------------------------
