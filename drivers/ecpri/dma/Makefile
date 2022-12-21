@@ -1,6 +1,6 @@
-ECPRIDMADRVTOP = $(src)/drivers
+ECPRIDMADRVTOP = $(LASSEN_ROOT)/drivers/ecpri/dma/drivers
 
-ccflags-y += -I$(src)/../../include
+ccflags-y += -I$(LASSEN_ROOT)/drivers/include
 ccflags-y += -I$(ECPRIDMADRVTOP)/gsi
 ccflags-y += -I$(ECPRIDMADRVTOP)/gsi/gsihal
 ccflags-y += -I$(ECPRIDMADRVTOP)/ecpri_dma
