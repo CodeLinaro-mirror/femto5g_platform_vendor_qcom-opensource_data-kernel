@@ -258,8 +258,7 @@ int ecpriss_xbar_l2_lut(void);
 int ecpriss_xbar_oc_rx_lut(uint32_t port_index,
 		ecpriss_flow_tx_cfg_s *xbar_tx_cfg);
 void ecpriss_xbar_non_ecpri_lut_cfg(void);
-void ecpriss_xbar_print_stats(void);
-void ecpriss_xbar_print_stats(void);
-void ecpriss_xbar_config_sats(void);
+void ecpriss_xbar_stats_update(void);
+void ecpriss_xbar_config_stats_update(void);
 
 #endif

@@ -164,7 +164,7 @@ void debug_qudp_egress_config(void)
 	}
 }
 // ecpriss_pdata->cfg_stats.qudp_cfg.egress
-void ecpriss_qudp_egress_config_stats(int32_t fh_index)
+void ecpriss_qudp_egress_config_stats_update(int32_t fh_index)
 {
 	int32_t egress_table_index = 0;
 
@@ -282,7 +282,7 @@ void debug_qudp_ingress_config(void)
 
 }
 // ecpriss_pdata->cfg_stats.qudp_cfg.ingress
-void ecpriss_qudp_ingress_config_stats(int32_t fh_index)
+void ecpriss_qudp_ingress_config_stats_update(int32_t fh_index)
 {
 	uint32_t flag = 1;
 	int32_t fltr_index = 0;
@@ -383,7 +383,7 @@ void ecpriss_qudp_ingress_config_stats(int32_t fh_index)
 	}
 	return;
 }
-void ecpriss_qudp_print_fh_egress_stats(uint32_t port_index, uint32_t link_index)
+void ecpriss_qudp_fh_egress_stats_update(uint32_t port_index, uint32_t link_index)
 {
 	uint32_t lsb_val = 0;
 	uint64_t msb_val = 0;
@@ -446,7 +446,7 @@ void ecpriss_qudp_print_fh_egress_stats(uint32_t port_index, uint32_t link_index
 }
 
 
-void ecpriss_qudp_print_fh_ingress_stats(uint32_t port_index, uint32_t link_index)
+void ecpriss_qudp_fh_ingress_stats_update(uint32_t port_index, uint32_t link_index)
 {
 	uint32_t lsb_val = 0;
 	uint64_t msb_val = 0;
@@ -570,7 +570,7 @@ void ecpriss_qudp_print_fh_ingress_stats(uint32_t port_index, uint32_t link_inde
 			ECPRI_UDP_FH_INGRESS_IP_FILTERED_PACKETS_MSB_PORT_p_LINK_n,port_index,link_index);
 
 	val = msb_val >> MSB_SHIFT | lsb_val;
-	ecpriss_pdata->qudp_ctx->fh_port_cfg[port_index].stats.ingress_ip_filtered_packets[link_index]=val;
+	ecpriss_pdata->qudp_ctx->fh_port_cfg[port_index].stats.ingress_ip_filtered_packets[link_index] = val;
 	pr_info("ECPRI_UDP_FH_INGRESS_IP_FILTERED_PACKETS : port_index :%d link_index %d value = %d\n", port_index,link_index,val);
 
 	ecpriss_qudp_hal_read_reg_mn_fields(ECPRISS_QUDP_FH,
@@ -1084,6 +1084,19 @@ static int ecpriss_qudp_ingress_init_cfg(void)
 	int port_type = 0;
 	int port_idx = 0;
 
+	ecpri_qudp_hwio_def_ecpri_udp_fh_debug_features_cfg_s udp_fh_debug_feature_cfg;
+	ecpriss_qudp_hal_read_reg_n_fields(ECPRISS_QUDP_FH,
+				ECPRI_UDP_FH_DEBUG_FEATURES_CFG,
+				0,
+				&udp_fh_debug_feature_cfg);
+
+	 udp_fh_debug_feature_cfg.watermark_en = 1;
+	 udp_fh_debug_feature_cfg.en_clear_watermark_on_read = 1;
+
+ 	 ecpriss_qudp_hal_write_reg_n_fields(ECPRISS_QUDP_FH,
+				ECPRI_UDP_FH_DEBUG_FEATURES_CFG,
+				0,
+				&udp_fh_debug_feature_cfg);
 
 	for(port_type=0;port_type<ECPRISS_PORT_TYPE_MAX;port_type++)
 	{
