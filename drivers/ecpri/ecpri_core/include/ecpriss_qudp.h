@@ -12,7 +12,7 @@
 #define MAX_WHITELIST_ENTRIES       16
 #define QUDP_IRQ_MAX                6
 #define ECPRISS_MAX_LINKS           4
-
+#define MAX_QUDP_WM_ENTRY    10
 typedef enum
 {
 	ECPRISS_UDP_C2C_IRQ_PORT0,
@@ -111,6 +111,20 @@ typedef struct ecpriss_qudp_stats
 	uint32_t fh_ingress_udp_watermark_port_p_link_n_pkt_handler_sync_fifos[ECPRISS_MAX_LINKS];
 	uint32_t fh_ingress_udp_watermark_port_p_link_n_cmd_fifo[ECPRISS_MAX_LINKS];
 	uint32_t fh_ingress_udp_watermark_port_p_link_n_pkt_fifo[ECPRISS_MAX_LINKS];
+
+	uint32_t fh_ingress_wm_ptp_fifo[ECPRISS_MAX_LINKS][MAX_QUDP_WM_ENTRY];
+	uint32_t fh_ingress_wm_sync_fifo[ECPRISS_MAX_LINKS][MAX_QUDP_WM_ENTRY];
+	uint32_t fh_ingress_wm_cmd_fifo[ECPRISS_MAX_LINKS][MAX_QUDP_WM_ENTRY];
+	uint32_t fh_ingress_wm_pkt_fifo[ECPRISS_MAX_LINKS][MAX_QUDP_WM_ENTRY];
+
+	uint32_t fh_egress_output_fifo[MAX_QUDP_WM_ENTRY];
+	uint32_t fh_egress_cs_update_fifo[MAX_QUDP_WM_ENTRY];
+	uint32_t fh_egress_cs_calc_fifo[MAX_QUDP_WM_ENTRY];
+	uint32_t fh_egress_hdri_output_fifo[MAX_QUDP_WM_ENTRY];
+	uint32_t fh_egress_hdri_cfg_index_fifo[MAX_QUDP_WM_ENTRY];
+	uint32_t fh_egress_pkt_fifo[MAX_QUDP_WM_ENTRY];
+
+	uint64_t curr_wm_index;
 }ecpriss_qudp_stats;
 
 typedef struct ecpriss_qudp_interrupt_stats

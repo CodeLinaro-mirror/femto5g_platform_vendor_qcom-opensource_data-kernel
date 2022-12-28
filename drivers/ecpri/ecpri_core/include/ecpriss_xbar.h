@@ -11,6 +11,7 @@
 #define NUM_OF_FHP 3
 #define NUM_OF_FLTR 16
 #define NUM_EGRESS_ENTRY 255
+#define MAX_XBAR_WM_ENTRY 10
 
 #include "ecpriss_xbar_hal.h"
 #include "ecpriss_flow.h"
@@ -83,6 +84,18 @@ typedef struct ecpriss_xbar_stats_s
 	uint64_t xbar_c2ctx_pkt_cnt[TOTAL_LINKS];
 	uint64_t xbar_ocrx_pkt_cnt[XBAR_LINKS];
 	uint64_t xbar_octx_pkt_cnt[XBAR_LINKS];
+	uint32_t ocrx_fh_wm_fh0[MAX_XBAR_WM_ENTRY];
+	uint32_t ocrx_fh_wm_fh1[MAX_XBAR_WM_ENTRY];
+	uint32_t ocrx_fh_wm_fh2[MAX_XBAR_WM_ENTRY];
+	uint32_t ocrx_0_1_wm_cc0[MAX_XBAR_WM_ENTRY];
+	uint32_t ocrx_0_1_wm_cc1[MAX_XBAR_WM_ENTRY];
+	uint32_t ocrx_2_3_wm_cc2[MAX_XBAR_WM_ENTRY];
+	uint32_t ocrx_2_3_wm_cc3[MAX_XBAR_WM_ENTRY];
+	uint32_t octx_0_1_wm_cc0[MAX_XBAR_WM_ENTRY];
+	uint32_t octx_0_1_wm_cc1[MAX_XBAR_WM_ENTRY];
+	uint32_t octx_2_3_wm_cc2[MAX_XBAR_WM_ENTRY];
+	uint32_t octx_2_3_wm_cc3[MAX_XBAR_WM_ENTRY];
+	uint64_t curr_wm_index;
 	fh_port_config xbar_fh_port[NUM_OF_FHP];
 }ecpriss_xbar_stats_s;
 

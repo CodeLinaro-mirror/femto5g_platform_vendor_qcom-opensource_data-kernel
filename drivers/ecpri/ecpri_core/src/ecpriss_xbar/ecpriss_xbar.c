@@ -71,6 +71,7 @@ void ecpriss_xbar_stats_update(void)
 {
 	uint64_t val=0;
 	int link_index;
+	uint64_t curr_wm_index = 0;
 
 	ecpri_xbar_hwio_def_ecpri_xbar_xbar_dbg_ocrx_fh_buff_watermark_s xbar_ocrx_fh_buff_watermark;
 	ecpri_xbar_hwio_def_ecpri_xbar_xbar_dbg_ocrx_0_1_buff_watermark_s xbar_dbg_ocrx_0_1_buff_watermark;
@@ -79,6 +80,9 @@ void ecpriss_xbar_stats_update(void)
 	ecpri_xbar_hwio_def_ecpri_xbar_xbar_dbg_octx_oc_2_3_buff_watermark_s octx_oc_2_3_buff_watermark;
 	ecpri_xbar_hwio_def_ecpri_xbar_xbar_dbg_fhrx_unknown_pcid_cnt_s xbar_dbg_fhrx_unknown_pcid_cnt;
 	ecpri_xbar_hwio_def_ecpri_xbar_xbar_dbg_ocrx_unknown_pcid_cnt_s xbar_dbg_ocrx_unknown_pcid_cnt;
+
+	curr_wm_index = ecpriss_pdata->xbar_ctx->stats.curr_wm_index % MAX_XBAR_WM_ENTRY;
+	ecpriss_pdata->xbar_ctx->stats.curr_wm_index++ ;
 
 	for(link_index=0;link_index<TOTAL_LINKS;link_index++) {
 		val = ecpriss_xbar_hal_read_reg_n(ECPRISS_XBAR_GLOBAL,ECPRI_XBAR_XBAR_DBG_FHRX_PKT_CNT_n,link_index);
@@ -169,6 +173,11 @@ void ecpriss_xbar_stats_update(void)
 	ecpriss_pdata->xbar_ctx->stats.xbar_ocrx_fh_buff_watermark_fh1 = xbar_ocrx_fh_buff_watermark.fh1;
 	ecpriss_pdata->xbar_ctx->stats.xbar_ocrx_fh_buff_watermark_fh2 = xbar_ocrx_fh_buff_watermark.fh2;
 
+	ecpriss_pdata->xbar_ctx->stats.ocrx_fh_wm_fh0[curr_wm_index] = xbar_ocrx_fh_buff_watermark.fh0;
+	ecpriss_pdata->xbar_ctx->stats.ocrx_fh_wm_fh1[curr_wm_index] = xbar_ocrx_fh_buff_watermark.fh1;
+	ecpriss_pdata->xbar_ctx->stats.ocrx_fh_wm_fh2[curr_wm_index] = xbar_ocrx_fh_buff_watermark.fh2;
+
+
 	pr_debug("ECPRI_XBAR_XBAR_DBG_FHTX_UC_PKT_CNT val = %u\n",
 			xbar_ocrx_fh_buff_watermark);
 
@@ -177,6 +186,9 @@ void ecpriss_xbar_stats_update(void)
 			0, &xbar_dbg_ocrx_0_1_buff_watermark);
 	ecpriss_pdata->xbar_ctx->stats.xbar_dbg_ocrx_0_1_buff_watermark_cc0 = xbar_dbg_ocrx_0_1_buff_watermark.cc0;
 	ecpriss_pdata->xbar_ctx->stats.xbar_dbg_ocrx_0_1_buff_watermark_cc1 = xbar_dbg_ocrx_0_1_buff_watermark.cc1;
+
+	ecpriss_pdata->xbar_ctx->stats.ocrx_0_1_wm_cc0[curr_wm_index] = xbar_dbg_ocrx_0_1_buff_watermark.cc0;
+	ecpriss_pdata->xbar_ctx->stats.ocrx_0_1_wm_cc1[curr_wm_index] = xbar_dbg_ocrx_0_1_buff_watermark.cc1;
 
 	pr_debug("ECPRI_XBAR_XBAR_DBG_OCRX_0_1_BUFF_WATERMARK val = %u\n",
 			xbar_dbg_ocrx_0_1_buff_watermark);
@@ -187,6 +199,10 @@ void ecpriss_xbar_stats_update(void)
 	ecpriss_pdata->xbar_ctx->stats.xbar_dbg_ocrx_2_3_buff_watermark_cc2 = xbar_dbg_ocrx_2_3_buff_watermark.cc2;
 	ecpriss_pdata->xbar_ctx->stats.xbar_dbg_ocrx_2_3_buff_watermark_cc3 = xbar_dbg_ocrx_2_3_buff_watermark.cc3;
 
+	ecpriss_pdata->xbar_ctx->stats.ocrx_2_3_wm_cc2[curr_wm_index] = xbar_dbg_ocrx_2_3_buff_watermark.cc2;
+	ecpriss_pdata->xbar_ctx->stats.ocrx_2_3_wm_cc3[curr_wm_index] = xbar_dbg_ocrx_2_3_buff_watermark.cc3;
+
+
 	pr_debug("ECPRI_XBAR_XBAR_DBG_OCRX_2_3_BUFF_WATERMARK, val = %u\n",
 			xbar_dbg_ocrx_2_3_buff_watermark);
 
@@ -196,6 +212,10 @@ void ecpriss_xbar_stats_update(void)
 	ecpriss_pdata->xbar_ctx->stats.octx_oc_0_1_buff_watermark_cc0 = octx_oc_0_1_buff_watermark.cc0;
 	ecpriss_pdata->xbar_ctx->stats.octx_oc_0_1_buff_watermark_cc1 = octx_oc_0_1_buff_watermark.cc1;
 
+	ecpriss_pdata->xbar_ctx->stats.octx_0_1_wm_cc0[curr_wm_index] = octx_oc_0_1_buff_watermark.cc0;
+	ecpriss_pdata->xbar_ctx->stats.octx_0_1_wm_cc1[curr_wm_index] = octx_oc_0_1_buff_watermark.cc1;
+
+
 	pr_debug("ECPRI_XBAR_XBAR_DBG_OCTX_OC_0_1_BUFF_WATERMARK, val = %u\n",
 			octx_oc_0_1_buff_watermark);
 
@@ -204,6 +224,10 @@ void ecpriss_xbar_stats_update(void)
 			0, &octx_oc_2_3_buff_watermark);
 	ecpriss_pdata->xbar_ctx->stats.octx_oc_2_3_buff_watermark_cc2 = octx_oc_2_3_buff_watermark.cc2;
 	ecpriss_pdata->xbar_ctx->stats.octx_oc_2_3_buff_watermark_cc3 = octx_oc_2_3_buff_watermark.cc3;
+
+	ecpriss_pdata->xbar_ctx->stats.octx_2_3_wm_cc2[curr_wm_index] = octx_oc_2_3_buff_watermark.cc2;
+	ecpriss_pdata->xbar_ctx->stats.octx_2_3_wm_cc3[curr_wm_index] = octx_oc_2_3_buff_watermark.cc3;
+
 
 	pr_debug("ECPRI_XBAR_XBAR_DBG_OCTX_OC_2_3_BUFF_WATERMARK, val = %u\n",
 			octx_oc_2_3_buff_watermark);
