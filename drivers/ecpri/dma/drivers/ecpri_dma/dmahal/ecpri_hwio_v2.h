@@ -1,6 +1,6 @@
 /*
  * SPDX-License-Identifier: GPL-2.0-only
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 #ifndef __ECPRI_HWIO_V2_H__
 #define __ECPRI_HWIO_V2_H__
@@ -24,33 +24,53 @@
 */
 
 /*----------------------------------------------------------------------------
- * MODULE: ECPRI_DMA
+ * MODULE: ECPRI_DMA Bases
  *--------------------------------------------------------------------------*/
-// TODO: Collect and order all REG_BASES
-#define ECPRI_DMA_DEBUG_REG_BASE                                       (ECPRI_WRAPPER_BASE      + 0x0033c000)
-#define ECPRI_DMA_DEBUG_REG_BASE_PHYS                                  (ECPRI_WRAPPER_BASE_PHYS + 0x0033c000)
-#define ECPRI_DMA_DEBUG_REG_BASE_OFFS                                  0x0033c000
-
-
-#define ECPRI_DMA_RAM_REG_BASE                                            (ECPRI_WRAPPER_BASE      + 0x00340000)
-#define ECPRI_DMA_RAM_REG_BASE_SIZE                                       0x10000
-#define ECPRI_DMA_RAM_REG_BASE_USED                                       0xdffc
-#define ECPRI_DMA_RAM_REG_BASE_PHYS                                       (ECPRI_WRAPPER_BASE_PHYS + 0x00340000)
-#define ECPRI_DMA_RAM_REG_BASE_OFFS                                       0x00340000
-
-#define ECPRI_DMA_REG_BASE   (ECPRI_WRAPPER_BASE      + 0x00300000)
+ /*	ECPRI_DMA_REG_BASE_OFFS is 0x00300000 but DMA driver already maps memory
+     directly to this offset, therefor HAL shouldn't add it again */
+#define ECPRI_DMA_REG_BASE   (ECPRI_WRAPPER_BASE)
 #define ECPRI_DMA_REG_BASE_SIZE 0x40000
 #define ECPRI_DMA_REG_BASE_USED 0x0
-#define ECPRI_DMA_REG_BASE_PHYS (ECPRI_WRAPPER_BASE_PHYS + 0x00300000)
-/*	ECPRI_DMA_REG_BASE_OFFS is 0x00300000 but DMA driver already maps memory
-    directly to this offset, therefor HAL shouldn't add it again */
-#define ECPRI_DMA_REG_BASE_OFFS 0x0
+#define ECPRI_DMA_REG_BASE_PHYS (ECPRI_WRAPPER_BASE_PHYS)
+#define ECPRI_DMA_REG_BASE_OFFS (0x0)
 
-#define ECPRI_DMA_NON_SECURED_REG_BASE                                                                                   (ECPRI_WRAPPER_BASE      + 0x00300000)
+#define ECPRI_DMA_NON_SECURED_REG_BASE                                                                                   (ECPRI_WRAPPER_BASE      + 0x0)
 #define ECPRI_DMA_NON_SECURED_REG_BASE_SIZE                                                                              0x20000
 #define ECPRI_DMA_NON_SECURED_REG_BASE_USED                                                                              0x13008
-#define ECPRI_DMA_NON_SECURED_REG_BASE_PHYS                                                                              (ECPRI_WRAPPER_BASE_PHYS + 0x00300000)
-#define ECPRI_DMA_NON_SECURED_REG_BASE_OFFS                                                                              0x00300000
+#define ECPRI_DMA_NON_SECURED_REG_BASE_PHYS                                                                              (ECPRI_WRAPPER_BASE_PHYS + 0x0)
+#define ECPRI_DMA_NON_SECURED_REG_BASE_OFFS                                                                              (0x0)
+
+#define ECPRI_DMA_EES_REG_BASE                                                               (ECPRI_WRAPPER_BASE      + 0x00020000)
+#define ECPRI_DMA_EES_REG_BASE_SIZE                                                          0x2000
+#define ECPRI_DMA_EES_REG_BASE_USED                                                          0x1020
+#define ECPRI_DMA_EES_REG_BASE_PHYS                                                          (ECPRI_WRAPPER_BASE_PHYS + 0x00020000)
+#define ECPRI_DMA_EES_REG_BASE_OFFS                                                          (0x00020000)
+
+#define ECPRI_DMA_DEBUG_REG_BASE                                       (ECPRI_WRAPPER_BASE      + 0x003c000)
+#define ECPRI_DMA_DEBUG_REG_BASE_PHYS                                  (ECPRI_WRAPPER_BASE_PHYS + 0x003c000)
+#define ECPRI_DMA_DEBUG_REG_BASE_OFFS                                  (0x0003c000)
+
+#define ECPRI_DMA_NS_RESTRICTED_REG_BASE                                            (ECPRI_WRAPPER_BASE      + 0x00038000)
+#define ECPRI_DMA_NS_RESTRICTED_REG_BASE_SIZE                                       0x4000
+#define ECPRI_DMA_NS_RESTRICTED_REG_BASE_USED                                       0x2928
+#define ECPRI_DMA_NS_RESTRICTED_REG_BASE_PHYS                                       (ECPRI_WRAPPER_BASE_PHYS + 0x00038000)
+#define ECPRI_DMA_NS_RESTRICTED_REG_BASE_OFFS                                       0x00038000
+
+#define ECPRI_DMA_SECURED_REG_BASE                                               (ECPRI_WRAPPER_BASE      + 0x00030000)
+#define ECPRI_DMA_SECURED_REG_BASE_SIZE                                          0x8000
+#define ECPRI_DMA_SECURED_REG_BASE_USED                                          0x4098
+#define ECPRI_DMA_SECURED_REG_BASE_PHYS                                          (ECPRI_WRAPPER_BASE_PHYS + 0x00030000)
+#define ECPRI_DMA_SECURED_REG_BASE_OFFS                                          0x00330000
+
+#define ECPRI_DMA_RAM_REG_BASE                                            (ECPRI_WRAPPER_BASE      + 0x00040000)
+#define ECPRI_DMA_RAM_REG_BASE_SIZE                                       0x10000
+#define ECPRI_DMA_RAM_REG_BASE_USED                                       0xdffc
+#define ECPRI_DMA_RAM_REG_BASE_PHYS                                       (ECPRI_WRAPPER_BASE_PHYS + 0x00040000)
+#define ECPRI_DMA_RAM_REG_BASE_OFFS                                       (0x00040000)
+
+/*----------------------------------------------------------------------------
+ * MODULE: ECPRI_DMA
+ *--------------------------------------------------------------------------*/
 
 #define HWIO_ECPRI_HW_PARAMS_0_V2_ADDR                                                                                  (ECPRI_DMA_NON_SECURED_REG_BASE      + 0x0)
 #define HWIO_ECPRI_HW_PARAMS_0_V2_PHYS                                                                                  (ECPRI_DMA_NON_SECURED_REG_BASE_PHYS + 0x0)
@@ -1006,12 +1026,6 @@
                 out_dword(HWIO_ECPRI_RED_MARKER_ABOVE_CLR_V2_GSI_m_REG_n_ADDR(m,n),val)
 #define HWIO_ECPRI_RED_MARKER_ABOVE_CLR_V2_GSI_m_REG_n_ENDPOINTS_BMSK                                                   0xffffffff
 #define HWIO_ECPRI_RED_MARKER_ABOVE_CLR_V2_GSI_m_REG_n_ENDPOINTS_SHFT                                                            0
-
-#define ECPRI_DMA_NS_RESTRICTED_REG_BASE                                            (ECPRI_WRAPPER_BASE      + 0x00338000)
-#define ECPRI_DMA_NS_RESTRICTED_REG_BASE_SIZE                                       0x4000
-#define ECPRI_DMA_NS_RESTRICTED_REG_BASE_USED                                       0x2928
-#define ECPRI_DMA_NS_RESTRICTED_REG_BASE_PHYS                                       (ECPRI_WRAPPER_BASE_PHYS + 0x00338000)
-#define ECPRI_DMA_NS_RESTRICTED_REG_BASE_OFFS                                       0x00338000
 
 #define HWIO_ECPRI_ENDP_CFG_DEST_V2_GSI_m_CH_n_ADDR(m,n)                           (ECPRI_DMA_NS_RESTRICTED_REG_BASE      + 0X0 + (0x1000*(m)) + (0x20*(n)))
 #define HWIO_ECPRI_ENDP_CFG_DEST_V2_GSI_m_CH_n_PHYS(m,n)                           (ECPRI_DMA_NS_RESTRICTED_REG_BASE_PHYS + 0X0 + (0x1000*(m)) + (0x20*(n)))
@@ -2323,12 +2337,6 @@
  * MODULE: ECPRI_DMA_SECURED
  *--------------------------------------------------------------------------*/
 
-#define ECPRI_DMA_SECURED_REG_BASE                                               (ECPRI_WRAPPER_BASE      + 0x00330000)
-#define ECPRI_DMA_SECURED_REG_BASE_SIZE                                          0x8000
-#define ECPRI_DMA_SECURED_REG_BASE_USED                                          0x4098
-#define ECPRI_DMA_SECURED_REG_BASE_PHYS                                          (ECPRI_WRAPPER_BASE_PHYS + 0x00330000)
-#define ECPRI_DMA_SECURED_REG_BASE_OFFS                                          0x00330000
-
 #define HWIO_ECPRI_ENDP_CFG_TLV_FIFO_V2_GSI_m_CH_n_ADDR(m,n)                    (ECPRI_DMA_SECURED_REG_BASE      + 0X0 + (0x1000*(m)) + (0x20*(n)))
 #define HWIO_ECPRI_ENDP_CFG_TLV_FIFO_V2_GSI_m_CH_n_PHYS(m,n)                    (ECPRI_DMA_SECURED_REG_BASE_PHYS + 0X0 + (0x1000*(m)) + (0x20*(n)))
 #define HWIO_ECPRI_ENDP_CFG_TLV_FIFO_V2_GSI_m_CH_n_OFFS(m,n)                    (ECPRI_DMA_SECURED_REG_BASE_OFFS + 0X0 + (0x1000*(m)) + (0x20*(n)))
@@ -2520,16 +2528,6 @@
 #define HWIO_ECPRI_LTE_WATERMARKS_LTE_DDH_CMD_BUFFER_SHFT                  13
 #define HWIO_ECPRI_LTE_WATERMARKS_LTE_LATENCY_BUFFER_BMSK              0x1fff
 #define HWIO_ECPRI_LTE_WATERMARKS_LTE_LATENCY_BUFFER_SHFT                   0
-
-/*----------------------------------------------------------------------------
- * MODULE: ECPRI_DMA_EES
- *--------------------------------------------------------------------------*/
-
-#define ECPRI_DMA_EES_REG_BASE                                                               (ECPRI_WRAPPER_BASE      + 0x00320000)
-#define ECPRI_DMA_EES_REG_BASE_SIZE                                                          0x2000
-#define ECPRI_DMA_EES_REG_BASE_USED                                                          0x1020
-#define ECPRI_DMA_EES_REG_BASE_PHYS                                                          (ECPRI_WRAPPER_BASE_PHYS + 0x00320000)
-#define ECPRI_DMA_EES_REG_BASE_OFFS                                                          0x00320000
 
 /*----------------------------------------------------------------------------
  * MODULE: ECPRI_DMA_NON_SECURED

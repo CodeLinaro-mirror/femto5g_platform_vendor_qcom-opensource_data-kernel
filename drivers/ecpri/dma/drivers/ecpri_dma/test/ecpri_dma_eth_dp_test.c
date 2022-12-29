@@ -1,6 +1,6 @@
 /*
  * SPDX-License-Identifier: GPL-2.0-only
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include "ecpri_dma_ut_framework.h"
@@ -25,8 +25,8 @@ extern struct ecpri_dma_eth_client_context *ecpri_dma_eth_client_ctx;
   */
 
 #define ECPRI_DMA_ETH_CLIENT_UT_LINK_INDEX                0
-#define ECPRI_DMA_ETH_CLIENT_UT_READY_RCVD_TMOUT_MS       500
-#define ECPRI_DMA_ETH_CLIENT_UT_WAIT_FOR_CMPLTN_TIMEOUT   300
+#define ECPRI_DMA_ETH_CLIENT_UT_READY_RCVD_TMOUT_MS       10000
+#define ECPRI_DMA_ETH_CLIENT_UT_WAIT_FOR_CMPLTN_TIMEOUT   10000
 #define ECPRI_DMA_ETH_CLIENT_UT_MODER_CNTR_THRSHLD        1
 #define ECPRI_DMA_ETH_CLIENT_UT_MODER_TIMER_THRSHLD       0
 #define ECPRI_DMA_ETH_CLIENT_UT_TEST_PACKET_CONTENT       0x12345678
@@ -698,7 +698,7 @@ static int ecpri_dma_eth_dp_test_util_wait_for_tx_comp(u32 num_of_pkts_sent)
 		ret = wait_for_completion_timeout(
 			&eth_client_test_suite_ctx.
 			irq_received[ECPRI_DMA_ENDP_DIR_SRC],
-			msecs_to_jiffies(100));
+			msecs_to_jiffies(ECPRI_DMA_ETH_CLIENT_UT_WAIT_FOR_CMPLTN_TIMEOUT));
 		if (ret == 0 &&
 			eth_client_test_suite_ctx.tx_comp_pkts_num !=
 			num_of_pkts_sent)
@@ -1084,7 +1084,7 @@ static int ecpri_dma_eth_dp_test_util_verify_rx_large_data(
 	ret = wait_for_completion_timeout(
 		&eth_client_test_suite_ctx.
 		irq_received[ECPRI_DMA_ENDP_DIR_DEST],
-		msecs_to_jiffies(100));
+		msecs_to_jiffies(ECPRI_DMA_ETH_CLIENT_UT_WAIT_FOR_CMPLTN_TIMEOUT));
 	if (ret == 0) {
 		DMA_UT_LOG("Test failed due to Rx timeout");
 		return -EFAULT;
@@ -2303,7 +2303,7 @@ static int ecpri_dma_eth_dp_test_suite_commit(void *priv) {
 	ret = wait_for_completion_timeout(
 		&eth_client_test_suite_ctx.
 		irq_received[ECPRI_DMA_ENDP_DIR_SRC],
-		msecs_to_jiffies(1000));
+		msecs_to_jiffies(ECPRI_DMA_ETH_CLIENT_UT_WAIT_FOR_CMPLTN_TIMEOUT));
 	if (ret != 0) {
 		DMA_UT_TEST_FAIL_REPORT("Test failed, Tx should timeout");
 		return -EFAULT;

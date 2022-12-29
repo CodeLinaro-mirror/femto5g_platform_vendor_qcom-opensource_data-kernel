@@ -1,6 +1,6 @@
 /*
  * SPDX-License-Identifier: GPL-2.0-only
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include "gsi.h"
@@ -11,18 +11,20 @@
 #include "ecpri_dma_ut_framework.h"
 
 
-#define ECPRI_DMA_MHI_TEST_NUM_HW_CHS				4
-#define ECPRI_DMA_MHI_TEST_NUM_EVENT_RINGS			ECPRI_DMA_MHI_TEST_NUM_HW_CHS
+#define ECPRI_DMA_MHI_TEST_MAX_NUM_HW_CHS_PAIRS		\
+										(ECPRI_DMA_MHI_MAX_HW_CHANNELS / 2)
+#define ECPRI_DMA_MHI_TEST_MAX_NUM_HW_CHS		ECPRI_DMA_MHI_MAX_HW_CHANNELS
+#define ECPRI_DMA_MHI_TEST_MAX_NUM_EVENT_RINGS	ECPRI_DMA_MHI_MAX_HW_CHANNELS
 #define ECPRI_DMA_MHI_TEST_MSI_DATA					0x10000000
 #define ECPRI_DMA_MHI_TEST_MSI_MASK					~0x10000000
 #define ECPRI_DMA_MHI_TEST_CMPLN_TIMEOUT			5000
 #define ECPRI_DMA_MHI_TEST_FIRST_HW_CH_ID			100
 #define ECPRI_DMA_MHI_TEST_FIRST_EVENT_RING_ID		0
 #define ECPRI_DMA_MHI_TEST_RING_LEN					(0x10)
-#define ECPRI_DMA_MHI_TEST_FRST_SRC_CHANNEL_ID		0
-#define ECPRI_DMA_MHI_TEST_SCND_SRC_CHANNEL_ID		2
-#define ECPRI_DMA_MHI_TEST_FRST_DEST_CHANNEL_ID		1
-#define ECPRI_DMA_MHI_TEST_SCND_DEST_CHANNEL_ID		3
+#define ECPRI_DMA_MHI_TEST_FAPI_FRST_SRC_CHANNEL_ID		0
+#define ECPRI_DMA_MHI_TEST_FAPI_FRST_DEST_CHANNEL_ID	1
+#define ECPRI_DMA_MHI_TEST_FH_FRST_SRC_CHANNEL_ID		0
+#define ECPRI_DMA_MHI_TEST_FH_CHANNEL_ID_DIFF			1
 #define ECPRI_DMA_MHI_TEST_PACKET_CONTENT			0x12345678
 #define ECPRI_DMA_MHI_TEST_BUFF_SIZE				1500
 #define ECPRI_DMA_MHI_TEST_VM0_SRC_ENDP_ID			20
@@ -37,78 +39,338 @@
 #define ECPRI_DMA_MHI_TEST_EXPECTED_CH_EV_MASK_PF	0x0
 #define ECPRI_DMA_MHI_TEST_MSI_INTRPT_LOOPS			20
 #define ECPRI_DMA_MHI_TEST_START_POLL_LOOPS			20
+#define ECPRI_DMA_MHI_TEST_EXPECTED_CH_EV_MASK_FH_VMS_6		0xFFF
+#define ECPRI_DMA_MHI_TEST_EXPECTED_CH_EV_MASK_FH_VMS_9		0x3FFFF
+#define ECPRI_DMA_MHI_TEST_EXPECTED_CH_EV_MASK_FH_VMS_12	0xFFFFFF
+#define ECPRI_DMA_MHI_TEST_MAX_VF_ID	(ecpri_dma_get_ctx_hw_ver() == \
+			ECPRI_HW_V1_0 ? ECPRI_DMA_VM_IDS_MAX_V1 : ECPRI_DMA_VM_IDS_MAX)
 
  /* Define for test endp buffer size */
 #define ECPRI_DMA_MHI_TEST_BUFF_SIZE                1500
 #define ECPRI_DMA_MHI_TEST_EMPTY_BUFF               0
 
-/* Usage for setup, how many VMs to use in the test
-*  1,..,4,5 ~ VM0,..,VM3,PF
-*/
-#define ECPRI_DMA_MHI_TEST_FUNCTIONS_TO_RUN         5
+enum ecpri_dma_mhi_client_test_vf_type
+{
+	ECPRI_DMA_MHI_CLIENT_TEST_VF_TYPE_FAPI,
+	ECPRI_DMA_MHI_CLIENT_TEST_VF_TYPE_FH,
+};
 
 struct ecpri_dma_mhi_client_test_vf_id_mapping {
 	u32 first_src_endp_id;
-	u32 second_src_endp_id;
 	u32 first_dest_endp_id;
-	u32 second_dest_endp_id;
 	u32 gsi_id;
-};
-
-static const int ecpri_dma_mhi_client_test_ev_id_map
-[ECPRI_DMA_MHI_TEST_NUM_EVENT_RINGS] =
-{
-	[0] = ECPRI_DMA_MHI_TEST_FIRST_EVENT_RING_ID + 0,
-	[1] = ECPRI_DMA_MHI_TEST_FIRST_EVENT_RING_ID + 1,
-	[2] = ECPRI_DMA_MHI_TEST_FIRST_EVENT_RING_ID + 2,
-	[3] = ECPRI_DMA_MHI_TEST_FIRST_EVENT_RING_ID + 3
-};
-
-static const int ecpri_dma_mhi_client_test_host_ch_id_map
-[ECPRI_DMA_MHI_TEST_NUM_HW_CHS] =
-{
-	[0] = ECPRI_DMA_MHI_TEST_FIRST_HW_CH_ID +
-		  ECPRI_DMA_MHI_TEST_FRST_SRC_CHANNEL_ID,
-	[1] = ECPRI_DMA_MHI_TEST_FIRST_HW_CH_ID +
-		  ECPRI_DMA_MHI_TEST_FRST_DEST_CHANNEL_ID,
-	[2] = ECPRI_DMA_MHI_TEST_FIRST_HW_CH_ID +
-		  ECPRI_DMA_MHI_TEST_SCND_SRC_CHANNEL_ID,
-	[3] = ECPRI_DMA_MHI_TEST_FIRST_HW_CH_ID +
-		  ECPRI_DMA_MHI_TEST_SCND_DEST_CHANNEL_ID
+	u32 num_of_hw_chs_pairs;
+	enum ecpri_dma_mhi_client_test_vf_type type;
 };
 
 /* HW CH */
 static const struct ecpri_dma_mhi_client_test_vf_id_mapping
 ecpri_dma_mhi_client_test_mapping
-[ECPRI_DMA_MHI_CLIENT_FUNCTION_NUM] = {
-	[ECPRI_DMA_VM_IDS_VM0] = {
+[ECPRI_HW_MAX][ECPRI_HW_FLAVOR_MAX][ECPRI_DMA_MHI_CLIENT_FUNCTION_NUM] = {
+	[ECPRI_HW_V1_0] [ECPRI_HW_FLAVOR_DU_PCIE] [ECPRI_DMA_VM_IDS_VM0] = {
 		.first_src_endp_id = 20,
-		.second_src_endp_id = 21,
 		.first_dest_endp_id = 57,
-		.second_dest_endp_id = 58,
-		.gsi_id = ECPRI_DMA_GSI_ID_0
+		.gsi_id = ECPRI_DMA_GSI_ID_0,
+		.num_of_hw_chs_pairs = 2,
+		.type = ECPRI_DMA_MHI_CLIENT_TEST_VF_TYPE_FAPI,
 	},
-	[ECPRI_DMA_VM_IDS_VM1] = {
+	[ECPRI_HW_V1_0][ECPRI_HW_FLAVOR_DU_PCIE][ECPRI_DMA_VM_IDS_VM1] = {
 		.first_src_endp_id = 23,
-		.second_src_endp_id = 24,
 		.first_dest_endp_id = 60,
-		.second_dest_endp_id = 61,
-		.gsi_id = ECPRI_DMA_GSI_ID_0
+		.gsi_id = ECPRI_DMA_GSI_ID_0,
+		.num_of_hw_chs_pairs = 2,
+		.type = ECPRI_DMA_MHI_CLIENT_TEST_VF_TYPE_FAPI,
 	},
-	[ECPRI_DMA_VM_IDS_VM2] = {
+	[ECPRI_HW_V1_0][ECPRI_HW_FLAVOR_DU_PCIE][ECPRI_DMA_VM_IDS_VM2] = {
 		.first_src_endp_id = 26,
-		.second_src_endp_id = 27,
 		.first_dest_endp_id = 63,
-		.second_dest_endp_id = 64,
-		.gsi_id = ECPRI_DMA_GSI_ID_0
+		.gsi_id = ECPRI_DMA_GSI_ID_0,
+		.num_of_hw_chs_pairs = 2,
+		.type = ECPRI_DMA_MHI_CLIENT_TEST_VF_TYPE_FAPI,
 	},
-	[ECPRI_DMA_VM_IDS_VM3] = {
+	[ECPRI_HW_V1_0][ECPRI_HW_FLAVOR_DU_PCIE][ECPRI_DMA_VM_IDS_VM3] = {
 		.first_src_endp_id = 29,
-		.second_src_endp_id = 30,
 		.first_dest_endp_id = 66,
-		.second_dest_endp_id = 67,
-		.gsi_id = ECPRI_DMA_GSI_ID_0
-	}
+		.gsi_id = ECPRI_DMA_GSI_ID_0,
+		.num_of_hw_chs_pairs = 2,
+		.type = ECPRI_DMA_MHI_CLIENT_TEST_VF_TYPE_FAPI,
+	},
+	[ECPRI_HW_V2_0][ECPRI_HW_FLAVOR_DU_PCIE_3_X_12] [ECPRI_DMA_VM_IDS_VM0] = {
+		.first_src_endp_id = 11,
+		.first_dest_endp_id = 48,
+		.gsi_id = ECPRI_DMA_GSI_ID_0,
+		.num_of_hw_chs_pairs = 2,
+		.type = ECPRI_DMA_MHI_CLIENT_TEST_VF_TYPE_FAPI,
+	},
+	[ECPRI_HW_V2_0][ECPRI_HW_FLAVOR_DU_PCIE_3_X_12][ECPRI_DMA_VM_IDS_VM1] = {
+		.first_src_endp_id = 13,
+		.first_dest_endp_id = 50,
+		.gsi_id = ECPRI_DMA_GSI_ID_0,
+		.num_of_hw_chs_pairs = 2,
+		.type = ECPRI_DMA_MHI_CLIENT_TEST_VF_TYPE_FAPI,
+	},
+	[ECPRI_HW_V2_0][ECPRI_HW_FLAVOR_DU_PCIE_3_X_12][ECPRI_DMA_VM_IDS_VM2] = {
+		.first_src_endp_id = 15,
+		.first_dest_endp_id = 52,
+		.gsi_id = ECPRI_DMA_GSI_ID_0,
+		.num_of_hw_chs_pairs = 2,
+		.type = ECPRI_DMA_MHI_CLIENT_TEST_VF_TYPE_FAPI,
+	},
+	[ECPRI_HW_V2_0][ECPRI_HW_FLAVOR_DU_PCIE_3_X_12][ECPRI_DMA_VM_IDS_VM3] = {
+		.first_src_endp_id = 17,
+		.first_dest_endp_id = 54,
+		.gsi_id = ECPRI_DMA_GSI_ID_0,
+		.num_of_hw_chs_pairs = 2,
+		.type = ECPRI_DMA_MHI_CLIENT_TEST_VF_TYPE_FAPI,
+	},
+	[ECPRI_HW_V2_0][ECPRI_HW_FLAVOR_DU_PCIE_3_X_12][ECPRI_DMA_VM_IDS_VFA] = {
+		.first_src_endp_id = 4,
+		.first_dest_endp_id = 41,
+		.gsi_id = ECPRI_DMA_GSI_ID_1,
+		.num_of_hw_chs_pairs = 2,
+		.type = ECPRI_DMA_MHI_CLIENT_TEST_VF_TYPE_FAPI,
+	},
+	[ECPRI_HW_V2_0][ECPRI_HW_FLAVOR_DU_PCIE_3_X_12][ECPRI_DMA_VM_IDS_VFB] = {
+		.first_src_endp_id = 6,
+		.first_dest_endp_id = 43,
+		.gsi_id = ECPRI_DMA_GSI_ID_1,
+		.num_of_hw_chs_pairs = 2,
+		.type = ECPRI_DMA_MHI_CLIENT_TEST_VF_TYPE_FAPI,
+	},
+	[ECPRI_HW_V2_0][ECPRI_HW_FLAVOR_DU_PCIE_3_X_12][ECPRI_DMA_VM_IDS_VF1] = {
+		.first_src_endp_id = 8,
+		.first_dest_endp_id = 45,
+		.gsi_id = ECPRI_DMA_GSI_ID_1,
+		.num_of_hw_chs_pairs = 12,
+		.type = ECPRI_DMA_MHI_CLIENT_TEST_VF_TYPE_FH,
+	},
+	[ECPRI_HW_V2_0][ECPRI_HW_FLAVOR_DU_PCIE_3_X_12][ECPRI_DMA_VM_IDS_VFD] = {
+		.first_src_endp_id = 2,
+		.first_dest_endp_id = 39,
+		.gsi_id = ECPRI_DMA_GSI_ID_2,
+		.num_of_hw_chs_pairs = 2,
+		.type = ECPRI_DMA_MHI_CLIENT_TEST_VF_TYPE_FAPI,
+	},
+	[ECPRI_HW_V2_0][ECPRI_HW_FLAVOR_DU_PCIE_3_X_12][ECPRI_DMA_VM_IDS_VF4] = {
+		.first_src_endp_id = 4,
+		.first_dest_endp_id = 41,
+		.gsi_id = ECPRI_DMA_GSI_ID_2,
+		.num_of_hw_chs_pairs = 12,
+		.type = ECPRI_DMA_MHI_CLIENT_TEST_VF_TYPE_FH,
+	},
+	[ECPRI_HW_V2_0][ECPRI_HW_FLAVOR_DU_PCIE_3_X_12][ECPRI_DMA_VM_IDS_VF5] = {
+		.first_src_endp_id = 16,
+		.first_dest_endp_id = 53,
+		.gsi_id = ECPRI_DMA_GSI_ID_2,
+		.num_of_hw_chs_pairs = 12,
+		.type = ECPRI_DMA_MHI_CLIENT_TEST_VF_TYPE_FH,
+	},
+	[ECPRI_HW_V2_0][ECPRI_HW_FLAVOR_DU_PCIE_4_X_9][ECPRI_DMA_VM_IDS_VM0] = {
+		.first_src_endp_id = 11,
+		.first_dest_endp_id = 48,
+		.gsi_id = ECPRI_DMA_GSI_ID_0,
+		.num_of_hw_chs_pairs = 2,
+		.type = ECPRI_DMA_MHI_CLIENT_TEST_VF_TYPE_FAPI,
+	},
+	[ECPRI_HW_V2_0][ECPRI_HW_FLAVOR_DU_PCIE_4_X_9][ECPRI_DMA_VM_IDS_VM1] = {
+		.first_src_endp_id = 13,
+		.first_dest_endp_id = 50,
+		.gsi_id = ECPRI_DMA_GSI_ID_0,
+		.num_of_hw_chs_pairs = 2,
+		.type = ECPRI_DMA_MHI_CLIENT_TEST_VF_TYPE_FAPI,
+	},
+	[ECPRI_HW_V2_0][ECPRI_HW_FLAVOR_DU_PCIE_4_X_9][ECPRI_DMA_VM_IDS_VM2] = {
+		.first_src_endp_id = 15,
+		.first_dest_endp_id = 52,
+		.gsi_id = ECPRI_DMA_GSI_ID_0,
+		.num_of_hw_chs_pairs = 2,
+		.type = ECPRI_DMA_MHI_CLIENT_TEST_VF_TYPE_FAPI,
+	},
+	[ECPRI_HW_V2_0][ECPRI_HW_FLAVOR_DU_PCIE_4_X_9][ECPRI_DMA_VM_IDS_VM3] = {
+		.first_src_endp_id = 17,
+		.first_dest_endp_id = 54,
+		.gsi_id = ECPRI_DMA_GSI_ID_0,
+		.num_of_hw_chs_pairs = 2,
+		.type = ECPRI_DMA_MHI_CLIENT_TEST_VF_TYPE_FAPI,
+	},
+	[ECPRI_HW_V2_0][ECPRI_HW_FLAVOR_DU_PCIE_4_X_9][ECPRI_DMA_VM_IDS_VFA] = {
+		.first_src_endp_id = 4,
+		.first_dest_endp_id = 41,
+		.gsi_id = ECPRI_DMA_GSI_ID_1,
+		.num_of_hw_chs_pairs = 2,
+		.type = ECPRI_DMA_MHI_CLIENT_TEST_VF_TYPE_FAPI,
+	},
+	[ECPRI_HW_V2_0][ECPRI_HW_FLAVOR_DU_PCIE_4_X_9][ECPRI_DMA_VM_IDS_VFB] = {
+		.first_src_endp_id = 6,
+		.first_dest_endp_id = 43,
+		.gsi_id = ECPRI_DMA_GSI_ID_1,
+		.num_of_hw_chs_pairs = 2,
+		.type = ECPRI_DMA_MHI_CLIENT_TEST_VF_TYPE_FAPI,
+	},
+	[ECPRI_HW_V2_0][ECPRI_HW_FLAVOR_DU_PCIE_4_X_9][ECPRI_DMA_VM_IDS_VF1] = {
+		.first_src_endp_id = 8,
+		.first_dest_endp_id = 45,
+		.gsi_id = ECPRI_DMA_GSI_ID_1,
+		.num_of_hw_chs_pairs = 9,
+		.type = ECPRI_DMA_MHI_CLIENT_TEST_VF_TYPE_FH,
+	},
+	[ECPRI_HW_V2_0][ECPRI_HW_FLAVOR_DU_PCIE_4_X_9][ECPRI_DMA_VM_IDS_VF2] = {
+		.first_src_endp_id = 17,
+		.first_dest_endp_id = 54,
+		.gsi_id = ECPRI_DMA_GSI_ID_1,
+		.num_of_hw_chs_pairs = 9,
+		.type = ECPRI_DMA_MHI_CLIENT_TEST_VF_TYPE_FH,
+	},
+	[ECPRI_HW_V2_0][ECPRI_HW_FLAVOR_DU_PCIE_4_X_9][ECPRI_DMA_VM_IDS_VFD] = {
+		.first_src_endp_id = 4,
+		.first_dest_endp_id = 41,
+		.gsi_id = ECPRI_DMA_GSI_ID_2,
+		.num_of_hw_chs_pairs = 2,
+		.type = ECPRI_DMA_MHI_CLIENT_TEST_VF_TYPE_FAPI,
+	},
+	[ECPRI_HW_V2_0][ECPRI_HW_FLAVOR_DU_PCIE_4_X_9][ECPRI_DMA_VM_IDS_VFE] = {
+		.first_src_endp_id = 6,
+		.first_dest_endp_id = 43,
+		.gsi_id = ECPRI_DMA_GSI_ID_2,
+		.num_of_hw_chs_pairs = 2,
+		.type = ECPRI_DMA_MHI_CLIENT_TEST_VF_TYPE_FAPI,
+	},
+	[ECPRI_HW_V2_0][ECPRI_HW_FLAVOR_DU_PCIE_4_X_9][ECPRI_DMA_VM_IDS_VF4] = {
+		.first_src_endp_id = 8,
+		.first_dest_endp_id = 45,
+		.gsi_id = ECPRI_DMA_GSI_ID_2,
+		.num_of_hw_chs_pairs = 9,
+		.type = ECPRI_DMA_MHI_CLIENT_TEST_VF_TYPE_FH,
+	},
+	[ECPRI_HW_V2_0][ECPRI_HW_FLAVOR_DU_PCIE_4_X_9][ECPRI_DMA_VM_IDS_VF5] = {
+		.first_src_endp_id = 17,
+		.first_dest_endp_id = 54,
+		.gsi_id = ECPRI_DMA_GSI_ID_2,
+		.num_of_hw_chs_pairs = 9,
+		.type = ECPRI_DMA_MHI_CLIENT_TEST_VF_TYPE_FH,
+	},
+	[ECPRI_HW_V2_0][ECPRI_HW_FLAVOR_DU_PCIE_5_X_6] [ECPRI_DMA_VM_IDS_VM0] = {
+		.first_src_endp_id = 11,
+		.first_dest_endp_id = 48,
+		.gsi_id = ECPRI_DMA_GSI_ID_0,
+		.num_of_hw_chs_pairs = 2,
+		.type = ECPRI_DMA_MHI_CLIENT_TEST_VF_TYPE_FAPI,
+	},
+	[ECPRI_HW_V2_0][ECPRI_HW_FLAVOR_DU_PCIE_5_X_6][ECPRI_DMA_VM_IDS_VM1] = {
+		.first_src_endp_id = 13,
+		.first_dest_endp_id = 50,
+		.gsi_id = ECPRI_DMA_GSI_ID_0,
+		.num_of_hw_chs_pairs = 2,
+		.type = ECPRI_DMA_MHI_CLIENT_TEST_VF_TYPE_FAPI,
+	},
+	[ECPRI_HW_V2_0][ECPRI_HW_FLAVOR_DU_PCIE_5_X_6][ECPRI_DMA_VM_IDS_VM2] = {
+		.first_src_endp_id = 15,
+		.first_dest_endp_id = 52,
+		.gsi_id = ECPRI_DMA_GSI_ID_0,
+		.num_of_hw_chs_pairs = 2,
+		.type = ECPRI_DMA_MHI_CLIENT_TEST_VF_TYPE_FAPI,
+	},
+	[ECPRI_HW_V2_0][ECPRI_HW_FLAVOR_DU_PCIE_5_X_6][ECPRI_DMA_VM_IDS_VM3] = {
+		.first_src_endp_id = 17,
+		.first_dest_endp_id = 54,
+		.gsi_id = ECPRI_DMA_GSI_ID_0,
+		.num_of_hw_chs_pairs = 2,
+		.type = ECPRI_DMA_MHI_CLIENT_TEST_VF_TYPE_FAPI,
+	},
+	[ECPRI_HW_V2_0][ECPRI_HW_FLAVOR_DU_PCIE_5_X_6][ECPRI_DMA_VM_IDS_VFA] = {
+		.first_src_endp_id = 6,
+		.first_dest_endp_id = 43,
+		.gsi_id = ECPRI_DMA_GSI_ID_1,
+		.num_of_hw_chs_pairs = 2,
+		.type = ECPRI_DMA_MHI_CLIENT_TEST_VF_TYPE_FAPI,
+	},
+	[ECPRI_HW_V2_0][ECPRI_HW_FLAVOR_DU_PCIE_5_X_6][ECPRI_DMA_VM_IDS_VFB] = {
+		.first_src_endp_id = 8,
+		.first_dest_endp_id = 45,
+		.gsi_id = ECPRI_DMA_GSI_ID_1,
+		.num_of_hw_chs_pairs = 2,
+		.type = ECPRI_DMA_MHI_CLIENT_TEST_VF_TYPE_FAPI,
+	},
+	[ECPRI_HW_V2_0][ECPRI_HW_FLAVOR_DU_PCIE_5_X_6][ECPRI_DMA_VM_IDS_VFC] = {
+		.first_src_endp_id = 10,
+		.first_dest_endp_id = 47,
+		.gsi_id = ECPRI_DMA_GSI_ID_1,
+		.num_of_hw_chs_pairs = 2,
+		.type = ECPRI_DMA_MHI_CLIENT_TEST_VF_TYPE_FAPI,
+	},
+	[ECPRI_HW_V2_0][ECPRI_HW_FLAVOR_DU_PCIE_5_X_6][ECPRI_DMA_VM_IDS_VF1] = {
+		.first_src_endp_id = 12,
+		.first_dest_endp_id = 49,
+		.gsi_id = ECPRI_DMA_GSI_ID_1,
+		.num_of_hw_chs_pairs = 6,
+		.type = ECPRI_DMA_MHI_CLIENT_TEST_VF_TYPE_FH,
+	},
+	[ECPRI_HW_V2_0][ECPRI_HW_FLAVOR_DU_PCIE_5_X_6][ECPRI_DMA_VM_IDS_VF2] = {
+		.first_src_endp_id = 18,
+		.first_dest_endp_id = 55,
+		.gsi_id = ECPRI_DMA_GSI_ID_1,
+		.num_of_hw_chs_pairs = 6,
+		.type = ECPRI_DMA_MHI_CLIENT_TEST_VF_TYPE_FH,
+	},
+	[ECPRI_HW_V2_0][ECPRI_HW_FLAVOR_DU_PCIE_5_X_6][ECPRI_DMA_VM_IDS_VFD] = {
+		.first_src_endp_id = 4,
+		.first_dest_endp_id = 41,
+		.gsi_id = ECPRI_DMA_GSI_ID_2,
+		.num_of_hw_chs_pairs = 2,
+		.type = ECPRI_DMA_MHI_CLIENT_TEST_VF_TYPE_FAPI,
+	},
+	[ECPRI_HW_V2_0][ECPRI_HW_FLAVOR_DU_PCIE_5_X_6][ECPRI_DMA_VM_IDS_VFE] = {
+		.first_src_endp_id = 6,
+		.first_dest_endp_id = 43,
+		.gsi_id = ECPRI_DMA_GSI_ID_2,
+		.num_of_hw_chs_pairs = 2,
+		.type = ECPRI_DMA_MHI_CLIENT_TEST_VF_TYPE_FAPI,
+	},
+	[ECPRI_HW_V2_0][ECPRI_HW_FLAVOR_DU_PCIE_5_X_6][ECPRI_DMA_VM_IDS_VF3] = {
+		.first_src_endp_id = 8,
+		.first_dest_endp_id = 45,
+		.gsi_id = ECPRI_DMA_GSI_ID_2,
+		.num_of_hw_chs_pairs = 6,
+		.type = ECPRI_DMA_MHI_CLIENT_TEST_VF_TYPE_FH,
+	},
+	[ECPRI_HW_V2_0][ECPRI_HW_FLAVOR_DU_PCIE_5_X_6][ECPRI_DMA_VM_IDS_VF4] = {
+		.first_src_endp_id = 14,
+		.first_dest_endp_id = 51,
+		.gsi_id = ECPRI_DMA_GSI_ID_2,
+		.num_of_hw_chs_pairs = 6,
+		.type = ECPRI_DMA_MHI_CLIENT_TEST_VF_TYPE_FH,
+	},
+	[ECPRI_HW_V2_0][ECPRI_HW_FLAVOR_DU_PCIE_5_X_6][ECPRI_DMA_VM_IDS_VF5] = {
+		.first_src_endp_id = 20,
+		.first_dest_endp_id = 57,
+		.gsi_id = ECPRI_DMA_GSI_ID_2,
+		.num_of_hw_chs_pairs = 6,
+		.type = ECPRI_DMA_MHI_CLIENT_TEST_VF_TYPE_FH,
+	},
+};
+
+static const int active_vfs
+[ECPRI_HW_MAX][ECPRI_HW_FLAVOR_MAX][ECPRI_DMA_VM_IDS_MAX] =
+{
+	[ECPRI_HW_V1_0][ECPRI_HW_FLAVOR_DU_PCIE] =
+		{ECPRI_DMA_VM_IDS_VM0, ECPRI_DMA_VM_IDS_VM1, ECPRI_DMA_VM_IDS_VM2,
+		ECPRI_DMA_VM_IDS_VM3, -1},
+	[ECPRI_HW_V2_0][ECPRI_HW_FLAVOR_DU_PCIE_3_X_12] =
+		{ECPRI_DMA_VM_IDS_VM0, ECPRI_DMA_VM_IDS_VM1, ECPRI_DMA_VM_IDS_VM2,
+		ECPRI_DMA_VM_IDS_VM3, ECPRI_DMA_VM_IDS_VF1, ECPRI_DMA_VM_IDS_VF4,
+		ECPRI_DMA_VM_IDS_VF5, ECPRI_DMA_VM_IDS_VFA, ECPRI_DMA_VM_IDS_VFB,
+		ECPRI_DMA_VM_IDS_VFD, -1},
+	[ECPRI_HW_V2_0][ECPRI_HW_FLAVOR_DU_PCIE_4_X_9] =
+		{ECPRI_DMA_VM_IDS_VM0, ECPRI_DMA_VM_IDS_VM1, ECPRI_DMA_VM_IDS_VM2,
+		ECPRI_DMA_VM_IDS_VM3, ECPRI_DMA_VM_IDS_VF1, ECPRI_DMA_VM_IDS_VF2,
+		ECPRI_DMA_VM_IDS_VF4, ECPRI_DMA_VM_IDS_VF5, ECPRI_DMA_VM_IDS_VFA,
+		ECPRI_DMA_VM_IDS_VFB, ECPRI_DMA_VM_IDS_VFD, ECPRI_DMA_VM_IDS_VFE, -1},
+	[ECPRI_HW_V2_0][ECPRI_HW_FLAVOR_DU_PCIE_5_X_6] =
+		{ECPRI_DMA_VM_IDS_VM0, ECPRI_DMA_VM_IDS_VM1, ECPRI_DMA_VM_IDS_VM2,
+		ECPRI_DMA_VM_IDS_VM3, ECPRI_DMA_VM_IDS_VF1, ECPRI_DMA_VM_IDS_VF2,
+		ECPRI_DMA_VM_IDS_VF3, ECPRI_DMA_VM_IDS_VF4, ECPRI_DMA_VM_IDS_VF5,
+		ECPRI_DMA_VM_IDS_VFA, ECPRI_DMA_VM_IDS_VFB, ECPRI_DMA_VM_IDS_VFC,
+		ECPRI_DMA_VM_IDS_VFD, ECPRI_DMA_VM_IDS_VFE},
 };
 
 /**
@@ -141,31 +403,32 @@ struct ecpri_dma_mhi_client_test_suite_context {
 	struct ecpri_dma_mem_buffer msi;
 	struct ecpri_dma_mem_buffer ch_ctx_array;
 	struct ecpri_dma_mem_buffer ev_ctx_array;
+	dma_addr_t ev_ctx_array_gsi_addr;
 	struct ecpri_dma_mem_buffer mmio_buf;
-	struct ecpri_dma_mem_buffer xfer_ring_bufs[ECPRI_DMA_MHI_TEST_NUM_HW_CHS];
-	struct ecpri_dma_mem_buffer ev_ring_bufs[ECPRI_DMA_MHI_TEST_NUM_EVENT_RINGS];
+	struct ecpri_dma_mem_buffer xfer_ring_bufs[ECPRI_DMA_MHI_TEST_MAX_NUM_HW_CHS];
+	struct ecpri_dma_mem_buffer ev_ring_bufs[ECPRI_DMA_MHI_TEST_MAX_NUM_EVENT_RINGS];
 	struct ecpri_dma_mem_buffer src_buffer;
 	struct ecpri_dma_mem_buffer dest_buffer;
 
 	struct completion ecpri_dma_mhi_test_ready_comp;
 	struct completion ecpri_dma_mhi_test_async_comp;
 
-	u8 channel_ids[ECPRI_DMA_MHI_TEST_NUM_HW_CHS];
-	u32 channel_hdls[ECPRI_DMA_MHI_TEST_NUM_HW_CHS];
+	u8 channel_ids[ECPRI_DMA_MHI_TEST_MAX_NUM_HW_CHS];
+	u32 channel_hdls[ECPRI_DMA_MHI_TEST_MAX_NUM_HW_CHS];
 
 	int async_user_data;
 	struct mhi_dma_function_params function;
 	struct mhi_dma_init_params init_params;
 	struct mhi_dma_init_out out_params;
 	struct mhi_dma_start_params start_params;
-	struct mhi_dma_connect_params frst_src_conn_params;
-	struct mhi_dma_connect_params frst_dest_conn_params;
-	struct mhi_dma_connect_params second_src_conn_params;
-	struct mhi_dma_connect_params second_dest_conn_params;
-	struct mhi_dma_disconnect_params frst_src_disc_params;
-	struct mhi_dma_disconnect_params frst_dest_disc_params;
-	struct mhi_dma_disconnect_params second_src_disc_params;
-	struct mhi_dma_disconnect_params second_dest_disc_params;
+	struct mhi_dma_connect_params
+		src_conn_params[ECPRI_DMA_MHI_TEST_MAX_NUM_HW_CHS_PAIRS];
+	struct mhi_dma_connect_params
+		dest_conn_params[ECPRI_DMA_MHI_TEST_MAX_NUM_HW_CHS_PAIRS];
+	struct mhi_dma_disconnect_params
+		src_disc_params[ECPRI_DMA_MHI_TEST_MAX_NUM_HW_CHS_PAIRS];
+	struct mhi_dma_disconnect_params
+		dest_disc_params[ECPRI_DMA_MHI_TEST_MAX_NUM_HW_CHS_PAIRS];
 };
 
 struct ecpri_dma_mhi_client_test_suite_context*
@@ -335,9 +598,7 @@ static inline int ecpri_dma_mhi_client_test_get_funct_ctx_idx(
 	int* idx)
 {
 	int ret = 0;
-	int max_vf_id =
-		ecpri_dma_get_ctx_hw_ver() == ECPRI_HW_V1_0 ?
-		ECPRI_DMA_VM_IDS_MAX_V1 : ECPRI_DMA_VM_IDS_MAX;
+	int max_vf_id = ECPRI_DMA_MHI_TEST_MAX_VF_ID;
 
 	if (function->function_type ==
 		MHI_DMA_FUNCTION_TYPE_VIRTUAL &&
@@ -516,62 +777,7 @@ static int ecpri_dma_mhi_client_test_util_setup_dma_endps(
 	return 0;
 }
 
-/**
- * ecpri_dma_mhi_client_test_get_ee_index() - Gets the correspodning EE ID
- *
- * @function: [IN] Function parameters, type and id
- * @ee_idx:         [OUT] The EE index from map array
- *
- * Return codes: 0: success
- *		-EINVAL: Unexpected function type
- */
-static inline int ecpri_dma_mhi_client_test_get_ee_index(
-	struct mhi_dma_function_params function,
-	enum ecpri_dma_ees* ee_idx)
-{
-	int ret = 0;
-	int max_vf_id =
-		ecpri_dma_get_ctx_hw_ver() == ECPRI_HW_V1_0 ?
-		ECPRI_DMA_VM_IDS_MAX_V1 : ECPRI_DMA_VM_IDS_MAX;
-
-	if (function.function_type ==
-		MHI_DMA_FUNCTION_TYPE_VIRTUAL &&
-		function.vf_id < max_vf_id) {
-		switch (function.vf_id)
-		{
-		case ECPRI_DMA_VM_IDS_VM0:
-			*(ee_idx) = ECPRI_DMA_EE_VM0;
-			break;
-		case ECPRI_DMA_VM_IDS_VM1:
-			*(ee_idx) = ECPRI_DMA_EE_VM1;
-			break;
-		case ECPRI_DMA_VM_IDS_VM2:
-			*(ee_idx) = ECPRI_DMA_EE_VM2;
-			break;
-		case ECPRI_DMA_VM_IDS_VM3:
-			*(ee_idx) = ECPRI_DMA_EE_VM3;
-			break;
-		default:
-			DMA_UT_ERR("Unexpected function type, type: %d, vf_id: %d\n",
-				function.function_type, function.vf_id);
-			ret = -EINVAL;
-			break;
-		}
-	}
-	else if (function.function_type ==
-		MHI_DMA_FUNCTION_TYPE_PHYSICAL) {
-		*(ee_idx) = ECPRI_DMA_EE_PF;
-	}
-	else {
-		DMA_UT_ERR("Unexpected function type, type: %d, vf_id: %d\n",
-			function.function_type, function.vf_id);
-		ret = -EINVAL;
-	}
-
-	return ret;
-}
-
-static void ecpri_dma_mhi_client_test_free_mmio_space(int idx)
+void ecpri_dma_mhi_client_test_free_mmio_space(int idx)
 {
 
 	DMA_UT_DBG("Free MMIO Space enter\n");
@@ -630,7 +836,7 @@ static int ecpri_dma_mhi_client_test_alloc_mmio_space(int idx)
 
 	/* allocate buffer for channel context */
 	ch_ctx_array->size = sizeof(struct ecpri_dma_mhi_host_ch_ctx) *
-		ECPRI_DMA_MHI_TEST_FIRST_HW_CH_ID + ECPRI_DMA_MHI_TEST_NUM_HW_CHS;
+		(ECPRI_DMA_MHI_TEST_FIRST_HW_CH_ID + ECPRI_DMA_MHI_TEST_MAX_NUM_HW_CHS);
 	ch_ctx_array->virt_base = dma_alloc_coherent(ecpri_dma_ctx->pdev,
 		ch_ctx_array->size, &ch_ctx_array->phys_base, GFP_KERNEL);
 	if (!ch_ctx_array->virt_base) {
@@ -644,8 +850,8 @@ static int ecpri_dma_mhi_client_test_alloc_mmio_space(int idx)
 
 	/* allocate buffer for event context */
 	ev_ctx_array->size = sizeof(struct ecpri_dma_mhi_host_ev_ctx) *
-		ECPRI_DMA_MHI_TEST_FIRST_EVENT_RING_ID +
-		ECPRI_DMA_MHI_TEST_NUM_EVENT_RINGS;
+		(ECPRI_DMA_MHI_TEST_FIRST_EVENT_RING_ID +
+		ECPRI_DMA_MHI_TEST_MAX_NUM_EVENT_RINGS);
 	ev_ctx_array->virt_base = dma_alloc_coherent(ecpri_dma_ctx->pdev,
 		ev_ctx_array->size, &ev_ctx_array->phys_base, GFP_KERNEL);
 	if (!ev_ctx_array->virt_base) {
@@ -659,7 +865,8 @@ static int ecpri_dma_mhi_client_test_alloc_mmio_space(int idx)
 
 	/* allocate buffer for mmio */
 	mmio_buf->size = sizeof(struct ecpri_dma_mhi_mmio_register_set);
-	mmio_buf->virt_base = dma_alloc_coherent(ecpri_dma_ctx->pdev, mmio_buf->size,
+	mmio_buf->virt_base = dma_alloc_coherent(ecpri_dma_ctx->pdev,
+		mmio_buf->size,
 		&mmio_buf->phys_base, GFP_KERNEL);
 	if (!mmio_buf->virt_base) {
 		DMA_UT_ERR("no mem for mmio buf\n");
@@ -677,9 +884,7 @@ static int ecpri_dma_mhi_client_test_alloc_mmio_space(int idx)
 	 * Host sets the pointer to the channel context array
 	 * during initialization.
 	 */
-	p_mmio->ccabap = (u32)ch_ctx_array->phys_base -
-		(ECPRI_DMA_MHI_TEST_FIRST_HW_CH_ID *
-			sizeof(struct ecpri_dma_mhi_host_ch_ctx));
+	p_mmio->ccabap = (u64)ch_ctx_array->phys_base;
 	DMA_UT_DBG("pMmio->ccabap 0x%llx\n", p_mmio->ccabap);
 
 	/**
@@ -687,9 +892,7 @@ static int ecpri_dma_mhi_client_test_alloc_mmio_space(int idx)
 	 * Host sets the pointer to the event context array
 	 * during initialization
 	 */
-	p_mmio->ecabap = (u32)ev_ctx_array->phys_base -
-		(ECPRI_DMA_MHI_TEST_FIRST_EVENT_RING_ID *
-			sizeof(struct ecpri_dma_mhi_host_ev_ctx));
+	p_mmio->ecabap = (u64)ev_ctx_array->phys_base;
 	DMA_UT_DBG("pMmio->ecabap 0x%llx\n", p_mmio->ecabap);
 
 	/**
@@ -697,14 +900,14 @@ static int ecpri_dma_mhi_client_test_alloc_mmio_space(int idx)
 	 * In test register carries the pointer of
 	 *  virtual address for the buffer of channel context array
 	 */
-	p_mmio->crcbap = (unsigned long)ch_ctx_array->virt_base;
+	p_mmio->crcbap = (u64)ch_ctx_array->virt_base;
 
 	/**
 	 * Register is not accessed by HWP.
 	 * In test register carries the pointer of
 	 *  virtual address for the buffer of channel context array
 	 */
-	p_mmio->crdb = (unsigned long)ev_ctx_array->virt_base;
+	p_mmio->crdb = (u64)ev_ctx_array->virt_base;
 
 	/* test is running only on device. no need to translate addresses */
 	p_mmio->mhiaddr.mhicrtlbase = 0x04;
@@ -848,14 +1051,13 @@ static void ecpri_dma_mhi_client_test_async_comp_cb(void* user_data)
 		ecpri_dma_mhi_test_async_comp);
 }
 
-static inline int ecpri_dma_mhi_client_test_utils_get_ee_index(
+static inline int ecpri_dma_mhi_client_test_utils_get_ee_gsi_index(
 	struct mhi_dma_function_params function,
-	enum ecpri_dma_ees* ee_idx)
+	enum ecpri_dma_ees* ee_idx,
+	enum ecpri_dma_gsi_id *gsi_idx)
 {
 	int ret = 0;
-	int max_vf_id =
-		ecpri_dma_get_ctx_hw_ver() == ECPRI_HW_V1_0 ?
-		ECPRI_DMA_VM_IDS_MAX_V1 : ECPRI_DMA_VM_IDS_MAX;
+	int max_vf_id = ECPRI_DMA_MHI_TEST_MAX_VF_ID;
 
 	if (function.function_type ==
 		MHI_DMA_FUNCTION_TYPE_VIRTUAL &&
@@ -863,16 +1065,56 @@ static inline int ecpri_dma_mhi_client_test_utils_get_ee_index(
 		switch (function.vf_id)
 		{
 		case ECPRI_DMA_VM_IDS_VM0:
+		case ECPRI_DMA_VM_IDS_VM1:
+		case ECPRI_DMA_VM_IDS_VM2:
+		case ECPRI_DMA_VM_IDS_VM3:
+			*(gsi_idx) = ECPRI_DMA_GSI_ID_0;
+			break;
+		case ECPRI_DMA_VM_IDS_VFA:
+		case ECPRI_DMA_VM_IDS_VFB:
+		case ECPRI_DMA_VM_IDS_VFC:
+		case ECPRI_DMA_VM_IDS_VF1:
+		case ECPRI_DMA_VM_IDS_VF2:
+			*(gsi_idx) = ECPRI_DMA_GSI_ID_1;
+			break;
+		case ECPRI_DMA_VM_IDS_VFD:
+		case ECPRI_DMA_VM_IDS_VFE:
+		case ECPRI_DMA_VM_IDS_VF3:
+		case ECPRI_DMA_VM_IDS_VF4:
+		case ECPRI_DMA_VM_IDS_VF5:
+			*(gsi_idx) = ECPRI_DMA_GSI_ID_2;
+			break;
+		default:
+			DMA_UT_ERR("Unexpected function type, type: %d, vf_id: %d\n",
+				function.function_type, function.vf_id);
+			ret = -EINVAL;
+			break;
+		}
+		switch (function.vf_id)
+		{
+		case ECPRI_DMA_VM_IDS_VM0:
+		case ECPRI_DMA_VM_IDS_VFA:
+		case ECPRI_DMA_VM_IDS_VFD:
 			*(ee_idx) = ECPRI_DMA_EE_VM0;
 			break;
 		case ECPRI_DMA_VM_IDS_VM1:
+		case ECPRI_DMA_VM_IDS_VFB:
+		case ECPRI_DMA_VM_IDS_VFE:
 			*(ee_idx) = ECPRI_DMA_EE_VM1;
 			break;
 		case ECPRI_DMA_VM_IDS_VM2:
+		case ECPRI_DMA_VM_IDS_VFC:
+		case ECPRI_DMA_VM_IDS_VF3:
 			*(ee_idx) = ECPRI_DMA_EE_VM2;
 			break;
 		case ECPRI_DMA_VM_IDS_VM3:
+		case ECPRI_DMA_VM_IDS_VF1:
+		case ECPRI_DMA_VM_IDS_VF4:
 			*(ee_idx) = ECPRI_DMA_EE_VM3;
+			break;
+		case ECPRI_DMA_VM_IDS_VF2:
+		case ECPRI_DMA_VM_IDS_VF5:
+			*(ee_idx) = ECPRI_DMA_EE_PF;
 			break;
 		default:
 			DMA_UT_ERR("Unexpected function type, type: %d, vf_id: %d\n",
@@ -884,6 +1126,7 @@ static inline int ecpri_dma_mhi_client_test_utils_get_ee_index(
 	else if (function.function_type ==
 		MHI_DMA_FUNCTION_TYPE_PHYSICAL) {
 		*(ee_idx) = ECPRI_DMA_EE_PF;
+		*(gsi_idx) = ECPRI_DMA_GSI_ID_0;
 	}
 	else {
 		DMA_UT_ERR("Unexpected function type, type: %d, vf_id: %d\n",
@@ -968,9 +1211,9 @@ static int ecpri_dma_mhi_client_test_config_channel_context(
 	p_mmio = (struct ecpri_dma_mhi_mmio_register_set*)mmio->virt_base;
 	host_channels =
 		(struct ecpri_dma_mhi_host_ch_ctx*)
-		((unsigned long)p_mmio->crcbap);
+		((u64)p_mmio->crcbap);
 	host_events = (struct ecpri_dma_mhi_host_ev_ctx*)
-		((unsigned long)p_mmio->crdb);
+		((u64)p_mmio->crdb);
 
 	DMA_UT_DBG("p_mmio: %px host_channels: %px host_events: %px\n",
 		p_mmio, host_channels, host_events);
@@ -1002,6 +1245,10 @@ static int ecpri_dma_mhi_client_test_config_channel_context(
 			DMA_UT_ERR("no mem for ev ring buf\n");
 			return -ENOMEM;
 		}
+
+		DMA_UT_DBG("Going to config EV ID: %u virt ptr 0x%x, virt RP PTR 0x%x\n",
+			host_ev_id, &host_events[host_ev_id], &host_events[host_ev_id].rp);
+
 		host_events[host_ev_id].intmodc = 1;
 		host_events[host_ev_id].intmodt = 0;
 		host_events[host_ev_id].msivec = dev_ev_ring_idx;
@@ -1149,8 +1396,29 @@ static int ecpri_dma_mhi_client_test_verify_connect(
 	return ret;
 }
 
-static void ecpri_dma_mhi_client_test_destroy_data_context(int idx)
+void ecpri_dma_mhi_client_test_destroy_data_context(int idx)
 {
+	u32 endp_pair_id = 0;
+	u32 hw_ver = ecpri_dma_get_ctx_hw_ver();
+	u32 hw_flavor = ecpri_dma_get_ctx_hw_flavor();
+	u32 first_src_ch, first_dest_ch, ch_id_diff;
+
+	if (ecpri_dma_mhi_client_test_mapping[hw_ver][hw_flavor][idx].type ==
+		ECPRI_DMA_MHI_CLIENT_TEST_VF_TYPE_FAPI)
+	{
+		first_src_ch = ECPRI_DMA_MHI_TEST_FAPI_FRST_SRC_CHANNEL_ID;
+		first_dest_ch = ECPRI_DMA_MHI_TEST_FAPI_FRST_DEST_CHANNEL_ID;
+		ch_id_diff = ecpri_dma_mhi_client_test_mapping
+			[hw_ver][hw_flavor][idx].num_of_hw_chs_pairs;
+	}
+	else
+	{
+		first_src_ch = ECPRI_DMA_MHI_TEST_FH_FRST_SRC_CHANNEL_ID;
+		first_dest_ch = ecpri_dma_mhi_client_test_mapping
+			[hw_ver][hw_flavor][idx].num_of_hw_chs_pairs;
+		ch_id_diff = ECPRI_DMA_MHI_TEST_FH_CHANNEL_ID_DIFF;
+	}
+
 	/* Destroy DEST data buffer */
 	dma_free_coherent(ecpri_dma_ctx->pdev,
 		mhi_client_test_suite_ctx[idx]->dest_buffer.size,
@@ -1166,95 +1434,88 @@ static void ecpri_dma_mhi_client_test_destroy_data_context(int idx)
 	mhi_client_test_suite_ctx[idx]->src_buffer.virt_base = NULL;
 
 	/* Destroy channels context */
-	ecpri_dma_mhi_client_test_destroy_channel_context(
-		mhi_client_test_suite_ctx[idx]->xfer_ring_bufs,
-		mhi_client_test_suite_ctx[idx]->ev_ring_bufs,
-		ecpri_dma_mhi_client_test_host_ch_id_map[3],
-		ecpri_dma_mhi_client_test_ev_id_map[3]);
+	for (endp_pair_id = 0;
+		endp_pair_id <
+		ecpri_dma_mhi_client_test_mapping[hw_ver][hw_flavor][idx].
+		num_of_hw_chs_pairs;
+		endp_pair_id++) {
+		ecpri_dma_mhi_client_test_destroy_channel_context(
+			mhi_client_test_suite_ctx[idx]->xfer_ring_bufs,
+			mhi_client_test_suite_ctx[idx]->ev_ring_bufs,
+			ECPRI_DMA_MHI_TEST_FIRST_HW_CH_ID + first_src_ch +
+			(endp_pair_id * ch_id_diff),
+			first_src_ch + (endp_pair_id * ch_id_diff));
 
-	ecpri_dma_mhi_client_test_destroy_channel_context(
-		mhi_client_test_suite_ctx[idx]->xfer_ring_bufs,
-		mhi_client_test_suite_ctx[idx]->ev_ring_bufs,
-		ecpri_dma_mhi_client_test_host_ch_id_map[2],
-		ecpri_dma_mhi_client_test_ev_id_map[2]);
-
-	ecpri_dma_mhi_client_test_destroy_channel_context(
-		mhi_client_test_suite_ctx[idx]->xfer_ring_bufs,
-		mhi_client_test_suite_ctx[idx]->ev_ring_bufs,
-		ecpri_dma_mhi_client_test_host_ch_id_map[1],
-		ecpri_dma_mhi_client_test_ev_id_map[1]);
-
-	ecpri_dma_mhi_client_test_destroy_channel_context(
-		mhi_client_test_suite_ctx[idx]->xfer_ring_bufs,
-		mhi_client_test_suite_ctx[idx]->ev_ring_bufs,
-		ecpri_dma_mhi_client_test_host_ch_id_map[0],
-		ecpri_dma_mhi_client_test_ev_id_map[0]);
+		ecpri_dma_mhi_client_test_destroy_channel_context(
+			mhi_client_test_suite_ctx[idx]->xfer_ring_bufs,
+			mhi_client_test_suite_ctx[idx]->ev_ring_bufs,
+			ECPRI_DMA_MHI_TEST_FIRST_HW_CH_ID+ first_dest_ch +
+			(endp_pair_id * ch_id_diff),
+			first_dest_ch + (endp_pair_id * ch_id_diff));
+	}
 }
 
 static int ecpri_dma_mhi_client_test_setup_channels(int idx)
 {
 	int ret = 0;
+	u32 endp_pair_id = 0;
+	u32 hw_ver = ecpri_dma_get_ctx_hw_ver();
+	u32 hw_flavor = ecpri_dma_get_ctx_hw_flavor();
+	u32 first_src_ch, first_dest_ch, ch_id_diff;
 
-	DMA_UT_DBG("Entry setup_channels\n");
+	DMA_UT_DBG("Entry setup_channels VF ID %d\n", idx);
 
-	/* Config First SRC Channel Context */
-	ret = ecpri_dma_mhi_client_test_config_channel_context(
-		&mhi_client_test_suite_ctx[idx]->mmio_buf,
-		mhi_client_test_suite_ctx[idx]->xfer_ring_bufs,
-		mhi_client_test_suite_ctx[idx]->ev_ring_bufs,
-		ecpri_dma_mhi_client_test_host_ch_id_map[0],
-		ecpri_dma_mhi_client_test_ev_id_map[0],
-		ECPRI_DMA_MHI_TEST_RING_LEN,
-		ECPRI_DMA_MHI_TEST_RING_LEN,
-		ECPRI_DMA_ENDP_DIR_SRC);
-	if (ret != 0) {
-		DMA_UT_ERR("Fail to config first SRC ch ctx - err %d", ret);
-		return ret;
+	if (ecpri_dma_mhi_client_test_mapping[hw_ver][hw_flavor][idx].type ==
+		ECPRI_DMA_MHI_CLIENT_TEST_VF_TYPE_FAPI)
+	{
+		first_src_ch = ECPRI_DMA_MHI_TEST_FAPI_FRST_SRC_CHANNEL_ID;
+		first_dest_ch = ECPRI_DMA_MHI_TEST_FAPI_FRST_DEST_CHANNEL_ID;
+		ch_id_diff = ecpri_dma_mhi_client_test_mapping
+			[hw_ver][hw_flavor][idx].num_of_hw_chs_pairs;
+	}
+	else
+	{
+		first_src_ch = ECPRI_DMA_MHI_TEST_FH_FRST_SRC_CHANNEL_ID;
+		first_dest_ch = ecpri_dma_mhi_client_test_mapping
+			[hw_ver][hw_flavor][idx].num_of_hw_chs_pairs;
+		ch_id_diff = ECPRI_DMA_MHI_TEST_FH_CHANNEL_ID_DIFF;
 	}
 
-	/* Config Second SRC Channel Context */
-	ret = ecpri_dma_mhi_client_test_config_channel_context(
-		&mhi_client_test_suite_ctx[idx]->mmio_buf,
-		mhi_client_test_suite_ctx[idx]->xfer_ring_bufs,
-		mhi_client_test_suite_ctx[idx]->ev_ring_bufs,
-		ecpri_dma_mhi_client_test_host_ch_id_map[1],
-		ecpri_dma_mhi_client_test_ev_id_map[1],
-		ECPRI_DMA_MHI_TEST_RING_LEN,
-		ECPRI_DMA_MHI_TEST_RING_LEN,
-		ECPRI_DMA_ENDP_DIR_SRC);
-	if (ret) {
-		DMA_UT_ERR("Fail to config second SRC ch ctx - err %d", ret);
-		goto fail_destroy_frst_src_ch_ctx;
-	}
+	/* Config Channels Context */
+	for (endp_pair_id = 0;
+		endp_pair_id <
+		ecpri_dma_mhi_client_test_mapping[hw_ver][hw_flavor][idx].
+		num_of_hw_chs_pairs;
+		endp_pair_id++) {
+		ret = ecpri_dma_mhi_client_test_config_channel_context(
+			&mhi_client_test_suite_ctx[idx]->mmio_buf,
+			mhi_client_test_suite_ctx[idx]->xfer_ring_bufs,
+			mhi_client_test_suite_ctx[idx]->ev_ring_bufs,
+			ECPRI_DMA_MHI_TEST_FIRST_HW_CH_ID + first_src_ch +
+			(endp_pair_id * ch_id_diff),
+			first_src_ch + (endp_pair_id * ch_id_diff),
+			ECPRI_DMA_MHI_TEST_RING_LEN,
+			ECPRI_DMA_MHI_TEST_RING_LEN,
+			ECPRI_DMA_ENDP_DIR_SRC);
+		if (ret != 0) {
+			DMA_UT_ERR("Fail to config  SRC ch ctx - err %d", ret);
+			goto fail_destroy_ch_cntxt;
+		}
 
-	/* Config First DEST Channel Context */
-	ret = ecpri_dma_mhi_client_test_config_channel_context(
-		&mhi_client_test_suite_ctx[idx]->mmio_buf,
-		mhi_client_test_suite_ctx[idx]->xfer_ring_bufs,
-		mhi_client_test_suite_ctx[idx]->ev_ring_bufs,
-		ecpri_dma_mhi_client_test_host_ch_id_map[2],
-		ecpri_dma_mhi_client_test_ev_id_map[2],
-		ECPRI_DMA_MHI_TEST_RING_LEN,
-		ECPRI_DMA_MHI_TEST_RING_LEN,
-		ECPRI_DMA_ENDP_DIR_DEST);
-	if (ret) {
-		DMA_UT_ERR("Fail to config first DEST ch ctx - err %d", ret);
-		goto fail_destroy_scnd_src_ch_ctx;
-	}
-
-	/* Config Second DEST Channel Context */
-	ret = ecpri_dma_mhi_client_test_config_channel_context(
-		&mhi_client_test_suite_ctx[idx]->mmio_buf,
-		mhi_client_test_suite_ctx[idx]->xfer_ring_bufs,
-		mhi_client_test_suite_ctx[idx]->ev_ring_bufs,
-		ecpri_dma_mhi_client_test_host_ch_id_map[3],
-		ecpri_dma_mhi_client_test_ev_id_map[3],
-		ECPRI_DMA_MHI_TEST_RING_LEN,
-		ECPRI_DMA_MHI_TEST_RING_LEN,
-		ECPRI_DMA_ENDP_DIR_DEST);
-	if (ret) {
-		DMA_UT_ERR("Fail to config second DEST ch ctx - err %d", ret);
-		goto fail_destroy_first_dest_ch_ctx;
+		ret = ecpri_dma_mhi_client_test_config_channel_context(
+			&mhi_client_test_suite_ctx[idx]->mmio_buf,
+			mhi_client_test_suite_ctx[idx]->xfer_ring_bufs,
+			mhi_client_test_suite_ctx[idx]->ev_ring_bufs,
+			ECPRI_DMA_MHI_TEST_FIRST_HW_CH_ID + first_dest_ch +
+			(endp_pair_id * ch_id_diff),
+			first_dest_ch + (endp_pair_id * ch_id_diff),
+			ECPRI_DMA_MHI_TEST_RING_LEN,
+			ECPRI_DMA_MHI_TEST_RING_LEN,
+			ECPRI_DMA_ENDP_DIR_DEST);
+		if (ret != 0) {
+			DMA_UT_ERR("Fail to config DEST ch ctx - err %d", ret);
+			goto fail_destroy_ch_cntxt;
+		}
 	}
 
 	/* allocate DEST data buffer */
@@ -1266,8 +1527,12 @@ static int ecpri_dma_mhi_client_test_setup_channels(int idx)
 	if (!mhi_client_test_suite_ctx[idx]->dest_buffer.virt_base) {
 		DMA_UT_ERR("no mem for dest data buffer\n");
 		ret = -ENOMEM;
-		goto fail_destroy_second_dest_ch_ctx;
+		goto fail_destroy_ch_cntxt;
 	}
+
+	DMA_UT_DBG("DEST buff for idx %d addr: 0x%px, virt 0x%px\n", idx,
+		mhi_client_test_suite_ctx[idx]->dest_buffer.phys_base,
+		mhi_client_test_suite_ctx[idx]->dest_buffer.virt_base);
 
 	memset(mhi_client_test_suite_ctx[idx]->dest_buffer.virt_base, 0,
 		ECPRI_DMA_MHI_TEST_BUFF_SIZE);
@@ -1283,6 +1548,9 @@ static int ecpri_dma_mhi_client_test_setup_channels(int idx)
 		ret = -EFAULT;
 		goto fail_destroy_dest_data_buf;
 	}
+	DMA_UT_DBG("SRC buff for idx %d addr: 0x%px, virt 0x%px\n", idx,
+		mhi_client_test_suite_ctx[idx]->src_buffer.phys_base,
+		mhi_client_test_suite_ctx[idx]->src_buffer.virt_base);
 
 	memset(mhi_client_test_suite_ctx[idx]->src_buffer.virt_base, 0,
 		ECPRI_DMA_MHI_TEST_BUFF_SIZE);
@@ -1295,31 +1563,22 @@ fail_destroy_dest_data_buf:
 		mhi_client_test_suite_ctx[idx]->dest_buffer.virt_base,
 		mhi_client_test_suite_ctx[idx]->dest_buffer.phys_base);
 	mhi_client_test_suite_ctx[idx]->dest_buffer.virt_base = NULL;
-fail_destroy_second_dest_ch_ctx:
-	ecpri_dma_mhi_client_test_destroy_channel_context(
-		mhi_client_test_suite_ctx[idx]->xfer_ring_bufs,
-		mhi_client_test_suite_ctx[idx]->ev_ring_bufs,
-		ecpri_dma_mhi_client_test_host_ch_id_map[3],
-		ecpri_dma_mhi_client_test_ev_id_map[3]);
-fail_destroy_first_dest_ch_ctx:
-	ecpri_dma_mhi_client_test_destroy_channel_context(
-		mhi_client_test_suite_ctx[idx]->xfer_ring_bufs,
-		mhi_client_test_suite_ctx[idx]->ev_ring_bufs,
-		ecpri_dma_mhi_client_test_host_ch_id_map[2],
-		ecpri_dma_mhi_client_test_ev_id_map[2]);
-fail_destroy_scnd_src_ch_ctx:
-	ecpri_dma_mhi_client_test_destroy_channel_context(
-		mhi_client_test_suite_ctx[idx]->xfer_ring_bufs,
-		mhi_client_test_suite_ctx[idx]->ev_ring_bufs,
-		ecpri_dma_mhi_client_test_host_ch_id_map[1],
-		ecpri_dma_mhi_client_test_ev_id_map[1]);
-fail_destroy_frst_src_ch_ctx:
-	ecpri_dma_mhi_client_test_destroy_channel_context(
-		mhi_client_test_suite_ctx[idx]->xfer_ring_bufs,
-		mhi_client_test_suite_ctx[idx]->ev_ring_bufs,
-		ecpri_dma_mhi_client_test_host_ch_id_map[0],
-		ecpri_dma_mhi_client_test_ev_id_map[0]);
-	return 0;
+fail_destroy_ch_cntxt:
+	for (; endp_pair_id >= 0; endp_pair_id--) {
+		ecpri_dma_mhi_client_test_destroy_channel_context(
+			mhi_client_test_suite_ctx[idx]->xfer_ring_bufs,
+			mhi_client_test_suite_ctx[idx]->ev_ring_bufs,
+			ECPRI_DMA_MHI_TEST_FIRST_HW_CH_ID + first_src_ch +
+			(endp_pair_id * ch_id_diff),
+			first_src_ch + (endp_pair_id * ch_id_diff));
+		ecpri_dma_mhi_client_test_destroy_channel_context(
+			mhi_client_test_suite_ctx[idx]->xfer_ring_bufs,
+			mhi_client_test_suite_ctx[idx]->ev_ring_bufs,
+			ECPRI_DMA_MHI_TEST_FIRST_HW_CH_ID + first_dest_ch +
+			(endp_pair_id * ch_id_diff),
+			first_dest_ch + (endp_pair_id * ch_id_diff));
+	}
+	return ret;
 }
 
 static int ecpri_dma_mhi_client_test_suite_setup(void** ppriv)
@@ -1333,6 +1592,21 @@ static int ecpri_dma_mhi_client_test_suite_setup(void** ppriv)
 
 	if (!ecpri_dma_ctx) {
 		DMA_UT_ERR("ECPRI DMA ctx is not initialized\n");
+		return -EINVAL;
+	}
+
+	if (ecpri_dma_get_ctx_hw_ver() == ECPRI_HW_V1_0 &&
+		ecpri_dma_get_ctx_hw_flavor() != ECPRI_HW_FLAVOR_DU_PCIE)
+	{
+		DMA_UT_ERR("MHI UTs require PCIe flavor\n");
+		return -EINVAL;
+	}
+	else if (ecpri_dma_get_ctx_hw_ver() == ECPRI_HW_V2_0 &&
+		(ecpri_dma_get_ctx_hw_flavor() != ECPRI_HW_FLAVOR_DU_PCIE_5_X_6 &&
+			ecpri_dma_get_ctx_hw_flavor() != ECPRI_HW_FLAVOR_DU_PCIE_4_X_9 &&
+			ecpri_dma_get_ctx_hw_flavor() != ECPRI_HW_FLAVOR_DU_PCIE_3_X_12))
+	{
+		DMA_UT_ERR("MHI UTs require PCIe flavor\n");
 		return -EINVAL;
 	}
 
@@ -1424,6 +1698,55 @@ static void ecpri_dma_mhi_client_test_utils_create_init_params(
 	init_params->test_mode = true;
 }
 
+static int ecpri_dma_mhi_client_test_utils_calc_expected_func_mask(
+	struct mhi_dma_function_params function,
+	u32* expected_mask)
+{
+	if (ecpri_dma_get_ctx_hw_ver() == ECPRI_HW_V1_0) {
+		*expected_mask =
+			function.function_type == MHI_DMA_FUNCTION_TYPE_PHYSICAL ?
+			ECPRI_DMA_MHI_TEST_EXPECTED_CH_EV_MASK_PF :
+			ECPRI_DMA_MHI_TEST_EXPECTED_CH_EV_MASK_VMS;
+	}
+	else
+	{
+		if (function.function_type == MHI_DMA_FUNCTION_TYPE_PHYSICAL)
+		{
+			*expected_mask = ECPRI_DMA_MHI_TEST_EXPECTED_CH_EV_MASK_PF;
+		}
+		else
+		{
+			if (function.vf_id >= ECPRI_DMA_VM_IDS_VF1 &&
+				function.vf_id <= ECPRI_DMA_VM_IDS_VF5)
+			{
+				switch (ecpri_dma_get_ctx_hw_flavor())
+				{
+				case ECPRI_HW_FLAVOR_DU_PCIE_3_X_12:
+					*expected_mask =
+						ECPRI_DMA_MHI_TEST_EXPECTED_CH_EV_MASK_FH_VMS_12;
+					break;
+				case ECPRI_HW_FLAVOR_DU_PCIE_4_X_9:
+					*expected_mask =
+						ECPRI_DMA_MHI_TEST_EXPECTED_CH_EV_MASK_FH_VMS_9;
+					break;
+				case ECPRI_HW_FLAVOR_DU_PCIE_5_X_6:
+					*expected_mask =
+						ECPRI_DMA_MHI_TEST_EXPECTED_CH_EV_MASK_FH_VMS_6;
+					break;
+				default:
+					DMA_UT_TEST_FAIL_REPORT("Unkown flavor\n");
+					return -EINVAL;
+				}
+			}
+			else
+			{
+				*expected_mask = ECPRI_DMA_MHI_TEST_EXPECTED_CH_EV_MASK_VMS;
+			}
+		}
+	}
+	return 0;
+}
+
 static int ecpri_dma_mhi_client_test_utils_invoke_init(
 	struct mhi_dma_function_params function,
 	struct mhi_dma_init_params* init_params,
@@ -1432,14 +1755,21 @@ static int ecpri_dma_mhi_client_test_utils_invoke_init(
 	int ret = 0;
 	bool timeout = true;
 	enum ecpri_dma_ees ee_idx = 0;
+	enum ecpri_dma_gsi_id gsi_idx = 0;
 	u64 ch_db_base, ev_db_base;
-	u32 expected_mask =
-		function.function_type == MHI_DMA_FUNCTION_TYPE_PHYSICAL ?
-		ECPRI_DMA_MHI_TEST_EXPECTED_CH_EV_MASK_PF :
-		ECPRI_DMA_MHI_TEST_EXPECTED_CH_EV_MASK_VMS;
+	u32 expected_mask = 0;
 
 	DMA_UT_DBG("Running mhi_dma_init\n");
-	ret = ecpri_dma_mhi_driver_ops.mhi_dma_init(function, init_params, out_params);
+
+	ret = ecpri_dma_mhi_client_test_utils_calc_expected_func_mask(function,
+		&expected_mask);
+	if (ret) {
+		DMA_UT_ERR("Unable to calc expected mask, RETURN CODE: %d\n", ret);
+		return ret;
+	}
+
+	ret = ecpri_dma_mhi_driver_ops.mhi_dma_init(function, init_params,
+		out_params);
 	if (ret) {
 		DMA_UT_ERR("mhi_dma_init failed, RETURN CODE: %d\n", ret);
 		DMA_UT_TEST_FAIL_REPORT("mhi_dma_init failed\n");
@@ -1461,7 +1791,8 @@ static int ecpri_dma_mhi_client_test_utils_invoke_init(
 		return -EFAULT;
 	}
 
-	ret = ecpri_dma_mhi_client_test_utils_get_ee_index(function, &ee_idx);
+	ret = ecpri_dma_mhi_client_test_utils_get_ee_gsi_index(function, &ee_idx,
+		&gsi_idx);
 	if (ret) {
 		DMA_UT_ERR(
 			"Return code %d\n", ret);
@@ -1470,9 +1801,9 @@ static int ecpri_dma_mhi_client_test_utils_invoke_init(
 	}
 
 	ch_db_base = gsihal_get_reg_pnk_addr(
-		GSI_EE_n_GSI_CH_k_DOORBELL_0, 0, ee_idx, 0);
+		GSI_EE_n_GSI_CH_k_DOORBELL_0, gsi_idx, ee_idx, 0);
 	ev_db_base = gsihal_get_reg_pnk_addr(
-		GSI_EE_n_EV_CH_k_DOORBELL_0, 0, ee_idx, 0);
+		GSI_EE_n_EV_CH_k_DOORBELL_0, gsi_idx, ee_idx, 0);
 
 	if (out_params->ch_db_fwd_base !=
 		ch_db_base ||
@@ -1633,66 +1964,71 @@ static int ecpri_dma_mhi_client_test_utils_check_memcpy_init_state(
 		return -EFAULT;
 	}
 
-	if (memcpy_ctx->destroy_pending != false) {
-		DMA_UT_ERR("Test failed due to "
-			"memcpy_ctx->destroy_pending %d, VF_ID%d\n",
-			memcpy_ctx->destroy_pending, function->vf_id);
-		DMA_UT_TEST_FAIL_REPORT("Test failed due to "
-			"memcpy_ctx->destroy_pending");
-		return -EFAULT;
-	}
-	DMA_UT_DBG("Checking memcpy_ctx->destroy_pending - OK\n");
+	if (ecpri_dma_get_ctx_hw_ver() == ECPRI_HW_V1_0)
+	{
+		/*	Starting V2 the memcpy CTX is shared so the following
+			checks are irrelevant */
+		if (memcpy_ctx->destroy_pending != false) {
+			DMA_UT_ERR("Test failed due to "
+				"memcpy_ctx->destroy_pending %d, VF_ID%d\n",
+				memcpy_ctx->destroy_pending, function->vf_id);
+			DMA_UT_TEST_FAIL_REPORT("Test failed due to "
+				"memcpy_ctx->destroy_pending");
+			return -EFAULT;
+		}
+		DMA_UT_DBG("Checking memcpy_ctx->destroy_pending - OK\n");
 
-	/* Each successful memcpy_init increases ref_count */
-	if (atomic_read(&memcpy_ctx->ref_count) != 1) {
-		DMA_UT_ERR("Test failed due to "
-			"memcpy_ctx->ref_count %d, VF_ID%d\n",
-			atomic_read(&memcpy_ctx->ref_count), function->vf_id);
-		DMA_UT_TEST_FAIL_REPORT("Test failed due to "
-			"memcpy_ctx->ref_count");
-		return -EFAULT;
-	}
-	DMA_UT_DBG("Checking memcpy_ctx->ref_count - OK\n");
+		/* Each successful memcpy_init increases ref_count */
+		if (atomic_read(&memcpy_ctx->ref_count) != 1) {
+			DMA_UT_ERR("Test failed due to "
+				"memcpy_ctx->ref_count %d, VF_ID%d\n",
+				atomic_read(&memcpy_ctx->ref_count), function->vf_id);
+			DMA_UT_TEST_FAIL_REPORT("Test failed due to "
+				"memcpy_ctx->ref_count");
+			return -EFAULT;
+		}
+		DMA_UT_DBG("Checking memcpy_ctx->ref_count - OK\n");
 
-	if (atomic_read(&memcpy_ctx->async_pending) != 0) {
-		DMA_UT_ERR("Test failed due to "
-			"memcpy_ctx->async_pending %d, VF_ID%d\n",
-			atomic_read(&memcpy_ctx->async_pending), function->vf_id);
-		DMA_UT_TEST_FAIL_REPORT("Test failed due to "
-			"memcpy_ctx->async_pending");
-		return -EFAULT;
-	}
-	DMA_UT_DBG("Checking memcpy_ctx->async_pending - OK\n");
+		if (atomic_read(&memcpy_ctx->async_pending) != 0) {
+			DMA_UT_ERR("Test failed due to "
+				"memcpy_ctx->async_pending %d, VF_ID%d\n",
+				atomic_read(&memcpy_ctx->async_pending), function->vf_id);
+			DMA_UT_TEST_FAIL_REPORT("Test failed due to "
+				"memcpy_ctx->async_pending");
+			return -EFAULT;
+		}
+		DMA_UT_DBG("Checking memcpy_ctx->async_pending - OK\n");
 
-	if (atomic_read(&memcpy_ctx->sync_pending) != 0) {
-		DMA_UT_ERR("Test failed due to "
-			"memcpy_ctx->sync_pending %d, VF_ID%d\n",
-			atomic_read(&memcpy_ctx->sync_pending), function->vf_id);
-		DMA_UT_TEST_FAIL_REPORT("Test failed due to "
-			"memcpy_ctx->sync_pending");
-		return -EFAULT;
-	}
-	DMA_UT_DBG("Checking memcpy_ctx->sync_pending - OK\n");
+		if (atomic_read(&memcpy_ctx->sync_pending) != 0) {
+			DMA_UT_ERR("Test failed due to "
+				"memcpy_ctx->sync_pending %d, VF_ID%d\n",
+				atomic_read(&memcpy_ctx->sync_pending), function->vf_id);
+			DMA_UT_TEST_FAIL_REPORT("Test failed due to "
+				"memcpy_ctx->sync_pending");
+			return -EFAULT;
+		}
+		DMA_UT_DBG("Checking memcpy_ctx->sync_pending - OK\n");
 
-	if (atomic_read(&memcpy_ctx->sync_total) != 0) {
-		DMA_UT_ERR("Test failed due to "
-			"memcpy_ctx->sync_total %d, VF_ID%d\n",
-			atomic_read(&memcpy_ctx->sync_total), function->vf_id);
-		DMA_UT_TEST_FAIL_REPORT("Test failed due to "
-			"memcpy_ctx->sync_total");
-		return -EFAULT;
-	}
-	DMA_UT_DBG("Checking memcpy_ctx->sync_total - OK\n");
+		if (atomic_read(&memcpy_ctx->sync_total) != 0) {
+			DMA_UT_ERR("Test failed due to "
+				"memcpy_ctx->sync_total %d, VF_ID%d\n",
+				atomic_read(&memcpy_ctx->sync_total), function->vf_id);
+			DMA_UT_TEST_FAIL_REPORT("Test failed due to "
+				"memcpy_ctx->sync_total");
+			return -EFAULT;
+		}
+		DMA_UT_DBG("Checking memcpy_ctx->sync_total - OK\n");
 
-	if (atomic_read(&memcpy_ctx->async_total) != 0) {
-		DMA_UT_ERR("Test failed due to "
-			"memcpy_ctx->async_total %d, VF_ID%d\n",
-			atomic_read(&memcpy_ctx->async_total), function->vf_id);
-		DMA_UT_TEST_FAIL_REPORT("Test failed due to "
-			"memcpy_ctx->async_total");
-		return -EFAULT;
+		if (atomic_read(&memcpy_ctx->async_total) != 0) {
+			DMA_UT_ERR("Test failed due to "
+				"memcpy_ctx->async_total %d, VF_ID%d\n",
+				atomic_read(&memcpy_ctx->async_total), function->vf_id);
+			DMA_UT_TEST_FAIL_REPORT("Test failed due to "
+				"memcpy_ctx->async_total");
+			return -EFAULT;
+		}
+		DMA_UT_DBG("Checking memcpy_ctx->async_total - OK\n");
 	}
-	DMA_UT_DBG("Checking memcpy_ctx->async_total - OK\n");
 
 	return ret;
 }
@@ -1701,28 +2037,24 @@ static void ecpri_dma_mhi_client_test_utils_create_all_functions(
 	struct mhi_dma_function_params* function)
 {
 	int i;
-	int max_vf_id =
-		ecpri_dma_get_ctx_hw_ver() == ECPRI_HW_V1_0 ?
-		ECPRI_DMA_VM_IDS_MAX_V1 : ECPRI_DMA_VM_IDS_MAX;
+	int max_vf_id = ECPRI_DMA_MHI_TEST_MAX_VF_ID;
 
 	for (i = 0; i < max_vf_id; i++)
 	{
-		if (i < max_vf_id) {
-			function[i].function_type =
-				MHI_DMA_FUNCTION_TYPE_VIRTUAL;
-			function[i].vf_id = ECPRI_DMA_VM_IDS_VM0 + i;
-			DMA_UT_DBG("Preparing function params for IDX: %d, VF_ID %d,"
-				"type %d\n",
-				i, function[i].vf_id, ECPRI_DMA_VM_IDS_VM0 + i);
-		}
-		else {
-			function[i].function_type =
-				MHI_DMA_FUNCTION_TYPE_PHYSICAL;
-			function[i].vf_id = ECPRI_DMA_MHI_PF_ID;
-			DMA_UT_DBG("Preparing function params for IDX: %d, VF_ID %d\n",
-				i, function[i].vf_id, ECPRI_DMA_MHI_PF_ID);
-		}
+		function[i].function_type =
+			MHI_DMA_FUNCTION_TYPE_VIRTUAL;
+		function[i].vf_id = ECPRI_DMA_VM_IDS_VM0 + i;
+		DMA_UT_DBG("Preparing function params for IDX: %d, VF_ID %d,"
+			"type %d\n",
+			i, function[i].vf_id, ECPRI_DMA_VM_IDS_VM0 + i);
 	}
+
+	function[i].function_type =
+		MHI_DMA_FUNCTION_TYPE_PHYSICAL;
+	function[i].vf_id = ECPRI_DMA_MHI_PF_ID;
+	DMA_UT_DBG("Preparing function params for IDX: %d, VF_ID %d\n",
+		i, function[i].vf_id, ECPRI_DMA_MHI_PF_ID);
+
 	DMA_UT_DBG("Function params are prepared successfully\n");
 }
 
@@ -1893,7 +2225,7 @@ static int ecpri_dma_mhi_test_q_transfer_re(
 	struct ecpri_dma_mem_buffer xfer_ring_bufs[],
 	struct ecpri_dma_mem_buffer ev_ring_bufs[],
 	u8 host_ch_id,
-	struct ecpri_dma_mem_buffer buffer,
+	struct ecpri_dma_mem_buffer *buffer,
 	enum ecpri_dma_ees ee, int gsi_id)
 {
 	struct gsi_tre* curr_re;
@@ -1911,9 +2243,9 @@ static int ecpri_dma_mhi_test_q_transfer_re(
 
 	p_mmio = (struct ecpri_dma_mhi_mmio_register_set*)mmio->virt_base;
 	host_channels = (struct ecpri_dma_mhi_host_ch_ctx*)
-		((unsigned long)p_mmio->crcbap);
+		((u64)p_mmio->crcbap);
 	host_events = (struct ecpri_dma_mhi_host_ev_ctx*)
-		((unsigned long)p_mmio->crdb);
+		((u64)p_mmio->crdb);
 
 	if (host_ch_id >=
 		(ECPRI_DMA_MHI_TEST_FIRST_HW_CH_ID + ECPRI_DMA_MHI_MAX_HW_CHANNELS) ||
@@ -1962,7 +2294,7 @@ static int ecpri_dma_mhi_test_q_transfer_re(
 		host_channels[host_ch_id].rbase);
 
 	curr_re = (struct gsi_tre*)
-		((unsigned long)xfer_ring_bufs[device_ch_idx].virt_base +
+		((u64)xfer_ring_bufs[device_ch_idx].virt_base +
 			wp_ofst);
 	if (host_channels[host_ch_id].rlen & 0xFFFFFFFF00000000) {
 		DMA_UT_DBG("invalid ch rlen %llu\n",
@@ -1976,8 +2308,8 @@ static int ecpri_dma_mhi_test_q_transfer_re(
 
 	/* write current RE */
 	curr_re->re_type = GSI_RE_XFER;
-	curr_re->buf_len = (u16)buffer.size;
-	curr_re->buffer_ptr = (u32)buffer.phys_base;
+	curr_re->buf_len = (u16)buffer->size;
+	curr_re->buffer_ptr = (u32)buffer->phys_base;
 	curr_re->bei = false;
 	curr_re->ieob = true;
 	curr_re->ieot = true;
@@ -2047,15 +2379,15 @@ static int ecpri_dma_mhi_test_loopback_data_transfer(int idx,
 	struct ecpri_dma_mhi_host_ch_ctx* host_channels;
 	struct ecpri_dma_mhi_host_ev_ctx* host_events;
 
-	DMA_UT_DBG("Entry  host_src_ch_id%d  host_dest_ch_id %d ee %d\n",
-		host_src_ch_id, host_dest_ch_id, ee);
+	DMA_UT_DBG("Entry VF %d host_src_ch_id %d  host_dest_ch_id %d ee %d gsi %d\n",
+		idx, host_src_ch_id, host_dest_ch_id, ee, gsi_id);
 
 	mmio = &mhi_client_test_suite_ctx[idx]->mmio_buf;
 	p_mmio = (struct ecpri_dma_mhi_mmio_register_set*)mmio->virt_base;
 	host_channels = (struct ecpri_dma_mhi_host_ch_ctx*)
-		((unsigned long)p_mmio->crcbap);
+		((u64)p_mmio->crcbap);
 	host_events = (struct ecpri_dma_mhi_host_ev_ctx*)
-		((unsigned long)p_mmio->crdb);
+		((u64)p_mmio->crdb);
 
 	/* invalidate MSI Interrupt value */
 	memset(mhi_client_test_suite_ctx[idx]->msi.virt_base,
@@ -2069,10 +2401,19 @@ static int ecpri_dma_mhi_test_loopback_data_transfer(int idx,
 	memset(mhi_client_test_suite_ctx[idx]->dest_buffer.virt_base, 0,
 		ECPRI_DMA_MHI_TEST_BUFF_SIZE);
 	for (i = 0; i < ECPRI_DMA_MHI_TEST_BUFF_SIZE; i++)
-		memset(mhi_client_test_suite_ctx[idx]->src_buffer.virt_base + i,
-			(val + i) & 0xFF, 1);
+		((u8*)mhi_client_test_suite_ctx[idx]->src_buffer.virt_base)[i] =
+			(val + i) & 0xFF;
+
+	DMA_UT_DBG("DEST BUFF VIRT 0x%px PHYS 0x%x\n",
+		mhi_client_test_suite_ctx[idx]->dest_buffer.virt_base,
+		mhi_client_test_suite_ctx[idx]->dest_buffer.phys_base);
+	DMA_UT_DBG("SRC BUFF VIRT 0x%px PHYS 0x%x val 0x%x\n",
+		mhi_client_test_suite_ctx[idx]->src_buffer.virt_base,
+		mhi_client_test_suite_ctx[idx]->src_buffer.phys_base,
+		*((u32*)mhi_client_test_suite_ctx[idx]->src_buffer.virt_base));
 
 	dest_device_ev_idx = host_channels[host_dest_ch_id].erindex;
+	DMA_UT_DBG("Dest ER %d\n", dest_device_ev_idx);
 	dest_orig_rp = host_events[dest_device_ev_idx].rp;
 
 	/* queue RE for DEST side and trigger doorbell */
@@ -2080,7 +2421,7 @@ static int ecpri_dma_mhi_test_loopback_data_transfer(int idx,
 		mhi_client_test_suite_ctx[idx]->xfer_ring_bufs,
 		mhi_client_test_suite_ctx[idx]->ev_ring_bufs,
 		host_dest_ch_id,
-		mhi_client_test_suite_ctx[idx]->dest_buffer, ee, gsi_id);
+		&mhi_client_test_suite_ctx[idx]->dest_buffer, ee, gsi_id);
 	if (ret) {
 		DMA_UT_DBG("q_transfer_re failed %d\n", ret);
 		DMA_UT_TEST_FAIL_REPORT("fail DEST q xfer re");
@@ -2088,6 +2429,7 @@ static int ecpri_dma_mhi_test_loopback_data_transfer(int idx,
 	}
 
 	src_device_ev_idx = host_channels[host_src_ch_id].erindex;
+	DMA_UT_DBG("SRC ER %d\n", src_device_ev_idx);
 	src_orig_rp = host_events[src_device_ev_idx].rp;
 
 	/* queue REs for SRC side and trigger doorbell */
@@ -2095,7 +2437,7 @@ static int ecpri_dma_mhi_test_loopback_data_transfer(int idx,
 		mhi_client_test_suite_ctx[idx]->xfer_ring_bufs,
 		mhi_client_test_suite_ctx[idx]->ev_ring_bufs,
 		host_src_ch_id,
-		mhi_client_test_suite_ctx[idx]->src_buffer, ee, gsi_id);
+		&mhi_client_test_suite_ctx[idx]->src_buffer, ee, gsi_id);
 	if (ret) {
 		DMA_UT_DBG("q_transfer_re failed %d\n", ret);
 		DMA_UT_TEST_FAIL_REPORT("fail SRC q xfer re");
@@ -2114,15 +2456,26 @@ static int ecpri_dma_mhi_test_loopback_data_transfer(int idx,
 	dest_new_rp = host_events[dest_device_ev_idx].rp;
 	src_new_rp = host_events[src_device_ev_idx].rp;
 
+	DMA_UT_DBG("DEST EV RP VIRT 0x%px\n", &host_events[dest_device_ev_idx].rp);
+	DMA_UT_DBG("SRC EV RP VIRT 0x%px\n", &host_events[src_device_ev_idx].rp);
+
 	/* Verify RP for both channels */
 	if (((dest_new_rp - dest_orig_rp) != sizeof(struct gsi_xfer_compl_evt)) ||
 		((src_new_rp - src_orig_rp) != sizeof(struct gsi_xfer_compl_evt))) {
-		DMA_UT_DBG("RP failure\n");
+		DMA_UT_DBG(
+			"RP failure dest_orig 0x%x, dest_new 0x%x src_orig 0x%x, src_new 0x%x\n",
+			dest_orig_rp , dest_new_rp, src_orig_rp, src_new_rp);
 		DMA_UT_TEST_FAIL_REPORT("RP should advance in offset of one TRE");
 		return -EFAULT;
 	}
 
 	/* compare the two buffers */
+	dma_sync_single_for_cpu(ecpri_dma_get_pdev(),
+		mhi_client_test_suite_ctx[idx]->dest_buffer.phys_base,
+		mhi_client_test_suite_ctx[idx]->dest_buffer.size, DMA_BIDIRECTIONAL);
+	dma_sync_single_for_cpu(ecpri_dma_get_pdev(),
+		mhi_client_test_suite_ctx[idx]->src_buffer.phys_base,
+		mhi_client_test_suite_ctx[idx]->src_buffer.size, DMA_BIDIRECTIONAL);
 	if (memcmp(mhi_client_test_suite_ctx[idx]->dest_buffer.virt_base,
 		mhi_client_test_suite_ctx[idx]->src_buffer.virt_base,
 		ECPRI_DMA_MHI_TEST_BUFF_SIZE)) {
@@ -2136,17 +2489,15 @@ static int ecpri_dma_mhi_test_loopback_data_transfer(int idx,
 
 static int ecpri_dma_mhi_client_test_suite_utils_disconnect_endps(
 	struct mhi_dma_function_params* function,
-	struct mhi_dma_disconnect_params* frst_src_disc_params,
-	struct mhi_dma_disconnect_params* frst_dest_disc_params,
-	struct mhi_dma_disconnect_params* second_src_disc_params,
-	struct mhi_dma_disconnect_params* second_dest_disc_params)
+	struct mhi_dma_disconnect_params* src_disc_params,
+	struct mhi_dma_disconnect_params* dest_disc_params)
 {
 	int ret = 0;
 
 	if (ecpri_dma_get_ctx_hw_ver() == ECPRI_HW_V1_0) {
 		/* Disconnect first SRC&DEST pair */
 		ret = ecpri_dma_mhi_driver_ops.mhi_dma_disconnect_endp(*function,
-			frst_src_disc_params);
+			src_disc_params);
 		if (ret != 0) {
 			DMA_UT_ERR("Unable to disconnect FIRST SRC, ret = %d\n",
 				ret);
@@ -2154,33 +2505,16 @@ static int ecpri_dma_mhi_client_test_suite_utils_disconnect_endps(
 		}
 
 		ret = ecpri_dma_mhi_driver_ops.mhi_dma_disconnect_endp(*function,
-			frst_dest_disc_params);
+			dest_disc_params);
 		if (ret != 0) {
 			DMA_UT_ERR("Unable to disconnect FIRST DEST, ret = %d\n",
-				ret);
-			return -EPERM;
-		}
-
-		/* Disconnect second SRC&DEST pair */
-		ret = ecpri_dma_mhi_driver_ops.mhi_dma_disconnect_endp(*function,
-			second_src_disc_params);
-		if (ret != 0) {
-			DMA_UT_ERR("Unable to disconnect SECOND SRC, ret = %d\n",
-				ret);
-			return -EPERM;
-		}
-
-		ret = ecpri_dma_mhi_driver_ops.mhi_dma_disconnect_endp(*function,
-			second_dest_disc_params);
-		if (ret != 0) {
-			DMA_UT_ERR("Unable to disconnect SECOND DEST, ret = %d\n",
 				ret);
 			return -EPERM;
 		}
 	}
 	else {
 		ret = ecpri_dma_mhi_driver_ops.mhi_dma_disconnect_endp(*function,
-			frst_src_disc_params);
+			src_disc_params);
 		if (ret != 0) {
 			DMA_UT_ERR("Unable to disconnect FIRST SRC, ret = %d\n",
 				ret);
@@ -2188,25 +2522,9 @@ static int ecpri_dma_mhi_client_test_suite_utils_disconnect_endps(
 		}
 
 		ret = ecpri_dma_mhi_driver_ops.mhi_dma_disconnect_endp(*function,
-			frst_dest_disc_params);
+			dest_disc_params);
 		if (ret != 0) {
 			DMA_UT_ERR("Unable to disconnect FIRST DEST, ret = %d\n",
-				ret);
-			return -EPERM;
-		}
-
-		ret = ecpri_dma_mhi_driver_ops.mhi_dma_disconnect_endp(*function,
-			second_src_disc_params);
-		if (ret != 0) {
-			DMA_UT_ERR("Unable to disconnect SECOND SRC, ret = %d\n",
-				ret);
-			return -EPERM;
-		}
-
-		ret = ecpri_dma_mhi_driver_ops.mhi_dma_disconnect_endp(*function,
-			second_dest_disc_params);
-		if (ret != 0) {
-			DMA_UT_ERR("Unable to disconnect SECOND DEST, ret = %d\n",
 				ret);
 			return -EPERM;
 		}
@@ -2273,16 +2591,16 @@ static int ecpri_dma_mhi_client_test_suite_mhi_init(void* priv)
 
 static int ecpri_dma_mhi_client_test_suite_mhi_init_all_vms(void* priv)
 {
-	int test_i;
+	int test_i, vf_i;
 	int ret = 0;
 	struct mhi_dma_function_params function[ECPRI_DMA_MHI_CLIENT_FUNCTION_NUM];
 	struct mhi_dma_init_params init_params[ECPRI_DMA_MHI_CLIENT_FUNCTION_NUM];
 	struct mhi_dma_init_out out_params[ECPRI_DMA_MHI_CLIENT_FUNCTION_NUM];
 	struct mhi_dma_start_params start_params[ECPRI_DMA_MHI_CLIENT_FUNCTION_NUM];
 	struct ecpri_dma_mhi_client_context* mhi_dma_ctx = NULL;
-	int max_vf_id =
-		ecpri_dma_get_ctx_hw_ver() == ECPRI_HW_V1_0 ?
-		ECPRI_DMA_VM_IDS_MAX_V1 : ECPRI_DMA_VM_IDS_MAX;
+	int max_vf_id = ECPRI_DMA_MHI_TEST_MAX_VF_ID;
+	u32 hw_ver = ecpri_dma_get_ctx_hw_ver();
+	u32 hw_flavor = ecpri_dma_get_ctx_hw_flavor();
 
 	DMA_UT_DBG("Start MHI Init for all VMs\n");
 	DMA_UT_DBG("Preparing function params\n");
@@ -2291,7 +2609,11 @@ static int ecpri_dma_mhi_client_test_suite_mhi_init_all_vms(void* priv)
 	ecpri_dma_mhi_client_test_utils_create_all_functions(function);
 
 	/* Run tests for all VMs and PF */
-	for (test_i = 0; test_i < max_vf_id; test_i++) {
+	for (vf_i = 0; vf_i < max_vf_id; vf_i++)
+	{
+		test_i = active_vfs[hw_ver][hw_flavor][vf_i];
+		if (test_i == -1)
+			break;
 		ret = ecpri_dma_mhi_client_test_utils_create_params_and_init(
 			&function[test_i], &init_params[test_i], &out_params[test_i],
 			&start_params[test_i]);
@@ -2303,7 +2625,11 @@ static int ecpri_dma_mhi_client_test_suite_mhi_init_all_vms(void* priv)
 	}
 
 	/* Compare driver states for all VMs/PF */
-	for (test_i = 0; test_i < max_vf_id; test_i++) {
+	for (vf_i = 0; vf_i < max_vf_id; vf_i++)
+	{
+		test_i = active_vfs[hw_ver][hw_flavor][vf_i];
+		if (test_i == -1)
+			break;
 		DMA_UT_DBG("Starting DMA driver check for VF_ID %d\n",
 			function[test_i].vf_id);
 		ret = ecpri_dma_mhi_client_test_utils_check_driver_state(
@@ -2318,7 +2644,11 @@ static int ecpri_dma_mhi_client_test_suite_mhi_init_all_vms(void* priv)
 			function[test_i].vf_id);
 	}
 
-	for (test_i = 0; test_i < max_vf_id; test_i++) {
+	for (vf_i = 0; vf_i < max_vf_id; vf_i++)
+	{
+		test_i = active_vfs[hw_ver][hw_flavor][vf_i];
+		if (test_i == -1)
+			break;
 		ecpri_dma_mhi_driver_ops.mhi_dma_destroy(function[test_i]);
 	}
 
@@ -2339,9 +2669,15 @@ static int ecpri_dma_mhi_client_test_suite_vm_memcpy_init(void* priv)
 		MHI_DMA_FUNCTION_TYPE_VIRTUAL, ECPRI_DMA_VM_IDS_VM0);
 
 	/* Get the index of VM/PF */
-	ret = ecpri_dma_mhi_test_get_func_idx(&function, &idx);
-	if (ret != 0) {
-		return ret;
+	if (ecpri_dma_get_ctx_hw_ver() == ECPRI_HW_V1_0) {
+		ret = ecpri_dma_mhi_test_get_func_idx(&function, &idx);
+		if (ret != 0) {
+			return ret;
+		}
+	}
+	else
+	{
+		idx = ECPRI_DMA_MHI_PF_ID;
 	}
 
 	/* Invoke memcpy_init */
@@ -2401,9 +2737,15 @@ static int ecpri_dma_mhi_client_test_suite_pf_memcpy_init(void* priv)
 		MHI_DMA_FUNCTION_TYPE_PHYSICAL, ECPRI_DMA_MHI_PF_ID);
 
 	/* Get the index of VM/PF */
-	ret = ecpri_dma_mhi_test_get_func_idx(&function, &idx);
-	if (ret != 0) {
-		return ret;
+	if (ecpri_dma_get_ctx_hw_ver() == ECPRI_HW_V1_0) {
+		ret = ecpri_dma_mhi_test_get_func_idx(&function, &idx);
+		if (ret != 0) {
+			return ret;
+		}
+	}
+	else
+	{
+		idx = ECPRI_DMA_MHI_PF_ID;
 	}
 
 	/* Invoke memcpy_init */
@@ -2453,12 +2795,13 @@ static int ecpri_dma_mhi_client_test_suite_memcpy_init_all_vms_pf(void* priv)
 {
 	int j;
 	int ret = 0;
-	int test_i;
+	int test_i = 0, vf_i = 0;
+	int idx = 0;
 	struct mhi_dma_function_params function[ECPRI_DMA_MHI_CLIENT_FUNCTION_NUM];
 	struct ecpri_dma_mhi_memcpy_context* mhi_memcpy_ctx = NULL;
-	int max_vf_id =
-		ecpri_dma_get_ctx_hw_ver() == ECPRI_HW_V1_0 ?
-		ECPRI_DMA_VM_IDS_MAX_V1 : ECPRI_DMA_VM_IDS_MAX;
+	int max_vf_id = ECPRI_DMA_MHI_TEST_MAX_VF_ID;
+	u32 hw_ver = ecpri_dma_get_ctx_hw_ver();
+	u32 hw_flavor = ecpri_dma_get_ctx_hw_flavor();
 
 	DMA_UT_DBG("Start MEMCPY_INIT ALL\n");
 	DMA_UT_DBG("Preparing function params\n");
@@ -2467,7 +2810,11 @@ static int ecpri_dma_mhi_client_test_suite_memcpy_init_all_vms_pf(void* priv)
 	ecpri_dma_mhi_client_test_utils_create_all_functions(function);
 
 	/* Run tests 4 for VMs: [0, 3] and PF: 4*/
-	for (test_i = 0; test_i < max_vf_id; test_i++) {
+	for (vf_i = 0; vf_i < max_vf_id; vf_i++)
+	{
+		test_i = active_vfs[hw_ver][hw_flavor][vf_i];
+		if (test_i == -1)
+			break;
 		ret = ecpri_dma_mhi_driver_ops.mhi_dma_memcpy_init(function[test_i]);
 		if (ret != 0) {
 			DMA_UT_ERR("Memcopy_init failed for,"
@@ -2489,11 +2836,28 @@ static int ecpri_dma_mhi_client_test_suite_memcpy_init_all_vms_pf(void* priv)
 	}
 
 	/* Compare driver states for all VMs/PF */
-	for (test_i = 0; test_i < max_vf_id; test_i++) {
+	for (vf_i = 0; vf_i < max_vf_id; vf_i++)
+	{
+		test_i = active_vfs[hw_ver][hw_flavor][vf_i];
+		if (test_i == -1)
+			break;
 		DMA_UT_DBG("Starting DMA driver check for VF_ID %d\n",
 			function[test_i].vf_id);
+
+		/* Get the index of VM/PF */
+		if (ecpri_dma_get_ctx_hw_ver() == ECPRI_HW_V1_0) {
+			ret = ecpri_dma_mhi_test_get_func_idx(&function[test_i], &idx);
+			if (ret != 0) {
+				return ret;
+			}
+		}
+		else
+		{
+			idx = ECPRI_DMA_MHI_PF_ID;
+		}
+
 		ret = ecpri_dma_mhi_client_test_utils_check_memcpy_init_state(
-			test_i, mhi_memcpy_ctx, &function[test_i]);
+			idx, mhi_memcpy_ctx, &function[test_i]);
 		if (ret != 0) {
 			DMA_UT_ERR("Driver state for VF_ID %d / IDX %d has failed\n",
 				function[test_i].vf_id, test_i);
@@ -2539,9 +2903,16 @@ static int ecpri_dma_mhi_client_test_suite_vm_memcpy_pf_sync(void* priv)
 	ecpri_dma_mhi_test_create_func_params(&function,
 		MHI_DMA_FUNCTION_TYPE_PHYSICAL, ECPRI_DMA_MHI_PF_ID);
 
-	ret = ecpri_dma_mhi_test_get_func_idx(&function, &idx);
-	if (ret != 0) {
-		return ret;
+	/* Get the index of VM/PF */
+	if (ecpri_dma_get_ctx_hw_ver() == ECPRI_HW_V1_0) {
+		ret = ecpri_dma_mhi_test_get_func_idx(&function, &idx);
+		if (ret != 0) {
+			return ret;
+		}
+	}
+	else
+	{
+		idx = ECPRI_DMA_MHI_PF_ID;
 	}
 
 	ret = ecpri_dma_mhi_driver_ops.mhi_dma_memcpy_init(function);
@@ -2754,12 +3125,17 @@ static int ecpri_dma_mhi_client_test_suite_connect_endp_vm(void* priv)
 	int ret = 0;
 	int idx;
 	static int vf_id = ECPRI_DMA_VM_IDS_VM0;
+	u32 hw_ver = 0, hw_flavor = 0;
+	u32 first_src_ch, first_dest_ch;
 
 	struct ecpri_dma_mhi_client_context* mhi_dma_ctx = NULL;
 	struct ecpri_dma_mhi_client_test_suite_context* ctx = NULL;
 
 	DMA_UT_DBG("Start CONNECT ENDP VM%d\n", vf_id);
 	ctx = mhi_client_test_suite_ctx[vf_id];
+
+	hw_ver = ecpri_dma_get_ctx_hw_ver();
+	hw_flavor = ecpri_dma_get_ctx_hw_flavor();
 
 	/* Create func params */
 	ecpri_dma_mhi_test_create_func_params(&ctx->function,
@@ -2789,27 +3165,40 @@ static int ecpri_dma_mhi_client_test_suite_connect_endp_vm(void* priv)
 		return -EPERM;
 	}
 
+	if (ecpri_dma_mhi_client_test_mapping[hw_ver][hw_flavor][idx].type ==
+		ECPRI_DMA_MHI_CLIENT_TEST_VF_TYPE_FAPI)
+	{
+		first_src_ch = ECPRI_DMA_MHI_TEST_FAPI_FRST_SRC_CHANNEL_ID;
+		first_dest_ch = ECPRI_DMA_MHI_TEST_FAPI_FRST_DEST_CHANNEL_ID;
+	}
+	else
+	{
+		first_src_ch = ECPRI_DMA_MHI_TEST_FH_FRST_SRC_CHANNEL_ID;
+		first_dest_ch = ecpri_dma_mhi_client_test_mapping
+			[hw_ver][hw_flavor][idx].num_of_hw_chs_pairs;
+	}
+
 	/* Create connect params */
 	ecpri_dma_mhi_client_test_utils_create_conn_params(
-		&ctx->frst_src_conn_params, idx,
-		ECPRI_DMA_MHI_TEST_EMPTY_BUFF,
-		ECPRI_DMA_MHI_TEST_FRST_SRC_CHANNEL_ID);
+		&ctx->src_conn_params[0], idx,
+		ECPRI_DMA_MHI_TEST_EMPTY_BUFF, first_src_ch);
 
 	ecpri_dma_mhi_client_test_utils_create_conn_params(
-		&ctx->frst_dest_conn_params, idx,
-		ECPRI_DMA_MHI_TEST_BUFF_SIZE,
-		ECPRI_DMA_MHI_TEST_FRST_DEST_CHANNEL_ID);
+		&ctx->dest_conn_params[0], idx,
+		ECPRI_DMA_MHI_TEST_BUFF_SIZE, first_dest_ch);
 
 	/* Connect and verify */
 	ret = ecpri_dma_mhi_utils_connect_and_verify_endps(&ctx->function,
-		&ctx->frst_src_conn_params, &ctx->frst_dest_conn_params,
-		&ctx->frst_src_disc_params.clnt_hdl,
-		&ctx->frst_dest_disc_params.clnt_hdl, idx,
-		ECPRI_DMA_MHI_TEST_FRST_SRC_CHANNEL_ID,
-		ECPRI_DMA_MHI_TEST_FRST_DEST_CHANNEL_ID,
-		ecpri_dma_mhi_client_test_mapping[idx].first_src_endp_id,
-		ecpri_dma_mhi_client_test_mapping[idx].first_dest_endp_id,
-		ecpri_dma_mhi_client_test_mapping[idx].gsi_id);
+		&ctx->src_conn_params[0], &ctx->dest_conn_params[0],
+		&ctx->src_disc_params[0].clnt_hdl,
+		&ctx->dest_disc_params[0].clnt_hdl, idx,
+		first_src_ch,
+		first_dest_ch,
+		ecpri_dma_mhi_client_test_mapping[hw_ver][hw_flavor][idx].
+		first_src_endp_id,
+		ecpri_dma_mhi_client_test_mapping[hw_ver][hw_flavor][idx].
+		first_dest_endp_id,
+		ecpri_dma_mhi_client_test_mapping[hw_ver][hw_flavor][idx].gsi_id);
 	if (ret != 0) {
 		DMA_UT_ERR("VF_ID %d / IDX %d failed", ctx->function.vf_id, idx);
 		DMA_UT_TEST_FAIL_REPORT("Connect_endp for has failed\n");
@@ -2819,34 +3208,34 @@ static int ecpri_dma_mhi_client_test_suite_connect_endp_vm(void* priv)
 	/* Disconnect */
 	if (ecpri_dma_get_ctx_hw_ver() == ECPRI_HW_V1_0) {
 		ret = ecpri_dma_mhi_driver_ops.mhi_dma_disconnect_endp(ctx->function,
-			&ctx->frst_dest_disc_params);
+			&ctx->src_disc_params[0]);
 		if (ret != 0) {
-			DMA_UT_ERR("Disconnect endp for DEST, VF_ID %d has failed\n",
+			DMA_UT_ERR("Disconnect endp for SRC, VF_ID %d has failed\n",
 				ctx->function.vf_id);
 			return -EPERM;
 		}
 
 		ret = ecpri_dma_mhi_driver_ops.mhi_dma_disconnect_endp(ctx->function,
-			&ctx->frst_src_disc_params);
+			&ctx->dest_disc_params[0]);
 		if (ret != 0) {
-			DMA_UT_ERR("Disconnect endp for SRC, VF_ID %d has failed\n",
+			DMA_UT_ERR("Disconnect endp for DEST, VF_ID %d has failed\n",
 				ctx->function.vf_id);
 			return -EPERM;
 		}
 	}
 	else {
 		ret = ecpri_dma_mhi_driver_ops.mhi_dma_disconnect_endp(ctx->function,
-			&ctx->frst_dest_disc_params);
+			&ctx->src_disc_params[0]);
 		if (ret != 0) {
-			DMA_UT_ERR("Disconnect endp for DEST, VF_ID %d has failed\n",
+			DMA_UT_ERR("Disconnect endp for SRC, VF_ID %d has failed\n",
 				ctx->function.vf_id);
 			return -EPERM;
 		}
 
 		ret = ecpri_dma_mhi_driver_ops.mhi_dma_disconnect_endp(ctx->function,
-			&ctx->frst_src_disc_params);
+			&ctx->dest_disc_params[0]);
 		if (ret != 0) {
-			DMA_UT_ERR("Disconnect endp for SRC, VF_ID %d has failed\n",
+			DMA_UT_ERR("Disconnect endp for DEST, VF_ID %d has failed\n",
 				ctx->function.vf_id);
 			return -EPERM;
 		}
@@ -2855,23 +3244,28 @@ static int ecpri_dma_mhi_client_test_suite_connect_endp_vm(void* priv)
 	ecpri_dma_mhi_driver_ops.mhi_dma_destroy(ctx->function);
 
 	vf_id++;
-	vf_id = vf_id % ECPRI_DMA_MHI_VIRTUAL_FUNCTION_NUM;
+	vf_id = vf_id % ECPRI_DMA_VM_IDS_MAX;
 
 	return 0;
 }
 
 static int ecpri_dma_mhi_client_test_suite_connect_endp_all(void* priv) {
-	int test_i;
+	int test_i, vf_i;
 	int ret = 0;
 	struct ecpri_dma_mhi_client_context* mhi_dma_ctx = NULL;
 	struct ecpri_dma_mhi_client_test_suite_context* ctx = NULL;
-	int max_vf_id =
-		ecpri_dma_get_ctx_hw_ver() == ECPRI_HW_V1_0 ?
-		ECPRI_DMA_VM_IDS_MAX_V1 : ECPRI_DMA_VM_IDS_MAX;
+	int max_vf_id = ECPRI_DMA_MHI_TEST_MAX_VF_ID;
+	u32 endp_pair_id = 0;
+	u32 hw_ver = ecpri_dma_get_ctx_hw_ver();
+	u32 hw_flavor = ecpri_dma_get_ctx_hw_flavor();
+	u32 first_src_ch, first_dest_ch, ch_id_diff;
 
 	/* Run tests for VMs only */
-	for (test_i = 0; test_i < max_vf_id; test_i++)
+	for (vf_i = 0; vf_i < max_vf_id; vf_i++)
 	{
+		test_i = active_vfs[hw_ver][hw_flavor][vf_i];
+		if (test_i == -1)
+			break;
 		ctx = mhi_client_test_suite_ctx[test_i];
 
 		DMA_UT_DBG("STARTING TEST FOR VF_ID %d\n",
@@ -2902,36 +3296,47 @@ static int ecpri_dma_mhi_client_test_suite_connect_endp_all(void* priv) {
 			return -EPERM;
 		}
 
-		/* Connect First pair of ENDPs */
-		ret = ecpri_dma_mhi_utils_connect_and_verify_endps(&ctx->function,
-			&ctx->frst_src_conn_params, &ctx->frst_dest_conn_params,
-			&ctx->frst_src_disc_params.clnt_hdl,
-			&ctx->frst_dest_disc_params.clnt_hdl, test_i,
-			ECPRI_DMA_MHI_TEST_FRST_SRC_CHANNEL_ID,
-			ECPRI_DMA_MHI_TEST_FRST_DEST_CHANNEL_ID,
-			ecpri_dma_mhi_client_test_mapping[test_i].first_src_endp_id,
-			ecpri_dma_mhi_client_test_mapping[test_i].first_dest_endp_id,
-			ecpri_dma_mhi_client_test_mapping[test_i].gsi_id);
-		if (ret != 0) {
-			DMA_UT_ERR("VF_ID %d / IDX %d failed", ctx->function.vf_id, test_i);
-			DMA_UT_TEST_FAIL_REPORT("Connect_endp has failed\n");
-			return -EFAULT;
+		if (ecpri_dma_mhi_client_test_mapping[hw_ver][hw_flavor][test_i].type ==
+			ECPRI_DMA_MHI_CLIENT_TEST_VF_TYPE_FAPI)
+		{
+			first_src_ch = ECPRI_DMA_MHI_TEST_FAPI_FRST_SRC_CHANNEL_ID;
+			first_dest_ch = ECPRI_DMA_MHI_TEST_FAPI_FRST_DEST_CHANNEL_ID;
+			ch_id_diff = ecpri_dma_mhi_client_test_mapping
+				[hw_ver][hw_flavor][test_i].num_of_hw_chs_pairs;
+		}
+		else
+		{
+			first_src_ch = ECPRI_DMA_MHI_TEST_FH_FRST_SRC_CHANNEL_ID;
+			first_dest_ch = ecpri_dma_mhi_client_test_mapping
+				[hw_ver][hw_flavor][test_i].num_of_hw_chs_pairs;
+			ch_id_diff = ECPRI_DMA_MHI_TEST_FH_CHANNEL_ID_DIFF;
 		}
 
-		/* Connect second pair of ENDPs */
-		ret = ecpri_dma_mhi_utils_connect_and_verify_endps(&ctx->function,
-			&ctx->second_src_conn_params, &ctx->second_dest_conn_params,
-			&ctx->second_src_disc_params.clnt_hdl,
-			&ctx->second_dest_disc_params.clnt_hdl,	test_i,
-			ECPRI_DMA_MHI_TEST_SCND_SRC_CHANNEL_ID,
-			ECPRI_DMA_MHI_TEST_SCND_DEST_CHANNEL_ID,
-			ecpri_dma_mhi_client_test_mapping[test_i].second_src_endp_id,
-			ecpri_dma_mhi_client_test_mapping[test_i].second_dest_endp_id,
-			ecpri_dma_mhi_client_test_mapping[test_i].gsi_id);
-		if (ret != 0) {
-			DMA_UT_ERR("Connect endp for VF_ID %d / IDX %d has failed\n",
-				ctx->function.vf_id, test_i);
-			return -EPERM;
+		/* Connect pairs of ENDPs */
+		for (endp_pair_id = 0;
+			endp_pair_id <
+			ecpri_dma_mhi_client_test_mapping[hw_ver][hw_flavor][test_i].
+			num_of_hw_chs_pairs;
+			endp_pair_id++) {
+			ret = ecpri_dma_mhi_utils_connect_and_verify_endps(&ctx->function,
+				&ctx->src_conn_params[endp_pair_id],
+				&ctx->dest_conn_params[endp_pair_id],
+				&ctx->src_disc_params[endp_pair_id].clnt_hdl,
+				&ctx->dest_disc_params[endp_pair_id].clnt_hdl, test_i,
+				first_src_ch + (endp_pair_id * ch_id_diff),
+				first_dest_ch + (endp_pair_id * ch_id_diff),
+				ecpri_dma_mhi_client_test_mapping[hw_ver][hw_flavor][test_i].
+				first_src_endp_id + endp_pair_id,
+				ecpri_dma_mhi_client_test_mapping[hw_ver][hw_flavor][test_i].
+				first_dest_endp_id + endp_pair_id,
+				ecpri_dma_mhi_client_test_mapping[hw_ver][hw_flavor][test_i].
+				gsi_id);
+			if (ret != 0) {
+				DMA_UT_ERR("VF_ID %d / IDX %d failed", ctx->function.vf_id,
+					test_i);
+				DMA_UT_TEST_FAIL_REPORT("Connect_endp has failed\n");
+				return -EFAULT;
+			}
 		}
 
 		DMA_UT_DBG("FINISHED TEST FOR VF_ID %d\n",
@@ -2968,16 +3373,16 @@ static int ecpri_dma_mhi_client_test_suite_connect_endp_all(void* priv) {
 	}
 
 	/* Create connect_params for SRC ENDP */
-	DMA_UT_DBG("PF CH_ID %d\n", ECPRI_DMA_MHI_TEST_FRST_SRC_CHANNEL_ID);
+	DMA_UT_DBG("PF CH_ID %d\n", ECPRI_DMA_MHI_TEST_FAPI_FRST_SRC_CHANNEL_ID);
 	ecpri_dma_mhi_client_test_utils_create_conn_params(
-		&ctx->frst_src_conn_params, test_i,
+		&ctx->src_conn_params[0], test_i,
 		ECPRI_DMA_MHI_TEST_EMPTY_BUFF,
-		ECPRI_DMA_MHI_TEST_FRST_SRC_CHANNEL_ID);
+		ECPRI_DMA_MHI_TEST_FAPI_FRST_SRC_CHANNEL_ID);
 
 	/*Connect_endp for SRC ENDP - expected to fail*/
 	ret = ecpri_dma_mhi_driver_ops.mhi_dma_connect_endp(ctx->function,
-		&ctx->frst_src_conn_params,
-		&ctx->frst_src_disc_params.clnt_hdl);
+		&ctx->src_conn_params[0],
+		&ctx->src_disc_params[0].clnt_hdl);
 	if (ret != -EINVAL) {
 		DMA_UT_ERR("PF expected to fail, ret = %d\n",
 			ret);
@@ -2989,20 +3394,28 @@ static int ecpri_dma_mhi_client_test_suite_connect_endp_all(void* priv) {
 	ret = 0;
 
 	/* Cleanup */
-	for (test_i = 0; test_i < max_vf_id; test_i++)
+	for (vf_i = 0; vf_i < max_vf_id; vf_i++)
 	{
+		test_i = active_vfs[hw_ver][hw_flavor][vf_i];
+		if (test_i == -1)
+			break;
 		ctx = mhi_client_test_suite_ctx[test_i];
 
 		/* Disconnect endps */
-		ret = ecpri_dma_mhi_client_test_suite_utils_disconnect_endps(
-			&ctx->function,
-			&ctx->frst_src_disc_params, &ctx->frst_dest_disc_params,
-			&ctx->second_src_disc_params, &ctx->second_dest_disc_params
-		);
-		if (ret != 0) {
-			DMA_UT_ERR("Unable to disconnect ret = %d\n",
-				ret);
-			return -EPERM;
+		for (endp_pair_id = 0;
+			endp_pair_id <
+			ecpri_dma_mhi_client_test_mapping[hw_ver][hw_flavor][test_i].
+			num_of_hw_chs_pairs;
+			endp_pair_id++) {
+			ret = ecpri_dma_mhi_client_test_suite_utils_disconnect_endps(
+				&ctx->function,
+				&ctx->src_disc_params[endp_pair_id],
+				&ctx->dest_disc_params[endp_pair_id]);
+			if (ret != 0) {
+				DMA_UT_ERR("Unable to disconnect ret = %d\n",
+					ret);
+				return -EPERM;
+			}
 		}
 
 		/* Destroy dma per VM */
@@ -3016,26 +3429,34 @@ static int ecpri_dma_mhi_client_test_suite_connect_endp_all(void* priv) {
 	return ret;
 }
 
-
+/**
+ * For HW CHs UTs to pass SMMU must be bypassed in DTSi + use of devcfg_noac tz
+ * is required for S1 + S2 SMMU bypass.
+ * In addition to bypass SMMU SIDs of DMA and GSI must be shared as following:
+ * iommus = <&apps_smmu 0x800 0x0>,
+ *		 <&apps_smmu 0x801 0x0>,
+ *		 <&apps_smmu 0x802 0x0>,
+ *		 <&apps_smmu 0xC00 0x0>,
+ *		 <&apps_smmu 0xC01 0x0>,
+ *		 <&apps_smmu 0xC02 0x0>,
+ *		 <&apps_smmu 0x1000 0x0>;
+ *	qcom,iommu-dma = "bypass";
+ *	#dma-coherent;
+ */
 static int
 ecpri_dma_mhi_client_test_suite_hw_ch_vm_single_packet_single_buffer(void* priv)
 {
 	int ret = 0;
-	int idx, i;
+	int idx;
 	enum ecpri_dma_ees ee;
+	enum ecpri_dma_gsi_id gsi_id;
 	u8 vf_id = ECPRI_DMA_VM_IDS_VM0;
+	u32 hw_ver = ecpri_dma_get_ctx_hw_ver();
+	u32 hw_flavor = ecpri_dma_get_ctx_hw_flavor();
+	u32 first_src_ch, first_dest_ch;
 
 	struct ecpri_dma_mhi_client_context* mhi_dma_ctx = NULL;
 	struct ecpri_dma_mhi_client_test_suite_context* ctx = NULL;
-
-	for (i = 0; i < ECPRI_DMA_SMMU_CB_MAX; i++)
-	{
-		if (ecpri_dma_ctx->s1_bypass_arr[i] != true)
-		{
-			DMA_UT_ERR("SMMU must be bypassed for MHI HW CHs testing\n");
-			return -EINVAL;
-		}
-	}
 
 	DMA_UT_DBG("Start HW CH VM%d\n", vf_id);
 	ctx = mhi_client_test_suite_ctx[vf_id];
@@ -3070,36 +3491,57 @@ ecpri_dma_mhi_client_test_suite_hw_ch_vm_single_packet_single_buffer(void* priv)
 
 	/* Create loop-back */
 	ret = ecpri_dma_mhi_client_test_util_setup_dma_endps(
-		ecpri_dma_mhi_client_test_mapping[idx].first_src_endp_id,
-		ecpri_dma_mhi_client_test_mapping[idx].first_dest_endp_id,
-		ecpri_dma_mhi_client_test_mapping[idx].gsi_id,
+		ecpri_dma_mhi_client_test_mapping[hw_ver][hw_flavor][idx].
+		first_src_endp_id,
+		ecpri_dma_mhi_client_test_mapping[hw_ver][hw_flavor][idx].
+		first_dest_endp_id,
+		ecpri_dma_mhi_client_test_mapping[hw_ver][hw_flavor][idx].
+		gsi_id,
 		true);
 	if (ret != 0) {
 		DMA_UT_ERR("VF_ID %d / IDX %d failed"
 			" SRC ENDP ID %d, DEST ENDP ID %d\n", ctx->function.vf_id, idx,
-			ecpri_dma_mhi_client_test_mapping[idx].first_src_endp_id,
-			ecpri_dma_mhi_client_test_mapping[idx].first_dest_endp_id);
+			ecpri_dma_mhi_client_test_mapping[hw_ver][hw_flavor][idx].
+			first_src_endp_id,
+			ecpri_dma_mhi_client_test_mapping[hw_ver][hw_flavor][idx].
+			first_dest_endp_id);
 		DMA_UT_TEST_FAIL_REPORT("Loopback configuration failed");
 		return -EFAULT;
 	}
 
+	if (ecpri_dma_mhi_client_test_mapping[hw_ver][hw_flavor][idx].type ==
+		ECPRI_DMA_MHI_CLIENT_TEST_VF_TYPE_FAPI)
+	{
+		first_src_ch = ECPRI_DMA_MHI_TEST_FAPI_FRST_SRC_CHANNEL_ID;
+		first_dest_ch = ECPRI_DMA_MHI_TEST_FAPI_FRST_DEST_CHANNEL_ID;
+	}
+	else
+	{
+		first_src_ch = ECPRI_DMA_MHI_TEST_FH_FRST_SRC_CHANNEL_ID;
+		first_dest_ch = ecpri_dma_mhi_client_test_mapping
+			[hw_ver][hw_flavor][idx].num_of_hw_chs_pairs;
+	}
+
 	/* Invoke connect_endp and verify - for first pair */
 	ret = ecpri_dma_mhi_utils_connect_and_verify_endps(&ctx->function,
-		&ctx->frst_src_conn_params, &ctx->frst_dest_conn_params,
-		&ctx->frst_src_disc_params.clnt_hdl,
-		&ctx->frst_dest_disc_params.clnt_hdl, idx,
-		ECPRI_DMA_MHI_TEST_FRST_SRC_CHANNEL_ID,
-		ECPRI_DMA_MHI_TEST_FRST_DEST_CHANNEL_ID,
-		ecpri_dma_mhi_client_test_mapping[idx].first_src_endp_id,
-		ecpri_dma_mhi_client_test_mapping[idx].first_dest_endp_id,
-		ecpri_dma_mhi_client_test_mapping[idx].gsi_id);
+		&ctx->src_conn_params[0], &ctx->dest_conn_params[0],
+		&ctx->src_disc_params[0].clnt_hdl,
+		&ctx->dest_disc_params[0].clnt_hdl, idx,
+		first_src_ch,
+		first_dest_ch,
+		ecpri_dma_mhi_client_test_mapping[hw_ver][hw_flavor][idx].
+		first_src_endp_id,
+		ecpri_dma_mhi_client_test_mapping[hw_ver][hw_flavor][idx].
+		first_dest_endp_id,
+		ecpri_dma_mhi_client_test_mapping[hw_ver][hw_flavor][idx].gsi_id);
 	if (ret != 0) {
 		DMA_UT_ERR("VF_ID %d / IDX %d failed\n", ctx->function.vf_id, idx);
 		DMA_UT_TEST_FAIL_REPORT("Connect_endp has failed\n");
 		return -EFAULT;
 	}
 
-	ret = ecpri_dma_mhi_client_test_get_ee_index(ctx->function, &ee);
+	ret = ecpri_dma_mhi_client_test_utils_get_ee_gsi_index(ctx->function, &ee,
+		&gsi_id);
 	if (ret != 0) {
 		DMA_UT_ERR("VF_ID %d / IDX %d failed\n", ctx->function.vf_id, idx);
 		DMA_UT_TEST_FAIL_REPORT("Get EE index has failed\n");
@@ -3108,34 +3550,42 @@ ecpri_dma_mhi_client_test_suite_hw_ch_vm_single_packet_single_buffer(void* priv)
 
 	/* Generate, enqueue, and poll TRE  */
 	ret = ecpri_dma_mhi_test_loopback_data_transfer(idx,
-		ecpri_dma_mhi_client_test_host_ch_id_map[0],
-		ecpri_dma_mhi_client_test_host_ch_id_map[1], ee, 0);
+		ECPRI_DMA_MHI_TEST_FIRST_HW_CH_ID + first_src_ch,
+		ECPRI_DMA_MHI_TEST_FIRST_HW_CH_ID + first_dest_ch, ee,
+		ecpri_dma_mhi_client_test_mapping[hw_ver][hw_flavor][idx].gsi_id);
 	if (ret != 0) {
 		DMA_UT_ERR("VF_ID %d / IDX %d failed"
 			" SRC ENDP ID %d, DEST ENDP ID %d\n", ctx->function.vf_id, idx,
-			ecpri_dma_mhi_client_test_mapping[idx].first_src_endp_id,
-			ecpri_dma_mhi_client_test_mapping[idx].first_dest_endp_id);
+			ecpri_dma_mhi_client_test_mapping[hw_ver][hw_flavor][idx].
+			first_src_endp_id,
+			ecpri_dma_mhi_client_test_mapping[hw_ver][hw_flavor][idx].
+			first_dest_endp_id);
 		DMA_UT_TEST_FAIL_REPORT("Transfer has failed");
 		return -EFAULT;
 	}
 
 	/* Reset loopback at the end of the test*/
 	ret = ecpri_dma_mhi_client_test_util_setup_dma_endps(
-		ecpri_dma_mhi_client_test_mapping[idx].first_src_endp_id,
-		ecpri_dma_mhi_client_test_mapping[idx].first_dest_endp_id,
-		ecpri_dma_mhi_client_test_mapping[idx].gsi_id, false);
+		ecpri_dma_mhi_client_test_mapping[hw_ver][hw_flavor][idx].
+		first_src_endp_id,
+		ecpri_dma_mhi_client_test_mapping[hw_ver][hw_flavor][idx].
+		first_dest_endp_id,
+		ecpri_dma_mhi_client_test_mapping[hw_ver][hw_flavor][idx].gsi_id,
+		false);
 	if (ret != 0) {
 		DMA_UT_ERR("VF_ID %d / IDX %d failed"
 			" SRC ENDP ID %d, DEST ENDP ID %d\n", ctx->function.vf_id, idx,
-			ecpri_dma_mhi_client_test_mapping[idx].first_src_endp_id,
-			ecpri_dma_mhi_client_test_mapping[idx].first_dest_endp_id);
+			ecpri_dma_mhi_client_test_mapping[hw_ver][hw_flavor][idx].
+			first_src_endp_id,
+			ecpri_dma_mhi_client_test_mapping[hw_ver][hw_flavor][idx].
+			first_dest_endp_id);
 		DMA_UT_TEST_FAIL_REPORT("Loopback configuration has failed\n");
 		return -EFAULT;
 	}
 
 	if (ecpri_dma_get_ctx_hw_ver() == ECPRI_HW_V1_0) {
 		ret = ecpri_dma_mhi_driver_ops.mhi_dma_disconnect_endp(ctx->function,
-			&ctx->frst_src_disc_params);
+			&ctx->src_disc_params[0]);
 		if (ret != 0) {
 			DMA_UT_ERR("Disconnect endp for SRC, VF_ID %d has failed\n",
 				ctx->function.vf_id);
@@ -3143,16 +3593,16 @@ ecpri_dma_mhi_client_test_suite_hw_ch_vm_single_packet_single_buffer(void* priv)
 		}
 
 		ret = ecpri_dma_mhi_driver_ops.mhi_dma_disconnect_endp(ctx->function,
-			&ctx->frst_dest_disc_params);
+			&ctx->dest_disc_params[0]);
 		if (ret != 0) {
-			DMA_UT_ERR("Disconnect endp for SRC, VF_ID %d has failed\n",
+			DMA_UT_ERR("Disconnect endp for DEST, VF_ID %d has failed\n",
 				ctx->function.vf_id);
 			return -EPERM;
 		}
 	}
 	else {
 		ret = ecpri_dma_mhi_driver_ops.mhi_dma_disconnect_endp(ctx->function,
-			&ctx->frst_src_disc_params);
+			&ctx->src_disc_params[0]);
 		if (ret != 0) {
 			DMA_UT_ERR("Disconnect endp for SRC, VF_ID %d has failed\n",
 				ctx->function.vf_id);
@@ -3160,9 +3610,9 @@ ecpri_dma_mhi_client_test_suite_hw_ch_vm_single_packet_single_buffer(void* priv)
 		}
 
 		ret = ecpri_dma_mhi_driver_ops.mhi_dma_disconnect_endp(ctx->function,
-			&ctx->frst_dest_disc_params);
+			&ctx->dest_disc_params[0]);
 		if (ret != 0) {
-			DMA_UT_ERR("Disconnect endp for SRC, VF_ID %d has failed\n",
+			DMA_UT_ERR("Disconnect endp for DEST, VF_ID %d has failed\n",
 				ctx->function.vf_id);
 			return -EPERM;
 		}
@@ -3175,31 +3625,43 @@ ecpri_dma_mhi_client_test_suite_hw_ch_vm_single_packet_single_buffer(void* priv)
 	return 0;
 }
 
+/**
+ * For HW CHs UTs to pass SMMU must be bypassed in DTSi + use of devcfg_noac tz
+ * is required for S1 + S2 SMMU bypass.
+ * In addition to bypass SMMU SIDs of DMA and GSI must be shared as following:
+ * iommus = <&apps_smmu 0x800 0x0>,
+ *		 <&apps_smmu 0x801 0x0>,
+ *		 <&apps_smmu 0x802 0x0>,
+ *		 <&apps_smmu 0xC00 0x0>,
+ *		 <&apps_smmu 0xC01 0x0>,
+ *		 <&apps_smmu 0xC02 0x0>,
+ *		 <&apps_smmu 0x1000 0x0>;
+ *	qcom,iommu-dma = "bypass";
+ *	#dma-coherent;
+ */
 static int
 ecpri_dma_mhi_client_test_suite_hw_ch_all_single_packet_single_buffer(void* priv)
 {
 	int ret = 0;
-	int idx, i;
-	int test_i;
+	int idx;
+	int test_i = 0, vf_i = 0;
 	enum ecpri_dma_ees ee;
+	enum ecpri_dma_gsi_id gsi_id;
 	struct ecpri_dma_mhi_client_test_suite_context* ctx = NULL;
 	struct ecpri_dma_mhi_client_context* mhi_dma_ctx = NULL;
-	int max_vf_id =
-		ecpri_dma_get_ctx_hw_ver() == ECPRI_HW_V1_0 ?
-		ECPRI_DMA_VM_IDS_MAX_V1 : ECPRI_DMA_VM_IDS_MAX;
-
-	for (i = 0; i < ECPRI_DMA_SMMU_CB_MAX; i++)
-	{
-		if (ecpri_dma_ctx->s1_bypass_arr[i] != true)
-		{
-			DMA_UT_ERR("SMMU must be bypassed for MHI HW CHs testing\n");
-			return -EINVAL;
-		}
-	}
+	int max_vf_id = ECPRI_DMA_MHI_TEST_MAX_VF_ID;
+	u32 endp_pair_id = 0;
+	u32 hw_ver = ecpri_dma_get_ctx_hw_ver();
+	u32 hw_flavor = ecpri_dma_get_ctx_hw_flavor();
+	u32 first_src_ch, first_dest_ch, ch_id_diff;
 
 	/* Run tests only for VMs */
-	for (test_i = 0; test_i < max_vf_id; test_i++)
+	for (vf_i = 0; vf_i < max_vf_id; vf_i++)
 	{
+		test_i = active_vfs[hw_ver][hw_flavor][vf_i];
+		if (test_i == -1)
+			break;
+
 		DMA_UT_DBG(" Start HW CH VM %d\n", test_i);
 		ctx = mhi_client_test_suite_ctx[test_i];
 
@@ -3231,150 +3693,135 @@ ecpri_dma_mhi_client_test_suite_hw_ch_all_single_packet_single_buffer(void* priv
 			return -EPERM;
 		}
 
+		if (ecpri_dma_mhi_client_test_mapping[hw_ver][hw_flavor][test_i].type ==
+			ECPRI_DMA_MHI_CLIENT_TEST_VF_TYPE_FAPI)
+		{
+			first_src_ch = ECPRI_DMA_MHI_TEST_FAPI_FRST_SRC_CHANNEL_ID;
+			first_dest_ch = ECPRI_DMA_MHI_TEST_FAPI_FRST_DEST_CHANNEL_ID;
+			ch_id_diff = ecpri_dma_mhi_client_test_mapping
+				[hw_ver][hw_flavor][test_i].num_of_hw_chs_pairs;
+		}
+		else
+		{
+			first_src_ch = ECPRI_DMA_MHI_TEST_FH_FRST_SRC_CHANNEL_ID;
+			first_dest_ch = ecpri_dma_mhi_client_test_mapping
+				[hw_ver][hw_flavor][test_i].num_of_hw_chs_pairs;
+			ch_id_diff = ECPRI_DMA_MHI_TEST_FH_CHANNEL_ID_DIFF;
+		}
+
 		/* Create loop-back */
-		ret = ecpri_dma_mhi_client_test_util_setup_dma_endps(
-			ecpri_dma_mhi_client_test_mapping[idx].first_src_endp_id,
-			ecpri_dma_mhi_client_test_mapping[idx].first_dest_endp_id,
-			ecpri_dma_mhi_client_test_mapping[idx].gsi_id, true);
-		if (ret != 0) {
-			DMA_UT_ERR("VF_ID %d / IDX %d failed"
-				" SRC ENDP ID %d, DEST ENDP ID %d\n", ctx->function.vf_id, idx,
-				ecpri_dma_mhi_client_test_mapping[idx].first_src_endp_id,
-				ecpri_dma_mhi_client_test_mapping[idx].first_dest_endp_id);
-			DMA_UT_TEST_FAIL_REPORT("Loopback configuration has failed\n");
-			return -EFAULT;
-		}
+		for (endp_pair_id = 0;
+			endp_pair_id <
+			ecpri_dma_mhi_client_test_mapping[hw_ver][hw_flavor][test_i].
+			num_of_hw_chs_pairs;
+			endp_pair_id++) {
+			ret = ecpri_dma_mhi_client_test_util_setup_dma_endps(
+				ecpri_dma_mhi_client_test_mapping[hw_ver][hw_flavor][idx].
+				first_src_endp_id + endp_pair_id,
+				ecpri_dma_mhi_client_test_mapping[hw_ver][hw_flavor][idx].
+				first_dest_endp_id + endp_pair_id,
+				ecpri_dma_mhi_client_test_mapping[hw_ver][hw_flavor][idx].
+				gsi_id, true);
+			if (ret != 0) {
+				DMA_UT_ERR("VF_ID %d / IDX %d failed"
+					" SRC ENDP ID %d, DEST ENDP ID %d\n", ctx->function.vf_id, idx,
+					ecpri_dma_mhi_client_test_mapping[hw_ver][hw_flavor][idx].
+					first_src_endp_id + endp_pair_id,
+					ecpri_dma_mhi_client_test_mapping[hw_ver][hw_flavor][idx].
+					first_dest_endp_id + endp_pair_id);
+				DMA_UT_TEST_FAIL_REPORT("Loopback configuration has failed\n");
+				return -EFAULT;
+			}
 
-		ret = ecpri_dma_mhi_client_test_util_setup_dma_endps(
-			ecpri_dma_mhi_client_test_mapping[idx].second_src_endp_id,
-			ecpri_dma_mhi_client_test_mapping[idx].second_dest_endp_id,
-			ecpri_dma_mhi_client_test_mapping[idx].gsi_id, true);
-		if (ret != 0) {
-			DMA_UT_ERR("VF_ID %d / IDX %d failed"
-				" SRC ENDP ID %d, DEST ENDP ID %d\n", ctx->function.vf_id, idx,
-				ecpri_dma_mhi_client_test_mapping[idx].second_src_endp_id,
-				ecpri_dma_mhi_client_test_mapping[idx].second_dest_endp_id);
-			DMA_UT_TEST_FAIL_REPORT("Loopback configuration has failed\n");
-			return -EFAULT;
-		}
+			/* Invoke connect_endp and verify - for first pair */
+			ret = ecpri_dma_mhi_utils_connect_and_verify_endps(&ctx->function,
+				&ctx->src_conn_params[endp_pair_id],
+				&ctx->dest_conn_params[endp_pair_id],
+				&ctx->src_disc_params[endp_pair_id].clnt_hdl,
+				&ctx->dest_disc_params[endp_pair_id].clnt_hdl, idx,
+				first_src_ch + (endp_pair_id * ch_id_diff),
+				first_dest_ch + (endp_pair_id * ch_id_diff),
+				ecpri_dma_mhi_client_test_mapping[hw_ver][hw_flavor][idx].
+				first_src_endp_id + endp_pair_id,
+				ecpri_dma_mhi_client_test_mapping[hw_ver][hw_flavor][idx].
+				first_dest_endp_id + endp_pair_id,
+				ecpri_dma_mhi_client_test_mapping[hw_ver][hw_flavor][idx].gsi_id);
+			if (ret != 0) {
+				DMA_UT_ERR("VF_ID %d / IDX %d failed\n", ctx->function.vf_id, idx);
+				DMA_UT_TEST_FAIL_REPORT("Connect_endp has failed\n");
+				return -EFAULT;
+			}
 
-		/* Invoke connect_endp and verify - for first pair */
-		ret = ecpri_dma_mhi_utils_connect_and_verify_endps(&ctx->function,
-			&ctx->frst_src_conn_params, &ctx->frst_dest_conn_params,
-			&ctx->frst_src_disc_params.clnt_hdl,
-			&ctx->frst_dest_disc_params.clnt_hdl, idx,
-			ECPRI_DMA_MHI_TEST_FRST_SRC_CHANNEL_ID,
-			ECPRI_DMA_MHI_TEST_FRST_DEST_CHANNEL_ID,
-			ecpri_dma_mhi_client_test_mapping[idx].first_src_endp_id,
-			ecpri_dma_mhi_client_test_mapping[idx].first_dest_endp_id,
-			ecpri_dma_mhi_client_test_mapping[idx].gsi_id);
-		if (ret != 0) {
-			DMA_UT_ERR("VF_ID %d / IDX %d failed\n", ctx->function.vf_id, idx);
-			DMA_UT_TEST_FAIL_REPORT("Connect_endp has failed\n");
-			return -EFAULT;
-		}
+			ret = ecpri_dma_mhi_client_test_utils_get_ee_gsi_index(ctx->function,
+				&ee, &gsi_id);
+			if (ret != 0) {
+				DMA_UT_ERR("VF_ID %d / IDX %d failed\n", ctx->function.vf_id, idx);
+				DMA_UT_TEST_FAIL_REPORT("Get EE index has failed\n");
+				return -EFAULT;
+			}
 
-		/* Invoke connect_endp and verify - for second pair */
-		ret = ecpri_dma_mhi_utils_connect_and_verify_endps(&ctx->function,
-			&ctx->second_src_conn_params, &ctx->second_dest_conn_params,
-			&ctx->second_src_disc_params.clnt_hdl,
-			&ctx->second_dest_disc_params.clnt_hdl, idx,
-			ECPRI_DMA_MHI_TEST_SCND_SRC_CHANNEL_ID,
-			ECPRI_DMA_MHI_TEST_SCND_DEST_CHANNEL_ID,
-			ecpri_dma_mhi_client_test_mapping[idx].second_src_endp_id,
-			ecpri_dma_mhi_client_test_mapping[idx].second_dest_endp_id,
-			ecpri_dma_mhi_client_test_mapping[idx].gsi_id);
-		if (ret != 0) {
-			DMA_UT_ERR("VF_ID %d / IDX %d failed\n", ctx->function.vf_id, idx);
-			DMA_UT_TEST_FAIL_REPORT("Connect_endp has failed\n");
-			return -EFAULT;
-		}
+			/* Generate, enqueue, and poll TRE for first pair*/
+			ret = ecpri_dma_mhi_test_loopback_data_transfer(idx,
+				ECPRI_DMA_MHI_TEST_FIRST_HW_CH_ID +
+				first_src_ch + (endp_pair_id * ch_id_diff),
+				ECPRI_DMA_MHI_TEST_FIRST_HW_CH_ID +
+				first_dest_ch + (endp_pair_id * ch_id_diff), ee,
+				ecpri_dma_mhi_client_test_mapping[hw_ver][hw_flavor][idx].gsi_id);
+			if (ret != 0) {
+				DMA_UT_ERR("VF_ID %d / IDX %d failed"
+					" SRC CH ID %d, DEST CH ID %d\n", ctx->function.vf_id, idx,
+					first_src_ch + (endp_pair_id * ch_id_diff),
+					first_dest_ch + (endp_pair_id * ch_id_diff));
+				DMA_UT_TEST_FAIL_REPORT("Transfer has failed\n");
+				return -EFAULT;
+			}
 
-		ret = ecpri_dma_mhi_client_test_get_ee_index(ctx->function, &ee);
-		if (ret != 0) {
-			DMA_UT_ERR("VF_ID %d / IDX %d failed\n", ctx->function.vf_id, idx);
-			DMA_UT_TEST_FAIL_REPORT("Get EE index has failed\n");
-			return -EFAULT;
-		}
-
-		/* Generate, enqueue, and poll TRE for first pair*/
-		ret = ecpri_dma_mhi_test_loopback_data_transfer(idx,
-			ecpri_dma_mhi_client_test_host_ch_id_map[
-				ECPRI_DMA_MHI_TEST_FRST_SRC_CHANNEL_ID],
-			ecpri_dma_mhi_client_test_host_ch_id_map[
-				ECPRI_DMA_MHI_TEST_FRST_DEST_CHANNEL_ID], ee, 0);
-		if (ret != 0) {
-			DMA_UT_ERR("VF_ID %d / IDX %d failed"
-				" SRC CH ID %d, DEST CH ID %d\n", ctx->function.vf_id, idx,
-				ecpri_dma_mhi_client_test_host_ch_id_map[
-					ECPRI_DMA_MHI_TEST_FRST_SRC_CHANNEL_ID],
-				ecpri_dma_mhi_client_test_host_ch_id_map[
-					ECPRI_DMA_MHI_TEST_FRST_DEST_CHANNEL_ID]);
-			DMA_UT_TEST_FAIL_REPORT("Transfer has failed\n");
-			return -EFAULT;
-		}
-
-		/* Generate, enqueue, and poll TRE for second pair */
-		ret = ecpri_dma_mhi_test_loopback_data_transfer(idx,
-			ecpri_dma_mhi_client_test_host_ch_id_map[
-				ECPRI_DMA_MHI_TEST_SCND_SRC_CHANNEL_ID],
-			ecpri_dma_mhi_client_test_host_ch_id_map[
-				ECPRI_DMA_MHI_TEST_SCND_DEST_CHANNEL_ID], ee, 0);
-		if (ret != 0) {
-			DMA_UT_ERR("VF_ID %d / IDX %d failed"
-				" SRC CH ID %d, DEST CH ID %d\n", ctx->function.vf_id, idx,
-				ecpri_dma_mhi_client_test_host_ch_id_map[
-					ECPRI_DMA_MHI_TEST_SCND_SRC_CHANNEL_ID],
-				ecpri_dma_mhi_client_test_host_ch_id_map[
-					ECPRI_DMA_MHI_TEST_SCND_DEST_CHANNEL_ID]);
-			DMA_UT_TEST_FAIL_REPORT("Transfer has failed\n");
-			return -EFAULT;
-		}
-
-		/* Reset loopback at the end of the test*/
-		ret = ecpri_dma_mhi_client_test_util_setup_dma_endps(
-			ecpri_dma_mhi_client_test_mapping[idx].second_src_endp_id,
-			ecpri_dma_mhi_client_test_mapping[idx].second_dest_endp_id,
-			ecpri_dma_mhi_client_test_mapping[idx].gsi_id, false);
-		if (ret != 0) {
-			DMA_UT_ERR("VF_ID %d / IDX %d failed"
-				" SRC ENDP ID %d, DEST ENDP ID %d\n", ctx->function.vf_id, idx,
-				ecpri_dma_mhi_client_test_mapping[idx].second_src_endp_id,
-				ecpri_dma_mhi_client_test_mapping[idx].second_dest_endp_id);
-			DMA_UT_TEST_FAIL_REPORT("Loopback configuration has failed\n");
-			return -EFAULT;
-		}
-
-		ret = ecpri_dma_mhi_client_test_util_setup_dma_endps(
-			ecpri_dma_mhi_client_test_mapping[idx].first_src_endp_id,
-			ecpri_dma_mhi_client_test_mapping[idx].first_dest_endp_id,
-			ecpri_dma_mhi_client_test_mapping[idx].gsi_id, false);
-		if (ret != 0) {
-			DMA_UT_ERR("VF_ID %d / IDX %d failed"
-				" SRC ENDP ID %d, DEST ENDP ID %d\n", ctx->function.vf_id, idx,
-				ecpri_dma_mhi_client_test_mapping[idx].first_src_endp_id,
-				ecpri_dma_mhi_client_test_mapping[idx].first_dest_endp_id);
-			DMA_UT_TEST_FAIL_REPORT("Loopback configuration has failed\n");
-			return -EFAULT;
+			ret = ecpri_dma_mhi_client_test_util_setup_dma_endps(
+				ecpri_dma_mhi_client_test_mapping[hw_ver][hw_flavor][idx].
+				first_src_endp_id,
+				ecpri_dma_mhi_client_test_mapping[hw_ver][hw_flavor][idx].
+				first_dest_endp_id,
+				ecpri_dma_mhi_client_test_mapping[hw_ver][hw_flavor][idx].gsi_id,
+				false);
+			if (ret != 0) {
+				DMA_UT_ERR("VF_ID %d / IDX %d failed"
+					" SRC ENDP ID %d, DEST ENDP ID %d\n", ctx->function.vf_id,
+					idx,
+					ecpri_dma_mhi_client_test_mapping[hw_ver][hw_flavor][idx].
+					first_src_endp_id,
+					ecpri_dma_mhi_client_test_mapping[hw_ver][hw_flavor][idx].
+					first_dest_endp_id);
+				DMA_UT_TEST_FAIL_REPORT("Loopback configuration has failed\n");
+				return -EFAULT;
+			}
 		}
 
 		DMA_UT_DBG("Finished HW CH VM %d\n", test_i);
 	}
 
 	/* Cleanup */
-	for (test_i = 0; test_i < max_vf_id; test_i++)
+	for (vf_i = 0; vf_i < max_vf_id; vf_i++)
 	{
+		test_i = active_vfs[hw_ver][hw_flavor][vf_i];
+		if (test_i == -1)
+			break;
+
 		ctx = mhi_client_test_suite_ctx[test_i];
 		/* Disconnect endps */
-		ret = ecpri_dma_mhi_client_test_suite_utils_disconnect_endps(
-			&ctx->function,
-			&ctx->frst_src_disc_params, &ctx->frst_dest_disc_params,
-			&ctx->second_src_disc_params, &ctx->second_dest_disc_params
-		);
-		if (ret != 0) {
-			DMA_UT_ERR("Unable to disconnect ret = %d\n",
-				ret);
-			return -EPERM;
+		for (endp_pair_id = 0;
+			endp_pair_id <
+			ecpri_dma_mhi_client_test_mapping[hw_ver][hw_flavor][test_i].
+			num_of_hw_chs_pairs;
+			endp_pair_id++) {
+			ret = ecpri_dma_mhi_client_test_suite_utils_disconnect_endps(
+				&ctx->function,
+				&ctx->src_disc_params[endp_pair_id],
+				&ctx->dest_disc_params[endp_pair_id]);
+			if (ret != 0) {
+				DMA_UT_ERR("Unable to disconnect ret = %d\n",
+					ret);
+				return -EPERM;
+			}
 		}
 
 		ecpri_dma_mhi_driver_ops.mhi_dma_destroy(ctx->function);
