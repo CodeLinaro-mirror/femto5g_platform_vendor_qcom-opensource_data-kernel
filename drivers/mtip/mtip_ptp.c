@@ -151,7 +151,7 @@ int mtip_ptp_tx_ts_list_size(u32 link_index)
    return rv;
 }
 
-int mtip_ptp_tx_ts_list_push(u32 link_index, u64 tstamp)
+int mtip_ptp_tx_ts_list_push(u32 link_index, u32 tstamp_secs, u32 tstamp_nsecs)
 {
    int rv = 0;
    struct mtip_tx_ts_node* node = NULL;
@@ -170,7 +170,8 @@ int mtip_ptp_tx_ts_list_push(u32 link_index, u64 tstamp)
    // init the list
    INIT_LIST_HEAD(&node->list);
 
-   node->tstamp = tstamp;
+   node->tstamp_secs = tstamp_secs;
+   node->tstamp_nsecs = tstamp_nsecs;
 
    list_add_tail(&node->list, &listptr->head);
    ++listptr->count;
@@ -179,7 +180,7 @@ out:
    return rv;
 }
 
-int mtip_ptp_tx_ts_list_pop(u32 link_index, u64* tstamp)
+int mtip_ptp_tx_ts_list_pop(u32 link_index, u32* tstamp_secs, u32* tstamp_nsecs)
 {
    int rv = 0;
    struct mtip_tx_ts_node* tmp;
@@ -212,7 +213,8 @@ int mtip_ptp_tx_ts_list_pop(u32 link_index, u64* tstamp)
    }
    else
    {
-      *tstamp = tmp->tstamp;
+      *tstamp_secs = tmp->tstamp_secs;
+      *tstamp_nsecs = tmp->tstamp_nsecs;
 
       // free the node
       kfree(tmp);
@@ -317,11 +319,12 @@ int mtip_ptp_tx_ts_skb_list_pop(u32 link_index, struct sk_buff **skb)
    return rv;
 }
 
-void post_mtip_process_timestamp(u32 link_index, u64 timestamp)
+void post_mtip_process_timestamp(u32 link_index, u32 timestamp_secs, u32 timestamp_nsecs)
 {
    struct mtip_process_timestamp_task* taskstruct = kmalloc(sizeof(struct mtip_process_timestamp_task), GFP_ATOMIC);
    taskstruct->link_index = link_index;
-   taskstruct->timestamp = timestamp;
+   taskstruct->timestamp_secs = timestamp_secs;
+   taskstruct->timestamp_nsecs = timestamp_nsecs;
    mtip_queue_work(MTIP_WORKQ_TASK_PROCESS_TIMESTAMP, taskstruct);
 }
 
@@ -329,10 +332,11 @@ void run_mtip_process_timestamp(void* work_ptr)
 {
     struct mtip_process_timestamp_task* taskstruct = (struct mtip_process_timestamp_task*)work_ptr;
     u32 link_index = taskstruct->link_index;
-    u64 timestamp = taskstruct->timestamp;
+    u32 timestamp_secs = taskstruct->timestamp_secs;
+    u32 timestamp_nsecs = taskstruct->timestamp_nsecs;
     struct sk_buff* skb = NULL;
 
-    CSMLOGINFO("process tx timestamp %d\n", timestamp);
+    CSMLOGINFO("process tx timestamp %d, %d\n", timestamp_secs, timestamp_nsecs);
 
     // bottom half of process a timestamp
     // acquire the lock
@@ -343,7 +347,7 @@ void run_mtip_process_timestamp(void* work_ptr)
     {
         // there are no skbs pending
         // queue the timestamp
-        mtip_ptp_tx_ts_list_push(link_index, timestamp);
+        mtip_ptp_tx_ts_list_push(link_index, timestamp_secs, timestamp_nsecs);
     }
     else
     {
@@ -352,7 +356,7 @@ void run_mtip_process_timestamp(void* work_ptr)
         mtip_ptp_tx_ts_skb_list_pop(link_index, &skb);
 
         // set the timestamp of the skb
-        mtip_ptp_set_tx_timestamp(skb, timestamp);
+        mtip_ptp_set_tx_timestamp(skb, timestamp_secs, timestamp_nsecs);
 
         CSMLOGDBG("freeing skb: len: %d\n", skb->len);
 
@@ -363,23 +367,25 @@ void run_mtip_process_timestamp(void* work_ptr)
     mtip_ptp_tx_ts_lock_release(link_index);
 }
 
-void mtip_ptp_set_rx_timestamp(struct sk_buff* skb, u64 nanosecs)
+void mtip_ptp_set_rx_timestamp(struct sk_buff* skb, u32 timestamp_secs, u32 timestamp_nsecs)
 {
     struct skb_shared_hwtstamps *shhwtstamp = NULL;
+    u64 nanosecs = ((u64)timestamp_secs)*NSEC_PER_SEC + (u64)timestamp_nsecs;
 
     shhwtstamp = skb_hwtstamps(skb);
     memset(shhwtstamp, 0, sizeof(struct skb_shared_hwtstamps));
 
-    CSMLOGINFO("Read rx timestamp %ld\n", nanosecs);
+    CSMLOGINFO("Read rx nanosecs %ld\n", nanosecs);
 
     shhwtstamp->hwtstamp = ns_to_ktime(nanosecs);
 }
 
-void mtip_ptp_set_tx_timestamp(struct sk_buff* skb, u64 nanosecs)
+void mtip_ptp_set_tx_timestamp(struct sk_buff* skb, u32 timestamp_secs, u32 timestamp_nsecs)
 {
     struct skb_shared_hwtstamps shhwtstamp;
+    u64 nanosecs = ((u64)timestamp_secs)*NSEC_PER_SEC + (u64)timestamp_nsecs;
 
-    CSMLOGINFO("Read tx timestamp %ld\n", nanosecs);
+    CSMLOGINFO("Read tx nanosecs %ld\n", nanosecs);
 
     memset(&shhwtstamp, 0, sizeof(struct skb_shared_hwtstamps));
     shhwtstamp.hwtstamp = ns_to_ktime(nanosecs);

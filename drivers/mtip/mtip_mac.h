@@ -124,7 +124,8 @@
 struct mtip_process_timestamp_task
 {
     u32 link_index;
-    u64 timestamp;
+    u32 timestamp_secs;
+    u32 timestamp_nsecs;
 };
 
 void mtip_mac_initialize(struct mtip_netdev_priv* priv);
@@ -159,7 +160,7 @@ void mtip_mac_wrapper_register_irq(struct device *dev, unsigned int irq,
 
 void mtip_mac_wrapper_pcs_mode_control(struct mtip_port_device_info* port_device);
 
-u64 mtip_mac_read_timestamp(u32 link_index);
+void mtip_mac_read_timestamp(u32 link_index, u32* timestamp_secs, u32* timestamp_nsecs);
 
 void mtip_mac_set_interrupt_mask(u32 link_index);
 u32 mtip_mac_get_interrupt_mask(u32 link_index);

@@ -175,7 +175,8 @@ void run_mtip_tx_comp_cb(void* work_ptr)
    struct mtip_netdev_priv *priv;
    u32 link_index;
    bool free_skb = true;
-   u64 nanosecs;
+   u32 timestamp_secs;
+   u32 timestamp_nsecs;
 
    if (taskstruct == NULL) 
    {
@@ -241,10 +242,10 @@ void run_mtip_tx_comp_cb(void* work_ptr)
           else
           {
               // there is a timestamp available
-              mtip_ptp_tx_ts_list_pop(link_index, &nanosecs);
+              mtip_ptp_tx_ts_list_pop(link_index, &timestamp_secs, &timestamp_nsecs);
 
               // set the timestamp of the skb
-              mtip_ptp_set_tx_timestamp(skb, nanosecs);
+              mtip_ptp_set_tx_timestamp(skb, timestamp_secs, timestamp_nsecs);
 
               free_skb = true;
           }

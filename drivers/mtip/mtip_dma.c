@@ -522,8 +522,10 @@ static int mtip_dma_process_packet(struct net_device *netdev,
    u32 link_index;
    spinlock_t *lock;
    unsigned long flags;
-   u64 nanosecs;
-   u64* nsptr;
+   u64 timestamp;
+   u32 timestamp_secs;
+   u32 timestamp_nsecs;
+   u64* tsptr;
    int i;
    struct iphdr* iphdr;
 
@@ -570,10 +572,19 @@ static int mtip_dma_process_packet(struct net_device *netdev,
        CSMLOGERR("Rx packet status code is PTP, packet size = %d\n", status_code, size);
 
        // the packet holds the 8 bytes TS in trailer
-       nsptr = (u64*)(base + size - 8);
-       nanosecs = *nsptr;
+       tsptr = (u64*)(base + size - 8);
+       timestamp = *tsptr;
+
+       // number of secs is the upper 32 bits
+       timestamp_secs = (u32)(timestamp >> 32);
+
+       // number of nanosecs is the lower 32 bits
+       timestamp_nsecs = (u32)(timestamp & 0xFFFFFFFF);
+
+       CSMLOGINFO("Rx packet timestamp %ld, timestamp_secs %d, timestamp_nsecs %d", timestamp, timestamp_secs, timestamp_nsecs);
+
        // set the timestamp in the skb
-       mtip_ptp_set_rx_timestamp(skb, nanosecs);
+       mtip_ptp_set_rx_timestamp(skb, timestamp_secs, timestamp_nsecs);
 
        skb_put(skb, size - 8);
        //skb->len = size - 8;

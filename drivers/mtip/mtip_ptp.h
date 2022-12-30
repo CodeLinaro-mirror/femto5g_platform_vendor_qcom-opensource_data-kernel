@@ -14,7 +14,8 @@
 struct mtip_tx_ts_node
 {
    struct list_head list;
-   u64              tstamp;
+   u32              tstamp_secs;
+   u32              tstamp_nsecs;
 };
 
 struct mtip_tx_ts_skb_node
@@ -44,10 +45,10 @@ struct mtip_tx_ts_skb_list
 int mtip_ptp_initialize(u32 link_index);
 int mtip_ptp_handle_hwtstamp_ioctl(struct ifreq *ifr, u32 link_index);
 
-void mtip_ptp_set_rx_timestamp(struct sk_buff* skb, u64 nanosecs);
-void mtip_ptp_set_tx_timestamp(struct sk_buff* skb, u64 nanosecs);
+void mtip_ptp_set_rx_timestamp(struct sk_buff* skb, u32 timestamp_secs, u32 timestamp_nsecs);
+void mtip_ptp_set_tx_timestamp(struct sk_buff* skb, u32 timestamp_secs, u32 timestamp_nsecs);
 
-void post_mtip_process_timestamp(u32 link_index, u64 timestamp);
+void post_mtip_process_timestamp(u32 link_index, u32 timestamp_secs, u32 timestamp_nsecs);
 void run_mtip_process_timestamp(void* workptr);
 
 void mtip_ptp_tx_ts_lock_init(u32 link_index);
@@ -57,8 +58,8 @@ void mtip_ptp_tx_ts_lock_release(u32 link_index);
 int mtip_ptp_tx_ts_list_initialize(u32 link_index);
 int mtip_ptp_tx_ts_list_finalize(u32 link_index);
 int mtip_ptp_tx_ts_list_size(u32 link_index);
-int mtip_ptp_tx_ts_list_push(u32 link_index, u64 tstamp);
-int mtip_ptp_tx_ts_list_pop(u32 link_index, u64* tstamp);
+int mtip_ptp_tx_ts_list_push(u32 link_index, u32 tstamp_secs, u32 tstamp_nsecs);
+int mtip_ptp_tx_ts_list_pop(u32 link_index, u32* tstamp_secs, u32* tstamp_nsecs);
 
 int mtip_ptp_tx_ts_skb_list_initialize(u32 link_index);
 int mtip_ptp_tx_ts_skb_list_finalize(u32 link_index);

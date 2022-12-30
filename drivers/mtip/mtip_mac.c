@@ -59,7 +59,8 @@ static irqreturn_t mtip_mac_interrupt_handler(int irq, void *devptr)
    u32 int_status;
    int i;
    u32 link_index;
-   u64 timestamp;
+   u32 timestamp_secs;
+   u32 timestamp_nsecs;
    bool found = false;
    bool handled = false;
 
@@ -106,12 +107,12 @@ static irqreturn_t mtip_mac_interrupt_handler(int irq, void *devptr)
            if ((int_status & MTIP_MAC_INTERRUPT_PTP_TX_INTR) != 0)
            {
                // there is a PTP interrupt pending
-               timestamp = mtip_mac_read_timestamp(link_index);
+               mtip_mac_read_timestamp(link_index, &timestamp_secs, &timestamp_nsecs);
 
-               CSMLOGINFO("Tx Timestamp %d read for link: %d with link_index: %d\n", timestamp, i, link_index);
+               CSMLOGINFO("Tx Timestamp %d, %d read for link: %d with link_index: %d\n", timestamp_secs, timestamp_nsecs, i, link_index);
 
                // post a job to workqueue to process this timestamp
-               post_mtip_process_timestamp(link_index, timestamp);
+               post_mtip_process_timestamp(link_index, timestamp_secs, timestamp_nsecs);
 
                // clear the interrupt
                mtip_mac_clear_interrupts(link_index, MTIP_MAC_INTERRUPT_PTP_TX_INTR);
@@ -709,15 +710,12 @@ void mtip_mac_set_interrupt_mask(u32 link_index)
     return;
 }
 
-u64 mtip_mac_read_timestamp(u32 link_index)
+void mtip_mac_read_timestamp(u32 link_index, u32* timestamp_secs, u32* timestamp_nsecs)
 {
-    u32 read_val1 = 0;
-    u32 read_val0 = 0;
     void __iomem *wrapper_base_addr;
     u32 port_device_index;
     u32 link_device_index;
     u32 real_link_number;
-    u64 timestamp;
 
     mtip_lookup_device_by_link_index(link_index, &port_device_index, &link_device_index);
 
@@ -726,15 +724,12 @@ u64 mtip_mac_read_timestamp(u32 link_index)
     wrapper_base_addr = platform_driver_priv->devices.port_devices[port_device_index].wrapper_base_addr;
 
     // read the upper 32 bits
-    read_val1 = (u32)ioread32(wrapper_base_addr + real_link_number*MTIP_MAC_WRAPPER_TX_TS_REG_OFFSET + MTIP_MAC_WRAPPER_TX_TS1_REG_BASE_OFFSET);
+    *timestamp_secs = (u32)ioread32(wrapper_base_addr + real_link_number*MTIP_MAC_WRAPPER_TX_TS_REG_OFFSET + MTIP_MAC_WRAPPER_TX_TS1_REG_BASE_OFFSET);
 
     // read the lower 32 bits
-    read_val0 = (u32)ioread32(wrapper_base_addr + real_link_number*MTIP_MAC_WRAPPER_TX_TS_REG_OFFSET + MTIP_MAC_WRAPPER_TX_TS0_REG_BASE_OFFSET);
+    *timestamp_nsecs = (u32)ioread32(wrapper_base_addr + real_link_number*MTIP_MAC_WRAPPER_TX_TS_REG_OFFSET + MTIP_MAC_WRAPPER_TX_TS0_REG_BASE_OFFSET);
 
-    // check this. Is read_val1 the significant bits?
-    timestamp = ((u64)read_val0 | ((u64)read_val1 << 32));
-
-    return timestamp;
+    return;
 }
 
 u32 mtip_mac_get_interrupt_mask(u32 link_index)
