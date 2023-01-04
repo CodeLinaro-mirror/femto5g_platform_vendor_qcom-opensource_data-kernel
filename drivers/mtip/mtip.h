@@ -1,7 +1,7 @@
 //SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
- */ 
+ */
 
 #ifndef _MTIP_H
 #define _MTIP_H
@@ -61,8 +61,8 @@
 #define MTIP_TX_RING_SIZE 512
 #define MTIP_RX_RING_SIZE 512
 
-#define MTIP_TX_MOD_COUNTER_THRESHOLD 1       // RECOMMENDED VALUE: 25% of RING SIZE
-#define MTIP_TX_MOD_TIMER_THRESHOLD   0       // RECOMMENDED VALUE: 10 msec
+#define MTIP_TX_MOD_COUNTER_THRESHOLD 32
+#define MTIP_TX_MOD_TIMER_THRESHOLD   10
 
 #define MTIP_TX_PACKET_AVAILABILITY_THRESHOLD     50
 
