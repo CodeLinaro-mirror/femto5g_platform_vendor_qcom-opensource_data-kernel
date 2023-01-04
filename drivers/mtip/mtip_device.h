@@ -19,6 +19,7 @@ struct mtip_netdev_priv {
    spinlock_t lock;
    void __iomem           *mac_ioaddr;
    u64 hashtablebits;
+   u32 priv_flags;
 
    // these are used only for RUMI E2E
    struct phy_device      *phydev;

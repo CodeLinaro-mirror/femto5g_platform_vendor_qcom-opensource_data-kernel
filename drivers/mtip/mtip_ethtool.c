@@ -69,6 +69,42 @@ static const char * const mtip_ethtool_stat_strings[] = {
 
 #define MTIP_ETHTOOL_STATS_LEN	ARRAY_SIZE(mtip_ethtool_stat_strings)
 
+static const char* const mtip_ethtool_priv_flags_str_arr[] = {
+    "1x100GBASE_R",
+    "1x100GBASE_R_RSFEC_LL",
+    "1x100GBASE_R_RSFEC",
+    "1x100GBASE_R2",
+    "1x100GBASE_R2_RSFEC",
+    "1x100GBASE_R4",
+    "1x100GBASE_R4_RSFEC",
+    "1x50GBASE_R",
+    "1x50GBASE_R_RSFEC",
+    "2x50GBASE_R",
+    "2x50GBASE_R_RSFEC",
+    "1x50GBASE_R2",
+    "1x50GBASE_R2_RSFEC",
+    "1x50GBASE_R2_LUAI",
+    "1x50GBASE_R2_LUAI_FEC",
+    "2x50GBASE_R2",
+    "2x50GBASE_R2_FEC",
+    "2x50GBASE_R2_LUAI",
+    "2x50GBASE_R2_LUAI_FEC",
+    "1x40GBASE_R4",
+    "1x40GBASE_R4_FEC",
+    "1x25GBASE_R",
+    "1x25GBASE_R_FEC",
+    "4x25GBASE_R",
+    "4x25GBASE_R_FEC",
+    "1x25GBASE_R_RSFEC",
+    "4x25GBASE_R_RSFEC",
+    "1x10GBASE_R",
+    "1x10GBASE_R_FEC",
+    "4x10GBASE_R",
+    "4x10GBASE_R_FEC",
+};
+
+#define MTIP_ETHTOOL_PRIV_FLAGS_LEN ARRAY_SIZE(mtip_ethtool_priv_flags_str_arr)
+
 static int mtip_get_sset_count(struct net_device *netdev, int sset)
 {
     CSMLOGINFO("ethtool: get_sset_count %d, %d\n", sset, MTIP_ETHTOOL_STATS_LEN);
@@ -76,6 +112,8 @@ static int mtip_get_sset_count(struct net_device *netdev, int sset)
 	switch (sset) {
 	case ETH_SS_STATS:
 		return MTIP_ETHTOOL_STATS_LEN;
+    case ETH_SS_PRIV_FLAGS:
+        return MTIP_ETHTOOL_PRIV_FLAGS_LEN;
 	default:
 		return -EOPNOTSUPP;
 	}
@@ -93,6 +131,14 @@ static void mtip_get_strings(struct net_device *netdev, u32 stringset, u8 *data)
 				ETH_GSTRING_LEN);
 			data += ETH_GSTRING_LEN;
 		}
+    }
+    else if (stringset == ETH_SS_PRIV_FLAGS) 
+    {
+        for (i = 0; i < MTIP_ETHTOOL_PRIV_FLAGS_LEN; i++) {
+            strlcpy(data, mtip_ethtool_priv_flags_str_arr[i],
+                ETH_GSTRING_LEN);
+            data += ETH_GSTRING_LEN;
+        }
     }
 }
 
@@ -265,14 +311,78 @@ int	mtip_ethtool_set_fecparam(struct net_device* netdev, struct ethtool_fecparam
     return 0;
 }
 
+static u32 mtip_ethtool_get_priv_flags(struct net_device *netdev)
+{
+    struct mtip_netdev_priv *priv;
+    u32 link_index;
+
+    priv = netdev_priv(netdev);
+    link_index = priv->link_index;
+
+    CSMLOGINFO("Get priv called for link index: %d", link_index);
+
+    // return flags currently enabled
+    return priv->priv_flags;
+}
+
+#define MTIP_ETHTOOL_SET_PFLAG(params, pflag, enable)			\
+ 	do {							\
+ 		if (enable)					\
+ 			(params)->priv_flags |= BIT(pflag);		\
+ 		else						\
+ 			(params)->priv_flags &= ~(BIT(pflag));	\
+	} while (0)
+
+static int mtip_ethtool_handle_pflag(struct net_device *netdev,
+			      u32 wanted_flags,
+			      u32 flag)
+{
+    struct mtip_netdev_priv *priv = netdev_priv(netdev);
+	bool enable = !!(wanted_flags & BIT(flag));
+    u32 changes = wanted_flags ^ priv->priv_flags;
+
+	if (!(changes & BIT(flag)))
+		return 0;
+
+	MTIP_ETHTOOL_SET_PFLAG(priv, flag, enable);
+	return 0;
+}
+
+static int mtip_ethtool_set_priv_flags(struct net_device *netdev, u32 flags)
+{
+    struct mtip_netdev_priv *priv;
+    u32 link_index;
+    u32 pflag;
+    int err;
+
+    priv = netdev_priv(netdev);
+    link_index = priv->link_index;
+
+    CSMLOGINFO("Set priv called for link index: %d with flags: 0x%x", link_index, flags);
+
+    if (mtip_check_if_running(netdev) == true) 
+    {
+        CSMLOGERR("Set priv called when running for link_index: %d", link_index);
+        return -EINVAL;
+    }
+
+    for (pflag = 0; pflag < MTIP_ETHTOOL_PRIV_FLAGS_LEN; pflag++) {
+        err = mtip_ethtool_handle_pflag(netdev, flags, pflag);
+        if (err)
+            break;
+    }
+    return err;
+}
+
 static const struct ethtool_ops mtip_ethtool_ops = {
-   .begin = mtip_check_if_running,
    .get_drvinfo = mtip_getdrvinfo,
    .get_sset_count  = mtip_get_sset_count,
    .get_strings = mtip_get_strings,
    .get_ethtool_stats = mtip_ethtool_get_stats,
    .get_ts_info = mtip_get_ts_info,
    .get_link_ksettings = mtip_get_link_ksettings,
+   .get_priv_flags = mtip_ethtool_get_priv_flags,
+   .set_priv_flags = mtip_ethtool_set_priv_flags,
    .get_fecparam = mtip_ethtool_get_fecparam,
    .set_fecparam = mtip_ethtool_set_fecparam,
 };

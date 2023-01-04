@@ -934,11 +934,6 @@ static int mtip_open(struct net_device *netdev)
       netif_start_queue(netdev);
    }
 
-   /*
-    * set the ethtool ops
-    */
-   mtip_ethtool_set_ops(netdev);
-
    /* 
     * set the link state to OPEN * 
     */
@@ -1155,6 +1150,11 @@ void mtip_netdevice_init(struct net_device *dev)
 
    // initialize the lock
    spin_lock_init(&priv->lock);
+
+   /*
+    * set the ethtool ops
+    */
+   mtip_ethtool_set_ops(dev);
 }
 
 enum mtip_link_state_enum mtip_get_link_state_by_device(u32 port_device_index, u32 link_device_index)
