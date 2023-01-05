@@ -108,6 +108,11 @@
 #define MTIP_MAC_INTERRUPT_PTP_TX_INTR            0x00000040
 #define MTIP_MAC_INTERRUPT_LINK_DOWN_INTR         0x00100000
 #define MTIP_MAC_INTERRUPT_LINK_UP_INTR           0x00200000
+#define MTIP_MAC_INTERRUPT_HI_BER_INTR            0x01000000
+#define MTIP_MAC_INTERRUPT_LINE_FAULT_INTR        0x00000001
+#define MTIP_MAC_INTERRUPT_REMOTE_FAULT_INTR      0x00000002
+#define MTIP_MAC_INTERRUPT_LOCAL_FAULT_INTR       0x00000004
+
 
 /*
  * Other configuration items
@@ -165,10 +170,6 @@ void mtip_mac_read_timestamp(u32 link_index, u32* timestamp_secs, u32* timestamp
 void mtip_mac_set_interrupt_mask(u32 link_index);
 u32 mtip_mac_get_interrupt_mask(u32 link_index);
 
-u32 mtip_mac_get_interrupt_summary(struct mtip_port_device_info* port_device);
-
-u32 mtip_mac_get_interrupt_status(u32 link_index);
-void mtip_mac_clear_interrupts(u32 link_index, u32 int_to_clear);
 bool mtip_mac_wrapper_get_link_status(u32 link_index);
 
 // functions to enable/disable rsfec for 25g mode

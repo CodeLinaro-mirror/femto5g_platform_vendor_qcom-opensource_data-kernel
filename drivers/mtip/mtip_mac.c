@@ -52,19 +52,105 @@
 #include "mtip_ptp.h"
 #include "mtip_workq.h"
 
+static u32 mtip_mac_get_interrupt_summary(struct mtip_port_device_info* port_device)
+{
+    u32 read_val = 0;
+    void __iomem *wrapper_base_addr;
+
+    wrapper_base_addr = port_device->wrapper_base_addr;
+
+    read_val = (u32)ioread32(wrapper_base_addr + MTIP_MAC_WRAPPER_INTERRUPT_SUMMARY_REG_OFFSET);
+    return read_val;
+}
+
+static u32 mtip_mac_get_interrupt_status(u32 link_index)
+{
+    u32 read_val = 0;
+    void __iomem *wrapper_base_addr;
+    u32 port_device_index;
+    u32 link_device_index;
+    u32 real_link_number;
+
+    mtip_lookup_device_by_link_index(link_index, &port_device_index, &link_device_index);
+
+    mtip_lookup_real_link_number_by_link_index(link_index, &real_link_number);
+
+    wrapper_base_addr = platform_driver_priv->devices.port_devices[port_device_index].wrapper_base_addr;
+
+    read_val = (u32)ioread32(wrapper_base_addr + real_link_number*MTIP_MAC_WRAPPER_INTERRUPT_OFFSET + MTIP_MAC_WRAPPER_INTERRUPT_STAT_REG_OFFSET);
+    return read_val;
+}
+
+void mtip_mac_clear_interrupts(u32 link_index, u32 int_to_clear)
+{
+    u32 write_val = int_to_clear;
+    void __iomem *wrapper_base_addr;
+    u32 port_device_index;
+    u32 link_device_index;
+    u32 real_link_number;
+
+    mtip_lookup_device_by_link_index(link_index, &port_device_index, &link_device_index);
+
+    mtip_lookup_real_link_number_by_link_index(link_index, &real_link_number);
+
+    wrapper_base_addr = platform_driver_priv->devices.port_devices[port_device_index].wrapper_base_addr;
+
+    CSMLOGINFO("clearing 0x%x on link_index: %d", write_val, link_index);
+
+    // clear all interrupts
+    iowrite32(write_val,
+              wrapper_base_addr + real_link_number*MTIP_MAC_WRAPPER_INTERRUPT_OFFSET + MTIP_MAC_WRAPPER_INTERRUPT_CLR_REG_OFFSET);
+    return;
+}
+
+static void mtip_mac_clear_all_interrupts(u32 link_index, u32 int_to_clear)
+{
+    u32 write_val = int_to_clear;
+    void __iomem *wrapper_base_addr;
+    u32 port_device_index;
+    u32 link_device_index;
+    u32 real_link_number;
+
+    mtip_lookup_device_by_link_index(link_index, &port_device_index, &link_device_index);
+
+    mtip_lookup_real_link_number_by_link_index(link_index, &real_link_number);
+
+    wrapper_base_addr = platform_driver_priv->devices.port_devices[port_device_index].wrapper_base_addr;
+
+    CSMLOGINFO("clearing all interrupts on link_index: %d", link_index);
+
+    // clear all interrupts
+    iowrite32(write_val,
+              wrapper_base_addr + real_link_number*MTIP_MAC_WRAPPER_INTERRUPT_OFFSET + MTIP_MAC_WRAPPER_INTERRUPT_CLR_REG_OFFSET);
+
+    // reset the CLR_REG
+    iowrite32(0x0,
+              wrapper_base_addr + real_link_number*MTIP_MAC_WRAPPER_INTERRUPT_OFFSET + MTIP_MAC_WRAPPER_INTERRUPT_CLR_REG_OFFSET);
+    return;
+}
+
 static irqreturn_t mtip_mac_interrupt_handler(int irq, void *devptr) 
 {
+   irqreturn_t retval = IRQ_NONE;
    struct mtip_port_device_info * portptr;
    u32 summary;
    u32 int_status;
+   u32 int_mask;
    int i;
    u32 link_index;
    u32 timestamp_secs;
    u32 timestamp_nsecs;
    bool found = false;
    bool handled = false;
+   u32 handled_interrupts = MTIP_MAC_INTERRUPT_PTP_TX_INTR;
+   handled_interrupts |= MTIP_MAC_INTERRUPT_LINK_DOWN_INTR;
+   handled_interrupts |= MTIP_MAC_INTERRUPT_LINK_UP_INTR;
+   handled_interrupts |= MTIP_MAC_INTERRUPT_HI_BER_INTR;
+   handled_interrupts |= MTIP_MAC_INTERRUPT_LINE_FAULT_INTR;
+   handled_interrupts |= MTIP_MAC_INTERRUPT_REMOTE_FAULT_INTR;
+   handled_interrupts |= MTIP_MAC_INTERRUPT_LOCAL_FAULT_INTR;
 
-   CSMLOGINFO("Got an interrupt!\n");
+   CSMLOGINFO("ENTER: Interrupt! handling 0x%x\n", handled_interrupts);
 
    // check if this an interrupt that needs to be handled
    for (i = 0; i < platform_driver_priv->devices.num_port_phandles; ++i) 
@@ -79,7 +165,8 @@ static irqreturn_t mtip_mac_interrupt_handler(int irq, void *devptr)
    if (found == false) 
    {
        // no need to handle interrupt
-       return IRQ_NONE;
+       retval = IRQ_NONE;
+       goto func_exit;
    }
 
    // set the portptr
@@ -101,9 +188,11 @@ static irqreturn_t mtip_mac_interrupt_handler(int irq, void *devptr)
            mtip_lookup_link_index_by_real_port_and_link(&link_index, portptr->port_type, i);
 
            int_status = mtip_mac_get_interrupt_status(link_index);
+           int_mask = mtip_mac_get_interrupt_mask(link_index);
 
-           CSMLOGINFO("Interrupt status 0x%x for link: %d with link_index: %d\n", int_status, i, link_index);
+           CSMLOGINFO("Interrupt status 0x%x for link: %d with link_index: %d, mask: 0x%x\n", int_status, i, link_index, int_mask);
 
+           // check for PTP interrupt
            if ((int_status & MTIP_MAC_INTERRUPT_PTP_TX_INTR) != 0)
            {
                // there is a PTP interrupt pending
@@ -114,36 +203,40 @@ static irqreturn_t mtip_mac_interrupt_handler(int irq, void *devptr)
                // post a job to workqueue to process this timestamp
                post_mtip_process_timestamp(link_index, timestamp_secs, timestamp_nsecs);
 
-               // clear the interrupt
-               mtip_mac_clear_interrupts(link_index, MTIP_MAC_INTERRUPT_PTP_TX_INTR);
-
                handled = true;
            }
+
+           // check for LINK DOWN
            if ((int_status & MTIP_MAC_INTERRUPT_LINK_DOWN_INTR) != 0)
            {
                // check if the LINK_UP_INTR is also set
                if ((int_status & MTIP_MAC_INTERRUPT_LINK_UP_INTR) != 0) 
                {
+                   CSMLOGINFO("Got a link down/up interrupt link_index: %d: ignoring", link_index);
+
                    // LINK_UP also set
                    // ignore both
                    handled = true;
                }
                else
                {
+                   CSMLOGINFO("Got a link down interrupt link_index: %d", link_index);
+
                    // got a link down interrupt for link index
                    post_mtip_process_link_state(link_index, false);
 
                    handled = true;
                }
-
-               // clear the interrupt
-               mtip_mac_clear_interrupts(link_index, MTIP_MAC_INTERRUPT_LINK_DOWN_INTR);
            }
+
+           // check for LINK UP
            if ((int_status & MTIP_MAC_INTERRUPT_LINK_UP_INTR) != 0) 
            {
                // check if LINK_DOWN is set
                if ((int_status & MTIP_MAC_INTERRUPT_LINK_DOWN_INTR) != 0)
                {
+                   CSMLOGINFO("Got a link down/up interrupt link_index: %d: ignoring", link_index);
+
                    // LINK_DOWN also set
                    // ignore both
 
@@ -151,15 +244,57 @@ static irqreturn_t mtip_mac_interrupt_handler(int irq, void *devptr)
                }
                else
                {
+                   CSMLOGINFO("Got a link up interrupt link_index: %d", link_index);
+
                    // got a link up interrupt for link index
                    post_mtip_process_link_state(link_index, true);
 
                    handled = true;
                }
-
-               // clear the interrupt
-               mtip_mac_clear_interrupts(link_index, MTIP_MAC_INTERRUPT_LINK_UP_INTR);
            }
+
+           // check if HI BER
+           if ((int_status & MTIP_MAC_INTERRUPT_HI_BER_INTR) != 0)
+           {
+               CSMLOGINFO("Received a HI-BER interrupt on link_index: %d", link_index);
+
+               handled = true;
+           }
+
+           // check if LINE FAULT
+           if ((int_status & MTIP_MAC_INTERRUPT_LINE_FAULT_INTR) != 0)
+           {
+               CSMLOGINFO("Received a Line fault interrupt on link_index: %d", link_index);
+
+               handled = true;
+           }
+
+           // check if REMOTE FAULT
+           if ((int_status & MTIP_MAC_INTERRUPT_REMOTE_FAULT_INTR) != 0)
+           {
+               CSMLOGINFO("Received a remote fault interrupt on link_index: %d", link_index);
+
+               handled = true;
+           }
+
+           // check if LOCAL FAULT
+           if ((int_status & MTIP_MAC_INTERRUPT_LOCAL_FAULT_INTR) != 0)
+           {
+               CSMLOGINFO("Received a local fault interrupt on link_index: %d", link_index);
+
+               handled = true;
+           }
+
+           // catchall
+           if ((int_status & ~(handled_interrupts)) != 0)
+           {
+               CSMLOGINFO("Interrupt 0x%x received for link: %d with link_index: %d\n", (int_status & ~(handled_interrupts)), i, link_index);
+
+               handled = true;
+           }
+
+           // clear all the pending interrupts
+           mtip_mac_clear_all_interrupts(link_index, int_status);
        }
 
        summary = summary >> 1;
@@ -168,13 +303,12 @@ static irqreturn_t mtip_mac_interrupt_handler(int irq, void *devptr)
    if (handled == true) 
    {
        // set as handled
-       return IRQ_HANDLED;
+       retval = IRQ_HANDLED;
    }
-   else
-   {
-       // set as not handled
-       return IRQ_NONE;
-   }
+
+func_exit:
+   CSMLOGINFO("EXIT: Interrupt! handling retval = %d\n", retval);
+   return retval;
 }
 
 static int mtip_mac_read_version(struct mtip_netdev_priv *priv) {
@@ -633,10 +767,8 @@ void mtip_mac_wrapper_pcs_mode_control(struct mtip_port_device_info* port_device
  */
 void mtip_mac_wrapper_init(struct mtip_port_device_info* port_device)
 {
-    void __iomem *wrapper_base_addr;
+    void __iomem *wrapper_base_addr = port_device->wrapper_base_addr;
     u32 calendar_cfg_val;
-
-    wrapper_base_addr = port_device->wrapper_base_addr;
 
    CSMLOGINFO("MAC Wrapper Init\n");
 
@@ -699,7 +831,12 @@ void mtip_mac_set_interrupt_mask(u32 link_index)
     wrapper_base_addr = platform_driver_priv->devices.port_devices[port_device_index].wrapper_base_addr;
 
     // set the interrupts we are interested in
-    write_val |= (MTIP_MAC_INTERRUPT_PTP_TX_INTR | MTIP_MAC_INTERRUPT_LINK_DOWN_INTR | MTIP_MAC_INTERRUPT_LINK_UP_INTR);
+    write_val  =  MTIP_MAC_INTERRUPT_PTP_TX_INTR;
+    write_val |= MTIP_MAC_INTERRUPT_LINK_DOWN_INTR;
+    write_val |= MTIP_MAC_INTERRUPT_LINK_UP_INTR;
+    write_val |= MTIP_MAC_INTERRUPT_HI_BER_INTR;
+    write_val |= MTIP_MAC_INTERRUPT_LINE_FAULT_INTR;
+    write_val |= MTIP_MAC_INTERRUPT_REMOTE_FAULT_INTR;
 
     CSMLOGINFO("Setting mask: 0x%x to register 0x%x with real_link_number %d link_index %d\n", write_val, 
                real_link_number*MTIP_MAC_WRAPPER_INTERRUPT_OFFSET + MTIP_MAC_WRAPPER_INTERRUPT_MASK_REG_OFFSET, real_link_number, link_index);
@@ -748,55 +885,6 @@ u32 mtip_mac_get_interrupt_mask(u32 link_index)
 
     read_val = (u32)ioread32(wrapper_base_addr + real_link_number*MTIP_MAC_WRAPPER_INTERRUPT_OFFSET + MTIP_MAC_WRAPPER_INTERRUPT_MASK_REG_OFFSET);
     return read_val;
-}
-
-u32 mtip_mac_get_interrupt_summary(struct mtip_port_device_info* port_device)
-{
-    u32 read_val = 0;
-    void __iomem *wrapper_base_addr;
-
-    wrapper_base_addr = port_device->wrapper_base_addr;
-
-    read_val = (u32)ioread32(wrapper_base_addr + MTIP_MAC_WRAPPER_INTERRUPT_SUMMARY_REG_OFFSET);
-    return read_val;
-}
-
-u32 mtip_mac_get_interrupt_status(u32 link_index)
-{
-    u32 read_val = 0;
-    void __iomem *wrapper_base_addr;
-    u32 port_device_index;
-    u32 link_device_index;
-    u32 real_link_number;
-
-    mtip_lookup_device_by_link_index(link_index, &port_device_index, &link_device_index);
-
-    mtip_lookup_real_link_number_by_link_index(link_index, &real_link_number);
-
-    wrapper_base_addr = platform_driver_priv->devices.port_devices[port_device_index].wrapper_base_addr;
-
-    read_val = (u32)ioread32(wrapper_base_addr + real_link_number*MTIP_MAC_WRAPPER_INTERRUPT_OFFSET + MTIP_MAC_WRAPPER_INTERRUPT_STAT_REG_OFFSET);
-    return read_val;
-}
-
-void mtip_mac_clear_interrupts(u32 link_index, u32 int_to_clear)
-{
-    u32 write_val = int_to_clear;
-    void __iomem *wrapper_base_addr;
-    u32 port_device_index;
-    u32 link_device_index;
-    u32 real_link_number;
-
-    mtip_lookup_device_by_link_index(link_index, &port_device_index, &link_device_index);
-
-    mtip_lookup_real_link_number_by_link_index(link_index, &real_link_number);
-
-    wrapper_base_addr = platform_driver_priv->devices.port_devices[port_device_index].wrapper_base_addr;
-
-    // clear all interrupts
-    iowrite32(write_val,
-              wrapper_base_addr + real_link_number*MTIP_MAC_WRAPPER_INTERRUPT_OFFSET + MTIP_MAC_WRAPPER_INTERRUPT_CLR_REG_OFFSET);
-    return;
 }
 
 bool mtip_mac_wrapper_get_link_status(u32 link_index)

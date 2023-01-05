@@ -1336,8 +1336,11 @@ static int mtip_platform_setup(void)
                   mtip_pcs_enable_loopback(i);
               }
 
-              // set the MAC interrupt mask
-              mtip_mac_set_interrupt_mask(i);
+              if (mtip_rumi_platform == 0) 
+              {
+                  // set the MAC interrupt mask
+                  mtip_mac_set_interrupt_mask(i);
+              }
           }
 
           // add the mtip_napi_rx
@@ -1345,7 +1348,6 @@ static int mtip_platform_setup(void)
           netif_napi_add(platform_driver_priv->mtip_links[i]->dev, &(platform_driver_priv->mtip_links[i]->napi), mtip_napi_poll, MTIP_NAPI_WEIGHT);
 
           CSMLOGINFO("mtip_devs[%d] = 0x%lx with link_index = %d\n", i, (unsigned long)platform_driver_priv->mtip_links[i]->dev, priv->link_index);
-
        }
    }
 
