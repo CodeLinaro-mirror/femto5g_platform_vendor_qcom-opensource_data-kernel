@@ -42,6 +42,8 @@ struct eip_link {
 	struct net_device *ndev;
 	struct eip_channel rx;
 	struct eip_channel tx;
+
+	void *ipsec_priv;
 };
 
 #endif /* _EIP_DEVICE_H_ */
