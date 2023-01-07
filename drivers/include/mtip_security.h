@@ -22,6 +22,7 @@ struct mtip_security_device;
  * @fixup_tx_skb: Called for every outgoing skb to perform any fixups necessary
  *                for hardware offload
  *
+ * @update_config: Called when port level config is changed
  */
 struct mtip_security_ops {
 	int (*add_link) (struct net_device * ndev,
@@ -34,6 +35,8 @@ struct mtip_security_ops {
 
 	int (*fixup_rx_skb) (struct sk_buff * skb);
 	int (*fixup_tx_skb) (struct sk_buff * skb);
+
+	int (*update_config) (struct mtip_security_device * sdev, u32 active_links);
 };
 
 /** struct mtip_security_device - Defines a security port device
