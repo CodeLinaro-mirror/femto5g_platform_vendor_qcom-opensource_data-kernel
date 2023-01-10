@@ -775,7 +775,7 @@ static int mtip_platform_validate_dt_lane_config(struct mtip_port_device_info* p
         port_speed +=  lane_speed_gbps * link->num_lanes;
     }
 
-    if (port_speed > 100)
+    if (port_speed > 100000)
     {
         CSMLOGERR("Total port_speed %d exceeds 100Gbps\n", port_speed);
         return -1;
@@ -1437,24 +1437,24 @@ int mtip_platform_convert_lane_speed_to_gbps(enum eth_phy_iface_phy_lane_speed_e
     {
     case PHY_LANE_SPEED_100G:
         {
-            return 100;
+            return 100000;
         }
         break;
 
     case PHY_LANE_SPEED_50G:
         {
-            return 50;
+            return 50000;
         }
         break;
 
     case PHY_LANE_SPEED_10G:
         {
-            return 10;
+            return 10000;
         }
         break;
     case PHY_LANE_SPEED_25G:
         {
-            return 25;
+            return 25000;
         }
         break;
     default:

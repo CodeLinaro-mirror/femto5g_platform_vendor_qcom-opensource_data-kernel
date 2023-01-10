@@ -374,6 +374,48 @@ static int mtip_ethtool_set_priv_flags(struct net_device *netdev, u32 flags)
     return err;
 }
 
+static void mtip_ethtool_set_msglevel(struct net_device *netdev, u32 level)
+{
+    u32 link_index;
+    u32 real_port_number;
+    struct mtip_netdev_priv *priv;
+    u32 val = level%2;
+
+    priv = netdev_priv(netdev);
+    link_index = priv->link_index;
+
+    // check if the corresponding port is in LINK_UP state
+    mtip_lookup_real_port_number_by_link_index(link_index, &real_port_number);
+
+    if (val == 0)
+    {
+        CSMLOGERR("Using set msglevel to set PHYLINK state to CONNECTED for link index %d", link_index);
+        platform_driver_priv->mtip_ports[real_port_number]->port_state = MTIP_PORT_STATE_CONNECTED;
+
+        platform_driver_priv->mtip_ports[real_port_number]->sfp_port_type = PORT_DA;
+    }
+    else
+    {
+        CSMLOGERR("Using set msglevel to toggle PHYLINK state to NOT CONNECTED for link index %d", link_index);
+        platform_driver_priv->mtip_ports[real_port_number]->port_state = MTIP_PORT_STATE_DISCONNECTED;
+    }
+}
+
+static u32 mtip_ethtool_get_msglevel(struct net_device *netdev)
+{
+    u32 link_index;
+    u32 real_port_number;
+    struct mtip_netdev_priv *priv;
+
+    priv = netdev_priv(netdev);
+    link_index = priv->link_index;
+
+    // check if the corresponding port is in LINK_UP state
+    mtip_lookup_real_port_number_by_link_index(link_index, &real_port_number);
+
+    return platform_driver_priv->mtip_ports[real_port_number]->port_state;
+}
+
 static const struct ethtool_ops mtip_ethtool_ops = {
    .get_drvinfo = mtip_getdrvinfo,
    .get_sset_count  = mtip_get_sset_count,
@@ -385,6 +427,8 @@ static const struct ethtool_ops mtip_ethtool_ops = {
    .set_priv_flags = mtip_ethtool_set_priv_flags,
    .get_fecparam = mtip_ethtool_get_fecparam,
    .set_fecparam = mtip_ethtool_set_fecparam,
+   .set_msglevel = mtip_ethtool_set_msglevel,
+   .get_msglevel = mtip_ethtool_get_msglevel,
 };
 
 void mtip_ethtool_set_ops(struct net_device *netdev)
