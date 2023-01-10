@@ -299,6 +299,11 @@ static int ecpri_dma_mhi_get_endp_ctx(
 	ee_idx = func_map->ee_id;
 	gsi_id = func_map->gsi_id;
 
+	if (gsi_id == ECPRI_DMA_GSI_NUM_MAX) {
+		DMAERR("Invalid GSI ID");
+		return -EINVAL;
+	}
+
 	for (endp_id = 0; endp_id < ECPRI_DMA_ENDP_NUM_MAX; endp_id++)
 	{
 		if ((*ecpri_dma_ctx->endp_map)[gsi_id][endp_id].valid &&
@@ -592,6 +597,11 @@ static void ecpri_dma_mhi_memcpy_async_notify_comp(
 	struct ecpri_dma_mhi_async_wq_work_type *work = NULL;
 	u32 actual_num = 0;
 	int hw_ver = ecpri_dma_get_ctx_hw_ver();
+
+	if (ECPRI_HW_MAX == hw_ver) {
+ 		DMAERR("Invalid HW version\n");
+		return;
+	}
 
 	if (!endp) {
 		DMAERR("Null params args\n");

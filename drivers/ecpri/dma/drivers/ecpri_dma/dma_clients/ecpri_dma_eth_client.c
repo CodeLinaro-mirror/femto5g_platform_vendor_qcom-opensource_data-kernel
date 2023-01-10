@@ -160,10 +160,18 @@ static void ecpri_dma_eth_client_register_ready(void *user_data)
 	u32 hw_ver = ecpri_dma_get_ctx_hw_ver();
 	u32 hw_flavor = ecpri_dma_get_ctx_hw_flavor();
 
-	struct ecpri_dma_eth_client_endp_mapping *current_map =
-		&eth_client_endp_map[hw_ver][hw_flavor][0];
+	struct ecpri_dma_eth_client_endp_mapping *current_map;
 
 	DMADBG_LOW("Begin\n");
+
+	if ((ECPRI_HW_MAX == hw_ver) || (ECPRI_HW_FLAVOR_MAX == hw_flavor)) {
+		DMAERR(
+			"Wrong HW or Flavor versions hw_ver: %d hw_flavor = %d\n",
+			 hw_ver, hw_flavor);
+		return;
+	}
+
+	current_map = &eth_client_endp_map[hw_ver][hw_flavor][0];
 
 	if (!ecpri_dma_eth_client_ctx || !ecpri_dma_eth_client_ctx->ready_cb) {
 		DMAERR("ETH Ready Callback is NULL\n");
@@ -421,7 +429,13 @@ int ecpri_dma_eth_register(struct ecpri_dma_eth_register_params *ready_info,
 	if (ready) {
 		hw_ver = ecpri_dma_get_ctx_hw_ver();
 		hw_flavor = ecpri_dma_get_ctx_hw_flavor();
-		current_map = &eth_client_endp_map[hw_ver][hw_flavor][0];
+
+        if ((hw_ver < ECPRI_HW_MAX) && (hw_flavor < ECPRI_HW_FLAVOR_MAX)) {
+            current_map = &eth_client_endp_map[hw_ver][hw_flavor][0];
+        } else {
+            DMAERR("HW ver/flavor out of bounds");
+            return -EINVAL;
+        }
 
 		ecpri_dma_eth_client_ctx->link_to_endp_mapping = current_map;
 
@@ -472,6 +486,11 @@ int ecpri_dma_eth_connect_endpoints(
 	struct ecpri_dma_moderation_config rx_mod_cfg = { 1, 0 };
 
 	DMADBG_LOW("Begin\n");
+
+    if (NULL == ecpri_dma_eth_client_ctx) {
+        DMAERR("Context pointer is NULL\n");
+        return -EINVAL;
+    }
 
 	if (!hdl || !params ||
 	params->link_index > ECPRI_DMA_ETH_CLIENT_MAX_CONNTECTIONS ||
@@ -583,7 +602,7 @@ int ecpri_dma_eth_disconnect_endpoints(ecpri_dma_eth_conn_hdl_t hdl)
 	}
 
 	if (!ecpri_dma_eth_client_ctx
-	    || !ecpri_dma_eth_client_ctx->is_eth_ready) {
+		|| !ecpri_dma_eth_client_ctx->is_eth_ready) {
 		DMAERR("Context not initialized\n");
 		return -EPERM;
 	}
@@ -673,7 +692,13 @@ int ecpri_dma_eth_start_endpoints(ecpri_dma_eth_conn_hdl_t hdl)
 
 	/* Retrieve Connection */
 	connection = ecpri_dma_eth_client_get_conn_from_hdl(hdl);
-	if (!connection || !connection->valid) {
+
+	if (!connection) {
+		DMAERR("NULL pointer to connection\n");
+		return -EINVAL;
+	}
+
+	if (!connection->valid) {
 		DMAERR("Connection invalid handle:%x, ENDP ID:%d\n", hdl,
 			connection->tx_endp_ctx->endp_id);
 		return -EINVAL;
@@ -714,7 +739,12 @@ int ecpri_dma_eth_stop_endpoints(ecpri_dma_eth_conn_hdl_t hdl)
 
 	/* Retrieve Connection */
 	connection = ecpri_dma_eth_client_get_conn_from_hdl(hdl);
-	if (!connection || !connection->valid) {
+	if (!connection) {
+		DMAERR("NULL pointer to connection\n");
+		return -EINVAL;
+	}
+
+	if (!connection->valid) {
 		DMAERR("Connection invalid handle:%x, ENDP ID:%d\n", hdl,
 			connection->tx_endp_ctx->endp_id);
 		return -EINVAL;
@@ -834,7 +864,12 @@ int ecpri_dma_eth_tx_ring_state(ecpri_dma_eth_conn_hdl_t hdl,
 
 	/* Retrieve Connection */
 	connection = ecpri_dma_eth_client_get_conn_from_hdl(hdl);
-	if (!connection || !connection->valid) {
+	if (!connection) {
+		DMAERR("NULL pointer to connection\n");
+		return -EINVAL;
+	}
+
+	if (!connection->valid) {
 		DMAERR("Connection invalid handle:%x, ENDP ID:%d\n", hdl,
 			connection->tx_endp_ctx->endp_id);
 		return -EINVAL;
@@ -869,8 +904,13 @@ int ecpri_dma_eth_rx_ring_state(ecpri_dma_eth_conn_hdl_t hdl,
 
 	/* Retrieve Connection */
 	connection = ecpri_dma_eth_client_get_conn_from_hdl(hdl);
-	if (!connection || !connection->valid) {
-		DMAERR("Connection invalid, handle:%x, ENDP ID:%d\n", hdl,
+	if (!connection) {
+		DMAERR("NULL pointer to connection\n");
+		return -EINVAL;
+	}
+
+	if (!connection->valid) {
+		DMAERR("Connection invalid handle:%x, ENDP ID:%d\n", hdl,
 			connection->tx_endp_ctx->endp_id);
 		return -EINVAL;
 	}
@@ -898,7 +938,12 @@ int ecpri_dma_eth_rx_mode_set(ecpri_dma_eth_conn_hdl_t hdl,
 
 	/* Retrieve Connection */
 	connection = ecpri_dma_eth_client_get_conn_from_hdl(hdl);
-	if (!connection || !connection->valid) {
+	if (!connection) {
+		DMAERR("NULL pointer to connection\n");
+		return -EINVAL;
+	}
+
+	if (!connection->valid) {
 		DMAERR("Connection invalid handle:%x, ENDP ID:%d\n", hdl,
 			connection->tx_endp_ctx->endp_id);
 		return -EINVAL;
@@ -935,7 +980,12 @@ int ecpri_dma_eth_rx_mode_get(ecpri_dma_eth_conn_hdl_t hdl,
 
 	/* Retrieve Connection */
 	connection = ecpri_dma_eth_client_get_conn_from_hdl(hdl);
-	if (!connection || !connection->valid) {
+	if (!connection) {
+		DMAERR("NULL pointer to connection\n");
+		return -EINVAL;
+	}
+
+	if (!connection->valid) {
 		DMAERR("Connection invalid handle:%x, ENDP ID:%d\n", hdl,
 			connection->tx_endp_ctx->endp_id);
 		return -EINVAL;
@@ -968,7 +1018,12 @@ int ecpri_dma_eth_rx_poll(ecpri_dma_eth_conn_hdl_t hdl, u32 budget,
 
 	/* Retrieve Connection */
 	connection = ecpri_dma_eth_client_get_conn_from_hdl(hdl);
-	if (!connection || !connection->valid) {
+	if (!connection) {
+		DMAERR("NULL pointer to connection\n");
+		return -EINVAL;
+	}
+
+	if (!connection->valid) {
 		DMAERR("Connection invalid handle:%x, ENDP ID:%d\n", hdl,
 			connection->tx_endp_ctx->endp_id);
 		return -EINVAL;
@@ -1004,7 +1059,12 @@ int ecpri_dma_eth_replenish_buffers(ecpri_dma_eth_conn_hdl_t hdl,
 
 	/* Retrieve Connection */
 	connection = ecpri_dma_eth_client_get_conn_from_hdl(hdl);
-	if (!connection || !connection->valid) {
+	if (!connection) {
+		DMAERR("NULL pointer to connection\n");
+		return -EINVAL;
+	}
+
+	if (!connection->valid) {
 		DMAERR("Connection invalid handle:%x, ENDP ID:%d\n", hdl,
 			connection->tx_endp_ctx->endp_id);
 		return -EINVAL;
@@ -1052,7 +1112,12 @@ int ecpri_dma_eth_query_stats(ecpri_dma_eth_conn_hdl_t hdl,
 
 	/* Retrieve Connection */
 	connection = ecpri_dma_eth_client_get_conn_from_hdl(hdl);
-	if (!connection || !connection->valid) {
+	if (!connection) {
+		DMAERR("NULL pointer to connection\n");
+		return -EINVAL;
+	}
+
+	if (!connection->valid) {
 		DMAERR("Connection invalid handle:%x, ENDP ID:%d\n", hdl,
 			connection->tx_endp_ctx->endp_id);
 		return -EINVAL;

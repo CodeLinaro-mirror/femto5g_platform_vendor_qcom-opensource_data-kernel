@@ -8553,7 +8553,7 @@ bool ecpri_dma_is_ready(void)
 int ecpri_dma_gsi_setup_event_ring(struct ecpri_dma_endp_context *ep,
 	u32 ring_length, gfp_t mem_flag)
 {
-	struct ecpri_dma_mhi_channel_ctx* channel;
+	struct ecpri_dma_mhi_channel_ctx* channel = NULL;
 	struct gsi_evt_ring_props gsi_evt_ring_props;
 	dma_addr_t evt_dma_addr;
 	dma_addr_t evt_rp_dma_addr;

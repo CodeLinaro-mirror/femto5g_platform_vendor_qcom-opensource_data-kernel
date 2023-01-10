@@ -1199,12 +1199,13 @@ int gsi_register_device(struct gsi_per_props* props, unsigned long* dev_hdl)
 		if (running_emulation)
 			devm_iounmap(gsi_ctx->dev, gsi_ctx->intcntrlr_base);
 		gsi_ctx->base = gsi_ctx->intcntrlr_base = NULL;
-		for (i = 0; i < GSI_EE_MAX; i++)
-		{
-			if (i == GSI_Q6_EE)
-				continue;
-			devm_free_irq(gsi_ctx->dev, props->irq[gsi_id][i],
+		for (gsi_id = 0; gsi_id < gsi_ctx->num_of_gsi; gsi_id++) {
+			for (i = 0; i < GSI_EE_MAX; i++) {
+				if (i == GSI_Q6_EE)
+					continue;
+				devm_free_irq(gsi_ctx->dev, props->irq[gsi_id][i],
 				&gsi_ctx->irq_arr[gsi_id][i]);
+			}
 		}
 		GSIERR("MHI event ring start id %u is beyond max %u\n",
 			props->mhi_er_id_limits[0], gsi_ctx->max_ev);
@@ -2185,7 +2186,7 @@ int gsi_alloc_channel(struct gsi_chan_props *props, unsigned long dev_hdl,
 		unsigned long *chan_hdl)
 {
 	struct gsi_chan_ctx *ctx;
-	struct gsi_evt_ctx *ev_ctx;
+	struct gsi_evt_ctx *ev_ctx = NULL;
 	int res;
 	enum gsi_ch_cmd_opcode op = GSI_CH_ALLOCATE;
 	uint8_t erindex;
@@ -2566,7 +2567,7 @@ void gsi_dump_ch_info(unsigned long chan_hdl)
 		GSIERR("bad params chan_hdl=%lu\n", chan_hdl);
 		return;
 	}
-	
+
 	gsi_id = ctx->props.gsi_id;
 	ch_id = ctx->props.ch_id;
 	ee = ctx->props.ee;
@@ -3097,7 +3098,7 @@ int gsi_is_channel_empty(unsigned long chan_hdl, bool *is_empty)
 		GSIERR("bad params chan_hdl=%lu\n", chan_hdl);
 		return -GSI_STATUS_INVALID_PARAMS;
 	}
-	
+
 	gsi_id = ctx->props.gsi_id;
 	ee = ctx->props.ee;
 
@@ -4156,7 +4157,7 @@ int gsi_get_hw_profiling_stats(struct gsi_hw_profiling_data *stats)
 		GSIERR("bad parms NULL stats == NULL\n");
 		return -EINVAL;
 	}
-	
+
 	for (gsi_id = 0; gsi_id < gsi_ctx->num_of_gsi; gsi_id++)
 	{
 		stats->bp_cnt[gsi_id] = (u64)gsihal_read_reg_p(
