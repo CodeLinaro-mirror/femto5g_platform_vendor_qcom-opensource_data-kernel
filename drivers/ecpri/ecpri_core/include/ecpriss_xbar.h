@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: GPL-2.0-only
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #ifndef ECPRISS_XBAR_H_
@@ -123,13 +123,13 @@ typedef struct ecpriss_xbar_port_cfg
 
 typedef struct ecpriss_xbar_flow_cfg
 {
-	uint32_t     pcid;
-	uint32_t     dma_ring_id;
-	uint32_t     oc_link_id;
-	uint8_t      route_to_oran;
-	uint8_t      route_to_c2c;
-	uint8_t      route_to_dma;
-	uint8_t      valid;
+	uint32_t     pcid : 16;
+	uint32_t     dma_ring_id : 7;
+	uint32_t     oc_link_id : 2;
+	uint32_t     route_to_oran : 1;
+	uint32_t     route_to_c2c : 1;
+	uint32_t     route_to_dma : 1;
+	uint32_t     valid : 1;
 }ecpriss_xbar_pcid_flow_cfg_s;
 
 
@@ -141,11 +141,11 @@ typedef struct ecpriss_xbar_port_lut
 
 typedef struct ecpriss_xbar_oc_rx_flow_cfg
 {
-	uint32_t     pcid;
-	uint32_t     l2_encap_info;
-	uint32_t     l3_encap_info;
-	uint32_t     l3_encap_valid;
-	uint32_t     valid;
+	uint32_t     pcid : 16;
+	uint32_t     l2_encap_info : 7;
+	uint32_t     l3_encap_info : 7;
+	uint32_t     l3_encap_valid : 1;
+	uint32_t     valid : 1;
 }ecpriss_xbar_oc_rx_flow_cfg_s;
 
 typedef struct ecpriss_xbar_oc_rx_port_lut
@@ -157,8 +157,10 @@ typedef struct ecpriss_xbar_oc_rx_port_lut
 typedef struct ecpriss_flow_ctx
 {
 	ecpriss_xbar_port_lut_s		fh_xbar_lut[ECPRISS_MAX_PORTS];
+#ifdef C2C_XBAR_LUT
 	ecpriss_xbar_port_lut_s		c2c_dl_xbar_lut[ECPRISS_MAX_PORTS];
 	ecpriss_xbar_port_lut_s		c2c_ul_xbar_lut[ECPRISS_MAX_PORTS];
+#endif
 	ecpriss_xbar_oc_rx_port_lut_s	oc_rx_xbar_lut[ECPRISS_MAX_PORTS];
 }ecpriss_flow_ctx_s;
 
