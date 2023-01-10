@@ -371,6 +371,8 @@ static int mtip_ethtool_set_priv_flags(struct net_device *netdev, u32 flags)
         if (err)
             break;
     }
+
+    mtip_netdev_set_port_config(netdev);
     return err;
 }
 

@@ -434,6 +434,7 @@ static void mtip_phy_link_up(struct phylink_config *config,
     int sfp_phandle;
     struct mtip_port_device_info* port_device = NULL;
     struct mtip_link_device_info* link_device = NULL;
+    enum mtip_port_config_enum port_config;
 
     ret = mtip_phy_find_matching_port(config, &real_port_number);
 
@@ -474,30 +475,69 @@ static void mtip_phy_link_up(struct phylink_config *config,
     // set the port_device
     port_device = &platform_driver_priv->devices.port_devices[real_port_number];
 
-    // deal with the phy_port_type as appropriate
-    if (sfp_port_type == PORT_FIBRE)
-    {
-        // handle the case where FIBRE is connected
-        mtip_mac_wrapper_enable_rsfec_for_25g_mode(port_device);
+    // this is the port configuration
+    port_config = port_device->port_config;
 
-        // enable rsfec in the pcs
-        for (i = 0; i < port_device->num_link_phandles; ++i)
-        {
-            link_device = &port_device->link_devices[i];
-            mtip_pcs_enable_rsfec_for_25g_mode(link_device);
-        }
-    }
-    else
+    switch (port_config) 
     {
-        // handle the case where DAC or OTHER is connected
-        mtip_mac_wrapper_disable_rsfec_for_25g_mode(port_device);
-
-        // disable rsfec in pcs
-        for (i = 0; i < port_device->num_link_phandles; ++i)
+    case MTIP_PORT_CONFIG_1x25GBASE_R:
+    case MTIP_PORT_CONFIG_4x25GBASE_R:
         {
-            link_device = &port_device->link_devices[i];
-            mtip_pcs_disable_rsfec_for_25g_mode(link_device);
+            // deal with the phy_port_type as appropriate
+            if (sfp_port_type == PORT_FIBRE)
+            {
+                // handle the case where FIBRE is connected
+                // we have to enable RSFEC for FIBRE
+                mtip_mac_wrapper_enable_rsfec_for_25g_mode(port_device);
+
+                // enable rsfec in the pcs
+                for (i = 0; i < port_device->num_link_phandles; ++i)
+                {
+                    link_device = &port_device->link_devices[i];
+                    mtip_pcs_enable_rsfec_for_25g_mode(link_device);
+                }
+            }
+            else
+            {
+                // handle the case where DAC or OTHER is connected
+                mtip_mac_wrapper_disable_rsfec_for_25g_mode(port_device);
+
+                // disable rsfec in pcs
+                for (i = 0; i < port_device->num_link_phandles; ++i)
+                {
+                    link_device = &port_device->link_devices[i];
+                    mtip_pcs_disable_rsfec_for_25g_mode(link_device);
+                }
+            }
         }
+        break;
+
+    case MTIP_PORT_CONFIG_4x25GBASE_R_RSFEC:
+    case MTIP_PORT_CONFIG_1x25GBASE_R_RSFEC:
+    case MTIP_PORT_CONFIG_1x10GBASE_R:
+    case MTIP_PORT_CONFIG_1x10GBASE_R_FEC:
+    case MTIP_PORT_CONFIG_4x10GBASE_R:
+    case MTIP_PORT_CONFIG_4x10GBASE_R_FEC:
+    case MTIP_PORT_CONFIG_1x100GBASE_R:
+    case MTIP_PORT_CONFIG_1x100GBASE_R_RSFEC_LL:
+    case MTIP_PORT_CONFIG_1x100GBASE_R_RSFEC:
+    case MTIP_PORT_CONFIG_1x100GBASE_R2:
+    case MTIP_PORT_CONFIG_1x100GBASE_R2_RSFEC:
+    case MTIP_PORT_CONFIG_1x100GBASE_R4:
+    case MTIP_PORT_CONFIG_1x100GBASE_R4_RSFEC:
+    case MTIP_PORT_CONFIG_1x50GBASE_R:
+    case MTIP_PORT_CONFIG_1x50GBASE_R_RSFEC:
+    case MTIP_PORT_CONFIG_2x50GBASE_R:
+    case MTIP_PORT_CONFIG_2x50GBASE_R_RSFEC:
+    case MTIP_PORT_CONFIG_1x50GBASE_R2:
+    case MTIP_PORT_CONFIG_1x50GBASE_R2_RSFEC:
+    case MTIP_PORT_CONFIG_1x40GBASE_R4:
+    case MTIP_PORT_CONFIG_1x40GBASE_R4_FEC:
+    default:
+        {
+            CSMLOGINFO("No need to change RSFEC mode for port_config: %d", port_config);
+        }
+        break;
     }
 
     switch (current_state) 

@@ -53,6 +53,7 @@
 #include "mtip_debug_eth.h"
 #include "mtip_phy.h"
 #include "mtip_sysfs.h"
+#include "mtip_platform.h"
 
 int macsec_eth_set_macsec_ops(const struct macsec_ops* rb_macsec_ops)
 {
@@ -1170,4 +1171,72 @@ enum mtip_link_state_enum mtip_get_link_state_by_device(u32 port_device_index, u
     else {
         return platform_driver_priv->mtip_links[link_index]->state;
     }
+}
+
+int mtip_netdev_set_port_config(struct net_device *netdev)
+{
+    struct mtip_netdev_priv *priv;
+    u32 link_index;
+    u32 pflags;
+    u32 port_device_index;
+    u32 link_device_index;
+    enum mtip_port_config_enum port_config = MTIP_PORT_CONFIG_4x25GBASE_R;
+    u32 pattern = 0x01;
+    struct mtip_link_device_info* link_device;
+
+    priv = netdev_priv(netdev);
+    link_index = priv->link_index;
+    pflags = priv->priv_flags;
+
+    mtip_lookup_device_by_link_index(link_index, &port_device_index, &link_device_index);
+
+    link_device = &platform_driver_priv->devices.port_devices[port_device_index].link_devices[link_device_index];
+
+    // set port config based on pflags
+    if ((pflags & (pattern << MTIP_PORT_CONFIG_4x10GBASE_R)) != 0)
+    {
+        port_config = MTIP_PORT_CONFIG_4x10GBASE_R;
+
+        // also set the lane speed
+        link_device->lane_speed = PHY_LANE_SPEED_10G;
+    }
+
+    if ((pflags & (pattern << MTIP_PORT_CONFIG_4x10GBASE_R_FEC)) != 0)
+    {
+        port_config = MTIP_PORT_CONFIG_4x10GBASE_R_FEC;
+
+        // also set the lane speed
+        link_device->lane_speed = PHY_LANE_SPEED_10G;
+    }
+
+    if ((pflags & (pattern << MTIP_PORT_CONFIG_4x25GBASE_R)) != 0)
+    {
+        port_config = MTIP_PORT_CONFIG_4x25GBASE_R;
+
+        // also set the lane speed
+        link_device->lane_speed = PHY_LANE_SPEED_25G;
+    }
+
+    if ((pflags & (pattern << MTIP_PORT_CONFIG_4x25GBASE_R_FEC)) != 0)
+    {
+        port_config = MTIP_PORT_CONFIG_4x25GBASE_R_FEC;
+
+        // also set the lane speed
+        link_device->lane_speed = PHY_LANE_SPEED_25G;
+    }
+
+    if ((pflags & (pattern << MTIP_PORT_CONFIG_4x25GBASE_R_RSFEC)) != 0)
+    {
+        port_config = MTIP_PORT_CONFIG_4x25GBASE_R_RSFEC;
+    }
+
+    CSMLOGINFO("Setting the port config of link index %d to %d", link_index, port_config);
+
+    // set the port config based on pflags TBD
+    platform_driver_priv->devices.port_devices[port_device_index].port_config = port_config;
+
+    // setup ethernet based on the updated port config
+    mtip_platform_setup_ethernet();
+
+    return 0;
 }
