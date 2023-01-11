@@ -12,6 +12,7 @@
 #include <linux/platform_device.h>
 #include <linux/clk.h>
 #include <linux/of.h>
+#include <linux/spinlock.h>
 
 #include "cs_driver.h"
 #include "device_mgmt.h"
@@ -19,6 +20,8 @@
 #include "api_driver164_init.h"
 #include "macsec_eth.h"
 #include "eip_macsec.h"
+#include "adapter_secy_support.h"
+#include "adapter_cfye_support.h"
 
 /* ETHSS_FHx_MACSEC_WRAPPER_CSR Init sequence offsets and recommended values*/
 #define MACSEC_WRAPPER_CFG_REG_OFFSET    0x000A8000
@@ -70,6 +73,15 @@ struct eip_device {
 #define EIP_CLK_NOM_MAX (EIP_CLK_FREQ(200.0))
 
 struct eip_device eip_device_platform_data[EIP_MAX_PORT];
+
+static void eip_secy_cfye_spinlock_init(void)
+{
+    unsigned int i;
+    for (i=0; i<ADAPTER_EIP164_MAX_NOF_DEVICES; i++)
+        spin_lock_init(&SecY_Device_StaticFields[i].Lock);
+    for (i=0; i<ADAPTER_EIP163_MAX_NOF_DEVICES; i++)
+        spin_lock_init(&CfyE_Device_StaticFields[i].Lock);
+}
 
 static int eip_enable_clock(struct platform_device *pdev, uint32_t port_id)
 {
@@ -424,6 +436,8 @@ static int eip_module_init(void)
 	int nIRQ = -1;
 
 	pr_info("eip_main: secure eip_module_init called\n");
+
+	eip_secy_cfye_spinlock_init();
 
 	/* trigger first-time initialization of the adapter */
 	if (Device_Initialize(&nIRQ) < 0)
