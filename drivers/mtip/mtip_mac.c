@@ -1163,7 +1163,7 @@ void mtip_mac_wrapper_register_irq(struct device *dev, unsigned int irq,
 
    CSMLOGINFO("Registering IRQ %d, %s for MAC Wrapper\n", irq, dev_name);
 
-   irqret = devm_request_irq(dev, irq, (irq_handler_t)mtip_mac_interrupt_handler, IRQF_SHARED | IRQF_TRIGGER_RISING, dev_name, devptr);
+   irqret = devm_request_irq(dev, irq, (irq_handler_t)mtip_mac_interrupt_handler, IRQF_SHARED | IRQF_TRIGGER_HIGH, dev_name, devptr);
    if (irqret) {
        CSMLOGERR("failed to register IRQ handler irq=%d\n", irq);
        return;

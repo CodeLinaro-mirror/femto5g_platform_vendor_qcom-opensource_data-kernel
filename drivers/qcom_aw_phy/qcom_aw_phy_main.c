@@ -769,7 +769,7 @@ static void qcom_aw_phy_hw_init() {
       ret_val = devm_request_irq(
           &phy_inst_info->pdev->dev, phy_inst_info->phy_status_irq,
           (irq_handler_t)qcom_aw_phy_interrupt_handler,
-          IRQF_SHARED | IRQF_TRIGGER_RISING, NULL, phy_inst_info);
+          IRQF_SHARED | IRQF_TRIGGER_HIGH, NULL, phy_inst_info);
       if (ret_val) {
         local_err_val = LOCAL_ERROR_2;
         goto func_exit;
