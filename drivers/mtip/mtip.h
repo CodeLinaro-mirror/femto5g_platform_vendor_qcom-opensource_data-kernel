@@ -308,6 +308,12 @@ struct mtip_platform_driver_priv
 
     // the spin lock to access driver priv
     spinlock_t driver_lock;
+
+    // IPC log buffer
+    void* ipc_log_buf;
+
+    // IPC log buffer low
+    void* ipc_log_buf_low;
 };
 
 // extern declarations

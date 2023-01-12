@@ -504,6 +504,29 @@ static int mtip_module_init(void)
    // initialize the topology
    platform_driver_priv->topology = NULL;
 
+   // Init IPC log buffers
+   platform_driver_priv->ipc_log_buf = ipc_log_context_create(CSM_IPC_LOG_PAGES,
+		"csm_mtip", 0);
+	if (platform_driver_priv->ipc_log_buf == NULL)
+    {
+		CSMLOGINFO("mtip_init(): failed to create IPC log context, continue...\n");
+    }
+    else
+    {
+        CSMLOGINFO("mtip_init(): IPC log context created successfully, continue...\n");
+    }
+
+    platform_driver_priv->ipc_log_buf_low = ipc_log_context_create(CSM_IPC_LOG_PAGES,
+		"csm_mtip_low", 0);
+    if (platform_driver_priv->ipc_log_buf_low == NULL)
+    {
+		CSMLOGINFO("mtip_init(): failed to create IPC log LOW context, continue...\n");
+    }
+    else
+    {
+        CSMLOGINFO("mtip_init(): IPC log context LOW created successfully, continue...\n");
+    }
+
    if (mtip_rumi_platform == 0) 
    {
        // register with the PHY
@@ -552,6 +575,10 @@ static int mtip_module_init(void)
    goto out;
 
 cleanup:
+   if (platform_driver_priv->ipc_log_buf)
+		ipc_log_context_destroy(platform_driver_priv->ipc_log_buf);
+   if (platform_driver_priv->ipc_log_buf_low)
+        ipc_log_context_destroy(platform_driver_priv->ipc_log_buf_low);
    kfree(platform_driver_priv);
    platform_driver_priv = NULL;
 
@@ -581,6 +608,10 @@ static void mtip_module_exit(void)
        mtip_phy_deregister_eth();
    }
 
+   if (platform_driver_priv->ipc_log_buf)
+		ipc_log_context_destroy(platform_driver_priv->ipc_log_buf);
+   if (platform_driver_priv->ipc_log_buf_low)
+        ipc_log_context_destroy(platform_driver_priv->ipc_log_buf_low);
    kfree(platform_driver_priv);
    platform_driver_priv = NULL;
    return;

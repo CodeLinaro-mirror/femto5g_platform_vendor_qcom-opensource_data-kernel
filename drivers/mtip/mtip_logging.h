@@ -6,19 +6,42 @@
 #ifndef	_CSM_LOGGING_H
 #define	_CSM_LOGGING_H
 
+
+#include <linux/ipc_logging.h>
+
+#define CSM_IPC_LOG_PAGES 50
+
+#define CSM_IPC_Log(buf, fmt, args...) \
+do {\
+     if (buf) \
+			ipc_log_string((buf), fmt, __func__, __LINE__, ## args); \
+} while (0)
+
 #define CSMLOGDBG(fmt, args...) \
 do {\
-	pr_debug(DRV_NAME " %s:%d " fmt, __func__, __LINE__, ## args);\
+	pr_debug(DRV_NAME " %s:%d " fmt, __func__, __LINE__, ## args); \
+    if (platform_driver_priv) { \
+			CSM_IPC_Log(platform_driver_priv->ipc_log_buf_low , \
+				DRV_NAME " %s:%d " fmt, ## args); \
+        } \
 } while (0)
 
 #define CSMLOGERR(fmt, args...) \
 do {\
 	pr_err(DRV_NAME " %s:%d " fmt, __func__, __LINE__, ## args);\
+    if (platform_driver_priv) {\
+			CSM_IPC_Log(platform_driver_priv->ipc_log_buf , \
+				DRV_NAME " %s:%d " fmt, ## args); \
+        } \
 } while (0)
 
 #define CSMLOGINFO(fmt, args...) \
 do {\
 	pr_info(DRV_NAME " %s:%d " fmt, __func__, __LINE__, ## args);\
+    if (platform_driver_priv) { \
+			CSM_IPC_Log(platform_driver_priv->ipc_log_buf , \
+				DRV_NAME " %s:%d " fmt, ## args); \
+        } \
 } while (0)
 
 #endif // _CSM_LOGGING_H
