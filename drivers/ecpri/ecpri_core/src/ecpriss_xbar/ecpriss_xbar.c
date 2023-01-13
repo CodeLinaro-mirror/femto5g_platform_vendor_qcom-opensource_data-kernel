@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: GPL-2.0-only
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include "ecpriss_core.h"
@@ -572,7 +572,7 @@ static int ecpriss_xbar_register_interrupts(struct device *dev)
 		}
 		xbar_irq_mapping =  platform_get_irq(pdev, EXPRISS_XBAR_INDEX);
 		res = request_irq(xbar_irq_mapping, ecpriss_xbar_isr,
-				IRQF_TRIGGER_RISING, "ecpri_ss", NULL);
+				IRQF_TRIGGER_HIGH, "ecpri_ss", NULL);
 		if (res){
 			pr_err("IRQ request failed irq=%d res=%d\n",
 					xbar_irq_mapping, res);
