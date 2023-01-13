@@ -707,16 +707,6 @@ int qcom_aw_phy_teardown(enum mtip_port_type_enum port_type,
     mutex_unlock(&phy_inst_info->lane_lock[lane]);
   }
 
-  /* Common Lane tear down */
-  aw_err_val =
-      aw_pmd_iso_request_cmn_state_change(&mss, AW_CMN_PD, CMN_ACK_TIMEOUT_US);
-  if (aw_err_val != AW_ERR_CODE_NONE) {
-    ret_val = EIO;
-    local_err_val = LOCAL_ERROR_7;
-    mutex_unlock(&phy_inst_info->phy_inst_lock);
-    goto func_exit;
-  }
-
   phy_inst_info->bring_up_status = false;
 
   mutex_unlock(&phy_inst_info->phy_inst_lock);
