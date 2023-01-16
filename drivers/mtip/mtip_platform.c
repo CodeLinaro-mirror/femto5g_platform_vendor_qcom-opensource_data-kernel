@@ -1,6 +1,6 @@
 //SPDX-License-Identifier: GPL-2.0-only
 /*
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  */ 
 
 #include <linux/init.h>
@@ -1128,6 +1128,7 @@ static bool mtip_platform_consolidate_port_lane_config(struct mtip_port_device_i
             lane = port_device->link_devices[i].lanes[j];
             port_device->lane_config[lane].lane_enabled = true;
             port_device->lane_config[lane].lane_speed = lane_speed;
+            port_device->lane_config[lane].link_index = i;
 
             CSMLOGINFO("Setting port: %d lane_config[%d] to lane_speed: %d\n", port_device->port_type, lane, lane_speed);
         }

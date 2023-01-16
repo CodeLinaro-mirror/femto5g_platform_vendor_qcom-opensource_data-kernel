@@ -1,6 +1,6 @@
 
 /* SPDX-License-Identifier: GPL-2.0-only
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 /**
@@ -231,7 +231,7 @@ ssize_t qcom_aw_phy_set_attr(struct file *file, const char __user *buf,
   int i = 0, j = 0, k = 0;
   int min = 0, max = 0, min_port = 0, max_port = 0, lane_index = 0;
   bool lanes_enabled[PHY_LANE_MAX] = {true, true, true, true};
-  struct qcom_aw_phy_synce_snr_valid_change snr_valid_info;
+  struct qcom_aw_phy_gnl_snr_valid_change snr_valid_info;
   char *token;
   char token_string[100];
   char *save_ptr = NULL;
@@ -275,6 +275,7 @@ ssize_t qcom_aw_phy_set_attr(struct file *file, const char __user *buf,
       for (i = PHY_LANE_0; i < num_lanes; i++) {
         lane_config[i].lane_enabled = true;
         lane_config[i].lane_speed = lane_speed;
+        lane_config[i].link_index = i;
       }
       qcom_aw_phy_driver_iface_ops.eth_phy_iface_phy_setup(port_type,
                                                            lane_config);
@@ -329,7 +330,7 @@ ssize_t qcom_aw_phy_set_attr(struct file *file, const char __user *buf,
 
     case SNR_VALID_CB:
       QCOM_AW_PHY_LOG_ERR("SNR valid status change");
-      snr_valid_info.lane_id = FH0_LANE_0;
+      snr_valid_info.eth_inst = 0;
       snr_valid_info.snr_valid_status = true;
       qcom_aw_phy_gnl_snr_valid_change(snr_valid_info);
       break;
