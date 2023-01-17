@@ -247,18 +247,8 @@ void mtip_mac_set_frame_length(struct mtip_netdev_priv *priv, u32 frame_length)
 {
    u32 link_index = priv->link_index;
 
-   // check if the frame length at least MTIP_MAC_INIT_FRAME_LENGTH
-   if (frame_length < MTIP_MAC_INIT_FRAME_LENGTH) 
-   {
-       // set the frame length to MTIP_MAC_INIT_FRAME_LENGTH
-       iowrite32(MTIP_MAC_INIT_FRAME_LENGTH, priv->mac_ioaddr + MTIP_MAC_FRM_LENGTH);
-       CSMLOGINFO("Setting frame length to %d for link index: %d\n", MTIP_MAC_INIT_FRAME_LENGTH, link_index);
-   }
-   else
-   {
-       iowrite32(frame_length, priv->mac_ioaddr + MTIP_MAC_FRM_LENGTH);
-       CSMLOGINFO("Setting frame length to %d for link index: %d\n", frame_length, link_index);
-   }
+   iowrite32(frame_length, priv->mac_ioaddr + MTIP_MAC_FRM_LENGTH);
+   CSMLOGINFO("Setting frame length to %d for link index: %d\n", frame_length, link_index);
 }
 
 u32 mtip_mac_get_frame_length(u32 port_number, u32 link_number)

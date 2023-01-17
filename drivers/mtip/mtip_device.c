@@ -821,7 +821,6 @@ static int mtip_change_mtu(struct net_device *netdev, int new_mtu)
    spinlock_t *lock;
    u32 link_index;
    int mplane_mtu;
-   int mtu_overhead = ETH_HLEN + ETH_FCS_LEN + VLAN_HLEN;
    
    priv = (struct mtip_netdev_priv*)netdev_priv(netdev);
    lock = &(priv->lock);
@@ -848,7 +847,7 @@ static int mtip_change_mtu(struct net_device *netdev, int new_mtu)
    spin_unlock_irqrestore(lock, flags);
 
    // set the frame length in the hardware
-   mtip_mac_set_frame_length(priv, new_mtu + mtu_overhead);
+   mtip_mac_set_frame_length(priv, new_mtu);
 
    /* Send update to clients */
    post_mtip_client_send_event(ETH_ECPRISS_EVENT_UP, link_index);
