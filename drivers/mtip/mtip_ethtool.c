@@ -381,7 +381,6 @@ static void mtip_ethtool_set_msglevel(struct net_device *netdev, u32 level)
     u32 link_index;
     u32 real_port_number;
     struct mtip_netdev_priv *priv;
-    u32 val = level%2;
 
     priv = netdev_priv(netdev);
     link_index = priv->link_index;
@@ -389,17 +388,38 @@ static void mtip_ethtool_set_msglevel(struct net_device *netdev, u32 level)
     // check if the corresponding port is in LINK_UP state
     mtip_lookup_real_port_number_by_link_index(link_index, &real_port_number);
 
-    if (val == 0)
+    switch (level)
     {
-        CSMLOGERR("Using set msglevel to set PHYLINK state to CONNECTED for link index %d", link_index);
-        platform_driver_priv->mtip_ports[real_port_number]->port_state = MTIP_PORT_STATE_CONNECTED;
+    case 0:
+        {
+            CSMLOGERR("Using set msglevel %d to toggle PHYLINK state to NOT CONNECTED for link index %d", level, link_index);
+            platform_driver_priv->mtip_ports[real_port_number]->port_state = MTIP_PORT_STATE_DISCONNECTED;
+        }
+        break;
 
-        platform_driver_priv->mtip_ports[real_port_number]->sfp_port_type = PORT_DA;
-    }
-    else
-    {
-        CSMLOGERR("Using set msglevel to toggle PHYLINK state to NOT CONNECTED for link index %d", link_index);
-        platform_driver_priv->mtip_ports[real_port_number]->port_state = MTIP_PORT_STATE_DISCONNECTED;
+    case 1:
+        {
+            CSMLOGERR("Using set msglevel %d to set PHYLINK state to CONNECTED for DAC link index %d", level, link_index);
+            platform_driver_priv->mtip_ports[real_port_number]->port_state = MTIP_PORT_STATE_CONNECTED;
+
+            platform_driver_priv->mtip_ports[real_port_number]->sfp_port_type = PORT_DA;
+        }
+        break;
+
+    case 2:
+        {
+            CSMLOGERR("Using set msglevel %d to set PHYLINK state to CONNECTED for FIBRE link index %d", level, link_index);
+            platform_driver_priv->mtip_ports[real_port_number]->port_state = MTIP_PORT_STATE_CONNECTED;
+
+            platform_driver_priv->mtip_ports[real_port_number]->sfp_port_type = PORT_FIBRE;
+        }
+        break;
+
+    default:
+        {
+            CSMLOGERR("Ignoring msglevel %d for link index: %d", level, link_index);
+        }
+        break;
     }
 }
 

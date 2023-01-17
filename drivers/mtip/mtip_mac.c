@@ -688,6 +688,7 @@ static u32 mtip_mac_wrapper_calendar_cfg_val(struct mtip_port_device_info* port_
     u32 link_index;
     u32 real_link_number;
     u32 pattern = 0x00000001;
+    enum mtip_port_config_enum port_config = port_device->port_config;
 
 // for now only symmetric configurations are supported
 // the weights are set to 000
@@ -700,7 +701,7 @@ static u32 mtip_mac_wrapper_calendar_cfg_val(struct mtip_port_device_info* port_
         cfg_val |= (pattern << (4*real_link_number));
     }
 
-    CSMLOGINFO("Setting calendar config of port %d to 0x%x\n", port_device->port_type, cfg_val);
+    CSMLOGINFO("Setting calendar config of port %d to 0x%x with port config %d and num links %d\n", port_device->port_type, cfg_val, port_config, port_device->num_link_phandles);
 
     return cfg_val;
 }
@@ -1096,18 +1097,10 @@ void mtip_mac_wrapper_init(struct mtip_port_device_info* port_device)
 {
     void __iomem *wrapper_base_addr = port_device->wrapper_base_addr;
     u32 calendar_cfg_val;
+    enum mtip_port_config_enum port_config = port_device->port_config;
+    u32 tx_amf_cfg_val;
 
    CSMLOGINFO("MAC Wrapper Init\n");
-
-   calendar_cfg_val = mtip_mac_wrapper_calendar_cfg_val(port_device);
-
-   // Enable MAC instances with calendar config register
-   iowrite32(calendar_cfg_val,
-             wrapper_base_addr + MTIP_MAC_WRAPPER_CALENDAR_CFG_REG_OFFSET);
-
-   // Configure TX AMF value
-   iowrite32(MTIP_MAC_WRAPPER_TX_AMF_CFG_REG_VAL,
-             wrapper_base_addr + MTIP_MAC_WRAPPER_TX_AMF_CFG_REG_OFFSET);
 
    // set the TSC_OFFSET REG
    iowrite32(MTIP_MAC_WRAPPER_TSC_OFFSET_REG_VAL,
@@ -1116,6 +1109,72 @@ void mtip_mac_wrapper_init(struct mtip_port_device_info* port_device)
    // enable the Global timer
    iowrite32(MTIP_MAC_WRAPPER_GLOBAL_TIMER_EN_REG_VAL,
              wrapper_base_addr + MTIP_MAC_WRAPPER_GLOBAL_TIMER_EN_REG_OFFSET);
+
+   calendar_cfg_val = mtip_mac_wrapper_calendar_cfg_val(port_device);
+
+   // Enable MAC instances with calendar config register
+   iowrite32(calendar_cfg_val,
+             wrapper_base_addr + MTIP_MAC_WRAPPER_CALENDAR_CFG_REG_OFFSET);
+
+   // set the TX_AMF value
+   switch (port_config)
+   {
+   case MTIP_PORT_CONFIG_1x100GBASE_R:
+   case MTIP_PORT_CONFIG_1x100GBASE_R_RSFEC:
+   case MTIP_PORT_CONFIG_1x100GBASE_R_RSFEC_LL:
+   case MTIP_PORT_CONFIG_1x100GBASE_R2:
+   case MTIP_PORT_CONFIG_1x100GBASE_R2_RSFEC:
+   case MTIP_PORT_CONFIG_1x50GBASE_R:
+   case MTIP_PORT_CONFIG_1x50GBASE_R_RSFEC:
+   case MTIP_PORT_CONFIG_1x40GBASE_R4:
+   case MTIP_PORT_CONFIG_1x40GBASE_R4_FEC:
+   case MTIP_PORT_CONFIG_1x10GBASE_R:
+   case MTIP_PORT_CONFIG_1x10GBASE_R_FEC:
+   case MTIP_PORT_CONFIG_1x100GBASE_R4:
+   case MTIP_PORT_CONFIG_1x100GBASE_R4_RSFEC:
+   case MTIP_PORT_CONFIG_1x50GBASE_R2:
+   case MTIP_PORT_CONFIG_1x50GBASE_R2_RSFEC:
+   case MTIP_PORT_CONFIG_1x50GBASE_R2_LUAI:
+   case MTIP_PORT_CONFIG_1x50GBASE_R2_LUAI_FEC:
+   case MTIP_PORT_CONFIG_1x25GBASE_R:
+   case MTIP_PORT_CONFIG_1x25GBASE_R_FEC:
+   case MTIP_PORT_CONFIG_1x25GBASE_R_RSFEC:
+       {
+           tx_amf_cfg_val = MTIP_MAC_WRAPPER_TX_AMF_CFG_REG_VAL_1_LINKS;
+       }
+       break;
+
+   case MTIP_PORT_CONFIG_2x50GBASE_R:
+   case MTIP_PORT_CONFIG_2x50GBASE_R_RSFEC:
+   case MTIP_PORT_CONFIG_2x50GBASE_R2:
+   case MTIP_PORT_CONFIG_2x50GBASE_R2_FEC:
+   case MTIP_PORT_CONFIG_2x50GBASE_R2_LUAI:
+   case MTIP_PORT_CONFIG_2x50GBASE_R2_LUAI_FEC:
+       {
+           tx_amf_cfg_val = MTIP_MAC_WRAPPER_TX_AMF_CFG_REG_VAL_2_LINKS;
+       }
+       break;
+   case MTIP_PORT_CONFIG_4x25GBASE_R:
+   case MTIP_PORT_CONFIG_4x25GBASE_R_FEC:
+   case MTIP_PORT_CONFIG_4x25GBASE_R_RSFEC:
+   case MTIP_PORT_CONFIG_4x10GBASE_R:
+   case MTIP_PORT_CONFIG_4x10GBASE_R_FEC:
+       {
+           tx_amf_cfg_val = MTIP_MAC_WRAPPER_TX_AMF_CFG_REG_VAL_4_LINKS;
+       }
+       break;
+   default:
+       {
+           tx_amf_cfg_val = MTIP_MAC_WRAPPER_TX_AMF_CFG_REG_VAL_4_LINKS;
+       }
+       break;
+   }
+
+   CSMLOGINFO("Setting tx_amf to 0x%x for port type %d with port config %d", tx_amf_cfg_val, port_device->port_type, port_device->port_config);
+
+   // Configure TX AMF value
+   iowrite32(tx_amf_cfg_val,
+             wrapper_base_addr + MTIP_MAC_WRAPPER_TX_AMF_CFG_REG_OFFSET);
 
    return;
 }

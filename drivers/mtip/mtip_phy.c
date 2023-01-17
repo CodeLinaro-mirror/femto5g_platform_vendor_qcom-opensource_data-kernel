@@ -194,8 +194,17 @@ int mtip_phy_deregister_eth(void)
 
 int mtip_phy_setup_phy(struct mtip_port_device_info* port_device)
 {
+    int i;
+
     // setup the phy for the port
     // pass the consolidated lane config of the port to phy
+    CSMLOGINFO("setting up phy for port %d", port_device->port_type);
+
+    for (i = 0; i < PHY_LANE_MAX; ++i)
+    {
+        CSMLOGINFO("lane config[%d] enabled %d speed %d", i, port_device->lane_config[i].lane_enabled, port_device->lane_config[i].lane_speed);
+    }
+
     return (qcom_aw_phy_driver_iface_ops.eth_phy_iface_phy_setup)(port_device->port_type, port_device->lane_config);
 }
 
@@ -266,6 +275,7 @@ int mtip_phy_bringup_phy(u32 link_index, int sfp_port_type)
     bool lanes_enabled[PHY_LANE_MAX];
     u32 port_device_index;
     u32 link_device_index;
+    int i;
 
     CSMLOGINFO("calling phy_bringup with link: %d, port_type: %d\n", link_index, sfp_port_type);
 
@@ -278,6 +288,13 @@ int mtip_phy_bringup_phy(u32 link_index, int sfp_port_type)
     port_type = platform_driver_priv->devices.port_devices[port_device_index].port_type;
 
     mtip_phy_get_lanes_of_link(link_index, lanes_enabled);
+
+    CSMLOGINFO("phy bringup for port: %d link: %d", port_type, link_index);
+
+    for (i = 0; i < PHY_LANE_MAX; ++i) 
+    {
+        CSMLOGINFO("phy_bringup_phy lane enabled[%d] is %d", i, lanes_enabled[i]);
+    }
 
     // bringup the phy for the specified lanes
     return (qcom_aw_phy_driver_iface_ops.eth_phy_iface_phy_bringup)(port_type, lanes_enabled, sfp_port_type);
@@ -315,6 +332,7 @@ int mtip_phy_notify_link_status(u32 link_index, bool status)
     bool lanes_enabled[PHY_LANE_MAX];
     u32 port_device_index;
     u32 link_device_index;
+    int i;
 
     if (mtip_lookup_device_by_link_index(link_index, &port_device_index, &link_device_index) < 0)
     {
@@ -325,6 +343,13 @@ int mtip_phy_notify_link_status(u32 link_index, bool status)
     port_type = platform_driver_priv->devices.port_devices[port_device_index].port_type;
 
     mtip_phy_get_lanes_of_link(link_index, lanes_enabled);
+
+    CSMLOGINFO("phy_notify_link for port: %d link: %d", port_type, link_index);
+
+    for (i = 0; i < PHY_LANE_MAX; ++i) 
+    {
+        CSMLOGINFO("phy_notify_link lane enabled[%d] is %d", i, lanes_enabled[i]);
+    }
 
     // notify PHY of the link status
     return (qcom_aw_phy_driver_iface_ops.eth_phy_iface_notify_mac_link_status)(port_type, lanes_enabled, status);

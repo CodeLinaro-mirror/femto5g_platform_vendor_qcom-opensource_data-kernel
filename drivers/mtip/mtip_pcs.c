@@ -161,6 +161,7 @@ static void mtip_pcs_set_vendor_vl_intvl(enum mtip_port_config_enum port_config,
         {
             marker_counter = 0x3FFF;
         }
+        break;
 
     case MTIP_PORT_CONFIG_1x25GBASE_R:
     case MTIP_PORT_CONFIG_4x25GBASE_R:
