@@ -71,6 +71,10 @@ extern struct eth_phy_iface_ops qcom_aw_phy_driver_iface_ops;
  */ 
 extern int qsfp_eth_get_link_type(u32 qsfp_phandle, u8* link_info);
 
+// PCS level retry delay to bring up PHY lane
+#define MTIP_PHY_RETRY_TIMER     10000
+#define MTIP_PHY_RETRY_MIN_TIMER     100
+
 static void mtip_phy_ready_cb(void *user_data)
 {
     CSMLOGINFO("Got the PHY ready cb\n");
@@ -115,13 +119,13 @@ static int mtip_phy_get_link_index_for_phy_lane(
     return -1;
 }
 
-static void mtip_phy_cdr_lock_cb(enum mtip_port_type_enum port_type, enum eth_phy_iface_phy_lane_num_enum lane_num)
+static void mtip_phy_cdr_lock_cb(enum mtip_port_type_enum port_type, enum eth_phy_iface_phy_lane_num_enum lane_num, bool status)
 {
     int link_index = -1;
     struct mtip_delayed_work_q_params *wq_params;
-    struct net_device *dev;
+    int delay_ms = MTIP_PHY_RETRY_MIN_TIMER;
 
-    CSMLOGERR("CDR lock success for port: %d, lane %d\n", port_type, lane_num);
+    CSMLOGERR("CDR lock callback for port: %d, lane %d, status %d\n", port_type, lane_num, status);
 
     link_index = mtip_phy_get_link_index_for_phy_lane(port_type, lane_num);
     if(link_index == -1){
@@ -129,9 +133,12 @@ static void mtip_phy_cdr_lock_cb(enum mtip_port_type_enum port_type, enum eth_ph
       return;
     }
 
+    if(status == true)
+      delay_ms = MTIP_PHY_RETRY_TIMER;
+
     if(mtip_mac_wrapper_get_link_status(link_index) == false){
       wq_params = kmalloc(sizeof(struct mtip_delayed_work_q_params),
-                          GFP_KERNEL);
+                          GFP_ATOMIC);
       if(!wq_params)
         CSMLOGERR("Malloc failed!");
       else{
@@ -139,30 +146,12 @@ static void mtip_phy_cdr_lock_cb(enum mtip_port_type_enum port_type, enum eth_ph
                           mtip_phy_retry_phy_bringup);
         wq_params->port_type = port_type;
         wq_params->link_index = link_index;
-        mtip_workq_queue_delayed_work(wq_params);
+        mtip_workq_queue_delayed_work(wq_params, delay_ms);
       }
     }
     else{
-      mtip_mac_enable_tx_rx(link_index);
-
-      if(link_index == MTIP_DEBUG_ETH_LINK_INDEX)
-      {
-        mtip_sysfs_mac_link_status(true);
-      }
-
-      dev = platform_driver_priv->mtip_links[link_index]->dev;
-
-      // wake queues
-      netif_tx_wake_all_queues(dev);
-
-      if (!netif_carrier_ok(dev)) {
-        netif_carrier_on(dev);
-        netdev_info(dev, "Link is Up\n");
-      }
-
-      mtip_phy_notify_link_status(link_index, true);
+      post_mtip_process_link_state(link_index, true);
     }
-
     return;
 }
 
@@ -174,7 +163,7 @@ int mtip_phy_register_eth(void)
     mtip_phy_eth_params.notify_an_complete = mtip_phy_an_complete_cb;
     mtip_phy_eth_params.userdata_ready = NULL;
     mtip_phy_eth_params.notify_ready = mtip_phy_ready_cb;
-    mtip_phy_eth_params.cdr_lock_success = mtip_phy_cdr_lock_cb;
+    mtip_phy_eth_params.cdr_lock_cb = mtip_phy_cdr_lock_cb;
 
     // register with the PHY
     res = (qcom_aw_phy_driver_iface_ops.eth_phy_iface_eth_register)(&mtip_phy_eth_params, &is_ready);
@@ -247,31 +236,15 @@ void mtip_phy_retry_phy_bringup(struct work_struct *work)
     struct delayed_work *delayed_work_item = to_delayed_work(work);
     struct mtip_delayed_work_q_params *wq_params =
         container_of(delayed_work_item, struct mtip_delayed_work_q_params, wq_item);
-    struct net_device *dev;
 
-    if(platform_driver_priv->mtip_links[wq_params->link_index]->state == 
-                                                          MTIP_LINK_STATE_CLOSE)
+    if(platform_driver_priv->mtip_links[wq_params->link_index]->state == MTIP_LINK_STATE_CLOSE)
+    {
       goto func_exit;
+    }
 
-    if(mtip_mac_wrapper_get_link_status(wq_params->link_index) == true){
-      mtip_mac_enable_tx_rx(wq_params->link_index);
-
-      if(wq_params->link_index == MTIP_DEBUG_ETH_LINK_INDEX)
-      {
-        mtip_sysfs_mac_link_status(true);
-      }
-
-      dev = platform_driver_priv->mtip_links[wq_params->link_index]->dev;
-
-      // wake queues
-      netif_tx_wake_all_queues(dev);
-
-      if (!netif_carrier_ok(dev)) {
-        netif_carrier_on(dev);
-        netdev_info(dev, "Link is Up\n");
-      }
-
-      mtip_phy_notify_link_status(wq_params->link_index, true);
+    if(mtip_mac_wrapper_get_link_status(wq_params->link_index) == true)
+    {
+      post_mtip_process_link_state(wq_params->link_index, true);
       goto func_exit;
     }
 
@@ -317,7 +290,6 @@ int mtip_phy_teardown_phy(u32 link_index)
     u32 port_device_index;
     u32 link_device_index;
     int ret_val = 0;
-    struct net_device *dev;
 
     if (mtip_lookup_device_by_link_index(link_index, &port_device_index, &link_device_index) < 0)
     {
@@ -332,26 +304,8 @@ int mtip_phy_teardown_phy(u32 link_index)
     // teardown the phy for the specified lanes
     ret_val = (qcom_aw_phy_driver_iface_ops.eth_phy_iface_phy_teardown)(port_type, lanes_enabled);
 
-    // stop the queues
-    netif_tx_stop_all_queues(platform_driver_priv->mtip_links[link_index]->dev);
-    
     // disable tx_rx on the link
-    mtip_mac_disable_tx_rx(link_index);
-    
-    if(link_index == MTIP_DEBUG_ETH_LINK_INDEX)
-    {
-      mtip_sysfs_mac_link_status(false);
-    }
-
-    dev = platform_driver_priv->mtip_links[link_index]->dev;
-
-    if (netif_carrier_ok(dev)) {
-      netif_carrier_off(dev);
-      netdev_info(dev, "Link is Down\n");
-    }
-
-    mtip_phy_notify_link_status(link_index, false);
-
+    post_mtip_process_link_state(link_index, false);
     return ret_val;
 }
 
@@ -480,6 +434,7 @@ static void mtip_phy_link_up(struct phylink_config *config,
     int sfp_phandle;
     struct mtip_port_device_info* port_device = NULL;
     struct mtip_link_device_info* link_device = NULL;
+    enum mtip_port_config_enum port_config;
 
     ret = mtip_phy_find_matching_port(config, &real_port_number);
 
@@ -520,30 +475,69 @@ static void mtip_phy_link_up(struct phylink_config *config,
     // set the port_device
     port_device = &platform_driver_priv->devices.port_devices[real_port_number];
 
-    // deal with the phy_port_type as appropriate
-    if (sfp_port_type == PORT_FIBRE)
-    {
-        // handle the case where FIBRE is connected
-        mtip_mac_wrapper_enable_rsfec_for_25g_mode(port_device);
+    // this is the port configuration
+    port_config = port_device->port_config;
 
-        // enable rsfec in the pcs
-        for (i = 0; i < port_device->num_link_phandles; ++i)
-        {
-            link_device = &port_device->link_devices[i];
-            mtip_pcs_enable_rsfec_for_25g_mode(link_device);
-        }
-    }
-    else
+    switch (port_config) 
     {
-        // handle the case where DAC or OTHER is connected
-        mtip_mac_wrapper_disable_rsfec_for_25g_mode(port_device);
-
-        // disable rsfec in pcs
-        for (i = 0; i < port_device->num_link_phandles; ++i)
+    case MTIP_PORT_CONFIG_1x25GBASE_R:
+    case MTIP_PORT_CONFIG_4x25GBASE_R:
         {
-            link_device = &port_device->link_devices[i];
-            mtip_pcs_disable_rsfec_for_25g_mode(link_device);
+            // deal with the phy_port_type as appropriate
+            if (sfp_port_type == PORT_FIBRE)
+            {
+                // handle the case where FIBRE is connected
+                // we have to enable RSFEC for FIBRE
+                mtip_mac_wrapper_enable_rsfec_for_25g_mode(port_device);
+
+                // enable rsfec in the pcs
+                for (i = 0; i < port_device->num_link_phandles; ++i)
+                {
+                    link_device = &port_device->link_devices[i];
+                    mtip_pcs_enable_rsfec_for_25g_mode(link_device);
+                }
+            }
+            else
+            {
+                // handle the case where DAC or OTHER is connected
+                mtip_mac_wrapper_disable_rsfec_for_25g_mode(port_device);
+
+                // disable rsfec in pcs
+                for (i = 0; i < port_device->num_link_phandles; ++i)
+                {
+                    link_device = &port_device->link_devices[i];
+                    mtip_pcs_disable_rsfec_for_25g_mode(link_device);
+                }
+            }
         }
+        break;
+
+    case MTIP_PORT_CONFIG_4x25GBASE_R_RSFEC:
+    case MTIP_PORT_CONFIG_1x25GBASE_R_RSFEC:
+    case MTIP_PORT_CONFIG_1x10GBASE_R:
+    case MTIP_PORT_CONFIG_1x10GBASE_R_FEC:
+    case MTIP_PORT_CONFIG_4x10GBASE_R:
+    case MTIP_PORT_CONFIG_4x10GBASE_R_FEC:
+    case MTIP_PORT_CONFIG_1x100GBASE_R:
+    case MTIP_PORT_CONFIG_1x100GBASE_R_RSFEC_LL:
+    case MTIP_PORT_CONFIG_1x100GBASE_R_RSFEC:
+    case MTIP_PORT_CONFIG_1x100GBASE_R2:
+    case MTIP_PORT_CONFIG_1x100GBASE_R2_RSFEC:
+    case MTIP_PORT_CONFIG_1x100GBASE_R4:
+    case MTIP_PORT_CONFIG_1x100GBASE_R4_RSFEC:
+    case MTIP_PORT_CONFIG_1x50GBASE_R:
+    case MTIP_PORT_CONFIG_1x50GBASE_R_RSFEC:
+    case MTIP_PORT_CONFIG_2x50GBASE_R:
+    case MTIP_PORT_CONFIG_2x50GBASE_R_RSFEC:
+    case MTIP_PORT_CONFIG_1x50GBASE_R2:
+    case MTIP_PORT_CONFIG_1x50GBASE_R2_RSFEC:
+    case MTIP_PORT_CONFIG_1x40GBASE_R4:
+    case MTIP_PORT_CONFIG_1x40GBASE_R4_FEC:
+    default:
+        {
+            CSMLOGINFO("No need to change RSFEC mode for port_config: %d", port_config);
+        }
+        break;
     }
 
     switch (current_state) 

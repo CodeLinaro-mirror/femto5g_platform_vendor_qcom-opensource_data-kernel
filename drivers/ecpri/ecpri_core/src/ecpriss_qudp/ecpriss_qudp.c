@@ -16,15 +16,7 @@ volatile int ecpriss_filtering_enabled = 0;
 #define BYTE_SHIFT                     8
 #define MSB_SHIFT                      32
 
-static int qudp_irq_mapping[QUDP_IRQ_MAX]=
-{
-	[ECPRISS_UDP_C2C_IRQ_PORT0]=491,
-	[ECPRISS_UDP_C2C_IRQ_PORT1]=492,
-	[ECPRISS_UDP_FH_IRQ_PORT0]=493,
-	[ECPRISS_UDP_FH_IRQ_PORT1]=494,
-	[ECPRISS_UDP_FH_IRQ_PORT2]=495,
-	[ECPRISS_UDP_L2_IRQ]=496
-};
+int qudp_irq_mapping[QUDP_IRQ_MAX];
 
 void ecpriss_qudp_clear_stats(uint32_t port_index, uint32_t link_index)
 {
@@ -172,7 +164,7 @@ void debug_qudp_egress_config(void)
 	}
 }
 // ecpriss_pdata->cfg_stats.qudp_cfg.egress
-void ecpriss_qudp_egress_config_stats(int32_t fh_index)
+void ecpriss_qudp_egress_config_stats_update(int32_t fh_index)
 {
 	int32_t egress_table_index = 0;
 
@@ -290,7 +282,7 @@ void debug_qudp_ingress_config(void)
 
 }
 // ecpriss_pdata->cfg_stats.qudp_cfg.ingress
-void ecpriss_qudp_ingress_config_stats(int32_t fh_index)
+void ecpriss_qudp_ingress_config_stats_update(int32_t fh_index)
 {
 	uint32_t flag = 1;
 	int32_t fltr_index = 0;
@@ -391,7 +383,7 @@ void ecpriss_qudp_ingress_config_stats(int32_t fh_index)
 	}
 	return;
 }
-void ecpriss_qudp_print_fh_egress_stats(uint32_t port_index, uint32_t link_index)
+void ecpriss_qudp_fh_egress_stats_update(uint32_t port_index, uint32_t link_index)
 {
 	uint32_t lsb_val = 0;
 	uint64_t msb_val = 0;
@@ -408,7 +400,7 @@ void ecpriss_qudp_print_fh_egress_stats(uint32_t port_index, uint32_t link_index
 
 	val = msb_val << MSB_SHIFT | lsb_val;
 	ecpriss_pdata->qudp_ctx->fh_port_cfg[port_index].stats.egress_num_udp_packets[link_index] = val;
-	pr_info("ECPRI_UDP_FH_EGRESS_NUM_UDP_PACKETS : port_index :%d link_index %d value = %d\n", port_index,link_index,val);
+	pr_debug("ECPRI_UDP_FH_EGRESS_NUM_UDP_PACKETS : port_index :%d link_index %d value = %d\n", port_index,link_index,val);
 
 	lsb_val =ecpriss_qudp_hal_read_reg_mn(ECPRISS_QUDP_FH_RAMS,
 			ECPRI_UDP_FH_EGRESS_NUM_ETH_ONLY_PACKETS_LSB_PORT_p_LINK_n,
@@ -421,7 +413,7 @@ void ecpriss_qudp_print_fh_egress_stats(uint32_t port_index, uint32_t link_index
 
 	val = msb_val << MSB_SHIFT | lsb_val;
 	ecpriss_pdata->qudp_ctx->fh_port_cfg[port_index].stats.egress_num_eth_packets[link_index] = val;
-	pr_info("ECPRI_UDP_FH_EGRESS_NUM_ETH_ONLY_PACKETS : port_index :%d link_index %d value = %d\n", port_index,link_index,val);
+	pr_debug("ECPRI_UDP_FH_EGRESS_NUM_ETH_ONLY_PACKETS : port_index :%d link_index %d value = %d\n", port_index,link_index,val);
 
 
 	lsb_val = ecpriss_qudp_hal_read_reg_mn(ECPRISS_QUDP_FH_RAMS,
@@ -435,7 +427,7 @@ void ecpriss_qudp_print_fh_egress_stats(uint32_t port_index, uint32_t link_index
 
 	val = msb_val << MSB_SHIFT | lsb_val;
 	ecpriss_pdata->qudp_ctx->fh_port_cfg[port_index].stats.egress_num_bypassed_packets[link_index] = val;
-	pr_info("ECPRI_UDP_FH_EGRESS_NUM_BYPASSED_PACKETS : port_index :%d link_index %d value = %d\n", port_index,link_index,val);
+	pr_debug("ECPRI_UDP_FH_EGRESS_NUM_BYPASSED_PACKETS : port_index :%d link_index %d value = %d\n", port_index,link_index,val);
 
 
 	lsb_val = ecpriss_qudp_hal_read_reg_mn(ECPRISS_QUDP_FH_RAMS,
@@ -449,20 +441,26 @@ void ecpriss_qudp_print_fh_egress_stats(uint32_t port_index, uint32_t link_index
 
 	val = msb_val << MSB_SHIFT | lsb_val;
 	ecpriss_pdata->qudp_ctx->fh_port_cfg[port_index].stats.egress_num_mtu_err_packets[link_index] = val;
-	pr_info("ECPRI_UDP_FH_EGRESS_MTU_ERR_PACKETS : port_index :%d link_index %d value = %d\n", port_index,link_index,val);
+	pr_debug("ECPRI_UDP_FH_EGRESS_MTU_ERR_PACKETS : port_index :%d link_index %d value = %d\n", port_index,link_index,val);
 	return;
 }
 
 
-void ecpriss_qudp_print_fh_ingress_stats(uint32_t port_index, uint32_t link_index)
+void ecpriss_qudp_fh_ingress_stats_update(uint32_t port_index, uint32_t link_index)
 {
 	uint32_t lsb_val = 0;
 	uint64_t msb_val = 0;
 	uint64_t val = 0;
-	ecpri_qudp_hwio_def_ecpri_udp_fh_egress_udp_watermark_port_p_s
-		fh_egress_udp_watermark_port_p;
-	ecpri_qudp_hwio_def_ecpri_udp_fh_ingress_udp_watermark_port_p_link_n_s
-	fh_ingress_udp_watermark_port_p_link_n;
+	uint32_t curr_wm_index = 0;
+
+	ecpri_qudp_hwio_def_ecpri_udp_fh_egress_udp_watermark_port_p_s fh_egress_udp_watermark_port_p;
+	ecpri_qudp_hwio_def_ecpri_udp_fh_ingress_udp_watermark_port_p_link_n_s  fh_ingress_udp_watermark_port_p_link_n;
+
+	curr_wm_index =
+		ecpriss_pdata->qudp_ctx->fh_port_cfg[port_index].stats.curr_wm_index % MAX_QUDP_WM_ENTRY;
+
+	ecpriss_pdata->qudp_ctx->fh_port_cfg[port_index].stats.curr_wm_index++;
+
 
 	lsb_val = ecpriss_qudp_hal_read_reg_mn(ECPRISS_QUDP_FH_RAMS,
 			ECPRI_UDP_FH_INGRESS_NUM_UDP_PACKETS_LSB_PORT_p_LINK_n,
@@ -476,7 +474,7 @@ void ecpriss_qudp_print_fh_ingress_stats(uint32_t port_index, uint32_t link_inde
 
 	val = msb_val << MSB_SHIFT | lsb_val;
 	ecpriss_pdata->qudp_ctx->fh_port_cfg[port_index].stats.ingress_num_udp_packets[link_index] = val;
-	pr_info("ECPRI_UDP_FH_INGRESS_NUM_UDP_PACKETS : port_index :%d link_index %d value = %d\n", port_index,link_index,val);
+	pr_debug("ECPRI_UDP_FH_INGRESS_NUM_UDP_PACKETS : port_index :%d link_index %d value = %d\n", port_index,link_index,val);
 
 
 	lsb_val = ecpriss_qudp_hal_read_reg_mn(ECPRISS_QUDP_FH_RAMS,
@@ -491,7 +489,7 @@ void ecpriss_qudp_print_fh_ingress_stats(uint32_t port_index, uint32_t link_inde
 
 	val = msb_val << MSB_SHIFT | lsb_val;
 	ecpriss_pdata->qudp_ctx->fh_port_cfg[port_index].stats.ingress_num_non_udp_packets[link_index] = val;
-	pr_info("ECPRI_UDP_FH_INGRESS_NUM_NON_UDP_PACKETS : port_index :%d link_index %d value = %d\n", port_index,link_index,val);
+	pr_debug("ECPRI_UDP_FH_INGRESS_NUM_NON_UDP_PACKETS : port_index :%d link_index %d value = %d\n", port_index,link_index,val);
 
 	lsb_val = ecpriss_qudp_hal_read_reg_mn(ECPRISS_QUDP_FH_RAMS,
 			ECPRI_UDP_FH_INGRESS_FCS_ERR_PACKETS_LSB_PORT_p_LINK_n,
@@ -504,7 +502,7 @@ void ecpriss_qudp_print_fh_ingress_stats(uint32_t port_index, uint32_t link_inde
 
 	val = msb_val << MSB_SHIFT | lsb_val;
 	ecpriss_pdata->qudp_ctx->fh_port_cfg[port_index].stats.ingress_num_fcs_err_packets[link_index] = val;
-	pr_info("ECPRI_UDP_FH_INGRESS_FCS_ERR_PACKETS : port_index :%d link_index %d value = %d\n", port_index,link_index,val);
+	pr_debug("ECPRI_UDP_FH_INGRESS_FCS_ERR_PACKETS : port_index :%d link_index %d value = %d\n", port_index,link_index,val);
 
 	lsb_val = ecpriss_qudp_hal_read_reg_mn(ECPRISS_QUDP_FH_RAMS,
 			ECPRI_UDP_FH_INGRESS_IPV4_CS_ERROR_PACKETS_LSB_PORT_p_LINK_n,
@@ -517,7 +515,7 @@ void ecpriss_qudp_print_fh_ingress_stats(uint32_t port_index, uint32_t link_inde
 
 	val = msb_val << MSB_SHIFT | lsb_val;
 	ecpriss_pdata->qudp_ctx->fh_port_cfg[port_index].stats.ingress_num_ipv4_cs_err_packets[link_index] = val;
-	pr_info("ECPRI_UDP_FH_INGRESS_IPV4_CS_ERROR_PACKETS : port_index :%d link_index %d value = %d\n", port_index,link_index,val);
+	pr_debug("ECPRI_UDP_FH_INGRESS_IPV4_CS_ERROR_PACKETS : port_index :%d link_index %d value = %d\n", port_index,link_index,val);
 
 	lsb_val = ecpriss_qudp_hal_read_reg_mn(ECPRISS_QUDP_FH_RAMS,
 			ECPRI_UDP_FH_INGRESS_UDP_CS_ERROR_PACKETS_LSB_PORT_p_LINK_n,
@@ -531,7 +529,7 @@ void ecpriss_qudp_print_fh_ingress_stats(uint32_t port_index, uint32_t link_inde
 
 	val = msb_val << MSB_SHIFT | lsb_val;
 	ecpriss_pdata->qudp_ctx->fh_port_cfg[port_index].stats.ingress_num_udp_cs_err_packets[link_index] = val;
-	pr_info("ECPRI_UDP_FH_INGRESS_UDP_CS_ERROR_PACKETS : port_index :%d link_index %d value = %d\n", port_index,link_index,val);
+	pr_debug("ECPRI_UDP_FH_INGRESS_UDP_CS_ERROR_PACKETS : port_index :%d link_index %d value = %d\n", port_index,link_index,val);
 
 	lsb_val = ecpriss_qudp_hal_read_reg_mn(ECPRISS_QUDP_FH_RAMS,
 			ECPRI_UDP_FH_INGRESS_VLAN_FILTERED_PACKETS_LSB_PORT_p_LINK_n,
@@ -544,7 +542,7 @@ void ecpriss_qudp_print_fh_ingress_stats(uint32_t port_index, uint32_t link_inde
 
 	val = msb_val << MSB_SHIFT | lsb_val;
 	ecpriss_pdata->qudp_ctx->fh_port_cfg[port_index].stats.ingress_num_vlan_filtered_packets[link_index] = val;
-	pr_info("ECPRI_UDP_FH_INGRESS_VLAN_FILTERED_PACKETS : port_index :%d link_index %d value = %d\n", port_index,link_index,val);
+	pr_debug("ECPRI_UDP_FH_INGRESS_VLAN_FILTERED_PACKETS : port_index :%d link_index %d value = %d\n", port_index,link_index,val);
 
 	lsb_val = ecpriss_qudp_hal_read_reg_mn(ECPRISS_QUDP_FH_RAMS,
 			ECPRI_UDP_FH_INGRESS_SEC_ERR_PACKETS_LSB_PORT_p_LINK_n,
@@ -557,7 +555,7 @@ void ecpriss_qudp_print_fh_ingress_stats(uint32_t port_index, uint32_t link_inde
 			link_index);
 	val = msb_val << MSB_SHIFT | lsb_val;
 	ecpriss_pdata->qudp_ctx->fh_port_cfg[port_index].stats.ingress_num_sec_err_packets[link_index] = val;
-	pr_info("ECPRI_UDP_FH_INGRESS_SEC_ERR_PACKETS : port_index :%d link_index %d value = %d\n", port_index,link_index,val);
+	pr_debug("ECPRI_UDP_FH_INGRESS_SEC_ERR_PACKETS : port_index :%d link_index %d value = %d\n", port_index,link_index,val);
 
 	lsb_val = ecpriss_qudp_hal_read_reg_mn(ECPRISS_QUDP_FH_RAMS,
 			ECPRI_UDP_FH_INGRESS_IP_LEN_ERR_PACKETS_LSB_PORT_p_LINK_n,
@@ -569,7 +567,7 @@ void ecpriss_qudp_print_fh_ingress_stats(uint32_t port_index, uint32_t link_inde
 			link_index);
 	val = msb_val << MSB_SHIFT | lsb_val;
 	ecpriss_pdata->qudp_ctx->fh_port_cfg[port_index].stats.ingress_ip_len_err_packets[link_index] = val;
-	pr_info("ECPRI_UDP_FH_INGRESS_IP_LEN_ERR_PACKETS : port_index :%d link_index %d value = %d\n", port_index,link_index,val);
+	pr_debug("ECPRI_UDP_FH_INGRESS_IP_LEN_ERR_PACKETS : port_index :%d link_index %d value = %d\n", port_index,link_index,val);
 
 	lsb_val = ecpriss_qudp_hal_read_reg_mn(ECPRISS_QUDP_FH_RAMS,
 			ECPRI_UDP_FH_INGRESS_IP_FILTERED_PACKETS_LSB_PORT_p_LINK_n,port_index,link_index);
@@ -578,8 +576,8 @@ void ecpriss_qudp_print_fh_ingress_stats(uint32_t port_index, uint32_t link_inde
 			ECPRI_UDP_FH_INGRESS_IP_FILTERED_PACKETS_MSB_PORT_p_LINK_n,port_index,link_index);
 
 	val = msb_val >> MSB_SHIFT | lsb_val;
-	ecpriss_pdata->qudp_ctx->fh_port_cfg[port_index].stats.ingress_ip_filtered_packets[link_index]=val;
-	pr_info("ECPRI_UDP_FH_INGRESS_IP_FILTERED_PACKETS : port_index :%d link_index %d value = %d\n", port_index,link_index,val);
+	ecpriss_pdata->qudp_ctx->fh_port_cfg[port_index].stats.ingress_ip_filtered_packets[link_index] = val;
+	pr_debug("ECPRI_UDP_FH_INGRESS_IP_FILTERED_PACKETS : port_index :%d link_index %d value = %d\n", port_index,link_index,val);
 
 	ecpriss_qudp_hal_read_reg_mn_fields(ECPRISS_QUDP_FH,
 			ECPRI_UDP_FH_INGRESS_UDP_WATERMARK_PORT_p_LINK_n,
@@ -597,6 +595,15 @@ void ecpriss_qudp_print_fh_ingress_stats(uint32_t port_index, uint32_t link_inde
 	ecpriss_pdata->qudp_ctx->fh_port_cfg[port_index].stats.fh_ingress_udp_watermark_port_p_link_n_cmd_fifo[link_index] =
 		fh_ingress_udp_watermark_port_p_link_n.cmd_fifo;
 	ecpriss_pdata->qudp_ctx->fh_port_cfg[port_index].stats.fh_ingress_udp_watermark_port_p_link_n_pkt_fifo[link_index] =
+		fh_ingress_udp_watermark_port_p_link_n.pkt_fifo;
+
+	ecpriss_pdata->qudp_ctx->fh_port_cfg[port_index].stats.fh_ingress_wm_ptp_fifo[link_index][curr_wm_index] =
+		fh_ingress_udp_watermark_port_p_link_n.ptp_timestamp_fifo;
+	ecpriss_pdata->qudp_ctx->fh_port_cfg[port_index].stats.fh_ingress_wm_sync_fifo[link_index][curr_wm_index] =
+		fh_ingress_udp_watermark_port_p_link_n.pkt_handler_sync_fifos;
+	ecpriss_pdata->qudp_ctx->fh_port_cfg[port_index].stats.fh_ingress_wm_cmd_fifo[link_index][curr_wm_index] =
+		fh_ingress_udp_watermark_port_p_link_n.cmd_fifo;
+	ecpriss_pdata->qudp_ctx->fh_port_cfg[port_index].stats.fh_ingress_wm_pkt_fifo[link_index][curr_wm_index] =
 		fh_ingress_udp_watermark_port_p_link_n.pkt_fifo;
 
 	ecpriss_qudp_hal_read_reg_mn_fields(ECPRISS_QUDP_FH,
@@ -619,6 +626,20 @@ void ecpriss_qudp_print_fh_ingress_stats(uint32_t port_index, uint32_t link_inde
 	ecpriss_pdata->qudp_ctx->fh_port_cfg[port_index].stats.fh_egress_udp_watermark_port_p_hdri_cfg_index_fifo =
 		fh_egress_udp_watermark_port_p.hdri_cfg_index_fifo;
 	ecpriss_pdata->qudp_ctx->fh_port_cfg[port_index].stats.fh_egress_udp_watermark_port_p_pkt_fifo =
+		fh_egress_udp_watermark_port_p.pkt_fifo;
+
+
+	ecpriss_pdata->qudp_ctx->fh_port_cfg[port_index].stats.fh_egress_output_fifo[curr_wm_index] =
+		fh_egress_udp_watermark_port_p.aligner_output_fifo;
+	ecpriss_pdata->qudp_ctx->fh_port_cfg[port_index].stats.fh_egress_cs_update_fifo[curr_wm_index] =
+		fh_egress_udp_watermark_port_p.cs_update_fifo;
+	ecpriss_pdata->qudp_ctx->fh_port_cfg[port_index].stats.fh_egress_cs_calc_fifo[curr_wm_index] =
+		fh_egress_udp_watermark_port_p.cs_calc_fifo;
+	ecpriss_pdata->qudp_ctx->fh_port_cfg[port_index].stats.fh_egress_hdri_output_fifo[curr_wm_index] =
+		fh_egress_udp_watermark_port_p.hdri_output_fifo;
+	ecpriss_pdata->qudp_ctx->fh_port_cfg[port_index].stats.fh_egress_hdri_cfg_index_fifo[curr_wm_index] =
+		fh_egress_udp_watermark_port_p.hdri_cfg_index_fifo;
+	ecpriss_pdata->qudp_ctx->fh_port_cfg[port_index].stats.fh_egress_pkt_fifo[curr_wm_index] =
 		fh_egress_udp_watermark_port_p.pkt_fifo;
 
 	return;
@@ -1092,6 +1113,19 @@ static int ecpriss_qudp_ingress_init_cfg(void)
 	int port_type = 0;
 	int port_idx = 0;
 
+	ecpri_qudp_hwio_def_ecpri_udp_fh_debug_features_cfg_s udp_fh_debug_feature_cfg;
+	ecpriss_qudp_hal_read_reg_n_fields(ECPRISS_QUDP_FH,
+				ECPRI_UDP_FH_DEBUG_FEATURES_CFG,
+				0,
+				&udp_fh_debug_feature_cfg);
+
+	 udp_fh_debug_feature_cfg.watermark_en = 1;
+	 udp_fh_debug_feature_cfg.en_clear_watermark_on_read = 1;
+
+ 	 ecpriss_qudp_hal_write_reg_n_fields(ECPRISS_QUDP_FH,
+				ECPRI_UDP_FH_DEBUG_FEATURES_CFG,
+				0,
+				&udp_fh_debug_feature_cfg);
 
 	for(port_type=0;port_type<ECPRISS_PORT_TYPE_MAX;port_type++)
 	{
@@ -1625,7 +1659,6 @@ static int ecpriss_irq_init(ecpriss_qudp_interrupt_events_e qudp_irq,
 			pr_err("ecpriss_irq_init pdev is NULL" );
 			break;
 		}
-		pr_info("IRQ =  %d\n", qudp_irq_mapping[qudp_irq]);
 		qudp_irq_mapping[qudp_irq] =  platform_get_irq(pdev, qudp_irq);
 
 		res = request_irq(qudp_irq_mapping[qudp_irq], ecpriss_qudp_isr, IRQF_TRIGGER_RISING, "ecpri_ss", NULL);
@@ -1635,6 +1668,7 @@ static int ecpriss_irq_init(ecpriss_qudp_interrupt_events_e qudp_irq,
 					qudp_irq_mapping[qudp_irq], res);
 			break;
 		}
+		pr_info("IRQ =  %d\n", qudp_irq_mapping[qudp_irq]);
 
 		res = enable_irq_wake(qudp_irq_mapping[qudp_irq]);
 		if (res){

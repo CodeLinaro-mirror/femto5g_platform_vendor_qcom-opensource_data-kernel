@@ -35,6 +35,9 @@
 
 #define ENABLE_ECPRI_TEST    1
 
+#define MAX_PORTS 3
+#define MAX_MAC_LINKS 4
+
 #define ECPRI_CLK_FREQ(x) (x * 1000 * 1000UL)
 
 /* ECPRI clock */
@@ -143,6 +146,14 @@ typedef struct ecpriss_core_clock {
 	struct clk* ecpri_mss_oran;
 }ecpri_clock;
 
+typedef struct ecpri_stats_timer_params
+{
+	struct timer_list stats_timer;
+	uint32_t stats_interval;
+	uint8_t stats_timer_running;
+}ecpri_stats_timer_params_s;
+
+
 /**
  * struct ecpri_dma_endp_cfg - DMA endpoint configurations
  * @ecpri_state:
@@ -170,6 +181,7 @@ typedef struct ecpriss_core_private_s {
 	ecpriss_qudp_ctx_s                   *qudp_ctx;
 	ecpriss_xbar_ctx_s                   *xbar_ctx;
 	ecpriss_config_stats_s                cfg_stats;
+	ecpri_stats_timer_params_s            stats_timer_info;
 	struct mutex                          ecpriss_mutex_lock;
 } ecpriss_core_private_s;
 
@@ -182,5 +194,10 @@ static spinlock_t irq_lock;
 void ecpriss_eth_event_processing_wq(struct work_struct *work);
 void ecpriss_dma_event_processing_wq(struct work_struct *work);
 void ecpriss_eth_topology_init_wq(struct work_struct *work);
-
+void ecpriss_interrupt_events_processing_wq(struct work_struct *work);
+int ecpriss_stats_timer_enable(int timeout);
+int ecpriss_stats_timer_interrupt_create(void);
+void ecpriss_update_all_stats(void);
+void ecpriss_core_set_stats_timeout_info(int val);
+int ecpriss_core_get_stats_timeout_info(void);
 #endif

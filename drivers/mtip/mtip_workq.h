@@ -53,6 +53,6 @@ struct mtip_delayed_work_q_params{
 int mtip_queue_work(unsigned int work_type, void* work_ptr);
 int mtip_initialize_workq(void);
 int mtip_destroy_workq(void);
-int mtip_workq_queue_delayed_work(struct mtip_delayed_work_q_params *wq_params);
+int mtip_workq_queue_delayed_work(struct mtip_delayed_work_q_params *wq_params, int delay_ms);
 
 #endif // _MTIP_WORKQ_H

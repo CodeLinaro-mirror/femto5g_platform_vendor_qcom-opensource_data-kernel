@@ -47,7 +47,7 @@
 #include "mtip_macstats.h"
 #include "mtip_mac.h"
 #include "mtip_pcs.h"
-
+#include "mtip_debug_eth.h"
 
 static const char * const mtip_ethtool_stat_strings[] = {
     "EtherStatsOctets",
@@ -69,6 +69,42 @@ static const char * const mtip_ethtool_stat_strings[] = {
 
 #define MTIP_ETHTOOL_STATS_LEN	ARRAY_SIZE(mtip_ethtool_stat_strings)
 
+static const char* const mtip_ethtool_priv_flags_str_arr[] = {
+    "1x100GBASE_R",
+    "1x100GBASE_R_RSFEC_LL",
+    "1x100GBASE_R_RSFEC",
+    "1x100GBASE_R2",
+    "1x100GBASE_R2_RSFEC",
+    "1x100GBASE_R4",
+    "1x100GBASE_R4_RSFEC",
+    "1x50GBASE_R",
+    "1x50GBASE_R_RSFEC",
+    "2x50GBASE_R",
+    "2x50GBASE_R_RSFEC",
+    "1x50GBASE_R2",
+    "1x50GBASE_R2_RSFEC",
+    "1x50GBASE_R2_LUAI",
+    "1x50GBASE_R2_LUAI_FEC",
+    "2x50GBASE_R2",
+    "2x50GBASE_R2_FEC",
+    "2x50GBASE_R2_LUAI",
+    "2x50GBASE_R2_LUAI_FEC",
+    "1x40GBASE_R4",
+    "1x40GBASE_R4_FEC",
+    "1x25GBASE_R",
+    "1x25GBASE_R_FEC",
+    "4x25GBASE_R",
+    "4x25GBASE_R_FEC",
+    "1x25GBASE_R_RSFEC",
+    "4x25GBASE_R_RSFEC",
+    "1x10GBASE_R",
+    "1x10GBASE_R_FEC",
+    "4x10GBASE_R",
+    "4x10GBASE_R_FEC",
+};
+
+#define MTIP_ETHTOOL_PRIV_FLAGS_LEN ARRAY_SIZE(mtip_ethtool_priv_flags_str_arr)
+
 static int mtip_get_sset_count(struct net_device *netdev, int sset)
 {
     CSMLOGINFO("ethtool: get_sset_count %d, %d\n", sset, MTIP_ETHTOOL_STATS_LEN);
@@ -76,6 +112,8 @@ static int mtip_get_sset_count(struct net_device *netdev, int sset)
 	switch (sset) {
 	case ETH_SS_STATS:
 		return MTIP_ETHTOOL_STATS_LEN;
+    case ETH_SS_PRIV_FLAGS:
+        return MTIP_ETHTOOL_PRIV_FLAGS_LEN;
 	default:
 		return -EOPNOTSUPP;
 	}
@@ -94,6 +132,14 @@ static void mtip_get_strings(struct net_device *netdev, u32 stringset, u8 *data)
 			data += ETH_GSTRING_LEN;
 		}
     }
+    else if (stringset == ETH_SS_PRIV_FLAGS) 
+    {
+        for (i = 0; i < MTIP_ETHTOOL_PRIV_FLAGS_LEN; i++) {
+            strlcpy(data, mtip_ethtool_priv_flags_str_arr[i],
+                ETH_GSTRING_LEN);
+            data += ETH_GSTRING_LEN;
+        }
+    }
 }
 
 static void mtip_ethtool_get_stats(struct net_device *netdev, struct ethtool_stats *stats, u64 *data) 
@@ -106,7 +152,7 @@ static void mtip_ethtool_get_stats(struct net_device *netdev, struct ethtool_sta
     mtip_macstats_get_stats(netdev, data);
 }
 
-static int mtip_check_if_running(struct net_device *dev)
+int mtip_check_if_running(struct net_device *dev)
 {
     CSMLOGINFO("ethtool: check_if_running\n");
 
@@ -115,7 +161,7 @@ static int mtip_check_if_running(struct net_device *dev)
 	return 0;
 }
 
-static void mtip_getdrvinfo(struct net_device *dev, struct ethtool_drvinfo *info)
+void mtip_getdrvinfo(struct net_device *dev, struct ethtool_drvinfo *info)
 {
     CSMLOGINFO("ethtool: getdrvinfo\n");
 
@@ -123,7 +169,7 @@ static void mtip_getdrvinfo(struct net_device *dev, struct ethtool_drvinfo *info
 	strlcpy(info->version, MTIP_MAC_DRIVER_VERSION, sizeof(info->version));
 }
 
-static int mtip_get_link_ksettings(struct net_device *dev, struct ethtool_link_ksettings *cmd)
+int mtip_get_link_ksettings(struct net_device *dev, struct ethtool_link_ksettings *cmd)
 {
     struct mtip_netdev_priv *priv;
     u32 link_index;
@@ -265,20 +311,142 @@ int	mtip_ethtool_set_fecparam(struct net_device* netdev, struct ethtool_fecparam
     return 0;
 }
 
+static u32 mtip_ethtool_get_priv_flags(struct net_device *netdev)
+{
+    struct mtip_netdev_priv *priv;
+    u32 link_index;
+
+    priv = netdev_priv(netdev);
+    link_index = priv->link_index;
+
+    CSMLOGINFO("Get priv called for link index: %d", link_index);
+
+    // return flags currently enabled
+    return priv->priv_flags;
+}
+
+#define MTIP_ETHTOOL_SET_PFLAG(params, pflag, enable)			\
+ 	do {							\
+ 		if (enable)					\
+ 			(params)->priv_flags |= BIT(pflag);		\
+ 		else						\
+ 			(params)->priv_flags &= ~(BIT(pflag));	\
+	} while (0)
+
+static int mtip_ethtool_handle_pflag(struct net_device *netdev,
+			      u32 wanted_flags,
+			      u32 flag)
+{
+    struct mtip_netdev_priv *priv = netdev_priv(netdev);
+	bool enable = !!(wanted_flags & BIT(flag));
+    u32 changes = wanted_flags ^ priv->priv_flags;
+
+	if (!(changes & BIT(flag)))
+		return 0;
+
+	MTIP_ETHTOOL_SET_PFLAG(priv, flag, enable);
+	return 0;
+}
+
+static int mtip_ethtool_set_priv_flags(struct net_device *netdev, u32 flags)
+{
+    struct mtip_netdev_priv *priv;
+    u32 link_index;
+    u32 pflag;
+    int err;
+
+    priv = netdev_priv(netdev);
+    link_index = priv->link_index;
+
+    CSMLOGINFO("Set priv called for link index: %d with flags: 0x%x", link_index, flags);
+
+    if (mtip_check_if_running(netdev) == true) 
+    {
+        CSMLOGERR("Set priv called when running for link_index: %d", link_index);
+        return -EINVAL;
+    }
+
+    for (pflag = 0; pflag < MTIP_ETHTOOL_PRIV_FLAGS_LEN; pflag++) {
+        err = mtip_ethtool_handle_pflag(netdev, flags, pflag);
+        if (err)
+            break;
+    }
+
+    mtip_netdev_set_port_config(netdev);
+    return err;
+}
+
+static void mtip_ethtool_set_msglevel(struct net_device *netdev, u32 level)
+{
+    u32 link_index;
+    u32 real_port_number;
+    struct mtip_netdev_priv *priv;
+    u32 val = level%2;
+
+    priv = netdev_priv(netdev);
+    link_index = priv->link_index;
+
+    // check if the corresponding port is in LINK_UP state
+    mtip_lookup_real_port_number_by_link_index(link_index, &real_port_number);
+
+    if (val == 0)
+    {
+        CSMLOGERR("Using set msglevel to set PHYLINK state to CONNECTED for link index %d", link_index);
+        platform_driver_priv->mtip_ports[real_port_number]->port_state = MTIP_PORT_STATE_CONNECTED;
+
+        platform_driver_priv->mtip_ports[real_port_number]->sfp_port_type = PORT_DA;
+    }
+    else
+    {
+        CSMLOGERR("Using set msglevel to toggle PHYLINK state to NOT CONNECTED for link index %d", link_index);
+        platform_driver_priv->mtip_ports[real_port_number]->port_state = MTIP_PORT_STATE_DISCONNECTED;
+    }
+}
+
+static u32 mtip_ethtool_get_msglevel(struct net_device *netdev)
+{
+    u32 link_index;
+    u32 real_port_number;
+    struct mtip_netdev_priv *priv;
+
+    priv = netdev_priv(netdev);
+    link_index = priv->link_index;
+
+    // check if the corresponding port is in LINK_UP state
+    mtip_lookup_real_port_number_by_link_index(link_index, &real_port_number);
+
+    return platform_driver_priv->mtip_ports[real_port_number]->port_state;
+}
+
 static const struct ethtool_ops mtip_ethtool_ops = {
-   .begin = mtip_check_if_running,
    .get_drvinfo = mtip_getdrvinfo,
    .get_sset_count  = mtip_get_sset_count,
    .get_strings = mtip_get_strings,
    .get_ethtool_stats = mtip_ethtool_get_stats,
    .get_ts_info = mtip_get_ts_info,
    .get_link_ksettings = mtip_get_link_ksettings,
+   .get_priv_flags = mtip_ethtool_get_priv_flags,
+   .set_priv_flags = mtip_ethtool_set_priv_flags,
    .get_fecparam = mtip_ethtool_get_fecparam,
    .set_fecparam = mtip_ethtool_set_fecparam,
+   .set_msglevel = mtip_ethtool_set_msglevel,
+   .get_msglevel = mtip_ethtool_get_msglevel,
 };
 
 void mtip_ethtool_set_ops(struct net_device *netdev)
 {
+  struct mtip_netdev_priv* priv;
+  u32 link_index;
+
    CSMLOGINFO("Setting ethtool ops for netdev 0x%lx\n", (unsigned long)netdev);
-   netdev->ethtool_ops = &mtip_ethtool_ops;
+
+   priv = netdev_priv(netdev);
+   link_index = priv->link_index;
+   CSMLOGERR("Link index : %d\n",link_index);
+
+
+   if(link_index == MTIP_DEBUG_ETH_LINK_INDEX)
+      netdev->ethtool_ops = mtip_debug_eth_get_ethtool_ops();
+   else
+      netdev->ethtool_ops = &mtip_ethtool_ops;
 }

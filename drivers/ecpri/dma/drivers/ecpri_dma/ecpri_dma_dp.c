@@ -9,6 +9,7 @@
 #include <linux/io.h>
 #include <linux/ratelimit.h>
 #include <linux/msm_gsi.h>
+#include <linux/mhi_dma.h>
 #include "ecpri_dma_i.h"
 #include "dmahal.h"
 #include "gsi.h"
@@ -286,7 +287,7 @@ void ecpri_dma_dp_exception_endp_notify_completion(
 static int ecpri_dma_dp_gen_gsi_xfer(struct ecpri_dma_pkt *pkt,
 	struct gsi_xfer_elem *gsi_xfer,
 	struct ecpri_dma_outstanding_pkt_wrapper *pkt_wrapper,
-	u32 *total_bytes)
+	u32 *total_bytes, struct ecpri_dma_dynamic_vf_params *vf_params)
 {
 	int i = 0;
 
@@ -305,6 +306,13 @@ static int ecpri_dma_dp_gen_gsi_xfer(struct ecpri_dma_pkt *pkt,
 		}
 		else
 			gsi_xfer[i].flags |= GSI_XFER_FLAG_CHAIN;
+
+		if (vf_params->vf_valid)
+		{
+			gsi_xfer[i].vf_valid = vf_params->vf_valid;
+			gsi_xfer[i].pf = vf_params->is_pf;
+			gsi_xfer[i].vf_id = vf_params->vf_id;
+		}
 
 		total_bytes += pkt->buffs[i]->size;
 	}
@@ -711,13 +719,16 @@ int ecpri_dma_dp_transmit(struct ecpri_dma_endp_context *endp,
 	int dma_dir;
 	u32 total_bytes = 0;
 	unsigned long flags;
+	struct ecpri_dma_dynamic_vf_params vf_params;
+	struct mhi_dma_function_params* function;
 
 	if (!endp || !endp->valid || !pkts || num_of_pkts == 0) {
 		DMAERR("Invalid parameters\n");
 		return -EINVAL;
 	}
 
-	DMADBG("Transmit start\n");
+	DMADBG("Transmit start for ENDP %d GSI ID %d, num_of_pkts: %d\n",
+		endp->endp_id, endp->gsi_id, num_of_pkts);
 
 	if (endp->gsi_ep_cfg->dir == ECPRI_DMA_ENDP_DIR_SRC)
 		dma_dir = DMA_TO_DEVICE;
@@ -739,6 +750,18 @@ int ecpri_dma_dp_transmit(struct ecpri_dma_endp_context *endp,
 				}
 			}
 		}
+	}
+
+	/* Extract VF params for MHI memcpy CHs */
+	if (endp->dynamic_vf_enabled)
+	{
+		function = (struct mhi_dma_function_params*)(pkts[0]->user_data);
+		vf_params.vf_valid = true;
+
+		if (function->function_type == MHI_DMA_FUNCTION_TYPE_PHYSICAL)
+			vf_params.is_pf = true;
+		else
+			vf_params.vf_id = function->vf_id;
 	}
 
 	spin_lock_irqsave(&endp->spinlock, flags);
@@ -799,7 +822,7 @@ int ecpri_dma_dp_transmit(struct ecpri_dma_endp_context *endp,
 		/* Generate parameters for GSI transfer */
 		ret = ecpri_dma_dp_gen_gsi_xfer(pkts[i],
 						&gsi_xfer_arr[gsi_xfer_index],
-						pkt_wrapper, &total_bytes);
+						pkt_wrapper, &total_bytes, &vf_params);
 		if (ret)
 		{
 			DMAERR("Failed to generate gsi xfer for pkt %d\n", i);

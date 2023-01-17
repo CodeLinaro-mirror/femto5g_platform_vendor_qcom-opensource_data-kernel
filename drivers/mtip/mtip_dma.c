@@ -522,8 +522,10 @@ static int mtip_dma_process_packet(struct net_device *netdev,
    u32 link_index;
    spinlock_t *lock;
    unsigned long flags;
-   u64 nanosecs;
-   u64* nsptr;
+   u64 timestamp;
+   u32 timestamp_secs;
+   u32 timestamp_nsecs;
+   u64* tsptr;
    int i;
    struct iphdr* iphdr;
 
@@ -538,8 +540,11 @@ static int mtip_dma_process_packet(struct net_device *netdev,
    // we expect to receive the entire packet in one buffer
    if (num_of_buffers != 1)
    {
-      CSMLOGDBG("num_of_buffers %d != 1.... dropping\n", num_of_buffers);
-      return -1;
+      CSMLOGERR("num_of_buffers %d != 1.... dropping\n", num_of_buffers);
+
+      // free up the data structs and return for now
+      rv = -1;
+      goto out;
    }
 
    base = buffs[0]->virt_base;
@@ -555,7 +560,9 @@ static int mtip_dma_process_packet(struct net_device *netdev,
        // dump the contents of the modified packet
        mtip_dma_dump_packet(base, size);
 #endif
-       return -1;
+       // free up the data structs and return for now
+       rv = -1;
+       goto out;
    }
 
    CSMLOGDBG("Rx packet received status code: %d\n", status_code);
@@ -565,10 +572,19 @@ static int mtip_dma_process_packet(struct net_device *netdev,
        CSMLOGERR("Rx packet status code is PTP, packet size = %d\n", status_code, size);
 
        // the packet holds the 8 bytes TS in trailer
-       nsptr = (u64*)(base + size - 8);
-       nanosecs = *nsptr;
+       tsptr = (u64*)(base + size - 8);
+       timestamp = *tsptr;
+
+       // number of secs is the upper 32 bits
+       timestamp_secs = (u32)(timestamp >> 32);
+
+       // number of nanosecs is the lower 32 bits
+       timestamp_nsecs = (u32)(timestamp & 0xFFFFFFFF);
+
+       CSMLOGINFO("Rx packet timestamp %ld, timestamp_secs %d, timestamp_nsecs %d", timestamp, timestamp_secs, timestamp_nsecs);
+
        // set the timestamp in the skb
-       mtip_ptp_set_rx_timestamp(skb, nanosecs);
+       mtip_ptp_set_rx_timestamp(skb, timestamp_secs, timestamp_nsecs);
 
        skb_put(skb, size - 8);
        //skb->len = size - 8;
@@ -607,12 +623,15 @@ static int mtip_dma_process_packet(struct net_device *netdev,
 
    napi_gro_receive(napi_ptr, skb);
 
+out:
    // free the container
    for (i = 0; i < num_of_buffers; ++i) 
    {
        kfree(buffs[i]);
    }
    kfree(buffs);
+
+   kfree(pkt);
 
    return rv;
 }

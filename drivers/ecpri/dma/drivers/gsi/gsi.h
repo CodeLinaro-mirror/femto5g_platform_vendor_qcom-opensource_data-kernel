@@ -21,14 +21,15 @@
 #define GSI_ASSERT() \
 	BUG()
 
-#define GSI_EE_MAX      7
-#define GSI_AP_EE      0
-#define GSI_Q6_EE      1
-#define GSI_CHAN_MAX      36
-#define GSI_EVT_RING_MAX  36
-#define GSI_NO_EVT_ERINDEX 255
-#define GSI_ISR_CACHE_MAX 20
-#define MAX_CHANNELS_SHARING_EVENT_RING 2
+#define GSI_NUM_MAX						3
+#define GSI_EE_MAX						7
+#define GSI_AP_EE						0
+#define GSI_Q6_EE						1
+#define GSI_CHAN_MAX					36
+#define GSI_EVT_RING_MAX				36
+#define GSI_NO_EVT_ERINDEX				255
+#define GSI_ISR_CACHE_MAX				20
+#define MAX_CHANNELS_SHARING_EVENT_RING	2
 
 #define GSI_IPC_LOGGING(buf, fmt, args...) \
 	do { \
@@ -179,6 +180,7 @@ enum gsi_evt_ring_elem_size {
  * @gsi_read_event_ring_rp: function reads the value of the event ring RP.
  */
 struct gsi_evt_ring_props {
+	uint8_t gsi_id;
 	uint8_t ee;
 	enum gsi_evt_chtype intf;
 	enum gsi_intr_type intr;
@@ -201,7 +203,7 @@ struct gsi_evt_ring_props {
 	bool evchid_valid;
 	uint8_t evchid;
 	uint64_t (*gsi_read_event_ring_rp)(struct gsi_evt_ring_props *props,
-						uint8_t id, int ee);
+						uint8_t id, int ee, int gsi_id);
 };
 
 enum gsi_chan_mode {
@@ -250,6 +252,7 @@ struct gsi_per_notify {
  *
  * @gsi:        GSI core version
  * @ee:         EE where this driver and peripheral driver runs
+ * @num_of_gsi: Number of GSI instances
  * @intr:       control interrupt type
  * @intvec:     write data for MSI write
  * @msi_addr:   MSI address
@@ -281,16 +284,17 @@ struct gsi_per_notify {
 struct gsi_per_props {
 	enum gsi_ver ver;
 	unsigned int ee;
+	unsigned int num_of_gsi;
 	enum gsi_intr_type intr;
 	uint32_t intvec;
 	uint64_t msi_addr;
-	unsigned int irq[GSI_EE_MAX];
+	unsigned int irq[GSI_NUM_MAX][GSI_EE_MAX];
 	phys_addr_t phys_addr;
 	unsigned long size;
 	phys_addr_t emulator_intcntrlr_addr;
 	unsigned long emulator_intcntrlr_size;
 	irq_handler_t emulator_intcntrlr_client_isr;
-	bool mhi_er_id_limits_valid[GSI_EE_MAX];
+	bool mhi_er_id_limits_valid[GSI_NUM_MAX][GSI_EE_MAX];
 	uint32_t mhi_er_id_limits[2];
 	void (*notify_cb)(struct gsi_per_notify *notify);
 	void (*req_clk_cb)(void *user_data, bool *granted);
@@ -393,6 +397,7 @@ enum gsi_chan_use_db_eng {
 /**
  * gsi_chan_props - Channel related properties
  *
+ * @gsi_id:              GSI ID
  * @ee:              execution environment
  * @prot:            interface type
  * @dir:             channel direction
@@ -460,6 +465,7 @@ enum gsi_chan_use_db_eng {
  *
  */
 struct gsi_chan_props {
+	uint8_t gsi_id;
 	uint8_t ee;
 	enum gsi_chan_prot prot;
 	enum gsi_chan_dir dir;
@@ -715,24 +721,29 @@ struct gsi_log_ts {
 	u32 interrupt_type;
 };
 
+struct gsi_id_ee_tuple {
+	int gsi_id;
+	int ee;
+};
+
 struct gsi_ctx {
 	void __iomem *base;
 	phys_addr_t phys_base;
 	struct device *dev;
 	struct gsi_per_props per;
 	bool per_registered;
-	struct gsi_chan_ctx chan[GSI_EE_MAX][GSI_CHAN_MAX];
-	struct ch_debug_stats ch_dbg[GSI_EE_MAX][GSI_CHAN_MAX];
-	struct gsi_evt_ctx evtr[GSI_EE_MAX][GSI_EVT_RING_MAX];
+	struct gsi_chan_ctx chan[GSI_NUM_MAX][GSI_EE_MAX][GSI_CHAN_MAX];
+	struct ch_debug_stats ch_dbg[GSI_NUM_MAX][GSI_EE_MAX][GSI_CHAN_MAX];
+	struct gsi_evt_ctx evtr[GSI_NUM_MAX][GSI_EE_MAX][GSI_EVT_RING_MAX];
 	struct gsi_generic_ee_cmd_debug_stats gen_ee_cmd_dbg;
 	struct mutex mlock;
 	struct semaphore sem;
 	spinlock_t slock;
-	unsigned long evt_bmap[GSI_EE_MAX];
+	unsigned long evt_bmap[GSI_NUM_MAX][GSI_EE_MAX];
 	bool enabled;
-	atomic_t num_chan[GSI_EE_MAX];
-	atomic_t num_evt_ring[GSI_EE_MAX];
-	struct gsi_ee_scratch scratch[GSI_EE_MAX];
+	atomic_t num_chan[GSI_NUM_MAX][GSI_EE_MAX];
+	atomic_t num_evt_ring[GSI_NUM_MAX][GSI_EE_MAX];
+	struct gsi_ee_scratch scratch[GSI_NUM_MAX][GSI_EE_MAX];
 	int num_ch_dp_stats;
 	struct workqueue_struct *dp_stat_wq;
 	u32 max_ch;
@@ -744,7 +755,8 @@ struct gsi_ctx {
 	spinlock_t ch_idr_lock;
 	struct idr ev_idr;
 	spinlock_t ev_idr_lock;
-	int irq_arr[GSI_EE_MAX];
+	struct gsi_id_ee_tuple irq_arr[GSI_NUM_MAX][GSI_EE_MAX];
+	u32 num_of_gsi;
 	/*
 	 * The following used only on emulation systems.
 	 */
@@ -765,8 +777,11 @@ enum gsi_re_type {
 
 struct __packed gsi_tre {
 	uint64_t buffer_ptr;
-	uint16_t buf_len;
-	uint16_t resvd1;
+	uint32_t buf_len : 21;
+	uint32_t resvd1 : 5;
+	uint32_t vf_valid : 1;
+	uint32_t pf : 1;
+	uint32_t vf_id : 4;
 	uint16_t chain:1;
 	uint16_t resvd4:7;
 	uint16_t ieob:1;
@@ -774,7 +789,9 @@ struct __packed gsi_tre {
 	uint16_t bei:1;
 	uint16_t resvd3:5;
 	uint8_t re_type;
-	uint8_t resvd2;
+	uint8_t mirror : 1;
+	uint8_t redirect : 1;
+	uint8_t resvd2 : 6;
 };
 
 struct __packed gsi_xfer_compl_evt {
@@ -857,10 +874,10 @@ enum gsi_generic_ee_cmd_return_code {
  * @mcs_idle_cnt: Cycle count for MCS idle
  */
 struct gsi_hw_profiling_data {
-    u64 bp_cnt;
-    u64 bp_and_pending_cnt;
-    u64 mcs_busy_cnt;
-    u64 mcs_idle_cnt;
+    u64 bp_cnt[GSI_NUM_MAX];
+    u64 bp_and_pending_cnt[GSI_NUM_MAX];
+    u64 mcs_busy_cnt[GSI_NUM_MAX];
+    u64 mcs_idle_cnt[GSI_NUM_MAX];
 };
 
 /**
@@ -919,6 +936,15 @@ extern struct gsi_ctx *gsi_ctx;
  *
  * @xfer_user_data: cookie used in xfer_cb
  *
+ * @vf_valid:   VF valid bit
+ *
+ * @pf:         PF valid bit, in use only if VF valid is set
+ *
+ * @vf_id:      VF ID, in use only if VF valid is set
+ *
+ * @mirror:     mirror bit
+ *
+ * @redirect:   redirect bit
  */
 struct gsi_xfer_elem {
 	uint64_t addr;
@@ -926,6 +952,11 @@ struct gsi_xfer_elem {
 	uint16_t flags;
 	enum gsi_xfer_elem_type type;
 	void *xfer_user_data;
+	bool vf_valid;
+	bool pf;
+	uint16_t vf_id;
+	bool mirror;
+	bool redirect;
 };
 
 /**
@@ -1090,8 +1121,8 @@ int gsi_register_device(struct gsi_per_props *props, unsigned long *dev_hdl);
  *
  * @Return gsi_status
  */
-int gsi_write_device_scratch(unsigned long dev_hdl, int ee,
-		struct gsi_device_scratch *val);
+int gsi_write_device_scratch(unsigned long dev_hdl, int gsi_id, int ee,
+	struct gsi_device_scratch* val);
 
 /**
  * gsi_deregister_device - Peripheral should call this function to
@@ -1232,16 +1263,6 @@ int gsi_write_channel_scratch(unsigned long chan_hdl,
  */
 int gsi_read_channel_scratch(unsigned long chan_hdl,
 		union __packed gsi_channel_scratch *val);
-
-/*
- * gsi_pending_irq_type - Peripheral should call this function to
- * check if there is any pending irq
- *
- * This function can sleep
- *
- * @Return gsi_irq_type
- */
-int gsi_pending_irq_type(void);
 
 /**
  * gsi_update_mhi_channel_scratch - MHI Peripheral should call this
@@ -1433,7 +1454,8 @@ void gsi_get_inst_ram_offset_and_size(unsigned long *base_offset,
 
  * @Return gsi_status
  */
-int gsi_halt_channel_ee(unsigned int chan_idx, unsigned int ee, int *code);
+int gsi_halt_channel_ee(unsigned int chan_idx, unsigned int ee,
+	unsigned int gsi_id, int* code);
 
 /**
  * gsi_get_refetch_reg - get WP/RP value from re_fetch register
@@ -1460,7 +1482,8 @@ int gsi_get_wp(unsigned long chan_hdl);
  *
  * @Return gsi_status
  */
-int gsi_map_base(phys_addr_t gsi_base_addr, u32 gsi_size, enum gsi_ver ver);
+int gsi_map_base(phys_addr_t gsi_base_addr, u32 gsi_size, enum gsi_ver ver,
+	u32 num_of_gsi);
 
 /**
  * gsi_unmap_base - Peripheral should call this function to undo the
@@ -1480,7 +1503,8 @@ int gsi_unmap_base(void);
  *
  * @Return gsi_status
  */
-int gsi_map_virtual_ch_to_per_ep(u32 ee, u32 chan_num, u32 per_ep_index);
+int gsi_map_virtual_ch_to_per_ep(u32 gsi_id, u32 ee, u32 chan_num,
+	u32 per_ep_index);
 
 /**
 * gsi_query_msi_addr - get gsi channel msi address
@@ -1550,19 +1574,19 @@ int gsi_get_fw_version(struct gsi_fw_version *ver);
 /**
  * These APIs are mostly for the ecpri_dma_stats module
  */
-uint64_t gsi_read_event_ring_wp(int evtr_id, int ee);
+uint64_t gsi_read_event_ring_wp(int evtr_id, int ee, int gsi_id);
 
 uint64_t gsi_read_event_ring_bp(int evt_hdl);
 
 uint64_t gsi_get_evt_ring_rp(int evt_hdl);
 
-uint64_t gsi_read_chan_ring_wp(int chan_id, int ee);
+uint64_t gsi_read_chan_ring_wp(int chan_id, int ee, int gsi_id);
 
-uint64_t gsi_read_chan_ring_rp(int chan_id, int ee);
+uint64_t gsi_read_chan_ring_rp(int chan_id, int ee, int gsi_id);
 
 uint64_t gsi_read_chan_ring_bp(int chan_hdl);
 
-uint64_t gsi_read_chan_ring_re_fetch_wp(int chan_id, int ee);
+uint64_t gsi_read_chan_ring_re_fetch_wp(int chan_id, int ee, int gsi_id);
 
 enum gsi_chan_prot gsi_get_chan_prot_type(int chan_hdl);
 
@@ -1580,6 +1604,6 @@ uint32_t gsi_get_evt_ring_len(int evt_hdl);
 
 int gsi_get_peripheral_ee(void);
 
-uint32_t gsi_get_chan_stop_stm(int chan_id, int ee);
+uint32_t gsi_get_chan_stop_stm(int chan_id, int ee, int gsi_id);
 
 #endif

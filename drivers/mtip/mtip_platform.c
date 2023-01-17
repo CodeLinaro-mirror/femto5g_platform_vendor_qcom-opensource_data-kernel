@@ -775,7 +775,7 @@ static int mtip_platform_validate_dt_lane_config(struct mtip_port_device_info* p
         port_speed +=  lane_speed_gbps * link->num_lanes;
     }
 
-    if (port_speed > 100)
+    if (port_speed > 100000)
     {
         CSMLOGERR("Total port_speed %d exceeds 100Gbps\n", port_speed);
         return -1;
@@ -1099,12 +1099,14 @@ static int mtip_platform_set_mac_addresses(void)
     return 0;
 }
 
-static void mtip_platform_consolidate_port_lane_config(struct mtip_port_device_info* port_device)
+static bool mtip_platform_consolidate_port_lane_config(struct mtip_port_device_info* port_device)
 {
     int i, j;
     enum eth_phy_iface_phy_lane_speed_enum  lane_speed;
     u32 num_lanes;
     u32 lane;
+    enum mtip_port_config_enum port_config = MTIP_PORT_CONFIG_4x25GBASE_R;
+    bool rv = true;
 
     CSMLOGINFO("Consolidating lane config of port: %d\n", port_device->port_type);
 
@@ -1130,36 +1132,72 @@ static void mtip_platform_consolidate_port_lane_config(struct mtip_port_device_i
             CSMLOGINFO("Setting port: %d lane_config[%d] to lane_speed: %d\n", port_device->port_type, lane, lane_speed);
         }
     }
-    return;
+
+    // set the PORT CONFIG
+    // for now only symmetric configurations are supported
+    // link 0 configuration will be used to set the port config
+    lane_speed = port_device->link_devices[0].lane_speed;
+    num_lanes = port_device->link_devices[0].num_lanes;
+
+    switch (lane_speed) 
+    {
+    case PHY_LANE_SPEED_25G:
+        {
+            if (num_lanes == 4)
+            {
+                port_config = MTIP_PORT_CONFIG_1x100GBASE_R4_RSFEC;
+            }
+            else if (num_lanes == 2) 
+            {
+                port_config = MTIP_PORT_CONFIG_1x50GBASE_R2_RSFEC;
+            }
+            else
+            {
+                port_config = MTIP_PORT_CONFIG_4x25GBASE_R;
+            }
+        }
+        break;
+
+    case PHY_LANE_SPEED_10G:
+        {
+            if (num_lanes == 4)
+            {
+                port_config = MTIP_PORT_CONFIG_1x40GBASE_R4;
+            }
+            else
+            {
+                port_config = MTIP_PORT_CONFIG_4x10GBASE_R;
+            }
+        }
+        break;
+
+    case PHY_LANE_SPEED_50G:
+    case PHY_LANE_SPEED_100G:
+    default:
+        {
+            CSMLOGERR("Unsupported lane_speed: %d", lane_speed);
+            rv = false;
+        }
+        break;
+    }
+
+    CSMLOGINFO("Setting port: %d port config to %d", port_device->port_type, port_config);
+
+    // set the config of the port
+    port_device->port_config = port_config;
+    return rv;
 }
 
-static int mtip_platform_setup(void)
+int mtip_platform_setup_ethernet(void)
 {
-   int i, j = 0;
+   int i = 0;
    int result;
    int ret = 0;
-   struct net_device *netdev = NULL;
    struct mtip_netdev_priv *priv;
-   u32 total_num_links = 0;
    u32 port_device_index;
    u32 link_device_index;
 
-   // validate device tree config
-   if (mtip_platform_validate_dt_config() < 0)
-   {
-       CSMLOGERR("platform validate failed!\n");
-       return -ENODEV;
-   }
-
-   // enable all the necessary clocks
-   mtip_clocks_setup_clocks();
-
-   // consolidate the lane configuration of all ports
-   for (i = 0; i < platform_driver_priv->devices.num_port_phandles; ++i)
-   {
-       // consolidate the lane config
-       mtip_platform_consolidate_port_lane_config(&platform_driver_priv->devices.port_devices[i]);
-   }
+   CSMLOGINFO("Setting up ethernet");
 
    if (mtip_rumi_platform != 0) 
    {
@@ -1174,7 +1212,7 @@ static int mtip_platform_setup(void)
    }
    else
    {
-       // initialize the PCS of the ports
+       // initialize the RSFEC, SETUP PHY and PHYLINK of the ports
        for (i = 0; i < platform_driver_priv->devices.num_port_phandles; ++i)
        {
            CSMLOGINFO("Initializing RSFEC and PHY for port: %d\n", i);
@@ -1208,6 +1246,95 @@ static int mtip_platform_setup(void)
      }
    }
 
+   // allocate the net device structures
+   for (i = 0; i < MTIP_MAX_LINKS; ++i) 
+   {
+       // for each valid link
+       if (platform_driver_priv->mtip_links[i] != NULL) 
+       {
+           // find the port and link numbers
+           mtip_lookup_device_by_link_index(i, &port_device_index, &link_device_index);
+
+          priv = netdev_priv(platform_driver_priv->mtip_links[i]->dev);
+
+          // Initialize the MAC block
+          mtip_mac_initialize(priv);
+
+          if (mtip_rumi_platform != 0) 
+          {
+              // setup loopback if needed
+              if (mtip_loopback_mode != MTIP_MODE_DEFAULT)
+              {
+                  // enable IOMACRO loopback
+                  mtip_dut_enable_rgmii_loopback(i);
+              }
+              else
+              {
+                  // MDIO registration
+                  result = mtip_mdio_register(platform_driver_priv->mtip_links[i]->dev,
+                                              platform_driver_priv->devices.port_devices[port_device_index].link_devices[link_device_index].link_pdev->dev.of_node);
+                  if (result) {
+                     CSMLOGERR("MDIO registration failed with err %d", result);
+                  }
+
+                  CSMLOGINFO("TX delay = %d, RX delay = %d", mtip_dut_get_tx_delay(i), mtip_dut_get_rx_delay(i));
+              }
+          }
+          else
+          {
+              // this is the default for the target
+              // initialize the PCS for the link
+              mtip_pcs_config_pcs(i);
+
+              if (mtip_loopback_mode == MTIP_MODE_LOOPBACK)
+              {
+                  // enable pcs loopback on the link
+                  mtip_pcs_enable_loopback(i);
+              }
+
+              if (mtip_rumi_platform == 0) 
+              {
+                  // set the MAC interrupt mask
+                  mtip_mac_set_interrupt_mask(i);
+              }
+          }
+       }
+   }
+
+   return ret;
+}
+
+/**
+ * mtip_platform_setup
+ */
+static int mtip_platform_setup(void)
+{
+   int i, j = 0;
+   int result;
+   int ret = 0;
+   struct net_device *netdev = NULL;
+   struct mtip_netdev_priv *priv;
+   u32 total_num_links = 0;
+   u32 port_device_index;
+   u32 link_device_index;
+
+   // validate device tree config
+   if (mtip_platform_validate_dt_config() < 0)
+   {
+       CSMLOGERR("platform validate failed!\n");
+       return -ENODEV;
+   }
+
+   // enable all the necessary clocks
+   mtip_clocks_setup_clocks();
+
+   // consolidate the lane configuration of all ports
+   for (i = 0; i < platform_driver_priv->devices.num_port_phandles; ++i)
+   {
+       // consolidate the lane config
+       mtip_platform_consolidate_port_lane_config(&platform_driver_priv->devices.port_devices[i]);
+   }
+
    // calculate the total number of active links across all ports
    total_num_links = 0;
 
@@ -1236,17 +1363,6 @@ static int mtip_platform_setup(void)
                }
             }
         }
-   }
-
-   if (mtip_rumi_platform == 0) 
-   {
-       // program the MAC address of all the links by reading the fuse registers
-       mtip_platform_set_mac_addresses();
-   }
-   else
-   {
-       // set default mac addresses
-       mtip_platform_set_mac_addresses_for_rumi();
    }
 
    // allocate the net device structures
@@ -1292,70 +1408,40 @@ static int mtip_platform_setup(void)
 
           priv->hashtablebits = 0;
 
+          // set the priv flags to 25Gbps
+          priv->priv_flags = (0x1 << MTIP_PORT_CONFIG_4x25GBASE_R);
+
           // Set up link between ndev and pdev
           SET_NETDEV_DEV(platform_driver_priv->mtip_links[i]->dev, &platform_driver_priv->devices.port_devices[port_device_index].link_devices[link_device_index].link_pdev->dev);
 
           priv->mac_ioaddr = platform_driver_priv->devices.port_devices[port_device_index].link_devices[link_device_index].mac_ioaddr;
 
-          // Initialize the MAC block
-          mtip_mac_initialize(priv);
-
           CSMLOGINFO("dev = 0x%lx with link_index = %d",
                      (unsigned long)platform_driver_priv->mtip_links[i]->dev,
                      priv->link_index);
-
-          if (mtip_rumi_platform != 0) 
-          {
-              // setup loopback if needed
-              if (mtip_loopback_mode != MTIP_MODE_DEFAULT)
-              {
-                  // enable IOMACRO loopback
-                  mtip_dut_enable_rgmii_loopback(i);
-              }
-              else
-              {
-                  // MDIO registration
-                  result = mtip_mdio_register(platform_driver_priv->mtip_links[i]->dev,
-                                              platform_driver_priv->devices.port_devices[port_device_index].link_devices[link_device_index].link_pdev->dev.of_node);
-                  if (result) {
-                     CSMLOGERR("MDIO registration failed with err %d", result);
-                  }
-
-                  CSMLOGINFO("TX delay = %d, RX delay = %d", mtip_dut_get_tx_delay(i), mtip_dut_get_rx_delay(i));
-              }
-          }
-          else
-          {
-              // this is the default for the target
-              // initialize the PCS for the link
-              mtip_pcs_config_pcs(i);
-
-              if (mtip_loopback_mode == MTIP_MODE_LOOPBACK)
-              {
-                  // enable pcs loopback on the link
-                  mtip_pcs_enable_loopback(i);
-              }
-
-              // set the MAC interrupt mask
-              mtip_mac_set_interrupt_mask(i);
-          }
 
           // add the mtip_napi_rx
           // this needs to be done before register netdev
           netif_napi_add(platform_driver_priv->mtip_links[i]->dev, &(platform_driver_priv->mtip_links[i]->napi), mtip_napi_poll, MTIP_NAPI_WEIGHT);
 
           CSMLOGINFO("mtip_devs[%d] = 0x%lx with link_index = %d\n", i, (unsigned long)platform_driver_priv->mtip_links[i]->dev, priv->link_index);
-
        }
    }
 
    if (mtip_rumi_platform == 0)
    {
-      for (i = 0; i < platform_driver_priv->devices.num_port_phandles; ++i)
-      {
-         // setup phylink for the port
-         mtip_phy_create_phylink(&platform_driver_priv->devices.port_devices[i]);
-      }
+       // program the MAC address of all the links by reading the fuse registers
+       mtip_platform_set_mac_addresses();
+
+       for (i = 0; i < platform_driver_priv->devices.num_port_phandles; ++i) {
+           // setup phylink for the port
+           mtip_phy_create_phylink(&platform_driver_priv->devices.port_devices[i]);
+       }
+   }
+   else
+   {
+       // set default mac addresses
+       mtip_platform_set_mac_addresses_for_rumi();
    }
 
    // register the net devices
@@ -1378,6 +1464,9 @@ static int mtip_platform_setup(void)
            }
        }
    }
+
+   // setup the ethernet
+   mtip_platform_setup_ethernet();
 
    // the system topology is now setup using the device tree
    mtip_setup_topology();
@@ -1435,24 +1524,24 @@ int mtip_platform_convert_lane_speed_to_gbps(enum eth_phy_iface_phy_lane_speed_e
     {
     case PHY_LANE_SPEED_100G:
         {
-            return 100;
+            return 100000;
         }
         break;
 
     case PHY_LANE_SPEED_50G:
         {
-            return 50;
+            return 50000;
         }
         break;
 
     case PHY_LANE_SPEED_10G:
         {
-            return 10;
+            return 10000;
         }
         break;
     case PHY_LANE_SPEED_25G:
         {
-            return 25;
+            return 25000;
         }
         break;
     default:

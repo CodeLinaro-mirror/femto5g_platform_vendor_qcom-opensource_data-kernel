@@ -52,18 +52,105 @@
 #include "mtip_ptp.h"
 #include "mtip_workq.h"
 
+static u32 mtip_mac_get_interrupt_summary(struct mtip_port_device_info* port_device)
+{
+    u32 read_val = 0;
+    void __iomem *wrapper_base_addr;
+
+    wrapper_base_addr = port_device->wrapper_base_addr;
+
+    read_val = (u32)ioread32(wrapper_base_addr + MTIP_MAC_WRAPPER_INTERRUPT_SUMMARY_REG_OFFSET);
+    return read_val;
+}
+
+static u32 mtip_mac_get_interrupt_status(u32 link_index)
+{
+    u32 read_val = 0;
+    void __iomem *wrapper_base_addr;
+    u32 port_device_index;
+    u32 link_device_index;
+    u32 real_link_number;
+
+    mtip_lookup_device_by_link_index(link_index, &port_device_index, &link_device_index);
+
+    mtip_lookup_real_link_number_by_link_index(link_index, &real_link_number);
+
+    wrapper_base_addr = platform_driver_priv->devices.port_devices[port_device_index].wrapper_base_addr;
+
+    read_val = (u32)ioread32(wrapper_base_addr + real_link_number*MTIP_MAC_WRAPPER_INTERRUPT_OFFSET + MTIP_MAC_WRAPPER_INTERRUPT_STAT_REG_OFFSET);
+    return read_val;
+}
+
+void mtip_mac_clear_interrupts(u32 link_index, u32 int_to_clear)
+{
+    u32 write_val = int_to_clear;
+    void __iomem *wrapper_base_addr;
+    u32 port_device_index;
+    u32 link_device_index;
+    u32 real_link_number;
+
+    mtip_lookup_device_by_link_index(link_index, &port_device_index, &link_device_index);
+
+    mtip_lookup_real_link_number_by_link_index(link_index, &real_link_number);
+
+    wrapper_base_addr = platform_driver_priv->devices.port_devices[port_device_index].wrapper_base_addr;
+
+    CSMLOGINFO("clearing 0x%x on link_index: %d", write_val, link_index);
+
+    // clear all interrupts
+    iowrite32(write_val,
+              wrapper_base_addr + real_link_number*MTIP_MAC_WRAPPER_INTERRUPT_OFFSET + MTIP_MAC_WRAPPER_INTERRUPT_CLR_REG_OFFSET);
+    return;
+}
+
+static void mtip_mac_clear_all_interrupts(u32 link_index, u32 int_to_clear)
+{
+    u32 write_val = int_to_clear;
+    void __iomem *wrapper_base_addr;
+    u32 port_device_index;
+    u32 link_device_index;
+    u32 real_link_number;
+
+    mtip_lookup_device_by_link_index(link_index, &port_device_index, &link_device_index);
+
+    mtip_lookup_real_link_number_by_link_index(link_index, &real_link_number);
+
+    wrapper_base_addr = platform_driver_priv->devices.port_devices[port_device_index].wrapper_base_addr;
+
+    CSMLOGINFO("clearing all interrupts on link_index: %d", link_index);
+
+    // clear all interrupts
+    iowrite32(write_val,
+              wrapper_base_addr + real_link_number*MTIP_MAC_WRAPPER_INTERRUPT_OFFSET + MTIP_MAC_WRAPPER_INTERRUPT_CLR_REG_OFFSET);
+
+    // reset the CLR_REG
+    iowrite32(0x0,
+              wrapper_base_addr + real_link_number*MTIP_MAC_WRAPPER_INTERRUPT_OFFSET + MTIP_MAC_WRAPPER_INTERRUPT_CLR_REG_OFFSET);
+    return;
+}
+
 static irqreturn_t mtip_mac_interrupt_handler(int irq, void *devptr) 
 {
+   irqreturn_t retval = IRQ_NONE;
    struct mtip_port_device_info * portptr;
    u32 summary;
    u32 int_status;
+   u32 int_mask;
    int i;
    u32 link_index;
-   u64 timestamp;
+   u32 timestamp_secs;
+   u32 timestamp_nsecs;
    bool found = false;
    bool handled = false;
+   u32 handled_interrupts = MTIP_MAC_INTERRUPT_PTP_TX_INTR;
+   handled_interrupts |= MTIP_MAC_INTERRUPT_LINK_DOWN_INTR;
+   handled_interrupts |= MTIP_MAC_INTERRUPT_LINK_UP_INTR;
+   handled_interrupts |= MTIP_MAC_INTERRUPT_HI_BER_INTR;
+   handled_interrupts |= MTIP_MAC_INTERRUPT_LINE_FAULT_INTR;
+   handled_interrupts |= MTIP_MAC_INTERRUPT_REMOTE_FAULT_INTR;
+   handled_interrupts |= MTIP_MAC_INTERRUPT_LOCAL_FAULT_INTR;
 
-   CSMLOGINFO("Got an interrupt!\n");
+   CSMLOGINFO("ENTER: Interrupt! handling 0x%x\n", handled_interrupts);
 
    // check if this an interrupt that needs to be handled
    for (i = 0; i < platform_driver_priv->devices.num_port_phandles; ++i) 
@@ -78,7 +165,8 @@ static irqreturn_t mtip_mac_interrupt_handler(int irq, void *devptr)
    if (found == false) 
    {
        // no need to handle interrupt
-       return IRQ_NONE;
+       retval = IRQ_NONE;
+       goto func_exit;
    }
 
    // set the portptr
@@ -100,49 +188,55 @@ static irqreturn_t mtip_mac_interrupt_handler(int irq, void *devptr)
            mtip_lookup_link_index_by_real_port_and_link(&link_index, portptr->port_type, i);
 
            int_status = mtip_mac_get_interrupt_status(link_index);
+           int_mask = mtip_mac_get_interrupt_mask(link_index);
 
-           CSMLOGINFO("Interrupt status 0x%x for link: %d with link_index: %d\n", int_status, i, link_index);
+           CSMLOGINFO("Interrupt status 0x%x for link: %d with link_index: %d, mask: 0x%x\n", int_status, i, link_index, int_mask);
 
+           // check for PTP interrupt
            if ((int_status & MTIP_MAC_INTERRUPT_PTP_TX_INTR) != 0)
            {
                // there is a PTP interrupt pending
-               timestamp = mtip_mac_read_timestamp(link_index);
+               mtip_mac_read_timestamp(link_index, &timestamp_secs, &timestamp_nsecs);
 
-               CSMLOGINFO("Tx Timestamp %d read for link: %d with link_index: %d\n", timestamp, i, link_index);
+               CSMLOGINFO("Tx Timestamp %d, %d read for link: %d with link_index: %d\n", timestamp_secs, timestamp_nsecs, i, link_index);
 
                // post a job to workqueue to process this timestamp
-               post_mtip_process_timestamp(link_index, timestamp);
-
-               // clear the interrupt
-               mtip_mac_clear_interrupts(link_index, MTIP_MAC_INTERRUPT_PTP_TX_INTR);
+               post_mtip_process_timestamp(link_index, timestamp_secs, timestamp_nsecs);
 
                handled = true;
            }
+
+           // check for LINK DOWN
            if ((int_status & MTIP_MAC_INTERRUPT_LINK_DOWN_INTR) != 0)
            {
                // check if the LINK_UP_INTR is also set
                if ((int_status & MTIP_MAC_INTERRUPT_LINK_UP_INTR) != 0) 
                {
+                   CSMLOGINFO("Got a link down/up interrupt link_index: %d: ignoring", link_index);
+
                    // LINK_UP also set
                    // ignore both
                    handled = true;
                }
                else
                {
+                   CSMLOGINFO("Got a link down interrupt link_index: %d", link_index);
+
                    // got a link down interrupt for link index
                    post_mtip_process_link_state(link_index, false);
 
                    handled = true;
                }
-
-               // clear the interrupt
-               mtip_mac_clear_interrupts(link_index, MTIP_MAC_INTERRUPT_LINK_DOWN_INTR);
            }
+
+           // check for LINK UP
            if ((int_status & MTIP_MAC_INTERRUPT_LINK_UP_INTR) != 0) 
            {
                // check if LINK_DOWN is set
                if ((int_status & MTIP_MAC_INTERRUPT_LINK_DOWN_INTR) != 0)
                {
+                   CSMLOGINFO("Got a link down/up interrupt link_index: %d: ignoring", link_index);
+
                    // LINK_DOWN also set
                    // ignore both
 
@@ -150,15 +244,57 @@ static irqreturn_t mtip_mac_interrupt_handler(int irq, void *devptr)
                }
                else
                {
+                   CSMLOGINFO("Got a link up interrupt link_index: %d", link_index);
+
                    // got a link up interrupt for link index
                    post_mtip_process_link_state(link_index, true);
 
                    handled = true;
                }
-
-               // clear the interrupt
-               mtip_mac_clear_interrupts(link_index, MTIP_MAC_INTERRUPT_LINK_UP_INTR);
            }
+
+           // check if HI BER
+           if ((int_status & MTIP_MAC_INTERRUPT_HI_BER_INTR) != 0)
+           {
+               CSMLOGINFO("Received a HI-BER interrupt on link_index: %d", link_index);
+
+               handled = true;
+           }
+
+           // check if LINE FAULT
+           if ((int_status & MTIP_MAC_INTERRUPT_LINE_FAULT_INTR) != 0)
+           {
+               CSMLOGINFO("Received a Line fault interrupt on link_index: %d", link_index);
+
+               handled = true;
+           }
+
+           // check if REMOTE FAULT
+           if ((int_status & MTIP_MAC_INTERRUPT_REMOTE_FAULT_INTR) != 0)
+           {
+               CSMLOGINFO("Received a remote fault interrupt on link_index: %d", link_index);
+
+               handled = true;
+           }
+
+           // check if LOCAL FAULT
+           if ((int_status & MTIP_MAC_INTERRUPT_LOCAL_FAULT_INTR) != 0)
+           {
+               CSMLOGINFO("Received a local fault interrupt on link_index: %d", link_index);
+
+               handled = true;
+           }
+
+           // catchall
+           if ((int_status & ~(handled_interrupts)) != 0)
+           {
+               CSMLOGINFO("Interrupt 0x%x received for link: %d with link_index: %d\n", (int_status & ~(handled_interrupts)), i, link_index);
+
+               handled = true;
+           }
+
+           // clear all the pending interrupts
+           mtip_mac_clear_all_interrupts(link_index, int_status);
        }
 
        summary = summary >> 1;
@@ -167,13 +303,12 @@ static irqreturn_t mtip_mac_interrupt_handler(int irq, void *devptr)
    if (handled == true) 
    {
        // set as handled
-       return IRQ_HANDLED;
+       retval = IRQ_HANDLED;
    }
-   else
-   {
-       // set as not handled
-       return IRQ_NONE;
-   }
+
+func_exit:
+   CSMLOGINFO("EXIT: Interrupt! handling retval = %d\n", retval);
+   return retval;
 }
 
 static int mtip_mac_read_version(struct mtip_netdev_priv *priv) {
@@ -247,8 +382,18 @@ void mtip_mac_set_frame_length(struct mtip_netdev_priv *priv, u32 frame_length)
 {
    u32 link_index = priv->link_index;
 
-   iowrite32(frame_length, priv->mac_ioaddr + MTIP_MAC_FRM_LENGTH);
-   CSMLOGINFO("Setting frame length to %d for link index: %d\n", frame_length, link_index);
+   // check if the frame length at least MTIP_MAC_INIT_FRAME_LENGTH
+   if (frame_length < MTIP_MAC_INIT_FRAME_LENGTH) 
+   {
+       // set the frame length to MTIP_MAC_INIT_FRAME_LENGTH
+       iowrite32(MTIP_MAC_INIT_FRAME_LENGTH, priv->mac_ioaddr + MTIP_MAC_FRM_LENGTH);
+       CSMLOGINFO("Setting frame length to %d for link index: %d\n", MTIP_MAC_INIT_FRAME_LENGTH, link_index);
+   }
+   else
+   {
+       iowrite32(frame_length, priv->mac_ioaddr + MTIP_MAC_FRM_LENGTH);
+       CSMLOGINFO("Setting frame length to %d for link index: %d\n", frame_length, link_index);
+   }
 }
 
 u32 mtip_mac_get_frame_length(u32 port_number, u32 link_number)
@@ -461,6 +606,46 @@ void mtip_mac_disable_tx_rx(u32 link_index)
    iowrite32(command_config, mac_ioaddr + MTIP_MAC_COMMAND_CONFIG);
 }
 
+static void mtip_mac_set_xif_mode(struct mtip_netdev_priv *priv) {
+    u32 link_index = priv->link_index;
+    u32 port_device_index;
+    u32 link_device_index;
+    enum mtip_port_config_enum port_config;
+    u32 xif_mode = MTIP_MAC_INIT_XIF_MODE_FOR_XLGMII;
+
+    mtip_lookup_device_by_link_index(link_index, &port_device_index, &link_device_index);
+
+    port_config = platform_driver_priv->devices.port_devices[port_device_index].port_config;
+
+    switch (port_config) {
+    case MTIP_PORT_CONFIG_1x25GBASE_R:
+    case MTIP_PORT_CONFIG_1x25GBASE_R_FEC:
+    case MTIP_PORT_CONFIG_4x25GBASE_R:
+    case MTIP_PORT_CONFIG_4x25GBASE_R_FEC:
+    case MTIP_PORT_CONFIG_1x25GBASE_R_RSFEC:
+    case MTIP_PORT_CONFIG_4x25GBASE_R_RSFEC:
+    case MTIP_PORT_CONFIG_1x10GBASE_R:
+    case MTIP_PORT_CONFIG_1x10GBASE_R_FEC:
+    case MTIP_PORT_CONFIG_4x10GBASE_R:
+    case MTIP_PORT_CONFIG_4x10GBASE_R_FEC:
+        {
+            xif_mode = MTIP_MAC_INIT_XIF_MODE_FOR_XGMII;
+        }
+        break;
+
+    default:
+        {
+            xif_mode = MTIP_MAC_INIT_XIF_MODE_FOR_XLGMII;
+        }
+        break;
+    }
+
+    CSMLOGINFO("Setting xif_mode of link_index: %d to: 0x%x", link_index, xif_mode);
+
+    iowrite32(xif_mode, priv->mac_ioaddr + MTIP_MAC_XIF_MODE);
+    return;
+}
+
 /*
 1.	Provide a soft reset to the MAC core by doing the following steps.
 a.	Write to the register MAC0_COMMAND_CONFIG with vaue 0x1800.
@@ -518,8 +703,8 @@ void mtip_mac_initialize(struct mtip_netdev_priv *priv)
    // set the CRC INV MASK
    iowrite32(MTIP_MAC_INIT_CRC_INV_MASK, priv->mac_ioaddr + MTIP_MAC_CRC_INV_MASK);
 
-   // set the XIF mode: TBD
-   iowrite32(MTIP_MAC_INIT_XIF_MODE, priv->mac_ioaddr + MTIP_MAC_XIF_MODE);
+   // set the XIF mode
+   mtip_mac_set_xif_mode(priv);
 
    CSMLOGINFO("MAC Init complete\n");
 }
@@ -556,63 +741,386 @@ static u32 mtip_mac_wrapper_calendar_cfg_val(struct mtip_port_device_info* port_
     return cfg_val;
 }
 
-void mtip_mac_wrapper_pcs_mode_control(struct mtip_port_device_info* port_device)
+static void mtip_mac_wrapper_set_csr_cfg(struct mtip_port_device_info* port_device)
 {
-    int i;
-    u32 num_lanes;
-    int j;
-    enum eth_phy_iface_phy_lane_speed_enum lane_speed;
-    u32 lane;
-    u32 csr_cfg = 0;
-    u32 pcs_mode_set = 0;
-    u32 serdes_mux_cfg = 0;
+    u32 csr_cfg = MTIP_MAC_WRAPPER_CSR_CFG_REG_VAL;
     void __iomem* wrapper_base_addr = port_device->wrapper_base_addr;
+    enum mtip_port_config_enum port_config = port_device->port_config;
 
-    for (i = 0; i < port_device->num_link_phandles; ++i) 
+    switch (port_config)
     {
-        num_lanes = port_device->link_devices[i].num_lanes;
-        lane_speed = port_device->link_devices[i].lane_speed;
-        
-        for (j = 0; j < num_lanes; ++j)
+    case MTIP_PORT_CONFIG_1x100GBASE_R:
+    case MTIP_PORT_CONFIG_1x100GBASE_R_RSFEC:
+    case MTIP_PORT_CONFIG_1x100GBASE_R_RSFEC_LL:
         {
-            lane = port_device->link_devices[j].lanes[j];
-
-            // configure the lane based on the speed
-            switch (lane_speed)
-            {
-            case PHY_LANE_SPEED_25G:
-                {
-                    // this needs a proper fix
-                    pcs_mode_set = MTIP_MAC_WRAPPER_PCS_MODE_25G_RSFEC_DISABLE_VAL;
-                    csr_cfg = 0x3C00;
-                    serdes_mux_cfg = 0x400;
-                }
-                break;
-            case PHY_LANE_SPEED_10G:
-            case PHY_LANE_SPEED_50G:
-            case PHY_LANE_SPEED_100G:
-            default:
-                {
-                    CSMLOGINFO("Need settings for speed: %d\n", lane_speed);
-                }
-                break;
-            }
+            csr_cfg = MTIP_MAC_WRAPPER_CSR_CFG_100GBASE_R_VAL;
         }
+        break;
+
+    case MTIP_PORT_CONFIG_1x100GBASE_R2:
+    case MTIP_PORT_CONFIG_1x100GBASE_R2_RSFEC:
+    case MTIP_PORT_CONFIG_1x50GBASE_R:
+    case MTIP_PORT_CONFIG_1x50GBASE_R_RSFEC:
+    case MTIP_PORT_CONFIG_2x50GBASE_R:
+    case MTIP_PORT_CONFIG_2x50GBASE_R_RSFEC:
+    case MTIP_PORT_CONFIG_2x50GBASE_R2:
+    case MTIP_PORT_CONFIG_2x50GBASE_R2_FEC:
+    case MTIP_PORT_CONFIG_2x50GBASE_R2_LUAI:
+    case MTIP_PORT_CONFIG_2x50GBASE_R2_LUAI_FEC:
+        {
+            csr_cfg = MTIP_MAC_WRAPPER_CSR_CFG_50GBASE_R_VAL;
+        }
+        break;
+
+    case MTIP_PORT_CONFIG_1x40GBASE_R4:
+    case MTIP_PORT_CONFIG_1x40GBASE_R4_FEC:
+        {
+            csr_cfg = MTIP_MAC_WRAPPER_CSR_CFG_40GBASE_R_VAL;
+        }
+        break;
+
+    case MTIP_PORT_CONFIG_1x10GBASE_R:
+    case MTIP_PORT_CONFIG_1x10GBASE_R_FEC:
+        {
+            csr_cfg = MTIP_MAC_WRAPPER_CSR_CFG_10GBASE_R_VAL;
+        }
+        break;
+
+    case MTIP_PORT_CONFIG_1x100GBASE_R4:
+    case MTIP_PORT_CONFIG_1x100GBASE_R4_RSFEC:
+    case MTIP_PORT_CONFIG_1x50GBASE_R2:
+    case MTIP_PORT_CONFIG_1x50GBASE_R2_RSFEC:
+    case MTIP_PORT_CONFIG_1x50GBASE_R2_LUAI:
+    case MTIP_PORT_CONFIG_1x50GBASE_R2_LUAI_FEC:
+    case MTIP_PORT_CONFIG_1x25GBASE_R:
+    case MTIP_PORT_CONFIG_1x25GBASE_R_FEC:
+    case MTIP_PORT_CONFIG_1x25GBASE_R_RSFEC:
+    case MTIP_PORT_CONFIG_4x25GBASE_R:
+    case MTIP_PORT_CONFIG_4x25GBASE_R_FEC:
+    case MTIP_PORT_CONFIG_4x25GBASE_R_RSFEC:
+    case MTIP_PORT_CONFIG_4x10GBASE_R:
+    case MTIP_PORT_CONFIG_4x10GBASE_R_FEC:
+    default:
+        {
+            // set to the default value
+            csr_cfg = MTIP_MAC_WRAPPER_CSR_CFG_REG_VAL;
+        }
+        break;
     }
 
-    CSMLOGINFO("Setting CSR: 0%x, PCS Mode: 0x%x, MUX CFG: 0x%x\n", csr_cfg, pcs_mode_set, serdes_mux_cfg);
+    CSMLOGINFO("Setting CSR_CFG to: 0x%x", csr_cfg);
 
     // set the mac wrapper csr cfg
     iowrite32(csr_cfg,
               wrapper_base_addr + MTIP_MAC_WRAPPER_CSR_CONFIG_OFFSET);
+    return;
+}
+
+static void mtip_mac_wrapper_set_pcs_mode(struct mtip_port_device_info* port_device)
+{
+    u32 pcs_mode_set = 0;
+    void __iomem* wrapper_base_addr = port_device->wrapper_base_addr;
+    enum mtip_port_config_enum port_config = port_device->port_config;
+
+    switch (port_config) 
+    {
+    case MTIP_PORT_CONFIG_1x100GBASE_R:
+        {
+            pcs_mode_set =  0x404c0;
+        }
+        break;
+    case MTIP_PORT_CONFIG_1x100GBASE_R_RSFEC:
+        {
+            pcs_mode_set =  0x400c0;
+        }
+        break;
+    case MTIP_PORT_CONFIG_1x100GBASE_R_RSFEC_LL:
+        {
+            pcs_mode_set =  0x430c0;
+        }
+        break;
+    case MTIP_PORT_CONFIG_1x100GBASE_R2:
+        {
+            pcs_mode_set =  0x400c3;
+        }
+        break;
+    case MTIP_PORT_CONFIG_1x100GBASE_R2_RSFEC:
+        {
+            pcs_mode_set =  0x4f0c3;
+        }
+        break;
+    case MTIP_PORT_CONFIG_1x100GBASE_R4:
+        {
+            pcs_mode_set =  0x4000F;
+        }
+        break;
+    case MTIP_PORT_CONFIG_1x100GBASE_R4_RSFEC:
+        {
+            pcs_mode_set =  0x4f00f;
+        }
+        break;
+    case MTIP_PORT_CONFIG_1x40GBASE_R4:
+        {
+            pcs_mode_set =  0x100000;
+        }
+        break;
+    case MTIP_PORT_CONFIG_1x40GBASE_R4_FEC:
+        {
+            pcs_mode_set =  0x1f00000;
+        }
+        break;
+    case MTIP_PORT_CONFIG_1x50GBASE_R:
+        {
+            pcs_mode_set =  0x41;
+        }
+        break;
+    case MTIP_PORT_CONFIG_1x50GBASE_R_RSFEC:
+        {
+            pcs_mode_set =  0x1041;
+        }
+        break;
+    case MTIP_PORT_CONFIG_1x50GBASE_R2:
+        {
+            pcs_mode_set =  0x3;
+        }
+        break;
+    case MTIP_PORT_CONFIG_1x50GBASE_R2_RSFEC:
+        {
+            pcs_mode_set =  0x3003;
+        }
+        break;
+    case MTIP_PORT_CONFIG_1x50GBASE_R2_LUAI:
+        {
+            pcs_mode_set =  0x10000;
+        }
+        break;
+    case MTIP_PORT_CONFIG_1x50GBASE_R2_LUAI_FEC:
+        {
+            pcs_mode_set =  0x210000;
+        }
+        break;
+    case MTIP_PORT_CONFIG_1x25GBASE_R:
+        {
+            pcs_mode_set =  0;
+        }
+        break;
+    case MTIP_PORT_CONFIG_1x25GBASE_R_FEC:
+        {
+            pcs_mode_set =  0x600000;
+        }
+        break;
+    case MTIP_PORT_CONFIG_1x25GBASE_R_RSFEC:
+        {
+            pcs_mode_set =  0xF031;
+        }
+        break;
+    case MTIP_PORT_CONFIG_1x10GBASE_R:
+        {
+            pcs_mode_set =  0;
+        }
+        break;
+    case MTIP_PORT_CONFIG_1x10GBASE_R_FEC:
+        {
+            pcs_mode_set =  0x600000;
+        }
+        break;
+    case MTIP_PORT_CONFIG_2x50GBASE_R:
+        {
+            pcs_mode_set =  0xc3;
+        }
+        break;
+    case MTIP_PORT_CONFIG_2x50GBASE_R_RSFEC:
+        {
+            pcs_mode_set =  0x30c3;
+        }
+        break;
+    case MTIP_PORT_CONFIG_2x50GBASE_R2:
+        {
+            pcs_mode_set =  0;
+        }
+        break;
+    case MTIP_PORT_CONFIG_2x50GBASE_R2_FEC:
+        {
+            pcs_mode_set =  0;
+        }
+        break;
+    case MTIP_PORT_CONFIG_2x50GBASE_R2_LUAI:
+        {
+            pcs_mode_set =  0;
+        }
+        break;
+    case MTIP_PORT_CONFIG_2x50GBASE_R2_LUAI_FEC:
+        {
+            pcs_mode_set =  0;
+        }
+        break;
+    case MTIP_PORT_CONFIG_4x25GBASE_R:
+        {
+            pcs_mode_set =  0;
+        }
+        break;
+    case MTIP_PORT_CONFIG_4x25GBASE_R_FEC:
+        {
+            pcs_mode_set =  0x1e00000;
+        }
+        break;
+    case MTIP_PORT_CONFIG_4x25GBASE_R_RSFEC:
+        {
+            pcs_mode_set =  0x3f;
+        }
+        break;
+    case MTIP_PORT_CONFIG_4x10GBASE_R:
+        {
+            pcs_mode_set =  0;
+        }
+        break;
+    case MTIP_PORT_CONFIG_4x10GBASE_R_FEC:
+        {
+            pcs_mode_set =  0x1e00000;
+        }
+        break;
+    default:
+        {
+            pcs_mode_set = 0x0;
+        }
+        break;
+    }
+
+    CSMLOGINFO("Setting PCS Mode to: 0x%x", pcs_mode_set);
 
     // set the mac wrapper pcs mode set
     iowrite32(pcs_mode_set,
               wrapper_base_addr + MTIP_MAC_WRAPPER_PCS_MODE_SET_OFFSET);
+    return;
+}
 
-    // set the serdes mux cfg register
-    iowrite32(serdes_mux_cfg,
+static void mtip_mac_wrapper_set_serdes_mux_cfg(struct mtip_port_device_info* port_device)
+{
+    u32 serdes_mux_val = 0;
+    void __iomem* wrapper_base_addr = port_device->wrapper_base_addr;
+    enum mtip_port_config_enum port_config = port_device->port_config;
+
+    switch (port_config)
+    {
+    case MTIP_PORT_CONFIG_1x100GBASE_R:
+    case MTIP_PORT_CONFIG_1x100GBASE_R_RSFEC:
+    case MTIP_PORT_CONFIG_1x100GBASE_R_RSFEC_LL:
+        {
+            serdes_mux_val = 0x1;
+        }
+        break;
+
+    case MTIP_PORT_CONFIG_1x100GBASE_R2:
+    case MTIP_PORT_CONFIG_1x100GBASE_R2_RSFEC:
+        {
+            serdes_mux_val = 0x2;
+        }
+        break;
+
+    case MTIP_PORT_CONFIG_1x100GBASE_R4:
+    case MTIP_PORT_CONFIG_1x100GBASE_R4_RSFEC:
+        {
+            serdes_mux_val = 0x4;
+        }
+        break;
+
+    case MTIP_PORT_CONFIG_1x50GBASE_R:
+    case MTIP_PORT_CONFIG_1x50GBASE_R_RSFEC:
+        {
+            serdes_mux_val = 0x20;
+        }
+        break;
+
+    case MTIP_PORT_CONFIG_1x50GBASE_R2:
+    case MTIP_PORT_CONFIG_1x50GBASE_R2_RSFEC:
+    case MTIP_PORT_CONFIG_1x50GBASE_R2_LUAI:
+    case MTIP_PORT_CONFIG_1x50GBASE_R2_LUAI_FEC:
+        {
+            serdes_mux_val = 0x8;
+        }
+        break;
+
+    case MTIP_PORT_CONFIG_1x40GBASE_R4:
+    case MTIP_PORT_CONFIG_1x40GBASE_R4_FEC:
+        {
+            serdes_mux_val = 0x10;
+        }
+        break;
+
+    case MTIP_PORT_CONFIG_1x25GBASE_R:
+    case MTIP_PORT_CONFIG_1x25GBASE_R_FEC:
+    case MTIP_PORT_CONFIG_1x25GBASE_R_RSFEC:
+        {
+            serdes_mux_val = 0x400;
+        }
+        break;
+
+    case MTIP_PORT_CONFIG_1x10GBASE_R:
+    case MTIP_PORT_CONFIG_1x10GBASE_R_FEC:
+        {
+            serdes_mux_val = 0;
+        }
+        break;
+
+    case MTIP_PORT_CONFIG_2x50GBASE_R:
+    case MTIP_PORT_CONFIG_2x50GBASE_R_RSFEC:
+        {
+            serdes_mux_val = 0x20;
+        }
+        break;
+
+    case MTIP_PORT_CONFIG_2x50GBASE_R2:
+    case MTIP_PORT_CONFIG_2x50GBASE_R2_FEC:
+    case MTIP_PORT_CONFIG_2x50GBASE_R2_LUAI:
+    case MTIP_PORT_CONFIG_2x50GBASE_R2_LUAI_FEC:
+        {
+            serdes_mux_val = 0x800;
+        }
+        break;
+
+    case MTIP_PORT_CONFIG_4x25GBASE_R:
+    case MTIP_PORT_CONFIG_4x25GBASE_R_FEC:
+    case MTIP_PORT_CONFIG_4x25GBASE_R_RSFEC:
+        {
+            serdes_mux_val = 0x400;
+        }
+        break;
+
+    case MTIP_PORT_CONFIG_4x10GBASE_R:
+    case MTIP_PORT_CONFIG_4x10GBASE_R_FEC:
+        {
+            serdes_mux_val = 0;
+        }
+        break;
+
+    default:
+        {
+            serdes_mux_val = 0;
+        }
+        break;
+    }
+
+    CSMLOGINFO("Setting SERDES MUX CFG to: 0x%x\n", serdes_mux_val);
+
+    // set the serdes mux val register
+    iowrite32(serdes_mux_val,
               wrapper_base_addr + MTIP_MAC_WRAPPER_SERDES_MUX_CFG_OFFSET);
+    return;
+}
+
+/* 
+ * mtip_mac_wrapper_pcs_mode_control 
+ */ 
+void mtip_mac_wrapper_pcs_mode_control(struct mtip_port_device_info* port_device)
+{
+    // set the csr cfg value
+    mtip_mac_wrapper_set_csr_cfg(port_device);
+
+    // set the pcs mode value
+    mtip_mac_wrapper_set_pcs_mode(port_device);
+
+    // set the serdes mux cfg value
+    mtip_mac_wrapper_set_serdes_mux_cfg(port_device);
 
     return;
 }
@@ -622,10 +1130,8 @@ void mtip_mac_wrapper_pcs_mode_control(struct mtip_port_device_info* port_device
  */
 void mtip_mac_wrapper_init(struct mtip_port_device_info* port_device)
 {
-    void __iomem *wrapper_base_addr;
+    void __iomem *wrapper_base_addr = port_device->wrapper_base_addr;
     u32 calendar_cfg_val;
-
-    wrapper_base_addr = port_device->wrapper_base_addr;
 
    CSMLOGINFO("MAC Wrapper Init\n");
 
@@ -657,7 +1163,7 @@ void mtip_mac_wrapper_register_irq(struct device *dev, unsigned int irq,
 
    CSMLOGINFO("Registering IRQ %d, %s for MAC Wrapper\n", irq, dev_name);
 
-   irqret = devm_request_irq(dev, irq, (irq_handler_t)mtip_mac_interrupt_handler, IRQF_SHARED | IRQF_TRIGGER_RISING, dev_name, devptr);
+   irqret = devm_request_irq(dev, irq, (irq_handler_t)mtip_mac_interrupt_handler, IRQF_SHARED | IRQF_TRIGGER_HIGH, dev_name, devptr);
    if (irqret) {
        CSMLOGERR("failed to register IRQ handler irq=%d\n", irq);
        return;
@@ -688,7 +1194,12 @@ void mtip_mac_set_interrupt_mask(u32 link_index)
     wrapper_base_addr = platform_driver_priv->devices.port_devices[port_device_index].wrapper_base_addr;
 
     // set the interrupts we are interested in
-    write_val |= (MTIP_MAC_INTERRUPT_PTP_TX_INTR | MTIP_MAC_INTERRUPT_LINK_DOWN_INTR | MTIP_MAC_INTERRUPT_LINK_UP_INTR);
+    write_val  =  MTIP_MAC_INTERRUPT_PTP_TX_INTR;
+    write_val |= MTIP_MAC_INTERRUPT_LINK_DOWN_INTR;
+    write_val |= MTIP_MAC_INTERRUPT_LINK_UP_INTR;
+    write_val |= MTIP_MAC_INTERRUPT_HI_BER_INTR;
+    write_val |= MTIP_MAC_INTERRUPT_LINE_FAULT_INTR;
+    write_val |= MTIP_MAC_INTERRUPT_REMOTE_FAULT_INTR;
 
     CSMLOGINFO("Setting mask: 0x%x to register 0x%x with real_link_number %d link_index %d\n", write_val, 
                real_link_number*MTIP_MAC_WRAPPER_INTERRUPT_OFFSET + MTIP_MAC_WRAPPER_INTERRUPT_MASK_REG_OFFSET, real_link_number, link_index);
@@ -699,15 +1210,12 @@ void mtip_mac_set_interrupt_mask(u32 link_index)
     return;
 }
 
-u64 mtip_mac_read_timestamp(u32 link_index)
+void mtip_mac_read_timestamp(u32 link_index, u32* timestamp_secs, u32* timestamp_nsecs)
 {
-    u32 read_val1 = 0;
-    u32 read_val0 = 0;
     void __iomem *wrapper_base_addr;
     u32 port_device_index;
     u32 link_device_index;
     u32 real_link_number;
-    u64 timestamp;
 
     mtip_lookup_device_by_link_index(link_index, &port_device_index, &link_device_index);
 
@@ -716,15 +1224,12 @@ u64 mtip_mac_read_timestamp(u32 link_index)
     wrapper_base_addr = platform_driver_priv->devices.port_devices[port_device_index].wrapper_base_addr;
 
     // read the upper 32 bits
-    read_val1 = (u32)ioread32(wrapper_base_addr + real_link_number*MTIP_MAC_WRAPPER_TX_TS_REG_OFFSET + MTIP_MAC_WRAPPER_TX_TS1_REG_BASE_OFFSET);
+    *timestamp_secs = (u32)ioread32(wrapper_base_addr + real_link_number*MTIP_MAC_WRAPPER_TX_TS_REG_OFFSET + MTIP_MAC_WRAPPER_TX_TS1_REG_BASE_OFFSET);
 
     // read the lower 32 bits
-    read_val0 = (u32)ioread32(wrapper_base_addr + real_link_number*MTIP_MAC_WRAPPER_TX_TS_REG_OFFSET + MTIP_MAC_WRAPPER_TX_TS0_REG_BASE_OFFSET);
+    *timestamp_nsecs = (u32)ioread32(wrapper_base_addr + real_link_number*MTIP_MAC_WRAPPER_TX_TS_REG_OFFSET + MTIP_MAC_WRAPPER_TX_TS0_REG_BASE_OFFSET);
 
-    // check this. Is read_val1 the significant bits?
-    timestamp = ((u64)read_val0 | ((u64)read_val1 << 32));
-
-    return timestamp;
+    return;
 }
 
 u32 mtip_mac_get_interrupt_mask(u32 link_index)
@@ -745,55 +1250,6 @@ u32 mtip_mac_get_interrupt_mask(u32 link_index)
     return read_val;
 }
 
-u32 mtip_mac_get_interrupt_summary(struct mtip_port_device_info* port_device)
-{
-    u32 read_val = 0;
-    void __iomem *wrapper_base_addr;
-
-    wrapper_base_addr = port_device->wrapper_base_addr;
-
-    read_val = (u32)ioread32(wrapper_base_addr + MTIP_MAC_WRAPPER_INTERRUPT_SUMMARY_REG_OFFSET);
-    return read_val;
-}
-
-u32 mtip_mac_get_interrupt_status(u32 link_index)
-{
-    u32 read_val = 0;
-    void __iomem *wrapper_base_addr;
-    u32 port_device_index;
-    u32 link_device_index;
-    u32 real_link_number;
-
-    mtip_lookup_device_by_link_index(link_index, &port_device_index, &link_device_index);
-
-    mtip_lookup_real_link_number_by_link_index(link_index, &real_link_number);
-
-    wrapper_base_addr = platform_driver_priv->devices.port_devices[port_device_index].wrapper_base_addr;
-
-    read_val = (u32)ioread32(wrapper_base_addr + real_link_number*MTIP_MAC_WRAPPER_INTERRUPT_OFFSET + MTIP_MAC_WRAPPER_INTERRUPT_STAT_REG_OFFSET);
-    return read_val;
-}
-
-void mtip_mac_clear_interrupts(u32 link_index, u32 int_to_clear)
-{
-    u32 write_val = int_to_clear;
-    void __iomem *wrapper_base_addr;
-    u32 port_device_index;
-    u32 link_device_index;
-    u32 real_link_number;
-
-    mtip_lookup_device_by_link_index(link_index, &port_device_index, &link_device_index);
-
-    mtip_lookup_real_link_number_by_link_index(link_index, &real_link_number);
-
-    wrapper_base_addr = platform_driver_priv->devices.port_devices[port_device_index].wrapper_base_addr;
-
-    // clear all interrupts
-    iowrite32(write_val,
-              wrapper_base_addr + real_link_number*MTIP_MAC_WRAPPER_INTERRUPT_OFFSET + MTIP_MAC_WRAPPER_INTERRUPT_CLR_REG_OFFSET);
-    return;
-}
-
 bool mtip_mac_wrapper_get_link_status(u32 link_index)
 {
     u32 read_val = 0;
@@ -810,8 +1266,8 @@ bool mtip_mac_wrapper_get_link_status(u32 link_index)
     wrapper_base_addr = platform_driver_priv->devices.port_devices[port_device_index].wrapper_base_addr;
 
     read_val = (u32)ioread32(wrapper_base_addr + MTIP_MAC_WRAPPER_CORE_STATUS_REG_OFFSET);
-    CSMLOGERR("mtip_mac_wrapper_get_link_status, core status = %d, for port %d, link %d",
-               read_val, port_device_index, link_device_index);
+    CSMLOGERR("mtip_mac_wrapper_get_link_status link_index: %d, core status = %d, for port %d, link %d",
+               link_index, read_val, port_device_index, link_device_index);
 
     if (((read_val & GENMASK(9,6)) >> 6) & (1 << link_device_index))
       return true;
@@ -824,7 +1280,7 @@ bool mtip_mac_wrapper_get_link_status(u32 link_index)
 void mtip_mac_wrapper_enable_rsfec_for_25g_mode(struct mtip_port_device_info* port_device)
 {
     // PCS_MODE_SET to 0x3F
-    u32 pcs_mode_set = MTIP_MAC_WRAPPER_PCS_MODE_25G_RSFEC_ENABLE_VAL;
+    u32 pcs_mode_set = MTIP_MAC_WRAPPER_PCS_MODE_4X25G_RSFEC_ENABLE_VAL;
     void __iomem* wrapper_base_addr = port_device->wrapper_base_addr;
 
     CSMLOGINFO("Setting PCS Mode: 0x%x\n", pcs_mode_set);
@@ -841,7 +1297,7 @@ void mtip_mac_wrapper_enable_rsfec_for_25g_mode(struct mtip_port_device_info* po
 void mtip_mac_wrapper_disable_rsfec_for_25g_mode(struct mtip_port_device_info* port_device)
 {
     // PCS_MODE_SET to 0x0
-    u32 pcs_mode_set = MTIP_MAC_WRAPPER_PCS_MODE_25G_RSFEC_DISABLE_VAL;
+    u32 pcs_mode_set = MTIP_MAC_WRAPPER_PCS_MODE_4X25G_RSFEC_DISABLE_VAL;
     void __iomem* wrapper_base_addr = port_device->wrapper_base_addr;
 
     CSMLOGINFO("Setting PCS Mode: 0x%x\n", pcs_mode_set);

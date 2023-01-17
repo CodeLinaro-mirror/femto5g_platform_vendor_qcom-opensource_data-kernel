@@ -8,6 +8,7 @@
 
 #include "ecpri_dma_i.h"
 #include "ecpri_hwio.h"
+#include "ecpri_hwio_v2.h"
 #include "ecpri_hwio_def.h"
 
 int ecpri_dma_hal_reg_init(enum ecpri_hw_ver ecpri_hw_ver);

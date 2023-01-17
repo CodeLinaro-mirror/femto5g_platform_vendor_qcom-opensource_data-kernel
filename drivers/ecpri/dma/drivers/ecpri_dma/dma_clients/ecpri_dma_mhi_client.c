@@ -23,51 +23,150 @@ static const char* wq_name[ECPRI_DMA_MHI_CLIENT_FUNCTION_NUM]
 		"ecpri_dma_mhi_wq_vm_1",
 		"ecpri_dma_mhi_wq_vm_2",
 		"ecpri_dma_mhi_wq_vm_3",
+		"ecpri_dma_mhi_wq_vf_1",
+		"ecpri_dma_mhi_wq_vf_2",
+		"ecpri_dma_mhi_wq_vf_3",
+		"ecpri_dma_mhi_wq_vf_4",
+		"ecpri_dma_mhi_wq_vf_5",
+		"ecpri_dma_mhi_wq_vf_a",
+		"ecpri_dma_mhi_wq_vf_b",
+		"ecpri_dma_mhi_wq_vf_c",
+		"ecpri_dma_mhi_wq_vf_d",
+		"ecpri_dma_mhi_wq_vf_e",
 		"ecpri_dma_mhi_wq_pf"
 	}
 };
 
+static const struct ecpri_dma_mhi_ee_gsi_tuple
+ecpri_dma_mhi_function_map[ECPRI_DMA_VM_IDS_MAX] = {
+	[ECPRI_DMA_VM_IDS_VM0] = {ECPRI_DMA_EE_VM0, ECPRI_DMA_GSI_ID_0},
+	[ECPRI_DMA_VM_IDS_VM1] = {ECPRI_DMA_EE_VM1, ECPRI_DMA_GSI_ID_0},
+	[ECPRI_DMA_VM_IDS_VM2] = {ECPRI_DMA_EE_VM2, ECPRI_DMA_GSI_ID_0},
+	[ECPRI_DMA_VM_IDS_VM3] = {ECPRI_DMA_EE_VM3, ECPRI_DMA_GSI_ID_0},
+	[ECPRI_DMA_VM_IDS_VF1] = {ECPRI_DMA_EE_VF1, ECPRI_DMA_GSI_ID_1},
+	[ECPRI_DMA_VM_IDS_VF2] = {ECPRI_DMA_EE_VF2, ECPRI_DMA_GSI_ID_1},
+	[ECPRI_DMA_VM_IDS_VF3] = {ECPRI_DMA_EE_VF3, ECPRI_DMA_GSI_ID_2},
+	[ECPRI_DMA_VM_IDS_VF4] = {ECPRI_DMA_EE_VF4, ECPRI_DMA_GSI_ID_2},
+	[ECPRI_DMA_VM_IDS_VF5] = {ECPRI_DMA_EE_VF5, ECPRI_DMA_GSI_ID_2},
+	[ECPRI_DMA_VM_IDS_VFA] = {ECPRI_DMA_EE_VFA, ECPRI_DMA_GSI_ID_1},
+	[ECPRI_DMA_VM_IDS_VFB] = {ECPRI_DMA_EE_VFB, ECPRI_DMA_GSI_ID_1},
+	[ECPRI_DMA_VM_IDS_VFC] = {ECPRI_DMA_EE_VFC, ECPRI_DMA_GSI_ID_1},
+	[ECPRI_DMA_VM_IDS_VFD] = {ECPRI_DMA_EE_VFE, ECPRI_DMA_GSI_ID_2},
+	[ECPRI_DMA_VM_IDS_VFE] = {ECPRI_DMA_EE_VFD, ECPRI_DMA_GSI_ID_2}
+};
+
+static const struct ecpri_dma_mhi_ee_gsi_tuple
+	ecpri_dma_mhi_physical_function_tuple =
+		{ ECPRI_DMA_EE_PF, ECPRI_DMA_GSI_ID_0 };
+
 static const struct ecpri_dma_mhi_function_endp_data
-ecpri_dma_mhi_function_endp_dt[ECPRI_DMA_MHI_CLIENT_FUNCTION_NUM] = {
-	[ECPRI_DMA_VM_IDS_VM0] = {
-		.sync_src_id = 22,
-		.sync_dest_id = 59,
-		.async_src_id =
-			ECPRI_DMA_MHI_INVALID_ENDP_ID,
-		.async_dest_id =
-			ECPRI_DMA_MHI_INVALID_ENDP_ID
+ecpri_dma_mhi_function_endp_dt[ECPRI_HW_MAX][ECPRI_DMA_MHI_CLIENT_FUNCTION_NUM] =
+{
+	[ECPRI_HW_V1_0][ECPRI_DMA_VM_IDS_VM0] = {
+		.sync_src_id   = 22,
+		.sync_dest_id  = 59,
+		.async_src_id  = ECPRI_DMA_MHI_INVALID_ENDP_ID,
+		.async_dest_id = ECPRI_DMA_MHI_INVALID_ENDP_ID
 	},
-	[ECPRI_DMA_VM_IDS_VM1] = {
-		.sync_src_id = 25,
-		.sync_dest_id = 62,
-		.async_src_id =
-			ECPRI_DMA_MHI_INVALID_ENDP_ID,
-		.async_dest_id =
-			ECPRI_DMA_MHI_INVALID_ENDP_ID
+	[ECPRI_HW_V1_0][ECPRI_DMA_VM_IDS_VM1] = {
+		.sync_src_id   = 25,
+		.sync_dest_id  = 62,
+		.async_src_id  = ECPRI_DMA_MHI_INVALID_ENDP_ID,
+		.async_dest_id = ECPRI_DMA_MHI_INVALID_ENDP_ID
 	},
-	[ECPRI_DMA_VM_IDS_VM2] = {
-		.sync_src_id = 28,
-		.sync_dest_id = 65,
-		.async_src_id =
-			ECPRI_DMA_MHI_INVALID_ENDP_ID,
-		.async_dest_id =
-			ECPRI_DMA_MHI_INVALID_ENDP_ID
+	[ECPRI_HW_V1_0][ECPRI_DMA_VM_IDS_VM2] = {
+		.sync_src_id   = 28,
+		.sync_dest_id  = 65,
+		.async_src_id  = ECPRI_DMA_MHI_INVALID_ENDP_ID,
+		.async_dest_id = ECPRI_DMA_MHI_INVALID_ENDP_ID
 	},
-	[ECPRI_DMA_VM_IDS_VM3] = {
-		.sync_src_id = 31,
-		.sync_dest_id = 68,
-		.async_src_id =
-			ECPRI_DMA_MHI_INVALID_ENDP_ID,
-		.async_dest_id =
-			ECPRI_DMA_MHI_INVALID_ENDP_ID
+	[ECPRI_HW_V1_0][ECPRI_DMA_VM_IDS_VM3] = {
+		.sync_src_id   = 31,
+		.sync_dest_id  = 68,
+		.async_src_id  = ECPRI_DMA_MHI_INVALID_ENDP_ID,
+		.async_dest_id = ECPRI_DMA_MHI_INVALID_ENDP_ID
 	},
-	[ECPRI_DMA_MHI_PF_ID] = {
-		.sync_src_id = 32,
-		.sync_dest_id = 69,
-		.async_src_id = 33,
+	[ECPRI_HW_V1_0][ECPRI_DMA_VM_IDS_VF1 ... ECPRI_DMA_VM_IDS_VFE] = {
+		.sync_src_id   = ECPRI_DMA_MHI_INVALID_ENDP_ID,
+		.sync_dest_id  = ECPRI_DMA_MHI_INVALID_ENDP_ID,
+		.async_src_id  = ECPRI_DMA_MHI_INVALID_ENDP_ID,
+		.async_dest_id = ECPRI_DMA_MHI_INVALID_ENDP_ID
+	},
+	[ECPRI_HW_V1_0][ECPRI_DMA_MHI_PF_ID] = {
+		.sync_src_id   = 32,
+		.sync_dest_id  = 69,
+		.async_src_id  = 33,
 		.async_dest_id = 70
+	},
+	[ECPRI_HW_V2_0][ECPRI_DMA_VM_IDS_VM0 ... ECPRI_DMA_VM_IDS_VFE] = {
+		.sync_src_id   = ECPRI_DMA_MHI_INVALID_ENDP_ID,
+		.sync_dest_id  = ECPRI_DMA_MHI_INVALID_ENDP_ID,
+		.async_src_id  = ECPRI_DMA_MHI_INVALID_ENDP_ID,
+		.async_dest_id = ECPRI_DMA_MHI_INVALID_ENDP_ID
+	},
+	[ECPRI_HW_V2_0][ECPRI_DMA_MHI_PF_ID] = {
+		.sync_src_id   = 19,
+		.sync_dest_id  = 56,
+		.async_src_id  = 20,
+		.async_dest_id = 57
 	}
 };
+
+/*
+* ecpri_dma_mhi_get_function_mapping() - Maps VF index to corresponding EE and
+* GSI ID
+*/
+static int ecpri_dma_mhi_get_function_mapping(
+	struct mhi_dma_function_params function,
+	const struct ecpri_dma_mhi_ee_gsi_tuple** tuple)
+{
+	if (function.function_type == MHI_DMA_FUNCTION_TYPE_VIRTUAL &&
+		function.vf_id < ECPRI_DMA_MHI_CLIENT_FUNCTION_NUM - 1) {
+		*(tuple) = &ecpri_dma_mhi_function_map[function.vf_id];
+	}
+	else if (function.function_type == MHI_DMA_FUNCTION_TYPE_PHYSICAL)
+	{
+		*(tuple) = &ecpri_dma_mhi_physical_function_tuple;
+	}
+	else {
+		DMAERR("Unexpected function type, type: %d, vf_id: %d\n",
+			function.function_type, function.vf_id);
+		return -EINVAL;
+	}
+
+	return 0;
+}
+
+static inline void ecpri_dma_mhi_get_sync_async_endp_ids(
+	int* sync_src_endp_id, int* sync_dest_endp_id,
+	int* async_src_endp_id, int* async_dest_endp_id, int idx)
+{
+	int hw_ver = ecpri_dma_get_ctx_hw_ver();
+	if (hw_ver == ECPRI_HW_V1_0) {
+		*(sync_src_endp_id) =
+			ecpri_dma_mhi_function_endp_dt[hw_ver][idx].sync_src_id;
+		*(sync_dest_endp_id) =
+			ecpri_dma_mhi_function_endp_dt[hw_ver][idx].sync_dest_id;
+		*(async_src_endp_id) =
+			ecpri_dma_mhi_function_endp_dt[hw_ver][idx].async_src_id;
+		*(async_dest_endp_id) =
+			ecpri_dma_mhi_function_endp_dt[hw_ver][idx].async_dest_id;
+	}
+	else {
+		*(sync_src_endp_id) =
+			ecpri_dma_mhi_function_endp_dt[hw_ver][ECPRI_DMA_MHI_PF_ID]
+			.sync_src_id;
+		*(sync_dest_endp_id) =
+			ecpri_dma_mhi_function_endp_dt[hw_ver][ECPRI_DMA_MHI_PF_ID]
+			.sync_dest_id;
+		*(async_src_endp_id) =
+			ecpri_dma_mhi_function_endp_dt[hw_ver][ECPRI_DMA_MHI_PF_ID]
+			.async_src_id;
+		*(async_dest_endp_id) =
+			ecpri_dma_mhi_function_endp_dt[hw_ver][ECPRI_DMA_MHI_PF_ID]
+			.async_dest_id;
+	}
+}
 
 static inline bool ecpri_dma_mhi_check_destroy_pending(
 	struct ecpri_dma_mhi_memcpy_context* memcpy_ctx)
@@ -93,88 +192,83 @@ static inline bool ecpri_dma_mhi_check_destroy_pending(
 	return destroy_pending;
 }
 
-/**
- * ecpri_dma_mhi_get_function_context_index() -
- * Gets the VF/PF index in Global Context Array
- *
- * @function: [IN] Function parameters, type and id
- * @idx:            [OUT] The translated index
- *
- * Return codes: 0: success
- *		-EINVAL: Unexpected function type
- */
 static inline int ecpri_dma_mhi_get_function_context_index(
-	struct mhi_dma_function_params function,
-	int* idx)
+	struct mhi_dma_function_params function, int* idx,
+	enum ecpri_dma_mhi_dma_context_type ctx_type)
 {
 	int ret = 0;
-	if (function.function_type ==
-		MHI_DMA_FUNCTION_TYPE_VIRTUAL &&
-		function.vf_id < ECPRI_DMA_MHI_CLIENT_FUNCTION_NUM - 1) {
-		*(idx) = function.vf_id;
-	}
-	else if (function.function_type ==
-		MHI_DMA_FUNCTION_TYPE_PHYSICAL) {
-		*(idx) = (ECPRI_DMA_MHI_CLIENT_FUNCTION_NUM - 1);
-	}
-	else {
-		DMAERR("Unexpected function type, type: %d, vf_id: %d\n",
-			function.function_type, function.vf_id);
+	enum ecpri_hw_ver hw_ver = ecpri_dma_get_ctx_hw_ver();
+
+	switch (ctx_type)
+	{
+	case ECPRI_DMA_MHI_DMA_CLIENT_CTX:
+		if (function.function_type ==
+			MHI_DMA_FUNCTION_TYPE_VIRTUAL &&
+			function.vf_id < ECPRI_DMA_MHI_CLIENT_FUNCTION_NUM - 1) {
+			*(idx) = function.vf_id;
+		}
+		else if (function.function_type ==
+			MHI_DMA_FUNCTION_TYPE_PHYSICAL) {
+			*(idx) = (ECPRI_DMA_MHI_CLIENT_FUNCTION_NUM - 1);
+		}
+		break;
+	case ECPRI_DMA_MHI_DMA_MEMCPY_CTX:
+		/* V1 Code */
+		if (hw_ver == ECPRI_HW_V1_0) {
+			if (function.function_type ==
+				MHI_DMA_FUNCTION_TYPE_VIRTUAL &&
+				function.vf_id < ECPRI_DMA_MHI_CLIENT_FUNCTION_NUM - 1) {
+				*(idx) = function.vf_id;
+			}
+			else if (function.function_type ==
+				MHI_DMA_FUNCTION_TYPE_PHYSICAL) {
+				*(idx) = (ECPRI_DMA_MHI_CLIENT_FUNCTION_NUM - 1);
+			}
+			else {
+				DMAERR("Unexpected function type, type: %d, vf_id: %d\n",
+					function.function_type, function.vf_id);
+				ret = -EINVAL;
+			}
+		}
+		/* V2 Code */
+		else {
+			*(idx) = (ECPRI_DMA_MHI_CLIENT_FUNCTION_NUM - 1);
+		}
+		break;
+	default:
+		DMAERR("Unexpected client type, type: %d, vf_id: %d\n", ctx_type);
 		ret = -EINVAL;
 	}
 
 	return ret;
 }
 
-/**
- * ecpri_dma_mhi_get_ee_index() - Gets the correspodning EE ID
- *
- * @function: [IN] Function parameters, type and id
- * @ee_idx:         [OUT] The EE index from map array
- *
- * Return codes: 0: success
- *		-EINVAL: Unexpected function type
- */
-static inline int ecpri_dma_mhi_get_ee_index(
-	struct mhi_dma_function_params function,
-	enum ecpri_dma_ees* ee_idx)
+static inline void ecpri_dma_mhi_set_endps(int idx,
+	struct ecpri_dma_mhi_memcpy_context* memcpy_ctx)
 {
-	int ret = 0;
-	if (function.function_type ==
-		MHI_DMA_FUNCTION_TYPE_VIRTUAL &&
-		function.vf_id < ECPRI_DMA_MHI_CLIENT_FUNCTION_NUM - 1) {
-		switch (function.vf_id)
-		{
-		case ECPRI_DMA_VM_IDS_VM0:
-			*(ee_idx) = ECPRI_DMA_EE_VM0;
-			break;
-		case ECPRI_DMA_VM_IDS_VM1:
-			*(ee_idx) = ECPRI_DMA_EE_VM1;
-			break;
-		case ECPRI_DMA_VM_IDS_VM2:
-			*(ee_idx) = ECPRI_DMA_EE_VM2;
-			break;
-		case ECPRI_DMA_VM_IDS_VM3:
-			*(ee_idx) = ECPRI_DMA_EE_VM3;
-			break;
-		default:
-			DMAERR("Unexpected function type, type: %d, vf_id: %d\n",
-				function.function_type, function.vf_id);
-			ret = -EINVAL;
-			break;
-		}
-	}
-	else if (function.function_type ==
-		MHI_DMA_FUNCTION_TYPE_PHYSICAL) {
-		*(ee_idx) = ECPRI_DMA_EE_PF;
-	}
-	else {
-		DMAERR("Unexpected function type, type: %d, vf_id: %d\n",
-			function.function_type, function.vf_id);
-		ret = -EINVAL;
+	int sync_src_endp_id = ECPRI_DMA_MHI_INVALID_ENDP_ID;
+	int sync_dest_endp_id = ECPRI_DMA_MHI_INVALID_ENDP_ID;
+	int async_src_endp_id = ECPRI_DMA_MHI_INVALID_ENDP_ID;
+	int async_dest_endp_id = ECPRI_DMA_MHI_INVALID_ENDP_ID;
+	enum ecpri_dma_gsi_id gsi_id = ECPRI_DMA_GSI_ID_0;
+
+	ecpri_dma_mhi_get_sync_async_endp_ids(&sync_src_endp_id,
+		&sync_dest_endp_id, &async_src_endp_id, &async_dest_endp_id, idx);
+
+	memcpy_ctx->sync_dest_endp =
+		&ecpri_dma_ctx->endp_ctx[gsi_id][sync_dest_endp_id];
+	memcpy_ctx->sync_src_endp =
+		&ecpri_dma_ctx->endp_ctx[gsi_id][sync_src_endp_id];
+
+	if (async_src_endp_id != ECPRI_DMA_MHI_INVALID_ENDP_ID &&
+		async_dest_endp_id != ECPRI_DMA_MHI_INVALID_ENDP_ID)
+	{
+		memcpy_ctx->async_dest_endp =
+			&ecpri_dma_ctx->endp_ctx[gsi_id][async_dest_endp_id];
+		memcpy_ctx->async_src_endp =
+			&ecpri_dma_ctx->endp_ctx[gsi_id][async_src_endp_id];
 	}
 
-	return ret;
 }
 
 /**
@@ -187,19 +281,33 @@ static inline int ecpri_dma_mhi_get_ee_index(
  *
  */
 static int ecpri_dma_mhi_get_endp_ctx(
-	enum ecpri_dma_ees ee_idx, u8 channel_id,
+	struct mhi_dma_function_params function, u8 channel_id,
 	struct ecpri_dma_endp_context** endp_ctx)
 {
 	int ret = -EINVAL;
-	int i;
+	int endp_id, gsi_id;
 
-	for (i = 0; i < ECPRI_DMA_ENDP_NUM_MAX; i++)
+	enum ecpri_dma_ees ee_idx;
+	const struct ecpri_dma_mhi_ee_gsi_tuple* func_map;
+
+	ret = ecpri_dma_mhi_get_function_mapping(function, &func_map);
+	if (ret)
 	{
-		if (ecpri_dma_ctx->endp_map[i].valid &&
-			ecpri_dma_ctx->endp_map[i].dma_gsi_chan_num == channel_id &&
-			ecpri_dma_ctx->endp_map[i].ee == ee_idx) {
-			*(endp_ctx) = &ecpri_dma_ctx->endp_ctx[i];
-			ecpri_dma_ctx->endp_ctx[i].endp_id = i;
+		DMAERR("Unknown function");
+		return ret;
+	}
+	ee_idx = func_map->ee_id;
+	gsi_id = func_map->gsi_id;
+
+	for (endp_id = 0; endp_id < ECPRI_DMA_ENDP_NUM_MAX; endp_id++)
+	{
+		if ((*ecpri_dma_ctx->endp_map)[gsi_id][endp_id].valid &&
+			(*ecpri_dma_ctx->endp_map)[gsi_id][endp_id].dma_gsi_chan_num ==
+			channel_id &&
+			(*ecpri_dma_ctx->endp_map)[gsi_id][endp_id].ee == ee_idx) {
+			*(endp_ctx) = &ecpri_dma_ctx->endp_ctx[gsi_id][endp_id];
+			ecpri_dma_ctx->endp_ctx[gsi_id][endp_id].gsi_id = gsi_id;
+			ecpri_dma_ctx->endp_ctx[gsi_id][endp_id].endp_id = endp_id;
 			ret = 0;
 			break;
 		}
@@ -209,23 +317,36 @@ static int ecpri_dma_mhi_get_endp_ctx(
 }
 
 static void ecpri_dma_mhi_get_l2_ch_bitmap(
-	enum ecpri_dma_ees ee_idx, u32 function, u32 *bitmap)
+	struct mhi_dma_function_params function, u32 idx, u32 *bitmap)
 {
-	int i;
+	int endp_id;
+	enum ecpri_dma_gsi_id gsi_id;
+	enum ecpri_dma_ees ee_idx;
+	const struct ecpri_dma_mhi_ee_gsi_tuple* func_map;
+	enum ecpri_hw_ver hw_ver = ecpri_dma_get_ctx_hw_ver();
+
+	if (ecpri_dma_mhi_get_function_mapping(function, &func_map))
+	{
+		DMAERR("Unknown function");
+	}
+	ee_idx = func_map->ee_id;
+	gsi_id = func_map->gsi_id;
 
 	DMADBG("Begin\n");
 
 	*bitmap = 0;
 
-	for (i = 0; i < ECPRI_DMA_ENDP_NUM_MAX; i++)
+	for (endp_id = 0; endp_id < ECPRI_DMA_ENDP_NUM_MAX; endp_id++)
 	{
-		if (ecpri_dma_ctx->endp_map[i].valid &&
-			ecpri_dma_ctx->endp_map[i].ee == ee_idx &&
-			i != ecpri_dma_mhi_function_endp_dt[function].sync_src_id &&
-			i != ecpri_dma_mhi_function_endp_dt[function].sync_dest_id &&
-			i != ecpri_dma_mhi_function_endp_dt[function].async_src_id &&
-			i != ecpri_dma_mhi_function_endp_dt[function].async_dest_id) {
-			*bitmap |= 1 << ecpri_dma_ctx->endp_map[i].dma_gsi_chan_num;
+		/* Note: For V2 there is no SW Chanels in VM */
+		if ((*ecpri_dma_ctx->endp_map)[gsi_id][endp_id].valid &&
+			(*ecpri_dma_ctx->endp_map)[gsi_id][endp_id].ee == ee_idx &&
+			endp_id != ecpri_dma_mhi_function_endp_dt[hw_ver][idx].sync_src_id &&
+			endp_id != ecpri_dma_mhi_function_endp_dt[hw_ver][idx].sync_dest_id &&
+			endp_id != ecpri_dma_mhi_function_endp_dt[hw_ver][idx].async_src_id &&
+			endp_id != ecpri_dma_mhi_function_endp_dt[hw_ver][idx].async_dest_id){
+			*bitmap |= 1 << (*ecpri_dma_ctx->endp_map)[gsi_id][endp_id]
+				.dma_gsi_chan_num;
 		}
 	}
 }
@@ -236,6 +357,7 @@ static void ecpri_dma_mhi_get_l2_ch_bitmap(
  *
  * @buff_addr:  [IN] Buffer address
  * @len:        [IN] Buffer length
+ * @function:   [in] VF \ PF info
  * @pkts:       [OUT] Allocated packets data
  *
  * Return codes: 0: success
@@ -245,14 +367,23 @@ static void ecpri_dma_mhi_get_l2_ch_bitmap(
 static int ecpri_dma_mhi_dma_alloc_pkt(
 	u64 buff_addr,
 	int len,
+	struct mhi_dma_function_params function,
 	struct ecpri_dma_pkt*** pkt_ptr)
 {
 	int ret = 0;
 	struct ecpri_dma_pkt** pkt = NULL;
+	struct mhi_dma_function_params* function_ptr = NULL;
+
+	function_ptr = kzalloc(sizeof(*function_ptr), GFP_KERNEL);
+	if (!function_ptr) {
+		DMAERR("failed to alloc packets array \n");
+		return -ENOMEM;
+	}
 
 	pkt = kzalloc(sizeof(*pkt), GFP_KERNEL);
 	if (!pkt) {
 		DMAERR("failed to alloc packets array \n");
+		kfree(function_ptr);
 		return -ENOMEM;
 	}
 
@@ -260,6 +391,7 @@ static int ecpri_dma_mhi_dma_alloc_pkt(
 	if (!pkt[0]) {
 		DMAERR("failed to alloc packet\n");
 		kfree(pkt);
+		kfree(function_ptr);
 		ret = -ENOMEM;
 		goto fail_alloc;
 	}
@@ -270,6 +402,7 @@ static int ecpri_dma_mhi_dma_alloc_pkt(
 		DMAERR("failed to alloc buffers array \n");
 		kfree(pkt[0]);
 		kfree(pkt);
+		kfree(function_ptr);
 		ret = -ENOMEM;
 		goto fail_alloc;
 	}
@@ -281,6 +414,7 @@ static int ecpri_dma_mhi_dma_alloc_pkt(
 		kfree(pkt[0]->buffs);
 		kfree(pkt[0]);
 		kfree(pkt);
+		kfree(function_ptr);
 		ret = -ENOMEM;
 		goto fail_alloc;
 	}
@@ -288,6 +422,10 @@ static int ecpri_dma_mhi_dma_alloc_pkt(
 	pkt[0]->buffs[0]->phys_base = (dma_addr_t)buff_addr;
 	pkt[0]->buffs[0]->size = len;
 	pkt[0]->num_of_buffers = 1;
+	pkt[0]->user_data = function_ptr;
+
+	function_ptr->function_type = function.function_type;
+	function_ptr->vf_id = function.vf_id;
 
 	*pkt_ptr = pkt;
 
@@ -305,6 +443,7 @@ fail_alloc:
 static void ecpri_dma_mhi_dma_free_pkt(
 	struct ecpri_dma_pkt* pkts)
 {
+	kfree(pkts->user_data);
 	kfree(pkts->buffs[0]);
 	kfree(pkts->buffs);
 	kfree(pkts);
@@ -401,7 +540,7 @@ static void ecpri_dma_mhi_memcpy_async_wq_cb_ready_vms(struct work_struct* work)
 
 	/* Get the index of VM/PF */
 	ret = ecpri_dma_mhi_get_function_context_index(
-		async_work->xfer_desc->function, &idx);
+		async_work->xfer_desc->function, &idx, ECPRI_DMA_MHI_DMA_MEMCPY_CTX);
 	if (ret != 0) {
 		DMAERR("Function params are invalid,"
 			"function type: %d, vf_id: %d\n",
@@ -452,6 +591,7 @@ static void ecpri_dma_mhi_memcpy_async_notify_comp(
 		async_pkts[ECPRI_DMA_MHI_CLIENT_MEMCPY_ASYNC_BUDGET];
 	struct ecpri_dma_mhi_async_wq_work_type *work = NULL;
 	u32 actual_num = 0;
+	int hw_ver = ecpri_dma_get_ctx_hw_ver();
 
 	if (!endp) {
 		DMAERR("Null params args\n");
@@ -460,7 +600,8 @@ static void ecpri_dma_mhi_memcpy_async_notify_comp(
 
 	/* Skip VMs, pass the PF only*/
 	if (endp->endp_id !=
-		ecpri_dma_mhi_function_endp_dt[ECPRI_DMA_MHI_PF_ID].async_dest_id) {
+		ecpri_dma_mhi_function_endp_dt[hw_ver][ECPRI_DMA_MHI_PF_ID]
+		.async_dest_id) {
 		DMAERR("Received unexpected async completion on ENDP %d\n",
 			endp->endp_id);
 		return;
@@ -523,58 +664,92 @@ static void ecpri_dma_mhi_memcpy_async_notify_comp(
 }
 
 /**
- * ecpri_dma_mhi_alloc_sync_async_endps() - Helper function
- *                                          to allocate endpnts
+ * ecpri_dma_mhi_alloc_sync_async_endps() - Helper function to allocate endps
  */
 static int ecpri_dma_mhi_alloc_sync_async_endps(
 	struct ecpri_dma_moderation_config* mod_cfg,
-	int sync_src_id, int sync_dest_id,
-	int async_src_id, int async_dest_id)
+	struct mhi_dma_function_params function, int idx)
 {
 	int ret = 0;
+	int sync_src_endp_id = ECPRI_DMA_MHI_INVALID_ENDP_ID;
+	int sync_dest_endp_id = ECPRI_DMA_MHI_INVALID_ENDP_ID;
+	int async_src_endp_id = ECPRI_DMA_MHI_INVALID_ENDP_ID;
+	int async_dest_endp_id = ECPRI_DMA_MHI_INVALID_ENDP_ID;
+	enum ecpri_dma_gsi_id gsi_id = ECPRI_DMA_GSI_ID_0;
+	const struct ecpri_dma_mhi_ee_gsi_tuple* func_map;
+	enum ecpri_hw_ver hw_ver = ecpri_dma_get_ctx_hw_ver();
 
-	ecpri_dma_ctx->endp_ctx[sync_src_id].eventless_endp = true;
-	ret = ecpri_dma_alloc_endp(
-		sync_src_id, ECPRI_DMA_MHI_MEMCPY_RLEN,
-		mod_cfg, false, NULL);
+	ret = ecpri_dma_mhi_get_function_mapping(function, &func_map);
+	if (ret)
+	{
+		DMAERR("Unknown function");
+		return ret;
+	}
+	gsi_id = func_map->gsi_id;
+
+	ecpri_dma_mhi_get_sync_async_endp_ids(&sync_src_endp_id, &sync_dest_endp_id,
+		&async_src_endp_id, &async_dest_endp_id, idx);
+
+	ecpri_dma_ctx->
+		endp_ctx[gsi_id][sync_src_endp_id].eventless_endp = true;
+
+	ret = ecpri_dma_alloc_endp(gsi_id, sync_src_endp_id,
+		ECPRI_DMA_MHI_MEMCPY_RLEN, mod_cfg, false, NULL);
 	if (ret != 0) {
 		DMAERR("Unable to allocate SYNC_SRC ENDP, endp_id: %d\n",
-			sync_src_id);
+			sync_src_endp_id);
 		goto fail_alloc_sync_src;
 	}
 
-	ret = ecpri_dma_alloc_endp(
-		sync_dest_id, ECPRI_DMA_MHI_MEMCPY_RLEN,
+	ret = ecpri_dma_alloc_endp(gsi_id,
+		sync_dest_endp_id, ECPRI_DMA_MHI_MEMCPY_RLEN,
 		mod_cfg, false, NULL);
 	if (ret != 0) {
 		DMAERR("Unable to allocate SYNC_DEST ENDP, endp_id: %d\n",
-			sync_dest_id);
+			sync_dest_endp_id);
 		goto fail_alloc_sync_dest;
 	}
 
+	if (hw_ver > ECPRI_HW_V1_0)
+	{
+		ecpri_dma_ctx->
+			endp_ctx[gsi_id][sync_src_endp_id].dynamic_vf_enabled = true;
+		ecpri_dma_ctx->
+			endp_ctx[gsi_id][sync_dest_endp_id].dynamic_vf_enabled = true;
+	}
+
 	/* Skip the VMs */
-	if (async_src_id == ECPRI_DMA_MHI_INVALID_ENDP_ID ||
-		async_dest_id == ECPRI_DMA_MHI_INVALID_ENDP_ID)
+	if (async_src_endp_id == ECPRI_DMA_MHI_INVALID_ENDP_ID ||
+		async_dest_endp_id == ECPRI_DMA_MHI_INVALID_ENDP_ID)
 		return ret;
 
-	ecpri_dma_ctx->endp_ctx[async_src_id].eventless_endp = true;
-	ret = ecpri_dma_alloc_endp(
-		async_src_id, ECPRI_DMA_MHI_MEMCPY_RLEN,
+	ecpri_dma_ctx->
+		endp_ctx[gsi_id][async_src_endp_id].eventless_endp = true;
+	ret = ecpri_dma_alloc_endp(gsi_id,
+		async_src_endp_id, ECPRI_DMA_MHI_MEMCPY_RLEN,
 		mod_cfg, false, NULL);
 	if (ret != 0) {
 		DMAERR("Unable to allocate ASYNC_SRC ENDP, endp_id: %d\n",
-			async_src_id);
+			async_src_endp_id);
 		goto fail_alloc_async_src;
 	}
 
-	ret = ecpri_dma_alloc_endp(
-		async_dest_id, ECPRI_DMA_MHI_MEMCPY_RLEN,
+	ret = ecpri_dma_alloc_endp(gsi_id,
+		async_dest_endp_id, ECPRI_DMA_MHI_MEMCPY_RLEN,
 		mod_cfg, false,
 		ecpri_dma_mhi_memcpy_async_notify_comp);
 	if (ret != 0) {
 		DMAERR("Unable to allocate ASYNC_DEST ENDP, endp_id: %d\n",
-			async_dest_id);
+			async_dest_endp_id);
 		goto fail_alloc_async_dest;
+	}
+
+	if (hw_ver > ECPRI_HW_V1_0)
+	{
+		ecpri_dma_ctx->
+			endp_ctx[gsi_id][async_src_endp_id].dynamic_vf_enabled = true;
+		ecpri_dma_ctx->
+			endp_ctx[gsi_id][async_dest_endp_id].dynamic_vf_enabled = true;
 	}
 
 	ret = 0;
@@ -582,13 +757,13 @@ static int ecpri_dma_mhi_alloc_sync_async_endps(
 
 fail_alloc_async_dest:
 	ecpri_dma_dealloc_endp(
-		&ecpri_dma_ctx->endp_ctx[async_src_id]);
+		&ecpri_dma_ctx->endp_ctx[gsi_id][async_src_endp_id]);
 fail_alloc_async_src:
 	ecpri_dma_dealloc_endp(
-		&ecpri_dma_ctx->endp_ctx[sync_dest_id]);
+		&ecpri_dma_ctx->endp_ctx[gsi_id][sync_dest_endp_id]);
 fail_alloc_sync_dest:
 	ecpri_dma_dealloc_endp(
-		&ecpri_dma_ctx->endp_ctx[sync_src_id]);
+		&ecpri_dma_ctx->endp_ctx[gsi_id][sync_src_endp_id]);
 fail_alloc_sync_src:
 success:
 	return ret;
@@ -599,48 +774,56 @@ success:
  * to enable endpnts
  *
  */
-static int ecpri_dma_mhi_enable_mhi_memcpy_endps(int sync_src_id,
-	int sync_dest_id, int async_src_id, int async_dest_id)
+static int ecpri_dma_mhi_enable_mhi_memcpy_endps(int idx)
 {
 	int ret = 0;
 
+	int sync_src_endp_id = ECPRI_DMA_MHI_INVALID_ENDP_ID;
+	int sync_dest_endp_id = ECPRI_DMA_MHI_INVALID_ENDP_ID;
+	int async_src_endp_id = ECPRI_DMA_MHI_INVALID_ENDP_ID;
+	int async_dest_endp_id = ECPRI_DMA_MHI_INVALID_ENDP_ID;
+	enum ecpri_dma_gsi_id gsi_id = ECPRI_DMA_GSI_ID_0;
+
+	ecpri_dma_mhi_get_sync_async_endp_ids(&sync_src_endp_id,
+		&sync_dest_endp_id, &async_src_endp_id, &async_dest_endp_id, idx);
+
 	ret = ecpri_dma_enable_dma_endp(
-		&ecpri_dma_ctx->endp_ctx[sync_src_id]);
+		&ecpri_dma_ctx->endp_ctx[gsi_id][sync_src_endp_id]);
 	if (ret != 0) {
-		DMAERR("Unable to enable SYNC SRC endpoint %d\n",
-			sync_src_id);
+		DMAERR("Unable to enable SYNC SRC endpoint %d, GSI %d\n",
+			sync_src_endp_id, gsi_id);
 		ret = -EFAULT;
 		goto fail_enable_sync_src;
 	}
 
 	ret = ecpri_dma_enable_dma_endp(
-		&ecpri_dma_ctx->endp_ctx[sync_dest_id]);
+		&ecpri_dma_ctx->endp_ctx[gsi_id][sync_dest_endp_id]);
 	if (ret != 0) {
-		DMAERR("Unable to enable SYNC DEST endpoint %d\n",
-			sync_dest_id);
+		DMAERR("Unable to enable SYNC DEST endpoint %d, GSI %d\n",
+			sync_dest_endp_id, gsi_id);
 		ret = -EFAULT;
 		goto fail_enable_sync_dest;
 	}
 
 	/* Skip the VMs */
-	if (async_src_id == ECPRI_DMA_MHI_INVALID_ENDP_ID ||
-		async_dest_id == ECPRI_DMA_MHI_INVALID_ENDP_ID)
+	if (async_src_endp_id == ECPRI_DMA_MHI_INVALID_ENDP_ID ||
+		async_dest_endp_id == ECPRI_DMA_MHI_INVALID_ENDP_ID)
 		return ret;
 
 	ret = ecpri_dma_enable_dma_endp(
-		&ecpri_dma_ctx->endp_ctx[async_src_id]);
+		&ecpri_dma_ctx->endp_ctx[gsi_id][async_src_endp_id]);
 	if (ret != 0) {
-		DMAERR("Unable to enable ASYNC SRC endpoint %d\n",
-			async_src_id);
+		DMAERR("Unable to enable ASYNC SRC endpoint %d, GSI %d\n",
+			async_src_endp_id, gsi_id);
 		ret = -EFAULT;
 		goto fail_enable_async_src;
 	}
 
 	ret = ecpri_dma_enable_dma_endp(
-		&ecpri_dma_ctx->endp_ctx[async_dest_id]);
+		&ecpri_dma_ctx->endp_ctx[gsi_id][async_dest_endp_id]);
 	if (ret != 0) {
-		DMAERR("Unable to enable ASYNC DEST endpoint %d\n",
-			async_dest_id);
+		DMAERR("Unable to enable ASYNC DEST endpoint %d, GSI %d\n",
+			async_dest_endp_id, gsi_id);
 		ret = -EFAULT;
 		goto fail_enable_async_dest;
 	}
@@ -650,13 +833,13 @@ static int ecpri_dma_mhi_enable_mhi_memcpy_endps(int sync_src_id,
 
 fail_enable_async_dest:
 	ecpri_dma_reset_endp(
-		&ecpri_dma_ctx->endp_ctx[async_src_id]);
+		&ecpri_dma_ctx->endp_ctx[gsi_id][async_src_endp_id]);
 fail_enable_async_src:
 	ecpri_dma_reset_endp(
-		&ecpri_dma_ctx->endp_ctx[sync_dest_id]);
+		&ecpri_dma_ctx->endp_ctx[gsi_id][sync_dest_endp_id]);
 fail_enable_sync_dest:
 	ecpri_dma_reset_endp(
-		&ecpri_dma_ctx->endp_ctx[sync_src_id]);
+		&ecpri_dma_ctx->endp_ctx[gsi_id][sync_src_endp_id]);
 fail_enable_sync_src:
 success:
 	return ret;
@@ -666,48 +849,56 @@ success:
  * ecpri_dma_mhi_start_memcpy_endps() - Helper function to start endpnts
  *
  */
-static int ecpri_dma_mhi_start_memcpy_endps(int sync_src_id,
-	int sync_dest_id, int async_src_id, int async_dest_id)
+static int ecpri_dma_mhi_start_memcpy_endps(int idx)
 {
 	int ret = 0;
 
+	int sync_src_endp_id = ECPRI_DMA_MHI_INVALID_ENDP_ID;
+	int sync_dest_endp_id = ECPRI_DMA_MHI_INVALID_ENDP_ID;
+	int async_src_endp_id = ECPRI_DMA_MHI_INVALID_ENDP_ID;
+	int async_dest_endp_id = ECPRI_DMA_MHI_INVALID_ENDP_ID;
+	enum ecpri_dma_gsi_id gsi_id = ECPRI_DMA_GSI_ID_0;
+
+	ecpri_dma_mhi_get_sync_async_endp_ids(&sync_src_endp_id,
+		&sync_dest_endp_id, &async_src_endp_id, &async_dest_endp_id, idx);
+
 	ret = ecpri_dma_start_endp(
-		&ecpri_dma_ctx->endp_ctx[sync_src_id]);
+		&ecpri_dma_ctx->endp_ctx[gsi_id][sync_src_endp_id]);
 	if (ret != 0) {
-		DMAERR("Unable to start endp, endp_id: %d\n",
-			sync_src_id);
+		DMAERR("Unable to start endp, endp_id: %d, gsi_id %d\n",
+			sync_src_endp_id, gsi_id);
 		ret = -EFAULT;
 		goto fail_start_sync_src;
 	}
 
 	ret = ecpri_dma_start_endp(
-		&ecpri_dma_ctx->endp_ctx[sync_dest_id]);
+		&ecpri_dma_ctx->endp_ctx[gsi_id][sync_dest_endp_id]);
 	if (ret != 0) {
-		DMAERR("Unable to start endp, endp_id: %d\n",
-			sync_dest_id);
+		DMAERR("Unable to start endp, endp_id: %d, gsi_id %d\n",
+			sync_dest_endp_id, gsi_id);
 		ret = -EFAULT;
 		goto fail_start_sync_dest;
 	}
 
 	/* Skip the VMs */
-	if (async_src_id == ECPRI_DMA_MHI_INVALID_ENDP_ID ||
-		async_dest_id == ECPRI_DMA_MHI_INVALID_ENDP_ID)
+	if (async_src_endp_id == ECPRI_DMA_MHI_INVALID_ENDP_ID ||
+		async_dest_endp_id == ECPRI_DMA_MHI_INVALID_ENDP_ID)
 		goto success;
 
 	ret = ecpri_dma_start_endp(
-		&ecpri_dma_ctx->endp_ctx[async_src_id]);
+		&ecpri_dma_ctx->endp_ctx[gsi_id][async_src_endp_id]);
 	if (ret != 0) {
-		DMAERR("Unable to start endp, endp_id: %d\n",
-			async_src_id);
+		DMAERR("Unable to start endp, endp_id: %d, gsi_id %d\n",
+			async_src_endp_id, gsi_id);
 		ret = -EFAULT;
 		goto fail_start_async_src;
 	}
 
 	ret = ecpri_dma_start_endp(
-		&ecpri_dma_ctx->endp_ctx[async_dest_id]);
+		&ecpri_dma_ctx->endp_ctx[gsi_id][async_dest_endp_id]);
 	if (ret != 0) {
-		DMAERR("Unable to start endp, endp_id: %d\n",
-			async_dest_id);
+		DMAERR("Unable to start endp, endp_id: %d, gsi_id %d\n",
+			async_dest_endp_id, gsi_id);
 		ret = -EFAULT;
 		goto fail_start_async_dest;
 	}
@@ -717,13 +908,13 @@ static int ecpri_dma_mhi_start_memcpy_endps(int sync_src_id,
 
 fail_start_async_dest:
 	ecpri_dma_stop_endp(
-		&ecpri_dma_ctx->endp_ctx[async_src_id]);
+		&ecpri_dma_ctx->endp_ctx[gsi_id][async_src_endp_id]);
 fail_start_async_src:
 	ecpri_dma_stop_endp(
-		&ecpri_dma_ctx->endp_ctx[sync_dest_id]);
+		&ecpri_dma_ctx->endp_ctx[gsi_id][sync_dest_endp_id]);
 fail_start_sync_dest:
 	ecpri_dma_stop_endp(
-		&ecpri_dma_ctx->endp_ctx[sync_src_id]);
+		&ecpri_dma_ctx->endp_ctx[gsi_id][sync_src_endp_id]);
 fail_start_sync_src:
 success:
 	return ret;
@@ -733,24 +924,32 @@ success:
  * ecpri_dma_mhi_set_memcpy_endps_mode() - Helper function to set endpnts mode
  *
  */
-static int ecpri_dma_mhi_set_memcpy_endps_mode(int sync_src_id,
-	int sync_dest_id, int async_src_id, int async_dest_id)
+static int ecpri_dma_mhi_set_memcpy_endps_mode(int idx)
 {
 	int ret = 0;
 
+	int sync_src_endp_id = ECPRI_DMA_MHI_INVALID_ENDP_ID;
+	int sync_dest_endp_id = ECPRI_DMA_MHI_INVALID_ENDP_ID;
+	int async_src_endp_id = ECPRI_DMA_MHI_INVALID_ENDP_ID;
+	int async_dest_endp_id = ECPRI_DMA_MHI_INVALID_ENDP_ID;
+	enum ecpri_dma_gsi_id gsi_id = ECPRI_DMA_GSI_ID_0;
+
+	ecpri_dma_mhi_get_sync_async_endp_ids(&sync_src_endp_id,
+		&sync_dest_endp_id, &async_src_endp_id, &async_dest_endp_id, idx);
+
 	ret = ecpri_dma_set_endp_mode(
-		&ecpri_dma_ctx->endp_ctx[sync_dest_id],
+		&ecpri_dma_ctx->endp_ctx[gsi_id][sync_dest_endp_id],
 		ECPRI_DMA_NOTIFY_MODE_POLL);
 	if (ret != 0) {
-		DMAERR("Unable to set mode, ENDP ID:%d, mode: %d, \n",
-			sync_dest_id,
+		DMAERR("Unable to set mode, ENDP ID:%d, GSI ID %d, mode: %d, \n",
+			sync_dest_endp_id, gsi_id,
 			ECPRI_DMA_NOTIFY_MODE_POLL);
 		return ret;
 	}
 
 	/* Skip the VMs */
-	if (async_src_id == ECPRI_DMA_MHI_INVALID_ENDP_ID ||
-		async_dest_id == ECPRI_DMA_MHI_INVALID_ENDP_ID)
+	if (async_src_endp_id == ECPRI_DMA_MHI_INVALID_ENDP_ID ||
+		async_dest_endp_id == ECPRI_DMA_MHI_INVALID_ENDP_ID)
 		return ret;
 
 	/* Note: Async channels are by default in IRQ mode, no need to set  */
@@ -762,46 +961,54 @@ static int ecpri_dma_mhi_set_memcpy_endps_mode(int sync_src_id,
  * ecpri_dma_mhi_stop_memcpy_endps() - Helper function to stop endpnts
  *
  */
-static int ecpri_dma_mhi_stop_memcpy_endps(int sync_src_id,
-	int sync_dest_id, int async_src_id, int async_dest_id)
+static int ecpri_dma_mhi_stop_memcpy_endps(int idx)
 {
 	int ret = 0;
 
+	int sync_src_endp_id = ECPRI_DMA_MHI_INVALID_ENDP_ID;
+	int sync_dest_endp_id = ECPRI_DMA_MHI_INVALID_ENDP_ID;
+	int async_src_endp_id = ECPRI_DMA_MHI_INVALID_ENDP_ID;
+	int async_dest_endp_id = ECPRI_DMA_MHI_INVALID_ENDP_ID;
+	enum ecpri_dma_gsi_id gsi_id = ECPRI_DMA_GSI_ID_0;
+
+	ecpri_dma_mhi_get_sync_async_endp_ids(&sync_src_endp_id,
+		&sync_dest_endp_id, &async_src_endp_id, &async_dest_endp_id, idx);
+
 	ret = ecpri_dma_stop_endp(
-		&ecpri_dma_ctx->endp_ctx[sync_src_id]);
+		&ecpri_dma_ctx->endp_ctx[gsi_id][sync_src_endp_id]);
 	if (ret != 0) {
-		DMAERR("Unable to stop endp, endp_id: %d\n",
-			sync_src_id);
+		DMAERR("Unable to stop endp, endp_id: %d, gsi_id %d\n",
+			sync_src_endp_id, gsi_id);
 		return ret;
 	}
 
 
 	ret = ecpri_dma_stop_endp(
-		&ecpri_dma_ctx->endp_ctx[sync_dest_id]);
+		&ecpri_dma_ctx->endp_ctx[gsi_id][sync_dest_endp_id]);
 	if (ret != 0) {
-		DMAERR("Unable to stop endp, endp_id: %d\n",
-			sync_dest_id);
+		DMAERR("Unable to stop endp, endp_id: %d, gsi_id %d\n",
+			sync_dest_endp_id, gsi_id);
 		return ret;
 	}
 
 	/* Skip the VMs */
-	if (async_src_id == ECPRI_DMA_MHI_INVALID_ENDP_ID ||
-		async_dest_id == ECPRI_DMA_MHI_INVALID_ENDP_ID)
+	if (async_src_endp_id == ECPRI_DMA_MHI_INVALID_ENDP_ID ||
+		async_dest_endp_id == ECPRI_DMA_MHI_INVALID_ENDP_ID)
 		return ret;
 
 	ret = ecpri_dma_stop_endp(
-		&ecpri_dma_ctx->endp_ctx[async_src_id]);
+		&ecpri_dma_ctx->endp_ctx[gsi_id][async_src_endp_id]);
 	if (ret != 0) {
-		DMAERR("Unable to stop endp, endp_id: %d\n",
-			async_src_id);
+		DMAERR("Unable to stop endp, endp_id: %d, gsi_id %d\n",
+			async_src_endp_id, gsi_id);
 		return ret;
 	}
 
 	ret = ecpri_dma_stop_endp(
-		&ecpri_dma_ctx->endp_ctx[async_dest_id]);
+		&ecpri_dma_ctx->endp_ctx[gsi_id][async_dest_endp_id]);
 	if (ret != 0) {
-		DMAERR("Unable to stop endp, endp_id: %d\n",
-			async_dest_id);
+		DMAERR("Unable to stop endp, endp_id: %d, gsi_id %d\n",
+			async_dest_endp_id, gsi_id);
 		return ret;
 	}
 
@@ -812,45 +1019,53 @@ static int ecpri_dma_mhi_stop_memcpy_endps(int sync_src_id,
  * ecpri_dma_mhi_disable_memcpy_endps() - Helper function to disable endpnts
  *
  */
-static int ecpri_dma_mhi_disable_memcpy_endps(int sync_src_id,
-	int sync_dest_id, int async_src_id, int async_dest_id)
+static int ecpri_dma_mhi_disable_memcpy_endps(int idx)
 {
 	int ret = 0;
 
+	int sync_src_endp_id = ECPRI_DMA_MHI_INVALID_ENDP_ID;
+	int sync_dest_endp_id = ECPRI_DMA_MHI_INVALID_ENDP_ID;
+	int async_src_endp_id = ECPRI_DMA_MHI_INVALID_ENDP_ID;
+	int async_dest_endp_id = ECPRI_DMA_MHI_INVALID_ENDP_ID;
+	enum ecpri_dma_gsi_id gsi_id = ECPRI_DMA_GSI_ID_0;
+
+	ecpri_dma_mhi_get_sync_async_endp_ids(&sync_src_endp_id,
+		&sync_dest_endp_id, &async_src_endp_id, &async_dest_endp_id, idx);
+
 	ret = ecpri_dma_disable_dma_endp(
-		&ecpri_dma_ctx->endp_ctx[sync_src_id]);
+		&ecpri_dma_ctx->endp_ctx[gsi_id][sync_src_endp_id]);
 	if (ret != 0) {
-		DMAERR("Unable to disable endpoint %d\n",
-			sync_src_id);
+		DMAERR("Unable to disable endpoint %d, gsi_id %d\n",
+			sync_src_endp_id, gsi_id);
 		return ret;
 	}
 
 	ret = ecpri_dma_disable_dma_endp(
-		&ecpri_dma_ctx->endp_ctx[sync_dest_id]);
+		&ecpri_dma_ctx->endp_ctx[gsi_id][sync_dest_endp_id]);
 	if (ret != 0) {
-		DMAERR("Unable to disable endpoint %d\n",
-			sync_dest_id);
+		DMAERR("Unable to disable endpoint %d, gsi_id %d\n",
+			sync_dest_endp_id, gsi_id);
 		return ret;
 	}
 
 	/* Skip the VMs */
-	if (async_src_id == ECPRI_DMA_MHI_INVALID_ENDP_ID ||
-		async_dest_id == ECPRI_DMA_MHI_INVALID_ENDP_ID)
+	if (async_src_endp_id == ECPRI_DMA_MHI_INVALID_ENDP_ID ||
+		async_dest_endp_id == ECPRI_DMA_MHI_INVALID_ENDP_ID)
 		return ret;
 
 	ret = ecpri_dma_disable_dma_endp(
-		&ecpri_dma_ctx->endp_ctx[async_src_id]);
+		&ecpri_dma_ctx->endp_ctx[gsi_id][async_src_endp_id]);
 	if (ret != 0) {
-		DMAERR("Unable to disable endpoint %d\n",
-			async_src_id);
+		DMAERR("Unable to disable endpoint %d, gsi_id %d\n",
+			async_src_endp_id, gsi_id);
 		return ret;
 	}
 
 	ret = ecpri_dma_disable_dma_endp(
-		&ecpri_dma_ctx->endp_ctx[async_dest_id]);
+		&ecpri_dma_ctx->endp_ctx[gsi_id][async_dest_endp_id]);
 	if (ret != 0) {
-		DMAERR("Unable to disable endpoint %d\n",
-			async_dest_id);
+		DMAERR("Unable to disable endpoint %d, gsi_id %d\n",
+			async_dest_endp_id, gsi_id);
 		return ret;
 	}
 
@@ -861,45 +1076,53 @@ static int ecpri_dma_mhi_disable_memcpy_endps(int sync_src_id,
  * ecpri_dma_mhi_dealloc_memcpy_endps() - Helper function to dealloc endpnts
  *
  */
-static int ecpri_dma_mhi_dealloc_memcpy_endps(int sync_src_id,
-	int sync_dest_id, int async_src_id, int async_dest_id)
+static int ecpri_dma_mhi_dealloc_memcpy_endps(int idx)
 {
 	int ret = 0;
 
+	int sync_src_endp_id = ECPRI_DMA_MHI_INVALID_ENDP_ID;
+	int sync_dest_endp_id = ECPRI_DMA_MHI_INVALID_ENDP_ID;
+	int async_src_endp_id = ECPRI_DMA_MHI_INVALID_ENDP_ID;
+	int async_dest_endp_id = ECPRI_DMA_MHI_INVALID_ENDP_ID;
+	enum ecpri_dma_gsi_id gsi_id = ECPRI_DMA_GSI_ID_0;
+
+	ecpri_dma_mhi_get_sync_async_endp_ids(&sync_src_endp_id,
+		&sync_dest_endp_id, &async_src_endp_id, &async_dest_endp_id, idx);
+
 	ret = ecpri_dma_dealloc_endp(
-		&ecpri_dma_ctx->endp_ctx[sync_src_id]);
+		&ecpri_dma_ctx->endp_ctx[gsi_id][sync_src_endp_id]);
 	if (ret != 0) {
-		DMAERR("Unable to deallocate endp, endp_id: %d\n",
-			sync_src_id);
+		DMAERR("Unable to deallocate endp, endp_id: %d, gsi_id: %d\n",
+			sync_src_endp_id, gsi_id);
 		return ret;
 	}
 
 	ret = ecpri_dma_dealloc_endp(
-		&ecpri_dma_ctx->endp_ctx[sync_dest_id]);
+		&ecpri_dma_ctx->endp_ctx[gsi_id][sync_dest_endp_id]);
 	if (ret != 0) {
-		DMAERR("Unable to deallocate endp, endp_id: %d\n",
-			sync_dest_id);
+		DMAERR("Unable to deallocate endp, endp_id: %d, gsi_id: %d\n",
+			sync_dest_endp_id, gsi_id);
 		return ret;
 	}
 
 	/* Skip the VMs */
-	if (async_src_id == ECPRI_DMA_MHI_INVALID_ENDP_ID ||
-		async_dest_id == ECPRI_DMA_MHI_INVALID_ENDP_ID)
+	if (async_src_endp_id == ECPRI_DMA_MHI_INVALID_ENDP_ID ||
+		async_dest_endp_id == ECPRI_DMA_MHI_INVALID_ENDP_ID)
 		return ret;
 
 	ret = ecpri_dma_dealloc_endp(
-		&ecpri_dma_ctx->endp_ctx[async_src_id]);
+		&ecpri_dma_ctx->endp_ctx[gsi_id][async_src_endp_id]);
 	if (ret != 0) {
-		DMAERR("Unable to deallocate endp, endp_id: %d\n",
-			async_src_id);
+		DMAERR("Unable to deallocate endp, endp_id: %d, gsi_id: %d\n",
+			async_src_endp_id, gsi_id);
 		return ret;
 	}
 
 	ret = ecpri_dma_dealloc_endp(
-		&ecpri_dma_ctx->endp_ctx[async_dest_id]);
+		&ecpri_dma_ctx->endp_ctx[gsi_id][async_dest_endp_id]);
 	if (ret != 0) {
-		DMAERR("Unable to deallocate endp, endp_id: %d\n",
-			async_dest_id);
+		DMAERR("Unable to deallocate endp, endp_id: %d, gsi_id: %d\n",
+			async_dest_endp_id, gsi_id);
 		return ret;
 	}
 
@@ -910,46 +1133,54 @@ static int ecpri_dma_mhi_dealloc_memcpy_endps(int sync_src_id,
  * ecpri_dma_mhi_reset_memcpy_endps() - Helper function to reset endpnts
  *
  */
-static int ecpri_dma_mhi_reset_memcpy_endps(int sync_src_id,
-	int sync_dest_id, int async_src_id, int async_dest_id)
+static int ecpri_dma_mhi_reset_memcpy_endps(int idx)
 {
 	int ret = 0;
 	struct ecpri_dma_endp_context* endp_cfg = NULL;
 
-	endp_cfg = &ecpri_dma_ctx->endp_ctx[sync_src_id];
+	int sync_src_endp_id = ECPRI_DMA_MHI_INVALID_ENDP_ID;
+	int sync_dest_endp_id = ECPRI_DMA_MHI_INVALID_ENDP_ID;
+	int async_src_endp_id = ECPRI_DMA_MHI_INVALID_ENDP_ID;
+	int async_dest_endp_id = ECPRI_DMA_MHI_INVALID_ENDP_ID;
+	enum ecpri_dma_gsi_id gsi_id = ECPRI_DMA_GSI_ID_0;
+
+	ecpri_dma_mhi_get_sync_async_endp_ids(&sync_src_endp_id,
+		&sync_dest_endp_id, &async_src_endp_id, &async_dest_endp_id, idx);
+
+	endp_cfg = &ecpri_dma_ctx->endp_ctx[gsi_id][sync_src_endp_id];
 	ret = ecpri_dma_reset_endp(endp_cfg);
 	if (ret != GSI_STATUS_SUCCESS) {
-		DMAERR("Unable to reset endp, endp_id: %d\n",
-			sync_src_id);
+		DMAERR("Unable to reset endp, endp_id: %d, gsi_id %d\n",
+			sync_src_endp_id, gsi_id);
 		return ret;
 	}
 
-	endp_cfg = &ecpri_dma_ctx->endp_ctx[sync_dest_id];
+	endp_cfg = &ecpri_dma_ctx->endp_ctx[gsi_id][sync_dest_endp_id];
 	ret = ecpri_dma_reset_endp(endp_cfg);
 	if (ret != GSI_STATUS_SUCCESS) {
-		DMAERR("Unable to reset endp, endp_id: %d\n",
-			sync_dest_id);
+		DMAERR("Unable to reset endp, endp_id: %d, gsi_id %d\n",
+			sync_dest_endp_id, gsi_id);
 		return ret;
 	}
 
 	/* Skip the VMs */
-	if (async_src_id == ECPRI_DMA_MHI_INVALID_ENDP_ID ||
-		async_dest_id == ECPRI_DMA_MHI_INVALID_ENDP_ID)
+	if (async_src_endp_id == ECPRI_DMA_MHI_INVALID_ENDP_ID ||
+		async_dest_endp_id == ECPRI_DMA_MHI_INVALID_ENDP_ID)
 		return ret;
 
-	endp_cfg = &ecpri_dma_ctx->endp_ctx[async_src_id];
+	endp_cfg = &ecpri_dma_ctx->endp_ctx[gsi_id][async_src_endp_id];
 	ret = ecpri_dma_reset_endp(endp_cfg);
 	if (ret != GSI_STATUS_SUCCESS) {
-		DMAERR("Unable to reset endp, endp_id: %d\n",
-			async_src_id);
+		DMAERR("Unable to reset endp, endp_id: %d, gsi_id %d\n",
+			async_src_endp_id, gsi_id);
 		return ret;
 	}
 
-	endp_cfg = &ecpri_dma_ctx->endp_ctx[async_dest_id];
+	endp_cfg = &ecpri_dma_ctx->endp_ctx[gsi_id][async_dest_endp_id];
 	ret = ecpri_dma_reset_endp(endp_cfg);
 	if (ret != GSI_STATUS_SUCCESS) {
-		DMAERR("Unable to reset endp, endp_id: %d\n",
-			async_dest_id);
+		DMAERR("Unable to reset endp, endp_id: %d, gsi_id %d\n",
+			async_dest_endp_id, gsi_id);
 		return ret;
 	}
 
@@ -978,15 +1209,10 @@ static int ecpri_dma_mhi_reset_memcpy_endps(int sync_src_id,
  *		-ENOMEM: allocating memory error
  *		-EPERM: ENDP connection failed
  */
-static int ecpri_dma_mhi_memcpy_init(
-	struct mhi_dma_function_params function)
+static int ecpri_dma_mhi_memcpy_init(struct mhi_dma_function_params function)
 {
-	int idx;
-	int ret;
-	int sync_src_id = ECPRI_DMA_MHI_INVALID_ENDP_ID;
-	int sync_dest_id = ECPRI_DMA_MHI_INVALID_ENDP_ID;
-	int async_src_id = ECPRI_DMA_MHI_INVALID_ENDP_ID;
-	int async_dest_id = ECPRI_DMA_MHI_INVALID_ENDP_ID;
+	int idx, ret;
+
 	bool ready = false;
 	struct ecpri_dma_moderation_config mod_cfg;
 	struct ecpri_dma_mhi_memcpy_context* memcpy_ctx = NULL;
@@ -1010,7 +1236,7 @@ static int ecpri_dma_mhi_memcpy_init(
 
 	/* Get the index of VM/PF */
 	ret = ecpri_dma_mhi_get_function_context_index(
-		function, &idx);
+		function, &idx, ECPRI_DMA_MHI_DMA_MEMCPY_CTX);
 	if (ret != 0) {
 		DMAERR("Function params are invalid,"
 			"function type: %d, vf_id: %d\n",
@@ -1059,41 +1285,22 @@ static int ecpri_dma_mhi_memcpy_init(
 	mod_cfg.moderation_counter_threshold = 1;
 	mod_cfg.moderation_timer_threshold = 0;
 
-	sync_src_id =
-		ecpri_dma_mhi_function_endp_dt[idx].sync_src_id;
-	sync_dest_id =
-		ecpri_dma_mhi_function_endp_dt[idx].sync_dest_id;
-	async_src_id =
-		ecpri_dma_mhi_function_endp_dt[idx].async_src_id;
-	async_dest_id =
-		ecpri_dma_mhi_function_endp_dt[idx].async_dest_id;
-
 	/* Allocate endpoints */
-	ret = ecpri_dma_mhi_alloc_sync_async_endps(&mod_cfg, sync_src_id,
-		sync_dest_id, async_src_id, async_dest_id);
+	ret = ecpri_dma_mhi_alloc_sync_async_endps(&mod_cfg, function, idx);
 	if (ret != 0) {
 		DMAERR("Unable to allocate endp\n");
 		goto fail_alloc_endp;
 	}
 
 	/* Enable endpoints */
-	ret = ecpri_dma_mhi_enable_mhi_memcpy_endps(sync_src_id,
-		sync_dest_id, async_src_id, async_dest_id);
+	ret = ecpri_dma_mhi_enable_mhi_memcpy_endps(idx);
 	if (ret != 0) {
 		DMAERR("Unable to enable endp\n");
 		goto fail_enable_endp;
 	}
 
 	/* Set endpoints */
-	memcpy_ctx->sync_dest_endp = &ecpri_dma_ctx->endp_ctx[sync_dest_id];
-	memcpy_ctx->sync_src_endp = &ecpri_dma_ctx->endp_ctx[sync_src_id];
-
-	if (async_src_id != ECPRI_DMA_MHI_INVALID_ENDP_ID &&
-		async_dest_id != ECPRI_DMA_MHI_INVALID_ENDP_ID)
-	{
-		memcpy_ctx->async_dest_endp = &ecpri_dma_ctx->endp_ctx[async_dest_id];
-		memcpy_ctx->async_src_endp = &ecpri_dma_ctx->endp_ctx[async_src_id];
-	}
+	ecpri_dma_mhi_set_endps(idx, memcpy_ctx);
 
 	// TODO: init_memcpy_debugfs()
 
@@ -1102,8 +1309,7 @@ static int ecpri_dma_mhi_memcpy_init(
 
 fail_enable_endp:
 	/* Dealloc endpoints */
-	ret = ecpri_dma_mhi_dealloc_memcpy_endps(sync_src_id,
-		sync_dest_id, async_src_id, async_dest_id);
+	ret = ecpri_dma_mhi_dealloc_memcpy_endps(idx);
 	if (ret != 0) {
 		DMAERR("Unable to deallocate endps\n");
 		ecpri_dma_assert();
@@ -1120,32 +1326,26 @@ fail_alloc_ctx:
 static void ecpri_dma_mhi_memcpy_destroy(
 	struct mhi_dma_function_params function)
 {
-	int ret;
-	int idx;
-	int sync_src_id = ECPRI_DMA_MHI_INVALID_ENDP_ID;
-	int sync_dest_id = ECPRI_DMA_MHI_INVALID_ENDP_ID;
-	int async_src_id = ECPRI_DMA_MHI_INVALID_ENDP_ID;
-	int async_dest_id = ECPRI_DMA_MHI_INVALID_ENDP_ID;
+	int ret, idx;
+
+	int sync_src_endp_id = ECPRI_DMA_MHI_INVALID_ENDP_ID;
+	int sync_dest_endp_id = ECPRI_DMA_MHI_INVALID_ENDP_ID;
+	int async_src_endp_id = ECPRI_DMA_MHI_INVALID_ENDP_ID;
+	int async_dest_endp_id = ECPRI_DMA_MHI_INVALID_ENDP_ID;
+	enum ecpri_dma_gsi_id gsi_id = ECPRI_DMA_GSI_ID_0;
+
 	struct ecpri_dma_mhi_memcpy_context* memcpy_ctx = NULL;
+	const struct ecpri_dma_mhi_ee_gsi_tuple* func_map;
 
 	/* Get the index of VM/PF */
 	ret = ecpri_dma_mhi_get_function_context_index(
-		function, &idx);
+		function, &idx, ECPRI_DMA_MHI_DMA_MEMCPY_CTX);
 	if (ret != 0) {
 		DMAERR("Function params are invalid,"
 			"function type: %d, vf_id: %d\n",
 			function.function_type, function.vf_id);
 		return;
 	}
-
-	sync_src_id =
-		ecpri_dma_mhi_function_endp_dt[idx].sync_src_id;
-	sync_dest_id =
-		ecpri_dma_mhi_function_endp_dt[idx].sync_dest_id;
-	async_src_id =
-		ecpri_dma_mhi_function_endp_dt[idx].async_src_id;
-	async_dest_id =
-		ecpri_dma_mhi_function_endp_dt[idx].async_dest_id;
 
 	memcpy_ctx = ecpri_dma_mhi_memcpy_ctx[idx];
 	if (!memcpy_ctx) {
@@ -1159,25 +1359,32 @@ static void ecpri_dma_mhi_memcpy_destroy(
 		return;
 	}
 
+	ret = ecpri_dma_mhi_get_function_mapping(function, &func_map);
+	if (ret)
+	{
+		DMAERR("Unknown function");
+	}
+	gsi_id = func_map->gsi_id;
+
+	ecpri_dma_mhi_get_sync_async_endp_ids(&sync_src_endp_id,
+		&sync_dest_endp_id, &async_src_endp_id, &async_dest_endp_id, idx);
+
 	/* Reset endpoints */
-	ret = ecpri_dma_mhi_reset_memcpy_endps(sync_src_id,
-		sync_dest_id, async_src_id, async_dest_id);
+	ret = ecpri_dma_mhi_reset_memcpy_endps(idx);
 	if (ret != 0) {
 		DMAERR("Unable to reset endps\n");
 		ecpri_dma_assert();
 	}
 
 	/* Disable endpoints */
-	ret = ecpri_dma_mhi_disable_memcpy_endps(sync_src_id,
-		sync_dest_id, async_src_id, async_dest_id);
+	ret = ecpri_dma_mhi_disable_memcpy_endps(idx);
 	if (ret != 0) {
 		DMAERR("Unable to disable GSI endps\n");
 		ecpri_dma_assert();
 	}
 
 	/* Dealloc endpoints */
-	ret = ecpri_dma_mhi_dealloc_memcpy_endps(sync_src_id,
-		sync_dest_id, async_src_id, async_dest_id);
+	ret = ecpri_dma_mhi_dealloc_memcpy_endps(idx);
 	if (ret != 0) {
 		DMAERR("Unable to deallocate endps\n");
 		ecpri_dma_assert();
@@ -1197,8 +1404,8 @@ static void ecpri_dma_mhi_memcpy_destroy(
 	memcpy_ctx->sync_dest_endp = NULL;
 	memcpy_ctx->sync_src_endp = NULL;
 
-	if (async_src_id != ECPRI_DMA_MHI_INVALID_ENDP_ID &&
-		async_dest_id != ECPRI_DMA_MHI_INVALID_ENDP_ID)
+	if (async_src_endp_id != ECPRI_DMA_MHI_INVALID_ENDP_ID &&
+		async_dest_endp_id != ECPRI_DMA_MHI_INVALID_ENDP_ID)
 	{
 		memcpy_ctx->async_dest_endp = NULL;
 		memcpy_ctx->async_src_endp = NULL;
@@ -1250,7 +1457,7 @@ static int ecpri_dma_mhi_dma_sync_memcpy(
 
 	/* Get the index of VM/PF */
 	ret = ecpri_dma_mhi_get_function_context_index(
-		function, &idx);
+		function, &idx, ECPRI_DMA_MHI_DMA_MEMCPY_CTX);
 	if (ret != 0) {
 		DMAERR("Function params are invalid,"
 			"function type: %d, vf_id: %d\n",
@@ -1287,14 +1494,14 @@ static int ecpri_dma_mhi_dma_sync_memcpy(
 	spin_unlock_irqrestore(&memcpy_ctx->sync_lock, flags);
 
 	/* Allocate packets */
-	ret = ecpri_dma_mhi_dma_alloc_pkt(dest, len, &pkts_dest);
+	ret = ecpri_dma_mhi_dma_alloc_pkt(dest, len, function, &pkts_dest);
 	if (ret != 0) {
 		DMAERR("Unable to allocate packets for destination\n");
 		ret = -EPERM;
 		goto fail_dest_alloc;
 	}
 
-	ret = ecpri_dma_mhi_dma_alloc_pkt(src, len, &pkts_src);
+	ret = ecpri_dma_mhi_dma_alloc_pkt(src, len, function, &pkts_src);
 	if (ret != 0) {
 		DMAERR("Unable to allocate packets for source\n");
 		ret = -EPERM;
@@ -1375,7 +1582,7 @@ static int ecpri_dma_mhi_dma_async_memcpy_vm_handling(
 
 	/* Get the index of VM/PF */
 	ret = ecpri_dma_mhi_get_function_context_index(
-		function, &idx);
+		function, &idx, ECPRI_DMA_MHI_DMA_MEMCPY_CTX);
 	if (ret != 0) {
 		DMAERR("Function params are invalid,"
 			"function type: %d, vf_id: %d\n",
@@ -1474,7 +1681,7 @@ static int ecpri_dma_mhi_dma_async_memcpy(
 
 	/* Get the index of VM/PF */
 	ret = ecpri_dma_mhi_get_function_context_index(
-		function, &idx);
+		function, &idx, ECPRI_DMA_MHI_DMA_MEMCPY_CTX);
 	if (ret != 0) {
 		DMAERR("Function params are invalid,"
 			"function type: %d, vf_id: %d\n",
@@ -1520,13 +1727,13 @@ static int ecpri_dma_mhi_dma_async_memcpy(
 	xfer_descr->user_cb = user_cb;
 	xfer_descr->user_data = user_param;
 
-	ret = ecpri_dma_mhi_dma_alloc_pkt(dest, len, &pkt_dest);
+	ret = ecpri_dma_mhi_dma_alloc_pkt(dest, len, function, &pkt_dest);
 	if (ret != 0) {
 		DMAERR("Unable to allocate packets for destination\n");
 		return -ENOMEM;
 	}
 
-	ret = ecpri_dma_mhi_dma_alloc_pkt(src, len, &pkt_src);
+	ret = ecpri_dma_mhi_dma_alloc_pkt(src, len, function, &pkt_src);
 	if (ret != 0) {
 		ecpri_dma_mhi_dma_free_pkt(pkt_dest[0]);
 		DMAERR("Unable to allocate packets for source\n");
@@ -1592,10 +1799,7 @@ static int ecpri_dma_mhi_dma_memcpy_disable(
 {
 	int idx;
 	int ret = 0;
-	int sync_src_id = ECPRI_DMA_MHI_INVALID_ENDP_ID;
-	int sync_dest_id = ECPRI_DMA_MHI_INVALID_ENDP_ID;
-	int async_src_id = ECPRI_DMA_MHI_INVALID_ENDP_ID;
-	int async_dest_id = ECPRI_DMA_MHI_INVALID_ENDP_ID;
+
 	unsigned long flags;
 	unsigned long flags_sync;
 	unsigned long flags_async;
@@ -1604,7 +1808,7 @@ static int ecpri_dma_mhi_dma_memcpy_disable(
 
 	/* Get the index of VM/PF */
 	ret = ecpri_dma_mhi_get_function_context_index(
-		function, &idx);
+		function, &idx, ECPRI_DMA_MHI_DMA_MEMCPY_CTX);
 	if (ret != 0) {
 		DMAERR("Function params are invalid,"
 			"function type: %d, vf_id: %d\n",
@@ -1622,15 +1826,6 @@ static int ecpri_dma_mhi_dma_memcpy_disable(
 		DMAERR("Memcpy destroy in progress\n");
 		return -EFAULT;
 	}
-
-	sync_src_id =
-		ecpri_dma_mhi_function_endp_dt[idx].sync_src_id;
-	sync_dest_id =
-		ecpri_dma_mhi_function_endp_dt[idx].sync_dest_id;
-	async_src_id =
-		ecpri_dma_mhi_function_endp_dt[idx].async_src_id;
-	async_dest_id =
-		ecpri_dma_mhi_function_endp_dt[idx].async_dest_id;
 
 	spin_lock_irqsave(&memcpy_ctx->lock,
 		flags);
@@ -1689,8 +1884,7 @@ static int ecpri_dma_mhi_dma_memcpy_disable(
 		flags);
 
 	/* Stop endpoints */
-	ret = ecpri_dma_mhi_stop_memcpy_endps(sync_src_id,
-		sync_dest_id, async_src_id, async_dest_id);
+	ret = ecpri_dma_mhi_stop_memcpy_endps(idx);
 	if (ret != 0) {
 		DMAERR("Unable to stop endp\n");
 		return ret;
@@ -1750,15 +1944,18 @@ static int ecpri_dma_mhi_dma_memcpy_enable(
 {
 	int idx;
 	int ret = 0;
-	int sync_src_id = ECPRI_DMA_MHI_INVALID_ENDP_ID;
-	int sync_dest_id = ECPRI_DMA_MHI_INVALID_ENDP_ID;
-	int async_src_id = ECPRI_DMA_MHI_INVALID_ENDP_ID;
-	int async_dest_id = ECPRI_DMA_MHI_INVALID_ENDP_ID;
+	int sync_src_endp_id = ECPRI_DMA_MHI_INVALID_ENDP_ID;
+	int sync_dest_endp_id = ECPRI_DMA_MHI_INVALID_ENDP_ID;
+	int async_src_endp_id = ECPRI_DMA_MHI_INVALID_ENDP_ID;
+	int async_dest_endp_id = ECPRI_DMA_MHI_INVALID_ENDP_ID;
+	enum ecpri_dma_gsi_id gsi_id = ECPRI_DMA_GSI_ID_0;
+
 	struct ecpri_dma_mhi_memcpy_context* memcpy_ctx;
+	const struct ecpri_dma_mhi_ee_gsi_tuple* func_map;
 
 	/* Check function params are valid */
 	ret = ecpri_dma_mhi_get_function_context_index(
-		function, &idx);
+		function, &idx, ECPRI_DMA_MHI_DMA_MEMCPY_CTX);
 	if (ret != 0) {
 		DMAERR("Function params are invalid,"
 			"function type: %d, vf_id: %d\n",
@@ -1784,20 +1981,21 @@ static int ecpri_dma_mhi_dma_memcpy_enable(
 		return 0;
 	}
 
-	sync_src_id =
-		ecpri_dma_mhi_function_endp_dt[idx].sync_src_id;
-	sync_dest_id =
-		ecpri_dma_mhi_function_endp_dt[idx].sync_dest_id;
-	async_src_id =
-		ecpri_dma_mhi_function_endp_dt[idx].async_src_id;
-	async_dest_id =
-		ecpri_dma_mhi_function_endp_dt[idx].async_dest_id;
+	ret = ecpri_dma_mhi_get_function_mapping(function, &func_map);
+	if (ret)
+	{
+		DMAERR("Unknown function");
+		return ret;
+	}
+	gsi_id = func_map->gsi_id;
+
+	ecpri_dma_mhi_get_sync_async_endp_ids(&sync_src_endp_id,
+		&sync_dest_endp_id, &async_src_endp_id, &async_dest_endp_id, idx);
 
 	atomic_inc(&memcpy_ctx->ref_count);
 
 	/* Start endpoints */
-	ret = ecpri_dma_mhi_start_memcpy_endps(sync_src_id,
-		sync_dest_id, async_src_id, async_dest_id);
+	ret = ecpri_dma_mhi_start_memcpy_endps(idx);
 	if (ret != 0) {
 		DMAERR("Unable to start endp\n");
 		ret = -EPERM;
@@ -1805,8 +2003,7 @@ static int ecpri_dma_mhi_dma_memcpy_enable(
 	}
 
 	/* Set endpoints mode */
-	ret = ecpri_dma_mhi_set_memcpy_endps_mode(sync_src_id,
-		sync_dest_id, async_src_id, async_dest_id);
+	ret = ecpri_dma_mhi_set_memcpy_endps_mode(idx);
 	if (ret != 0) {
 		DMAERR("Unable to set endpoints mode\n");
 		goto fail_set_mode;
@@ -1817,15 +2014,13 @@ static int ecpri_dma_mhi_dma_memcpy_enable(
 
 fail_set_mode:
 	/* Stop endpoints */
-	ret = ecpri_dma_mhi_stop_memcpy_endps(sync_src_id,
-		sync_dest_id, async_src_id, async_dest_id);
+	ret = ecpri_dma_mhi_stop_memcpy_endps(idx);
 	if (ret != 0) {
 		DMAERR("Unable to stop endps\n");
 		ecpri_dma_assert();
 	}
 	/* Reset endpoints */
-	ret = ecpri_dma_mhi_reset_memcpy_endps(sync_src_id,
-		sync_dest_id, async_src_id, async_dest_id);
+	ret = ecpri_dma_mhi_reset_memcpy_endps(idx);
 	if (ret != 0) {
 		DMAERR("Unable to reset endps\n");
 		ecpri_dma_assert();
@@ -1859,6 +2054,7 @@ static int ecpri_dma_mhi_client_init(
 	int ret;
 	enum ecpri_dma_ees ee_idx;
 	struct ecpri_dma_mhi_wq_work_type* work = NULL;
+	const struct ecpri_dma_mhi_ee_gsi_tuple* func_map;
 
 	if (!params) {
 		DMAERR("Null params args\n");
@@ -1870,8 +2066,8 @@ static int ecpri_dma_mhi_client_init(
 		return -EINVAL;
 	}
 
-	ret = ecpri_dma_mhi_get_function_context_index(
-		function, &idx);
+	ret = ecpri_dma_mhi_get_function_context_index(function, &idx,
+		ECPRI_DMA_MHI_DMA_CLIENT_CTX);
 	if (ret != 0) {
 		DMAERR("Function params are invalid,"
 			"function type: %d, vf_id: %d\n",
@@ -1976,19 +2172,21 @@ static int ecpri_dma_mhi_client_init(
 		goto fail_set_state;
 	}
 
-	ret = ecpri_dma_mhi_get_ee_index(function, &ee_idx);
-	if (ret != 0) {
-		DMAERR("Unable to translate VF/PF to EE index\n");
-		return -EINVAL;
+	ret = ecpri_dma_mhi_get_function_mapping(function, &func_map);
+	if (ret)
+	{
+		DMAERR("Unknown function");
+		return ret;
 	}
+	ee_idx = func_map->ee_id;
 
 	/* Fill out param */
-	ecpri_dma_mhi_get_l2_ch_bitmap(ee_idx, idx, &out->ch_db_fwd_msk);
+	ecpri_dma_mhi_get_l2_ch_bitmap(function, idx, &out->ch_db_fwd_msk);
 	out->ev_db_fwd_msk = out->ch_db_fwd_msk;
-	out->ch_db_fwd_base = gsihal_get_reg_nk_addr(
-		GSI_EE_n_GSI_CH_k_DOORBELL_0, ee_idx, 0);
-	out->ev_db_fwd_base =gsihal_get_reg_nk_addr(
-		GSI_EE_n_EV_CH_k_DOORBELL_0, ee_idx, 0);
+	out->ch_db_fwd_base = gsihal_get_reg_pnk_addr(
+		GSI_EE_n_GSI_CH_k_DOORBELL_0, 0, ee_idx, 0);
+	out->ev_db_fwd_base =gsihal_get_reg_pnk_addr(
+		GSI_EE_n_EV_CH_k_DOORBELL_0, 0, ee_idx, 0);
 
 	/* Create notifier for driver ready */
 	work = kzalloc(sizeof(*work), GFP_KERNEL);
@@ -2036,7 +2234,7 @@ static void ecpri_dma_mhi_destroy(
 	int ret;
 
 	ret = ecpri_dma_mhi_get_function_context_index(
-		function, &idx);
+		function, &idx, ECPRI_DMA_MHI_DMA_CLIENT_CTX);
 	if (ret != 0) {
 		DMAERR("Function params are invalid,"
 			"function type: %d, vf_id: %d\n",
@@ -2111,13 +2309,16 @@ static int ecpri_dma_mhi_client_dma_start(
 	unsigned long flags;
 	unsigned long gsi_dev_hdl;
 	enum ecpri_dma_ees ee_idx;
+	u32 gsi_id;
+	const struct ecpri_dma_mhi_ee_gsi_tuple* func_map;
 
 	if (!params) {
 		DMAERR("Null params args\n");
 		return -EINVAL;
 	}
 
-	ret = ecpri_dma_mhi_get_function_context_index(function, &idx);
+	ret = ecpri_dma_mhi_get_function_context_index(function, &idx,
+	ECPRI_DMA_MHI_DMA_CLIENT_CTX);
 	if (ret != 0) {
 		DMAERR("Function params are invalid, function"
 			" type: %d, vf_id: %d\n",
@@ -2157,13 +2358,16 @@ static int ecpri_dma_mhi_client_dma_start(
 		return -EFAULT;
 	}
 
-	ret = ecpri_dma_mhi_get_ee_index(function, &ee_idx);
-	if (ret != 0) {
-		DMAERR("Unable to translate VF/PF to EE index\n");
-		return -EINVAL;
+	ret = ecpri_dma_mhi_get_function_mapping(function, &func_map);
+	if (ret)
+	{
+		DMAERR("Unknown function");
+		return ret;
 	}
+	ee_idx = func_map->ee_id;
+	gsi_id = func_map->gsi_id;
 
-	ret = gsi_write_device_scratch(gsi_dev_hdl, ee_idx,
+	ret = gsi_write_device_scratch(gsi_dev_hdl, gsi_id, ee_idx,
 		&ecpri_dma_mhi_client_ctx[idx]->dev_scratch);
 	if (ret != 0) {
 		DMAERR("Unable to write device scratch, idx: %d,"
@@ -2324,7 +2528,8 @@ static int ecpri_dma_mhi_client_connect_internal(
 	mod_cfg.moderation_counter_threshold = channel->int_modc;
 	mod_cfg.moderation_timer_threshold = channel->int_modt;
 
-	ret = ecpri_dma_alloc_endp(channel->endp_ctx->endp_id, channel->rlen,
+	ret = ecpri_dma_alloc_endp(channel->endp_ctx->gsi_id,
+		channel->endp_ctx->endp_id, channel->rlen,
 		&mod_cfg, channel->is_over_pcie, NULL);
 	if (ret != 0) {
 		DMAERR("Failed to allocate endp %d\n", channel->endp_ctx->endp_id);
@@ -2417,13 +2622,15 @@ static int ecpri_dma_mhi_dma_connect_endp(
 	struct ecpri_dma_mhi_channel_ctx* channel;
 	struct ecpri_dma_endp_context* endp_ctx;
 	u32 ch_idx = ECPRI_DMA_MHI_INVALID_CH_ID;
+	const struct ecpri_dma_mhi_ee_gsi_tuple* func_map;
 
 	if (!in) {
 		DMAERR("Null params args\n");
 		return -EINVAL;
 	}
 
-	ret = ecpri_dma_mhi_get_function_context_index(function, &idx);
+	ret = ecpri_dma_mhi_get_function_context_index(function, &idx,
+		ECPRI_DMA_MHI_DMA_CLIENT_CTX);
 	if (ret != 0) {
 		DMAERR("Function params are invalid, function type: %d, vf_id: %d\n",
 			function.function_type, function.vf_id);
@@ -2476,13 +2683,15 @@ static int ecpri_dma_mhi_dma_connect_endp(
 	channel->channel_id = ch_idx;
 	channel->event_id = channel->ch_ctx_host.erindex -
 		ecpri_dma_mhi_client_ctx[idx]->first_ev;
-	ret = ecpri_dma_mhi_get_ee_index(function, &ee_idx);
-	if (ret != 0) {
-		DMAERR("Unable to translate VF/PF to EE index\n");
-		return -EINVAL;
+	ret = ecpri_dma_mhi_get_function_mapping(function, &func_map);
+	if (ret)
+	{
+		DMAERR("Unknown function");
+		return ret;
 	}
+	ee_idx = func_map->ee_id;
 
-	ret = ecpri_dma_mhi_get_endp_ctx(ee_idx, ch_idx,
+	ret = ecpri_dma_mhi_get_endp_ctx(function, ch_idx,
 		&endp_ctx);
 	if (ret != 0) {
 		DMAERR("endp_ctx, ee: %d, ch_id: %d\n",
@@ -2554,7 +2763,8 @@ static int ecpri_dma_mhi_dma_disconnect_endp(
 	int ret = 0;
 	struct ecpri_dma_mhi_channel_ctx* channel = NULL;
 
-	ret = ecpri_dma_mhi_get_function_context_index(function, &idx);
+	ret = ecpri_dma_mhi_get_function_context_index(function, &idx,
+		ECPRI_DMA_MHI_DMA_CLIENT_CTX);
 	if (ret != 0) {
 		DMAERR("Function params are invalid, function type: %d, vf_id: %d\n",
 			function.function_type, function.vf_id);
@@ -2638,7 +2848,8 @@ int ecpri_dma_mhi_client_update_mstate(struct mhi_dma_function_params function,
 	DMADBG("Begin\n");
 
 	/* Function params validity check */
-	ret = ecpri_dma_mhi_get_function_context_index(function, &idx);
+	ret = ecpri_dma_mhi_get_function_context_index(function, &idx,
+		ECPRI_DMA_MHI_DMA_CLIENT_CTX);
 	if (ret != 0) {
 		DMAERR("Function params are invalid,"
 		       "function type: %d, vf_id: %d\n",

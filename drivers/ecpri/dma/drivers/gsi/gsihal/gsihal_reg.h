@@ -367,79 +367,83 @@ struct gsihal_reg_gsi_ee_n_cntxt_gsi_irq {
 int gsihal_reg_init(enum gsi_ver gsi_ver);
 
 /*
- * gsihal_read_reg_nk() - Get nk parameterized reg value
+ * gsihal_read_reg_pnk() - Get pnk parameterized reg value
  */
-u32 gsihal_read_reg_nk(enum gsihal_reg_name reg, u32 n, u32 k);
+u32 gsihal_read_reg_pnk(enum gsihal_reg_name reg, u32 p, u32 n, u32 k);
 
 /*
- * gsihal_read_reg_n() - Get n parameterized reg value
+ * gsihal_read_reg_pn() - Get n parameterized reg value
  */
-static inline u32 gsihal_read_reg_n(enum gsihal_reg_name reg, u32 n)
+static inline u32 gsihal_read_reg_pn(enum gsihal_reg_name reg, u32 p, u32 n)
 {
-	return gsihal_read_reg_nk(reg, n, 0);
+	return gsihal_read_reg_pnk(reg, p, n, 0);
 }
 
 /*
- * gsihal_read_reg() - Get reg value
+ * gsihal_read_reg_p() - Get reg value
  */
-static inline u32 gsihal_read_reg(enum gsihal_reg_name reg)
+static inline u32 gsihal_read_reg_p(enum gsihal_reg_name reg, u32 p)
 {
-	return gsihal_read_reg_nk(reg, 0, 0);
+	return gsihal_read_reg_pnk(reg, p, 0, 0);
 }
 
 /*
- * gsihal_write_reg_nk() - Write to n/k parameterized reg a raw value
+ * gsihal_write_reg_pnk() - Write to n/k parameterized reg a raw value
  */
-void gsihal_write_reg_nk(enum gsihal_reg_name reg, u32 n, u32 k, u32 val);
+void gsihal_write_reg_pnk(enum gsihal_reg_name reg, u32 p,
+	u32 n, u32 k, u32 val);
 
 /*
- * gsihal_write_reg_n() - Write to n parameterized reg a raw value
+ * gsihal_write_reg_pn() - Write to n parameterized reg a raw value
  */
-static inline void gsihal_write_reg_n(enum gsihal_reg_name reg, u32 n, u32 val)
+static inline void gsihal_write_reg_pn(enum gsihal_reg_name reg, u32 p, u32 n, u32 val)
 {
-	gsihal_write_reg_nk(reg, n, 0, val);
+	gsihal_write_reg_pnk(reg, p, n, 0, val);
 }
 
 /*
- * gsihal_write_reg() - Write to reg a raw value
+ * gsihal_write_reg_p() - Write to reg a raw value
  */
-static inline void gsihal_write_reg(enum gsihal_reg_name reg, u32 val)
+static inline void gsihal_write_reg_p(enum gsihal_reg_name reg, u32 p, u32 val)
 {
-	gsihal_write_reg_nk(reg, 0, 0, val);
+	gsihal_write_reg_pnk(reg, p, 0, 0, val);
 }
 
 /*
- * gsihal_read_reg_nk_fields() - Get the parsed value of nk parameterized reg
+ * gsihal_read_reg_pnk_fields() - Get the parsed value of pnk parameterized reg
  */
-u32 gsihal_read_reg_nk_fields(enum gsihal_reg_name reg,
-	u32 n, u32 k, void *fields);
+u32 gsihal_read_reg_pnk_fields(enum gsihal_reg_name reg,
+	u32 p, u32 n, u32 k, void *fields);
 
 /*
- * gsihal_write_reg_nk_fields() - Write to nk parameterized reg a prased value
+ * gsihal_write_reg_pnk_fields() - Write to nk parameterized reg a prased value
  */
-void gsihal_write_reg_nk_fields(enum gsihal_reg_name reg, u32 n, u32 k,
+void gsihal_write_reg_pnk_fields(enum gsihal_reg_name reg, u32 p, u32 n, u32 k,
 	const void *fields);
 
 /*
-* gsihal_read_reg_n_fields() - Get the parsed value of n parameterized reg
+* gsihal_read_reg_pn_fields() - Get the parsed value of n parameterized reg
 */
-u32 gsihal_read_reg_n_fields(enum gsihal_reg_name reg, u32 n, void *fields);
+u32 gsihal_read_reg_pn_fields(enum gsihal_reg_name reg, u32 p, u32 n,
+	void *fields);
 
 /*
- * gsihal_write_reg_n_fields() - Write to n parameterized reg a prased value
+ * gsihal_write_reg_pn_fields() - Write to n parameterized reg a prased value
  */
-void gsihal_write_reg_n_fields(enum gsihal_reg_name reg, u32 n,
+void gsihal_write_reg_pn_fields(enum gsihal_reg_name reg, u32 p, u32 n,
 	const void *fields);
 
 /*
- * gsihal_write_reg_fields() - Write to reg a prased value
+ * gsihal_write_reg_p_fields() - Write to reg a prased value
  */
-void gsihal_write_reg_fields(enum gsihal_reg_name reg, const void *fields);
+void gsihal_write_reg_p_fields(enum gsihal_reg_name reg, u32 p,
+	const void *fields);
 
 /*
- * gsihal_read_reg_fields() - Get the parsed value of reg
+ * gsihal_read_reg_p_fields() - Get the parsed value of reg
  */
-u32 gsihal_read_reg_fields(enum gsihal_reg_name reg, void *fields);
+u32 gsihal_read_reg_p_fields(enum gsihal_reg_name reg, u32 p,
+	void *fields);
 
 /*
 * gsihal_get_bit_map_array_size() - Get the size of the bit map
@@ -449,9 +453,9 @@ u32 gsihal_read_reg_fields(enum gsihal_reg_name reg, void *fields);
 u32 gsihal_get_bit_map_array_size(void);
 
 /*
-* gsihal_read_ch_reg() - Get the raw value of a ch reg
+* gsihal_read_ch_reg_p() - Get the raw value of a ch reg
 */
-u32 gsihal_read_ch_reg(enum gsihal_reg_name reg, u32 ch_num);
+u32 gsihal_read_ch_reg_p(enum gsihal_reg_name reg, u32 p, u32 ch_num);
 
 /*
  * gsihal_test_ch_bit() - return true if a ch bit is set
@@ -486,26 +490,26 @@ u32 gsihal_get_ch_reg_offset(enum gsihal_reg_name reg, u32 ch_num);
 u32 gsihal_get_ch_reg_n_offset(enum gsihal_reg_name reg, u32 n, u32 ch_num);
 
 /*
- * gsihal_write_ch_bit_map_reg_n() - Write mask to ch reg a raw value
+ * gsihal_write_ch_bit_map_reg_pn() - Write mask to ch reg a raw value
  */
-void gsihal_write_ch_bit_map_reg_n(enum gsihal_reg_name reg, u32 n, u32 ch_num,
-	u32 mask);
+void gsihal_write_ch_bit_map_reg_pn(enum gsihal_reg_name reg, u32 p, u32 n,
+	u32 ch_num, u32 mask);
 
 /*
  * gsihal_write_set_ch_bit_map_reg_n() - Set ch bit in reg a raw value
  */
-void gsihal_write_set_ch_bit_map_reg_n(enum gsihal_reg_name reg, u32 n,
+void gsihal_write_set_ch_bit_map_reg_n(enum gsihal_reg_name reg, u32 p, u32 n,
 	u32 ch_num);
 
 /*
  * Get the offset of a nk parameterized register
  */
-u32 gsihal_get_reg_nk_ofst(enum gsihal_reg_name reg, u32 n, u32 k);
+u32 gsihal_get_reg_pnk_ofst(enum gsihal_reg_name reg, u32 p, u32 n, u32 k);
 
 /*
  * Get the address of a nk parameterized register
  */
-u32 gsihal_get_reg_nk_addr(enum gsihal_reg_name reg, u32 n, u32 k);
+u32 gsihal_get_reg_pnk_addr(enum gsihal_reg_name reg, u32 p, u32 n, u32 k);
 
 /*
  * Check that ring length is valid
@@ -515,9 +519,10 @@ bool gsihal_check_ring_length_valid(u32 r_len, u32 elem_size);
 /*
  * Get the offset of a n parameterized register
  */
-static inline u32 gsihal_get_reg_n_ofst(enum gsihal_reg_name reg, u32 n)
+static inline u32 gsihal_get_reg_pn_ofst(enum gsihal_reg_name reg, u32 p,
+	u32 n)
 {
-	return gsihal_get_reg_nk_ofst(reg, n, 0);
+	return gsihal_get_reg_pnk_ofst(reg, p, n, 0);
 }
 
 /*
@@ -525,7 +530,7 @@ static inline u32 gsihal_get_reg_n_ofst(enum gsihal_reg_name reg, u32 n)
  */
 static inline u32 gsihal_get_reg_ofst(enum gsihal_reg_name reg)
 {
-	return gsihal_get_reg_nk_ofst(reg, 0, 0);
+	return gsihal_get_reg_pnk_ofst(reg, 0, 0, 0);
 }
 
 /*

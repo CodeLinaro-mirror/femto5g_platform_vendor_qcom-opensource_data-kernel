@@ -34,6 +34,8 @@ Attribute definitions for the HWIO_*_ATTR macros are as follows:
 	directly to this offset, therefor HAL shouldn't add it again */
 #define GSI_GSI_REG_BASE_OFFS 0
 
+#define ECPRI_GSI_p_GSI_TOP_OFFS (0x100000)
+
 #define HWIO_GSI_GSI_CFG_ADDR (GSI_GSI_REG_BASE + 0x00000000)
 #define HWIO_GSI_GSI_CFG_PHYS (GSI_GSI_REG_BASE_PHYS + 0x00000000)
 #define HWIO_GSI_GSI_CFG_OFFS (GSI_GSI_REG_BASE_OFFS + 0x00000000)

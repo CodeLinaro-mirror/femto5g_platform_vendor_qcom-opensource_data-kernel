@@ -86,7 +86,9 @@ struct ecpri_dma_ecpri_ss_register_params {
  * @dma_ring_type:    DMA ring type associated with the particular
  *                    DMA channel
  * @src_dma_ring_id:  SRC DMA ring ID associated for the given DMA channel
+ * @src_dma_ring_gsi_id: SRC DMA ring GSI ID
  * @dest_dma_ring_id: DEST DMA ring ID associated for the given DMA channel
+ * @dest_dma_ring_gsi_id: DEST DMA ring GSI ID
  *
  */
 struct ecpri_dma_ring_params {
@@ -94,7 +96,9 @@ struct ecpri_dma_ring_params {
 	enum ecpri_dma_vm_ids nfapi_vm_id;
 	enum ecpri_dma_ring_type dma_ring_type;
 	u32 src_dma_ring_id;
+	u32 src_dma_ring_gsi_id;
 	u32 dest_dma_ring_id;
+	u32 dest_dma_ring_gsi_id;
 };
 
 /**

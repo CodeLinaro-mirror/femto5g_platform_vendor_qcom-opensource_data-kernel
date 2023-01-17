@@ -125,6 +125,18 @@ do {\
 /* Max ENDP ID for eCPRI DMA */
 #define ECPRI_DMA_ENDP_NUM_MAX 74
 
+/* Num of GSIs in HW VER 1 */
+#define ECPRI_DMA_NUM_OF_GSI_HW_VER_1_0 1
+
+/* Num of GSIs in HW VER 2 */
+#define ECPRI_DMA_NUM_OF_GSI_HW_VER_2_0 3
+
+/* Max Num of GSIs in HW */
+#define ECPRI_DMA_MAX_NUM_OF_GSI_HW ECPRI_DMA_NUM_OF_GSI_HW_VER_2_0
+
+/* Defines invalid ENDP ID for eCPRI DMA */
+#define ECPRI_DMA_ENDP_INVALID -1
+
 /* Define for IPC log size */
 #define ECPRI_DMA_IPC_LOG_PAGES 50
 
@@ -153,6 +165,24 @@ do {\
 enum ecpri_dma_smmu_cb_type {
 	ECPRI_DMA_SMMU_CB_AP,
 	ECPRI_DMA_SMMU_CB_MAX
+};
+
+/*
+* ecpri_dma_endp_gsi_tuple - ENDPs data contains ENDP ID and GSI ID
+*
+* @endp_id: ENDP ID of the connection
+* @gsi_id: GSI ID of GSI connection is relevant to
+*/
+struct ecpri_dma_endp_gsi_tuple {
+	u32 endp_id;
+	u32 gsi_id;
+};
+
+enum ecpri_dma_gsi_id {
+	ECPRI_DMA_GSI_ID_0,
+	ECPRI_DMA_GSI_ID_1,
+	ECPRI_DMA_GSI_ID_2,
+	ECPRI_DMA_GSI_NUM_MAX
 };
 
 /** Structers **/
@@ -241,6 +271,7 @@ struct ecpri_dma_exception_stats {
 /**
  * struct ecpri_dma_endp_context - DMA end point context
  * @valid: flag indicating id EP context is valid
+ * @gsi_id: ID of GSI current endp related
  * @endp_id: ID of current endp
  * @hdl: connection handle
  * @gsi_ep_cfg: GSI EP configuration
@@ -281,11 +312,12 @@ struct ecpri_dma_exception_stats {
  * @tasklet: EP tasklet to handle completion notification
  * @spinlock: EP lock to sync accesses to EP resources
  * @l2_mhi_channel_ptr: Pointer to the MHI Channel CTX
- * @mask: Mask indicating number of messages assigned by the host to device
+ * @dynamic_vf_enabled: Indicating this is a memcpy ENDP with dynamic VF
  *
  */
 struct ecpri_dma_endp_context {
 	bool valid;
+	u32 gsi_id;
 	u32 endp_id;
 	u32 hdl;
 	const struct dma_gsi_ep_config *gsi_ep_cfg;
@@ -328,6 +360,7 @@ struct ecpri_dma_endp_context {
 	struct tasklet_struct tasklet;
 	spinlock_t spinlock;
 	void* l2_mhi_channel_ptr;
+	bool dynamic_vf_enabled;
 };
 
 /**
@@ -419,7 +452,7 @@ struct ecpri_dma_icc_paths {
   * @ecpri_dma_num_endps: Number of endps
   * @endp_map: ENDP configuration mapping matching to current flavor & version
   * @endp_ctx: ENDP context array
-  * @exception_endp: Exception ENDP number
+  * @exception_endp: Exception ENDP number and related GSI ID
   * @ecpri_dma_exception_wq: WQ to handle Exception replenish
   * @exception_stats: Exception statistics
   *
@@ -444,7 +477,7 @@ struct ecpri_dma_context {
 	u32 pcie_intcntrlr_mem_base;
 	u32 pcie_intcntrlr_mem_size;
 	u32 ecpri_dma_irq;
-	u32 gsi_irq[ECPRI_DMA_NUM_EE];
+	u32 gsi_irq[ECPRI_DMA_MAX_NUM_OF_GSI_HW][ECPRI_DMA_NUM_EE];
 	u32 pcie_irq;
 	bool use_uefi_boot;
 	bool dma_initialization_complete;
@@ -455,13 +488,15 @@ struct ecpri_dma_context {
 	enum gsi_ver gsi_ver;
 	unsigned long gsi_dev_hdl;
 	u32 ecpri_dma_num_endps;
-	const struct dma_gsi_ep_config *endp_map;
-	struct ecpri_dma_endp_context endp_ctx[ECPRI_DMA_ENDP_NUM_MAX];
-	u32 exception_endp;
+	const struct dma_gsi_ep_config (*endp_map)[ECPRI_DMA_GSI_NUM_MAX][ECPRI_DMA_ENDP_NUM_MAX];
+	struct ecpri_dma_endp_context
+		endp_ctx[ECPRI_DMA_GSI_NUM_MAX][ECPRI_DMA_ENDP_NUM_MAX];
+	struct ecpri_dma_endp_gsi_tuple exception_endp;
 	struct workqueue_struct *ecpri_dma_exception_wq;
 	struct ecpri_dma_exception_stats exception_stats;
 	struct ecpri_dma_clks clks;
 	struct ecpri_dma_icc_paths icc_paths;
+	u32 num_of_gsi;
 };
 
 /**
@@ -478,7 +513,7 @@ struct ecpri_dma_plat_drv_res {
 	u32 pcie_intcntrlr_mem_base;
 	u32 pcie_intcntrlr_mem_size;
 	u32 ecpri_dma_irq;
-	u32 gsi_irq[ECPRI_DMA_NUM_EE];
+	u32 gsi_irq[ECPRI_DMA_MAX_NUM_OF_GSI_HW][ECPRI_DMA_NUM_EE];
 	u32 pcie_irq;
 	u32 ee;
 	u32 max_num_smmu_cb;
@@ -509,6 +544,67 @@ struct ecpri_dma_ready_cb_wrapper {
 	struct ecpri_dma_ready info;
 };
 
+struct ecpri_dma_ecpri_endp_cfg_xbar_fields {
+	u32 dest_stream;
+	u32 xbar_tid;
+	u32 xbar_tuser;
+	u32 l2_segmentation_en;
+	u32 loopback_en;
+	u32 pre_hdr_en;
+	u32 nfapi_without_offload;
+};
+
+struct ecpri_dma_ecpri_testbus_ctrl_fields {
+	u32 sel;
+	u32 sel_internal;
+};
+
+struct ecpri_dma_ecpri_endp_exception_channel_fields {
+	u32 channel;
+	u32 gid;
+	u32 enable;
+};
+
+struct ecpri_dma_ecpri_dpl_trig_ctrl_fields {
+	u32 b_enable;
+	u32 b_width;
+	u32 b_location;
+	u32 a_enable;
+	u32 a_width;
+	u32 a_location;
+	u32 dst_channel;
+	u32 dst_gid;
+};
+
+struct ecpri_dma_ecpri_dpl_cfg_fields {
+	u32 dpl_mtu;
+	u32 dpl_select;
+	u32 dpl_tre_mirror_en;
+	u32 dpl_flush_clr;
+	u32 dpl_flush_pkt;
+};
+
+struct ecpri_dma_ecpri_tpdm_cfg_fields {
+	u32 record_type;
+	u32 record_rate;
+	u32 record_channel;
+	u32 record_gid;
+	u32 record_en;
+	u32 unit_en;
+};
+
+struct ecpri_dma_ecpri_nso_dbg_cntxt_info_1_fields {
+	u32 eng_state;
+	u32 src_id;
+	u32 size;
+	u32 num_of_sectors;
+	u32 last;
+	u32 msg_too_long;
+	u32 gsi_id;
+	u32 jumbo_pkt_en;
+	u32 nfapi_hdr_valid;
+};
+
 /** Functions **/
 
 typedef void (*client_notify_comp)(
@@ -534,7 +630,7 @@ int ecpri_dma_ap_resume(struct device *dev);
 void *ecpri_dma_get_ipc_logbuf(void);
 void *ecpri_dma_get_ipc_logbuf_low(void);
 
-int ecpri_dma_alloc_endp(int endp_id, u32 ring_length,
+int ecpri_dma_alloc_endp(u32 gsi_id, int endp_id, u32 ring_length,
 	struct ecpri_dma_moderation_config *mod_cfg,
 	bool is_over_pcie,
 	client_notify_comp notify_comp);

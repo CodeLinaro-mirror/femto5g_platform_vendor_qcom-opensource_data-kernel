@@ -39,6 +39,7 @@
 #define MTIP_MACSTATS_RX_BLOCKSIZE                                    0x0000008C
 #define MTIP_MACSTATS_TX_BLOCKSIZE                                    0x00000068
 
+u64 mtip_macstats_read_stat(void __iomem *macstats_base_addr, unsigned int offset);
 void mtip_macstats_get_stats(struct net_device *netdev, u64 *data);
 
 #endif // _MTIP_MACSTATS_H

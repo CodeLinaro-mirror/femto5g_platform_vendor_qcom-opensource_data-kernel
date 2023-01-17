@@ -1,7 +1,7 @@
 //SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
- */ 
+ */
 
 #ifndef _MTIP_H
 #define _MTIP_H
@@ -61,13 +61,14 @@
 #define MTIP_TX_RING_SIZE 512
 #define MTIP_RX_RING_SIZE 512
 
-#define MTIP_TX_MOD_COUNTER_THRESHOLD 1       // RECOMMENDED VALUE: 25% of RING SIZE
-#define MTIP_TX_MOD_TIMER_THRESHOLD   0       // RECOMMENDED VALUE: 10 msec
+#define MTIP_TX_MOD_COUNTER_THRESHOLD 32
+#define MTIP_TX_MOD_TIMER_THRESHOLD   10
 
 #define MTIP_TX_PACKET_AVAILABILITY_THRESHOLD     50
 
 #define MTIP_TSC_OFFSET_VAL          0x00000013  // TSC OFFSET REGISTER VALUE TO BE SET AFTER BRING UP IS COMPLETE
 #define MTIP_DEBUG_ETH_LINK_INDEX     15
+
 /*
  * Information related to the devices in the device tree
  */
@@ -102,6 +103,46 @@ struct mtip_link_device_info
     const char*            link_name;
 };
 
+/*
+ * mtip_port_config enum 
+ *    These are the set of support PORT configurations 
+ */
+enum mtip_port_config_enum
+{
+    MTIP_PORT_CONFIG_1x100GBASE_R,
+    MTIP_PORT_CONFIG_1x100GBASE_R_RSFEC_LL,
+    MTIP_PORT_CONFIG_1x100GBASE_R_RSFEC,
+    MTIP_PORT_CONFIG_1x100GBASE_R2,
+    MTIP_PORT_CONFIG_1x100GBASE_R2_RSFEC,
+    MTIP_PORT_CONFIG_1x100GBASE_R4,
+    MTIP_PORT_CONFIG_1x100GBASE_R4_RSFEC,
+    MTIP_PORT_CONFIG_1x50GBASE_R,
+    MTIP_PORT_CONFIG_1x50GBASE_R_RSFEC,
+    MTIP_PORT_CONFIG_2x50GBASE_R,
+    MTIP_PORT_CONFIG_2x50GBASE_R_RSFEC,
+    MTIP_PORT_CONFIG_1x50GBASE_R2,
+    MTIP_PORT_CONFIG_1x50GBASE_R2_RSFEC,
+    MTIP_PORT_CONFIG_1x50GBASE_R2_LUAI,
+    MTIP_PORT_CONFIG_1x50GBASE_R2_LUAI_FEC,
+    MTIP_PORT_CONFIG_2x50GBASE_R2,
+    MTIP_PORT_CONFIG_2x50GBASE_R2_FEC,
+    MTIP_PORT_CONFIG_2x50GBASE_R2_LUAI,
+    MTIP_PORT_CONFIG_2x50GBASE_R2_LUAI_FEC,
+    MTIP_PORT_CONFIG_1x40GBASE_R4,
+    MTIP_PORT_CONFIG_1x40GBASE_R4_FEC,
+    MTIP_PORT_CONFIG_1x25GBASE_R,
+    MTIP_PORT_CONFIG_1x25GBASE_R_FEC,
+    MTIP_PORT_CONFIG_4x25GBASE_R,
+    MTIP_PORT_CONFIG_4x25GBASE_R_FEC,
+    MTIP_PORT_CONFIG_1x25GBASE_R_RSFEC,
+    MTIP_PORT_CONFIG_4x25GBASE_R_RSFEC,
+    MTIP_PORT_CONFIG_1x10GBASE_R,
+    MTIP_PORT_CONFIG_1x10GBASE_R_FEC,
+    MTIP_PORT_CONFIG_4x10GBASE_R,
+    MTIP_PORT_CONFIG_4x10GBASE_R_FEC,
+    MTIP_PORT_CONFIG_MAX
+};
+
 // the information stored for each port device
 struct mtip_port_device_info
 {
@@ -113,6 +154,9 @@ struct mtip_port_device_info
 
    // the port type
    u32 port_type;
+
+   // the port configuration
+   enum mtip_port_config_enum port_config;
 
    // the base address for the MAC Wrapper
    void __iomem          *wrapper_base_addr;
@@ -264,6 +308,12 @@ struct mtip_platform_driver_priv
 
     // the spin lock to access driver priv
     spinlock_t driver_lock;
+
+    // IPC log buffer
+    void* ipc_log_buf;
+
+    // IPC log buffer low
+    void* ipc_log_buf_low;
 };
 
 // extern declarations

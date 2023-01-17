@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: GPL-2.0-only
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #ifndef ECPRISS_XBAR_H_
@@ -11,6 +11,7 @@
 #define NUM_OF_FHP 3
 #define NUM_OF_FLTR 16
 #define NUM_EGRESS_ENTRY 255
+#define MAX_XBAR_WM_ENTRY 10
 
 #include "ecpriss_xbar_hal.h"
 #include "ecpriss_flow.h"
@@ -18,11 +19,10 @@
 #include "ecpriss_qudp_hwio_def.h"
 
 #define ECPRISS_MAX_PCID_ENTRIES 65535
-#define EXPRISS_XBAR_IRQ_MAPPING 497
 
 /*
  * Index of this in device tree file
- * ecpriss_qudp_interrupt_events_e it has index 0-5
+ * ecpriss_qudp_interrupt_events_e it has index 0-6
  */
 #define EXPRISS_XBAR_INDEX 6
 typedef enum
@@ -84,6 +84,18 @@ typedef struct ecpriss_xbar_stats_s
 	uint64_t xbar_c2ctx_pkt_cnt[TOTAL_LINKS];
 	uint64_t xbar_ocrx_pkt_cnt[XBAR_LINKS];
 	uint64_t xbar_octx_pkt_cnt[XBAR_LINKS];
+	uint32_t ocrx_fh_wm_fh0[MAX_XBAR_WM_ENTRY];
+	uint32_t ocrx_fh_wm_fh1[MAX_XBAR_WM_ENTRY];
+	uint32_t ocrx_fh_wm_fh2[MAX_XBAR_WM_ENTRY];
+	uint32_t ocrx_0_1_wm_cc0[MAX_XBAR_WM_ENTRY];
+	uint32_t ocrx_0_1_wm_cc1[MAX_XBAR_WM_ENTRY];
+	uint32_t ocrx_2_3_wm_cc2[MAX_XBAR_WM_ENTRY];
+	uint32_t ocrx_2_3_wm_cc3[MAX_XBAR_WM_ENTRY];
+	uint32_t octx_0_1_wm_cc0[MAX_XBAR_WM_ENTRY];
+	uint32_t octx_0_1_wm_cc1[MAX_XBAR_WM_ENTRY];
+	uint32_t octx_2_3_wm_cc2[MAX_XBAR_WM_ENTRY];
+	uint32_t octx_2_3_wm_cc3[MAX_XBAR_WM_ENTRY];
+	uint64_t curr_wm_index;
 	fh_port_config xbar_fh_port[NUM_OF_FHP];
 }ecpriss_xbar_stats_s;
 
@@ -111,13 +123,13 @@ typedef struct ecpriss_xbar_port_cfg
 
 typedef struct ecpriss_xbar_flow_cfg
 {
-	uint32_t     pcid;
-	uint32_t     dma_ring_id;
-	uint32_t     oc_link_id;
-	uint8_t      route_to_oran;
-	uint8_t      route_to_c2c;
-	uint8_t      route_to_dma;
-	uint8_t      valid;
+	uint32_t     pcid : 16;
+	uint32_t     dma_ring_id : 7;
+	uint32_t     oc_link_id : 2;
+	uint32_t     route_to_oran : 1;
+	uint32_t     route_to_c2c : 1;
+	uint32_t     route_to_dma : 1;
+	uint32_t     valid : 1;
 }ecpriss_xbar_pcid_flow_cfg_s;
 
 
@@ -129,11 +141,11 @@ typedef struct ecpriss_xbar_port_lut
 
 typedef struct ecpriss_xbar_oc_rx_flow_cfg
 {
-	uint32_t     pcid;
-	uint32_t     l2_encap_info;
-	uint32_t     l3_encap_info;
-	uint32_t     l3_encap_valid;
-	uint32_t     valid;
+	uint32_t     pcid : 16;
+	uint32_t     l2_encap_info : 7;
+	uint32_t     l3_encap_info : 7;
+	uint32_t     l3_encap_valid : 1;
+	uint32_t     valid : 1;
 }ecpriss_xbar_oc_rx_flow_cfg_s;
 
 typedef struct ecpriss_xbar_oc_rx_port_lut
@@ -145,8 +157,10 @@ typedef struct ecpriss_xbar_oc_rx_port_lut
 typedef struct ecpriss_flow_ctx
 {
 	ecpriss_xbar_port_lut_s		fh_xbar_lut[ECPRISS_MAX_PORTS];
+#ifdef C2C_XBAR_LUT
 	ecpriss_xbar_port_lut_s		c2c_dl_xbar_lut[ECPRISS_MAX_PORTS];
 	ecpriss_xbar_port_lut_s		c2c_ul_xbar_lut[ECPRISS_MAX_PORTS];
+#endif
 	ecpriss_xbar_oc_rx_port_lut_s	oc_rx_xbar_lut[ECPRISS_MAX_PORTS];
 }ecpriss_flow_ctx_s;
 
@@ -259,8 +273,7 @@ int ecpriss_xbar_l2_lut(void);
 int ecpriss_xbar_oc_rx_lut(uint32_t port_index,
 		ecpriss_flow_tx_cfg_s *xbar_tx_cfg);
 void ecpriss_xbar_non_ecpri_lut_cfg(void);
-void ecpriss_xbar_print_stats(void);
-void ecpriss_xbar_print_stats(void);
-void ecpriss_xbar_config_sats(void);
+void ecpriss_xbar_stats_update(void);
+void ecpriss_xbar_config_stats_update(void);
 
 #endif

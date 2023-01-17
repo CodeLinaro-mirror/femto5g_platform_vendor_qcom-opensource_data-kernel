@@ -37,6 +37,7 @@ static ssize_t gsi_dump_evt(struct file *file,
 	u32 arg1;
 	u32 arg2;
 	u32 arg3;
+	u32 arg4;
 	unsigned long missing;
 	char *sptr, *token;
 	uint32_t val;
@@ -72,69 +73,75 @@ static ssize_t gsi_dump_evt(struct file *file,
 	if (kstrtou32(token, 0, &arg3))
 		return -EINVAL;
 
-	TDBG("arg1=%u arg2=%u arg3=%u\n", arg1, arg2, arg3);
+	token = strsep(&sptr, " ");
+	if (!token)
+		return -EINVAL;
+	if (kstrtou32(token, 0, &arg4))
+		return -EINVAL;
+
+	TDBG("arg1=%u arg2=%u arg3=%u arg4=%u\n", arg1, arg2, arg3, arg4);
 
 	if (arg1 >= gsi_ctx->max_ev) {
 		TERR("invalid evt ring id %u\n", arg1);
 		return -EINVAL;
 	}
 
-	val = gsihal_read_reg_nk(GSI_EE_n_EV_CH_k_CNTXT_0,
-		arg2, arg1);
-	TERR("EV%2d EE%d CTX0  0x%x\n", arg1, arg2, val);
-	val = gsihal_read_reg_nk(GSI_EE_n_EV_CH_k_CNTXT_1,
-		arg2, arg1);
-	TERR("EV%2d EE%d CTX1  0x%x\n", arg1, arg2, val);
-	val = gsihal_read_reg_nk(GSI_EE_n_EV_CH_k_CNTXT_2,
-		arg2, arg1);
-	TERR("EV%2d EE%d CTX2  0x%x\n", arg1, arg2, val);
-	val = gsihal_read_reg_nk(GSI_EE_n_EV_CH_k_CNTXT_3,
-		arg2, arg1);
-	TERR("EV%2d EE%d CTX3  0x%x\n", arg1, arg2, val);
-	val = gsihal_read_reg_nk(GSI_EE_n_EV_CH_k_CNTXT_4,
-		arg2, arg1);
-	TERR("EV%2d EE%d CTX4  0x%x\n", arg1, arg2, val);
-	val = gsihal_read_reg_nk(GSI_EE_n_EV_CH_k_CNTXT_5,
-		arg2, arg1);
-	TERR("EV%2d EE%d CTX5  0x%x\n", arg1, arg2, val);
-	val = gsihal_read_reg_nk(GSI_EE_n_EV_CH_k_CNTXT_6,
-		arg2, arg1);
-	TERR("EV%2d EE%d CTX6  0x%x\n", arg1, arg2, val);
-	val = gsihal_read_reg_nk(GSI_EE_n_EV_CH_k_CNTXT_7,
-		arg2, arg1);
-	TERR("EV%2d EE%d CTX7  0x%x\n", arg1, arg2, val);
-	val = gsihal_read_reg_nk(GSI_EE_n_EV_CH_k_CNTXT_8,
-		arg2, arg1);
-	TERR("EV%2d EE%d CTX8  0x%x\n", arg1, arg2, val);
-	val = gsihal_read_reg_nk(GSI_EE_n_EV_CH_k_CNTXT_9,
-		arg2, arg1);
-	TERR("EV%2d EE%d CTX9  0x%x\n", arg1, arg2, val);
-	val = gsihal_read_reg_nk(GSI_EE_n_EV_CH_k_CNTXT_10,
-		arg2, arg1);
-	TERR("EV%2d EE%d CTX10 0x%x\n", arg1, arg2, val);
-	val = gsihal_read_reg_nk(GSI_EE_n_EV_CH_k_CNTXT_11,
-		arg2, arg1);
-	TERR("EV%2d EE%d CTX11 0x%x\n", arg1, arg2, val);
-	val = gsihal_read_reg_nk(GSI_EE_n_EV_CH_k_CNTXT_12,
-		arg2, arg1);
-	TERR("EV%2d EE%d CTX12 0x%x\n", arg1, arg2, val);
-	val = gsihal_read_reg_nk(GSI_EE_n_EV_CH_k_CNTXT_13,
-		arg2, arg1);
-	TERR("EV%2d EE%d CTX13 0x%x\n", arg1, arg2, val);
-	val = gsihal_read_reg_nk(GSI_EE_n_EV_CH_k_SCRATCH_0,
-		arg2, arg1);
-	TERR("EV%2d EE%d SCR0  0x%x\n", arg1, arg2, val);
-	val = gsihal_read_reg_nk(GSI_EE_n_EV_CH_k_SCRATCH_1,
-		arg2, arg1);
-	TERR("EV%2d EE%d SCR1  0x%x\n", arg1, arg2, val);
+	val = gsihal_read_reg_pnk(GSI_EE_n_EV_CH_k_CNTXT_0,
+		arg3, arg2, arg1);
+	TERR("EV%2d EE%d GSI ID %d CTX0  0x%x\n", arg1, arg2, arg3, val);
+	val = gsihal_read_reg_pnk(GSI_EE_n_EV_CH_k_CNTXT_1,
+		arg3, arg2, arg1);
+	TERR("EV%2d EE%d GSI ID %d CTX1  0x%x\n", arg1, arg2, arg3, val);
+	val = gsihal_read_reg_pnk(GSI_EE_n_EV_CH_k_CNTXT_2,
+		arg3, arg2, arg1);
+	TERR("EV%2d EE%d GSI ID %d CTX2  0x%x\n", arg1, arg2, arg3, val);
+	val = gsihal_read_reg_pnk(GSI_EE_n_EV_CH_k_CNTXT_3,
+		arg3, arg2, arg1);
+	TERR("EV%2d EE%d GSI ID %d CTX3  0x%x\n", arg1, arg2, arg3, val);
+	val = gsihal_read_reg_pnk(GSI_EE_n_EV_CH_k_CNTXT_4,
+		arg3, arg2, arg1);
+	TERR("EV%2d EE%d GSI ID %d CTX4  0x%x\n", arg1, arg2, arg3, val);
+	val = gsihal_read_reg_pnk(GSI_EE_n_EV_CH_k_CNTXT_5,
+		arg3, arg2, arg1);
+	TERR("EV%2d EE%d GSI ID %d CTX5  0x%x\n", arg1, arg2, arg3, val);
+	val = gsihal_read_reg_pnk(GSI_EE_n_EV_CH_k_CNTXT_6,
+		arg3, arg2, arg1);
+	TERR("EV%2d EE%d GSI ID %d CTX6  0x%x\n", arg1, arg2, arg3, val);
+	val = gsihal_read_reg_pnk(GSI_EE_n_EV_CH_k_CNTXT_7,
+		arg3, arg2, arg1);
+	TERR("EV%2d EE%d GSI ID %d CTX7  0x%x\n", arg1, arg2, arg3, val);
+	val = gsihal_read_reg_pnk(GSI_EE_n_EV_CH_k_CNTXT_8,
+		arg3, arg2, arg1);
+	TERR("EV%2d EE%d GSI ID %d CTX8  0x%x\n", arg1, arg2, arg3, val);
+	val = gsihal_read_reg_pnk(GSI_EE_n_EV_CH_k_CNTXT_9,
+		arg3, arg2, arg1);
+	TERR("EV%2d EE%d GSI ID %d CTX9  0x%x\n", arg1, arg2, arg3, val);
+	val = gsihal_read_reg_pnk(GSI_EE_n_EV_CH_k_CNTXT_10,
+		arg3, arg2, arg1);
+	TERR("EV%2d EE%d GSI ID %d CTX10 0x%x\n", arg1, arg2, arg3, val);
+	val = gsihal_read_reg_pnk(GSI_EE_n_EV_CH_k_CNTXT_11,
+		arg3, arg2, arg1);
+	TERR("EV%2d EE%d GSI ID %d CTX11 0x%x\n", arg1, arg2, arg3, val);
+	val = gsihal_read_reg_pnk(GSI_EE_n_EV_CH_k_CNTXT_12,
+		arg3, arg2, arg1);
+	TERR("EV%2d EE%d GSI ID %d CTX12 0x%x\n", arg1, arg2, arg3, val);
+	val = gsihal_read_reg_pnk(GSI_EE_n_EV_CH_k_CNTXT_13,
+		arg3, arg2, arg1);
+	TERR("EV%2d EE%d GSI ID %d CTX13 0x%x\n", arg1, arg2, arg3, val);
+	val = gsihal_read_reg_pnk(GSI_EE_n_EV_CH_k_SCRATCH_0,
+		arg3, arg2, arg1);
+	TERR("EV%2d EE%d GSI ID %d SCR0  0x%x\n", arg1, arg2, arg3, val);
+	val = gsihal_read_reg_pnk(GSI_EE_n_EV_CH_k_SCRATCH_1,
+		arg3, arg2, arg1);
+	TERR("EV%2d EE%d GSI ID %d SCR1  0x%x\n", arg1, arg2, arg3, val);
 
-	if (arg3) {
-		ctx = &gsi_ctx->evtr[arg2][arg1];
+	if (arg4) {
+		ctx = &gsi_ctx->evtr[arg3][arg2][arg1];
 
 		if (ctx->props.ring_base_vaddr) {
 			for (i = 0; i < ctx->props.ring_len / 16; i++)
-				TERR("EV%2d EE%d (0x%08llx) %08x %08x %08x %08x\n",
-				arg1, arg2, ctx->props.ring_base_addr + i * 16,
+				TERR("EV%2d EE%d GSI ID %d (0x%08llx) %08x %08x %08x %08x\n",
+				arg1, arg2, arg3, ctx->props.ring_base_addr + i * 16,
 				*(u32 *)((u8 *)ctx->props.ring_base_vaddr +
 					i * 16 + 0),
 				*(u32 *)((u8 *)ctx->props.ring_base_vaddr +
@@ -157,6 +164,7 @@ static ssize_t gsi_dump_ch(struct file *file,
 	u32 arg1;
 	u32 arg2;
 	u32 arg3;
+	u32 arg4;
 	unsigned long missing;
 	char *sptr, *token;
 	struct gsi_chan_ctx *ctx;
@@ -191,17 +199,23 @@ static ssize_t gsi_dump_ch(struct file *file,
 	if (kstrtou32(token, 0, &arg3))
 		return -EINVAL;
 
-	TDBG("arg1=%u arg2=%u arg2=%u\n", arg1, arg2, arg3);
+	token = strsep(&sptr, " ");
+	if (!token)
+		return -EINVAL;
+	if (kstrtou32(token, 0, &arg4))
+		return -EINVAL;
+
+	TDBG("arg1=%u arg2=%u arg3=%u arg4=%u\n", arg1, arg2, arg3, arg4);
 
 	if (arg1 >= gsi_ctx->max_ch) {
 		TERR("invalid chan id %u\n", arg1);
 		return -EINVAL;
 	}
 
-	ctx = &gsi_ctx->chan[arg2][arg1];
+	ctx = &gsi_ctx->chan[arg3][arg2][arg1];
 	gsi_dump_ch_info(ctx->hdl);
 
-	if (arg3) {
+	if (arg4) {
 		if (ctx->props.ring_base_vaddr) {
 			for (i = 0; i < ctx->props.ring_len / 16; i++)
 				TERR("CH%2d (0x%08llx) %08x %08x %08x %08x\n",
@@ -254,7 +268,7 @@ static void gsi_dump_ch_stats(struct gsi_chan_ctx *ctx)
 static ssize_t gsi_dump_stats(struct file *file,
 		const char __user *buf, size_t count, loff_t *ppos)
 {
-	int ch_id, ee;
+	int ch_id, ee, gsi_id;
 	int min, max, ret;
 
 	ret = kstrtos32_from_user(buf, count, 0, &ch_id);
@@ -265,11 +279,15 @@ static ssize_t gsi_dump_stats(struct file *file,
 	if (ret)
 		return ret;
 
+	ret = kstrtos32_from_user(buf, count, 0, &gsi_id);
+	if (ret)
+		return ret;
+
 	if (ch_id == -1) {
 		min = 0;
 		max = gsi_ctx->max_ch;
 	} else if (ch_id < 0 || ch_id >= gsi_ctx->max_ch ||
-		   !gsi_ctx->chan[ee][ch_id].allocated) {
+		   !gsi_ctx->chan[gsi_id][ee][ch_id].allocated) {
 		goto error;
 	} else {
 		min = ch_id;
@@ -277,7 +295,7 @@ static ssize_t gsi_dump_stats(struct file *file,
 	}
 
 	for (ch_id = min; ch_id < max; ch_id++)
-		gsi_dump_ch_stats(&gsi_ctx->chan[ee][ch_id]);
+		gsi_dump_ch_stats(&gsi_ctx->chan[gsi_id][ee][ch_id]);
 
 	return count;
 error:
@@ -309,7 +327,7 @@ static void gsi_dbg_destroy_stats_wq(void)
 static ssize_t gsi_enable_dp_stats(struct file *file,
 	const char __user *buf, size_t count, loff_t *ppos)
 {
-	int ch_id, ee;
+	int ch_id, ee, gsi_id;
 	bool enable;
 	int ret;
 
@@ -332,16 +350,19 @@ static ssize_t gsi_enable_dp_stats(struct file *file,
 	if (kstrtos32(dbg_buff + 1, 0, &ee))
 		goto error;
 
+	if (kstrtos32(dbg_buff + 1, 0, &gsi_id))
+		goto error;
+
 	if (ch_id < 0 || ch_id >= gsi_ctx->max_ch ||
-	    !gsi_ctx->chan[ee][ch_id].allocated) {
+	    !gsi_ctx->chan[gsi_id][ee][ch_id].allocated) {
 		goto error;
 	}
 
-	if (gsi_ctx->chan[ee][ch_id].enable_dp_stats == enable) {
+	if (gsi_ctx->chan[gsi_id][ee][ch_id].enable_dp_stats == enable) {
 		TERR("ch_%d: already enabled/disabled\n", ch_id);
 		return -EINVAL;
 	}
-	gsi_ctx->chan[ee][ch_id].enable_dp_stats = enable;
+	gsi_ctx->chan[gsi_id][ee][ch_id].enable_dp_stats = enable;
 
 	if (enable)
 		gsi_ctx->num_ch_dp_stats++;
@@ -370,7 +391,7 @@ error:
 static ssize_t gsi_set_max_elem_dp_stats(struct file *file,
 		const char __user *buf, size_t count, loff_t *ppos)
 {
-	u32 ch_id, ee;
+	u32 ch_id, ee, gsi_id;
 	u32 max_elem;
 	unsigned long missing;
 	char *sptr, *token;
@@ -403,6 +424,11 @@ static ssize_t gsi_set_max_elem_dp_stats(struct file *file,
 		goto error;
 	}
 
+	if (kstrtou32(token, 0, &gsi_id)) {
+		TERR("\n");
+		goto error;
+	}
+
 	token = strsep(&sptr, " ");
 	if (!token) {
 		/* get */
@@ -411,7 +437,7 @@ static ssize_t gsi_set_max_elem_dp_stats(struct file *file,
 		if (ch_id >= gsi_ctx->max_ch)
 			goto error;
 		PRT_STAT("ch %d: max_re_expected=%d\n", ch_id,
-			gsi_ctx->chan[ee][ch_id].props.max_re_expected);
+			gsi_ctx->chan[gsi_id][ee][ch_id].props.max_re_expected);
 		return count;
 	}
 	if (kstrtou32(token, 0, &max_elem)) {
@@ -426,7 +452,7 @@ static ssize_t gsi_set_max_elem_dp_stats(struct file *file,
 		goto error;
 	}
 
-	gsi_ctx->chan[ee][ch_id].props.max_re_expected = max_elem;
+	gsi_ctx->chan[gsi_id][ee][ch_id].props.max_re_expected = max_elem;
 
 	return count;
 
@@ -438,15 +464,18 @@ error:
 
 static void gsi_wq_print_dp_stats(struct work_struct *work)
 {
-	int ch_id;
-	int ee;
-	for (ee = 0; ee < GSI_EE_MAX; ee++)
+	int ch_id, ee, gsi_id;
+
+	for (gsi_id = 0; gsi_id < GSI_NUM_MAX; gsi_id++)
 	{
-		if (ee == GSI_Q6_EE)
-			continue;
-		for (ch_id = 0; ch_id < gsi_ctx->max_ch; ch_id++) {
-			if (gsi_ctx->chan[ee][ch_id].print_dp_stats)
-				gsi_dump_ch_stats(&gsi_ctx->chan[ee][ch_id]);
+		for (ee = 0; ee < GSI_EE_MAX; ee++)
+		{
+			if (ee == GSI_Q6_EE)
+				continue;
+			for (ch_id = 0; ch_id < gsi_ctx->max_ch; ch_id++) {
+				if (gsi_ctx->chan[gsi_id][ee][ch_id].print_dp_stats)
+					gsi_dump_ch_stats(&gsi_ctx->chan[gsi_id][ee][ch_id]);
+			}
 		}
 	}
 
@@ -460,18 +489,19 @@ static void gsi_dbg_update_ch_dp_stats(struct gsi_chan_ctx *ctx)
 	uint16_t end_hw;
 	uint64_t rp_hw;
 	uint64_t wp_hw;
+	int gsi_id = ctx->props.gsi_id;
 	int ee = ctx->props.ee;
 	uint16_t used_hw;
 
-	rp_hw = gsihal_read_reg_nk(GSI_EE_n_GSI_CH_k_CNTXT_4,
-		ee, ctx->props.ch_id);
-	rp_hw |= ((uint64_t)gsihal_read_reg_nk(GSI_EE_n_GSI_CH_k_CNTXT_5,
-		ee, ctx->props.ch_id)) << 32;
+	rp_hw = gsihal_read_reg_pnk(GSI_EE_n_GSI_CH_k_CNTXT_4,
+		gsi_id, ee, ctx->props.ch_id);
+	rp_hw |= ((uint64_t)gsihal_read_reg_pnk(GSI_EE_n_GSI_CH_k_CNTXT_5,
+		gsi_id, ee, ctx->props.ch_id)) << 32;
 
-	wp_hw = gsihal_read_reg_nk(GSI_EE_n_GSI_CH_k_CNTXT_6,
-		ee, ctx->props.ch_id);
-	wp_hw |= ((uint64_t)gsihal_read_reg_nk(GSI_EE_n_GSI_CH_k_CNTXT_7,
-		ee, ctx->props.ch_id)) << 32;
+	wp_hw = gsihal_read_reg_pnk(GSI_EE_n_GSI_CH_k_CNTXT_6,
+		gsi_id, ee, ctx->props.ch_id);
+	wp_hw |= ((uint64_t)gsihal_read_reg_pnk(GSI_EE_n_GSI_CH_k_CNTXT_7,
+		gsi_id, ee, ctx->props.ch_id)) << 32;
 
 	start_hw = gsi_find_idx_from_addr(&ctx->ring, rp_hw);
 	end_hw = gsi_find_idx_from_addr(&ctx->ring, wp_hw);
@@ -487,16 +517,18 @@ static void gsi_dbg_update_ch_dp_stats(struct gsi_chan_ctx *ctx)
 
 static void gsi_wq_update_dp_stats(struct work_struct *work)
 {
-	int ch_id;
-	int ee;
-	for (ee = 0; ee < GSI_EE_MAX; ee++)
+	int ch_id, ee, gsi_id;
+	for (gsi_id = 0; gsi_id < GSI_NUM_MAX; gsi_id++)
 	{
-		if (ee == GSI_Q6_EE)
-			continue;
-		for (ch_id = 0; ch_id < gsi_ctx->max_ch; ch_id++) {
-			if (gsi_ctx->chan[ee][ch_id].allocated &&
-				gsi_ctx->chan[ee][ch_id].enable_dp_stats)
-				gsi_dbg_update_ch_dp_stats(&gsi_ctx->chan[ee][ch_id]);
+		for (ee = 0; ee < GSI_EE_MAX; ee++)
+		{
+			if (ee == GSI_Q6_EE)
+				continue;
+			for (ch_id = 0; ch_id < gsi_ctx->max_ch; ch_id++) {
+				if (gsi_ctx->chan[gsi_id][ee][ch_id].allocated &&
+					gsi_ctx->chan[gsi_id][ee][ch_id].enable_dp_stats)
+					gsi_dbg_update_ch_dp_stats(&gsi_ctx->chan[gsi_id][ee][ch_id]);
+			}
 		}
 	}
 
@@ -508,7 +540,7 @@ static void gsi_wq_update_dp_stats(struct work_struct *work)
 static ssize_t gsi_rst_stats(struct file *file,
 		const char __user *buf, size_t count, loff_t *ppos)
 {
-	int ch_id, ee;
+	int ch_id, ee, gsi_id;
 	int min, max, ret;
 
 	ret = kstrtos32_from_user(buf, count, 0, &ch_id);
@@ -519,11 +551,15 @@ static ssize_t gsi_rst_stats(struct file *file,
 	if (ret)
 		return ret;
 
+	ret = kstrtos32_from_user(buf, count, 0, &gsi_id);
+	if (ret)
+		return ret;
+
 	if (ch_id == -1) {
 		min = 0;
 		max = gsi_ctx->max_ch;
 	} else if (ch_id < 0 || ch_id >= gsi_ctx->max_ch ||
-		   !gsi_ctx->chan[ee][ch_id].allocated) {
+		   !gsi_ctx->chan[gsi_id][ee][ch_id].allocated) {
 		goto error;
 	} else {
 		min = ch_id;
@@ -531,8 +567,8 @@ static ssize_t gsi_rst_stats(struct file *file,
 	}
 
 	for (ch_id = min; ch_id < max; ch_id++)
-		memset(&gsi_ctx->chan[ee][ch_id].stats, 0,
-			sizeof(gsi_ctx->chan[ee][ch_id].stats));
+		memset(&gsi_ctx->chan[gsi_id][ee][ch_id].stats, 0,
+			sizeof(gsi_ctx->chan[gsi_id][ee][ch_id].stats));
 
 	return count;
 error:
@@ -543,7 +579,7 @@ error:
 static ssize_t gsi_print_dp_stats(struct file *file,
 	const char __user *buf, size_t count, loff_t *ppos)
 {
-	int ch_id, ee;
+	int ch_id, ee, gsi_id;
 	bool enable;
 	int ret;
 
@@ -566,16 +602,19 @@ static ssize_t gsi_print_dp_stats(struct file *file,
 	if (kstrtos32(dbg_buff + 1, 0, &ee))
 		goto error;
 
+	if (kstrtos32(dbg_buff + 1, 0, &gsi_id))
+		goto error;
+
 	if (ch_id < 0 || ch_id >= gsi_ctx->max_ch ||
-	    !gsi_ctx->chan[ee][ch_id].allocated) {
+	    !gsi_ctx->chan[gsi_id][ee][ch_id].allocated) {
 		goto error;
 	}
 
-	if (gsi_ctx->chan[ee][ch_id].print_dp_stats == enable) {
+	if (gsi_ctx->chan[gsi_id][ee][ch_id].print_dp_stats == enable) {
 		TERR("ch_%d: already enabled/disabled\n", ch_id);
 		return -EINVAL;
 	}
-	gsi_ctx->chan[ee][ch_id].print_dp_stats = enable;
+	gsi_ctx->chan[gsi_id][ee][ch_id].print_dp_stats = enable;
 
 	if (enable)
 		gsi_ctx->num_ch_dp_stats++;
@@ -635,35 +674,44 @@ static ssize_t gsi_read_gsi_hw_profiling_stats(struct file *file,
 	struct gsi_hw_profiling_data stats;
 	int nbytes, cnt = 0;
 	u64 totalCycles = 0, util = 0;
+	u32 gsi_id;
 
-	if (!gsi_get_hw_profiling_stats(&stats)) {
-		totalCycles = stats.mcs_busy_cnt + stats.mcs_idle_cnt +
-			stats.bp_and_pending_cnt;
-		if (totalCycles != 0)
-			util = div_u64(
-				100 * (stats.mcs_busy_cnt + stats.bp_and_pending_cnt),
-				totalCycles);
-		else
-			util = 0;
+	for (gsi_id = 0; gsi_id < gsi_ctx->num_of_gsi; gsi_id++)
+	{
+		if (!gsi_get_hw_profiling_stats(&stats)) {
+			totalCycles = stats.mcs_busy_cnt[gsi_id] +
+				stats.mcs_idle_cnt[gsi_id] +
+				stats.bp_and_pending_cnt[gsi_id];
+			if (totalCycles != 0)
+				util = div_u64(
+					100 * (stats.mcs_busy_cnt[gsi_id] +
+						stats.bp_and_pending_cnt[gsi_id]),
+					totalCycles);
+			else
+				util = 0;
 
-		nbytes = scnprintf(dbg_buff, GSI_MAX_MSG_LEN,
-			"bp_count=0x%llx\n"
-			"bp_and_pending_count=0x%llx\n"
-			"mcs_busy=0x%llx\n"
-			"mcs_idle=0x%llx\n"
-			"total_cycle_count=0x%llx\n"
-			"utilization_percentage=%llu%%\n",
-			stats.bp_cnt,
-			stats.bp_and_pending_cnt,
-			stats.mcs_busy_cnt,
-			stats.mcs_idle_cnt,
-			totalCycles,
-			util);
-		cnt += nbytes;
-	} else {
-		nbytes = scnprintf(dbg_buff, GSI_MAX_MSG_LEN,
-			"Fail to read GSI HW Profiling stats\n");
-		cnt += nbytes;
+			nbytes = scnprintf(dbg_buff, GSI_MAX_MSG_LEN,
+				"Results for GSI ID %d\n"
+				"bp_count=0x%llx\n"
+				"bp_and_pending_count=0x%llx\n"
+				"mcs_busy=0x%llx\n"
+				"mcs_idle=0x%llx\n"
+				"total_cycle_count=0x%llx\n"
+				"utilization_percentage=%llu%%\n",
+				gsi_id,
+				stats.bp_cnt[gsi_id],
+				stats.bp_and_pending_cnt[gsi_id],
+				stats.mcs_busy_cnt[gsi_id],
+				stats.mcs_idle_cnt[gsi_id],
+				totalCycles,
+				util);
+			cnt += nbytes;
+		}
+		else {
+			nbytes = scnprintf(dbg_buff, GSI_MAX_MSG_LEN,
+				"Fail to read GSI HW Profiling stats\n");
+			cnt += nbytes;
+		}
 	}
 
 	return simple_read_from_buffer(buf, count, ppos, dbg_buff, cnt);

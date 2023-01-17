@@ -37,20 +37,22 @@
  */
 #define MTIP_MAC_RESET                            0x00001800
 
-#define MTIP_MAC_INIT_COMMAND_CONFIG              0x00002810
+#define MTIP_MAC_INIT_COMMAND_CONFIG              0x00000800      // was 0x00002810
 
 #define MTIP_MAC_COMMAND_CONFIG_ENABLE_TX         0x00000001
 #define MTIP_MAC_COMMAND_CONFIG_ENABLE_RX         0x00000002
 #define MTIP_MAC_COMMAND_CONFIG_SET_PROMISC       0x00000010
 
 #define MTIP_MAC_INIT_FRAME_LENGTH                9216
-#define MTIP_MAC_INIT_RX_FIFO_SECTIONS            0x00000001
+#define MTIP_MAC_INIT_RX_FIFO_SECTIONS            0x00000002
 #define MTIP_MAC_INIT_TX_FIFO_SECTIONS            0x00000004
 #define MTIP_MAC_INIT_HASHTABLE_LOAD              0x0
 #define MTIP_MAC_INIT_TX_IPG_LENGTH               0x0000000C
 #define MTIP_MAC_INIT_CRC_MODE                    0x0
 #define MTIP_MAC_INIT_CRC_INV_MASK                0xFFFFFFFF
-#define MTIP_MAC_INIT_XIF_MODE                    0x00010101
+#define MTIP_MAC_INIT_XIF_MODE_FOR_XGMII          0x00010101
+#define MTIP_MAC_INIT_XIF_MODE_FOR_XLGMII         0x00010100
+
 
 #define MTIP_MAC_HASHTABLE_SIZE                   64
 
@@ -81,10 +83,17 @@
 #define MTIP_MAC_WRAPPER_CORE_STATUS_REG_OFFSET          0x00000004
 
 // MAC Wrapper Register values
-#define MTIP_MAC_WRAPPER_CALENDAR_CFG_REG_VAL            0x00001111
-#define MTIP_MAC_WRAPPER_TX_AMF_CFG_REG_VAL              0x1E1E1E1E
-#define MTIP_MAC_WRAPPER_PCS_MODE_25G_RSFEC_ENABLE_VAL   0x0000003F
-#define MTIP_MAC_WRAPPER_PCS_MODE_25G_RSFEC_DISABLE_VAL  0x00000000
+#define MTIP_MAC_WRAPPER_CALENDAR_CFG_REG_VAL                0x00001111
+#define MTIP_MAC_WRAPPER_TX_AMF_CFG_REG_VAL                  0x26262626
+
+#define MTIP_MAC_WRAPPER_PCS_MODE_4X25G_RSFEC_ENABLE_VAL   0x0000003F
+#define MTIP_MAC_WRAPPER_PCS_MODE_4X25G_RSFEC_DISABLE_VAL  0x00000000
+
+#define MTIP_MAC_WRAPPER_CSR_CFG_REG_VAL                 0x00003C00
+#define MTIP_MAC_WRAPPER_CSR_CFG_100GBASE_R_VAL          0x00003D30
+#define MTIP_MAC_WRAPPER_CSR_CFG_50GBASE_R_VAL           0x00003C30
+#define MTIP_MAC_WRAPPER_CSR_CFG_40GBASE_R_VAL           0x0003FC00
+#define MTIP_MAC_WRAPPER_CSR_CFG_10GBASE_R_VAL           0x0000FC00
 
 #define MTIP_MAC_WRAPPER_CSR_SIGNAL_DET_BASE             0
 #define MTIP_MAC_WRAPPER_CSR_SD_8X_EN_BASE               4
@@ -108,6 +117,11 @@
 #define MTIP_MAC_INTERRUPT_PTP_TX_INTR            0x00000040
 #define MTIP_MAC_INTERRUPT_LINK_DOWN_INTR         0x00100000
 #define MTIP_MAC_INTERRUPT_LINK_UP_INTR           0x00200000
+#define MTIP_MAC_INTERRUPT_HI_BER_INTR            0x01000000
+#define MTIP_MAC_INTERRUPT_LINE_FAULT_INTR        0x00000001
+#define MTIP_MAC_INTERRUPT_REMOTE_FAULT_INTR      0x00000002
+#define MTIP_MAC_INTERRUPT_LOCAL_FAULT_INTR       0x00000004
+
 
 /*
  * Other configuration items
@@ -124,7 +138,8 @@
 struct mtip_process_timestamp_task
 {
     u32 link_index;
-    u64 timestamp;
+    u32 timestamp_secs;
+    u32 timestamp_nsecs;
 };
 
 void mtip_mac_initialize(struct mtip_netdev_priv* priv);
@@ -132,42 +147,32 @@ void mtip_mac_initialize(struct mtip_netdev_priv* priv);
 void mtip_mac_finalize(void __iomem *mac_base_addr, unsigned int irq,
                             const char* name, void* dev_id);
 
-void mtip_mac_enable_tx_rx(u32 link_index);
+void mtip_mac_wrapper_init(struct mtip_port_device_info* port_device);
 
+void mtip_mac_wrapper_pcs_mode_control(struct mtip_port_device_info* port_device);
+
+void mtip_mac_enable_tx_rx(u32 link_index);
 void mtip_mac_disable_tx_rx(u32 link_index);
 
 void mtip_mac_set_frame_length(struct mtip_netdev_priv* priv, 
                                          u32 frame_length);
-
 u32 mtip_mac_get_frame_length(u32 port_number, u32 link_number);
 
 void mtip_mac_set_mac_address(struct mtip_netdev_priv* priv, 
                                          struct sockaddr *saddr);
-
 void mtip_mac_get_mac_address_by_device(u32 port_device_index, u32 link_device_index, uint8_t saddr[]);
-
 void mtip_mac_set_mac_address_by_device(u32 port_device_index, u32 link_device_index, uint8_t saddr[]);
 
 int mtip_mac_set_promisc_mode(struct mtip_netdev_priv *priv, bool mode);
-
 void mtip_mac_set_hashtable_entry(struct mtip_netdev_priv *priv, u8 entry_address, u8 val);
-
-void mtip_mac_wrapper_init(struct mtip_port_device_info* port_device);
 
 void mtip_mac_wrapper_register_irq(struct device *dev, unsigned int irq,
                               const char* dev_name, void* devptr);
 
-void mtip_mac_wrapper_pcs_mode_control(struct mtip_port_device_info* port_device);
-
-u64 mtip_mac_read_timestamp(u32 link_index);
-
+void mtip_mac_read_timestamp(u32 link_index, u32* timestamp_secs, u32* timestamp_nsecs);
 void mtip_mac_set_interrupt_mask(u32 link_index);
 u32 mtip_mac_get_interrupt_mask(u32 link_index);
 
-u32 mtip_mac_get_interrupt_summary(struct mtip_port_device_info* port_device);
-
-u32 mtip_mac_get_interrupt_status(u32 link_index);
-void mtip_mac_clear_interrupts(u32 link_index, u32 int_to_clear);
 bool mtip_mac_wrapper_get_link_status(u32 link_index);
 
 // functions to enable/disable rsfec for 25g mode

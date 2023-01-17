@@ -197,7 +197,7 @@ ssize_t sysfs_store_dport(struct kobject *kobj, struct kobj_attribute *attr,
                           const char *buf, size_t count);
 ssize_t sysfs_show_status(struct kobject *kobj, struct kobj_attribute *attr,
                           char *buf);
-int sysfs_store_flush_register_set(int index);
+void sysfs_store_flush_register_set(int index, int* ret_val);
 ssize_t sysfs_store_flush(struct kobject *kobj, struct kobj_attribute *attr,
                           const char *buf, size_t count);
 ssize_t sysfs_show_txcount(struct kobject *kobj, struct kobj_attribute *attr,
@@ -224,7 +224,7 @@ ssize_t sysfs_store_Timeout(struct kobject *kobj, struct kobj_attribute *attr,
                             const char *buf, size_t count);
 ssize_t sysfs_show_vlanID(struct kobject *kobj, struct kobj_attribute *attr,
                           char *buf);
-int sysfs_store_vlanID_Register_Set(const char *buf, u64 *FIFO_vlanID, u32 reg1,
+void sysfs_store_vlanID_Register_Set(const char *buf, u64 *FIFO_vlanID, u32 reg1,
                                     u32 reg2);
 ssize_t sysfs_store_vlanID(struct kobject *kobj, struct kobj_attribute *attr,
                            const char *buf, size_t count);

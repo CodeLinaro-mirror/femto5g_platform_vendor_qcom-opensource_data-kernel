@@ -60,6 +60,8 @@
 
 #define MIN(a,b) ((a < b) ? a : b)
 
+#define MAX_INT_CHAR_SIZE 15
+
 void __iomem *debug_port_base_address;
 
 struct kobject *kobj_root, *kobj_ref_L3L2headers, *kobj_ref_L2headers,
@@ -72,8 +74,8 @@ struct L3Headers L3 = {.saddr = {0}, .daddr = {0}, .sport = 0, .dport = 0};
 struct StreamingFifo F0 = {.status = 0,
                            .flush = 0,
                            .txcount = 0,
-                           .AddrRange_Start = 0,
-                           .AddrRange_End = 0,
+                           .AddrRange_Start = 0x0,
+                           .AddrRange_End = 0x1000,
                            .OverFlowInterrupt = 0,
                            .Threshold = 1500,
                            .Timeout = 0,
@@ -81,8 +83,8 @@ struct StreamingFifo F0 = {.status = 0,
 struct StreamingFifo F1 = {.status = 0,
                            .flush = 0,
                            .txcount = 0,
-                           .AddrRange_Start = 0,
-                           .AddrRange_End = 0,
+                           .AddrRange_Start = 0x1000,
+                           .AddrRange_End = 0x2000,
                            .OverFlowInterrupt = 0,
                            .Threshold = 1000,
                            .Timeout = 0,
@@ -90,8 +92,8 @@ struct StreamingFifo F1 = {.status = 0,
 struct StreamingFifo F2 = {.status = 0,
                            .flush = 0,
                            .txcount = 0,
-                           .AddrRange_Start = 0,
-                           .AddrRange_End = 0,
+                           .AddrRange_Start = 0x2000,
+                           .AddrRange_End = 0x3000,
                            .OverFlowInterrupt = 0,
                            .Threshold = 1000,
                            .Timeout = 0,
@@ -99,8 +101,8 @@ struct StreamingFifo F2 = {.status = 0,
 struct StreamingFifo F3 = {.status = 0,
                            .flush = 0,
                            .txcount = 0,
-                           .AddrRange_Start = 0,
-                           .AddrRange_End = 0,
+                           .AddrRange_Start = 0x3000,
+                           .AddrRange_End = 0x4000,
                            .OverFlowInterrupt = 0,
                            .Threshold = 1000,
                            .Timeout = 0,
@@ -108,8 +110,8 @@ struct StreamingFifo F3 = {.status = 0,
 struct StreamingFifo F4 = {.status = 0,
                            .flush = 0,
                            .txcount = 0,
-                           .AddrRange_Start = 0,
-                           .AddrRange_End = 0,
+                           .AddrRange_Start = 0x4000,
+                           .AddrRange_End = 0x5000,
                            .OverFlowInterrupt = 0,
                            .Threshold = 1000,
                            .Timeout = 0,
@@ -117,8 +119,8 @@ struct StreamingFifo F4 = {.status = 0,
 struct PacketFifo F5 = {.status = 0,
                         .flush = 0,
                         .txcount = 0,
-                        .AddrRange_Start = 0,
-                        .AddrRange_End = 0,
+                        .AddrRange_Start = 0x5000,
+                        .AddrRange_End = 0x6000,
                         .OverFlowInterrupt = 0,
                         .vlanID = 0};
 struct PacketFifo F6 = {.status = 0,
@@ -292,18 +294,6 @@ void setup_AXI_Address_Range(int index) {
 
   // Setup AXI Address Range for the FIFOS
   unsigned int i = 0;
-  F0.AddrRange_Start = 0x0;
-  F0.AddrRange_End = 0x1000;
-  F1.AddrRange_Start = 0x1000;
-  F1.AddrRange_End = 0x2000;
-  F2.AddrRange_Start = 0x2000;
-  F2.AddrRange_End = 0x3000;
-  F3.AddrRange_Start = 0x3000;
-  F3.AddrRange_End = 0x4000;
-  F4.AddrRange_Start = 0x4000;
-  F4.AddrRange_End = 0x5000;
-  F5.AddrRange_Start = 0x5000;
-  F5.AddrRange_End = 0x6000;
 
   while (i <= index) {
     iowrite32(AXI_START_ARRAY[i], debug_port_base_address + AXI_REG_START[i]);
@@ -343,7 +333,7 @@ ssize_t sysfs_show_enabled(struct kobject *kobj, struct kobj_attribute *attr,
                            char *buf) {
   int val;
   CSMLOGINFO(KERN_INFO " Reading - sysfs show func...%s \n", kobj->name);
-  val = snprintf(buf, sizeof(root.enabled), "%d", root.enabled);
+  val = snprintf(buf, sizeof(root.enabled), "%d\n", root.enabled);
   CSMLOGINFO(KERN_INFO " Sysfs show func returned %d \n", val);
   return val;
 }
@@ -376,7 +366,7 @@ ssize_t sysfs_show_saddr(struct kobject *kobj, struct kobj_attribute *attr,
       if (i != L2_size)
         strlcat(L2_show_value, ":", sizeof(L2_show_value));
     }
-    val = snprintf(buf, sizeof(L2_show_value), "%s", L2_show_value);
+    val = snprintf(buf, sizeof(L2_show_value), "%s\n", L2_show_value);
   } else if (!strncmp(kobj->name, "L3_Info", Kobj_Name_L3_Info_Size)) {
     for (i = 0; i <= L3_size; i++) {
       snprintf(tmp_L3[i], sizeof(L3.saddr), "%d", L3.saddr[i]);
@@ -384,7 +374,7 @@ ssize_t sysfs_show_saddr(struct kobject *kobj, struct kobj_attribute *attr,
       if (i != L3_size)
         strlcat(L3_show_value, ".", sizeof(L3_show_value));
     }
-    val = snprintf(buf, sizeof(L3_show_value), "%s", L3_show_value);
+    val = snprintf(buf, sizeof(L3_show_value), "%s\n", L3_show_value);
   }
   CSMLOGINFO(KERN_INFO " Sysfs show func returned %d \n", val);
   return val;
@@ -453,7 +443,8 @@ ssize_t sysfs_store_saddr(struct kobject *kobj, struct kobj_attribute *attr,
       iowrite32(L3_val, debug_port_base_address + L3_IPV4_SA_ARRAY[index]);
     }
   }
-  return -1;
+
+  return count;
 }
 
 /*
@@ -483,7 +474,7 @@ ssize_t sysfs_show_daddr(struct kobject *kobj, struct kobj_attribute *attr,
       if (i != L2_size)
         strlcat(L2_show_value, ":", sizeof(L2_show_value));
     }
-    val = snprintf(buf, sizeof(L2_show_value), "%s", L2_show_value);
+    val = snprintf(buf, sizeof(L2_show_value), "%s\n", L2_show_value);
   } else if (!strncmp(kobj->name, "L3_Info", Kobj_Name_L3_Info_Size)) {
     for (i = 0; i <= L3_size; i++) {
       snprintf(tmp_L3[i], sizeof(L3.daddr), "%d", L3.daddr[i]);
@@ -491,7 +482,7 @@ ssize_t sysfs_show_daddr(struct kobject *kobj, struct kobj_attribute *attr,
       if (i != L3_size)
         strlcat(L3_show_value, ".", sizeof(L3_show_value));
     }
-    val = snprintf(buf, sizeof(L3_show_value), "%s", L3_show_value);
+    val = snprintf(buf, sizeof(L3_show_value), "%s\n", L3_show_value);
   }
   CSMLOGINFO(KERN_INFO " Sysfs show func returned %d \n", val);
   return val;
@@ -552,7 +543,8 @@ ssize_t sysfs_store_daddr(struct kobject *kobj, struct kobj_attribute *attr,
       iowrite32(L3_val, debug_port_base_address + L3_IPV4_DA_ARRAY[index]);
     }
   }
-  return -1;
+
+  return count;
 }
 
 /*
@@ -569,7 +561,7 @@ ssize_t sysfs_show_sport(struct kobject *kobj, struct kobj_attribute *attr,
                          char *buf) {
   int val;
   CSMLOGINFO(KERN_INFO " Reading - sysfs show func...%s \n", kobj->name);
-  val = snprintf(buf, sizeof(L3.sport), "%d", L3.sport);
+  val = snprintf(buf, sizeof(L3.sport), "%d\n", L3.sport);
   CSMLOGINFO(KERN_INFO " Sysfs show func returned %d \n", val);
   return val;
 }
@@ -592,7 +584,8 @@ ssize_t sysfs_store_sport(struct kobject *kobj, struct kobj_attribute *attr,
     val |= ((data & GENMASK(7, 0))<<8);
     iowrite32(val, debug_port_base_address + UDP_SP_DP_ARRAY[index]);
   }
-  return -1;
+
+  return count;
 }
 
 /*
@@ -609,7 +602,7 @@ ssize_t sysfs_show_dport(struct kobject *kobj, struct kobj_attribute *attr,
                          char *buf) {
   int val;
   CSMLOGINFO(KERN_INFO " Reading - sysfs show func...%s \n", kobj->name);
-  val = snprintf(buf, sizeof(L3.dport), "%d", L3.dport);
+  val = snprintf(buf, sizeof(L3.dport), "%d\n", L3.dport);
   CSMLOGINFO(KERN_INFO " Sysfs show func returned %d \n", val);
   return val;
 }
@@ -632,7 +625,8 @@ ssize_t sysfs_store_dport(struct kobject *kobj, struct kobj_attribute *attr,
     val |= ((data & GENMASK(7, 0))<< 24);
     iowrite32(val, debug_port_base_address + UDP_SP_DP_ARRAY[index]);
   }
-  return -1;
+
+  return count;
 }
 
 /*
@@ -647,21 +641,21 @@ ssize_t sysfs_show_status(struct kobject *kobj, struct kobj_attribute *attr,
   int val = -1;
   CSMLOGINFO(KERN_INFO " Reading - sysfs show func...%s \n", kobj->name);
   if (!strncmp(kobj->name, "FIFO_0", Kobj_Name_FIFO_Size)) {
-    val = snprintf(buf, sizeof(F0.status), "%d", F0.status);
+    val = snprintf(buf, sizeof(F0.status), "%d\n", F0.status);
   } else if (!strncmp(kobj->name, "FIFO_1", Kobj_Name_FIFO_Size)) {
-    val = snprintf(buf, sizeof(F1.status), "%d", F1.status);
+    val = snprintf(buf, sizeof(F1.status), "%d\n", F1.status);
   } else if (!strncmp(kobj->name, "FIFO_2", Kobj_Name_FIFO_Size)) {
-    val = snprintf(buf, sizeof(F2.status), "%d", F2.status);
+    val = snprintf(buf, sizeof(F2.status), "%d\n", F2.status);
   } else if (!strncmp(kobj->name, "FIFO_3", Kobj_Name_FIFO_Size)) {
-    val = snprintf(buf, sizeof(F3.status), "%d", F3.status);
+    val = snprintf(buf, sizeof(F3.status), "%d\n", F3.status);
   } else if (!strncmp(kobj->name, "FIFO_4", Kobj_Name_FIFO_Size)) {
-    val = snprintf(buf, sizeof(F4.status), "%d", F4.status);
+    val = snprintf(buf, sizeof(F4.status), "%d\n", F4.status);
   } else if (!strncmp(kobj->name, "FIFO_5", Kobj_Name_FIFO_Size)) {
-    val = snprintf(buf, sizeof(F5.status), "%d", F5.status);
+    val = snprintf(buf, sizeof(F5.status), "%d\n", F5.status);
   } else if (!strncmp(kobj->name, "FIFO_6", Kobj_Name_FIFO_Size)) {
-    val = snprintf(buf, sizeof(F6.status), "%d", F6.status);
+    val = snprintf(buf, sizeof(F6.status), "%d\n", F6.status);
   } else if (!strncmp(kobj->name, "FIFO_7", Kobj_Name_FIFO_Size)) {
-    val = snprintf(buf, sizeof(F7.status), "%d", F7.status);
+    val = snprintf(buf, sizeof(F7.status), "%d\n", F7.status);
   }
   CSMLOGINFO(KERN_INFO " Sysfs show func returned %d \n", val);
   return val;
@@ -675,38 +669,38 @@ FIFO’s. Access Type: Write Format: Integer Example Write: # echo 1 >
 */
 ssize_t sysfs_store_flush(struct kobject *kobj, struct kobj_attribute *attr,
                           const char *buf, size_t count) {
-  int val = -1;
+  int val = count;
   CSMLOGINFO(KERN_INFO " Reading - sysfs store func...%s \n", kobj->name);
   if (!strncmp(kobj->name, "FIFO_0", Kobj_Name_FIFO_Size)) {
     sscanf(buf, "%d", &F0.flush);
-    val = sysfs_store_flush_register_set(FIFO_0);
+    sysfs_store_flush_register_set(FIFO_0, &val);
   } else if (!strncmp(kobj->name, "FIFO_1", Kobj_Name_FIFO_Size)) {
     sscanf(buf, "%d", &F1.flush);
-    val = sysfs_store_flush_register_set(FIFO_1);
+    sysfs_store_flush_register_set(FIFO_1, &val);
   } else if (!strncmp(kobj->name, "FIFO_2", Kobj_Name_FIFO_Size)) {
     sscanf(buf, "%d", &F2.flush);
-    val = sysfs_store_flush_register_set(FIFO_2);
+    sysfs_store_flush_register_set(FIFO_2, &val);
   } else if (!strncmp(kobj->name, "FIFO_3", Kobj_Name_FIFO_Size)) {
     sscanf(buf, "%d", &F3.flush);
-    val = sysfs_store_flush_register_set(FIFO_3);
+    sysfs_store_flush_register_set(FIFO_3, &val);
   } else if (!strncmp(kobj->name, "FIFO_4", Kobj_Name_FIFO_Size)) {
     sscanf(buf, "%d", &F4.flush);
-    val = sysfs_store_flush_register_set(FIFO_4);
+    sysfs_store_flush_register_set(FIFO_4, &val);
   } else if (!strncmp(kobj->name, "FIFO_5", Kobj_Name_FIFO_Size)) {
     sscanf(buf, "%d", &F5.flush);
-    val = sysfs_store_flush_register_set(FIFO_5);
+    sysfs_store_flush_register_set(FIFO_5, &val);
   } else if (!strncmp(kobj->name, "FIFO_6", Kobj_Name_FIFO_Size)) {
     sscanf(buf, "%d", &F6.flush);
-    val = sysfs_store_flush_register_set(FIFO_6);
+    sysfs_store_flush_register_set(FIFO_6, &val);
   } else if (!strncmp(kobj->name, "FIFO_7", Kobj_Name_FIFO_Size)) {
     sscanf(buf, "%d", &F7.flush);
-    val = sysfs_store_flush_register_set(FIFO_7);
+    sysfs_store_flush_register_set(FIFO_7, &val);
   }
-  CSMLOGINFO(KERN_INFO " Sysfs store func returned %d count of bytes \n", val);
-  return val;
+
+  return count;
 }
 
-int sysfs_store_flush_register_set(int index) {
+void sysfs_store_flush_register_set(int index, int* ret_val) {
   int data = 0;
   int set_bit = 1;
   int flush_bit;
@@ -721,21 +715,25 @@ int sysfs_store_flush_register_set(int index) {
     // Changes to accomodate corresponding FIFO's instead of all FIFO's.
     flush_bit = 1;
     if (readl_poll_timeout(debug_port_base_address + DBG_ETH_DBG_FIFO_STATUS, v,
-                           !(v & (flush_bit << index)), 100, 10000))
-      return -EBUSY;
+                           !(v & (flush_bit << index)), 100, 10000)){
+      *ret_val = -EBUSY;
+      return;
+    }
   } else if (index >= FIFO_5 && index <= FIFO_7) {
     // Changes to accomodate corresponding FIFO's instead of all FIFO's.
     flush_bit = 10;
     if (readl_poll_timeout(debug_port_base_address + DBG_ETH_DBG_FIFO_STATUS, v,
-                           !(v & (flush_bit << (index-FIFO_5))), 100, 10000))
-      return -EBUSY;
+                           !(v & (flush_bit << (index-FIFO_5))), 100, 10000)){
+      *ret_val = -EBUSY;
+      return;
+    }
   }
 
   // Clearing the bit
   data &= ~(set_bit << index);
   iowrite32(data, debug_port_base_address + DBG_ETH_DBG_SW_FLUSH);
 
-  return data;
+  return;
 }
 
 /*
@@ -753,38 +751,36 @@ ssize_t sysfs_show_txcount(struct kobject *kobj, struct kobj_attribute *attr,
   if (!strncmp(kobj->name, "FIFO_0", Kobj_Name_FIFO_Size)) {
     data = (int)ioread32(debug_port_base_address + STREAM_PKT_CNT_0);
     F0.txcount = data;
-    buff_size = snprintf(buf, sizeof(F0.txcount), "%d", F0.txcount);
+    buff_size = snprintf(buf, MAX_INT_CHAR_SIZE, "%d\n", F0.txcount);
   } else if (!strncmp(kobj->name, "FIFO_1", Kobj_Name_FIFO_Size)) {
     data = (int)ioread32(debug_port_base_address + STREAM_PKT_CNT_1);
     F1.txcount = data;
-    buff_size = snprintf(buf, sizeof(F1.txcount), "%d", F1.txcount);
+    buff_size = snprintf(buf, MAX_INT_CHAR_SIZE, "%d\n", F1.txcount);
   } else if (!strncmp(kobj->name, "FIFO_2", Kobj_Name_FIFO_Size)) {
     data = (int)ioread32(debug_port_base_address + STREAM_PKT_CNT_2);
     F2.txcount = data;
-    buff_size = snprintf(buf, sizeof(F2.txcount), "%d", F2.txcount);
+    buff_size = snprintf(buf, MAX_INT_CHAR_SIZE, "%d\n", F2.txcount);
   } else if (!strncmp(kobj->name, "FIFO_3", Kobj_Name_FIFO_Size)) {
     data = (int)ioread32(debug_port_base_address + STREAM_PKT_CNT_3);
     F3.txcount = data;
-    buff_size = snprintf(buf, sizeof(F3.txcount), "%d", F3.txcount);
+    buff_size = snprintf(buf, MAX_INT_CHAR_SIZE, "%d\n", F3.txcount);
   } else if (!strncmp(kobj->name, "FIFO_4", Kobj_Name_FIFO_Size)) {
     data = (int)ioread32(debug_port_base_address + STREAM_PKT_CNT_4);
     F4.txcount = data;
-    buff_size = snprintf(buf, sizeof(F4.txcount), "%d", F4.txcount);
+    buff_size = snprintf(buf, MAX_INT_CHAR_SIZE, "%d\n", F4.txcount);
   } else if (!strncmp(kobj->name, "FIFO_5", Kobj_Name_FIFO_Size)) {
     data = (int)ioread32(debug_port_base_address + PACKET_FIFO1_PKT_CNT);
     F5.txcount = data;
-    buff_size = snprintf(buf, sizeof(F5.txcount), "%d", F5.txcount);
+    buff_size = snprintf(buf, MAX_INT_CHAR_SIZE, "%d\n", F5.txcount);
   } else if (!strncmp(kobj->name, "FIFO_6", Kobj_Name_FIFO_Size)) {
     data = (int)ioread32(debug_port_base_address + PACKET_FIFO2_PKT_CNT);
     F6.txcount = data;
-    buff_size = snprintf(buf, sizeof(F6.txcount), "%d", F6.txcount);
+    buff_size = snprintf(buf, MAX_INT_CHAR_SIZE, "%d\n", F6.txcount);
   } else if (!strncmp(kobj->name, "FIFO_7", Kobj_Name_FIFO_Size)) {
     data = (int)ioread32(debug_port_base_address + PACKET_FIFO3_PKT_CNT);
     F6.txcount = data;
-    buff_size = snprintf(buf, sizeof(F7.txcount), "%d", F7.txcount);
+    buff_size = snprintf(buf, MAX_INT_CHAR_SIZE, "%d\n", F7.txcount);
   }
-  CSMLOGINFO(KERN_INFO "The number of packets that has been sent through the "
-                       "QDSS interface is as follows : \n");
   CSMLOGINFO(KERN_INFO " Sysfs show func returned %d with size %d \n", data,
              buff_size);
   return buff_size;
@@ -805,22 +801,23 @@ ssize_t sysfs_show_AddrRange_Start(struct kobject *kobj,
   int val = -1;
   CSMLOGINFO(KERN_INFO " Reading - sysfs show func...%s \n", kobj->name);
   if (!strncmp(kobj->name, "FIFO_0", Kobj_Name_FIFO_Size)) {
-    val = snprintf(buf, sizeof(F0.AddrRange_Start), "%d", F0.AddrRange_Start); //%x
+    val = snprintf(buf, MAX_INT_CHAR_SIZE, "0x%x\n", F0.AddrRange_Start); //%x
   } else if (!strncmp(kobj->name, "FIFO_1", Kobj_Name_FIFO_Size)) {
-    val = snprintf(buf, sizeof(F1.AddrRange_Start), "%d", F1.AddrRange_Start);
+    val = snprintf(buf, MAX_INT_CHAR_SIZE, "0x%x\n", F1.AddrRange_Start);
   } else if (!strncmp(kobj->name, "FIFO_2", Kobj_Name_FIFO_Size)) {
-    val = snprintf(buf, sizeof(F2.AddrRange_Start), "%d", F2.AddrRange_Start);
+    val = snprintf(buf, MAX_INT_CHAR_SIZE, "0x%x\n", F2.AddrRange_Start);
   } else if (!strncmp(kobj->name, "FIFO_3", Kobj_Name_FIFO_Size)) {
-    val = snprintf(buf, sizeof(F3.AddrRange_Start), "%d", F3.AddrRange_Start);
+    val = snprintf(buf, MAX_INT_CHAR_SIZE, "0x%x\n", F3.AddrRange_Start);
   } else if (!strncmp(kobj->name, "FIFO_4", Kobj_Name_FIFO_Size)) {
-    val = snprintf(buf, sizeof(F4.AddrRange_Start), "%d", F4.AddrRange_Start);
+    val = snprintf(buf, MAX_INT_CHAR_SIZE, "0x%x\n", F4.AddrRange_Start);
   } else if (!strncmp(kobj->name, "FIFO_5", Kobj_Name_FIFO_Size)) {
-    val = snprintf(buf, sizeof(F5.AddrRange_Start), "%d", F5.AddrRange_Start);
+    val = snprintf(buf, MAX_INT_CHAR_SIZE, "0x%x\n", F5.AddrRange_Start);
   } else if (!strncmp(kobj->name, "FIFO_6", Kobj_Name_FIFO_Size)) {
-    val = snprintf(buf, sizeof(F6.AddrRange_Start), "%d", F6.AddrRange_Start);
+    val = snprintf(buf, MAX_INT_CHAR_SIZE, "0x%x\n", F6.AddrRange_Start);
   } else if (!strncmp(kobj->name, "FIFO_7", Kobj_Name_FIFO_Size)) {
-    val = snprintf(buf, sizeof(F7.AddrRange_Start), "%d", F7.AddrRange_Start);
+    val = snprintf(buf, MAX_INT_CHAR_SIZE, "0x%x\n", F7.AddrRange_Start);
   }
+
   CSMLOGINFO(KERN_INFO " Sysfs show func returned %d \n", val);
   return val;
 }
@@ -828,35 +825,35 @@ ssize_t sysfs_show_AddrRange_Start(struct kobject *kobj,
 ssize_t sysfs_store_AddrRange_Start(struct kobject *kobj,
                                     struct kobj_attribute *attr,
                                     const char *buf, size_t count) {
-  int val = -1;
+
   CSMLOGINFO(KERN_INFO " Reading - sysfs store func...%s \n", kobj->name);
   if (!strncmp(kobj->name, "FIFO_0", Kobj_Name_FIFO_Size)) {
-    sscanf(buf, "%d", &F0.AddrRange_Start);
-    val = count;
+    sscanf(buf, "%x", &F0.AddrRange_Start);
+    iowrite32(F0.AddrRange_Start, debug_port_base_address + STREAM_FIFO_ADDR_MIN_0);
   } else if (!strncmp(kobj->name, "FIFO_1", Kobj_Name_FIFO_Size)) {
-    sscanf(buf, "%d", &F1.AddrRange_Start);
-    val = count;
+    sscanf(buf, "%x", &F1.AddrRange_Start);
+    iowrite32(F1.AddrRange_Start, debug_port_base_address + STREAM_FIFO_ADDR_MIN_1);
   } else if (!strncmp(kobj->name, "FIFO_2", Kobj_Name_FIFO_Size)) {
-    sscanf(buf, "%d", &F2.AddrRange_Start);
-    val = count;
+    sscanf(buf, "%x", &F2.AddrRange_Start);
+    iowrite32(F2.AddrRange_Start, debug_port_base_address + STREAM_FIFO_ADDR_MIN_2);
   } else if (!strncmp(kobj->name, "FIFO_3", Kobj_Name_FIFO_Size)) {
-    sscanf(buf, "%d", &F3.AddrRange_Start);
-    val = count;
+    sscanf(buf, "%x", &F3.AddrRange_Start);
+    iowrite32(F3.AddrRange_Start, debug_port_base_address + STREAM_FIFO_ADDR_MIN_3);
   } else if (!strncmp(kobj->name, "FIFO_4", Kobj_Name_FIFO_Size)) {
-    sscanf(buf, "%d", &F4.AddrRange_Start);
-    val = count;
+    sscanf(buf, "%x", &F4.AddrRange_Start);
+    iowrite32(F4.AddrRange_Start, debug_port_base_address + STREAM_FIFO_ADDR_MIN_4);
   } else if (!strncmp(kobj->name, "FIFO_5", Kobj_Name_FIFO_Size)) {
-    sscanf(buf, "%d", &F5.AddrRange_Start);
-    val = count;
+    sscanf(buf, "%x", &F5.AddrRange_Start);
+    iowrite32(F5.AddrRange_Start, debug_port_base_address + PACKET_FIFO_ADDR_MIN);
   } else if (!strncmp(kobj->name, "FIFO_6", Kobj_Name_FIFO_Size)) {
-    sscanf(buf, "%d", &F6.AddrRange_Start);
-    val = count;
+    sscanf(buf, "%x", &F6.AddrRange_Start);
+    iowrite32(F6.AddrRange_Start, debug_port_base_address + PACKET_FIFO_ADDR_MIN);
   } else if (!strncmp(kobj->name, "FIFO_7", Kobj_Name_FIFO_Size)) {
-    sscanf(buf, "%d", &F7.AddrRange_Start);
-    val = count;
+    sscanf(buf, "%x", &F7.AddrRange_Start);
+    iowrite32(F7.AddrRange_Start, debug_port_base_address + PACKET_FIFO_ADDR_MIN);
   }
-  CSMLOGINFO(KERN_INFO " Sysfs store func returned %d count of bytes \n", val);
-  return val;
+
+  return count;
 }
 
 /*
@@ -873,22 +870,23 @@ ssize_t sysfs_show_AddrRange_End(struct kobject *kobj,
   int val = -1;
   CSMLOGINFO(KERN_INFO " Reading - sysfs show func...%s \n", kobj->name);
   if (!strncmp(kobj->name, "FIFO_0", Kobj_Name_FIFO_Size)) {
-    val = snprintf(buf, sizeof(F0.AddrRange_End), "%d", F0.AddrRange_End);
+    val = snprintf(buf, MAX_INT_CHAR_SIZE, "0x%x\n", F0.AddrRange_End);
   } else if (!strncmp(kobj->name, "FIFO_1", Kobj_Name_FIFO_Size)) {
-    val = snprintf(buf, sizeof(F1.AddrRange_End), "%d", F1.AddrRange_End);
+    val = snprintf(buf, MAX_INT_CHAR_SIZE, "0x%x\n", F1.AddrRange_End);
   } else if (!strncmp(kobj->name, "FIFO_2", Kobj_Name_FIFO_Size)) {
-    val = snprintf(buf, sizeof(F2.AddrRange_End), "%d", F2.AddrRange_End);
+    val = snprintf(buf, MAX_INT_CHAR_SIZE, "0x%x\n", F2.AddrRange_End);
   } else if (!strncmp(kobj->name, "FIFO_3", Kobj_Name_FIFO_Size)) {
-    val = snprintf(buf, sizeof(F3.AddrRange_End), "%d", F3.AddrRange_End);
+    val = snprintf(buf, MAX_INT_CHAR_SIZE, "0x%x\n", F3.AddrRange_End);
   } else if (!strncmp(kobj->name, "FIFO_4", Kobj_Name_FIFO_Size)) {
-    val = snprintf(buf, sizeof(F4.AddrRange_End), "%d", F4.AddrRange_End);
+    val = snprintf(buf, MAX_INT_CHAR_SIZE, "0x%x\n", F4.AddrRange_End);
   } else if (!strncmp(kobj->name, "FIFO_5", Kobj_Name_FIFO_Size)) {
-    val = snprintf(buf, sizeof(F5.AddrRange_End), "%d", F5.AddrRange_End);
+    val = snprintf(buf, MAX_INT_CHAR_SIZE, "0x%x\n", F5.AddrRange_End);
   } else if (!strncmp(kobj->name, "FIFO_6", Kobj_Name_FIFO_Size)) {
-    val = snprintf(buf, sizeof(F6.AddrRange_End), "%d", F6.AddrRange_End);
+    val = snprintf(buf, MAX_INT_CHAR_SIZE, "0x%x\n", F6.AddrRange_End);
   } else if (!strncmp(kobj->name, "FIFO_7", Kobj_Name_FIFO_Size)) {
-    val = snprintf(buf, sizeof(F7.AddrRange_End), "%d", F7.AddrRange_End);
+    val = snprintf(buf, MAX_INT_CHAR_SIZE, "0x%x\n", F7.AddrRange_End);
   }
+
   CSMLOGINFO(KERN_INFO " Sysfs show func returned %d \n", val);
   return val;
 }
@@ -896,35 +894,34 @@ ssize_t sysfs_show_AddrRange_End(struct kobject *kobj,
 ssize_t sysfs_store_AddrRange_End(struct kobject *kobj,
                                   struct kobj_attribute *attr, const char *buf,
                                   size_t count) {
-  int val = -1;
   CSMLOGINFO(KERN_INFO " Reading - sysfs store func...%s \n", kobj->name);
   if (!strncmp(kobj->name, "FIFO_0", Kobj_Name_FIFO_Size)) {
-    sscanf(buf, "%d", &F0.AddrRange_End);
-    val = count;
+    sscanf(buf, "%x", &F0.AddrRange_End);
+    iowrite32(F0.AddrRange_End, debug_port_base_address + STREAM_FIFO_ADDR_MAX_0);
   } else if (!strncmp(kobj->name, "FIFO_1", Kobj_Name_FIFO_Size)) {
-    sscanf(buf, "%d", &F1.AddrRange_End);
-    val = count;
+    sscanf(buf, "%x", &F1.AddrRange_End);
+    iowrite32(F1.AddrRange_End, debug_port_base_address + STREAM_FIFO_ADDR_MAX_1);
   } else if (!strncmp(kobj->name, "FIFO_2", Kobj_Name_FIFO_Size)) {
-    sscanf(buf, "%d", &F2.AddrRange_End);
-    val = count;
+    sscanf(buf, "%x", &F2.AddrRange_End);
+    iowrite32(F2.AddrRange_End, debug_port_base_address + STREAM_FIFO_ADDR_MAX_2);
   } else if (!strncmp(kobj->name, "FIFO_3", Kobj_Name_FIFO_Size)) {
-    sscanf(buf, "%d", &F3.AddrRange_End);
-    val = count;
+    sscanf(buf, "%x", &F3.AddrRange_End);
+    iowrite32(F3.AddrRange_End, debug_port_base_address + STREAM_FIFO_ADDR_MAX_3);
   } else if (!strncmp(kobj->name, "FIFO_4", Kobj_Name_FIFO_Size)) {
-    sscanf(buf, "%d", &F4.AddrRange_End);
-    val = count;
+    sscanf(buf, "%x", &F4.AddrRange_End);
+    iowrite32(F4.AddrRange_End, debug_port_base_address + STREAM_FIFO_ADDR_MAX_4);
   } else if (!strncmp(kobj->name, "FIFO_5", Kobj_Name_FIFO_Size)) {
-    sscanf(buf, "%d", &F5.AddrRange_End);
-    val = count;
+    sscanf(buf, "%x", &F5.AddrRange_End);
+    iowrite32(F5.AddrRange_End, debug_port_base_address + PACKET_FIFO_ADDR_MAX);
   } else if (!strncmp(kobj->name, "FIFO_6", Kobj_Name_FIFO_Size)) {
-    sscanf(buf, "%d", &F6.AddrRange_End);
-    val = count;
+    sscanf(buf, "%x", &F6.AddrRange_End);
+    iowrite32(F6.AddrRange_End, debug_port_base_address + PACKET_FIFO_ADDR_MAX);
   } else if (!strncmp(kobj->name, "FIFO_7", Kobj_Name_FIFO_Size)) {
-    sscanf(buf, "%d", &F7.AddrRange_End);
-    val = count;
+    sscanf(buf, "%x", &F7.AddrRange_End);
+    iowrite32(F7.AddrRange_End, debug_port_base_address + PACKET_FIFO_ADDR_MAX);
   }
-  CSMLOGINFO(KERN_INFO " Sysfs store func returned %d count of bytes \n", val);
-  return val;
+
+  return count;
 }
 /*
 OverFlowInterrupt Endpoint – (/sys/kernel/debugeth/FIFO_#/OverFlowInterrupt)
@@ -938,21 +935,21 @@ ssize_t sysfs_show_OverFlowInterrupt(struct kobject *kobj,
   int val = -1;
   CSMLOGINFO(KERN_INFO " Reading - sysfs show func...%s \n", kobj->name);
   if (!strncmp(kobj->name, "FIFO_0", Kobj_Name_FIFO_Size)) {
-    val = snprintf(buf, sizeof(F0.OverFlowInterrupt), "%d", F0.OverFlowInterrupt);
+    val = snprintf(buf, sizeof(F0.OverFlowInterrupt), "%d\n", F0.OverFlowInterrupt);
   } else if (!strncmp(kobj->name, "FIFO_1", Kobj_Name_FIFO_Size)) {
-    val = snprintf(buf, sizeof(F1.OverFlowInterrupt), "%d", F1.OverFlowInterrupt);
+    val = snprintf(buf, sizeof(F1.OverFlowInterrupt), "%d\n", F1.OverFlowInterrupt);
   } else if (!strncmp(kobj->name, "FIFO_2", Kobj_Name_FIFO_Size)) {
-    val = snprintf(buf, sizeof(F2.OverFlowInterrupt), "%d", F2.OverFlowInterrupt);
+    val = snprintf(buf, sizeof(F2.OverFlowInterrupt), "%d\n", F2.OverFlowInterrupt);
   } else if (!strncmp(kobj->name, "FIFO_3", Kobj_Name_FIFO_Size)) {
-    val = snprintf(buf, sizeof(F3.OverFlowInterrupt), "%d", F3.OverFlowInterrupt);
+    val = snprintf(buf, sizeof(F3.OverFlowInterrupt), "%d\n", F3.OverFlowInterrupt);
   } else if (!strncmp(kobj->name, "FIFO_4", Kobj_Name_FIFO_Size)) {
-    val = snprintf(buf, sizeof(F4.OverFlowInterrupt), "%d", F4.OverFlowInterrupt);
+    val = snprintf(buf, sizeof(F4.OverFlowInterrupt), "%d\n", F4.OverFlowInterrupt);
   } else if (!strncmp(kobj->name, "FIFO_5", Kobj_Name_FIFO_Size)) {
-    val = snprintf(buf, sizeof(F5.OverFlowInterrupt), "%d", F5.OverFlowInterrupt);
+    val = snprintf(buf, sizeof(F5.OverFlowInterrupt), "%d\n", F5.OverFlowInterrupt);
   } else if (!strncmp(kobj->name, "FIFO_6", Kobj_Name_FIFO_Size)) {
-    val = snprintf(buf, sizeof(F6.OverFlowInterrupt), "%d", F6.OverFlowInterrupt);
+    val = snprintf(buf, sizeof(F6.OverFlowInterrupt), "%d\n", F6.OverFlowInterrupt);
   } else if (!strncmp(kobj->name, "FIFO_7", Kobj_Name_FIFO_Size)) {
-    val = snprintf(buf, sizeof(F7.OverFlowInterrupt), "%d", F7.OverFlowInterrupt);
+    val = snprintf(buf, sizeof(F7.OverFlowInterrupt), "%d\n", F7.OverFlowInterrupt);
   }
   CSMLOGINFO(KERN_INFO " Sysfs show func returned %d \n", val);
   return val;
@@ -970,15 +967,15 @@ ssize_t sysfs_show_Threshold(struct kobject *kobj, struct kobj_attribute *attr,
   int val = -1;
   CSMLOGINFO(KERN_INFO " Reading - sysfs show func...%s \n", kobj->name);
   if (!strncmp(kobj->name, "FIFO_0", Kobj_Name_FIFO_Size)) {
-    val = snprintf(buf, sizeof(F0.Threshold), "%d", F0.Threshold);
+    val = snprintf(buf, MAX_INT_CHAR_SIZE, "%d\n", F0.Threshold);
   } else if (!strncmp(kobj->name, "FIFO_1", Kobj_Name_FIFO_Size)) {
-    val = snprintf(buf, sizeof(F1.Threshold), "%d", F1.Threshold);
+    val = snprintf(buf, MAX_INT_CHAR_SIZE, "%d\n", F1.Threshold);
   } else if (!strncmp(kobj->name, "FIFO_2", Kobj_Name_FIFO_Size)) {
-    val = snprintf(buf, sizeof(F2.Threshold), "%d", F2.Threshold);
+    val = snprintf(buf, MAX_INT_CHAR_SIZE, "%d\n", F2.Threshold);
   } else if (!strncmp(kobj->name, "FIFO_3", Kobj_Name_FIFO_Size)) {
-    val = snprintf(buf, sizeof(F3.Threshold), "%d", F3.Threshold);
+    val = snprintf(buf, MAX_INT_CHAR_SIZE, "%d\n", F3.Threshold);
   } else if (!strncmp(kobj->name, "FIFO_4", Kobj_Name_FIFO_Size)) {
-    val = snprintf(buf, sizeof(F4.Threshold), "%d", F4.Threshold);
+    val = snprintf(buf, MAX_INT_CHAR_SIZE, "%d\n", F4.Threshold);
   }
   CSMLOGINFO(KERN_INFO " Sysfs show func returned %d \n", val);
   return val;
@@ -986,31 +983,24 @@ ssize_t sysfs_show_Threshold(struct kobject *kobj, struct kobj_attribute *attr,
 
 ssize_t sysfs_store_Threshold(struct kobject *kobj, struct kobj_attribute *attr,
                               const char *buf, size_t count) {
-  int val = -1;
   CSMLOGINFO(KERN_INFO " Reading - sysfs store func...%s \n", kobj->name);
   if (!strncmp(kobj->name, "FIFO_0", Kobj_Name_FIFO_Size)) {
     sscanf(buf, "%d", &F0.Threshold);
     setup_StreamingFIFO(FIFO_0);
-    val = count;
   } else if (!strncmp(kobj->name, "FIFO_1", Kobj_Name_FIFO_Size)) {
     sscanf(buf, "%d", &F1.Threshold);
     setup_StreamingFIFO(FIFO_1);
-    val = count;
   } else if (!strncmp(kobj->name, "FIFO_2", Kobj_Name_FIFO_Size)) {
     sscanf(buf, "%d", &F2.Threshold);
     setup_StreamingFIFO(FIFO_2);
-    val = count;
   } else if (!strncmp(kobj->name, "FIFO_3", Kobj_Name_FIFO_Size)) {
     sscanf(buf, "%d", &F3.Threshold);
     setup_StreamingFIFO(FIFO_3);
-    val = count;
   } else if (!strncmp(kobj->name, "FIFO_4", Kobj_Name_FIFO_Size)) {
     sscanf(buf, "%d", &F4.Threshold);
     setup_StreamingFIFO(FIFO_4);
-    val = count;
   }
-  CSMLOGINFO(KERN_INFO " Sysfs store func returned %d count of bytes \n", val);
-  return val;
+  return count;
 }
 
 /*
@@ -1026,15 +1016,15 @@ ssize_t sysfs_show_Timeout(struct kobject *kobj, struct kobj_attribute *attr,
   int val = -1;
   CSMLOGINFO(KERN_INFO " Reading - sysfs show func...%s \n", kobj->name);
   if (!strncmp(kobj->name, "FIFO_0", Kobj_Name_FIFO_Size)) {
-    val = snprintf(buf, sizeof(F0.Timeout), "%d", F0.Timeout);
+    val = snprintf(buf, MAX_INT_CHAR_SIZE, "%d\n", F0.Timeout);
   } else if (!strncmp(kobj->name, "FIFO_1", Kobj_Name_FIFO_Size)) {
-    val = snprintf(buf, sizeof(F1.Timeout), "%d", F1.Timeout);
+    val = snprintf(buf, MAX_INT_CHAR_SIZE, "%d\n", F1.Timeout);
   } else if (!strncmp(kobj->name, "FIFO_2", Kobj_Name_FIFO_Size)) {
-    val = snprintf(buf, sizeof(F2.Timeout), "%d", F2.Timeout);
+    val = snprintf(buf, MAX_INT_CHAR_SIZE, "%d\n", F2.Timeout);
   } else if (!strncmp(kobj->name, "FIFO_3", Kobj_Name_FIFO_Size)) {
-    val = snprintf(buf, sizeof(F3.Timeout), "%d", F3.Timeout);
+    val = snprintf(buf, MAX_INT_CHAR_SIZE, "%d\n", F3.Timeout);
   } else if (!strncmp(kobj->name, "FIFO_4", Kobj_Name_FIFO_Size)) {
-    val = snprintf(buf, sizeof(F4.Timeout), "%d", F4.Timeout);
+    val = snprintf(buf, MAX_INT_CHAR_SIZE, "%d\n", F4.Timeout);
   }
   CSMLOGINFO(KERN_INFO " Sysfs show func returned %d \n", val);
   return val;
@@ -1042,31 +1032,24 @@ ssize_t sysfs_show_Timeout(struct kobject *kobj, struct kobj_attribute *attr,
 
 ssize_t sysfs_store_Timeout(struct kobject *kobj, struct kobj_attribute *attr,
                             const char *buf, size_t count) {
-  int val = -1;
   CSMLOGINFO(KERN_INFO " Reading - sysfs store func...%s \n", kobj->name);
   if (!strncmp(kobj->name, "FIFO_0", Kobj_Name_FIFO_Size)) {
     sscanf(buf, "%d", &F0.Timeout);
     iowrite32(F0.Timeout, debug_port_base_address + STREAM_FIFO_TIMER_0);
-    val = count;
   } else if (!strncmp(kobj->name, "FIFO_1", Kobj_Name_FIFO_Size)) {
     sscanf(buf, "%d", &F1.Timeout);
     iowrite32(F1.Timeout, debug_port_base_address + STREAM_FIFO_TIMER_1);
-    val = count;
   } else if (!strncmp(kobj->name, "FIFO_2", Kobj_Name_FIFO_Size)) {
     sscanf(buf, "%d", &F2.Timeout);
     iowrite32(F2.Timeout, debug_port_base_address + STREAM_FIFO_TIMER_2);
-    val = count;
   } else if (!strncmp(kobj->name, "FIFO_3", Kobj_Name_FIFO_Size)) {
     sscanf(buf, "%d", &F3.Timeout);
     iowrite32(F3.Timeout, debug_port_base_address + STREAM_FIFO_TIMER_3);
-    val = count;
   } else if (!strncmp(kobj->name, "FIFO_4", Kobj_Name_FIFO_Size)) {
     sscanf(buf, "%d", &F4.Timeout);
     iowrite32(F4.Timeout, debug_port_base_address + STREAM_FIFO_TIMER_4);
-    val = count;
   }
-  CSMLOGINFO(KERN_INFO " Sysfs store func returned %d count of bytes \n", val);
-  return val;
+  return count;
 }
 
 /*
@@ -1084,27 +1067,27 @@ ssize_t sysfs_show_vlanID(struct kobject *kobj, struct kobj_attribute *attr,
 
   CSMLOGINFO(KERN_INFO " Reading - sysfs show func...%s \n", kobj->name);
   if (!strncmp(kobj->name, "FIFO_0", Kobj_Name_FIFO_Size)) {
-    val = snprintf(buf, sizeof(F0.vlanID), "%d", F0.vlanID);
+    val = snprintf(buf, sizeof(F0.vlanID), "%d\n", F0.vlanID);
   } else if (!strncmp(kobj->name, "FIFO_1", Kobj_Name_FIFO_Size)) {
-    val = snprintf(buf, sizeof(F1.vlanID), "%d", F1.vlanID);
+    val = snprintf(buf, sizeof(F1.vlanID), "%d\n", F1.vlanID);
   } else if (!strncmp(kobj->name, "FIFO_2", Kobj_Name_FIFO_Size)) {
-    val = snprintf(buf, sizeof(F2.vlanID), "%d", F2.vlanID);
+    val = snprintf(buf, sizeof(F2.vlanID), "%d\n", F2.vlanID);
   } else if (!strncmp(kobj->name, "FIFO_3", Kobj_Name_FIFO_Size)) {
-    val = snprintf(buf, sizeof(F3.vlanID),"%d", F3.vlanID);
+    val = snprintf(buf, sizeof(F3.vlanID), "%d\n", F3.vlanID);
   } else if (!strncmp(kobj->name, "FIFO_4", Kobj_Name_FIFO_Size)) {
-    val = snprintf(buf, sizeof(F4.vlanID), "%d", F4.vlanID);
+    val = snprintf(buf, sizeof(F4.vlanID), "%d\n", F4.vlanID);
   } else if (!strncmp(kobj->name, "FIFO_5", Kobj_Name_FIFO_Size)) {
-    val = snprintf(buf, sizeof(F5.vlanID), "%d", F5.vlanID);
+    val = snprintf(buf, sizeof(F5.vlanID), "%d\n", F5.vlanID);
   } else if (!strncmp(kobj->name, "FIFO_6", Kobj_Name_FIFO_Size)) {
-    val = snprintf(buf, sizeof(F6.vlanID), "%d", F6.vlanID);
+    val = snprintf(buf, sizeof(F6.vlanID), "%d\n", F6.vlanID);
   } else if (!strncmp(kobj->name, "FIFO_7", Kobj_Name_FIFO_Size)) {
-    val = snprintf(buf, sizeof(F7.vlanID), "%d", F7.vlanID);
+    val = snprintf(buf, sizeof(F7.vlanID), "%d\n", F7.vlanID);
   }
   CSMLOGINFO(KERN_INFO " Sysfs show func returned %d \n", val);
   return val;
 }
 
-int sysfs_store_vlanID_Register_Set(const char *buf, u64 *FIFO_vlanID, u32 reg1,
+void sysfs_store_vlanID_Register_Set(const char *buf, u64 *FIFO_vlanID, u32 reg1,
                                     u32 reg2) {
   u32 val;
   u32 vlan_id = 0;
@@ -1135,40 +1118,38 @@ int sysfs_store_vlanID_Register_Set(const char *buf, u64 *FIFO_vlanID, u32 reg1,
   CSMLOGINFO(KERN_INFO " sysfs_store_vlanID_Register_Set - write reg2 %x", val);
   iowrite32(val, debug_port_base_address + reg2);
 
-  return val;
+  return;
 }
 
 ssize_t sysfs_store_vlanID(struct kobject *kobj, struct kobj_attribute *attr,
                            const char *buf, size_t count) {
-  u32 val = -1;
   CSMLOGINFO(KERN_INFO " Reading - sysfs store func...%s \n", kobj->name);
   if (!strncmp(kobj->name, "FIFO_0", Kobj_Name_FIFO_Size)) {
-    val = sysfs_store_vlanID_Register_Set(buf, &F0.vlanID, VLAN_TAG_0,
+    sysfs_store_vlanID_Register_Set(buf, &F0.vlanID, VLAN_TAG_0,
                                           L2_SA_ADDR_HI_0);
   } else if (!strncmp(kobj->name, "FIFO_1", Kobj_Name_FIFO_Size)) {
-    val = sysfs_store_vlanID_Register_Set(buf, &F1.vlanID, VLAN_TAG_1,
+    sysfs_store_vlanID_Register_Set(buf, &F1.vlanID, VLAN_TAG_1,
                                           L2_SA_ADDR_HI_1);
   } else if (!strncmp(kobj->name, "FIFO_2", Kobj_Name_FIFO_Size)) {
-    val = sysfs_store_vlanID_Register_Set(buf, &F2.vlanID, VLAN_TAG_2,
+    sysfs_store_vlanID_Register_Set(buf, &F2.vlanID, VLAN_TAG_2,
                                           L2_SA_ADDR_HI_2);
   } else if (!strncmp(kobj->name, "FIFO_3", Kobj_Name_FIFO_Size)) {
-    val = sysfs_store_vlanID_Register_Set(buf, &F3.vlanID, VLAN_TAG_3,
+    sysfs_store_vlanID_Register_Set(buf, &F3.vlanID, VLAN_TAG_3,
                                           L2_SA_ADDR_HI_3);
   } else if (!strncmp(kobj->name, "FIFO_4", Kobj_Name_FIFO_Size)) {
-    val = sysfs_store_vlanID_Register_Set(buf, &F4.vlanID, VLAN_TAG_4,
+    sysfs_store_vlanID_Register_Set(buf, &F4.vlanID, VLAN_TAG_4,
                                           L2_SA_ADDR_HI_4);
   } else if (!strncmp(kobj->name, "FIFO_5", Kobj_Name_FIFO_Size)) {
-    val = sysfs_store_vlanID_Register_Set(buf, &F5.vlanID, VLAN_TAG_5,
+    sysfs_store_vlanID_Register_Set(buf, &F5.vlanID, VLAN_TAG_5,
                                           L2_SA_ADDR_HI_5);
   } else if (!strncmp(kobj->name, "FIFO_6", Kobj_Name_FIFO_Size)) {
-    val = sysfs_store_vlanID_Register_Set(buf, &F6.vlanID, VLAN_TAG_6,
+    sysfs_store_vlanID_Register_Set(buf, &F6.vlanID, VLAN_TAG_6,
                                           L2_SA_ADDR_HI_6);
   } else if (!strncmp(kobj->name, "FIFO_7", Kobj_Name_FIFO_Size)) {
-    val = sysfs_store_vlanID_Register_Set(buf, &F7.vlanID, VLAN_TAG_7,
+    sysfs_store_vlanID_Register_Set(buf, &F7.vlanID, VLAN_TAG_7,
                                           L2_SA_ADDR_HI_7);
   }
-  CSMLOGINFO(KERN_INFO " Sysfs show func returned %d \n", val);
-  return val;
+  return count;
 }
 
 int remove_sysfs(struct kobject *kobj_ref, struct kobj_attribute *attr) {

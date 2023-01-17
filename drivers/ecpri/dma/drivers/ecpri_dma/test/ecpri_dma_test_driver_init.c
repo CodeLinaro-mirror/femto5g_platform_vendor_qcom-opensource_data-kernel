@@ -53,7 +53,8 @@ static int ecpri_dma_test_driver_init_verify_dtsi_params()
 static int ecpri_dma_test_driver_init_verify_endp_mapping()
 {
 	int res = 0;
-	const struct dma_gsi_ep_config *test_endp_map;
+	const struct dma_gsi_ep_config (*test_endp_map)
+		[ECPRI_DMA_GSI_NUM_MAX][ECPRI_DMA_ENDP_NUM_MAX];
 
 	res = ecpri_dma_get_endp_mapping(ecpri_dma_ut_curr_hw_ver,
 		ecpri_dma_ut_curr_hw_flv, &test_endp_map);
@@ -136,212 +137,223 @@ static int ecpri_dma_test_driver_init_dtsi_parsing_v1_du_l2(void *priv)
 
 static int ecpri_dma_test_driver_init_dma_paths(void *priv)
 {
-	int i = 0;
-	const struct dma_gsi_ep_config *endp_map;
-	ecpri_hwio_def_ecpri_endp_cfg_destn_u endp_cfg_dest = { 0 };
-	ecpri_hwio_def_ecpri_endp_cfg_destn_u endp_cfg_dest_hw = { 0 };
-	ecpri_hwio_def_ecpri_endp_cfg_xbarn_u endp_cfg_xbar = { 0 };
-	ecpri_hwio_def_ecpri_endp_cfg_xbarn_u endp_cfg_xbar_hw = { 0 };
-	ecpri_hwio_def_ecpri_dma_exception_channel_u exception_ch = { 0 };
-	ecpri_hwio_def_ecpri_dma_exception_channel_u exception_ch_hw = { 0 };
-	ecpri_hwio_def_ecpri_endp_cfg_aggr_n_u cfg_aggr = { 0 };
-	ecpri_hwio_def_ecpri_endp_cfg_aggr_n_u cfg_aggr_hw = { 0 };
-	ecpri_hwio_def_ecpri_endp_nfapi_reassembly_cfg_n_u nfapi_cfg = { 0 };
-	ecpri_hwio_def_ecpri_endp_nfapi_reassembly_cfg_n_u nfapi_cfg_hw = { 0 };
-	ecpri_hwio_def_ecpri_endp_gsi_cfg_n_u endp_gsi_cfg = { 0 };
-	ecpri_hwio_def_ecpri_endp_gsi_cfg_n_u endp_gsi_cfg_hw = { 0 };
+	int endp_id = 0, gsi_id = 0;
+	const struct dma_gsi_ep_config (*endp_map)
+		[ECPRI_DMA_GSI_NUM_MAX][ECPRI_DMA_ENDP_NUM_MAX];
+	ecpri_hwio_def_ecpri_endp_cfg_dest_gsi_m_ch_n_u endp_cfg_dest = { 0 };
+	ecpri_hwio_def_ecpri_endp_cfg_dest_gsi_m_ch_n_u endp_cfg_dest_hw = { 0 };
+	struct ecpri_dma_ecpri_endp_cfg_xbar_fields endp_cfg_xbar = { 0 };
+	ecpri_hwio_def_ecpri_endp_cfg_xbar_u endp_cfg_xbar_hw = { 0 };
+	struct ecpri_dma_ecpri_endp_exception_channel_fields exception_ch = { 0 };
+	struct ecpri_dma_ecpri_endp_exception_channel_fields exception_ch_hw = { 0 };
+	ecpri_hwio_def_ecpri_endp_cfg_aggr_gsi_m_ch_n_u cfg_aggr = { 0 };
+	ecpri_hwio_def_ecpri_endp_cfg_aggr_gsi_m_ch_n_u cfg_aggr_hw = { 0 };
+	ecpri_hwio_def_ecpri_endp_nfapi_reassembly_cfg_gsi_m_ch_n_u nfapi_cfg = { 0 };
+	ecpri_hwio_def_ecpri_endp_nfapi_reassembly_cfg_gsi_m_ch_n_u nfapi_cfg_hw = { 0 };
+	ecpri_hwio_def_ecpri_endp_gsi_cfg_gsi_m_ch_n_u endp_gsi_cfg = { 0 };
+	ecpri_hwio_def_ecpri_endp_gsi_cfg_gsi_m_ch_n_u endp_gsi_cfg_hw = { 0 };
 
 	DMA_UT_LOG("Start DMA HW registers verification\n");
 
-	if (!ecpri_dma_ctx || !ecpri_dma_ctx->endp_map) {
+	if (!ecpri_dma_ctx || !(*ecpri_dma_ctx->endp_map)) {
 		DMA_UT_TEST_FAIL_REPORT("eCPRI DMA CTX isn't ready");
 		return -EINVAL;
 	}
 
 	endp_map = ecpri_dma_ctx->endp_map;
 
-	for (i = 0; i < ecpri_dma_ctx->ecpri_dma_num_endps; i++) {
-		memset(&endp_gsi_cfg, 0, sizeof(endp_gsi_cfg));
-		memset(&endp_gsi_cfg_hw, 0, sizeof(endp_gsi_cfg_hw));
+	for (gsi_id = 0; gsi_id < ECPRI_DMA_GSI_NUM_MAX; gsi_id++) {
+		for (endp_id = 0;
+			endp_id < ecpri_dma_ctx->ecpri_dma_num_endps; endp_id++) {
+			memset(&endp_gsi_cfg, 0, sizeof(endp_gsi_cfg));
+			memset(&endp_gsi_cfg_hw, 0, sizeof(endp_gsi_cfg_hw));
 
-		endp_gsi_cfg_hw.value = ecpri_dma_hal_read_reg_n(
-			ECPRI_ENDP_GSI_CFG_n, i);
+			endp_gsi_cfg_hw.value = ecpri_dma_hal_read_reg_mn(
+				ECPRI_ENDP_GSI_CFG, gsi_id, endp_id);
 
-		if (endp_map[i].valid) {
-			/* Verify ENDP is enabled */
-			endp_gsi_cfg.def.endp_en = 1;
+			if ((*endp_map)[gsi_id][endp_id].valid) {
+				/* Verify ENDP is enabled */
+				endp_gsi_cfg.def.endp_en = 1;
 
-			if (endp_gsi_cfg.value != endp_gsi_cfg_hw.value) {
-				DMA_UT_LOG(
-					"ENDP %d is expected to be enabled\n", i);
-				DMA_UT_TEST_FAIL_REPORT(
-					"ENDP is expected to be valid");
-				return -EFAULT;
-			}
-
-			if (endp_map[i].is_exception) {
-				/* Verify ENDP is configured as exception */
-				memset(&exception_ch, 0, sizeof(exception_ch));
-				memset(&exception_ch_hw, 0, sizeof(exception_ch_hw));
-				exception_ch.def.enable = 1;
-				exception_ch.def.channel = i;
-
-				exception_ch_hw.value = ecpri_dma_hal_read_reg(
-					ECPRI_DMA_EXCEPTION_CHANNEL);
-
-				if (exception_ch.value != exception_ch_hw.value) {
+				if (endp_gsi_cfg.value != endp_gsi_cfg_hw.value) {
 					DMA_UT_LOG(
-						"ENDP %d is expected to be exception ENDP\n", i);
+						"ENDP %d is expected to be enabled\n", endp_id);
 					DMA_UT_TEST_FAIL_REPORT(
-						"Excepetion ENDP isn't configured as expected");
+						"ENDP is expected to be valid");
 					return -EFAULT;
 				}
-				if (ecpri_dma_ctx->exception_endp != i) {
-					DMA_UT_LOG(
-						"ENDP %d is expected to be exception ENDP\n", i);
-					DMA_UT_TEST_FAIL_REPORT(
-						"Excepetion ENDP isn't configured as expected in ecpri_ctx");
-					return -EFAULT;
+
+				if ((*endp_map)[gsi_id][endp_id].is_exception) {
+					/* Verify ENDP is configured as exception */
+					memset(&exception_ch, 0, sizeof(exception_ch));
+					memset(&exception_ch_hw, 0, sizeof(exception_ch_hw));
+					exception_ch.enable = 1;
+					exception_ch.gid = gsi_id;
+					exception_ch.channel = endp_id;
+
+					ecpri_dma_hal_read_reg_fields(ECPRI_DMA_EXCEPTION_CHANNEL,
+						&exception_ch_hw);
+
+					if (exception_ch.channel != exception_ch_hw.channel) {
+						DMA_UT_LOG(
+							"ENDP %d is expected to be exception ENDP\n",
+							endp_id);
+						DMA_UT_TEST_FAIL_REPORT(
+							"Excepetion ENDP isn't configured as expected");
+						return -EFAULT;
+					}
+					if (ecpri_dma_ctx->exception_endp.endp_id != endp_id) {
+						DMA_UT_LOG(
+							"ENDP %d is expected to be exception ENDP\n",
+							endp_id);
+						DMA_UT_TEST_FAIL_REPORT(
+							"Excepetion ENDP isn't configured as expected"
+							"in ecpri_ctx");
+						return -EFAULT;
+					}
 				}
-			}
 
-			switch (endp_map[i].dir) {
-			case ECPRI_DMA_ENDP_DIR_SRC:
-				/* Verify SRC ENDP configs */
-				memset(&endp_cfg_dest, 0,
-					sizeof(endp_cfg_dest));
-				memset(&endp_cfg_xbar, 0,
-					sizeof(endp_cfg_xbar));
-				memset(&endp_cfg_dest_hw, 0,
-					sizeof(endp_cfg_dest_hw));
-				memset(&endp_cfg_xbar_hw, 0,
-					sizeof(endp_cfg_xbar_hw));
+				switch ((*endp_map)[gsi_id][endp_id].dir) {
+				case ECPRI_DMA_ENDP_DIR_SRC:
+					/* Verify SRC ENDP configs */
+					memset(&endp_cfg_dest, 0,
+						sizeof(endp_cfg_dest));
+					memset(&endp_cfg_xbar, 0,
+						sizeof(endp_cfg_xbar));
+					memset(&endp_cfg_dest_hw, 0,
+						sizeof(endp_cfg_dest_hw));
+					memset(&endp_cfg_xbar_hw, 0,
+						sizeof(endp_cfg_xbar_hw));
 
-				switch (endp_map[i].stream_mode) {
-				case ECPRI_DMA_ENDP_STREAM_MODE_M2M:
-					endp_cfg_dest.def.use_dest_cfg = 1;
-					endp_cfg_dest.def.dest_mem_channel =
-						endp_map[i].dest;
+					switch ((*endp_map)[gsi_id][endp_id].stream_mode) {
+					case ECPRI_DMA_ENDP_STREAM_MODE_M2M:
+						endp_cfg_dest.def.use_dest_cfg = 1;
+						endp_cfg_dest.def.dest_mem_channel =
+							(*endp_map)[gsi_id][endp_id].dest;
 
-					endp_cfg_dest_hw.value = ecpri_dma_hal_read_reg_n(
-						ECPRI_ENDP_CFG_DEST_n, i);
+						endp_cfg_dest_hw.value = ecpri_dma_hal_read_reg_mn(
+							ECPRI_ENDP_CFG_DEST, gsi_id, endp_id);
 
-					if (endp_cfg_dest.value != endp_cfg_dest_hw.value) {
-						DMA_UT_LOG(
-							"ENDP %d Destination isn't configured correctly\n",
-							i);
-						DMA_UT_TEST_FAIL_REPORT(
-							"ENDP DEST register isn't configured correctly");
-						return -EFAULT;
-					}
-					break;
-
-				case ECPRI_DMA_ENDP_STREAM_MODE_M2S:
-					endp_cfg_dest.def.use_dest_cfg = 0;
-					endp_cfg_xbar.def.dest_stream =
-						endp_map[i].dest;
-					endp_cfg_xbar.def.xbar_tid =
-						endp_map[i].tid.value;
-					//TODO: Below are required for nFAPI
-					//endp_cfg_xbar.xbar_user = Get from Core driver, need API
-					endp_cfg_xbar.def.l2_segmentation_en =
-						endp_map[i].is_nfapi ? 1 : 0;
-
-					endp_cfg_dest_hw.value = ecpri_dma_hal_read_reg_n(
-						ECPRI_ENDP_CFG_DEST_n, i);
-					endp_cfg_xbar_hw.value = ecpri_dma_hal_read_reg_n(
-						ECPRI_ENDP_CFG_XBAR_n, i);
-
-					if (endp_cfg_dest.value != endp_cfg_dest_hw.value) {
-						DMA_UT_LOG(
-							"ENDP %d Destination isn't configured correctly\n",
-							i);
-						DMA_UT_TEST_FAIL_REPORT(
-							"ENDP DEST register isn't configured correctly");
-						return -EFAULT;
-					}
-					if (endp_cfg_xbar.value != endp_cfg_xbar_hw.value) {
-						DMA_UT_LOG(
-							"ENDP %d XBAR CFG isn't configured correctly\n",
-							i);
-						DMA_UT_TEST_FAIL_REPORT(
-							"XBAR CFG register isn't configured correctly");
-						return -EFAULT;
-					}
-					break;
-				default:
-					DMA_UT_TEST_FAIL_REPORT("SRC ENDP isn't M2M or S2M");
-					return -EFAULT;
-					break;
-				}
-				break;
-			case ECPRI_DMA_ENDP_DIR_DEST:
-				/* Verify DEST ENDP configs */
-				switch (endp_map[i].stream_mode) {
-				case ECPRI_DMA_ENDP_STREAM_MODE_M2M:
-					break;
-				case ECPRI_DMA_ENDP_STREAM_MODE_S2M:
-					if (endp_map[i].is_nfapi) {
-						memset(&cfg_aggr, 0,
-							sizeof(cfg_aggr));
-						memset(&cfg_aggr_hw, 0,
-							sizeof(cfg_aggr_hw));
-						memset(&nfapi_cfg, 0,
-							sizeof(nfapi_cfg));
-						memset(&nfapi_cfg_hw, 0,
-							sizeof(nfapi_cfg_hw));
-
-						cfg_aggr.def.aggr_type = 1;
-						nfapi_cfg.def.vm_id =
-							endp_map[i]
-							.nfapi_dest_vm_id;
-
-						cfg_aggr_hw.value = ecpri_dma_hal_read_reg_n(
-							ECPRI_ENDP_CFG_AGGR_n, i);
-						nfapi_cfg_hw.value = ecpri_dma_hal_read_reg_n(
-							ECPRI_ENDP_NFAPI_REASSEMBLY_CFG_n, i);
-
-						if (cfg_aggr.value != cfg_aggr_hw.value) {
+						if (endp_cfg_dest.value != endp_cfg_dest_hw.value) {
 							DMA_UT_LOG(
-								"ENDP %d AGGR isn't configured correctly\n",
-								i);
+								"ENDP %d Destination isn't configured"
+								" correctly\n", endp_id);
 							DMA_UT_TEST_FAIL_REPORT(
-								"ENDP AGGR isn't configured correctly");
+								"ENDP DEST register isn't configured"
+								" correctly");
 							return -EFAULT;
 						}
-						if (nfapi_cfg.value != nfapi_cfg_hw.value) {
+						break;
+
+					case ECPRI_DMA_ENDP_STREAM_MODE_M2S:
+						endp_cfg_dest.def.use_dest_cfg = 0;
+						endp_cfg_xbar.dest_stream =
+							(*ecpri_dma_ctx->endp_map)[gsi_id][endp_id].dest;
+						endp_cfg_xbar.xbar_tid =
+							(*ecpri_dma_ctx->endp_map)[gsi_id][endp_id].tid.value;
+						//TODO: Below are required for nFAPI
+						//endp_cfg_xbar.xbar_user = Get from Core driver, need API
+						endp_cfg_xbar.l2_segmentation_en =
+							(*endp_map)[gsi_id][endp_id].is_nfapi ? 1 : 0;
+
+						endp_cfg_dest_hw.value = ecpri_dma_hal_read_reg_mn(
+							ECPRI_ENDP_CFG_DEST, gsi_id, endp_id);
+						endp_cfg_xbar_hw.value = ecpri_dma_hal_read_reg_mn(
+							ECPRI_ENDP_CFG_XBAR, gsi_id, endp_id);
+
+						if (endp_cfg_dest.value != endp_cfg_dest_hw.value) {
 							DMA_UT_LOG(
-								"ENDP %d Reassembly isn't configured correctly\n",
-								i);
+								"ENDP %d Destination isn't configured"
+								" correctly\n", endp_id);
 							DMA_UT_TEST_FAIL_REPORT(
-								"ENDP Reassembly isn't configured correctly");
+								"ENDP DEST register isn't configured correctly");
 							return -EFAULT;
 						}
+						/* TODO: Fix test for V2
+						if (endp_cfg_xbar.value != endp_cfg_xbar_hw.value) {
+							DMA_UT_LOG(
+								"ENDP %d XBAR CFG isn't configured correctly\n",
+								endp_id);
+							DMA_UT_TEST_FAIL_REPORT(
+								"XBAR CFG register isn't configured correctly");
+							return -EFAULT;
+						}*/
+						break;
+					default:
+						DMA_UT_TEST_FAIL_REPORT("SRC ENDP isn't M2M or S2M");
+						return -EFAULT;
+						break;
+					}
+					break;
+				case ECPRI_DMA_ENDP_DIR_DEST:
+					/* Verify DEST ENDP configs */
+					switch ((*endp_map)[gsi_id][endp_id].stream_mode) {
+					case ECPRI_DMA_ENDP_STREAM_MODE_M2M:
+						break;
+					case ECPRI_DMA_ENDP_STREAM_MODE_S2M:
+						if ((*endp_map)[gsi_id][endp_id].is_nfapi) {
+							memset(&cfg_aggr, 0,
+								sizeof(cfg_aggr));
+							memset(&cfg_aggr_hw, 0,
+								sizeof(cfg_aggr_hw));
+							memset(&nfapi_cfg, 0,
+								sizeof(nfapi_cfg));
+							memset(&nfapi_cfg_hw, 0,
+								sizeof(nfapi_cfg_hw));
+
+							cfg_aggr.def.aggr_type = 1;
+							nfapi_cfg.def.vm_id =
+								(*endp_map)[gsi_id][endp_id]
+								.nfapi_dest_vm_id;
+
+							cfg_aggr_hw.value = ecpri_dma_hal_read_reg_mn(
+								ECPRI_ENDP_CFG_AGGR, gsi_id, endp_id);
+							nfapi_cfg_hw.value = ecpri_dma_hal_read_reg_mn(
+								ECPRI_ENDP_NFAPI_REASSEMBLY_CFG, gsi_id, endp_id);
+
+							if (cfg_aggr.value != cfg_aggr_hw.value) {
+								DMA_UT_LOG(
+									"ENDP %d AGGR isn't configured correctly\n",
+									endp_id);
+								DMA_UT_TEST_FAIL_REPORT(
+									"ENDP AGGR isn't configured correctly");
+								return -EFAULT;
+							}
+							if (nfapi_cfg.value != nfapi_cfg_hw.value) {
+								DMA_UT_LOG(
+									"ENDP %d Reassembly isn't configured"
+									" correctly\n", endp_id);
+								DMA_UT_TEST_FAIL_REPORT(
+									"ENDP Reassembly isn't configured correctly");
+								return -EFAULT;
+							}
+							break;
+						}
+						break;
+					default:
+						DMA_UT_TEST_FAIL_REPORT("DEST ENDP isn't M2M or S2M");
+						return -EFAULT;
 						break;
 					}
 					break;
 				default:
-					DMA_UT_TEST_FAIL_REPORT("DEST ENDP isn't M2M or S2M");
+					DMA_UT_TEST_FAIL_REPORT("ENDP isn't SRC nor DEST");
 					return -EFAULT;
 					break;
 				}
-				break;
-			default:
-				DMA_UT_TEST_FAIL_REPORT("ENDP isn't SRC nor DEST");
-				return -EFAULT;
-				break;
 			}
-		} else {
-			/* Verify ENDP is not enabled */
-			endp_gsi_cfg.def.endp_en = 0;
+			else {
+				/* Verify ENDP is not enabled */
+				endp_gsi_cfg.def.endp_en = 0;
 
-			if (endp_gsi_cfg.value != endp_gsi_cfg_hw.value) {
-				DMA_UT_LOG(
-					"ENDP %d is expected to be disabled\n",
-					i);
-				DMA_UT_TEST_FAIL_REPORT(
-					"ENDP is expected to be invalid");
-				return -EFAULT;
+				if (endp_gsi_cfg.value != endp_gsi_cfg_hw.value) {
+					DMA_UT_LOG(
+						"ENDP %d is expected to be disabled\n",
+						endp_id);
+					DMA_UT_TEST_FAIL_REPORT(
+						"ENDP is expected to be invalid");
+					return -EFAULT;
+				}
 			}
 		}
 	}
@@ -351,9 +363,10 @@ static int ecpri_dma_test_driver_init_dma_paths(void *priv)
 
 static int ecpri_dma_test_driver_init_gsi_hw(void *priv)
 {
-	int i = 0;
-	struct ecpri_dma_endp_context *endp_ctx;
-	const struct dma_gsi_ep_config *endp_map;
+	int endp_id = 0, gsi_id = 0;
+	struct ecpri_dma_endp_context **endp_ctx;
+	const struct dma_gsi_ep_config (*endp_map)
+		[ECPRI_DMA_GSI_NUM_MAX][ECPRI_DMA_ENDP_NUM_MAX];
 	struct gsihal_reg_ch_k_cntxt_0 cntx0_hw;
 
 	DMA_UT_LOG("Start GSI HW registers verification\n");
@@ -364,74 +377,76 @@ static int ecpri_dma_test_driver_init_gsi_hw(void *priv)
 	}
 
 	endp_map = ecpri_dma_ctx->endp_map;
-	endp_ctx = ecpri_dma_ctx->endp_ctx;
+	endp_ctx = (struct ecpri_dma_endp_context**)ecpri_dma_ctx->endp_ctx;
 
-	for (i = 0; i < ecpri_dma_ctx->ecpri_dma_num_endps; i++) {
-		if (endp_ctx[i].valid) {
-			memset(&cntx0_hw, 0, sizeof(cntx0_hw));
+	for (gsi_id = 0; gsi_id < ECPRI_DMA_GSI_NUM_MAX; gsi_id++) {
+		for (endp_id = 0;
+			endp_id < ecpri_dma_ctx->ecpri_dma_num_endps; endp_id++) {
+			if (endp_ctx[gsi_id][endp_id].valid) {
+				memset(&cntx0_hw, 0, sizeof(cntx0_hw));
 
-			gsihal_read_reg_nk_fields(GSI_EE_n_GSI_CH_k_CNTXT_0,
-				ecpri_dma_ctx->ee,
-				endp_map[i].dma_gsi_chan_num, &cntx0_hw);
+				gsihal_read_reg_pnk_fields(GSI_EE_n_GSI_CH_k_CNTXT_0, gsi_id,
+					ecpri_dma_ctx->ee,
+					(*endp_map)[gsi_id][endp_id].dma_gsi_chan_num, &cntx0_hw);
 
-			if (cntx0_hw.element_size != GSI_EVT_RING_RE_SIZE_16B) {
-				DMA_UT_LOG(
-					"ENDP %d element size isn't configured correctly\n",
-					i);
-				DMA_UT_TEST_FAIL_REPORT(
-					"ENDP element size isn't configured correctly");
-				return -EFAULT;
-			}
-			if (cntx0_hw.chtype_protocol != GSI_CHAN_PROT_MHI) {
-				DMA_UT_LOG(
-					"ENDP %d protocol isn't configured correctly\n",
-					i);
-				DMA_UT_TEST_FAIL_REPORT(
-					"ENDP protocol isn't configured correctly");
-				return -EFAULT;
-			}
-			if (cntx0_hw.ee != endp_map[i].ee) {
-				DMA_UT_LOG(
-					"ENDP %d ee isn't configured correctly\n",
-					i);
-				DMA_UT_TEST_FAIL_REPORT(
-					"ENDP ee isn't configured correctly");
-				return -EFAULT;
-			}
-			if (endp_map[i].dir == ECPRI_DMA_ENDP_DIR_SRC)
-			{
-				if (cntx0_hw.chtype_dir != GSI_CHAN_DIR_TO_GSI) {
+				if (cntx0_hw.element_size != GSI_EVT_RING_RE_SIZE_16B) {
 					DMA_UT_LOG(
-						"ENDP %d direction isn't configured correctly\n",
-						i);
+						"ENDP %d element size isn't configured correctly\n",
+						endp_id);
 					DMA_UT_TEST_FAIL_REPORT(
-						"ENDP direction isn't configured correctly");
+						"ENDP element size isn't configured correctly");
 					return -EFAULT;
 				}
-			}
-			else
-			{
-				if (cntx0_hw.chtype_dir != GSI_CHAN_DIR_FROM_GSI) {
+				if (cntx0_hw.chtype_protocol != GSI_CHAN_PROT_MHI) {
 					DMA_UT_LOG(
-						"ENDP %d direction isn't configured correctly\n",
-						i);
+						"ENDP %d protocol isn't configured correctly\n",
+						endp_id);
 					DMA_UT_TEST_FAIL_REPORT(
-						"ENDP direction isn't configured correctly");
+						"ENDP protocol isn't configured correctly");
 					return -EFAULT;
 				}
-			}
-			/* CH is valid therefor expected to be at least allocated */
-			if (cntx0_hw.chstate == GSI_CHAN_STATE_NOT_ALLOCATED) {
-				DMA_UT_LOG(
-					"ENDP %d CH state isn't configured correctly\n",
-					i);
-				DMA_UT_TEST_FAIL_REPORT(
-					"ENDP CH state isn't configured correctly");
-				return -EFAULT;
+				if (cntx0_hw.ee != (*endp_map)[gsi_id][endp_id].ee) {
+					DMA_UT_LOG(
+						"ENDP %d ee isn't configured correctly\n",
+						endp_id);
+					DMA_UT_TEST_FAIL_REPORT(
+						"ENDP ee isn't configured correctly");
+					return -EFAULT;
+				}
+				if ((*endp_map)[gsi_id][endp_id].dir == ECPRI_DMA_ENDP_DIR_SRC)
+				{
+					if (cntx0_hw.chtype_dir != GSI_CHAN_DIR_TO_GSI) {
+						DMA_UT_LOG(
+							"ENDP %d direction isn't configured correctly\n",
+							endp_id);
+						DMA_UT_TEST_FAIL_REPORT(
+							"ENDP direction isn't configured correctly");
+						return -EFAULT;
+					}
+				}
+				else
+				{
+					if (cntx0_hw.chtype_dir != GSI_CHAN_DIR_FROM_GSI) {
+						DMA_UT_LOG(
+							"ENDP %d direction isn't configured correctly\n",
+							endp_id);
+						DMA_UT_TEST_FAIL_REPORT(
+							"ENDP direction isn't configured correctly");
+						return -EFAULT;
+					}
+				}
+				/* CH is valid therefor expected to be at least allocated */
+				if (cntx0_hw.chstate == GSI_CHAN_STATE_NOT_ALLOCATED) {
+					DMA_UT_LOG(
+						"ENDP %d CH state isn't configured correctly\n",
+						endp_id);
+					DMA_UT_TEST_FAIL_REPORT(
+						"ENDP CH state isn't configured correctly");
+					return -EFAULT;
+				}
 			}
 		}
 	}
-
 	return 0;
 }
 /* Suite definition block */

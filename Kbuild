@@ -11,4 +11,5 @@ obj-$(CONFIG_LASSEN_MTIP) += drivers/mtip/
 obj-$(CONFIG_ECPRI_CORE) += drivers/ecpri/ecpri_core/
 obj-$(CONFIG_ECPRI_OXTOR) += drivers/ecpri/ecpri_oxtor/
 obj-$(CONFIG_LASSEN_MACSEC) += drivers/macsec/
+obj-$(CONFIG_LASSEN_SECURE_EIP) += drivers/secure_eip/
 obj-$(CONFIG_LASSEN_QCOM_AW_PHY) += drivers/qcom_aw_phy/

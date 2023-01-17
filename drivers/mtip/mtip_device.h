@@ -19,6 +19,7 @@ struct mtip_netdev_priv {
    spinlock_t lock;
    void __iomem           *mac_ioaddr;
    u64 hashtablebits;
+   u32 priv_flags;
 
    // these are used only for RUMI E2E
    struct phy_device      *phydev;
@@ -70,5 +71,7 @@ void mtip_netdevice_init(struct net_device *dev);
 enum mtip_link_state_enum mtip_get_link_state_by_device(u32 port_device_index, u32 link_device_index);
 
 int mtip_set_netdev_hw_mac_addr(struct net_device *netdev, u32 link_index);
+
+int mtip_netdev_set_port_config(struct net_device *netdev);
 
 #endif // _MTIP_DEVICE_H

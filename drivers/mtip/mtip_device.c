@@ -53,6 +53,7 @@
 #include "mtip_debug_eth.h"
 #include "mtip_phy.h"
 #include "mtip_sysfs.h"
+#include "mtip_platform.h"
 
 int macsec_eth_set_macsec_ops(const struct macsec_ops* rb_macsec_ops)
 {
@@ -175,7 +176,8 @@ void run_mtip_tx_comp_cb(void* work_ptr)
    struct mtip_netdev_priv *priv;
    u32 link_index;
    bool free_skb = true;
-   u64 nanosecs;
+   u32 timestamp_secs;
+   u32 timestamp_nsecs;
 
    if (taskstruct == NULL) 
    {
@@ -241,10 +243,10 @@ void run_mtip_tx_comp_cb(void* work_ptr)
           else
           {
               // there is a timestamp available
-              mtip_ptp_tx_ts_list_pop(link_index, &nanosecs);
+              mtip_ptp_tx_ts_list_pop(link_index, &timestamp_secs, &timestamp_nsecs);
 
               // set the timestamp of the skb
-              mtip_ptp_set_tx_timestamp(skb, nanosecs);
+              mtip_ptp_set_tx_timestamp(skb, timestamp_secs, timestamp_nsecs);
 
               free_skb = true;
           }
@@ -821,6 +823,7 @@ static int mtip_change_mtu(struct net_device *netdev, int new_mtu)
    spinlock_t *lock;
    u32 link_index;
    int mplane_mtu;
+   int mtu_overhead = ETH_HLEN + ETH_FCS_LEN + VLAN_HLEN;
    
    priv = (struct mtip_netdev_priv*)netdev_priv(netdev);
    lock = &(priv->lock);
@@ -847,7 +850,7 @@ static int mtip_change_mtu(struct net_device *netdev, int new_mtu)
    spin_unlock_irqrestore(lock, flags);
 
    // set the frame length in the hardware
-   mtip_mac_set_frame_length(priv, new_mtu);
+   mtip_mac_set_frame_length(priv, new_mtu + mtu_overhead);
 
    /* Send update to clients */
    post_mtip_client_send_event(ETH_ECPRISS_EVENT_UP, link_index);
@@ -931,11 +934,6 @@ static int mtip_open(struct net_device *netdev)
        */
       netif_start_queue(netdev);
    }
-
-   /*
-    * set the ethtool ops
-    */
-   mtip_ethtool_set_ops(netdev);
 
    /* 
     * set the link state to OPEN * 
@@ -1153,6 +1151,11 @@ void mtip_netdevice_init(struct net_device *dev)
 
    // initialize the lock
    spin_lock_init(&priv->lock);
+
+   /*
+    * set the ethtool ops
+    */
+   mtip_ethtool_set_ops(dev);
 }
 
 enum mtip_link_state_enum mtip_get_link_state_by_device(u32 port_device_index, u32 link_device_index)
@@ -1168,4 +1171,72 @@ enum mtip_link_state_enum mtip_get_link_state_by_device(u32 port_device_index, u
     else {
         return platform_driver_priv->mtip_links[link_index]->state;
     }
+}
+
+int mtip_netdev_set_port_config(struct net_device *netdev)
+{
+    struct mtip_netdev_priv *priv;
+    u32 link_index;
+    u32 pflags;
+    u32 port_device_index;
+    u32 link_device_index;
+    enum mtip_port_config_enum port_config = MTIP_PORT_CONFIG_4x25GBASE_R;
+    u32 pattern = 0x01;
+    struct mtip_link_device_info* link_device;
+
+    priv = netdev_priv(netdev);
+    link_index = priv->link_index;
+    pflags = priv->priv_flags;
+
+    mtip_lookup_device_by_link_index(link_index, &port_device_index, &link_device_index);
+
+    link_device = &platform_driver_priv->devices.port_devices[port_device_index].link_devices[link_device_index];
+
+    // set port config based on pflags
+    if ((pflags & (pattern << MTIP_PORT_CONFIG_4x10GBASE_R)) != 0)
+    {
+        port_config = MTIP_PORT_CONFIG_4x10GBASE_R;
+
+        // also set the lane speed
+        link_device->lane_speed = PHY_LANE_SPEED_10G;
+    }
+
+    if ((pflags & (pattern << MTIP_PORT_CONFIG_4x10GBASE_R_FEC)) != 0)
+    {
+        port_config = MTIP_PORT_CONFIG_4x10GBASE_R_FEC;
+
+        // also set the lane speed
+        link_device->lane_speed = PHY_LANE_SPEED_10G;
+    }
+
+    if ((pflags & (pattern << MTIP_PORT_CONFIG_4x25GBASE_R)) != 0)
+    {
+        port_config = MTIP_PORT_CONFIG_4x25GBASE_R;
+
+        // also set the lane speed
+        link_device->lane_speed = PHY_LANE_SPEED_25G;
+    }
+
+    if ((pflags & (pattern << MTIP_PORT_CONFIG_4x25GBASE_R_FEC)) != 0)
+    {
+        port_config = MTIP_PORT_CONFIG_4x25GBASE_R_FEC;
+
+        // also set the lane speed
+        link_device->lane_speed = PHY_LANE_SPEED_25G;
+    }
+
+    if ((pflags & (pattern << MTIP_PORT_CONFIG_4x25GBASE_R_RSFEC)) != 0)
+    {
+        port_config = MTIP_PORT_CONFIG_4x25GBASE_R_RSFEC;
+    }
+
+    CSMLOGINFO("Setting the port config of link index %d to %d", link_index, port_config);
+
+    // set the port config based on pflags TBD
+    platform_driver_priv->devices.port_devices[port_device_index].port_config = port_config;
+
+    // setup ethernet based on the updated port config
+    mtip_platform_setup_ethernet();
+
+    return 0;
 }

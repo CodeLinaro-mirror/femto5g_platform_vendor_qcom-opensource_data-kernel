@@ -274,6 +274,22 @@ static int mtip_clocks_setup_dbg_clocks(void)
     {
         CSMLOGERR("Failed to vote ECPRI_CC_MSS_EMAC_CLK\n");
     }
+    else
+    {
+        clk_set_rate(pclk, MTIP_ECPRI_MSS_EMAC_REF_CLK_MAX_NOM);
+    }
+    platform_driver_priv->clocks.ecpricc_dbg_clocks[index] = pclk;
+    ++index;
+
+    ret = mtip_clocks_enable_clock(dev, "ECPRI_CC_ETH_DBG_NOC_AXI_CLK", &pclk);
+    if (ret)
+    {
+        CSMLOGERR("Failed to vote ECPRI_CC_ETH_DBG_NOC_AXI_CLK\n");
+    }
+    else
+    {
+        clk_set_rate(pclk, MTIP_ECPRI_ETH_DBG_NOC_REF_CLK_MAX_NOM);
+    }
     platform_driver_priv->clocks.ecpricc_dbg_clocks[index] = pclk;
     ++index;
 

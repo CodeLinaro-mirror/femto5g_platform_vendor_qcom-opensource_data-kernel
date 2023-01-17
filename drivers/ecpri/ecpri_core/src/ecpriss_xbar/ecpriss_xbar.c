@@ -8,7 +8,7 @@
 #define ENABLE_BIT 1
 #define DISABLE_BIT 0
 
-void ecpriss_xbar_config_sats(void){
+void ecpriss_xbar_config_stats_update(void){
 	uint64_t val=0;
 	int fh_index;
 	int pcid_index;
@@ -67,10 +67,11 @@ void ecpriss_xbar_config_sats(void){
 	}
 }
 
-void ecpriss_xbar_print_stats(void)
+void ecpriss_xbar_stats_update(void)
 {
 	uint64_t val=0;
 	int link_index;
+	uint64_t curr_wm_index = 0;
 
 	ecpri_xbar_hwio_def_ecpri_xbar_xbar_dbg_ocrx_fh_buff_watermark_s xbar_ocrx_fh_buff_watermark;
 	ecpri_xbar_hwio_def_ecpri_xbar_xbar_dbg_ocrx_0_1_buff_watermark_s xbar_dbg_ocrx_0_1_buff_watermark;
@@ -80,85 +81,88 @@ void ecpriss_xbar_print_stats(void)
 	ecpri_xbar_hwio_def_ecpri_xbar_xbar_dbg_fhrx_unknown_pcid_cnt_s xbar_dbg_fhrx_unknown_pcid_cnt;
 	ecpri_xbar_hwio_def_ecpri_xbar_xbar_dbg_ocrx_unknown_pcid_cnt_s xbar_dbg_ocrx_unknown_pcid_cnt;
 
+	curr_wm_index = ecpriss_pdata->xbar_ctx->stats.curr_wm_index % MAX_XBAR_WM_ENTRY;
+	ecpriss_pdata->xbar_ctx->stats.curr_wm_index++ ;
+
 	for(link_index=0;link_index<TOTAL_LINKS;link_index++) {
 		val = ecpriss_xbar_hal_read_reg_n(ECPRISS_XBAR_GLOBAL,ECPRI_XBAR_XBAR_DBG_FHRX_PKT_CNT_n,link_index);
-		ecpriss_pdata->xbar_ctx->stats.xbar_fhrx_pkt_cnt[link_index] = val;
-		pr_info("ECPRI_XBAR_XBAR_DBG_FHRX_PKT_CNT_n val = %d link_index = %d\n",val,link_index);
+		ecpriss_pdata->xbar_ctx->stats.xbar_fhrx_pkt_cnt[link_index] += val;
+		pr_debug("ECPRI_XBAR_XBAR_DBG_FHRX_PKT_CNT_n val = %d link_index = %d\n",val,link_index);
 
 		val = ecpriss_xbar_hal_read_reg_n(ECPRISS_XBAR_GLOBAL,ECPRI_XBAR_XBAR_DBG_FHTX_PKT_CNT_n,link_index);
-		pr_info("ECPRI_XBAR_XBAR_DBG_FHTX_PKT_CNT_n val = %d link_index = %d\n",val,link_index);
-		ecpriss_pdata->xbar_ctx->stats.xbar_fhtx_pkt_cnt[link_index] = val;
+		pr_debug("ECPRI_XBAR_XBAR_DBG_FHTX_PKT_CNT_n val = %d link_index = %d\n",val,link_index);
+		ecpriss_pdata->xbar_ctx->stats.xbar_fhtx_pkt_cnt[link_index] += val;
 
 		val = ecpriss_xbar_hal_read_reg(ECPRISS_XBAR_GLOBAL,ECPRI_XBAR_XBAR_DBG_C2CRX_PKT_CNT_n);
-		pr_info("ECPRI_XBAR_XBAR_DBG_C2CRX_PKT_CNT_n val = %d link_index = %d\n",val,link_index);
-		ecpriss_pdata->xbar_ctx->stats.xbar_c2crx_pkt_cnt[link_index] = val;
+		pr_debug("ECPRI_XBAR_XBAR_DBG_C2CRX_PKT_CNT_n val = %d link_index = %d\n",val,link_index);
+		ecpriss_pdata->xbar_ctx->stats.xbar_c2crx_pkt_cnt[link_index] += val;
 
 		val = ecpriss_xbar_hal_read_reg_n(ECPRISS_XBAR_GLOBAL,ECPRI_XBAR_XBAR_DBG_C2CTX_PKT_CNT_n,link_index);
-		pr_info("ECPRI_XBAR_XBAR_DBG_C2CTX_PKT_CNT_n val = %d link_index = %d\n",val,link_index);
-		ecpriss_pdata->xbar_ctx->stats.xbar_c2ctx_pkt_cnt[link_index] = val;
+		pr_debug("ECPRI_XBAR_XBAR_DBG_C2CTX_PKT_CNT_n val = %d link_index = %d\n",val,link_index);
+		ecpriss_pdata->xbar_ctx->stats.xbar_c2ctx_pkt_cnt[link_index] += val;
 
 		val = ecpriss_xbar_hal_read_reg_n(ECPRISS_XBAR_GLOBAL,ECPRI_XBAR_XBAR_DBG_OCRX_UNKNOWN_PCID_INFO_1_n,link_index);
 		pr_debug("ECPRI_XBAR_XBAR_DBG_OCRX_UNKNOWN_PCID_INFO_1_n val = %d link_index = %d\n",val,link_index);
-		ecpriss_pdata->xbar_ctx->stats.ocrx_unknown_pcid_info_1_n[link_index] = val;
+		ecpriss_pdata->xbar_ctx->stats.ocrx_unknown_pcid_info_1_n[link_index] += val;
 
 		val = ecpriss_xbar_hal_read_reg_n(ECPRISS_XBAR_GLOBAL,ECPRI_XBAR_XBAR_DBG_OCRX_UNKNOWN_PCID_INFO_2_n,link_index);
 		pr_debug("ECPRI_XBAR_XBAR_DBG_OCRX_UNKNOWN_PCID_INFO_2_n val = %d link_index = %d\n",val,link_index);
-		ecpriss_pdata->xbar_ctx->stats.ocrx_unknown_pcid_info_2_n[link_index] = val;
+		ecpriss_pdata->xbar_ctx->stats.ocrx_unknown_pcid_info_2_n[link_index] += val;
 
 		val = ecpriss_xbar_hal_read_reg_n(ECPRISS_XBAR_GLOBAL,ECPRI_XBAR_XBAR_DBG_FHRX_UNKNOWN_PCID_INFO_1_n,link_index);
 		pr_debug("ECPRI_XBAR_XBAR_DBG_FHRX_UNKNOWN_PCID_INFO_1_n val = %d link_index = %d\n",val,link_index);
-		ecpriss_pdata->xbar_ctx->stats.fhrx_unknown_pcid_info_1_n[link_index] = val;
+		ecpriss_pdata->xbar_ctx->stats.fhrx_unknown_pcid_info_1_n[link_index] += val;
 
 		val = ecpriss_xbar_hal_read_reg_n(ECPRISS_XBAR_GLOBAL,ECPRI_XBAR_XBAR_DBG_FHRX_UNKNOWN_PCID_INFO_2_n,link_index);
 		pr_debug("ECPRI_XBAR_XBAR_DBG_FHRX_UNKNOWN_PCID_INFO_2_n val = %d link_index = %d\n",val,link_index);
-		ecpriss_pdata->xbar_ctx->stats.fhrx_unknown_pcid_info_2_n[link_index] = val;
+		ecpriss_pdata->xbar_ctx->stats.fhrx_unknown_pcid_info_2_n[link_index] += val;
 
 	}
 	for(link_index=0; link_index < XBAR_LINKS; link_index++) {
 
 		val = ecpriss_xbar_hal_read_reg_n(ECPRISS_XBAR_GLOBAL, ECPRI_XBAR_XBAR_DBG_OCTX_PKT_CNT_n,link_index);
-		ecpriss_pdata->xbar_ctx->stats.xbar_octx_pkt_cnt[link_index] = val;
-		pr_info("ECPRI_XBAR_XBAR_DBG_OCTX_PKT_CNT_n val = %d link_index = %d\n",val,link_index);
+		ecpriss_pdata->xbar_ctx->stats.xbar_octx_pkt_cnt[link_index] += val;
+		pr_debug("ECPRI_XBAR_XBAR_DBG_OCTX_PKT_CNT_n val = %d link_index = %d\n",val,link_index);
 
 		val = ecpriss_xbar_hal_read_reg_n(ECPRISS_XBAR_GLOBAL, ECPRI_XBAR_XBAR_DBG_OCRX_PKT_CNT_n,link_index);
-		ecpriss_pdata->xbar_ctx->stats.xbar_ocrx_pkt_cnt[link_index] = val;
-		pr_info("ECPRI_XBAR_XBAR_DBG_OCRX_PKT_CNT_n val = %d link_index = %d\n",val,link_index);
+		ecpriss_pdata->xbar_ctx->stats.xbar_ocrx_pkt_cnt[link_index] += val;
+		pr_debug("ECPRI_XBAR_XBAR_DBG_OCRX_PKT_CNT_n val = %d link_index = %d\n",val,link_index);
 
 	}
 
 	val = ecpriss_xbar_hal_read_reg(ECPRISS_XBAR_GLOBAL,ECPRI_XBAR_XBAR_DBG_FHRX_DMA_PKT_CNT);
-	pr_info("ECPRI_XBAR_XBAR_DBG_FHRX_DMA_PKT_CNT val = %d\n",val);
-	ecpriss_pdata->xbar_ctx->stats.xbar_fhrx_dma_pkt_cnt = val;
+	pr_debug("ECPRI_XBAR_XBAR_DBG_FHRX_DMA_PKT_CNT val = %d\n",val);
+	ecpriss_pdata->xbar_ctx->stats.xbar_fhrx_dma_pkt_cnt += val;
 
 	val = ecpriss_xbar_hal_read_reg(ECPRISS_XBAR_GLOBAL,ECPRI_XBAR_XBAR_DBG_FHRX_UC_PKT_CNT);
-	pr_info("ECPRI_XBAR_XBAR_DBG_FHRX_UC_PKT_CNT val = %d\n",val);
-	ecpriss_pdata->xbar_ctx->stats.xbar_fhrx_uc_pkt_cnt = val;
+	pr_debug("ECPRI_XBAR_XBAR_DBG_FHRX_UC_PKT_CNT val = %d\n",val);
+	ecpriss_pdata->xbar_ctx->stats.xbar_fhrx_uc_pkt_cnt += val;
 
 	val = ecpriss_xbar_hal_read_reg(ECPRISS_XBAR_GLOBAL,ECPRI_XBAR_XBAR_DBG_FHRX_UC_ERR_PKT_CNT);
-	pr_info("ECPRI_XBAR_XBAR_DBG_FHRX_UC_ERR_PKT_CNT val = %d\n",val);
-	ecpriss_pdata->xbar_ctx->stats.xbar_fhrx_uc_err_pkt_cnt = val;
+	pr_debug("ECPRI_XBAR_XBAR_DBG_FHRX_UC_ERR_PKT_CNT val = %d\n",val);
+	ecpriss_pdata->xbar_ctx->stats.xbar_fhrx_uc_err_pkt_cnt += val;
 
 	val = ecpriss_xbar_hal_read_reg(ECPRISS_XBAR_GLOBAL,ECPRI_XBAR_XBAR_DBG_FHRX_ERR_PKT_CNT);
-	pr_info("ECPRI_XBAR_XBAR_DBG_FHRX_ERR_PKT_CNT val = %d\n",val);
-	ecpriss_pdata->xbar_ctx->stats.xbar_fhrx_err_pkt_cnt = val;
+	pr_debug("ECPRI_XBAR_XBAR_DBG_FHRX_ERR_PKT_CNT val = %d\n",val);
+	ecpriss_pdata->xbar_ctx->stats.xbar_fhrx_err_pkt_cnt += val;
 
 
 
 	val = ecpriss_xbar_hal_read_reg(ECPRISS_XBAR_GLOBAL,ECPRI_XBAR_XBAR_DBG_FHTX_C2C_PKT_OVF_CNT);
-	pr_info("ECPRI_XBAR_XBAR_DBG_FHTX_C2C_PKT_OVF_CNT val = %d\n",val);
-	ecpriss_pdata->xbar_ctx->stats.xbar_fhtx_c2c_pkt_ovf_cnt = val;
+	pr_debug("ECPRI_XBAR_XBAR_DBG_FHTX_C2C_PKT_OVF_CNT val = %d\n",val);
+	ecpriss_pdata->xbar_ctx->stats.xbar_fhtx_c2c_pkt_ovf_cnt += val;
 
 	val = ecpriss_xbar_hal_read_reg(ECPRISS_XBAR_GLOBAL,ECPRI_XBAR_XBAR_DBG_FHTX_DMA_PKT_CNT);
-	pr_info("	ECPRI_XBAR_XBAR_DBG_FHTX_DMA_PKT_CNT val = %d\n",val);
-	ecpriss_pdata->xbar_ctx->stats.xbar_fhtx_dma_pkt_cnt = val;
+	pr_debug("ECPRI_XBAR_XBAR_DBG_FHTX_DMA_PKT_CNT val = %d\n",val);
+	ecpriss_pdata->xbar_ctx->stats.xbar_fhtx_dma_pkt_cnt += val;
 
 	val = ecpriss_xbar_hal_read_reg(ECPRISS_XBAR_GLOBAL,ECPRI_XBAR_XBAR_DBG_C2CRX_DMA_PKT_CNT);
-	pr_info("ECPRI_XBAR_XBAR_DBG_C2CRX_DMA_PKT_CNT val = %d\n",val);
-	ecpriss_pdata->xbar_ctx->stats.xbar_c2crx_dma_pkt_cnt = val;
+	pr_debug("ECPRI_XBAR_XBAR_DBG_C2CRX_DMA_PKT_CNT val = %d\n",val);
+	ecpriss_pdata->xbar_ctx->stats.xbar_c2crx_dma_pkt_cnt += val;
 
 	val = ecpriss_xbar_hal_read_reg(ECPRISS_XBAR_GLOBAL,ECPRI_XBAR_XBAR_DBG_C2CRX_ERR_PKT_CNT);
-	pr_info("ECPRI_XBAR_XBAR_DBG_C2CRX_ERR_PKT_CNT val = %d\n",val);
-	ecpriss_pdata->xbar_ctx->stats.xbar_c2crx_err_pkt_cnt = val;
+	pr_debug("ECPRI_XBAR_XBAR_DBG_C2CRX_ERR_PKT_CNT val = %d\n",val);
+	ecpriss_pdata->xbar_ctx->stats.xbar_c2crx_err_pkt_cnt += val;
 
 
 
@@ -169,6 +173,11 @@ void ecpriss_xbar_print_stats(void)
 	ecpriss_pdata->xbar_ctx->stats.xbar_ocrx_fh_buff_watermark_fh1 = xbar_ocrx_fh_buff_watermark.fh1;
 	ecpriss_pdata->xbar_ctx->stats.xbar_ocrx_fh_buff_watermark_fh2 = xbar_ocrx_fh_buff_watermark.fh2;
 
+	ecpriss_pdata->xbar_ctx->stats.ocrx_fh_wm_fh0[curr_wm_index] = xbar_ocrx_fh_buff_watermark.fh0;
+	ecpriss_pdata->xbar_ctx->stats.ocrx_fh_wm_fh1[curr_wm_index] = xbar_ocrx_fh_buff_watermark.fh1;
+	ecpriss_pdata->xbar_ctx->stats.ocrx_fh_wm_fh2[curr_wm_index] = xbar_ocrx_fh_buff_watermark.fh2;
+
+
 	pr_debug("ECPRI_XBAR_XBAR_DBG_FHTX_UC_PKT_CNT val = %u\n",
 			xbar_ocrx_fh_buff_watermark);
 
@@ -177,6 +186,9 @@ void ecpriss_xbar_print_stats(void)
 			0, &xbar_dbg_ocrx_0_1_buff_watermark);
 	ecpriss_pdata->xbar_ctx->stats.xbar_dbg_ocrx_0_1_buff_watermark_cc0 = xbar_dbg_ocrx_0_1_buff_watermark.cc0;
 	ecpriss_pdata->xbar_ctx->stats.xbar_dbg_ocrx_0_1_buff_watermark_cc1 = xbar_dbg_ocrx_0_1_buff_watermark.cc1;
+
+	ecpriss_pdata->xbar_ctx->stats.ocrx_0_1_wm_cc0[curr_wm_index] = xbar_dbg_ocrx_0_1_buff_watermark.cc0;
+	ecpriss_pdata->xbar_ctx->stats.ocrx_0_1_wm_cc1[curr_wm_index] = xbar_dbg_ocrx_0_1_buff_watermark.cc1;
 
 	pr_debug("ECPRI_XBAR_XBAR_DBG_OCRX_0_1_BUFF_WATERMARK val = %u\n",
 			xbar_dbg_ocrx_0_1_buff_watermark);
@@ -187,6 +199,10 @@ void ecpriss_xbar_print_stats(void)
 	ecpriss_pdata->xbar_ctx->stats.xbar_dbg_ocrx_2_3_buff_watermark_cc2 = xbar_dbg_ocrx_2_3_buff_watermark.cc2;
 	ecpriss_pdata->xbar_ctx->stats.xbar_dbg_ocrx_2_3_buff_watermark_cc3 = xbar_dbg_ocrx_2_3_buff_watermark.cc3;
 
+	ecpriss_pdata->xbar_ctx->stats.ocrx_2_3_wm_cc2[curr_wm_index] = xbar_dbg_ocrx_2_3_buff_watermark.cc2;
+	ecpriss_pdata->xbar_ctx->stats.ocrx_2_3_wm_cc3[curr_wm_index] = xbar_dbg_ocrx_2_3_buff_watermark.cc3;
+
+
 	pr_debug("ECPRI_XBAR_XBAR_DBG_OCRX_2_3_BUFF_WATERMARK, val = %u\n",
 			xbar_dbg_ocrx_2_3_buff_watermark);
 
@@ -196,6 +212,10 @@ void ecpriss_xbar_print_stats(void)
 	ecpriss_pdata->xbar_ctx->stats.octx_oc_0_1_buff_watermark_cc0 = octx_oc_0_1_buff_watermark.cc0;
 	ecpriss_pdata->xbar_ctx->stats.octx_oc_0_1_buff_watermark_cc1 = octx_oc_0_1_buff_watermark.cc1;
 
+	ecpriss_pdata->xbar_ctx->stats.octx_0_1_wm_cc0[curr_wm_index] = octx_oc_0_1_buff_watermark.cc0;
+	ecpriss_pdata->xbar_ctx->stats.octx_0_1_wm_cc1[curr_wm_index] = octx_oc_0_1_buff_watermark.cc1;
+
+
 	pr_debug("ECPRI_XBAR_XBAR_DBG_OCTX_OC_0_1_BUFF_WATERMARK, val = %u\n",
 			octx_oc_0_1_buff_watermark);
 
@@ -204,6 +224,10 @@ void ecpriss_xbar_print_stats(void)
 			0, &octx_oc_2_3_buff_watermark);
 	ecpriss_pdata->xbar_ctx->stats.octx_oc_2_3_buff_watermark_cc2 = octx_oc_2_3_buff_watermark.cc2;
 	ecpriss_pdata->xbar_ctx->stats.octx_oc_2_3_buff_watermark_cc3 = octx_oc_2_3_buff_watermark.cc3;
+
+	ecpriss_pdata->xbar_ctx->stats.octx_2_3_wm_cc2[curr_wm_index] = octx_oc_2_3_buff_watermark.cc2;
+	ecpriss_pdata->xbar_ctx->stats.octx_2_3_wm_cc3[curr_wm_index] = octx_oc_2_3_buff_watermark.cc3;
+
 
 	pr_debug("ECPRI_XBAR_XBAR_DBG_OCTX_OC_2_3_BUFF_WATERMARK, val = %u\n",
 			octx_oc_2_3_buff_watermark);
@@ -536,7 +560,7 @@ static irqreturn_t ecpriss_xbar_isr(int irq, void *ctxt)
 static int ecpriss_xbar_register_interrupts(struct device *dev)
 {
 	int res = 0;
-	int xbar_irq_mapping =  EXPRISS_XBAR_IRQ_MAPPING;
+	int xbar_irq_mapping = 0;
 	struct platform_device *pdev = NULL;
 
 	do{
@@ -560,8 +584,8 @@ static int ecpriss_xbar_register_interrupts(struct device *dev)
 					xbar_irq_mapping, res);
 			goto err;
 		}
-		pr_info("XBAR interrupt id %d registered with ecpriss_irq_init Interrupt Registration Success %d\n",
-				EXPRISS_XBAR_IRQ_MAPPING,xbar_irq_mapping);
+		pr_info("XBAR interrupt id %d registered with ecpriss_irq_init Interrupt Registration Success\n",
+				xbar_irq_mapping);
 
 	}while(0);
 
@@ -599,7 +623,7 @@ static void ecpriss_xbar_enable_stats(void)
 	xbar_cfg.c2crx_cnt_en = ENABLE_BIT;
 	xbar_cfg.c2ctx_cnt_en = ENABLE_BIT;
 	xbar_cfg.xbar_cnt_en = ENABLE_BIT;
-	xbar_cfg.xbar_cnt_clr_en = DISABLE_BIT;
+	xbar_cfg.xbar_cnt_clr_en = ENABLE_BIT;
 	xbar_cfg.tpdm_en = ENABLE_BIT;
 	xbar_cfg.axis_arb_fix_en = ENABLE_BIT;
 
