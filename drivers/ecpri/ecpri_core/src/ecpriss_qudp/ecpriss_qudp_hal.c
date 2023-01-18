@@ -23,6 +23,7 @@
 
 
 #include "ecpriss_qudp_hal.h"
+#include "ecpriss_log.h"
 
 ecpriss_qudp_hal_context_s  ecpriss_qudp_hal_ctx;
 static const char *ecpriss_qudp_hal_reg_name_to_str[ECPRISS_QUDP_REG_MAX] = {
@@ -2813,7 +2814,7 @@ static struct ecpriss_qudp_hal_reg_obj ecpriss_qudp_hal_reg_objs[ECPRISS_HW_MAX]
 const char *ecpriss_qudp_hal_reg_name_str(ecpriss_qudp_hal_reg_name_e reg_name)
 {
 	if (reg_name < 0 || reg_name >= ECPRISS_QUDP_REG_MAX) {
-		pr_err("requested name of invalid reg=%d\n", reg_name);
+		ECPRILOGERR("requested name of invalid reg=%d\n", reg_name);
 		return "Invalid Register";
 	}
 	return ecpriss_qudp_hal_reg_name_to_str[reg_name];
@@ -2833,11 +2834,11 @@ int ecpriss_qudp_global_hal_reg_init(struct device *dev)
 		ecpriss_qudp_hal_ctx.ecpriss_dev = dev;
 		ecpriss_qudp_hal_ctx.qudp_global_phy_base = ECPRISS_QUDP_GLOBAL_REG_BASE;
 
-		pr_info("Mapping  QUDP global HAL reg space : 0x%x\n", ecpriss_qudp_hal_ctx.qudp_global_phy_base);
+		ECPRILOGINFO("Mapping  QUDP global HAL reg space : 0x%x\n", ecpriss_qudp_hal_ctx.qudp_global_phy_base);
 		ecpriss_qudp_hal_ctx.global_base = ioremap(ecpriss_qudp_hal_ctx.qudp_global_phy_base,
 				ECPRISS_QUDP_GLOBAL_REG_SIZE);
 		if (!ecpriss_qudp_hal_ctx.global_base) {
-			pr_err(":ecpriss_global_base ioremap err\n");
+			ECPRILOGERR(":ecpriss_global_base ioremap err\n");
 			result = -EFAULT;
 			break;
 		}
@@ -2855,11 +2856,11 @@ int ecpriss_qudp_fh_hal_reg_init(struct device *dev)
 	{
 		ecpriss_qudp_hal_ctx.qudp_fh_phy_base = ECPRISS_FH_QUDP_REG_BASE;
 
-		pr_err("Mapping  QUDP FH HAL reg space : 0x%x\n", ecpriss_qudp_hal_ctx.qudp_global_phy_base);
+		ECPRILOGINFO("Mapping  QUDP FH HAL reg space : 0x%x\n", ecpriss_qudp_hal_ctx.qudp_global_phy_base);
 		ecpriss_qudp_hal_ctx.fh_base = ioremap(ecpriss_qudp_hal_ctx.qudp_fh_phy_base,
 				ECPRISS_QUDP_FH_REG_SIZE);
 		if (!ecpriss_qudp_hal_ctx.fh_base) {
-			pr_err(":ecpriss_qudp_fh_base ioremap err\n");
+			ECPRILOGERR(":ecpriss_qudp_fh_base ioremap err\n");
 			result = -EFAULT;
 			break;
 		}
@@ -2871,7 +2872,7 @@ int ecpriss_qudp_fh_hal_reg_init(struct device *dev)
 		ecpriss_qudp_hal_ctx.fh_filter_base = ioremap(ecpriss_qudp_hal_ctx.qudp_fh_phy_filter_base,
 				ECPRISS_QUDP_FH_FILTER_REG_SIZE);
 		if (!ecpriss_qudp_hal_ctx.fh_filter_base) {
-			pr_err(":ecpriss_qudp_fh_base filter ioremap err\n");
+			ECPRILOGERR(":ecpriss_qudp_fh_base filter ioremap err\n");
 			result = -EFAULT;
 			break;
 		}
@@ -2882,7 +2883,7 @@ int ecpriss_qudp_fh_hal_reg_init(struct device *dev)
 		ecpriss_qudp_hal_ctx.fh_rams_base = ioremap(ecpriss_qudp_hal_ctx.qudp_fh_phy_rams_base,
 				ECPRISS_QUDP_FH_RAMS_REG_SIZE);
 		if (!ecpriss_qudp_hal_ctx.qudp_fh_phy_rams_base) {
-			pr_err(":ecpriss_qudp_fh_base filter ioremap err\n");
+			ECPRILOGERR(":ecpriss_qudp_fh_base filter ioremap err\n");
 			result = -EFAULT;
 			break;
 		}
@@ -2906,7 +2907,7 @@ int ecpriss_qudp_c2c_hal_reg_init(struct device *dev)
 		ecpriss_qudp_hal_ctx.c2c_base = ioremap(ecpriss_qudp_hal_ctx.qudp_c2c_phy_base,
 				ECPRISS_QUDP_C2C_REG_SIZE);
 		if (!ecpriss_qudp_hal_ctx.c2c_base) {
-			pr_err(":ecpriss_xbar_base ioremap err\n");
+			ECPRILOGERR(":ecpriss_xbar_base ioremap err\n");
 			result = -EFAULT;
 			break;
 		}
@@ -2925,11 +2926,11 @@ int ecpriss_qudp_l2_hal_reg_init(struct device *dev)
 	{
 		ecpriss_qudp_hal_ctx.qudp_l2_phy_base = ECPRISS_QUDP_L2_REG_BASE;
 
-		pr_debug("Mapping QUDP L2 HAL reg space : 0x%x\n", ecpriss_qudp_hal_ctx.qudp_l2_phy_base);
+		ECPRILOGINFO("Mapping QUDP L2 HAL reg space : 0x%x\n", ecpriss_qudp_hal_ctx.qudp_l2_phy_base);
 		ecpriss_qudp_hal_ctx.l2_base = ioremap(ecpriss_qudp_hal_ctx.qudp_l2_phy_base,
 				ECPRISS_QUDP_L2_REG_SIZE);
 		if (!ecpriss_qudp_hal_ctx.l2_base) {
-			pr_err(":ecpriss_xbar_base ioremap err\n");
+			ECPRILOGERR(":ecpriss_xbar_base ioremap err\n");
 			result = -EFAULT;
 			break;
 		}
@@ -3004,17 +3005,17 @@ uint32_t ecpriss_qudp_hal_read_reg_n(ecpriss_qudp_hal_reg_type_e  reg_type,
 	uint32_t offset;
 
 	if (reg >= ECPRISS_QUDP_REG_MAX) {
-		pr_err("Invalid register reg=%u\n", reg);
+		ECPRILOGERR("Invalid register reg=%u\n", reg);
 		WARN_ON(1);
 		return -EINVAL;
 	}
 
-	pr_debug("read from %s n=%u\n",
+	ECPRILOGDBG("read from %s n=%u\n",
 			ecpriss_qudp_hal_reg_name_str(reg), n);
 
 	offset = ecpriss_qudp_hal_reg_objs[ecpriss_qudp_hal_ctx.hw_type][reg].offset;
 	if (offset == -1) {
-		pr_err("Read access to obsolete reg=%s\n",
+		ECPRILOGERR("Read access to obsolete reg=%s\n",
 				ecpriss_qudp_hal_reg_name_str(reg));
 		WARN_ON(1);
 		return -EPERM;
@@ -3036,16 +3037,16 @@ uint32_t ecpriss_qudp_hal_read_reg_mn(ecpriss_qudp_hal_reg_type_e  reg_type,
 	uint32_t offset;
 
 	if (reg >= ECPRISS_QUDP_REG_MAX) {
-		pr_err("Invalid register reg=%u\n", reg);
+		ECPRILOGERR("Invalid register reg=%u\n", reg);
 		WARN_ON(1);
 		return -EINVAL;
 	}
 
-	pr_debug("read %s m=%u n=%u\n",
+	ECPRILOGDBG("read %s m=%u n=%u\n",
 			ecpriss_qudp_hal_reg_name_str(reg), m, n);
 	offset = ecpriss_qudp_hal_reg_objs[ecpriss_qudp_hal_ctx.hw_type][reg].offset;
 	if (offset == -1) {
-		pr_err("Read access to obsolete reg=%s\n",
+		ECPRILOGERR("Read access to obsolete reg=%s\n",
 				ecpriss_qudp_hal_reg_name_str(reg));
 		WARN_ON_ONCE(1);
 		return -EPERM;
@@ -3070,12 +3071,12 @@ void ecpriss_qudp_hal_write_reg_mn(ecpriss_qudp_hal_reg_type_e  reg_type,
 	uint32_t offset;
 
 	if (reg >= ECPRISS_QUDP_REG_MAX) {
-		pr_err("Invalid register reg=%u\n", reg);
+		ECPRILOGERR("Invalid register reg=%u\n", reg);
 		WARN_ON(1);
 		return;
 	}
 
-	pr_debug("write to %s m=%u n=%u val=%u\n",
+	ECPRILOGDBG("write to %s m=%u n=%u val=%u\n",
 			ecpriss_qudp_hal_reg_name_str(reg), m, n, val);
 	offset = ecpriss_qudp_hal_reg_objs[ecpriss_qudp_hal_ctx.hw_type][reg].offset;
 
@@ -3083,7 +3084,7 @@ void ecpriss_qudp_hal_write_reg_mn(ecpriss_qudp_hal_reg_type_e  reg_type,
 
 
 	if (offset == -1) {
-		pr_err("Write access to obsolete reg=%s\n",
+		ECPRILOGERR("Write access to obsolete reg=%s\n",
 				ecpriss_qudp_hal_reg_name_str(reg));
 		WARN_ON(1);
 		return;
@@ -3109,17 +3110,17 @@ void ecpriss_qudp_hal_write_reg_mn_fields(ecpriss_qudp_hal_reg_type_e  reg_type,
 	uint32_t offset;
 
 	if (reg >= ECPRISS_QUDP_REG_MAX) {
-		pr_err("Invalid register reg=%u\n", reg);
+		ECPRILOGERR("Invalid register reg=%u\n", reg);
 		WARN_ON(1);
 		return;
 	}
 
-	pr_debug("write to %s m=%u n=%u val=%u\n",
+	ECPRILOGDBG("write to %s m=%u n=%u val=%u\n",
 			ecpriss_qudp_hal_reg_name_str(reg), m, n, val);
 	offset = ecpriss_qudp_hal_reg_objs[ecpriss_qudp_hal_ctx.hw_type][reg].offset;
 
 	if (offset == -1) {
-		pr_err("Write access to obsolete reg=%s\n",
+		ECPRILOGERR("Write access to obsolete reg=%s\n",
 				ecpriss_qudp_hal_reg_name_str(reg));
 		WARN_ON(1);
 		return;
@@ -3144,22 +3145,22 @@ uint32_t ecpriss_qudp_hal_read_reg_mn_fields(ecpriss_qudp_hal_reg_type_e  reg_ty
 	uint32_t offset;
 
 	if (!fields) {
-		pr_err("Input error fields\n");
+		ECPRILOGERR("Input error fields\n");
 		WARN_ON(1);
 		return -EINVAL;
 	}
 
 	if (reg >= ECPRISS_QUDP_REG_MAX) {
-		pr_err("Invalid register reg=%u\n", reg);
+		ECPRILOGERR("Invalid register reg=%u\n", reg);
 		WARN_ON(1);
 		return -EINVAL;
 	}
 
-	pr_debug("read from %s n=%u and parse it\n",
+	ECPRILOGDBG("read from %s n=%u and parse it\n",
 			ecpriss_qudp_hal_reg_name_str(reg), n);
 	offset = ecpriss_qudp_hal_reg_objs[ecpriss_qudp_hal_ctx.hw_type][reg].offset;
 	if (offset == -1) {
-		pr_err("Read access to obsolete reg=%s\n",
+		ECPRILOGERR("Read access to obsolete reg=%s\n",
 				ecpriss_qudp_hal_reg_name_str(reg));
 		WARN_ON(1);
 		return -EPERM;
@@ -3184,21 +3185,21 @@ uint32_t ecpriss_qudp_hal_read_reg_n_fields(ecpriss_qudp_hal_reg_type_e  reg_typ
 	uint32_t offset;
 
 	if (!fields) {
-		pr_err("Input error fields\n");
+		ECPRILOGERR("Input error fields\n");
 		WARN_ON(1);
 		return -EINVAL;
 	}
 
 	if (reg >= ECPRISS_QUDP_REG_MAX) {
-		pr_err("Invalid register reg=%u\n", reg);
+		ECPRILOGERR("Invalid register reg=%u\n", reg);
 		WARN_ON(1);
 		return -EINVAL;
 	}
 
-	pr_debug("read from %s \n", ecpriss_qudp_hal_reg_name_str(reg), n);
+	ECPRILOGDBG("read from %s \n", ecpriss_qudp_hal_reg_name_str(reg), n);
 	offset = ecpriss_qudp_hal_reg_objs[ecpriss_qudp_hal_ctx.hw_type][reg].offset;
 	if (offset == -1) {
-		pr_err("Read access to obsolete reg=%s\n",
+		ECPRILOGERR("Read access to obsolete reg=%s\n",
 				ecpriss_qudp_hal_reg_name_str(reg));
 		WARN_ON(1);
 		return -EPERM;
@@ -3225,21 +3226,21 @@ void ecpriss_qudp_hal_write_reg_n_fields(ecpriss_qudp_hal_reg_type_e  reg_type,
 	uint32_t offset;
 
 	if (!fields) {
-		pr_err("Input error fields=%pK\n", fields);
+		ECPRILOGERR("Input error fields=%pK\n", fields);
 		WARN_ON(1);
 		return;
 	}
 
 	if (reg >= ECPRISS_QUDP_REG_MAX) {
-		pr_err("Invalid register reg=%u\n", reg);
+		ECPRILOGERR("Invalid register reg=%u\n", reg);
 		WARN_ON(1);
 		return;
 	}
 
-	//pr_info("write to %s \n",ecpriss_qudp_hal_reg_name_str(reg), n);
+	//ECPRILOGINFO("write to %s \n",ecpriss_qudp_hal_reg_name_str(reg), n);
 	offset = ecpriss_qudp_hal_reg_objs[ecpriss_qudp_hal_ctx.hw_type][reg].offset;
 	if (offset == -1) {
-		pr_err("Write access to obsolete reg=%s\n",
+		ECPRILOGERR("Write access to obsolete reg=%s\n",
 				ecpriss_qudp_hal_reg_name_str(reg));
 		WARN_ON(1);
 		return;
