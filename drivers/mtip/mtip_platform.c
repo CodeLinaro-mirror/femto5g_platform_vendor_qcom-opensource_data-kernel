@@ -1151,7 +1151,7 @@ static bool mtip_platform_consolidate_port_lane_config(struct mtip_port_device_i
             }
             else if (num_lanes == 2) 
             {
-                port_config = MTIP_PORT_CONFIG_1x50GBASE_R2_RSFEC;
+                port_config = MTIP_PORT_CONFIG_2x50GBASE_R2;
             }
             else
             {

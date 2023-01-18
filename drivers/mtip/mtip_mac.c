@@ -708,67 +708,171 @@ static u32 mtip_mac_wrapper_calendar_cfg_val(struct mtip_port_device_info* port_
 
 static void mtip_mac_wrapper_set_csr_cfg(struct mtip_port_device_info* port_device)
 {
-    u32 csr_cfg = MTIP_MAC_WRAPPER_CSR_CFG_REG_VAL;
+    u32 csr_cfg = MTIP_MAC_WRAPPER_CSR_CFG_REG_BASE_VAL;
     void __iomem* wrapper_base_addr = port_device->wrapper_base_addr;
     enum mtip_port_config_enum port_config = port_device->port_config;
 
     switch (port_config)
     {
     case MTIP_PORT_CONFIG_1x100GBASE_R:
+        {
+            csr_cfg |= 0x130;
+        }
+        break;
     case MTIP_PORT_CONFIG_1x100GBASE_R_RSFEC:
+        {
+            csr_cfg |= 0x130;
+        }
+        break;
     case MTIP_PORT_CONFIG_1x100GBASE_R_RSFEC_LL:
         {
-            csr_cfg = MTIP_MAC_WRAPPER_CSR_CFG_100GBASE_R_VAL;
+            csr_cfg |= 0x130;
         }
         break;
-
     case MTIP_PORT_CONFIG_1x100GBASE_R2:
+        {
+            csr_cfg |= 0x30;
+        }
+        break;
     case MTIP_PORT_CONFIG_1x100GBASE_R2_RSFEC:
+        {
+            csr_cfg |= 0x30;
+        }
+        break;
     case MTIP_PORT_CONFIG_1x50GBASE_R:
+        {
+            csr_cfg |= 0x30;
+        }
+        break;
     case MTIP_PORT_CONFIG_1x50GBASE_R_RSFEC:
+        {
+            csr_cfg |= 0x30;
+        }
+        break;
     case MTIP_PORT_CONFIG_2x50GBASE_R:
+        {
+            csr_cfg |= 0x30;
+        }
+        break;
     case MTIP_PORT_CONFIG_2x50GBASE_R_RSFEC:
+        {
+            csr_cfg |= 0x30;
+        }
+        break;
     case MTIP_PORT_CONFIG_2x50GBASE_R2:
+        {
+            csr_cfg |= 0x0;
+        }
+        break;
     case MTIP_PORT_CONFIG_2x50GBASE_R2_FEC:
+        {
+            csr_cfg |= 0x0;
+        }
+        break;
     case MTIP_PORT_CONFIG_2x50GBASE_R2_LUAI:
+        {
+            csr_cfg |= 0x0;
+        }
+        break;
     case MTIP_PORT_CONFIG_2x50GBASE_R2_LUAI_FEC:
         {
-            csr_cfg = MTIP_MAC_WRAPPER_CSR_CFG_50GBASE_R_VAL;
+            csr_cfg |= 0x0;
         }
         break;
-
     case MTIP_PORT_CONFIG_1x40GBASE_R4:
+        {
+            csr_cfg |= 0x3c000;
+        }
+        break;
     case MTIP_PORT_CONFIG_1x40GBASE_R4_FEC:
         {
-            csr_cfg = MTIP_MAC_WRAPPER_CSR_CFG_40GBASE_R_VAL;
+            csr_cfg |= 0x3c000;
         }
         break;
-
     case MTIP_PORT_CONFIG_1x10GBASE_R:
+        {
+            csr_cfg |= 0xc000;
+        }
+        break;
     case MTIP_PORT_CONFIG_1x10GBASE_R_FEC:
         {
-            csr_cfg = MTIP_MAC_WRAPPER_CSR_CFG_10GBASE_R_VAL;
+            csr_cfg |= 0xc000;
         }
         break;
-
     case MTIP_PORT_CONFIG_1x100GBASE_R4:
+        {
+            csr_cfg |= 0x0;
+        }
+        break;
     case MTIP_PORT_CONFIG_1x100GBASE_R4_RSFEC:
+        {
+            csr_cfg |= 0x0;
+        }
+        break;
     case MTIP_PORT_CONFIG_1x50GBASE_R2:
+        {
+            csr_cfg |= 0x0;
+        }
+        break;
     case MTIP_PORT_CONFIG_1x50GBASE_R2_RSFEC:
+        {
+            csr_cfg |= 0x0;
+        }
+        break;
     case MTIP_PORT_CONFIG_1x50GBASE_R2_LUAI:
+        {
+            csr_cfg |= 0x0;
+        }
+        break;
     case MTIP_PORT_CONFIG_1x50GBASE_R2_LUAI_FEC:
+        {
+            csr_cfg |= 0x0;
+        }
+        break;
     case MTIP_PORT_CONFIG_1x25GBASE_R:
+        {
+            csr_cfg |= 0x0;
+        }
+        break;
     case MTIP_PORT_CONFIG_1x25GBASE_R_FEC:
+        {
+            csr_cfg |= 0x0;
+        }
+        break;
     case MTIP_PORT_CONFIG_1x25GBASE_R_RSFEC:
+        {
+            csr_cfg |= 0x0;
+        }
+        break;
     case MTIP_PORT_CONFIG_4x25GBASE_R:
+        {
+            csr_cfg |= 0x0;
+        }
+        break;
     case MTIP_PORT_CONFIG_4x25GBASE_R_FEC:
+        {
+            csr_cfg |= 0x0;
+        }
+        break;
     case MTIP_PORT_CONFIG_4x25GBASE_R_RSFEC:
+        {
+            csr_cfg |= 0x0;
+        }
+        break;
     case MTIP_PORT_CONFIG_4x10GBASE_R:
+        {
+            csr_cfg |= 0x0;
+        }
+        break;
     case MTIP_PORT_CONFIG_4x10GBASE_R_FEC:
+        {
+            csr_cfg |= 0x0;
+        }
+        break;
     default:
         {
             // set to the default value
-            csr_cfg = MTIP_MAC_WRAPPER_CSR_CFG_REG_VAL;
+            csr_cfg |= 0x0;
         }
         break;
     }
@@ -901,7 +1005,7 @@ static void mtip_mac_wrapper_set_pcs_mode(struct mtip_port_device_info* port_dev
         break;
     case MTIP_PORT_CONFIG_2x50GBASE_R2:
         {
-            pcs_mode_set =  0;
+            pcs_mode_set = 0x30000;
         }
         break;
     case MTIP_PORT_CONFIG_2x50GBASE_R2_FEC:

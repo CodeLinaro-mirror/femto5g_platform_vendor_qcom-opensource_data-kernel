@@ -133,24 +133,42 @@ static void mtip_phy_cdr_lock_cb(enum mtip_port_type_enum port_type, enum eth_ph
       return;
     }
 
-    if(status == true)
-      delay_ms = MTIP_PHY_RETRY_TIMER;
-
-    if(mtip_mac_wrapper_get_link_status(link_index) == false){
-      wq_params = kmalloc(sizeof(struct mtip_delayed_work_q_params),
-                          GFP_ATOMIC);
-      if(!wq_params)
-        CSMLOGERR("Malloc failed!");
-      else{
-        INIT_DELAYED_WORK(&wq_params->wq_item,
-                          mtip_phy_retry_phy_bringup);
-        wq_params->port_type = port_type;
-        wq_params->link_index = link_index;
-        mtip_workq_queue_delayed_work(wq_params, delay_ms);
-      }
+    if (status == true)
+    {
+        CSMLOGINFO("Got CDR lock cb for link: %d lane %d status is TRUE", link_index, lane_num);
     }
-    else{
-      post_mtip_process_link_state(link_index, true);
+    else
+    {
+        CSMLOGINFO("Got CDR lock cb for link: %d lane %d status is FALSE", link_index, lane_num);
+    }
+
+    if (status == true) 
+    {
+        // set the delay to 10seconds
+        delay_ms = 10000000;//MTIP_PHY_RETRY_TIMER;
+    }
+
+    if (mtip_mac_wrapper_get_link_status(link_index) == false) 
+    {
+        wq_params = kmalloc(sizeof(struct mtip_delayed_work_q_params),
+                            GFP_ATOMIC);
+
+        if (!wq_params)
+        {
+            CSMLOGERR("Malloc failed!");
+        }
+        else 
+        {
+            INIT_DELAYED_WORK(&wq_params->wq_item,
+                              mtip_phy_retry_phy_bringup);
+            wq_params->port_type = port_type;
+            wq_params->link_index = link_index;
+            mtip_workq_queue_delayed_work(wq_params, delay_ms);
+        }
+    } 
+    else 
+    {
+        post_mtip_process_link_state(link_index, true);
     }
     return;
 }
@@ -493,6 +511,12 @@ static void mtip_phy_link_up(struct phylink_config *config,
     qsfp_eth_get_link_type(sfp_phandle, &sfp_port_type);
 
     CSMLOGINFO("sfp_port_type %d, associated with port %d", sfp_port_type, real_port_number);
+
+    // if sfp port type is OTHER, force it to be PORT_DA
+    if (sfp_port_type == PORT_OTHER) 
+    {
+        sfp_port_type = PORT_DA;
+    }
 
     // update the sfp port type
     platform_driver_priv->mtip_ports[real_port_number]->sfp_port_type = sfp_port_type;

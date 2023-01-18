@@ -156,6 +156,10 @@ static void mtip_pcs_set_vendor_vl_intvl(enum mtip_port_config_enum port_config,
     case MTIP_PORT_CONFIG_1x100GBASE_R4_RSFEC:
     case MTIP_PORT_CONFIG_1x50GBASE_R2:
     case MTIP_PORT_CONFIG_1x50GBASE_R2_RSFEC:
+    case MTIP_PORT_CONFIG_2x50GBASE_R2:
+    case MTIP_PORT_CONFIG_2x50GBASE_R2_FEC:
+    case MTIP_PORT_CONFIG_2x50GBASE_R2_LUAI:
+    case MTIP_PORT_CONFIG_2x50GBASE_R2_LUAI_FEC:
     case MTIP_PORT_CONFIG_1x40GBASE_R4:
     case MTIP_PORT_CONFIG_1x40GBASE_R4_FEC:
         {
@@ -163,6 +167,10 @@ static void mtip_pcs_set_vendor_vl_intvl(enum mtip_port_config_enum port_config,
         }
         break;
 
+    case MTIP_PORT_CONFIG_1x50GBASE_R2_LUAI:
+    case MTIP_PORT_CONFIG_1x50GBASE_R2_LUAI_FEC:
+    case MTIP_PORT_CONFIG_1x25GBASE_R_FEC:
+    case MTIP_PORT_CONFIG_4x25GBASE_R_FEC:
     case MTIP_PORT_CONFIG_1x25GBASE_R:
     case MTIP_PORT_CONFIG_4x25GBASE_R:
     case MTIP_PORT_CONFIG_1x10GBASE_R:
@@ -498,8 +506,12 @@ static void mtip_pcs_set_vl_registers(enum mtip_port_config_enum port_config, st
         }
         break;
 
+    case MTIP_PORT_CONFIG_2x50GBASE_R2_FEC:
+    case MTIP_PORT_CONFIG_2x50GBASE_R2_LUAI:
+    case MTIP_PORT_CONFIG_2x50GBASE_R2_LUAI_FEC:
     case MTIP_PORT_CONFIG_1x50GBASE_R2:
     case MTIP_PORT_CONFIG_1x50GBASE_R2_RSFEC:
+    case MTIP_PORT_CONFIG_2x50GBASE_R2:
         {
             mtip_pcs_set_vl_registers_for_1x50gbase_R2(link_device);
         }
@@ -649,18 +661,44 @@ int mtip_rsfec_initialize(struct mtip_port_device_info *port_device) {
             case MTIP_PORT_CONFIG_1x100GBASE_R2:
             case MTIP_PORT_CONFIG_1x100GBASE_R2_RSFEC:
                 {
-                    rsfec_control_val = MTIP_RSFEC_CONTROL_AM16_COPY_DIS_BIT;
+                    if (i == 0)
+                    {
+                        rsfec_control_val = MTIP_RSFEC_CONTROL_AM16_COPY_DIS_BIT;
+                    }
+                    else
+                    {
+                        rsfec_control_val = 0;
+                    }
                 }
                 break;
 
             case MTIP_PORT_CONFIG_1x50GBASE_R:
             case MTIP_PORT_CONFIG_1x50GBASE_R_RSFEC:
-            case MTIP_PORT_CONFIG_2x50GBASE_R:
-            case MTIP_PORT_CONFIG_2x50GBASE_R_RSFEC:
             case MTIP_PORT_CONFIG_1x50GBASE_R2:
             case MTIP_PORT_CONFIG_1x50GBASE_R2_RSFEC:
                 {
-                    rsfec_control_val = MTIP_RSFEC_CONTROL_KP_ENABLE_BIT | MTIP_RSFEC_CONTROL_TC_PAD_VALUE_BIT;
+                    if (i == 0)
+                    {
+                        rsfec_control_val = MTIP_RSFEC_CONTROL_KP_ENABLE_BIT | MTIP_RSFEC_CONTROL_TC_PAD_VALUE_BIT;
+                    }
+                    else
+                    {
+                        rsfec_control_val = 0;
+                    }
+                }
+                break;
+
+            case MTIP_PORT_CONFIG_2x50GBASE_R:
+            case MTIP_PORT_CONFIG_2x50GBASE_R_RSFEC:
+                {
+                    if ((i == 0) || (i == 2))
+                    {
+                        rsfec_control_val = MTIP_RSFEC_CONTROL_KP_ENABLE_BIT | MTIP_RSFEC_CONTROL_TC_PAD_VALUE_BIT;
+                    }
+                    else
+                    {
+                        rsfec_control_val = 0;
+                    }
                 }
                 break;
 
@@ -670,6 +708,43 @@ int mtip_rsfec_initialize(struct mtip_port_device_info *port_device) {
             case MTIP_PORT_CONFIG_4x25GBASE_R_RSFEC:
                 {
                     rsfec_control_val = MTIP_RSFEC_CONTROL_TC_PAD_VALUE_BIT;
+                }
+                break;
+
+            case MTIP_PORT_CONFIG_1x50GBASE_R2_LUAI:
+            case MTIP_PORT_CONFIG_1x50GBASE_R2_LUAI_FEC:
+                {
+                    if (i == 0)
+                    {
+                        rsfec_control_val = MTIP_RSFEC_CONTROL_KP_ENABLE_BIT | MTIP_RSFEC_CONTROL_TC_PAD_VALUE_BIT;
+                    }
+                    else
+                    {
+                        rsfec_control_val = 0;
+                    }
+                }
+                break;
+
+            case MTIP_PORT_CONFIG_2x50GBASE_R2:
+            case MTIP_PORT_CONFIG_2x50GBASE_R2_FEC:
+            case MTIP_PORT_CONFIG_2x50GBASE_R2_LUAI:
+            case MTIP_PORT_CONFIG_2x50GBASE_R2_LUAI_FEC:
+                {
+                    if ((i == 0) || (i == 2))
+                    {
+                        rsfec_control_val = MTIP_RSFEC_CONTROL_KP_ENABLE_BIT | MTIP_RSFEC_CONTROL_TC_PAD_VALUE_BIT;
+                    }
+                    else
+                    {
+                        rsfec_control_val = 0;
+                    }
+                }
+                break;
+
+            case MTIP_PORT_CONFIG_1x25GBASE_R_FEC:
+            case MTIP_PORT_CONFIG_4x25GBASE_R_FEC:
+                {
+                    rsfec_control_val = MTIP_RSFEC_CONTROL_KP_ENABLE_BIT | MTIP_RSFEC_CONTROL_TC_PAD_VALUE_BIT;
                 }
                 break;
 
@@ -686,7 +761,6 @@ int mtip_rsfec_initialize(struct mtip_port_device_info *port_device) {
                     rsfec_control_val = 0; // TC PAD VALUE is 0
                 }
                 break;
-
             }
 
             CSMLOGINFO("Setting RSFEC addr 0x%x to 0x%x\n", MTIP_RSFEC_CONTROL_OFFSET + i * MTIP_RSFEC_LINK_OFFSET, rsfec_control_val);
