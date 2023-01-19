@@ -49,5 +49,3 @@ ecpri_core-$(CONFIG_ECPRI_CORE) += \
 		src/ecpriss_xbar/ecpriss_xbar_hal.o \
 		src/utilities/ecpriss_workqueue.o \
 
-CDEFINES += -DBUILD_TIMESTAMP=\"$(shell date -u +'%Y-%m-%dT%H:%M:%SZ')\"
-
