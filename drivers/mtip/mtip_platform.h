@@ -17,7 +17,7 @@ int mtip_link_probe(struct platform_device *pdev);
 int mtip_platform_probe(struct platform_device *pdev);
 int mtip_platform_remove(struct platform_device *pdev);
 
-int mtip_platform_setup_ethernet(void);
+int mtip_platform_setup_ethernet(unsigned int port_device);
 int mtip_platform_convert_lane_speed_to_gbps(enum eth_phy_iface_phy_lane_speed_enum lane_speed);
 
 #endif // _MTIP_PLATFORM_H

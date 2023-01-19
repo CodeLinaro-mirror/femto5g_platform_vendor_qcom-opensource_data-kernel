@@ -1190,120 +1190,109 @@ static bool mtip_platform_consolidate_port_lane_config(struct mtip_port_device_i
     return rv;
 }
 
-int mtip_platform_setup_ethernet(void)
+int mtip_platform_setup_ethernet(unsigned int port_device)
 {
-   int i = 0;
-   int result;
-   int ret = 0;
-   struct mtip_netdev_priv *priv;
-   u32 port_device_index;
-   u32 link_device_index;
+    int i;
+    int result;
+    int ret = 0;
+    struct mtip_netdev_priv *priv;
+    u32 port_device_index;
+    u32 link_device_index;
 
-   CSMLOGINFO("Setting up ethernet");
+    CSMLOGINFO("Setting up ethernet for port_device %d", port_device);
 
-   if (mtip_rumi_platform != 0) 
-   {
-       // Reset the EMULATION DUT ONLY FOR RUMI
-       for (i = 0; i < platform_driver_priv->devices.num_port_phandles; ++i) 
-       {
-         CSMLOGINFO("Reseting the FH emulation at index: %d\n", i);
+    if (mtip_rumi_platform != 0) 
+    {
+        // Reset the EMULATION DUT ONLY FOR RUMI
+        CSMLOGINFO("Reseting the FH emulation at index: %d\n", port_device);
 
-         // reset the FH emulation
-         mtip_dut_reset(platform_driver_priv->devices.port_devices[i].dut_base_addr);
-       }
-   }
-   else
-   {
-       // initialize the RSFEC, SETUP PHY and PHYLINK of the ports
-       for (i = 0; i < platform_driver_priv->devices.num_port_phandles; ++i)
-       {
-           CSMLOGINFO("Initializing RSFEC and PHY for port: %d\n", i);
+        // reset the FH emulation
+        mtip_dut_reset(platform_driver_priv->devices.port_devices[port_device].dut_base_addr);
+    } 
+    else 
+    {
+        // initialize the RSFEC, SETUP PHY and PHYLINK of the ports
+        CSMLOGINFO("Initializing RSFEC and PHY for port: %d\n", port_device);
 
-           // initialize the RSFEC of the port
-           mtip_rsfec_initialize(&platform_driver_priv->devices.port_devices[i]);
+        // initialize the RSFEC of the port
+        mtip_rsfec_initialize(&platform_driver_priv->devices.port_devices[port_device]);
 
-           // setup the phy of the port
-           mtip_phy_setup_phy(&platform_driver_priv->devices.port_devices[i]);
-       }
-   }
+        // setup the phy of the port
+        mtip_phy_setup_phy(&platform_driver_priv->devices.port_devices[port_device]);
+    }
 
-   // Initialize the MAC WRAPPER   
-   for (i = 0; i < platform_driver_priv->devices.num_port_phandles; ++i) 
-   {
-     CSMLOGINFO("Initializing MAC port at index: %d\n", i);
+    // Initialize the MAC WRAPPER
+    CSMLOGINFO("Initializing MAC port at index: %d\n", port_device);
 
-     // MAC wrapper Init
-     mtip_mac_wrapper_init(&platform_driver_priv->devices.port_devices[i]);
+    // MAC wrapper Init
+    mtip_mac_wrapper_init(&platform_driver_priv->devices.port_devices[port_device]);
 
-     // register for MAC wrapper IRQ
-     mtip_mac_wrapper_register_irq(&platform_driver_priv->devices.port_devices[i].port_pdev->dev, 
-                                    platform_driver_priv->devices.port_devices[i].wrapper_irq, 
-                                    DRV_NAME, 
-                                    (void *)&platform_driver_priv->devices.port_devices[i]);
+    if (mtip_rumi_platform == 0) 
+    {
+        // set the mac wrapper pcs mode control
+        mtip_mac_wrapper_pcs_mode_control(&platform_driver_priv->devices.port_devices[port_device]);
+    }
 
-     if (mtip_rumi_platform == 0) 
-     {
-         // set the mac wrapper pcs mode control
-         mtip_mac_wrapper_pcs_mode_control(&platform_driver_priv->devices.port_devices[i]);
-     }
-   }
+    // allocate the net device structures
+    for (i = 0; i < MTIP_MAX_LINKS; ++i) 
+    {
+        // for each valid link
+        if (platform_driver_priv->mtip_links[i] != NULL) 
+        {
+            // find the port and link numbers
+            mtip_lookup_device_by_link_index(i, &port_device_index, &link_device_index);
 
-   // allocate the net device structures
-   for (i = 0; i < MTIP_MAX_LINKS; ++i) 
-   {
-       // for each valid link
-       if (platform_driver_priv->mtip_links[i] != NULL) 
-       {
-           // find the port and link numbers
-           mtip_lookup_device_by_link_index(i, &port_device_index, &link_device_index);
+            if (port_device == port_device_index) 
+            {
+                priv = netdev_priv(platform_driver_priv->mtip_links[i]->dev);
 
-          priv = netdev_priv(platform_driver_priv->mtip_links[i]->dev);
+                // Initialize the MAC block
+                mtip_mac_initialize(priv);
 
-          // Initialize the MAC block
-          mtip_mac_initialize(priv);
+                if (mtip_rumi_platform != 0) 
+                {
+                    // setup loopback if needed
+                    if (mtip_loopback_mode != MTIP_MODE_DEFAULT) 
+                    {
+                        // enable IOMACRO loopback
+                        mtip_dut_enable_rgmii_loopback(i);
+                    } 
+                    else 
+                    {
+                        // MDIO registration
+                        result = mtip_mdio_register(platform_driver_priv->mtip_links[i]->dev,
+                                                    platform_driver_priv->devices.port_devices[port_device_index].link_devices[link_device_index].link_pdev->dev.of_node);
+                        if (result) 
+                        {
+                            CSMLOGERR("MDIO registration failed with err %d", result);
+                        }
 
-          if (mtip_rumi_platform != 0) 
-          {
-              // setup loopback if needed
-              if (mtip_loopback_mode != MTIP_MODE_DEFAULT)
-              {
-                  // enable IOMACRO loopback
-                  mtip_dut_enable_rgmii_loopback(i);
-              }
-              else
-              {
-                  // MDIO registration
-                  result = mtip_mdio_register(platform_driver_priv->mtip_links[i]->dev,
-                                              platform_driver_priv->devices.port_devices[port_device_index].link_devices[link_device_index].link_pdev->dev.of_node);
-                  if (result) {
-                     CSMLOGERR("MDIO registration failed with err %d", result);
-                  }
+                        CSMLOGINFO("TX delay = %d, RX delay = %d", mtip_dut_get_tx_delay(i), mtip_dut_get_rx_delay(i));
+                    }
+                } 
+                else 
+                {
+                    // this is the default for the target
+                    // initialize the PCS for the link
+                    mtip_pcs_config_pcs(i);
 
-                  CSMLOGINFO("TX delay = %d, RX delay = %d", mtip_dut_get_tx_delay(i), mtip_dut_get_rx_delay(i));
-              }
-          }
-          else
-          {
-              // this is the default for the target
-              // initialize the PCS for the link
-              mtip_pcs_config_pcs(i);
+                    if (mtip_loopback_mode == MTIP_MODE_LOOPBACK) 
+                    {
+                        // enable pcs loopback on the link
+                        mtip_pcs_enable_loopback(i);
+                    }
 
-              if (mtip_loopback_mode == MTIP_MODE_LOOPBACK)
-              {
-                  // enable pcs loopback on the link
-                  mtip_pcs_enable_loopback(i);
-              }
+                    if (mtip_rumi_platform == 0) 
+                    {
+                        // set the MAC interrupt mask
+                        mtip_mac_set_interrupt_mask(i);
+                    }
+                }
+            }
+        }
+    }
 
-              if (mtip_rumi_platform == 0) 
-              {
-                  // set the MAC interrupt mask
-                  mtip_mac_set_interrupt_mask(i);
-              }
-          }
-       }
-   }
-
-   return ret;
+    return ret;
 }
 
 /**
@@ -1327,15 +1316,15 @@ static int mtip_platform_setup(void)
        return -ENODEV;
    }
 
-   // enable all the necessary clocks
-   mtip_clocks_setup_clocks();
-
    // consolidate the lane configuration of all ports
    for (i = 0; i < platform_driver_priv->devices.num_port_phandles; ++i)
    {
        // consolidate the lane config
        mtip_platform_consolidate_port_lane_config(&platform_driver_priv->devices.port_devices[i]);
    }
+
+   // enable all the necessary clocks
+   mtip_clocks_setup_clocks();
 
    // calculate the total number of active links across all ports
    total_num_links = 0;
@@ -1468,7 +1457,19 @@ static int mtip_platform_setup(void)
    }
 
    // setup the ethernet
-   mtip_platform_setup_ethernet();
+   for (i = 0; i < platform_driver_priv->devices.num_port_phandles; ++i)
+   {
+       mtip_platform_setup_ethernet(i);
+
+       // register for MAC wrapper IRQ
+       mtip_mac_wrapper_register_irq(&platform_driver_priv->devices.port_devices[i].port_pdev->dev, 
+                                      platform_driver_priv->devices.port_devices[i].wrapper_irq, 
+                                      DRV_NAME, 
+                                      (void *)&platform_driver_priv->devices.port_devices[i]);
+
+       // set the clock rates based on updated port config
+       mtip_clocks_set_clock_rates(platform_driver_priv->devices.port_devices[i].port_type, platform_driver_priv->devices.port_devices[i].port_config);
+   }
 
    // the system topology is now setup using the device tree
    mtip_setup_topology();

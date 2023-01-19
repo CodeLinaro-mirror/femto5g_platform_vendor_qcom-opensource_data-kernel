@@ -633,3 +633,685 @@ void mtip_clocks_setup_clocks(void)
     return;
 }
 
+static void mtip_clocks_set_fh0_clock_rates(enum mtip_port_config_enum port_config)
+{
+    u32 ff_0_index = 0;
+    u32 ff_1_index = 1;
+    u32 ff_2_index = 2;
+    u32 ff_3_index = 3;
+    u32 hm_ref_index = 4;
+
+    struct clk* ff_0_clock = platform_driver_priv->clocks.ecpricc_fh0_clocks[ff_0_index];
+    struct clk* ff_1_clock = platform_driver_priv->clocks.ecpricc_fh0_clocks[ff_1_index];
+    struct clk* ff_2_clock = platform_driver_priv->clocks.ecpricc_fh0_clocks[ff_2_index];
+    struct clk* ff_3_clock = platform_driver_priv->clocks.ecpricc_fh0_clocks[ff_3_index];
+    struct clk* hm_ref_clock = platform_driver_priv->clocks.ecpricc_fh0_clocks[hm_ref_index];
+
+    switch (port_config) 
+    {
+        // config 1 is 100GBASE_R family
+    case MTIP_PORT_CONFIG_1x100GBASE_R:
+    case MTIP_PORT_CONFIG_1x100GBASE_R_RSFEC_LL:
+    case MTIP_PORT_CONFIG_1x100GBASE_R_RSFEC:
+        // config 2 is 100GBASE_R2 family
+    case MTIP_PORT_CONFIG_1x100GBASE_R2:
+    case MTIP_PORT_CONFIG_1x100GBASE_R2_RSFEC:
+        // config 3 is 100GBASE_R4 family
+    case MTIP_PORT_CONFIG_1x100GBASE_R4:
+    case MTIP_PORT_CONFIG_1x100GBASE_R4_RSFEC:
+        {
+            // set ff0 to high and rest to off
+            clk_set_rate(ff_0_clock, MTIP_ECPRI_FF_CLK_HIGH);
+            clk_set_rate(ff_1_clock, MTIP_ECPRI_FF_CLK_OFF);
+            clk_set_rate(ff_2_clock, MTIP_ECPRI_FF_CLK_OFF);
+            clk_set_rate(ff_3_clock, MTIP_ECPRI_FF_CLK_OFF);
+
+            // set hm ref to high
+            clk_set_rate(hm_ref_clock, MTIP_ECPRI_MAC_HM_REF_CLK_HIGH);
+        }
+        break;
+        // config 4 is 1x50GBASE_R2 family
+    case MTIP_PORT_CONFIG_1x50GBASE_R2:
+    case MTIP_PORT_CONFIG_1x50GBASE_R2_RSFEC:
+    case MTIP_PORT_CONFIG_1x50GBASE_R2_LUAI:
+    case MTIP_PORT_CONFIG_1x50GBASE_R2_LUAI_FEC:
+        {
+            // set ff0 to medium and rest to off
+            clk_set_rate(ff_0_clock, MTIP_ECPRI_FF_CLK_MED);
+            clk_set_rate(ff_1_clock, MTIP_ECPRI_FF_CLK_OFF);
+            clk_set_rate(ff_2_clock, MTIP_ECPRI_FF_CLK_OFF);
+            clk_set_rate(ff_3_clock, MTIP_ECPRI_FF_CLK_OFF);
+
+            // set hm ref to high
+            clk_set_rate(hm_ref_clock, MTIP_ECPRI_MAC_HM_REF_CLK_HIGH);
+        }
+        break;
+        // config 5 is 40GBASE_R4 family
+    case MTIP_PORT_CONFIG_1x40GBASE_R4:
+    case MTIP_PORT_CONFIG_1x40GBASE_R4_FEC:
+        {
+            // set ff0 to medium and rest to off
+            clk_set_rate(ff_0_clock, MTIP_ECPRI_FF_CLK_MED);
+            clk_set_rate(ff_1_clock, MTIP_ECPRI_FF_CLK_OFF);
+            clk_set_rate(ff_2_clock, MTIP_ECPRI_FF_CLK_OFF);
+            clk_set_rate(ff_3_clock, MTIP_ECPRI_FF_CLK_OFF);
+
+            // set hm ref to medium
+            clk_set_rate(hm_ref_clock, MTIP_ECPRI_MAC_HM_REF_CLK_MED);
+        }
+        break;
+        // config 6 2x50GBASE_R family
+    case MTIP_PORT_CONFIG_2x50GBASE_R:
+    case MTIP_PORT_CONFIG_2x50GBASE_R_RSFEC:
+    case MTIP_PORT_CONFIG_1x50GBASE_R:
+    case MTIP_PORT_CONFIG_1x50GBASE_R_RSFEC:
+        {
+            // set ff0 and ff1 to medium and rest to off
+            clk_set_rate(ff_0_clock, MTIP_ECPRI_FF_CLK_MED);
+            clk_set_rate(ff_1_clock, MTIP_ECPRI_FF_CLK_MED);
+            clk_set_rate(ff_2_clock, MTIP_ECPRI_FF_CLK_OFF);
+            clk_set_rate(ff_3_clock, MTIP_ECPRI_FF_CLK_OFF);
+
+            // set hm ref to high
+            clk_set_rate(hm_ref_clock, MTIP_ECPRI_MAC_HM_REF_CLK_HIGH);
+        }
+        break;
+        // config 11 is 4x25GBASE_R family
+    case MTIP_PORT_CONFIG_1x25GBASE_R:
+    case MTIP_PORT_CONFIG_1x25GBASE_R_FEC:
+    case MTIP_PORT_CONFIG_4x25GBASE_R:
+    case MTIP_PORT_CONFIG_4x25GBASE_R_FEC:
+    case MTIP_PORT_CONFIG_1x25GBASE_R_RSFEC:
+    case MTIP_PORT_CONFIG_4x25GBASE_R_RSFEC:
+        {
+            // set all to medium
+            clk_set_rate(ff_0_clock, MTIP_ECPRI_FF_CLK_MED);
+            clk_set_rate(ff_1_clock, MTIP_ECPRI_FF_CLK_MED);
+            clk_set_rate(ff_2_clock, MTIP_ECPRI_FF_CLK_MED);
+            clk_set_rate(ff_3_clock, MTIP_ECPRI_FF_CLK_MED);
+
+            // set hm ref to medium
+            clk_set_rate(hm_ref_clock, MTIP_ECPRI_MAC_HM_REF_CLK_MED);
+        }
+        break;
+        // config 12 is 4x10GBASE_R family
+    case MTIP_PORT_CONFIG_1x10GBASE_R:
+    case MTIP_PORT_CONFIG_1x10GBASE_R_FEC:
+    case MTIP_PORT_CONFIG_4x10GBASE_R:
+    case MTIP_PORT_CONFIG_4x10GBASE_R_FEC:
+        {
+            // set all to low
+            clk_set_rate(ff_0_clock, MTIP_ECPRI_FF_CLK_LOW);
+            clk_set_rate(ff_1_clock, MTIP_ECPRI_FF_CLK_LOW);
+            clk_set_rate(ff_2_clock, MTIP_ECPRI_FF_CLK_LOW);
+            clk_set_rate(ff_3_clock, MTIP_ECPRI_FF_CLK_LOW);
+
+            // set hm ref to low
+            clk_set_rate(hm_ref_clock, MTIP_ECPRI_MAC_HM_REF_CLK_LOW);
+        }
+        break;
+        // config 13 is 2x50GBASE_R2 family
+    case MTIP_PORT_CONFIG_2x50GBASE_R2:
+    case MTIP_PORT_CONFIG_2x50GBASE_R2_FEC:
+    case MTIP_PORT_CONFIG_2x50GBASE_R2_LUAI:
+    case MTIP_PORT_CONFIG_2x50GBASE_R2_LUAI_FEC:
+        {
+            // set ff0 and ff1 to medium and rest to off
+            clk_set_rate(ff_0_clock, MTIP_ECPRI_FF_CLK_MED);
+            clk_set_rate(ff_1_clock, MTIP_ECPRI_FF_CLK_MED);
+            clk_set_rate(ff_2_clock, MTIP_ECPRI_FF_CLK_OFF);
+            clk_set_rate(ff_3_clock, MTIP_ECPRI_FF_CLK_OFF);
+
+            // set hm ref to high
+            clk_set_rate(hm_ref_clock, MTIP_ECPRI_MAC_HM_REF_CLK_HIGH);
+        }
+        break;
+    default:
+        break;
+    }
+}
+
+static void mtip_clocks_set_fh1_clock_rates(enum mtip_port_config_enum port_config)
+{
+    u32 ff_0_index = 0;
+    u32 ff_1_index = 1;
+    u32 ff_2_index = 2;
+    u32 ff_3_index = 3;
+    u32 hm_ref_index = 4;
+
+    struct clk* ff_0_clock = platform_driver_priv->clocks.ecpricc_fh1_clocks[ff_0_index];
+    struct clk* ff_1_clock = platform_driver_priv->clocks.ecpricc_fh1_clocks[ff_1_index];
+    struct clk* ff_2_clock = platform_driver_priv->clocks.ecpricc_fh1_clocks[ff_2_index];
+    struct clk* ff_3_clock = platform_driver_priv->clocks.ecpricc_fh1_clocks[ff_3_index];
+    struct clk* hm_ref_clock = platform_driver_priv->clocks.ecpricc_fh1_clocks[hm_ref_index];
+
+    switch (port_config) 
+    {
+        // config 1 is 100GBASE_R family
+    case MTIP_PORT_CONFIG_1x100GBASE_R:
+    case MTIP_PORT_CONFIG_1x100GBASE_R_RSFEC_LL:
+    case MTIP_PORT_CONFIG_1x100GBASE_R_RSFEC:
+        // config 2 is 100GBASE_R2 family
+    case MTIP_PORT_CONFIG_1x100GBASE_R2:
+    case MTIP_PORT_CONFIG_1x100GBASE_R2_RSFEC:
+        // config 3 is 100GBASE_R4 family
+    case MTIP_PORT_CONFIG_1x100GBASE_R4:
+    case MTIP_PORT_CONFIG_1x100GBASE_R4_RSFEC:
+        {
+            // set ff0 to high and rest to off
+            clk_set_rate(ff_0_clock, MTIP_ECPRI_FF_CLK_HIGH);
+            clk_set_rate(ff_1_clock, MTIP_ECPRI_FF_CLK_OFF);
+            clk_set_rate(ff_2_clock, MTIP_ECPRI_FF_CLK_OFF);
+            clk_set_rate(ff_3_clock, MTIP_ECPRI_FF_CLK_OFF);
+
+            // set hm ref to high
+            clk_set_rate(hm_ref_clock, MTIP_ECPRI_MAC_HM_REF_CLK_HIGH);
+        }
+        break;
+        // config 4 is 1x50GBASE_R2 family
+    case MTIP_PORT_CONFIG_1x50GBASE_R2:
+    case MTIP_PORT_CONFIG_1x50GBASE_R2_RSFEC:
+    case MTIP_PORT_CONFIG_1x50GBASE_R2_LUAI:
+    case MTIP_PORT_CONFIG_1x50GBASE_R2_LUAI_FEC:
+        {
+            // set ff0 to medium and rest to off
+            clk_set_rate(ff_0_clock, MTIP_ECPRI_FF_CLK_MED);
+            clk_set_rate(ff_1_clock, MTIP_ECPRI_FF_CLK_OFF);
+            clk_set_rate(ff_2_clock, MTIP_ECPRI_FF_CLK_OFF);
+            clk_set_rate(ff_3_clock, MTIP_ECPRI_FF_CLK_OFF);
+
+            // set hm ref to high
+            clk_set_rate(hm_ref_clock, MTIP_ECPRI_MAC_HM_REF_CLK_HIGH);
+        }
+        break;
+        // config 5 is 40GBASE_R4 family
+    case MTIP_PORT_CONFIG_1x40GBASE_R4:
+    case MTIP_PORT_CONFIG_1x40GBASE_R4_FEC:
+        {
+            // set ff0 to medium and rest to off
+            clk_set_rate(ff_0_clock, MTIP_ECPRI_FF_CLK_MED);
+            clk_set_rate(ff_1_clock, MTIP_ECPRI_FF_CLK_OFF);
+            clk_set_rate(ff_2_clock, MTIP_ECPRI_FF_CLK_OFF);
+            clk_set_rate(ff_3_clock, MTIP_ECPRI_FF_CLK_OFF);
+
+            // set hm ref to medium
+            clk_set_rate(hm_ref_clock, MTIP_ECPRI_MAC_HM_REF_CLK_MED);
+        }
+        break;
+        // config 6 2x50GBASE_R family
+    case MTIP_PORT_CONFIG_2x50GBASE_R:
+    case MTIP_PORT_CONFIG_2x50GBASE_R_RSFEC:
+    case MTIP_PORT_CONFIG_1x50GBASE_R:
+    case MTIP_PORT_CONFIG_1x50GBASE_R_RSFEC:
+        {
+            // set ff0 and ff1 to medium and rest to off
+            clk_set_rate(ff_0_clock, MTIP_ECPRI_FF_CLK_MED);
+            clk_set_rate(ff_1_clock, MTIP_ECPRI_FF_CLK_MED);
+            clk_set_rate(ff_2_clock, MTIP_ECPRI_FF_CLK_OFF);
+            clk_set_rate(ff_3_clock, MTIP_ECPRI_FF_CLK_OFF);
+
+            // set hm ref to high
+            clk_set_rate(hm_ref_clock, MTIP_ECPRI_MAC_HM_REF_CLK_HIGH);
+        }
+        break;
+        // config 11 is 4x25GBASE_R family
+    case MTIP_PORT_CONFIG_1x25GBASE_R:
+    case MTIP_PORT_CONFIG_1x25GBASE_R_FEC:
+    case MTIP_PORT_CONFIG_4x25GBASE_R:
+    case MTIP_PORT_CONFIG_4x25GBASE_R_FEC:
+    case MTIP_PORT_CONFIG_1x25GBASE_R_RSFEC:
+    case MTIP_PORT_CONFIG_4x25GBASE_R_RSFEC:
+        {
+            // set all to medium
+            clk_set_rate(ff_0_clock, MTIP_ECPRI_FF_CLK_MED);
+            clk_set_rate(ff_1_clock, MTIP_ECPRI_FF_CLK_MED);
+            clk_set_rate(ff_2_clock, MTIP_ECPRI_FF_CLK_MED);
+            clk_set_rate(ff_3_clock, MTIP_ECPRI_FF_CLK_MED);
+
+            // set hm ref to medium
+            clk_set_rate(hm_ref_clock, MTIP_ECPRI_MAC_HM_REF_CLK_MED);
+        }
+        break;
+        // config 12 is 4x10GBASE_R family
+    case MTIP_PORT_CONFIG_1x10GBASE_R:
+    case MTIP_PORT_CONFIG_1x10GBASE_R_FEC:
+    case MTIP_PORT_CONFIG_4x10GBASE_R:
+    case MTIP_PORT_CONFIG_4x10GBASE_R_FEC:
+        {
+            // set all to low
+            clk_set_rate(ff_0_clock, MTIP_ECPRI_FF_CLK_LOW);
+            clk_set_rate(ff_1_clock, MTIP_ECPRI_FF_CLK_LOW);
+            clk_set_rate(ff_2_clock, MTIP_ECPRI_FF_CLK_LOW);
+            clk_set_rate(ff_3_clock, MTIP_ECPRI_FF_CLK_LOW);
+
+            // set hm ref to low
+            clk_set_rate(hm_ref_clock, MTIP_ECPRI_MAC_HM_REF_CLK_LOW);
+        }
+        break;
+        // config 13 is 2x50GBASE_R2 family
+    case MTIP_PORT_CONFIG_2x50GBASE_R2:
+    case MTIP_PORT_CONFIG_2x50GBASE_R2_FEC:
+    case MTIP_PORT_CONFIG_2x50GBASE_R2_LUAI:
+    case MTIP_PORT_CONFIG_2x50GBASE_R2_LUAI_FEC:
+        {
+            // set ff0 and ff1 to medium and rest to off
+            clk_set_rate(ff_0_clock, MTIP_ECPRI_FF_CLK_MED);
+            clk_set_rate(ff_1_clock, MTIP_ECPRI_FF_CLK_MED);
+            clk_set_rate(ff_2_clock, MTIP_ECPRI_FF_CLK_OFF);
+            clk_set_rate(ff_3_clock, MTIP_ECPRI_FF_CLK_OFF);
+
+            // set hm ref to high
+            clk_set_rate(hm_ref_clock, MTIP_ECPRI_MAC_HM_REF_CLK_HIGH);
+        }
+        break;
+    default:
+        break;
+    }
+}
+
+static void mtip_clocks_set_fh2_clock_rates(enum mtip_port_config_enum port_config)
+{
+    u32 ff_0_index = 0;
+    u32 ff_1_index = 1;
+    u32 ff_2_index = 2;
+    u32 ff_3_index = 3;
+    u32 hm_ref_index = 4;
+
+    struct clk* ff_0_clock = platform_driver_priv->clocks.ecpricc_fh2_clocks[ff_0_index];
+    struct clk* ff_1_clock = platform_driver_priv->clocks.ecpricc_fh2_clocks[ff_1_index];
+    struct clk* ff_2_clock = platform_driver_priv->clocks.ecpricc_fh2_clocks[ff_2_index];
+    struct clk* ff_3_clock = platform_driver_priv->clocks.ecpricc_fh2_clocks[ff_3_index];
+    struct clk* hm_ref_clock = platform_driver_priv->clocks.ecpricc_fh2_clocks[hm_ref_index];
+
+    switch (port_config) 
+    {
+        // config 1 is 100GBASE_R family
+    case MTIP_PORT_CONFIG_1x100GBASE_R:
+    case MTIP_PORT_CONFIG_1x100GBASE_R_RSFEC_LL:
+    case MTIP_PORT_CONFIG_1x100GBASE_R_RSFEC:
+        // config 2 is 100GBASE_R2 family
+    case MTIP_PORT_CONFIG_1x100GBASE_R2:
+    case MTIP_PORT_CONFIG_1x100GBASE_R2_RSFEC:
+        // config 3 is 100GBASE_R4 family
+    case MTIP_PORT_CONFIG_1x100GBASE_R4:
+    case MTIP_PORT_CONFIG_1x100GBASE_R4_RSFEC:
+        {
+            // set ff0 to high and rest to off
+            clk_set_rate(ff_0_clock, MTIP_ECPRI_FF_CLK_HIGH);
+            clk_set_rate(ff_1_clock, MTIP_ECPRI_FF_CLK_OFF);
+            clk_set_rate(ff_2_clock, MTIP_ECPRI_FF_CLK_OFF);
+            clk_set_rate(ff_3_clock, MTIP_ECPRI_FF_CLK_OFF);
+
+            // set hm ref to high
+            clk_set_rate(hm_ref_clock, MTIP_ECPRI_MAC_HM_REF_CLK_HIGH);
+        }
+        break;
+        // config 4 is 1x50GBASE_R2 family
+    case MTIP_PORT_CONFIG_1x50GBASE_R2:
+    case MTIP_PORT_CONFIG_1x50GBASE_R2_RSFEC:
+    case MTIP_PORT_CONFIG_1x50GBASE_R2_LUAI:
+    case MTIP_PORT_CONFIG_1x50GBASE_R2_LUAI_FEC:
+        {
+            // set ff0 to medium and rest to off
+            clk_set_rate(ff_0_clock, MTIP_ECPRI_FF_CLK_MED);
+            clk_set_rate(ff_1_clock, MTIP_ECPRI_FF_CLK_OFF);
+            clk_set_rate(ff_2_clock, MTIP_ECPRI_FF_CLK_OFF);
+            clk_set_rate(ff_3_clock, MTIP_ECPRI_FF_CLK_OFF);
+
+            // set hm ref to high
+            clk_set_rate(hm_ref_clock, MTIP_ECPRI_MAC_HM_REF_CLK_HIGH);
+        }
+        break;
+        // config 5 is 40GBASE_R4 family
+    case MTIP_PORT_CONFIG_1x40GBASE_R4:
+    case MTIP_PORT_CONFIG_1x40GBASE_R4_FEC:
+        {
+            // set ff0 to medium and rest to off
+            clk_set_rate(ff_0_clock, MTIP_ECPRI_FF_CLK_MED);
+            clk_set_rate(ff_1_clock, MTIP_ECPRI_FF_CLK_OFF);
+            clk_set_rate(ff_2_clock, MTIP_ECPRI_FF_CLK_OFF);
+            clk_set_rate(ff_3_clock, MTIP_ECPRI_FF_CLK_OFF);
+
+            // set hm ref to medium
+            clk_set_rate(hm_ref_clock, MTIP_ECPRI_MAC_HM_REF_CLK_MED);
+        }
+        break;
+        // config 6 2x50GBASE_R family
+    case MTIP_PORT_CONFIG_2x50GBASE_R:
+    case MTIP_PORT_CONFIG_2x50GBASE_R_RSFEC:
+    case MTIP_PORT_CONFIG_1x50GBASE_R:
+    case MTIP_PORT_CONFIG_1x50GBASE_R_RSFEC:
+        {
+            // set ff0 and ff1 to medium and rest to off
+            clk_set_rate(ff_0_clock, MTIP_ECPRI_FF_CLK_MED);
+            clk_set_rate(ff_1_clock, MTIP_ECPRI_FF_CLK_MED);
+            clk_set_rate(ff_2_clock, MTIP_ECPRI_FF_CLK_OFF);
+            clk_set_rate(ff_3_clock, MTIP_ECPRI_FF_CLK_OFF);
+
+            // set hm ref to high
+            clk_set_rate(hm_ref_clock, MTIP_ECPRI_MAC_HM_REF_CLK_HIGH);
+        }
+        break;
+        // config 11 is 4x25GBASE_R family
+    case MTIP_PORT_CONFIG_1x25GBASE_R:
+    case MTIP_PORT_CONFIG_1x25GBASE_R_FEC:
+    case MTIP_PORT_CONFIG_4x25GBASE_R:
+    case MTIP_PORT_CONFIG_4x25GBASE_R_FEC:
+    case MTIP_PORT_CONFIG_1x25GBASE_R_RSFEC:
+    case MTIP_PORT_CONFIG_4x25GBASE_R_RSFEC:
+        {
+            // set all to medium
+            clk_set_rate(ff_0_clock, MTIP_ECPRI_FF_CLK_MED);
+            clk_set_rate(ff_1_clock, MTIP_ECPRI_FF_CLK_MED);
+            clk_set_rate(ff_2_clock, MTIP_ECPRI_FF_CLK_MED);
+            clk_set_rate(ff_3_clock, MTIP_ECPRI_FF_CLK_MED);
+
+            // set hm ref to medium
+            clk_set_rate(hm_ref_clock, MTIP_ECPRI_MAC_HM_REF_CLK_MED);
+        }
+        break;
+        // config 12 is 4x10GBASE_R family
+    case MTIP_PORT_CONFIG_1x10GBASE_R:
+    case MTIP_PORT_CONFIG_1x10GBASE_R_FEC:
+    case MTIP_PORT_CONFIG_4x10GBASE_R:
+    case MTIP_PORT_CONFIG_4x10GBASE_R_FEC:
+        {
+            // set all to low
+            clk_set_rate(ff_0_clock, MTIP_ECPRI_FF_CLK_LOW);
+            clk_set_rate(ff_1_clock, MTIP_ECPRI_FF_CLK_LOW);
+            clk_set_rate(ff_2_clock, MTIP_ECPRI_FF_CLK_LOW);
+            clk_set_rate(ff_3_clock, MTIP_ECPRI_FF_CLK_LOW);
+
+            // set hm ref to low
+            clk_set_rate(hm_ref_clock, MTIP_ECPRI_MAC_HM_REF_CLK_LOW);
+        }
+        break;
+        // config 13 is 2x50GBASE_R2 family
+    case MTIP_PORT_CONFIG_2x50GBASE_R2:
+    case MTIP_PORT_CONFIG_2x50GBASE_R2_FEC:
+    case MTIP_PORT_CONFIG_2x50GBASE_R2_LUAI:
+    case MTIP_PORT_CONFIG_2x50GBASE_R2_LUAI_FEC:
+        {
+            // set ff0 and ff1 to medium and rest to off
+            clk_set_rate(ff_0_clock, MTIP_ECPRI_FF_CLK_MED);
+            clk_set_rate(ff_1_clock, MTIP_ECPRI_FF_CLK_MED);
+            clk_set_rate(ff_2_clock, MTIP_ECPRI_FF_CLK_OFF);
+            clk_set_rate(ff_3_clock, MTIP_ECPRI_FF_CLK_OFF);
+
+            // set hm ref to high
+            clk_set_rate(hm_ref_clock, MTIP_ECPRI_MAC_HM_REF_CLK_HIGH);
+        }
+        break;
+    default:
+        break;
+    }
+}
+
+static void mtip_clocks_set_c2c_clock_rates(enum mtip_port_config_enum port_config)
+{
+    u32 c2c_ff_0_index = 0;
+    u32 c2c_ff_1_index = 1;
+    u32 dbg_ff_0_index = 0;
+    u32 c2c_hm_ref_index = 2;
+
+    struct clk* c2c_ff_0_clock = platform_driver_priv->clocks.ecpricc_c2c_clocks[c2c_ff_0_index];
+    struct clk* c2c_ff_1_clock = platform_driver_priv->clocks.ecpricc_c2c_clocks[c2c_ff_1_index];
+
+    struct clk* dbg_ff_0_clock = platform_driver_priv->clocks.ecpricc_dbg_clocks[dbg_ff_0_index];
+
+    struct clk* c2c_hm_ref_clock = platform_driver_priv->clocks.ecpricc_c2c_clocks[c2c_hm_ref_index];
+
+    switch (port_config)
+    {
+        // config 1 is 100GBASE_R family
+    case MTIP_PORT_CONFIG_1x100GBASE_R:
+    case MTIP_PORT_CONFIG_1x100GBASE_R_RSFEC_LL:
+    case MTIP_PORT_CONFIG_1x100GBASE_R_RSFEC:
+        {
+            // set ff0 to high and rest to off
+            clk_set_rate(c2c_ff_0_clock, MTIP_ECPRI_FF_CLK_HIGH);
+            clk_set_rate(c2c_ff_1_clock, MTIP_ECPRI_FF_CLK_OFF);
+            clk_set_rate(dbg_ff_0_clock, MTIP_ECPRI_FF_CLK_OFF);
+
+            // set hm ref to high
+            clk_set_rate(c2c_hm_ref_clock, MTIP_ECPRI_MAC_HM_REF_CLK_HIGH);
+        }
+        break;
+
+        // config 2 is 100GBASE_R2 family
+    case MTIP_PORT_CONFIG_1x100GBASE_R2:
+    case MTIP_PORT_CONFIG_1x100GBASE_R2_RSFEC:
+        {
+            // set ff0 to high and rest to off
+            clk_set_rate(c2c_ff_0_clock, MTIP_ECPRI_FF_CLK_HIGH);
+            clk_set_rate(c2c_ff_1_clock, MTIP_ECPRI_FF_CLK_OFF);
+            clk_set_rate(dbg_ff_0_clock, MTIP_ECPRI_FF_CLK_OFF);
+
+            // set hm ref to high
+            clk_set_rate(c2c_hm_ref_clock, MTIP_ECPRI_MAC_HM_REF_CLK_HIGH);
+        }
+        break;
+
+        // config 3 is 100GBASE_R4 family
+    case MTIP_PORT_CONFIG_1x100GBASE_R4:
+    case MTIP_PORT_CONFIG_1x100GBASE_R4_RSFEC:
+        {
+            // set ff0 to high and rest to off
+            clk_set_rate(c2c_ff_0_clock, MTIP_ECPRI_FF_CLK_HIGH);
+            clk_set_rate(c2c_ff_1_clock, MTIP_ECPRI_FF_CLK_OFF);
+            clk_set_rate(dbg_ff_0_clock, MTIP_ECPRI_FF_CLK_OFF);
+
+            // set hm ref to high
+            clk_set_rate(c2c_hm_ref_clock, MTIP_ECPRI_MAC_HM_REF_CLK_HIGH);
+        }
+        break;
+
+        // config 4 is 50GBASE_R2 family
+    case MTIP_PORT_CONFIG_1x50GBASE_R2:
+    case MTIP_PORT_CONFIG_1x50GBASE_R2_RSFEC:
+    case MTIP_PORT_CONFIG_1x50GBASE_R2_LUAI:
+    case MTIP_PORT_CONFIG_1x50GBASE_R2_LUAI_FEC:
+    case MTIP_PORT_CONFIG_2x50GBASE_R2:
+    case MTIP_PORT_CONFIG_2x50GBASE_R2_FEC:
+    case MTIP_PORT_CONFIG_2x50GBASE_R2_LUAI:
+    case MTIP_PORT_CONFIG_2x50GBASE_R2_LUAI_FEC:
+        {
+            // set ff0 to medium and rest to off
+            clk_set_rate(c2c_ff_0_clock, MTIP_ECPRI_FF_CLK_MED);
+            clk_set_rate(c2c_ff_1_clock, MTIP_ECPRI_FF_CLK_OFF);
+            clk_set_rate(dbg_ff_0_clock, MTIP_ECPRI_FF_CLK_OFF);
+
+            // set hm ref to high
+            clk_set_rate(c2c_hm_ref_clock, MTIP_ECPRI_MAC_HM_REF_CLK_HIGH);
+        }
+        break;
+
+        // config 6 is 40GBASE_R4 family
+    case MTIP_PORT_CONFIG_1x40GBASE_R4:
+    case MTIP_PORT_CONFIG_1x40GBASE_R4_FEC:
+        {
+            // set ff0 to medium and rest to off
+            clk_set_rate(c2c_ff_0_clock, MTIP_ECPRI_FF_CLK_MED);
+            clk_set_rate(c2c_ff_1_clock, MTIP_ECPRI_FF_CLK_OFF);
+            clk_set_rate(dbg_ff_0_clock, MTIP_ECPRI_FF_CLK_OFF);
+
+            // set hm ref to medium
+            clk_set_rate(c2c_hm_ref_clock, MTIP_ECPRI_MAC_HM_REF_CLK_MED);
+        }
+        break;
+
+    case MTIP_PORT_CONFIG_1x50GBASE_R:
+    case MTIP_PORT_CONFIG_1x50GBASE_R_RSFEC:
+    case MTIP_PORT_CONFIG_2x50GBASE_R:
+    case MTIP_PORT_CONFIG_2x50GBASE_R_RSFEC:
+    case MTIP_PORT_CONFIG_1x25GBASE_R:
+    case MTIP_PORT_CONFIG_1x25GBASE_R_FEC:
+    case MTIP_PORT_CONFIG_4x25GBASE_R:
+    case MTIP_PORT_CONFIG_4x25GBASE_R_FEC:
+    case MTIP_PORT_CONFIG_1x25GBASE_R_RSFEC:
+    case MTIP_PORT_CONFIG_4x25GBASE_R_RSFEC:
+    case MTIP_PORT_CONFIG_1x10GBASE_R:
+    case MTIP_PORT_CONFIG_1x10GBASE_R_FEC:
+    case MTIP_PORT_CONFIG_4x10GBASE_R:
+    case MTIP_PORT_CONFIG_4x10GBASE_R_FEC:
+    default:
+        {
+            CSMLOGINFO("Not changing clock rate... leaving as default");
+        }
+        break;
+    }
+}
+
+static void mtip_clocks_set_dbg_clock_rates(enum mtip_port_config_enum port_config)
+{
+    u32 ff_1_index = 1;
+    u32 hm_ref_index = 2;
+
+    struct clk* ff_1_clock = platform_driver_priv->clocks.ecpricc_dbg_clocks[ff_1_index];
+    struct clk* hm_ref_clock = platform_driver_priv->clocks.ecpricc_dbg_clocks[hm_ref_index];
+
+    switch (port_config) 
+    {
+        // config 1 is 100GBASE_R family
+    case MTIP_PORT_CONFIG_1x100GBASE_R:
+    case MTIP_PORT_CONFIG_1x100GBASE_R_RSFEC_LL:
+    case MTIP_PORT_CONFIG_1x100GBASE_R_RSFEC:
+        {
+            // set ff1 to high
+            clk_set_rate(ff_1_clock, MTIP_ECPRI_FF_CLK_HIGH);
+
+            // set hm ref to high
+            clk_set_rate(hm_ref_clock, MTIP_ECPRI_MAC_HM_REF_CLK_HIGH);
+        }
+        break;
+
+        // config 2 is 100GBASE_R2 family
+    case MTIP_PORT_CONFIG_1x100GBASE_R2:
+    case MTIP_PORT_CONFIG_1x100GBASE_R2_RSFEC:
+        {
+            // set ff1 to high
+            clk_set_rate(ff_1_clock, MTIP_ECPRI_FF_CLK_HIGH);
+
+            // set hm ref to high
+            clk_set_rate(hm_ref_clock, MTIP_ECPRI_MAC_HM_REF_CLK_HIGH);
+        }
+        break;
+
+        // config 3 is 50GBASE_R2 family
+    case MTIP_PORT_CONFIG_1x50GBASE_R2:
+    case MTIP_PORT_CONFIG_1x50GBASE_R2_RSFEC:
+    case MTIP_PORT_CONFIG_1x50GBASE_R2_LUAI:
+    case MTIP_PORT_CONFIG_1x50GBASE_R2_LUAI_FEC:
+        {
+            // set ff1 to medium
+            clk_set_rate(ff_1_clock, MTIP_ECPRI_FF_CLK_MED);
+
+            // set hm ref to high
+            clk_set_rate(hm_ref_clock, MTIP_ECPRI_MAC_HM_REF_CLK_HIGH);
+        }
+        break;
+
+        // config 4 is 20GBASE_R2 family: NOT SUPPORTED
+        // config 5 is 25GBASE_R family
+    case MTIP_PORT_CONFIG_1x25GBASE_R:
+    case MTIP_PORT_CONFIG_1x25GBASE_R_FEC:
+    case MTIP_PORT_CONFIG_4x25GBASE_R:
+    case MTIP_PORT_CONFIG_4x25GBASE_R_FEC:
+    case MTIP_PORT_CONFIG_1x25GBASE_R_RSFEC:
+    case MTIP_PORT_CONFIG_4x25GBASE_R_RSFEC:
+        {
+            // set ff1 to medium
+            clk_set_rate(ff_1_clock, MTIP_ECPRI_FF_CLK_MED);
+
+            // set hm ref to medium
+            clk_set_rate(hm_ref_clock, MTIP_ECPRI_MAC_HM_REF_CLK_MED);
+        }
+        break;
+
+        // config 6 is 50GBASE_R family
+    case MTIP_PORT_CONFIG_1x50GBASE_R:
+    case MTIP_PORT_CONFIG_1x50GBASE_R_RSFEC:
+    case MTIP_PORT_CONFIG_2x50GBASE_R:
+    case MTIP_PORT_CONFIG_2x50GBASE_R_RSFEC:
+        {
+            // set ff1 to medium
+            clk_set_rate(ff_1_clock, MTIP_ECPRI_FF_CLK_MED);
+
+            // set hm ref to high
+            clk_set_rate(hm_ref_clock, MTIP_ECPRI_MAC_HM_REF_CLK_HIGH);
+        }
+        break;
+
+        // config 7 is 10GBASE_R family
+    case MTIP_PORT_CONFIG_1x10GBASE_R:
+    case MTIP_PORT_CONFIG_1x10GBASE_R_FEC:
+    case MTIP_PORT_CONFIG_4x10GBASE_R:
+    case MTIP_PORT_CONFIG_4x10GBASE_R_FEC:
+        {
+            // set ff1 to low
+            clk_set_rate(ff_1_clock, MTIP_ECPRI_FF_CLK_LOW);
+
+            // set hm ref to low
+            clk_set_rate(hm_ref_clock, MTIP_ECPRI_MAC_HM_REF_CLK_LOW);
+        }
+        break;
+
+    case MTIP_PORT_CONFIG_1x100GBASE_R4:
+    case MTIP_PORT_CONFIG_1x100GBASE_R4_RSFEC:
+    case MTIP_PORT_CONFIG_2x50GBASE_R2:
+    case MTIP_PORT_CONFIG_2x50GBASE_R2_FEC:
+    case MTIP_PORT_CONFIG_2x50GBASE_R2_LUAI:
+    case MTIP_PORT_CONFIG_2x50GBASE_R2_LUAI_FEC:
+    case MTIP_PORT_CONFIG_1x40GBASE_R4:
+    case MTIP_PORT_CONFIG_1x40GBASE_R4_FEC:
+    default:
+        {
+            CSMLOGINFO("Not changing clock rate.. leaving at default");
+        }
+        break;
+    }
+}
+
+/**
+ * mtip_clocks_set_clock_rates 
+ * Set the clock rates for the port based on port config 
+ * Most of the clocks are unchanged 
+ * Only ff_0, ff_1, ff_2, ff_3, hm_ref have to set according to 
+ * port configuration 
+ */
+void mtip_clocks_set_clock_rates(enum mtip_port_type_enum port_type, enum mtip_port_config_enum port_config)
+{
+    switch (port_type) 
+    {
+    case MTIP_PORT_TYPE_FH_0:
+        {
+            mtip_clocks_set_fh0_clock_rates(port_config);
+        }
+        break;
+    case MTIP_PORT_TYPE_FH_1:
+        {
+            mtip_clocks_set_fh1_clock_rates(port_config);
+        }
+        break;
+    case MTIP_PORT_TYPE_FH_2:
+        {
+            mtip_clocks_set_fh2_clock_rates(port_config);
+        }
+        break;
+    case MTIP_PORT_TYPE_L2:
+        {
+            mtip_clocks_set_c2c_clock_rates(port_config);
+        }
+        break;
+    case MTIP_PORT_TYPE_DEBUG:
+        {
+            mtip_clocks_set_dbg_clock_rates(port_config);
+        }
+        break;
+    default:
+        {
+            CSMLOGERR("Unknown port type %d", port_type);
+        }
+        break;
+    }
+}

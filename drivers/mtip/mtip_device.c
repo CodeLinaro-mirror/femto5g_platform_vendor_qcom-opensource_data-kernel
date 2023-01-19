@@ -1236,7 +1236,10 @@ int mtip_netdev_set_port_config(struct net_device *netdev)
     platform_driver_priv->devices.port_devices[port_device_index].port_config = port_config;
 
     // setup ethernet based on the updated port config
-    mtip_platform_setup_ethernet();
+    mtip_platform_setup_ethernet(port_device_index);
+
+    // set the clock rates based on updated port config
+    mtip_clocks_set_clock_rates(platform_driver_priv->devices.port_devices[port_device_index].port_type, port_config);
 
     return 0;
 }
