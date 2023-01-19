@@ -26,6 +26,7 @@
 #include "mtip_macstats.h"
 #include "mtip_debug_eth.h"
 #include "mtip_sysfs.h"
+#include "mtip_debug_eth_gnl.h"
 
 struct work_struct mtip_debug_eth_work;
 
@@ -172,12 +173,17 @@ int mtip_debug_eth_probe(struct platform_device *pdev) {
 
     // Interrupt init
     mtip_debug_eth_irq_init(pdev);
+
+    mtip_debug_eth_gnl_init();
   }
 
   return debug_ret;
 }
 
-int mtip_debug_eth_remove(struct platform_device *pdev) { return 0; }
+int mtip_debug_eth_remove(struct platform_device *pdev) {
+  mtip_debug_eth_gnl_exit();
+  return 0; 
+}
 
 int mtip_debug_eth_register_platform_driver() {
   int ret_val;
