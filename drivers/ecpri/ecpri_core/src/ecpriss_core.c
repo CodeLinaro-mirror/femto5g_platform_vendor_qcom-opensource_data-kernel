@@ -461,6 +461,7 @@ static int ecpriss_core_data_init(void)
 	ecpriss_pdata->qudp_ctx->ecpriss_qudp_hal_ctx =
 		qudp_ctx_g.ecpriss_qudp_hal_ctx;
 	ecpriss_pdata->xbar_ctx->ecpriss_xbar_hal = xbar_ctx_g.ecpriss_xbar_hal;
+	spin_lock_init(&irq_lock);
 
 	/* ecpriss_pdata->stats = &stats_g; */
 
