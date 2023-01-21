@@ -19,7 +19,7 @@
 #define ECPRI_DMA_EXCEPTION_ENDP_BUFF_SIZE 1500
 
 /* Max size of outstanding packet cache */
-#define ECPRI_DMA_OUTSTANDING_PKTS_CACHE_MAX_THRESHOLD 2000
+#define ECPRI_DMA_OUTSTANDING_PKTS_CACHE_MAX_THRESHOLD 100
 
 /** Structures **/
 
