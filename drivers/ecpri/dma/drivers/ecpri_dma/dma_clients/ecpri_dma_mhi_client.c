@@ -1818,8 +1818,10 @@ static int ecpri_dma_mhi_dma_memcpy_disable(
 
 	memcpy_ctx = ecpri_dma_mhi_memcpy_ctx[idx];
 	if (!memcpy_ctx) {
-		DMAERR("Memcpy context is not initialized\n");
-		return -EPERM;
+		DMAERR(
+			"Memcpy context is not initialized function type: %d, vf_id: %d",
+			function.function_type, function.vf_id);
+		return 0;
 	}
 
 	if (ecpri_dma_mhi_check_destroy_pending(memcpy_ctx) == true) {
