@@ -810,4 +810,22 @@ int mtip_phy_create_phylink(struct mtip_port_device_info* port_device)
     return 0;
 }
 
+int mtip_phy_destroy_phylink(u32 port_index)
+{
+    // stop the phylink
+    phylink_stop(platform_driver_priv->mtip_ports[port_index]->phylink);
+
+    // destory the phylink
+    phylink_destroy(platform_driver_priv->mtip_ports[port_index]->phylink);
+
+    // free the netdev
+    free_netdev(platform_driver_priv->mtip_ports[port_index]->port_dummy_ndev);
+
+    // free the allocated memory for the mtip_port
+    kfree(platform_driver_priv->mtip_ports[port_index]);
+
+    platform_driver_priv->mtip_ports[port_index] = NULL;
+    return 0;
+}
+
 

@@ -145,22 +145,23 @@ static int mtip_platform_cleanup_link(unsigned int link_index)
       platform_driver_priv->mtip_links[link_index]->dma_hdl = 0;
 
       kfree(platform_driver_priv->mtip_links[link_index]);
+
+      platform_driver_priv->mtip_links[link_index] = NULL;
    }
    return 0;
 }
 
 static void mtip_platform_cleanup_ports(void) {
    int i;
-   unsigned int num_links;
 
-   CSMLOGINFO("cleaning up %d ports\n", platform_driver_priv->devices.num_port_phandles);
+   CSMLOGINFO("cleaning up %d ports\n", MTIP_MAX_PORTS);
 
-   for (i = 0; i < platform_driver_priv->devices.num_port_phandles; ++i) {
-       num_links = platform_driver_priv->devices.port_devices[i].num_link_phandles;
-
-      CSMLOGINFO("Freeing %d links for port %d\n", num_links, i);
-
-      //kfree(platform_driver_priv->mtip_ports[i]);
+   for (i = 0; i < MTIP_MAX_PORTS; ++i) 
+   {
+       if (platform_driver_priv->mtip_ports[i] != NULL) 
+       {
+           mtip_phy_destroy_phylink(i);
+       }
    }
 }
 
@@ -1496,21 +1497,23 @@ int mtip_platform_remove(struct platform_device *pdev)
    // free the net devices
    for (i = 0; i < MTIP_MAX_LINKS; ++i) 
    {
-      // unregister the netdevs
-      unregister_netdev(platform_driver_priv->mtip_links[i]->dev);
+       if (platform_driver_priv->mtip_links[i] != NULL) 
+       {
+           // unregister the netdevs
+          unregister_netdev(platform_driver_priv->mtip_links[i]->dev);
+
+          // free the netdevs
+          free_netdev(platform_driver_priv->mtip_links[i]->dev);
+       }
    }
 
-   // free the net devices
    for (i = 0; i < MTIP_MAX_LINKS; ++i) 
    {
-      // free the netdevs
-      free_netdev(platform_driver_priv->mtip_links[i]->dev);
-   }
-
-   // free the link info
-   for (i = 0; i < MTIP_MAX_LINKS; ++i)
-   {
-      mtip_platform_cleanup_link(i);
+       if (platform_driver_priv->mtip_links[i] != NULL) 
+       {
+           // cleanup the link
+           mtip_platform_cleanup_link(i);
+       }
    }
 
    // free the ports

@@ -31,5 +31,6 @@ struct mtip_portdev_priv
 };
 
 int mtip_phy_create_phylink(struct mtip_port_device_info* port_device);
+int mtip_phy_destroy_phylink(u32 port_index);
 
 #endif // _MTIP_PHY_H
