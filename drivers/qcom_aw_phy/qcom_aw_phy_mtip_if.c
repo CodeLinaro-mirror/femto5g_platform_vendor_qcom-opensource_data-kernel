@@ -147,38 +147,60 @@ int qcom_aw_phy_setup(
   }
 
   phy_inst_info = &phy_config_info->phy_inst_config_info[phy_inst_type];
+
+  mutex_lock(&phy_inst_info->phy_inst_lock);
+
   if (phy_inst_info->valid == false) {
     ret_val = EINVAL;
     local_err_val = LOCAL_ERROR_2;
     goto func_exit;
   }
 
-  mutex_init(&phy_inst_info->phy_inst_lock);
+  /* Ignore the call if PHY has been already brought up */
+  if (phy_inst_info->bring_up_status == true) {
+    ret_val = EINVAL;
+    local_err_val = LOCAL_ERROR_3;
+    goto func_exit;
+  }
 
   for (i = 0; i < PHY_LANE_MAX; i++) {
+
+    mutex_lock(&phy_inst_info->lane_lock[i]);
+
+    // Reset the number of lanes to 0
+    phy_inst_info->num_lanes = 0;
+
+    phy_lane_params = &phy_inst_info->lane_params[i];
+
     if (lane_config[i].lane_enabled) {
 
       // Increment the number of lanes
       phy_inst_info->num_lanes++;
 
       // Set the lane as enabled and lane speed config.
-      phy_lane_params = &phy_inst_info->lane_params[i];
       phy_lane_params->lane_config = lane_config[i];
 
-      // Initialize the lock
-      mutex_init(&phy_inst_info->lane_lock[i]);
-
-      // Initialize the retry counter and retry timer values
+      // Initialize the retry counter
       phy_inst_info->cdr_lock_retry_counter[i] = 0;
 
       QCOM_AW_PHY_LOG_INFO("%s: Port %d has lane %d enabled with speed %d",
                            __func__, port_type, i, lane_config[i].lane_speed);
     }
+    else{
+      /* Clear the old lane configuration */
+      memset(&phy_lane_params->lane_config, 0,
+             sizeof(struct eth_phy_iface_phy_lane_config));
+    }
+
+    mutex_unlock(&phy_inst_info->lane_lock[i]);
+
   }
 
 func_exit:
   QCOM_AW_PHY_LOG_ERR("%s: returns %d with local error %d", __func__, ret_val,
                       local_err_val);
+
+  mutex_unlock(&phy_inst_info->phy_inst_lock);
 
   return ret_val;
 }

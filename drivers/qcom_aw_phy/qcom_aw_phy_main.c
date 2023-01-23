@@ -811,6 +811,7 @@ static int qcom_aw_phy_inst_probe(struct platform_device *pdev) {
   int ret_val = 0;
   struct resource *tcsr_resource;
   struct pinctrl *pinctrl;
+  uint8_t i = 0;
 
   QCOM_AW_PHY_LOG_INFO("QCOM AW PHY driver instance probed for device %s!",
                        pdev->name);
@@ -830,8 +831,16 @@ static int qcom_aw_phy_inst_probe(struct platform_device *pdev) {
     if (phy_inst_type < QCOM_AW_PHY_INST_MAX) {
       phy_inst_info =
           &qcom_aw_phy_config_info.phy_inst_config_info[phy_inst_type];
+
+      /* Initialize the PHY instance fields */
       phy_inst_info->valid = true;
       phy_inst_info->phy_inst = phy_inst_type;
+
+      mutex_init(&phy_inst_info->phy_inst_lock);
+
+      for (i = 0; i < PHY_LANE_MAX; i++) {
+        mutex_init(&phy_inst_info->lane_lock[i]);
+      }
     } else {
       local_err_val = LOCAL_ERROR_0;
       ret_val = EINVAL;
