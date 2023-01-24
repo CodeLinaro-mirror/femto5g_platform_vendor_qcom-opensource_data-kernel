@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: GPL-2.0-only
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 /**
@@ -38,8 +38,8 @@ void qcom_aw_phy_synce_notify_phy_lane_state_change() {
   enum qcom_aw_phy_instance_enum phy_inst_type = QCOM_AW_PHY_INST_FH0;
   struct qcom_aw_phy_inst_config *phy_inst_info = NULL;
   enum eth_phy_iface_phy_lane_num_enum lane_num;
-  enum qcom_aw_phy_synce_lane_id synce_lane_num;
-  struct qcom_aw_phy_synce_lane_status lane_status[MAX_PHY_SYNCE_LANES];
+  enum qcom_aw_phy_synce_eth_inst synce_eth_num;
+  struct qcom_aw_phy_gnl_eth_status eth_status[MAX_ETH_NUM];
   enum local_error_enum local_err_val = LOCAL_ERROR_INVALID;
 
   phy_config_info = qcom_aw_phy_get_config_info();
@@ -48,8 +48,8 @@ void qcom_aw_phy_synce_notify_phy_lane_state_change() {
     goto func_exit;
   }
 
-  memset(lane_status, 0,
-         sizeof(struct qcom_aw_phy_synce_lane_status) * MAX_PHY_SYNCE_LANES);
+  memset(eth_status, 0,
+         sizeof(struct qcom_aw_phy_gnl_eth_status) * MAX_ETH_NUM);
 
   for (phy_inst_type = QCOM_AW_PHY_INST_FH0;
        phy_inst_type <= QCOM_AW_PHY_INST_L2; phy_inst_type++) {
@@ -58,9 +58,10 @@ void qcom_aw_phy_synce_notify_phy_lane_state_change() {
     if (phy_inst_info->valid) {
       for (lane_num = PHY_LANE_0; lane_num < PHY_LANE_MAX; lane_num++) {
         if (phy_inst_info->lane_params[lane_num].link_status) {
-          synce_lane_num = (phy_inst_type * PHY_LANE_MAX) + lane_num;
-          lane_status[synce_lane_num].lane_status = true;
-          lane_status[synce_lane_num].lane_speed =
+          synce_eth_num = qcom_aw_phy_synce_phy_lane_to_eth_inst(phy_inst_type,
+                                                                 lane_num);
+          eth_status[synce_eth_num].eth_status = true;
+          eth_status[synce_eth_num].lane_speed =
               phy_inst_info->lane_params[lane_num].lane_config.lane_speed;
         }
       }
@@ -68,7 +69,7 @@ void qcom_aw_phy_synce_notify_phy_lane_state_change() {
   }
 
   // Send netlink message with lane_status for all lanes
-  qcom_aw_phy_gnl_lane_status_change(lane_status);
+  qcom_aw_phy_gnl_eth_status_change(eth_status);
 
 func_exit:
   QCOM_AW_PHY_LOG_ERR("qcom_aw_phy_synce_notify_phy_lane_state_change, "
@@ -90,7 +91,7 @@ void qcom_aw_phy_synce_notify_snr_valid_change(
     enum qcom_aw_phy_instance_enum phy_inst,
     enum eth_phy_iface_phy_lane_num_enum lane_num, bool valid) {
 
-  struct qcom_aw_phy_synce_snr_valid_change snr_valid_info = {0};
+  struct qcom_aw_phy_gnl_snr_valid_change snr_valid_info = {0};
   enum local_error_enum local_err_val = LOCAL_ERROR_INVALID;
 
   if (!QCOM_AW_PHY_INST_VALID(phy_inst) || !QCOM_AW_PHY_LANE_VALID(lane_num)) {
@@ -98,7 +99,8 @@ void qcom_aw_phy_synce_notify_snr_valid_change(
     goto func_exit;
   }
 
-  snr_valid_info.lane_id = (phy_inst * PHY_LANE_MAX) + lane_num;
+  snr_valid_info.eth_inst = qcom_aw_phy_synce_phy_lane_to_eth_inst(phy_inst,
+                                                                   lane_num);
   snr_valid_info.snr_valid_status = valid;
 
   // Send netlink message with SNR valid status for this lane
@@ -353,5 +355,103 @@ func_exit:
                        "ret_val %d, local error %d",
                        synce_lane_num, ret_val, local_err_val);
 
+  return ret_val;
+}
+
+/*-------------------------------------------------------------------
+* qcom_aw_phy_synce_eth_inst_to_phy_lane_id
+
+* @eth_inst: ETH instance
+
+* Return value : @lane_num: PHY lane number
+
+* Description: This function takes ETH instance as an input
+               and translates it into PHY lane id.
+------------------------------------------------------------------- */
+enum qcom_aw_phy_synce_lane_id qcom_aw_phy_synce_eth_inst_to_phy_lane_id(
+      enum qcom_aw_phy_synce_eth_inst eth_inst){
+  u32 i = 0;
+  u32 eth_link_index;
+  struct qcom_aw_phy_config *phy_config_info = NULL;
+  enum qcom_aw_phy_instance_enum phy_inst_type = QCOM_AW_PHY_INST_MAX;
+  struct qcom_aw_phy_inst_config *phy_inst_info = NULL;
+  struct eth_phy_iface_phy_lane_config lane_config;
+  enum local_error_enum local_err_val = LOCAL_ERROR_INVALID;
+  enum qcom_aw_phy_synce_lane_id ret_val = LANE_NONE;
+
+  if (eth_inst <= ETH_NONE || eth_inst >= MAX_ETH_NUM) {
+    local_err_val = LOCAL_ERROR_0;
+    goto func_exit;
+  }
+
+  phy_inst_type = (enum qcom_aw_phy_instance_enum)(eth_inst/MAX_MAC_LINKS_PER_PORT);
+  eth_link_index = eth_inst%4;
+
+  phy_config_info = qcom_aw_phy_get_config_info();
+  if (!phy_config_info) {
+    local_err_val = LOCAL_ERROR_1;
+    goto func_exit;
+  }
+
+  phy_inst_info = &phy_config_info->phy_inst_config_info[phy_inst_type];
+  if (phy_inst_info->valid == false) {
+    local_err_val = LOCAL_ERROR_2;
+    goto func_exit;
+  }
+
+  for (i = 0; i < PHY_LANE_MAX; i++) {
+    lane_config = phy_inst_info->lane_params[i].lane_config;
+    if (lane_config.lane_enabled &&
+        lane_config.link_index == eth_link_index){
+        ret_val = (phy_inst_type*PHY_LANE_MAX)+i;
+        break;
+    }
+  }
+
+func_exit:
+  QCOM_AW_PHY_LOG_ERR("%s: returns %d with local error %d", __func__, ret_val,
+                      local_err_val);
+  return ret_val;
+}
+
+/*-------------------------------------------------------------------
+* qcom_aw_phy_synce_phy_lane_to_eth_inst
+
+* @PHY instance
+* @PHY lane number
+
+* Return value: @eth_inst: ETH instance
+
+* Description: This function takes PHY lane id as an input
+               and translates it into ETH instance 
+------------------------------------------------------------------- */
+enum qcom_aw_phy_synce_eth_inst qcom_aw_phy_synce_phy_lane_to_eth_inst(
+      enum qcom_aw_phy_instance_enum phy_inst_type,
+      enum eth_phy_iface_phy_lane_num_enum lane_num){
+  u32 eth_link_index;
+  struct qcom_aw_phy_config *phy_config_info = NULL;
+  struct qcom_aw_phy_inst_config *phy_inst_info = NULL;
+  enum local_error_enum local_err_val = LOCAL_ERROR_INVALID;
+  enum qcom_aw_phy_synce_eth_inst ret_val = ETH_NONE;
+
+  phy_config_info = qcom_aw_phy_get_config_info();
+  if (!phy_config_info) {
+    local_err_val = LOCAL_ERROR_0;
+    goto func_exit;
+  }
+
+  phy_inst_info = &phy_config_info->phy_inst_config_info[phy_inst_type];
+  if (phy_inst_info->valid == false) {
+    local_err_val = LOCAL_ERROR_1;
+    goto func_exit;
+  }
+
+  eth_link_index = phy_inst_info->lane_params[lane_num].lane_config.link_index;
+
+  ret_val = (phy_inst_type*MAX_MAC_LINKS_PER_PORT) + eth_link_index;
+
+func_exit:
+  QCOM_AW_PHY_LOG_ERR("%s: returns %d with local error %d", __func__, ret_val,
+                      local_err_val);
   return ret_val;
 }

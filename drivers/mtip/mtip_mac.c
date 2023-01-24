@@ -145,10 +145,6 @@ static irqreturn_t mtip_mac_interrupt_handler(int irq, void *devptr)
    u32 handled_interrupts = MTIP_MAC_INTERRUPT_PTP_TX_INTR;
    handled_interrupts |= MTIP_MAC_INTERRUPT_LINK_DOWN_INTR;
    handled_interrupts |= MTIP_MAC_INTERRUPT_LINK_UP_INTR;
-   handled_interrupts |= MTIP_MAC_INTERRUPT_HI_BER_INTR;
-   handled_interrupts |= MTIP_MAC_INTERRUPT_LINE_FAULT_INTR;
-   handled_interrupts |= MTIP_MAC_INTERRUPT_REMOTE_FAULT_INTR;
-   handled_interrupts |= MTIP_MAC_INTERRUPT_LOCAL_FAULT_INTR;
 
    CSMLOGINFO("ENTER: Interrupt! handling 0x%x\n", handled_interrupts);
 
@@ -251,38 +247,6 @@ static irqreturn_t mtip_mac_interrupt_handler(int irq, void *devptr)
 
                    handled = true;
                }
-           }
-
-           // check if HI BER
-           if ((int_status & MTIP_MAC_INTERRUPT_HI_BER_INTR) != 0)
-           {
-               CSMLOGINFO("Received a HI-BER interrupt on link_index: %d", link_index);
-
-               handled = true;
-           }
-
-           // check if LINE FAULT
-           if ((int_status & MTIP_MAC_INTERRUPT_LINE_FAULT_INTR) != 0)
-           {
-               CSMLOGINFO("Received a Line fault interrupt on link_index: %d", link_index);
-
-               handled = true;
-           }
-
-           // check if REMOTE FAULT
-           if ((int_status & MTIP_MAC_INTERRUPT_REMOTE_FAULT_INTR) != 0)
-           {
-               CSMLOGINFO("Received a remote fault interrupt on link_index: %d", link_index);
-
-               handled = true;
-           }
-
-           // check if LOCAL FAULT
-           if ((int_status & MTIP_MAC_INTERRUPT_LOCAL_FAULT_INTR) != 0)
-           {
-               CSMLOGINFO("Received a local fault interrupt on link_index: %d", link_index);
-
-               handled = true;
            }
 
            // catchall
@@ -1197,9 +1161,6 @@ void mtip_mac_set_interrupt_mask(u32 link_index)
     write_val  =  MTIP_MAC_INTERRUPT_PTP_TX_INTR;
     write_val |= MTIP_MAC_INTERRUPT_LINK_DOWN_INTR;
     write_val |= MTIP_MAC_INTERRUPT_LINK_UP_INTR;
-    write_val |= MTIP_MAC_INTERRUPT_HI_BER_INTR;
-    write_val |= MTIP_MAC_INTERRUPT_LINE_FAULT_INTR;
-    write_val |= MTIP_MAC_INTERRUPT_REMOTE_FAULT_INTR;
 
     CSMLOGINFO("Setting mask: 0x%x to register 0x%x with real_link_number %d link_index %d\n", write_val, 
                real_link_number*MTIP_MAC_WRAPPER_INTERRUPT_OFFSET + MTIP_MAC_WRAPPER_INTERRUPT_MASK_REG_OFFSET, real_link_number, link_index);

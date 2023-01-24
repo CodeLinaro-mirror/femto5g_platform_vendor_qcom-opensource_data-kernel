@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: GPL-2.0-only
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 /**
@@ -734,6 +734,7 @@ int qcom_aw_phy_mac_link_status(enum mtip_port_type_enum port_type,
   enum qcom_aw_phy_instance_enum phy_inst_type = QCOM_AW_PHY_INST_MAX;
   struct qcom_aw_phy_inst_config *phy_inst_info = NULL;
   enum eth_phy_iface_phy_lane_num_enum lane_num;
+  bool notify_flag = false;
   enum local_error_enum local_err_val = LOCAL_ERROR_INVALID;
   int ret_val = 0;
 
@@ -761,11 +762,16 @@ int qcom_aw_phy_mac_link_status(enum mtip_port_type_enum port_type,
   }
 
   for (lane_num = PHY_LANE_0; lane_num < PHY_LANE_MAX; lane_num++) {
-    if(lanes_enabled[lane_num])
-      phy_inst_info->lane_params[lane_num].link_status = status;
+    if(lanes_enabled[lane_num]){
+      if(phy_inst_info->lane_params[lane_num].link_status != status){
+        phy_inst_info->lane_params[lane_num].link_status = status;
+        notify_flag = true;
+      }
+    }
   }
 
-  qcom_aw_phy_synce_notify_phy_lane_state_change();
+  if(notify_flag)
+    qcom_aw_phy_synce_notify_phy_lane_state_change();
 
 func_exit:
   QCOM_AW_PHY_LOG_ERR("%s: PHY instance %d, status %d, "
