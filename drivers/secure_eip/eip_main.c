@@ -22,6 +22,7 @@
 #include "eip_macsec.h"
 #include "adapter_secy_support.h"
 #include "adapter_cfye_support.h"
+#include "eip_log.h"
 
 /* ETHSS_FHx_MACSEC_WRAPPER_CSR Init sequence offsets and recommended values*/
 #define MACSEC_WRAPPER_CFG_REG_OFFSET    0x000A8000
@@ -435,31 +436,48 @@ static int eip_module_init(void)
 	int ret = 0;
 	int nIRQ = -1;
 
+	ret = eip_log_init();
+	if(ret)
+	{
+		pr_err("eip_main: eip_log_init with error: %d\n",
+		       ret);
+		return -EINVAL;
+	}
 	pr_info("eip_main: secure eip_module_init called\n");
 
 	eip_secy_cfye_spinlock_init();
 
 	/* trigger first-time initialization of the adapter */
-	if (Device_Initialize(&nIRQ) < 0)
-		return -EINVAL;
+	ret = Device_Initialize(&nIRQ);
+	if (ret)
+		goto device_init_fail;
 
 	ret = platform_driver_register(&eip_driver);
-	if (ret < 0) {
+	if (ret) {
 		pr_err("eip_main: platform_driver_register with error: %d\n",
 		       ret);
-		Device_UnInitialize();
+		goto platform_reg_fail;
 	}
 	ret = macsec_eth_set_macsec_ops(&eip_macsec_ops);
-	if (ret < 0) {
+	if (ret) {
 		pr_err
 		    ("eip_main: macsec_eth_set_macsec_ops failed with ret %d\n",
 		     ret);
-		platform_driver_unregister(&eip_driver);
-		Device_UnInitialize();
-		return ret;
+		goto macsec_ops_fail;
 	}
 
 	pr_info("eip_main: secure eip_module_init ret %d\n", ret);
+
+	return ret;
+
+macsec_ops_fail:
+	platform_driver_unregister(&eip_driver);
+
+platform_reg_fail:
+	Device_UnInitialize();
+
+device_init_fail:
+	eip_log_deinit();
 
 	return ret;
 }
@@ -467,11 +485,9 @@ static int eip_module_init(void)
 static void eip_module_exit(void)
 {
 	printk("eip_main: eip_module_exit called\n");
-
 	platform_driver_unregister(&eip_driver);
 	Device_UnInitialize();
-
-	return;
+	eip_log_deinit();
 }
 
 int Driver164_Init(void)
