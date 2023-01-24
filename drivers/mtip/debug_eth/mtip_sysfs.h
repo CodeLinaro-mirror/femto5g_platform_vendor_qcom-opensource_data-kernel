@@ -178,8 +178,8 @@ void mtip_sysfs_isr_work_thread(struct work_struct *work);
 void setup_diag_l3_saddr(u_int8_t *l3_saddr);
 void setup_diag_l3_daddr(u_int8_t *l3_daddr);
 void setup_diag_l2_daddr(u_int8_t *l2_daddr);
-void setup_diag_addr_range(u_int8_t fifo_num, u_int8_t addr_range_start,
-                           u_int8_t addr_range_end);
+void setup_diag_addr_range(u_int8_t fifo_num, u_int32_t addr_range_start,
+                           u_int32_t addr_range_end);
 void setup_diag_port(u_int8_t src_port, u_int8_t dest_port);
 void setup_diag_flush(u_int8_t fifo_num);
 void setup_diag_threshold(u_int8_t fifo_num, u_int8_t threshold);

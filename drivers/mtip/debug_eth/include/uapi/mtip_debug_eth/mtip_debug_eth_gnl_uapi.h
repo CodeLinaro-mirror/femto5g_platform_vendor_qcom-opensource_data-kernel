@@ -52,8 +52,8 @@ typedef struct {
   u_int8_t dest_l3_addr[4];
   u_int8_t source_l2_addr[6];
   u_int8_t dest_l2_addr[6];
-  u_int8_t addr_range_start;
-  u_int8_t addr_range_end;
+  u_int32_t addr_range_start;
+  u_int32_t addr_range_end;
   u_int8_t source_port;
   u_int8_t dest_port;
   u_int8_t flush;

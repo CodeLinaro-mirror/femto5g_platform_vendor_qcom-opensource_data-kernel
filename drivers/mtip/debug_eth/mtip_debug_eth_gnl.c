@@ -94,6 +94,7 @@ int mtip_debug_eth_gnl_set_common_params(struct sk_buff *sender_skb,
   struct nlattr *na;
   mtip_debug_eth_gnl_params *mtip_debug_eth_gnl_params_tbl;
   int ret_val = 0;
+  int temp = 0;
 
   pr_err("mtip_debug_eth_gnl_set_common_params invoked");
 
@@ -114,9 +115,11 @@ int mtip_debug_eth_gnl_set_common_params(struct sk_buff *sender_skb,
     return ret_val;
   }
 
-  setup_diag_l3_saddr(mtip_debug_eth_gnl_params_tbl->source_l3_addr);
-  setup_diag_l3_daddr(mtip_debug_eth_gnl_params_tbl->dest_l3_addr);
   setup_diag_l2_daddr(mtip_debug_eth_gnl_params_tbl->dest_l2_addr);
+  if(memcmp(mtip_debug_eth_gnl_params_tbl->source_l3_addr,&temp,4*sizeof(u_int8_t))!=0 && memcmp(mtip_debug_eth_gnl_params_tbl->dest_l3_addr,&temp,4*sizeof(u_int8_t))!=0){
+    setup_diag_l3_saddr(mtip_debug_eth_gnl_params_tbl->source_l3_addr);
+    setup_diag_l3_daddr(mtip_debug_eth_gnl_params_tbl->dest_l3_addr);
+  }
 
   return 0;
 }

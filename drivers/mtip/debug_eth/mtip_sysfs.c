@@ -392,8 +392,8 @@ void setup_diag_l2_daddr(u_int8_t *l2_daddr){
   return;
 }
 
-void setup_diag_addr_range(u_int8_t fifo_num, u_int8_t addr_range_start,
-                           u_int8_t addr_range_end) {
+void setup_diag_addr_range(u_int8_t fifo_num, u_int32_t addr_range_start,
+                           u_int32_t addr_range_end) {
 
   pr_err("setup_diag_addr_range called with fifo_num :%d addr_range_start : %d "
          "addr_range_end : %d \n",
