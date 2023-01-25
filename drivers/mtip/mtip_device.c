@@ -896,6 +896,11 @@ static int mtip_open(struct net_device *netdev)
     */
    platform_driver_priv->mtip_links[link_index]->state = MTIP_LINK_STATE_OPEN; 
 
+   /* 
+    * set the link state to OPEN * 
+    */
+   platform_driver_priv->mtip_links[link_index]->state = MTIP_LINK_STATE_OPEN; 
+
    // this is done only for the RUMI E2E
    if (mtip_rumi_platform != 0) 
    {
