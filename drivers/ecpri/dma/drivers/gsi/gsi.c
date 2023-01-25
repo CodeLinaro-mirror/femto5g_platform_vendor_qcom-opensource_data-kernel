@@ -152,6 +152,30 @@ static void __gsi_remove_ev_hdl(u32 hdl) {
 	spin_unlock_irqrestore(&gsi_ctx->ev_idr_lock, flags);
 }
 
+static void __gsi_clear_all_irq(int gsi_id, int ee)
+{
+	u32 k, max_k;
+	u32 val = ~0;
+
+	gsihal_write_reg_pn(GSI_EE_n_CNTXT_GLOB_IRQ_CLR, gsi_id, ee, val);
+	gsihal_write_reg_pn(GSI_EE_n_CNTXT_GSI_IRQ_CLR, gsi_id, ee, val);
+
+	max_k = gsihal_get_bit_map_array_size();
+	for (k = 0; k < max_k; k++)
+	{
+		gsihal_write_reg_pnk(GSI_INTER_EE_n_SRC_GSI_CH_IRQ_CLR_k, gsi_id, ee,
+			k, val);
+		gsihal_write_reg_pnk(GSI_INTER_EE_n_SRC_EV_CH_IRQ_CLR_k, gsi_id, ee,
+			k, val);
+		gsihal_write_reg_pnk(GSI_EE_n_CNTXT_SRC_GSI_CH_IRQ_CLR_k, gsi_id, ee,
+			k, val);
+		gsihal_write_reg_pnk(GSI_EE_n_CNTXT_SRC_EV_CH_IRQ_CLR_k, gsi_id, ee,
+			k, val);
+		gsihal_write_reg_pnk(GSI_EE_n_CNTXT_SRC_IEOB_IRQ_CLR_k, gsi_id, ee,
+			k, val);
+	}
+}
+
 static void __gsi_config_type_irq(int gsi_id, int ee, u32 mask, u32 val)
 {
 	u32 curr;
@@ -1200,6 +1224,9 @@ int gsi_register_device(struct gsi_per_props* props, unsigned long* dev_hdl)
 				gsi_ctx->evt_bmap[gsi_id][i] |=
 				((1 << (props->mhi_er_id_limits[1] + 1)) - 1) ^
 				((1 << (props->mhi_er_id_limits[0])) - 1);
+
+			/* Clear all IRQs before enable */
+			__gsi_clear_all_irq(gsi_id, i);
 
 			/*
 			 * enable all interrupts but GSI_BREAK_POINT.
