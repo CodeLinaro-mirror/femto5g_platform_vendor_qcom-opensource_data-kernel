@@ -423,6 +423,9 @@ int qcom_aw_phy_bringup_manual_eq_mode(
     aw_pmd_analog_loopback_set(mss, 1);
   }
 
+  pmd_write_field(mss, RX_CTLE_ADDR, RX_CTLE_RATE_NT_MASK,
+                  RX_CTLE_RATE_NT_OFFSET, 0);
+
   /* Delay before triggering RX equalization */
   mdelay(500);
 
