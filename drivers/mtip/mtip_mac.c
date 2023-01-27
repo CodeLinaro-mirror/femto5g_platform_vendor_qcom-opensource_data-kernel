@@ -1217,20 +1217,19 @@ bool mtip_mac_wrapper_get_link_status(u32 link_index)
     void __iomem *wrapper_base_addr;
     u32 port_device_index;
     u32 link_device_index;
+    u32 real_link_number;
 
     mtip_lookup_device_by_link_index(link_index, &port_device_index, &link_device_index);
 
-    // For Debug ETH, 2nd link index to be monitored instead of 1st
-    if(platform_driver_priv->devices.port_devices[port_device_index].port_type == MTIP_PORT_TYPE_DEBUG)
-      link_device_index += 1;
+    mtip_lookup_real_link_number_by_link_index(link_index, &real_link_number);
 
     wrapper_base_addr = platform_driver_priv->devices.port_devices[port_device_index].wrapper_base_addr;
 
     read_val = (u32)ioread32(wrapper_base_addr + MTIP_MAC_WRAPPER_CORE_STATUS_REG_OFFSET);
     CSMLOGERR("mtip_mac_wrapper_get_link_status link_index: %d, core status = %d, for port %d, link %d",
-               link_index, read_val, port_device_index, link_device_index);
+               link_index, read_val, port_device_index, real_link_number);
 
-    if (((read_val & GENMASK(9,6)) >> 6) & (1 << link_device_index))
+    if (((read_val & GENMASK(9,6)) >> 6) & (1 << real_link_number))
       return true;
 
     return false;
