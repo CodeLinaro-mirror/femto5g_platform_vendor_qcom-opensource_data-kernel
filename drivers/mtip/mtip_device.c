@@ -341,6 +341,9 @@ void run_mtip_process_link_state(void* work_ptr)
  			netif_carrier_on(dev);
  			netdev_info(dev, "Link is Up\n");
  		}
+
+        // tell all the clients of the link status update
+        post_mtip_client_send_event(ETH_ECPRISS_EVENT_UP, link_index);
     }
     else
     {
@@ -361,6 +364,9 @@ void run_mtip_process_link_state(void* work_ptr)
  			netif_carrier_off(dev);
  			netdev_info(dev, "Link is Down\n");
  		}
+
+        // tell all the clients of the link status update
+        post_mtip_client_send_event(ETH_ECPRISS_EVENT_DOWN, link_index);
     }
 
     if (mtip_loopback_mode != MTIP_MODE_LOOPBACK) 
@@ -885,6 +891,10 @@ static int mtip_open(struct net_device *netdev)
        CSMLOGINFO("Number of lanes assigned to link %d is 0", link_index);
        return -ENODEV;
    }
+   /* 
+    * set the link state to OPEN * 
+    */
+   platform_driver_priv->mtip_links[link_index]->state = MTIP_LINK_STATE_OPEN; 
 
    // this is done only for the RUMI E2E
    if (mtip_rumi_platform != 0) 
@@ -945,11 +955,6 @@ static int mtip_open(struct net_device *netdev)
        */
       netif_start_queue(netdev);
    }
-
-   /* 
-    * set the link state to OPEN * 
-    */
-   platform_driver_priv->mtip_links[link_index]->state = MTIP_LINK_STATE_OPEN; 
 
    /* Send update to clients */
    post_mtip_client_send_event(ETH_ECPRISS_EVENT_UP, link_index);
