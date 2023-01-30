@@ -51,6 +51,7 @@
 #include "mtip_logging.h"
 #include "mtip_ptp.h"
 #include "mtip_workq.h"
+#include "mtip_ethtool.h"
 
 static u32 mtip_mac_get_interrupt_summary(struct mtip_port_device_info* port_device)
 {
@@ -684,24 +685,66 @@ void mtip_mac_finalize(void __iomem *mac_base_addr, unsigned int irq, const char
 static u32 mtip_mac_wrapper_calendar_cfg_val(struct mtip_port_device_info* port_device)
 {
     u32 cfg_val = 0;
-    int j;
-    u32 link_index;
-    u32 real_link_number;
-    u32 pattern = 0x00000001;
     enum mtip_port_config_enum port_config = port_device->port_config;
 
-// for now only symmetric configurations are supported
-// the weights are set to 000
-    for (j = 0; j < port_device->num_link_phandles; ++j)
+    switch (port_config) 
     {
-        link_index = port_device->link_devices[j].link_index;
+    case MTIP_PORT_CONFIG_1x100GBASE_R:
+    case MTIP_PORT_CONFIG_1x100GBASE_R_RSFEC:
+    case MTIP_PORT_CONFIG_1x100GBASE_R_RSFEC_LL:
+    case MTIP_PORT_CONFIG_1x100GBASE_R2:
+    case MTIP_PORT_CONFIG_1x100GBASE_R2_RSFEC:
+    case MTIP_PORT_CONFIG_1x50GBASE_R:
+    case MTIP_PORT_CONFIG_1x50GBASE_R_RSFEC:
+    case MTIP_PORT_CONFIG_1x40GBASE_R4:
+    case MTIP_PORT_CONFIG_1x40GBASE_R4_FEC:
+    case MTIP_PORT_CONFIG_1x10GBASE_R:
+    case MTIP_PORT_CONFIG_1x10GBASE_R_FEC:
+    case MTIP_PORT_CONFIG_1x100GBASE_R4:
+    case MTIP_PORT_CONFIG_1x100GBASE_R4_RSFEC:
+    case MTIP_PORT_CONFIG_1x50GBASE_R2:
+    case MTIP_PORT_CONFIG_1x50GBASE_R2_RSFEC:
+    case MTIP_PORT_CONFIG_1x50GBASE_R2_LUAI:
+    case MTIP_PORT_CONFIG_1x50GBASE_R2_LUAI_FEC:
+    case MTIP_PORT_CONFIG_1x25GBASE_R:
+    case MTIP_PORT_CONFIG_1x25GBASE_R_FEC:
+    case MTIP_PORT_CONFIG_1x25GBASE_R_RSFEC:
+        {
+            cfg_val = MTIP_MAC_WRAPPER_CALENDAR_CFG_REG_VAL_1_LINKS;
+        }
+        break;
 
-        mtip_lookup_real_link_number_by_link_index(link_index, &real_link_number);
-
-        cfg_val |= (pattern << (4*real_link_number));
+    case MTIP_PORT_CONFIG_2x50GBASE_R:
+    case MTIP_PORT_CONFIG_2x50GBASE_R_RSFEC:
+    case MTIP_PORT_CONFIG_2x50GBASE_R2:
+    case MTIP_PORT_CONFIG_2x50GBASE_R2_FEC:
+    case MTIP_PORT_CONFIG_2x50GBASE_R2_LUAI:
+    case MTIP_PORT_CONFIG_2x50GBASE_R2_LUAI_FEC:
+        {
+            cfg_val = MTIP_MAC_WRAPPER_CALENDAR_CFG_REG_VAL_2_LINKS;
+        }
+        break;
+    case MTIP_PORT_CONFIG_4x25GBASE_R:
+    case MTIP_PORT_CONFIG_4x25GBASE_R_FEC:
+    case MTIP_PORT_CONFIG_4x25GBASE_R_RSFEC:
+    case MTIP_PORT_CONFIG_4x10GBASE_R:
+    case MTIP_PORT_CONFIG_4x10GBASE_R_FEC:
+        {
+            cfg_val = MTIP_MAC_WRAPPER_CALENDAR_CFG_REG_VAL_4_LINKS;
+        }
+        break;
+    default:
+        {
+            cfg_val = MTIP_MAC_WRAPPER_CALENDAR_CFG_REG_VAL_4_LINKS;
+        }
+        break;
     }
 
-    CSMLOGINFO("Setting calendar config of port %d to 0x%x with port config %d and num links %d\n", port_device->port_type, cfg_val, port_config, port_device->num_link_phandles);
+    CSMLOGINFO("Setting calendar config of port %d to 0x%x with port config %d, str %s", 
+               port_device->port_type, 
+               cfg_val, 
+               port_config, 
+               mtip_ethtool_get_priv_flags_str(port_config));
 
     return cfg_val;
 }
