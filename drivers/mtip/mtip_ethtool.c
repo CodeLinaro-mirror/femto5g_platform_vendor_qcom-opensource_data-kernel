@@ -105,6 +105,11 @@ static const char* const mtip_ethtool_priv_flags_str_arr[] = {
 
 #define MTIP_ETHTOOL_PRIV_FLAGS_LEN ARRAY_SIZE(mtip_ethtool_priv_flags_str_arr)
 
+const char* mtip_ethtool_get_priv_flags_str(u32 index)
+{
+    return mtip_ethtool_priv_flags_str_arr[index];
+}
+
 static int mtip_get_sset_count(struct net_device *netdev, int sset)
 {
     CSMLOGINFO("ethtool: get_sset_count %d, %d\n", sset, MTIP_ETHTOOL_STATS_LEN);
@@ -415,6 +420,11 @@ static void mtip_ethtool_set_msglevel(struct net_device *netdev, u32 level)
         }
         break;
 
+    case 3:
+        {
+            mtip_platform_print_platform();
+        }
+        break;
     default:
         {
             CSMLOGERR("Ignoring msglevel %d for link index: %d", level, link_index);
@@ -464,7 +474,7 @@ void mtip_ethtool_set_ops(struct net_device *netdev)
    link_index = priv->link_index;
    CSMLOGERR("Link index : %d\n",link_index);
 
-
+   // TBD: here link_index is not yet valid
    if(link_index == MTIP_DEBUG_ETH_LINK_INDEX)
       netdev->ethtool_ops = mtip_debug_eth_get_ethtool_ops();
    else

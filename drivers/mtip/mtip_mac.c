@@ -1334,6 +1334,29 @@ void mtip_mac_set_interrupt_mask(u32 link_index)
     return;
 }
 
+void mtip_mac_clear_interrupt_mask(u32 link_index)
+{
+    u32 write_val = 0;
+    void __iomem *wrapper_base_addr;
+    u32 port_device_index;
+    u32 link_device_index;
+    u32 real_link_number;
+
+    mtip_lookup_device_by_link_index(link_index, &port_device_index, &link_device_index);
+
+    mtip_lookup_real_link_number_by_link_index(link_index, &real_link_number);
+
+    wrapper_base_addr = platform_driver_priv->devices.port_devices[port_device_index].wrapper_base_addr;
+
+    CSMLOGINFO("Setting mask: 0x%x to register 0x%x with real_link_number %d link_index %d\n", write_val, 
+               real_link_number*MTIP_MAC_WRAPPER_INTERRUPT_OFFSET + MTIP_MAC_WRAPPER_INTERRUPT_MASK_REG_OFFSET, real_link_number, link_index);
+
+    // Enable MAC interrupt
+    iowrite32(write_val,
+              wrapper_base_addr + real_link_number*MTIP_MAC_WRAPPER_INTERRUPT_OFFSET + MTIP_MAC_WRAPPER_INTERRUPT_MASK_REG_OFFSET);
+    return;
+}
+
 void mtip_mac_read_timestamp(u32 link_index, u32* timestamp_secs, u32* timestamp_nsecs)
 {
     void __iomem *wrapper_base_addr;

@@ -691,7 +691,7 @@ int mtip_rsfec_initialize(struct mtip_port_device_info *port_device) {
             case MTIP_PORT_CONFIG_2x50GBASE_R:
             case MTIP_PORT_CONFIG_2x50GBASE_R_RSFEC:
                 {
-                    if ((i == 0) || (i == 2))
+                    if ((i == 0) || (i == 1))
                     {
                         rsfec_control_val = MTIP_RSFEC_CONTROL_KP_ENABLE_BIT | MTIP_RSFEC_CONTROL_TC_PAD_VALUE_BIT;
                     }
@@ -730,7 +730,7 @@ int mtip_rsfec_initialize(struct mtip_port_device_info *port_device) {
             case MTIP_PORT_CONFIG_2x50GBASE_R2_LUAI:
             case MTIP_PORT_CONFIG_2x50GBASE_R2_LUAI_FEC:
                 {
-                    if ((i == 0) || (i == 2))
+                    if ((i == 0) || (i == 1))
                     {
                         rsfec_control_val = MTIP_RSFEC_CONTROL_KP_ENABLE_BIT | MTIP_RSFEC_CONTROL_TC_PAD_VALUE_BIT;
                     }

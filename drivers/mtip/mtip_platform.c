@@ -55,6 +55,7 @@
 #include "mtip_phy.h"
 #include "mtip_dut.h"
 #include "mtip_clocks.h"
+#include "mtip_ethtool.h"
 
 static int mtip_platform_setup(void);
 
@@ -1108,6 +1109,7 @@ static bool mtip_platform_consolidate_port_lane_config(struct mtip_port_device_i
     u32 lane;
     enum mtip_port_config_enum port_config = MTIP_PORT_CONFIG_4x25GBASE_R;
     bool rv = true;
+    u32 link_index;
 
     CSMLOGINFO("Consolidating lane config of port: %d\n", port_device->port_type);
 
@@ -1123,15 +1125,17 @@ static bool mtip_platform_consolidate_port_lane_config(struct mtip_port_device_i
     {
         lane_speed = port_device->link_devices[i].lane_speed;
         num_lanes = port_device->link_devices[i].num_lanes;
+        link_index = port_device->link_devices[i].link_index;
 
         for (j = 0; j < num_lanes; ++j)
         {
             lane = port_device->link_devices[i].lanes[j];
             port_device->lane_config[lane].lane_enabled = true;
             port_device->lane_config[lane].lane_speed = lane_speed;
-            port_device->lane_config[lane].link_index = i;
 
-            CSMLOGINFO("Setting port: %d lane_config[%d] to lane_speed: %d\n", port_device->port_type, lane, lane_speed);
+            port_device->lane_config[lane].link_index = link_index;
+
+            CSMLOGINFO("Setting port: %d lane_config[%d] to lane_speed: %d, link_index: %d\n", port_device->port_type, lane, lane_speed, link_index);
         }
     }
 
@@ -1183,7 +1187,7 @@ static bool mtip_platform_consolidate_port_lane_config(struct mtip_port_device_i
         break;
     }
 
-    CSMLOGINFO("Setting port: %d port config to %d", port_device->port_type, port_config);
+    CSMLOGINFO("Setting port: %d port config to %d str %s", port_device->port_type, port_config, mtip_ethtool_get_priv_flags_str(port_config));
 
     // set the config of the port
     port_device->port_config = port_config;
@@ -1237,55 +1241,75 @@ int mtip_platform_setup_ethernet(unsigned int port_device)
     for (i = 0; i < MTIP_MAX_LINKS; ++i) 
     {
         // for each valid link
-        if (platform_driver_priv->mtip_links[i] != NULL) 
+        if (mtip_lookup_device_by_link_index(i, &port_device_index, &link_device_index) >= 0)
         {
-            // find the port and link numbers
-            mtip_lookup_device_by_link_index(i, &port_device_index, &link_device_index);
-
-            if (port_device == port_device_index) 
+            // make sure there is at least one lane assigned to the link
+            if (platform_driver_priv->devices.port_devices[port_device_index].link_devices[link_device_index].num_lanes != 0)
             {
-                priv = netdev_priv(platform_driver_priv->mtip_links[i]->dev);
-
-                // Initialize the MAC block
-                mtip_mac_initialize(priv);
-
-                if (mtip_rumi_platform != 0) 
+                // check for the link object
+                if (platform_driver_priv->mtip_links[i] != NULL)
                 {
-                    // setup loopback if needed
-                    if (mtip_loopback_mode != MTIP_MODE_DEFAULT) 
+                    if (port_device == port_device_index) 
                     {
-                        // enable IOMACRO loopback
-                        mtip_dut_enable_rgmii_loopback(i);
-                    } 
-                    else 
-                    {
-                        // MDIO registration
-                        result = mtip_mdio_register(platform_driver_priv->mtip_links[i]->dev,
-                                                    platform_driver_priv->devices.port_devices[port_device_index].link_devices[link_device_index].link_pdev->dev.of_node);
-                        if (result) 
+                        priv = netdev_priv(platform_driver_priv->mtip_links[i]->dev);
+
+                        // Initialize the MAC block
+                        mtip_mac_initialize(priv);
+
+                        if (mtip_rumi_platform != 0) 
                         {
-                            CSMLOGERR("MDIO registration failed with err %d", result);
+                            // setup loopback if needed
+                            if (mtip_loopback_mode != MTIP_MODE_DEFAULT) 
+                            {
+                                // enable IOMACRO loopback
+                                mtip_dut_enable_rgmii_loopback(i);
+                            } 
+                            else 
+                            {
+                                // MDIO registration
+                                result = mtip_mdio_register(platform_driver_priv->mtip_links[i]->dev,
+                                                            platform_driver_priv->devices.port_devices[port_device_index].link_devices[link_device_index].link_pdev->dev.of_node);
+                                if (result) 
+                                {
+                                    CSMLOGERR("MDIO registration failed with err %d", result);
+                                }
+
+                                CSMLOGINFO("TX delay = %d, RX delay = %d", mtip_dut_get_tx_delay(i), mtip_dut_get_rx_delay(i));
+                            }
+                        } 
+                        else 
+                        {
+                            // this is the default for the target
+                            // initialize the PCS for the link
+                            mtip_pcs_config_pcs(i);
+
+                            if (mtip_loopback_mode == MTIP_MODE_LOOPBACK) 
+                            {
+                                // enable pcs loopback on the link
+                                mtip_pcs_enable_loopback(i);
+                            }
+
+                            if (mtip_rumi_platform == 0) 
+                            {
+                                // set the MAC interrupt mask
+                                mtip_mac_set_interrupt_mask(i);
+                            }
                         }
-
-                        CSMLOGINFO("TX delay = %d, RX delay = %d", mtip_dut_get_tx_delay(i), mtip_dut_get_rx_delay(i));
                     }
-                } 
-                else 
+                }
+            }
+            else
+            {
+                // check for the link object
+                if (platform_driver_priv->mtip_links[i] != NULL)
                 {
-                    // this is the default for the target
-                    // initialize the PCS for the link
-                    mtip_pcs_config_pcs(i);
-
-                    if (mtip_loopback_mode == MTIP_MODE_LOOPBACK) 
+                    if (port_device == port_device_index) 
                     {
-                        // enable pcs loopback on the link
-                        mtip_pcs_enable_loopback(i);
-                    }
-
-                    if (mtip_rumi_platform == 0) 
-                    {
-                        // set the MAC interrupt mask
-                        mtip_mac_set_interrupt_mask(i);
+                        if (mtip_rumi_platform == 0) 
+                        {
+                            // clear the MAC interrupt mask
+                            mtip_mac_clear_interrupt_mask(i);
+                        }
                     }
                 }
             }
@@ -1399,8 +1423,8 @@ static int mtip_platform_setup(void)
 
           priv->hashtablebits = 0;
 
-          // set the priv flags to 25Gbps
-          priv->priv_flags = (0x1 << MTIP_PORT_CONFIG_4x25GBASE_R);
+          // set the priv flags
+          priv->priv_flags = (0x1 << (platform_driver_priv->devices.port_devices[port_device_index].port_config));
 
           // Set up link between ndev and pdev
           SET_NETDEV_DEV(platform_driver_priv->mtip_links[i]->dev, &platform_driver_priv->devices.port_devices[port_device_index].link_devices[link_device_index].link_pdev->dev);
@@ -1559,3 +1583,131 @@ int mtip_platform_convert_lane_speed_to_gbps(enum eth_phy_iface_phy_lane_speed_e
     return -1;
 }
 
+void mtip_platform_print_link_device(struct mtip_link_device_info* link_device)
+{
+    int i;
+    CSMLOGINFO("link phandle: %d, link_index: %d, link name: %s", 
+               link_device->link_phandle, 
+               link_device->link_index,
+               link_device->link_name);
+
+    CSMLOGINFO("lane speed: %d, num_lanes: %d", link_device->lane_speed, link_device->num_lanes);
+
+    for (i = 0; i < link_device->num_lanes; ++i) 
+    {
+        CSMLOGINFO("lanes[%d] = %d", i, link_device->lanes[i]);
+    }
+}
+
+void mtip_platform_print_port_device(struct mtip_port_device_info* port_device)
+{
+    int i;
+
+    CSMLOGINFO("printing port phandle: %d, port_type: %d, sfp_handle: %d", 
+               port_device->port_phandle,
+               port_device->port_type,
+               port_device->sfp_phandle);
+
+    CSMLOGINFO("port config: %d str %s", port_device->port_config, mtip_ethtool_get_priv_flags_str(port_device->port_config));
+
+    for (i = 0; i < PHY_LANE_MAX; ++i) 
+    {
+        CSMLOGINFO("lane config[%d] enabled: %d speed: %d link_index: %d", 
+                   i, 
+                   port_device->lane_config[i].lane_enabled,
+                   port_device->lane_config[i].lane_speed,
+                   port_device->lane_config[i].link_index);
+    }
+
+    CSMLOGINFO("num links: %d, links probed: %d", port_device->num_link_phandles, port_device->num_link_phandles_probed);
+
+    for (i = 0; i < port_device->num_link_phandles; ++i) 
+    {
+        CSMLOGINFO("link device[%d] link phandle: %d start", i, port_device->link_phandles[i]);
+        mtip_platform_print_link_device(&port_device->link_devices[i]);
+        CSMLOGINFO("link device[%d] end", i);
+    }
+}
+
+/**
+ * print the contents of devices
+ */
+void mtip_platform_print_devices(void)
+{
+    int i;
+
+    CSMLOGINFO("devices enum_mode: %d, num ports: %d, probed: %d", 
+               platform_driver_priv->devices.mode,
+               platform_driver_priv->devices.num_port_phandles,
+               platform_driver_priv->devices.num_port_phandles_probed);
+
+    for (i = 0; i < platform_driver_priv->devices.num_port_phandles; ++i) 
+    {
+        CSMLOGINFO("port device: %d port phandle: %d start", i, platform_driver_priv->devices.port_phandles[i]);
+        mtip_platform_print_port_device(&platform_driver_priv->devices.port_devices[i]);
+        CSMLOGINFO("port device: %d end", i);
+    }
+}
+
+/**
+ * print the contents of links
+ */
+void mtip_platform_print_links(void)
+{
+    int i;
+    struct mtip_link_info* link;
+
+    for (i = 0; i < MTIP_MAX_LINKS; ++i) 
+    {
+        if (platform_driver_priv->mtip_links[i] != NULL) 
+        {
+            link = platform_driver_priv->mtip_links[i];
+
+            CSMLOGINFO("mtip_link[%d] state: %d, dma_hdl: %d, pdi: %d, ldi: %d, ts_enable: %d, peak_rx_available: %d, active fec: %d", i, 
+                       link->state,
+                       link->dma_hdl,
+                       link->port_device_index,
+                       link->link_device_index,
+                       link->ptp_ts_enabled,
+                       link->peak_rx_available,
+                       link->active_fec);
+        }
+        else
+        {
+            CSMLOGINFO("mtip_link[%d] is NULL", i);
+        }
+    }
+}
+
+/**
+ * print the contents of ports
+ */
+void mtip_platform_print_ports(void)
+{
+    int i;
+    struct mtip_port_info* port;
+
+    for (i = 0; i < MTIP_MAX_PORTS; ++i) 
+    {
+        if (platform_driver_priv->mtip_ports[i] != NULL) 
+        {
+            port = platform_driver_priv->mtip_ports[i];
+
+            CSMLOGINFO("mtip_ports[%d] port_state: %d, sfp_port_type: %d", i, port->port_state, port->sfp_port_type);
+        }
+        else
+        {
+            CSMLOGINFO("mtip_ports[%d] is NULL", i);
+        }
+    }
+}
+
+void mtip_platform_print_platform(void)
+{
+    CSMLOGINFO("Printing platform start");
+    CSMLOGINFO("perr: %d dma_is_ready: %d, phy_is_ready: %d", platform_driver_priv->perr, platform_driver_priv->dma_is_ready, platform_driver_priv->phy_is_ready);
+    mtip_platform_print_devices();
+    mtip_platform_print_links();
+    mtip_platform_print_ports();
+    CSMLOGINFO("Printing platform end");
+}
