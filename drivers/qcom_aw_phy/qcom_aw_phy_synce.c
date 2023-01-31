@@ -374,7 +374,6 @@ func_exit:
 enum qcom_aw_phy_synce_lane_id qcom_aw_phy_synce_eth_inst_to_phy_lane_id(
       enum qcom_aw_phy_synce_eth_inst eth_inst){
   u32 i = 0;
-  u32 eth_link_index;
   struct qcom_aw_phy_config *phy_config_info = NULL;
   enum qcom_aw_phy_instance_enum phy_inst_type = QCOM_AW_PHY_INST_MAX;
   struct qcom_aw_phy_inst_config *phy_inst_info = NULL;
@@ -388,7 +387,6 @@ enum qcom_aw_phy_synce_lane_id qcom_aw_phy_synce_eth_inst_to_phy_lane_id(
   }
 
   phy_inst_type = (enum qcom_aw_phy_instance_enum)(eth_inst/MAX_MAC_LINKS_PER_PORT);
-  eth_link_index = eth_inst%4;
 
   phy_config_info = qcom_aw_phy_get_config_info();
   if (!phy_config_info) {
@@ -405,7 +403,7 @@ enum qcom_aw_phy_synce_lane_id qcom_aw_phy_synce_eth_inst_to_phy_lane_id(
   for (i = 0; i < PHY_LANE_MAX; i++) {
     lane_config = phy_inst_info->lane_params[i].lane_config;
     if (lane_config.lane_enabled &&
-        lane_config.link_index == eth_link_index){
+        lane_config.link_index == eth_inst){
         ret_val = (phy_inst_type*PHY_LANE_MAX)+i;
         break;
     }
@@ -431,7 +429,6 @@ func_exit:
 enum qcom_aw_phy_synce_eth_inst qcom_aw_phy_synce_phy_lane_to_eth_inst(
       enum qcom_aw_phy_instance_enum phy_inst_type,
       enum eth_phy_iface_phy_lane_num_enum lane_num){
-  u32 eth_link_index;
   struct qcom_aw_phy_config *phy_config_info = NULL;
   struct qcom_aw_phy_inst_config *phy_inst_info = NULL;
   enum local_error_enum local_err_val = LOCAL_ERROR_INVALID;
@@ -449,9 +446,7 @@ enum qcom_aw_phy_synce_eth_inst qcom_aw_phy_synce_phy_lane_to_eth_inst(
     goto func_exit;
   }
 
-  eth_link_index = phy_inst_info->lane_params[lane_num].lane_config.link_index;
-
-  ret_val = (phy_inst_type*MAX_MAC_LINKS_PER_PORT) + eth_link_index;
+  ret_val = phy_inst_info->lane_params[lane_num].lane_config.link_index;
 
 func_exit:
   QCOM_AW_PHY_LOG_ERR("%s: returns %d with local error %d", __func__, ret_val,
