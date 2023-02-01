@@ -153,7 +153,7 @@ static irqreturn_t qcom_aw_phy_interrupt_handler(int irq, void *devptr) {
       case QCOM_AW_PHY_RX_SIGNAL_DETECT_LANE_1:
       case QCOM_AW_PHY_RX_SIGNAL_DETECT_LANE_2:
       case QCOM_AW_PHY_RX_SIGNAL_DETECT_LANE_3:
-        QCOM_AW_PHY_LOG_ERR("RX signal detect interrupt received for lane %d",
+        QCOM_AW_PHY_LOG_DBG("RX signal detect interrupt received for lane %d",
                             i - QCOM_AW_PHY_RX_SIGNAL_DETECT_LANE_0);
         wq_params = kmalloc(sizeof(struct qcom_aw_phy_work_q_params),
                             GFP_ATOMIC);
@@ -263,9 +263,11 @@ static irqreturn_t qcom_aw_phy_interrupt_handler(int irq, void *devptr) {
                             QCOM_AW_PHY_WRAPPER_INT_ERROR_CLR_REG_OFFSET);
 
 func_exit:
-  QCOM_AW_PHY_LOG_INFO(
-      "QCOM_aw_phy_interrupt_handler returns %d, local_err = %d", ret_val,
-      local_err_val);
+  if(local_err_val != LOCAL_ERROR_INVALID){
+    QCOM_AW_PHY_LOG_INFO(
+            "QCOM_aw_phy_interrupt_handler returns %d, local_err = %d", ret_val,
+            local_err_val);
+  }
 
   return ret_val;
 }
@@ -758,11 +760,6 @@ static void qcom_aw_phy_hw_init() {
                            "Version MINOR = %d Version PATCH = %d\n",
                            (version_raw >> 16) & 0xFF,
                            (version_raw >> 8) & 0xFF, version_raw & 0xFF);
-
-      // Set digital signal detect
-      pmd_write_field(&mss, RX_SIGNAL_DETECT_REG3_ADDR,
-                      RX_SIGNAL_DETECT_REG3_VALID_PCS_SEL_NT_MASK,
-                      RX_SIGNAL_DETECT_REG3_VALID_PCS_SEL_NT_OFFSET, 1);
 
 #ifndef FEATURE_QCOM_AW_RUMI_SW
       /* Register for PHY status IRQ */

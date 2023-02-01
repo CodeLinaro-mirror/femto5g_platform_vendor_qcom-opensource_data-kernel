@@ -902,6 +902,17 @@ int aw_pmd_rx_dfe_adapt_set(mss_access_t *mss, uint32_t dfe_adapt_enable) {
   return AW_ERR_CODE_NONE;
 }
 
+int aw_pmd_rx_background_adapt_enable_set(mss_access_t *mss, uint32_t rx_background_adapt)
+{
+    if (rx_background_adapt == 1){
+        CHECK(pmd_write_field(mss, RXMFSM_CTRL_ADDR, RXMFSM_CTRL_RXMFSM_EQBK_POWER_STATE_MASK, RXMFSM_CTRL_RXMFSM_EQBK_POWER_STATE_OFFSET, 0));
+    }
+    else {
+        CHECK(pmd_write_field(mss, RXMFSM_CTRL_ADDR, RXMFSM_CTRL_RXMFSM_EQBK_POWER_STATE_MASK, RXMFSM_CTRL_RXMFSM_EQBK_POWER_STATE_OFFSET, 7));
+    }
+    return AW_ERR_CODE_NONE;
+}
+
 int aw_pmd_rxeq_prbs_set(mss_access_t *mss, uint32_t prbs_en) {
   CHECK(pmd_write_field(mss, RXEQ_PRBS_ADDR, RXEQ_PRBS_MASK, RXEQ_PRBS_OFFSET,
                         prbs_en));
@@ -1775,7 +1786,7 @@ int aw_pmd_iso_request_tx_state_change(mss_access_t *mss, aw_pstate_t tx_pstate,
                                        uint32_t tx_rate, uint32_t tx_width,
                                        uint32_t timeout_us) {
   int poll_result;
-  USR_PRINTF("Setting TX rate/width/pstate\n");
+  //USR_PRINTF("Setting TX rate/width/pstate\n");
   aw_pmd_iso_tx_reset_set(mss, 1);
   aw_pmd_iso_tx_rate_set(mss, tx_rate);
   aw_pmd_iso_tx_width_set(mss, tx_width);
@@ -1807,7 +1818,7 @@ int aw_pmd_iso_request_rx_state_change(mss_access_t *mss, aw_pstate_t rx_pstate,
                                        uint32_t rx_rate, uint32_t rx_width,
                                        uint32_t timeout_us) {
   int poll_result;
-  USR_PRINTF("Setting RX rate/width/pstate\n");
+  //USR_PRINTF("Setting RX rate/width/pstate\n");
   aw_pmd_iso_rx_reset_set(mss, 1);
   aw_pmd_iso_rx_rate_set(mss, rx_rate);
   aw_pmd_iso_rx_width_set(mss, rx_width);
@@ -1843,11 +1854,11 @@ int aw_pmd_rx_check_cdr_lock(mss_access_t *mss, uint32_t timeout_us) {
                                1, timeout_us);
 
   if (poll_result == -1) {
-    USR_PRINTF("ERROR: RX CDR timed out waiting for lock\n");
+    //USR_PRINTF("ERROR: RX CDR timed out waiting for lock\n");
     return AW_ERR_CODE_POLL_TIMEOUT;
 
   } else {
-    USR_PRINTF("RX CDR is locked\n");
+    //USR_PRINTF("RX CDR is locked\n");
     return AW_ERR_CODE_NONE;
   }
 }
@@ -2029,9 +2040,8 @@ int aw_pmd_rx_equalize(mss_access_t *mss, aw_eq_type_t eq_type,
     USR_PRINTF("ERROR: Timed out waiting for rx linkeval ack\n");
     return AW_ERR_CODE_POLL_TIMEOUT;
   } else {
-    USR_PRINTF("Received RXEQ EVAL Ack\n");
     aw_pmd_eqeval_incdec_get(mss, &incdec);
-    USR_PRINTF("EqEval incdec = 0x%X\n", incdec);
+    USR_PRINTF("Received RXEQ EVAL Ack, EqEval incdec = 0x%X\n", incdec);
     return AW_ERR_CODE_NONE;
   }
 }
@@ -2125,3 +2135,20 @@ int aw_pmd_snr_vld_enable_set(mss_access_t *mss, uint32_t vld_enable) {
                         RX_SNR_REG1_VLD_ENABLE_A_OFFSET, vld_enable));
   return AW_ERR_CODE_NONE;
 }
+
+int aw_pmd_pam4_enable(mss_access_t *mss, uint32_t enable) {
+
+    CHECK(pmd_write_field(mss, RX_CNTRL_REG2_ADDR, RX_CNTRL_REG2_RX_GRAY_ENA_NT_MASK, RX_CNTRL_REG2_RX_GRAY_ENA_NT_OFFSET, enable));
+    CHECK(pmd_write_field(mss, TX_DATAPATH_REG1_ADDR, TX_DATAPATH_REG1_GRAY_CODE_ENABLE_A_MASK, TX_DATAPATH_REG1_GRAY_CODE_ENABLE_A_OFFSET, enable));
+    CHECK(pmd_write_field(mss, TX_DATAPATH_REG2_ADDR, TX_DATAPATH_REG2_PAMCODE_OVR_EN_A_MASK, TX_DATAPATH_REG2_PAMCODE_OVR_EN_A_OFFSET, enable));
+
+    return AW_ERR_CODE_NONE;
+}
+
+int aw_pmd_set_rx_spare(mss_access_t *mss, uint32_t value) {
+
+    CHECK(pmd_write_field(mss, RX_ADDR, RX_SPARE_NT_MASK, RX_SPARE_NT_OFFSET, value));
+
+    return AW_ERR_CODE_NONE;
+}
+
