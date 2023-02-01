@@ -48,6 +48,74 @@
 #include "mtip_workq.h"
 #include "mtip_mac.h"
 
+static eth_ecpriss_link_rate_e mtip_client_get_link_rate(u32 port_device_index)
+{
+    enum mtip_port_config_enum port_config = platform_driver_priv->devices.port_devices[port_device_index].port_config;
+    eth_ecpriss_link_rate_e link_rate = ETH_ECPRISS_LINK_RATE_25;
+
+    switch (port_config) 
+    {
+    case MTIP_PORT_CONFIG_1x100GBASE_R:
+    case MTIP_PORT_CONFIG_1x100GBASE_R_RSFEC_LL:
+    case MTIP_PORT_CONFIG_1x100GBASE_R_RSFEC:
+    case MTIP_PORT_CONFIG_1x100GBASE_R2:
+    case MTIP_PORT_CONFIG_1x100GBASE_R2_RSFEC:
+    case MTIP_PORT_CONFIG_1x100GBASE_R4:
+    case MTIP_PORT_CONFIG_1x100GBASE_R4_RSFEC:
+        {
+            link_rate = ETH_ECPRISS_LINK_RATE_100;
+        }
+        break;
+    case MTIP_PORT_CONFIG_1x50GBASE_R:
+    case MTIP_PORT_CONFIG_1x50GBASE_R_RSFEC:
+    case MTIP_PORT_CONFIG_2x50GBASE_R:
+    case MTIP_PORT_CONFIG_2x50GBASE_R_RSFEC:
+    case MTIP_PORT_CONFIG_1x50GBASE_R2:
+    case MTIP_PORT_CONFIG_1x50GBASE_R2_RSFEC:
+    case MTIP_PORT_CONFIG_1x50GBASE_R2_LUAI:
+    case MTIP_PORT_CONFIG_1x50GBASE_R2_LUAI_FEC:
+    case MTIP_PORT_CONFIG_2x50GBASE_R2:
+    case MTIP_PORT_CONFIG_2x50GBASE_R2_FEC:
+    case MTIP_PORT_CONFIG_2x50GBASE_R2_LUAI:
+    case MTIP_PORT_CONFIG_2x50GBASE_R2_LUAI_FEC:
+        {
+            link_rate = ETH_ECPRISS_LINK_RATE_50;
+        }
+        break;
+    case MTIP_PORT_CONFIG_1x40GBASE_R4:
+    case MTIP_PORT_CONFIG_1x40GBASE_R4_FEC:
+        {
+            link_rate = ETH_ECPRISS_LINK_RATE_40;
+        }
+        break;
+    case MTIP_PORT_CONFIG_1x25GBASE_R:
+    case MTIP_PORT_CONFIG_1x25GBASE_R_FEC:
+    case MTIP_PORT_CONFIG_1x25GBASE_R_RSFEC:
+    case MTIP_PORT_CONFIG_4x25GBASE_R:
+    case MTIP_PORT_CONFIG_4x25GBASE_R_FEC:
+    case MTIP_PORT_CONFIG_4x25GBASE_R_RSFEC:
+        {
+            link_rate = ETH_ECPRISS_LINK_RATE_25;
+        }
+        break;
+    case MTIP_PORT_CONFIG_1x10GBASE_R:
+    case MTIP_PORT_CONFIG_1x10GBASE_R_FEC:
+    case MTIP_PORT_CONFIG_4x10GBASE_R:
+    case MTIP_PORT_CONFIG_4x10GBASE_R_FEC:
+        {
+            link_rate = ETH_ECPRISS_LINK_RATE_10;
+        }
+        break;
+    default:
+        {
+            CSMLOGERR("Unknown port config %d", port_config);
+        }
+        break;
+    }
+    
+    return link_rate;
+}
+
 static void mtip_update_topology()
 {
     int i, j;
@@ -120,7 +188,7 @@ static void mtip_update_topology()
                         topology->topology_params[port_number].port_params[port].link_params[link_number].link_state = mtip_get_link_state_by_device(i, j);
 
                         // set the link rate
-                        topology->topology_params[port_number].port_params[port].link_params[link_number].link_rate = ETH_ECPRISS_LINK_RATE_25;
+                        topology->topology_params[port_number].port_params[port].link_params[link_number].link_rate = mtip_client_get_link_rate(i);
 
                         // increment the link number
                         ++link_number;
