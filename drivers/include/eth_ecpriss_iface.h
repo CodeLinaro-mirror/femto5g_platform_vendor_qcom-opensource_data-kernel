@@ -56,9 +56,12 @@ typedef enum {
  * enum eth_ecpriss_link_type - link type
  */
 typedef enum {
-	ETH_ECPRISS_LINK_RATE_1000 = 0,
-	ETH_ECPRISS_LINK_RATE_100,
-	ETH_ECPRISS_LINK_RATE_25,
+    ETH_ECPRISS_LINK_RATE_10 = 0,
+    ETH_ECPRISS_LINK_RATE_25,
+    ETH_ECPRISS_LINK_RATE_40,
+    ETH_ECPRISS_LINK_RATE_50,
+    ETH_ECPRISS_LINK_RATE_100,
+    ETH_ECPRISS_LINK_RATE_MAX
 } eth_ecpriss_link_rate_e;
 
 /**
