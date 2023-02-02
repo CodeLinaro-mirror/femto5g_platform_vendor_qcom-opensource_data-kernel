@@ -751,6 +751,7 @@ static u32 mtip_mac_wrapper_calendar_cfg_val(struct mtip_port_device_info* port_
 
 static void mtip_mac_wrapper_set_csr_cfg(struct mtip_port_device_info* port_device)
 {
+    // by default enable TX_CRC_APPEND for all modes
     u32 csr_cfg = MTIP_MAC_WRAPPER_CSR_CFG_REG_BASE_VAL;
     void __iomem* wrapper_base_addr = port_device->wrapper_base_addr;
     enum mtip_port_config_enum port_config = port_device->port_config;
@@ -824,12 +825,12 @@ static void mtip_mac_wrapper_set_csr_cfg(struct mtip_port_device_info* port_devi
         break;
     case MTIP_PORT_CONFIG_1x40GBASE_R4:
         {
-            csr_cfg |= 0x3c000;
+            csr_cfg |= 0x0;
         }
         break;
     case MTIP_PORT_CONFIG_1x40GBASE_R4_FEC:
         {
-            csr_cfg |= 0x3c000;
+            csr_cfg |= 0x0;
         }
         break;
     case MTIP_PORT_CONFIG_1x10GBASE_R:
