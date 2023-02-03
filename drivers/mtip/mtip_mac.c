@@ -994,7 +994,7 @@ static void mtip_mac_wrapper_set_pcs_mode(struct mtip_port_device_info* port_dev
         break;
     case MTIP_PORT_CONFIG_1x50GBASE_R2:
         {
-            pcs_mode_set =  0x3;
+            pcs_mode_set = 0x30000;
         }
         break;
     case MTIP_PORT_CONFIG_1x50GBASE_R2_RSFEC:
