@@ -9,6 +9,6 @@
 #include "aw_alphacore.h"
 
 int aw_pmd_rx_dsp_get(mss_access_t *mss, uint32_t branch,
-                      aw_dsp_param_t *dsp_info);
+                      aw_dsp_param_t *dsp_info, uint32_t print_en);
 
 #endif

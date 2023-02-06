@@ -9,7 +9,7 @@
 #include "aw_alphacore_vfield_defines.h"
 #include "aw_pmd_rx_dsp_get.h"
 
-const char aw_library_version[] = "1.0.10";
+const char aw_library_version[] = "1.0.11";
 
 uint32_t power(uint32_t x, uint32_t n)
 {
@@ -281,9 +281,12 @@ int aw_pmd_anlt_link_training_reset(mss_access_t *mss) {
 int aw_pmd_anlt_link_training_config_set(mss_access_t *mss, uint32_t width,
                                          uint32_t clause, uint32_t mod) {
 
-  CHECK(pmd_write_field(mss, ETH_LT_SETTINGS2_ADDR,
-                        ETH_LT_SETTINGS2_LT_RXDURINGEQ_MASK,
-                        ETH_LT_SETTINGS2_LT_RXDURINGEQ_OFFSET, 1));
+  CHECK(pmd_write_field(mss, ETH_LT_NO_AN_CTRL_ADDR,
+                        ETH_LT_NO_AN_CTRL_LT_WIDTH_MASK,
+                        ETH_LT_NO_AN_CTRL_LT_WIDTH_OFFSET, width));
+  CHECK(pmd_write_field(mss, ETH_LT_NO_AN_CTRL_ADDR,
+                        ETH_LT_NO_AN_CTRL_LT_CTRL_MASK,
+                        ETH_LT_NO_AN_CTRL_LT_CTRL_OFFSET, clause));
 
   CHECK(pmd_write_field(mss, ETH_LT_SETTINGS_ADDR,
                         ETH_LT_SETTINGS_LT_REG_FINAL_MOD_MASK,
@@ -552,6 +555,12 @@ int aw_pmd_force_signal_detect_config_set(mss_access_t *mss,
   }
 }
 
+int aw_pmd_txfir_ovr_set(mss_access_t *mss, uint32_t txfir_ovr) {
+  CHECK(pmd_write_field(mss, FIR_ADDR, FIR_OVR_EN_A_MASK, FIR_OVR_EN_A_OFFSET,
+                        txfir_ovr));
+  return AW_ERR_CODE_NONE;
+}
+
 int aw_pmd_txfir_config_set(mss_access_t *mss, aw_txfir_config_t *txfir_cfg,
                             uint32_t fir_ovr_enable) {
   uint32_t cm3_mask = 0x7;
@@ -607,8 +616,7 @@ int aw_pmd_txfir_config_set(mss_access_t *mss, aw_txfir_config_t *txfir_cfg,
   fir = fir + ((txfir_cfg->CM2 & cm2_mask) << 3);
   fir = fir + (txfir_cfg->CM3 & cm3_mask);
 
-  CHECK(pmd_write_field(mss, FIR_ADDR, FIR_OVR_EN_A_MASK, FIR_OVR_EN_A_OFFSET,
-                        fir_ovr_enable));
+  aw_pmd_txfir_ovr_set(mss, fir_ovr_enable);
   CHECK(pmd_write_field(mss, FIR_ADDR, FIR_VAL_A_MASK, FIR_VAL_A_OFFSET, fir));
 
   return AW_ERR_CODE_NONE;
@@ -1471,11 +1479,11 @@ int aw_pmd_iso_rx_state_ack_get(mss_access_t *mss, uint32_t *rx_state_ack) {
 
 int aw_pmd_isolate_cmn_set(mss_access_t *mss, uint32_t en) {
   CHECK(pmd_write_field(mss, DIG_SOC_CMN_OVRD_ADDR,
-                        DIG_SOC_CMN_OVRD_CMN_OVRD_EN_A_MASK,
-                        DIG_SOC_CMN_OVRD_CMN_OVRD_EN_A_OFFSET, en));
-  CHECK(pmd_write_field(mss, DIG_SOC_CMN_OVRD_ADDR,
                         DIG_SOC_CMN_OVRD_CTRL_CLK_A_MASK,
                         DIG_SOC_CMN_OVRD_CTRL_CLK_A_OFFSET, en));
+  CHECK(pmd_write_field(mss, DIG_SOC_CMN_OVRD_ADDR,
+                        DIG_SOC_CMN_OVRD_CMN_OVRD_EN_A_MASK,
+                        DIG_SOC_CMN_OVRD_CMN_OVRD_EN_A_OFFSET, en));
   return AW_ERR_CODE_NONE;
 }
 
@@ -1962,24 +1970,6 @@ int aw_pmd_rx_check_bist(mss_access_t *mss, aw_bist_mode_t bist_mode,
   return AW_ERR_CODE_FUNC_FAILURE;
 }
 
-int aw_pmd_rx_burst_err_config_set(mss_access_t *mss,
-                                   uint32_t burst_err_threshold) {
-  CHECK(pmd_write_field(
-      mss, RX_DATABIST_TOP_REG14_ADDR,
-      RX_DATABIST_TOP_REG14_BURST_ERROR_BITS_THRESHOLD_NT_MASK,
-      RX_DATABIST_TOP_REG14_BURST_ERROR_BITS_THRESHOLD_NT_OFFSET,
-      burst_err_threshold));
-  return AW_ERR_CODE_NONE;
-}
-
-int aw_pmd_rx_burst_err_get(mss_access_t *mss, uint32_t *burst_errs) {
-  CHECK(pmd_read_field(mss, RX_DATABIST_TOP_RDREG12_ADDR,
-                       RX_DATABIST_TOP_RDREG12_BURST_ERR_FOUND_CNT_NT_MASK,
-                       RX_DATABIST_TOP_RDREG12_BURST_ERR_FOUND_CNT_NT_OFFSET,
-                       burst_errs));
-  return AW_ERR_CODE_NONE;
-}
-
 int aw_pmd_eqeval_type_set(mss_access_t *mss, uint32_t eq_type) {
   CHECK(pmd_write_field(mss, DIG_SOC_LANE_OVRD_REG2_ADDR,
                         DIG_SOC_LANE_OVRD_REG2_ICTL_RX_LINKEVAL_TYPE_A_MASK,
@@ -2055,26 +2045,6 @@ int aw_pmd_rd_data_pipeline_stages_set(mss_access_t *mss,
     CHECK(pmd_write_field(mss, SRAM1_CFG_ADDR, SRAM1_CFG_RD_DATA_PIPELINE_STAGES_A_MASK, SRAM1_CFG_RD_DATA_PIPELINE_STAGES_A_OFFSET, stages));
 #endif
     return AW_ERR_CODE_NONE;
-}
-
-int aw_pmd_rx_burst_mode_config_set(mss_access_t *mss, uint32_t pam_mode,
-                                    uint32_t burst_threshold,
-                                    uint32_t burst_mode) {
-
-  CHECK(pmd_write_field(mss, RX_DATABIST_TOP_REG1_ADDR,
-                        RX_DATABIST_TOP_REG1_BURST_ERR_SYMBOL_MODE_NT_MASK,
-                        RX_DATABIST_TOP_REG1_BURST_ERR_SYMBOL_MODE_NT_OFFSET,
-                        pam_mode));
-  CHECK(pmd_write_field(mss, RX_DATABIST_TOP_REG1_ADDR,
-                        RX_DATABIST_TOP_REG1_BURST_MODE_NT_MASK,
-                        RX_DATABIST_TOP_REG1_BURST_MODE_NT_OFFSET, burst_mode));
-  CHECK(pmd_write_field(
-      mss, RX_DATABIST_TOP_REG14_ADDR,
-      RX_DATABIST_TOP_REG14_BURST_ERROR_BITS_THRESHOLD_NT_MASK,
-      RX_DATABIST_TOP_REG14_BURST_ERROR_BITS_THRESHOLD_NT_OFFSET,
-      burst_threshold));
-
-  return AW_ERR_CODE_NONE;
 }
 
 int aw_pmd_rx_gray_code_mapping_set(mss_access_t *mss, uint8_t gray_code_map) {
