@@ -1,4 +1,4 @@
-
+#ifdef CONFIG_DEBUG_FS
 #define TREE "\
 { \
 	ecpri_ss \
@@ -285,4 +285,4 @@
 	} \
 } \
 "
-
+#endif
