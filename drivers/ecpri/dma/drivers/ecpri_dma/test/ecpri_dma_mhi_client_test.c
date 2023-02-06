@@ -650,6 +650,105 @@ static void ecpri_dma_mhi_test_poll_for_start(
 	}
 }
 
+static int ecpri_dma_mhi_client_test_util_setup_redirect(
+	int src_endp_id, int default_dest_endp_id,
+	int redirect_endp_id, u32 gsi_id,
+	bool enable_loopback)
+{
+	ecpri_hwio_def_ecpri_endp_cfg_dest_gsi_m_ch_n_u endp_cfg_dest = { 0 };
+	ecpri_hwio_def_ecpri_redirect_channel_u redirect_channel = { 0 };
+	struct ecpri_dma_ecpri_endp_cfg_xbar_fields endp_cfg_xbar = { 0 };
+
+	if (!(*ecpri_dma_ctx->endp_map)[gsi_id])
+		return -EINVAL;
+
+	if (!(*ecpri_dma_ctx->endp_map)[gsi_id][src_endp_id].valid ||
+		(*ecpri_dma_ctx->endp_map)[gsi_id][src_endp_id].is_exception ||
+		!(*ecpri_dma_ctx->endp_map)[gsi_id][default_dest_endp_id].valid ||
+		(*ecpri_dma_ctx->endp_map)[gsi_id][default_dest_endp_id].is_exception||
+		!(*ecpri_dma_ctx->endp_map)[gsi_id][redirect_endp_id].valid ||
+		(*ecpri_dma_ctx->endp_map)[gsi_id][redirect_endp_id].is_exception)
+		return -EINVAL;
+
+	/* Configure test SRC ENDP to loopback into test DEST ENDP */
+	memset(&endp_cfg_dest, 0, sizeof(endp_cfg_dest));
+	memset(&endp_cfg_xbar, 0, sizeof(endp_cfg_xbar));
+	memset(&redirect_channel, 0, sizeof(redirect_channel));
+
+	/* First disable ENDPs */
+	ecpri_dma_hal_write_reg_mn(
+		ECPRI_ENDP_GSI_CFG, gsi_id, src_endp_id, 0);
+	ecpri_dma_hal_write_reg_mn(
+		ECPRI_ENDP_GSI_CFG, gsi_id, redirect_endp_id, 0);
+
+	if (enable_loopback)
+	{
+		endp_cfg_dest.def.dest_mem_channel =
+			default_dest_endp_id;
+		endp_cfg_dest.def.loopback_gid = gsi_id;
+
+		endp_cfg_xbar.loopback_en = 1;
+
+		redirect_channel.def.channel = redirect_endp_id;
+		redirect_channel.def.gid = gsi_id;
+
+		ecpri_dma_hal_write_reg_mn(
+			ECPRI_ENDP_CFG_DEST, gsi_id, src_endp_id,
+			endp_cfg_dest.value);
+		ecpri_dma_hal_write_reg_mn_fields(
+			ECPRI_ENDP_CFG_XBAR, gsi_id, src_endp_id,
+			&endp_cfg_xbar);
+		ecpri_dma_hal_write_reg(
+			ECPRI_DMA_REDIRECT_CHANNEL, redirect_channel.value);
+	}
+	else {
+		/* SRC */
+		switch ((*ecpri_dma_ctx->endp_map)[gsi_id][src_endp_id].stream_mode) {
+		case ECPRI_DMA_ENDP_STREAM_MODE_M2M:
+			endp_cfg_dest.def.use_dest_cfg = 1;
+			endp_cfg_dest.def.dest_mem_channel =
+				(*ecpri_dma_ctx->endp_map)[gsi_id][src_endp_id].dest;
+			ecpri_dma_hal_write_reg_mn(
+				ECPRI_ENDP_CFG_DEST, gsi_id, src_endp_id,
+				endp_cfg_dest.value);
+			break;
+		case ECPRI_DMA_ENDP_STREAM_MODE_M2S:
+			endp_cfg_dest.def.use_dest_cfg = 0;
+			endp_cfg_xbar.dest_stream =
+				(*ecpri_dma_ctx->endp_map)[gsi_id][src_endp_id].dest;
+			endp_cfg_xbar.xbar_tid =
+				(*ecpri_dma_ctx->endp_map)[gsi_id][src_endp_id].tid.value;
+			//TODO: Below are required for nFAPI
+			//endp_cfg_xbar.xbar_user = Get from Core driver, need API
+			endp_cfg_xbar.l2_segmentation_en =
+				(*ecpri_dma_ctx->endp_map)[gsi_id][src_endp_id].is_nfapi ? 1 : 0;
+			ecpri_dma_hal_write_reg_mn(
+				ECPRI_ENDP_CFG_DEST, gsi_id, src_endp_id,
+				endp_cfg_dest.value);
+			ecpri_dma_hal_write_reg_mn_fields(
+				ECPRI_ENDP_CFG_XBAR, gsi_id, src_endp_id,
+				&endp_cfg_xbar);
+			break;
+		default:
+			DMA_UT_ERR("SRC ENDP %d isn't M2M or S2M, address = 0x%px\n",
+				src_endp_id, &(*ecpri_dma_ctx->endp_map)[gsi_id][src_endp_id]);
+			return -EINVAL;
+			break;
+		}
+
+		ecpri_dma_hal_write_reg(
+			ECPRI_DMA_REDIRECT_CHANNEL, redirect_channel.value);
+	}
+
+	/* Re-enable ENDPs */
+	ecpri_dma_hal_write_reg_mn(
+		ECPRI_ENDP_GSI_CFG, gsi_id, src_endp_id, 1);
+	ecpri_dma_hal_write_reg_mn(
+		ECPRI_ENDP_GSI_CFG, gsi_id, redirect_endp_id, 1);
+
+	return 0;
+}
+
 static int ecpri_dma_mhi_client_test_util_setup_dma_endps(
 	int src_endp_id, int dest_endp_id, u32 gsi_id,
 	bool enable_loopback)
@@ -2226,7 +2325,7 @@ static int ecpri_dma_mhi_test_q_transfer_re(
 	struct ecpri_dma_mem_buffer ev_ring_bufs[],
 	u8 host_ch_id,
 	struct ecpri_dma_mem_buffer *buffer,
-	enum ecpri_dma_ees ee, int gsi_id)
+	enum ecpri_dma_ees ee, int gsi_id, bool redirect)
 {
 	struct gsi_tre* curr_re;
 	struct ecpri_dma_mhi_mmio_register_set* p_mmio;
@@ -2314,6 +2413,8 @@ static int ecpri_dma_mhi_test_q_transfer_re(
 	curr_re->ieob = true;
 	curr_re->ieot = true;
 	curr_re->chain = 0;
+	if(redirect)
+		curr_re->redirect = 1;
 
 	/* set next WP */
 	host_channels[host_ch_id].wp =
@@ -2355,6 +2456,222 @@ static void ecpri_dma_mhi_test_check_msi_intr(int both,
 		msleep(20);
 		i++;
 	}
+}
+
+/**
+ * ecpri_dma_mhi_test_loopback_data_transfer_redirect() - Generates TRE and
+ * data and enqueues them to correct GSI ring.
+ * Sends data using loopback.
+ * @idx - VF Index
+ * @host_src_ch_id - SRC CH Host index
+ * @host_dest_ch_id - DEST CH Host index
+ * @host_redirect_ch_id - REDIRECT CH Host index
+ * @ee - EE of the VF
+ * @gsi_id - GSI ID of the VF
+ *
+ * Return: 0 on Successs, Negative on error
+ */
+static int ecpri_dma_mhi_test_loopback_data_transfer_redirect(int idx,
+	int host_src_ch_id, int host_dest_ch_id, int host_redirect_ch_id,
+	enum ecpri_dma_ees ee, int gsi_id)
+{
+	u64 redirect_orig_rp, dest_orig_rp, redirect_new_rp, dest_new_rp;
+	u64 src_orig_rp, src_new_rp;
+	struct ecpri_dma_mem_buffer* mmio;
+	struct ecpri_dma_mhi_mmio_register_set* p_mmio;
+	int i, ret;
+	static int val;
+	bool timeout = true;
+	u32 dest_device_ev_idx;
+	u32 redirect_device_ev_idx;
+	u32 src_device_ev_idx;
+	struct ecpri_dma_mhi_host_ch_ctx* host_channels;
+	struct ecpri_dma_mhi_host_ev_ctx* host_events;
+	struct ecpri_dma_mem_buffer redirect_buffer;
+	struct gsi_redirected_xfer_compl_evt* curr_ev = NULL;
+	u32 hw_ver = ecpri_dma_get_ctx_hw_ver();
+	u32 hw_flavor = ecpri_dma_get_ctx_hw_flavor();
+
+	DMA_UT_DBG(
+		"Entry VF %d host_src_ch_id %d host_dest_ch_id %d"
+		" host_redirect_ch_id %d ee %d gsi %d\n",
+		idx, host_src_ch_id, host_dest_ch_id, host_redirect_ch_id, ee, gsi_id);
+
+	mmio = &mhi_client_test_suite_ctx[idx]->mmio_buf;
+	p_mmio = (struct ecpri_dma_mhi_mmio_register_set*)mmio->virt_base;
+	host_channels = (struct ecpri_dma_mhi_host_ch_ctx*)
+		((u64)p_mmio->crcbap);
+	host_events = (struct ecpri_dma_mhi_host_ev_ctx*)
+		((u64)p_mmio->crdb);
+
+	/* invalidate MSI Interrupt value */
+	memset(mhi_client_test_suite_ctx[idx]->msi.virt_base,
+		0xFF,
+		mhi_client_test_suite_ctx[idx]->msi.size);
+
+	/* Generates different packet content values for each re-entry*/
+	val++;
+
+	/* Prepare packet and credits */
+	redirect_buffer.size = ECPRI_DMA_MHI_TEST_BUFF_SIZE;
+	redirect_buffer.virt_base = dma_alloc_coherent(
+		ecpri_dma_ctx->pdev, redirect_buffer.size,
+		&redirect_buffer.phys_base, GFP_KERNEL);
+	if (!redirect_buffer.virt_base) {
+		DMA_UT_ERR("no mem for redirect data buffer\n");
+		return -ENOMEM;
+	}
+
+	memset(redirect_buffer.virt_base, 0,
+		ECPRI_DMA_MHI_TEST_BUFF_SIZE);
+	memset(mhi_client_test_suite_ctx[idx]->dest_buffer.virt_base, 0,
+		ECPRI_DMA_MHI_TEST_BUFF_SIZE);
+	for (i = 0; i < ECPRI_DMA_MHI_TEST_BUFF_SIZE; i++)
+		((u8*)mhi_client_test_suite_ctx[idx]->src_buffer.virt_base)[i] =
+			(val + i) & 0xFF;
+
+	DMA_UT_DBG("REDIRECT BUFF VIRT 0x%px PHYS 0x%x\n",
+		redirect_buffer.virt_base,
+		redirect_buffer.phys_base);
+	DMA_UT_DBG("DEST BUFF VIRT 0x%px PHYS 0x%x\n",
+		mhi_client_test_suite_ctx[idx]->dest_buffer.virt_base,
+		mhi_client_test_suite_ctx[idx]->dest_buffer.phys_base);
+	DMA_UT_DBG("SRC BUFF VIRT 0x%px PHYS 0x%x val 0x%x\n",
+		mhi_client_test_suite_ctx[idx]->src_buffer.virt_base,
+		mhi_client_test_suite_ctx[idx]->src_buffer.phys_base,
+		*((u32*)mhi_client_test_suite_ctx[idx]->src_buffer.virt_base));
+
+	redirect_device_ev_idx = host_channels[host_redirect_ch_id].erindex;
+	DMA_UT_DBG("Redirect ER %d\n", redirect_device_ev_idx);
+	redirect_orig_rp = host_events[redirect_device_ev_idx].rp;
+
+	dest_device_ev_idx = host_channels[host_dest_ch_id].erindex;
+	DMA_UT_DBG("Dest ER %d\n", dest_device_ev_idx);
+	dest_orig_rp = host_events[dest_device_ev_idx].rp;
+
+	/* queue RE for REDIRECT side and trigger doorbell */
+	ret = ecpri_dma_mhi_test_q_transfer_re(mmio,
+		mhi_client_test_suite_ctx[idx]->xfer_ring_bufs,
+		mhi_client_test_suite_ctx[idx]->ev_ring_bufs,
+		host_redirect_ch_id,
+		&redirect_buffer, ee, gsi_id, false);
+	if (ret) {
+		DMA_UT_DBG("q_transfer_re failed %d\n", ret);
+		DMA_UT_TEST_FAIL_REPORT("fail REDIRECT q xfer re");
+		ret = -EFAULT;
+		goto fail_redirect;
+	}
+
+	/* queue RE for DEST side and trigger doorbell */
+	ret = ecpri_dma_mhi_test_q_transfer_re(mmio,
+		mhi_client_test_suite_ctx[idx]->xfer_ring_bufs,
+		mhi_client_test_suite_ctx[idx]->ev_ring_bufs,
+		host_dest_ch_id,
+		&mhi_client_test_suite_ctx[idx]->dest_buffer, ee, gsi_id, false);
+	if (ret) {
+		DMA_UT_DBG("q_transfer_re failed %d\n", ret);
+		DMA_UT_TEST_FAIL_REPORT("fail DEST q xfer re");
+		ret = -EFAULT;
+		goto fail_redirect;
+	}
+
+	src_device_ev_idx = host_channels[host_src_ch_id].erindex;
+	DMA_UT_DBG("SRC ER %d\n", src_device_ev_idx);
+	src_orig_rp = host_events[src_device_ev_idx].rp;
+
+	/* queue REs for SRC side and trigger doorbell */
+	ret = ecpri_dma_mhi_test_q_transfer_re(mmio,
+		mhi_client_test_suite_ctx[idx]->xfer_ring_bufs,
+		mhi_client_test_suite_ctx[idx]->ev_ring_bufs,
+		host_src_ch_id,
+		&mhi_client_test_suite_ctx[idx]->src_buffer, ee, gsi_id, true);
+	if (ret) {
+		DMA_UT_DBG("q_transfer_re failed %d\n", ret);
+		DMA_UT_TEST_FAIL_REPORT("fail SRC q xfer re");
+		ret = -EFAULT;
+		goto fail_redirect;
+	}
+
+	ecpri_dma_mhi_test_check_msi_intr(true, host_src_ch_id,
+		host_redirect_ch_id, idx, &timeout);
+	if (timeout) {
+		DMA_UT_DBG("transfer timeout. MSI = 0x%x\n",
+			*((u32*)mhi_client_test_suite_ctx[idx]->msi.virt_base));
+		DMA_UT_TEST_FAIL_REPORT("xfter timeout");
+		ret = -EFAULT;
+		goto fail_redirect;
+	}
+
+	redirect_new_rp = host_events[redirect_device_ev_idx].rp;
+	dest_new_rp = host_events[dest_device_ev_idx].rp;
+	src_new_rp = host_events[src_device_ev_idx].rp;
+
+	DMA_UT_DBG("REDIRECT EV RP VIRT 0x%px\n", &host_events[redirect_device_ev_idx].rp);
+	DMA_UT_DBG("DEST EV RP VIRT 0x%px\n", &host_events[dest_device_ev_idx].rp);
+	DMA_UT_DBG("SRC EV RP VIRT 0x%px\n", &host_events[src_device_ev_idx].rp);
+
+	/* Verify RP for both channels */
+	if (((dest_new_rp - dest_orig_rp) == sizeof(struct gsi_xfer_compl_evt)) ||
+		((redirect_new_rp - redirect_orig_rp) !=
+		sizeof(struct gsi_xfer_compl_evt)) ||
+		((src_new_rp - src_orig_rp) != sizeof(struct gsi_xfer_compl_evt))) {
+		DMA_UT_DBG(
+			"RP failure dest_orig 0x%x, dest_new 0x%x"
+			" src_orig 0x%x, src_new 0x%x"
+			" redirect_orig 0x%x redirect_new 0x%x\n",
+			dest_orig_rp, dest_new_rp, src_orig_rp, src_new_rp,
+			redirect_orig_rp, redirect_new_rp);
+		DMA_UT_TEST_FAIL_REPORT("RP should advance in offset of one TRE");
+		ret = -EFAULT;
+		goto fail_redirect;
+	}
+
+	/* compare the two buffers */
+	dma_sync_single_for_cpu(ecpri_dma_get_pdev(),
+		redirect_buffer.phys_base,
+		redirect_buffer.size, DMA_BIDIRECTIONAL);
+	dma_sync_single_for_cpu(ecpri_dma_get_pdev(),
+		mhi_client_test_suite_ctx[idx]->src_buffer.phys_base,
+		mhi_client_test_suite_ctx[idx]->src_buffer.size, DMA_BIDIRECTIONAL);
+
+	if (memcmp(redirect_buffer.virt_base,
+		mhi_client_test_suite_ctx[idx]->src_buffer.virt_base,
+		ECPRI_DMA_MHI_TEST_BUFF_SIZE)) {
+		DMA_UT_DBG("buffer are not equal\n");
+		DMA_UT_TEST_FAIL_REPORT("non-equal buffers after xfer");
+		ret = -EFAULT;
+		goto fail_redirect;
+	}
+
+	/* Check redirect bit is set in redirect event*/
+	curr_ev = (struct gsi_redirected_xfer_compl_evt*)
+		((u64)mhi_client_test_suite_ctx[idx]->
+			ev_ring_bufs[redirect_device_ev_idx].virt_base);
+	if(!curr_ev->redirected) {
+		DMA_UT_DBG("Redirect bit in EV not set\n");
+		DMA_UT_TEST_FAIL_REPORT("Redirect bit in EV not set");
+		ret = -EFAULT;
+		goto fail_redirect;
+	}
+
+	if(curr_ev->src_gsi != gsi_id ||
+		curr_ev->src_ch !=
+		ecpri_dma_mhi_client_test_mapping[hw_ver][hw_flavor]
+		[idx].first_src_endp_id) {
+		DMA_UT_DBG("SRC CH or GSI doesn't match expected gsi %d endp %d\n",
+			curr_ev->src_gsi, curr_ev->src_ch);
+		DMA_UT_TEST_FAIL_REPORT("SRC CH or GSI doesn't match");
+		ret = -EFAULT;
+		goto fail_redirect;
+	}
+
+fail_redirect:
+	dma_free_coherent(ecpri_dma_ctx->pdev,
+		redirect_buffer.size,
+		redirect_buffer.virt_base,
+		redirect_buffer.phys_base);
+
+	return ret;
 }
 
 /**
@@ -2421,7 +2738,7 @@ static int ecpri_dma_mhi_test_loopback_data_transfer(int idx,
 		mhi_client_test_suite_ctx[idx]->xfer_ring_bufs,
 		mhi_client_test_suite_ctx[idx]->ev_ring_bufs,
 		host_dest_ch_id,
-		&mhi_client_test_suite_ctx[idx]->dest_buffer, ee, gsi_id);
+		&mhi_client_test_suite_ctx[idx]->dest_buffer, ee, gsi_id, false);
 	if (ret) {
 		DMA_UT_DBG("q_transfer_re failed %d\n", ret);
 		DMA_UT_TEST_FAIL_REPORT("fail DEST q xfer re");
@@ -2437,7 +2754,7 @@ static int ecpri_dma_mhi_test_loopback_data_transfer(int idx,
 		mhi_client_test_suite_ctx[idx]->xfer_ring_bufs,
 		mhi_client_test_suite_ctx[idx]->ev_ring_bufs,
 		host_src_ch_id,
-		&mhi_client_test_suite_ctx[idx]->src_buffer, ee, gsi_id);
+		&mhi_client_test_suite_ctx[idx]->src_buffer, ee, gsi_id, false);
 	if (ret) {
 		DMA_UT_DBG("q_transfer_re failed %d\n", ret);
 		DMA_UT_TEST_FAIL_REPORT("fail SRC q xfer re");
@@ -3830,6 +4147,223 @@ ecpri_dma_mhi_client_test_suite_hw_ch_all_single_packet_single_buffer(void* priv
 	return ret;
 }
 
+/**
+ * ecpri_dma_mhi_client_test_suite_hw_ch_redirect() - Redirect packet via TRE
+ * REDIRECT bit.
+ * @priv - UT framework test data
+ *
+ * For HW CHs UTs to pass SMMU must be bypassed in DTSi + use of devcfg_noac tz
+ * is required for S1 + S2 SMMU bypass.
+ * In addition to bypass SMMU SIDs of DMA and GSI must be shared as following:
+ * iommus = <&apps_smmu 0x800 0x0>,
+ *		 <&apps_smmu 0x801 0x0>,
+ *		 <&apps_smmu 0x802 0x0>,
+ *		 <&apps_smmu 0xC00 0x0>,
+ *		 <&apps_smmu 0xC01 0x0>,
+ *		 <&apps_smmu 0xC02 0x0>,
+ *		 <&apps_smmu 0x1000 0x0>;
+ *	qcom,iommu-dma = "bypass";
+ *	#dma-coherent;
+ *
+ * Return: 0 on Success, Negative on fail
+ */
+static int
+ecpri_dma_mhi_client_test_suite_hw_ch_redirect(void* priv)
+{
+	int ret = 0;
+	int idx;
+	enum ecpri_dma_ees ee;
+	enum ecpri_dma_gsi_id gsi_id;
+	u8 vf_id = ECPRI_DMA_VM_IDS_VF1;
+	u32 hw_ver = ecpri_dma_get_ctx_hw_ver();
+	u32 hw_flavor = ecpri_dma_get_ctx_hw_flavor();
+	u32 src_ch, dest_ch, redirect_ch;
+
+	struct ecpri_dma_mhi_client_context* mhi_dma_ctx = NULL;
+	struct ecpri_dma_mhi_client_test_suite_context* ctx = NULL;
+
+	DMA_UT_DBG("Start HW CH VM%d\n", vf_id);
+	ctx = mhi_client_test_suite_ctx[vf_id];
+
+	/* Create function */
+	ecpri_dma_mhi_test_create_func_params(&ctx->function,
+		MHI_DMA_FUNCTION_TYPE_VIRTUAL, vf_id);
+
+	ret = ecpri_dma_mhi_test_get_func_idx(&ctx->function, &idx);
+	if (ret != 0) {
+		return ret;
+	}
+
+	/* Register driver and verify driver state */
+	ret = ecpri_dma_mhi_client_test_utils_create_params_and_init(
+		&ctx->function, &ctx->init_params,
+		&ctx->out_params, &ctx->start_params);
+	if (ret != 0) {
+		DMA_UT_ERR("VF_ID %dfailed", ctx->function.vf_id);
+		DMA_UT_TEST_FAIL_REPORT("Test has failed\n");
+		return -EFAULT;
+	}
+
+	/* Check driver context */
+	ret = ecpri_dma_mhi_client_test_utils_check_driver_state(
+		idx, &ctx->init_params, mhi_dma_ctx, &ctx->function);
+	if (ret != 0) {
+		DMA_UT_ERR("Driver state for VF_ID %d / IDX %d has failed\n",
+			ctx->function.vf_id, idx);
+		return -EPERM;
+	}
+
+	/* Create redirect loop-back */
+	ret = ecpri_dma_mhi_client_test_util_setup_redirect(
+		ecpri_dma_mhi_client_test_mapping[hw_ver][hw_flavor][idx].
+		first_src_endp_id,
+		ecpri_dma_mhi_client_test_mapping[hw_ver][hw_flavor][idx].
+		first_dest_endp_id,
+		ecpri_dma_mhi_client_test_mapping[hw_ver][hw_flavor][idx].
+		first_dest_endp_id + ECPRI_DMA_MHI_TEST_FH_CHANNEL_ID_DIFF,
+		ecpri_dma_mhi_client_test_mapping[hw_ver][hw_flavor][idx].
+		gsi_id,
+		true);
+	if (ret != 0) {
+		DMA_UT_ERR("VF_ID %d / IDX %d failed"
+			" SRC ENDP ID %d, DEST ENDP ID %d\n", ctx->function.vf_id, idx,
+			ecpri_dma_mhi_client_test_mapping[hw_ver][hw_flavor][idx].
+			first_src_endp_id,
+			ecpri_dma_mhi_client_test_mapping[hw_ver][hw_flavor][idx].
+			first_dest_endp_id + ECPRI_DMA_MHI_TEST_FH_CHANNEL_ID_DIFF);
+		DMA_UT_TEST_FAIL_REPORT("Redirect  configuration failed");
+		return -EFAULT;
+	}
+	src_ch = ECPRI_DMA_MHI_TEST_FH_FRST_SRC_CHANNEL_ID;
+	dest_ch = ecpri_dma_mhi_client_test_mapping
+		[hw_ver][hw_flavor][idx].num_of_hw_chs_pairs;
+	redirect_ch = dest_ch + ECPRI_DMA_MHI_TEST_FH_CHANNEL_ID_DIFF;
+
+	/* Invoke connect_endp and verify - for first pair */
+	ret = ecpri_dma_mhi_utils_connect_and_verify_endps(&ctx->function,
+		&ctx->src_conn_params[0], &ctx->dest_conn_params[0],
+		&ctx->src_disc_params[0].clnt_hdl,
+		&ctx->dest_disc_params[0].clnt_hdl, idx,
+		src_ch,
+		dest_ch,
+		ecpri_dma_mhi_client_test_mapping[hw_ver][hw_flavor][idx].
+		first_src_endp_id,
+		ecpri_dma_mhi_client_test_mapping[hw_ver][hw_flavor][idx].
+		first_dest_endp_id,
+		ecpri_dma_mhi_client_test_mapping[hw_ver][hw_flavor][idx].gsi_id);
+	if (ret != 0) {
+		DMA_UT_ERR("VF_ID %d / IDX %d failed\n", ctx->function.vf_id, idx);
+		DMA_UT_TEST_FAIL_REPORT("Connect_endp has failed\n");
+		return -EFAULT;
+	}
+
+	/* Invoke connect_endp and verify - for second pair */
+	ret = ecpri_dma_mhi_utils_connect_and_verify_endps(&ctx->function,
+		&ctx->src_conn_params[ECPRI_DMA_MHI_TEST_FH_CHANNEL_ID_DIFF],
+		&ctx->dest_conn_params[1],
+		&ctx->src_disc_params[ECPRI_DMA_MHI_TEST_FH_CHANNEL_ID_DIFF].clnt_hdl,
+		&ctx->dest_disc_params[ECPRI_DMA_MHI_TEST_FH_CHANNEL_ID_DIFF].clnt_hdl,
+		idx,
+		src_ch + ECPRI_DMA_MHI_TEST_FH_CHANNEL_ID_DIFF,
+		redirect_ch,
+		ecpri_dma_mhi_client_test_mapping[hw_ver][hw_flavor][idx].
+		first_src_endp_id + ECPRI_DMA_MHI_TEST_FH_CHANNEL_ID_DIFF,
+		ecpri_dma_mhi_client_test_mapping[hw_ver][hw_flavor][idx].
+		first_dest_endp_id + ECPRI_DMA_MHI_TEST_FH_CHANNEL_ID_DIFF,
+		ecpri_dma_mhi_client_test_mapping[hw_ver][hw_flavor][idx].gsi_id);
+	if (ret != 0) {
+		DMA_UT_ERR("VF_ID %d / IDX %d failed\n", ctx->function.vf_id, idx);
+		DMA_UT_TEST_FAIL_REPORT("Connect_endp has failed\n");
+		return -EFAULT;
+	}
+
+	ret = ecpri_dma_mhi_client_test_utils_get_ee_gsi_index(ctx->function, &ee,
+		&gsi_id);
+	if (ret != 0) {
+		DMA_UT_ERR("VF_ID %d / IDX %d failed\n", ctx->function.vf_id, idx);
+		DMA_UT_TEST_FAIL_REPORT("Get EE index has failed\n");
+		return -EFAULT;
+	}
+
+	/* Generate, enqueue, and poll TRE  */
+	ret = ecpri_dma_mhi_test_loopback_data_transfer_redirect(idx,
+		ECPRI_DMA_MHI_TEST_FIRST_HW_CH_ID + src_ch,
+		ECPRI_DMA_MHI_TEST_FIRST_HW_CH_ID + dest_ch,
+		ECPRI_DMA_MHI_TEST_FIRST_HW_CH_ID + redirect_ch, ee,
+		ecpri_dma_mhi_client_test_mapping[hw_ver][hw_flavor][idx].gsi_id);
+	if (ret != 0) {
+		DMA_UT_ERR("VF_ID %d / IDX %d failed"
+			" SRC ENDP ID %d, DEST ENDP ID %d\n", ctx->function.vf_id, idx,
+			ecpri_dma_mhi_client_test_mapping[hw_ver][hw_flavor][idx].
+			first_src_endp_id,
+			ecpri_dma_mhi_client_test_mapping[hw_ver][hw_flavor][idx].
+			first_dest_endp_id);
+		DMA_UT_TEST_FAIL_REPORT("Transfer has failed");
+		return -EFAULT;
+	}
+
+	/* Reset loopback at the end of the test*/
+	ret = ecpri_dma_mhi_client_test_util_setup_redirect(
+		ecpri_dma_mhi_client_test_mapping[hw_ver][hw_flavor][idx].
+		first_src_endp_id,
+		ecpri_dma_mhi_client_test_mapping[hw_ver][hw_flavor][idx].
+		first_dest_endp_id,
+		ecpri_dma_mhi_client_test_mapping[hw_ver][hw_flavor][idx].
+		first_dest_endp_id + ECPRI_DMA_MHI_TEST_FH_CHANNEL_ID_DIFF,
+		ecpri_dma_mhi_client_test_mapping[hw_ver][hw_flavor][idx].
+		gsi_id,
+		false);
+	if (ret != 0) {
+		DMA_UT_ERR("VF_ID %d / IDX %d failed"
+			" SRC ENDP ID %d, DEST ENDP ID %d\n", ctx->function.vf_id, idx,
+			ecpri_dma_mhi_client_test_mapping[hw_ver][hw_flavor][idx].
+			first_src_endp_id,
+			ecpri_dma_mhi_client_test_mapping[hw_ver][hw_flavor][idx].
+			first_dest_endp_id + ECPRI_DMA_MHI_TEST_FH_CHANNEL_ID_DIFF);
+		DMA_UT_TEST_FAIL_REPORT("Loopback configuration has failed\n");
+		return -EFAULT;
+	}
+
+	ret = ecpri_dma_mhi_driver_ops.mhi_dma_disconnect_endp(ctx->function,
+		&ctx->src_disc_params[0]);
+	if (ret != 0) {
+		DMA_UT_ERR("Disconnect endp for SRC, VF_ID %d has failed\n",
+			ctx->function.vf_id);
+		return -EPERM;
+	}
+
+	ret = ecpri_dma_mhi_driver_ops.mhi_dma_disconnect_endp(ctx->function,
+		&ctx->dest_disc_params[0]);
+	if (ret != 0) {
+		DMA_UT_ERR("Disconnect endp for DEST, VF_ID %d has failed\n",
+			ctx->function.vf_id);
+		return -EPERM;
+	}
+
+	ret = ecpri_dma_mhi_driver_ops.mhi_dma_disconnect_endp(ctx->function,
+		&ctx->src_disc_params[1]);
+	if (ret != 0) {
+		DMA_UT_ERR("Disconnect endp for SRC, VF_ID %d has failed\n",
+			ctx->function.vf_id);
+		return -EPERM;
+	}
+
+	ret = ecpri_dma_mhi_driver_ops.mhi_dma_disconnect_endp(ctx->function,
+		&ctx->dest_disc_params[1]);
+	if (ret != 0) {
+		DMA_UT_ERR("Disconnect endp for DEST, VF_ID %d has failed\n",
+			ctx->function.vf_id);
+		return -EPERM;
+	}
+
+	ecpri_dma_mhi_driver_ops.mhi_dma_destroy(ctx->function);
+
+	DMA_UT_DBG("Finished HW CH VM%d\n", vf_id);
+
+	return 0;
+}
+
+
 /* Suite definition block */
 DMA_UT_DEFINE_SUITE_START(mhi_client, "MHI Client suite",
 	ecpri_dma_mhi_client_test_suite_setup,
@@ -3922,4 +4456,11 @@ DMA_UT_DEFINE_SUITE_START(mhi_client, "MHI Client suite",
 			"the content of the recevied packet.",
 			ecpri_dma_mhi_client_test_suite_hw_ch_all_single_packet_single_buffer,
 			false, ECPRI_HW_V1_0, ECPRI_HW_MAX),
+		DMA_UT_ADD_TEST(
+			hw_ch_redirect,
+			"Tests will verify the HW path for VM0. Test will connect ENDPs"
+			" and send the test packet via loopback from SRC to redirect DEST."
+			" Test will compare the content of the recevied packet.",
+			ecpri_dma_mhi_client_test_suite_hw_ch_redirect,
+			false, ECPRI_HW_V2_0, ECPRI_HW_MAX),
 } DMA_UT_DEFINE_SUITE_END(mhi_client);
