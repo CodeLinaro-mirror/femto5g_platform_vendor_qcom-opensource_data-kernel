@@ -1832,7 +1832,7 @@ int ecpriss_qudp_fh_rx_filter_cfg(uint32_t port_index, ecpriss_qudp_rx_cfg_s *rx
 		if(rx_cfg->fltr_en_mask & ECPRISS_QUDP_RX_CFG_FLTR_MASK_IP_DADDR)
 		{
 
-			dst_ip0.value |= ((rx_cfg->ip_dst_addr[3]) | (rx_cfg->ip_dst_addr[2] << 8) | (rx_cfg->ip_dst_addr[1] << 16)
+			dst_ip0.value = ((rx_cfg->ip_dst_addr[3]) | (rx_cfg->ip_dst_addr[2] << 8) | (rx_cfg->ip_dst_addr[1] << 16)
 					| (rx_cfg->ip_dst_addr[0] << 24));
 
 
@@ -1842,14 +1842,14 @@ int ecpriss_qudp_fh_rx_filter_cfg(uint32_t port_index, ecpriss_qudp_rx_cfg_s *rx
 					qudp_ingress_port->num_ip_fltr_entries,
 					&dst_ip0);
 
-			qudp_ingress_port->ipdst_addr[qudp_ingress_port->num_ip_fltr_entries][0] |= dst_ip0.value ;
+			qudp_ingress_port->ipdst_addr[qudp_ingress_port->num_ip_fltr_entries][0] = dst_ip0.value ;
 
 
 			if(rx_cfg->ip_type == ECPRISS_IPV6_TYPE)
 			{
 
 
-				dst_ip1.value |= ((rx_cfg->ip_dst_addr[7]) | (rx_cfg->ip_dst_addr[6] << 8) | (rx_cfg->ip_dst_addr[5] << 16)
+				dst_ip1.value = ((rx_cfg->ip_dst_addr[7]) | (rx_cfg->ip_dst_addr[6] << 8) | (rx_cfg->ip_dst_addr[5] << 16)
 						| (rx_cfg->ip_dst_addr[4] << 24));
 
 
@@ -1859,11 +1859,11 @@ int ecpriss_qudp_fh_rx_filter_cfg(uint32_t port_index, ecpriss_qudp_rx_cfg_s *rx
 						qudp_ingress_port->num_ip_fltr_entries,
 						&dst_ip1);
 
-				qudp_ingress_port->ipdst_addr[qudp_ingress_port->num_ip_fltr_entries][1] |= dst_ip1.value ;
+				qudp_ingress_port->ipdst_addr[qudp_ingress_port->num_ip_fltr_entries][1] = dst_ip1.value ;
 
 
 
-				dst_ip2.value |= ((rx_cfg->ip_dst_addr[11]) | (rx_cfg->ip_dst_addr[6] << 10) | (rx_cfg->ip_dst_addr[9] << 16)
+				dst_ip2.value = ((rx_cfg->ip_dst_addr[11]) | (rx_cfg->ip_dst_addr[10] << 8) | (rx_cfg->ip_dst_addr[9] << 16)
 						| (rx_cfg->ip_dst_addr[8] << 24));
 
 
@@ -1873,10 +1873,10 @@ int ecpriss_qudp_fh_rx_filter_cfg(uint32_t port_index, ecpriss_qudp_rx_cfg_s *rx
 						qudp_ingress_port->num_ip_fltr_entries,
 						&dst_ip2);
 
-				qudp_ingress_port->ipdst_addr[qudp_ingress_port->num_ip_fltr_entries][2] |= dst_ip2.value ;
+				qudp_ingress_port->ipdst_addr[qudp_ingress_port->num_ip_fltr_entries][2] = dst_ip2.value ;
 
 
-				dst_ip3.value |= ((rx_cfg->ip_dst_addr[15]) | (rx_cfg->ip_dst_addr[14] << 10) | (rx_cfg->ip_dst_addr[13] << 16)
+				dst_ip3.value = ((rx_cfg->ip_dst_addr[15]) | (rx_cfg->ip_dst_addr[14] << 8) | (rx_cfg->ip_dst_addr[13] << 16)
 						| (rx_cfg->ip_dst_addr[12] << 24));
 
 
@@ -1886,7 +1886,7 @@ int ecpriss_qudp_fh_rx_filter_cfg(uint32_t port_index, ecpriss_qudp_rx_cfg_s *rx
 						qudp_ingress_port->num_ip_fltr_entries,
 						&dst_ip3);
 
-				qudp_ingress_port->ipdst_addr[qudp_ingress_port->num_ip_fltr_entries][3] |= dst_ip3.value ;
+				qudp_ingress_port->ipdst_addr[qudp_ingress_port->num_ip_fltr_entries][3] = dst_ip3.value ;
 
 			}
 
