@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2015-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/of.h>
@@ -1221,7 +1221,7 @@ int gsi_register_device(struct gsi_per_props* props, unsigned long* dev_hdl)
 				- 1);
 
 			/* exclude reserved mhi events */
-			if (props->mhi_er_id_limits_valid[i])
+			if (props->mhi_er_id_limits_valid[gsi_id][i])
 				gsi_ctx->evt_bmap[gsi_id][i] |=
 				((1 << (props->mhi_er_id_limits[1] + 1)) - 1) ^
 				((1 << (props->mhi_er_id_limits[0])) - 1);
@@ -1662,6 +1662,7 @@ int gsi_alloc_evt_ring(struct gsi_evt_ring_props *props, unsigned long dev_hdl,
 	res = wait_for_completion_timeout(&ctx->compl, GSI_CMD_TIMEOUT);
 	if (res == 0) {
 		GSIERR("evt_id=%lu timed out\n", evt_id);
+		mutex_lock(&gsi_ctx->mlock);
 		if (!props->evchid_valid)
 			clear_bit(evt_id, &gsi_ctx->evt_bmap[props->gsi_id][props->ee]);
 		mutex_unlock(&gsi_ctx->mlock);
@@ -1671,6 +1672,7 @@ int gsi_alloc_evt_ring(struct gsi_evt_ring_props *props, unsigned long dev_hdl,
 	if (ctx->state != GSI_EVT_RING_STATE_ALLOCATED) {
 		GSIERR("evt_id=%lu allocation failed state=%u\n",
 				evt_id, ctx->state);
+		mutex_lock(&gsi_ctx->mlock);
 		if (!props->evchid_valid)
 			clear_bit(evt_id, &gsi_ctx->evt_bmap[props->gsi_id][props->ee]);
 		mutex_unlock(&gsi_ctx->mlock);

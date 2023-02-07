@@ -1,6 +1,6 @@
 /*
  * SPDX-License-Identifier: GPL-2.0-only
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 #include <linux/clk.h>
 #include <linux/compat.h>
@@ -405,7 +405,7 @@ static int ecpri_dma_alloc_exception_endp(void)
 
 				gsi_ep_cfg = &(*ecpri_dma_ctx->endp_map)[gsi_id][endp_id];
 				ep = &ecpri_dma_ctx->endp_ctx[gsi_id][endp_id];
-				DMADBG("Exception endp is ENDP# %d\n", endp_id);
+				DMADBG("Exception endp is ENDP# %d GSI#%d\n", endp_id, gsi_id);
 
 				ep->gsi_ep_cfg = gsi_ep_cfg;
 				if (ep->valid) {
@@ -798,9 +798,16 @@ static int ecpri_dma_post_init(void)
 			case ECPRI_DMA_EE_VM3:
 				gsi_props.mhi_er_id_limits_valid[gsi_id][ee] = true;
 				break;
+			case ECPRI_DMA_EE_PF:
+				/*	PF EE in GSI 0 doesn't have HW CHs, for other GSIs
+					there are HW CHs */
+				if(gsi_id==0)
+					gsi_props.mhi_er_id_limits_valid[gsi_id][ee] = false;
+				else
+					gsi_props.mhi_er_id_limits_valid[gsi_id][ee] = true;
+				break;
 			case ECPRI_DMA_EE_AP:
 			case ECPRI_DMA_EE_Q6:
-			case ECPRI_DMA_EE_PF:
 			default:
 				gsi_props.mhi_er_id_limits_valid[gsi_id][ee] = false;
 				break;
@@ -1104,9 +1111,9 @@ static int ecpri_dma_get_dts_configuration(struct platform_device* pdev,
 		DMADBG(":gsi-2-irq-ee-3 = %d\n", dma_drv_res->gsi_irq[2][3]);
 
 		resource = platform_get_resource_byname(pdev, IORESOURCE_IRQ,
-			"gsi-1-irq-ee-4");
+			"gsi-2-irq-ee-4");
 		if (!resource) {
-			DMAERR(":get resource failed for gsi-1-irq-ee-4\n");
+			DMAERR(":get resource failed for gsi-2-irq-ee-4\n");
 			return -ENODEV;
 		}
 		dma_drv_res->gsi_irq[2][4] = resource->start;

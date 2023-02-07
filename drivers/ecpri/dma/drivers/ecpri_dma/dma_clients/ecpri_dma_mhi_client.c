@@ -1,6 +1,6 @@
 /*
  * SPDX-License-Identifier: GPL-2.0-only
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include "ecpri_dma_mhi_client.h"
@@ -43,16 +43,16 @@ ecpri_dma_mhi_function_map[ECPRI_DMA_VM_IDS_MAX] = {
 	[ECPRI_DMA_VM_IDS_VM1] = {ECPRI_DMA_EE_VM1, ECPRI_DMA_GSI_ID_0},
 	[ECPRI_DMA_VM_IDS_VM2] = {ECPRI_DMA_EE_VM2, ECPRI_DMA_GSI_ID_0},
 	[ECPRI_DMA_VM_IDS_VM3] = {ECPRI_DMA_EE_VM3, ECPRI_DMA_GSI_ID_0},
-	[ECPRI_DMA_VM_IDS_VF1] = {ECPRI_DMA_EE_VF1, ECPRI_DMA_GSI_ID_1},
-	[ECPRI_DMA_VM_IDS_VF2] = {ECPRI_DMA_EE_VF2, ECPRI_DMA_GSI_ID_1},
-	[ECPRI_DMA_VM_IDS_VF3] = {ECPRI_DMA_EE_VF3, ECPRI_DMA_GSI_ID_2},
-	[ECPRI_DMA_VM_IDS_VF4] = {ECPRI_DMA_EE_VF4, ECPRI_DMA_GSI_ID_2},
-	[ECPRI_DMA_VM_IDS_VF5] = {ECPRI_DMA_EE_VF5, ECPRI_DMA_GSI_ID_2},
 	[ECPRI_DMA_VM_IDS_VFA] = {ECPRI_DMA_EE_VFA, ECPRI_DMA_GSI_ID_1},
 	[ECPRI_DMA_VM_IDS_VFB] = {ECPRI_DMA_EE_VFB, ECPRI_DMA_GSI_ID_1},
 	[ECPRI_DMA_VM_IDS_VFC] = {ECPRI_DMA_EE_VFC, ECPRI_DMA_GSI_ID_1},
-	[ECPRI_DMA_VM_IDS_VFD] = {ECPRI_DMA_EE_VFE, ECPRI_DMA_GSI_ID_2},
-	[ECPRI_DMA_VM_IDS_VFE] = {ECPRI_DMA_EE_VFD, ECPRI_DMA_GSI_ID_2}
+	[ECPRI_DMA_VM_IDS_VF1] = {ECPRI_DMA_EE_VF1, ECPRI_DMA_GSI_ID_1},
+	[ECPRI_DMA_VM_IDS_VF2] = {ECPRI_DMA_EE_VF2, ECPRI_DMA_GSI_ID_1},
+	[ECPRI_DMA_VM_IDS_VFD] = {ECPRI_DMA_EE_VFD, ECPRI_DMA_GSI_ID_2},
+	[ECPRI_DMA_VM_IDS_VFE] = {ECPRI_DMA_EE_VFE, ECPRI_DMA_GSI_ID_2},
+	[ECPRI_DMA_VM_IDS_VF3] = {ECPRI_DMA_EE_VF3, ECPRI_DMA_GSI_ID_2},
+	[ECPRI_DMA_VM_IDS_VF4] = {ECPRI_DMA_EE_VF4, ECPRI_DMA_GSI_ID_2},
+	[ECPRI_DMA_VM_IDS_VF5] = {ECPRI_DMA_EE_VF5, ECPRI_DMA_GSI_ID_2},
 };
 
 static const struct ecpri_dma_mhi_ee_gsi_tuple
@@ -209,7 +209,7 @@ static inline int ecpri_dma_mhi_get_function_context_index(
 		}
 		else if (function.function_type ==
 			MHI_DMA_FUNCTION_TYPE_PHYSICAL) {
-			*(idx) = (ECPRI_DMA_MHI_CLIENT_FUNCTION_NUM - 1);
+			*(idx) = ECPRI_DMA_MHI_PF_ID;
 		}
 		break;
 	case ECPRI_DMA_MHI_DMA_MEMCPY_CTX:
@@ -232,7 +232,7 @@ static inline int ecpri_dma_mhi_get_function_context_index(
 		}
 		/* V2 Code */
 		else {
-			*(idx) = (ECPRI_DMA_MHI_CLIENT_FUNCTION_NUM - 1);
+			*(idx) = ECPRI_DMA_MHI_PF_ID;
 		}
 		break;
 	default:
@@ -330,16 +330,22 @@ static void ecpri_dma_mhi_get_l2_ch_bitmap(
 	const struct ecpri_dma_mhi_ee_gsi_tuple* func_map;
 	enum ecpri_hw_ver hw_ver = ecpri_dma_get_ctx_hw_ver();
 
+	DMADBG("Begin\n");
+
+	*bitmap = 0;
+
 	if (ecpri_dma_mhi_get_function_mapping(function, &func_map))
 	{
 		DMAERR("Unknown function");
 	}
+
+	if (function.function_type == MHI_DMA_FUNCTION_TYPE_PHYSICAL)
+	{
+		return;
+	}
+
 	ee_idx = func_map->ee_id;
 	gsi_id = func_map->gsi_id;
-
-	DMADBG("Begin\n");
-
-	*bitmap = 0;
 
 	for (endp_id = 0; endp_id < ECPRI_DMA_ENDP_NUM_MAX; endp_id++)
 	{
@@ -2054,6 +2060,7 @@ static int ecpri_dma_mhi_client_init(
 	int idx;
 	int ret;
 	enum ecpri_dma_ees ee_idx;
+	u32 gsi_id;
 	struct ecpri_dma_mhi_wq_work_type* work = NULL;
 	const struct ecpri_dma_mhi_ee_gsi_tuple* func_map;
 
@@ -2180,14 +2187,15 @@ static int ecpri_dma_mhi_client_init(
 		return ret;
 	}
 	ee_idx = func_map->ee_id;
+	gsi_id = func_map->gsi_id;
 
 	/* Fill out param */
 	ecpri_dma_mhi_get_l2_ch_bitmap(function, idx, &out->ch_db_fwd_msk);
 	out->ev_db_fwd_msk = out->ch_db_fwd_msk;
 	out->ch_db_fwd_base = gsihal_get_reg_pnk_addr(
-		GSI_EE_n_GSI_CH_k_DOORBELL_0, 0, ee_idx, 0);
+		GSI_EE_n_GSI_CH_k_DOORBELL_0, gsi_id, ee_idx, 0);
 	out->ev_db_fwd_base =gsihal_get_reg_pnk_addr(
-		GSI_EE_n_EV_CH_k_DOORBELL_0, 0, ee_idx, 0);
+		GSI_EE_n_EV_CH_k_DOORBELL_0, gsi_id, ee_idx, 0);
 
 	/* Create notifier for driver ready */
 	work = kzalloc(sizeof(*work), GFP_KERNEL);
@@ -2455,6 +2463,7 @@ static int ecpri_dma_mhi_client_read_write_host(
 	return 0;
 
 failed_memcopy:
+	DMAERR("Failed memcpy\n");
 	dma_free_coherent(pdev, mem.size, mem.virt_base, mem.phys_base);
 	return ret;
 }

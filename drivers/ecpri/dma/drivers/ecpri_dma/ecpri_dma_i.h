@@ -1,6 +1,6 @@
 /*
  * SPDX-License-Identifier: GPL-2.0-only
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #ifndef _ECPRI_DMA_I_H_
@@ -409,6 +409,7 @@ struct ecpri_dma_clks {
 	struct clk* dma_fast_div2_clk;
 	struct clk* dma_fast_div2_noc_clk;
 	struct clk* dma_nfapi_axi_clk;
+	struct clk* gcc_ddrss_ecpri_gsi;
 };
 
 struct ecpri_dma_icc_paths {

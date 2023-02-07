@@ -1,6 +1,6 @@
 /*
  * SPDX-License-Identifier: GPL-2.0-only
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #ifndef _ECPRI_DMA_MHI_CLIENT_H_
@@ -17,8 +17,7 @@
 
 
 #define ECPRI_DMA_MHI_DMA_MAX_PKT_SZ              0x1FFFFF
-#define ECPRI_DMA_MHI_VIRTUAL_FUNCTION_NUM        (ECPRI_DMA_VM_IDS_MAX)
-#define ECPRI_DMA_MHI_MAX_HW_CHANNELS		      (4)
+#define ECPRI_DMA_MHI_MAX_HW_CHANNELS		      (24)
 #define ECPRI_DMA_MHI_INVALID_CH_ID			      (-1)
 #define ECPRI_DMA_MHI_INVALID_ENDP_ID			  (-1)
 #define ECPRI_DMA_MHI_MEMCPY_RLEN			      (256)
@@ -26,15 +25,15 @@
 #define ECPRI_DMA_MHI_POLLING_MAX_SLEEP_RX	      (1050)
 
 #define ECPRI_DMA_MHI_CLIENT_FUNCTION_NUM \
-			(ECPRI_DMA_MHI_VIRTUAL_FUNCTION_NUM + 1)
+			(ECPRI_DMA_VM_IDS_MAX + 1)
 #define ECPRI_DMA_MHI_MAX_VIRTUAL_FUNCTIONS_ID \
-			(ECPRI_DMA_MHI_VIRTUAL_FUNCTION_NUM - 1)
+			(ECPRI_DMA_VM_IDS_MAX - 1)
 
 /* Bit 40 mask */
 #define ECPRI_DMA_MHI_ASSERT_BIT_MASK        0x10000000000
 #define ECPRI_DMA_MHI_SLEEP_CLK_RATE_KHZ    (32)
 #define ECPRI_DMA_MHI_MIN_VALID_HDL         (1)
-#define ECPRI_DMA_MHI_PF_ID (ECPRI_DMA_MHI_CLIENT_FUNCTION_NUM - 1)
+#define ECPRI_DMA_MHI_PF_ID (ECPRI_DMA_VM_IDS_MAX)
 
 /* bit #40 in address should be asserted for MHI transfers over pcie */
 #define ECPRI_DMA_MHI_HOST_ADDR(addr) ((addr) | BIT_ULL(40))

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2020-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include "gsihal_i.h"
@@ -68,6 +68,7 @@ static const char *gsireg_name_to_str[GSI_REG_MAX] = {
 	__stringify(GSI_EE_n_GSI_HW_PARAM_0),
 	__stringify(GSI_EE_n_GSI_HW_PARAM_1),
 	__stringify(GSI_EE_n_GSI_HW_PARAM_2),
+	__stringify(GSI_EE_n_GSI_HW_PARAM_3),
 	__stringify(GSI_EE_n_GSI_HW_PARAM_4),
 	__stringify(GSI_EE_n_GSI_SW_VERSION),
 	__stringify(GSI_EE_n_CNTXT_INTSET),
@@ -1465,8 +1466,6 @@ void gsihal_write_reg_pnk(enum gsihal_reg_name reg, u32 p, u32 n, u32 k,
 		return;
 	}
 
-	GSIDBG_LOW("write to %s k=%u n=%u val=%u\n",
-		gsihal_reg_name_str(reg), k, n, val);
 	offset = gsihal_reg_objs[gsihal_ctx->gsi_ver][reg].offset;
 	if (offset == -1) {
 		GSIERR("Write access to obsolete reg=%s\n",
@@ -1478,6 +1477,8 @@ void gsihal_write_reg_pnk(enum gsihal_reg_name reg, u32 p, u32 n, u32 k,
 	offset += gsihal_reg_objs[gsihal_ctx->gsi_ver][reg].k_ofst * k;
 	offset += gsihal_reg_objs[gsihal_ctx->gsi_ver][reg].n_ofst * n;
 	offset += ECPRI_GSI_p_GSI_TOP_OFFS * p;
+	GSIDBG_LOW("write to %s p=%d k=%u n=%u val=0x%x addr = 0%px\n",
+		gsihal_reg_name_str(reg), p, k, n, val, gsihal_ctx->base + offset);
 	gsi_writel(val, gsihal_ctx->base + offset);
 }
 EXPORT_SYMBOL(gsihal_write_reg_pnk);
@@ -1521,8 +1522,6 @@ u32 gsihal_read_reg_pnk_fields(enum gsihal_reg_name reg, u32 p,
 		return -EINVAL;
 	}
 
-	GSIDBG_LOW("read from %s n=%u k= %u and parse it\n",
-		gsihal_reg_name_str(reg), n, k);
 	offset = gsihal_reg_objs[gsihal_ctx->gsi_ver][reg].offset;
 	if (offset == -1) {
 		GSIERR("Read access to obsolete reg=%s\n",
@@ -1533,6 +1532,8 @@ u32 gsihal_read_reg_pnk_fields(enum gsihal_reg_name reg, u32 p,
 	offset += gsihal_reg_objs[gsihal_ctx->gsi_ver][reg].n_ofst * n;
 	offset += gsihal_reg_objs[gsihal_ctx->gsi_ver][reg].k_ofst * k;
 	offset += ECPRI_GSI_p_GSI_TOP_OFFS * p;
+	GSIDBG_LOW("read from %s p=%u n=%u k=%u offset=0x%x and parse it\n",
+		gsihal_reg_name_str(reg), p, n, k, offset);
 	val = gsi_readl(gsihal_ctx->base + offset);
 	gsihal_reg_objs[gsihal_ctx->gsi_ver][reg].parse(reg, fields, val);
 
@@ -1578,8 +1579,8 @@ void gsihal_write_reg_pnk_fields(enum gsihal_reg_name reg, u32 p, u32 n, u32 k,
 		return;
 	}
 
-	GSIDBG_LOW("write to %s n=%u after constructing it\n",
-		gsihal_reg_name_str(reg), n);
+	GSIDBG_LOW("write to %s p=%u n=%u k=%u after constructing it\n",
+		gsihal_reg_name_str(reg), p, n, k);
 	offset = gsihal_reg_objs[gsihal_ctx->gsi_ver][reg].offset;
 	if (offset == -1) {
 		GSIERR("Write access to obsolete reg=%s\n",
