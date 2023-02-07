@@ -11,6 +11,11 @@
 #include "aw_alphacore_ip_defines.h"
 #include "aw_alphacore_vfield_defines.h"
 #include "aw_driver_sim.h"
+#include "qcom_aw_phy_utils.h"
+
+#ifndef USR_PRINTF
+#define USR_PRINTF(...) QCOM_AW_PHY_LOG_ERR(__VA_ARGS__)
+#endif
 
 #define CHECK(x)                                                               \
   do {                                                                         \
