@@ -1024,6 +1024,18 @@ static int __init qcom_aw_phy_init(void) {
   memset(&qcom_aw_phy_config_info, 0, sizeof(struct qcom_aw_phy_config));
   qcom_aw_phy_loopback_mode = QCOM_AW_PHY_NO_LB;
 
+  qcom_aw_phy_config_info.phy_ipc_log_buf =
+                               ipc_log_context_create(PHY_IPC_LOG_PAGES,
+                                                      "qcom_aw_phy", 0);
+  if(qcom_aw_phy_config_info.phy_ipc_log_buf == NULL)
+    QCOM_AW_PHY_LOG_ERR("Failed to create IPC log context");
+
+  qcom_aw_phy_config_info.phy_ipc_log_buf_low =
+                               ipc_log_context_create(PHY_IPC_LOG_PAGES,
+                                                      "qcom_aw_phy_low", 0);
+  if(qcom_aw_phy_config_info.phy_ipc_log_buf_low == NULL)
+    QCOM_AW_PHY_LOG_ERR("Failed to create IPC low log context");
+
   qcom_aw_phy_mtip_if_init();
 
   qcom_aw_phy_gnl_init();
@@ -1060,6 +1072,12 @@ static void __exit qcom_aw_phy_exit(void) {
 #ifdef FEATURE_QCOM_AW_TEST_SYS_FS
   qcom_aw_phy_del_sysfs();
 #endif
+
+  if(qcom_aw_phy_config_info.phy_ipc_log_buf)
+    ipc_log_context_destroy(qcom_aw_phy_config_info.phy_ipc_log_buf);
+
+  if(qcom_aw_phy_config_info.phy_ipc_log_buf_low)
+    ipc_log_context_destroy(qcom_aw_phy_config_info.phy_ipc_log_buf_low);
 
   platform_driver_unregister(&qcom_aw_phy_inst_driver);
 
