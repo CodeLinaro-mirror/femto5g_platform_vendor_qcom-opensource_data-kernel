@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: GPL-2.0-only
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #ifndef ECPRISS_HAL_H_
@@ -13,6 +13,9 @@
 
 #define ECPRI_OXTOR_BASE             0x09228000
 #define ECPRI_OXTOR_BASE_SIZE        0x2000
+
+#define ECPRI_OXTOR_BASE_V2          0x09428000
+#define ECPRI_OXTOR_GLOBAL_BASE_V2   0x09410000
 
 #define ECPRI_OXTOR_GLOBAL_BASE      0x09210000
 #define ECPRI_OXTOR_GLOBAL_BASE_SIZE 0x10000
@@ -116,7 +119,8 @@ struct ecpriss_oxtor_hal_reg_obj {
 
 typedef enum ecpriss_oxtor_hw_name
 {
-	ECPRISS_OXTOR_HW_v1_0,
+	ECPRISS_OXTOR_HW_v1_0 = 1,
+	ECPRISS_OXTOR_HW_v2_0,
 	ECPRISS_OXTOR_HW_MAX
 }ecpriss_xbar_hw_name_e;
 
@@ -126,7 +130,7 @@ typedef enum ecpriss_oxtor_hw_name
 #define ECPRISS_HAL_GETFIELD_FROM_REG(reg, shift, mask) \
 	(((reg) & (mask)) >> (shift))
 
-int ecpriss_oxtor_hal_ctx_init(void);
+int ecpriss_oxtor_hal_ctx_init(int hw_ver);
 
 u32 ecpriss_oxtor_hal_read_reg_n(enum ecpriss_oxtor_hal_reg_name reg, u32 n);
 
