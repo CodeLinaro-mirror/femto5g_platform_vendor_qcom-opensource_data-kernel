@@ -180,7 +180,7 @@
 		uint16_t		udp_dst_port;
 		ecpriss_ip_type		ip_type;
 		ecpriss_core_link_id_e  link_id;
-		uint32_t		ip_dst_addr[ECPRISS_IP_ADDR_MAX_WORDS];
+		uint8_t		ip_dst_addr[ECPRISS_IP_ADDR_LEN_MAX];
 	} ecpriss_qudp_rx_cfg_s;
 
 	/*!@brief
