@@ -1,6 +1,6 @@
 /*
  * SPDX-License-Identifier: GPL-2.0-only
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/dmapool.h>
@@ -776,6 +776,9 @@ int ecpri_dma_eth_transmit(ecpri_dma_eth_conn_hdl_t hdl,
 {
 	int ret = 0;
 	struct ecpri_dma_eth_client_connection *connection;
+	u32 num_of_pkts_remain = num_of_pkts;
+	u32 num_of_pkts_to_send = num_of_pkts;
+	bool commit_transmit = false;
 
 	DMADBG_LOW("Begin\n");
 
@@ -798,12 +801,25 @@ int ecpri_dma_eth_transmit(ecpri_dma_eth_conn_hdl_t hdl,
 	}
 
 	/* Transmit */
-	ret = ecpri_dma_dp_transmit(connection->tx_endp_ctx,
-		pkts, num_of_pkts, commit);
-	if (ret != 0) {
-		DMAERR("Unable to transmit, handle:%x, ENDP ID:%d\n", hdl,
-			connection->tx_endp_ctx->endp_id);
-		return -EINVAL;
+	while (num_of_pkts_remain) {
+		if (num_of_pkts_remain > ECPRI_DMA_DP_MAX_DESC) {
+			num_of_pkts_to_send = ECPRI_DMA_DP_MAX_DESC;
+			commit_transmit = false;
+		}
+		else {
+			num_of_pkts_to_send = num_of_pkts_remain;
+			commit_transmit = commit;
+		}
+
+		ret = ecpri_dma_dp_transmit(connection->tx_endp_ctx, pkts,
+			num_of_pkts_to_send, commit_transmit);
+		if (ret != 0) {
+			DMAERR("Unable to transmit, handle:%x, ENDP ID:%d\n",
+				hdl, connection->tx_endp_ctx->endp_id);
+			return -EINVAL;
+		}
+		pkts += num_of_pkts_to_send;
+		num_of_pkts_remain -= num_of_pkts_to_send;
 	}
 
 	DMADBG_LOW("Exit\n");
