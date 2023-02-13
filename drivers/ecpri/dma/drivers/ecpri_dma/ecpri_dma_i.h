@@ -22,6 +22,7 @@
 #include <linux/iommu.h>
 #include <linux/version.h>
 #include <linux/clk.h>
+#include <linux/types.h>
 #include <linux/mhi_dma.h>
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 9, 0))
 #include <linux/qcom-iommu-util.h>
@@ -41,6 +42,8 @@
 #endif
 
 #define DRV_NAME "ecpri-dma"
+#define DMA_INT_MAX ((int)(~0U >> 1))
+#define DMA_INT_MIN (-DMA_INT_MAX - 1)
 
 extern struct ecpri_dma_context *ecpri_dma_ctx;
 
@@ -456,6 +459,7 @@ struct ecpri_dma_icc_paths {
   * @exception_endp: Exception ENDP number and related GSI ID
   * @ecpri_dma_exception_wq: WQ to handle Exception replenish
   * @exception_stats: Exception statistics
+  * @driver_ver: current driver SW version, used to sync with Q6
   *
   */
 struct ecpri_dma_context {
@@ -498,6 +502,7 @@ struct ecpri_dma_context {
 	struct ecpri_dma_clks clks;
 	struct ecpri_dma_icc_paths icc_paths;
 	u32 num_of_gsi;
+	u32 driver_ver;
 };
 
 /**

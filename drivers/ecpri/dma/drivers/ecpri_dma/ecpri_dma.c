@@ -48,10 +48,12 @@
 #include "ecpri_dma_mhi_client.h"
 #include "dmahal.h"
 #include "ecpri_dma_reg_dump.h"
+#include "ecpri_dma_qmi_service.h"
 
 #define ECPRI_DMA_EXCEPTION_MAX_INITIAL_CREDITS (20)
 #define ECPRI_DMA_GSI_CHANNEL_STOP_SLEEP_MIN_USEC (3000)
 #define ECPRI_DMA_GSI_CHANNEL_STOP_SLEEP_MAX_USEC (5000)
+#define ECPRI_DMA_DRIVER_VERSION (1)
 
 int ecpri_dma_plat_drv_probe(struct platform_device *pdev_p);
 
@@ -275,6 +277,9 @@ static void ecpri_dma_notify_dma_ready(void)
 	spare_reg.value = ecpri_dma_get_ctx_hw_flavor();
 	ecpri_dma_hal_write_reg(
 		ECPRI_SPARE_REG, spare_reg.value);
+
+	/* Trigger QMI message */
+	ecpri_dma_qmi_send_q6_msg();
 
 	mutex_unlock(&ecpri_dma_ctx->lock);
 
@@ -1289,6 +1294,9 @@ static int ecpri_dma_pre_init(const struct ecpri_dma_plat_drv_res *resource_p,
 	if (ecpri_dma_ctx->logbuf_low == NULL)
 		DMADBG("failed to create IPC log, continue...\n");
 
+	/* Set Driver SW version - used for sync with Q6 */
+	ecpri_dma_ctx->driver_ver = ECPRI_DMA_DRIVER_VERSION;
+
 	/* Set master pdev and pdev*/
 	ecpri_dma_ctx->master_pdev = dma_pdev;
 	ecpri_dma_ctx->pdev = &dma_pdev->dev;
@@ -1350,8 +1358,6 @@ static int ecpri_dma_pre_init(const struct ecpri_dma_plat_drv_res *resource_p,
 		goto fail_remap;
 	}
 
-	
-
 	/* Init exception replenish WQ*/
 	ecpri_dma_ctx->ecpri_dma_exception_wq = create_singlethread_workqueue(
 		"ecpri_dma_exception_wq");
@@ -1359,6 +1365,14 @@ static int ecpri_dma_pre_init(const struct ecpri_dma_plat_drv_res *resource_p,
 		DMAERR("workqueue creation failed\n");
 		return -ENOMEM;
 	}
+
+	result = ecpri_dma_qmi_service_init();
+	if (0 != result)
+	{
+		DMAERR("QMI init failed\n");
+		ecpri_dma_assert();
+	}
+
 
 	DMADBG("pre_init complete\n");
 
