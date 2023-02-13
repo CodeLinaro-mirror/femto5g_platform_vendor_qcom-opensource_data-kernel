@@ -1575,7 +1575,7 @@ static void ecpriss_qudp_enable_interrupts(uint8_t                 port_index,
 
 
 		ecpriss_qudp_hal_read_reg_n_fields(ECPRISS_QUDP_FH,
-				ECPRI_UDP_FH_UDP_SW_IRQ_MASK_0_PORT_P,
+				ECPRI_UDP_FH_UDP_SW_IRQ_MASK_1_PORT_P,
 				port_index,
 				&fh_udp_sw_irq_mask_1_port_p);
 
@@ -1665,7 +1665,7 @@ static void ecpriss_qudp_enable_interrupts(uint8_t                 port_index,
 
 
 		ecpriss_qudp_hal_read_reg_n_fields(ECPRISS_QUDP_FH,
-				ECPRI_UDP_FH_UDP_SW_IRQ_MASK_0_PORT_P,
+				ECPRI_UDP_FH_UDP_SW_IRQ_MASK_1_PORT_P,
 				port_index,
 				&fh_udp_sw_irq_mask_1_port_p);
 
