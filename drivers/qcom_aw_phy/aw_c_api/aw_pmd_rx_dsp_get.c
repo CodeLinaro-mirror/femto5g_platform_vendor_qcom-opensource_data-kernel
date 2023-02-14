@@ -7,7 +7,7 @@
 #include "aw_alphacore.h"
 
 int aw_pmd_rx_dsp_get(mss_access_t *mss, uint32_t branch,
-                      aw_dsp_param_t *dsp_info) {
+                      aw_dsp_param_t *dsp_info, uint32_t print_en) {
   uint32_t target_rx_ccg;
   uint32_t slicer_rx_ccg;
   uint32_t ffe_rx_ccg;
@@ -764,9 +764,12 @@ int aw_pmd_rx_dsp_get(mss_access_t *mss, uint32_t branch,
                         RX_DATABLOCK_OFFSET_REG6_ADAPT_ENA_A_OFFSET,
                         offset_adapt_ena_a));
 
+  if (print_en == 1) {
   USR_PRINTF("Branch |   EL3   |   EL1   |   EH1   |   EH3   \n");
   USR_PRINTF("  %d  |   %d   |   %d   |   %d   |   %d   \n", branch,
              dsp_info->slicers.el3, dsp_info->slicers.el1,
              dsp_info->slicers.eh1, dsp_info->slicers.eh3);
+  }
+
   return AW_ERR_CODE_NONE;
 }
