@@ -177,11 +177,8 @@ void qcom_aw_phy_an_complete_cb(enum mtip_port_type_enum port_type,
                       lane_num);
 }
 
-void qcom_aw_phy_cdr_lock_cb(enum mtip_port_type_enum port_type,
-                                enum eth_phy_iface_phy_lane_num_enum lane_num,
-                                bool status) {
-  QCOM_AW_PHY_LOG_ERR("CDR lock for port %d, lane %d, status", port_type,
-                      lane_num, status);
+void qcom_aw_phy_cdr_lock_cb(u32 link_index, bool status) {
+  QCOM_AW_PHY_LOG_ERR("CDR lock for link_index %d, status", link_index, status);
 }
 ssize_t qcom_aw_phy_get_prbs_result(struct file *file, char __user *buf,
                                     size_t count, loff_t *ppos){

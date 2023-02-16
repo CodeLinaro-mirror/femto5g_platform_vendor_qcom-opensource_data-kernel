@@ -72,9 +72,11 @@ void qcom_aw_phy_synce_notify_phy_lane_state_change() {
   qcom_aw_phy_gnl_eth_status_change(eth_status);
 
 func_exit:
-  QCOM_AW_PHY_LOG_ERR("qcom_aw_phy_synce_notify_phy_lane_state_change, "
-                      "local error %d",
-                      local_err_val);
+  if(local_err_val != LOCAL_ERROR_INVALID){
+    QCOM_AW_PHY_LOG_ERR("qcom_aw_phy_synce_notify_phy_lane_state_change, "
+                        "local error %d",
+                        local_err_val);
+  }
 
   return;
 }
@@ -107,9 +109,12 @@ void qcom_aw_phy_synce_notify_snr_valid_change(
   qcom_aw_phy_gnl_snr_valid_change(snr_valid_info);
 
 func_exit:
-  QCOM_AW_PHY_LOG_ERR(
-      "qcom_aw_phy_synce_notify_snr_valid_change, local error %d",
-      local_err_val);
+  if(local_err_val != LOCAL_ERROR_INVALID){
+    QCOM_AW_PHY_LOG_ERR(
+        "qcom_aw_phy_synce_notify_snr_valid_change, local error %d",
+        local_err_val);
+  }
+
   return;
 }
 
@@ -122,9 +127,9 @@ void qcom_aw_phy_synce_handle_snr_valid_change(
   if(!wq_params)
     QCOM_AW_PHY_LOG_ERR("Invalid work queue structure!");
 
-  QCOM_AW_PHY_LOG_ERR("SNR valid %d rcvd for PHY %d lane %d",
-                      (bool)wq_params->user_data, wq_params->phy_inst,
-                      wq_params->lane_num);
+  QCOM_AW_PHY_LOG_INFO("SNR valid %d rcvd for PHY %d lane %d",
+                       (bool)wq_params->user_data, wq_params->phy_inst,
+                       wq_params->lane_num);
 
   qcom_aw_phy_synce_notify_snr_valid_change(wq_params->phy_inst,
                                             wq_params->lane_num,
@@ -331,11 +336,11 @@ int qcom_aw_phy_synce_set_synce_mux(
   }
 
   // Disable SyncE ACGC output
-  QCOM_AW_PHY_LOG_ERR("Disable ACGC output");
+  QCOM_AW_PHY_LOG_DBG("Disable ACGC output");
   reset_control_deassert(phy_config_info->acgc_reset_ctrl);
 
   // Select division ratio
-  QCOM_AW_PHY_LOG_ERR("Select division ratio");
+  QCOM_AW_PHY_LOG_DBG("Select division ratio");
   qcom_aw_phy_get_lane_speed_config(
       phy_inst_info->lane_params[phy_inst_lane_num].lane_config.lane_speed,
       &config);
@@ -343,14 +348,14 @@ int qcom_aw_phy_synce_set_synce_mux(
   clk_set_rate(phy_config_info->synce_div_clk,config.synce_div_clk_src_rate);
 
   // Select desired RX lane clock
-  QCOM_AW_PHY_LOG_ERR("Select desired RX lane clock");
+  QCOM_AW_PHY_LOG_DBG("Select desired RX lane clock");
   ret_val = clk_set_parent(phy_config_info->synce_cmux_clk_src,
                         phy_config_info->synce_phy_lane_clk[synce_lane_num]);
   if (ret_val)
     QCOM_AW_PHY_LOG_ERR("clk_set_parent failed ret: %d", ret_val);
 
   // Enable SyncE ACGC output
-  QCOM_AW_PHY_LOG_ERR("Enable ACGC output");
+  QCOM_AW_PHY_LOG_DBG("Enable ACGC output");
   reset_control_assert(phy_config_info->acgc_reset_ctrl);
 
 func_exit:
@@ -410,8 +415,11 @@ enum qcom_aw_phy_synce_lane_id qcom_aw_phy_synce_eth_inst_to_phy_lane_id(
   }
 
 func_exit:
-  QCOM_AW_PHY_LOG_ERR("%s: returns %d with local error %d", __func__, ret_val,
-                      local_err_val);
+  if(local_err_val != LOCAL_ERROR_INVALID){
+    QCOM_AW_PHY_LOG_ERR("%s: returns %d with local error %d", __func__, ret_val,
+                        local_err_val);
+  }
+
   return ret_val;
 }
 
@@ -449,7 +457,10 @@ enum qcom_aw_phy_synce_eth_inst qcom_aw_phy_synce_phy_lane_to_eth_inst(
   ret_val = phy_inst_info->lane_params[lane_num].lane_config.link_index;
 
 func_exit:
-  QCOM_AW_PHY_LOG_ERR("%s: returns %d with local error %d", __func__, ret_val,
-                      local_err_val);
+  if(local_err_val != LOCAL_ERROR_INVALID){
+    QCOM_AW_PHY_LOG_ERR("%s: returns %d with local error %d", __func__, ret_val,
+                        local_err_val);
+  }
+
   return ret_val;
 }

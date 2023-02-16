@@ -510,6 +510,8 @@ int aw_pmd_rx_polarity_set(mss_access_t *mss, uint32_t rx_pol_flip);
 
 int aw_pmd_rx_dfe_adapt_set(mss_access_t *mss, uint32_t dfe_adapt_enable);
 
+int aw_pmd_rx_background_adapt_enable_set(mss_access_t *mss, uint32_t rx_background_adapt);
+
 int aw_pmd_rxeq_prbs_set(mss_access_t *mss, uint32_t prbs_en);
 
 int aw_pmd_rx_chk_config_set(mss_access_t *mss, aw_bist_pattern_t pattern,
@@ -680,5 +682,9 @@ int aw_pmd_snr_vld_enable_set(mss_access_t *mss, uint32_t vld_enable);
 int aw_tc_sm_conv(uint32_t v, uint32_t i);
 
 int aw_pmd_rx_cdr_lock_get(mss_access_t *mss, uint32_t *rx_cdr_lock);
+
+int aw_pmd_pam4_enable(mss_access_t *mss, uint32_t enable);
+
+int aw_pmd_set_rx_spare(mss_access_t *mss, uint32_t value);
 
 #endif
