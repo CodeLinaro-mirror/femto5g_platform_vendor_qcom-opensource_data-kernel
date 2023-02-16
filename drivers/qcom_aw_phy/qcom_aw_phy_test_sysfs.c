@@ -195,8 +195,14 @@ ssize_t qcom_aw_phy_get_prbs_result(struct file *file, char __user *buf,
   }
 
   if(check_prbs_all_lanes == false){
-    min_port = rx_bist_phy_inst;
-    max_port = rx_bist_phy_inst;
+    if(rx_bist_phy_inst <= QCOM_AW_PHY_INST_FH2){
+      min_port = rx_bist_phy_inst;
+      max_port = rx_bist_phy_inst;
+    }
+    else{
+      min_port = QCOM_AW_PHY_INST_FH0;
+      max_port = QCOM_AW_PHY_INST_FH0;
+    }
   }
   else{
     min_port = QCOM_AW_PHY_INST_FH0;

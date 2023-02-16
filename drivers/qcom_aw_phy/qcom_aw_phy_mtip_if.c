@@ -463,7 +463,7 @@ int qcom_aw_phy_bringup_manual_eq_mode(
     struct qcom_aw_phy_inst_config *phy_inst_info,
     enum eth_phy_iface_phy_lane_num_enum lane,
     struct qcom_aw_phy_lane_speed_config config) {
-  aw_txfir_config_t txfir_cfg;
+  aw_txfir_config_t txfir_cfg = {0};
   struct qcom_aw_phy_work_q_params *wq_params = NULL;
   struct qcom_aw_phy_config *phy_config_info = NULL;
   enum local_error_enum local_err_val = LOCAL_ERROR_INVALID;
@@ -936,8 +936,10 @@ void qcom_aw_phy_handle_an_complete(struct work_struct *work){
   struct qcom_aw_phy_work_q_params *wq_params =
      container_of(delayed_work_item, struct qcom_aw_phy_work_q_params, wq_item);
 
-  if(!wq_params)
+  if(!wq_params){
     QCOM_AW_PHY_LOG_ERR("Invalid work queue structure!");
+    return;
+  }
 
   QCOM_AW_PHY_LOG_ERR("AN done rcvd for PHY %d lane %d",
                       wq_params->phy_inst, wq_params->lane_num);
@@ -956,7 +958,7 @@ void qcom_aw_phy_retry_lane_bring_up(struct work_struct *work){
   struct qcom_aw_phy_inst_config *phy_inst_info = NULL;
   enum eth_phy_iface_phy_lane_num_enum lane = PHY_LANE_0;
   mss_access_t mss = {.phy_offset = 0, .lane_offset = 0};
-  aw_txfir_config_t txfir_cfg;
+  aw_txfir_config_t txfir_cfg = {0};
   int cdr_lock_status = 0;
   enum local_error_enum local_err_val = LOCAL_ERROR_INVALID;
   int ret_val = 0;

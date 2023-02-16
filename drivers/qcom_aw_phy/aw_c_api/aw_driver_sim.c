@@ -36,16 +36,6 @@ int delay_us(int x) {
   return 0;
 }
 
-void simple_print(const char *fmt, ...) {
-  char str[200];
-  va_list args;
-
-  va_start(args, fmt);
-  vsnprintf(str, 200, fmt, args);
-  sv_print(str);
-  va_end(args);
-}
-
 int c_test_api_write(void) {
   uint32_t wval = 0x7FF;
   write_csr(0x00000000, wval);

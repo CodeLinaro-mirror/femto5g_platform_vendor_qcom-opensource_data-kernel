@@ -190,6 +190,12 @@ int qcom_aw_phy_gnl_eth_status_change(
   send_char_msg = (char *)kzalloc(sizeof(struct qcom_aw_phy_gnl_eth_status) *
                                       MAX_ETH_NUM,
                                   GFP_KERNEL);
+  if(send_char_msg == NULL){
+    ret_val = ENOMEM;
+    local_err_val = LOCAL_ERROR_2;
+    goto func_exit;
+  }
+
   memset(send_char_msg, 0,
          sizeof(struct qcom_aw_phy_gnl_eth_status) * MAX_ETH_NUM);
   memcpy(send_char_msg, lane_status,
@@ -200,7 +206,7 @@ int qcom_aw_phy_gnl_eth_status_change(
                         MAX_ETH_NUM,
                     send_char_msg);
   if (ret_val != 0) {
-    local_err_val = LOCAL_ERROR_2;
+    local_err_val = LOCAL_ERROR_3;
     goto func_exit;
   }
 
@@ -208,7 +214,7 @@ int qcom_aw_phy_gnl_eth_status_change(
 
   ret_val = genlmsg_unicast(&init_net, skb_buf, dst_portid);
   if (ret_val != 0) {
-    local_err_val = LOCAL_ERROR_3;
+    local_err_val = LOCAL_ERROR_4;
     goto func_exit;
   }
 
@@ -252,6 +258,13 @@ int qcom_aw_phy_gnl_snr_valid_change(
 
   send_char_msg = (char *)kzalloc(
       sizeof(struct qcom_aw_phy_gnl_snr_valid_change), GFP_KERNEL);
+
+  if (send_char_msg == NULL) {
+    ret_val = ENOMEM;
+    local_err_val = LOCAL_ERROR_2;
+    goto func_exit;
+  }
+
   memset(send_char_msg, 0, sizeof(struct qcom_aw_phy_gnl_snr_valid_change));
   memcpy(send_char_msg, &snr_valid_info,
          sizeof(struct qcom_aw_phy_gnl_snr_valid_change));
@@ -260,7 +273,7 @@ int qcom_aw_phy_gnl_snr_valid_change(
       nla_put(skb_buf, QCOM_AW_PHY_GNL_ATTR_SNR_VALID_CHANGE,
               sizeof(struct qcom_aw_phy_gnl_snr_valid_change), send_char_msg);
   if (ret_val != 0) {
-    local_err_val = LOCAL_ERROR_2;
+    local_err_val = LOCAL_ERROR_3;
     goto func_exit;
   }
 
@@ -268,7 +281,7 @@ int qcom_aw_phy_gnl_snr_valid_change(
 
   ret_val = genlmsg_unicast(&init_net, skb_buf, dst_portid);
   if (ret_val != 0) {
-    local_err_val = LOCAL_ERROR_3;
+    local_err_val = LOCAL_ERROR_4;
     goto func_exit;
   }
 
