@@ -142,6 +142,43 @@ static irqreturn_t qcom_aw_phy_interrupt_handler(int irq, void *devptr) {
       "Interrupt received for PHY instance %d, status %x, error %x",
       phy_inst_info->phy_inst, intr_status, intr_error);
 
+  // Handle error interrupt
+  for (i = QCOM_AW_PHY_INT_ERROR_BIT_MIN; i < QCOM_AW_PHY_INT_ERROR_BIT_MAX;
+       i++) {
+    temp_bmask = intr_error & (1 << i);
+    if (temp_bmask) {
+      switch (i) {
+      case QCOM_AW_PHY_SNR_VALID_ERR_LANE_0:
+      case QCOM_AW_PHY_SNR_VALID_ERR_LANE_1:
+      case QCOM_AW_PHY_SNR_VALID_ERR_LANE_2:
+      case QCOM_AW_PHY_SNR_VALID_ERR_LANE_3:
+        wq_params = kmalloc(sizeof(struct qcom_aw_phy_work_q_params),
+                            GFP_ATOMIC);
+        if(!wq_params)
+          QCOM_AW_PHY_LOG_ERR("Malloc failed!");
+        else{
+          INIT_DELAYED_WORK(&wq_params->wq_item,
+                            qcom_aw_phy_synce_handle_snr_valid_change);
+          wq_params->phy_inst = phy_inst_info->phy_inst;
+          wq_params->lane_num = i - QCOM_AW_PHY_SNR_VALID_ERR_LANE_0;
+          wq_params->user_data = (void*)false;
+          queue_delayed_work(qcom_aw_phy_config_info.wq, &wq_params->wq_item, 0);
+        }
+        clear |= (1<<i);
+        break;
+
+      default:
+        break;
+      }
+    }
+  }
+
+  // clear error interrupt
+  iowrite32(clear, phy_inst_info->wrapper_base_addr +
+                            QCOM_AW_PHY_WRAPPER_INT_ERROR_CLR_REG_OFFSET);
+
+  clear = 0;
+
   // Handle status interrupt
   for (i = QCOM_AW_PHY_INT_STATUS_BIT_MIN; i < QCOM_AW_PHY_INT_STATUS_BIT_MAX;
        i++) {
@@ -224,43 +261,6 @@ static irqreturn_t qcom_aw_phy_interrupt_handler(int irq, void *devptr) {
   // clear status interrupt
   iowrite32(clear, phy_inst_info->wrapper_base_addr +
                              QCOM_AW_PHY_WRAPPER_INT_STATUS_CLR_REG_OFFSET);
-
-  clear = 0;
-
-  // Handle error interrupt
-  for (i = QCOM_AW_PHY_INT_ERROR_BIT_MIN; i < QCOM_AW_PHY_INT_ERROR_BIT_MAX;
-       i++) {
-    temp_bmask = intr_error & (1 << i);
-    if (temp_bmask) {
-      switch (i) {
-      case QCOM_AW_PHY_SNR_VALID_ERR_LANE_0:
-      case QCOM_AW_PHY_SNR_VALID_ERR_LANE_1:
-      case QCOM_AW_PHY_SNR_VALID_ERR_LANE_2:
-      case QCOM_AW_PHY_SNR_VALID_ERR_LANE_3:
-        wq_params = kmalloc(sizeof(struct qcom_aw_phy_work_q_params),
-                            GFP_ATOMIC);
-        if(!wq_params)
-          QCOM_AW_PHY_LOG_ERR("Malloc failed!");
-        else{
-          INIT_DELAYED_WORK(&wq_params->wq_item,
-                            qcom_aw_phy_synce_handle_snr_valid_change);
-          wq_params->phy_inst = phy_inst_info->phy_inst;
-          wq_params->lane_num = i - QCOM_AW_PHY_SNR_VALID_ERR_LANE_0;
-          wq_params->user_data = (void*)false;
-          queue_delayed_work(qcom_aw_phy_config_info.wq, &wq_params->wq_item, 0);
-        }
-        clear |= (1<<i);
-        break;
-
-      default:
-        break;
-      }
-    }
-  }
-
-  // clear error interrupt
-  iowrite32(clear, phy_inst_info->wrapper_base_addr +
-                            QCOM_AW_PHY_WRAPPER_INT_ERROR_CLR_REG_OFFSET);
 
 func_exit:
   if(local_err_val != LOCAL_ERROR_INVALID){
