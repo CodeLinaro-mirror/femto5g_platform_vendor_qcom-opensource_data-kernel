@@ -286,7 +286,7 @@ static int ecpriss_xbar_check_entry_valid_bits(void)
 	return ret;
 }
 
-#if 0
+
 static void ecpriss_xbar_flush_init()
 {
 	ecpri_xbar_hwio_def_ecpri_xbar_xbar_flush_s xbar_flush;
@@ -299,28 +299,28 @@ static void ecpriss_xbar_flush_init()
 	pr_info("Reset xbar flush val = 0x%x\n", *flush_val);
 
 	/*Enable Flush*/
-	xbar_flush.flush_fh_0_rx = ENABLE_BIT;
+	xbar_flush.flush_fh_0_rx = DISABLE_BIT;
 	xbar_flush.flush_fh_0_tx = ENABLE_BIT;
-	xbar_flush.flush_fh_1_rx = ENABLE_BIT;
+	xbar_flush.flush_fh_1_rx = DISABLE_BIT;
 	xbar_flush.flush_fh_1_tx = ENABLE_BIT;
-	xbar_flush.flush_fh_2_rx = ENABLE_BIT;
+	xbar_flush.flush_fh_2_rx = DISABLE_BIT;
 	xbar_flush.flush_fh_2_tx = ENABLE_BIT;
-
+#if 0
 	xbar_flush.flush_c2c_0_rx = ENABLE_BIT;
 	xbar_flush.flush_c2c_0_tx = ENABLE_BIT;
 	xbar_flush.flush_c2c_1_rx = ENABLE_BIT;
 	xbar_flush.flush_c2c_1_tx = ENABLE_BIT;
 	xbar_flush.flush_c2c_2_rx = ENABLE_BIT;
 	xbar_flush.flush_c2c_2_tx = ENABLE_BIT;
-
-	xbar_flush.flush_oc_0_rx = ENABLE_BIT;
-	xbar_flush.flush_oc_0_tx = ENABLE_BIT;
-	xbar_flush.flush_oc_1_rx = ENABLE_BIT;
-	xbar_flush.flush_oc_1_tx = ENABLE_BIT;
-	xbar_flush.flush_oc_2_rx = ENABLE_BIT;
-	xbar_flush.flush_oc_2_tx = ENABLE_BIT;
-	xbar_flush.flush_oc_3_rx = ENABLE_BIT;
-	xbar_flush.flush_oc_3_tx = ENABLE_BIT;
+#endif
+	xbar_flush.flush_oc_0_rx = DISABLE_BIT;
+	xbar_flush.flush_oc_0_tx = DISABLE_BIT;
+	xbar_flush.flush_oc_1_rx = DISABLE_BIT;
+	xbar_flush.flush_oc_1_tx = DISABLE_BIT;
+	xbar_flush.flush_oc_2_rx = DISABLE_BIT;
+	xbar_flush.flush_oc_2_tx = DISABLE_BIT;
+	xbar_flush.flush_oc_3_rx = DISABLE_BIT;
+	xbar_flush.flush_oc_3_tx = DISABLE_BIT;
 
 	xbar_flush.reserved0 = 0;
 	xbar_flush.reserved1 = 0;
@@ -339,7 +339,7 @@ static void ecpriss_xbar_flush_init()
 	return;
 }
 
-
+#if 0
 /**
  * ecpriss_xbar_flush()
  *
@@ -480,6 +480,58 @@ static void ecpriss_xbar_flush(ecpriss_port_type_e    port_type,
 	return;
 }
 #endif
+
+void ecpriss_configure_xbar_flush(ecpriss_port_type_e port_type,
+                ecpriss_port_idx_e port_idx, eth_ecpriss_event_e event_type)
+{
+        ecpri_xbar_hwio_def_ecpri_xbar_xbar_flush_s xbar_flush;
+
+        ecpriss_xbar_hal_read_reg_n_fields(ECPRISS_XBAR_GLOBAL, ECPRI_XBAR_XBAR_FLUSH,0, &xbar_flush);
+
+        if (port_type == ECPRISS_PORT_TYPE_FH &&
+                        port_idx == ECPRISS_PORT_0 &&
+                        event_type == ETH_ECPRISS_EVENT_UP){
+                pr_err("XBAR flush for port 0 | enable: %d\n", DISABLE_BIT);
+                xbar_flush.flush_fh_0_tx = DISABLE_BIT;
+        }
+        else if (port_type == ECPRISS_PORT_TYPE_FH &&
+                        port_idx == ECPRISS_PORT_1 &&
+                        event_type == ETH_ECPRISS_EVENT_UP){
+                pr_err("XBAR flush for port 1 | enable: %d\n", DISABLE_BIT);
+                xbar_flush.flush_fh_1_tx = DISABLE_BIT;
+        }
+        else if (port_type == ECPRISS_PORT_TYPE_FH &&
+                        port_idx == ECPRISS_PORT_2 &&
+                        event_type == ETH_ECPRISS_EVENT_UP){
+                pr_err("XBAR flush for port 2 | enable: %d\n", DISABLE_BIT);
+                xbar_flush.flush_fh_2_tx = DISABLE_BIT;
+        }
+        else if (port_type == ECPRISS_PORT_TYPE_FH &&
+                        port_idx == ECPRISS_PORT_0 &&
+                        event_type == ETH_ECPRISS_EVENT_DOWN){
+                pr_err("XBAR flush for port 0 | enable: %d\n", ENABLE_BIT);
+                xbar_flush.flush_fh_0_tx = ENABLE_BIT;
+        }
+        else if (port_type == ECPRISS_PORT_TYPE_FH &&
+                        port_idx == ECPRISS_PORT_1 &&
+                        event_type == ETH_ECPRISS_EVENT_DOWN){
+                pr_err("XBAR flush for port 1 | enable: %d\n", ENABLE_BIT);
+                xbar_flush.flush_fh_1_tx = ENABLE_BIT;
+        }
+        else if (port_type == ECPRISS_PORT_TYPE_FH &&
+                        port_idx == ECPRISS_PORT_2 &&
+                        event_type == ETH_ECPRISS_EVENT_DOWN){
+                pr_err("XBAR flush for port 2 | enable: %d\n", ENABLE_BIT);
+                xbar_flush.flush_fh_2_tx = ENABLE_BIT;
+        }
+
+
+        ecpriss_xbar_hal_write_reg_n_fields(ECPRISS_XBAR_GLOBAL,
+                        ECPRI_XBAR_XBAR_FLUSH,
+                        0,
+                        &xbar_flush);
+        return;
+}
 
 static irqreturn_t ecpriss_xbar_isr(int irq, void *ctxt)
 {
@@ -855,7 +907,7 @@ int ecpriss_xbar_cold_init(struct device *dev)
 		}
 
 		ecpriss_xbar_enable_stats();
-
+		ecpriss_xbar_flush_init();
 		if(ecpriss_pdata)
 		{
 			if(ecpriss_pdata->xbar_ctx)
