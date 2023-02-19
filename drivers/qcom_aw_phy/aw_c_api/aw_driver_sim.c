@@ -361,7 +361,7 @@ int pmd_poll_field(mss_access_t *mss, uint32_t addr, uint32_t fld_mask,
     QCOM_AW_PHY_LOG_DBG("[pmd_poll_field]: Polling successful after %d us\n", i);
     return 0;
   } else {
-    QCOM_AW_PHY_LOG_ERR("[pmd_poll_field]: Polling timed out after %d us\n",
+    QCOM_AW_PHY_LOG_DBG("[pmd_poll_field]: Polling timed out after %d us\n",
                    timeout_us);
     return -1;
   }

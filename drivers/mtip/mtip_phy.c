@@ -72,8 +72,7 @@ extern struct eth_phy_iface_ops qcom_aw_phy_driver_iface_ops;
 extern int qsfp_eth_get_link_type(u32 qsfp_phandle, u8* link_info);
 
 // PCS level retry delay to bring up PHY lane
-#define MTIP_PHY_RETRY_TIMER     10000
-#define MTIP_PHY_RETRY_MIN_TIMER     100
+#define MTIP_PHY_RETRY_TIMER     2000
 
 static void mtip_phy_ready_cb(void *user_data)
 {
@@ -101,7 +100,6 @@ static void mtip_phy_an_complete_cb(enum mtip_port_type_enum port_type, enum eth
 static void mtip_phy_cdr_lock_cb(u32 link_index, bool status)
 {
     struct mtip_delayed_work_q_params *wq_params;
-    int delay_ms = MTIP_PHY_RETRY_MIN_TIMER;
 
     CSMLOGERR("CDR lock callback for link_index %d, status %d\n",
               link_index, status);
@@ -110,10 +108,8 @@ static void mtip_phy_cdr_lock_cb(u32 link_index, bool status)
     {
         post_mtip_process_link_state(link_index, true);
     }
-    else
+    else if(status == true)
     {
-      if(status == true)
-        delay_ms = MTIP_PHY_RETRY_TIMER;
 
       wq_params = kmalloc(sizeof(struct mtip_delayed_work_q_params),
                           GFP_ATOMIC);
@@ -123,7 +119,7 @@ static void mtip_phy_cdr_lock_cb(u32 link_index, bool status)
         INIT_DELAYED_WORK(&wq_params->wq_item,
                           mtip_phy_retry_phy_bringup);
         wq_params->link_index = link_index;
-        mtip_workq_queue_delayed_work(wq_params, delay_ms);
+        mtip_workq_queue_delayed_work(wq_params, MTIP_PHY_RETRY_TIMER);
       }
     }
 

@@ -192,8 +192,8 @@ enum qcom_aw_phy_synce_eth_inst{
 
 enum qcom_aw_phy_cdr_lock_lane_status{
 	CDR_LOCK_NONE = -1,
-	CDR_LOCK_SUCCESS = 0,
-	CDR_LOCK_FAILURE = 1
+	CDR_LOCK_FAILURE = 0,
+	CDR_LOCK_SUCCESS = 1
 };
 
 /* Lane Params - Lane specific information */

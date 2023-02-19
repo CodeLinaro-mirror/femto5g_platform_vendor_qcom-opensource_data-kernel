@@ -17,6 +17,10 @@
 #define USR_PRINTF(...) QCOM_AW_PHY_LOG_ERR(__VA_ARGS__)
 #endif
 
+#ifndef USR_PRINTF_DBG
+#define USR_PRINTF_DBG(...) QCOM_AW_PHY_LOG_DBG(__VA_ARGS__)
+#endif
+
 #define CHECK(x)                                                               \
   do {                                                                         \
     int err = (x);                                                             \
