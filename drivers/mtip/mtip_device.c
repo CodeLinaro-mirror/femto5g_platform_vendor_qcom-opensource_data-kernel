@@ -891,15 +891,14 @@ static int mtip_open(struct net_device *netdev)
        CSMLOGINFO("Number of lanes assigned to link %d is 0", link_index);
        return -ENODEV;
    }
-   /* 
-    * set the link state to OPEN * 
-    */
-   platform_driver_priv->mtip_links[link_index]->state = MTIP_LINK_STATE_OPEN; 
 
    /* 
     * set the link state to OPEN * 
     */
-   platform_driver_priv->mtip_links[link_index]->state = MTIP_LINK_STATE_OPEN; 
+   if (mtip_loopback_mode == MTIP_MODE_DEFAULT)
+   {
+      platform_driver_priv->mtip_links[link_index]->state = MTIP_LINK_STATE_OPEN;
+   }
 
    // this is done only for the RUMI E2E
    if (mtip_rumi_platform != 0) 
@@ -1020,7 +1019,10 @@ static int mtip_close(struct net_device *netdev)
    CSMLOGERR("Stopping netdev queue\n");
 
    // set the link state to CLOSE
-   platform_driver_priv->mtip_links[link_index]->state = MTIP_LINK_STATE_CLOSE;
+   if (mtip_loopback_mode == MTIP_MODE_DEFAULT)
+   {
+     platform_driver_priv->mtip_links[link_index]->state = MTIP_LINK_STATE_CLOSE;
+   }
 
    /* Send update to clients */
    post_mtip_client_send_event(ETH_ECPRISS_EVENT_DOWN, link_index);
