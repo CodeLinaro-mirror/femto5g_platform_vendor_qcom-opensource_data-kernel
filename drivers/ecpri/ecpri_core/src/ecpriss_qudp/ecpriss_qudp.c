@@ -1124,7 +1124,7 @@ static irqreturn_t ecpriss_qudp_isr(int irq, void *ctxt)
 	unsigned long flags = 0;
 	int port_index;
 	//Todo: check with respect to spinlock_irqsave and spinlock_irqrestore
-	spin_lock_irqsave(&ecpriss_pdata->irq_lock, flags);
+	spin_lock_irqsave(&irq_lock, flags);
 
 	for(port_index=0;port_index<ECPRISS_PORT_MAX;port_index++) {
 		ecpri_qudp_hwio_def_ecpri_udp_fh_udp_sw_irq_status_0_port_p_s fh_udp_sw_irq_status_0_port_p;
@@ -1451,7 +1451,7 @@ static irqreturn_t ecpriss_qudp_isr(int irq, void *ctxt)
 
 	}
 
-	spin_unlock_irqrestore(&ecpriss_pdata->irq_lock, flags);
+	spin_unlock_irqrestore(&irq_lock, flags);
 	return IRQ_HANDLED;
 }
 
