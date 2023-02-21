@@ -21,7 +21,7 @@
 #include <asm/io.h>
 
 #include "ecpriss_xbar_hal.h"
-#include "ecpriss_log.h"
+
 
 static const char *ecpriss_xbar_hal_reg_name_to_str[ECPRI_XBAR_XBAR_MAX+1] = {
 
@@ -117,7 +117,7 @@ ecpriss_xbar_hal_context_s ecpriss_xbar_hal_ctx;
 const char *ecpriss_xbar_hal_reg_name_str(enum ecpriss_xbar_hal_reg_name reg_name)
 {
 	if (reg_name < 0 || reg_name >= ECPRI_XBAR_XBAR_MAX) {
-		ECPRILOGERR("requested name of invalid reg=%d\n", reg_name);
+		pr_err("requested name of invalid reg=%d\n", reg_name);
 		return "Invalid Register";
 	}
 
@@ -497,7 +497,7 @@ static void ecpriss_xbar_hal_reg_parse_lut_status(enum ecpriss_xbar_hal_reg_name
 	ecpri_xbar_hwio_def_ecpri_xbar_xbar_lut_status_s *lut_status;
 	lut_status = (ecpri_xbar_hwio_def_ecpri_xbar_xbar_lut_status_s *)fields;
 
-	ECPRILOGINFO("ecpriss_xbar_hal_reg_parse_lut_status: 0x%x", val);
+	pr_info("ecpriss_xbar_hal_reg_parse_lut_status: 0x%x", val);
 
 	lut_status->fhrx_lut_init_done = ECPRISS_HAL_GETFIELD_FROM_REG(val,
 			HWIO_ECPRI_XBAR_XBAR_LUT_STATUS_FHRX_LUT_INIT_DONE_SHFT,
@@ -1149,19 +1149,20 @@ int ecpriss_xbar_hal_reg_init(struct device *dev)
 	int result = 0;
 	/* setup ECPRISS register access */
 
+	pr_err(" ecpriss_xbar_hal_reg_init #### ");
 	do
 	{
 		ecpriss_xbar_hal_ctx.hw_type = ECPRISS_XBAR_HW_v1_0;
 		ecpriss_xbar_hal_ctx.ecpriss_pdev = dev;
 
 		ecpriss_xbar_hal_ctx.phy_base = ECPRISS_XBAR_REG_BASE_ADDRESS;
-		ECPRILOGINFO("Mapping  XBAR HAL reg space : 0x%x\n", ecpriss_xbar_hal_ctx.phy_base);
+		pr_err("Mapping  XBAR HAL reg space : 0x%x\n", ecpriss_xbar_hal_ctx.phy_base);
 
 		ecpriss_xbar_hal_ctx.base = ioremap(ecpriss_xbar_hal_ctx.phy_base,ECPRISS_XBAR_REG_SIZE);
-		ECPRILOGINFO("XBAR HAL reg mapped : 0x%x\n", ecpriss_xbar_hal_ctx.base);
+		pr_err("XBAR HAL reg mapped : 0x%x\n", ecpriss_xbar_hal_ctx.base);
 
 		if (!ecpriss_xbar_hal_ctx.base) {
-			ECPRILOGERR(":ecpriss_xbar_base ioremap err\n");
+			pr_err(":ecpriss_xbar_base ioremap err\n");
 			result = -EFAULT;
 			break;
 		}
@@ -1182,7 +1183,7 @@ int ecpriss_xbar_hal_lut_reg_init(struct device *dev)
 		ecpriss_xbar_hal_ctx.lut_base = ioremap(ecpriss_xbar_hal_ctx.lut_phy_base, ECPRISS_XBAR_LUT_SIZE);
 
 		if (!ecpriss_xbar_hal_ctx.lut_base) {
-			ECPRILOGERR(":ecpriss-base ioremap err\n");
+			pr_err(":ecpriss-base ioremap err\n");
 			result = -EFAULT;
 			break;
 		}
@@ -1230,17 +1231,17 @@ u32 ecpriss_xbar_hal_read_reg(ecpriss_xbar_hal_reg_type_e  reg_type,
 	u32 offset;
 	int val=0;
 	if (reg >= ECPRI_XBAR_XBAR_MAX) {
-		ECPRILOGERR("Invalid register reg=%u\n", reg);
+		pr_err("Invalid register reg=%u\n", reg);
 		WARN_ON(1);
 		return -EINVAL;
 	}
 
-	//	ECPRILOGINFO("read from %s \n",
+	//	pr_info("read from %s \n",
 	//	ecpriss_xbar_hal_reg_name_str(reg));
 
 	offset = ecpriss_xbar_hal_reg_objs[ecpriss_xbar_hal_ctx.hw_type][reg].offset;
 	if (offset == -1) {
-		ECPRILOGERR("Read access to obsolete reg=%s\n",
+		pr_err("Read access to obsolete reg=%s\n",
 				ecpriss_xbar_hal_reg_name_str(reg));
 		WARN_ON(1);
 		return -EPERM;
@@ -1262,17 +1263,17 @@ u32 ecpriss_xbar_hal_read_reg_n(ecpriss_xbar_hal_reg_type_e  reg_type,
 	u32 offset;
 	int val=0;
 	if (reg >= ECPRI_XBAR_XBAR_MAX) {
-		ECPRILOGERR("Invalid register reg=%u\n", reg);
+		pr_err("Invalid register reg=%u\n", reg);
 		WARN_ON(1);
 		return -EINVAL;
 	}
 
-	//ECPRILOGINFO("read from %s n=%u\n",
+	//pr_info("read from %s n=%u\n",
 	//ecpriss_xbar_hal_reg_name_str(reg), n);
 
 	offset = ecpriss_xbar_hal_reg_objs[ecpriss_xbar_hal_ctx.hw_type][reg].offset;
 	if (offset == -1) {
-		ECPRILOGERR("Read access to obsolete reg=%s\n",
+		pr_err("Read access to obsolete reg=%s\n",
 				ecpriss_xbar_hal_reg_name_str(reg));
 		WARN_ON(1);
 		return -EPERM;
@@ -1295,16 +1296,16 @@ u32 ecpriss_xbar_hal_read_reg_mn(ecpriss_xbar_hal_reg_type_e  reg_type,
 	u32 offset;
 	int val=0;
 	if (reg >= ECPRI_XBAR_XBAR_MAX) {
-		ECPRILOGERR("Invalid register reg=%u\n", reg);
+		pr_err("Invalid register reg=%u\n", reg);
 		WARN_ON(1);
 		return -EINVAL;
 	}
 
-	//ECPRILOGINFO("read %s m=%u n=%u\n",
+	//pr_info("read %s m=%u n=%u\n",
 	//ecpriss_xbar_hal_reg_name_str(reg), m, n);
 	offset = ecpriss_xbar_hal_reg_objs[ecpriss_xbar_hal_ctx.hw_type][reg].offset;
 	if (offset == -1) {
-		ECPRILOGERR("Read access to obsolete reg=%s\n",
+		pr_err("Read access to obsolete reg=%s\n",
 				ecpriss_xbar_hal_reg_name_str(reg));
 		WARN_ON_ONCE(1);
 		return -EPERM;
@@ -1330,16 +1331,16 @@ void ecpriss_xbar_hal_write_reg_mn(ecpriss_xbar_hal_reg_type_e  reg_type,
 	u32 offset;
 
 	if (reg >= ECPRI_XBAR_XBAR_MAX) {
-		ECPRILOGERR("Invalid register reg=%u\n", reg);
+		pr_err("Invalid register reg=%u\n", reg);
 		WARN_ON(1);
 		return;
 	}
 
-	//	ECPRILOGINFO("write to %s m=%u n=%u val=%u\n",
+	//	pr_info("write to %s m=%u n=%u val=%u\n",
 	//	ecpriss_xbar_hal_reg_name_str(reg), m, n, val);
 	offset = ecpriss_xbar_hal_reg_objs[ecpriss_xbar_hal_ctx.hw_type][reg].offset;
 	if (offset == -1) {
-		ECPRILOGERR("Write access to obsolete reg=%s\n",
+		pr_err("Write access to obsolete reg=%s\n",
 				ecpriss_xbar_hal_reg_name_str(reg));
 		WARN_ON(1);
 		return;
@@ -1363,16 +1364,16 @@ void ecpriss_xbar_hal_write_reg_mn_fields(ecpriss_xbar_hal_reg_type_e  reg_type,
 	u32 offset;
 	u32 val = 0;
 	if (reg >= ECPRI_XBAR_XBAR_MAX) {
-		ECPRILOGERR("Invalid register reg=%u\n", reg);
+		pr_err("Invalid register reg=%u\n", reg);
 		WARN_ON(1);
 		return;
 	}
 
-	//ECPRILOGINFO("write to %s m=%u n=%u val=%u\n",
+	//pr_info("write to %s m=%u n=%u val=%u\n",
 	//ecpriss_xbar_hal_reg_name_str(reg), m, n, val);
 	offset = ecpriss_xbar_hal_reg_objs[ecpriss_xbar_hal_ctx.hw_type][reg].offset;
 	if (offset == -1) {
-		ECPRILOGERR("Write access to obsolete reg=%s\n",
+		pr_err("Write access to obsolete reg=%s\n",
 				ecpriss_xbar_hal_reg_name_str(reg));
 		WARN_ON(1);
 		return;
@@ -1394,22 +1395,22 @@ u32 ecpriss_xbar_hal_read_reg_mn_fields(ecpriss_xbar_hal_reg_type_e  reg_type,
 	u32 offset;
 
 	if (!fields) {
-		ECPRILOGERR("Input error fields\n");
+		pr_err("Input error fields\n");
 		WARN_ON(1);
 		return -EINVAL;
 	}
 
 	if (reg >= ECPRI_XBAR_XBAR_MAX) {
-		ECPRILOGERR("Invalid register reg=%u\n", reg);
+		pr_err("Invalid register reg=%u\n", reg);
 		WARN_ON(1);
 		return -EINVAL;
 	}
 
-	//ECPRILOGINFO("read from %s n=%u and parse it\n",
+	//pr_info("read from %s n=%u and parse it\n",
 	//	ecpriss_xbar_hal_reg_name_str(reg), n);
 	offset = ecpriss_xbar_hal_reg_objs[ecpriss_xbar_hal_ctx.hw_type][reg].offset;
 	if (offset == -1) {
-		ECPRILOGERR("Read access to obsolete reg=%s\n",
+		pr_err("Read access to obsolete reg=%s\n",
 				ecpriss_xbar_hal_reg_name_str(reg));
 		WARN_ON(1);
 		return -EPERM;
@@ -1433,30 +1434,30 @@ u32 ecpriss_xbar_hal_read_reg_n_fields(ecpriss_xbar_hal_reg_type_e  reg_type,
 	u32 offset;
 
 	if (!fields) {
-		ECPRILOGERR("Input error fields\n");
+		pr_err("Input error fields\n");
 		WARN_ON(1);
 		return -EINVAL;
 	}
 
 	if (reg >= ECPRI_XBAR_XBAR_MAX) {
-		ECPRILOGERR("Invalid register reg=%u\n", reg);
+		pr_err("Invalid register reg=%u\n", reg);
 		WARN_ON(1);
 		return -EINVAL;
 	}
 
-	//	ECPRILOGINFO("read from %s n=%u and parse it\n",	ecpriss_xbar_hal_reg_name_str(reg), n);
+	//	pr_info("read from %s n=%u and parse it\n",	ecpriss_xbar_hal_reg_name_str(reg), n);
 
 	offset = ecpriss_xbar_hal_reg_objs[ecpriss_xbar_hal_ctx.hw_type][reg].offset;
-	//ECPRILOGINFO("read reg ofst 0x%x \n",	offset);
+	//pr_info("read reg ofst 0x%x \n",	offset);
 
 	if (offset == -1) {
-		ECPRILOGERR("Read access to obsolete reg=%s\n",
+		pr_err("Read access to obsolete reg=%s\n",
 				ecpriss_xbar_hal_reg_name_str(reg));
 		WARN_ON(1);
 		return -EPERM;
 	}
 	offset += ecpriss_xbar_hal_reg_objs[ecpriss_xbar_hal_ctx.hw_type][reg].n_ofst * n;
-	//	ECPRILOGINFO("read reg ofst after n_ofst adjust 0x%x \n",	offset);
+	//	pr_info("read reg ofst after n_ofst adjust 0x%x \n",	offset);
 
 	val = ecpriss_xbar_reg_read(reg_type,offset);
 	ecpriss_xbar_hal_reg_objs[ecpriss_xbar_hal_ctx.hw_type][reg].parse(reg, fields, val);
@@ -1476,22 +1477,22 @@ void ecpriss_xbar_hal_write_reg_n_fields(ecpriss_xbar_hal_reg_type_e  reg_type,
 	u32 offset;
 
 	if (!fields) {
-		ECPRILOGERR("Input error fields=%pK\n", fields);
+		pr_err("Input error fields=%pK\n", fields);
 		WARN_ON(1);
 		return;
 	}
 
 	if (reg >= ECPRI_XBAR_XBAR_MAX) {
-		ECPRILOGERR("Invalid register reg=%u\n", reg);
+		pr_err("Invalid register reg=%u\n", reg);
 		WARN_ON(1);
 		return;
 	}
 
-	// ECPRILOGINFO("write to %s n=%u after constructing it\n",
+	// pr_info("write to %s n=%u after constructing it\n",
 	//ecpriss_xbar_hal_reg_name_str(reg), n);
 	offset = ecpriss_xbar_hal_reg_objs[ecpriss_xbar_hal_ctx.hw_type][reg].offset;
 	if (offset == -1) {
-		ECPRILOGERR("Write access to obsolete reg=%s\n",
+		pr_err("Write access to obsolete reg=%s\n",
 				ecpriss_xbar_hal_reg_name_str(reg));
 		WARN_ON(1);
 		return;
