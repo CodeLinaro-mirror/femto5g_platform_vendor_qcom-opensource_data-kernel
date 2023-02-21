@@ -126,7 +126,7 @@ static void mtip_update_topology()
     spinlock_t *lock = &platform_driver_priv->driver_lock;
     u32 port = 0;
 
-    CSMLOGINFO("Updating topology\n");
+    CSMLOGDBG("Updating topology\n");
 
     spin_lock_irqsave(lock, flags);
 
@@ -135,7 +135,7 @@ static void mtip_update_topology()
 
     // add check here for null pointer
     if (topology == NULL) {
-        CSMLOGINFO("Unable to update topology\n");
+        CSMLOGERR("Unable to update topology\n");
         spin_unlock_irqrestore(lock, flags);
         return;
     }
@@ -246,7 +246,7 @@ static void mtip_update_topology()
         case MTIP_PORT_TYPE_DEBUG:
         default:
             {
-                CSMLOGINFO("Ignoring port of type: %d", platform_driver_priv->devices.port_devices[i].port_type);
+                CSMLOGDBG("Ignoring port of type: %d", platform_driver_priv->devices.port_devices[i].port_type);
             }
             break;
         }
@@ -273,7 +273,7 @@ void run_mtip_client_send_ready(void* work_ptr)
    // update the topology since something might have changed
    mtip_update_topology();
 
-   CSMLOGINFO("Sending Ready to all registered clients\n");
+   CSMLOGDBG("Sending Ready to all registered clients\n");
 
    for (i = 0; i < MTIP_MAX_CLIENTS; ++i)
    {
@@ -314,7 +314,7 @@ void run_mtip_client_send_event(void* work_ptr)
    // update the topology since something might have changed
    mtip_update_topology();
 
-   CSMLOGINFO("Sending Event to all registered clients\n");
+   CSMLOGDBG("Sending Event to all registered clients\n");
 
    for (i = 0; i < MTIP_MAX_CLIENTS; ++i)
    {
@@ -335,7 +335,7 @@ void run_mtip_client_send_event(void* work_ptr)
    kfree(taskstruct);
 }
 
-static void mtip_print_topology(eth_ecpriss_topology_root_s *topology)
+void mtip_print_topology(eth_ecpriss_topology_root_s *topology)
 {
     uint8_t i, j, k;
     uint8_t                        num_unique_port_types;
@@ -391,7 +391,7 @@ int mtip_setup_topology(void)
 {
     eth_ecpriss_topology_root_s* topology;
 
-    CSMLOGINFO("setting up initial topology\n");
+    CSMLOGDBG("setting up initial topology\n");
 
     // allocate the memory for the topology structure
     topology = (eth_ecpriss_topology_root_s*)kmalloc(sizeof(eth_ecpriss_topology_root_s), GFP_KERNEL);
@@ -427,15 +427,13 @@ eth_ecpriss_status_e mtip_eth_get_topology(eth_ecpriss_dev_mode_e *device_mode, 
 
         memcpy(topology_params, platform_driver_priv->topology, sizeof(eth_ecpriss_topology_root_s));
 
-        mtip_print_topology(topology_params);
-
         ret = ETH_ECPRISS_STATUS_SUCCESS;
 
-        CSMLOGINFO("device mode is %d, ret is %d", *device_mode, ret);
+        CSMLOGDBG("Device mode is %d, ret is %d", *device_mode, ret);
     }
     else
     {
-        CSMLOGERR("topology is NULL ret: %d", ret);
+        CSMLOGINFO("topology is NULL ret: %d", ret);
     }
 
     return ret;

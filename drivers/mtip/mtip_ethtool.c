@@ -48,6 +48,7 @@
 #include "mtip_mac.h"
 #include "mtip_pcs.h"
 #include "mtip_debug_eth.h"
+#include "mtip_client.h"
 
 static const char * const mtip_ethtool_stat_strings[] = {
     "EtherStatsOctets",
@@ -149,7 +150,7 @@ const char* mtip_ethtool_get_priv_flags_str(u32 index)
 
 static int mtip_get_sset_count(struct net_device *netdev, int sset)
 {
-    CSMLOGINFO("ethtool: get_sset_count %d, %d\n", sset, MTIP_ETHTOOL_STATS_LEN);
+    CSMLOGDBG("ethtool: get_sset_count %d, %d\n", sset, MTIP_ETHTOOL_STATS_LEN);
 
 	switch (sset) {
 	case ETH_SS_STATS:
@@ -164,7 +165,7 @@ static int mtip_get_sset_count(struct net_device *netdev, int sset)
 static void mtip_get_strings(struct net_device *netdev, u32 stringset, u8 *data)
 {
     int i;
-    CSMLOGINFO("ethtool: get_strings stringset %d, %d\n", stringset, MTIP_ETHTOOL_STATS_LEN);
+    CSMLOGDBG("ethtool: get_strings stringset %d, %d\n", stringset, MTIP_ETHTOOL_STATS_LEN);
 
     if (stringset == ETH_SS_STATS) 
     {
@@ -186,7 +187,7 @@ static void mtip_get_strings(struct net_device *netdev, u32 stringset, u8 *data)
 
 static void mtip_ethtool_get_stats(struct net_device *netdev, struct ethtool_stats *stats, u64 *data) 
 {
-    CSMLOGINFO("ethtool: get_stats\n");
+    CSMLOGDBG("ethtool: get_stats\n");
 
     memset(data, 0, MTIP_ETHTOOL_STATS_LEN*sizeof(u64));
 
@@ -196,7 +197,7 @@ static void mtip_ethtool_get_stats(struct net_device *netdev, struct ethtool_sta
 
 int mtip_check_if_running(struct net_device *dev)
 {
-    CSMLOGINFO("ethtool: check_if_running\n");
+    CSMLOGDBG("ethtool: check_if_running\n");
 
 	if (!netif_running(dev))
 		return -EBUSY;
@@ -324,7 +325,7 @@ static int mtip_ethtool_dump_regs_len()
     // Multiply by 2 to add addresses of registers in buffer
     mtip_ethtool_reg_buffer_size = reg_buf_size * 2;
 
-    CSMLOGINFO("mtip_ethtool: reg buffer size %d  total buff size %d \n", 
+    CSMLOGDBG("mtip_ethtool: reg buffer size %d  total buff size %d \n", 
                reg_buf_size, mtip_ethtool_reg_buffer_size);
    
     // return size in bytes
@@ -342,7 +343,7 @@ static int mtip_ethtool_get_regs_len(struct net_device *dev)
 
 void mtip_getdrvinfo(struct net_device *dev, struct ethtool_drvinfo *info)
 {
-    CSMLOGINFO("ethtool: getdrvinfo\n");
+    CSMLOGDBG("ethtool: getdrvinfo\n");
 
     strlcpy(info->driver, MTIP_MAC_DRIVER, sizeof(info->driver));
 	strlcpy(info->version, MTIP_MAC_DRIVER_VERSION, sizeof(info->version));
@@ -359,7 +360,7 @@ int mtip_get_link_ksettings(struct net_device *dev, struct ethtool_link_ksetting
     priv = netdev_priv(dev);
     link_index = priv->link_index;
 
-    CSMLOGINFO("ethtool: get_link_ksettings for link_index: %d\n", link_index);
+    CSMLOGDBG("ethtool: get_link_ksettings for link_index: %d\n", link_index);
 
 	if (!netif_running(dev)) {
 		CSMLOGERR("%s: interface is disabled: we cannot track "
@@ -382,7 +383,7 @@ int mtip_get_link_ksettings(struct net_device *dev, struct ethtool_link_ksetting
 
 static int mtip_get_ts_info(struct net_device *ndev, struct ethtool_ts_info *info)
 {
-    CSMLOGINFO("ethtool: getting ts info\n");
+    CSMLOGDBG("ethtool: getting ts info\n");
 
 	ethtool_op_get_ts_info(ndev, info);
 
@@ -420,7 +421,7 @@ int	mtip_ethtool_get_fecparam(struct net_device* netdev, struct ethtool_fecparam
     // set the active fec
     pfec->active_fec = platform_driver_priv->mtip_links[link_index]->active_fec;
 
-    CSMLOGINFO("Getting FEC parameter for link index: %d, cmd: %d", link_index, cmd);
+    CSMLOGDBG("Getting FEC parameter for link index: %d, cmd: %d", link_index, cmd);
 
     return 0;
 }
@@ -441,11 +442,11 @@ int	mtip_ethtool_set_fecparam(struct net_device* netdev, struct ethtool_fecparam
     priv = netdev_priv(netdev);
     link_index = priv->link_index;
 
-    CSMLOGINFO("Setting FEC parameter for link index: %d, cmd: %d, active: %d, fec: %d", link_index, cmd, active_fec, fec);
+    CSMLOGDBG("Setting FEC parameter for link index: %d, cmd: %d, active: %d, fec: %d", link_index, cmd, active_fec, fec);
 
     mtip_lookup_device_by_link_index(link_index, &port_device_index, &link_device_index);
 
-    CSMLOGINFO("link index: %d, port_device: %d, link_device: %d", link_index, port_device_index, link_device_index);
+    CSMLOGDBG("link index: %d, port_device: %d, link_device: %d", link_index, port_device_index, link_device_index);
 
     // set the port_device
     port_device = &platform_driver_priv->devices.port_devices[port_device_index];
@@ -454,7 +455,7 @@ int	mtip_ethtool_set_fecparam(struct net_device* netdev, struct ethtool_fecparam
     if (fec == ETHTOOL_FEC_OFF) 
     {
         // find the port corresponding to the link
-        CSMLOGINFO("Going to set FEC OFF for link_index: %d", link_index);
+        CSMLOGDBG("Going to set FEC OFF for link_index: %d", link_index);
 
         // turn FEC to OFF
         mtip_mac_wrapper_disable_rsfec_for_25g_mode(port_device);
@@ -469,7 +470,7 @@ int	mtip_ethtool_set_fecparam(struct net_device* netdev, struct ethtool_fecparam
     else if (fec == ETHTOOL_FEC_RS) 
     {
         // find the port corresponding to the link
-        CSMLOGINFO("Going to set FEC RS for link_index: %d", link_index);
+        CSMLOGDBG("Going to set FEC RS for link_index: %d", link_index);
 
         // turn on RS FEC
         mtip_mac_wrapper_enable_rsfec_for_25g_mode(port_device);
@@ -498,7 +499,7 @@ static u32 mtip_ethtool_get_priv_flags(struct net_device *netdev)
     priv = netdev_priv(netdev);
     link_index = priv->link_index;
 
-    CSMLOGINFO("Get priv called for link index: %d", link_index);
+    CSMLOGDBG("Get priv called for link index: %d", link_index);
 
     // return flags currently enabled
     return priv->priv_flags;
@@ -537,7 +538,7 @@ static int mtip_ethtool_set_priv_flags(struct net_device *netdev, u32 flags)
     priv = netdev_priv(netdev);
     link_index = priv->link_index;
 
-    CSMLOGINFO("Set priv called for link index: %d with flags: 0x%x", link_index, flags);
+    CSMLOGDBG("Set priv called for link index: %d with flags: 0x%x", link_index, flags);
 
     if (mtip_check_if_running(netdev) == true) 
     {
@@ -571,14 +572,14 @@ static void mtip_ethtool_set_msglevel(struct net_device *netdev, u32 level)
     {
     case 0:
         {
-            CSMLOGERR("Using set msglevel %d to toggle PHYLINK state to NOT CONNECTED for link index %d", level, link_index);
+            CSMLOGINFO("Using set msglevel %d to toggle PHYLINK state to NOT CONNECTED for link index %d", level, link_index);
             platform_driver_priv->mtip_ports[real_port_number]->port_state = MTIP_PORT_STATE_DISCONNECTED;
         }
         break;
 
     case 1:
         {
-            CSMLOGERR("Using set msglevel %d to set PHYLINK state to CONNECTED for DAC link index %d", level, link_index);
+            CSMLOGINFO("Using set msglevel %d to set PHYLINK state to CONNECTED for DAC link index %d", level, link_index);
             platform_driver_priv->mtip_ports[real_port_number]->port_state = MTIP_PORT_STATE_CONNECTED;
 
             platform_driver_priv->mtip_ports[real_port_number]->sfp_port_type = PORT_DA;
@@ -587,7 +588,7 @@ static void mtip_ethtool_set_msglevel(struct net_device *netdev, u32 level)
 
     case 2:
         {
-            CSMLOGERR("Using set msglevel %d to set PHYLINK state to CONNECTED for FIBRE link index %d", level, link_index);
+            CSMLOGINFO("Using set msglevel %d to set PHYLINK state to CONNECTED for FIBRE link index %d", level, link_index);
             platform_driver_priv->mtip_ports[real_port_number]->port_state = MTIP_PORT_STATE_CONNECTED;
 
             platform_driver_priv->mtip_ports[real_port_number]->sfp_port_type = PORT_FIBRE;
@@ -599,9 +600,16 @@ static void mtip_ethtool_set_msglevel(struct net_device *netdev, u32 level)
             mtip_platform_print_platform();
         }
         break;
+
+    case 4:
+        {
+            mtip_print_topology(platform_driver_priv->topology);
+        }
+        break;
+
     default:
         {
-            CSMLOGERR("Ignoring msglevel %d for link index: %d", level, link_index);
+            CSMLOGINFO("Ignoring msglevel %d for link index: %d", level, link_index);
         }
         break;
     }
@@ -644,11 +652,10 @@ void mtip_ethtool_set_ops(struct net_device *netdev)
   struct mtip_netdev_priv* priv;
   u32 link_index;
 
-   CSMLOGINFO("Setting ethtool ops for netdev 0x%lx\n", (unsigned long)netdev);
+   CSMLOGDBG("Setting ethtool ops for netdev 0x%lx\n", (unsigned long)netdev);
 
    priv = netdev_priv(netdev);
    link_index = priv->link_index;
-   CSMLOGERR("Link index : %d\n",link_index);
 
    // TBD: here link_index is not yet valid
    if(link_index == MTIP_DEBUG_ETH_LINK_INDEX)

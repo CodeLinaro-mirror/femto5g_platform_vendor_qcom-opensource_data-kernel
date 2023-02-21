@@ -96,7 +96,7 @@ void mtip_mac_clear_interrupts(u32 link_index, u32 int_to_clear)
 
     wrapper_base_addr = platform_driver_priv->devices.port_devices[port_device_index].wrapper_base_addr;
 
-    CSMLOGINFO("clearing 0x%x on link_index: %d", write_val, link_index);
+    CSMLOGDBG("clearing 0x%x on link_index: %d", write_val, link_index);
 
     // clear all interrupts
     iowrite32(write_val,
@@ -118,7 +118,7 @@ static void mtip_mac_clear_all_interrupts(u32 link_index, u32 int_to_clear)
 
     wrapper_base_addr = platform_driver_priv->devices.port_devices[port_device_index].wrapper_base_addr;
 
-    CSMLOGINFO("clearing all interrupts on link_index: %d", link_index);
+    CSMLOGDBG("clearing all interrupts on link_index: %d", link_index);
 
     // clear all interrupts
     iowrite32(write_val,
@@ -147,7 +147,7 @@ static irqreturn_t mtip_mac_interrupt_handler(int irq, void *devptr)
    handled_interrupts |= MTIP_MAC_INTERRUPT_LINK_DOWN_INTR;
    handled_interrupts |= MTIP_MAC_INTERRUPT_LINK_UP_INTR;
 
-   CSMLOGINFO("ENTER: Interrupt! handling 0x%x\n", handled_interrupts);
+   CSMLOGDBG("ENTER: Interrupt! handling 0x%x\n", handled_interrupts);
 
    // check if this an interrupt that needs to be handled
    for (i = 0; i < platform_driver_priv->devices.num_port_phandles; ++i) 
@@ -169,7 +169,7 @@ static irqreturn_t mtip_mac_interrupt_handler(int irq, void *devptr)
    // set the portptr
    portptr = (struct mtip_port_device_info *)devptr;
 
-   CSMLOGINFO("Got an interrupt! on port type %d\n", portptr->port_type);
+   CSMLOGDBG("Got an interrupt! on port type %d\n", portptr->port_type);
 
    // read the interrupt summary
    summary = mtip_mac_get_interrupt_summary(portptr);
@@ -178,7 +178,7 @@ static irqreturn_t mtip_mac_interrupt_handler(int irq, void *devptr)
    {
        if ((summary & 0x01) == 0x1)
        {
-           CSMLOGINFO("Got an interrupt! on port type %d, link: %d\n", portptr->port_type, i);
+           CSMLOGDBG("Got an interrupt! on port type %d, link: %d\n", portptr->port_type, i);
 
            // the bit for link i is set
            // there is an interrupt pending
@@ -187,7 +187,7 @@ static irqreturn_t mtip_mac_interrupt_handler(int irq, void *devptr)
            int_status = mtip_mac_get_interrupt_status(link_index);
            int_mask = mtip_mac_get_interrupt_mask(link_index);
 
-           CSMLOGINFO("Interrupt status 0x%x for link: %d with link_index: %d, mask: 0x%x\n", int_status, i, link_index, int_mask);
+           CSMLOGDBG("Interrupt status 0x%x for link: %d with link_index: %d, mask: 0x%x\n", int_status, i, link_index, int_mask);
 
            // check for PTP interrupt
            if ((int_status & MTIP_MAC_INTERRUPT_PTP_TX_INTR) != 0)
@@ -195,7 +195,7 @@ static irqreturn_t mtip_mac_interrupt_handler(int irq, void *devptr)
                // there is a PTP interrupt pending
                mtip_mac_read_timestamp(link_index, &timestamp_secs, &timestamp_nsecs);
 
-               CSMLOGINFO("Tx Timestamp %d, %d read for link: %d with link_index: %d\n", timestamp_secs, timestamp_nsecs, i, link_index);
+               CSMLOGDBG("Tx Timestamp %d, %d read for link: %d with link_index: %d\n", timestamp_secs, timestamp_nsecs, i, link_index);
 
                // post a job to workqueue to process this timestamp
                post_mtip_process_timestamp(link_index, timestamp_secs, timestamp_nsecs);
@@ -209,7 +209,7 @@ static irqreturn_t mtip_mac_interrupt_handler(int irq, void *devptr)
                // check if the LINK_UP_INTR is also set
                if ((int_status & MTIP_MAC_INTERRUPT_LINK_UP_INTR) != 0) 
                {
-                   CSMLOGINFO("Got a link down/up interrupt link_index: %d: ignoring", link_index);
+                   CSMLOGDBG("Got a link down/up interrupt link_index: %d: ignoring", link_index);
 
                    // LINK_UP also set
                    // ignore both
@@ -217,7 +217,7 @@ static irqreturn_t mtip_mac_interrupt_handler(int irq, void *devptr)
                }
                else
                {
-                   CSMLOGINFO("Got a link down interrupt link_index: %d", link_index);
+                   CSMLOGDBG("Got a link down interrupt link_index: %d", link_index);
 
                    // got a link down interrupt for link index
                    post_mtip_process_link_state(link_index, false);
@@ -232,7 +232,7 @@ static irqreturn_t mtip_mac_interrupt_handler(int irq, void *devptr)
                // check if LINK_DOWN is set
                if ((int_status & MTIP_MAC_INTERRUPT_LINK_DOWN_INTR) != 0)
                {
-                   CSMLOGINFO("Got a link down/up interrupt link_index: %d: ignoring", link_index);
+                   CSMLOGDBG("Got a link down/up interrupt link_index: %d: ignoring", link_index);
 
                    // LINK_DOWN also set
                    // ignore both
@@ -241,7 +241,7 @@ static irqreturn_t mtip_mac_interrupt_handler(int irq, void *devptr)
                }
                else
                {
-                   CSMLOGINFO("Got a link up interrupt link_index: %d", link_index);
+                   CSMLOGDBG("Got a link up interrupt link_index: %d", link_index);
 
                    // got a link up interrupt for link index
                    post_mtip_process_link_state(link_index, true);
@@ -253,7 +253,7 @@ static irqreturn_t mtip_mac_interrupt_handler(int irq, void *devptr)
            // catchall
            if ((int_status & ~(handled_interrupts)) != 0)
            {
-               CSMLOGINFO("Interrupt 0x%x received for link: %d with link_index: %d\n", (int_status & ~(handled_interrupts)), i, link_index);
+               CSMLOGDBG("Interrupt 0x%x received for link: %d with link_index: %d\n", (int_status & ~(handled_interrupts)), i, link_index);
 
                handled = true;
            }
@@ -272,7 +272,7 @@ static irqreturn_t mtip_mac_interrupt_handler(int irq, void *devptr)
    }
 
 func_exit:
-   CSMLOGINFO("EXIT: Interrupt! handling retval = %d\n", retval);
+   CSMLOGDBG("EXIT: Interrupt! handling retval = %d\n", retval);
    return retval;
 }
 
@@ -280,12 +280,12 @@ static int mtip_mac_read_version(struct mtip_netdev_priv *priv) {
    u32 read_val;
    u32 link_index = priv->link_index;
 
-   CSMLOGINFO("Reading REVISION register for link index: %d\n", link_index);
+   CSMLOGDBG("Reading REVISION register for link index: %d\n", link_index);
 
    // read the value
    read_val = ioread32(priv->mac_ioaddr + MTIP_MAC_REVISION);
 
-   CSMLOGINFO("MAC REVISION: 0x%x for link index: %d\n", read_val, link_index);
+   CSMLOGDBG("MAC REVISION: 0x%x for link index: %d\n", read_val, link_index);
    return 0;
 }
 
@@ -309,7 +309,7 @@ static int mtip_mac_test_scratch(struct mtip_netdev_priv *priv) {
        return -1;
     }
 
-    CSMLOGINFO("scratch register test passed for link index: %d\n", link_index);
+    CSMLOGDBG("scratch register test passed for link index: %d\n", link_index);
    return 0;
 }
 
@@ -319,7 +319,7 @@ static void mtip_mac_reset_mac(struct mtip_netdev_priv *priv) {
    int flag = 0;
    u32 link_index = priv->link_index;
 
-   CSMLOGINFO("Reseting MAC for link index: %d\n", link_index);
+   CSMLOGDBG("Reseting MAC for link index: %d\n", link_index);
 
    // reset the MAC
    iowrite32(write_val, priv->mac_ioaddr + MTIP_MAC_COMMAND_CONFIG);
@@ -339,7 +339,7 @@ static void mtip_mac_reset_mac(struct mtip_netdev_priv *priv) {
       }
    }
 
-   CSMLOGINFO("MAC Reset complete for link index: %d\n", link_index);
+   CSMLOGDBG("MAC Reset complete for link index: %d\n", link_index);
    return;
 }
 
@@ -352,12 +352,12 @@ void mtip_mac_set_frame_length(struct mtip_netdev_priv *priv, u32 frame_length)
    {
        // set the frame length to MTIP_MAC_INIT_FRAME_LENGTH
        iowrite32(MTIP_MAC_INIT_FRAME_LENGTH, priv->mac_ioaddr + MTIP_MAC_FRM_LENGTH);
-       CSMLOGINFO("Setting frame length to %d for link index: %d\n", MTIP_MAC_INIT_FRAME_LENGTH, link_index);
+       CSMLOGDBG("Setting frame length to %d for link index: %d\n", MTIP_MAC_INIT_FRAME_LENGTH, link_index);
    }
    else
    {
        iowrite32(frame_length, priv->mac_ioaddr + MTIP_MAC_FRM_LENGTH);
-       CSMLOGINFO("Setting frame length to %d for link index: %d\n", frame_length, link_index);
+       CSMLOGDBG("Setting frame length to %d for link index: %d\n", frame_length, link_index);
    }
 }
 
@@ -389,7 +389,7 @@ void mtip_mac_set_mac_address(struct mtip_netdev_priv *priv,
    // write the upper bits
    iowrite32(upper, priv->mac_ioaddr + MTIP_MAC_MAC_ADDR_1);
 
-   CSMLOGINFO("Set the MAC address for link index: %d to upper: 0x%x, lower: 0x%x\n", link_index, upper, lower);
+   CSMLOGDBG("Set the MAC address for link index: %d to upper: 0x%x, lower: 0x%x\n", link_index, upper, lower);
 }
 
 void mtip_mac_get_mac_address_by_device(u32 port_device_index, u32 link_device_index, uint8_t sa_data[]) {
@@ -452,7 +452,7 @@ void mtip_mac_set_mac_address_by_device(u32 port_device_index, u32 link_device_i
     // write the upper bits
     iowrite32(upper, platform_driver_priv->devices.port_devices[port_device_index].link_devices[link_device_index].mac_ioaddr + MTIP_MAC_MAC_ADDR_1);
 
-    CSMLOGINFO("Set the MAC address for link index: %d, name: %s,  %x:%x:%x:%x:%x:%x \n", link_index, link_name, 
+    CSMLOGDBG("Set the MAC address for link index: %d, name: %s,  %x:%x:%x:%x:%x:%x \n", link_index, link_name, 
                sa_data[0], sa_data[1], sa_data[2], sa_data[3], sa_data[4], sa_data[5]);
 }
 
@@ -477,11 +477,11 @@ int mtip_mac_set_promisc_mode(struct mtip_netdev_priv *priv, bool mode)
             // write the value back to the CONFIG register
             iowrite32(write_val, priv->mac_ioaddr + MTIP_MAC_COMMAND_CONFIG);
 
-            CSMLOGINFO("Set the promisc mode for link index: %d\n", link_index);
+            CSMLOGDBG("Set the promisc mode for link index: %d\n", link_index);
         }
         else
         {
-            CSMLOGINFO("Promisc mode already set for link index: %d\n", link_index);
+            CSMLOGDBG("Promisc mode already set for link index: %d\n", link_index);
 
             ret = 1;
         }
@@ -496,11 +496,11 @@ int mtip_mac_set_promisc_mode(struct mtip_netdev_priv *priv, bool mode)
 
             // write the value back to the CONFIG register
             iowrite32(write_val, priv->mac_ioaddr + MTIP_MAC_COMMAND_CONFIG);
-            CSMLOGINFO("Reset the promisc mode for link index: %d\n", link_index);
+            CSMLOGDBG("Reset the promisc mode for link index: %d\n", link_index);
         }
         else
         {
-            CSMLOGINFO("Promisc mode already reset for link index: %d\n", link_index);
+            CSMLOGDBG("Promisc mode already reset for link index: %d\n", link_index);
 
             ret = 1;
         }
@@ -524,7 +524,7 @@ void mtip_mac_set_hashtable_entry(struct mtip_netdev_priv *priv, u8 entry_addres
 
    // write the value back to the CONFIG register
    iowrite32(write_val, priv->mac_ioaddr + MTIP_MAC_HASHTABLE_LOAD);
-   CSMLOGINFO("Setting hashtable of link index: %d, address: %d to %d\n", link_index, entry_address, write_val);
+   CSMLOGDBG("Setting hashtable of link index: %d, address: %d to %d\n", link_index, entry_address, write_val);
 }
 
 void mtip_mac_enable_tx_rx(u32 link_index)
@@ -605,7 +605,7 @@ static void mtip_mac_set_xif_mode(struct mtip_netdev_priv *priv) {
         break;
     }
 
-    CSMLOGINFO("Setting xif_mode of link_index: %d to: 0x%x", link_index, xif_mode);
+    CSMLOGDBG("Setting xif_mode of link_index: %d to: 0x%x", link_index, xif_mode);
 
     iowrite32(xif_mode, priv->mac_ioaddr + MTIP_MAC_XIF_MODE);
     return;
@@ -671,7 +671,7 @@ void mtip_mac_initialize(struct mtip_netdev_priv *priv)
    // set the XIF mode
    mtip_mac_set_xif_mode(priv);
 
-   CSMLOGINFO("MAC Init complete\n");
+   CSMLOGDBG("MAC Init complete\n");
 }
 
 void mtip_mac_finalize(void __iomem *mac_base_addr, unsigned int irq, const char *name, void *devptr) {
@@ -740,7 +740,7 @@ static u32 mtip_mac_wrapper_calendar_cfg_val(struct mtip_port_device_info* port_
         break;
     }
 
-    CSMLOGINFO("Setting calendar config of port %d to 0x%x with port config %d, str %s", 
+    CSMLOGDBG("Setting calendar config of port %d to 0x%x with port config %d, str %s", 
                port_device->port_type, 
                cfg_val, 
                port_config, 
@@ -921,7 +921,7 @@ static void mtip_mac_wrapper_set_csr_cfg(struct mtip_port_device_info* port_devi
         break;
     }
 
-    CSMLOGINFO("Setting CSR_CFG to: 0x%x", csr_cfg);
+    CSMLOGDBG("Setting CSR_CFG to: 0x%x", csr_cfg);
 
     // set the mac wrapper csr cfg
     iowrite32(csr_cfg,
@@ -1099,7 +1099,7 @@ static void mtip_mac_wrapper_set_pcs_mode(struct mtip_port_device_info* port_dev
         break;
     }
 
-    CSMLOGINFO("Setting PCS Mode to: 0x%x", pcs_mode_set);
+    CSMLOGDBG("Setting PCS Mode to: 0x%x", pcs_mode_set);
 
     // set the mac wrapper pcs mode set
     iowrite32(pcs_mode_set,
@@ -1213,7 +1213,7 @@ static void mtip_mac_wrapper_set_serdes_mux_cfg(struct mtip_port_device_info* po
         break;
     }
 
-    CSMLOGINFO("Setting SERDES MUX CFG to: 0x%x\n", serdes_mux_val);
+    CSMLOGDBG("Setting SERDES MUX CFG to: 0x%x\n", serdes_mux_val);
 
     // set the serdes mux val register
     iowrite32(serdes_mux_val,
@@ -1248,7 +1248,7 @@ void mtip_mac_wrapper_init(struct mtip_port_device_info* port_device)
     enum mtip_port_config_enum port_config = port_device->port_config;
     u32 tx_amf_cfg_val;
 
-   CSMLOGINFO("MAC Wrapper Init\n");
+   CSMLOGDBG("MAC Wrapper Init\n");
 
    // set the TSC_OFFSET REG
    iowrite32(MTIP_MAC_WRAPPER_TSC_OFFSET_REG_VAL,
@@ -1318,7 +1318,7 @@ void mtip_mac_wrapper_init(struct mtip_port_device_info* port_device)
        break;
    }
 
-   CSMLOGINFO("Setting tx_amf to 0x%x for port type %d with port config %d", tx_amf_cfg_val, port_device->port_type, port_device->port_config);
+   CSMLOGDBG("Setting tx_amf to 0x%x for port type %d with port config %d", tx_amf_cfg_val, port_device->port_type, port_device->port_config);
 
    // Configure TX AMF value
    iowrite32(tx_amf_cfg_val,
@@ -1332,22 +1332,22 @@ void mtip_mac_wrapper_register_irq(struct device *dev, unsigned int irq,
 {
    int irqret;
 
-   CSMLOGINFO("Registering IRQ %d, %s for MAC Wrapper\n", irq, dev_name);
+   CSMLOGDBG("Registering IRQ %d, %s for MAC Wrapper\n", irq, dev_name);
 
    irqret = devm_request_irq(dev, irq, (irq_handler_t)mtip_mac_interrupt_handler, IRQF_SHARED | IRQF_TRIGGER_HIGH | IRQF_ONESHOT, dev_name, devptr);
    if (irqret) {
        CSMLOGERR("failed to register IRQ handler irq=%d\n", irq);
        return;
    }
-   CSMLOGINFO("IRQ handler irq=%d registered\n", irq);
+   CSMLOGDBG("IRQ handler irq=%d registered\n", irq);
 
    irqret = enable_irq_wake(irq);
    if (irqret)
        CSMLOGERR("fail to enable IRQ wakeup irq=%d res=%d\n", irq, irqret);
    else
-       CSMLOGINFO("IRQ wakeup enabled irq=%d\n", irq);
+       CSMLOGDBG("IRQ wakeup enabled irq=%d\n", irq);
 
-   CSMLOGINFO("MAC Wrapper IRQ register done\n");
+   CSMLOGDBG("MAC Wrapper IRQ register done\n");
 }
 
 void mtip_mac_set_interrupt_mask(u32 link_index)
@@ -1417,7 +1417,7 @@ void mtip_mac_set_link_status_interrupt_mask(u32 link_index)
     write_val |= MTIP_MAC_INTERRUPT_LINK_DOWN_INTR;
     write_val |= MTIP_MAC_INTERRUPT_LINK_UP_INTR;
 
-    CSMLOGINFO("Setting mask: 0x%x to register 0x%x with real_link_number %d link_index %d\n", write_val, 
+    CSMLOGDBG("Setting mask: 0x%x to register 0x%x with real_link_number %d link_index %d\n", write_val, 
                real_link_number*MTIP_MAC_WRAPPER_INTERRUPT_OFFSET + MTIP_MAC_WRAPPER_INTERRUPT_MASK_REG_OFFSET, real_link_number, link_index);
 
     // Enable MAC interrupt
@@ -1444,7 +1444,7 @@ void mtip_mac_clear_link_status_interrupt_mask(u32 link_index)
     write_val &= (~MTIP_MAC_INTERRUPT_LINK_DOWN_INTR);
     write_val &= (~MTIP_MAC_INTERRUPT_LINK_UP_INTR);
 
-    CSMLOGINFO("Setting mask: 0x%x to register 0x%x with real_link_number %d link_index %d\n", write_val, 
+    CSMLOGDBG("Setting mask: 0x%x to register 0x%x with real_link_number %d link_index %d\n", write_val, 
                real_link_number*MTIP_MAC_WRAPPER_INTERRUPT_OFFSET + MTIP_MAC_WRAPPER_INTERRUPT_MASK_REG_OFFSET, real_link_number, link_index);
 
     // Enable MAC interrupt
@@ -1508,7 +1508,7 @@ bool mtip_mac_wrapper_get_link_status(u32 link_index)
     wrapper_base_addr = platform_driver_priv->devices.port_devices[port_device_index].wrapper_base_addr;
 
     read_val = (u32)ioread32(wrapper_base_addr + MTIP_MAC_WRAPPER_CORE_STATUS_REG_OFFSET);
-    CSMLOGERR("mtip_mac_wrapper_get_link_status link_index: %d, core status = %d, for port %d, link %d",
+    CSMLOGINFO("mtip_mac_wrapper_get_link_status link_index: %d, core status = %d, for port %d, link %d",
                link_index, read_val, port_device_index, real_link_number);
 
     if (((read_val & GENMASK(9,6)) >> 6) & (1 << real_link_number))
@@ -1525,7 +1525,7 @@ void mtip_mac_wrapper_enable_rsfec_for_25g_mode(struct mtip_port_device_info* po
     u32 pcs_mode_set = MTIP_MAC_WRAPPER_PCS_MODE_4X25G_RSFEC_ENABLE_VAL;
     void __iomem* wrapper_base_addr = port_device->wrapper_base_addr;
 
-    CSMLOGINFO("Setting PCS Mode: 0x%x\n", pcs_mode_set);
+    CSMLOGDBG("Setting PCS Mode: 0x%x\n", pcs_mode_set);
 
     // set the mac wrapper pcs mode set
     iowrite32(pcs_mode_set,
@@ -1542,7 +1542,7 @@ void mtip_mac_wrapper_disable_rsfec_for_25g_mode(struct mtip_port_device_info* p
     u32 pcs_mode_set = MTIP_MAC_WRAPPER_PCS_MODE_4X25G_RSFEC_DISABLE_VAL;
     void __iomem* wrapper_base_addr = port_device->wrapper_base_addr;
 
-    CSMLOGINFO("Setting PCS Mode: 0x%x\n", pcs_mode_set);
+    CSMLOGDBG("Setting PCS Mode: 0x%x\n", pcs_mode_set);
 
     // set the mac wrapper pcs mode set
     iowrite32(pcs_mode_set,

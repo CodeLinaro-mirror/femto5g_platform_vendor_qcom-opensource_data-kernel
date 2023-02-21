@@ -74,7 +74,7 @@ int mtip_ptp_handle_hwtstamp_ioctl(struct ifreq *ifr, u32 link_index)
 {
     struct hwtstamp_config config;
 
-    CSMLOGINFO("hwtstamp ioctl received link_index: %d\n", link_index);
+    CSMLOGDBG("hwtstamp ioctl received link_index: %d\n", link_index);
 
     if (copy_from_user(&config, ifr->ifr_data,
                sizeof(struct hwtstamp_config))) {
@@ -90,14 +90,14 @@ int mtip_ptp_handle_hwtstamp_ioctl(struct ifreq *ifr, u32 link_index)
     // check if TS is to be turned on or off
     if (config.tx_type == HWTSTAMP_TX_OFF) {
 
-        CSMLOGINFO("Received an ioctl to disable HW Time stamping for link_index: %d\n", link_index);
+        CSMLOGDBG("Received an ioctl to disable HW Time stamping for link_index: %d\n", link_index);
 
         // set PTP TS disbled for the interface
         platform_driver_priv->mtip_links[link_index]->ptp_ts_enabled = false;
     }
     else if (config.tx_type == HWTSTAMP_TX_ON) {
 
-        CSMLOGINFO("Received an ioctl to enable HW Time stamping for link_index: %d\n", link_index);
+        CSMLOGDBG("Received an ioctl to enable HW Time stamping for link_index: %d\n", link_index);
 
         // set PTP TS enabled for the interface
         platform_driver_priv->mtip_links[link_index]->ptp_ts_enabled = true;
@@ -336,7 +336,7 @@ void run_mtip_process_timestamp(void* work_ptr)
     u32 timestamp_nsecs = taskstruct->timestamp_nsecs;
     struct sk_buff* skb = NULL;
 
-    CSMLOGINFO("process tx timestamp %d, %d\n", timestamp_secs, timestamp_nsecs);
+    CSMLOGDBG("process tx timestamp %d, %d\n", timestamp_secs, timestamp_nsecs);
 
     // bottom half of process a timestamp
     // acquire the lock
@@ -378,7 +378,7 @@ void mtip_ptp_set_rx_timestamp(struct sk_buff* skb, u32 timestamp_secs, u32 time
     shhwtstamp = skb_hwtstamps(skb);
     memset(shhwtstamp, 0, sizeof(struct skb_shared_hwtstamps));
 
-    CSMLOGINFO("Read rx nanosecs %ld\n", nanosecs);
+    CSMLOGDBG("Read rx nanosecs %ld\n", nanosecs);
 
     shhwtstamp->hwtstamp = ns_to_ktime(nanosecs);
 }
@@ -388,7 +388,7 @@ void mtip_ptp_set_tx_timestamp(struct sk_buff* skb, u32 timestamp_secs, u32 time
     struct skb_shared_hwtstamps shhwtstamp;
     u64 nanosecs = ((u64)timestamp_secs)*NSEC_PER_SEC + (u64)timestamp_nsecs;
 
-    CSMLOGINFO("Read tx nanosecs %ld\n", nanosecs);
+    CSMLOGDBG("Read tx nanosecs %ld\n", nanosecs);
 
     memset(&shhwtstamp, 0, sizeof(struct skb_shared_hwtstamps));
     shhwtstamp.hwtstamp = ns_to_ktime(nanosecs);

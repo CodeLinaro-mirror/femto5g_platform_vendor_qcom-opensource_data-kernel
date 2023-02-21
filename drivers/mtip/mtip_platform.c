@@ -118,7 +118,7 @@ static int mtip_platform_setup_link(unsigned int port_device_index, unsigned int
       // add to hashmap
       mtip_hashmap_insert(hdl, link_index);
 
-      CSMLOGINFO("connect_dma_pipe is complete with hdl: %d for link_index: %d\n", hdl, link_index);
+      CSMLOGDBG("connect_dma_pipe is complete with hdl: %d for link_index: %d\n", hdl, link_index);
    }
 
    goto out;
@@ -184,12 +184,12 @@ int mtip_link_probe(struct platform_device *pdev)
     u32 lane;
     u32 lane_speed;
 
-    CSMLOGINFO("mtip_link_probe called of device \"%s\"\n", pdev->name);
+    CSMLOGDBG("mtip_link_probe called of device \"%s\"\n", pdev->name);
 
     link_device.link_pdev = pdev;
     link_device.link_phandle = pdev->dev.of_node->phandle;
 
-    CSMLOGINFO("phandle of the link device: %d\n", link_device.link_phandle);
+    CSMLOGDBG("phandle of the link device: %d\n", link_device.link_phandle);
 
     /* Get the link index */
     result	= of_property_read_u32(pdev->dev.of_node, "qcom,mac-link-index", &link_device.link_index);
@@ -199,7 +199,7 @@ int mtip_link_probe(struct platform_device *pdev)
         return ret;
     }
 
-    CSMLOGINFO("qcom,mac-link-index is %d\n", link_device.link_index);
+    CSMLOGDBG("qcom,mac-link-index is %d\n", link_device.link_index);
 
     /* Get the name */
     result = of_property_read_string(pdev->dev.of_node,"qcom,mac-link-name", &linkname);
@@ -210,7 +210,7 @@ int mtip_link_probe(struct platform_device *pdev)
     }
 
     link_device.link_name = linkname;
-    CSMLOGINFO("link name is %s\n", link_device.link_name);
+    CSMLOGDBG("link name is %s\n", link_device.link_name);
 
     // get the mac link base address
    resource = platform_get_resource_byname(pdev, IORESOURCE_MEM, "mac");
@@ -218,7 +218,7 @@ int mtip_link_probe(struct platform_device *pdev)
        CSMLOGERR(":get resource failed for mac\n");
        return -ENODEV;
    }
-   CSMLOGERR("index: %d, link base = 0x%x, link size = 0x%x\n", link_device.link_index, resource->start, resource_size(resource));
+   CSMLOGDBG("index: %d, link base = 0x%x, link size = 0x%x\n", link_device.link_index, resource->start, resource_size(resource));
 
    // set the MAC base address
    link_device.mac_ioaddr = devm_ioremap_resource(&pdev->dev, resource);
@@ -231,7 +231,7 @@ int mtip_link_probe(struct platform_device *pdev)
            CSMLOGERR(":get resource failed for pcs\n");
            return -ENODEV;
        }
-       CSMLOGERR("index: %d, link base = 0x%x, link size = 0x%x\n", link_device.link_index, resource->start, resource_size(resource));
+       CSMLOGDBG("index: %d, link base = 0x%x, link size = 0x%x\n", link_device.link_index, resource->start, resource_size(resource));
 
        // set the base address
        link_device.pcs_ioaddr = devm_ioremap_resource(&pdev->dev, resource);
@@ -252,7 +252,7 @@ int mtip_link_probe(struct platform_device *pdev)
 
    link_device.lane_speed = lane_speed;
 
-   CSMLOGINFO("qcom,lane-speed is %d\n", link_device.lane_speed);
+   CSMLOGDBG("qcom,lane-speed is %d\n", link_device.lane_speed);
 
    // get the number of lanes
    if (!of_get_property(pdev->dev.of_node, "qcom,lane-numbers", &lane_entries))
@@ -263,7 +263,7 @@ int mtip_link_probe(struct platform_device *pdev)
 
    link_device.num_lanes = lane_entries / (sizeof(u32));
 
-   CSMLOGERR("Number of lanes assigned is: %d\n", link_device.num_lanes);
+   CSMLOGDBG("Number of lanes assigned is: %d\n", link_device.num_lanes);
 
    if ((link_device.num_lanes == 0) || (link_device.num_lanes > PHY_LANE_MAX))
    {
@@ -275,7 +275,7 @@ int mtip_link_probe(struct platform_device *pdev)
    {
        if (of_property_read_u32_index(pdev->dev.of_node, "qcom,lane-numbers", i, &lane) >= 0)
        {
-           CSMLOGERR("Lane: %d assigned to link\n", lane);
+           CSMLOGDBG("Lane: %d assigned to link\n", lane);
            link_device.lanes[i] = lane;
        }
        else
@@ -300,7 +300,7 @@ int mtip_link_probe(struct platform_device *pdev)
                port_index = i;
                link_index = j;
                link_found = true;
-               CSMLOGINFO("Found link_phandle %d in port device %d at index: %d\n", link_device.link_phandle, i, j);
+               CSMLOGDBG("Found link_phandle %d in port device %d at index: %d\n", link_device.link_phandle, i, j);
                break;
            }
        }
@@ -308,7 +308,7 @@ int mtip_link_probe(struct platform_device *pdev)
 
    if (link_found)
    {
-       CSMLOGINFO("Updating index: %d, %d with link information\n", port_index, link_index);
+       CSMLOGDBG("Updating index: %d, %d with link information\n", port_index, link_index);
 
        // set the link device at the found indices
        memcpy(&platform_driver_priv->devices.port_devices[port_index].link_devices[link_index], &link_device, sizeof(struct mtip_link_device_info));
@@ -345,10 +345,10 @@ int mtip_link_probe(struct platform_device *pdev)
    }
    else
    {
-       CSMLOGINFO("Still waiting for all probes to complete\n");
+       CSMLOGDBG("Still waiting for all probes to complete\n");
        ret = 0;
    }
-    CSMLOGERR("done with processing link device: %lx", (unsigned long) pdev);
+    CSMLOGDBG("done with processing link device: %lx", (unsigned long) pdev);
     return ret;
 }
 
@@ -370,12 +370,12 @@ int mtip_port_probe(struct platform_device *pdev)
     u32             dut_base_regs[2];
     u32             sfp_phandle;
 
-    CSMLOGINFO("mtip_port_probe called of device \"%s\"\n", pdev->name);
+    CSMLOGDBG("mtip_port_probe called of device \"%s\"\n", pdev->name);
 
     port_device.port_pdev = pdev;
     
     port_device.port_phandle = pdev->dev.of_node->phandle;
-    CSMLOGINFO("phandle of the port device: %d\n", port_device.port_phandle);
+    CSMLOGDBG("phandle of the port device: %d\n", port_device.port_phandle);
 
     /* Get the port type */
     result = of_property_read_u32(pdev->dev.of_node, "qcom,port-type", &port_device.port_type);
@@ -385,7 +385,7 @@ int mtip_port_probe(struct platform_device *pdev)
         return -ENODEV;
     }
 
-   CSMLOGINFO("port type is %d\n", port_device.port_type);
+   CSMLOGDBG("port type is %d\n", port_device.port_type);
 
    // mac wrapper base address
    wrapper_resource = platform_get_resource_byname(pdev, IORESOURCE_MEM, "mac-wrapper");
@@ -393,7 +393,7 @@ int mtip_port_probe(struct platform_device *pdev)
        CSMLOGERR(":get resource failed for mac-wrapper\n");
        return -ENODEV;
    }
-   CSMLOGERR("port type: %d, port base = 0x%x, port size = 0x%x\n", port_device.port_type, wrapper_resource->start, resource_size(wrapper_resource));
+   CSMLOGDBG("port type: %d, port base = 0x%x, port size = 0x%x\n", port_device.port_type, wrapper_resource->start, resource_size(wrapper_resource));
 
    // set the base address
    port_device.wrapper_base_addr = devm_ioremap_resource(&pdev->dev, wrapper_resource);
@@ -404,7 +404,7 @@ int mtip_port_probe(struct platform_device *pdev)
        CSMLOGERR(":get resource failed for macstats\n");
        return -ENODEV;
    }
-   CSMLOGERR("port type: %d, port base = 0x%x, port size = 0x%x\n", port_device.port_type, wrapper_resource->start, resource_size(wrapper_resource));
+   CSMLOGDBG("port type: %d, port base = 0x%x, port size = 0x%x\n", port_device.port_type, wrapper_resource->start, resource_size(wrapper_resource));
 
    // set the base address
    port_device.macstats_base_addr = devm_ioremap_resource(&pdev->dev, wrapper_resource);
@@ -417,7 +417,7 @@ int mtip_port_probe(struct platform_device *pdev)
            CSMLOGERR(":get resource failed for rsfec\n");
            return -ENODEV;
        }
-       CSMLOGERR("port type: %d, port base = 0x%x, port size = 0x%x\n", port_device.port_type, wrapper_resource->start, resource_size(wrapper_resource));
+       CSMLOGDBG("port type: %d, port base = 0x%x, port size = 0x%x\n", port_device.port_type, wrapper_resource->start, resource_size(wrapper_resource));
 
        // set the base address
        port_device.rsfec_base_addr = devm_ioremap_resource(&pdev->dev, wrapper_resource);
@@ -429,7 +429,7 @@ int mtip_port_probe(struct platform_device *pdev)
        CSMLOGERR(":get resource failed for irq 0\n");
        return -ENODEV;
    }
-   CSMLOGERR("port type: %d, :irq = %d\n", port_device.port_type, irq_resource->start);
+   CSMLOGDBG("port type: %d, :irq = %d\n", port_device.port_type, irq_resource->start);
 
    // set the irq
    port_device.wrapper_irq = irq_resource->start;
@@ -439,7 +439,7 @@ int mtip_port_probe(struct platform_device *pdev)
        // read the dut_base_regs
        ret = of_property_read_u32_array(pdev->dev.of_node, "qcom,dut-base-reg", dut_base_regs, 2);
        if (ret < 0) {
-           CSMLOGINFO("dut_base_regs[0] : %x, dut_base_regs[1] = %x, ret: %d\n", dut_base_regs[0], dut_base_regs[1], ret );
+           CSMLOGERR("dut_base_regs[0] : %x, dut_base_regs[1] = %x, ret: %d\n", dut_base_regs[0], dut_base_regs[1], ret );
            return -ENODEV;
        }
 
@@ -451,18 +451,18 @@ int mtip_port_probe(struct platform_device *pdev)
        // set the dut base address
        port_device.dut_base_addr = devm_ioremap_resource(&pdev->dev, &dev_resource);
 
-       CSMLOGINFO("ioremap of resource done: 0x%lx\n", port_device.dut_base_addr);
+       CSMLOGDBG("ioremap of resource done: 0x%lx\n", port_device.dut_base_addr);
    }
 
    // read the sfp phandle
    if (of_property_read_u32_index(pdev->dev.of_node, "sfp", 0, &sfp_phandle) >= 0)
    {
-       CSMLOGERR("Port found sfp_phandle: %d\n", sfp_phandle);
+       CSMLOGDBG("Port found sfp_phandle: %d\n", sfp_phandle);
        port_device.sfp_phandle = sfp_phandle;
    }
    else
    {
-       CSMLOGERR("Port failed to find sfp_phandle\n");
+       CSMLOGDBG("Port failed to find sfp_phandle\n");
        port_device.sfp_phandle = -1;
    }
 
@@ -487,13 +487,13 @@ int mtip_port_probe(struct platform_device *pdev)
        return -ENODEV;
    }
 
-   CSMLOGERR("Port link entries: %d, num_phandles: %d\n", link_entries, port_device.num_link_phandles);
+   CSMLOGDBG("Port link entries: %d, num_phandles: %d\n", link_entries, port_device.num_link_phandles);
 
    for (i = 0; i < port_device.num_link_phandles; ++i) 
    {
        if (of_property_read_u32_index(pdev->dev.of_node, "qcom,mac-port-link-references", i, &phandle) >= 0)
        {
-           CSMLOGERR("Port found phandle: %d for index: %d\n", phandle, i);
+           CSMLOGDBG("Port found phandle: %d for index: %d\n", phandle, i);
            port_device.link_phandles[i] = phandle;
        }
        else
@@ -513,7 +513,7 @@ int mtip_port_probe(struct platform_device *pdev)
    {
        if (port_device.port_phandle == platform_driver_priv->devices.port_phandles[i])
        {
-           CSMLOGINFO("Found port_phandle %d in root device at index: %d\n", port_device.port_phandle, i);
+           CSMLOGDBG("Found port_phandle %d in root device at index: %d\n", port_device.port_phandle, i);
            index_found = true;
            break;
        }
@@ -521,7 +521,7 @@ int mtip_port_probe(struct platform_device *pdev)
 
    if (index_found)
    {
-       CSMLOGINFO("Updating index: %d with port information\n", i);
+       CSMLOGDBG("Updating index: %d with port information\n", i);
 
        // set the port device at the found index
        memcpy(&platform_driver_priv->devices.port_devices[i], &port_device, sizeof(struct mtip_port_device_info));
@@ -543,10 +543,10 @@ int mtip_port_probe(struct platform_device *pdev)
 
    if (all_ports_probed)
    {
-       CSMLOGINFO("All ports received probe!");
+       CSMLOGERR("All ports received probe!");
    }
 
-    CSMLOGERR("done with processing port device: %lx", (unsigned long) pdev);
+    CSMLOGDBG("done with processing port device: %lx", (unsigned long) pdev);
     return ret;
 }
 
@@ -563,7 +563,7 @@ int mtip_platform_probe(struct platform_device *pdev)
     u32 fuse_bit_offset;
     struct resource dev_resource;
 
-    CSMLOGINFO("mtip_platform_probe called for device: \"%s\"\n", pdev->name);
+    CSMLOGDBG("mtip_platform_probe called for device: \"%s\"\n", pdev->name);
 
     /* Get the device mode */
     result	= of_property_read_u32(pdev->dev.of_node, "qcom,device-mode", &mode);
@@ -574,10 +574,10 @@ int mtip_platform_probe(struct platform_device *pdev)
     }
 
     if (mode == MTIP_DEVICE_RU) {
-       CSMLOGINFO("device-mode is RU");
+       CSMLOGERR("device-mode is RU");
     }
     else {
-       CSMLOGINFO("device-mode is DU");
+       CSMLOGERR("device-mode is DU");
     }
     platform_driver_priv->devices.mode = mode;
 
@@ -590,7 +590,7 @@ int mtip_platform_probe(struct platform_device *pdev)
             CSMLOGERR("Unable to read mac-address-fuse, result: %d\n", result);
             return -ENODEV;
         }
-        CSMLOGINFO("fuse_addr[0] : %x, fuse_addr[1] = %x, ret: %d\n", fuse_addr[0], fuse_addr[1], result);
+        CSMLOGDBG("fuse_addr[0] : %x, fuse_addr[1] = %x, ret: %d\n", fuse_addr[0], fuse_addr[1], result);
 
         dev_resource.start = fuse_addr[0];
         dev_resource.end = fuse_addr[0] + fuse_addr[1];
@@ -607,7 +607,7 @@ int mtip_platform_probe(struct platform_device *pdev)
             CSMLOGERR("Unable to read mac-address-bit-offset, result: %d\n", result);
             return -ENODEV;
         }
-        CSMLOGINFO("fuse_bit_offset = %d, ret: %d\n", fuse_bit_offset, result);
+        CSMLOGDBG("fuse_bit_offset = %d, ret: %d\n", fuse_bit_offset, result);
 
         // set the fuse bit offset
         platform_driver_priv->devices.fuse_bit_offset = fuse_bit_offset;
@@ -628,7 +628,7 @@ int mtip_platform_probe(struct platform_device *pdev)
 
     port_count = port_entries/(sizeof(u32));
 
-    CSMLOGERR("Platform port entries: %d, port count: %d\n", port_entries, port_count);
+    CSMLOGDBG("Platform port entries: %d, port count: %d\n", port_entries, port_count);
 
     platform_driver_priv->devices.num_port_phandles = port_count;
 
@@ -642,7 +642,7 @@ int mtip_platform_probe(struct platform_device *pdev)
     {
         if (of_property_read_u32_index(pdev->dev.of_node, "qcom,mac-port-references", i, &phandle) >= 0)
         {
-            CSMLOGERR("Platform found phandle: %d for index: %d\n", phandle, i);
+            CSMLOGDBG("Platform found phandle: %d for index: %d\n", phandle, i);
             platform_driver_priv->devices.port_phandles[i] = phandle;
         }
         else
@@ -652,7 +652,7 @@ int mtip_platform_probe(struct platform_device *pdev)
         }
     }
 
-    CSMLOGERR("done with processing platform device: %lx", (unsigned long) pdev);
+    CSMLOGDBG("done with processing platform device: %lx", (unsigned long) pdev);
     return ret;
 }
 
@@ -697,7 +697,7 @@ static int mtip_platform_validate_dt_lane_config(struct mtip_port_device_info* p
         }
     }
 
-    CSMLOGINFO("No lane conflicts present for port type %d\n", port_device->port_type);
+    CSMLOGDBG("No lane conflicts present for port type %d\n", port_device->port_type);
 
     for (j = 0; j < port_device->num_link_phandles; ++j)
     {
@@ -760,7 +760,7 @@ static int mtip_platform_validate_dt_lane_config(struct mtip_port_device_info* p
         }
     }
 
-    CSMLOGINFO("Lane speed assignment to lanes is valid");
+    CSMLOGDBG("Lane speed assignment to lanes is valid");
 
     for (j = 0; j < port_device->num_link_phandles; ++j)
     {
@@ -783,7 +783,7 @@ static int mtip_platform_validate_dt_lane_config(struct mtip_port_device_info* p
         return -1;
     }
 
-    CSMLOGINFO("Total port_speed is %d\n", port_speed);
+    CSMLOGDBG("Total port_speed is %d\n", port_speed);
 
     return 0;
 }
@@ -807,17 +807,17 @@ static int mtip_platform_validate_dt_config()
 
     for (i = 0; i < platform_driver_priv->devices.num_port_phandles; ++i) 
     {
-        CSMLOGINFO("validating port %d dt config\n", i);
+        CSMLOGDBG("validating port %d dt config\n", i);
 
         if (platform_driver_priv->devices.port_devices[i].num_link_phandles == 0)
         {
-            CSMLOGERR("Port %d has no links: ignoring\n", j);
+            CSMLOGDBG("Port %d has no links: ignoring\n", j);
         }
         else
         {
             port_type = platform_driver_priv->devices.port_devices[i].port_type;
 
-            CSMLOGINFO("Port %d has %d links\n", i, platform_driver_priv->devices.port_devices[i].num_link_phandles);
+            CSMLOGDBG("Port %d has %d links\n", i, platform_driver_priv->devices.port_devices[i].num_link_phandles);
 
             // use the real port and link of the first link
             first_link_index = platform_driver_priv->devices.port_devices[i].link_devices[0].link_index;
@@ -859,7 +859,7 @@ static int mtip_platform_set_mac_addresses_for_rumi(void)
     u32 oui;
     u32 nic;
     
-    CSMLOGINFO("Setting default MAC addresses on RUMI\n");
+    CSMLOGDBG("Setting default MAC addresses on RUMI\n");
 
     // set the oui and nic values in little endian order
     oui = 0x00534E; 
@@ -901,7 +901,7 @@ static u8 mtip_platform_read_fuse_mac_info_version(void)
     fuse_base_addr = platform_driver_priv->devices.fuse_base_addr;
     fuse_bit_offset = platform_driver_priv->devices.fuse_bit_offset;
 
-    CSMLOGINFO("Going to read version info from fuse: 0x%lx\n", (unsigned long)fuse_base_addr);
+    CSMLOGDBG("Going to read version info from fuse: 0x%lx\n", (unsigned long)fuse_base_addr);
 
     // read the first 64 bits
     first_fuse_word = ioread64(fuse_base_addr);
@@ -912,7 +912,7 @@ static u8 mtip_platform_read_fuse_mac_info_version(void)
     // the version will be the first three bits
     version = (u8)((first_fuse_word) & 0x7);
 
-    CSMLOGINFO("FUSE version: %d\n", version);
+    CSMLOGDBG("FUSE version: %d\n", version);
 
     return version;
 }
@@ -952,7 +952,7 @@ static int mtip_platform_read_fuse_version1_info(u32* oui,
     // set the oui
     *oui = (u32)(first_fuse_word & 0xFFFFFF);
 
-    CSMLOGINFO("VENDOR OUI is 0x%x\n", *oui);
+    CSMLOGDBG("VENDOR OUI is 0x%x\n", *oui);
 
     // shift by 24 bits
     first_fuse_word = (first_fuse_word >> 24);
@@ -960,7 +960,7 @@ static int mtip_platform_read_fuse_version1_info(u32* oui,
     // set the start_nic
     *start_nic = (u32)(first_fuse_word & 0xFFFFFF);
 
-    CSMLOGINFO("MAC Address Start Offset is 0x%x\n", *start_nic);
+    CSMLOGDBG("MAC Address Start Offset is 0x%x\n", *start_nic);
 
     // shift by 24 bits
     first_fuse_word = (first_fuse_word >> 24);
@@ -968,7 +968,7 @@ static int mtip_platform_read_fuse_version1_info(u32* oui,
     // set the num_macs
     *num_macs = (u8)(first_fuse_word & 0x1F);
 
-    CSMLOGINFO("Number of MAC addresses is %d\n", *num_macs);
+    CSMLOGDBG("Number of MAC addresses is %d\n", *num_macs);
 
     // read the second 64 bits
     second_fuse_word = ioread64(fuse_base_addr + sizeof(u64));
@@ -976,7 +976,7 @@ static int mtip_platform_read_fuse_version1_info(u32* oui,
     // set the secondary nic
     *start_secondary_nic = (u32)(second_fuse_word & 0xFFFFFF);
 
-    CSMLOGINFO("Secondary MAC address offset: 0x%x\n", *start_secondary_nic);
+    CSMLOGDBG("Secondary MAC address offset: 0x%x\n", *start_secondary_nic);
 
     // shift by 24 bits
     second_fuse_word = (second_fuse_word >> 24);
@@ -984,7 +984,7 @@ static int mtip_platform_read_fuse_version1_info(u32* oui,
     // set the num secondary macs
     *num_secondary_macs = (u8)(second_fuse_word & 0x1F);
 
-    CSMLOGINFO("Num secondary MAC Addresses: %d\n", *num_secondary_macs);
+    CSMLOGDBG("Num secondary MAC Addresses: %d\n", *num_secondary_macs);
 
     return 0;
 }
@@ -1009,7 +1009,7 @@ static int mtip_platform_set_mac_addresses(void)
     {
         CSMLOGERR("Unsupported FUSE MAC INFO version number: %d\n", version);
 
-        CSMLOGINFO("Setting default MAC addresses\n");
+        CSMLOGDBG("Setting default MAC addresses\n");
 
         // the oui and nic are in little endian order
         oui = 0x00534E; // EXAMPLE
@@ -1111,7 +1111,7 @@ static bool mtip_platform_consolidate_port_lane_config(struct mtip_port_device_i
     bool rv = true;
     u32 link_index;
 
-    CSMLOGINFO("Consolidating lane config of port: %d\n", port_device->port_type);
+    CSMLOGDBG("Consolidating lane config of port: %d\n", port_device->port_type);
 
     // set all the lanes as disabled
     for (i = 0; i < PHY_LANE_MAX; ++i) 
@@ -1135,7 +1135,7 @@ static bool mtip_platform_consolidate_port_lane_config(struct mtip_port_device_i
 
             port_device->lane_config[lane].link_index = link_index;
 
-            CSMLOGINFO("Setting port: %d lane_config[%d] to lane_speed: %d, link_index: %d\n", port_device->port_type, lane, lane_speed, link_index);
+            CSMLOGDBG("Setting port: %d lane_config[%d] to lane_speed: %d, link_index: %d\n", port_device->port_type, lane, lane_speed, link_index);
         }
     }
 
@@ -1187,7 +1187,7 @@ static bool mtip_platform_consolidate_port_lane_config(struct mtip_port_device_i
         break;
     }
 
-    CSMLOGINFO("Setting port: %d port config to %d str %s", port_device->port_type, port_config, mtip_ethtool_get_priv_flags_str(port_config));
+    CSMLOGERR("Setting port: %d port config to %d str %s", port_device->port_type, port_config, mtip_ethtool_get_priv_flags_str(port_config));
 
     // set the config of the port
     port_device->port_config = port_config;
@@ -1203,12 +1203,12 @@ int mtip_platform_setup_ethernet(unsigned int port_device)
     u32 port_device_index;
     u32 link_device_index;
 
-    CSMLOGINFO("Setting up ethernet for port_device %d", port_device);
+    CSMLOGDBG("Setting up ethernet for port_device %d", port_device);
 
     if (mtip_rumi_platform != 0) 
     {
         // Reset the EMULATION DUT ONLY FOR RUMI
-        CSMLOGINFO("Reseting the FH emulation at index: %d\n", port_device);
+        CSMLOGDBG("Reseting the FH emulation at index: %d\n", port_device);
 
         // reset the FH emulation
         mtip_dut_reset(platform_driver_priv->devices.port_devices[port_device].dut_base_addr);
@@ -1216,7 +1216,7 @@ int mtip_platform_setup_ethernet(unsigned int port_device)
     else 
     {
         // initialize the RSFEC, SETUP PHY and PHYLINK of the ports
-        CSMLOGINFO("Initializing RSFEC and PHY for port: %d\n", port_device);
+        CSMLOGDBG("Initializing RSFEC and PHY for port: %d\n", port_device);
 
         // initialize the RSFEC of the port
         mtip_rsfec_initialize(&platform_driver_priv->devices.port_devices[port_device]);
@@ -1226,7 +1226,7 @@ int mtip_platform_setup_ethernet(unsigned int port_device)
     }
 
     // Initialize the MAC WRAPPER
-    CSMLOGINFO("Initializing MAC port at index: %d\n", port_device);
+    CSMLOGDBG("Initializing MAC port at index: %d\n", port_device);
 
     // MAC wrapper Init
     mtip_mac_wrapper_init(&platform_driver_priv->devices.port_devices[port_device]);
@@ -1274,7 +1274,7 @@ int mtip_platform_setup_ethernet(unsigned int port_device)
                                     CSMLOGERR("MDIO registration failed with err %d", result);
                                 }
 
-                                CSMLOGINFO("TX delay = %d, RX delay = %d", mtip_dut_get_tx_delay(i), mtip_dut_get_rx_delay(i));
+                                CSMLOGDBG("TX delay = %d, RX delay = %d", mtip_dut_get_tx_delay(i), mtip_dut_get_rx_delay(i));
                             }
                         } 
                         else 
@@ -1358,7 +1358,7 @@ static int mtip_platform_setup(void)
        total_num_links += platform_driver_priv->devices.port_devices[i].num_link_phandles;
    }
 
-   CSMLOGINFO("Setting up %d links\n", total_num_links);
+   CSMLOGDBG("Setting up %d links\n", total_num_links);
 
    for (i = 0; i < platform_driver_priv->devices.num_port_phandles; ++i) 
    {
@@ -1431,7 +1431,7 @@ static int mtip_platform_setup(void)
 
           priv->mac_ioaddr = platform_driver_priv->devices.port_devices[port_device_index].link_devices[link_device_index].mac_ioaddr;
 
-          CSMLOGINFO("dev = 0x%lx with link_index = %d",
+          CSMLOGDBG("dev = 0x%lx with link_index = %d",
                      (unsigned long)platform_driver_priv->mtip_links[i]->dev,
                      priv->link_index);
 
@@ -1439,7 +1439,7 @@ static int mtip_platform_setup(void)
           // this needs to be done before register netdev
           netif_napi_add(platform_driver_priv->mtip_links[i]->dev, &(platform_driver_priv->mtip_links[i]->napi), mtip_napi_poll, MTIP_NAPI_WEIGHT);
 
-          CSMLOGINFO("mtip_devs[%d] = 0x%lx with link_index = %d\n", i, (unsigned long)platform_driver_priv->mtip_links[i]->dev, priv->link_index);
+          CSMLOGDBG("mtip_devs[%d] = 0x%lx with link_index = %d\n", i, (unsigned long)platform_driver_priv->mtip_links[i]->dev, priv->link_index);
        }
    }
 
@@ -1472,7 +1472,7 @@ static int mtip_platform_setup(void)
            } else {
               ret = 0;
 
-              CSMLOGINFO("mtip: register netdev complete for \"%s\"\n", platform_driver_priv->mtip_links[i]->dev->name);
+              CSMLOGDBG("mtip: register netdev complete for \"%s\"\n", platform_driver_priv->mtip_links[i]->dev->name);
 
               // set the netdev MAC address from the HW
               mtip_set_netdev_hw_mac_addr(platform_driver_priv->mtip_links[i]->dev, i);

@@ -76,7 +76,7 @@ extern int qsfp_eth_get_link_type(u32 qsfp_phandle, u8* link_info);
 
 static void mtip_phy_ready_cb(void *user_data)
 {
-    CSMLOGINFO("Got the PHY ready cb\n");
+    CSMLOGDBG("Got the PHY ready cb\n");
 
     if (platform_driver_priv->phy_is_ready == false) 
     {
@@ -101,7 +101,7 @@ static void mtip_phy_cdr_lock_ind(u32 link_index, bool status)
 {
     struct mtip_delayed_work_q_params *wq_params;
 
-    CSMLOGERR("CDR lock indication for link_index %d, status %d\n",
+    CSMLOGINFO("CDR lock indication for link_index %d, status %d\n",
               link_index, status);
 
     if (mtip_mac_wrapper_get_link_status(link_index) == true) 
@@ -166,7 +166,7 @@ int mtip_phy_register_eth(void)
 
 int mtip_phy_deregister_eth(void)
 {
-    CSMLOGINFO("Deregistering with the phy driver\n");
+    CSMLOGDBG("Deregistering with the phy driver\n");
 
     // deregister with the PHY driver
     (qcom_aw_phy_driver_iface_ops.eth_phy_iface_eth_deregister)();
@@ -184,7 +184,7 @@ int mtip_phy_setup_phy(struct mtip_port_device_info* port_device)
 
     for (i = 0; i < PHY_LANE_MAX; ++i)
     {
-        CSMLOGINFO("lane config[%d] enabled %d speed %d", i, port_device->lane_config[i].lane_enabled, port_device->lane_config[i].lane_speed);
+        CSMLOGDBG("lane config[%d] enabled %d speed %d", i, port_device->lane_config[i].lane_enabled, port_device->lane_config[i].lane_speed);
     }
 
     return (qcom_aw_phy_driver_iface_ops.eth_phy_iface_phy_setup)(port_device->port_type, port_device->lane_config);
@@ -218,7 +218,7 @@ static void mtip_phy_get_lanes_of_link(u32 link_index, bool lanes_enabled[PHY_LA
         lanes_enabled[lane] = true;
         ++lane_count;
     }
-    CSMLOGINFO("lane count of link_index: %d is %d\n", link_index, lane_count);
+    CSMLOGDBG("lane count of link_index: %d is %d\n", link_index, lane_count);
     return;
 }
 
@@ -242,7 +242,7 @@ void mtip_phy_retry_phy_bringup(struct work_struct *work)
 
     mtip_lookup_real_port_number_by_link_index(wq_params->link_index, &real_port_number);
 
-    CSMLOGINFO("mtip_phy_retry_phy_bringup with link: %d, port: %d\n",
+    CSMLOGDBG("mtip_phy_retry_phy_bringup with link: %d, port: %d\n",
                wq_params->link_index, real_port_number);
 
     mtip_phy_teardown_phy(wq_params->link_index);
@@ -262,7 +262,7 @@ int mtip_phy_bringup_phy(u32 link_index, int sfp_port_type)
     u32 link_device_index;
     int i;
 
-    CSMLOGINFO("calling phy_bringup with link: %d, port_type: %d\n", link_index, sfp_port_type);
+    CSMLOGDBG("calling phy_bringup with link: %d, port_type: %d\n", link_index, sfp_port_type);
 
     if (mtip_lookup_device_by_link_index(link_index, &port_device_index, &link_device_index) < 0)
     {
@@ -274,11 +274,11 @@ int mtip_phy_bringup_phy(u32 link_index, int sfp_port_type)
 
     mtip_phy_get_lanes_of_link(link_index, lanes_enabled);
 
-    CSMLOGINFO("phy bringup for port: %d link: %d", port_type, link_index);
+    CSMLOGDBG("phy bringup for port: %d link: %d", port_type, link_index);
 
     for (i = 0; i < PHY_LANE_MAX; ++i) 
     {
-        CSMLOGINFO("phy_bringup_phy lane enabled[%d] is %d", i, lanes_enabled[i]);
+        CSMLOGDBG("phy_bringup_phy lane enabled[%d] is %d", i, lanes_enabled[i]);
     }
 
     // bringup the phy for the specified lanes
@@ -329,11 +329,11 @@ int mtip_phy_notify_link_status(u32 link_index, bool status)
 
     mtip_phy_get_lanes_of_link(link_index, lanes_enabled);
 
-    CSMLOGINFO("phy_notify_link for port: %d link: %d", port_type, link_index);
+    CSMLOGDBG("phy_notify_link for port: %d link: %d", port_type, link_index);
 
     for (i = 0; i < PHY_LANE_MAX; ++i) 
     {
-        CSMLOGINFO("phy_notify_link lane enabled[%d] is %d", i, lanes_enabled[i]);
+        CSMLOGDBG("phy_notify_link lane enabled[%d] is %d", i, lanes_enabled[i]);
     }
 
     // notify PHY of the link status
@@ -366,10 +366,10 @@ static void mtip_phy_phy_validate(struct phylink_config *config,
     }
     else
     {
-        CSMLOGINFO("phy_validate found matching port: %d\n", real_port_number);
+        CSMLOGDBG("phy_validate found matching port: %d\n", real_port_number);
     }
 
-    CSMLOGINFO("phy validate ops received\n");
+    CSMLOGDBG("phy validate ops received\n");
 
     return;
 }
@@ -389,13 +389,13 @@ static void mtip_phy_get_link_state(struct phylink_config *config,
     }
     else
     {
-        CSMLOGINFO("get_link_state found matching port: %d\n", real_port_number);
+        CSMLOGDBG("get_link_state found matching port: %d\n", real_port_number);
     }
 
     // indicate that the mac pcs state is up
     state->link = 1;
 
-    CSMLOGINFO("mtip_mac_link_state %d\n", state->link);
+    CSMLOGDBG("mtip_mac_link_state %d\n", state->link);
 
 	return;
 }
@@ -417,12 +417,12 @@ static void mtip_phy_config(struct phylink_config *config,
     }
     else
     {
-        CSMLOGINFO("config found matching port: %d\n", real_port_number);
+        CSMLOGDBG("config found matching port: %d\n", real_port_number);
     }
 
     an_enabled = state->an_enabled;
 
-    CSMLOGINFO("phy config ops received with an_enabled: %d\n", an_enabled);
+    CSMLOGDBG("phy config ops received with an_enabled: %d\n", an_enabled);
 
    return;
 }
@@ -455,13 +455,13 @@ static void mtip_phy_link_up(struct phylink_config *config,
     }
     else
     {
-        CSMLOGINFO("link_up found matching port: %d\n", real_port_number);
+        CSMLOGDBG("link_up found matching port: %d\n", real_port_number);
     }
 
-    CSMLOGINFO("phy link up ops received\n");
+    CSMLOGDBG("phy link up ops received\n");
 
     // print the data passed
-    CSMLOGERR("mode: %d, interface: %d, speed: %d, duplex: %d, tx_pause: %d, rx_pause: %d\n", mode, (unsigned int)interface, speed, duplex, tx_pause, rx_pause);
+    CSMLOGINFO("mode: %d, interface: %d, speed: %d, duplex: %d, tx_pause: %d, rx_pause: %d\n", mode, (unsigned int)interface, speed, duplex, tx_pause, rx_pause);
 
     // /lookup the sfp_port_type of the port
     sfp_phandle = platform_driver_priv->mtip_ports[real_port_number]->sfp_phandle;
@@ -477,7 +477,7 @@ static void mtip_phy_link_up(struct phylink_config *config,
     // ask the qsfp driver for the port type
     qsfp_eth_get_link_type(sfp_phandle, &sfp_port_type);
 
-    CSMLOGINFO("sfp_port_type %d, associated with port %d", sfp_port_type, real_port_number);
+    CSMLOGDBG("sfp_port_type %d, associated with port %d", sfp_port_type, real_port_number);
 
     // if sfp port type is OTHER, force it to be PORT_DA
     if (sfp_port_type == PORT_OTHER) 
@@ -551,7 +551,7 @@ static void mtip_phy_link_up(struct phylink_config *config,
     case MTIP_PORT_CONFIG_1x40GBASE_R4_FEC:
     default:
         {
-            CSMLOGINFO("No need to change RSFEC mode for port_config: %d", port_config);
+            CSMLOGDBG("No need to change RSFEC mode for port_config: %d", port_config);
         }
         break;
     }
@@ -576,12 +576,12 @@ static void mtip_phy_link_up(struct phylink_config *config,
 
                         if (link_state == MTIP_LINK_STATE_OPEN) 
                         {
-                            CSMLOGINFO("Port: %d with link_index: %d in OPEN state\n", real_port_number, link_index);
+                            CSMLOGDBG("Port: %d with link_index: %d in OPEN state\n", real_port_number, link_index);
 
                             // bring up the phy
                            mtip_phy_bringup_phy(link_index, sfp_port_type);
 
-                           CSMLOGINFO("phy bringup done for link: %d\n", link_index);
+                           CSMLOGDBG("phy bringup done for link: %d\n", link_index);
                         }
                     }
                 }
@@ -614,12 +614,12 @@ static void mtip_phy_link_up(struct phylink_config *config,
 
                         if ((link_state == MTIP_LINK_STATE_OPEN) || (link_state == MTIP_LINK_STATE_DOWN))
                         {
-                            CSMLOGINFO("Port: %d with link_index: %d in %d state\n", real_port_number, link_index, link_state);
+                            CSMLOGDBG("Port: %d with link_index: %d in %d state\n", real_port_number, link_index, link_state);
 
                             // bring up the phy
                            mtip_phy_bringup_phy(link_index, sfp_port_type);
 
-                           CSMLOGINFO("phy bringup done for link: %d\n", link_index);
+                           CSMLOGDBG("phy bringup done for link: %d\n", link_index);
                         }
                     }
                 }
@@ -660,10 +660,10 @@ static void mtip_phy_link_down(struct phylink_config *config, unsigned int mode,
     }
     else
     {
-        CSMLOGINFO("link_down found matching port: %d\n", real_port_number);
+        CSMLOGDBG("link_down found matching port: %d\n", real_port_number);
     }
 
-    CSMLOGINFO("phy link down ops received\n");
+    CSMLOGDBG("phy link down ops received\n");
 
     // /lookup the sfp_port_type of the port
     sfp_phandle = platform_driver_priv->mtip_ports[real_port_number]->sfp_phandle;
@@ -701,12 +701,12 @@ static void mtip_phy_link_down(struct phylink_config *config, unsigned int mode,
 
                         if ((link_state == MTIP_LINK_STATE_UP) || (link_state == MTIP_LINK_STATE_DOWN))
                         {
-                            CSMLOGINFO("Port: %d with link_index: %d in %d state\n", real_port_number, link_index, link_state);
+                            CSMLOGDBG("Port: %d with link_index: %d in %d state\n", real_port_number, link_index, link_state);
 
                             // teardown the phy
                             mtip_phy_teardown_phy(link_index);
 
-                            CSMLOGINFO("phy teardown done for link: %d\n", link_index);
+                            CSMLOGDBG("phy teardown done for link: %d\n", link_index);
                         }
                     }
                 }
@@ -741,7 +741,7 @@ static const struct phylink_mac_ops mtip_phylink_mac_ops = {
 
 static void mtip_phy_port_netdevice_init(struct net_device *dev) 
 {
-   CSMLOGINFO("dummy netdev init for 0x%lx\n", (unsigned long)dev);
+   CSMLOGDBG("dummy netdev init for 0x%lx\n", (unsigned long)dev);
 }
 
 int mtip_phy_create_phylink(struct mtip_port_device_info* port_device)
@@ -802,7 +802,7 @@ int mtip_phy_create_phylink(struct mtip_port_device_info* port_device)
 	port_info->phylink = phylink_create(&port_info->phylink_config, of_fwnode_handle(port_pdev->dev.of_node),
 	                         mode, &mtip_phylink_mac_ops);
 
-    CSMLOGINFO("got phylink 0x%lx\n", port_info->phylink);
+    CSMLOGDBG("got phylink 0x%lx\n", port_info->phylink);
 
 	if (IS_ERR(port_info->phylink))
 	{
@@ -810,7 +810,7 @@ int mtip_phy_create_phylink(struct mtip_port_device_info* port_device)
 		return IS_ERR(port_info->phylink);
 	}
 
-    CSMLOGINFO("phylink create done\n");
+    CSMLOGINFO("phylink create done for port %d\n", port_type);
 
     // start has to be done in rtnl context
     rtnl_lock();
@@ -821,7 +821,7 @@ int mtip_phy_create_phylink(struct mtip_port_device_info* port_device)
     // start has to be done in rtnl context
     rtnl_unlock();
 
-    CSMLOGINFO("phylink start done\n");
+    CSMLOGDBG("phylink start done\n");
 
     return 0;
 }

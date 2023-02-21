@@ -50,11 +50,11 @@
 
 void mtip_dma_ready_cb(void *user_data)
 {
-   CSMLOGINFO("mtip_dma_ready_cb\n");
+   CSMLOGDBG("mtip_dma_ready_cb\n");
 
    if (platform_driver_priv->dma_is_ready == false) 
    {
-      CSMLOGINFO("registering platform driver\n");
+      CSMLOGDBG("registering platform driver\n");
 
       // call the platform driver register
       platform_driver_priv->perr = mtip_register_platform_driver();
@@ -213,7 +213,7 @@ int mtip_connect_dma_pipe(u32 link_index, ecpri_dma_eth_conn_hdl_t* hdl)
 
    if (rv >= 0)
    {
-      CSMLOGINFO("assigned connect handle %d\n", *hdl);
+      CSMLOGINFO("assigned connect handle %d to link_index: %d\n", *hdl, link_index);
    }
    return rv;
 }
@@ -228,7 +228,7 @@ int mtip_disconnect_dma_pipe(ecpri_dma_eth_conn_hdl_t hdl)
 
    if (ret >= 0)
    {
-      CSMLOGINFO("disconnected pipe with handle %d\n", hdl);
+      CSMLOGDBG("disconnected pipe with handle %d\n", hdl);
    }
    return ret;
 }
@@ -243,7 +243,7 @@ int mtip_start_dma_pipe(struct net_device *netdev, ecpri_dma_eth_conn_hdl_t hdl)
 
    if (rv >= 0)
    {
-      CSMLOGINFO("started pipe %d\n", hdl);
+      CSMLOGDBG("started pipe %d\n", hdl);
    }
 
    // set the initial set of rx buffers
@@ -263,7 +263,7 @@ int mtip_stop_dma_pipe(ecpri_dma_eth_conn_hdl_t hdl)
 
    if (rv >= 0)
    {
-      CSMLOGINFO("stopped pipe %d\n", hdl);
+      CSMLOGDBG("stopped pipe %d\n", hdl);
    }
    return rv;
 }
@@ -584,7 +584,7 @@ static int mtip_dma_process_packet(struct net_device *netdev,
        // number of nanosecs is the lower 32 bits
        timestamp_nsecs = (u32)(timestamp & 0xFFFFFFFF);
 
-       CSMLOGINFO("Rx packet timestamp %ld, timestamp_secs %d, timestamp_nsecs %d", timestamp, timestamp_secs, timestamp_nsecs);
+       CSMLOGDBG("Rx packet timestamp %ld, timestamp_secs %d, timestamp_nsecs %d", timestamp, timestamp_secs, timestamp_nsecs);
 
        // set the timestamp in the skb
        mtip_ptp_set_rx_timestamp(skb, timestamp_secs, timestamp_nsecs);
