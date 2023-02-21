@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: GPL-2.0-only
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include "ecpriss_core.h"
@@ -1661,7 +1661,7 @@ static int ecpriss_irq_init(ecpriss_qudp_interrupt_events_e qudp_irq,
 		}
 		qudp_irq_mapping[qudp_irq] =  platform_get_irq(pdev, qudp_irq);
 
-		res = request_irq(qudp_irq_mapping[qudp_irq], ecpriss_qudp_isr, IRQF_TRIGGER_HIGH, "ecpri_ss", NULL);
+		res = request_irq(qudp_irq_mapping[qudp_irq], ecpriss_qudp_isr, IRQF_TRIGGER_RISING, "ecpri_ss", NULL);
 
 		if (res){
 			pr_err("IRQ request failed irq=%d res=%d\n",

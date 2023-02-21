@@ -1448,7 +1448,7 @@ u32 ecpriss_xbar_hal_read_reg_n_fields(ecpriss_xbar_hal_reg_type_e  reg_type,
 	//	pr_info("read from %s n=%u and parse it\n",	ecpriss_xbar_hal_reg_name_str(reg), n);
 
 	offset = ecpriss_xbar_hal_reg_objs[ecpriss_xbar_hal_ctx.hw_type][reg].offset;
-	//pr_info("read reg ofst 0x%x \n",	offset);
+	pr_info("read reg ofst 0x%x \n",	offset);
 
 	if (offset == -1) {
 		pr_err("Read access to obsolete reg=%s\n",
