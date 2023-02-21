@@ -1,6 +1,6 @@
 /*
  * SPDX-License-Identifier: GPL-2.0-only
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include "ecpri_dma_reg_dump.h"
@@ -341,6 +341,10 @@ struct ecpri_dma_reg_save_dma_dpl_s {
 	ecpri_hwio_def_ecpri_dpl_trig_b_n_u
 		ecpri_dpl_trig_b_n
 		[GEN_ARR_SIZE_n(ECPRI_DPL_TRIG_B_n)];
+	ecpri_hwio_def_ecpri_endp_dpl_cfg_gsi_m_ch_n_u
+		ecpri_dma_endp_dpl_cfg_mn
+		[GEN_GSI_m_CH_n_ARR_SIZE_m(ECPRI_ENDP_DPL_CFG)]
+		[GEN_GSI_m_CH_n_ARR_SIZE_n(ECPRI_ENDP_DPL_CFG)];
 };
 
 struct ecpri_dma_reg_save_dma_markers_s {
@@ -878,6 +882,9 @@ void ecpri_dma_save_registers(void) {
 
 	/* DMA endps */
 	for (gsi_id = 0; gsi_id < ECPRI_DMA_GSI_NUM_MAX; gsi_id++) {
+		if (gsi_id >= ecpri_dma_ctx->num_of_gsi)
+			break;
+
 		for (endp_id = 0; endp_id < ECPRI_DMA_ENDP_NUM_MAX; endp_id++) {
 			READ_DMA_REG_M_N(ECPRI_ENDP_CFG_DEST,
 				dma.endps[gsi_id][endp_id], ecpri_endp_cfg_dest,
@@ -1013,6 +1020,8 @@ void ecpri_dma_save_registers(void) {
 		dma.dpl, ecpri_dpl_trig_a_n);
 	READ_DMA_REG_ARR_N(ECPRI_DPL_TRIG_B_n,
 		dma.dpl, ecpri_dpl_trig_b_n);
+	READ_DMA_REG_ARR_GSI_M_CH_N(ECPRI_ENDP_DPL_CFG,
+		dma.dpl, ecpri_dma_endp_dpl_cfg_mn);
 
 	/* DMA markers */
 	READ_DMA_REG_ARR_GSI_M_REG_N(ECPRI_YELLOW_MARKER_BELOW,
@@ -1038,6 +1047,9 @@ void ecpri_dma_save_registers(void) {
 	
 	/* Save GSI registers */
 	for (gsi_id = 0; gsi_id < ECPRI_DMA_GSI_NUM_MAX; gsi_id++) {
+		if (gsi_id >= ecpri_dma_ctx->num_of_gsi)
+			break;
+
 		ecpri_dma_reg_save.gsi[gsi_id].fw_ver =
 			gsihal_read_reg_pn(GSI_GSI_INST_RAM_n, gsi_id,
 				ECPRI_DMA_REG_SAVE_FW_VER_ROW);
@@ -1047,7 +1059,6 @@ void ecpri_dma_save_registers(void) {
 		READ_GSI_REG(GSI_GSI_REE_CFG, gsi[gsi_id].gen, gsi_ree_cfg, gsi_id);
 		READ_GSI_REG_ARR_N(GSI_GSI_INST_RAM_n, gsi[gsi_id].gen, gsi_inst_ram_n,
 			gsi_id);
-
 
 		/* gen_ee */
 		for (ee = 0; ee < ECPRI_DMA_MAX_EE; ee++) {
