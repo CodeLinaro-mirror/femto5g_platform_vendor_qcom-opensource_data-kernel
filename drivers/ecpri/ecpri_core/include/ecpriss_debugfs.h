@@ -5,6 +5,7 @@
 #ifndef __ECPRISS_STATS_AND_INTERRUPTS__
 #define __ECPRISS_STATS_AND_INTERRUPTS__
 
+#ifdef CONFIG_DEBUG_FS
 #define FINAL_STATS_STR_MAX_SIZE 1024
 #define FINAL_STATS_DYNAMIC_STR_MAX_SIZE 4096
 #define TEMP_STAT_VAL_STR_MAX_SIZE 100
@@ -15,5 +16,5 @@
 #define XBAR_WRAPPER_SIZE 64
 
 int setup_debugfs_directory(void);
-
+#endif
 #endif

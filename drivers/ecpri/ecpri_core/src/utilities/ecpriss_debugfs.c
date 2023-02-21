@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0-only
  * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
  */
-
+#ifdef CONFIG_DEBUG_FS
 /* global includes */
 #include <linux/fcntl.h>
 #include <linux/string.h>
@@ -23,15 +23,34 @@ struct dentry *list_dv[64];
 char input_string[] = TREE;
 #define MAX_STR_SIZE (NUM_OF_FHP * 1000 * 128)
 char max_str[MAX_STR_SIZE];
+
+typedef struct{
+	char *source;
+	char *delim;
+	char *token;
+	uint32_t *index;
+	uint32_t token_len;
+	uint32_t delim_len;
+	uint32_t source_len;
+}parser_s;
 /*
  * only white listed alphbates are allowed
  * { } , _  : and 0 to 9 a to z A to Z
  */
 /*****************************************************************************/
-static void remove_whitespaces(char * str){
+static void remove_whitespaces(char * str, uint32_t len){
         int i,j;
+
+	if(!str){
+		ECPRILOGERR("Null pointer Input\n");
+		return;
+	}
         for(i = 0, j=0; str[i] != '\0'; i++)
         {
+		if(i > len){
+			ECPRILOGERR("Invalid Input\n");
+			return;
+		}
                 if((str[i] >= 'a' && str[i] <= 'z') ||
                                 (str[i] >= 'A' && str[i] <='Z') ||
                                 (str[i] >= '0' && str[i] <= '9') ||
@@ -46,51 +65,75 @@ static void remove_whitespaces(char * str){
         }
         str[j] = 0;
 }
-static char parser(char * source , char *delim, char *token, int *index){
+static char parser(parser_s *parser_in){
         int i,j,k;
 
-        if(!source || !token || !delim)
+	if(!parser_in)
+		return 0;
+
+        if(!parser_in->source || !parser_in->token || !parser_in->delim)
                 return 0;
 
-        memset(token,0,64);
-        for(i= *index,j=0; source[i] !=0; i++){
-                for(k=0;delim[k] !=0; k++){
-                        if(source[i] == delim[k]){
-                                if(strlen(token) == 0)
+        memset(parser_in->token, 0, parser_in->token_len);
+
+        for(i= *parser_in->index, j = 0; parser_in->source[i] !=0 ; i++){
+		if(j > parser_in->token_len){
+			ECPRILOGERR("Invalid token length\n");
+			return 0;
+		}
+		if(i > parser_in->source_len){
+			ECPRILOGERR("Invalid Input\n");
+			return 0;
+		}
+
+                for(k = 0; parser_in->delim[k] !=0; k++){
+			if(k > parser_in->delim_len){
+				ECPRILOGERR("Invalid Input\n");
+				break;
+			}
+                        if(parser_in->source[i] == parser_in->delim[k]){
+                                if(strlen(parser_in->token) == 0)
                                 {
                                         continue;
                                 }
-                                *index = i++;
-                                return delim[k];
+                                *parser_in->index = i++;
+                                return parser_in->delim[k];
                         }
                 }
-                token[j++] = source[i];
+                parser_in->token[j++] = parser_in->source[i];
 
         }
         return 0;
-
 }
-static void remove_firstchar(char * str){
+static void remove_firstchar(char * str, uint32_t len){
 	int i;
-	int len;
 
 	if(!str)
 		return;
-	len = strlen(str);
 
 	for(i=0;i<len;i++){
 		str[i] = str[i+1];
+
+		if(str[i] == 0)
+			break;
 	}
 	return;
 
 }
-static void get_file_name(char *filename){
+static void get_file_name(char *filename, uint32_t len){
 
-	int index;
+	int index = 0;
 	char token[64];
-	int i;
+	int i = 0;
 	int iscoln = 0;
-	for(i=0; filename[i] !=0 || i < 64 ;i++){
+	parser_s parser_in;
+
+	if(!filename){
+		ECPRILOGERR("Null Pointer Input\n");
+		return ;
+	}
+
+	for(i=0; filename[i] !=0 || i < len ;i++){
 		if(filename[i] ==  ':'){
 			iscoln = 1;
 			break;
@@ -101,9 +144,17 @@ static void get_file_name(char *filename){
 
 	if(!filename)
 		return;
-	parser(filename, ":",token, &index);
-	parser(filename, ":",token, &index);
-	remove_firstchar(token);
+	parser_in.source = filename;
+	parser_in.delim = ":";
+	parser_in.token = token;
+	parser_in.index = &index;
+	parser_in.token_len = sizeof(token);
+	parser_in.delim_len = 1;
+	parser_in.source_len = len;
+
+	parser(&parser_in);
+	parser(&parser_in);
+	remove_firstchar(token, sizeof(token));
 	scnprintf(filename, sizeof(token), "%s", token);
 	return;
 }
@@ -3685,6 +3736,10 @@ static struct file_operations dummy;
 
 static struct file_operations *file_name_to_wrapper(char *filename)
 {
+	if(!filename){
+		ECPRILOGERR("Null Pointer Input\n");
+		return NULL;
+	}
 	if (!strncmp(filename, "fh:stats:00", FH_WRAPPER_SIZE))
 	{
 		return &stats_fh_ops_00;
@@ -3994,22 +4049,33 @@ int32_t setup_debugfs_directory()
 {
         char token[64];
 	char my_delm;
-        int index;
-	int len= 0;
+        int index = 0;
+	int len = 0;
 	struct file_operations *fileops = NULL;
-	struct dentry *kobj_root;
+	struct dentry *kobj_root = NULL;
 	int curr_index = 0;
+	parser_s parser_in;
 
-        remove_whitespaces(input_string);
+        remove_whitespaces(input_string, sizeof(input_string));
 	//ECPRILOGERR("%s\n", input_string);
-	my_delm = parser(input_string, "{},",token, &index);
+	token[63] = '\0';
+
+	parser_in.source = input_string;
+	parser_in.delim = "{},";
+	parser_in.token = token;
+	parser_in.index = &index;
+	parser_in.token_len = sizeof(token);
+	parser_in.delim_len = 4;
+	parser_in.source_len = sizeof(input_string);
+
+	my_delm = parser(&parser_in);
         while (my_delm != 0){
 		len= strlen(token);
 		//ECPRILOGERR("token: %s\n",token);
 
                 if(token[0] == '{' && len >2)
                 {
-			remove_firstchar(token);
+			remove_firstchar(token, sizeof(token));
 			//ECPRILOGERR("token after removal: %s\n",token);
 
 			if(curr_index == 0)
@@ -4027,7 +4093,7 @@ int32_t setup_debugfs_directory()
 			}
                 }else if( token[0] == '}'  && len > 2)
                 {
-			remove_firstchar(token);
+			remove_firstchar(token, sizeof(token));
 			//ECPRILOGERR("token after removal: %s\n",token);
 			//ECPRILOGERR("Curr_index = %u, inserting %s, parent was %u", curr_index, token, curr_index-1);
 			//ECPRILOGERR("Decresing cur_index -1\n");
@@ -4040,11 +4106,11 @@ int32_t setup_debugfs_directory()
 
                 }else if(token[0] == ',' && len > 2){
 			// we want to create file
-			remove_firstchar(token);
+			remove_firstchar(token, sizeof(token));
 			//ECPRILOGERR("token after removal: %s\n",token);
 			// file_name_to_callback , this will return a function pointer
 			fileops = file_name_to_wrapper(token);
-			get_file_name(token);
+			get_file_name(token, sizeof(token));
 			//ECPRILOGERR("token after get_file_name: %s\n",token);
 			if(!debugfs_create_file(token, 0444, list_dv[curr_index - 1], 0, fileops)){
 				//ECPRILOGERR("Unable to create the debugfs file...\n");
@@ -4057,9 +4123,10 @@ int32_t setup_debugfs_directory()
 			curr_index-- ;
 
 		}
-		my_delm = parser(input_string, "{},",token, &index);
+		my_delm = parser(&parser_in);
         }
         return 0;
 
 }
 /*****************************************************************************/
+#endif /* CONFIG_DEBUG_FS */
