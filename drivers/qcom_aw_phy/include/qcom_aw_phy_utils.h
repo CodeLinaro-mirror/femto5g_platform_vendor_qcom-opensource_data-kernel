@@ -13,35 +13,23 @@
 #define QCOM_AW_PHY_UTILS_H
 
 #include <linux/types.h>
-#include <linux/ipc_logging.h>
 #include "eth_phy_iface.h"
 #include "qcom_aw_phy_main.h"
 #include "aw_c_api/aw_driver_sim.h"
 
-#define PHY_IPC_LOG_PAGES 50
-
 #define QCOM_AW_PHY_LOG_DBG(fmt, args...) \
 do {\
-  struct qcom_aw_phy_config* phy_config = qcom_aw_phy_get_config_info();\
-  if(phy_config && phy_config->phy_ipc_log_buf_low)\
-    ipc_log_string(phy_config->phy_ipc_log_buf_low, " %s:%d " fmt, __func__, __LINE__, ## args);\
-  pr_debug(" %s:%d " fmt, __func__, __LINE__, ## args);\
+	pr_debug(" %s:%d " fmt, __func__, __LINE__, ## args);\
 } while (0)
 
 #define QCOM_AW_PHY_LOG_ERR(fmt, args...) \
 do {\
-  struct qcom_aw_phy_config* phy_config = qcom_aw_phy_get_config_info();\
-  if(phy_config && phy_config->phy_ipc_log_buf)\
-    ipc_log_string(phy_config->phy_ipc_log_buf, " %s:%d " fmt, __func__, __LINE__, ## args);\
-  pr_debug(" %s:%d " fmt, __func__, __LINE__, ## args);\
+	pr_err(" %s:%d " fmt, __func__, __LINE__, ## args);\
 } while (0)
 
 #define QCOM_AW_PHY_LOG_INFO(fmt, args...) \
 do {\
-  struct qcom_aw_phy_config* phy_config = qcom_aw_phy_get_config_info();\
-  if(phy_config && phy_config->phy_ipc_log_buf)\
-    ipc_log_string(phy_config->phy_ipc_log_buf, " %s:%d " fmt, __func__, __LINE__, ## args);\
-  pr_debug(" %s:%d " fmt, __func__, __LINE__, ## args);\
+	pr_info(" %s:%d " fmt, __func__, __LINE__, ## args);\
 } while (0)
 
 /*-------------------------------------------------------------------

@@ -230,8 +230,6 @@ struct qcom_aw_phy_config{
 	struct clk                      *synce_div_clk;
 	struct clk                      *synce_phy_lane_clk[MAX_PHY_SYNCE_LANES];
 	struct workqueue_struct         *wq;
-	void                            *phy_ipc_log_buf;
-	void                            *phy_ipc_log_buf_low;
 };
 
 /* PHY lane speed config - Rate, width, LTCS clause, Modulation technique*/
