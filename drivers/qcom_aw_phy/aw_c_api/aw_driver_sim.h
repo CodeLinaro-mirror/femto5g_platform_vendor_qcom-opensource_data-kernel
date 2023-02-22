@@ -10,10 +10,15 @@
 #include <linux/printk.h>
 #include "aw_alphacore_csr_defines.h"
 
+
 #define LANE0_OFFSET 0x02000000
 #define SRAM_OFFSET 0x80000000
 
 #define USR_SLEEP(x) delay_us(x);
+
+#ifndef USR_PRINTF
+#define USR_PRINTF(...) pr_err(__VA_ARGS__)
+#endif
 
 typedef struct mss_access_s {
 
