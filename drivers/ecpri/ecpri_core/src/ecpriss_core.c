@@ -491,7 +491,7 @@ static int ecpriss_core_data_init(void)
 	ecpriss_pdata->qudp_ctx->ecpriss_qudp_hal_ctx =
 		qudp_ctx_g.ecpriss_qudp_hal_ctx;
 	ecpriss_pdata->xbar_ctx->ecpriss_xbar_hal = xbar_ctx_g.ecpriss_xbar_hal;
-	spin_lock_init(&ecpriss_pdata->irq_lock);
+	spin_lock_init(&irq_lock);
 	ecpriss_pdata->ecpriss_core_logbuf =
         ipc_log_context_create(ECPRISS_CORE_IPC_LOG_PAGES,
                 "ecpriss_core", 0);
