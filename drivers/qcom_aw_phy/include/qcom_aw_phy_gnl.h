@@ -41,6 +41,8 @@ int qcom_aw_phy_gnl_no_action(struct sk_buff *sender_skb,
                                          struct genl_info *info);
 int qcom_aw_phy_gnl_init_lib(struct sk_buff *sender_skb,
                                         struct genl_info *info);
+int qcom_aw_phy_gnl_close_lib(struct sk_buff *sender_skb,
+                                         struct genl_info *info);
 int qcom_aw_phy_gnl_set_snr_threshold(struct sk_buff *sender_skb,
                                                      struct genl_info *info);
 int qcom_aw_phy_gnl_get_snr_value(struct sk_buff *sender_skb,

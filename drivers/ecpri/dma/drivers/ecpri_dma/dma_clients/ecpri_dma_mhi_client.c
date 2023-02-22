@@ -1,6 +1,6 @@
 /*
  * SPDX-License-Identifier: GPL-2.0-only
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include "ecpri_dma_mhi_client.h"
@@ -43,16 +43,16 @@ ecpri_dma_mhi_function_map[ECPRI_DMA_VM_IDS_MAX] = {
 	[ECPRI_DMA_VM_IDS_VM1] = {ECPRI_DMA_EE_VM1, ECPRI_DMA_GSI_ID_0},
 	[ECPRI_DMA_VM_IDS_VM2] = {ECPRI_DMA_EE_VM2, ECPRI_DMA_GSI_ID_0},
 	[ECPRI_DMA_VM_IDS_VM3] = {ECPRI_DMA_EE_VM3, ECPRI_DMA_GSI_ID_0},
-	[ECPRI_DMA_VM_IDS_VF1] = {ECPRI_DMA_EE_VF1, ECPRI_DMA_GSI_ID_1},
-	[ECPRI_DMA_VM_IDS_VF2] = {ECPRI_DMA_EE_VF2, ECPRI_DMA_GSI_ID_1},
-	[ECPRI_DMA_VM_IDS_VF3] = {ECPRI_DMA_EE_VF3, ECPRI_DMA_GSI_ID_2},
-	[ECPRI_DMA_VM_IDS_VF4] = {ECPRI_DMA_EE_VF4, ECPRI_DMA_GSI_ID_2},
-	[ECPRI_DMA_VM_IDS_VF5] = {ECPRI_DMA_EE_VF5, ECPRI_DMA_GSI_ID_2},
 	[ECPRI_DMA_VM_IDS_VFA] = {ECPRI_DMA_EE_VFA, ECPRI_DMA_GSI_ID_1},
 	[ECPRI_DMA_VM_IDS_VFB] = {ECPRI_DMA_EE_VFB, ECPRI_DMA_GSI_ID_1},
 	[ECPRI_DMA_VM_IDS_VFC] = {ECPRI_DMA_EE_VFC, ECPRI_DMA_GSI_ID_1},
-	[ECPRI_DMA_VM_IDS_VFD] = {ECPRI_DMA_EE_VFE, ECPRI_DMA_GSI_ID_2},
-	[ECPRI_DMA_VM_IDS_VFE] = {ECPRI_DMA_EE_VFD, ECPRI_DMA_GSI_ID_2}
+	[ECPRI_DMA_VM_IDS_VF1] = {ECPRI_DMA_EE_VF1, ECPRI_DMA_GSI_ID_1},
+	[ECPRI_DMA_VM_IDS_VF2] = {ECPRI_DMA_EE_VF2, ECPRI_DMA_GSI_ID_1},
+	[ECPRI_DMA_VM_IDS_VFD] = {ECPRI_DMA_EE_VFD, ECPRI_DMA_GSI_ID_2},
+	[ECPRI_DMA_VM_IDS_VFE] = {ECPRI_DMA_EE_VFE, ECPRI_DMA_GSI_ID_2},
+	[ECPRI_DMA_VM_IDS_VF3] = {ECPRI_DMA_EE_VF3, ECPRI_DMA_GSI_ID_2},
+	[ECPRI_DMA_VM_IDS_VF4] = {ECPRI_DMA_EE_VF4, ECPRI_DMA_GSI_ID_2},
+	[ECPRI_DMA_VM_IDS_VF5] = {ECPRI_DMA_EE_VF5, ECPRI_DMA_GSI_ID_2},
 };
 
 static const struct ecpri_dma_mhi_ee_gsi_tuple
@@ -209,7 +209,7 @@ static inline int ecpri_dma_mhi_get_function_context_index(
 		}
 		else if (function.function_type ==
 			MHI_DMA_FUNCTION_TYPE_PHYSICAL) {
-			*(idx) = (ECPRI_DMA_MHI_CLIENT_FUNCTION_NUM - 1);
+			*(idx) = ECPRI_DMA_MHI_PF_ID;
 		}
 		break;
 	case ECPRI_DMA_MHI_DMA_MEMCPY_CTX:
@@ -232,7 +232,7 @@ static inline int ecpri_dma_mhi_get_function_context_index(
 		}
 		/* V2 Code */
 		else {
-			*(idx) = (ECPRI_DMA_MHI_CLIENT_FUNCTION_NUM - 1);
+			*(idx) = ECPRI_DMA_MHI_PF_ID;
 		}
 		break;
 	default:
@@ -299,6 +299,11 @@ static int ecpri_dma_mhi_get_endp_ctx(
 	ee_idx = func_map->ee_id;
 	gsi_id = func_map->gsi_id;
 
+	if (gsi_id == ECPRI_DMA_GSI_NUM_MAX) {
+		DMAERR("Invalid GSI ID");
+		return -EINVAL;
+	}
+
 	for (endp_id = 0; endp_id < ECPRI_DMA_ENDP_NUM_MAX; endp_id++)
 	{
 		if ((*ecpri_dma_ctx->endp_map)[gsi_id][endp_id].valid &&
@@ -325,16 +330,22 @@ static void ecpri_dma_mhi_get_l2_ch_bitmap(
 	const struct ecpri_dma_mhi_ee_gsi_tuple* func_map;
 	enum ecpri_hw_ver hw_ver = ecpri_dma_get_ctx_hw_ver();
 
+	DMADBG("Begin\n");
+
+	*bitmap = 0;
+
 	if (ecpri_dma_mhi_get_function_mapping(function, &func_map))
 	{
 		DMAERR("Unknown function");
 	}
+
+	if (function.function_type == MHI_DMA_FUNCTION_TYPE_PHYSICAL)
+	{
+		return;
+	}
+
 	ee_idx = func_map->ee_id;
 	gsi_id = func_map->gsi_id;
-
-	DMADBG("Begin\n");
-
-	*bitmap = 0;
 
 	for (endp_id = 0; endp_id < ECPRI_DMA_ENDP_NUM_MAX; endp_id++)
 	{
@@ -368,10 +379,10 @@ static int ecpri_dma_mhi_dma_alloc_pkt(
 	u64 buff_addr,
 	int len,
 	struct mhi_dma_function_params function,
-	struct ecpri_dma_pkt*** pkt_ptr)
+	struct ecpri_dma_pkt** pkt_ptr)
 {
 	int ret = 0;
-	struct ecpri_dma_pkt** pkt = NULL;
+	struct ecpri_dma_pkt* pkt = NULL;
 	struct mhi_dma_function_params* function_ptr = NULL;
 
 	function_ptr = kzalloc(sizeof(*function_ptr), GFP_KERNEL);
@@ -387,42 +398,31 @@ static int ecpri_dma_mhi_dma_alloc_pkt(
 		return -ENOMEM;
 	}
 
-	pkt[0] = kzalloc(sizeof(*pkt[0]), GFP_KERNEL);
-	if (!pkt[0]) {
-		DMAERR("failed to alloc packet\n");
-		kfree(pkt);
-		kfree(function_ptr);
-		ret = -ENOMEM;
-		goto fail_alloc;
-	}
-
-	pkt[0]->buffs =
-		kzalloc(sizeof(*(pkt[0]->buffs)), GFP_KERNEL);
-	if (!(pkt[0]->buffs)) {
+	pkt->buffs =
+		kzalloc(sizeof(*(pkt->buffs)), GFP_KERNEL);
+	if (!(pkt->buffs)) {
 		DMAERR("failed to alloc buffers array \n");
-		kfree(pkt[0]);
 		kfree(pkt);
 		kfree(function_ptr);
 		ret = -ENOMEM;
 		goto fail_alloc;
 	}
 
-	pkt[0]->buffs[0] = kzalloc(
-		sizeof(*(pkt[0]->buffs[0])), GFP_KERNEL);
-	if (!pkt[0]->buffs[0]) {
+	pkt->buffs[0] = kzalloc(
+		sizeof(*(pkt->buffs[0])), GFP_KERNEL);
+	if (!pkt->buffs[0]) {
 		DMAERR("failed to alloc dma buff wrapper\n");
-		kfree(pkt[0]->buffs);
-		kfree(pkt[0]);
+		kfree(pkt->buffs);
 		kfree(pkt);
 		kfree(function_ptr);
 		ret = -ENOMEM;
 		goto fail_alloc;
 	}
 
-	pkt[0]->buffs[0]->phys_base = (dma_addr_t)buff_addr;
-	pkt[0]->buffs[0]->size = len;
-	pkt[0]->num_of_buffers = 1;
-	pkt[0]->user_data = function_ptr;
+	pkt->buffs[0]->phys_base = (dma_addr_t)buff_addr;
+	pkt->buffs[0]->size = len;
+	pkt->num_of_buffers = 1;
+	pkt->user_data = function_ptr;
 
 	function_ptr->function_type = function.function_type;
 	function_ptr->vf_id = function.vf_id;
@@ -437,16 +437,16 @@ fail_alloc:
  * ecpri_dma_mhi_dma_free_pkt() - Frees
  * the allocated memory for packet's
  *
- * @pkts:       [IN] Allocated packets data
+ * @pkt:       [IN] Allocated packets data
  *
  */
 static void ecpri_dma_mhi_dma_free_pkt(
-	struct ecpri_dma_pkt* pkts)
+	struct ecpri_dma_pkt** pkt)
 {
-	kfree(pkts->user_data);
-	kfree(pkts->buffs[0]);
-	kfree(pkts->buffs);
-	kfree(pkts);
+	kfree((*pkt)->user_data);
+	kfree((*pkt)->buffs[0]);
+	kfree((*pkt)->buffs);
+	kfree(*pkt);
 }
 
 /**
@@ -593,6 +593,11 @@ static void ecpri_dma_mhi_memcpy_async_notify_comp(
 	u32 actual_num = 0;
 	int hw_ver = ecpri_dma_get_ctx_hw_ver();
 
+	if (ECPRI_HW_MAX == hw_ver) {
+ 		DMAERR("Invalid HW version\n");
+		return;
+	}
+
 	if (!endp) {
 		DMAERR("Null params args\n");
 		return;
@@ -656,7 +661,7 @@ static void ecpri_dma_mhi_memcpy_async_notify_comp(
 			ecpri_dma_assert();
 		}
 
-		ecpri_dma_mhi_dma_free_pkt(async_pkts[i]->pkt);
+		ecpri_dma_mhi_dma_free_pkt(&async_pkts[i]->pkt);
 	}
 
 	/* There might be more packet to poll, rescheduale tasklet */
@@ -1440,8 +1445,8 @@ static int ecpri_dma_mhi_dma_sync_memcpy(
 	u32 actual_num;
 	unsigned long flags;
 
-	struct ecpri_dma_pkt** pkts_dest = NULL;
-	struct ecpri_dma_pkt** pkts_src = NULL;
+	struct ecpri_dma_pkt* pkts_dest = NULL;
+	struct ecpri_dma_pkt* pkts_src = NULL;
 	struct ecpri_dma_mhi_memcpy_context* memcpy_ctx = NULL;
 	struct ecpri_dma_pkt_completion_wrapper* pkt_wrapper = NULL;
 
@@ -1510,19 +1515,18 @@ static int ecpri_dma_mhi_dma_sync_memcpy(
 
 	/* Transmit packets */
 	ret = ecpri_dma_dp_transmit(memcpy_ctx->sync_dest_endp,
-		pkts_dest, 1, true);
+		&pkts_dest, 1, true);
 	if (ret != 0) {
 		DMAERR("Unable to transmit dest\n");
-		ret = -EPERM;
+		ret = -EFAULT;
 		goto fail_transmit;
 	}
 
 	ret = ecpri_dma_dp_transmit(memcpy_ctx->sync_src_endp,
-		pkts_src, 1, true);
+		&pkts_src, 1, true);
 	if (ret != 0) {
-		DMAERR("Unable to transmit src\n");
-		ret = -EPERM;
-		goto fail_transmit;
+		DMAERR("Unable to transmit SRC but dest is already queued\n");
+		ecpri_dma_assert();
 	}
 
 	actual_num = 0;
@@ -1562,9 +1566,9 @@ fail_poll_rx:
 fail_alloc_wrapper:
 fail_transmit:
 success:
-	ecpri_dma_mhi_dma_free_pkt(pkts_src[0]);
+	ecpri_dma_mhi_dma_free_pkt(&pkts_src);
 fail_src_alloc:
-	ecpri_dma_mhi_dma_free_pkt(pkts_dest[0]);
+	ecpri_dma_mhi_dma_free_pkt(&pkts_dest);
 fail_dest_alloc:
 	return ret;
 }
@@ -1665,8 +1669,8 @@ static int ecpri_dma_mhi_dma_async_memcpy(
 	int idx;
 	int ret;
 	unsigned long flags;
-	struct ecpri_dma_pkt** pkt_dest = NULL;
-	struct ecpri_dma_pkt** pkt_src = NULL;
+	struct ecpri_dma_pkt* pkt_dest = NULL;
+	struct ecpri_dma_pkt* pkt_src = NULL;
 	struct ecpri_dma_mhi_memcpy_context* memcpy_ctx = NULL;
 	struct ecpri_dma_mhi_xfer_wrapper* xfer_descr = NULL;
 
@@ -1735,7 +1739,7 @@ static int ecpri_dma_mhi_dma_async_memcpy(
 
 	ret = ecpri_dma_mhi_dma_alloc_pkt(src, len, function, &pkt_src);
 	if (ret != 0) {
-		ecpri_dma_mhi_dma_free_pkt(pkt_dest[0]);
+		ecpri_dma_mhi_dma_free_pkt(&pkt_dest);
 		DMAERR("Unable to allocate packets for source\n");
 		return -ENOMEM;
 	}
@@ -1749,20 +1753,21 @@ static int ecpri_dma_mhi_dma_async_memcpy(
 
 	ret = ecpri_dma_dp_transmit(
 		memcpy_ctx->async_dest_endp,
-		pkt_dest, 1, true);
+		&pkt_dest, 1, true);
 	if (ret != 0) {
 		DMAERR("Unable to transmit\n");
-		ret = -EPERM;
+		ret = -EFAULT;
 		goto fail_dest_transmit;
 	}
 	ret = ecpri_dma_dp_transmit(memcpy_ctx->async_src_endp,
-		pkt_src, 1, true);
+		&pkt_src, 1, true);
 	if (ret != 0) {
-		DMAERR("Unable to transmit\n");
+		DMAERR("Unable to transmit SRC but dest is already queued\n");
 		ecpri_dma_assert();
 	}
 
 	spin_unlock_irqrestore(&memcpy_ctx->async_lock, flags);
+	ecpri_dma_mhi_dma_free_pkt(&pkt_src);
 	return 0;
 
 fail_dest_transmit:
@@ -1776,8 +1781,8 @@ fail_dest_transmit:
 
 	kmem_cache_free(memcpy_ctx->xfer_wrapper_cache,
 		xfer_descr);
-	ecpri_dma_mhi_dma_free_pkt(pkt_dest[0]);
-	ecpri_dma_mhi_dma_free_pkt(pkt_src[0]);
+	ecpri_dma_mhi_dma_free_pkt(&pkt_dest);
+	ecpri_dma_mhi_dma_free_pkt(&pkt_src);
 
 	return ret;
 }
@@ -1818,8 +1823,10 @@ static int ecpri_dma_mhi_dma_memcpy_disable(
 
 	memcpy_ctx = ecpri_dma_mhi_memcpy_ctx[idx];
 	if (!memcpy_ctx) {
-		DMAERR("Memcpy context is not initialized\n");
-		return -EPERM;
+		DMAERR(
+			"Memcpy context is not initialized function type: %d, vf_id: %d",
+			function.function_type, function.vf_id);
+		return 0;
 	}
 
 	if (ecpri_dma_mhi_check_destroy_pending(memcpy_ctx) == true) {
@@ -2053,6 +2060,7 @@ static int ecpri_dma_mhi_client_init(
 	int idx;
 	int ret;
 	enum ecpri_dma_ees ee_idx;
+	u32 gsi_id;
 	struct ecpri_dma_mhi_wq_work_type* work = NULL;
 	const struct ecpri_dma_mhi_ee_gsi_tuple* func_map;
 
@@ -2179,14 +2187,15 @@ static int ecpri_dma_mhi_client_init(
 		return ret;
 	}
 	ee_idx = func_map->ee_id;
+	gsi_id = func_map->gsi_id;
 
 	/* Fill out param */
 	ecpri_dma_mhi_get_l2_ch_bitmap(function, idx, &out->ch_db_fwd_msk);
 	out->ev_db_fwd_msk = out->ch_db_fwd_msk;
 	out->ch_db_fwd_base = gsihal_get_reg_pnk_addr(
-		GSI_EE_n_GSI_CH_k_DOORBELL_0, 0, ee_idx, 0);
+		GSI_EE_n_GSI_CH_k_DOORBELL_0, gsi_id, ee_idx, 0);
 	out->ev_db_fwd_base =gsihal_get_reg_pnk_addr(
-		GSI_EE_n_EV_CH_k_DOORBELL_0, 0, ee_idx, 0);
+		GSI_EE_n_EV_CH_k_DOORBELL_0, gsi_id, ee_idx, 0);
 
 	/* Create notifier for driver ready */
 	work = kzalloc(sizeof(*work), GFP_KERNEL);
@@ -2450,9 +2459,11 @@ static int ecpri_dma_mhi_client_read_write_host(
 		}
 	}
 
+	dma_free_coherent(pdev, mem.size, mem.virt_base, mem.phys_base);
 	return 0;
 
 failed_memcopy:
+	DMAERR("Failed memcpy\n");
 	dma_free_coherent(pdev, mem.size, mem.virt_base, mem.phys_base);
 	return ret;
 }

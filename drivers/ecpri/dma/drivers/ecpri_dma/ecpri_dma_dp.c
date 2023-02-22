@@ -357,7 +357,7 @@ void ecpri_dma_tasklet_rx_done(unsigned long data)
 void ecpri_dma_tasklet_transmit_done(unsigned long data)
 {
 	struct ecpri_dma_endp_context *endp;
-	struct ecpri_dma_outstanding_pkt_wrapper *curr_pkt_wrapper;
+	struct ecpri_dma_outstanding_pkt_wrapper *curr_pkt_wrapper = NULL;
 	struct ecpri_dma_pkt_completion_wrapper **comp_pkts_arr;
 	struct ecpri_dma_pkt *pkt;
 	struct list_head *pos, *n;

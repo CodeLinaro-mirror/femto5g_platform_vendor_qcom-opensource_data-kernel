@@ -10,6 +10,7 @@
   MAC driver.
 */
 
+#include "mtip_debug_eth_gnl_uapi.h"
 #include <linux/kernel.h>
 #include <linux/list.h>
 #include <linux/mutex.h>
@@ -174,6 +175,20 @@ void set_debug_base_address(void __iomem *addr);
 void __iomem *get_debug_base_address(void);
 void mtip_sysfs_mac_link_status(int status);
 void mtip_sysfs_isr_work_thread(struct work_struct *work);
+void setup_diag_l3_saddr(u_int8_t *l3_saddr);
+void setup_diag_l3_daddr(u_int8_t *l3_daddr);
+void setup_diag_l2_daddr(u_int8_t *l2_daddr);
+void setup_diag_addr_range(u_int8_t fifo_num, u_int32_t addr_range_start,
+                           u_int32_t addr_range_end);
+void setup_diag_port(u_int8_t src_port, u_int8_t dest_port);
+void setup_diag_flush(u_int8_t fifo_num);
+void setup_diag_threshold(u_int8_t fifo_num, u_int8_t threshold);
+void setup_diag_timeout(u_int8_t fifo_num, u_int8_t timeout);
+void setup_diag_vlanID_register_set(u_int16_t vlanID, u_int32_t reg1,
+                                    u_int32_t reg2);
+void setup_diag_vlanID(u_int8_t fifo_num, u_int16_t vlanID);
+mtip_debug_eth_gnl_params get_diag_result(u_int8_t fifo_num);
+
 int setup_sysfs(void __iomem *addr, struct device *dev);
 void setup_AXI_Address_Range(int index);
 void setup_StreamingFIFO(int index);

@@ -183,12 +183,12 @@ typedef struct ecpriss_core_private_s {
 	ecpriss_config_stats_s                cfg_stats;
 	ecpri_stats_timer_params_s            stats_timer_info;
 	struct mutex                          ecpriss_mutex_lock;
+	spinlock_t                            irq_lock;
 } ecpriss_core_private_s;
 
 extern ecpriss_core_private_s *ecpriss_pdata;
 extern ecpriss_xbar_ctx_s     xbar_ctx_g;
 extern ecpriss_qudp_ctx_s     qudp_ctx_g;
-static spinlock_t irq_lock;
 
 
 void ecpriss_eth_event_processing_wq(struct work_struct *work);

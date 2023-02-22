@@ -28,7 +28,7 @@ do {\
 
 #define CSMLOGERR(fmt, args...) \
 do {\
-	pr_err(DRV_NAME " %s:%d " fmt, __func__, __LINE__, ## args);\
+	pr_debug(DRV_NAME " %s:%d " fmt, __func__, __LINE__, ## args);\
     if (platform_driver_priv) {\
 			CSM_IPC_Log(platform_driver_priv->ipc_log_buf , \
 				DRV_NAME " %s:%d " fmt, ## args); \
@@ -37,7 +37,7 @@ do {\
 
 #define CSMLOGINFO(fmt, args...) \
 do {\
-	pr_info(DRV_NAME " %s:%d " fmt, __func__, __LINE__, ## args);\
+	pr_debug(DRV_NAME " %s:%d " fmt, __func__, __LINE__, ## args);\
     if (platform_driver_priv) { \
 			CSM_IPC_Log(platform_driver_priv->ipc_log_buf , \
 				DRV_NAME " %s:%d " fmt, ## args); \

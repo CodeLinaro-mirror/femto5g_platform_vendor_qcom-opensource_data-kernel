@@ -98,45 +98,23 @@ static void mtip_phy_an_complete_cb(enum mtip_port_type_enum port_type, enum eth
     return;
 }
 
-static int mtip_phy_get_link_index_for_phy_lane(
-    enum mtip_port_type_enum port_type, enum eth_phy_iface_phy_lane_num_enum lane_num)
+static void mtip_phy_cdr_lock_cb(u32 link_index, bool status)
 {
-    int i,j,k;
-    u32 num_lanes;
-
-    for(i = 0; i < MTIP_MAX_PORTS; i++){
-      if(platform_driver_priv->devices.port_devices[i].port_type == port_type){
-        for(j = 0; j < MTIP_MAX_LINKS_PER_PORT; j++){
-          num_lanes = platform_driver_priv->devices.port_devices[i].link_devices[j].num_lanes;
-          for (k = 0; k < num_lanes; k++){
-            if(platform_driver_priv->devices.port_devices[i].link_devices[j].lanes[k] == lane_num)
-              return platform_driver_priv->devices.port_devices[i].link_devices[j].link_index;
-          }
-        }
-      }
-    }
-
-    return -1;
-}
-
-static void mtip_phy_cdr_lock_cb(enum mtip_port_type_enum port_type, enum eth_phy_iface_phy_lane_num_enum lane_num, bool status)
-{
-    int link_index = -1;
     struct mtip_delayed_work_q_params *wq_params;
     int delay_ms = MTIP_PHY_RETRY_MIN_TIMER;
 
-    CSMLOGERR("CDR lock callback for port: %d, lane %d, status %d\n", port_type, lane_num, status);
+    CSMLOGERR("CDR lock callback for link_index %d, status %d\n",
+              link_index, status);
 
-    link_index = mtip_phy_get_link_index_for_phy_lane(port_type, lane_num);
-    if(link_index == -1){
-      CSMLOGERR("Index not found\n");
-      return;
+    if (mtip_mac_wrapper_get_link_status(link_index) == true) 
+    {
+        post_mtip_process_link_state(link_index, true);
     }
+    else
+    {
+      if(status == true)
+        delay_ms = MTIP_PHY_RETRY_TIMER;
 
-    if(status == true)
-      delay_ms = MTIP_PHY_RETRY_TIMER;
-
-    if(mtip_mac_wrapper_get_link_status(link_index) == false){
       wq_params = kmalloc(sizeof(struct mtip_delayed_work_q_params),
                           GFP_ATOMIC);
       if(!wq_params)
@@ -144,17 +122,13 @@ static void mtip_phy_cdr_lock_cb(enum mtip_port_type_enum port_type, enum eth_ph
       else{
         INIT_DELAYED_WORK(&wq_params->wq_item,
                           mtip_phy_retry_phy_bringup);
-        wq_params->port_type = port_type;
         wq_params->link_index = link_index;
         mtip_workq_queue_delayed_work(wq_params, delay_ms);
       }
     }
-    else{
-      post_mtip_process_link_state(link_index, true);
-    }
+
     return;
 }
-
 
 int mtip_phy_register_eth(void)
 {
@@ -194,8 +168,17 @@ int mtip_phy_deregister_eth(void)
 
 int mtip_phy_setup_phy(struct mtip_port_device_info* port_device)
 {
+    int i;
+
     // setup the phy for the port
     // pass the consolidated lane config of the port to phy
+    CSMLOGINFO("setting up phy for port %d", port_device->port_type);
+
+    for (i = 0; i < PHY_LANE_MAX; ++i)
+    {
+        CSMLOGINFO("lane config[%d] enabled %d speed %d", i, port_device->lane_config[i].lane_enabled, port_device->lane_config[i].lane_speed);
+    }
+
     return (qcom_aw_phy_driver_iface_ops.eth_phy_iface_phy_setup)(port_device->port_type, port_device->lane_config);
 }
 
@@ -236,6 +219,7 @@ void mtip_phy_retry_phy_bringup(struct work_struct *work)
     struct delayed_work *delayed_work_item = to_delayed_work(work);
     struct mtip_delayed_work_q_params *wq_params =
         container_of(delayed_work_item, struct mtip_delayed_work_q_params, wq_item);
+    u32 real_port_number;
 
     if(platform_driver_priv->mtip_links[wq_params->link_index]->state == MTIP_LINK_STATE_CLOSE)
     {
@@ -248,12 +232,14 @@ void mtip_phy_retry_phy_bringup(struct work_struct *work)
       goto func_exit;
     }
 
-    CSMLOGINFO("mtip_phy_retry_phy_bringup with link: %d, port_type: %d\n",
-               wq_params->link_index, wq_params->port_type);
+    mtip_lookup_real_port_number_by_link_index(wq_params->link_index, &real_port_number);
+
+    CSMLOGINFO("mtip_phy_retry_phy_bringup with link: %d, port: %d\n",
+               wq_params->link_index, real_port_number);
 
     mtip_phy_teardown_phy(wq_params->link_index);
     mtip_phy_bringup_phy(wq_params->link_index,
-         platform_driver_priv->mtip_ports[wq_params->port_type]->sfp_port_type);
+         platform_driver_priv->mtip_ports[real_port_number]->sfp_port_type);
 
 func_exit:
     kfree(wq_params);
@@ -266,6 +252,7 @@ int mtip_phy_bringup_phy(u32 link_index, int sfp_port_type)
     bool lanes_enabled[PHY_LANE_MAX];
     u32 port_device_index;
     u32 link_device_index;
+    int i;
 
     CSMLOGINFO("calling phy_bringup with link: %d, port_type: %d\n", link_index, sfp_port_type);
 
@@ -278,6 +265,13 @@ int mtip_phy_bringup_phy(u32 link_index, int sfp_port_type)
     port_type = platform_driver_priv->devices.port_devices[port_device_index].port_type;
 
     mtip_phy_get_lanes_of_link(link_index, lanes_enabled);
+
+    CSMLOGINFO("phy bringup for port: %d link: %d", port_type, link_index);
+
+    for (i = 0; i < PHY_LANE_MAX; ++i) 
+    {
+        CSMLOGINFO("phy_bringup_phy lane enabled[%d] is %d", i, lanes_enabled[i]);
+    }
 
     // bringup the phy for the specified lanes
     return (qcom_aw_phy_driver_iface_ops.eth_phy_iface_phy_bringup)(port_type, lanes_enabled, sfp_port_type);
@@ -315,6 +309,7 @@ int mtip_phy_notify_link_status(u32 link_index, bool status)
     bool lanes_enabled[PHY_LANE_MAX];
     u32 port_device_index;
     u32 link_device_index;
+    int i;
 
     if (mtip_lookup_device_by_link_index(link_index, &port_device_index, &link_device_index) < 0)
     {
@@ -325,6 +320,13 @@ int mtip_phy_notify_link_status(u32 link_index, bool status)
     port_type = platform_driver_priv->devices.port_devices[port_device_index].port_type;
 
     mtip_phy_get_lanes_of_link(link_index, lanes_enabled);
+
+    CSMLOGINFO("phy_notify_link for port: %d link: %d", port_type, link_index);
+
+    for (i = 0; i < PHY_LANE_MAX; ++i) 
+    {
+        CSMLOGINFO("phy_notify_link lane enabled[%d] is %d", i, lanes_enabled[i]);
+    }
 
     // notify PHY of the link status
     return (qcom_aw_phy_driver_iface_ops.eth_phy_iface_notify_mac_link_status)(port_type, lanes_enabled, status);
@@ -468,6 +470,12 @@ static void mtip_phy_link_up(struct phylink_config *config,
     qsfp_eth_get_link_type(sfp_phandle, &sfp_port_type);
 
     CSMLOGINFO("sfp_port_type %d, associated with port %d", sfp_port_type, real_port_number);
+
+    // if sfp port type is OTHER, force it to be PORT_DA
+    if (sfp_port_type == PORT_OTHER) 
+    {
+        sfp_port_type = PORT_DA;
+    }
 
     // update the sfp port type
     platform_driver_priv->mtip_ports[real_port_number]->sfp_port_type = sfp_port_type;
@@ -807,6 +815,24 @@ int mtip_phy_create_phylink(struct mtip_port_device_info* port_device)
 
     CSMLOGINFO("phylink start done\n");
 
+    return 0;
+}
+
+int mtip_phy_destroy_phylink(u32 port_index)
+{
+    // stop the phylink
+    phylink_stop(platform_driver_priv->mtip_ports[port_index]->phylink);
+
+    // destory the phylink
+    phylink_destroy(platform_driver_priv->mtip_ports[port_index]->phylink);
+
+    // free the netdev
+    free_netdev(platform_driver_priv->mtip_ports[port_index]->port_dummy_ndev);
+
+    // free the allocated memory for the mtip_port
+    kfree(platform_driver_priv->mtip_ports[port_index]);
+
+    platform_driver_priv->mtip_ports[port_index] = NULL;
     return 0;
 }
 

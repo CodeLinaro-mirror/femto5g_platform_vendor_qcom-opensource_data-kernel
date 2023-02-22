@@ -11,6 +11,11 @@
 #include "aw_alphacore_ip_defines.h"
 #include "aw_alphacore_vfield_defines.h"
 #include "aw_driver_sim.h"
+#include "qcom_aw_phy_utils.h"
+
+#ifndef USR_PRINTF
+#define USR_PRINTF(...) QCOM_AW_PHY_LOG_ERR(__VA_ARGS__)
+#endif
 
 #define CHECK(x)                                                               \
   do {                                                                         \
@@ -356,7 +361,7 @@ typedef enum aw_bist_pattern_e {
   AW_HALF_RATE_CLOCK = 13,
   AW_QUARTER_RATE_CLOCK = 14,
   AW_PATT_32_1S_32_0S = 15,
-  AW_BIST_PATTERN_MAX
+  AW_BIST_PATTERN_MAX = 16
 } aw_bist_pattern_t;
 
 typedef enum aw_bist_mode_e {
@@ -407,9 +412,13 @@ uint32_t aw_width_decoder(uint32_t width_encoded);
 int aw_pmd_anlt_logical_lane_num_set(mss_access_t *mss, uint32_t logical_lane,
                                      uint32_t an_no_attached);
 
+int aw_pmd_anlt_auto_neg_link_status_ovr_enable(mss_access_t *mss, uint32_t en);
+
 int aw_pmd_anlt_auto_neg_adv_ability_set(mss_access_t *mss,
                                          uint32_t *adv_ability,
                                          uint32_t *fec_ability, uint32_t nonce);
+
+int aw_pmd_anlt_ms_per_ck_set(mss_access_t *mss, uint32_t ms_per_ck);
 
 int aw_pmd_anlt_auto_neg_config_set(mss_access_t *mss,
                                     uint32_t status_check_disable,
@@ -428,10 +437,20 @@ int aw_pmd_anlt_auto_neg_next_page_oui_compare_set(mss_access_t *mss,
 
 int aw_pmd_anlt_link_training_en_set(mss_access_t *mss, uint32_t en);
 
+int aw_pmd_link_training_without_an_config_set(mss_access_t *mss,
+                                               uint32_t width, uint32_t clause);
+
+int aw_pmd_anlt_link_training_preset_check_set(mss_access_t *mss,
+                                               uint32_t clause,
+                                               uint32_t preset_check);
+
 int aw_pmd_anlt_link_training_reset(mss_access_t *mss);
 
 int aw_pmd_anlt_link_training_config_set(mss_access_t *mss, uint32_t width,
                                          uint32_t clause, uint32_t mod);
+
+int aw_pmd_anlt_link_training_prbs_seed_set(mss_access_t *mss, uint32_t clause,
+                                            uint32_t logical_lane);
 
 int aw_pmd_anlt_link_training_init_preset_set(mss_access_t *mss,
                                               uint32_t clause, uint32_t init[],
@@ -442,9 +461,6 @@ int aw_pmd_anlt_link_training_min_max_set(mss_access_t *mss, uint32_t pre1_max,
                                           uint32_t main_max, uint32_t post1_max,
                                           uint32_t pre1_min, uint32_t main_min,
                                           uint32_t post1_min);
-
-int aw_pmd_anlt_link_training_prbs_seed_set(mss_access_t *mss, uint32_t clause,
-                                            uint32_t logical_lane);
 
 int aw_pmd_anlt_link_training_start_set(mss_access_t *mss, uint32_t start);
 
@@ -493,6 +509,8 @@ int aw_pmd_tx_polarity_set(mss_access_t *mss, uint32_t tx_pol_flip);
 int aw_pmd_rx_polarity_set(mss_access_t *mss, uint32_t rx_pol_flip);
 
 int aw_pmd_rx_dfe_adapt_set(mss_access_t *mss, uint32_t dfe_adapt_enable);
+
+int aw_pmd_rx_background_adapt_enable_set(mss_access_t *mss, uint32_t rx_background_adapt);
 
 int aw_pmd_rxeq_prbs_set(mss_access_t *mss, uint32_t prbs_en);
 
@@ -627,11 +645,6 @@ int aw_pmd_rx_check_bist(mss_access_t *mss, aw_bist_mode_t bist_mode,
                          uint32_t timeout_us, int32_t expected_errors,
                          aw_dwell_params_t *dwell_params);
 
-int aw_pmd_rx_burst_err_config_set(mss_access_t *mss,
-                                   uint32_t burst_err_threshold);
-
-int aw_pmd_rx_burst_err_get(mss_access_t *mss, uint32_t *burst_errs);
-
 int aw_pmd_eqeval_type_set(mss_access_t *mss, uint32_t eq_type);
 
 int aw_pmd_eqeval_req_set(mss_access_t *mss, uint32_t value);
@@ -654,17 +667,6 @@ typedef enum {
 
 int aw_pmd_nep_loopback_set(mss_access_t *mss, uint32_t nep_loopback_enable);
 
-int aw_pmd_anlt_ms_per_ck_set(mss_access_t *mss, uint32_t ms_per_ck);
-
-int aw_pmd_anlt_auto_neg_link_status_ovr_enable(mss_access_t *mss, uint32_t en);
-
-int aw_pmd_link_training_without_an_config_set(mss_access_t *mss,
-                                               uint32_t width, uint32_t clause);
-
-int aw_pmd_anlt_link_training_preset_check_set(mss_access_t *mss,
-                                               uint32_t clause,
-                                               uint32_t preset_check);
-
 int aw_pmd_snr_vld_hys_thresh_set_from_target_snr(mss_access_t *mss,
                                                   uint32_t target_snr_low,
                                                   uint32_t target_snr_high);
@@ -680,5 +682,9 @@ int aw_pmd_snr_vld_enable_set(mss_access_t *mss, uint32_t vld_enable);
 int aw_tc_sm_conv(uint32_t v, uint32_t i);
 
 int aw_pmd_rx_cdr_lock_get(mss_access_t *mss, uint32_t *rx_cdr_lock);
+
+int aw_pmd_pam4_enable(mss_access_t *mss, uint32_t enable);
+
+int aw_pmd_set_rx_spare(mss_access_t *mss, uint32_t value);
 
 #endif

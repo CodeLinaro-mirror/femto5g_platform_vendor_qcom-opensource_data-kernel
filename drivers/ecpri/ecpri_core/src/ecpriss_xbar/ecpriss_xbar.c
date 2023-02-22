@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: GPL-2.0-only
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include "ecpriss_core.h"
@@ -7,6 +7,7 @@
 #define ECPRISS_PORT_OC_3 3
 #define ENABLE_BIT 1
 #define DISABLE_BIT 0
+#include "ecpriss_log.h"
 
 void ecpriss_xbar_config_stats_update(void){
 	uint64_t val=0;
@@ -25,7 +26,7 @@ void ecpriss_xbar_config_stats_update(void){
 	val = ecpriss_xbar_hal_read_reg_n_fields(ECPRISS_XBAR_GLOBAL, ECPRI_XBAR_XBAR_CFG,0, &xbar_cfg);
 	ecpriss_pdata->cfg_stats.xbar_cfg.global_cfg.global  = val;
 #ifdef DEBUG
-	pr_info(" ECPRI_XBAR_XBAR_CFG val = 0x%x \n",val);
+	ECPRILOGINFO(" ECPRI_XBAR_XBAR_CFG val = 0x%x \n",val);
 #endif
 	for(fh_index=0; fh_index < NUM_OF_FHP; fh_index++) {
 		for(pcid_index=0; pcid_index < LUT_INDEX; pcid_index++) {
@@ -37,7 +38,7 @@ void ecpriss_xbar_config_stats_update(void){
 			ecpriss_pdata->cfg_stats.xbar_cfg.lut_cfg.fhrx[fh_index][pcid_index]  = val;
 
 #ifdef DEBUG
-			pr_info(" ECPRI_XBAR_LUT_XBAR_FHRX_m_LUT_n val = 0x%x FH_index = %d, PCID_index = %d\n",val,fh_index,pcid_index);
+			ECPRILOGINFO(" ECPRI_XBAR_LUT_XBAR_FHRX_m_LUT_n val = 0x%x FH_index = %d, PCID_index = %d\n",val,fh_index,pcid_index);
 #endif
 #ifdef C2C
 			val = ecpriss_xbar_hal_read_reg_mn_fields(ECPRISS_XBAR_LUT,
@@ -45,14 +46,14 @@ void ecpriss_xbar_config_stats_update(void){
 					fh_index,
 					pcid_index,
 					&xbar_c2crx_m_ul_n);
-			pr_info(" ECPRI_XBAR_LUT_XBAR_C2CRX_m_UL_LUT_n, val = 0x%x FH_index = %d, PCID_index = %d\n",val,fh_index,pcid_index);
+			ECPRILOGINFO(" ECPRI_XBAR_LUT_XBAR_C2CRX_m_UL_LUT_n, val = 0x%x FH_index = %d, PCID_index = %d\n",val,fh_index,pcid_index);
 
 			val = ecpriss_xbar_hal_read_reg_mn_fields(ECPRISS_XBAR_LUT,
 					ECPRI_XBAR_LUT_XBAR_C2CRX_m_DL_LUT_n,
 					fh_index,
 					pcid_index,
 					&xbar_c2crx_m_dl_n);
-			pr_info(" ECPRI_XBAR_LUT_XBAR_C2CRX_m_DL_LUT_n, val = 0x%x FH_index = %d, PCID_index = %d\n",val,fh_index,pcid_index);
+			ECPRILOGINFO(" ECPRI_XBAR_LUT_XBAR_C2CRX_m_DL_LUT_n, val = 0x%x FH_index = %d, PCID_index = %d\n",val,fh_index,pcid_index);
 #endif
 			val = ecpriss_xbar_hal_read_reg_mn_fields(ECPRISS_XBAR_LUT,
 					ECPRI_XBAR_LUT_XBAR_OCRX_m_LUT_n,
@@ -61,7 +62,7 @@ void ecpriss_xbar_config_stats_update(void){
 					&xbar_ocrx_m_lut_n);
 			ecpriss_pdata->cfg_stats.xbar_cfg.lut_cfg.ocrx[fh_index][pcid_index]  = val;
 #ifdef DEBUG
-			pr_info(" ECPRI_XBAR_LUT_XBAR_OCRX_m_LUT_n, val = 0x%x FH_index = %d, PCID_index = %d\n",val,fh_index,pcid_index);
+			ECPRILOGINFO(" ECPRI_XBAR_LUT_XBAR_OCRX_m_LUT_n, val = 0x%x FH_index = %d, PCID_index = %d\n",val,fh_index,pcid_index);
 #endif
 		}
 	}
@@ -87,34 +88,34 @@ void ecpriss_xbar_stats_update(void)
 	for(link_index=0;link_index<TOTAL_LINKS;link_index++) {
 		val = ecpriss_xbar_hal_read_reg_n(ECPRISS_XBAR_GLOBAL,ECPRI_XBAR_XBAR_DBG_FHRX_PKT_CNT_n,link_index);
 		ecpriss_pdata->xbar_ctx->stats.xbar_fhrx_pkt_cnt[link_index] += val;
-		pr_debug("ECPRI_XBAR_XBAR_DBG_FHRX_PKT_CNT_n val = %d link_index = %d\n",val,link_index);
+		ECPRILOGDBG("ECPRI_XBAR_XBAR_DBG_FHRX_PKT_CNT_n val = %d link_index = %d\n",val,link_index);
 
 		val = ecpriss_xbar_hal_read_reg_n(ECPRISS_XBAR_GLOBAL,ECPRI_XBAR_XBAR_DBG_FHTX_PKT_CNT_n,link_index);
-		pr_debug("ECPRI_XBAR_XBAR_DBG_FHTX_PKT_CNT_n val = %d link_index = %d\n",val,link_index);
+		ECPRILOGDBG("ECPRI_XBAR_XBAR_DBG_FHTX_PKT_CNT_n val = %d link_index = %d\n",val,link_index);
 		ecpriss_pdata->xbar_ctx->stats.xbar_fhtx_pkt_cnt[link_index] += val;
 
 		val = ecpriss_xbar_hal_read_reg(ECPRISS_XBAR_GLOBAL,ECPRI_XBAR_XBAR_DBG_C2CRX_PKT_CNT_n);
-		pr_debug("ECPRI_XBAR_XBAR_DBG_C2CRX_PKT_CNT_n val = %d link_index = %d\n",val,link_index);
+		ECPRILOGDBG("ECPRI_XBAR_XBAR_DBG_C2CRX_PKT_CNT_n val = %d link_index = %d\n",val,link_index);
 		ecpriss_pdata->xbar_ctx->stats.xbar_c2crx_pkt_cnt[link_index] += val;
 
 		val = ecpriss_xbar_hal_read_reg_n(ECPRISS_XBAR_GLOBAL,ECPRI_XBAR_XBAR_DBG_C2CTX_PKT_CNT_n,link_index);
-		pr_debug("ECPRI_XBAR_XBAR_DBG_C2CTX_PKT_CNT_n val = %d link_index = %d\n",val,link_index);
+		ECPRILOGDBG("ECPRI_XBAR_XBAR_DBG_C2CTX_PKT_CNT_n val = %d link_index = %d\n",val,link_index);
 		ecpriss_pdata->xbar_ctx->stats.xbar_c2ctx_pkt_cnt[link_index] += val;
 
 		val = ecpriss_xbar_hal_read_reg_n(ECPRISS_XBAR_GLOBAL,ECPRI_XBAR_XBAR_DBG_OCRX_UNKNOWN_PCID_INFO_1_n,link_index);
-		pr_debug("ECPRI_XBAR_XBAR_DBG_OCRX_UNKNOWN_PCID_INFO_1_n val = %d link_index = %d\n",val,link_index);
+		ECPRILOGDBG("ECPRI_XBAR_XBAR_DBG_OCRX_UNKNOWN_PCID_INFO_1_n val = %d link_index = %d\n",val,link_index);
 		ecpriss_pdata->xbar_ctx->stats.ocrx_unknown_pcid_info_1_n[link_index] += val;
 
 		val = ecpriss_xbar_hal_read_reg_n(ECPRISS_XBAR_GLOBAL,ECPRI_XBAR_XBAR_DBG_OCRX_UNKNOWN_PCID_INFO_2_n,link_index);
-		pr_debug("ECPRI_XBAR_XBAR_DBG_OCRX_UNKNOWN_PCID_INFO_2_n val = %d link_index = %d\n",val,link_index);
+		ECPRILOGDBG("ECPRI_XBAR_XBAR_DBG_OCRX_UNKNOWN_PCID_INFO_2_n val = %d link_index = %d\n",val,link_index);
 		ecpriss_pdata->xbar_ctx->stats.ocrx_unknown_pcid_info_2_n[link_index] += val;
 
 		val = ecpriss_xbar_hal_read_reg_n(ECPRISS_XBAR_GLOBAL,ECPRI_XBAR_XBAR_DBG_FHRX_UNKNOWN_PCID_INFO_1_n,link_index);
-		pr_debug("ECPRI_XBAR_XBAR_DBG_FHRX_UNKNOWN_PCID_INFO_1_n val = %d link_index = %d\n",val,link_index);
+		ECPRILOGDBG("ECPRI_XBAR_XBAR_DBG_FHRX_UNKNOWN_PCID_INFO_1_n val = %d link_index = %d\n",val,link_index);
 		ecpriss_pdata->xbar_ctx->stats.fhrx_unknown_pcid_info_1_n[link_index] += val;
 
 		val = ecpriss_xbar_hal_read_reg_n(ECPRISS_XBAR_GLOBAL,ECPRI_XBAR_XBAR_DBG_FHRX_UNKNOWN_PCID_INFO_2_n,link_index);
-		pr_debug("ECPRI_XBAR_XBAR_DBG_FHRX_UNKNOWN_PCID_INFO_2_n val = %d link_index = %d\n",val,link_index);
+		ECPRILOGDBG("ECPRI_XBAR_XBAR_DBG_FHRX_UNKNOWN_PCID_INFO_2_n val = %d link_index = %d\n",val,link_index);
 		ecpriss_pdata->xbar_ctx->stats.fhrx_unknown_pcid_info_2_n[link_index] += val;
 
 	}
@@ -122,46 +123,46 @@ void ecpriss_xbar_stats_update(void)
 
 		val = ecpriss_xbar_hal_read_reg_n(ECPRISS_XBAR_GLOBAL, ECPRI_XBAR_XBAR_DBG_OCTX_PKT_CNT_n,link_index);
 		ecpriss_pdata->xbar_ctx->stats.xbar_octx_pkt_cnt[link_index] += val;
-		pr_debug("ECPRI_XBAR_XBAR_DBG_OCTX_PKT_CNT_n val = %d link_index = %d\n",val,link_index);
+		ECPRILOGDBG("ECPRI_XBAR_XBAR_DBG_OCTX_PKT_CNT_n val = %d link_index = %d\n",val,link_index);
 
 		val = ecpriss_xbar_hal_read_reg_n(ECPRISS_XBAR_GLOBAL, ECPRI_XBAR_XBAR_DBG_OCRX_PKT_CNT_n,link_index);
 		ecpriss_pdata->xbar_ctx->stats.xbar_ocrx_pkt_cnt[link_index] += val;
-		pr_debug("ECPRI_XBAR_XBAR_DBG_OCRX_PKT_CNT_n val = %d link_index = %d\n",val,link_index);
+		ECPRILOGDBG("ECPRI_XBAR_XBAR_DBG_OCRX_PKT_CNT_n val = %d link_index = %d\n",val,link_index);
 
 	}
 
 	val = ecpriss_xbar_hal_read_reg(ECPRISS_XBAR_GLOBAL,ECPRI_XBAR_XBAR_DBG_FHRX_DMA_PKT_CNT);
-	pr_debug("ECPRI_XBAR_XBAR_DBG_FHRX_DMA_PKT_CNT val = %d\n",val);
+	ECPRILOGDBG("ECPRI_XBAR_XBAR_DBG_FHRX_DMA_PKT_CNT val = %d\n",val);
 	ecpriss_pdata->xbar_ctx->stats.xbar_fhrx_dma_pkt_cnt += val;
 
 	val = ecpriss_xbar_hal_read_reg(ECPRISS_XBAR_GLOBAL,ECPRI_XBAR_XBAR_DBG_FHRX_UC_PKT_CNT);
-	pr_debug("ECPRI_XBAR_XBAR_DBG_FHRX_UC_PKT_CNT val = %d\n",val);
+	ECPRILOGDBG("ECPRI_XBAR_XBAR_DBG_FHRX_UC_PKT_CNT val = %d\n",val);
 	ecpriss_pdata->xbar_ctx->stats.xbar_fhrx_uc_pkt_cnt += val;
 
 	val = ecpriss_xbar_hal_read_reg(ECPRISS_XBAR_GLOBAL,ECPRI_XBAR_XBAR_DBG_FHRX_UC_ERR_PKT_CNT);
-	pr_debug("ECPRI_XBAR_XBAR_DBG_FHRX_UC_ERR_PKT_CNT val = %d\n",val);
+	ECPRILOGDBG("ECPRI_XBAR_XBAR_DBG_FHRX_UC_ERR_PKT_CNT val = %d\n",val);
 	ecpriss_pdata->xbar_ctx->stats.xbar_fhrx_uc_err_pkt_cnt += val;
 
 	val = ecpriss_xbar_hal_read_reg(ECPRISS_XBAR_GLOBAL,ECPRI_XBAR_XBAR_DBG_FHRX_ERR_PKT_CNT);
-	pr_debug("ECPRI_XBAR_XBAR_DBG_FHRX_ERR_PKT_CNT val = %d\n",val);
+	ECPRILOGDBG("ECPRI_XBAR_XBAR_DBG_FHRX_ERR_PKT_CNT val = %d\n",val);
 	ecpriss_pdata->xbar_ctx->stats.xbar_fhrx_err_pkt_cnt += val;
 
 
 
 	val = ecpriss_xbar_hal_read_reg(ECPRISS_XBAR_GLOBAL,ECPRI_XBAR_XBAR_DBG_FHTX_C2C_PKT_OVF_CNT);
-	pr_debug("ECPRI_XBAR_XBAR_DBG_FHTX_C2C_PKT_OVF_CNT val = %d\n",val);
+	ECPRILOGDBG("ECPRI_XBAR_XBAR_DBG_FHTX_C2C_PKT_OVF_CNT val = %d\n",val);
 	ecpriss_pdata->xbar_ctx->stats.xbar_fhtx_c2c_pkt_ovf_cnt += val;
 
 	val = ecpriss_xbar_hal_read_reg(ECPRISS_XBAR_GLOBAL,ECPRI_XBAR_XBAR_DBG_FHTX_DMA_PKT_CNT);
-	pr_debug("ECPRI_XBAR_XBAR_DBG_FHTX_DMA_PKT_CNT val = %d\n",val);
+	ECPRILOGDBG("ECPRI_XBAR_XBAR_DBG_FHTX_DMA_PKT_CNT val = %d\n",val);
 	ecpriss_pdata->xbar_ctx->stats.xbar_fhtx_dma_pkt_cnt += val;
 
 	val = ecpriss_xbar_hal_read_reg(ECPRISS_XBAR_GLOBAL,ECPRI_XBAR_XBAR_DBG_C2CRX_DMA_PKT_CNT);
-	pr_debug("ECPRI_XBAR_XBAR_DBG_C2CRX_DMA_PKT_CNT val = %d\n",val);
+	ECPRILOGDBG("ECPRI_XBAR_XBAR_DBG_C2CRX_DMA_PKT_CNT val = %d\n",val);
 	ecpriss_pdata->xbar_ctx->stats.xbar_c2crx_dma_pkt_cnt += val;
 
 	val = ecpriss_xbar_hal_read_reg(ECPRISS_XBAR_GLOBAL,ECPRI_XBAR_XBAR_DBG_C2CRX_ERR_PKT_CNT);
-	pr_debug("ECPRI_XBAR_XBAR_DBG_C2CRX_ERR_PKT_CNT val = %d\n",val);
+	ECPRILOGDBG("ECPRI_XBAR_XBAR_DBG_C2CRX_ERR_PKT_CNT val = %d\n",val);
 	ecpriss_pdata->xbar_ctx->stats.xbar_c2crx_err_pkt_cnt += val;
 
 
@@ -178,7 +179,7 @@ void ecpriss_xbar_stats_update(void)
 	ecpriss_pdata->xbar_ctx->stats.ocrx_fh_wm_fh2[curr_wm_index] = xbar_ocrx_fh_buff_watermark.fh2;
 
 
-	pr_debug("ECPRI_XBAR_XBAR_DBG_FHTX_UC_PKT_CNT val = %u\n",
+	ECPRILOGDBG("ECPRI_XBAR_XBAR_DBG_FHTX_UC_PKT_CNT val = %u\n",
 			xbar_ocrx_fh_buff_watermark);
 
 	val = ecpriss_xbar_hal_read_reg_n_fields(ECPRISS_XBAR_GLOBAL,
@@ -190,7 +191,7 @@ void ecpriss_xbar_stats_update(void)
 	ecpriss_pdata->xbar_ctx->stats.ocrx_0_1_wm_cc0[curr_wm_index] = xbar_dbg_ocrx_0_1_buff_watermark.cc0;
 	ecpriss_pdata->xbar_ctx->stats.ocrx_0_1_wm_cc1[curr_wm_index] = xbar_dbg_ocrx_0_1_buff_watermark.cc1;
 
-	pr_debug("ECPRI_XBAR_XBAR_DBG_OCRX_0_1_BUFF_WATERMARK val = %u\n",
+	ECPRILOGDBG("ECPRI_XBAR_XBAR_DBG_OCRX_0_1_BUFF_WATERMARK val = %u\n",
 			xbar_dbg_ocrx_0_1_buff_watermark);
 
 	val = ecpriss_xbar_hal_read_reg_n_fields(ECPRISS_XBAR_GLOBAL,
@@ -203,7 +204,7 @@ void ecpriss_xbar_stats_update(void)
 	ecpriss_pdata->xbar_ctx->stats.ocrx_2_3_wm_cc3[curr_wm_index] = xbar_dbg_ocrx_2_3_buff_watermark.cc3;
 
 
-	pr_debug("ECPRI_XBAR_XBAR_DBG_OCRX_2_3_BUFF_WATERMARK, val = %u\n",
+	ECPRILOGDBG("ECPRI_XBAR_XBAR_DBG_OCRX_2_3_BUFF_WATERMARK, val = %u\n",
 			xbar_dbg_ocrx_2_3_buff_watermark);
 
 	val = ecpriss_xbar_hal_read_reg_n_fields(ECPRISS_XBAR_GLOBAL,
@@ -216,7 +217,7 @@ void ecpriss_xbar_stats_update(void)
 	ecpriss_pdata->xbar_ctx->stats.octx_0_1_wm_cc1[curr_wm_index] = octx_oc_0_1_buff_watermark.cc1;
 
 
-	pr_debug("ECPRI_XBAR_XBAR_DBG_OCTX_OC_0_1_BUFF_WATERMARK, val = %u\n",
+	ECPRILOGDBG("ECPRI_XBAR_XBAR_DBG_OCTX_OC_0_1_BUFF_WATERMARK, val = %u\n",
 			octx_oc_0_1_buff_watermark);
 
 	val = ecpriss_xbar_hal_read_reg_n_fields(ECPRISS_XBAR_GLOBAL,
@@ -229,7 +230,7 @@ void ecpriss_xbar_stats_update(void)
 	ecpriss_pdata->xbar_ctx->stats.octx_2_3_wm_cc3[curr_wm_index] = octx_oc_2_3_buff_watermark.cc3;
 
 
-	pr_debug("ECPRI_XBAR_XBAR_DBG_OCTX_OC_2_3_BUFF_WATERMARK, val = %u\n",
+	ECPRILOGDBG("ECPRI_XBAR_XBAR_DBG_OCTX_OC_2_3_BUFF_WATERMARK, val = %u\n",
 			octx_oc_2_3_buff_watermark);
 
 
@@ -274,18 +275,18 @@ static int ecpriss_xbar_check_entry_valid_bits(void)
 				xbar_lut_status.c2crx_ul_lut_init_done ||
 				xbar_lut_status.ocrx_lut_init_done)
 		{
-			pr_info("ecpriss_xbar_check_entry_valid_bits(): XBAR HW LUT Inited\n");
+			ECPRILOGINFO("ecpriss_xbar_check_entry_valid_bits(): XBAR HW LUT Inited\n");
 		}
 		else
 		{
-			pr_info("Init LUT done error\n");
+			ECPRILOGERR("Init LUT done error\n");
 			break;
 		}
 	}while (0);
 	return ret;
 }
 
-#if 0
+
 static void ecpriss_xbar_flush_init()
 {
 	ecpri_xbar_hwio_def_ecpri_xbar_xbar_flush_s xbar_flush;
@@ -298,28 +299,28 @@ static void ecpriss_xbar_flush_init()
 	pr_info("Reset xbar flush val = 0x%x\n", *flush_val);
 
 	/*Enable Flush*/
-	xbar_flush.flush_fh_0_rx = ENABLE_BIT;
+	xbar_flush.flush_fh_0_rx = DISABLE_BIT;
 	xbar_flush.flush_fh_0_tx = ENABLE_BIT;
-	xbar_flush.flush_fh_1_rx = ENABLE_BIT;
+	xbar_flush.flush_fh_1_rx = DISABLE_BIT;
 	xbar_flush.flush_fh_1_tx = ENABLE_BIT;
-	xbar_flush.flush_fh_2_rx = ENABLE_BIT;
+	xbar_flush.flush_fh_2_rx = DISABLE_BIT;
 	xbar_flush.flush_fh_2_tx = ENABLE_BIT;
-
+#if 0
 	xbar_flush.flush_c2c_0_rx = ENABLE_BIT;
 	xbar_flush.flush_c2c_0_tx = ENABLE_BIT;
 	xbar_flush.flush_c2c_1_rx = ENABLE_BIT;
 	xbar_flush.flush_c2c_1_tx = ENABLE_BIT;
 	xbar_flush.flush_c2c_2_rx = ENABLE_BIT;
 	xbar_flush.flush_c2c_2_tx = ENABLE_BIT;
-
-	xbar_flush.flush_oc_0_rx = ENABLE_BIT;
-	xbar_flush.flush_oc_0_tx = ENABLE_BIT;
-	xbar_flush.flush_oc_1_rx = ENABLE_BIT;
-	xbar_flush.flush_oc_1_tx = ENABLE_BIT;
-	xbar_flush.flush_oc_2_rx = ENABLE_BIT;
-	xbar_flush.flush_oc_2_tx = ENABLE_BIT;
-	xbar_flush.flush_oc_3_rx = ENABLE_BIT;
-	xbar_flush.flush_oc_3_tx = ENABLE_BIT;
+#endif
+	xbar_flush.flush_oc_0_rx = DISABLE_BIT;
+	xbar_flush.flush_oc_0_tx = DISABLE_BIT;
+	xbar_flush.flush_oc_1_rx = DISABLE_BIT;
+	xbar_flush.flush_oc_1_tx = DISABLE_BIT;
+	xbar_flush.flush_oc_2_rx = DISABLE_BIT;
+	xbar_flush.flush_oc_2_tx = DISABLE_BIT;
+	xbar_flush.flush_oc_3_rx = DISABLE_BIT;
+	xbar_flush.flush_oc_3_tx = DISABLE_BIT;
 
 	xbar_flush.reserved0 = 0;
 	xbar_flush.reserved1 = 0;
@@ -338,7 +339,7 @@ static void ecpriss_xbar_flush_init()
 	return;
 }
 
-
+#if 0
 /**
  * ecpriss_xbar_flush()
  *
@@ -480,13 +481,65 @@ static void ecpriss_xbar_flush(ecpriss_port_type_e    port_type,
 }
 #endif
 
+void ecpriss_configure_xbar_flush(ecpriss_port_type_e port_type,
+                ecpriss_port_idx_e port_idx, eth_ecpriss_event_e event_type)
+{
+        ecpri_xbar_hwio_def_ecpri_xbar_xbar_flush_s xbar_flush;
+
+        ecpriss_xbar_hal_read_reg_n_fields(ECPRISS_XBAR_GLOBAL, ECPRI_XBAR_XBAR_FLUSH,0, &xbar_flush);
+
+        if (port_type == ECPRISS_PORT_TYPE_FH &&
+                        port_idx == ECPRISS_PORT_0 &&
+                        event_type == ETH_ECPRISS_EVENT_UP){
+                pr_err("XBAR flush for port 0 | enable: %d\n", DISABLE_BIT);
+                xbar_flush.flush_fh_0_tx = DISABLE_BIT;
+        }
+        else if (port_type == ECPRISS_PORT_TYPE_FH &&
+                        port_idx == ECPRISS_PORT_1 &&
+                        event_type == ETH_ECPRISS_EVENT_UP){
+                pr_err("XBAR flush for port 1 | enable: %d\n", DISABLE_BIT);
+                xbar_flush.flush_fh_1_tx = DISABLE_BIT;
+        }
+        else if (port_type == ECPRISS_PORT_TYPE_FH &&
+                        port_idx == ECPRISS_PORT_2 &&
+                        event_type == ETH_ECPRISS_EVENT_UP){
+                pr_err("XBAR flush for port 2 | enable: %d\n", DISABLE_BIT);
+                xbar_flush.flush_fh_2_tx = DISABLE_BIT;
+        }
+        else if (port_type == ECPRISS_PORT_TYPE_FH &&
+                        port_idx == ECPRISS_PORT_0 &&
+                        event_type == ETH_ECPRISS_EVENT_DOWN){
+                pr_err("XBAR flush for port 0 | enable: %d\n", ENABLE_BIT);
+                xbar_flush.flush_fh_0_tx = ENABLE_BIT;
+        }
+        else if (port_type == ECPRISS_PORT_TYPE_FH &&
+                        port_idx == ECPRISS_PORT_1 &&
+                        event_type == ETH_ECPRISS_EVENT_DOWN){
+                pr_err("XBAR flush for port 1 | enable: %d\n", ENABLE_BIT);
+                xbar_flush.flush_fh_1_tx = ENABLE_BIT;
+        }
+        else if (port_type == ECPRISS_PORT_TYPE_FH &&
+                        port_idx == ECPRISS_PORT_2 &&
+                        event_type == ETH_ECPRISS_EVENT_DOWN){
+                pr_err("XBAR flush for port 2 | enable: %d\n", ENABLE_BIT);
+                xbar_flush.flush_fh_2_tx = ENABLE_BIT;
+        }
+
+
+        ecpriss_xbar_hal_write_reg_n_fields(ECPRISS_XBAR_GLOBAL,
+                        ECPRI_XBAR_XBAR_FLUSH,
+                        0,
+                        &xbar_flush);
+        return;
+}
+
 static irqreturn_t ecpriss_xbar_isr(int irq, void *ctxt)
 {
 	unsigned long flags = 0;
 	ecpri_xbar_hwio_def_ecpri_xbar_xbar_sw_irq_status_s xbar_sw_irq_status;
 	ecpri_xbar_hwio_def_ecpri_xbar_xbar_sw_irq_clr_s xbar_sw_irq_clear;
 
-	spin_lock_irqsave(&irq_lock, flags);
+	spin_lock_irqsave(&ecpriss_pdata->irq_lock, flags);
 
 	ecpriss_xbar_hal_read_reg_n_fields(ECPRISS_XBAR_GLOBAL,
 			ECPRI_XBAR_XBAR_SW_IRQ_STATUS, 0,&xbar_sw_irq_status);
@@ -545,7 +598,7 @@ static irqreturn_t ecpriss_xbar_isr(int irq, void *ctxt)
 	}
 	ecpriss_xbar_hal_write_reg_n_fields(ECPRISS_XBAR_GLOBAL,
 			ECPRI_XBAR_XBAR_SW_IRQ_CLR , 0, &xbar_sw_irq_clear);
-	spin_unlock_irqrestore(&irq_lock, flags);
+	spin_unlock_irqrestore(&ecpriss_pdata->irq_lock, flags);
 	return IRQ_HANDLED;
 }
 
@@ -567,26 +620,24 @@ static int ecpriss_xbar_register_interrupts(struct device *dev)
 		pdev = to_platform_device(dev);
 
 		if(dev ==  NULL){
-			pr_err("ecpriss_xbar_irq_init pdev is NULL" );
+			ECPRILOGERR("ecpriss_xbar_irq_init pdev is NULL" );
 			goto err;
 		}
 		xbar_irq_mapping =  platform_get_irq(pdev, EXPRISS_XBAR_INDEX);
 		res = request_irq(xbar_irq_mapping, ecpriss_xbar_isr,
-				IRQF_TRIGGER_RISING, "ecpri_ss", NULL);
+				IRQF_TRIGGER_HIGH, "ecpri_ss", NULL);
 		if (res){
-			pr_err("IRQ request failed irq=%d res=%d\n",
+			ECPRILOGERR("IRQ request failed irq=%d res=%d\n",
 					xbar_irq_mapping, res);
 			goto err;
 		}
 		res = enable_irq_wake(xbar_irq_mapping);
 		if (res){
-			pr_err("fail to enable IPA IRQ wakeup irq=%d res=%d\n",
+			ECPRILOGERR("fail to enable IPA IRQ wakeup irq=%d res=%d\n",
 					xbar_irq_mapping, res);
 			goto err;
 		}
-		pr_info("XBAR interrupt id %d registered with ecpriss_irq_init Interrupt Registration Success\n",
-				xbar_irq_mapping);
-
+		ECPRILOGINFO("XBAR interrupt id %d registered with ecpriss_irq_init Interrupt Registration Success\n",xbar_irq_mapping);
 	}while(0);
 
 	return 0;
@@ -613,7 +664,7 @@ static void ecpriss_xbar_enable_stats(void)
 	/*Read Reset value*/
 	ecpriss_xbar_hal_read_reg_n_fields(ECPRISS_XBAR_GLOBAL, ECPRI_XBAR_XBAR_CFG,0, &xbar_cfg);
 	cfg_val = (int*)(&xbar_cfg);
-	pr_info("Reset xbar cfg val = 0x%04x\n", *cfg_val);
+	ECPRILOGINFO("Reset xbar cfg val = 0x%04x\n", *cfg_val);
 
 
 	xbar_cfg.fhrx_cnt_en = ENABLE_BIT;
@@ -634,7 +685,7 @@ static void ecpriss_xbar_enable_stats(void)
 	/*Read post write value*/
 	ecpriss_xbar_hal_read_reg_n_fields(ECPRISS_XBAR_GLOBAL, ECPRI_XBAR_XBAR_CFG,0, &xbar_cfg);
 	cfg_val = (int*)(&xbar_cfg);
-	pr_info("xbar cfg val post write= 0x%x\n", *cfg_val);
+	ECPRILOGINFO("xbar cfg val post write= 0x%x\n", *cfg_val);
 	return;
 }
 
@@ -694,7 +745,7 @@ void ecpriss_xbar_non_ecpri_lut_cfg(void)
 							xbar_fhrx_0_non_ecpri_lut.ring_id_3 = dma_port_cfg->dma_rings_param[3].dest_dma_ring_id;
 							break;
 						default:
-							pr_err("Wrong default value %d\n",j);
+							ECPRILOGERR("Wrong default value %d\n",j);
 							break;
 					}
 				}
@@ -744,7 +795,7 @@ void ecpriss_xbar_non_ecpri_lut_cfg(void)
 							xbar_fhrx_1_non_ecpri_lut.ring_id_3 = dma_port_cfg->dma_rings_param[3].dest_dma_ring_id;
 							break;
 						default:
-							pr_err("Wrong default value %d\n",j);
+							ECPRILOGERR("Wrong default value %d\n",j);
 							break;
 					}
 				}
@@ -791,7 +842,7 @@ void ecpriss_xbar_non_ecpri_lut_cfg(void)
 							xbar_fhrx_2_non_ecpri_lut.ring_id_3 = dma_port_cfg->dma_rings_param[3].dest_dma_ring_id;
 							break;
 						default:
-							pr_err("Wrong default value j = %d\n",j);
+							ECPRILOGERR("Wrong default value j = %d\n",j);
 							break;
 					}
 				}
@@ -856,7 +907,7 @@ int ecpriss_xbar_cold_init(struct device *dev)
 		}
 
 		ecpriss_xbar_enable_stats();
-
+		ecpriss_xbar_flush_init();
 		if(ecpriss_pdata)
 		{
 			if(ecpriss_pdata->xbar_ctx)
@@ -865,7 +916,7 @@ int ecpriss_xbar_cold_init(struct device *dev)
 			}
 			else
 			{
-				pr_err("xbar ctxt is NULL\n");
+				ECPRILOGERR("xbar ctxt is NULL\n");
 			}
 		}
 
@@ -935,7 +986,7 @@ int ecpriss_xbar_fh_rx_lut(uint32_t  port_index,
 		xbar_port_lut->lut_table[current_pcid_index].valid = 1;
 		xbar_fhrx_m_lut_n.valid = 1;
 
-		pr_err("ecpriss_xbar_fh_rx_lut: PICD %d OC LInk ID %d and Valid %d Route to Oran %d",
+		ECPRILOGDBG("ecpriss_xbar_fh_rx_lut: PICD %d OC LInk ID %d and Valid %d Route to Oran %d",
 				current_pcid_index, xbar_fhrx_m_lut_n.oc_link_id , xbar_fhrx_m_lut_n.valid , xbar_fhrx_m_lut_n.route_to_oran);
 
 		ecpriss_xbar_hal_write_reg_mn_fields(ECPRISS_XBAR_LUT,
@@ -1002,7 +1053,7 @@ int ecpriss_xbar_oc_rx_lut(uint32_t               port_index,
 		xbar_ocrx_m_lut_n.valid = 1;
 		ocrx_xbar_port_lut->lut_table[current_pcid_index].valid = 1;
 
-		pr_err("ecpriss_xbar_oc_rx_lut: PCID %d L2 Index %d L3 Index  and Valid " , ocrx_xbar_port_lut->lut_table[current_pcid_index].pcid,
+		ECPRILOGDBG("ecpriss_xbar_oc_rx_lut: PCID %d L2 Index %d L3 Index  and Valid " , ocrx_xbar_port_lut->lut_table[current_pcid_index].pcid,
 				xbar_ocrx_m_lut_n.l2_encap_info , xbar_ocrx_m_lut_n.l3_encap_info , xbar_ocrx_m_lut_n.valid );
 		ecpriss_xbar_hal_write_reg_mn_fields(ECPRISS_XBAR_LUT,
 				ECPRI_XBAR_LUT_XBAR_OCRX_m_LUT_n,

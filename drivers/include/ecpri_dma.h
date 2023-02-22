@@ -1,6 +1,6 @@
 /*
  * SPDX-License-Identifier: GPL-2.0-only
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #ifndef _ECPRI_DMA_H_
@@ -31,19 +31,19 @@ enum ecpri_hw_ver {
  * @ECPRI_HW_FLAVOR_NONE: eCPRI hardware flavor not defined
  * @ECPRI_HW_FLAVOR_RU: eCPRI hardware flavor RU
  * @ECPRI_HW_FLAVOR_DU_PCIE: eCPRI hardware flavor DU - PCIe
+ * ECPRI_HW_FLAVOR_DU_PCIE_3_X_12: eCPRI hardware flavor DU_PCIE_3_X_12
  * @ECPRI_HW_FLAVOR_DU_L2: eCPRI hardware flavor DU - L2
  * ECPRI_HW_FLAVOR_DU_PCIE_4_X_9: eCPRI hardware flavor DU_PCIE_4_X_9
  * ECPRI_HW_FLAVOR_DU_PCIE_5_X_6: eCPRI hardware flavor DU_PCIE_5_X_6
- * ECPRI_HW_FLAVOR_DU_PCIE_3_X_12: eCPRI hardware flavor DU_PCIE_3_X_12
  */
 enum ecpri_hw_flavor {
 	ECPRI_HW_FLAVOR_NONE = 0,
 	ECPRI_HW_FLAVOR_RU = 1,
 	ECPRI_HW_FLAVOR_DU_PCIE = 2,
+	ECPRI_HW_FLAVOR_DU_PCIE_3_X_12 = ECPRI_HW_FLAVOR_DU_PCIE,
 	ECPRI_HW_FLAVOR_DU_L2 = 3,
 	ECPRI_HW_FLAVOR_DU_PCIE_4_X_9 = 4,
 	ECPRI_HW_FLAVOR_DU_PCIE_5_X_6 = 5,
-	ECPRI_HW_FLAVOR_DU_PCIE_3_X_12 = 6,
 	ECPRI_HW_FLAVOR_MAX,
 };
 
@@ -86,16 +86,16 @@ enum ecpri_dma_ees {
 	ECPRI_DMA_EE_VM2 = 4,
 	ECPRI_DMA_EE_VM3 = 5,
 	ECPRI_DMA_EE_PF  = 6,
-	ECPRI_DMA_EE_VF1 = 2,
-	ECPRI_DMA_EE_VF2 = 3,
-	ECPRI_DMA_EE_VF3 = 4,
-	ECPRI_DMA_EE_VF4 = 5,
-	ECPRI_DMA_EE_VF5 = 6,
 	ECPRI_DMA_EE_VFA = 2,
 	ECPRI_DMA_EE_VFB = 3,
 	ECPRI_DMA_EE_VFC = 4,
-	ECPRI_DMA_EE_VFD = 5,
-	ECPRI_DMA_EE_VFE = 6,
+	ECPRI_DMA_EE_VF1 = 5,
+	ECPRI_DMA_EE_VF2 = 6,
+	ECPRI_DMA_EE_VFD = 2,
+	ECPRI_DMA_EE_VFE = 3,
+	ECPRI_DMA_EE_VF3 = 4,
+	ECPRI_DMA_EE_VF4 = 5,
+	ECPRI_DMA_EE_VF5 = 6,
 };
 
 enum ecpri_dma_vm_ids {

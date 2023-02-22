@@ -61,7 +61,8 @@ enum qcom_aw_phy_debug_fs_cmd{
   ENABLE_TX_BIST,
   RX_CDR_CHECKER,
   ENABLE_RX_BIST,
-  CHECK_PRBS_ALL_LANES
+  CHECK_PRBS_ALL_LANES,
+  SET_EQ_MODE
 };
 
 int                                        qcom_aw_phy_attr_val;
@@ -141,7 +142,8 @@ char help_menu[] = {
 24,x	Enables/disables TX BIST generator based on value 'x' (0-disable/1-enable)\n\
 25		Checks RX CDR lock on RX PHY and lane set with options 18 and 19 respectively.\n\
 26,x	Enables/disables RX BIST checker based on value 'x' (0-disable/1-enable)\n\
-27,x	Flag to configure if PRBS needs to be validated for all lanes\n"};
+27,x	Flag to configure if PRBS needs to be validated for all lanes\n\
+28,x	Set equalization mode 'x' (1-Manual, 2-ANLT. 3-LT)\n"};
 
 void qcom_aw_phy_setup_sysfs() {
 
@@ -175,11 +177,8 @@ void qcom_aw_phy_an_complete_cb(enum mtip_port_type_enum port_type,
                       lane_num);
 }
 
-void qcom_aw_phy_cdr_lock_cb(enum mtip_port_type_enum port_type,
-                                enum eth_phy_iface_phy_lane_num_enum lane_num,
-                                bool status) {
-  QCOM_AW_PHY_LOG_ERR("CDR lock for port %d, lane %d, status", port_type,
-                      lane_num, status);
+void qcom_aw_phy_cdr_lock_cb(u32 link_index, bool status) {
+  QCOM_AW_PHY_LOG_ERR("CDR lock for link_index %d, status", link_index, status);
 }
 ssize_t qcom_aw_phy_get_prbs_result(struct file *file, char __user *buf,
                                     size_t count, loff_t *ppos){
@@ -243,6 +242,7 @@ ssize_t qcom_aw_phy_set_attr(struct file *file, const char __user *buf,
   int enable_flag = 0;
   uint32_t err_cnt_55_32, err_cnt_31_0;
   bool error = false;
+  enum qcom_aw_phy_eq_mode_enum eq_mode = QCOM_AW_PHY_EQ_MODE_MIN;
 
   memset(token_string, 0, sizeof(token_string));
   if (copy_from_user(&token_string, buf, MIN(sizeof(token_string), count))){
@@ -665,6 +665,18 @@ ssize_t qcom_aw_phy_set_attr(struct file *file, const char __user *buf,
       sscanf(token, "%d", &enable_flag);
       QCOM_AW_PHY_LOG_ERR("Checking PRBS for all lanes = %d", enable_flag);
       check_prbs_all_lanes = enable_flag;
+      break;
+
+    case SET_EQ_MODE:
+      token = qcom_aw_phy_strtok(NULL, ',', &save_ptr);
+      sscanf(token, "%d", &eq_mode);
+      QCOM_AW_PHY_LOG_ERR("Equalization mode set to %d", eq_mode);
+
+      phy_config_info = qcom_aw_phy_get_config_info();
+      for (i = QCOM_AW_PHY_INST_FH0; i < QCOM_AW_PHY_INST_MAX; i++) {
+        phy_inst_info = &phy_config_info->phy_inst_config_info[i];
+        phy_inst_info->phy_eq_mode = eq_mode;
+      }
       break;
 
     default:

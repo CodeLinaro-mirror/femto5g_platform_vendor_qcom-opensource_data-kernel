@@ -6,6 +6,7 @@
 #include "ecpriss_netlink.h"
 #include "ecpriss_workqueue.h"
 #include "ecpriss_debugfs.h"
+#include "ecpriss_log.h"
 
 extern struct ecpri_dma_ecpri_ss_ops dma_ecpri_ss_driver_ops;
 extern struct eth_ecpriss_ops mtip_ecpri_ops;
@@ -18,6 +19,8 @@ extern struct eth_ecpriss_ops mtip_ecpri_ops;
 #define PRE_INT                       1
 
 #define MAX_NUM_FLOW 120
+#define ETH_LINK_STATE_UP 3
+#define ETH_LINK_STATE_DOWN 4
 
 int stats_timeout_ms = 250;
 void ecpriss_eth_topology_cb(void);
@@ -27,6 +30,7 @@ void ecpriss_stats_timer_cb(struct timer_list *data);
 
 void ecpriss_eth_events_cb(eth_ecpriss_event_e event_type,
 		eth_ecpriss_link_event_params_s *link_event_params);
+void ecpriss_configure_xbar_flush(ecpriss_port_type_e port_type,ecpriss_port_idx_e port_idx,eth_ecpriss_event_e event_type);
 
 void ecpriss_dma_ecpri_ss_log_msg_cb(void *user_data, const char *fmt, ...);
 
@@ -48,7 +52,6 @@ eth_ecpriss_interface_events_cb           eth_interface_events_cb;
 struct ecpri_dma_ecpri_ss_register_params dma_ready_info;
 eth_ecpriss_link_event_params_s           link_event_params;
 /* ecpriss_stats_s                           stats_g; */
-
 
 
 /* DEbug Useful Data */
@@ -94,7 +97,7 @@ void ecpriss_process_packet(ecpriss_packet_payload_s *packet)
 
 		flow_tx = &packet->flow_cfg.flow_tx_cfg;
 
-		pr_err(
+		ECPRILOGINFO(
 				"ecpriss_process_packet:UL SRC %d,PortIndex %d " ,
 				flow_tx->src , flow_tx->port_index);
 
@@ -188,13 +191,14 @@ static void ecpriss_eth_cpy_params(ecpriss_qudp_port_cfg_s       *port_cfg,
 void ecpriss_eth_topology_init(void)
 {
 	int ret = 0;
-	int i,j;
+	int i,j,k;
 	eth_ecpriss_dev_mode_e device_mode;
 	uint8_t port_index;
 	uint8_t num_links;
 
 	ecpriss_qudp_port_cfg_s      *port_cfg_local;
-
+        eth_ecpriss_port_params_s *port_params = NULL;
+        bool link_state_flag = false;
 	do {
 		ret = (mtip_ecpri_ops.eth_ecpriss_get_topology)(&device_mode,
 				&eth_link_params_g);
@@ -214,6 +218,20 @@ void ecpriss_eth_topology_init(void)
 						&ecpriss_pdata->qudp_ctx->fh_port_cfg[port_index];
 					num_links =
 						eth_link_params_g.topology_params[i].port_params[j].num_links;
+					port_params = &eth_link_params_g.topology_params[i].port_params[port_index];
+                                        for(k=0;k<num_links;k++){
+						//pr_err("port_index: %d link_index: %d link state: %d\n",port_index,k,port_params->link_params[k].link_state);
+                                                if(port_params->link_params[k].link_state == ETH_LINK_STATE_UP){
+                                                        link_state_flag = true;
+	                                        }
+                                        }
+                                        if(link_state_flag == true){
+                                                ecpriss_configure_xbar_flush(ECPRISS_PORT_TYPE_FH,port_index,ETH_ECPRISS_EVENT_UP);
+                                        }
+                                        else{
+                                                ecpriss_configure_xbar_flush(ECPRISS_PORT_TYPE_FH,port_index,ETH_ECPRISS_EVENT_DOWN);
+                                        }
+					link_state_flag = false;
 					ecpriss_eth_cpy_params(port_cfg_local,
 							&eth_link_params_g,
 							port_index,
@@ -382,7 +400,7 @@ void ecpriss_eth_topology_cb(void)
 		ret = ecpriss_queue_work(ecpriss_wq,
 				ecpriss_work);
 		if(ret < 0) {
-			pr_err("Queue work failed\n");
+			ECPRILOGERR("Queue work failed\n");
 			break;
 		}
 	} while (0);
@@ -396,7 +414,7 @@ void ecpriss_eth_events_cb(eth_ecpriss_event_e event_type,
 	struct workqueue_struct *ecpriss_wq;
 	struct work_struct *ecpriss_work;
 
-	pr_err("ecpriss_eth_events_cb event received %d", event_type);
+	ECPRILOGERR("ecpriss_eth_events_cb event received %d", event_type);
 
 
 	do{
@@ -410,7 +428,7 @@ void ecpriss_eth_events_cb(eth_ecpriss_event_e event_type,
 		ret = ecpriss_queue_work(ecpriss_wq,
 				ecpriss_work);
 		if(ret < 0) {
-			pr_err("Queue work failed\n");
+			ECPRILOGERR("Queue work failed\n");
 			break;
 		}
 
@@ -432,7 +450,7 @@ void ecpriss_dma_endp_cb(void * userdata)
 		ret = ecpriss_queue_work(ecpriss_wq,
 				ecpriss_work);
 		if(ret < 0) {
-			pr_err("Queue work failed\n");
+			ECPRILOGERR("Queue work failed\n");
 			break;
 		}
 	}while (0);
@@ -453,7 +471,7 @@ void ecpriss_stats_timer_cb(struct timer_list *data)
 		ret = ecpriss_queue_work(ecpriss_wq,
 				ecpriss_work);
 		if(ret < 0) {
-			pr_err("Queue work failed\n");
+			ECPRILOGERR("Queue work failed\n");
 			break;
 		}
 
@@ -491,7 +509,12 @@ static int ecpriss_core_data_init(void)
 	ecpriss_pdata->qudp_ctx->ecpriss_qudp_hal_ctx =
 		qudp_ctx_g.ecpriss_qudp_hal_ctx;
 	ecpriss_pdata->xbar_ctx->ecpriss_xbar_hal = xbar_ctx_g.ecpriss_xbar_hal;
-
+	spin_lock_init(&ecpriss_pdata->irq_lock);
+	ecpriss_pdata->ecpriss_core_logbuf =
+        ipc_log_context_create(ECPRISS_CORE_IPC_LOG_PAGES,
+                "ecpriss_core", 0);
+        if (ecpriss_pdata->ecpriss_core_logbuf == NULL)
+        ECPRILOGERR("failed to create log context for ECPRISS_SS driver\n");
 	/* ecpriss_pdata->stats = &stats_g; */
 
 	eth_topology_ready_cb = &ecpriss_eth_topology_cb;
@@ -499,24 +522,24 @@ static int ecpriss_core_data_init(void)
 	do {
 		ret = ecpriss_initialize_workq();
 		if(ret < 0) {
-			pr_err("Work queue init failed\n");
+			ECPRILOGERR("Work queue init failed\n");
 			break;
 		}
-		pr_info("eCPRI core Work queue Inited\n");
+		ECPRILOGINFO("eCPRI core Work queue Inited\n");
 
 		ret = ecpriss_netlink_socket_create();
 		if(ret < 0) {
-			pr_err("Netlink socket initialization failed\n");
+			ECPRILOGERR("Netlink socket initialization failed\n");
 			break;
 		}
-		pr_info("eCPRI Netlink Socket(NETLINK_ECPRI family) Created\n");
+		ECPRILOGINFO("eCPRI Netlink Socket(NETLINK_ECPRI family) Created\n");
 
 		ret = ecpriss_stats_timer_interrupt_create();
 		if(ret < 0) {
-			pr_err("eCPRI Timer Interrupt creation failed\n");
+			ECPRILOGERR("eCPRI Timer Interrupt creation failed\n");
 			break;
 		}
-		pr_info("eCPRI Statistics Timer Interrupt created\n");
+		ECPRILOGINFO("eCPRI Statistics Timer Interrupt created\n");
 
 	} while (0);
 	return ret;
@@ -586,97 +609,97 @@ static int ecpriss_clock_init(struct device *dev)
 	int ret = 0;
 	sys_clock.ecpri_cg = devm_clk_get(dev,"ecpri_cg");
 	if (!sys_clock.ecpri_cg){
-		pr_err("Failed to get ecpri_cg\n");
+		ECPRILOGERR("Failed to get ecpri_cg\n");
 		return -ENOMEM;
 	}
 	sys_clock.ecpri_fr = devm_clk_get(dev,"ecpri_fr");
 	if (!sys_clock.ecpri_fr){
-		pr_err("Failed to get ecpri_fr \n");
+		ECPRILOGERR("Failed to get ecpri_fr \n");
 		return -ENOMEM;
 	}
 	sys_clock.ecpri_eth_100G_fh0 = devm_clk_get(dev,"ecpri_eth_100G_fh0");
 	if (!sys_clock.ecpri_eth_100G_fh0){
-		pr_err("Failed to get ecpri_eth_100G_fh0\n");
+		ECPRILOGERR("Failed to get ecpri_eth_100G_fh0\n");
 		return -ENOMEM;
 	}
 	sys_clock.ecpri_eth_100G_fh1 = devm_clk_get(dev,"ecpri_eth_100G_fh1");
 	if (!sys_clock.ecpri_eth_100G_fh1){
-		pr_err("Failed to get ecpri_eth_100G_fh1\n");
+		ECPRILOGERR("Failed to get ecpri_eth_100G_fh1\n");
 		return -ENOMEM;
 	}
 	sys_clock.ecpri_eth_100G_fh2 = devm_clk_get(dev,"ecpri_eth_100G_fh2");
 	if (!sys_clock.ecpri_eth_100G_fh2){
-		pr_err("Failed to get ecpri_eth_100G_fh2\n");
+		ECPRILOGERR("Failed to get ecpri_eth_100G_fh2\n");
 		return -ENOMEM;
 	}
 	sys_clock.ecpri_eth_100G_c2c0 = devm_clk_get(dev,"ecpri_eth_100G_c2c0");
 	if (!sys_clock.ecpri_eth_100G_c2c0){
-		pr_err("Failed to get ecpri_eth_100G_c2c0\n");
+		ECPRILOGERR("Failed to get ecpri_eth_100G_c2c0\n");
 		return -ENOMEM;
 	}
 	sys_clock.ecpri_eth_100G_c2c1 = devm_clk_get(dev,"ecpri_eth_100G_c2c1");
 	if (!sys_clock.ecpri_eth_100G_c2c1){
-		pr_err("Failed to get ecpri_eth_100G_c2c1\n");
+		ECPRILOGERR("Failed to get ecpri_eth_100G_c2c1\n");
 		return -ENOMEM;
 	}
 	sys_clock.ecpri_eth_100G_dbg_c2c = devm_clk_get(dev,"ecpri_eth_100G_dbg_c2c");
 	if (!sys_clock.ecpri_eth_100G_dbg_c2c){
-		pr_err("Failed to get ecpri_eth_100G_dbg_c2c\n");
+		ECPRILOGERR("Failed to get ecpri_eth_100G_dbg_c2c\n");
 		return -ENOMEM;
 	}
 	sys_clock.ecpri_oran_div2 = devm_clk_get(dev,"ecpri_oran_div2");
 	if (!sys_clock.ecpri_oran_div2){
-		pr_err("Failed to get ecpri_oran_div2\n");
+		ECPRILOGERR("Failed to get ecpri_oran_div2\n");
 		return -ENOMEM;
 	}
 	sys_clock.ecpri_mss_oran = devm_clk_get(dev,"ecpri_mss_oran");
 	if (!sys_clock.ecpri_mss_oran){
-		pr_err("Failed to get ecpri_mss_oran\n");
+		ECPRILOGERR("Failed to get ecpri_mss_oran\n");
 		return -ENOMEM;
 	}
 
 	ret = clk_prepare_enable(sys_clock.ecpri_cg);
 	if (ret){
-		pr_err("Failed to vote ecpri_cg \n");
+		ECPRILOGERR("Failed to vote ecpri_cg \n");
         }
 
 	clk_set_rate(sys_clock.ecpri_cg, ECPRI_CG_CLK_NOM_MAX);
 
 	ret = clk_prepare_enable(sys_clock.ecpri_fr);
 	if (ret){
-		pr_err("Failed to vote ecpri_fr\n");
+		ECPRILOGERR("Failed to vote ecpri_fr\n");
         }
 	ret = clk_prepare_enable(sys_clock.ecpri_eth_100G_fh0);
 	if (ret){
-		pr_err("Failed to vote ecpri_eth_100G_fh0\n");
+		ECPRILOGERR("Failed to vote ecpri_eth_100G_fh0\n");
         }
 	ret = clk_prepare_enable(sys_clock.ecpri_eth_100G_fh1);
 	if (ret){
-		pr_err("Failed to vote ecpri_eth_100G_fh1\n");
+		ECPRILOGERR("Failed to vote ecpri_eth_100G_fh1\n");
         }
 	ret = clk_prepare_enable(sys_clock.ecpri_eth_100G_fh2);
 	if (ret){
-		pr_err("Failed to vote ecpri_eth_100G_fh2\n");
+		ECPRILOGERR("Failed to vote ecpri_eth_100G_fh2\n");
         }
 	ret = clk_prepare_enable(sys_clock.ecpri_eth_100G_c2c0);
 	if (ret){
-		pr_err("Failed to vote ecpri_eth_100G_c2c0\n");
+		ECPRILOGERR("Failed to vote ecpri_eth_100G_c2c0\n");
         }
 	ret = clk_prepare_enable(sys_clock.ecpri_eth_100G_c2c1);
 	if (ret){
-		pr_err("Failed to vote ecpri_eth_100G_c2c1\n");
+		ECPRILOGERR("Failed to vote ecpri_eth_100G_c2c1\n");
         }
 	ret = clk_prepare_enable(sys_clock.ecpri_eth_100G_dbg_c2c);
 	if (ret){
-		pr_err("Failed to vote ecpri_eth_100G_dbg_c2c\n");
+		ECPRILOGERR("Failed to vote ecpri_eth_100G_dbg_c2c\n");
         }
 	ret = clk_prepare_enable(sys_clock.ecpri_oran_div2);
 	if (ret){
-		pr_err("Failed to vote ecpri_oran_div2\n");
+		ECPRILOGERR("Failed to vote ecpri_oran_div2\n");
         }
 	ret = clk_prepare_enable(sys_clock.ecpri_mss_oran);
 	if (ret){
-		pr_err("Failed to vote ecpri_mss_oran\n");
+		ECPRILOGERR("Failed to vote ecpri_mss_oran\n");
         }
 
 	clk_set_rate(sys_clock.ecpri_mss_oran, ECPRI_MSS_ORAN_NOM_MAX);
@@ -737,14 +760,14 @@ int ecpriss_stats_timer_enable(int timeout)
 
 int ecpriss_core_get_stats_timeout_info(void)
 {
-	pr_info("ecpriss: Stats Timeout current val %d\n", stats_timeout_ms);
+	ECPRILOGINFO("ecpriss: Stats Timeout current val %d\n", stats_timeout_ms);
 	return stats_timeout_ms;
 }
 
 void ecpriss_core_set_stats_timeout_info(int val)
 {
 	stats_timeout_ms = val;
-	pr_info("ecpriss: Setting Stats Timeout to val %d\n", stats_timeout_ms);
+	ECPRILOGINFO("ecpriss: Setting Stats Timeout to val %d\n", stats_timeout_ms);
 }
 
 
@@ -770,42 +793,43 @@ static int ecpriss_core_init(struct platform_device *pdev)
 		}
 		memset(ecpriss_pdata,0,sizeof(ecpriss_core_private_s));
 
-		ret = ecpriss_clock_init(&pdev->dev);
+		ret = ecpriss_core_data_init();
 		if(ret < 0) {
-			pr_err("Initialization of clock failed\n");
+			ECPRILOGERR("Initialization of pdata failed\n");
 			break;
 		}
 
-		ret = ecpriss_core_data_init();
+		ret = ecpriss_clock_init(&pdev->dev);
 		if(ret < 0) {
-			pr_err("Initialization of pdata failed\n");
+			ECPRILOGERR("Initialization of clock failed\n");
 			break;
 		}
+
 
 		ret = ecpriss_xbar_cold_init(&pdev->dev);
 		if(ret < 0) {
-			pr_err("XBAR cold init failed\n");
+			ECPRILOGERR("XBAR cold init failed\n");
 			break;
 		}
 
 		ret = ecpriss_core_register_callbacks();
 		if(ret < 0) {
-			pr_err("Callback registrations failed\n");
+			ECPRILOGERR("Callback registrations failed\n");
 			break;
 		}
 
 		ret = ecpriss_qudp_init(&pdev->dev);
 		if(ret < 0) {
-			pr_err("QUDP initialization failed\n");
+			ECPRILOGERR("QUDP initialization failed\n");
 			break;
 		}
 
-		pr_err("QUDP init complete\n");
+		ECPRILOGERR("QUDP init complete\n");
 
 		ret = ecpriss_stats_timer_enable(stats_timeout_ms);
 
 		if(ret < 0) {
-			pr_err("Stats Collection failed\n");
+			ECPRILOGERR("Stats Collection failed\n");
 			break;
 		}
 
@@ -818,7 +842,7 @@ static int ecpriss_core_init(struct platform_device *pdev)
 static int ecpriss_core_probe(struct platform_device *pdev)
 {
 	int ret = 0;
-	pr_err("ecpriss_core_probe(): Start \n");
+	ECPRILOGDBG("ecpriss_core_probe(): Start \n");
 	if(pdev == NULL) {
 		ret = -ENOMEM;
 	}
@@ -827,7 +851,7 @@ static int ecpriss_core_probe(struct platform_device *pdev)
 	 * Debug FS Init
 	 */
 	setup_debugfs_directory();
-	pr_debug("ecpriss_core_probe(): End\n");
+	ECPRILOGDBG("ecpriss_core_probe(): End\n");
 	/*Clean up for init failure.*/
 	return ret;
 }
@@ -858,13 +882,7 @@ static struct platform_driver ecpriss_core_driver = {
 
 static int __init ecpriss_core_module_init(void)
 {
-	/* ecpriss_pdata->ecpriss_core_logbuf =
-	ipc_log_context_create(ECPRISS_CORE_IPC_LOG_PAGES,
-		"ecpriss_core", 0);
-	if (ecpriss_pdata->ecpriss_core_logbuf == NULL)
-	pr_debug(
-	"failed to create log context for ECPRISS_SS driver\n"); */
-	pr_err("ecpriss_core_module_init():Start \n");
+	ECPRILOGDBG("ecpriss_core_module_init():Start \n");
 	return platform_driver_register(&ecpriss_core_driver);
 }
 

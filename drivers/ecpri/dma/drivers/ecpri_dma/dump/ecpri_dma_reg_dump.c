@@ -5,9 +5,9 @@
 
 #include "ecpri_dma_reg_dump.h"
 
-#define READ_DMA_REG_N_K(reg_name, substruct, field_name, __n, __k)		\
+#define READ_DMA_REG_M_N(reg_name, substruct, field_name, __m, __n)		\
 	ecpri_dma_reg_save.substruct.field_name.value =						\
-	ecpri_dma_hal_read_reg_nk(reg_name, __n, __k)
+	ecpri_dma_hal_read_reg_mn(reg_name, __m, __n)
 
 
 #define READ_DMA_REG_ARR_GSI_M_REG_N(reg_name, substruct, field_name) do {		\
@@ -39,11 +39,6 @@
 #define READ_DMA_REG_N(reg_name, substruct, field_name, __n) do {		\
 			ecpri_dma_reg_save.substruct.field_name.value =				\
 			ecpri_dma_hal_read_reg_n(reg_name, __n);					\
-	} while(0)
-
-#define READ_DMA_REG_K(reg_name, substruct, field_name, __k) do {		\
-			ecpri_dma_reg_save.substruct.field_name.value =				\
-			ecpri_dma_hal_read_reg_nk(reg_name, 0, __k);				\
 	} while(0)
 
 #define READ_DMA_REG(reg_name, substruct, field_name)					\
@@ -884,43 +879,43 @@ void ecpri_dma_save_registers(void) {
 	/* DMA endps */
 	for (gsi_id = 0; gsi_id < ECPRI_DMA_GSI_NUM_MAX; gsi_id++) {
 		for (endp_id = 0; endp_id < ECPRI_DMA_ENDP_NUM_MAX; endp_id++) {
-			READ_DMA_REG_N_K(ECPRI_ENDP_CFG_DEST,
+			READ_DMA_REG_M_N(ECPRI_ENDP_CFG_DEST,
 				dma.endps[gsi_id][endp_id], ecpri_endp_cfg_dest,
 				gsi_id, endp_id);
-			READ_DMA_REG_N_K(ECPRI_ENDP_CFG_XBAR,
+			READ_DMA_REG_M_N(ECPRI_ENDP_CFG_XBAR,
 				dma.endps[gsi_id][endp_id], ecpri_endp_cfg_xbarn,
 				gsi_id, endp_id);
-			READ_DMA_REG_N_K(ECPRI_ENDP_GSI_CFG,
+			READ_DMA_REG_M_N(ECPRI_ENDP_GSI_CFG,
 				dma.endps[gsi_id][endp_id], ecpri_endp_gsi_cfg_n,
 				gsi_id, endp_id);
-			READ_DMA_REG_N_K(ECPRI_ENDP_INIT_CTRL_STATUS,
+			READ_DMA_REG_M_N(ECPRI_ENDP_INIT_CTRL_STATUS,
 				dma.endps[gsi_id][endp_id], ecpri_endp_init_ctrl_status_n,
 				gsi_id, endp_id);
-			READ_DMA_REG_N_K(ECPRI_ENDP_AXI_ATTR,
+			READ_DMA_REG_M_N(ECPRI_ENDP_AXI_ATTR,
 				dma.endps[gsi_id][endp_id], ecpri_endp_axi_attr_n,
 				gsi_id, endp_id);
-			READ_DMA_REG_N_K(ECPRI_ENDP_CFG_AGGR,
+			READ_DMA_REG_M_N(ECPRI_ENDP_CFG_AGGR,
 				dma.endps[gsi_id][endp_id], ecpri_endp_cfg_aggr_n,
 				gsi_id, endp_id);
-			READ_DMA_REG_N_K(ECPRI_ENDP_YELLOW_RED_MARKER_CFG,
+			READ_DMA_REG_M_N(ECPRI_ENDP_YELLOW_RED_MARKER_CFG,
 				dma.endps[gsi_id][endp_id], ecpri_endp_yellow_red_marker_cfg_n,
 				gsi_id, endp_id);
-			READ_DMA_REG_N_K(ECPRI_ENDP_NFAPI_REASSEMBLY_CFG,
+			READ_DMA_REG_M_N(ECPRI_ENDP_NFAPI_REASSEMBLY_CFG,
 				dma.endps[gsi_id][endp_id], ecpri_endp_nfapi_reassembly_cfg_n,
 				gsi_id, endp_id);
-			READ_DMA_REG_N_K(ECPRI_ENDP_GSI_CONS_BYTES_TLV,
+			READ_DMA_REG_M_N(ECPRI_ENDP_GSI_CONS_BYTES_TLV,
 				dma.endps[gsi_id][endp_id], ecpri_endp_gsi_cons_bytes_tlv_n,
 				gsi_id, endp_id);
-			READ_DMA_REG_N_K(ECPRI_ENDP_GSI_CONS_BYTES_AOS,
+			READ_DMA_REG_M_N(ECPRI_ENDP_GSI_CONS_BYTES_AOS,
 				dma.endps[gsi_id][endp_id], ecpri_endp_gsi_cons_bytes_aos_n,
 				gsi_id, endp_id);
-			READ_DMA_REG_N_K(ECPRI_ENDP_GSI_IF_FIFO_CFG_TLV,
+			READ_DMA_REG_M_N(ECPRI_ENDP_GSI_IF_FIFO_CFG_TLV,
 				dma.endps[gsi_id][endp_id], ecpri_endp_gsi_if_fifo_cfg_tlv_n,
 				gsi_id, endp_id);
-			READ_DMA_REG_N_K(ECPRI_ENDP_GSI_IF_FIFO_CFG_AOS,
+			READ_DMA_REG_M_N(ECPRI_ENDP_GSI_IF_FIFO_CFG_AOS,
 				dma.endps[gsi_id][endp_id], ecpri_endp_gsi_if_fifo_cfg_aos_n,
 				gsi_id, endp_id);
-			READ_DMA_REG_N_K(ECPRI_ENDP_CFG_VFID, dma.endps[gsi_id][endp_id],
+			READ_DMA_REG_M_N(ECPRI_ENDP_CFG_VFID, dma.endps[gsi_id][endp_id],
 				ecpri_endp_cfg_vfid_n, gsi_id, endp_id);
 		}
 	}
@@ -1369,10 +1364,10 @@ void ecpri_dma_save_registers(void) {
 
 		/* Save FIFO Status registers */
 		for (endp_id = 0; endp_id < ECPRI_DMA_ENDP_NUM_MAX; endp_id++) {
-			READ_DMA_REG_N_K(ECPRI_GSI_TLV_FIFO_STATUS,
+			READ_DMA_REG_M_N(ECPRI_GSI_TLV_FIFO_STATUS,
 				gsi_fifo_status[gsi_id][endp_id], gsi_tlv_fifo_status_mn,
 				gsi_id, endp_id);
-			READ_DMA_REG_N_K(ECPRI_GSI_AOS_FIFO_STATUS,
+			READ_DMA_REG_M_N(ECPRI_GSI_AOS_FIFO_STATUS,
 				gsi_fifo_status[gsi_id][endp_id], gsi_aos_fifo_status_mn,
 				gsi_id, endp_id);
 		}

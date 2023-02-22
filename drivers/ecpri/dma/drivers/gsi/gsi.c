@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2015-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/of.h>
@@ -150,6 +150,30 @@ static void __gsi_remove_ev_hdl(u32 hdl) {
 	spin_lock_irqsave(&gsi_ctx->ev_idr_lock, flags);
 	idr_remove(&gsi_ctx->ev_idr, hdl);
 	spin_unlock_irqrestore(&gsi_ctx->ev_idr_lock, flags);
+}
+
+static void __gsi_clear_all_irq(int gsi_id, int ee)
+{
+	u32 k, max_k;
+	u32 val = ~0;
+
+	gsihal_write_reg_pn(GSI_EE_n_CNTXT_GLOB_IRQ_CLR, gsi_id, ee, val);
+	gsihal_write_reg_pn(GSI_EE_n_CNTXT_GSI_IRQ_CLR, gsi_id, ee, val);
+
+	max_k = gsihal_get_bit_map_array_size();
+	for (k = 0; k < max_k; k++)
+	{
+		gsihal_write_reg_pnk(GSI_INTER_EE_n_SRC_GSI_CH_IRQ_CLR_k, gsi_id, ee,
+			k, val);
+		gsihal_write_reg_pnk(GSI_INTER_EE_n_SRC_EV_CH_IRQ_CLR_k, gsi_id, ee,
+			k, val);
+		gsihal_write_reg_pnk(GSI_EE_n_CNTXT_SRC_GSI_CH_IRQ_CLR_k, gsi_id, ee,
+			k, val);
+		gsihal_write_reg_pnk(GSI_EE_n_CNTXT_SRC_EV_CH_IRQ_CLR_k, gsi_id, ee,
+			k, val);
+		gsihal_write_reg_pnk(GSI_EE_n_CNTXT_SRC_IEOB_IRQ_CLR_k, gsi_id, ee,
+			k, val);
+	}
 }
 
 static void __gsi_config_type_irq(int gsi_id, int ee, u32 mask, u32 val)
@@ -1175,12 +1199,13 @@ int gsi_register_device(struct gsi_per_props* props, unsigned long* dev_hdl)
 		if (running_emulation)
 			devm_iounmap(gsi_ctx->dev, gsi_ctx->intcntrlr_base);
 		gsi_ctx->base = gsi_ctx->intcntrlr_base = NULL;
-		for (i = 0; i < GSI_EE_MAX; i++)
-		{
-			if (i == GSI_Q6_EE)
-				continue;
-			devm_free_irq(gsi_ctx->dev, props->irq[gsi_id][i],
+		for (gsi_id = 0; gsi_id < gsi_ctx->num_of_gsi; gsi_id++) {
+			for (i = 0; i < GSI_EE_MAX; i++) {
+				if (i == GSI_Q6_EE)
+					continue;
+				devm_free_irq(gsi_ctx->dev, props->irq[gsi_id][i],
 				&gsi_ctx->irq_arr[gsi_id][i]);
+			}
 		}
 		GSIERR("MHI event ring start id %u is beyond max %u\n",
 			props->mhi_er_id_limits[0], gsi_ctx->max_ev);
@@ -1196,10 +1221,13 @@ int gsi_register_device(struct gsi_per_props* props, unsigned long* dev_hdl)
 				- 1);
 
 			/* exclude reserved mhi events */
-			if (props->mhi_er_id_limits_valid[i])
+			if (props->mhi_er_id_limits_valid[gsi_id][i])
 				gsi_ctx->evt_bmap[gsi_id][i] |=
 				((1 << (props->mhi_er_id_limits[1] + 1)) - 1) ^
 				((1 << (props->mhi_er_id_limits[0])) - 1);
+
+			/* Clear all IRQs before enable */
+			__gsi_clear_all_irq(gsi_id, i);
 
 			/*
 			 * enable all interrupts but GSI_BREAK_POINT.
@@ -1634,6 +1662,7 @@ int gsi_alloc_evt_ring(struct gsi_evt_ring_props *props, unsigned long dev_hdl,
 	res = wait_for_completion_timeout(&ctx->compl, GSI_CMD_TIMEOUT);
 	if (res == 0) {
 		GSIERR("evt_id=%lu timed out\n", evt_id);
+		mutex_lock(&gsi_ctx->mlock);
 		if (!props->evchid_valid)
 			clear_bit(evt_id, &gsi_ctx->evt_bmap[props->gsi_id][props->ee]);
 		mutex_unlock(&gsi_ctx->mlock);
@@ -1643,6 +1672,7 @@ int gsi_alloc_evt_ring(struct gsi_evt_ring_props *props, unsigned long dev_hdl,
 	if (ctx->state != GSI_EVT_RING_STATE_ALLOCATED) {
 		GSIERR("evt_id=%lu allocation failed state=%u\n",
 				evt_id, ctx->state);
+		mutex_lock(&gsi_ctx->mlock);
 		if (!props->evchid_valid)
 			clear_bit(evt_id, &gsi_ctx->evt_bmap[props->gsi_id][props->ee]);
 		mutex_unlock(&gsi_ctx->mlock);
@@ -2158,7 +2188,7 @@ int gsi_alloc_channel(struct gsi_chan_props *props, unsigned long dev_hdl,
 		unsigned long *chan_hdl)
 {
 	struct gsi_chan_ctx *ctx;
-	struct gsi_evt_ctx *ev_ctx;
+	struct gsi_evt_ctx *ev_ctx = NULL;
 	int res;
 	enum gsi_ch_cmd_opcode op = GSI_CH_ALLOCATE;
 	uint8_t erindex;
@@ -2539,7 +2569,7 @@ void gsi_dump_ch_info(unsigned long chan_hdl)
 		GSIERR("bad params chan_hdl=%lu\n", chan_hdl);
 		return;
 	}
-	
+
 	gsi_id = ctx->props.gsi_id;
 	ch_id = ctx->props.ch_id;
 	ee = ctx->props.ee;
@@ -3070,7 +3100,7 @@ int gsi_is_channel_empty(unsigned long chan_hdl, bool *is_empty)
 		GSIERR("bad params chan_hdl=%lu\n", chan_hdl);
 		return -GSI_STATUS_INVALID_PARAMS;
 	}
-	
+
 	gsi_id = ctx->props.gsi_id;
 	ee = ctx->props.ee;
 
@@ -4129,7 +4159,7 @@ int gsi_get_hw_profiling_stats(struct gsi_hw_profiling_data *stats)
 		GSIERR("bad parms NULL stats == NULL\n");
 		return -EINVAL;
 	}
-	
+
 	for (gsi_id = 0; gsi_id < gsi_ctx->num_of_gsi; gsi_id++)
 	{
 		stats->bp_cnt[gsi_id] = (u64)gsihal_read_reg_p(

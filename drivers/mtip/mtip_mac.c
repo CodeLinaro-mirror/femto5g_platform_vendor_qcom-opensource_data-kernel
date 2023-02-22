@@ -51,6 +51,7 @@
 #include "mtip_logging.h"
 #include "mtip_ptp.h"
 #include "mtip_workq.h"
+#include "mtip_ethtool.h"
 
 static u32 mtip_mac_get_interrupt_summary(struct mtip_port_device_info* port_device)
 {
@@ -684,72 +685,21 @@ void mtip_mac_finalize(void __iomem *mac_base_addr, unsigned int irq, const char
 static u32 mtip_mac_wrapper_calendar_cfg_val(struct mtip_port_device_info* port_device)
 {
     u32 cfg_val = 0;
-    int j;
-    u32 link_index;
-    u32 real_link_number;
-    u32 pattern = 0x00000001;
-
-// for now only symmetric configurations are supported
-// the weights are set to 000
-    for (j = 0; j < port_device->num_link_phandles; ++j)
-    {
-        link_index = port_device->link_devices[j].link_index;
-
-        mtip_lookup_real_link_number_by_link_index(link_index, &real_link_number);
-
-        cfg_val |= (pattern << (4*real_link_number));
-    }
-
-    CSMLOGINFO("Setting calendar config of port %d to 0x%x\n", port_device->port_type, cfg_val);
-
-    return cfg_val;
-}
-
-static void mtip_mac_wrapper_set_csr_cfg(struct mtip_port_device_info* port_device)
-{
-    u32 csr_cfg = MTIP_MAC_WRAPPER_CSR_CFG_REG_VAL;
-    void __iomem* wrapper_base_addr = port_device->wrapper_base_addr;
     enum mtip_port_config_enum port_config = port_device->port_config;
 
-    switch (port_config)
+    switch (port_config) 
     {
     case MTIP_PORT_CONFIG_1x100GBASE_R:
     case MTIP_PORT_CONFIG_1x100GBASE_R_RSFEC:
     case MTIP_PORT_CONFIG_1x100GBASE_R_RSFEC_LL:
-        {
-            csr_cfg = MTIP_MAC_WRAPPER_CSR_CFG_100GBASE_R_VAL;
-        }
-        break;
-
     case MTIP_PORT_CONFIG_1x100GBASE_R2:
     case MTIP_PORT_CONFIG_1x100GBASE_R2_RSFEC:
     case MTIP_PORT_CONFIG_1x50GBASE_R:
     case MTIP_PORT_CONFIG_1x50GBASE_R_RSFEC:
-    case MTIP_PORT_CONFIG_2x50GBASE_R:
-    case MTIP_PORT_CONFIG_2x50GBASE_R_RSFEC:
-    case MTIP_PORT_CONFIG_2x50GBASE_R2:
-    case MTIP_PORT_CONFIG_2x50GBASE_R2_FEC:
-    case MTIP_PORT_CONFIG_2x50GBASE_R2_LUAI:
-    case MTIP_PORT_CONFIG_2x50GBASE_R2_LUAI_FEC:
-        {
-            csr_cfg = MTIP_MAC_WRAPPER_CSR_CFG_50GBASE_R_VAL;
-        }
-        break;
-
     case MTIP_PORT_CONFIG_1x40GBASE_R4:
     case MTIP_PORT_CONFIG_1x40GBASE_R4_FEC:
-        {
-            csr_cfg = MTIP_MAC_WRAPPER_CSR_CFG_40GBASE_R_VAL;
-        }
-        break;
-
     case MTIP_PORT_CONFIG_1x10GBASE_R:
     case MTIP_PORT_CONFIG_1x10GBASE_R_FEC:
-        {
-            csr_cfg = MTIP_MAC_WRAPPER_CSR_CFG_10GBASE_R_VAL;
-        }
-        break;
-
     case MTIP_PORT_CONFIG_1x100GBASE_R4:
     case MTIP_PORT_CONFIG_1x100GBASE_R4_RSFEC:
     case MTIP_PORT_CONFIG_1x50GBASE_R2:
@@ -759,15 +709,214 @@ static void mtip_mac_wrapper_set_csr_cfg(struct mtip_port_device_info* port_devi
     case MTIP_PORT_CONFIG_1x25GBASE_R:
     case MTIP_PORT_CONFIG_1x25GBASE_R_FEC:
     case MTIP_PORT_CONFIG_1x25GBASE_R_RSFEC:
+        {
+            cfg_val = MTIP_MAC_WRAPPER_CALENDAR_CFG_REG_VAL_1_LINKS;
+        }
+        break;
+
+    case MTIP_PORT_CONFIG_2x50GBASE_R:
+    case MTIP_PORT_CONFIG_2x50GBASE_R_RSFEC:
+    case MTIP_PORT_CONFIG_2x50GBASE_R2:
+    case MTIP_PORT_CONFIG_2x50GBASE_R2_FEC:
+    case MTIP_PORT_CONFIG_2x50GBASE_R2_LUAI:
+    case MTIP_PORT_CONFIG_2x50GBASE_R2_LUAI_FEC:
+        {
+            cfg_val = MTIP_MAC_WRAPPER_CALENDAR_CFG_REG_VAL_2_LINKS;
+        }
+        break;
     case MTIP_PORT_CONFIG_4x25GBASE_R:
     case MTIP_PORT_CONFIG_4x25GBASE_R_FEC:
     case MTIP_PORT_CONFIG_4x25GBASE_R_RSFEC:
     case MTIP_PORT_CONFIG_4x10GBASE_R:
     case MTIP_PORT_CONFIG_4x10GBASE_R_FEC:
+        {
+            cfg_val = MTIP_MAC_WRAPPER_CALENDAR_CFG_REG_VAL_4_LINKS;
+        }
+        break;
+    default:
+        {
+            cfg_val = MTIP_MAC_WRAPPER_CALENDAR_CFG_REG_VAL_4_LINKS;
+        }
+        break;
+    }
+
+    CSMLOGINFO("Setting calendar config of port %d to 0x%x with port config %d, str %s", 
+               port_device->port_type, 
+               cfg_val, 
+               port_config, 
+               mtip_ethtool_get_priv_flags_str(port_config));
+
+    return cfg_val;
+}
+
+static void mtip_mac_wrapper_set_csr_cfg(struct mtip_port_device_info* port_device)
+{
+    // by default enable TX_CRC_APPEND for all modes
+    u32 csr_cfg = MTIP_MAC_WRAPPER_CSR_CFG_REG_BASE_VAL;
+    void __iomem* wrapper_base_addr = port_device->wrapper_base_addr;
+    enum mtip_port_config_enum port_config = port_device->port_config;
+
+    switch (port_config)
+    {
+    case MTIP_PORT_CONFIG_1x100GBASE_R:
+        {
+            csr_cfg |= 0x130;
+        }
+        break;
+    case MTIP_PORT_CONFIG_1x100GBASE_R_RSFEC:
+        {
+            csr_cfg |= 0x130;
+        }
+        break;
+    case MTIP_PORT_CONFIG_1x100GBASE_R_RSFEC_LL:
+        {
+            csr_cfg |= 0x130;
+        }
+        break;
+    case MTIP_PORT_CONFIG_1x100GBASE_R2:
+        {
+            csr_cfg |= 0x30;
+        }
+        break;
+    case MTIP_PORT_CONFIG_1x100GBASE_R2_RSFEC:
+        {
+            csr_cfg |= 0x30;
+        }
+        break;
+    case MTIP_PORT_CONFIG_1x50GBASE_R:
+        {
+            csr_cfg |= 0x30;
+        }
+        break;
+    case MTIP_PORT_CONFIG_1x50GBASE_R_RSFEC:
+        {
+            csr_cfg |= 0x30;
+        }
+        break;
+    case MTIP_PORT_CONFIG_2x50GBASE_R:
+        {
+            csr_cfg |= 0x30;
+        }
+        break;
+    case MTIP_PORT_CONFIG_2x50GBASE_R_RSFEC:
+        {
+            csr_cfg |= 0x30;
+        }
+        break;
+    case MTIP_PORT_CONFIG_2x50GBASE_R2:
+        {
+            csr_cfg |= 0x0;
+        }
+        break;
+    case MTIP_PORT_CONFIG_2x50GBASE_R2_FEC:
+        {
+            csr_cfg |= 0x0;
+        }
+        break;
+    case MTIP_PORT_CONFIG_2x50GBASE_R2_LUAI:
+        {
+            csr_cfg |= 0x0;
+        }
+        break;
+    case MTIP_PORT_CONFIG_2x50GBASE_R2_LUAI_FEC:
+        {
+            csr_cfg |= 0x0;
+        }
+        break;
+    case MTIP_PORT_CONFIG_1x40GBASE_R4:
+        {
+            csr_cfg |= 0x0;
+        }
+        break;
+    case MTIP_PORT_CONFIG_1x40GBASE_R4_FEC:
+        {
+            csr_cfg |= 0x0;
+        }
+        break;
+    case MTIP_PORT_CONFIG_1x10GBASE_R:
+        {
+            csr_cfg |= 0xc000;
+        }
+        break;
+    case MTIP_PORT_CONFIG_1x10GBASE_R_FEC:
+        {
+            csr_cfg |= 0xc000;
+        }
+        break;
+    case MTIP_PORT_CONFIG_1x100GBASE_R4:
+        {
+            csr_cfg |= 0x0;
+        }
+        break;
+    case MTIP_PORT_CONFIG_1x100GBASE_R4_RSFEC:
+        {
+            csr_cfg |= 0x0;
+        }
+        break;
+    case MTIP_PORT_CONFIG_1x50GBASE_R2:
+        {
+            csr_cfg |= 0x0;
+        }
+        break;
+    case MTIP_PORT_CONFIG_1x50GBASE_R2_RSFEC:
+        {
+            csr_cfg |= 0x0;
+        }
+        break;
+    case MTIP_PORT_CONFIG_1x50GBASE_R2_LUAI:
+        {
+            csr_cfg |= 0x0;
+        }
+        break;
+    case MTIP_PORT_CONFIG_1x50GBASE_R2_LUAI_FEC:
+        {
+            csr_cfg |= 0x0;
+        }
+        break;
+    case MTIP_PORT_CONFIG_1x25GBASE_R:
+        {
+            csr_cfg |= 0x0;
+        }
+        break;
+    case MTIP_PORT_CONFIG_1x25GBASE_R_FEC:
+        {
+            csr_cfg |= 0x0;
+        }
+        break;
+    case MTIP_PORT_CONFIG_1x25GBASE_R_RSFEC:
+        {
+            csr_cfg |= 0x0;
+        }
+        break;
+    case MTIP_PORT_CONFIG_4x25GBASE_R:
+        {
+            csr_cfg |= 0x0;
+        }
+        break;
+    case MTIP_PORT_CONFIG_4x25GBASE_R_FEC:
+        {
+            csr_cfg |= 0x0;
+        }
+        break;
+    case MTIP_PORT_CONFIG_4x25GBASE_R_RSFEC:
+        {
+            csr_cfg |= 0x0;
+        }
+        break;
+    case MTIP_PORT_CONFIG_4x10GBASE_R:
+        {
+            csr_cfg |= 0x0;
+        }
+        break;
+    case MTIP_PORT_CONFIG_4x10GBASE_R_FEC:
+        {
+            csr_cfg |= 0x0;
+        }
+        break;
     default:
         {
             // set to the default value
-            csr_cfg = MTIP_MAC_WRAPPER_CSR_CFG_REG_VAL;
+            csr_cfg |= 0x0;
         }
         break;
     }
@@ -845,7 +994,7 @@ static void mtip_mac_wrapper_set_pcs_mode(struct mtip_port_device_info* port_dev
         break;
     case MTIP_PORT_CONFIG_1x50GBASE_R2:
         {
-            pcs_mode_set =  0x3;
+            pcs_mode_set = 0x30000;
         }
         break;
     case MTIP_PORT_CONFIG_1x50GBASE_R2_RSFEC:
@@ -900,7 +1049,7 @@ static void mtip_mac_wrapper_set_pcs_mode(struct mtip_port_device_info* port_dev
         break;
     case MTIP_PORT_CONFIG_2x50GBASE_R2:
         {
-            pcs_mode_set =  0;
+            pcs_mode_set = 0x30000;
         }
         break;
     case MTIP_PORT_CONFIG_2x50GBASE_R2_FEC:
@@ -1096,18 +1245,10 @@ void mtip_mac_wrapper_init(struct mtip_port_device_info* port_device)
 {
     void __iomem *wrapper_base_addr = port_device->wrapper_base_addr;
     u32 calendar_cfg_val;
+    enum mtip_port_config_enum port_config = port_device->port_config;
+    u32 tx_amf_cfg_val;
 
    CSMLOGINFO("MAC Wrapper Init\n");
-
-   calendar_cfg_val = mtip_mac_wrapper_calendar_cfg_val(port_device);
-
-   // Enable MAC instances with calendar config register
-   iowrite32(calendar_cfg_val,
-             wrapper_base_addr + MTIP_MAC_WRAPPER_CALENDAR_CFG_REG_OFFSET);
-
-   // Configure TX AMF value
-   iowrite32(MTIP_MAC_WRAPPER_TX_AMF_CFG_REG_VAL,
-             wrapper_base_addr + MTIP_MAC_WRAPPER_TX_AMF_CFG_REG_OFFSET);
 
    // set the TSC_OFFSET REG
    iowrite32(MTIP_MAC_WRAPPER_TSC_OFFSET_REG_VAL,
@@ -1116,6 +1257,72 @@ void mtip_mac_wrapper_init(struct mtip_port_device_info* port_device)
    // enable the Global timer
    iowrite32(MTIP_MAC_WRAPPER_GLOBAL_TIMER_EN_REG_VAL,
              wrapper_base_addr + MTIP_MAC_WRAPPER_GLOBAL_TIMER_EN_REG_OFFSET);
+
+   calendar_cfg_val = mtip_mac_wrapper_calendar_cfg_val(port_device);
+
+   // Enable MAC instances with calendar config register
+   iowrite32(calendar_cfg_val,
+             wrapper_base_addr + MTIP_MAC_WRAPPER_CALENDAR_CFG_REG_OFFSET);
+
+   // set the TX_AMF value
+   switch (port_config)
+   {
+   case MTIP_PORT_CONFIG_1x100GBASE_R:
+   case MTIP_PORT_CONFIG_1x100GBASE_R_RSFEC:
+   case MTIP_PORT_CONFIG_1x100GBASE_R_RSFEC_LL:
+   case MTIP_PORT_CONFIG_1x100GBASE_R2:
+   case MTIP_PORT_CONFIG_1x100GBASE_R2_RSFEC:
+   case MTIP_PORT_CONFIG_1x50GBASE_R:
+   case MTIP_PORT_CONFIG_1x50GBASE_R_RSFEC:
+   case MTIP_PORT_CONFIG_1x40GBASE_R4:
+   case MTIP_PORT_CONFIG_1x40GBASE_R4_FEC:
+   case MTIP_PORT_CONFIG_1x10GBASE_R:
+   case MTIP_PORT_CONFIG_1x10GBASE_R_FEC:
+   case MTIP_PORT_CONFIG_1x100GBASE_R4:
+   case MTIP_PORT_CONFIG_1x100GBASE_R4_RSFEC:
+   case MTIP_PORT_CONFIG_1x50GBASE_R2:
+   case MTIP_PORT_CONFIG_1x50GBASE_R2_RSFEC:
+   case MTIP_PORT_CONFIG_1x50GBASE_R2_LUAI:
+   case MTIP_PORT_CONFIG_1x50GBASE_R2_LUAI_FEC:
+   case MTIP_PORT_CONFIG_1x25GBASE_R:
+   case MTIP_PORT_CONFIG_1x25GBASE_R_FEC:
+   case MTIP_PORT_CONFIG_1x25GBASE_R_RSFEC:
+       {
+           tx_amf_cfg_val = MTIP_MAC_WRAPPER_TX_AMF_CFG_REG_VAL_1_LINKS;
+       }
+       break;
+
+   case MTIP_PORT_CONFIG_2x50GBASE_R:
+   case MTIP_PORT_CONFIG_2x50GBASE_R_RSFEC:
+   case MTIP_PORT_CONFIG_2x50GBASE_R2:
+   case MTIP_PORT_CONFIG_2x50GBASE_R2_FEC:
+   case MTIP_PORT_CONFIG_2x50GBASE_R2_LUAI:
+   case MTIP_PORT_CONFIG_2x50GBASE_R2_LUAI_FEC:
+       {
+           tx_amf_cfg_val = MTIP_MAC_WRAPPER_TX_AMF_CFG_REG_VAL_2_LINKS;
+       }
+       break;
+   case MTIP_PORT_CONFIG_4x25GBASE_R:
+   case MTIP_PORT_CONFIG_4x25GBASE_R_FEC:
+   case MTIP_PORT_CONFIG_4x25GBASE_R_RSFEC:
+   case MTIP_PORT_CONFIG_4x10GBASE_R:
+   case MTIP_PORT_CONFIG_4x10GBASE_R_FEC:
+       {
+           tx_amf_cfg_val = MTIP_MAC_WRAPPER_TX_AMF_CFG_REG_VAL_4_LINKS;
+       }
+       break;
+   default:
+       {
+           tx_amf_cfg_val = MTIP_MAC_WRAPPER_TX_AMF_CFG_REG_VAL_4_LINKS;
+       }
+       break;
+   }
+
+   CSMLOGINFO("Setting tx_amf to 0x%x for port type %d with port config %d", tx_amf_cfg_val, port_device->port_type, port_device->port_config);
+
+   // Configure TX AMF value
+   iowrite32(tx_amf_cfg_val,
+             wrapper_base_addr + MTIP_MAC_WRAPPER_TX_AMF_CFG_REG_OFFSET);
 
    return;
 }
@@ -1161,6 +1368,29 @@ void mtip_mac_set_interrupt_mask(u32 link_index)
     write_val  =  MTIP_MAC_INTERRUPT_PTP_TX_INTR;
     write_val |= MTIP_MAC_INTERRUPT_LINK_DOWN_INTR;
     write_val |= MTIP_MAC_INTERRUPT_LINK_UP_INTR;
+
+    CSMLOGINFO("Setting mask: 0x%x to register 0x%x with real_link_number %d link_index %d\n", write_val, 
+               real_link_number*MTIP_MAC_WRAPPER_INTERRUPT_OFFSET + MTIP_MAC_WRAPPER_INTERRUPT_MASK_REG_OFFSET, real_link_number, link_index);
+
+    // Enable MAC interrupt
+    iowrite32(write_val,
+              wrapper_base_addr + real_link_number*MTIP_MAC_WRAPPER_INTERRUPT_OFFSET + MTIP_MAC_WRAPPER_INTERRUPT_MASK_REG_OFFSET);
+    return;
+}
+
+void mtip_mac_clear_interrupt_mask(u32 link_index)
+{
+    u32 write_val = 0;
+    void __iomem *wrapper_base_addr;
+    u32 port_device_index;
+    u32 link_device_index;
+    u32 real_link_number;
+
+    mtip_lookup_device_by_link_index(link_index, &port_device_index, &link_device_index);
+
+    mtip_lookup_real_link_number_by_link_index(link_index, &real_link_number);
+
+    wrapper_base_addr = platform_driver_priv->devices.port_devices[port_device_index].wrapper_base_addr;
 
     CSMLOGINFO("Setting mask: 0x%x to register 0x%x with real_link_number %d link_index %d\n", write_val, 
                real_link_number*MTIP_MAC_WRAPPER_INTERRUPT_OFFSET + MTIP_MAC_WRAPPER_INTERRUPT_MASK_REG_OFFSET, real_link_number, link_index);
@@ -1217,20 +1447,19 @@ bool mtip_mac_wrapper_get_link_status(u32 link_index)
     void __iomem *wrapper_base_addr;
     u32 port_device_index;
     u32 link_device_index;
+    u32 real_link_number;
 
     mtip_lookup_device_by_link_index(link_index, &port_device_index, &link_device_index);
 
-    // For Debug ETH, 2nd link index to be monitored instead of 1st
-    if(platform_driver_priv->devices.port_devices[port_device_index].port_type == MTIP_PORT_TYPE_DEBUG)
-      link_device_index += 1;
+    mtip_lookup_real_link_number_by_link_index(link_index, &real_link_number);
 
     wrapper_base_addr = platform_driver_priv->devices.port_devices[port_device_index].wrapper_base_addr;
 
     read_val = (u32)ioread32(wrapper_base_addr + MTIP_MAC_WRAPPER_CORE_STATUS_REG_OFFSET);
     CSMLOGERR("mtip_mac_wrapper_get_link_status link_index: %d, core status = %d, for port %d, link %d",
-               link_index, read_val, port_device_index, link_device_index);
+               link_index, read_val, port_device_index, real_link_number);
 
-    if (((read_val & GENMASK(9,6)) >> 6) & (1 << link_device_index))
+    if (((read_val & GENMASK(9,6)) >> 6) & (1 << real_link_number))
       return true;
 
     return false;

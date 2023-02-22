@@ -105,6 +105,11 @@ static const char* const mtip_ethtool_priv_flags_str_arr[] = {
 
 #define MTIP_ETHTOOL_PRIV_FLAGS_LEN ARRAY_SIZE(mtip_ethtool_priv_flags_str_arr)
 
+const char* mtip_ethtool_get_priv_flags_str(u32 index)
+{
+    return mtip_ethtool_priv_flags_str_arr[index];
+}
+
 static int mtip_get_sset_count(struct net_device *netdev, int sset)
 {
     CSMLOGINFO("ethtool: get_sset_count %d, %d\n", sset, MTIP_ETHTOOL_STATS_LEN);
@@ -381,7 +386,6 @@ static void mtip_ethtool_set_msglevel(struct net_device *netdev, u32 level)
     u32 link_index;
     u32 real_port_number;
     struct mtip_netdev_priv *priv;
-    u32 val = level%2;
 
     priv = netdev_priv(netdev);
     link_index = priv->link_index;
@@ -389,17 +393,43 @@ static void mtip_ethtool_set_msglevel(struct net_device *netdev, u32 level)
     // check if the corresponding port is in LINK_UP state
     mtip_lookup_real_port_number_by_link_index(link_index, &real_port_number);
 
-    if (val == 0)
+    switch (level)
     {
-        CSMLOGERR("Using set msglevel to set PHYLINK state to CONNECTED for link index %d", link_index);
-        platform_driver_priv->mtip_ports[real_port_number]->port_state = MTIP_PORT_STATE_CONNECTED;
+    case 0:
+        {
+            CSMLOGERR("Using set msglevel %d to toggle PHYLINK state to NOT CONNECTED for link index %d", level, link_index);
+            platform_driver_priv->mtip_ports[real_port_number]->port_state = MTIP_PORT_STATE_DISCONNECTED;
+        }
+        break;
 
-        platform_driver_priv->mtip_ports[real_port_number]->sfp_port_type = PORT_DA;
-    }
-    else
-    {
-        CSMLOGERR("Using set msglevel to toggle PHYLINK state to NOT CONNECTED for link index %d", link_index);
-        platform_driver_priv->mtip_ports[real_port_number]->port_state = MTIP_PORT_STATE_DISCONNECTED;
+    case 1:
+        {
+            CSMLOGERR("Using set msglevel %d to set PHYLINK state to CONNECTED for DAC link index %d", level, link_index);
+            platform_driver_priv->mtip_ports[real_port_number]->port_state = MTIP_PORT_STATE_CONNECTED;
+
+            platform_driver_priv->mtip_ports[real_port_number]->sfp_port_type = PORT_DA;
+        }
+        break;
+
+    case 2:
+        {
+            CSMLOGERR("Using set msglevel %d to set PHYLINK state to CONNECTED for FIBRE link index %d", level, link_index);
+            platform_driver_priv->mtip_ports[real_port_number]->port_state = MTIP_PORT_STATE_CONNECTED;
+
+            platform_driver_priv->mtip_ports[real_port_number]->sfp_port_type = PORT_FIBRE;
+        }
+        break;
+
+    case 3:
+        {
+            mtip_platform_print_platform();
+        }
+        break;
+    default:
+        {
+            CSMLOGERR("Ignoring msglevel %d for link index: %d", level, link_index);
+        }
+        break;
     }
 }
 
@@ -444,7 +474,7 @@ void mtip_ethtool_set_ops(struct net_device *netdev)
    link_index = priv->link_index;
    CSMLOGERR("Link index : %d\n",link_index);
 
-
+   // TBD: here link_index is not yet valid
    if(link_index == MTIP_DEBUG_ETH_LINK_INDEX)
       netdev->ethtool_ops = mtip_debug_eth_get_ethtool_ops();
    else

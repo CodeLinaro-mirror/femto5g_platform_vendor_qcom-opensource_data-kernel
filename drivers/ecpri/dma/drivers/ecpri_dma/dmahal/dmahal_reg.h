@@ -336,14 +336,6 @@ u32 ecpri_dma_hal_read_reg_n(enum ecpri_dma_hal_reg_name reg, u32 n);
 u32 ecpri_dma_hal_read_reg_mn(enum ecpri_dma_hal_reg_name reg, u32 m, u32 n);
 
 /*
-* ecpri_dma_hal_read_reg_nk() - Read from n/k parameterized reg
-*/
-static inline u32 ecpri_dma_hal_read_reg_nk(enum ecpri_dma_hal_reg_name reg, u32 n, u32 k)
-{
-	return ecpri_dma_hal_read_reg_mn(reg, k, n);
-}
-
-/*
 * ecpri_dma_hal_read_ep_reg_n() - Get n parameterized reg value according to ep
 */
 u32 ecpri_dma_hal_read_ep_reg_n(enum ecpri_dma_hal_reg_name reg, u32 n, u32 ep_num);

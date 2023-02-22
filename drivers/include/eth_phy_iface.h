@@ -65,18 +65,15 @@ typedef void (*eth_phy_iface_an_complete_cb)(
 	                            enum mtip_port_type_enum port_type,
 	                            enum eth_phy_iface_phy_lane_num_enum lane_num);
 
-typedef void (*eth_phy_iface_cdr_lock_cb)(
-	                            enum mtip_port_type_enum port_type,
-	                            enum eth_phy_iface_phy_lane_num_enum lane_num,
-	                            bool status);
+typedef void (*eth_phy_iface_cdr_lock_cb)(u32 link_index, bool status);
 
 /* struct eth_phy_iface_eth_register_params - PHY readiness parameters
  * @notify_ready:   PHY ready callback
  * @userdata_ready: userdata for PHY ready callback
  * @notify_an_complete:   AN complete callback(link fully up,
                           including LT and PCS)
- * @cdr_lock_cb: Callback to indicate CDR lock success/failure on
-                 a particular lane
+ * @cdr_lock_cb: Callback to indicate CDR lock success/failure across PHY lanes
+                 mapped to a particular MAC link
  */
 struct eth_phy_iface_eth_register_params {
 	eth_phy_iface_phy_ready_cb    notify_ready;

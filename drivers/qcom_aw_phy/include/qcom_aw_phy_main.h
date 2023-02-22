@@ -190,6 +190,12 @@ enum qcom_aw_phy_synce_eth_inst{
 	MAX_ETH_NUM
 };
 
+enum qcom_aw_phy_cdr_lock_lane_status{
+	CDR_LOCK_NONE = -1,
+	CDR_LOCK_SUCCESS = 0,
+	CDR_LOCK_FAILURE = 1
+};
+
 /* Lane Params - Lane specific information */
 struct qcom_aw_lane_params{
 	struct eth_phy_iface_phy_lane_config   lane_config;
@@ -212,7 +218,8 @@ struct qcom_aw_phy_inst_config{
 	struct qcom_aw_lane_params        lane_params[PHY_LANE_MAX];
 	struct mutex                      lane_lock[PHY_LANE_MAX];
 	uint8_t                           cdr_lock_retry_counter[PHY_LANE_MAX];
-	bool                              cdr_lock_cb_flag[PHY_LANE_MAX];
+	enum qcom_aw_phy_cdr_lock_lane_status
+	                                  cdr_lock_status_flag[PHY_LANE_MAX];
 	bool                              bring_up_status;
 	struct mutex                      phy_inst_lock;
 	int                               sfp_port_type;
@@ -230,6 +237,8 @@ struct qcom_aw_phy_config{
 	struct clk                      *synce_div_clk;
 	struct clk                      *synce_phy_lane_clk[MAX_PHY_SYNCE_LANES];
 	struct workqueue_struct         *wq;
+	void                            *phy_ipc_log_buf;
+	void                            *phy_ipc_log_buf_low;
 };
 
 /* PHY lane speed config - Rate, width, LTCS clause, Modulation technique*/

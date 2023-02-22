@@ -10,6 +10,7 @@ obj-$(CONFIG_LASSEN_SECURE_EIP) += lassen_secure_eip.o
 ccflags-y += -DCONFIG_LASSEN_SECURE_EIP
 ccflags-y += -DSECURE_MACSEC_DEBUG
 ccflags-y += -Wno-error
+ccflags-y += -I$(SECURE_EIP_TOP)/porting
 ccflags-y += -I$(SECURE_EIP_TOP)/cs
 ccflags-y += -I$(SECURE_EIP_TOP)/DDK/Kit/EIP163/incl
 ccflags-y += -I$(SECURE_EIP_TOP)/DDK/Kit/EIP164/incl
@@ -26,7 +27,6 @@ ccflags-y += -I$(SECURE_EIP_TOP)/DDK/Kit/DriverFramework/Basic_Defs_API/incl
 ccflags-y += -I$(SECURE_EIP_TOP)/DDK/Kit/DriverFramework/Device_API/incl
 ccflags-y += -I$(SECURE_EIP_TOP)/DDK/Kit/DriverFramework/CLib_Abstraction_API/incl
 ccflags-y += -I$(SECURE_EIP_TOP)/DDK/Kit/Log/incl
-ccflags-y += -I$(SECURE_EIP_TOP)/DDK/Kit/Log/src/printk
 
 ccflags-y += -I$(SECURE_EIP_TOP)/DDK/Kit/List/incl
 
@@ -90,3 +90,4 @@ lassen_secure_eip-y += DDK/Integration/Adapter_EIP163/src/adapter_cfye_warmboot.
 
 lassen_secure_eip-y += eip_macsec.o
 lassen_secure_eip-y += eip_main.o
+lassen_secure_eip-y += eip_log.o

@@ -27,7 +27,7 @@ static uint32_t dst_portid;
 
 struct genl_ops qcom_aw_phy_genl_ops[QCOM_AW_PHY_GNL_CMD_COUNT] = {
     {
-        .cmd = QCOM_AW_PHY_GNL_ATTR_INIT_LIB,
+        .cmd = QCOM_AW_PHY_GNL_CMD_INIT_LIB,
         .doit = qcom_aw_phy_gnl_init_lib,
         .validate = 0,
     },
@@ -61,6 +61,16 @@ struct genl_ops qcom_aw_phy_genl_ops[QCOM_AW_PHY_GNL_CMD_COUNT] = {
         .doit = qcom_aw_phy_gnl_set_synce_mux,
         .validate = 0,
     },
+    {
+        .cmd = QCOM_AW_PHY_GNL_CMD_CLOSE_LIB_REQ,
+        .doit = qcom_aw_phy_gnl_close_lib,
+        .validate = 0,
+    },
+    {
+        .cmd = QCOM_AW_PHY_GNL_CMD_CLOSE_LIB_RESP,
+        .doit = qcom_aw_phy_gnl_no_action,
+        .validate = 0,
+    },
 };
 
 static struct nla_policy qcom_aw_phy_gnl_policy[QCOM_AW_PHY_GNL_ATTR_MAX] = {
@@ -72,6 +82,8 @@ static struct nla_policy qcom_aw_phy_gnl_policy[QCOM_AW_PHY_GNL_ATTR_MAX] = {
     [QCOM_AW_PHY_GNL_ATTR_GET_SNR_VALUE_REQ] = {.type = NLA_S32},
     [QCOM_AW_PHY_GNL_ATTR_GET_SNR_VALUE_RESP] = {.type = NLA_NUL_STRING},
     [QCOM_AW_PHY_GNL_ATTR_SET_SYNCE_MUX] = {.type = NLA_S32},
+    [QCOM_AW_PHY_GNL_ATTR_CLOSE_LIB_REQ] = {.type = NLA_NUL_STRING},
+    [QCOM_AW_PHY_GNL_ATTR_CLOSE_LIB_RESP] = {.type = NLA_NUL_STRING},
 };
 
 static struct genl_family qcom_aw_phy_gnl_family = {
@@ -98,6 +110,58 @@ int qcom_aw_phy_gnl_init_lib(struct sk_buff *sender_skb,
   return 0;
 }
 
+int qcom_aw_phy_gnl_close_lib(struct sk_buff *sender_skb,
+                             struct genl_info *info) {
+  struct sk_buff *reply_skb;
+  void *msg_head;
+  int ret_val = 0;
+  enum local_error_enum local_err_val = LOCAL_ERROR_INVALID;
+
+  reply_skb = genlmsg_new(NLMSG_GOODSIZE, GFP_KERNEL);
+  if (reply_skb == NULL) {
+    ret_val = ENOMEM;
+    local_err_val = LOCAL_ERROR_0;
+    goto func_exit;
+  }
+
+  msg_head = genlmsg_put(reply_skb, info->snd_portid, info->snd_seq + 1,
+                         &qcom_aw_phy_gnl_family, 0,
+                         QCOM_AW_PHY_GNL_CMD_CLOSE_LIB_RESP);
+  if (msg_head == NULL) {
+    ret_val = ENOMEM;
+    local_err_val = LOCAL_ERROR_1;
+    goto func_exit;
+  }
+
+  ret_val = nla_put(reply_skb, QCOM_AW_PHY_GNL_ATTR_CLOSE_LIB_RESP,
+                    strlen("Close LIB response")+1, "Close LIB response");
+  if (ret_val != 0) {
+    local_err_val = LOCAL_ERROR_2;
+    goto func_exit;
+  }
+
+  genlmsg_end(reply_skb, msg_head);
+
+  ret_val = genlmsg_reply(reply_skb, info);
+  if (ret_val != 0) {
+    local_err_val = LOCAL_ERROR_3;
+    goto func_exit;
+  }
+
+  // Clear the port ID
+  dst_portid = 0;
+
+func_exit:
+
+  if(local_err_val != LOCAL_ERROR_INVALID){
+    QCOM_AW_PHY_LOG_ERR("qcom_aw_phy_gnl_close_lib returned %d "
+                        "with local error %d",
+                        ret_val, local_err_val);
+  }
+
+  return ret_val;
+}
+
 int qcom_aw_phy_gnl_eth_status_change(
     struct qcom_aw_phy_gnl_eth_status *lane_status) {
   struct sk_buff *skb_buf;
@@ -106,7 +170,7 @@ int qcom_aw_phy_gnl_eth_status_change(
   int ret_val = 0;
   enum local_error_enum local_err_val = LOCAL_ERROR_INVALID;
 
-  QCOM_AW_PHY_LOG_INFO("qcom_aw_phy_gnl_lane_status_change invoked");
+  QCOM_AW_PHY_LOG_DBG("qcom_aw_phy_gnl_lane_status_change invoked");
 
   skb_buf = genlmsg_new(NLMSG_GOODSIZE, GFP_KERNEL);
   if (skb_buf == NULL) {
@@ -152,9 +216,12 @@ func_exit:
   if (!send_char_msg)
     kfree(send_char_msg);
 
-  QCOM_AW_PHY_LOG_ERR("qcom_aw_phy_gnl_eth_status_change returned %d "
-                      "with local error %d",
-                      ret_val, local_err_val);
+  if(local_err_val != LOCAL_ERROR_INVALID){
+    QCOM_AW_PHY_LOG_ERR("qcom_aw_phy_gnl_eth_status_change returned %d "
+                        "with local error %d",
+                        ret_val, local_err_val);
+  }
+
   return ret_val;
 }
 
@@ -166,7 +233,7 @@ int qcom_aw_phy_gnl_snr_valid_change(
   int ret_val = 0;
   enum local_error_enum local_err_val = LOCAL_ERROR_INVALID;
 
-  QCOM_AW_PHY_LOG_ERR("qcom_aw_phy_gnl_snr_valid_change invoked");
+  QCOM_AW_PHY_LOG_DBG("qcom_aw_phy_gnl_snr_valid_change invoked");
 
   skb_buf = genlmsg_new(NLMSG_GOODSIZE, GFP_KERNEL);
   if (skb_buf == NULL) {
@@ -209,9 +276,11 @@ func_exit:
   if (!send_char_msg)
     kfree(send_char_msg);
 
-  QCOM_AW_PHY_LOG_ERR(
-      "qcom_aw_phy_gnl_snr_valid_change returned %d, local error %d", ret_val,
-      local_err_val);
+  if(local_err_val != LOCAL_ERROR_INVALID){
+    QCOM_AW_PHY_LOG_ERR(
+        "qcom_aw_phy_gnl_snr_valid_change returned %d, local error %d", ret_val,
+        local_err_val);
+  }
 
   return ret_val;
 }
@@ -275,9 +344,11 @@ int qcom_aw_phy_gnl_set_snr_threshold(struct sk_buff *sender_skb,
                                       recv_msg->low_val, recv_msg->high_val);
 
 func_exit:
-  QCOM_AW_PHY_LOG_ERR(
-      "qcom_aw_phy_gnl_set_snr_threshold returned %d, local error %d", ret_val,
-      local_err_val);
+  if(local_err_val != LOCAL_ERROR_INVALID){
+    QCOM_AW_PHY_LOG_ERR(
+        "qcom_aw_phy_gnl_set_snr_threshold returned %d, local error %d", ret_val,
+        local_err_val);
+  }
 
   return ret_val;
 }
@@ -293,7 +364,7 @@ int qcom_aw_phy_gnl_get_snr_value(struct sk_buff *sender_skb,
   int ret_val = 0;
   enum local_error_enum local_err_val = LOCAL_ERROR_INVALID;
 
-  QCOM_AW_PHY_LOG_INFO("qcom_aw_phy_gnl_get_snr_value invoked");
+  QCOM_AW_PHY_LOG_DBG("qcom_aw_phy_gnl_get_snr_value invoked");
 
   if (info == NULL) {
     ret_val = EINVAL;
@@ -314,7 +385,7 @@ int qcom_aw_phy_gnl_get_snr_value(struct sk_buff *sender_skb,
     local_err_val = LOCAL_ERROR_2;
     goto func_exit;
   } else {
-    QCOM_AW_PHY_LOG_INFO("Received ETH instance as %d", *recv_msg);
+    QCOM_AW_PHY_LOG_DBG("Received ETH instance as %d", *recv_msg);
   }
 
   if (*recv_msg <= ETH_NONE || *recv_msg >= MAX_ETH_NUM) {
@@ -380,7 +451,7 @@ int qcom_aw_phy_gnl_set_synce_mux(struct sk_buff *sender_skb,
   int ret_val = 0;
   enum local_error_enum local_err_val = LOCAL_ERROR_INVALID;
 
-  QCOM_AW_PHY_LOG_INFO("qcom_aw_phy_gnl_set_synce_mux invoked");
+  QCOM_AW_PHY_LOG_DBG("qcom_aw_phy_gnl_set_synce_mux invoked");
 
   if (info == NULL) {
     ret_val = EINVAL;
@@ -420,9 +491,11 @@ int qcom_aw_phy_gnl_set_synce_mux(struct sk_buff *sender_skb,
   }
 
 func_exit:
-  QCOM_AW_PHY_LOG_ERR(
-      "qcom_aw_phy_gnl_set_synce_mux returned %d, local error %d", ret_val,
-      local_err_val);
+  if(local_err_val != LOCAL_ERROR_INVALID){
+    QCOM_AW_PHY_LOG_ERR(
+        "qcom_aw_phy_gnl_set_synce_mux returned %d, local error %d", ret_val,
+        local_err_val);
+  }
 
   return ret_val;
 }
@@ -436,7 +509,7 @@ int qcom_aw_phy_gnl_init(void) {
     QCOM_AW_PHY_LOG_ERR("FAILED: genl_register_family(): %i\n", res);
     return -1;
   } else {
-    QCOM_AW_PHY_LOG_ERR("successfully registered using Generic Netlink.\n");
+    QCOM_AW_PHY_LOG_INFO("successfully registered using Generic Netlink.\n");
   }
 
   return 0;

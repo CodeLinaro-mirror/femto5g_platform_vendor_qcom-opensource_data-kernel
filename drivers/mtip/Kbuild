@@ -19,6 +19,9 @@ ccflags-y += $(LINUX_INC)
 ccflags-y += -I$(DATACSMKERNELTOP)/include/
 ccflags-y += -I$(DATACSMKERNELTOP)/mtip/
 ccflags-y += -I$(DATACSMKERNELTOP)/mtip/debug_eth/
+ccflags-y += -I$(DATACSMKERNELTOP)/mtip/debug_eth/include/uapi/mtip_debug_eth
+
+header-y += $(DATACSMKERNELTOP)/mtip/debug_eth/include/uapi/mtip_debug_eth/mtip_debug_eth_gnl_uapi.h
 
 ifeq ($(call cc-option-yn, -Wmaybe-uninitialized),y)
 EXTRA_CFLAGS += -Wmaybe-uninitialized
@@ -53,6 +56,5 @@ lassen_mtip-y += mtip_pcs.o
 lassen_mtip-y += mtip_phy.o
 lassen_mtip-y += debug_eth/mtip_debug_eth.o
 lassen_mtip-y += debug_eth/mtip_sysfs.o
-
-CDEFINES += -DBUILD_TIMESTAMP=\"$(shell date -u +'%Y-%m-%dT%H:%M:%SZ')\"
+lassen_mtip-y += debug_eth/mtip_debug_eth_gnl.o
 

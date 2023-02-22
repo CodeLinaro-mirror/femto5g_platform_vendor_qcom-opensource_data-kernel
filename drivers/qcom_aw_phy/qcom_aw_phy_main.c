@@ -142,6 +142,43 @@ static irqreturn_t qcom_aw_phy_interrupt_handler(int irq, void *devptr) {
       "Interrupt received for PHY instance %d, status %x, error %x",
       phy_inst_info->phy_inst, intr_status, intr_error);
 
+  // Handle error interrupt
+  for (i = QCOM_AW_PHY_INT_ERROR_BIT_MIN; i < QCOM_AW_PHY_INT_ERROR_BIT_MAX;
+       i++) {
+    temp_bmask = intr_error & (1 << i);
+    if (temp_bmask) {
+      switch (i) {
+      case QCOM_AW_PHY_SNR_VALID_ERR_LANE_0:
+      case QCOM_AW_PHY_SNR_VALID_ERR_LANE_1:
+      case QCOM_AW_PHY_SNR_VALID_ERR_LANE_2:
+      case QCOM_AW_PHY_SNR_VALID_ERR_LANE_3:
+        wq_params = kmalloc(sizeof(struct qcom_aw_phy_work_q_params),
+                            GFP_ATOMIC);
+        if(!wq_params)
+          QCOM_AW_PHY_LOG_ERR("Malloc failed!");
+        else{
+          INIT_DELAYED_WORK(&wq_params->wq_item,
+                            qcom_aw_phy_synce_handle_snr_valid_change);
+          wq_params->phy_inst = phy_inst_info->phy_inst;
+          wq_params->lane_num = i - QCOM_AW_PHY_SNR_VALID_ERR_LANE_0;
+          wq_params->user_data = (void*)false;
+          queue_delayed_work(qcom_aw_phy_config_info.wq, &wq_params->wq_item, 0);
+        }
+        clear |= (1<<i);
+        break;
+
+      default:
+        break;
+      }
+    }
+  }
+
+  // clear error interrupt
+  iowrite32(clear, phy_inst_info->wrapper_base_addr +
+                            QCOM_AW_PHY_WRAPPER_INT_ERROR_CLR_REG_OFFSET);
+
+  clear = 0;
+
   // Handle status interrupt
   for (i = QCOM_AW_PHY_INT_STATUS_BIT_MIN; i < QCOM_AW_PHY_INT_STATUS_BIT_MAX;
        i++) {
@@ -153,7 +190,7 @@ static irqreturn_t qcom_aw_phy_interrupt_handler(int irq, void *devptr) {
       case QCOM_AW_PHY_RX_SIGNAL_DETECT_LANE_1:
       case QCOM_AW_PHY_RX_SIGNAL_DETECT_LANE_2:
       case QCOM_AW_PHY_RX_SIGNAL_DETECT_LANE_3:
-        QCOM_AW_PHY_LOG_ERR("RX signal detect interrupt received for lane %d",
+        QCOM_AW_PHY_LOG_DBG("RX signal detect interrupt received for lane %d",
                             i - QCOM_AW_PHY_RX_SIGNAL_DETECT_LANE_0);
         wq_params = kmalloc(sizeof(struct qcom_aw_phy_work_q_params),
                             GFP_ATOMIC);
@@ -225,47 +262,12 @@ static irqreturn_t qcom_aw_phy_interrupt_handler(int irq, void *devptr) {
   iowrite32(clear, phy_inst_info->wrapper_base_addr +
                              QCOM_AW_PHY_WRAPPER_INT_STATUS_CLR_REG_OFFSET);
 
-  clear = 0;
-
-  // Handle error interrupt
-  for (i = QCOM_AW_PHY_INT_ERROR_BIT_MIN; i < QCOM_AW_PHY_INT_ERROR_BIT_MAX;
-       i++) {
-    temp_bmask = intr_error & (1 << i);
-    if (temp_bmask) {
-      switch (i) {
-      case QCOM_AW_PHY_SNR_VALID_ERR_LANE_0:
-      case QCOM_AW_PHY_SNR_VALID_ERR_LANE_1:
-      case QCOM_AW_PHY_SNR_VALID_ERR_LANE_2:
-      case QCOM_AW_PHY_SNR_VALID_ERR_LANE_3:
-        wq_params = kmalloc(sizeof(struct qcom_aw_phy_work_q_params),
-                            GFP_ATOMIC);
-        if(!wq_params)
-          QCOM_AW_PHY_LOG_ERR("Malloc failed!");
-        else{
-          INIT_DELAYED_WORK(&wq_params->wq_item,
-                            qcom_aw_phy_synce_handle_snr_valid_change);
-          wq_params->phy_inst = phy_inst_info->phy_inst;
-          wq_params->lane_num = i - QCOM_AW_PHY_SNR_VALID_ERR_LANE_0;
-          wq_params->user_data = (void*)false;
-          queue_delayed_work(qcom_aw_phy_config_info.wq, &wq_params->wq_item, 0);
-        }
-        clear |= (1<<i);
-        break;
-
-      default:
-        break;
-      }
-    }
-  }
-
-  // clear error interrupt
-  iowrite32(clear, phy_inst_info->wrapper_base_addr +
-                            QCOM_AW_PHY_WRAPPER_INT_ERROR_CLR_REG_OFFSET);
-
 func_exit:
-  QCOM_AW_PHY_LOG_INFO(
-      "QCOM_aw_phy_interrupt_handler returns %d, local_err = %d", ret_val,
-      local_err_val);
+  if(local_err_val != LOCAL_ERROR_INVALID){
+    QCOM_AW_PHY_LOG_INFO(
+            "QCOM_aw_phy_interrupt_handler returns %d, local_err = %d", ret_val,
+            local_err_val);
+  }
 
   return ret_val;
 }
@@ -759,11 +761,6 @@ static void qcom_aw_phy_hw_init() {
                            (version_raw >> 16) & 0xFF,
                            (version_raw >> 8) & 0xFF, version_raw & 0xFF);
 
-      // Set digital signal detect
-      pmd_write_field(&mss, RX_SIGNAL_DETECT_REG3_ADDR,
-                      RX_SIGNAL_DETECT_REG3_VALID_PCS_SEL_NT_MASK,
-                      RX_SIGNAL_DETECT_REG3_VALID_PCS_SEL_NT_OFFSET, 1);
-
 #ifndef FEATURE_QCOM_AW_RUMI_SW
       /* Register for PHY status IRQ */
       ret_val = devm_request_irq(
@@ -811,6 +808,7 @@ static int qcom_aw_phy_inst_probe(struct platform_device *pdev) {
   int ret_val = 0;
   struct resource *tcsr_resource;
   struct pinctrl *pinctrl;
+  uint8_t i = 0;
 
   QCOM_AW_PHY_LOG_INFO("QCOM AW PHY driver instance probed for device %s!",
                        pdev->name);
@@ -830,8 +828,16 @@ static int qcom_aw_phy_inst_probe(struct platform_device *pdev) {
     if (phy_inst_type < QCOM_AW_PHY_INST_MAX) {
       phy_inst_info =
           &qcom_aw_phy_config_info.phy_inst_config_info[phy_inst_type];
+
+      /* Initialize the PHY instance fields */
       phy_inst_info->valid = true;
       phy_inst_info->phy_inst = phy_inst_type;
+
+      mutex_init(&phy_inst_info->phy_inst_lock);
+
+      for (i = 0; i < PHY_LANE_MAX; i++) {
+        mutex_init(&phy_inst_info->lane_lock[i]);
+      }
     } else {
       local_err_val = LOCAL_ERROR_0;
       ret_val = EINVAL;
@@ -1015,6 +1021,18 @@ static int __init qcom_aw_phy_init(void) {
   memset(&qcom_aw_phy_config_info, 0, sizeof(struct qcom_aw_phy_config));
   qcom_aw_phy_loopback_mode = QCOM_AW_PHY_NO_LB;
 
+  qcom_aw_phy_config_info.phy_ipc_log_buf =
+                               ipc_log_context_create(PHY_IPC_LOG_PAGES,
+                                                      "qcom_aw_phy", 0);
+  if(qcom_aw_phy_config_info.phy_ipc_log_buf == NULL)
+    QCOM_AW_PHY_LOG_ERR("Failed to create IPC log context");
+
+  qcom_aw_phy_config_info.phy_ipc_log_buf_low =
+                               ipc_log_context_create(PHY_IPC_LOG_PAGES,
+                                                      "qcom_aw_phy_low", 0);
+  if(qcom_aw_phy_config_info.phy_ipc_log_buf_low == NULL)
+    QCOM_AW_PHY_LOG_ERR("Failed to create IPC low log context");
+
   qcom_aw_phy_mtip_if_init();
 
   qcom_aw_phy_gnl_init();
@@ -1051,6 +1069,12 @@ static void __exit qcom_aw_phy_exit(void) {
 #ifdef FEATURE_QCOM_AW_TEST_SYS_FS
   qcom_aw_phy_del_sysfs();
 #endif
+
+  if(qcom_aw_phy_config_info.phy_ipc_log_buf)
+    ipc_log_context_destroy(qcom_aw_phy_config_info.phy_ipc_log_buf);
+
+  if(qcom_aw_phy_config_info.phy_ipc_log_buf_low)
+    ipc_log_context_destroy(qcom_aw_phy_config_info.phy_ipc_log_buf_low);
 
   platform_driver_unregister(&qcom_aw_phy_inst_driver);
 

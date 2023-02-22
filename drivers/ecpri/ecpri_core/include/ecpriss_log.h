@@ -1,51 +1,43 @@
 /* SPDX-License-Identifier: GPL-2.0-only
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
-#define DRIVER_NAME             "ecpriss_core"
+#ifndef _ECPRI_H
+#define _ECPRI_H
+#include <linux/kernel.h>
+#include <linux/printk.h> /* printk */
+#include <linux/ipc_logging.h> /* ipc_logging */
+#include "ecpriss_core.h"
+#define DRV_NAME "ecpri" /* driver name */
 
-#define ECPRISS_CORE_DEBUG(fmt, args...) \
-	do { \
-		pr_debug(DRIVER_NAME " %s:%d "\
-				fmt, __func__, __LINE__, ## args);\
-#if 0
-		if (ecpriss_core_logbuf) { \
-			ECPRISS_CORE_IPC_LOGGING(ecpriss_core_logbuf, \
-					DRIVER_NAME " %s:%d " fmt, ## args); \
-		} \
+
+#define ECPRI_IPC_LOGGING(buf, fmt, args...) \
+        do { \
+                if (buf) \
+                        ipc_log_string((buf), fmt, __func__, __LINE__, \
+                                ## args); \
+        } while (0)
+
+#define ECPRILOGDBG(fmt, args...) \
+        do { \
+                pr_debug(DRV_NAME " %s:%d " fmt, __func__, __LINE__, ## args);\
+        } while (0)
+
+#define ECPRILOGERR(fmt, args...) \
+        do { \
+                pr_err(DRV_NAME " %s:%d " fmt, __func__, __LINE__, ## args);\
+                if (ecpriss_pdata) { \
+                        ECPRI_IPC_LOGGING(ecpriss_pdata -> ecpriss_core_logbuf, \
+                                DRV_NAME " %s:%d " fmt, ## args); \
+                } \
+        } while (0)
+#define ECPRILOGINFO(fmt, args...) \
+        do { \
+                pr_info(DRV_NAME " %s:%d " fmt, __func__, __LINE__, ## args);\
+                if (ecpriss_pdata) { \
+                        ECPRI_IPC_LOGGING(ecpriss_pdata -> ecpriss_core_logbuf, \
+                                DRV_NAME " %s:%d " fmt, ## args); \
+                } \
+        } while (0)
+
 #endif
-	} while (0)
-
-
-#define ECPRISS_CORE_INFO(fmt, args...) \
-	do { \
-		pr_info(DRIVER_NAME "@%s@%d@ctx:%s: "\
-			fmt, __func__, __LINE__, current->comm, ## args);\
-#if 0
-		if (ecpriss_core_logbuf) { \
-			ECPRISS_CORE_IPC_LOGGING(ecpriss_core_logbuf, \
-				DRIVER_NAME " %s:%d " fmt, ## args); \
-		} \
-#endif
-	} while (0)
-
-#define ECPRISS_CORE_ERROR(fmt, args...) \
-	do { \
-		pr_err(DRIVER_NAME "@%s@%d@ctx:%s: "\
-			fmt, __func__, __LINE__, current->comm, ## args);\
-#if 0
-		if (ecpriss_core_logbuf) { \
-			ECPRISS_CORE_IPC_LOGGING(ecpriss_core_logbuf, \
-					DRIVER_NAME " %s:%d " fmt, ## args); \
-		} \
-#endif
-	} while (0)
-
-#define NULL_CHECK(ptr) \
-	do { \
-		if (!(ptr)) { \
-			ECPRISS_CORE_ERROR("null pointer #ptr\n"); \
-			ret = -EINVAL; \
-		} \
-	} \
-	while (0)

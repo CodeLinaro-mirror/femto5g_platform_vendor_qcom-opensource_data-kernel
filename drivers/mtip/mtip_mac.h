@@ -83,21 +83,18 @@
 #define MTIP_MAC_WRAPPER_CORE_STATUS_REG_OFFSET          0x00000004
 
 // MAC Wrapper Register values
-#define MTIP_MAC_WRAPPER_CALENDAR_CFG_REG_VAL                0x00001111
-#define MTIP_MAC_WRAPPER_TX_AMF_CFG_REG_VAL                  0x26262626
+#define MTIP_MAC_WRAPPER_CALENDAR_CFG_REG_VAL_4_LINKS    0x00001111
+#define MTIP_MAC_WRAPPER_CALENDAR_CFG_REG_VAL_2_LINKS    0x00000011
+#define MTIP_MAC_WRAPPER_CALENDAR_CFG_REG_VAL_1_LINKS    0x00000001
+
+#define MTIP_MAC_WRAPPER_TX_AMF_CFG_REG_VAL_4_LINKS      0x26262626
+#define MTIP_MAC_WRAPPER_TX_AMF_CFG_REG_VAL_2_LINKS      0x02022626
+#define MTIP_MAC_WRAPPER_TX_AMF_CFG_REG_VAL_1_LINKS      0x02020226
 
 #define MTIP_MAC_WRAPPER_PCS_MODE_4X25G_RSFEC_ENABLE_VAL   0x0000003F
 #define MTIP_MAC_WRAPPER_PCS_MODE_4X25G_RSFEC_DISABLE_VAL  0x00000000
 
-#define MTIP_MAC_WRAPPER_CSR_CFG_REG_VAL                 0x00003C00
-#define MTIP_MAC_WRAPPER_CSR_CFG_100GBASE_R_VAL          0x00003D30
-#define MTIP_MAC_WRAPPER_CSR_CFG_50GBASE_R_VAL           0x00003C30
-#define MTIP_MAC_WRAPPER_CSR_CFG_40GBASE_R_VAL           0x0003FC00
-#define MTIP_MAC_WRAPPER_CSR_CFG_10GBASE_R_VAL           0x0000FC00
-
-#define MTIP_MAC_WRAPPER_CSR_SIGNAL_DET_BASE             0
-#define MTIP_MAC_WRAPPER_CSR_SD_8X_EN_BASE               4
-#define MTIP_MAC_WRAPPER_CSR_SD_N2_BASE                  14
+#define MTIP_MAC_WRAPPER_CSR_CFG_REG_BASE_VAL              0x00003C00
 
 #define MTIP_MAC_WRAPPER_PCS_MODE_FEC91_ENA_BASE         0
 #define MTIP_MAC_WRAPPER_PCS_MODE_FEC91_1LANE_BASE       4
@@ -171,6 +168,7 @@ void mtip_mac_wrapper_register_irq(struct device *dev, unsigned int irq,
 
 void mtip_mac_read_timestamp(u32 link_index, u32* timestamp_secs, u32* timestamp_nsecs);
 void mtip_mac_set_interrupt_mask(u32 link_index);
+void mtip_mac_clear_interrupt_mask(u32 link_index);
 u32 mtip_mac_get_interrupt_mask(u32 link_index);
 
 bool mtip_mac_wrapper_get_link_status(u32 link_index);
