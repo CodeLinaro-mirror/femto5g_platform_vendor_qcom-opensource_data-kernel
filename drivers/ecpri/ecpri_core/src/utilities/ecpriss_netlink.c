@@ -4,7 +4,6 @@
 
 #include "ecpriss_core.h"
 #include "ecpriss_netlink.h"
-#include "ecpriss_log.h"
 
 uint32_t global_pid = 0;
 
@@ -29,7 +28,7 @@ void ecpriss_netlink_send_netlink_message(int client_id,
 	struct sk_buff *skb_out = nlmsg_new(sizeof(packet.payload.buffer), GFP_KERNEL);
 	if (!skb_out)
 	{
-		ECPRILOGERR(KERN_ERR "Failed to allocate a new skb\n");
+		printk(KERN_ERR "Failed to allocate a new skb\n");
 		return;
 	}
 
@@ -41,7 +40,7 @@ void ecpriss_netlink_send_netlink_message(int client_id,
 	int result = 0;
 	printPacket(&packet);
 	result = nlmsg_unicast(socket, skb_out, global_pid);
-	ECPRILOGDBG(KERN_INFO "DEBUG:Unicast result = %d\n",result);
+	printk(KERN_INFO "DEBUG:Unicast result = %d\n",result);
 #endif
 	return;
 }
@@ -60,36 +59,36 @@ void ecpriss_netlink_debug_print_packet(ecpriss_packet_s *packet)
 {
 
 #if 0
-	ECPRILOGDBG(KERN_INFO "DEBUG:packet->header.version  = %d\n",
+	printk(KERN_INFO "DEBUG:packet->header.version  = %d\n",
 			packet->header.version);
-	ECPRILOGDBG(KERN_INFO "DEBUG:packet->header.client_id  = %d\n",
+	printk(KERN_INFO "DEBUG:packet->header.client_id  = %d\n",
 			packet->header.client_id);
-	ECPRILOGDBG(KERN_INFO "DEBUG:packet->header.message_id  = %d\n",
+	printk(KERN_INFO "DEBUG:packet->header.message_id  = %d\n",
 			packet->header.message_id);
-	ECPRILOGDBG(KERN_INFO "DEBUG:packet->header.num_flows  = %d\n",
+	printk(KERN_INFO "DEBUG:packet->header.num_flows  = %d\n",
 			packet->header.num_flows);
-	ECPRILOGDBG(KERN_INFO "DEBUG:packet->header.reserved  = %d\n",
+	printk(KERN_INFO "DEBUG:packet->header.reserved  = %d\n",
 			packet->header.reserved);
-	ECPRILOGDBG(KERN_INFO "DEBUG:packet->header.seq_id  = %d\n",
+	printk(KERN_INFO "DEBUG:packet->header.seq_id  = %d\n",
 			packet->header.seq_id);
-	ECPRILOGDBG(KERN_INFO "DEBUG:packet->header.len = %d\n",
+	printk(KERN_INFO "DEBUG:packet->header.len = %d\n",
 			packet->header.len);
-	//ECPRILOGDBG(KERN_INFO "DEBUG:packet->payload.len = %d\n",packet->payload.len);
-	//ECPRILOGDBG(KERN_INFO "DEBUG:packet->payload.buffer = %s",packet->payload.buffer);
+	//printk(KERN_INFO "DEBUG:packet->payload.len = %d\n",packet->payload.len);
+	//printk(KERN_INFO "DEBUG:packet->payload.buffer = %s",packet->payload.buffer);
 #endif
-	ECPRILOGDBG("DEBUG:packet->header.version  = %d\n",
+	pr_err("DEBUG:packet->header.version  = %d\n",
 			packet->header.version);
-	ECPRILOGDBG("DEBUG:packet->header.client_id  = %d\n",
+	pr_err("DEBUG:packet->header.client_id  = %d\n",
 			packet->header.client_id);
-	ECPRILOGDBG("DEBUG:packet->header.message_id  = %d\n",
+	pr_err("DEBUG:packet->header.message_id  = %d\n",
 			packet->header.message_id);
-	ECPRILOGDBG("DEBUG:packet->header.num_flows  = %d\n",
+	pr_err("DEBUG:packet->header.num_flows  = %d\n",
 			packet->header.num_flows);
-	ECPRILOGDBG("DEBUG:packet->header.reserved  = %d\n",
+	pr_err("DEBUG:packet->header.reserved  = %d\n",
 			packet->header.reserved);
-	ECPRILOGDBG("DEBUG:packet->header.seq_id  = %d\n",
+	pr_err("DEBUG:packet->header.seq_id  = %d\n",
 			packet->header.seq_id);
-	ECPRILOGDBG("DEBUG:packet->header.len = %d\n",
+	pr_err("DEBUG:packet->header.len = %d\n",
 			packet->header.len);
 	return;
 }
@@ -99,7 +98,7 @@ void ecpriss_netlink_receive_netlink_message(struct sk_buff *skb)
 	ecpriss_packet_s packet;
 	struct nlmsghdr *nlh;
 	nlh = (struct nlmsghdr *) skb->data;
-	ECPRILOGDBG("DEBUG:Received message: %p\n",
+	pr_err("DEBUG:Received message: %p\n",
 			(ecpriss_packet_s *) nlmsg_data(nlh));
 
 	memset(&packet , 0, sizeof(ecpriss_packet_s));
@@ -108,7 +107,7 @@ void ecpriss_netlink_receive_netlink_message(struct sk_buff *skb)
 	ecpriss_netlink_process_packet(&packet);
 	global_pid = nlh->nlmsg_pid;
 	//schedule_flag = 1;
-	ECPRILOGDBG(KERN_INFO "DEBUG:Global PID: %d\n", global_pid);
+	printk(KERN_INFO "DEBUG:Global PID: %d\n", global_pid);
 	//send_response( ECPRISS_KERNEL, ECPRISS_MESSAGE_RESPONSE,
 	//"KERNEL:Response message from kernel\n");=
 	return;

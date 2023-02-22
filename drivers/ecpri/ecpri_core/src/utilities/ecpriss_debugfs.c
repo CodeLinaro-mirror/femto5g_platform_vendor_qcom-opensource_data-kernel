@@ -14,7 +14,6 @@
 #include "ecpriss_debugfs.h"
 
 #include "debug_dir_struct.h"
-#include "ecpriss_log.h"
 
 #undef pr_fmt
 #define pr_fmt(fmt) "::%s:%u::" fmt, __func__, __LINE__
@@ -253,7 +252,7 @@ static ssize_t config_val_from_registers_qudp_ingress_mac_addr(char __user *buf,
 
 		}
 		data_size = strlen(max_str);
-		ECPRILOGDBG("strlen = %u \n",data_size);
+		pr_err("strlen = %u \n",data_size);
 	}
 	if(*ppos  >= max_str_size)
 		return 0;
@@ -332,7 +331,7 @@ static ssize_t config_val_from_registers_qudp_ingress_dst_ip(char __user *buf, i
 
 		}
 		data_size = strlen(max_str);
-		ECPRILOGDBG("strlen = %u \n",data_size);
+		pr_err("strlen = %u \n",data_size);
 	}
 	if(*ppos  >= max_str_size)
 		return 0;
@@ -390,7 +389,7 @@ static ssize_t config_val_from_registers_qudp_ingress_udp_clss_port(char __user 
 
 		}
 		data_size = strlen(max_str);
-		ECPRILOGDBG("strlen = %u \n",data_size);
+		pr_err("strlen = %u \n",data_size);
 	}
 	if(*ppos  >= max_str_size)
 		return 0;
@@ -448,7 +447,7 @@ static ssize_t config_val_from_registers_qudp_ingress_vlan(char __user *buf, int
 			}
 		}
 		data_size = strlen(max_str);
-		ECPRILOGDBG("strlen = %u \n",data_size);
+		pr_err("strlen = %u \n",data_size);
 	}
 	if(*ppos  >= max_str_size)
 		return 0;
@@ -538,7 +537,7 @@ static ssize_t config_val_from_valid_bits_filt(char __user *buf, int fh_index, s
 #endif
 
 		data_size = strlen(max_str);
-		ECPRILOGERR("strlen = %u \n",data_size);
+		pr_err("strlen = %u \n",data_size);
 	}
 	if(*ppos  >= max_str_size)
 		return 0;
@@ -802,7 +801,7 @@ static ssize_t config_val_from_registers_qudp_ingress_global_cfg(char __user *bu
 
 
 		data_size = strlen(max_str);
-		ECPRILOGDBG("strlen = %u \n",data_size);
+		pr_err("strlen = %u \n",data_size);
 	}
 	if(*ppos  >= max_str_size)
 		return 0;
@@ -895,7 +894,7 @@ static ssize_t config_val_from_registers_qudp_egress_src_ip_addr(char __user *bu
 
 		}
 		data_size = strlen(max_str);
-		ECPRILOGDBG("strlen = %u \n",data_size);
+		pr_err("strlen = %u \n",data_size);
 	}
 	if(*ppos  >= max_str_size)
 		return 0;
@@ -980,7 +979,7 @@ static ssize_t config_val_from_registers_qudp_egress_dst_ip_addr(char __user *bu
 
 		}
 		data_size = strlen(max_str);
-		ECPRILOGDBG("strlen = %u \n",data_size);
+		pr_err("strlen = %u \n",data_size);
 	}
 	if(*ppos  >= max_str_size)
 		return 0;
@@ -1038,7 +1037,7 @@ static ssize_t config_val_from_registers_qudp_egress_eth_src0_port(char __user *
 			}
 		}
 		data_size = strlen(max_str);
-		ECPRILOGDBG("strlen = %u \n",data_size);
+		pr_err("strlen = %u \n",data_size);
 	}
 	if(*ppos  >= max_str_size)
 		return 0;
@@ -1120,7 +1119,7 @@ static ssize_t config_val_from_registers_qudp_egress_eth_src1_dst1_port(char __u
 			}
 		}
 		data_size = strlen(max_str);
-		ECPRILOGDBG("strlen = %u \n",data_size);
+		pr_err("strlen = %u \n",data_size);
 	}
 	if(*ppos  >= max_str_size)
 		return 0;
@@ -1179,7 +1178,7 @@ static ssize_t config_val_from_registers_qudp_egress_eth_dst0_port(char __user *
 			}
 		}
 		data_size = strlen(max_str);
-		ECPRILOGDBG("strlen = %u \n",data_size);
+		pr_err("strlen = %u \n",data_size);
 	}
 	if(*ppos  >= max_str_size)
 		return 0;
@@ -1262,7 +1261,7 @@ static ssize_t config_val_from_registers_qudp_egress_vlan_ethertype(char __user 
 			}
 		}
 		data_size = strlen(max_str);
-		ECPRILOGDBG("strlen = %u \n",data_size);
+		pr_err("strlen = %u \n",data_size);
 	}
 	if(*ppos  >= max_str_size)
 		return 0;
@@ -1345,7 +1344,7 @@ static ssize_t config_val_from_registers_qudp_egress_udp_ports(char __user *buf,
 			}
 		}
 		data_size = strlen(max_str);
-		ECPRILOGDBG("strlen = %u \n",data_size);
+		pr_err("strlen = %u \n",data_size);
 	}
 	if(*ppos  >= max_str_size)
 		return 0;
@@ -1437,7 +1436,7 @@ static ssize_t config_val_from_registers_xbar(char __user *buf, cfg_prm_u param)
 			strlcat(max_str, temp_stat_val_str, max_str_size);
 			strlcat(max_str, "\n",max_str_size);
 		default :
-			ECPRILOGERR("default case\n");
+			pr_err("default case\n");
 			break;
 	}
 	ret_val = copy_to_user(buf,max_str,FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
@@ -2088,7 +2087,7 @@ static ssize_t error_value_from_registers_fh(char __user *buf, int port, int lin
 
 	if (!final_stats_str)
 	{
-		ECPRILOGERR("Memory allocation failure \n");
+		pr_err("Memory allocation failure \n");
 		goto err;
 	}
 
@@ -2253,7 +2252,7 @@ static ssize_t stats_value_from_registers_fh(char __user *buf, int port, int lin
 
 	if (!final_stats_str)
 	{
-		ECPRILOGERR("Memory allocation failure \n");
+		pr_err("Memory allocation failure \n");
 		goto err;
 	}
 
@@ -3983,7 +3982,7 @@ static struct file_operations *file_name_to_wrapper(char *filename)
 
 
 	else{
-		ECPRILOGERR("Invalid file name, no entry available\n");
+		pr_err("Invalid file name, no entry available\n");
 		return &dummy;
 	}
 	return NULL;
@@ -4001,59 +4000,59 @@ int32_t setup_debugfs_directory()
 	int curr_index = 0;
 
         remove_whitespaces(input_string);
-	//ECPRILOGERR("%s\n", input_string);
+	//pr_err("%s\n", input_string);
 	my_delm = parser(input_string, "{},",token, &index);
         while (my_delm != 0){
 		len= strlen(token);
-		//ECPRILOGERR("token: %s\n",token);
+		//pr_err("token: %s\n",token);
 
                 if(token[0] == '{' && len >2)
                 {
 			remove_firstchar(token);
-			//ECPRILOGERR("token after removal: %s\n",token);
+			//pr_err("token after removal: %s\n",token);
 
 			if(curr_index == 0)
 			{
 				list_dv[curr_index] = debugfs_create_dir(token,NULL);
-				//ECPRILOGERR("Curr_index = %u, inserting %s, parent was null", curr_index, token);
-				//ECPRILOGERR("Incremmting cur_index +1\n");
+				//pr_err("Curr_index = %u, inserting %s, parent was null", curr_index, token);
+				//pr_err("Incremmting cur_index +1\n");
 				curr_index++;
 			}else{
 				kobj_root = debugfs_create_dir(token, list_dv[curr_index -1]);
 				list_dv[curr_index] = kobj_root;
-				//ECPRILOGERR("Curr_index = %u, inserting %s, parent was %u", curr_index, token, curr_index-1);
-				//ECPRILOGERR("Incremmting cur_index +1\n");
+				//pr_err("Curr_index = %u, inserting %s, parent was %u", curr_index, token, curr_index-1);
+				//pr_err("Incremmting cur_index +1\n");
 				curr_index++;
 			}
                 }else if( token[0] == '}'  && len > 2)
                 {
 			remove_firstchar(token);
-			//ECPRILOGERR("token after removal: %s\n",token);
-			//ECPRILOGERR("Curr_index = %u, inserting %s, parent was %u", curr_index, token, curr_index-1);
-			//ECPRILOGERR("Decresing cur_index -1\n");
+			//pr_err("token after removal: %s\n",token);
+			//pr_err("Curr_index = %u, inserting %s, parent was %u", curr_index, token, curr_index-1);
+			//pr_err("Decresing cur_index -1\n");
 				curr_index--;
-			//ECPRILOGERR("inserting at Curr_index = %u, inserting %s, parent was %u", curr_index, token, curr_index-1);
+			//pr_err("inserting at Curr_index = %u, inserting %s, parent was %u", curr_index, token, curr_index-1);
 			kobj_root = debugfs_create_dir(token, list_dv[curr_index -1 ]);
 			list_dv[curr_index] = kobj_root;
-				//ECPRILOGERR("Incremmting cur_index +1\n");
+				//pr_err("Incremmting cur_index +1\n");
 				curr_index++;
 
                 }else if(token[0] == ',' && len > 2){
 			// we want to create file
 			remove_firstchar(token);
-			//ECPRILOGERR("token after removal: %s\n",token);
+			//pr_err("token after removal: %s\n",token);
 			// file_name_to_callback , this will return a function pointer
 			fileops = file_name_to_wrapper(token);
 			get_file_name(token);
-			//ECPRILOGERR("token after get_file_name: %s\n",token);
+			//pr_err("token after get_file_name: %s\n",token);
 			if(!debugfs_create_file(token, 0444, list_dv[curr_index - 1], 0, fileops)){
-				//ECPRILOGERR("Unable to create the debugfs file...\n");
+				//pr_err("Unable to create the debugfs file...\n");
 			}
-			//ECPRILOGERR("Curr_index = %u, inserting %s, parent was %u", curr_index, token, curr_index -1 );
+			//pr_err("Curr_index = %u, inserting %s, parent was %u", curr_index, token, curr_index -1 );
 
 		}else if(token[0] == '}' && len < 2){
-			//ECPRILOGERR("Curr_index = %u, inserting Nothing, parent was %u", curr_index,  curr_index+1);
-			//ECPRILOGERR("Decresing cur_index -1\n");
+			//pr_err("Curr_index = %u, inserting Nothing, parent was %u", curr_index,  curr_index+1);
+			//pr_err("Decresing cur_index -1\n");
 			curr_index-- ;
 
 		}
