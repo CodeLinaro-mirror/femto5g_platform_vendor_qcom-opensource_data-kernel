@@ -1291,7 +1291,7 @@ void sysfs_store_flush_register_set(int index, int* ret_val) {
     }
   } else if (index >= FIFO_5 && index <= FIFO_7) {
     // Changes to accomodate corresponding FIFO's instead of all FIFO's.
-    flush_bit = 10;
+    flush_bit = 0x400;
     if (readl_poll_timeout(debug_port_base_address + DBG_ETH_DBG_FIFO_STATUS, v,
                            !(v & (flush_bit << (index-FIFO_5))), 100, 10000)){
       *ret_val = -EBUSY;
