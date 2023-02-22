@@ -6936,12 +6936,14 @@ static void ecpri_dma_gsi_chan_err_cb(struct gsi_chan_err_notify* notify)
 	case GSI_CHAN_UNSUPPORTED_INTER_EE_OP_ERR:
 		DMAERR("Got GSI_CHAN_UNSUPPORTED_INTER_EE_OP_ERR\n");
 		break;
-	case GSI_CHAN_HWO_1_ERR:
-		DMAERR("Got GSI_CHAN_HWO_1_ERR\n");
+	case GSI_CHAN_UNRECOGNIZED_PROTOCOL_ERR:
+		DMAERR("Got GSI_CHAN_UNRECOGNIZED_PROTOCOL_ERR\n");
 		break;
 	default:
 		DMAERR("Unexpected err evt: %d\n", notify->evt_id);
 	}
+
+	ecpri_dma_assert();
 }
 
 static void  ecpri_dma_gsi_ev_err_cb(struct gsi_evt_err_notify* notify)
@@ -6962,6 +6964,7 @@ static void  ecpri_dma_gsi_ev_err_cb(struct gsi_evt_err_notify* notify)
 	default:
 		DMAERR("Unexpected err evt: %d\n", notify->evt_id);
 	}
+	ecpri_dma_assert();
 }
 
 /**
@@ -7411,17 +7414,16 @@ int ecpri_dma_gsi_setup_event_ring(struct ecpri_dma_endp_context *ep,
 
 	gsi_evt_ring_props.exclusive = true;
 	if (ep->is_endp_mhi_l2) {
-		gsi_evt_ring_props.err_cb = ecpri_dma_gsi_ev_err_cb;
 		gsi_evt_ring_props.user_data = (void*)channel;
 		gsi_evt_ring_props.evchid_valid = true;
 		gsi_evt_ring_props.evchid =	channel->event_id;
 	}
 	else {
 		gsi_evt_ring_props.user_data = NULL;
-		gsi_evt_ring_props.err_cb = ecpri_dma_dp_gsi_evt_ring_err_cb;
 	}
 	gsi_evt_ring_props.ee = gsi_ep_info->ee;
 	gsi_evt_ring_props.gsi_id = ep->gsi_id;
+	gsi_evt_ring_props.err_cb = ecpri_dma_gsi_ev_err_cb;
 
 	/* Send command to GSI to allocate an event channel */
 	result = gsi_alloc_evt_ring(&gsi_evt_ring_props,
