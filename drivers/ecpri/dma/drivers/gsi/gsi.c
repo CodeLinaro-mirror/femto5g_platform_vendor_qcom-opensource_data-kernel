@@ -509,8 +509,8 @@ static void gsi_handle_glob_err(u32 gsi_id, u32 err)
 		} else if (log->code == GSI_NON_ALLOCATED_EVT_ACCESS_ERR) {
 			chan_notify.evt_id =
 				GSI_CHAN_NON_ALLOCATED_EVT_ACCESS_ERR;
-		} else if (log->code == GSI_HWO_1_ERR) {
-			chan_notify.evt_id = GSI_CHAN_HWO_1_ERR;
+		} else if (log->code == GSI_UNRECOGNIZED_PROTOCOL_ERR) {
+			chan_notify.evt_id = GSI_CHAN_UNRECOGNIZED_PROTOCOL_ERR;
 		} else {
 			GSIERR("unexpected event log code %d\n", log->code);
 			GSI_ASSERT();
