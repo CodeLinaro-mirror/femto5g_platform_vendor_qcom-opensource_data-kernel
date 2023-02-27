@@ -21,9 +21,6 @@
 
 struct qcom_aw_phy_mtip_if_info qcom_aw_phy_mtip_if_info_s = {0};
 
-#define MAX_RETRY_COUNT 3
-static int cdr_lock_retry_timer[MAX_RETRY_COUNT] = {1,2,3};
-
 /*-------------------------------------------------------------------
 * Function Definitions
 ------------------------------------------------------------------- */
@@ -96,7 +93,10 @@ int qcom_aw_phy_mtip_register(
   qcom_aw_phy_mtip_if_info_s.an_complete_cb = ready_info->notify_an_complete;
 
   /* Register CDR lock success callback */
-  qcom_aw_phy_mtip_if_info_s.cdr_lock_cb = ready_info->cdr_lock_cb;
+  qcom_aw_phy_mtip_if_info_s.cdr_lock_ind = ready_info->cdr_lock_ind;
+
+  qcom_aw_phy_mtip_if_info_s.lane_bring_up_progress_ind =
+                                         ready_info->lane_bring_up_progress_ind;
 
   mutex_unlock(&qcom_aw_phy_mtip_if_info_s.lock);
 
@@ -180,9 +180,6 @@ int qcom_aw_phy_setup(
       // Set the lane as enabled and lane speed config.
       phy_lane_params->lane_config = lane_config[i];
 
-      // Initialize the retry counter
-      phy_inst_info->cdr_lock_retry_counter[i] = 0;
-
       phy_inst_info->cdr_lock_status_flag[i] = CDR_LOCK_NONE;
 
       QCOM_AW_PHY_LOG_INFO("Port %d has lane %d enabled with speed %d",
@@ -260,7 +257,13 @@ void qcom_aw_phy_handle_cdr_lock_status(
 
   }
 
-  qcom_aw_phy_mtip_if_info_s.cdr_lock_cb(eth_link_index, eth_level_status);
+  qcom_aw_phy_mtip_if_info_s.cdr_lock_ind(eth_link_index, eth_level_status);
+
+  if(eth_level_status == true){
+    /* Notify MAC to start listening to PCS link interrupts */
+    qcom_aw_phy_notify_lane_bring_up_progress_to_mac(phy_inst_info, lane, false);
+  }
+
   return;
 }
 
@@ -435,7 +438,7 @@ int qcom_aw_phy_bringup_lt_mode(mss_access_t *mss,
       qcom_aw_phy_handle_cdr_lock_status(phy_inst_info, lane, CDR_LOCK_SUCCESS);
     }
     else{
-      QCOM_AW_PHY_LOG_ERR("CDR lock failed");
+      qcom_aw_phy_handle_cdr_lock_status(phy_inst_info, lane, CDR_LOCK_FAILURE);
     }
   }
 
@@ -464,8 +467,6 @@ int qcom_aw_phy_bringup_manual_eq_mode(
     enum eth_phy_iface_phy_lane_num_enum lane,
     struct qcom_aw_phy_lane_speed_config config) {
   aw_txfir_config_t txfir_cfg = {0};
-  struct qcom_aw_phy_work_q_params *wq_params = NULL;
-  struct qcom_aw_phy_config *phy_config_info = NULL;
   enum local_error_enum local_err_val = LOCAL_ERROR_INVALID;
   aw_err_code_t aw_err_val = AW_ERR_CODE_NONE;
   int ret_val = 0;
@@ -538,42 +539,11 @@ int qcom_aw_phy_bringup_manual_eq_mode(
   mdelay(500);
 
   // Check CDR Lock
-  if(AW_ERR_CODE_POLL_TIMEOUT ==
-                          aw_pmd_rx_check_cdr_lock(mss, RX_CDR_TIMEOUT_US)){
-
-    phy_config_info = qcom_aw_phy_get_config_info();
-    if (!phy_config_info) {
-      ret_val = EINVAL;
-      local_err_val = LOCAL_ERROR_2;
-      goto func_exit;
-    }
-
-    QCOM_AW_PHY_LOG_DBG("CDR lock failed for PHY %d, lane %d, "
-                        "Retry count %d, TBD after %d sec",
-                        phy_inst_info->phy_inst, lane,
-                        phy_inst_info->cdr_lock_retry_counter[lane] + 1,
-                        cdr_lock_retry_timer\
-                               [phy_inst_info->cdr_lock_retry_counter[lane]]);
-
-    wq_params = kmalloc(sizeof(struct qcom_aw_phy_work_q_params),
-                        GFP_KERNEL);
-    if(!wq_params)
-      QCOM_AW_PHY_LOG_ERR("Malloc failed!");
-    else{
-      INIT_DELAYED_WORK(&wq_params->wq_item,
-                        qcom_aw_phy_retry_lane_bring_up);
-      wq_params->phy_inst = phy_inst_info->phy_inst;
-      wq_params->lane_num = lane;
-      wq_params->user_data = (void*)false;
-      queue_delayed_work(phy_config_info->wq, &wq_params->wq_item,
-                         msecs_to_jiffies(1000 * cdr_lock_retry_timer\
-                               [phy_inst_info->cdr_lock_retry_counter[lane]]));
-      if(phy_inst_info->cdr_lock_retry_counter[lane] < (MAX_RETRY_COUNT-1))
-        phy_inst_info->cdr_lock_retry_counter[lane]++;
-    }
+  if(AW_ERR_CODE_NONE == aw_pmd_rx_check_cdr_lock(mss, RX_CDR_TIMEOUT_US)){
+    qcom_aw_phy_handle_cdr_lock_status(phy_inst_info, lane, CDR_LOCK_SUCCESS);
   }
   else{
-    qcom_aw_phy_handle_cdr_lock_status(phy_inst_info, lane, CDR_LOCK_SUCCESS);
+    qcom_aw_phy_handle_cdr_lock_status(phy_inst_info, lane, CDR_LOCK_FAILURE);
   }
 
 func_exit:
@@ -677,6 +647,9 @@ int qcom_aw_phy_bringup(enum mtip_port_type_enum port_type,
     QCOM_AW_PHY_LOG_INFO("Bringing up lane %d on port %d!", lane, port_type);
 
     mutex_lock(&phy_inst_info->lane_lock[lane]);
+
+    /* Notify MAC to stop listening to PCS link interrupts */
+    qcom_aw_phy_notify_lane_bring_up_progress_to_mac(phy_inst_info, lane, true);
 
     /* Set the lane offset */
     pmd_set_lane(&mss, lane);
@@ -837,9 +810,6 @@ int qcom_aw_phy_teardown(enum mtip_port_type_enum port_type,
 
     phy_inst_info->cdr_lock_status_flag[lane] = CDR_LOCK_NONE;
 
-    // Reset the retry counter
-    phy_inst_info->cdr_lock_retry_counter[lane] = 0;
-
     mutex_unlock(&phy_inst_info->lane_lock[lane]);
   }
 
@@ -959,7 +929,7 @@ void qcom_aw_phy_handle_an_complete(struct work_struct *work){
   return;
 }
 
-void qcom_aw_phy_retry_lane_bring_up(struct work_struct *work){
+void qcom_aw_phy_handle_rx_sig_detect(struct work_struct *work){
   struct delayed_work *delayed_work_item = to_delayed_work(work);
   struct qcom_aw_phy_work_q_params *wq_params =
      container_of(delayed_work_item, struct qcom_aw_phy_work_q_params, wq_item);
@@ -1020,16 +990,26 @@ void qcom_aw_phy_retry_lane_bring_up(struct work_struct *work){
   /* Set the lane offset */
   pmd_set_lane(&mss, lane);
 
-  if(phy_inst_info->lane_params[lane].link_status == false){
+  /* Reset the CDR lock status flag if error interrupt is received */
+  if(false == (bool)wq_params->user_data){
+    QCOM_AW_PHY_LOG_ERR("RX signal detect error received for PHY %d lane %d",
+                        phy_inst_info->phy_inst, lane);
+    phy_inst_info->cdr_lock_status_flag[lane] = CDR_LOCK_NONE;
+  }
+  /* Retry lane bring up if detect interrupt is received and PCS link is down */
+  else if((phy_inst_info->lane_params[lane].link_status == false) &&
+          (phy_inst_info->cdr_lock_status_flag[lane] != CDR_LOCK_SUCCESS)){
 
-    QCOM_AW_PHY_LOG_DBG("Retry for PHY %d, lane %d, interrupt_trigger %d, ",
-                        wq_params->phy_inst, wq_params->lane_num,
-                        (bool)wq_params->user_data); 
+    QCOM_AW_PHY_LOG_INFO("Retry for PHY %d, lane %d",
+                         wq_params->phy_inst, wq_params->lane_num);
 
     /* Get lane rate and width based on the speed. */
     qcom_aw_phy_get_lane_speed_config(
                         phy_inst_info->lane_params[lane].lane_config.lane_speed,
                         &config);
+
+    // Notify MAC to stop listening to link status interrupts
+    qcom_aw_phy_notify_lane_bring_up_progress_to_mac(phy_inst_info, lane, true);
 
     if (phy_inst_info->phy_eq_mode == QCOM_AW_PHY_ANLT_MODE) {
       //TODO
@@ -1102,56 +1082,16 @@ void qcom_aw_phy_retry_lane_bring_up(struct work_struct *work){
 
       /* Delay before checking RX CDR lock post equalization */
       mdelay(500);
+    }
 
-      cdr_lock_status = aw_pmd_rx_check_cdr_lock(&mss, RX_CDR_TIMEOUT_US);
+    cdr_lock_status = aw_pmd_rx_check_cdr_lock(&mss, RX_CDR_TIMEOUT_US);
 
-      if(false == (bool)wq_params->user_data){
-
-        // Check CDR Lock
-        if(cdr_lock_status == AW_ERR_CODE_POLL_TIMEOUT){
-
-          /* If CDR lock fails even after maximum retries(5) at PHY level,
-          then the retry will be done at MAC/PCS level, where lanes will be
-          brought down to power down state and broguht up again to P0 */
-          if(phy_inst_info->cdr_lock_retry_counter[lane] >= MAX_RETRY_COUNT){
-
-            QCOM_AW_PHY_LOG_ERR("Max PHY retry attempts done");
-            if(phy_inst_info->cdr_lock_status_flag[lane] == CDR_LOCK_NONE){
-              qcom_aw_phy_handle_cdr_lock_status(phy_inst_info, lane,
-                                                 CDR_LOCK_FAILURE);
-            }
-
-            mutex_unlock(&phy_inst_info->lane_lock[lane]);
-            mutex_unlock(&phy_inst_info->phy_inst_lock);
-            goto func_exit;
-          }
-
-          QCOM_AW_PHY_LOG_DBG("CDR lock failed for PHY %d, lane %d, "
-                              "Retry count %d, TBD after %d sec",
-                              phy_inst_info->phy_inst, lane,
-                              phy_inst_info->cdr_lock_retry_counter[lane] + 1,
-                              cdr_lock_retry_timer\
-                                   [phy_inst_info->cdr_lock_retry_counter[lane]]);
-
-          wq_params->user_data = (void*)false;
-          queue_delayed_work(phy_config_info->wq, &wq_params->wq_item,
-                             msecs_to_jiffies(1000 * cdr_lock_retry_timer\
-                                  [phy_inst_info->cdr_lock_retry_counter[lane]]));
-          if(phy_inst_info->cdr_lock_retry_counter[lane] < MAX_RETRY_COUNT)
-            phy_inst_info->cdr_lock_retry_counter[lane]++;
-
-          mutex_unlock(&phy_inst_info->lane_lock[lane]);
-          mutex_unlock(&phy_inst_info->phy_inst_lock);
-          return;
-        }
-      }
-
-      if(cdr_lock_status == AW_ERR_CODE_NONE){
-        if(phy_inst_info->cdr_lock_status_flag[lane] == CDR_LOCK_NONE){
-          qcom_aw_phy_handle_cdr_lock_status(phy_inst_info, lane,
-                                             CDR_LOCK_SUCCESS);
-        }
-      }
+    if(cdr_lock_status == AW_ERR_CODE_NONE){
+      qcom_aw_phy_handle_cdr_lock_status(phy_inst_info, lane, CDR_LOCK_SUCCESS);
+    }
+    else{
+      qcom_aw_phy_handle_cdr_lock_status(phy_inst_info, lane,
+                                         CDR_LOCK_FAILURE);
     }
   }
 
@@ -1160,11 +1100,38 @@ void qcom_aw_phy_retry_lane_bring_up(struct work_struct *work){
 
 func_exit:
   if(local_err_val != LOCAL_ERROR_INVALID){
-    QCOM_AW_PHY_LOG_ERR("%s: returns %d with local error %d",
+    QCOM_AW_PHY_LOG_DBG("%s: returns %d with local error %d",
                         __func__, ret_val, local_err_val);
   }
 
   kfree(wq_params);
+
+  return;
+}
+
+/*-------------------------------------------------------------------
+* qcom_aw_phy_notify_lane_bring_up_progress_to_mac
+
+* @phy_inst: PHY instance type(FH/C2C/Debug)
+* @lane_num: Lane number
+
+* Description: This function notifies MAC that lane bring up is in progress and
+               it should stop listening to link status interrupts.
+------------------------------------------------------------------- */
+void qcom_aw_phy_notify_lane_bring_up_progress_to_mac(
+  struct qcom_aw_phy_inst_config *phy_inst_info,
+  enum eth_phy_iface_phy_lane_num_enum lane,
+  bool in_progress) {
+
+  u32 eth_link_index;
+
+  QCOM_AW_PHY_LOG_DBG("Lane bring up status %d for PHY %d, lane %d",
+                      in_progress, phy_inst_info->phy_inst, lane);
+
+  eth_link_index = phy_inst_info->lane_params[lane].lane_config.link_index;
+
+  qcom_aw_phy_mtip_if_info_s.lane_bring_up_progress_ind(
+                                                   eth_link_index, in_progress);
 
   return;
 }
