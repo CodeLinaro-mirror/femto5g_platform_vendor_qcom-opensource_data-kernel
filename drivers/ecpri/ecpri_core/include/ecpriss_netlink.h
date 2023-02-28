@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: GPL-2.0-only
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #ifndef ECPRISS_NETLINK_H_
@@ -77,6 +77,7 @@ typedef struct ecpriss_packet
 
 
 int ecpriss_netlink_socket_create(void);
+int ecpriss_netlink_socket_create_v2(void);
 void ecpriss_process_packet(ecpriss_packet_payload_s *packet);
 
 #endif

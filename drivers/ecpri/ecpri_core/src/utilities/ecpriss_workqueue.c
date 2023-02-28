@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: GPL-2.0-only
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include "ecpriss_core.h"
@@ -86,6 +86,47 @@ int ecpriss_initialize_workq(void)
 	return ret;
 }
 
+int ecpriss_initialize_workq_v2(void)
+{
+	int ret = 0;
+	do {
+		if(ecpriss_pdata_v2->events_workqueue->kernel_events_workqueue == NULL) {
+			events_workqueue =
+				create_singlethread_workqueue("ecpriss_events_workq");
+			ecpriss_pdata_v2->events_workqueue->kernel_events_workqueue =
+				events_workqueue;
+			if(events_workqueue == NULL) {
+				ret = -1;
+				break;
+			}
+		}
+
+		if(ecpriss_pdata_v2->interrupts_workqueue->ecpriss_interrupts_workq == NULL) {
+			interrupt_events_workqueue =
+				create_singlethread_workqueue("ecpriss_interrupts_workq");
+			ecpriss_pdata_v2->interrupts_workqueue->ecpriss_interrupts_workq =
+				interrupt_events_workqueue;
+			if(interrupt_events_workqueue == NULL) {
+				ret = -1;
+				break;
+			}
+		}
+
+		INIT_WORK(&ecpriss_dma_events_rdy,
+				ecpriss_dma_event_processing_wq);
+		ecpriss_pdata_v2->events_workqueue->ecpriss_dma_events_rdy_work=
+			&ecpriss_dma_events_rdy;
+		INIT_WORK(&ecpriss_eth_topology_events_rdy,
+				ecpriss_eth_topology_init_wq);
+		ecpriss_pdata_v2->events_workqueue->ecpriss_eth_topology_events_rdy_work =
+			&ecpriss_eth_topology_events_rdy;
+		INIT_WORK(&ecpriss_eth_events_rdy, ecpriss_eth_event_processing_wq);
+		ecpriss_pdata_v2->events_workqueue->ecpriss_eth_events_rdy_work =
+			&ecpriss_eth_events_rdy;
+	} while(0);
+
+	return ret;
+}
 /**
  * ecpriss_destroy_workq()
  *
