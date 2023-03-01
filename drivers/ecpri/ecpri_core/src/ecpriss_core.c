@@ -1224,6 +1224,39 @@ int ecpriss_stats_timer_interrupt_create_v2(void)
 }
 
 
+int ecpriss_stats_timer_disable(void)
+{
+	int ret = 0;
+
+	do{
+		ecpriss_pdata->stats_timer_info.stats_timer.expires = jiffies;
+		mod_timer(&ecpriss_pdata->stats_timer_info.stats_timer,
+				ecpriss_pdata->stats_timer_info.stats_timer.expires);
+
+		ecpriss_pdata->stats_timer_info.stats_timer_running = 0;
+		ecpriss_pdata->stats_timer_info.stats_interval = 0;
+	}while(0);
+
+	return ret;
+}
+
+
+int ecpriss_stats_timer_disable_v2(void)
+{
+	int ret = 0;
+
+	do{
+		ecpriss_pdata_v2->stats_timer_info.stats_timer.expires = jiffies;
+		mod_timer(&ecpriss_pdata_v2->stats_timer_info.stats_timer,
+				ecpriss_pdata_v2->stats_timer_info.stats_timer.expires);
+
+		ecpriss_pdata_v2->stats_timer_info.stats_timer_running = 0;
+		ecpriss_pdata_v2->stats_timer_info.stats_interval = 0;
+	}while(0);
+
+	return ret;
+}
+
 int ecpriss_stats_timer_enable(int timeout)
 {
 	int ret = 0;
@@ -1465,11 +1498,23 @@ static int __init ecpriss_core_module_init(void)
 
 static void __exit ecpriss_core_module_exit(void)
 {
-	if (ecpriss_pdata->netlink_socket) {
-		netlink_kernel_release(ecpriss_pdata->netlink_socket);
+	if(ecpriss_hw_ver == ECPRISS_HW_v1_0){
+		ecpriss_stats_timer_disable();
+		del_timer(&ecpriss_pdata->stats_timer_info.stats_timer);
+
+		if (ecpriss_pdata->netlink_socket) {
+			netlink_kernel_release(ecpriss_pdata->netlink_socket);
+		}
+	}else{
+		ecpriss_stats_timer_disable_v2();
+		del_timer(&ecpriss_pdata_v2->stats_timer_info.stats_timer);
+
+		if (ecpriss_pdata_v2->netlink_socket) {
+			netlink_kernel_release(ecpriss_pdata_v2->netlink_socket);
+		}
 	}
-	/* del_timer(&g_timer); */
 }
+
 #if 0
 void ecpriss_dump_pdata(void)
 {
