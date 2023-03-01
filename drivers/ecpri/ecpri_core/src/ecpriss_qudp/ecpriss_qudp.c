@@ -15,6 +15,8 @@ volatile int ecpriss_filtering_enabled = 0;
 #define ENABLE_FILTER                  1
 #define BYTE_SHIFT                     8
 #define MSB_SHIFT                      32
+#define CONFIGURE		       1
+#define DE_CONFIGURE		       0
 
 int qudp_irq_mapping[QUDP_IRQ_MAX];
 
@@ -484,6 +486,7 @@ void ecpriss_qudp_ingress_config_stats_update(int32_t fh_index)
 	for(fltr_index = 0; fltr_index < NUM_OF_FLTR ; fltr_index ++){
 
 		flag = flag << fltr_index;
+		ecpriss_pdata->cfg_stats.qudp_cfg.ingress.cfg.vlan[fh_index][fltr_index].value = 0;
 		if(ecpriss_pdata->cfg_stats.qudp_cfg.ingress.cfg.global_cfg[fh_index].enable_vlan_filt){
 			if(ecpriss_pdata->cfg_stats.qudp_cfg.ingress.vbits.vlan[fh_index].valid_bits & flag){
 				ecpriss_qudp_hal_read_reg_mn_fields(ECPRISS_QUDP_FH_FILTER,
@@ -493,6 +496,10 @@ void ecpriss_qudp_ingress_config_stats_update(int32_t fh_index)
 						&ecpriss_pdata->cfg_stats.qudp_cfg.ingress.cfg.vlan[fh_index][fltr_index]);
 			}
 		}
+		ecpriss_pdata->cfg_stats.qudp_cfg.ingress.cfg.ip_addr[fh_index][fltr_index].dst_ip0.value = 0;
+		ecpriss_pdata->cfg_stats.qudp_cfg.ingress.cfg.ip_addr[fh_index][fltr_index].dst_ip1.value = 0;
+		ecpriss_pdata->cfg_stats.qudp_cfg.ingress.cfg.ip_addr[fh_index][fltr_index].dst_ip2.value = 0;
+		ecpriss_pdata->cfg_stats.qudp_cfg.ingress.cfg.ip_addr[fh_index][fltr_index].dst_ip3.value = 0;
 		if(ecpriss_pdata->cfg_stats.qudp_cfg.ingress.cfg.global_cfg[fh_index].enable_ip_dst_filt){
 			if(ecpriss_pdata->cfg_stats.qudp_cfg.ingress.vbits.ip_addr[fh_index].valid_bits & flag){
 				ecpriss_qudp_hal_read_reg_mn_fields(ECPRISS_QUDP_FH_FILTER,
@@ -520,6 +527,7 @@ void ecpriss_qudp_ingress_config_stats_update(int32_t fh_index)
 						&ecpriss_pdata->cfg_stats.qudp_cfg.ingress.cfg.ip_addr[fh_index][fltr_index].dst_ip3);
 			}
 		}
+		ecpriss_pdata->cfg_stats.qudp_cfg.ingress.cfg.udp_clss[fh_index][fltr_index].value = 0;
 		if(ecpriss_pdata->cfg_stats.qudp_cfg.ingress.cfg.global_cfg[fh_index].enable_udp_dst_class){
 			if(ecpriss_pdata->cfg_stats.qudp_cfg.ingress.vbits.udp_clss[fh_index].valid_bits & flag){
 				ecpriss_qudp_hal_read_reg_mn_fields(ECPRISS_QUDP_FH_FILTER,
@@ -529,6 +537,8 @@ void ecpriss_qudp_ingress_config_stats_update(int32_t fh_index)
 						&ecpriss_pdata->cfg_stats.qudp_cfg.ingress.cfg.udp_clss[fh_index][fltr_index]);
 			}
 		}
+		ecpriss_pdata->cfg_stats.qudp_cfg.ingress.cfg.mac_addr[fh_index][fltr_index].mac_lsb.value = 0;
+		ecpriss_pdata->cfg_stats.qudp_cfg.ingress.cfg.mac_addr[fh_index][fltr_index].mac_msb.value = 0;
 		if(ecpriss_pdata->cfg_stats.qudp_cfg.ingress.cfg.global_cfg[fh_index].enable_mac_dst_check && fltr_index <= 4){
 			if(ecpriss_pdata->cfg_stats.qudp_cfg.ingress.vbits.mac_addr[fh_index].valid_bits & flag){
 				ecpriss_qudp_hal_read_reg_mn_fields(ECPRISS_QUDP_FH_FILTER,
@@ -1416,7 +1426,8 @@ void ecpriss_qudp_print_l2_ingress_stats(uint32_t port_index, uint32_t link_inde
  */
 
 static int ecpriss_qudp_ingress_modify_cfg(uint32_t port_index,
-		uint32_t value,	ecpriss_ingress_filter_mask_e field , int filtnum)
+		uint32_t value,	ecpriss_ingress_filter_mask_e field , uint8_t filtnum,
+		uint8_t cfg_action)
 {
 	ecpri_qudp_hwio_def_ecpri_udp_fh_ingress_config_p_s ingress_cfg;
 	ecpri_qudp_hwio_def_ecpri_udp_fh_filt_ip_dst_addr_port_p_entries_valid_bits_s ip_dst_valid_bit;
@@ -1442,12 +1453,17 @@ static int ecpriss_qudp_ingress_modify_cfg(uint32_t port_index,
 
 		if(ecpriss_filtering_enabled){
 			ingress_cfg.enable_ip_dst_filt = 1;
-			ip_dst_valid_bit.valid_bits |= 1 << filtnum;
+
+			if(cfg_action == CONFIGURE)
+				ip_dst_valid_bit.valid_bits |= 1 << filtnum;
+			else
+				ip_dst_valid_bit.valid_bits &= ~(1 << filtnum);
 		}else{
 			ingress_cfg.enable_ip_dst_filt = 0;
 			ip_dst_valid_bit.valid_bits = 0;
 
 		}
+
 
 		ecpriss_qudp_hal_write_reg_n_fields(ECPRISS_QUDP_FH,
 				ECPRI_UDP_FH_FILT_IP_DST_ADDR_PORT_p_ENTRIES_VALID_BITS,
@@ -1464,8 +1480,12 @@ static int ecpriss_qudp_ingress_modify_cfg(uint32_t port_index,
 		ecpriss_qudp_hal_read_reg_n_fields(ECPRISS_QUDP_FH,
 				ECPRI_UDP_FH_UDP_CLASSIFICATION_LIST_PORT_p_ENTRIES_VALID_BITS,
 				port_index, &udp_port);
+		ingress_cfg.enable_udp_dst_class = 1;
 
-		udp_port.valid_bits  |= 1UL << filtnum;
+		if(cfg_action == CONFIGURE)
+			udp_port.valid_bits  |= 1UL << filtnum;
+		else
+			udp_port.valid_bits  &= ~( 1UL << filtnum);
 
 		ecpriss_qudp_hal_write_reg_n_fields(ECPRISS_QUDP_FH,
 				ECPRI_UDP_FH_UDP_CLASSIFICATION_LIST_PORT_p_ENTRIES_VALID_BITS,
@@ -1485,7 +1505,11 @@ static int ecpriss_qudp_ingress_modify_cfg(uint32_t port_index,
 
 		if(ecpriss_filtering_enabled){
 			ingress_cfg.enable_vlan_filt = 1;
-			vlan_id.valid_bits  |= 1 << filtnum;
+
+			if(cfg_action == CONFIGURE)
+				vlan_id.valid_bits  |= (1 << filtnum);
+			else
+				vlan_id.valid_bits  &= ~(1 << filtnum);
 
 		}else{
 			ingress_cfg.enable_vlan_filt = 0;
@@ -3099,6 +3123,423 @@ int ecpriss_qudp_init_v2(struct device *dev)
 	return ret;
 }
 
+static bool ecpriss_qudp_fh_rx_is_ip_filter_exist(
+		ecpri_qudp_hwio_def_ecpri_udp_fh_filt_ip_dst_addr0_port_p_entry_n_s dst_ip0,
+		ecpri_qudp_hwio_def_ecpri_udp_fh_filt_ip_dst_addr1_port_p_entry_n_s dst_ip1,
+		ecpri_qudp_hwio_def_ecpri_udp_fh_filt_ip_dst_addr2_port_p_entry_n_s dst_ip2,
+		ecpri_qudp_hwio_def_ecpri_udp_fh_filt_ip_dst_addr3_port_p_entry_n_s dst_ip3,
+		uint8_t *filter_idx,
+		uint8_t port_index,
+		ecpriss_ip_type ip_type
+		)
+{
+	uint32_t i  =0;
+	ecpriss_qudp_ingress_per_port_cfg_s *qudp_ingress_port =
+		&ecpriss_pdata->qudp_ctx->fh_port_cfg[port_index].ingress_port_cfg;
+
+	for(i = 0; i< MAX_WHITELIST_ENTRIES; i++){
+		if(dst_ip0.value == qudp_ingress_port->ipdst_addr[i][0]){
+			if(ip_type == ECPRISS_IPV6_TYPE)
+			{
+				if(dst_ip1.value == qudp_ingress_port->ipdst_addr[i][1] &&
+						dst_ip2.value == qudp_ingress_port->ipdst_addr[i][2] &&
+						dst_ip3.value == qudp_ingress_port->ipdst_addr[i][3]){
+					*filter_idx = i;
+					return true;
+				}
+			}else{
+				*filter_idx = i;
+					return true;
+			}
+
+		}
+	}
+	return false;
+}
+static bool ecpriss_qudp_fh_rx_get_available_ipfilter_idx(
+		uint8_t *filter_idx,
+		uint8_t port_index,
+		ecpriss_ip_type ip_type
+		)
+{
+	uint32_t i  =0;
+	ecpriss_qudp_ingress_per_port_cfg_s *qudp_ingress_port =
+		&ecpriss_pdata->qudp_ctx->fh_port_cfg[port_index].ingress_port_cfg;
+
+	for(i = 0; i< MAX_WHITELIST_ENTRIES; i++){
+		if(0 == qudp_ingress_port->ipdst_addr[i][0]){
+			if(ip_type == ECPRISS_IPV6_TYPE)
+			{
+				if(0 == qudp_ingress_port->ipdst_addr[i][1] &&
+						0 == qudp_ingress_port->ipdst_addr[i][2] &&
+						0 == qudp_ingress_port->ipdst_addr[i][3]){
+					*filter_idx = i;
+					return true;
+				}
+			}else{
+				*filter_idx = i;
+					return true;
+			}
+
+		}
+	}
+	return false;
+}
+static bool ecpriss_qudp_fh_rx_ip_filter_cfg(uint32_t port_index, ecpriss_qudp_rx_cfg_s *rx_cfg)
+{
+
+	uint8_t filter_idx = 0;
+	uint8_t cfg_action = DE_CONFIGURE;
+	ecpriss_qudp_ingress_per_port_cfg_s *qudp_ingress_port =
+		&ecpriss_pdata->qudp_ctx->fh_port_cfg[port_index].ingress_port_cfg;
+
+	ecpri_qudp_hwio_def_ecpri_udp_fh_filt_ip_dst_addr0_port_p_entry_n_s dst_ip0 = {0};
+	ecpri_qudp_hwio_def_ecpri_udp_fh_filt_ip_dst_addr1_port_p_entry_n_s dst_ip1 = {0};
+	ecpri_qudp_hwio_def_ecpri_udp_fh_filt_ip_dst_addr2_port_p_entry_n_s dst_ip2 = {0};
+	ecpri_qudp_hwio_def_ecpri_udp_fh_filt_ip_dst_addr3_port_p_entry_n_s dst_ip3 = {0};
+
+	if(rx_cfg == NULL) {
+		return false;
+	}
+
+	if(rx_cfg->fltr_en_mask & ECPRISS_QUDP_RX_CFG_FLTR_MASK_IP_DADDR){
+		cfg_action = CONFIGURE;
+	}
+	if(cfg_action == CONFIGURE){
+		if(qudp_ingress_port->num_ip_fltr_entries >= MAX_WHITELIST_ENTRIES){
+			ECPRILOGERR("Cannot apply new IP filter, Capacity is full\n");
+			return false;
+		}
+	}
+	if(cfg_action == DE_CONFIGURE){
+		if(qudp_ingress_port->num_ip_fltr_entries <= 0){
+			ECPRILOGERR("Cannot Remove IP filter, No filter exist\n");
+			return false;
+		}
+	}
+	dst_ip0.value = ((rx_cfg->ip_dst_addr[3]) | (rx_cfg->ip_dst_addr[2] << 8) | (rx_cfg->ip_dst_addr[1] << 16)
+			| (rx_cfg->ip_dst_addr[0] << 24));
+
+	if(rx_cfg->ip_type == ECPRISS_IPV6_TYPE)
+	{
+		dst_ip1.value = ((rx_cfg->ip_dst_addr[7]) | (rx_cfg->ip_dst_addr[6] << 8) | (rx_cfg->ip_dst_addr[5] << 16)
+				| (rx_cfg->ip_dst_addr[4] << 24));
+
+		dst_ip2.value = ((rx_cfg->ip_dst_addr[11]) | (rx_cfg->ip_dst_addr[10] << 8) | (rx_cfg->ip_dst_addr[9] << 16)
+				| (rx_cfg->ip_dst_addr[8] << 24));
+
+		dst_ip3.value = ((rx_cfg->ip_dst_addr[15]) | (rx_cfg->ip_dst_addr[14] << 8) | (rx_cfg->ip_dst_addr[13] << 16)
+				| (rx_cfg->ip_dst_addr[12] << 24));
+	}
+	if(cfg_action == DE_CONFIGURE){
+		if((dst_ip0.value + dst_ip1.value + dst_ip2.value + dst_ip3.value ) == 0){
+			ECPRILOGERR("Invalid ip Config \n");
+			return false;
+		}
+	}
+	/*
+	 * Check if the IP filter already exist
+	 */
+	if(ecpriss_filtering_enabled){
+		if(ecpriss_qudp_fh_rx_is_ip_filter_exist(dst_ip0, dst_ip1 , dst_ip2, dst_ip3, &filter_idx, port_index, rx_cfg->ip_type)){
+			ECPRILOGERR("IP Filter exist in database \n");
+			if(cfg_action == CONFIGURE){
+				ECPRILOGERR("Cannot apply IP filter, Already exist\n");
+				return false;
+			}
+		}else{
+			ECPRILOGERR("IP Filter Doesn't exist in database \n");
+			if(cfg_action == CONFIGURE){
+				if(!ecpriss_qudp_fh_rx_get_available_ipfilter_idx(&filter_idx, port_index, rx_cfg->ip_type)){
+					ECPRILOGERR("Ip filter configuration is full, Can not apply new ip filtr config\n");
+					return false;
+				}
+
+			}else{
+				ECPRILOGERR("Cannot remove IP filter, does not exist\n");
+				return false;
+			}
+		}
+	}
+	/*
+	 * if ecpriss_filtering_enabled is set or it is One
+	 * remove the matching filter
+	 */
+	if(ecpriss_filtering_enabled == 1){
+		/*
+		 * remove filters
+		 */
+		if(cfg_action == DE_CONFIGURE){
+			ECPRILOGERR("forcing IP filter to zero to remove filter \n");
+			dst_ip0.value = 0;
+			dst_ip1.value = 0;
+			dst_ip2.value = 0;
+			dst_ip3.value = 0;
+			if(qudp_ingress_port->num_ip_fltr_entries)
+				qudp_ingress_port->num_ip_fltr_entries--;
+		}
+	}
+
+	ecpriss_qudp_hal_write_reg_mn_fields(ECPRISS_QUDP_FH_FILTER,
+			ECPRI_UDP_FH_FILT_IP_DST_ADDR0_PORT_p_ENTRY_n,
+			port_index,
+			filter_idx,
+			&dst_ip0);
+
+	qudp_ingress_port->ipdst_addr[filter_idx][0] = dst_ip0.value ;
+
+
+	if(rx_cfg->ip_type == ECPRISS_IPV6_TYPE)
+	{
+
+		ecpriss_qudp_hal_write_reg_mn_fields(ECPRISS_QUDP_FH_FILTER,
+				ECPRI_UDP_FH_FILT_IP_DST_ADDR1_PORT_p_ENTRY_n,
+				port_index,
+				filter_idx,
+				&dst_ip1);
+
+		qudp_ingress_port->ipdst_addr[filter_idx][1] = dst_ip1.value ;
+
+		ecpriss_qudp_hal_write_reg_mn_fields(ECPRISS_QUDP_FH_FILTER,
+				ECPRI_UDP_FH_FILT_IP_DST_ADDR2_PORT_p_ENTRY_n,
+				port_index,
+				filter_idx,
+				&dst_ip2);
+
+		qudp_ingress_port->ipdst_addr[filter_idx][2] = dst_ip2.value ;
+
+		ecpriss_qudp_hal_write_reg_mn_fields(ECPRISS_QUDP_FH_FILTER,
+				ECPRI_UDP_FH_FILT_IP_DST_ADDR3_PORT_p_ENTRY_n,
+				port_index,
+				filter_idx,
+				&dst_ip3);
+
+		qudp_ingress_port->ipdst_addr[filter_idx][3] = dst_ip3.value ;
+
+	}
+
+	if(ecpriss_filtering_enabled != 0 && cfg_action == CONFIGURE){
+		qudp_ingress_port->num_ip_fltr_entries++;
+	}
+	ecpriss_qudp_ingress_modify_cfg(port_index,
+			ENABLE_FILTER,
+			ECPRISS_QUDP_RX_CFG_FLTR_MASK_IP_DADDR,
+			filter_idx,
+			cfg_action);
+
+	return true;
+}
+static bool ecpriss_qudp_fh_rx_vlan_filter_cfg(uint32_t port_index, ecpriss_qudp_rx_cfg_s *rx_cfg)
+{
+
+	int i = 0;
+	uint8_t filter_idx = 0;
+	uint8_t cfg_action = DE_CONFIGURE;
+	ecpriss_qudp_ingress_per_port_cfg_s *qudp_ingress_port =
+		&ecpriss_pdata->qudp_ctx->fh_port_cfg[port_index].ingress_port_cfg;
+
+	ecpri_qudp_hwio_def_ecpri_udp_fh_filt_vlan_addr_port_p_entry_n_s vlan_addr_port = {0};
+
+	if(rx_cfg == NULL) {
+		return false;
+	}
+	if(rx_cfg->vlan_addr_port > 0)
+	{
+		filter_idx = 0;
+		cfg_action = DE_CONFIGURE;
+		if(rx_cfg->fltr_en_mask & ECPRISS_QUDP_RX_CFG_FLTR_MASK_VLAN){
+			cfg_action = CONFIGURE;
+		}
+		if(cfg_action == CONFIGURE){
+			if(qudp_ingress_port->num_vlan_fltr_entries >= MAX_WHITELIST_ENTRIES){
+				ECPRILOGERR("Cannot apply new VLAN filter, Capacity is full\n");
+				return false;
+			}
+		}
+		if(cfg_action == DE_CONFIGURE){
+			if(qudp_ingress_port->num_vlan_fltr_entries <= 0){
+				ECPRILOGERR("Cannot remove VLAN filter, No filter exist\n");
+				return false;
+			}
+		}
+
+		/*
+		 * Check if the VLAN filter already exist
+		 */
+		if(ecpriss_filtering_enabled){
+			for(i = 0; i< MAX_WHITELIST_ENTRIES; i++){
+				if(rx_cfg->vlan_addr_port == qudp_ingress_port->vlan_addr[i]){
+					if(cfg_action == CONFIGURE){
+						ECPRILOGERR("Cannot apply VLAN filter :%u, Already exist\n",rx_cfg->vlan_addr_port);
+						return false;
+					}else{
+						ECPRILOGERR("Filter exist at index %u\n", i);
+						filter_idx = i;
+						break;
+					}
+				}
+			}
+
+			if(cfg_action == DE_CONFIGURE){
+				if(filter_idx != i){
+					ECPRILOGERR("VLAN filter does not exist\n");
+					return false;
+				}
+			}else{
+				/*
+				 * look for available space in table
+				 */
+				ECPRILOGERR("Looking for available slot in table\n");
+				for(i = 0; i< MAX_WHITELIST_ENTRIES; i++){
+					if(0 == qudp_ingress_port->vlan_addr[i]){
+						filter_idx = i;
+						break;
+					}
+				}
+				if(i != filter_idx){
+					ECPRILOGERR("VLAN filter full, can not cfg new filter\n");
+					return false;
+				}
+
+			}
+		}
+		/*
+		 * remove the last applied filter
+		 */
+		if(ecpriss_filtering_enabled == 1){
+			if(cfg_action == DE_CONFIGURE){
+				ECPRILOGERR("forcing vlan id to zero to remove filter \n");
+				rx_cfg->vlan_addr_port = 0;
+				if(qudp_ingress_port->num_vlan_fltr_entries)
+					qudp_ingress_port->num_vlan_fltr_entries--;
+			}
+		}
+		vlan_addr_port.value = rx_cfg->vlan_addr_port;
+
+		ecpriss_qudp_hal_write_reg_mn_fields(ECPRISS_QUDP_FH_FILTER,
+				ECPRI_UDP_FH_FILT_VLAN_ADDR_PORT_p_ENTRY_n,
+				port_index,
+				filter_idx,
+				&vlan_addr_port);
+
+		qudp_ingress_port->vlan_addr[filter_idx] = rx_cfg->vlan_addr_port;
+
+
+		if(ecpriss_filtering_enabled != 0 && cfg_action == CONFIGURE){
+			qudp_ingress_port->num_vlan_fltr_entries++;
+		}
+		ecpriss_qudp_ingress_modify_cfg(port_index,
+				ENABLE_FILTER,
+				ECPRISS_QUDP_RX_CFG_FLTR_MASK_VLAN,
+				filter_idx,
+				cfg_action);
+
+	}
+	return true;
+}
+static bool ecpriss_qudp_fh_rx_udp_filter_cfg(uint32_t port_index, ecpriss_qudp_rx_cfg_s *rx_cfg)
+{
+
+	int i = 0;
+	uint8_t filter_idx = 0;
+	uint8_t cfg_action = DE_CONFIGURE;
+	ecpriss_qudp_ingress_per_port_cfg_s *qudp_ingress_port =
+		&ecpriss_pdata->qudp_ctx->fh_port_cfg[port_index].ingress_port_cfg;
+
+	ecpri_qudp_hwio_def_ecpri_udp_fh_udp_classification_list_port_p_entry_n_s udp_classification_port = {0};
+
+	if(rx_cfg == NULL) {
+		return false;
+	}
+	if(rx_cfg->udp_dst_port > 0)
+	{
+		if(rx_cfg->fltr_en_mask & ECPRISS_QUDP_RX_CFG_FLTR_MASK_UDP_DPORT){
+			cfg_action = CONFIGURE;
+		}
+
+		udp_classification_port.value = rx_cfg->udp_dst_port;
+		if(cfg_action == CONFIGURE){
+			if(qudp_ingress_port->num_udp_fltr_entries >= MAX_WHITELIST_ENTRIES){
+				ECPRILOGERR("Cannot apply new UDP_CLASSIFICATION filter, Capacity is full\n");
+				return false;
+			}
+		}
+		if(cfg_action == DE_CONFIGURE){
+			if(qudp_ingress_port->num_udp_fltr_entries <= 0){
+				ECPRILOGERR("Cannot remove UDP_CLASSIFICATION filter, No filter exist\n");
+				return false;
+			}
+		}
+
+		/*
+		 * Check if the UDP_CLASSIFICATION filter already exist
+		 */
+		for(i = 0; i< MAX_WHITELIST_ENTRIES; i++){
+			if(udp_classification_port.value == qudp_ingress_port->udp_port[i]){
+				if(cfg_action == CONFIGURE){
+					ECPRILOGERR("Cannot apply UDP_CLASSIFICATION filter :%u, Already exist\n",udp_classification_port.value);
+					return false;
+				}else{
+					ECPRILOGERR("Filter exist at index %u\n", i);
+					filter_idx = i;
+					break;
+				}
+			}
+		}
+		if(cfg_action == DE_CONFIGURE){
+			if(filter_idx != i){
+				ECPRILOGERR("VLAN filter does not exist\n");
+				return false;
+			}
+		}else{
+			/*
+			 * look for available space in table
+			 */
+			ECPRILOGERR("Looking for available slots \n");
+			for(i = 0; i< MAX_WHITELIST_ENTRIES; i++){
+				if(0 == qudp_ingress_port->udp_port[i]){
+					filter_idx = i;
+					break;
+				}
+			}
+			if(i != filter_idx){
+				ECPRILOGERR("UDP filter full, can not cfg new filter\n");
+				return false;
+			}
+		}
+
+		/*
+		 * UDP_classification value 0 is to remove last applied filter
+		 * UDP_class id '0' can not be used as filter
+		 * if filter exist remove the last applied filter
+		 */
+		if(cfg_action == DE_CONFIGURE){
+			udp_classification_port.value = 0;
+			rx_cfg->udp_dst_port = 0;
+			if(qudp_ingress_port->num_udp_fltr_entries)
+				qudp_ingress_port->num_udp_fltr_entries--;
+		}
+
+		ecpriss_qudp_hal_write_reg_mn_fields(ECPRISS_QUDP_FH_FILTER,
+				ECPRI_UDP_FH_UDP_CLASSIFICATION_LIST_PORT_p_ENTRY_n,
+				port_index,
+				filter_idx,
+				&udp_classification_port);
+
+		qudp_ingress_port->udp_port[filter_idx] = udp_classification_port.value;
+
+		if(cfg_action == CONFIGURE){
+			qudp_ingress_port->num_udp_fltr_entries++;
+		}
+		ecpriss_qudp_ingress_modify_cfg(port_index,
+				ENABLE_FILTER,
+				ECPRISS_QUDP_RX_CFG_FLTR_MASK_UDP_DPORT,
+				filter_idx,
+				cfg_action);
+
+	}
+	return true;
+}
 
 /**
  *  ecpriss_qudp_fh_rx_filter_cfg()
@@ -3141,145 +3582,22 @@ int ecpriss_qudp_init_v2(struct device *dev)
  */
 int ecpriss_qudp_fh_rx_filter_cfg(uint32_t port_index, ecpriss_qudp_rx_cfg_s *rx_cfg)
 {
+	bool ret = false;
 
-	int ret = 0;
-	ecpriss_qudp_ingress_per_port_cfg_s *qudp_ingress_port =
-		&ecpriss_pdata->qudp_ctx->fh_port_cfg[port_index].ingress_port_cfg;
+	ret = ecpriss_qudp_fh_rx_ip_filter_cfg(port_index, rx_cfg);
+	if(ret == false){
+		ECPRILOGERR("IP filter Config validation failed \n");
+	}
+	ret = ecpriss_qudp_fh_rx_vlan_filter_cfg(port_index, rx_cfg);
+	if(ret == false){
+		ECPRILOGERR("Vlan filter config validation failed \n");
+	}
+	ret = ecpriss_qudp_fh_rx_udp_filter_cfg(port_index, rx_cfg);
+	if(ret == false){
+		ECPRILOGERR("UDP filter config validation failed \n");
+	}
 
-	ecpri_qudp_hwio_def_ecpri_udp_fh_filt_vlan_addr_port_p_entry_n_s vlan_addr_port = {0};
-	ecpri_qudp_hwio_def_ecpri_udp_fh_udp_classification_list_port_p_entry_n_s udp_classification_port = {0};
-	ecpri_qudp_hwio_def_ecpri_udp_fh_filt_ip_dst_addr0_port_p_entry_n_s dst_ip0 = {0};
-	ecpri_qudp_hwio_def_ecpri_udp_fh_filt_ip_dst_addr1_port_p_entry_n_s dst_ip1 = {0};
-	ecpri_qudp_hwio_def_ecpri_udp_fh_filt_ip_dst_addr2_port_p_entry_n_s dst_ip2 = {0};
-	ecpri_qudp_hwio_def_ecpri_udp_fh_filt_ip_dst_addr3_port_p_entry_n_s dst_ip3 = {0};
-
-
-	do{
-		if(rx_cfg == NULL) {
-			ret = -ENOMEM;
-			break;
-		}
-
-
-		if(rx_cfg->fltr_en_mask & ECPRISS_QUDP_RX_CFG_FLTR_MASK_IP_DADDR)
-		{
-
-			dst_ip0.value |= ((rx_cfg->ip_dst_addr[3]) | (rx_cfg->ip_dst_addr[2] << 8) | (rx_cfg->ip_dst_addr[1] << 16)
-					| (rx_cfg->ip_dst_addr[0] << 24));
-
-
-			ecpriss_qudp_hal_write_reg_mn_fields(ECPRISS_QUDP_FH_FILTER,
-					ECPRI_UDP_FH_FILT_IP_DST_ADDR0_PORT_p_ENTRY_n,
-					port_index,
-					qudp_ingress_port->num_ip_fltr_entries,
-					&dst_ip0);
-
-			qudp_ingress_port->ipdst_addr[qudp_ingress_port->num_ip_fltr_entries][0] |= dst_ip0.value ;
-
-
-			if(rx_cfg->ip_type == ECPRISS_IPV6_TYPE)
-			{
-
-
-				dst_ip1.value |= ((rx_cfg->ip_dst_addr[7]) | (rx_cfg->ip_dst_addr[6] << 8) | (rx_cfg->ip_dst_addr[5] << 16)
-						| (rx_cfg->ip_dst_addr[4] << 24));
-
-
-				ecpriss_qudp_hal_write_reg_mn_fields(ECPRISS_QUDP_FH_FILTER,
-						ECPRI_UDP_FH_FILT_IP_DST_ADDR1_PORT_p_ENTRY_n,
-						port_index,
-						qudp_ingress_port->num_ip_fltr_entries,
-						&dst_ip1);
-
-				qudp_ingress_port->ipdst_addr[qudp_ingress_port->num_ip_fltr_entries][1] |= dst_ip1.value ;
-
-
-
-				dst_ip2.value |= ((rx_cfg->ip_dst_addr[11]) | (rx_cfg->ip_dst_addr[6] << 10) | (rx_cfg->ip_dst_addr[9] << 16)
-						| (rx_cfg->ip_dst_addr[8] << 24));
-
-
-				ecpriss_qudp_hal_write_reg_mn_fields(ECPRISS_QUDP_FH_FILTER,
-						ECPRI_UDP_FH_FILT_IP_DST_ADDR2_PORT_p_ENTRY_n,
-						port_index,
-						qudp_ingress_port->num_ip_fltr_entries,
-						&dst_ip2);
-
-				qudp_ingress_port->ipdst_addr[qudp_ingress_port->num_ip_fltr_entries][2] |= dst_ip2.value ;
-
-
-				dst_ip3.value |= ((rx_cfg->ip_dst_addr[15]) | (rx_cfg->ip_dst_addr[14] << 10) | (rx_cfg->ip_dst_addr[13] << 16)
-						| (rx_cfg->ip_dst_addr[12] << 24));
-
-
-				ecpriss_qudp_hal_write_reg_mn_fields(ECPRISS_QUDP_FH_FILTER,
-						ECPRI_UDP_FH_FILT_IP_DST_ADDR3_PORT_p_ENTRY_n,
-						port_index,
-						qudp_ingress_port->num_ip_fltr_entries,
-						&dst_ip3);
-
-				qudp_ingress_port->ipdst_addr[qudp_ingress_port->num_ip_fltr_entries][3] |= dst_ip3.value ;
-
-			}
-
-			ecpriss_qudp_ingress_modify_cfg(port_index,
-					ENABLE_FILTER,
-					ECPRISS_QUDP_RX_CFG_FLTR_MASK_IP_DADDR,
-					qudp_ingress_port->num_ip_fltr_entries);
-
-			qudp_ingress_port->num_ip_fltr_entries++;
-
-		}
-
-		if(rx_cfg->vlan_addr_port > 0 && (rx_cfg->fltr_en_mask & ECPRISS_QUDP_RX_CFG_FLTR_MASK_VLAN))
-		{
-			vlan_addr_port.value |= rx_cfg->vlan_addr_port;
-
-			ecpriss_qudp_hal_write_reg_mn_fields(ECPRISS_QUDP_FH_FILTER,
-					ECPRI_UDP_FH_FILT_VLAN_ADDR_PORT_p_ENTRY_n,
-					port_index,
-					qudp_ingress_port->num_vlan_fltr_entries,
-					&vlan_addr_port);
-
-
-
-			ecpriss_qudp_ingress_modify_cfg(port_index,
-					ENABLE_FILTER,
-					ECPRISS_QUDP_RX_CFG_FLTR_MASK_VLAN,
-					qudp_ingress_port->num_vlan_fltr_entries);
-
-
-
-			qudp_ingress_port->vlan_addr[qudp_ingress_port->num_vlan_fltr_entries] = rx_cfg->vlan_addr_port;
-			qudp_ingress_port->num_vlan_fltr_entries++;
-		}
-
-		if(rx_cfg->udp_dst_port > 0 && rx_cfg->fltr_en_mask & ECPRISS_QUDP_RX_CFG_FLTR_MASK_UDP_DPORT)
-		{
-			udp_classification_port.value |= rx_cfg->udp_dst_port;
-
-
-			ecpriss_qudp_hal_write_reg_mn_fields(ECPRISS_QUDP_FH_FILTER,
-					ECPRI_UDP_FH_UDP_CLASSIFICATION_LIST_PORT_p_ENTRY_n,
-					port_index,
-					qudp_ingress_port->num_udp_fltr_entries,
-					&udp_classification_port);
-
-			ecpriss_qudp_ingress_modify_cfg(port_index,
-					ENABLE_FILTER,
-					ECPRISS_QUDP_RX_CFG_FLTR_MASK_UDP_DPORT,
-					qudp_ingress_port->num_udp_fltr_entries);
-
-			qudp_ingress_port->udp_port[qudp_ingress_port->num_udp_fltr_entries] = rx_cfg->udp_dst_port;
-			qudp_ingress_port->num_udp_fltr_entries++;
-		}
-
-
-
-	}while (0);
-
-
-	return ret;
+	return 0;
 }
 
 int ecpriss_qudp_fh_rx_filter_cfg_v2(uint32_t port_index, ecpriss_qudp_rx_cfg_s *rx_cfg)
