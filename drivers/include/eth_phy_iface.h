@@ -17,7 +17,9 @@
 enum mtip_device_mode_enum
 {
    MTIP_DEVICE_RU = 0,
-   MTIP_DEVICE_DU
+   MTIP_DEVICE_DU,
+   MTIP_DEVICE_RUv2,
+   MTIP_DEVICE_DUv2
 };
 
 /* The Port type */
