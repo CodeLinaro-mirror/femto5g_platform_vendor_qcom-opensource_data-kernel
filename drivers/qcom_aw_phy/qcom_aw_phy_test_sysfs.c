@@ -34,6 +34,11 @@ static const struct file_operations qcom_aw_phy_debug_fs_prbs_result_ops = {
   .read = qcom_aw_phy_get_prbs_result,
 };
 
+static const struct file_operations qcom_aw_phy_debug_fs_tx_eq_ops = {
+  .write = qcom_aw_phy_set_tx_eq_val,
+  .read = qcom_aw_phy_get_tx_eq_val,
+};
+
 enum qcom_aw_phy_debug_fs_cmd{
   PHY_REG = 1,
   PHY_SETUP,
@@ -83,6 +88,8 @@ uint32_t                               err_count_overflow[12] = {0};
 uint64_t                               err_count[12] = {0};
 uint64_t                               ber[12] = {0};
 bool                                   check_prbs_all_lanes = false;
+
+uint32_t                               tx_fir_main_or_max[QCOM_AW_PHY_INST_MAX] = {0};
 
 extern struct eth_phy_iface_ops qcom_aw_phy_driver_iface_ops;
 
@@ -154,6 +161,9 @@ void qcom_aw_phy_setup_sysfs() {
 
   debugfs_create_file("prbs_result", 0644, dobj, 0,
                       &qcom_aw_phy_debug_fs_prbs_result_ops);
+
+  debugfs_create_file("tx_eq_val", 0644, dobj, 0,
+                      &qcom_aw_phy_debug_fs_tx_eq_ops);
 
   return;
 }
@@ -699,6 +709,88 @@ ssize_t qcom_aw_phy_set_attr(struct file *file, const char __user *buf,
     QCOM_AW_PHY_LOG_ERR("Invalid input, \"cat /sys/kernel/debug/qcom_aw_phy_test/qcom_aw_phy\" for help menu");
 
   return count;
+}
+
+ssize_t qcom_aw_phy_set_tx_eq_val(struct file *file, const char __user *buf,
+                             size_t count, loff_t *ppos) {
+  char *token;
+  char token_string[100];
+  char *save_ptr = NULL;
+  struct qcom_aw_phy_config *phy_config_info = NULL;
+  struct qcom_aw_phy_inst_config *phy_inst_info = NULL;
+  mss_access_t mss = {.phy_offset = 0, .lane_offset = 0};
+  aw_txfir_config_t txfir_cfg = {0};
+
+  memset(token_string, 0, sizeof(token_string));
+  if (copy_from_user(&token_string, buf, MIN(sizeof(token_string), count))){
+    QCOM_AW_PHY_LOG_ERR("Copy from user failed");
+    return -EFAULT;
+  }
+
+  token = qcom_aw_phy_strtok(token_string, ',', &save_ptr);
+  sscanf(token, "%d", &txfir_cfg.CM3);
+  token = qcom_aw_phy_strtok(NULL, ',', &save_ptr);
+  sscanf(token, "%d", &txfir_cfg.CM2);
+  token = qcom_aw_phy_strtok(NULL, ',', &save_ptr);
+  sscanf(token, "%d", &txfir_cfg.CM1);
+  token = qcom_aw_phy_strtok(NULL, ',', &save_ptr);
+  sscanf(token, "%d", &txfir_cfg.C0);
+  token = qcom_aw_phy_strtok(NULL, ',', &save_ptr);
+  sscanf(token, "%d", &txfir_cfg.C1);
+  token = qcom_aw_phy_strtok(NULL, ',', &save_ptr);
+  sscanf(token, "%d", &txfir_cfg.C2);
+  token = qcom_aw_phy_strtok(NULL, ',', &save_ptr);
+  sscanf(token, "%d", &txfir_cfg.C3);
+  token = qcom_aw_phy_strtok(NULL, ',', &save_ptr);
+  sscanf(token, "%d", &txfir_cfg.main_or_max);
+
+  QCOM_AW_PHY_LOG_ERR("TX EQ values for PHY instance %d, lane %d, "
+                      "CM3=%d, CM2=%d, CM1=%d, C0=%d, C1=%d, C2=%d, C3=%d, "
+                      "main_or_max=%d\n",
+                      tx_bist_phy_inst, tx_bist_lane_num,
+                      txfir_cfg.CM3, txfir_cfg.CM2, txfir_cfg.CM1,
+                      txfir_cfg.C0, txfir_cfg.C1, txfir_cfg.C2, txfir_cfg.C3,
+                      txfir_cfg.main_or_max);
+
+  phy_config_info = qcom_aw_phy_get_config_info();
+  phy_inst_info = &phy_config_info->phy_inst_config_info[tx_bist_phy_inst];
+  mss.phy_offset = phy_inst_info->base_addr;
+  pmd_set_lane(&mss, tx_bist_lane_num);
+
+  aw_pmd_txfir_config_set(&mss, &txfir_cfg, 1);
+
+  tx_fir_main_or_max[tx_bist_phy_inst] = txfir_cfg.main_or_max;
+
+  return count;
+}
+
+ssize_t qcom_aw_phy_get_tx_eq_val(struct file *file, char __user *buf,
+                                    size_t count, loff_t *ppos){
+  struct qcom_aw_phy_config *phy_config_info = NULL;
+  struct qcom_aw_phy_inst_config *phy_inst_info = NULL;
+  mss_access_t mss = {.phy_offset = 0, .lane_offset = 0};
+  aw_txfir_config_t txfir_cfg = {0};
+  char dbg_buf[200] = {0};
+  int nbytes = 0;
+
+  phy_config_info = qcom_aw_phy_get_config_info();
+  phy_inst_info = &phy_config_info->phy_inst_config_info[tx_bist_phy_inst];
+  mss.phy_offset = phy_inst_info->base_addr;
+  pmd_set_lane(&mss, tx_bist_lane_num);
+
+  txfir_cfg.main_or_max = tx_fir_main_or_max[tx_bist_phy_inst];
+  aw_pmd_txfir_config_get(&mss, &txfir_cfg);
+
+  nbytes += scnprintf(dbg_buf, 200,
+                      "TX EQ values for PHY instance %d, lane %d, "
+                      "CM3=%d, CM2=%d, CM1=%d, C0=%d, C1=%d,C2=%d, C3=%d, "
+                      "main_or_max=%d\n",
+                      tx_bist_phy_inst, tx_bist_lane_num,
+                      txfir_cfg.CM3, txfir_cfg.CM2, txfir_cfg.CM1,
+                      txfir_cfg.C0, txfir_cfg.C1, txfir_cfg.C2, txfir_cfg.C3,
+                      txfir_cfg.main_or_max);
+
+  return simple_read_from_buffer(buf, count, ppos, dbg_buf, nbytes);
 }
 
 #endif /* FEATURE_QCOM_AW_TEST_SYS_FS */
