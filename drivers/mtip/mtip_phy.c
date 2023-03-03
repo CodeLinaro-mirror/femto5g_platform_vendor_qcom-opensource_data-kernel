@@ -72,7 +72,7 @@ extern struct eth_phy_iface_ops qcom_aw_phy_driver_iface_ops;
 extern int qsfp_eth_get_link_type(u32 qsfp_phandle, u8* link_info);
 
 // PCS level retry delay to bring up PHY lane
-#define MTIP_PHY_RETRY_TIMER     2000
+#define MTIP_PHY_RETRY_TIMER     10000
 
 static void mtip_phy_ready_cb(void *user_data)
 {
@@ -97,11 +97,11 @@ static void mtip_phy_an_complete_cb(enum mtip_port_type_enum port_type, enum eth
     return;
 }
 
-static void mtip_phy_cdr_lock_cb(u32 link_index, bool status)
+static void mtip_phy_cdr_lock_ind(u32 link_index, bool status)
 {
     struct mtip_delayed_work_q_params *wq_params;
 
-    CSMLOGERR("CDR lock callback for link_index %d, status %d\n",
+    CSMLOGERR("CDR lock indication for link_index %d, status %d\n",
               link_index, status);
 
     if (mtip_mac_wrapper_get_link_status(link_index) == true) 
@@ -110,18 +110,29 @@ static void mtip_phy_cdr_lock_cb(u32 link_index, bool status)
     }
     else if(status == true)
     {
-
-      wq_params = kmalloc(sizeof(struct mtip_delayed_work_q_params),
-                          GFP_ATOMIC);
-      if(!wq_params)
-        CSMLOGERR("Malloc failed!");
-      else{
-        INIT_DELAYED_WORK(&wq_params->wq_item,
-                          mtip_phy_retry_phy_bringup);
-        wq_params->link_index = link_index;
-        mtip_workq_queue_delayed_work(wq_params, MTIP_PHY_RETRY_TIMER);
-      }
+        wq_params = kmalloc(sizeof(struct mtip_delayed_work_q_params),
+                            GFP_ATOMIC);
+        if(!wq_params)
+            CSMLOGERR("Malloc failed!");
+        else{
+            INIT_DELAYED_WORK(&wq_params->wq_item,
+                              mtip_phy_retry_phy_bringup);
+            wq_params->link_index = link_index;
+            mtip_workq_queue_delayed_work(wq_params, MTIP_PHY_RETRY_TIMER);
+        }
     }
+
+    return;
+}
+
+void mtip_phy_lane_bring_up_progress_ind(u32 link_index, bool in_progress)
+{
+    CSMLOGERR("Lane bring up progress: %d for link index %d", in_progress, link_index);
+
+    if(in_progress)
+        mtip_mac_clear_link_status_interrupt_mask(link_index);
+    else
+        mtip_mac_set_link_status_interrupt_mask(link_index);
 
     return;
 }
@@ -133,7 +144,8 @@ int mtip_phy_register_eth(void)
     mtip_phy_eth_params.notify_an_complete = mtip_phy_an_complete_cb;
     mtip_phy_eth_params.userdata_ready = NULL;
     mtip_phy_eth_params.notify_ready = mtip_phy_ready_cb;
-    mtip_phy_eth_params.cdr_lock_cb = mtip_phy_cdr_lock_cb;
+    mtip_phy_eth_params.cdr_lock_ind = mtip_phy_cdr_lock_ind;
+    mtip_phy_eth_params.lane_bring_up_progress_ind = mtip_phy_lane_bring_up_progress_ind;
 
     // register with the PHY
     res = (qcom_aw_phy_driver_iface_ops.eth_phy_iface_eth_register)(&mtip_phy_eth_params, &is_ready);

@@ -65,21 +65,27 @@ typedef void (*eth_phy_iface_an_complete_cb)(
 	                            enum mtip_port_type_enum port_type,
 	                            enum eth_phy_iface_phy_lane_num_enum lane_num);
 
-typedef void (*eth_phy_iface_cdr_lock_cb)(u32 link_index, bool status);
+typedef void (*eth_phy_iface_cdr_lock_ind)(u32 link_index, bool status);
+
+typedef void (*eth_phy_iface_lane_bring_up_progress_ind)(
+                                              u32 link_index, bool in_progress);
 
 /* struct eth_phy_iface_eth_register_params - PHY readiness parameters
  * @notify_ready:   PHY ready callback
  * @userdata_ready: userdata for PHY ready callback
  * @notify_an_complete:   AN complete callback(link fully up,
                           including LT and PCS)
- * @cdr_lock_cb: Callback to indicate CDR lock success/failure across PHY lanes
-                 mapped to a particular MAC link
+ * @cdr_lock_ind: CDR lock success/failure indication across PHY lanes
+                  mapped to a particular MAC link
+ * @lane_bring_up_progress_ind: Indication that at least one of the lanes 
+                  mapped to the passed MAC link is being brought up.
  */
 struct eth_phy_iface_eth_register_params {
-	eth_phy_iface_phy_ready_cb    notify_ready;
-	void                         *userdata_ready;
-	eth_phy_iface_an_complete_cb  notify_an_complete;
-	eth_phy_iface_cdr_lock_cb     cdr_lock_cb;
+	eth_phy_iface_phy_ready_cb                notify_ready;
+	void                                     *userdata_ready;
+	eth_phy_iface_an_complete_cb              notify_an_complete;
+	eth_phy_iface_cdr_lock_ind                cdr_lock_ind;
+	eth_phy_iface_lane_bring_up_progress_ind  lane_bring_up_progress_ind;
 };
 
 /* struct eth_phy_iface_ops - Structure for interface ops between MAC and

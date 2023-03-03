@@ -150,6 +150,26 @@ static irqreturn_t qcom_aw_phy_interrupt_handler(int irq, void *devptr) {
     temp_bmask = intr_error & (1 << i);
     if (temp_bmask) {
       switch (i) {
+
+      case QCOM_AW_PHY_RX_SIGNAL_DETECT_ERR_LANE_0:
+      case QCOM_AW_PHY_RX_SIGNAL_DETECT_ERR_LANE_1:
+      case QCOM_AW_PHY_RX_SIGNAL_DETECT_ERR_LANE_2:
+      case QCOM_AW_PHY_RX_SIGNAL_DETECT_ERR_LANE_3:
+        wq_params = kmalloc(sizeof(struct qcom_aw_phy_work_q_params),
+                            GFP_ATOMIC);
+        if(!wq_params)
+          QCOM_AW_PHY_LOG_ERR("Malloc failed!");
+        else{
+          INIT_DELAYED_WORK(&wq_params->wq_item,
+                            qcom_aw_phy_handle_rx_sig_detect);
+          wq_params->phy_inst = phy_inst_info->phy_inst;
+          wq_params->lane_num = i - QCOM_AW_PHY_RX_SIGNAL_DETECT_ERR_LANE_0;
+          wq_params->user_data = (void*)true;
+          queue_delayed_work(qcom_aw_phy_config_info.wq, &wq_params->wq_item, 0);
+        }
+        clear |= (1<<i);
+        break;
+
       case QCOM_AW_PHY_SNR_VALID_ERR_LANE_0:
       case QCOM_AW_PHY_SNR_VALID_ERR_LANE_1:
       case QCOM_AW_PHY_SNR_VALID_ERR_LANE_2:
@@ -200,7 +220,7 @@ static irqreturn_t qcom_aw_phy_interrupt_handler(int irq, void *devptr) {
           QCOM_AW_PHY_LOG_ERR("Malloc failed!");
         else{
           INIT_DELAYED_WORK(&wq_params->wq_item,
-                            qcom_aw_phy_retry_lane_bring_up);
+                            qcom_aw_phy_handle_rx_sig_detect);
           wq_params->phy_inst = phy_inst_info->phy_inst;
           wq_params->lane_num = i;
           wq_params->user_data = (void*)true;
@@ -336,6 +356,10 @@ void qcom_aw_phy_enable_interrupt(
   for (i = QCOM_AW_PHY_INT_ERROR_BIT_MIN; i < QCOM_AW_PHY_INT_ERROR_BIT_MAX;
        i++) {
     switch (i) {
+    case QCOM_AW_PHY_RX_SIGNAL_DETECT_ERR_LANE_0:
+    case QCOM_AW_PHY_RX_SIGNAL_DETECT_ERR_LANE_1:
+    case QCOM_AW_PHY_RX_SIGNAL_DETECT_ERR_LANE_2:
+    case QCOM_AW_PHY_RX_SIGNAL_DETECT_ERR_LANE_3:
     case QCOM_AW_PHY_SNR_VALID_ERR_LANE_0:
     case QCOM_AW_PHY_SNR_VALID_ERR_LANE_1:
     case QCOM_AW_PHY_SNR_VALID_ERR_LANE_2:

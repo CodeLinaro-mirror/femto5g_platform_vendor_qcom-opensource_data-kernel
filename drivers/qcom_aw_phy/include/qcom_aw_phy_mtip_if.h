@@ -29,14 +29,15 @@
 #define TX_RXDET_TIMEOUT_US          550
 
 struct qcom_aw_phy_mtip_if_info {
-	struct mutex                  lock;
-	bool                          is_phy_drv_ready;
-	bool                          is_mac_drv_ready;
-	bool                          is_ready_notified;
-	eth_phy_iface_phy_ready_cb    ready_cb;
-	void                         *ready_cb_user_data;
-	eth_phy_iface_an_complete_cb  an_complete_cb;
-	eth_phy_iface_cdr_lock_cb     cdr_lock_cb;
+	struct mutex                              lock;
+	bool                                      is_phy_drv_ready;
+	bool                                      is_mac_drv_ready;
+	bool                                      is_ready_notified;
+	eth_phy_iface_phy_ready_cb                ready_cb;
+	void                                     *ready_cb_user_data;
+	eth_phy_iface_an_complete_cb              an_complete_cb;
+	eth_phy_iface_cdr_lock_ind                cdr_lock_ind;
+	eth_phy_iface_lane_bring_up_progress_ind  lane_bring_up_progress_ind;
 };
 
 /*-------------------------------------------------------------------
@@ -72,6 +73,11 @@ void qcom_aw_phy_notify_an_complete(
 
 void qcom_aw_phy_handle_an_complete(struct work_struct *work);
 
-void qcom_aw_phy_retry_lane_bring_up(struct work_struct *work);
+void qcom_aw_phy_handle_rx_sig_detect(struct work_struct *work);
+
+void qcom_aw_phy_notify_lane_bring_up_progress_to_mac(
+                                  struct qcom_aw_phy_inst_config *phy_inst_info,
+                                  enum eth_phy_iface_phy_lane_num_enum lane,
+                                  bool in_progress);
 
 #endif /* QCOM_AW_PHY_MTIP_IF_H */

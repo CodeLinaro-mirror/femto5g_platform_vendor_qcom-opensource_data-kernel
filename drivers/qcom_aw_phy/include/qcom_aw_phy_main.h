@@ -95,11 +95,15 @@ enum qcom_aw_phy_int_status_bit_enum{
 
 /* PHY error interrupt bit positions */
 enum qcom_aw_phy_int_error_bit_enum{
-	QCOM_AW_PHY_INT_ERROR_BIT_MIN       = 4,
-	QCOM_AW_PHY_SNR_VALID_ERR_LANE_0    = QCOM_AW_PHY_INT_ERROR_BIT_MIN,
-	QCOM_AW_PHY_SNR_VALID_ERR_LANE_1    = 5,
-	QCOM_AW_PHY_SNR_VALID_ERR_LANE_2    = 6,
-	QCOM_AW_PHY_SNR_VALID_ERR_LANE_3    = 7,
+	QCOM_AW_PHY_INT_ERROR_BIT_MIN            = 0,
+	QCOM_AW_PHY_RX_SIGNAL_DETECT_ERR_LANE_0  = QCOM_AW_PHY_INT_ERROR_BIT_MIN,
+	QCOM_AW_PHY_RX_SIGNAL_DETECT_ERR_LANE_1  = 1,
+	QCOM_AW_PHY_RX_SIGNAL_DETECT_ERR_LANE_2  = 2,
+	QCOM_AW_PHY_RX_SIGNAL_DETECT_ERR_LANE_3  = 3,
+	QCOM_AW_PHY_SNR_VALID_ERR_LANE_0         = 4,
+	QCOM_AW_PHY_SNR_VALID_ERR_LANE_1         = 5,
+	QCOM_AW_PHY_SNR_VALID_ERR_LANE_2         = 6,
+	QCOM_AW_PHY_SNR_VALID_ERR_LANE_3         = 7,
 	QCOM_AW_PHY_INT_ERROR_BIT_MAX
 };
 
@@ -217,7 +221,6 @@ struct qcom_aw_phy_inst_config{
 	uint8_t                           num_lanes;
 	struct qcom_aw_lane_params        lane_params[PHY_LANE_MAX];
 	struct mutex                      lane_lock[PHY_LANE_MAX];
-	uint8_t                           cdr_lock_retry_counter[PHY_LANE_MAX];
 	enum qcom_aw_phy_cdr_lock_lane_status
 	                                  cdr_lock_status_flag[PHY_LANE_MAX];
 	bool                              bring_up_status;
