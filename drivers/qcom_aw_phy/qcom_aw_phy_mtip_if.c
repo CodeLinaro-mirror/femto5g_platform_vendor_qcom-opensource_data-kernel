@@ -402,10 +402,7 @@ int qcom_aw_phy_bringup_lt_mode(mss_access_t *mss,
   aw_pmd_rx_background_adapt_enable_set(mss, 1);
 
   if ((config.rate == 2) || (config.rate == 3)) {
-    aw_pmd_pam4_enable(mss, 1);
-
-    if (config.rate == 3)
-      aw_pmd_set_rx_spare(mss, 2);
+    aw_pmd_enable_pam4_mode(mss, 1);
   }
 
   aw_pmd_anlt_link_training_timeout_enable_set(mss, 0);
@@ -497,10 +494,7 @@ int qcom_aw_phy_bringup_manual_eq_mode(
   aw_pmd_anlt_ms_per_ck_set(mss, 99999);
 
   if ((config.rate == 2) || (config.rate == 3)) {
-    aw_pmd_pam4_enable(mss, 1);
-
-    if (config.rate == 3)
-      aw_pmd_set_rx_spare(mss, 2);
+    aw_pmd_enable_pam4_mode(mss, 1);
   }
 
   /* Configuration for Near End Parallel Loopback mode */
@@ -525,11 +519,6 @@ int qcom_aw_phy_bringup_manual_eq_mode(
   if (qcom_aw_phy_get_loopback_mode() == QCOM_AW_PHY_NEAR_END_SERIAL_LB) {
     QCOM_AW_PHY_LOG_INFO("Configuring PHY for near end serial LB");
     aw_pmd_analog_loopback_set(mss, 1);
-  }
-
-  if(phy_inst_info->sfp_port_type == PORT_FIBRE){
-    pmd_write_field(mss, RX_CTLE_ADDR, RX_CTLE_RATE_NT_MASK,
-                    RX_CTLE_RATE_NT_OFFSET, 0);
   }
 
   /* Delay before triggering RX equalization */
