@@ -287,10 +287,9 @@ static int ecpri_dma_dp_gen_gsi_xfer(struct ecpri_dma_pkt *pkt,
 		else
 			gsi_xfer[i].flags |= GSI_XFER_FLAG_CHAIN;
 
-		if (vf_params->vf_valid)
-		{
+		if (vf_params->vf_override) {
+			gsi_xfer[i].vf_override = vf_params->vf_override;
 			gsi_xfer[i].vf_valid = vf_params->vf_valid;
-			gsi_xfer[i].pf = vf_params->is_pf;
 			gsi_xfer[i].vf_id = vf_params->vf_id;
 		}
 
@@ -702,6 +701,8 @@ int ecpri_dma_dp_transmit(struct ecpri_dma_endp_context *endp,
 	struct ecpri_dma_dynamic_vf_params vf_params;
 	struct mhi_dma_function_params* function;
 
+	memset(&vf_params, 0, sizeof(struct ecpri_dma_dynamic_vf_params));
+
 	if (!endp || !endp->valid || !pkts || num_of_pkts == 0) {
 		DMAERR("Invalid parameters\n");
 		return -EINVAL;
@@ -733,15 +734,14 @@ int ecpri_dma_dp_transmit(struct ecpri_dma_endp_context *endp,
 	}
 
 	/* Extract VF params for MHI memcpy CHs */
-	if (endp->dynamic_vf_enabled)
-	{
+	if (endp->dynamic_vf_enabled) {
 		function = (struct mhi_dma_function_params*)(pkts[0]->user_data);
-		vf_params.vf_valid = true;
+		vf_params.vf_override = true;
 
-		if (function->function_type == MHI_DMA_FUNCTION_TYPE_PHYSICAL)
-			vf_params.is_pf = true;
-		else
+		if (function->function_type == MHI_DMA_FUNCTION_TYPE_VIRTUAL) {
+			vf_params.vf_valid = true;
 			vf_params.vf_id = function->vf_id;
+		}
 	}
 
 	spin_lock_irqsave(&endp->spinlock, flags);
