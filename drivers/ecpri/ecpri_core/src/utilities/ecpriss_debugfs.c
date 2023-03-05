@@ -3166,7 +3166,6 @@ static ssize_t stats_value_from_registers_xbar_v2(char __user *buf)
 
 	RESET_STR(temp_stat_val_str);
 	RESET_STR(link_id);
-	ecpriss_xbar_stats_update_v2();
 
 	for (i = 0; i < TOTAL_LINKS; i++)
 	{

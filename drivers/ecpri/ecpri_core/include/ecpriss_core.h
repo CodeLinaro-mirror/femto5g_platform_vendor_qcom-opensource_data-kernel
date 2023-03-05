@@ -219,8 +219,11 @@ void ecpriss_dma_event_processing_wq(struct work_struct *work);
 void ecpriss_eth_topology_init_wq(struct work_struct *work);
 void ecpriss_interrupt_events_processing_wq(struct work_struct *work);
 int ecpriss_stats_timer_enable(int timeout);
+int ecpriss_stats_timer_enable_v2(int timeout);
 int ecpriss_stats_timer_interrupt_create(void);
+int ecpriss_stats_timer_interrupt_create_v2(void);
 void ecpriss_update_all_stats(void);
+void ecpriss_update_all_stats_v2(void);
 void ecpriss_core_set_stats_timeout_info(int val);
 int ecpriss_core_get_stats_timeout_info(void);
 #endif

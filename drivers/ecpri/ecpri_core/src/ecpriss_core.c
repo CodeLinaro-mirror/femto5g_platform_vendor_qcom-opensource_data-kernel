@@ -121,10 +121,6 @@ void ecpriss_process_packet(ecpriss_packet_payload_s *packet)
 
 		flow_tx = &packet->flow_cfg.flow_tx_cfg;
 
-		ECPRILOGINFO(
-				"ecpriss_process_packet:UL SRC %d,PortIndex %d " ,
-				flow_tx->src , flow_tx->port_index);
-
 		switch((int)flow_tx->src){
 			case ECPRISS_ROUTE_SRC_OC:
 
@@ -564,8 +560,14 @@ void ecpriss_interrupt_events_processing_wq(struct work_struct *work)
 	if(work == NULL) {
 		return;
 	}
-	ecpriss_update_all_stats();
-	ecpriss_stats_timer_enable(stats_timeout_ms);
+	if(ecpriss_hw_ver == ECPRISS_HW_v1_0){
+		ecpriss_update_all_stats();
+		ecpriss_stats_timer_enable(stats_timeout_ms);
+	}else {
+		ecpriss_update_all_stats_v2();
+		ecpriss_stats_timer_enable_v2(stats_timeout_ms);
+	}
+
 	return;
 }
 void ecpriss_dma_events_cb(void *user_data, enum ecpri_dma_event_type evt)
@@ -722,6 +724,27 @@ void ecpriss_stats_timer_cb(struct timer_list *data)
 	}while (0);
 	return;
 }
+void ecpriss_stats_timer_cb_v2(struct timer_list *data)
+{
+	int ret = 0;
+	struct workqueue_struct    *ecpriss_wq;
+	struct work_struct         *ecpriss_work;
+
+	do{
+		ecpriss_wq =
+		ecpriss_pdata_v2->interrupts_workqueue->ecpriss_interrupts_workq;
+		ecpriss_work =
+		ecpriss_pdata_v2->interrupts_workqueue->ecpriss_interrupt_events_rdy_work;
+		ret = ecpriss_queue_work(ecpriss_wq,
+				ecpriss_work);
+		if(ret < 0) {
+			ECPRILOGERR("Queue work failed\n");
+			break;
+		}
+
+	}while (0);
+	return;
+}
 void ecpriss_dma_endp_cb_v2(void * userdata)
 {
 	int ret =0;
@@ -854,6 +877,14 @@ static int ecpriss_core_data_init_v2(void)
 			break;
 		}
 		ECPRILOGINFO("eCPRI Netlink Socket(NETLINK_ECPRI family) Created\n");
+
+		ret = ecpriss_stats_timer_interrupt_create_v2();
+		if(ret < 0) {
+			ECPRILOGERR("eCPRI Timer Interrupt creation failed\n");
+			break;
+		}
+		ECPRILOGINFO("eCPRI Statistics Timer Interrupt created\n");
+
 
 	} while (0);
 	return ret;
@@ -1092,6 +1123,21 @@ void ecpriss_update_all_stats(void)
 		ecpriss_xbar_stats_update();
 	}
 }
+void ecpriss_update_all_stats_v2(void)
+{
+	int fh = 0;
+	int link = 0;
+
+	for ( fh = 0 ; fh < MAX_PORTS; fh++) {
+
+		for (link = 0; link < MAX_MAC_LINKS; link++){
+			ecpriss_qudp_fh_ingress_stats_update_v2(fh,link);
+			ecpriss_qudp_fh_egress_stats_update_v2(fh,link);
+		}
+		ecpriss_xbar_stats_update_v2();
+	}
+}
+
 
 int ecpriss_stats_timer_interrupt_create(void)
 {
@@ -1109,6 +1155,24 @@ int ecpriss_stats_timer_interrupt_create(void)
 	return ret;
 
 }
+
+int ecpriss_stats_timer_interrupt_create_v2(void)
+{
+	int ret = 0;
+
+	do {
+
+		timer_setup(&ecpriss_pdata_v2->stats_timer_info.stats_timer,
+				&ecpriss_stats_timer_cb_v2,0);
+		ecpriss_pdata_v2->stats_timer_info.stats_timer_running = 0;
+		ecpriss_pdata_v2->stats_timer_info.stats_interval = 0;
+
+	}while (0);
+
+	return ret;
+
+}
+
 
 int ecpriss_stats_timer_enable(int timeout)
 {
@@ -1139,6 +1203,25 @@ void ecpriss_core_set_stats_timeout_info(int val)
 	stats_timeout_ms = val;
 	ECPRILOGINFO("ecpriss: Setting Stats Timeout to val %d\n", stats_timeout_ms);
 }
+
+int ecpriss_stats_timer_enable_v2(int timeout)
+{
+	int ret = 0;
+
+	do {
+		ecpriss_pdata_v2->stats_timer_info.stats_timer.expires =
+			jiffies + msecs_to_jiffies(timeout);
+		mod_timer(&ecpriss_pdata_v2->stats_timer_info.stats_timer,
+				ecpriss_pdata_v2->stats_timer_info.stats_timer.expires);
+
+		ecpriss_pdata_v2->stats_timer_info.stats_timer_running = 1;
+		ecpriss_pdata_v2->stats_timer_info.stats_interval = timeout;
+
+
+	}while (0);
+	return ret;
+}
+
 
 static int ecpriss_core_init(struct platform_device *pdev)
 {
@@ -1260,14 +1343,14 @@ static int ecpriss_core_init_v2(struct platform_device *pdev)
 
 		ECPRILOGERR("QUDP init complete\n");
 
-		ret = ecpriss_stats_timer_enable(stats_timeout_ms);
+		ret = ecpriss_stats_timer_enable_v2(stats_timeout_ms);
 
 		if(ret < 0) {
 			ECPRILOGERR("Stats Collection failed\n");
 			break;
 		}
 
-		ecpriss_pdata->ecpri_state = ECPRI_CORE_INIT;
+		ecpriss_pdata_v2->ecpri_state = ECPRI_CORE_INIT;
 
 	}while (0);
 	return ret;

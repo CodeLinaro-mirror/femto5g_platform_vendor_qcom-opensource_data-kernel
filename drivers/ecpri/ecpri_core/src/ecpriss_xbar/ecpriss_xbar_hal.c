@@ -2045,7 +2045,7 @@ uint32_t ecpriss_xbar_reg_read(ecpriss_xbar_hal_reg_type_e  reg_type, uint32_t o
 		val = ioread32(ecpriss_xbar_hal_ctx.lut_base + offset);
 	}
 
-	ECPRILOGINFO("Xbar read : reg type %d: offset %d and val %d\n",
+	ECPRILOGDBG("Xbar read : reg type %d: offset %d and val %d\n",
 			reg_type,offset,val);
 	return val;
 }
@@ -2056,7 +2056,7 @@ void ecpriss_xbar_reg_write(ecpriss_xbar_hal_reg_type_e  reg_type,
 		uint32_t offset,
 		uint32_t val)
 {
-	ECPRILOGINFO("Xbar Write : reg type %d: offset %d and val %d\n",
+	ECPRILOGDBG("Xbar Write : reg type %d: offset %d and val %d\n",
 			reg_type,offset,val);
 
 	if(reg_type == ECPRISS_XBAR_GLOBAL) {
