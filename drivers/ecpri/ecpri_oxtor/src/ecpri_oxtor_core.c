@@ -420,6 +420,7 @@ static long ecpri_oxtor_core_ioctl_hdlr(struct file *filp, unsigned int cmd,
 				"var.tx_cmd_cfg[%d].pkt_cfg.pkt_len = %d \n\t"
 				"var.tx_cmd_cfg[%d].pkt_cfg.inter_pkt_delay= %d"
 				"\n\t"
+				"var.tx_cmd_cfg[%d].pkt_cfg.first_byte_prach_hdr= %d\n"
 				"var.tx_cmd_cfg[%d].pkt_cfg.init_data = %d \n\t"
 				"var.tx_cmd_cfg[%d].pkt_cfg.ecpri_msg_type = %d"
 				"\n\t"
@@ -442,6 +443,7 @@ static long ecpri_oxtor_core_ioctl_hdlr(struct file *filp, unsigned int cmd,
 				,i,var.tx_cmd_cfg[i].pkt_cfg.xu_id
 				,i,var.tx_cmd_cfg[i].pkt_cfg.pkt_len
 				,i,var.tx_cmd_cfg[i].pkt_cfg.inter_pkt_delay
+				,i,var.tx_cmd_cfg[i].pkt_cfg.first_byte_prach_hdr
 				,i,var.tx_cmd_cfg[i].pkt_cfg.init_data
 				,i,var.tx_cmd_cfg[i].pkt_cfg.ecpri_msg_type
 				,i,var.tx_cmd_cfg[i].pkt_cfg.ring_wrap_en
