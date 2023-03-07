@@ -835,7 +835,7 @@ static void mtip_mac_wrapper_set_csr_cfg(struct mtip_port_device_info* port_devi
         break;
     case MTIP_PORT_CONFIG_1x10GBASE_R:
         {
-            csr_cfg |= 0xc000;
+            csr_cfg |= 0x0;
         }
         break;
     case MTIP_PORT_CONFIG_1x10GBASE_R_FEC:
