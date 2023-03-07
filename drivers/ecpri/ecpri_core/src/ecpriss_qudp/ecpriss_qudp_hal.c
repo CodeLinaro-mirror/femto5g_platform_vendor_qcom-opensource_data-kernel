@@ -5412,7 +5412,7 @@ void ecpriss_qudp_reg_write(ecpriss_qudp_hal_reg_type_e  reg_type,
 		uint32_t val)
 {
 
-	pr_info("QUDP: Write: Reg_type %d : offset: %d and Val %d\n",reg_type,
+	pr_debug("QUDP: Write: Reg_type %d : offset: %d and Val %d\n",reg_type,
 			offset,val);
 
 	if(reg_type == ECPRISS_QUDP_GLOBAL) {
@@ -5463,7 +5463,7 @@ uint32_t ecpriss_qudp_reg_read(ecpriss_qudp_hal_reg_type_e  reg_type,
 	else if(reg_type == ECPRISS_QUDP_L2) {
 		val = ioread32(ecpriss_qudp_hal_ctx.l2_base + offset);
 	}
-	pr_info("QUDP: Read: Reg_type %d : offset: %d and Val %d\n",reg_type,
+	pr_debug("QUDP: Read: Reg_type %d : offset: %d and Val %d\n",reg_type,
 			offset,val);
 
 	return val;
