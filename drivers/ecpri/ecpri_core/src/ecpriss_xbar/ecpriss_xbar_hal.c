@@ -777,6 +777,73 @@ static void ecpriss_xbar_hal_reg_parse_xbar_flush_2(enum ecpriss_xbar_hal_reg_na
 	return;
 }
 
+	static void ecpriss_xbar_hal_reg_parse_lut_xbar_fhrx_m_lut_n_2
+(enum ecpriss_xbar_hal_reg_name reg,  void *fields, uint32_t val)
+{
+	ecpri_xbar_hwio_def_ecpri_xbar_fhrx_m_lut_n_s *xbar_fhrx_m_lut_n
+		= (ecpri_xbar_hwio_def_ecpri_xbar_fhrx_m_lut_n_s *)fields;
+
+
+	xbar_fhrx_m_lut_n->ul_oc_link_id = ECPRISS_HAL_GETFIELD_FROM_REG(val,
+			HWIO_ECPRI_XBAR_FHRX_m_LUT_n_UL_OC_LINK_ID_SHFT,
+			HWIO_ECPRI_XBAR_FHRX_m_LUT_n_UL_OC_LINK_ID_BMSK);
+
+	xbar_fhrx_m_lut_n->ul_route_to_oran = ECPRISS_HAL_GETFIELD_FROM_REG(val,
+			HWIO_ECPRI_XBAR_FHRX_m_LUT_n_UL_ROUTE_TO_ORAN_SHFT,
+			HWIO_ECPRI_XBAR_FHRX_m_LUT_n_UL_ROUTE_TO_ORAN_BMSK);
+
+	xbar_fhrx_m_lut_n->ul_route_to_c2c = ECPRISS_HAL_GETFIELD_FROM_REG(val,
+			HWIO_ECPRI_XBAR_FHRX_m_LUT_n_UL_ROUTE_TO_C2C_SHFT,
+			HWIO_ECPRI_XBAR_FHRX_m_LUT_n_UL_ROUTE_TO_C2C_BMSK);
+
+
+	xbar_fhrx_m_lut_n->dl_oc_link_id = ECPRISS_HAL_GETFIELD_FROM_REG(val,
+			HWIO_ECPRI_XBAR_FHRX_m_LUT_n_DL_OC_LINK_ID_SHFT,
+			HWIO_ECPRI_XBAR_FHRX_m_LUT_n_DL_OC_LINK_ID_BMSK);
+
+	xbar_fhrx_m_lut_n->dl_route_to_oran = ECPRISS_HAL_GETFIELD_FROM_REG(val,
+			HWIO_ECPRI_XBAR_FHRX_m_LUT_n_DL_ROUTE_TO_ORAN_SHFT,
+			HWIO_ECPRI_XBAR_FHRX_m_LUT_n_DL_ROUTE_TO_ORAN_BMSK);
+
+	xbar_fhrx_m_lut_n->dl_route_to_c2c = ECPRISS_HAL_GETFIELD_FROM_REG(val,
+			HWIO_ECPRI_XBAR_FHRX_m_LUT_n_DL_ROUTE_TO_C2C_SHFT,
+			HWIO_ECPRI_XBAR_FHRX_m_LUT_n_DL_ROUTE_TO_C2C_BMSK);
+
+	xbar_fhrx_m_lut_n->dl_route_to_c2c = ECPRISS_HAL_GETFIELD_FROM_REG(val,
+			HWIO_ECPRI_XBAR_FHRX_m_LUT_n_DL_ROUTE_TO_C2C_SHFT,
+			HWIO_ECPRI_XBAR_FHRX_m_LUT_n_DL_ROUTE_TO_C2C_BMSK);
+
+
+	xbar_fhrx_m_lut_n->dl_route_to_c2c = ECPRISS_HAL_GETFIELD_FROM_REG(val,
+			HWIO_ECPRI_XBAR_FHRX_m_LUT_n_DL_ROUTE_TO_C2C_SHFT,
+			HWIO_ECPRI_XBAR_FHRX_m_LUT_n_DL_ROUTE_TO_C2C_BMSK);
+
+	xbar_fhrx_m_lut_n->dl_route_to_dma = ECPRISS_HAL_GETFIELD_FROM_REG(val,
+			HWIO_ECPRI_XBAR_FHRX_m_LUT_n_DL_ROUTE_TO_DMA_SHFT,
+			HWIO_ECPRI_XBAR_FHRX_m_LUT_n_DL_ROUTE_TO_DMA_BMSK);
+
+	xbar_fhrx_m_lut_n->other_oc_link_id = ECPRISS_HAL_GETFIELD_FROM_REG(val,
+			HWIO_ECPRI_XBAR_FHRX_m_LUT_n_OTHER_OC_LINK_ID_SHFT,
+			HWIO_ECPRI_XBAR_FHRX_m_LUT_n_OTHER_OC_LINK_ID_BMSK);
+
+	xbar_fhrx_m_lut_n->other_route_to_oran = ECPRISS_HAL_GETFIELD_FROM_REG(val,
+			HWIO_ECPRI_XBAR_FHRX_m_LUT_n_OTHER_ROUTE_TO_ORAN_SHFT,
+			HWIO_ECPRI_XBAR_FHRX_m_LUT_n_OTHER_ROUTE_TO_ORAN_BMSK);
+
+	xbar_fhrx_m_lut_n->other_route_to_c2c = ECPRISS_HAL_GETFIELD_FROM_REG(val,
+			HWIO_ECPRI_XBAR_FHRX_m_LUT_n_OTHER_ROUTE_TO_C2C_SHFT,
+			HWIO_ECPRI_XBAR_FHRX_m_LUT_n_OTHER_ROUTE_TO_C2C_BMSK);
+
+	xbar_fhrx_m_lut_n->other_route_to_dma = ECPRISS_HAL_GETFIELD_FROM_REG(val,
+			HWIO_ECPRI_XBAR_FHRX_m_LUT_n_OTHER_ROUTE_TO_DMA_SHFT,
+			HWIO_ECPRI_XBAR_FHRX_m_LUT_n_OTHER_ROUTE_TO_DMA_SHFT);
+
+
+
+	return;
+}
+
+
 	static void  ecpriss_xbar_hal_reg_construct_lut_xbar_ocrx_m_lut_n_2
 (enum ecpriss_xbar_hal_reg_name reg, const void *fields, uint32_t* val)
 {
@@ -1830,7 +1897,7 @@ static struct ecpriss_xbar_hal_reg_obj ecpriss_xbar_hal_reg_objs[ECPRISS_XBAR_HW
 
 	[ECPRISS_XBAR_HW_v2_0][ECPRI_XBAR_LUT_XBAR_FHRX_m_LUT_n_V2] = {
 		ecpriss_xbar_hal_reg_construct_lut_xbar_fhrx_m_lut_n_2,
-		ecpriss_xbar_hal_reg_parse_dummy_v2,
+		ecpriss_xbar_hal_reg_parse_lut_xbar_fhrx_m_lut_n_2,
 		0x09500000, 0x0, 0x4, 0, 0, 0, 0x40000},
 	[ECPRISS_XBAR_HW_v2_0][ECPRI_XBAR_LUT_XBAR_C2CRX_m_LUT_n_V2] = {
 		ecpriss_xbar_hal_reg_construct_dummy_v2,
