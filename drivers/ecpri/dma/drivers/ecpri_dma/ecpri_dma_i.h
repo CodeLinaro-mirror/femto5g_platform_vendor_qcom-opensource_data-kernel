@@ -505,6 +505,7 @@ struct ecpri_dma_context {
 	struct ecpri_dma_mem_buffer*
 		exception_buffs_ptr_arr[ECPRI_DMA_EXCEPTION_RING_SIZE];
 	struct ecpri_dma_mem_buffer exception_buffs[ECPRI_DMA_EXCEPTION_RING_SIZE];
+	struct mutex mhi_memcpy_setup_lock;
 };
 
 /**
