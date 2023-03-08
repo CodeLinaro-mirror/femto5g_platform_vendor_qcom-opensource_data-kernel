@@ -7841,6 +7841,35 @@ int ecpri_dma_setup_dma_endps(
 
 	return 0;
 }
+/**
+  * ecpri_dma_enable_tx_header()- enable
+  * @ep: Endpoint's context
+  * Return: 0 - on success, Linux error - on fail
+  */
+int ecpri_dma_set_tx_pre_header(
+	struct ecpri_dma_endp_context *ep)
+{
+	struct ecpri_dma_ecpri_endp_cfg_xbar_fields endp_cfg_xbar = {0};
+	if (!ep || !ep->valid)
+		return -EINVAL;
+
+	ecpri_dma_disable_dma_endp(ep);
+
+	/* Read register value */
+	ecpri_dma_hal_read_reg_mn_fields(
+		ECPRI_ENDP_CFG_XBAR, ep->gsi_id, ep->endp_id,
+		&endp_cfg_xbar);
+
+	/* Set pre header mode */
+	endp_cfg_xbar.pre_hdr_en = ep->tx_pre_header_enabled;
+
+	/* Write register value*/
+	ecpri_dma_hal_write_reg_mn_fields(
+		ECPRI_ENDP_CFG_XBAR, ep->gsi_id, ep->endp_id,
+		&endp_cfg_xbar);
+
+	return 0;
+}
 
 int ecpri_dma_enable_dma_endp(struct ecpri_dma_endp_context *ep)
 {
@@ -7849,8 +7878,11 @@ int ecpri_dma_enable_dma_endp(struct ecpri_dma_endp_context *ep)
 	if (!ep || !ep->valid)
 		return -EINVAL;
 
-	memset(&endp_gsi_cfg, 0, sizeof(endp_gsi_cfg));
+	endp_gsi_cfg.value = ecpri_dma_hal_read_reg_mn(
+		ECPRI_ENDP_GSI_CFG, ep->gsi_id, ep->endp_id);
+
 	endp_gsi_cfg.def.endp_en = 1;
+
 	ecpri_dma_hal_write_reg_mn(
 		ECPRI_ENDP_GSI_CFG, ep->gsi_id, ep->endp_id, endp_gsi_cfg.value);
 
@@ -7864,7 +7896,9 @@ int ecpri_dma_disable_dma_endp(struct ecpri_dma_endp_context *ep)
 	if (!ep)
 		return -EINVAL;
 
-	memset(&endp_gsi_cfg, 0, sizeof(endp_gsi_cfg));
+	endp_gsi_cfg.value = ecpri_dma_hal_read_reg_mn(
+		ECPRI_ENDP_GSI_CFG, ep->gsi_id, ep->endp_id);
+
 	endp_gsi_cfg.def.endp_en = 0;
 	ecpri_dma_hal_write_reg_mn(
 		ECPRI_ENDP_GSI_CFG, ep->gsi_id, ep->endp_id, endp_gsi_cfg.value);

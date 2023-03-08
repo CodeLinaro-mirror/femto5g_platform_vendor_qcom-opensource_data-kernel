@@ -317,6 +317,8 @@ struct ecpri_dma_exception_stats {
  * @spinlock: EP lock to sync accesses to EP resources
  * @l2_mhi_channel_ptr: Pointer to the MHI Channel CTX
  * @dynamic_vf_enabled: Indicating this is a memcpy ENDP with dynamic VF
+ * @tx_pre_header_enabled: Indicating whether tx pre header was enabled
+ * (tx endp only)
  *
  */
 struct ecpri_dma_endp_context {
@@ -363,6 +365,7 @@ struct ecpri_dma_endp_context {
 	spinlock_t spinlock;
 	void* l2_mhi_channel_ptr;
 	bool dynamic_vf_enabled;
+	bool tx_pre_header_enabled;
 };
 
 /**

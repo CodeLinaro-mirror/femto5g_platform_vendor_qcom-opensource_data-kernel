@@ -212,11 +212,13 @@ struct ecpri_dma_pkt {
  * @pkt: pointer to the completed packet provided by ETH driver
  * @status_code: DMA status code returned from DMA upon completion
  * @comp_code: Trasnfer completion code.
+ * @phys_port: Physical port
  */
 struct ecpri_dma_pkt_completion_wrapper {
 	struct ecpri_dma_pkt *pkt;
 	enum ecpri_dma_status_code status_code;
 	enum ecpri_dma_completion_code comp_code;
+	uint8_t phys_port;
 };
 
 /**

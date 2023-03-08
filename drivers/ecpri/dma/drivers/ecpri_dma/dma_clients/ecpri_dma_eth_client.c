@@ -565,6 +565,18 @@ int ecpri_dma_eth_connect_endpoints(
 		return ret;
 	}
 
+	/* Enable/disable Tx header */
+	connection->tx_endp_ctx->tx_pre_header_enabled =
+		params->enable_tx_pre_header;
+
+	ret = ecpri_dma_set_tx_pre_header(connection->tx_endp_ctx);
+	if (ret != 0) {
+		DMAERR("Unable to set Tx header, ENDP ID:%d\n",
+			ecpri_dma_eth_client_ctx->
+			link_to_endp_mapping[params->link_index].tx_endp.endp_id);
+		return -EINVAL;
+	}
+
 	ret = ecpri_dma_enable_dma_endp(connection->tx_endp_ctx);
 	if (ret != 0) {
 		DMAERR("Unable to enable Tx endpoint, ENDP ID:%d\n",

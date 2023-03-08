@@ -55,16 +55,17 @@ extern struct ecpri_dma_eth_client_context *ecpri_dma_eth_client_ctx;
 #define ECPRI_DMA_ETH_CLIENT_UT_TEST_BUFF_SIZE            1500
 
 /* Define for test endp buffer size */
-#define ECPRI_DMA_ETH_CLIENT_UT_TEST_TX_BUFF_SIZE            16
+#define ECPRI_DMA_ETH_CLIENT_UT_TEST_TX_BUFF_SIZE         32
 
 /* Define for test endp large buffer size */
 #define ECPRI_DMA_ETH_CLIENT_UT_TEST_LARGE_BUFFER_SIZE    2000
 
-/* Define for test endp large buffer size */
-#define ECPRI_DMA_ETH_CLIENT_UT_TEST_LARGE_BUFFER_SIZE    2000
 
 /* Define for test large payload number of buffers */
 #define ECPRI_DMA_ETH_CLIENT_UT_TEST_LARGE_BUFFERS_AMOUNT 2
+
+/* Parameter value  to to use for default connection config*/
+#define USE_DEFAULT_CONNECT_PARAMS (NULL)
 
 /**
  * ecpri_dma_eth_client_test_suite_context - all the information that
@@ -603,6 +604,8 @@ static void ecpri_dma_eth_dp_test_util_destroy_test_data(
 	eth_client_test_suite_ctx.rx_received_irq_in_poll = 0;
 	eth_client_test_suite_ctx.tx_comp_pkts_num = 0;
 }
+
+
 
 static int ecpri_dma_eth_dp_test_disconnect_endpoints(
 	ecpri_dma_eth_conn_hdl_t hdl)
@@ -1396,8 +1399,10 @@ fail_alloc:
 /**
  * ecpri_dma_eth_dp_test_util_init() - Performs all the necessary preparations,
  * configurations, and registration before executing the core test part.
+ * @connect_params_ptr: pointer to connect params or NULL for defaults
  */
-static int ecpri_dma_eth_dp_test_util_init()
+static int ecpri_dma_eth_dp_test_util_init(
+	struct ecpri_dma_eth_endpoint_connect_params* connect_params_ptr)
 {
 	int ret = 0;
 	bool is_dma_ready = false;
@@ -1423,8 +1428,26 @@ static int ecpri_dma_eth_dp_test_util_init()
 		return -EFAULT;
 	}
 
+	/* Configure connect parameters Defaults */
+	if (NULL == connect_params_ptr) {
+		connect_params.link_index = ECPRI_DMA_ETH_CLIENT_UT_LINK_INDEX;
+		connect_params.tx_ring_length = ECPRI_DMA_ETH_CLIENT_UT_RING_LENGTH;
+		connect_params.rx_ring_length = ECPRI_DMA_ETH_CLIENT_UT_RING_LENGTH;
+		connect_params.p_type = ECPRI_DMA_ENDP_STREAM_DEST_FH;
+		connect_params.tx_mod_cfg.moderation_counter_threshold =
+			ECPRI_DMA_ETH_CLIENT_UT_MODER_CNTR_THRSHLD;
+		connect_params.tx_mod_cfg.moderation_timer_threshold =
+			ECPRI_DMA_ETH_CLIENT_UT_MODER_TIMER_THRSHLD;
+		connect_params.enable_tx_pre_header = false;
+
+		/* Point connect parameters to local struct */
+		connect_params_ptr = &connect_params;
+	}
+
 	/* Connect endpoints */
-	ret = ecpri_dma_eth_dp_test_util_connect(&connect_params);
+	ret = ecpri_dma_eth_connect_endpoints(connect_params_ptr,
+		&eth_client_test_suite_ctx.hdl);
+
 	if (ret != 0) {
 		DMA_UT_LOG("Test failed due to DMA driver timeout\n");
 		return -EFAULT;
@@ -1870,7 +1893,7 @@ static int ecpri_dma_eth_dp_test_suite_single_pkt_single_buffer_exception(void *
 
 	DMA_UT_DBG("Start Loopback Single packet\n");
 
-	ret = ecpri_dma_eth_dp_test_util_init();
+	ret = ecpri_dma_eth_dp_test_util_init(USE_DEFAULT_CONNECT_PARAMS);
 	if (ret != 0) {
 		DMA_UT_LOG("Failed to initialize the test\n");
 		return ret;
@@ -1945,7 +1968,7 @@ static int ecpri_dma_eth_dp_test_suite_single_pkt_single_buffer(void *priv) {
 
 	DMA_UT_DBG("Start Loopback Single packet\n");
 
-	ret = ecpri_dma_eth_dp_test_util_init();
+	ret = ecpri_dma_eth_dp_test_util_init(USE_DEFAULT_CONNECT_PARAMS);
 	if (ret != 0) {
 		DMA_UT_LOG("Failed to initialize the test\n");
 		return ret;
@@ -2027,6 +2050,135 @@ static int ecpri_dma_eth_dp_test_suite_single_pkt_single_buffer(void *priv) {
 	return ret;
 }
 
+static int ecpri_dma_eth_dp_test_suite_tx_pre_header(void *priv) {
+	int ret = 0;
+	int num_of_pkts_to_send = 1;
+	int num_to_repelnish = 1;
+	struct ecpri_dma_pkt **tx_pkts;
+	struct ecpri_dma_pkt_completion_wrapper **rx_pkts;
+	struct ecpri_dma_eth_endpoint_connect_params connect_params;
+	struct ecpri_dma_tx_header *tx_header;
+	int i;
+	int j;
+
+	DMA_UT_DBG("Start tx pre-header test\n");
+
+	/* Assign common config params */
+	connect_params.link_index = ECPRI_DMA_ETH_CLIENT_UT_LINK_INDEX;
+	connect_params.tx_ring_length = ECPRI_DMA_ETH_CLIENT_UT_RING_LENGTH;
+	connect_params.rx_ring_length = ECPRI_DMA_ETH_CLIENT_UT_RING_LENGTH;
+	connect_params.p_type = ECPRI_DMA_ENDP_STREAM_DEST_FH;
+	connect_params.tx_mod_cfg.moderation_counter_threshold =
+		ECPRI_DMA_ETH_CLIENT_UT_MODER_CNTR_THRSHLD;
+	connect_params.tx_mod_cfg.moderation_timer_threshold =
+		ECPRI_DMA_ETH_CLIENT_UT_MODER_TIMER_THRSHLD;
+
+	/* Run once with Tx pre header enabled and once with pre header disabled*/
+	for (i = 0; i < 2; i++) {
+
+		/* Set pre header enable/disable */
+		if (0 == i)
+			connect_params.enable_tx_pre_header = true;
+		else
+			connect_params.enable_tx_pre_header = false;
+
+		ret = ecpri_dma_eth_dp_test_util_init(&connect_params);
+		if (ret != 0) {
+			DMA_UT_LOG("Failed to initialize the test\n");
+			return ret;
+		}
+
+		ret = ecpri_dma_eth_dp_test_util_prepare_test_data(num_of_pkts_to_send,
+			true, &tx_pkts, &rx_pkts);
+
+		if (ret != 0) {
+			DMA_UT_LOG("Failed to prepare test data\n");
+			return ret;
+		}
+
+		/* Fill buffer with data */
+		for (j = 0; j < ECPRI_DMA_ETH_CLIENT_UT_TEST_TX_BUFF_SIZE; j++)
+			*(u8*)(tx_pkts[0]->buffs[0]->virt_base) = j + 1;
+
+		/* Clear Tx header section */
+		memset(tx_pkts[0]->buffs[0]->virt_base, 0,
+				sizeof(struct ecpri_dma_tx_header));
+
+		/* Configure Tx header to defeult destination */
+		tx_header = tx_pkts[0]->buffs[0]->virt_base;
+		tx_header->destination_channel = ECPRI_DMA_ETH_CLIENT_UT_DEST_ENDP_ID;
+		tx_header->gsi_id = ECPRI_DMA_GSI_ID_0;
+
+		/* Transmit single packet */
+		ret = ecpri_dma_eth_transmit(eth_client_test_suite_ctx.hdl,
+			tx_pkts, num_of_pkts_to_send, true);
+		if (ret != 0) {
+			DMA_UT_TEST_FAIL_REPORT("Failed on transmit");
+			return -EFAULT;
+		}
+
+		/* Wait for single packet */
+		ret = ecpri_dma_eth_dp_test_util_wait_for_tx_comp(num_of_pkts_to_send);
+		if (ret != 0) {
+			DMA_UT_TEST_FAIL_REPORT("Test failed due to Tx timeout");
+			return -EFAULT;
+		}
+
+		/* Point to packet payload if header is used */
+		if (0 == i) {
+			tx_pkts[0]->buffs[0]->virt_base =
+				(u8*)(tx_pkts[0]->buffs[0]->virt_base) +
+					sizeof(struct ecpri_dma_tx_header);
+			tx_pkts[0]->buffs[0]->size -=
+				sizeof(struct ecpri_dma_tx_header);
+		}
+
+		ret = ecpri_dma_eth_dp_test_util_verify_rx(eth_client_test_suite_ctx.hdl,
+			1, tx_pkts, rx_pkts,
+			ECPRI_DMA_NOTIFY_MODE_IRQ, ECPRI_DMA_NOTIFY_MODE_IRQ,
+			&num_to_repelnish);
+
+		if (ret != 0) {
+			DMA_UT_TEST_FAIL_REPORT("Test failed due to verification\n");
+			return -EFAULT;
+		}
+
+		if (0 == i) {
+			/* Resore tx packets attributes */
+			tx_pkts[0]->buffs[0]->virt_base =
+				(u8*)(tx_pkts[0]->buffs[0]->virt_base) -
+					sizeof(struct ecpri_dma_tx_header);
+
+			tx_pkts[0]->buffs[0]->size +=
+					sizeof(struct ecpri_dma_tx_header);
+		}
+
+		if (ret != 0) {
+			DMA_UT_TEST_FAIL_REPORT("Test failed due to Tx fail");
+			return -EFAULT;
+		}
+
+		ret = ecpri_dma_eth_dp_test_util_rx_replenish(num_to_repelnish);
+		if (ret != 0) {
+			DMA_UT_LOG("Test failed due to replenish buffers failure\n");
+			return -EFAULT;
+		}
+
+		/* Test clean-up */
+		ret = ecpri_dma_eth_dp_test_util_clean_up(eth_client_test_suite_ctx.hdl,
+			num_of_pkts_to_send, true, tx_pkts,
+			rx_pkts);
+		if (ret != 0) {
+			DMA_UT_LOG("Failed to clean the test\n");
+			return ret;
+		}
+	}
+
+	DMA_UT_DBG("TX header test successful");
+	return ret;
+}
+
+
 static int ecpri_dma_eth_dp_test_suite_mult_pkt_single_buffer(void *priv) {
 	int ret = 0;
 	struct ecpri_dma_pkt **tx_pkts;
@@ -2036,7 +2188,7 @@ static int ecpri_dma_eth_dp_test_suite_mult_pkt_single_buffer(void *priv) {
 
 	DMA_UT_DBG("Start Loopback Multiple packets\n");
 
-	ret = ecpri_dma_eth_dp_test_util_init();
+	ret = ecpri_dma_eth_dp_test_util_init(USE_DEFAULT_CONNECT_PARAMS);
 	if (ret != 0) {
 		DMA_UT_LOG("Failed to initialize the test\n");
 		return ret;
@@ -2126,7 +2278,7 @@ static int ecpri_dma_eth_dp_test_suite_mode_change(void *priv) {
 
 	DMA_UT_DBG("Start Loopback Multiple packets\n");
 
-	ret = ecpri_dma_eth_dp_test_util_init();
+	ret = ecpri_dma_eth_dp_test_util_init(USE_DEFAULT_CONNECT_PARAMS);
 	if (ret != 0) {
 		DMA_UT_LOG("Failed to initialize the test\n");
 		return ret;
@@ -2272,7 +2424,7 @@ static int ecpri_dma_eth_dp_test_suite_chains_large_payload(void *priv) {
 
 	DMA_UT_DBG("Start Large Payload\n");
 
-	ret = ecpri_dma_eth_dp_test_util_init();
+	ret = ecpri_dma_eth_dp_test_util_init(USE_DEFAULT_CONNECT_PARAMS);
 	if (ret != 0) {
 		DMA_UT_LOG("Failed to initialize the test\n");
 		return ret;
@@ -2372,7 +2524,7 @@ static int ecpri_dma_eth_dp_test_suite_commit(void *priv) {
 
 	DMA_UT_DBG("Start Commit\n");
 
-	ret = ecpri_dma_eth_dp_test_util_init();
+	ret = ecpri_dma_eth_dp_test_util_init(USE_DEFAULT_CONNECT_PARAMS);
 	if (ret != 0) {
 		DMA_UT_LOG("Failed to initialize the test\n");
 		return ret;
@@ -2506,7 +2658,7 @@ static int ecpri_dma_eth_dp_test_suite_stop_reset_durig_data_m2s_s2m(
 
 	DMA_UT_DBG("Start stop & reset during data test\n");
 
-	ret = ecpri_dma_eth_dp_test_util_init();
+	ret = ecpri_dma_eth_dp_test_util_init(USE_DEFAULT_CONNECT_PARAMS);
 	if (ret != 0) {
 		DMA_UT_LOG("Failed to initialize the test\n");
 		return ret;
@@ -2657,7 +2809,7 @@ static int ecpri_dma_eth_dp_test_suite_stop_reset_durig_data(void* priv) {
 	if (ret)
 		return ret;
 
-	ret = ecpri_dma_eth_dp_test_util_init();
+	ret = ecpri_dma_eth_dp_test_util_init(USE_DEFAULT_CONNECT_PARAMS);
 	if (ret != 0) {
 		DMA_UT_LOG("Failed to initialize the test\n");
 		return ret;
@@ -2851,11 +3003,17 @@ DMA_UT_DEFINE_SUITE_START(eth_dp, "ETH DP suite",
 		"This test will verify stop & reset during data on M2S & S2M CHs.",
 		ecpri_dma_eth_dp_test_suite_stop_reset_durig_data_m2s_s2m, true,
 		ECPRI_HW_V2_0, ECPRI_HW_MAX),
-		DMA_UT_ADD_TEST(
-			single_pkt_single_buffer_exception,
-			"This test will verify the exception path by sending a single packet"
-			" with a single buffer on SRC ENDP and confirming ETH Client "
-			"received it the same on exception ENDP.",
-			ecpri_dma_eth_dp_test_suite_single_pkt_single_buffer_exception, true,
-			ECPRI_HW_V1_0, ECPRI_HW_MAX),
+	DMA_UT_ADD_TEST(
+		single_pkt_single_buffer_exception,
+		"This test will verify the exception path by sending a single packet"
+		" with a single buffer on SRC ENDP and confirming ETH Client "
+		"received it the same on exception ENDP.",
+		ecpri_dma_eth_dp_test_suite_single_pkt_single_buffer_exception, true,
+		ECPRI_HW_V1_0, ECPRI_HW_MAX),
+	DMA_UT_ADD_TEST(
+		tx_pre_header,
+		"Tx pre header test",
+		ecpri_dma_eth_dp_test_suite_tx_pre_header, true,
+		ECPRI_HW_V2_0, ECPRI_HW_MAX),
+
 } DMA_UT_DEFINE_SUITE_END(eth_dp);
