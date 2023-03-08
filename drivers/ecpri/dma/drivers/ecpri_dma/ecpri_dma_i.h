@@ -503,6 +503,7 @@ struct ecpri_dma_context {
 	struct ecpri_dma_icc_paths icc_paths;
 	u32 num_of_gsi;
 	u32 driver_ver;
+	struct mutex mhi_memcpy_setup_lock;
 };
 
 /**
