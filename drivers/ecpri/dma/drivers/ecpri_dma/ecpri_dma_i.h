@@ -162,6 +162,11 @@ do {\
 #define GCC_AHB_CLK_NOM_MAX (ECPRI_CLK_FREQ(100))
 #define GCC_XO_CLK_NOM_MAX (ECPRI_CLK_FREQ(19.20))
 
+/* Exception ENDP defines */
+#define ECPRI_DMA_EXCEPTION_RING_SIZE (512)
+#define ECPRI_DMA_DP_EXCEPTION_BUDGET (16)
+#define ECPRI_DMA_DP_EXCEPTION_BUFF_SIZE (1500)
+
 enum ecpri_dma_smmu_cb_type {
 	ECPRI_DMA_SMMU_CB_AP,
 	ECPRI_DMA_SMMU_CB_MAX
@@ -301,10 +306,6 @@ struct ecpri_dma_exception_stats {
  * @available_outstanding_pkts_cache: Cache for outstanding pkts wrappers alloc
  * @available_outstanding_pkts_list: List of pkt wrappers ready to be used
  * @avail_outstanding_pkts: Size of the ready pkt wrappers list
- * @available_exception_pkts_cache: Cache for exception pkts allocation,
- *									relavent only for exception endp
- * @available_exception_buffs_cache: Cache for exception buffers allocation,
- *									 relavent only for exception endp
  * @xmit_eot_cnt: atomic var to keep track of completed packets
  * @total_pkts_recv: EP statistics regarding number of packets received
  * @total_pkts_sent: EP statistics regarding number of packets sent
@@ -349,8 +350,6 @@ struct ecpri_dma_endp_context {
 	struct kmem_cache *available_outstanding_pkts_cache;
 	struct list_head available_outstanding_pkts_list;
 	u32 avail_outstanding_pkts;
-	struct kmem_cache *available_exception_pkts_cache;
-	struct kmem_cache *available_exception_buffs_cache;
 	atomic_t xmit_eot_cnt;
 
 	u32 total_pkts_recv;
@@ -498,6 +497,14 @@ struct ecpri_dma_context {
 	struct ecpri_dma_clks clks;
 	struct ecpri_dma_icc_paths icc_paths;
 	u32 num_of_gsi;
+	spinlock_t exception_spinlock;
+	u32 exception_pkt_idx;
+	struct ecpri_dma_pkt*
+		exception_pkts_arr[ECPRI_DMA_EXCEPTION_RING_SIZE];
+	struct ecpri_dma_pkt exception_pkts[ECPRI_DMA_EXCEPTION_RING_SIZE];
+	struct ecpri_dma_mem_buffer*
+		exception_buffs_ptr_arr[ECPRI_DMA_EXCEPTION_RING_SIZE];
+	struct ecpri_dma_mem_buffer exception_buffs[ECPRI_DMA_EXCEPTION_RING_SIZE];
 };
 
 /**
