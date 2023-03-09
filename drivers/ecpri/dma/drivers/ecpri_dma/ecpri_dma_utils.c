@@ -7722,6 +7722,11 @@ int ecpri_dma_gsi_start_channel(struct ecpri_dma_endp_context *ep)
 	return ret;
 }
 
+u32 ecpri_dma_get_sw_ver()
+{
+	return ecpri_dma_ctx->driver_ver;
+}
+
 u32 ecpri_dma_get_ctx_hw_ver()
 {
 	return ecpri_dma_ctx->ecpri_hw_ver;

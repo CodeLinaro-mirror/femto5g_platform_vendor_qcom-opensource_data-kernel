@@ -20,6 +20,8 @@ ecpri_dmam-m += \
 	drivers/ecpri_dma/ecpri_dma_interrupts.o \
 	drivers/ecpri_dma/ecpri_dma_debugfs.o \
 	drivers/ecpri_dma/ecpri_dma_dp.o \
+	drivers/ecpri_dma/ecpri_dma_qmi_service.o \
+	drivers/ecpri_dma/ecpri_dma_qmi_v01.o \
 	drivers/ecpri_dma/dump/ecpri_dma_reg_dump.o \
 	drivers/ecpri_dma/dma_clients/ecpri_dma_eth_client.o \
 	drivers/ecpri_dma/dma_clients/ecpri_dma_ss_core.o \

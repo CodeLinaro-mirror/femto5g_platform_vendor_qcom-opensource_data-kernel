@@ -47,6 +47,7 @@ int ecpri_dma_gsi_stop_channel(struct ecpri_dma_endp_context *ep);
 int ecpri_dma_gsi_reset_channel(struct ecpri_dma_endp_context *ep);
 int ecpri_dma_hw_init(void);
 
+u32 ecpri_dma_get_sw_ver(void);
 u32 ecpri_dma_get_ctx_hw_ver(void);
 u32 ecpri_dma_get_ctx_hw_flavor(void);
 int ecpri_dma_get_gsi_dev_hdl(unsigned long* dev_hdl);
