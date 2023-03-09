@@ -1741,14 +1741,14 @@ static int ecpriss_qudp_ingress_init_cfg_v2(void)
 						port_idx,
 						&ingress_cfg->fh_ingress_config);
 
-				ingress_cfg->fh_ingress_config.ipv4_cs_err_action = 1;
-				ingress_cfg->fh_ingress_config.udp_cs_err_action = 1;
-				ingress_cfg->fh_ingress_config.fcs_err_action = 1;
-				ingress_cfg->fh_ingress_config.pkt_err_action = 1;
-				ingress_cfg->fh_ingress_config.ip_len_err_action = 1;
-				ingress_cfg->fh_ingress_config.vlan_filt_miss_action = 1;
-				ingress_cfg->fh_ingress_config.ip_filt_miss_action = 1;
-				ingress_cfg->fh_ingress_config.non_local_dst_action = 1;
+				ingress_cfg->fh_ingress_config.ipv4_cs_err_action = 2;
+				ingress_cfg->fh_ingress_config.udp_cs_err_action = 2;
+				ingress_cfg->fh_ingress_config.fcs_err_action = 2;
+				ingress_cfg->fh_ingress_config.pkt_err_action = 2;
+				ingress_cfg->fh_ingress_config.ip_len_err_action = 2;
+				ingress_cfg->fh_ingress_config.vlan_filt_miss_action = 2;
+				ingress_cfg->fh_ingress_config.ip_filt_miss_action = 2;
+				ingress_cfg->fh_ingress_config.non_local_dst_action = 2;
 
 				ecpriss_qudp_hal_write_reg_n_fields(ECPRISS_QUDP_FH,
 						ECPRI_UDP_FH_INGRESS_CONFIG_P_V2,
