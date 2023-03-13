@@ -1730,7 +1730,7 @@ static int ecpriss_qudp_ingress_init_cfg_v2(void)
 		if(port_type == ECPRISS_PORT_TYPE_FH)
 		{
 
-//			for(port_idx=0;port_idx<ecpriss_pdata_v2->qudp_ctx_v2->num_ports;port_idx++)
+			for(port_idx=0;port_idx<ecpriss_pdata_v2->qudp_ctx_v2->num_ports;port_idx++)
 			{
 
 				ecpriss_qudp_ingress_per_port_cfg_s_v2       *ingress_cfg =
