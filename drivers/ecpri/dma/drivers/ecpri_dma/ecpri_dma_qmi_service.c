@@ -434,7 +434,6 @@ static void ecpri_dma_qmi_service_q6_send_init_msg(struct work_struct* work)
 		 * which requires a kernel panic in
 		 * order to forete dumps for QMI/Q6 side analysis.
 		 */
-		BUG();
 	}
 }
 
