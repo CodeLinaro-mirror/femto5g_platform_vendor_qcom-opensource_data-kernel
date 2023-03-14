@@ -1433,6 +1433,81 @@ void mtip_netdev_reconfigure_port(u32 port_device_index, enum mtip_port_config_e
     platform_driver_priv->devices.port_devices[port_device_index].port_config = port_config;
 }
 
+int mtip_device_update_security_config(struct net_device *netdev, enum mtip_port_config_enum port_config)
+{
+    struct mtip_netdev_priv *mtip_priv = NULL;
+    struct mtip_security_device *sdev = NULL;
+    u32 num_links = 4;
+
+    mtip_priv = (struct mtip_netdev_priv *)netdev_priv(netdev);
+    sdev = mtip_priv->sec_dev;
+
+    // set the new port/lane configuration
+    switch (port_config) 
+    {
+    case MTIP_PORT_CONFIG_1x100GBASE_R:
+    case MTIP_PORT_CONFIG_1x100GBASE_R_RSFEC_LL:
+    case MTIP_PORT_CONFIG_1x100GBASE_R_RSFEC:
+    case MTIP_PORT_CONFIG_1x100GBASE_R2:
+    case MTIP_PORT_CONFIG_1x100GBASE_R2_RSFEC:
+    case MTIP_PORT_CONFIG_1x100GBASE_R4:
+    case MTIP_PORT_CONFIG_1x100GBASE_R4_RSFEC:
+    case MTIP_PORT_CONFIG_1x50GBASE_R:
+    case MTIP_PORT_CONFIG_1x50GBASE_R_RSFEC:
+    case MTIP_PORT_CONFIG_1x50GBASE_R2:
+    case MTIP_PORT_CONFIG_1x50GBASE_R2_RSFEC:
+    case MTIP_PORT_CONFIG_1x50GBASE_R2_LUAI:
+    case MTIP_PORT_CONFIG_1x50GBASE_R2_LUAI_FEC:
+    case MTIP_PORT_CONFIG_1x40GBASE_R4:
+    case MTIP_PORT_CONFIG_1x40GBASE_R4_FEC:
+    case MTIP_PORT_CONFIG_1x25GBASE_R:
+    case MTIP_PORT_CONFIG_1x25GBASE_R_FEC:
+    case MTIP_PORT_CONFIG_1x25GBASE_R_RSFEC:
+    case MTIP_PORT_CONFIG_1x10GBASE_R:
+    case MTIP_PORT_CONFIG_1x10GBASE_R_FEC:
+        {
+            num_links = 1;
+        }
+        break;
+    case MTIP_PORT_CONFIG_2x50GBASE_R:
+    case MTIP_PORT_CONFIG_2x50GBASE_R_RSFEC:
+    case MTIP_PORT_CONFIG_2x50GBASE_R2:
+    case MTIP_PORT_CONFIG_2x50GBASE_R2_FEC:
+    case MTIP_PORT_CONFIG_2x50GBASE_R2_LUAI:
+    case MTIP_PORT_CONFIG_2x50GBASE_R2_LUAI_FEC:
+        {
+            num_links = 2;
+        }
+        break;
+    case MTIP_PORT_CONFIG_4x25GBASE_R:
+    case MTIP_PORT_CONFIG_4x25GBASE_R_FEC:
+    case MTIP_PORT_CONFIG_4x25GBASE_R_RSFEC:
+    case MTIP_PORT_CONFIG_4x10GBASE_R:
+    case MTIP_PORT_CONFIG_4x10GBASE_R_FEC:
+        {
+            num_links = 4;
+        }
+        break;
+    default:
+        {
+            CSMLOGERR("Unknown port config %d", port_config);
+        }
+        break;
+    }
+
+    if (sdev) 
+    {
+        if (sdev->ops) 
+        {
+            if (sdev->ops->update_config) 
+            {
+                (sdev->ops->update_config)(sdev, num_links);
+            }
+        }
+    }
+    return num_links;
+}
+
 int mtip_netdev_set_port_config(struct net_device *netdev)
 {
     struct mtip_netdev_priv *priv;
@@ -1478,6 +1553,9 @@ int mtip_netdev_set_port_config(struct net_device *netdev)
 
     // set the clock rates based on updated port config
     mtip_clocks_set_clock_rates(platform_driver_priv->devices.port_devices[port_device_index].port_type, port_config);
+
+    // provide an update to security driver regarding port config
+    mtip_device_update_security_config(netdev, port_config);
 
     return 0;
 }

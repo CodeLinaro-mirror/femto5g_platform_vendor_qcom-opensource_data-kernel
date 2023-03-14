@@ -8,6 +8,33 @@
 
 #include "mtip_security.h"
 
+/* update port config on all links. */
+static void __update_security_port_config()
+{
+    u32 link_index;
+    struct net_device *netdev;
+    struct mtip_link_info *link;
+    struct mtip_netdev_priv *mtip_priv;
+    u32 port_device_index;
+    u32 link_device_index;
+    enum mtip_port_config_enum port_config = MTIP_PORT_CONFIG_4x25GBASE_R;
+
+    for (link_index = 0; link_index < MTIP_MAX_LINKS; ++link_index) {
+        link = platform_driver_priv->mtip_links[link_index];
+        if (!link)
+            continue;
+
+        netdev = link->dev;
+        mtip_priv = (struct mtip_netdev_priv *)netdev_priv(netdev);
+
+        mtip_lookup_device_by_link_index(link_index, &port_device_index, &link_device_index);
+        port_config = platform_driver_priv->devices.port_devices[port_device_index].port_config;
+
+        // provide an update to security driver regarding port config
+        mtip_device_update_security_config(netdev, port_config);
+    }
+}
+
 /* Register security device recursively on all links. */
 static int __register_security_device(struct mtip_security_device *sdev, u32 link_id)
 {
@@ -60,10 +87,16 @@ fail:
  */
 int mtip_security_register_device(struct mtip_security_device *sdev)
 {
+    int retval = 0;
 	if (!sdev->ops || !sdev->ops->add_link || !sdev->ops->del_link)
 		return -EINVAL;
 
-	return __register_security_device(sdev, 0);
+	retval = __register_security_device(sdev, 0);
+
+    // update the number of links of all ports
+    __update_security_port_config();
+
+    return retval;
 }
 EXPORT_SYMBOL(mtip_security_register_device);
 
