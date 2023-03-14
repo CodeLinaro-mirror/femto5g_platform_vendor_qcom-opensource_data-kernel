@@ -199,6 +199,7 @@ int mtip_connect_dma_pipe(u32 link_index, ecpri_dma_eth_conn_hdl_t* hdl)
    int rv = 0;
    struct ecpri_dma_eth_endpoint_connect_params pipe_params;
 
+   memset(&pipe_params, 0, sizeof(pipe_params));
    pipe_params.link_index = link_index;
    pipe_params.tx_ring_length = MTIP_TX_RING_SIZE;
    pipe_params.rx_ring_length = MTIP_RX_RING_SIZE;
