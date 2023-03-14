@@ -77,7 +77,7 @@ INT DWC_ETH_QOS_mdio_read_direct(struct DWC_ETH_QOS_prv_data *pdata,
 
 	DBGPR_MDIO("--> DWC_ETH_QOS_mdio_read_direct\n");
 
-	if(!dwc_eth_qos_res_data.mac2mac_en) {
+	if(!dwc_eth_qos_res_data.mac2mac_en && !dwc_eth_qos_res_data.ext_phy) {
 		if (pdata->phy_state == PHY_IS_OFF) {
 			EMACDBG("Phy is in off state reading is not possible\n");
 			return -EOPNOTSUPP;
@@ -126,7 +126,7 @@ INT DWC_ETH_QOS_mdio_write_direct(struct DWC_ETH_QOS_prv_data *pdata,
 
 	DBGPR_MDIO("--> DWC_ETH_QOS_mdio_write_direct\n");
 
-	if(!dwc_eth_qos_res_data.mac2mac_en) {
+	if(!dwc_eth_qos_res_data.mac2mac_en && !dwc_eth_qos_res_data.ext_phy) {
 		if (pdata->phy_state == PHY_IS_OFF) {
 			EMACDBG("Phy is in off state writing is not possible\n");
 			return -EOPNOTSUPP;
@@ -248,7 +248,7 @@ static INT DWC_ETH_QOS_mdio_read(struct mii_bus *bus, int phyaddr, int phyreg)
 	DBGPR_MDIO("--> DWC_ETH_QOS_mdio_read: phyaddr = %d, phyreg = %d\n",
 		   phyaddr, phyreg);
 
-	if(!dwc_eth_qos_res_data.mac2mac_en) {
+	if(!dwc_eth_qos_res_data.mac2mac_en && !dwc_eth_qos_res_data.ext_phy) {
 		if (pdata->phy_state == PHY_IS_OFF) {
 			EMACDBG("Phy is in off state reading is not possible\n");
 			return -EOPNOTSUPP;
@@ -290,7 +290,7 @@ static INT DWC_ETH_QOS_mdio_write(struct mii_bus *bus, int phyaddr, int phyreg,
 
 	DBGPR_MDIO("--> DWC_ETH_QOS_mdio_write\n");
 
-	if(!dwc_eth_qos_res_data.mac2mac_en) {
+	if(!dwc_eth_qos_res_data.mac2mac_en && !dwc_eth_qos_res_data.ext_phy) {
 		if (pdata->phy_state == PHY_IS_OFF) {
 			EMACDBG("Phy is in off state writing is not possible\n");
 			return -EOPNOTSUPP;
@@ -1093,9 +1093,11 @@ bool DWC_ETH_QOS_is_phy_link_up(struct DWC_ETH_QOS_prv_data *pdata)
 	 * So, phydev->link is 1 even on booup with no PHY connected.
 	 * phydev->link is valid only after adjust_link is called once.
 	 * Use (pdata->oldlink != -1) to indicate phy link is not up */
-	if(dwc_eth_qos_res_data.mac2mac_en) {
+	if(dwc_eth_qos_res_data.mac2mac_en)
 		return true;
-	} else {
+	else if (dwc_eth_qos_res_data.ext_phy)
+		return dwc_eth_qos_res_data.ext_phy_link;
+	else {
 		return pdata->always_on_phy ? 1 :
 			((pdata->oldlink != -1) && pdata->phydev && pdata->phydev->link);
 	}

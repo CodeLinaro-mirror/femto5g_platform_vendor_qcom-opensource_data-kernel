@@ -1647,6 +1647,9 @@ struct DWC_ETH_QOS_res_data {
 	int mac2mac_rgmii_speed;
 	bool mac2mac_en;
 	int mac2mac_link;
+	bool ext_phy;
+	int ext_phy_link;
+	int ext_phy_speed;
 };
 
 enum mac_err_type {

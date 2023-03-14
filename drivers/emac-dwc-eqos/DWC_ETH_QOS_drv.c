@@ -599,7 +599,7 @@ static void DWC_ETH_QOS_restart_dev(struct DWC_ETH_QOS_prv_data *pdata,
 	 */
 	hw_if->init(pdata);
 
-	if(!dwc_eth_qos_res_data.mac2mac_en)
+	if(!dwc_eth_qos_res_data.mac2mac_en && !dwc_eth_qos_res_data.ext_phy)
 		DWC_ETH_QOS_restart_phy(pdata);
 
 	netif_wake_subqueue(pdata->dev, qinx);
@@ -795,6 +795,11 @@ void DWC_ETH_QOS_handle_phy_interrupt(struct DWC_ETH_QOS_prv_data *pdata)
 
 	if (dwc_eth_qos_res_data.mac2mac_en) {
 		EMACERR("%s: Phy is not registered\n", pdata->dev->name);
+		return -ENODEV;
+	}
+
+	if(dwc_eth_qos_res_data.ext_phy) {
+		EMACERR("PHY interrupts will not be handled here\n");
 		return -ENODEV;
 	}
 
@@ -1060,9 +1065,11 @@ irqreturn_t DWC_ETH_QOS_ISR_SW_DWC_ETH_QOS(int irq, void *dev_data)
 			DWC_ETH_QOS_handle_eee_interrupt(pdata);
 
 		/* PHY interrupt */
-		if (GET_VALUE(VARMAC_ISR, MAC_ISR_PHYIS_LPOS, MAC_ISR_PHYIS_HPOS) & 1) {
-			MAC_ISR_PHYIS_UDFRD(VARMAC_PHYIS);
-			DWC_ETH_QOS_handle_phy_interrupt(pdata);
+		if(!dwc_eth_qos_res_data.ext_phy)  {
+			if (GET_VALUE(VARMAC_ISR, MAC_ISR_PHYIS_LPOS, MAC_ISR_PHYIS_HPOS) & 1) {
+				MAC_ISR_PHYIS_UDFRD(VARMAC_PHYIS);
+				DWC_ETH_QOS_handle_phy_interrupt(pdata);
+			}
 		}
 	}
 
@@ -2269,8 +2276,9 @@ static int DWC_ETH_QOS_open(struct net_device *dev)
 	hw_if->prepare_dev_pktgen(pdata);
 #endif
 
-	if (pdata->phydev)
-		phy_start(pdata->phydev);
+	if(!dwc_eth_qos_res_data.ext_phy)
+		if (pdata->phydev)
+			phy_start(pdata->phydev);
 
 	pdata->eee_enabled = DWC_ETH_QOS_eee_init(pdata);
 
@@ -2369,7 +2377,7 @@ static int DWC_ETH_QOS_close(struct net_device *dev)
 	hw_if->exit();
 
 
-	if(!dwc_eth_qos_res_data.mac2mac_en) {
+	if(!dwc_eth_qos_res_data.mac2mac_en && !dwc_eth_qos_res_data.ext_phy) {
 		if (pdata->phydev)
 			phy_stop(pdata->phydev);
 
@@ -7137,8 +7145,9 @@ INT DWC_ETH_QOS_powerdown(struct net_device *dev, UINT wakeup_type,
 		return -EINVAL;
 	}
 
-	if (pdata->phydev)
-		phy_stop(pdata->phydev);
+	if(!dwc_eth_qos_res_data.ext_phy)
+		if (pdata->phydev)
+			phy_stop(pdata->phydev);
 
 	mutex_lock(&pdata->pmt_lock);
 
@@ -7223,8 +7232,9 @@ INT DWC_ETH_QOS_powerup(struct net_device *dev, UINT caller)
 
 	pdata->power_down = 0;
 
-	if (pdata->phydev)
-		phy_start(pdata->phydev);
+	if(!dwc_eth_qos_res_data.ext_phy)
+		if (pdata->phydev)
+			phy_start(pdata->phydev);
 
 	if (caller == DWC_ETH_QOS_DRIVER_CONTEXT)
 		netif_device_attach(dev);

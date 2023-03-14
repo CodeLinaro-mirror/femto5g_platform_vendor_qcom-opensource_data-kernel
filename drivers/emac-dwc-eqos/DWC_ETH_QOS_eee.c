@@ -438,6 +438,11 @@ bool DWC_ETH_QOS_eee_init(struct DWC_ETH_QOS_prv_data *pdata)
 		return -ENODEV;
 	}
 
+	if(dwc_eth_qos_res_data.ext_phy) {
+		EMACERR("External PHY is used\n");
+		return -ENODEV;
+	}
+
 	/* Disable smart EEE & EEE for ATH8030*/
 	if ((pdata->emac_hw_version_type == EMAC_HW_v2_3_1)
 		&& (pdata->io_macro_phy_intf == RMII_MODE) &&
@@ -538,6 +543,10 @@ void DWC_ETH_QOS_handle_eee_interrupt(struct DWC_ETH_QOS_prv_data *pdata)
 		return -ENODEV;
 	}
 
+	if(dwc_eth_qos_res_data.ext_phy) {
+		EMACERR("External PHY is used\n");
+		return -ENODEV;
+	}
 	lpi_status = hw_if->get_lpi_status();
 	DBGPR_EEE("MAC_LPI_Control_Status = %#x\n", lpi_status);
 
