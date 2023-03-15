@@ -779,7 +779,7 @@ static irqreturn_t ecpriss_xbar_isr_v2(int irq, void *ctxt)
 	ecpri_xbar_hwio_def_ecpri_xbar_sw_irq_status_s xbar_sw_irq_status;
 	ecpri_xbar_hwio_def_ecpri_xbar_sw_irq_clr_s xbar_sw_irq_clear;
 
-	spin_lock_irqsave(&ecpriss_pdata->irq_lock, flags);
+	spin_lock_irqsave(&ecpriss_pdata_v2->irq_lock, flags);
 
 	ecpriss_xbar_hal_read_reg_n_fields(ECPRISS_XBAR_GLOBAL,
 			ECPRI_XBAR_SW_IRQ_STATUS, 0,&xbar_sw_irq_status);
@@ -834,7 +834,7 @@ static irqreturn_t ecpriss_xbar_isr_v2(int irq, void *ctxt)
 	}
 	ecpriss_xbar_hal_write_reg_n_fields(ECPRISS_XBAR_GLOBAL,
 			ECPRI_XBAR_SW_IRQ_CLR , 0, &xbar_sw_irq_clear);
-	spin_unlock_irqrestore(&ecpriss_pdata->irq_lock, flags);
+	spin_unlock_irqrestore(&ecpriss_pdata_v2->irq_lock, flags);
 	return IRQ_HANDLED;
 }
 

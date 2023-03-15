@@ -12,8 +12,7 @@ extern struct ecpri_dma_ecpri_ss_ops dma_ecpri_ss_driver_ops;
 extern struct eth_ecpriss_ops mtip_ecpri_ops;
 
 #define ECPRISS_CORE_IPC_LOG_PAGES   50
-#define ECPRISS_CORE_LOCK() mutex_lock(&ecpriss_pdata->ecpriss_mutex_lock);
-#define ECPRISS_CORE_UNLOCK() mutex_unlock(&ecpriss_pdata->ecpriss_mutex_lock);
+
 
 /* Compile time flag for pre integration with DMA and ETH */
 #define PRE_INT                       1
@@ -423,13 +422,12 @@ void ecpriss_eth_event_processing(void)
 void ecpriss_eth_topology_init_wq(struct work_struct *work)
 {
 
-	ECPRISS_CORE_LOCK();
 	if(ecpriss_hw_ver == ECPRISS_HW_v1_0){
 		ecpriss_eth_topology_init();
 	}else {
 		ecpriss_eth_topology_init_v2();
+
 	}
-	ECPRISS_CORE_UNLOCK();
 	return;
 }
 
@@ -544,14 +542,12 @@ void ecpriss_dma_event_processing_wq(struct work_struct *work)
 	if(work == NULL) {
 		return;
 	}
-	ECPRISS_CORE_LOCK();
 
 	if(ecpriss_hw_ver == ECPRISS_HW_v1_0){
 		ecpriss_dma_endp_config();
 	}else {
 		ecpriss_dma_endp_config_v2();
 	}
-	ECPRISS_CORE_UNLOCK();
 	return;
 }
 
@@ -856,7 +852,6 @@ static int ecpriss_core_data_init_v2(void)
 	spin_lock_init(&ecpriss_pdata_v2->irq_lock);
 	ecpriss_pdata_v2->qudp_ctx_v2 = &qudp_ctx_g_v2;
 	ecpriss_pdata_v2->xbar_ctx_v2 = &xbar_ctx_g_v2;
-
 	ecpriss_pdata_v2->qudp_ctx_v2->ecpriss_qudp_hal_ctx =
 		qudp_ctx_g.ecpriss_qudp_hal_ctx;
 	ecpriss_pdata_v2->xbar_ctx_v2->ecpriss_xbar_hal = xbar_ctx_g_v2.ecpriss_xbar_hal;
