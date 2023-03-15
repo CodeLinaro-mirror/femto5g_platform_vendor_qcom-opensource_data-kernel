@@ -40,7 +40,7 @@ struct mtip_replenish_dma_rx_buffers_task
 {
    struct net_device * netdev;
    ecpri_dma_eth_conn_hdl_t  hdl;
-   u32                 num_of_pkts;
+   u32                 num_of_buffs;
 };
 void run_mtip_replenish_dma_rx_buffers(void* work_ptr);
 
