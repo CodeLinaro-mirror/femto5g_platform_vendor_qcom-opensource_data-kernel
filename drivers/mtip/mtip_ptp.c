@@ -365,6 +365,9 @@ void run_mtip_process_timestamp(void* work_ptr)
 
     // release the lock
     mtip_ptp_tx_ts_lock_release(link_index);
+
+    // free the taskstruct
+    kfree(taskstruct);
 }
 
 void mtip_ptp_set_rx_timestamp(struct sk_buff* skb, u32 timestamp_secs, u32 timestamp_nsecs)
