@@ -243,7 +243,7 @@ int mtip_lookup_real_link_number_by_link_index(u32 link_index, u32* link_number)
 		*link_number = 0;
 		break;
 	case 15:
-		*link_number = 2;
+		*link_number = 1;
 		break;
 	default:
         CSMLOGERR("invalid link_index: %d\n", link_index);
