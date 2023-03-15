@@ -7,7 +7,8 @@
 #include "ecpriss_workqueue.h"
 #include "ecpriss_debugfs.h"
 #include "ecpriss_log.h"
-
+#include <linux/notifier.h>
+#include <linux/panic_notifier.h>
 extern struct ecpri_dma_ecpri_ss_ops dma_ecpri_ss_driver_ops;
 extern struct eth_ecpriss_ops mtip_ecpri_ops;
 
@@ -779,7 +780,53 @@ void ecpriss_dma_ecpri_ss_log_msg_cb_v2(void *user_data, const char *fmt, ...)
 {
 	return ;
 }
+void ecpriss_panic_notifr_handler(void)
+{
+    int i;
+	ECPRILOGERR("ecpriss_hw_ver : %u",ecpriss_hw_ver);
 
+	ECPRILOGERR("ecpriss_pdata->dev_mode : %u",ecpriss_pdata->dev_mode);
+
+	ECPRILOGERR("ecpriss_pdata->callback_flag->eth_link_callback_rcvd  : %u ",ecpriss_pdata->callback_flag->eth_link_callback_rcvd);
+	ECPRILOGERR("ecpriss_pdata->callback_flag->dma_callback_rcvd : %u ",ecpriss_pdata->callback_flag->dma_callback_rcvd);
+	ECPRILOGERR("ecpriss_pdata->callback_flag->ssr_callback_rcvd : %u ",ecpriss_pdata->callback_flag->ssr_callback_rcvd);
+	ECPRILOGERR("ecpriss_pdata->callback_flag->macsec_callback_rcvd : %u ",ecpriss_pdata->callback_flag->macsec_callback_rcvd);
+
+	ECPRILOGERR("ecpriss_pdata->qudp_ctx->state : %u",ecpriss_pdata->qudp_ctx->state);
+	ECPRILOGERR("ecpriss_pdata->xbar_ctx->state : %u",ecpriss_pdata->xbar_ctx->state);
+	ECPRILOGERR("ecpriss_pdata->state : %u",ecpriss_pdata->ecpri_state);
+
+	for(i=0;i<XBAR_LINKS;i++)
+	{
+		ECPRILOGERR("ecpriss_pdata->xbar_ctx->stats.xbar_octx_pkt_cnt[%d]  : %u",i,ecpriss_pdata->xbar_ctx->stats.xbar_octx_pkt_cnt[i]);
+        ECPRILOGERR(" ecpriss_pdata->xbar_ctx->stats.xbar_ocrx_pkt_cnt[%d] : %u",i,ecpriss_pdata->xbar_ctx->stats.xbar_ocrx_pkt_cnt[i]);
+	}
+
+	ECPRILOGERR("ecpriss_pdata->xbar_ctx->stats.xbar_ocrx_fh_buff_watermark_fh0  : %u ",ecpriss_pdata->xbar_ctx->stats.xbar_ocrx_fh_buff_watermark_fh0);
+	ECPRILOGERR("Vecpriss_pdata->xbar_ctx->stats.xbar_ocrx_fh_buff_watermark_fh1 : %u ",ecpriss_pdata->xbar_ctx->stats.xbar_ocrx_fh_buff_watermark_fh1);
+	ECPRILOGERR("ecpriss_pdata->xbar_ctx->stats.xbar_ocrx_fh_buff_watermark_fh2  : %u ",ecpriss_pdata->xbar_ctx->stats.xbar_ocrx_fh_buff_watermark_fh2);
+
+	ECPRILOGERR("ecpriss_pdata->xbar_ctx->stats.octx_oc_0_1_buff_watermark_cc0 : %u ",ecpriss_pdata->xbar_ctx->stats.octx_oc_0_1_buff_watermark_cc0);
+	ECPRILOGERR("ecpriss_pdata->xbar_ctx->stats.octx_oc_0_1_buff_watermark_cc1 : %u ",ecpriss_pdata->xbar_ctx->stats.octx_oc_0_1_buff_watermark_cc1);
+	ECPRILOGERR("ecpriss_pdata->xbar_ctx->stats.octx_oc_2_3_buff_watermark_cc2 : %u ",ecpriss_pdata->xbar_ctx->stats.octx_oc_2_3_buff_watermark_cc2);
+	ECPRILOGERR("ecpriss_pdata->xbar_ctx->stats.octx_oc_2_3_buff_watermark_cc3 : %u ",ecpriss_pdata->xbar_ctx->stats.octx_oc_2_3_buff_watermark_cc3);
+
+	ECPRILOGERR("ecpriss_pdata->xbar_ctx->stats.xbar_dbg_ocrx_0_1_buff_watermark_cc0 : %u ",ecpriss_pdata->xbar_ctx->stats.xbar_dbg_ocrx_0_1_buff_watermark_cc0);
+	ECPRILOGERR("ecpriss_pdata->xbar_ctx->stats.xbar_dbg_ocrx_0_1_buff_watermark_cc1 : %u ",ecpriss_pdata->xbar_ctx->stats.xbar_dbg_ocrx_0_1_buff_watermark_cc1);
+	ECPRILOGERR("ecpriss_pdata->xbar_ctx->stats.xbar_dbg_ocrx_2_3_buff_watermark_cc2 : %u ",ecpriss_pdata->xbar_ctx->stats.xbar_dbg_ocrx_2_3_buff_watermark_cc2);
+	ECPRILOGERR("ecpriss_pdata->xbar_ctx->stats.xbar_dbg_ocrx_2_3_buff_watermark_cc3 : %u ",ecpriss_pdata->xbar_ctx->stats.xbar_dbg_ocrx_2_3_buff_watermark_cc3);
+}
+
+static int ecpriss_panic_notifier(struct notifier_block *this,unsigned long event, void *ptr)
+{
+	/*Panic Notifier Handler for Ecpriss Module*/
+	ecpriss_panic_notifr_handler();
+	return 0;
+}
+static struct notifier_block ecpriss_panic =
+{
+  .notifier_call  = ecpriss_panic_notifier,
+};
 
 static int ecpriss_core_data_init(void)
 {
@@ -802,6 +849,7 @@ static int ecpriss_core_data_init(void)
 		qudp_ctx_g.ecpriss_qudp_hal_ctx;
 	ecpriss_pdata->xbar_ctx->ecpriss_xbar_hal = xbar_ctx_g.ecpriss_xbar_hal;
 	spin_lock_init(&ecpriss_pdata->irq_lock);
+	atomic_notifier_chain_register(&panic_notifier_list,&ecpriss_panic);
 	ecpriss_pdata->ecpriss_core_logbuf =
         ipc_log_context_create(ECPRISS_CORE_IPC_LOG_PAGES,
                 "ecpriss_core", 0);
@@ -1415,6 +1463,279 @@ static void __exit ecpriss_core_module_exit(void)
 	}
 	/* del_timer(&g_timer); */
 }
+#if 0
+void ecpriss_dump_pdata(void)
+{
+    int i,j,k;
+	ECPRILOGERR("ecpriss_pdata->ecpri_state %u ",ecpriss_pdata->ecpri_state);
+
+	ECPRILOGERR("ecpriss_pdata->callback_flag->eth_link_callback_rcvd %u ",ecpriss_pdata->callback_flag->eth_link_callback_rcvd);
+	ECPRILOGERR("ecpriss_pdata->callback_flag->dma_callback_rcvd %u ",ecpriss_pdata->callback_flag->dma_callback_rcvd);
+	ECPRILOGERR("ecpriss_pdata->callback_flag->ssr_callback_rcvd %u ",ecpriss_pdata->callback_flag->ssr_callback_rcvd);
+	ECPRILOGERR("ecpriss_pdata->callback_flag->macsec_callback_rcvd %u ",ecpriss_pdata->callback_flag->macsec_callback_rcvd);
+
+	ECPRILOGERR("ecpriss_pdata->user_pid %u ",ecpriss_pdata->user_pid);
+
+	ECPRILOGERR("ecpriss_pdata->netlink_socket %u ",ecpriss_pdata->netlink_socket);
+
+	ECPRILOGERR("ecpriss_pdata->dma_endp->num_of_port_types  %u ",ecpriss_pdata->dma_endp->num_of_port_types);
+
+	ECPRILOGERR("ecpriss_pdata->dma_endp->flv  %u ",ecpriss_pdata->dma_endp->flv);
+
+	for(i=0;i<ECPRI_DMA_ENDP_STREAM_DEST_MAX;i++)
+	{
+		ECPRILOGERR("ecpriss_pdata->dma_endp->topology_params[%d].num_of_ports %u",i,ecpriss_pdata->dma_endp->topology_params[i].num_of_ports);
+		ECPRILOGERR("ecpriss_pdata->dma_endp->topology_params[%d].port_type %u",i,ecpriss_pdata->dma_endp->topology_params[i].port_type);
+		for(j=0;j<ECPRI_DMA_NUM_PORT_MAX;j++)
+		{
+		 ECPRILOGERR("ecpriss_pdata->dma_endp->topology_params[%d].dma_port_param[%d].port_index %u",i,j,ecpriss_pdata->dma_endp->topology_params[i].dma_port_param[j].port_index);
+		 ECPRILOGERR("ecpriss_pdata->dma_endp->topology_params[%d].dma_port_param[%d].num_of_rings %u",i,j,ecpriss_pdata->dma_endp->topology_params[i].dma_port_param[j].num_of_rings);
+		  for(k=0;k<ECPRI_DMA_RING_PER_PORT_MAX;k++)
+		  {
+		   ECPRILOGERR("ecpriss_pdata->dma_endp->topology_params[%d].dma_port_param[%d].dma_rings_param[%d].link_index %u",i,j,k,ecpriss_pdata->dma_endp->topology_params[i].dma_port_param[j].dma_rings_param[k].link_index);
+		   ECPRILOGERR("ecpriss_pdata->dma_endp->topology_params[%d].dma_port_param[%d].dma_rings_param[%d].nfapi_vm_id %u",i,j,k,ecpriss_pdata->dma_endp->topology_params[i].dma_port_param[j].dma_rings_param[k].nfapi_vm_id);
+		   ECPRILOGERR("Vecpriss_pdata->dma_endp->topology_params[%d].dma_port_param[%d].dma_rings_param[%d].dma_ring_type %u",i,j,k,ecpriss_pdata->dma_endp->topology_params[i].dma_port_param[j].dma_rings_param[k].dma_ring_type);
+		   ECPRILOGERR("ecpriss_pdata->dma_endp->topology_params[%d].dma_port_param[%d].dma_rings_param[%d].src_dma_ring_id %u",i,j,k,ecpriss_pdata->dma_endp->topology_params[i].dma_port_param[j].dma_rings_param[k].src_dma_ring_id);
+		   ECPRILOGERR("ecpriss_pdata->dma_endp->topology_params[%d].dma_port_param[%d].dma_rings_param[%d].dest_dma_ring_id %u",i,j,k,ecpriss_pdata->dma_endp->topology_params[i].dma_port_param[j].dma_rings_param[k].dest_dma_ring_id);
+		  }
+		}
+	}
+
+	ECPRILOGERR("ecpriss_pdata->eth_topology_params->eth_topology_init_done %u ", ecpriss_pdata->eth_topology_params->eth_topology_init_done);
+	ECPRILOGERR("ecpriss_pdata->eth_topology_params->num_unique_port_types %u ", ecpriss_pdata->eth_topology_params->num_unique_port_types);
+
+	for(i=0;i<ECPRISS_MAX_UNIQUE_PORT;i++)
+	{
+		ECPRILOGERR("ecpriss_pdata->eth_topology_params->topology_params[%d].port_type %u ",i,ecpriss_pdata->eth_topology_params->topology_params[i].port_type);
+		ECPRILOGERR("ecpriss_pdata->eth_topology_params->topology_params[%d].num_ports %u ",i,ecpriss_pdata->eth_topology_params->topology_params[i].num_ports);
+		for(j=0;j<ECPRISS_MAX_PORTS;j++)
+		{
+			ECPRILOGERR("ecpriss_pdata->eth_topology_params->topology_params[%d].port_params[%d].port_index %u ",i,j,ecpriss_pdata->eth_topology_params->topology_params[i].port_params[j].port_index);
+			ECPRILOGERR("ecpriss_pdata->eth_topology_params->topology_params[%d].port_params[%d].num_links %u ",i,j,ecpriss_pdata->eth_topology_params->topology_params[i].port_params[j].num_links);
+			for(k=0;k<ECPRISS_MAX_LINKS;k++)
+			{
+				ECPRILOGERR("ecpriss_pdata->eth_topology_params->topology_params[%d].port_params[%d].link_params[%d].link_index %u ",ecpriss_pdata->eth_topology_params->topology_params[i].port_params[j].link_params[k].link_index);
+	            ECPRILOGERR("ecpriss_pdata->eth_topology_params->topology_params[%d].port_params[%d].link_params[%d].link_mtu %u ",ecpriss_pdata->eth_topology_params->topology_params[i].port_params[j].link_params[k].link_mtu);
+				ECPRILOGERR("ecpriss_pdata->eth_topology_params->topology_params[%d].port_params[%d].link_params[%d].link_state %u ",ecpriss_pdata->eth_topology_params->topology_params[i].port_params[j].link_params[k].link_state);
+				ECPRILOGERR("ecpriss_pdata->eth_topology_params->topology_params[%d].port_params[%d].link_params[%d].link_rate %u ",ecpriss_pdata->eth_topology_params->topology_params[i].port_params[j].link_params[k].link_rate);
+			}
+		}
+	}
+	ECPRILOGERR("ecpriss_pdata->ecpriss_core_logbuf %u ",ecpriss_pdata->ecpriss_core_logbuf);
+
+	ECPRILOGERR("ecpriss_pdata->events_workqueue->ecpriss_eth_events_rdy_work %u",ecpriss_pdata->events_workqueue->ecpriss_eth_events_rdy_work);
+
+	ECPRILOGERR("ecpriss_pdata->events_workqueue->ecpriss_dma_events_rdy_work %u",ecpriss_pdata->events_workqueue->ecpriss_dma_events_rdy_work);
+
+	ECPRILOGERR("ecpriss_pdata->events_workqueue->ecpriss_eth_topology_events_rdy_work %u",ecpriss_pdata->events_workqueue->ecpriss_eth_topology_events_rdy_work);
+
+	ECPRILOGERR("ecpriss_pdata->events_workqueue->kernel_events_workqueue %u",ecpriss_pdata->events_workqueue->kernel_events_workqueue);
+
+	ECPRILOGERR("ecpriss_pdata->interrupts_workqueue->ecpriss_interrupt_events_rdy_work %u",ecpriss_pdata->interrupts_workqueue->ecpriss_interrupt_events_rdy_work);
+
+	ECPRILOGERR("ecpriss_pdata->interrupts_workqueue->ecpriss_interrupts_workq %u",ecpriss_pdata->interrupts_workqueue->ecpriss_interrupts_workq);
+
+	ECPRILOGERR("ecpriss_pdata->ready_cb %u",ecpriss_pdata->ready_cb);
+
+	ECPRILOGERR("ecpriss_pdata->dev_mode %u",ecpriss_pdata->dev_mode);
+
+	ECPRILOGERR("ecpriss_pdata->qudp_ctx->state %u",ecpriss_pdata->qudp_ctx->state);
+
+	ECPRILOGERR("ecpriss_pdata->qudp_ctx->num_ports %u",ecpriss_pdata->qudp_ctx->num_ports);
+
+    for(i=0;i<ecpriss_pdata->qudp_ctx->fh_port_cfg[0].port_index;i++)
+	{
+		ECPRILOGERR("ecpriss_pdata->qudp_ctx->fh_port_cfg[%d].port_index %u",i,ecpriss_pdata->qudp_ctx->fh_port_cfg[i].port_index);
+		ECPRILOGERR("ecpriss_pdata->qudp_ctx->fh_port_cfg[%d].ingress_port_cfg.num_ip_fltr_entries %u",i,ecpriss_pdata->qudp_ctx->fh_port_cfg[i].ingress_port_cfg.num_ip_fltr_entries);
+		ECPRILOGERR("ecpriss_pdata->qudp_ctx->fh_port_cfg[%d].ingress_port_cfg.num_vlan_fltr_entries %u",i,ecpriss_pdata->qudp_ctx->fh_port_cfg[i].ingress_port_cfg.num_vlan_fltr_entries);
+		ECPRILOGERR("ecpriss_pdata->qudp_ctx->fh_port_cfg[%d].ingress_port_cfg.num_udp_fltr_entries %u",i,ecpriss_pdata->qudp_ctx->fh_port_cfg[i].ingress_port_cfg.num_udp_fltr_entries);
+		for(j=0;j<MAX_WHITELIST_ENTRIES;j++)
+		{
+			for(k=0;k<ECPRISS_IP_ADDR_MAX_WORDS;k++)
+			{
+				ECPRILOGERR("ecpriss_pdata->qudp_ctx->fh_port_cfg[%d].ingress_port_cfg.ipdst_addr[%d][%d] %u",i,j,k,ecpriss_pdata->qudp_ctx->fh_port_cfg[i].ingress_port_cfg.ipdst_addr[j][k]);
+			}
+		}
+		for(j=0;j<MAX_WHITELIST_ENTRIES;j++)
+		{
+			  ECPRILOGERR("ecpriss_pdata->qudp_ctx->fh_port_cfg[%d].ingress_port_cfg.vlan_addr[%d] %u",i,j,ecpriss_pdata->qudp_ctx->fh_port_cfg[i].ingress_port_cfg.vlan_addr[j]);
+			  ECPRILOGERR("ecpriss_pdata->qudp_ctx->fh_port_cfg[%d].ingress_port_cfg.udp_port[%d] %u",i,j,ecpriss_pdata->qudp_ctx->fh_port_cfg[i].ingress_port_cfg.udp_port[j]);
+		}
+		ECPRILOGERR(" ecpriss_pdata->qudp_ctx->fh_port_cfg[%d].ingress_port_cfg.fh_ingress_config. enable_ip_dst_filt %u ",i,ecpriss_pdata->qudp_ctx->fh_port_cfg[i].ingress_port_cfg.fh_ingress_config. enable_ip_dst_filt);
+		ECPRILOGERR(" ecpriss_pdata->qudp_ctx->fh_port_cfg[%d].ingress_port_cfg.fh_ingress_config.enable_udp_dst_class %u ",i,ecpriss_pdata->qudp_ctx->fh_port_cfg[i].ingress_port_cfg.fh_ingress_config.enable_udp_dst_class);
+		ECPRILOGERR(" ecpriss_pdata->qudp_ctx->fh_port_cfg[%d].ingress_port_cfg.fh_ingress_config.enable_vlan_filt %u ",i,ecpriss_pdata->qudp_ctx->fh_port_cfg[i].ingress_port_cfg.fh_ingress_config.enable_vlan_filt);
+		ECPRILOGERR(" ecpriss_pdata->qudp_ctx->fh_port_cfg[%d].ingress_port_cfg.fh_ingress_config.enable_udp_cs_check %u ",i,ecpriss_pdata->qudp_ctx->fh_port_cfg[i].ingress_port_cfg.fh_ingress_config.enable_udp_cs_check);
+		ECPRILOGERR(" ecpriss_pdata->qudp_ctx->fh_port_cfg[%d].ingress_port_cfg.fh_ingress_config.enable_ip_len_check %u ",i,ecpriss_pdata->qudp_ctx->fh_port_cfg[i].ingress_port_cfg.fh_ingress_config.enable_ip_len_check);
+		ECPRILOGERR(" ecpriss_pdata->qudp_ctx->fh_port_cfg[%d].ingress_port_cfg.fh_ingress_config.ipv4_cs_err_action %u ",i,ecpriss_pdata->qudp_ctx->fh_port_cfg[i].ingress_port_cfg.fh_ingress_config.ipv4_cs_err_action);
+		ECPRILOGERR(" ecpriss_pdata->qudp_ctx->fh_port_cfg[%d].ingress_port_cfg.fh_ingress_config.udp_cs_err_action %u ",i,ecpriss_pdata->qudp_ctx->fh_port_cfg[i].ingress_port_cfg.fh_ingress_config.udp_cs_err_action);
+		ECPRILOGERR(" ecpriss_pdata->qudp_ctx->fh_port_cfg[%d].ingress_port_cfg.fh_ingress_config.fcs_err_action %u ",i,ecpriss_pdata->qudp_ctx->fh_port_cfg[i].ingress_port_cfg.fh_ingress_config.fcs_err_action);
+		ECPRILOGERR(" ecpriss_pdata->qudp_ctx->fh_port_cfg[%d].ingress_port_cfg.fh_ingress_config.pkt_err_action %u ",i,ecpriss_pdata->qudp_ctx->fh_port_cfg[i].ingress_port_cfg.fh_ingress_config.pkt_err_action);
+		ECPRILOGERR(" ecpriss_pdata->qudp_ctx->fh_port_cfg[%d].ingress_port_cfg.fh_ingress_config.ip_len_err_action %u ",i,ecpriss_pdata->qudp_ctx->fh_port_cfg[i].ingress_port_cfg.fh_ingress_config.ip_len_err_action);
+		ECPRILOGERR(" ecpriss_pdata->qudp_ctx->fh_port_cfg[%d].ingress_port_cfg.fh_ingress_config.disable_st_and_fw %u ",i,ecpriss_pdata->qudp_ctx->fh_port_cfg[i].ingress_port_cfg.fh_ingress_config.disable_st_and_fw);
+		ECPRILOGERR(" ecpriss_pdata->qudp_ctx->fh_port_cfg[%d].ingress_port_cfg.fh_ingress_config.vlan_filt_miss_action %u ",i,ecpriss_pdata->qudp_ctx->fh_port_cfg[i].ingress_port_cfg.fh_ingress_config.vlan_filt_miss_action);
+		ECPRILOGERR(" ecpriss_pdata->qudp_ctx->fh_port_cfg[%d].ingress_port_cfg.fh_ingress_config.ip_filt_miss_action %u ",i,ecpriss_pdata->qudp_ctx->fh_port_cfg[i].ingress_port_cfg.fh_ingress_config.ip_filt_miss_action);
+		ECPRILOGERR(" ecpriss_pdata->qudp_ctx->fh_port_cfg[%d].ingress_port_cfg.fh_ingress_config.enable_mac_dst_check %u ",i,ecpriss_pdata->qudp_ctx->fh_port_cfg[i].ingress_port_cfg.fh_ingress_config.enable_mac_dst_check);
+		ECPRILOGERR(" ecpriss_pdata->qudp_ctx->fh_port_cfg[%d].ingress_port_cfg.fh_ingress_config.use_external_not_local_mac_dst %u ",i,ecpriss_pdata->qudp_ctx->fh_port_cfg[i].ingress_port_cfg.fh_ingress_config.use_external_not_local_mac_dst);
+		ECPRILOGERR(" ecpriss_pdata->qudp_ctx->fh_port_cfg[%d].ingress_port_cfg.fh_ingress_config.enable_broadcast_checkk %u ",i,ecpriss_pdata->qudp_ctx->fh_port_cfg[i].ingress_port_cfg.fh_ingress_config.enable_broadcast_check);
+		ECPRILOGERR(" ecpriss_pdata->qudp_ctx->fh_port_cfg[%d].ingress_port_cfg.fh_ingress_config.last_in_chain %u ",i,ecpriss_pdata->qudp_ctx->fh_port_cfg[i].ingress_port_cfg.fh_ingress_config.last_in_chain);
+		ECPRILOGERR(" ecpriss_pdata->qudp_ctx->fh_port_cfg[%d].ingress_port_cfg.fh_ingress_config.non_local_dst_action %u ",i,ecpriss_pdata->qudp_ctx->fh_port_cfg[i].ingress_port_cfg.fh_ingress_config.non_local_dst_action);
+		ECPRILOGERR(" ecpriss_pdata->qudp_ctx->fh_port_cfg[%d].ingress_port_cfg.fh_ingress_config.enable_shared_filtering_2_links %u ",i,ecpriss_pdata->qudp_ctx->fh_port_cfg[i].ingress_port_cfg.fh_ingress_config.enable_shared_filtering_2_links);
+		ECPRILOGERR(" ecpriss_pdata->qudp_ctx->fh_port_cfg[%d].ingress_port_cfg.fh_ingress_config.enable_shared_filtering_4_links %u ",i,ecpriss_pdata->qudp_ctx->fh_port_cfg[i].ingress_port_cfg.fh_ingress_config.enable_shared_filtering_4_links);
+		ECPRILOGERR(" ecpriss_pdata->qudp_ctx->fh_port_cfg[%d].ingress_port_cfg.fh_ingress_config.enable_eth_padding_removal %u ",i,ecpriss_pdata->qudp_ctx->fh_port_cfg[i].ingress_port_cfg.fh_ingress_config.enable_eth_padding_removal);
+		ECPRILOGERR(" ecpriss_pdata->qudp_ctx->fh_port_cfg[%d].ingress_port_cfg.fh_ingress_config.reserved0 %u ",i,ecpriss_pdata->qudp_ctx->fh_port_cfg[i].ingress_port_cfg.fh_ingress_config.reserved0);
+		ECPRILOGERR(" ecpriss_pdata->qudp_ctx->fh_port_cfg[%d].ingress_port_cfg.l2_ingress_config.enable_ip_dst_filt %u ",i,ecpriss_pdata->qudp_ctx->fh_port_cfg[i].ingress_port_cfg.l2_ingress_config.enable_ip_dst_filt);
+		ECPRILOGERR(" ecpriss_pdata->qudp_ctx->fh_port_cfg[%d].ingress_port_cfg.l2_ingress_config.enable_udp_dst_class %u ",i,ecpriss_pdata->qudp_ctx->fh_port_cfg[i].ingress_port_cfg.l2_ingress_config.enable_udp_dst_class);
+		ECPRILOGERR(" ecpriss_pdata->qudp_ctx->fh_port_cfg[%d].ingress_port_cfg.l2_ingress_config.enable_vlan_filt %u ",i,ecpriss_pdata->qudp_ctx->fh_port_cfg[i].ingress_port_cfg.l2_ingress_config.enable_vlan_filt);
+		ECPRILOGERR(" ecpriss_pdata->qudp_ctx->fh_port_cfg[%d].ingress_port_cfg.l2_ingress_config.enable_udp_cs_check %u ",i,ecpriss_pdata->qudp_ctx->fh_port_cfg[i].ingress_port_cfg.l2_ingress_config.enable_udp_cs_check);
+		ECPRILOGERR(" ecpriss_pdata->qudp_ctx->fh_port_cfg[%d].ingress_port_cfg.l2_ingress_config.enable_ip_len_check %u ",i,ecpriss_pdata->qudp_ctx->fh_port_cfg[i].ingress_port_cfg.l2_ingress_config.enable_ip_len_check);
+		ECPRILOGERR(" ecpriss_pdata->qudp_ctx->fh_port_cfg[%d].ingress_port_cfg.l2_ingress_config.ipv4_cs_err_action %u ",i,ecpriss_pdata->qudp_ctx->fh_port_cfg[i].ingress_port_cfg.l2_ingress_config.ipv4_cs_err_action);
+		ECPRILOGERR(" ecpriss_pdata->qudp_ctx->fh_port_cfg[%d].ingress_port_cfg.l2_ingress_config.udp_cs_err_action %u ",i,ecpriss_pdata->qudp_ctx->fh_port_cfg[i].ingress_port_cfg.l2_ingress_config.udp_cs_err_action);
+		ECPRILOGERR(" ecpriss_pdata->qudp_ctx->fh_port_cfg[%d].ingress_port_cfg.l2_ingress_config.fcs_err_action %u ",i,ecpriss_pdata->qudp_ctx->fh_port_cfg[i].ingress_port_cfg.l2_ingress_config.fcs_err_action);
+		ECPRILOGERR(" ecpriss_pdata->qudp_ctx->fh_port_cfg[%d].ingress_port_cfg.l2_ingress_config.pkt_err_action %u ",i,ecpriss_pdata->qudp_ctx->fh_port_cfg[i].ingress_port_cfg.l2_ingress_config.pkt_err_action);
+		ECPRILOGERR(" ecpriss_pdata->qudp_ctx->fh_port_cfg[%d].ingress_port_cfg.l2_ingress_config.ip_len_err_action %u ",i,ecpriss_pdata->qudp_ctx->fh_port_cfg[i].ingress_port_cfg.l2_ingress_config.ip_len_err_action);
+		ECPRILOGERR(" ecpriss_pdata->qudp_ctx->fh_port_cfg[%d].ingress_port_cfg.l2_ingress_config.disable_st_and_fw %u ",i,ecpriss_pdata->qudp_ctx->fh_port_cfg[i].ingress_port_cfg.l2_ingress_config.disable_st_and_fw);
+		ECPRILOGERR(" ecpriss_pdata->qudp_ctx->fh_port_cfg[%d].ingress_port_cfg.l2_ingress_config.vlan_filt_miss_action %u ",i,ecpriss_pdata->qudp_ctx->fh_port_cfg[i].ingress_port_cfg.l2_ingress_config.vlan_filt_miss_action);
+		ECPRILOGERR(" ecpriss_pdata->qudp_ctx->fh_port_cfg[%d].ingress_port_cfg.l2_ingress_config.ip_filt_miss_action %u ",i,ecpriss_pdata->qudp_ctx->fh_port_cfg[i].ingress_port_cfg.l2_ingress_config.ip_filt_miss_action);
+		ECPRILOGERR(" ecpriss_pdata->qudp_ctx->fh_port_cfg[%d].ingress_port_cfg.l2_ingress_config.enable_mac_dst_check %u ",i,ecpriss_pdata->qudp_ctx->fh_port_cfg[i].ingress_port_cfg.l2_ingress_config.enable_mac_dst_check);
+		ECPRILOGERR(" ecpriss_pdata->qudp_ctx->fh_port_cfg[%d].ingress_port_cfg.l2_ingress_config.use_external_not_local_mac_dst %u ",i,ecpriss_pdata->qudp_ctx->fh_port_cfg[i].ingress_port_cfg.l2_ingress_config.use_external_not_local_mac_dst);
+		ECPRILOGERR(" ecpriss_pdata->qudp_ctx->fh_port_cfg[%d].ingress_port_cfg.l2_ingress_config.enable_broadcast_check %u ",i,ecpriss_pdata->qudp_ctx->fh_port_cfg[i].ingress_port_cfg.l2_ingress_config.enable_broadcast_check);
+		ECPRILOGERR(" ecpriss_pdata->qudp_ctx->fh_port_cfg[%d].ingress_port_cfg.l2_ingress_config.last_in_chain %u ",i,ecpriss_pdata->qudp_ctx->fh_port_cfg[i].ingress_port_cfg.l2_ingress_config.last_in_chain);
+		ECPRILOGERR(" ecpriss_pdata->qudp_ctx->fh_port_cfg[%d].ingress_port_cfg.l2_ingress_config.non_local_dst_action %u ",i,ecpriss_pdata->qudp_ctx->fh_port_cfg[i].ingress_port_cfg.l2_ingress_config.non_local_dst_action);
+		ECPRILOGERR(" ecpriss_pdata->qudp_ctx->fh_port_cfg[%d].ingress_port_cfg.l2_ingress_config.reserved0 %u ",i,ecpriss_pdata->qudp_ctx->fh_port_cfg[i].ingress_port_cfg.l2_ingress_config.reserved0);
+		ECPRILOGERR(" ecpriss_pdata->qudp_ctx->fh_port_cfg[%d].ingress_port_cfg.l2_ingress_config.enable_eth_padding_removal %u ",i,ecpriss_pdata->qudp_ctx->fh_port_cfg[i].ingress_port_cfg.l2_ingress_config.enable_eth_padding_removal);
+		ECPRILOGERR(" ecpriss_pdata->qudp_ctx->fh_port_cfg[%d].ingress_port_cfg.l2_ingress_config.reserved1 %u ",i,ecpriss_pdata->qudp_ctx->fh_port_cfg[i].ingress_port_cfg.l2_ingress_config.reserved1);
+	}
+
+		ECPRILOGERR(" ecpriss_pdata->xbar_ctx->fh_exception_port_cfg.eth_cfg.port_index %u ",ecpriss_pdata->xbar_ctx->fh_exception_port_cfg.eth_cfg.port_index);
+		ECPRILOGERR(" ecpriss_pdata->xbar_ctx->fh_exception_port_cfg.eth_cfg.num_links %u ",ecpriss_pdata->xbar_ctx->fh_exception_port_cfg.eth_cfg.num_links);
+
+		for(j=0;j<ECPRISS_MAX_LINKS;j++)
+		{
+			ECPRILOGERR("ecpriss_pdata->xbar_ctx->fh_exception_port_cfg.eth_cfg.link_params[%d].link_index %u ",j,ecpriss_pdata->xbar_ctx->fh_exception_port_cfg.eth_cfg.link_params[j].link_index);
+			ECPRILOGERR("ecpriss_pdata->xbar_ctx->fh_exception_port_cfg.eth_cfg.link_params[%d].link_mtu %u ",j,ecpriss_pdata->xbar_ctx->fh_exception_port_cfg.eth_cfg.link_params[j].link_mtu);
+			for(k=0;k<ECPRISS_MAC_ADDR_LEN;k++)
+			{
+			ECPRILOGERR("ecpriss_pdata->xbar_ctx->fh_exception_port_cfg.eth_cfg.link_params[%d].eth_mac_addr[%d] %u ",j,k,ecpriss_pdata->xbar_ctx->fh_exception_port_cfg.eth_cfg.link_params[j].eth_mac_addr[k]);
+			}
+			ECPRILOGERR("ecpriss_pdata->xbar_ctx->fh_exception_port_cfg.dma_port_cfg[%d].port_index %u ",j,ecpriss_pdata->xbar_ctx->fh_exception_port_cfg.eth_cfg.link_params[j].link_state);
+			ECPRILOGERR("ecpriss_pdata->xbar_ctx->fh_exception_port_cfg.eth_cfg.link_params[%d].link_rate %u ",j,ecpriss_pdata->xbar_ctx->fh_exception_port_cfg.eth_cfg.link_params[j].link_rate);
+		}
+
+		for(i=0;i<ECPRISS_MAX_PORTS;i++)
+		{
+			ECPRILOGERR("ecpriss_pdata->xbar_ctx->fh_exception_port_cfg.dma_port_cfg[%d].port_indexs %u ",i,ecpriss_pdata->xbar_ctx->fh_exception_port_cfg.dma_port_cfg[i].port_index);
+			ECPRILOGERR("ecpriss_pdata->xbar_ctx->fh_exception_port_cfg.dma_port_cfg[%d].num_of_rings %u ",i,ecpriss_pdata->xbar_ctx->fh_exception_port_cfg.dma_port_cfg[i].num_of_rings);
+			for(j=0;j<ECPRI_DMA_RING_PER_PORT_MAX;j++)
+			{
+			  ECPRILOGERR("ecpriss_pdata->xbar_ctx->fh_exception_port_cfg.dma_port_cfg[%d].dma_rings_param[%d].link_index%u ",i,j,ecpriss_pdata->xbar_ctx->fh_exception_port_cfg.dma_port_cfg[i].dma_rings_param[j].link_index);
+			  ECPRILOGERR("ecpriss_pdata->xbar_ctx->fh_exception_port_cfg.dma_port_cfg[%d].dma_rings_param[%d].nfapi_vm_id %u ",i,j,ecpriss_pdata->xbar_ctx->fh_exception_port_cfg.dma_port_cfg[i].dma_rings_param[j].nfapi_vm_id);
+			  ECPRILOGERR("ecpriss_pdata->xbar_ctx->fh_exception_port_cfg.dma_port_cfg[%d].dma_rings_param[%d].dma_ring_type %u ",i,j,ecpriss_pdata->xbar_ctx->fh_exception_port_cfg.dma_port_cfg[i].dma_rings_param[j].dma_ring_type);
+			  ECPRILOGERR("ecpriss_pdata->xbar_ctx->fh_exception_port_cfg.dma_port_cfg[%d].dma_rings_param[%d].src_dma_ring_id %u ",i,j,ecpriss_pdata->xbar_ctx->fh_exception_port_cfg.dma_port_cfg[i].dma_rings_param[j].src_dma_ring_id);
+			  ECPRILOGERR("ecpriss_pdata->xbar_ctx->fh_exception_port_cfg.dma_port_cfg[%d].dma_rings_param[%d].dest_dma_ring_id %u ",i,j,ecpriss_pdata->xbar_ctx->fh_exception_port_cfg.dma_port_cfg[i].dma_rings_param[j].dest_dma_ring_id);
+			}
+		}
+
+		for(j=0;j<ECPRISS_MAX_LINKS;j++)
+		{
+			ECPRILOGERR("ecpriss_pdata->xbar_ctx->fh_exception_port_cfg.eth_cfg.link_params[%d].link_index %u ",j,ecpriss_pdata->xbar_ctx->fh_exception_port_cfg.eth_cfg.link_params[j].link_index);
+			ECPRILOGERR("ecpriss_pdata->xbar_ctx->fh_exception_port_cfg.eth_cfg.link_params[%d].link_mtu %u ",j,ecpriss_pdata->xbar_ctx->fh_exception_port_cfg.eth_cfg.link_params[j].link_mtu);
+			for(k=0;k<ECPRISS_MAC_ADDR_LEN;k++)
+			{
+			ECPRILOGERR("ecpriss_pdata->xbar_ctx->fh_exception_port_cfg.eth_cfg.link_params[%d].eth_mac_addr[%d] %u ",j,k,ecpriss_pdata->xbar_ctx->fh_exception_port_cfg.eth_cfg.link_params[j].eth_mac_addr[k]);
+			}
+			ECPRILOGERR("ecpriss_pdata->xbar_ctx->fh_exception_port_cfg.eth_cfg.link_params[%d].link_state %u ",j,ecpriss_pdata->xbar_ctx->fh_exception_port_cfg.eth_cfg.link_params[j].link_state);
+			ECPRILOGERR("ecpriss_pdata->xbar_ctx->fh_exception_port_cfg.eth_cfg.link_params[%d].link_rate %u ",j,ecpriss_pdata->xbar_ctx->fh_exception_port_cfg.eth_cfg.link_params[j].link_rate);
+        }
+
+		for(i=0;i<ECPRISS_MAX_PORTS;i++)
+		{
+			ECPRILOGERR("ecpriss_pdata->xbar_ctx->fh_exception_port_cfg.dma_port_cfg[%d].port_index %u ",i,ecpriss_pdata->xbar_ctx->fh_exception_port_cfg.dma_port_cfg[i].port_index);
+			ECPRILOGERR("ecpriss_pdata->xbar_ctx->fh_exception_port_cfg.dma_port_cfg[%d].num_of_rings %u ",i,ecpriss_pdata->xbar_ctx->fh_exception_port_cfg.dma_port_cfg[i].num_of_rings);
+			for(j=0;j<ECPRI_DMA_RING_PER_PORT_MAX;j++)
+			{
+			  ECPRILOGERR("ecpriss_pdata->xbar_ctx->fh_exception_port_cfg.dma_port_cfg[%d].dma_rings_param[%d].link_index %u ",i,j,ecpriss_pdata->xbar_ctx->fh_exception_port_cfg.dma_port_cfg[i].dma_rings_param[j].link_index);
+			  ECPRILOGERR("ecpriss_pdata->xbar_ctx->fh_exception_port_cfg.dma_port_cfg[%d].dma_rings_param[%d].nfapi_vm_id %u ",i,j,ecpriss_pdata->xbar_ctx->fh_exception_port_cfg.dma_port_cfg[i].dma_rings_param[j].nfapi_vm_id);
+			  ECPRILOGERR("ecpriss_pdata->xbar_ctx->fh_exception_port_cfg.dma_port_cfg[%d].dma_rings_param[%d].dma_ring_type %u ",i,j,ecpriss_pdata->xbar_ctx->fh_exception_port_cfg.dma_port_cfg[i].dma_rings_param[j].dma_ring_type);
+			  ECPRILOGERR("ecpriss_pdata->xbar_ctx->fh_exception_port_cfg.dma_port_cfg[%d].dma_rings_param[%d].src_dma_ring_id %u ",i,j,ecpriss_pdata->xbar_ctx->fh_exception_port_cfg.dma_port_cfg[i].dma_rings_param[j].src_dma_ring_id);
+			  ECPRILOGERR("ecpriss_pdata->xbar_ctx->fh_exception_port_cfg.dma_port_cfg[%d].dma_rings_param[%d].dest_dma_ring_id %u ",i,j,ecpriss_pdata->xbar_ctx->fh_exception_port_cfg.dma_port_cfg[i].dma_rings_param[j].dest_dma_ring_id);
+			}
+		}
+
+		ECPRILOGERR("ecpriss_pdata->xbar_ctx->interrupt_cfg %u ",ecpriss_pdata->xbar_ctx->interrupt_cfg);
+		ECPRILOGERR("ecpriss_pdata->xbar_ctx->interrupt_cfg %u ",ecpriss_pdata->xbar_ctx->interrupt_cfg);
+
+		for(i=0;i<TOTAL_LINKS;i++)
+		{
+		ECPRILOGERR("ecpriss_pdata->xbar_ctx->stats.xbar_fhrx_pkt_cnt[%d] %u ",i,ecpriss_pdata->xbar_ctx->stats.xbar_fhrx_pkt_cnt[i]);
+		}
+
+		ECPRILOGERR("ecpriss_pdata->xbar_ctx->stats.xbar_fhrx_dma_pkt_cnt %u ",ecpriss_pdata->xbar_ctx->stats.xbar_fhrx_dma_pkt_cnt);
+		ECPRILOGERR("ecpriss_pdata->xbar_ctx->stats.xbar_fhrx_uc_pkt_cnt %u ",ecpriss_pdata->xbar_ctx->stats.xbar_fhrx_uc_pkt_cnt);
+		ECPRILOGERR("ecpriss_pdata->xbar_ctx->stats.xbar_fhrx_uc_err_pkt_cnt %u ",ecpriss_pdata->xbar_ctx->stats.xbar_fhrx_uc_err_pkt_cnt);
+		ECPRILOGERR("ecpriss_pdata->xbar_ctx->stats.xbar_fhrx_err_pkt_cnt %u ",ecpriss_pdata->xbar_ctx->stats.xbar_fhrx_err_pkt_cnt);
+
+		for(i=0;i<TOTAL_LINKS;i++)
+		{
+		ECPRILOGERR("ecpriss_pdata->xbar_ctx->stats.xbar_fhtx_pkt_cnt[%d] %u ",ecpriss_pdata->xbar_ctx->stats.xbar_fhtx_pkt_cnt[i]);
+		}
+
+		ECPRILOGERR("ecpriss_pdata->xbar_ctx->stats.xbar_fhtx_c2c_pkt_ovf_cnt %u ",ecpriss_pdata->xbar_ctx->stats.xbar_fhtx_c2c_pkt_ovf_cnt);
+		ECPRILOGERR("ecpriss_pdata->xbar_ctx->stats.xbar_fhtx_dma_pkt_cnt %u ",ecpriss_pdata->xbar_ctx->stats.xbar_fhtx_dma_pkt_cnt);
+		ECPRILOGERR("ecpriss_pdata->xbar_ctx->stats.xbar_c2c_pkt_ovf_cnt %u ",ecpriss_pdata->xbar_ctx->stats.xbar_c2c_pkt_ovf_cnt);
+		ECPRILOGERR("ecpriss_pdata->xbar_ctx->stats.xbar_c2crx_dma_pkt_cnt %u ",ecpriss_pdata->xbar_ctx->stats.xbar_c2crx_dma_pkt_cnt);
+		ECPRILOGERR("ecpriss_pdata->xbar_ctx->stats.xbar_c2crx_err_pkt_cnt %u ",ecpriss_pdata->xbar_ctx->stats.xbar_c2crx_err_pkt_cnt);
+		ECPRILOGERR("ecpriss_pdata->xbar_ctx->stats.xbar_fhtx_uc_pkt_cnt %u ",ecpriss_pdata->xbar_ctx->stats.xbar_fhtx_uc_pkt_cnt);
+
+		ECPRILOGERR("ecpriss_pdata->xbar_ctx->stats.xbar_ocrx_fh_buff_watermark_fh0 %u ",ecpriss_pdata->xbar_ctx->stats.xbar_ocrx_fh_buff_watermark_fh0);
+		ECPRILOGERR("Vecpriss_pdata->xbar_ctx->stats.xbar_ocrx_fh_buff_watermark_fh1 %u ",ecpriss_pdata->xbar_ctx->stats.xbar_ocrx_fh_buff_watermark_fh1);
+		ECPRILOGERR("ecpriss_pdata->xbar_ctx->stats.xbar_ocrx_fh_buff_watermark_fh2 %u ",ecpriss_pdata->xbar_ctx->stats.xbar_ocrx_fh_buff_watermark_fh2);
+
+		ECPRILOGERR("ecpriss_pdata->xbar_ctx->stats.xbar_dbg_ocrx_0_1_buff_watermark_cc0 %u ",ecpriss_pdata->xbar_ctx->stats.xbar_dbg_ocrx_0_1_buff_watermark_cc0);
+		ECPRILOGERR("ecpriss_pdata->xbar_ctx->stats.xbar_dbg_ocrx_0_1_buff_watermark_cc1 %u ",ecpriss_pdata->xbar_ctx->stats.xbar_dbg_ocrx_0_1_buff_watermark_cc1);
+		ECPRILOGERR("ecpriss_pdata->xbar_ctx->stats.xbar_dbg_ocrx_2_3_buff_watermark_cc2 %u ",ecpriss_pdata->xbar_ctx->stats.xbar_dbg_ocrx_2_3_buff_watermark_cc2);
+		ECPRILOGERR("ecpriss_pdata->xbar_ctx->stats.xbar_dbg_ocrx_2_3_buff_watermark_cc3 %u ",ecpriss_pdata->xbar_ctx->stats.xbar_dbg_ocrx_2_3_buff_watermark_cc3);
+		ECPRILOGERR("ecpriss_pdata->xbar_ctx->stats.xbar_dbg_ocrx_2_3_buff_watermark_cc3 %u ",ecpriss_pdata->xbar_ctx->stats.xbar_dbg_ocrx_2_3_buff_watermark_cc3);
+
+		ECPRILOGERR("ecpriss_pdata->xbar_ctx->stats.octx_oc_0_1_buff_watermark_cc0 %u ",ecpriss_pdata->xbar_ctx->stats.octx_oc_0_1_buff_watermark_cc0);
+		ECPRILOGERR("ecpriss_pdata->xbar_ctx->stats.octx_oc_0_1_buff_watermark_cc1 %u ",ecpriss_pdata->xbar_ctx->stats.octx_oc_0_1_buff_watermark_cc1);
+		ECPRILOGERR("ecpriss_pdata->xbar_ctx->stats.octx_oc_2_3_buff_watermark_cc2 %u ",ecpriss_pdata->xbar_ctx->stats.octx_oc_2_3_buff_watermark_cc2);
+		ECPRILOGERR("ecpriss_pdata->xbar_ctx->stats.octx_oc_2_3_buff_watermark_cc3 %u ",ecpriss_pdata->xbar_ctx->stats.octx_oc_2_3_buff_watermark_cc3);
+
+		ECPRILOGERR("ecpriss_pdata->xbar_ctx->stats.xbar_dbg_fhrx_unknown_pcid_cnt_fhrx_0_cnt %u ",ecpriss_pdata->xbar_ctx->stats.xbar_dbg_fhrx_unknown_pcid_cnt_fhrx_0_cnt);
+		ECPRILOGERR("ecpriss_pdata->xbar_ctx->stats.xbar_dbg_fhrx_unknown_pcid_cnt_fhrx_1_cnt %u ",ecpriss_pdata->xbar_ctx->stats.xbar_dbg_fhrx_unknown_pcid_cnt_fhrx_1_cnt);
+		ECPRILOGERR("ecpriss_pdata->xbar_ctx->stats.xbar_dbg_fhrx_unknown_pcid_cnt_fhrx_2_cnt %u ",ecpriss_pdata->xbar_ctx->stats.xbar_dbg_fhrx_unknown_pcid_cnt_fhrx_2_cnt);
+
+		ECPRILOGERR("ecpriss_pdata->xbar_ctx->stats.xbar_dbg_ocrx_unknown_pcid_cnt_ocrx_fh_0_cnt %u ",ecpriss_pdata->xbar_ctx->stats.xbar_dbg_ocrx_unknown_pcid_cnt_ocrx_fh_0_cnt);
+		ECPRILOGERR("ecpriss_pdata->xbar_ctx->stats.xbar_dbg_ocrx_unknown_pcid_cnt_ocrx_fh_1_cnt %u ",ecpriss_pdata->xbar_ctx->stats.xbar_dbg_ocrx_unknown_pcid_cnt_ocrx_fh_1_cnt);
+		ECPRILOGERR("ecpriss_pdata->xbar_ctx->stats.xbar_dbg_ocrx_unknown_pcid_cnt_ocrx_fh_2_cnt %u ",ecpriss_pdata->xbar_ctx->stats.xbar_dbg_ocrx_unknown_pcid_cnt_ocrx_fh_2_cnt);
+
+		ECPRILOGERR("ecpriss_pdata->xbar_ctx->interrupt_stats.octx_fh_len_err %u ",ecpriss_pdata->xbar_ctx->interrupt_stats.octx_fh_len_err);
+		ECPRILOGERR("ecpriss_pdata->xbar_ctx->interrupt_stats.octx_c2c_len_err %u ",ecpriss_pdata->xbar_ctx->interrupt_stats.octx_c2c_len_err);
+		ECPRILOGERR("ecpriss_pdata->xbar_ctx->interrupt_stats.fhtx_c2c_overflow %u ",ecpriss_pdata->xbar_ctx->interrupt_stats.fhtx_c2c_overflow);
+		ECPRILOGERR("ecpriss_pdata->xbar_ctx->interrupt_stats.c2ctx_fh_overflow %u ",ecpriss_pdata->xbar_ctx->interrupt_stats.c2ctx_fh_overflow);
+		ECPRILOGERR("ecpriss_pdata->xbar_ctx->interrupt_stats.octx_fh_overflow %u ",ecpriss_pdata->xbar_ctx->interrupt_stats.octx_fh_overflow);
+		ECPRILOGERR("ecpriss_pdata->xbar_ctx->interrupt_stats.octx_c2c_overflow %u ",ecpriss_pdata->xbar_ctx->interrupt_stats.octx_c2c_overflow);
+		ECPRILOGERR("ecpriss_pdata->xbar_ctx->interrupt_stats.fhrx_uc_pkt_pending %u ",ecpriss_pdata->xbar_ctx->interrupt_stats.fhrx_uc_pkt_pending);
+		ECPRILOGERR("ecpriss_pdata->xbar_ctx->interrupt_stats.fhrx_uc_overflow %u ",ecpriss_pdata->xbar_ctx->interrupt_stats.fhrx_uc_overflow);
+		ECPRILOGERR("ecpriss_pdata->xbar_ctx->interrupt_stats.fhrx_uc_pkt_err %u ",ecpriss_pdata->xbar_ctx->interrupt_stats.fhrx_uc_pkt_err);
+		ECPRILOGERR("ecpriss_pdata->xbar_ctx->interrupt_stats.fhrx_uc_pkt_drop %u ",ecpriss_pdata->xbar_ctx->interrupt_stats.fhrx_uc_pkt_drop);
+		ECPRILOGERR("ecpriss_pdata->xbar_ctx->interrupt_stats.ocrx_unknown_pcid %u ",ecpriss_pdata->xbar_ctx->interrupt_stats.ocrx_unknown_pcid);
+		ECPRILOGERR("ecpriss_pdata->xbar_ctx->interrupt_stats.fhrx_unknown_pcid %u ",ecpriss_pdata->xbar_ctx->interrupt_stats.fhrx_unknown_pcid);
+		ECPRILOGERR("ecpriss_pdata->xbar_ctx->interrupt_stats.c2crx_unkown_pcid %u ",ecpriss_pdata->xbar_ctx->interrupt_stats.c2crx_unkown_pcid);
+		ECPRILOGERR("ecpriss_pdata->cfg_stats.xbar_cfg.global_cfg.global %u ",ecpriss_pdata->cfg_stats.xbar_cfg.global_cfg.global);
+
+		for(i=0;i<NUM_OF_FHP;i++)
+		{
+			for(j=0;j<LUT_INDEX;j++)
+			{
+		      ECPRILOGERR("ecpriss_pdata->cfg_stats.xbar_cfg.lut_cfg.ocrx[%d][%d] %u ",i,j,ecpriss_pdata->cfg_stats.xbar_cfg.lut_cfg.ocrx[i][j]);
+		      ECPRILOGERR("ecpriss_pdata->cfg_stats.xbar_cfg.lut_cfg.fhrx[%d][%d] %u ",i,j,ecpriss_pdata->cfg_stats.xbar_cfg.lut_cfg.fhrx[i][j]);
+		      ECPRILOGERR("ecpriss_pdata->cfg_stats.xbar_cfg.lut_cfg.c2crxd %u ",ecpriss_pdata->cfg_stats.xbar_cfg.lut_cfg.c2crxdl);
+		      ECPRILOGERR("ecpriss_pdata->cfg_stats.xbar_cfg.lut_cfg.c2crxul %u ",ecpriss_pdata->cfg_stats.xbar_cfg.lut_cfg.c2crxul);
+			}
+		}
+}
+#endif
 
 
 MODULE_LICENSE("GPL");
