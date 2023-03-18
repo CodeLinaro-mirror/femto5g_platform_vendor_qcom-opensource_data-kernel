@@ -198,6 +198,7 @@ int mtip_connect_dma_pipe(u32 link_index, ecpri_dma_eth_conn_hdl_t* hdl)
 {
    int rv = 0;
    struct ecpri_dma_eth_endpoint_connect_params pipe_params;
+   enum mtip_device_mode_enum mode = platform_driver_priv->devices.mode;
 
    memset(&pipe_params, 0, sizeof(pipe_params));
    pipe_params.link_index = link_index;
@@ -207,6 +208,11 @@ int mtip_connect_dma_pipe(u32 link_index, ecpri_dma_eth_conn_hdl_t* hdl)
    pipe_params.p_type = ECPRI_DMA_ENDP_STREAM_DEST_FH;
    pipe_params.tx_mod_cfg.moderation_counter_threshold = MTIP_TX_MOD_COUNTER_THRESHOLD;
    pipe_params.tx_mod_cfg.moderation_timer_threshold = MTIP_TX_MOD_TIMER_THRESHOLD;
+
+   if ((mode == MTIP_DEVICE_RUv2) || (mode == MTIP_DEVICE_DUv2))
+   {
+       pipe_params.enable_tx_pre_header = true;
+   }
 
    // connect the pipe
    rv = (ecpri_dma_eth_driver_ops.ecpri_dma_eth_connect_endpoints)(&pipe_params, hdl);
@@ -378,7 +384,10 @@ static void mtip_dma_dump_packet(char* buf, int len)
 #endif
 
 // send a packet
-int mtip_dma_send_packet(struct net_device *netdev, ecpri_dma_eth_conn_hdl_t hdl, struct sk_buff *skb)
+// if send_tx_pre_header is true
+// then insert a 64-bit pre-header
+// and set bit 33 to 1 and bits 34:36 to ts_seq_num
+int mtip_dma_send_packet(struct net_device *netdev, ecpri_dma_eth_conn_hdl_t hdl, struct sk_buff *skb, bool send_tx_pre_header, bool send_tx_seq_num, u8 ts_seq_num)
 {
    struct ecpri_dma_pkt **pkts;
    struct ecpri_dma_mem_buffer ** buffs;
@@ -388,6 +397,8 @@ int mtip_dma_send_packet(struct net_device *netdev, ecpri_dma_eth_conn_hdl_t hdl
    u32 link_index;
    spinlock_t *lock;
    unsigned long flags;
+   u32 num_buffers = 1;
+   struct ecpri_dma_tx_header *pre_header_buff;
 
    priv = netdev_priv(netdev);
 
@@ -399,9 +410,52 @@ int mtip_dma_send_packet(struct net_device *netdev, ecpri_dma_eth_conn_hdl_t hdl
 
    pkts[0] = (struct ecpri_dma_pkt *)kmalloc(sizeof(struct ecpri_dma_pkt), GFP_ATOMIC);
 
-   buffs = (struct ecpri_dma_mem_buffer **)kmalloc(sizeof(struct ecpri_dma_mem_buffer*), GFP_ATOMIC);
+   if (send_tx_pre_header == true)
+   {
+       num_buffers = 2;
+   }
 
-   buffs[0] = (struct ecpri_dma_mem_buffer *)kmalloc(sizeof(struct ecpri_dma_mem_buffer), GFP_ATOMIC);
+   buffs = (struct ecpri_dma_mem_buffer **)kmalloc(num_buffers * sizeof(struct ecpri_dma_mem_buffer*), GFP_ATOMIC);
+
+   if (send_tx_pre_header == true)
+   {
+       pre_header_buff = (struct ecpri_dma_tx_header *)kmalloc(sizeof(struct ecpri_dma_tx_header), GFP_ATOMIC);
+       memset(pre_header_buff, 0, sizeof(struct ecpri_dma_tx_header));
+
+       buffs[0] = (struct ecpri_dma_mem_buffer *)kmalloc(sizeof(struct ecpri_dma_mem_buffer), GFP_ATOMIC);
+       buffs[1] = (struct ecpri_dma_mem_buffer *)kmalloc(sizeof(struct ecpri_dma_mem_buffer), GFP_ATOMIC);
+
+       // set enable bit (Bit 33) and put time stamp seq num in bit 34:36
+       if (send_tx_seq_num == true)
+       {
+           // Set Bit 33 flag for time stamping
+           pre_header_buff->timestamp_packet =  0x1;
+            // set time stamp seq num 3 bit
+           pre_header_buff->timestamp_tag = (u8)ts_seq_num & MTIP_PKT_TS_SEQ_MASK;
+       }
+
+       buffs[0]->size = sizeof(struct ecpri_dma_tx_header);
+       buffs[0]->virt_base = pre_header_buff;
+       buffs[0]->phys_base = 0;
+
+       // SKB data
+       buffs[1]->size = skb->len;
+       buffs[1]->virt_base = skb->data;
+       buffs[1]->phys_base = 0;
+   }
+   else
+   {
+       buffs[0] = (struct ecpri_dma_mem_buffer *)kmalloc(sizeof(struct ecpri_dma_mem_buffer), GFP_ATOMIC);
+
+       // update the buffs
+       buffs[0]->size = skb->len;
+       buffs[0]->virt_base = skb->data;
+       buffs[0]->phys_base = 0;
+   }
+
+   pkts[0]->num_of_buffers = num_buffers;
+   pkts[0]->buffs = buffs;
+   pkts[0]->user_data = (void*)skb;
 
    spin_lock_irqsave(lock, flags);
 
@@ -412,16 +466,7 @@ int mtip_dma_send_packet(struct net_device *netdev, ecpri_dma_eth_conn_hdl_t hdl
 
    spin_unlock_irqrestore(lock, flags);
 
-   // update the buffs
-   buffs[0]->size = skb->len;
-   buffs[0]->virt_base = skb->data;
-   buffs[0]->phys_base = 0;
-
-   pkts[0]->num_of_buffers = 1;
-   pkts[0]->buffs = buffs;
-   pkts[0]->user_data = (void*)skb;
-
-   CSMLOGDBG("mtip_send_packet hdl %d, link: %d, skb->data: 0x%lx len: %d\n", hdl, link_index, (unsigned long)buffs[0]->virt_base, skb->len);
+   CSMLOGDBG("mtip_send_packet hdl %d, link: %d, skb->data: 0x%lx len: %d seq_num %d \n", hdl, link_index, (unsigned long)buffs[0]->virt_base, skb->len, ts_seq_num);
 
 #ifdef MTIP_DUMP_PACKETS
    mtip_dma_dump_packet(skb->data, skb->len);
@@ -518,6 +563,7 @@ static void mtip_dma_skb_timestamp(struct sk_buff *head_skb)
     u64* tsptr;
     int size;
     int k = 0;
+    bool fragmented_packet = false;
 
     tail_skb = head_skb;
     next_skb = skb_shinfo(head_skb)->frag_list;
@@ -534,6 +580,8 @@ static void mtip_dma_skb_timestamp(struct sk_buff *head_skb)
                 break;
             }
         }
+
+        fragmented_packet = true;
     }
 
     base = tail_skb->data;
@@ -555,13 +603,16 @@ static void mtip_dma_skb_timestamp(struct sk_buff *head_skb)
     mtip_ptp_set_rx_timestamp(head_skb, timestamp_secs, timestamp_nsecs);
 
     //skb_put(tail_skb, size - 8);
-    tail_skb->len -= 8;
-    tail_skb->tail -= 8;
+    if (fragmented_packet == true) 
+    {
+        // reduce the length of the tail only if the packet is fragmented
+        tail_skb->len -= 8;
+        tail_skb->tail -= 8;
+    }
+
     head_skb->len -= 8;
     head_skb->data_len -= 8;
 }
-
-
 
 static void mtip_dma_process_packet(
     struct net_device *netdev, 

@@ -178,6 +178,10 @@ void run_mtip_tx_comp_cb(void* work_ptr)
    bool free_skb = true;
    u32 timestamp_secs;
    u32 timestamp_nsecs;
+   u8 pkt_ts_seq_num = 0;
+   u8 read_ts_seq_num = 0;
+   struct ecpri_dma_tx_header *pre_header_buff = NULL;
+   enum mtip_device_mode_enum mode = platform_driver_priv->devices.mode;
 
    if (taskstruct == NULL) 
    {
@@ -212,7 +216,7 @@ void run_mtip_tx_comp_cb(void* work_ptr)
           goto out;
       }
 
-      CSMLOGDBG("Tx comp for hdl: %d, skb->data: 0x%lx\n", hdl, (unsigned long)skb->data);
+      CSMLOGDBG("Tx comp for hdl: %d, skb->data: 0x%lx mode %d \n", hdl, (unsigned long)skb->data, mode);
 
       // store the netdev
       netdev = skb->dev;
@@ -221,10 +225,34 @@ void run_mtip_tx_comp_cb(void* work_ptr)
 
       free_skb = true;
 
+      buffs = (struct ecpri_dma_mem_buffer **)pkt->buffs;
+      num_of_buffers = pkt->num_of_buffers;
+
+      // Check if there is TX preheader,
+      // 1. if yes, Read the buffer and clear it. Even if time stamp is not there, 
+      //    TX preheader will be present for V2
+      if ((mode == MTIP_DEVICE_RUv2) || (mode == MTIP_DEVICE_DUv2))
+      {
+          if(num_of_buffers == 2)
+          {
+              pre_header_buff = (struct ecpri_dma_tx_header *)buffs[0]->virt_base;
+              if (pre_header_buff->timestamp_packet == 0x1)
+              {
+                  pkt_ts_seq_num = (u8)pre_header_buff->timestamp_tag & MTIP_PKT_TS_SEQ_MASK;
+              }
+
+              // free the pre header buff
+              kfree(pre_header_buff);
+          }
+      }
+
       // check if this skb needs HW timestamping
       if ((skb_shinfo(skb)->tx_flags & SKBTX_IN_PROGRESS)  != 0)
       {
           CSMLOGDBG("Tx comp cb for packet needing HW_TSTAMP\n");
+
+          // this packet should have the packet TS info in pre-header
+          // read the pkt_ts_seq_num from the pre-header (Already done above)
 
           // this packet needs to be timestamped
           // acquire the ptp lock
@@ -235,7 +263,7 @@ void run_mtip_tx_comp_cb(void* work_ptr)
           {
               // no timestamp interrupt received yet
               // push the skb to the list
-              mtip_ptp_tx_ts_skb_list_push(link_index, skb);
+              mtip_ptp_tx_ts_skb_list_push(link_index, skb, pkt_ts_seq_num);
 
               // don't free the skb just yet
               free_skb = false;
@@ -243,7 +271,18 @@ void run_mtip_tx_comp_cb(void* work_ptr)
           else
           {
               // there is a timestamp available
-              mtip_ptp_tx_ts_list_pop(link_index, &timestamp_secs, &timestamp_nsecs);
+              mtip_ptp_tx_ts_list_pop(link_index, &timestamp_secs, &timestamp_nsecs, &read_ts_seq_num);
+
+              if ((mode == MTIP_DEVICE_RUv2) || (mode == MTIP_DEVICE_DUv2)) 
+              {
+                  // match the read_ts_seq_num and the pkt_ts_seq_num
+                  if (read_ts_seq_num != pkt_ts_seq_num)
+                  {
+                      // for now we log this error
+                      // TBD: we need a way to recover from this
+                      CSMLOGERR("Read ts_seq_num %d does not match pkt ts_seq_num %d", read_ts_seq_num, pkt_ts_seq_num);
+                  }
+              }
 
               // set the timestamp of the skb
               mtip_ptp_set_tx_timestamp(skb, timestamp_secs, timestamp_nsecs);
@@ -536,6 +575,10 @@ static int mtip_start_xmit(struct sk_buff *skb, struct net_device *netdev)
    ecpri_dma_eth_conn_hdl_t other_hdl;
    u32 other_link_index;
    struct mtip_security_device *sec_dev;
+   u8 ts_seq_num = 0;
+   bool send_tx_pre_header = false;
+   bool send_tx_seq_num = false;
+   enum mtip_device_mode_enum mode = platform_driver_priv->devices.mode;
 
    CSMLOGDBG("mtip_start_xmit called\n");
 
@@ -629,10 +672,23 @@ static int mtip_start_xmit(struct sk_buff *skb, struct net_device *netdev)
        }
    }
 
+   // check if we need to send pre-header
+   if ((mode == MTIP_DEVICE_RUv2) || (mode == MTIP_DEVICE_DUv2)) 
+   {
+       send_tx_pre_header = true;
+   }
+
    // check if this packet needs timestamping
    if ((skb_shinfo(skb)->tx_flags & SKBTX_HW_TSTAMP) != 0)
    {
        CSMLOGDBG("Tx packet needing HW_TSTAMP skb->data: 0x%lx\n", (unsigned long)skb->data);
+
+       // check if we need to send sequence number
+       if ((mode == MTIP_DEVICE_RUv2) || (mode == MTIP_DEVICE_DUv2)) 
+       {
+           ts_seq_num = mtip_netdev_get_next_ptp_ts_seq_num(link_index);
+           send_tx_seq_num = true;
+       }
 
        // set the flag to in progress
        skb_shinfo(skb)->tx_flags |= SKBTX_IN_PROGRESS;
@@ -646,7 +702,7 @@ static int mtip_start_xmit(struct sk_buff *skb, struct net_device *netdev)
       }
    }
 
-   ret = mtip_dma_send_packet(netdev, hdl, skb);
+   ret = mtip_dma_send_packet(netdev, hdl, skb, send_tx_pre_header, send_tx_seq_num, ts_seq_num);
 
    // HANDLE THE ERROR
    if (ret < 0) {
@@ -1559,4 +1615,20 @@ int mtip_netdev_set_port_config(struct net_device *netdev)
     mtip_device_update_security_config(netdev, port_config);
 
     return 0;
+}
+
+// get the next ptp ts seq num to use
+u8 mtip_netdev_get_next_ptp_ts_seq_num(u32 link_index)
+{
+    u8 ts_seq_num;
+    u8 next_ts_seq_num;
+
+    ts_seq_num = platform_driver_priv->mtip_links[link_index]->ptp_ts_seq_num;
+
+    // the ts seq numbers are 3 bits
+    next_ts_seq_num = (ts_seq_num + 1)%8;
+
+    platform_driver_priv->mtip_links[link_index]->ptp_ts_seq_num = next_ts_seq_num;
+
+    return ts_seq_num;
 }

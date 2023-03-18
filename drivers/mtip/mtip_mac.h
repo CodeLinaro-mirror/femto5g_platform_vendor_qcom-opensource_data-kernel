@@ -65,6 +65,9 @@
 
 #define MTIP_MAC_WRAPPER_TX_TS_REG_OFFSET                0x00000008
 
+#define MTIP_MAC_WRAPPER_TX_TS_SEQ_NUM_REG_BASE_OFFSET   0x00000388
+#define MTIP_MAC_WRAPPER_TX_TS_SEQ_NUM_LINK_REG_OFFSET   0x00000004
+
 #define MTIP_MAC_WRAPPER_INTERRUPT_STAT_REG_OFFSET       0x00000250
 #define MTIP_MAC_WRAPPER_INTERRUPT_MASK_REG_OFFSET       0x00000254
 #define MTIP_MAC_WRAPPER_INTERRUPT_CLR_REG_OFFSET        0x00000258
@@ -137,6 +140,7 @@ struct mtip_process_timestamp_task
     u32 link_index;
     u32 timestamp_secs;
     u32 timestamp_nsecs;
+    u8  ts_seq_num;
 };
 
 void mtip_mac_initialize(struct mtip_netdev_priv* priv);
@@ -167,6 +171,8 @@ void mtip_mac_wrapper_register_irq(struct device *dev, unsigned int irq,
                               const char* dev_name, void* devptr);
 
 void mtip_mac_read_timestamp(u32 link_index, u32* timestamp_secs, u32* timestamp_nsecs);
+void mtip_mac_read_ts_seq_num(u32 link_index, u8* ts_seq);
+
 void mtip_mac_set_interrupt_mask(u32 link_index);
 void mtip_mac_clear_interrupt_mask(u32 link_index);
 void mtip_mac_set_link_status_interrupt_mask(u32 link_index);

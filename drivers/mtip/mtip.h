@@ -246,6 +246,7 @@ struct mtip_link_info
    u32 port_device_index;
    u32 link_device_index;
    bool ptp_ts_enabled;
+   u8 ptp_ts_seq_num;
    struct mtip_tx_ts_list tx_ts_list;
    struct mtip_tx_ts_skb_list tx_ts_skb_list;
    u32 peak_rx_available;

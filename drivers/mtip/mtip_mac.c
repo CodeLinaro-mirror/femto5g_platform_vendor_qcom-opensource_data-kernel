@@ -143,9 +143,13 @@ static irqreturn_t mtip_mac_interrupt_handler(int irq, void *devptr)
    u32 timestamp_nsecs;
    bool found = false;
    bool handled = false;
+   u8 ts_seq_num = 0x0;
+   enum mtip_device_mode_enum mode = MTIP_DEVICE_DU;
    u32 handled_interrupts = MTIP_MAC_INTERRUPT_PTP_TX_INTR;
    handled_interrupts |= MTIP_MAC_INTERRUPT_LINK_DOWN_INTR;
    handled_interrupts |= MTIP_MAC_INTERRUPT_LINK_UP_INTR;
+
+   mode = platform_driver_priv->devices.mode;
 
    CSMLOGDBG("ENTER: Interrupt! handling 0x%x\n", handled_interrupts);
 
@@ -197,8 +201,15 @@ static irqreturn_t mtip_mac_interrupt_handler(int irq, void *devptr)
 
                CSMLOGDBG("Tx Timestamp %d, %d read for link: %d with link_index: %d\n", timestamp_secs, timestamp_nsecs, i, link_index);
 
+               if ((mode == MTIP_DEVICE_RUv2) || (mode == MTIP_DEVICE_DUv2))
+               {
+                   mtip_mac_read_ts_seq_num(link_index, &ts_seq_num);
+
+                   CSMLOGDBG("TS seq num: %d for link_index: %d", ts_seq_num, link_index);
+               }
+
                // post a job to workqueue to process this timestamp
-               post_mtip_process_timestamp(link_index, timestamp_secs, timestamp_nsecs);
+               post_mtip_process_timestamp(link_index, timestamp_secs, timestamp_nsecs, ts_seq_num);
 
                handled = true;
            }
@@ -1472,6 +1483,29 @@ void mtip_mac_read_timestamp(u32 link_index, u32* timestamp_secs, u32* timestamp
     // read the lower 32 bits
     *timestamp_nsecs = (u32)ioread32(wrapper_base_addr + real_link_number*MTIP_MAC_WRAPPER_TX_TS_REG_OFFSET + MTIP_MAC_WRAPPER_TX_TS0_REG_BASE_OFFSET);
 
+    return;
+}
+
+void mtip_mac_read_ts_seq_num(u32 link_index, u8* ts_seq_num)
+{
+    void __iomem *wrapper_base_addr;
+    u32 port_device_index;
+    u32 link_device_index;
+    u32 real_link_number;
+    u32 ts_reg_val;
+
+    mtip_lookup_device_by_link_index(link_index, &port_device_index, &link_device_index);
+
+    mtip_lookup_real_link_number_by_link_index(link_index, &real_link_number);
+
+    wrapper_base_addr = platform_driver_priv->devices.port_devices[port_device_index].wrapper_base_addr;
+
+    // read the ts sequence number
+    ts_reg_val = (u32)ioread32(wrapper_base_addr + real_link_number*MTIP_MAC_WRAPPER_TX_TS_SEQ_NUM_LINK_REG_OFFSET + MTIP_MAC_WRAPPER_TX_TS_SEQ_NUM_REG_BASE_OFFSET);
+
+    // the ts seq number are the bottom four bits
+    // as defined in IPCAT
+    *ts_seq_num = (u8)(ts_reg_val & 0x0000000F);
     return;
 }
 
