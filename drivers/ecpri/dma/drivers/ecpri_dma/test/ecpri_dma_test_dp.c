@@ -1276,9 +1276,9 @@ static int ecpri_dma_dp_test_destroy_endp(
 				(NULL == endpoint_ptr->rx_pkts[i]->buffs) ||
 				(NULL == endpoint_ptr->rx_pkts[i]->buffs[0]) ||
 				(NULL == endpoint_ptr->rx_pkts[i]->buffs[0]->virt_base)) {
-					DMA_UT_LOG("Warning: rx_pkts or some of it isn't allocated\n");
-					continue;
-			   }
+				DMA_UT_LOG("Warning: rx_pkts or some of it isn't allocated\n");
+				continue;
+			}
 
 			kfree(endpoint_ptr->rx_pkts[i]->buffs[0]->virt_base);
 			kfree(endpoint_ptr->rx_pkts[i]->buffs[0]);
@@ -1566,7 +1566,7 @@ static int ecpri_dma_dp_test_suite_verify_rx(
 	int* total_rx_buffs_to_replenish)
 {
 	int res = 0;
-	int actual_num = 0;
+	int actual_num = 0, actual_buff_num = 0;
 	int sent_pkt_idx = 0, sent_pkt_buff_idx = 0;
 	int i = 0;
 	int curr_pkt_recv_size = 0;
@@ -1596,6 +1596,8 @@ static int ecpri_dma_dp_test_suite_verify_rx(
 
 	while (sent_pkt_idx != num_of_pkts_sent) {
 		actual_num = 0;
+
+		/* actual_num is in packets, need to check for jumbo packets */
 		res = ecpri_dma_dp_rx_poll(rx_endp, ECPRI_DMA_DP_TEST_RX_BUDGET,
 			rx_pkts, &actual_num);
 		if (res || !actual_num) {
@@ -1607,16 +1609,18 @@ static int ecpri_dma_dp_test_suite_verify_rx(
 		tx_buff_to_compare =
 			tx_pkts[sent_pkt_idx]->buffs[sent_pkt_buff_idx]->virt_base;
 		tx_buff_size = tx_pkts[sent_pkt_idx]->buffs[sent_pkt_buff_idx]->size;
-		for (i = 0; i < actual_num; i++) {
-			curr_pkt_recv_size = rx_pkts[i]->pkt->buffs[0]->size;
+		i = 0;
+		actual_buff_num = 0;
+		while (i < actual_num) {
+			curr_pkt_recv_size = rx_pkts[actual_buff_num]->pkt->buffs[0]->size;
 
-			if (curr_pkt_recv_size < tx_buff_size &&
-				curr_pkt_recv_size == ECPRI_DMA_DP_TEST_BUFF_SIZE)
+			if (rx_pkts[actual_buff_num]->comp_code !=
+				ECPRI_DMA_COMPLETION_CODE_EOT)
 			{
 				/* Over flow event */
 				if (memcmp(
 					tx_buff_to_compare,
-					rx_pkts[i]->pkt->buffs[0]->virt_base,
+					rx_pkts[actual_buff_num]->pkt->buffs[0]->virt_base,
 					curr_pkt_recv_size)) {
 					DMA_UT_LOG(
 						"Test failed due to buffers don't match i= %d\n",i);
@@ -1625,13 +1629,13 @@ static int ecpri_dma_dp_test_suite_verify_rx(
 							curr_pkt_recv_size);
 					DMA_UT_LOG("rx buff:\n");
 						ecpri_dma_dp_test_dump_packet(
-							rx_pkts[i]->pkt->buffs[0]->virt_base,
+							rx_pkts[actual_buff_num]->pkt->buffs[0]->virt_base,
 							curr_pkt_recv_size);
 					return -EFAULT;
 				}
 				tx_buff_to_compare =
 					(void*)((unsigned long)tx_buff_to_compare +
-						rx_pkts[i]->pkt->buffs[0]->size);
+						rx_pkts[actual_buff_num]->pkt->buffs[0]->size);
 				tx_buff_size -= ECPRI_DMA_DP_TEST_BUFF_SIZE;
 			}
 			else if (curr_pkt_recv_size == tx_buff_size)
@@ -1639,7 +1643,7 @@ static int ecpri_dma_dp_test_suite_verify_rx(
 				/* Buffers context matches and Tx EOT */
 				if (memcmp(
 					tx_buff_to_compare,
-					rx_pkts[i]->pkt->buffs[0]->virt_base,
+					rx_pkts[actual_buff_num]->pkt->buffs[0]->virt_base,
 					curr_pkt_recv_size)) {
 					DMA_UT_LOG(
 						"Test failed due to buffers don't match i= %d\n",i);
@@ -1648,7 +1652,7 @@ static int ecpri_dma_dp_test_suite_verify_rx(
 							curr_pkt_recv_size);
 					DMA_UT_LOG("rx buff:\n");
 						ecpri_dma_dp_test_dump_packet(
-							rx_pkts[i]->pkt->buffs[0]->virt_base,
+							rx_pkts[actual_buff_num]->pkt->buffs[0]->virt_base,
 							curr_pkt_recv_size);
 					return -EFAULT;
 				}
@@ -1659,11 +1663,12 @@ static int ecpri_dma_dp_test_suite_verify_rx(
 					sent_pkt_idx++;
 					if (num_of_pkts_sent == sent_pkt_idx)
 					{
-						kfree(rx_pkts[i]->pkt->buffs[0]->virt_base);
-						kfree(rx_pkts[i]->pkt->buffs[0]);
-						kfree(rx_pkts[i]->pkt->buffs);
-						kfree(rx_pkts[i]->pkt);
+						kfree(rx_pkts[actual_buff_num]->pkt->buffs[0]->virt_base);
+						kfree(rx_pkts[actual_buff_num]->pkt->buffs[0]);
+						kfree(rx_pkts[actual_buff_num]->pkt->buffs);
+						kfree(rx_pkts[actual_buff_num]->pkt);
 						(*total_rx_buffs_to_replenish)++;
+						actual_buff_num++;
 						break;
 					}
 				}
@@ -1676,7 +1681,7 @@ static int ecpri_dma_dp_test_suite_verify_rx(
 			{
 				/*	Tx chained buffers smaller than credit so HW put them all in
 					one credit buffer */
-				rx_buff_to_compare = rx_pkts[i]->pkt->buffs[0]->virt_base;
+				rx_buff_to_compare = rx_pkts[actual_buff_num]->pkt->buffs[0]->virt_base;
 				while (curr_pkt_recv_size &&
 					sent_pkt_buff_idx < tx_pkts[sent_pkt_idx]->num_of_buffers)
 				{
@@ -1748,11 +1753,18 @@ static int ecpri_dma_dp_test_suite_verify_rx(
 				}
 			}
 
-			kfree(rx_pkts[i]->pkt->buffs[0]->virt_base);
-			kfree(rx_pkts[i]->pkt->buffs[0]);
-			kfree(rx_pkts[i]->pkt->buffs);
-			kfree(rx_pkts[i]->pkt);
+			if (rx_pkts[actual_buff_num]->comp_code ==
+				ECPRI_DMA_COMPLETION_CODE_EOT)
+			{
+				i++;
+			}
+
+			kfree(rx_pkts[actual_buff_num]->pkt->buffs[0]->virt_base);
+			kfree(rx_pkts[actual_buff_num]->pkt->buffs[0]);
+			kfree(rx_pkts[actual_buff_num]->pkt->buffs);
+			kfree(rx_pkts[actual_buff_num]->pkt);
 			(*total_rx_buffs_to_replenish)++;
+			actual_buff_num++;
 		}
 	}
 
@@ -1926,8 +1938,15 @@ static int ecpri_dma_dp_test_suite_tx_header(void *priv) {
 	struct ecpri_dma_tx_header *packet_header_ptr;
 
 	u8 *p_packet_body;
+	enum ecpri_hw_flavor hw_flavor = ecpri_dma_get_ctx_hw_flavor();
 
 	DMA_UT_LOG("Start Tx pre-header test\n");
+	if (hw_flavor == ECPRI_HW_FLAVOR_RU || hw_flavor == ECPRI_HW_FLAVOR_DU_L2)
+	{
+		DMAERR("Tx pre-header test requires Multi-GSI which is only supported "
+			" on PCIe flavor\n");
+		return 0;
+	}
 
 	/* Point to Endpoints */
 	tx_endp = &dp_test_suite_ctx.endps[ECPRI_DMA_DP_TEST_ENDPOINT_DEFAULT_SRC];
@@ -2034,6 +2053,8 @@ static int ecpri_dma_dp_test_suite_tx_header(void *priv) {
 	}
 
 	/* Get Rx packets */
+	/* Test is sending single buffer packets so actual_num == number
+			of buffers, no need to check for EOT */
 	ret = ecpri_dma_dp_rx_poll(
 			redirect_endp->endp_ctx,
 			ECPRI_DMA_DP_TEST_RX_BUDGET,
@@ -2138,10 +2159,18 @@ static int ecpri_dma_dp_test_suite_tx_broadcast(void *priv) {
 	int ret = 0;
 	int i;
 	int j;
+	enum ecpri_hw_flavor hw_flavor = ecpri_dma_get_ctx_hw_flavor();
 
 	/* End: variable declaraion */
 
 	DMA_UT_LOG("Start Tx braodcast test\n");
+
+	if (hw_flavor == ECPRI_HW_FLAVOR_RU || hw_flavor == ECPRI_HW_FLAVOR_DU_L2)
+	{
+		DMAERR("Tx braodcast test requires Multi-GSI which is only supported "
+			" on PCIe flavor\n");
+		return 0;
+	}
 
 	/* Configure source for tx header redirection */
 	ret = ecpri_dma_dp_test_create_endp(
@@ -2276,6 +2305,8 @@ static int ecpri_dma_dp_test_suite_tx_broadcast(void *priv) {
 		}
 
 		/* Get rx packets */
+		/* Test is sending single buffer packets so actual_num == number
+			of buffers, no need to check for EOT */
 		ret =
 			ecpri_dma_dp_rx_poll(broadcast_endps_arr[i]->endp_ctx,
 								ECPRI_DMA_DP_TEST_RX_BUDGET,
@@ -2731,11 +2762,13 @@ static int ecpri_dma_dp_test_suite_wrap_around_single_buffer(void *priv)
 			&tx_pkts[i * num_of_pkts_to_send],
 			num_of_pkts_to_send, true);
 		if (res != 0) {
+			DMAERR("Failed on transmit, iteration %d\n", i);
 			DMA_UT_TEST_FAIL_REPORT("Failed on transmit");
 			return -EFAULT;
 		}
 
-		res = ecpri_dma_dp_test_suite_wait_for_tx_comp(ECPRI_DMA_DP_TEST_ENDPOINT_DEFAULT_SRC,
+		res = ecpri_dma_dp_test_suite_wait_for_tx_comp(
+			ECPRI_DMA_DP_TEST_ENDPOINT_DEFAULT_SRC,
 	 	(i + 1) * num_of_pkts_to_send);
 
 		if (res != 0) {

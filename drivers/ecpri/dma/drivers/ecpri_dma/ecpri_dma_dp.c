@@ -115,7 +115,7 @@ void ecpri_dma_dp_tasklet_exception_notify(unsigned long data)
 	int ret = 0;
 	struct ecpri_dma_pkt_completion_wrapper* exception_pkts_arr;
 	struct ecpri_dma_pkt_completion_wrapper **exception_pkts;
-	u32 actual_num = 0;
+	u32 actual_num = 0, actual_buff_num = 0;
 	struct ecpri_dma_endp_context *endp;
 	unsigned long flags;
 
@@ -128,20 +128,24 @@ void ecpri_dma_dp_tasklet_exception_notify(unsigned long data)
 
 	exception_pkts_arr = kzalloc(
 		sizeof(struct ecpri_dma_pkt_completion_wrapper) *
-				ECPRI_DMA_DP_EXCEPTION_BUDGET, GFP_NOWAIT);
+				ECPRI_DMA_DP_EXCEPTION_BUDGET *
+				ECPRI_DMA_DP_EXCEPTION_FH_RX_MAX_CHAIN, GFP_NOWAIT);
 	ecpri_dma_assert_on(!exception_pkts_arr);
 
 	exception_pkts = kzalloc(
 		sizeof(struct ecpri_dma_pkt_completion_wrapper*) *
-				ECPRI_DMA_DP_EXCEPTION_BUDGET, GFP_NOWAIT);
+				ECPRI_DMA_DP_EXCEPTION_BUDGET *
+				ECPRI_DMA_DP_EXCEPTION_FH_RX_MAX_CHAIN, GFP_NOWAIT);
 	ecpri_dma_assert_on(!exception_pkts);
 
-	for (i = 0; i < ECPRI_DMA_DP_EXCEPTION_BUDGET;i++) {
+	for (i = 0; i < ECPRI_DMA_DP_EXCEPTION_BUDGET *
+		ECPRI_DMA_DP_EXCEPTION_FH_RX_MAX_CHAIN ;i++) {
 		exception_pkts[i] = &exception_pkts_arr[i];
 	}
 
 	spin_lock_irqsave(&ecpri_dma_ctx->exception_spinlock, flags);
-	/* Poll Exceptions & Increase exception statistics */
+	/* Poll Exceptions & Increase exception statistics
+		actual_num is in packets, need to check for jumbo packets */
 	ret = ecpri_dma_dp_rx_poll(endp, ECPRI_DMA_DP_EXCEPTION_BUDGET,
 				   exception_pkts, &actual_num);
 	if (ret) {
@@ -153,18 +157,30 @@ void ecpri_dma_dp_tasklet_exception_notify(unsigned long data)
 	ecpri_dma_ctx->exception_stats.num_of_pkts_recieved += actual_num;
 
 	/* Credits have only one buffer so no need to check num_of_buffs */
-	for (i = 0; i < actual_num; i++) {
-		DMAERR("Got exception packet with status %d, dumping:\n",
-		       exception_pkts[i]->status_code);
+	i = 0;
+	actual_buff_num = 0;
+	while (i < actual_num) {
+		DMAERR("Got exception packet with status %d, dumping\n",
+		       exception_pkts[actual_buff_num]->status_code);
+		ecpri_dma_ctx->exception_status_statistics[
+			exception_pkts[actual_buff_num]->status_code]++;
 		//TODO: change from dump to terminal to dump to array
-		ecpri_dma_dump_packet(exception_pkts[i]->pkt->buffs[0]->virt_base,
-				      exception_pkts[i]->pkt->buffs[0]->size);
-		ecpri_dma_ctx->exception_stats.num_of_bytes_recieved +=
-			exception_pkts[i]->pkt->buffs[0]->size;
+
+		/* Each packet may have more than one buffer, need to check for EOT */
+		do {
+			ecpri_dma_dump_packet(
+				exception_pkts[actual_buff_num]->pkt->buffs[0]->virt_base,
+				exception_pkts[actual_buff_num]->pkt->buffs[0]->size);
+			ecpri_dma_ctx->exception_stats.num_of_bytes_recieved +=
+				exception_pkts[actual_buff_num]->pkt->buffs[0]->size;
+			actual_buff_num++;
+		} while (exception_pkts[actual_buff_num]->comp_code !=
+			ECPRI_DMA_COMPLETION_CODE_EOT);
+		i++;
 	}
 
 	if(actual_num == 0) {
-		/* No more packet to poll, change back to IRQ mode */
+		/* No more packets to poll, change back to IRQ mode */
 		ret = ecpri_dma_set_endp_mode(endp, ECPRI_DMA_NOTIFY_MODE_IRQ);
 		if (ret) {
 			DMAERR("Setting exception endp to IRQ mode failed\n");
@@ -173,7 +189,7 @@ void ecpri_dma_dp_tasklet_exception_notify(unsigned long data)
 			ecpri_dma_assert();
 		}
 	} else {
-		ret = ecpri_dma_dp_exception_replenish(endp, actual_num);
+		ret = ecpri_dma_dp_exception_replenish(endp, actual_buff_num);
 		if (ret) {
 			DMAERR("Failed to replenish exception endp\n");
 			kfree(exception_pkts_arr);
@@ -605,7 +621,7 @@ int ecpri_dma_dp_rx_poll(struct ecpri_dma_endp_context *endp, u32 budget,
 		endp->curr_completed_num--;
 	}
 
-	*actual_num = i;
+	*actual_num = budget - rem_budget;
 	spin_unlock_irqrestore(&endp->spinlock, flags);
 
 	return ret;
