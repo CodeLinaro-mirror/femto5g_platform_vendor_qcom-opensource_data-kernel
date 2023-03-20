@@ -262,6 +262,9 @@ void qcom_aw_phy_handle_cdr_lock_status(
   if(eth_level_status == true){
     /* Notify MAC to start listening to PCS link interrupts */
     qcom_aw_phy_notify_lane_bring_up_progress_to_mac(phy_inst_info, lane, false);
+
+    /* Start listening to SNR valid/error interrupts */
+    qcom_aw_phy_enable_snr_interrupt(phy_inst_info, lane);
   }
 
   return;
@@ -651,6 +654,9 @@ int qcom_aw_phy_bringup(enum mtip_port_type_enum port_type,
     /* Notify MAC to stop listening to PCS link interrupts */
     qcom_aw_phy_notify_lane_bring_up_progress_to_mac(phy_inst_info, lane, true);
 
+    /* Stop listening to SNR valid/error interrupts */
+    qcom_aw_phy_disable_snr_interrupt(phy_inst_info, lane);
+
     /* Set the lane offset */
     pmd_set_lane(&mss, lane);
 
@@ -1010,6 +1016,9 @@ void qcom_aw_phy_handle_rx_sig_detect(struct work_struct *work){
 
     // Notify MAC to stop listening to link status interrupts
     qcom_aw_phy_notify_lane_bring_up_progress_to_mac(phy_inst_info, lane, true);
+
+    /* Stop listening to SNR valid/error interrupts */
+    qcom_aw_phy_disable_snr_interrupt(phy_inst_info, lane);
 
     if (phy_inst_info->phy_eq_mode == QCOM_AW_PHY_ANLT_MODE) {
       //TODO
