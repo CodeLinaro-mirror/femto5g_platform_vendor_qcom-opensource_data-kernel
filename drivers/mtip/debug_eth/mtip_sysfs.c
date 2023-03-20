@@ -1669,22 +1669,30 @@ void sysfs_store_vlanID_Register_Set(const char *buf, u64 *FIFO_vlanID, u32 reg1
 
   sscanf(buf, "%d", &vid);
 
+  // Read the current VLAN tag enabled bit
+  val = (u32)ioread32(debug_port_base_address + reg2);
+  CSMLOGINFO(KERN_INFO " sysfs_store_vlanID_Register_Set - read reg2 %x", val);
+
+  // Reset the VLAN tag enabled bit
+  val &= (~(GENMASK(16, 16)));
+
+  /* If VLAN ID is valid, set the VLAN tag enabled bit again and
+     assign the VLAN ID value */
+  if(vid != 0){
+    val |= ((vlan_tag) << 16);
+    tpid_val = (((tpid >> 8) & GENMASK(7, 0)) | (((tpid & GENMASK(7, 0)) << 8)));
+    tci_val = (((vid >> 8) & GENMASK(7, 0)) | (((vid & GENMASK(7, 0)) << 8)));
+    vlan_id = (tci_val << 16) | tpid_val;
+  }
+
+  // Store the VLAN ID in local cache
   *FIFO_vlanID = vid;
 
-  //tpid_val = tpid;
-  tpid_val = (((tpid >> 8) & GENMASK(7, 0)) | (((tpid & GENMASK(7, 0)) << 8)));
-  tci_val = (((vid >> 8) & GENMASK(7, 0)) | (((vid & GENMASK(7, 0)) << 8)));
-
-  vlan_id = (tci_val << 16) | tpid_val;
-
+  // Store the VLAN ID in reg
   CSMLOGINFO(KERN_INFO " sysfs_store_vlanID_Register_Set - reg1 %x", vlan_id);
   iowrite32(vlan_id, debug_port_base_address + reg1);
 
-  val = (u32)ioread32(debug_port_base_address + reg2);
-  CSMLOGINFO(KERN_INFO " sysfs_store_vlanID_Register_Set - read reg2 %x", val);
-  val &= (~(GENMASK(16, 16)));
-  val |= ((vlan_tag) << 16);
-
+  // Store the VLAN ID enabled bit in reg
   CSMLOGINFO(KERN_INFO " sysfs_store_vlanID_Register_Set - write reg2 %x", val);
   iowrite32(val, debug_port_base_address + reg2);
 
