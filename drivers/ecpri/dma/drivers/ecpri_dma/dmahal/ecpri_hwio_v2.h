@@ -60,7 +60,7 @@
 #define ECPRI_DMA_SECURED_REG_BASE_SIZE                                          0x8000
 #define ECPRI_DMA_SECURED_REG_BASE_USED                                          0x4098
 #define ECPRI_DMA_SECURED_REG_BASE_PHYS                                          (ECPRI_WRAPPER_BASE_PHYS + 0x00030000)
-#define ECPRI_DMA_SECURED_REG_BASE_OFFS                                          0x00330000
+#define ECPRI_DMA_SECURED_REG_BASE_OFFS                                          0x00030000
 
 #define ECPRI_DMA_RAM_REG_BASE                                            (ECPRI_WRAPPER_BASE      + 0x00040000)
 #define ECPRI_DMA_RAM_REG_BASE_SIZE                                       0x10000
