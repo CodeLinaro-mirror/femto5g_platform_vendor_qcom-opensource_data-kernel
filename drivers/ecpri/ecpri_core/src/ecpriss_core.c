@@ -898,6 +898,13 @@ static int ecpriss_core_data_init_v2(void)
 	ecpriss_pdata_v2->events_workqueue = &events_workqueue_g;
 	ecpriss_pdata_v2->interrupts_workqueue = &interrupts_workqueue_g;
 	spin_lock_init(&ecpriss_pdata_v2->irq_lock);
+
+	ecpriss_pdata_v2->ecpriss_core_logbuf =
+        ipc_log_context_create(ECPRISS_CORE_IPC_LOG_PAGES,
+                "ecpriss_core", 0);
+        if (ecpriss_pdata_v2->ecpriss_core_logbuf == NULL)
+		ECPRILOGERR("failed to create log context for ECPRISS_SS driver\n");
+
 	ecpriss_pdata_v2->qudp_ctx_v2 = &qudp_ctx_g_v2;
 	ecpriss_pdata_v2->xbar_ctx_v2 = &xbar_ctx_g_v2;
 	ecpriss_pdata_v2->qudp_ctx_v2->ecpriss_qudp_hal_ctx =
