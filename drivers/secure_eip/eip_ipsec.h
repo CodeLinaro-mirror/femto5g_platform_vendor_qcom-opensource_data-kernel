@@ -34,15 +34,15 @@ struct eip_ethhdr {
 union eip_sa_tag_info {
 	u16 info;
 	struct {
-			u16 vport:9;
-			u16 rsvd:8;
-			u16 bypass:1;
+		u16 vport : 9;
+		u16 rsvd : 8;
+		u16 bypass : 1;
 	} egress;
 	struct {
-			u16 sa:10;
-			u16 rsvd:1;
-			u16 mtt:4;
-			u16 late_hdr:1;
+		u16 sa : 10;
+		u16 rsvd : 1;
+		u16 mtt : 4;
+		u16 late_hdr : 1;
 	} ingress;
 } __packed;
 
@@ -81,7 +81,8 @@ extern u16 eip_satag_etype;
 static inline struct eip_ipsec_link *ndev_to_ipsec(struct net_device *ndev)
 {
 	struct eip_link *link = (struct eip_link *)mtip_security_get_priv(ndev);
-	struct eip_ipsec_link *ilink = (struct eip_ipsec_link *)link->ipsec_priv;
+	struct eip_ipsec_link *ilink =
+		(struct eip_ipsec_link *)link->ipsec_priv;
 	return ilink;
 }
 
@@ -91,10 +92,21 @@ void eip_ipsec_deinit_link(struct eip_link *link);
 int eip_ipsec_fixup_rx_skb(struct sk_buff *skb);
 int eip_ipsec_fixup_tx_skb(struct sk_buff *skb);
 #else
-static inline int eip_ipsec_init_link(struct eip_link *link) { return 0; }
-static inline void eip_ipsec_deinit_link(struct eip_link *link) { }
-static inline int eip_ipsec_fixup_rx_skb(struct sk_buff *skb) { return 0; }
-static inline int eip_ipsec_fixup_tx_skb(struct sk_buff *skb) { return 0; }
+static inline int eip_ipsec_init_link(struct eip_link *link)
+{
+	return 0;
+}
+static inline void eip_ipsec_deinit_link(struct eip_link *link)
+{
+}
+static inline int eip_ipsec_fixup_rx_skb(struct sk_buff *skb)
+{
+	return 0;
+}
+static inline int eip_ipsec_fixup_tx_skb(struct sk_buff *skb)
+{
+	return 0;
+}
 #endif // CONFIG_XFRM_OFFLOAD
 
 #endif // _EIP_IPSEC_H_

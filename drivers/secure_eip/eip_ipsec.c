@@ -22,7 +22,8 @@
 
 u16 eip_satag_etype = EIP_SATAG_ETYPE_DEFAULT;
 module_param(eip_satag_etype, ushort, S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP);
-MODULE_PARM_DESC(eip_satag_etype, "Ether Type used for EIP SA Tag insertion/detection");
+MODULE_PARM_DESC(eip_satag_etype,
+		 "Ether Type used for EIP SA Tag insertion/detection");
 
 #ifndef EIP_IKE_PORT_DEFAULT
 #define EIP_IKE_PORT_DEFAULT 500
@@ -30,7 +31,8 @@ MODULE_PARM_DESC(eip_satag_etype, "Ether Type used for EIP SA Tag insertion/dete
 
 u16 eip_ike_port = EIP_IKE_PORT_DEFAULT;
 module_param(eip_ike_port, ushort, S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP);
-MODULE_PARM_DESC(eip_ike_port, "UDP port number that EIP uses for bypassing IKE packets");
+MODULE_PARM_DESC(eip_ike_port,
+		 "UDP port number that EIP uses for bypassing IKE packets");
 
 #ifndef EIP_NAT_PORT_DEFAULT
 #define EIP_NAT_PORT_DEFAULT 4500
@@ -38,7 +40,8 @@ MODULE_PARM_DESC(eip_ike_port, "UDP port number that EIP uses for bypassing IKE 
 
 u16 eip_nat_port = EIP_NAT_PORT_DEFAULT;
 module_param(eip_nat_port, ushort, S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP);
-MODULE_PARM_DESC(eip_nat_port, "UDP port number that EIP uses for detecting NAT-T packets");
+MODULE_PARM_DESC(eip_nat_port,
+		 "UDP port number that EIP uses for detecting NAT-T packets");
 
 static bool dump_xs = false;
 module_param(dump_xs, bool, S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP);
@@ -89,21 +92,23 @@ static bool eip_ipsec_supported(unsigned int devid)
 	CfyE_Device_Limits_t Device_Limits;
 
 	CfyE_Rc = CfyE_Device_Limits_Get(devid, &Device_Limits);
-	if (CfyE_Rc != CFYE_STATUS_OK)
-	{
-		pr_err("EIP IPSEC: CfyE_Device_Limits returned error %d\n", CfyE_Rc);
+	if (CfyE_Rc != CFYE_STATUS_OK) {
+		pr_err("EIP IPSEC: CfyE_Device_Limits returned error %d\n",
+		       CfyE_Rc);
 		return false;
 	}
 
 	if (Device_Limits.fIPsec)
 		pr_info("EIP IPSEC: IPsec is supported on DevID %u\n", devid);
 	else
-		pr_info("EIP IPSEC: IPsec is not supported on DevID %u\n", devid);
+		pr_info("EIP IPSEC: IPsec is not supported on DevID %u\n",
+			devid);
 
 	return Device_Limits.fIPsec;
 }
 
-static int __cfye_set_mode(unsigned int devid, unsigned int channel, bool inbound, bool ipsec)
+static int __cfye_set_mode(unsigned int devid, unsigned int channel,
+			   bool inbound, bool ipsec)
 {
 	CfyE_Status_t CfyE_Rc;
 	CfyE_Device_t DeviceParams;
@@ -141,8 +146,7 @@ static int __cfye_set_mode(unsigned int devid, unsigned int channel, bool inboun
 	IPsecParserParams.fVerifyUDPChkSum = false;
 	IPsecParserParams.fMACDACheck = false;
 
-	if (!inbound)
-	{
+	if (!inbound) {
 		EgressHdrParams.EgressHeaderEtype = eip_satag_etype;
 		EgressHdrParams.fEnable = true;
 
@@ -155,8 +159,7 @@ static int __cfye_set_mode(unsigned int devid, unsigned int channel, bool inboun
 	DeviceParams.Control_p = &DeviceCtrl;
 
 	CfyE_Rc = CfyE_Device_Update(devid, channel, &DeviceParams);
-	if (CfyE_Rc != CFYE_STATUS_OK)
-	{
+	if (CfyE_Rc != CFYE_STATUS_OK) {
 		pr_err("EIP IPSEC: Failed, CfyE_Device_Update()=%d\n", CfyE_Rc);
 		return -EFAULT;
 	}
@@ -176,10 +179,9 @@ static int __secy_set_mode(unsigned int devid, unsigned int channel, bool ipsec)
 	ZEROINIT(ChannelParams);
 
 	rc = SecY_Channel_Config_Get(devid, channel, &ChannelParams);
-	if (rc != SECY_STATUS_OK)
-	{
+	if (rc != SECY_STATUS_OK) {
 		pr_err("EIP IPSEC: SecY Device config not read, error=%d\n",
-					rc);
+		       rc);
 		return -EFAULT;
 	}
 
@@ -194,10 +196,9 @@ static int __secy_set_mode(unsigned int devid, unsigned int channel, bool ipsec)
 	DeviceConf.ChConf_p = &ChannelConf;
 
 	rc = SecY_Device_Update(devid, &DeviceConf);
-	if (rc != SECY_STATUS_OK)
-	{
+	if (rc != SECY_STATUS_OK) {
 		pr_err("EIP IPSEC: SecYDevice could not be configured, error=%d\n",
-					rc);
+		       rc);
 		return -EFAULT;
 	}
 
@@ -213,10 +214,12 @@ static int eip_ipsec_set_mode(struct eip_xfrm_state *eip_xs, bool ipsec)
 	unsigned int channel = eip_chid(eip_xs->channel);
 
 	return __secy_set_mode(devid, channel, ipsec) |
-			__cfye_set_mode(devid, channel, eip_xs->inbound, ipsec);
+	       __cfye_set_mode(devid, channel, eip_xs->inbound, ipsec);
 }
 
-static int eip_ipsec_alloc_vport(unsigned int devid, bool inbound, CfyE_vPortHandle_t *vport_h, unsigned int *vport)
+static int eip_ipsec_alloc_vport(unsigned int devid, bool inbound,
+				 CfyE_vPortHandle_t *vport_h,
+				 unsigned int *vport)
 {
 	CfyE_Status_t rc;
 	CfyE_vPort_t vport_params;
@@ -227,8 +230,7 @@ static int eip_ipsec_alloc_vport(unsigned int devid, bool inbound, CfyE_vPortHan
 		vport_params.PktExtension = 1;
 
 	rc = CfyE_vPort_Add(devid, vport_h, &vport_params, CYFE_MODE_IPSEC);
-	if (rc != CFYE_STATUS_OK)
-	{
+	if (rc != CFYE_STATUS_OK) {
 		pr_err("EIP IPSEC: Failed, CfyE_vPort_Add()=%d\n", rc);
 		return -EFAULT;
 	}
@@ -254,7 +256,8 @@ static void eip_ipsec_destroy_tr(u32 *tr, unsigned int wc)
 }
 
 static u32 *eip_ipsec_build_tr(bool inbound, u8 *key, unsigned int key_len,
-		u8 *salt, u32 spi, bool insert_satag, unsigned int *wc)
+			       u8 *salt, u32 spi, bool insert_satag,
+			       unsigned int *wc)
 {
 	u32 *tr = NULL;
 	unsigned int word_count;
@@ -311,15 +314,17 @@ static u32 *eip_ipsec_build_tr(bool inbound, u8 *key, unsigned int key_len,
 	return tr;
 }
 
-static int eip_ipsec_add_sa(unsigned int devid, unsigned int vport, bool inbound,
-		const struct xfrm_state *xs, SecY_SAHandle_t *sa_h, unsigned int *sa_index)
+static int eip_ipsec_add_sa(unsigned int devid, unsigned int vport,
+			    bool inbound, const struct xfrm_state *xs,
+			    SecY_SAHandle_t *sa_h, unsigned int *sa_index)
 {
 	SecY_Status_t rc = 0;
 	SecY_SA_t sa_params;
 	u32 *tr = NULL;
 	unsigned int word_count;
 	u8 *key = &xs->aead->alg_key[0];
-	unsigned int key_len = (xs->aead->alg_key_len - EIP_IPSEC_SALT_SIZE)/BITS_PER_BYTE;
+	unsigned int key_len =
+		(xs->aead->alg_key_len - EIP_IPSEC_SALT_SIZE) / BITS_PER_BYTE;
 	u8 *salt = &xs->aead->alg_key[key_len];
 	u32 spi = be32_to_cpu(xs->id.spi);
 
@@ -348,7 +353,8 @@ static int eip_ipsec_add_sa(unsigned int devid, unsigned int vport, bool inbound
 	 * bits in the TR (transform record).
 	 */
 
-	tr = eip_ipsec_build_tr(inbound, key, key_len, salt, spi, true, &word_count);
+	tr = eip_ipsec_build_tr(inbound, key, key_len, salt, spi, true,
+				&word_count);
 	if (tr == NULL) {
 		pr_err("EIP IPSEC: Failed to create transformation record\n");
 		return -EFAULT;
@@ -357,10 +363,9 @@ static int eip_ipsec_add_sa(unsigned int devid, unsigned int vport, bool inbound
 	sa_params.TransformRecord_p = tr;
 	sa_params.SA_WordCount = word_count;
 
-
-	if (!inbound)
-	{
-		SecY_SA_IPsec_E_t *egress_params = &sa_params.Params.IPsecEgress;
+	if (!inbound) {
+		SecY_SA_IPsec_E_t *egress_params =
+			&sa_params.Params.IPsecEgress;
 
 		sa_params.ActionType = SECY_SA_ACTION_IPSEC_EGRESS;
 		sa_params.DropType = SECY_SA_DROP_INTERNAL;
@@ -375,35 +380,32 @@ static int eip_ipsec_add_sa(unsigned int devid, unsigned int vport, bool inbound
 		egress_params->fOuterIPHdr = (xs->props.family == AF_INET6);
 		egress_params->fConfProtect = true;
 		egress_params->fProtectFrames = true;
-	} else
-	{
-		SecY_SA_IPsec_I_t *ingress_params = &sa_params.Params.IPsecIngress;
+	} else {
+		SecY_SA_IPsec_I_t *ingress_params =
+			&sa_params.Params.IPsecIngress;
 
 		sa_params.ActionType = SECY_SA_ACTION_IPSEC_INGRESS;
 		sa_params.DropType = SECY_SA_DROP_CRC_ERROR;
 		sa_params.DestPort = SECY_PORT_CONTROLLED;
 
-		ingress_params->fReplayProtect   = true;
-		ingress_params->fConfProtect     = true;
+		ingress_params->fReplayProtect = true;
+		ingress_params->fConfProtect = true;
 		ingress_params->fPadNotValidDrop = true;
-		ingress_params->fPadLenFailDrop  = true;
-		ingress_params->fUpdateIP  = true;
+		ingress_params->fPadLenFailDrop = true;
+		ingress_params->fUpdateIP = true;
 		ingress_params->fUpdateTTL = false;
 	}
 
 	rc = SecY_SA_Add(devid, vport, sa_h, &sa_params);
-	if (rc != SECY_STATUS_OK)
-	{
+	if (rc != SECY_STATUS_OK) {
 		pr_err("EIP IPSEC: Failed, SecY_SA_Add()=%d\n", rc);
 		goto out;
-
 	}
 
 	rc = SecY_SAIndex_Get(*sa_h, sa_index, NULL);
-	if (rc != SECY_STATUS_OK)
-	{
+	if (rc != SECY_STATUS_OK) {
 		pr_err("EIP IPSEC: Failed to get SA Index=%d\n", rc);
-		(void) SecY_SA_Remove(devid, *sa_h);
+		(void)SecY_SA_Remove(devid, *sa_h);
 		goto out;
 	}
 
@@ -455,16 +457,15 @@ static int eip_install_cfye_rule(struct eip_xfrm_state *eip_xs)
 	rule_params.Data[3] = 0;
 	rule_params.DataMask[3] = 0x0;
 
-	rc = CfyE_Rule_Add(devid, eip_xs->vport_h, &eip_xs->rule_h, &rule_params);
-	if (rc != CFYE_STATUS_OK)
-	{
+	rc = CfyE_Rule_Add(devid, eip_xs->vport_h, &eip_xs->rule_h,
+			   &rule_params);
+	if (rc != CFYE_STATUS_OK) {
 		pr_err("EIP IPSEC: Failed, CfyE_Rule_Add()=%d\n", rc);
 		return -EFAULT;
 	}
 
 	rc = CfyE_Rule_Enable(devid, eip_xs->rule_h, true);
-	if (rc != CFYE_STATUS_OK)
-	{
+	if (rc != CFYE_STATUS_OK) {
 		pr_err("EIP IPSEC: Failed, CfyE_Rule_Enable()=%d\n", rc);
 		return -EFAULT;
 	}
@@ -485,7 +486,8 @@ static int __eip_xdo_dev_state_add(struct eip_xfrm_state *eip_xs)
 		return -EFAULT;
 	}
 
-	rc = eip_ipsec_alloc_vport(devid, eip_xs->inbound, &eip_xs->vport_h, &eip_xs->vport);
+	rc = eip_ipsec_alloc_vport(devid, eip_xs->inbound, &eip_xs->vport_h,
+				   &eip_xs->vport);
 	if (rc) {
 		pr_err("EIP IPSEC: Failed to setup ipsec vport\n");
 		return -EFAULT;
@@ -504,7 +506,7 @@ static int __eip_xdo_dev_state_add(struct eip_xfrm_state *eip_xs)
 	}
 
 	rc = eip_ipsec_add_sa(devid, eip_xs->vport, eip_xs->inbound, eip_xs->xs,
-				&eip_xs->sa_h, &eip_xs->sa_index);
+			      &eip_xs->sa_h, &eip_xs->sa_index);
 	if (rc) {
 		pr_err("EIP IPSEC: Failed to install SA\n");
 		return -EFAULT;
@@ -531,8 +533,8 @@ static int eip_ipsec_validate_sa(const struct xfrm_state *xs)
 	}
 
 	if (xs->props.aalgo != SADB_AALG_NONE ||
-			xs->props.ealgo != SADB_X_EALG_AES_GCM_ICV16 ||
-			xs->props.calgo != SADB_X_CALG_NONE) {
+	    xs->props.ealgo != SADB_X_EALG_AES_GCM_ICV16 ||
+	    xs->props.calgo != SADB_X_CALG_NONE) {
 		pr_err("EIP IPSEC: EIP supports only AES GCM algo with 128-bit ICV");
 		return -EINVAL;
 	}
@@ -548,7 +550,7 @@ static int eip_ipsec_validate_sa(const struct xfrm_state *xs)
 	}
 
 	if ((xs->aead->alg_key_len - EIP_IPSEC_SALT_SIZE) != 128 &&
-			(xs->aead->alg_key_len - EIP_IPSEC_SALT_SIZE) != 256) {
+	    (xs->aead->alg_key_len - EIP_IPSEC_SALT_SIZE) != 256) {
 		pr_err("EIP IPSEC: EIP supports only 128/256-bit keys");
 		return -EINVAL;
 	}
@@ -606,7 +608,8 @@ static void eip_xdo_dev_state_delete(struct xfrm_state *xs)
 {
 	SecY_Status_t secy_rc;
 	CfyE_Status_t cfye_rc;
-	struct eip_xfrm_state *eip_xs = (struct eip_xfrm_state *) xs->xso.offload_handle;
+	struct eip_xfrm_state *eip_xs =
+		(struct eip_xfrm_state *)xs->xso.offload_handle;
 	struct eip_ipsec_link *ilink = eip_xs->ilink;
 	unsigned int devid;
 
@@ -644,7 +647,8 @@ static void eip_xdo_dev_state_delete(struct xfrm_state *xs)
 
 static void eip_xdo_dev_state_free(struct xfrm_state *xs)
 {
-	struct eip_xfrm_state *eip_xs = (struct eip_xfrm_state *) xs->xso.offload_handle;
+	struct eip_xfrm_state *eip_xs =
+		(struct eip_xfrm_state *)xs->xso.offload_handle;
 
 	pr_debug("EIP IPSEC: %s\n", __func__);
 
