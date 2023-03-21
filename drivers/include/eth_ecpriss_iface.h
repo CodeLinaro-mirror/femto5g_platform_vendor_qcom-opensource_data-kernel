@@ -65,6 +65,18 @@ typedef enum {
 } eth_ecpriss_link_rate_e;
 
 /**
+ * enum eth_ecpriss_link_state - link state
+ */
+typedef enum {
+    ETH_ECPRISS_LINK_STATE_INIT = 0,
+    ETH_ECPRISS_LINK_STATE_OPEN,
+    ETH_ECPRISS_LINK_STATE_CLOSE,
+    ETH_ECPRISS_LINK_STATE_UP,
+    ETH_ECPRISS_LINK_STATE_DOWN,
+    ETH_ECPRISS_LINK_STATE_MAX
+} eth_ecpriss_link_state_e;
+
+/**
  * ecpriss_eth_link_params
  * This struct is used for the link parameter values from the
  * topology.
@@ -77,7 +89,7 @@ typedef struct eth_ecpriss_link_params {
 	uint8_t                          link_index;
 	uint16_t                         link_mtu;
 	uint8_t                          eth_mac_addr[ECPRISS_MAC_ADDR_LEN];
-	uint16_t                         link_state;
+	eth_ecpriss_link_state_e         link_state;
 	eth_ecpriss_link_rate_e          link_rate;
 } eth_ecpriss_link_params_s;
 
