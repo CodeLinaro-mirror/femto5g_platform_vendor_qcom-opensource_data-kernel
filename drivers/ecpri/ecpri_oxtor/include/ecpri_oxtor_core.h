@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: GPL-2.0-only
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #ifndef ECPRISS_CORE_H_
@@ -62,6 +62,8 @@ typedef struct{
 
 	ecpri_oxtor_tx_ring_cntxt_s *tx_ring_cntxt_ptr;
 	ecpri_oxtor_rx_ring_cntxt_s *rx_ring_cntxt_ptr;
+	/* eCPRI HW Version*/
+	int hw_ver;
 
 } ecpri_oxtor_core_cntxt_s;
 

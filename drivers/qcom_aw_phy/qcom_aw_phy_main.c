@@ -34,6 +34,8 @@
 #define REF_CLK_MODE_SILABS       0
 #define REF_CLK_MODE_OSCILLATOR   1
 
+#define RX_SIGNAL_DETECT_RETRY_DELAY_TIMER 10
+
 /* Module parameters */
 static enum qcom_aw_phy_loopback_mode_enum qcom_aw_phy_loopback_mode;
 
@@ -138,7 +140,7 @@ static irqreturn_t qcom_aw_phy_interrupt_handler(int irq, void *devptr) {
   intr_error = ioread32(phy_inst_info->wrapper_base_addr +
                         QCOM_AW_PHY_WRAPPER_INT_ERROR_REG_OFFSET);
 
-  QCOM_AW_PHY_LOG_INFO(
+  QCOM_AW_PHY_LOG_DBG(
       "Interrupt received for PHY instance %d, status %x, error %x",
       phy_inst_info->phy_inst, intr_status, intr_error);
 
@@ -148,6 +150,26 @@ static irqreturn_t qcom_aw_phy_interrupt_handler(int irq, void *devptr) {
     temp_bmask = intr_error & (1 << i);
     if (temp_bmask) {
       switch (i) {
+
+      case QCOM_AW_PHY_RX_SIGNAL_DETECT_ERR_LANE_0:
+      case QCOM_AW_PHY_RX_SIGNAL_DETECT_ERR_LANE_1:
+      case QCOM_AW_PHY_RX_SIGNAL_DETECT_ERR_LANE_2:
+      case QCOM_AW_PHY_RX_SIGNAL_DETECT_ERR_LANE_3:
+        wq_params = kmalloc(sizeof(struct qcom_aw_phy_work_q_params),
+                            GFP_ATOMIC);
+        if(!wq_params)
+          QCOM_AW_PHY_LOG_ERR("Malloc failed!");
+        else{
+          INIT_DELAYED_WORK(&wq_params->wq_item,
+                            qcom_aw_phy_handle_rx_sig_detect);
+          wq_params->phy_inst = phy_inst_info->phy_inst;
+          wq_params->lane_num = i - QCOM_AW_PHY_RX_SIGNAL_DETECT_ERR_LANE_0;
+          wq_params->user_data = (void*)true;
+          queue_delayed_work(qcom_aw_phy_config_info.wq, &wq_params->wq_item, 0);
+        }
+        clear |= (1<<i);
+        break;
+
       case QCOM_AW_PHY_SNR_VALID_ERR_LANE_0:
       case QCOM_AW_PHY_SNR_VALID_ERR_LANE_1:
       case QCOM_AW_PHY_SNR_VALID_ERR_LANE_2:
@@ -198,11 +220,12 @@ static irqreturn_t qcom_aw_phy_interrupt_handler(int irq, void *devptr) {
           QCOM_AW_PHY_LOG_ERR("Malloc failed!");
         else{
           INIT_DELAYED_WORK(&wq_params->wq_item,
-                            qcom_aw_phy_retry_lane_bring_up);
+                            qcom_aw_phy_handle_rx_sig_detect);
           wq_params->phy_inst = phy_inst_info->phy_inst;
           wq_params->lane_num = i;
           wq_params->user_data = (void*)true;
-          queue_delayed_work(qcom_aw_phy_config_info.wq, &wq_params->wq_item, 0);
+          queue_delayed_work(qcom_aw_phy_config_info.wq, &wq_params->wq_item,
+                             RX_SIGNAL_DETECT_RETRY_DELAY_TIMER);
         }
         clear |= (1<<i);
         break;
@@ -333,6 +356,10 @@ void qcom_aw_phy_enable_interrupt(
   for (i = QCOM_AW_PHY_INT_ERROR_BIT_MIN; i < QCOM_AW_PHY_INT_ERROR_BIT_MAX;
        i++) {
     switch (i) {
+    case QCOM_AW_PHY_RX_SIGNAL_DETECT_ERR_LANE_0:
+    case QCOM_AW_PHY_RX_SIGNAL_DETECT_ERR_LANE_1:
+    case QCOM_AW_PHY_RX_SIGNAL_DETECT_ERR_LANE_2:
+    case QCOM_AW_PHY_RX_SIGNAL_DETECT_ERR_LANE_3:
     case QCOM_AW_PHY_SNR_VALID_ERR_LANE_0:
     case QCOM_AW_PHY_SNR_VALID_ERR_LANE_1:
     case QCOM_AW_PHY_SNR_VALID_ERR_LANE_2:
@@ -766,7 +793,7 @@ static void qcom_aw_phy_hw_init() {
       ret_val = devm_request_irq(
           &phy_inst_info->pdev->dev, phy_inst_info->phy_status_irq,
           (irq_handler_t)qcom_aw_phy_interrupt_handler,
-          IRQF_SHARED | IRQF_TRIGGER_HIGH, NULL, phy_inst_info);
+          IRQF_SHARED | IRQF_TRIGGER_HIGH | IRQF_ONESHOT, NULL, phy_inst_info);
       if (ret_val) {
         local_err_val = LOCAL_ERROR_2;
         goto func_exit;

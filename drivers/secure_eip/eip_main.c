@@ -1,5 +1,4 @@
 //SPDX-License-Identifier: GPL-2.0-only
-
 /*
 * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
 */
@@ -19,6 +18,10 @@
 #include "adapter_init.h"
 #include "api_driver164_init.h"
 #include "macsec_eth.h"
+
+#include <mtip_security.h>
+
+#include "eip_device.h"
 #include "eip_macsec.h"
 #include "adapter_secy_support.h"
 #include "adapter_cfye_support.h"
@@ -323,14 +326,100 @@ static inline void macsec_wrapper_init_config(u32 port_id)
 
 }
 
+static int eip_mtip_add_link(struct net_device *ndev,
+      struct mtip_security_device *rx_sec, int rx_link,
+      struct mtip_security_device *tx_sec, int tx_link)
+{
+	struct eip_link *link;
+	struct eip_port *rx_port = (struct eip_port *)rx_sec->sec_priv;
+	struct eip_port *tx_port = (struct eip_port *)tx_sec->sec_priv;
+
+	link = kzalloc(sizeof(*link), GFP_KERNEL);
+	if (!link)
+		return -ENOMEM;
+
+	link->ndev = ndev;
+	link->rx.dp = &rx_port->rx;
+	link->rx.ch = rx_link;
+
+	link->tx.dp = &tx_port->tx;
+	link->tx.ch = tx_link;
+
+	pr_crit("EIP IPSEC: %s %s rx = (%u, %u, %u), tx = (%u, %u, %u)\n",
+		__func__, ndev->name,
+		rx_sec->port_id, link->rx.dp->devid, link->rx.ch,
+		tx_sec->port_id, link->tx.dp->devid, link->tx.ch);
+
+	mtip_security_set_priv(ndev, link);
+
+	return 0;
+}
+
+static void eip_mtip_del_link(struct net_device *ndev)
+{
+	struct eip_link *link = (struct eip_link *)mtip_security_get_priv(ndev);
+
+	/* Necessary cleanup */
+
+	kfree(link);
+}
+
+static int eip_channel_set_bypass(struct eip_channel *channel, bool bypass)
+{
+	CfyE_Status_t ce_rc;
+	SecY_Status_t se_rc;
+	unsigned int devid, chid;
+
+	devid = channel->dp->devid;
+	chid = channel->ch;
+
+	ce_rc = CfyE_Channel_Bypass_Set(devid, chid, bypass);
+	se_rc = SecY_Channel_Bypass_Set(devid, chid, bypass);
+
+	if (ce_rc != CFYE_STATUS_OK || se_rc != SECY_STATUS_OK)
+		return -EFAULT;
+
+	return 0;
+}
+
+static int eip_link_set_bypass(struct eip_link *link, bool bypass)
+{
+	return eip_channel_set_bypass(&link->rx, bypass) |
+			eip_channel_set_bypass(&link->tx, bypass);
+}
+
+static int eip_mtip_enable_bypass(struct net_device *ndev)
+{
+	return eip_link_set_bypass((struct eip_link *)mtip_security_get_priv(ndev), true);
+}
+
+static int eip_mtip_disable_bypass(struct net_device *ndev)
+{
+	return eip_link_set_bypass((struct eip_link *)mtip_security_get_priv(ndev), false);
+}
+
+struct mtip_security_ops mtip_sec_ops = {
+	.add_link = eip_mtip_add_link,
+	.del_link = eip_mtip_del_link,
+	.enable_bypass = eip_mtip_enable_bypass,
+	.disable_bypass = eip_mtip_disable_bypass,
+};
+
 static int eip_probe(struct platform_device *pdev)
 {
 	int ret = 0;
 	struct resource *resource_base;
 	u32 port_id = 0;
 	struct resource *irq_resource;
+	struct eip_port *port;
 
 	pr_info("eip_main: eip_probe called \n");
+
+	port = devm_kzalloc(&pdev->dev, sizeof(*port), GFP_KERNEL);
+	if (!port)
+		return -ENOMEM;
+
+	platform_set_drvdata(pdev, port);
 
 	/* Read the Port ID */
 	ret = of_property_read_u32(pdev->dev.of_node, "qcom,port-id", &port_id);
@@ -351,6 +440,10 @@ static int eip_probe(struct platform_device *pdev)
 		pr_err("eip_main: EIP Clock enablment failed ");
 		return -ENODEV;
 	}
+
+	port->id = port_id;
+	port->rx.devid = port_id * 2;
+	port->tx.devid = port->rx.devid + 1;
 
 	eip_device_platform_data[port_id].port_id = port_id;
 
@@ -399,6 +492,12 @@ static int eip_probe(struct platform_device *pdev)
 		pr_err("eip_main: eip device init failed, return error");
 		return ret;
 	}
+
+	port->msec_dev.port_id = port->id;
+	port->msec_dev.ops = &mtip_sec_ops;
+	port->msec_dev.sec_priv = port;
+	mtip_security_register_device(&port->msec_dev);
+
 	pr_info("eip_main: eip device init done");
 
 	return ret;
@@ -407,15 +506,19 @@ static int eip_probe(struct platform_device *pdev)
 static int eip_remove(struct platform_device *pdev)
 {
 	int ret = 0;
-	uint32_t port_id = 0;
+	struct eip_port *port =
+			(struct eip_port *)platform_get_drvdata(pdev);
 
 	LOG_CRIT("eip_main: Currently not supported ");
 
-	wrapper_bypass_set(port_id, true);
-	ret = eip_port_deinit(port_id);
+	mtip_security_unregister_device(&port->msec_dev);
+
+	wrapper_bypass_set(port->id, true);
+
+	ret = eip_port_deinit(port->id);
 	if (!ret)
 		LOG_CRIT("eip_main: Device %d uniniatlized succesfully",
-			 port_id);
+			 port->id);
 
 	return ret;
 }

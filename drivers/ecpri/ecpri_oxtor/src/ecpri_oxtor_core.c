@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: GPL-2.0-only
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/fs.h>
@@ -138,8 +138,7 @@ static int ecpri_oxtor_core_init(void)
 
 	/* Initialize ecpriss_oxtor_hal_ctx */
 
-	ecpriss_oxtor_hal_ctx_init();
-
+	ecpriss_oxtor_hal_ctx_init(ecpri_oxtor_core_cntxt.hw_ver);
 
 	core_cntxt_ptr->xu_id = ECPRI_OXTOR_XU_ID_DEFAULT;
 
@@ -147,6 +146,7 @@ static int ecpri_oxtor_core_init(void)
 	core_cntxt_ptr->rx_ring_cntxt_ptr = &ecpri_oxtor_rx_ring_cnxt;
 
 	core_cntxt_ptr->init = true;
+
 
 	return 0;
 }
@@ -179,6 +179,15 @@ static int ecpri_oxtor_init(struct platform_device *pdev)
 			pr_err("Ioctl init failed\n");
 			break;
 		}
+
+		ret = of_property_read_u32(pdev->dev.of_node, "qcom,ecpri-oxtor-hw-ver",
+				      &ecpri_oxtor_core_cntxt.hw_ver);
+		if(ret < 0) {
+			pr_err("Reading HW Version Failed\n");
+			break;
+		}
+
+		pr_err("ecpri_oxtor: HW Ver %d\n",ecpri_oxtor_core_cntxt.hw_ver);
 
 		ret = ecpri_oxtor_core_init();
 		if(ret < 0) {

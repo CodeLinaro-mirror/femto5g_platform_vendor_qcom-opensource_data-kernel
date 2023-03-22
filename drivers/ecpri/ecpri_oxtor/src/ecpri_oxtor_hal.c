@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: GPL-2.0-only
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/atomic.h>
@@ -94,17 +94,25 @@ static int ecpri_oxtor_global_cfg_init(void) {
 	return 0;
 }
 
-int ecpriss_oxtor_hal_ctx_init(void) {
+int ecpriss_oxtor_hal_ctx_init(int hw_ver) {
 	ecpriss_oxtor_hal_ctx.hw_type = ECPRISS_OXTOR_HW_v1_0;
 	/* ecpriss_oxtor_hal_ctx.base = ECPRI_ORAN_XTOR_REG_BASE; */
 	/* Need to do ioremap and also need to take care of */
 	/* ECPRI_GLOBAL_XTOR_CFG TODO: Mayank*/
 
-	ecpriss_oxtor_hal_ctx.phy_base = ECPRI_OXTOR_BASE;
+	if(hw_ver == ECPRISS_OXTOR_HW_v1_0){
+		ecpriss_oxtor_hal_ctx.phy_base = ECPRI_OXTOR_BASE;
+	}else {
+		ecpriss_oxtor_hal_ctx.phy_base = ECPRI_OXTOR_BASE_V2;
+	}
 	ecpriss_oxtor_hal_ctx.base =
 		ioremap(ecpriss_oxtor_hal_ctx.phy_base, ECPRI_OXTOR_BASE_SIZE);
 
-	ecpriss_oxtor_hal_ctx.phy_global_base = ECPRI_OXTOR_GLOBAL_BASE;
+	if(hw_ver == ECPRISS_OXTOR_HW_v1_0){
+		ecpriss_oxtor_hal_ctx.phy_global_base = ECPRI_OXTOR_GLOBAL_BASE;
+	}else{
+		ecpriss_oxtor_hal_ctx.phy_global_base = ECPRI_OXTOR_GLOBAL_BASE_V2;
+	}
 	ecpriss_oxtor_hal_ctx.global_base =
 		ioremap(ecpriss_oxtor_hal_ctx.phy_global_base,
 				ECPRI_OXTOR_GLOBAL_BASE_SIZE);

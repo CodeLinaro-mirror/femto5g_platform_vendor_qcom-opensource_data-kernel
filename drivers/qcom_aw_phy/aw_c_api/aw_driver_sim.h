@@ -35,7 +35,6 @@ int serdes_init(mss_access_t *mss, uint32_t lane_offset,
 void write_csr(void __iomem *addr, uint32_t wdata);
 void read_csr(void __iomem *addr, uint32_t *rdata);
 int delay_us(int x);
-void simple_print(const char *fmt, ...);
 int c_test_api_write(void);
 int c_test_api_read(void);
 int pmd_set_lane(mss_access_t *mss, uint32_t lane);

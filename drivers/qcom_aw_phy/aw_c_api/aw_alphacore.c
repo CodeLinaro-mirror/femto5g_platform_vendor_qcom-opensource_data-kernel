@@ -1772,7 +1772,7 @@ int aw_pmd_iso_request_cmn_state_change(mss_access_t *mss,
   if (poll_result == -1) {
     USR_PRINTF("ERROR: polling for CMN state ack\n");
   } else {
-    USR_PRINTF("CMN state ack received\n");
+    USR_PRINTF_DBG("CMN state ack received\n");
   }
   aw_pmd_iso_cmn_state_req_set(mss, 0);
   if (poll_result == -1) {
@@ -1802,7 +1802,7 @@ int aw_pmd_iso_request_tx_state_change(mss_access_t *mss, aw_pstate_t tx_pstate,
   if (poll_result == -1) {
     USR_PRINTF("ERROR: polling for TX state ack\n");
   } else {
-    USR_PRINTF("TX state ack received\n");
+    USR_PRINTF_DBG("TX state ack received\n");
   }
 
   aw_pmd_iso_tx_state_req_set(mss, 0);
@@ -1834,7 +1834,7 @@ int aw_pmd_iso_request_rx_state_change(mss_access_t *mss, aw_pstate_t rx_pstate,
   if (poll_result == -1) {
     USR_PRINTF("ERROR: polling for RX state ack\n");
   } else {
-    USR_PRINTF("RX state ack received\n");
+    USR_PRINTF_DBG("RX state ack received\n");
   }
 
   aw_pmd_iso_rx_state_req_set(mss, 0);
@@ -1854,11 +1854,11 @@ int aw_pmd_rx_check_cdr_lock(mss_access_t *mss, uint32_t timeout_us) {
                                1, timeout_us);
 
   if (poll_result == -1) {
-    //USR_PRINTF("ERROR: RX CDR timed out waiting for lock\n");
+    USR_PRINTF_DBG("ERROR: RX CDR timed out waiting for lock\n");
     return AW_ERR_CODE_POLL_TIMEOUT;
 
   } else {
-    //USR_PRINTF("RX CDR is locked\n");
+    USR_PRINTF_DBG("RX CDR is locked\n");
     return AW_ERR_CODE_NONE;
   }
 }
@@ -2019,14 +2019,14 @@ int aw_pmd_rx_equalize(mss_access_t *mss, aw_eq_type_t eq_type,
   uint32_t incdec;
 
   aw_pmd_eqeval_type_set(mss, eq_type);
-  //aw_pmd_rxeq_prbs_set(mss, 1);
+  aw_pmd_rxeq_prbs_set(mss, 1);
   aw_pmd_eqeval_req_set(mss, 1);
   poll_result = pmd_poll_field(
       mss, DIG_SOC_LANE_STAT_REG1_ADDR,
       DIG_SOC_LANE_STAT_REG1_OCTL_RX_LINKEVAL_ACK_MASK,
       DIG_SOC_LANE_STAT_REG1_OCTL_RX_LINKEVAL_ACK_OFFSET, 1, timeout_us);
   if (poll_result == -1) {
-    USR_PRINTF("ERROR: Timed out waiting for asserting rx linkeval ack\n");
+    USR_PRINTF_DBG("ERROR: Timed out waiting for asserting rx linkeval ack\n");
     return AW_ERR_CODE_POLL_TIMEOUT;
   }
   aw_pmd_eqeval_req_set(mss, 0);
@@ -2037,11 +2037,11 @@ int aw_pmd_rx_equalize(mss_access_t *mss, aw_eq_type_t eq_type,
                      DIG_SOC_LANE_STAT_REG1_OCTL_RX_LINKEVAL_ACK_OFFSET, 0, 10);
 
   if (poll_result == -1) {
-    USR_PRINTF("ERROR: Timed out waiting for rx linkeval ack\n");
+    USR_PRINTF_DBG("ERROR: Timed out waiting for rx linkeval ack\n");
     return AW_ERR_CODE_POLL_TIMEOUT;
   } else {
     aw_pmd_eqeval_incdec_get(mss, &incdec);
-    USR_PRINTF("Received RXEQ EVAL Ack, EqEval incdec = 0x%X\n", incdec);
+    USR_PRINTF_DBG("Received RXEQ EVAL Ack, EqEval incdec = 0x%X\n", incdec);
     return AW_ERR_CODE_NONE;
   }
 }

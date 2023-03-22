@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: GPL-2.0-only
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include "ecpriss_core.h"
@@ -114,7 +114,7 @@ void ecpriss_netlink_receive_netlink_message(struct sk_buff *skb)
 	return;
 }
 
-int ecpriss_netlink_socket_create()
+int ecpriss_netlink_socket_create(void)
 {
 	struct netlink_kernel_cfg config = {
 		.input = ecpriss_netlink_receive_netlink_message,
@@ -126,3 +126,16 @@ int ecpriss_netlink_socket_create()
 	}
 	return 0;
 }
+int ecpriss_netlink_socket_create_v2(void)
+{
+	struct netlink_kernel_cfg config = {
+		.input = ecpriss_netlink_receive_netlink_message,
+	};
+	ecpriss_pdata_v2->netlink_socket =
+		netlink_kernel_create(&init_net, NETLINK_ECPRI, &config);
+	if (ecpriss_pdata_v2->netlink_socket == NULL) {
+		return -1;
+	}
+	return 0;
+}
+

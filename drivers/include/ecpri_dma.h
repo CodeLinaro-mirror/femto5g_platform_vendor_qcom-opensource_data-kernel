@@ -217,6 +217,82 @@ struct ecpri_dma_pkt_completion_wrapper {
 	enum ecpri_dma_completion_code comp_code;
 };
 
+/**
+ * Packet pre-header stucture
+ *
+ * @l2_index: L2 Index used by the UDP logic to add the L2 Header to the
+ *	 		  nFAPI Tx Packets
+ *
+ * @l3_index: L3 Index used by the UDP logic to add the L3 Header to the
+ * 			  nFAPI Tx Packets
+ *
+ * @l2_index_valid: L2 Index valid. If not set, it is assumed SW prepended this
+ *					field to the data.
+ *
+ * @l3_index_valid: L3 Index valid. If not set, it is assumed SW prepended this
+ *					 field to the data.
+ *
+ * @l2_index_source: If set, use L2 Index and Valid from Header. If not, use L2 Index
+ *					 and Valid from Channel Configuration.
+ *
+ * @l3_index_source:1; If set, use L3 Index and Valid from Header. If not, use L3
+ *  				   Index and Valid from Channel Configuration.
+ *
+ * @vport: VPORT field to be used by MACSEC.
+ *
+ * @action: Action to perform by MACSEC Core
+ *
+ * @vport_valid: Valid bit for fields {VPORT, Action}. If not set, user CSR
+ *				 registers values
+ *
+ * @timestamp_packet: If set, Ethernet TX logic shall generate a Timestamp when packet
+ *  				   is transmitted. Timestamp shall be returned via PTP RX
+ * 					   Timestamp FIFO.
+ *
+ * @timestamp_tag: Use to Tag Timestamp in PTP Rx FIFO.
+ *
+ * @link_id: Physical Ethernet Link to send this packet.
+ *
+ * @port_id: Physical Ethernet Port to send this packet. For nFAPI packets,
+ * 			 this field should be set to “0x2”.
+ *
+ * @link_id_port_id_valid: Valid bit for LinkID/PortID field. If Valid bit == 0, use
+ * 						   LinkID/PortID from Channel Configuration. For nFAPI packets,
+ *	 					   this bit should be set to “1”.
+ *
+ * @destination_channel: If the packet is sent from a Channel configured in Loopback
+ *						 mode, the packet is sent to a predefined (CSR) physical
+ *						 link and looped back to the Destination Channel
+ *						 (along with the GSI_ID).
+ *
+ *	@gsi_id: If the packet is sent from a Channel configured in
+ * 		     Loopback mode, the packet is sent to a predefined (CSR) physical
+ *			 link and looped back to the GSI_ID
+ *			 (along with the Destination Channel).
+ */
+struct ecpri_dma_tx_header
+{
+	u32 l2_index : 9;
+	u32 l3_index : 9;
+	u32 l2_index_valid : 1;
+	u32 l3_index_valid : 1;
+	u32 l2_index_source : 1;
+	u32 l3_index_source : 1;
+	u32 vport : 8;
+	u32 action : 2;
+	u32 vport_valid : 1;
+	u32 timestamp_packet : 1;
+	u32 timestamp_tag : 3;
+	u32 reserved : 1;
+	u32 link_id : 2;
+	u32 port_id : 2;
+	u32 link_id_port_id_valid : 1;
+	u32 reserved_1 : 5;
+	u32 destination_channel : 8;
+	u32 gsi_id : 2;
+	u32 reserved_2 : 6;
+};
+
 typedef void (*ecpri_dma_ready_cb)(void *user_data);
 
 /* Architecture API functions */

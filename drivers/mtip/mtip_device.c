@@ -1,6 +1,6 @@
 //SPDX-License-Identifier: GPL-2.0-only
 /*
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  */ 
 
 #include <linux/init.h>
@@ -534,12 +534,14 @@ static int mtip_start_xmit(struct sk_buff *skb, struct net_device *netdev)
    int ret;
    ecpri_dma_eth_conn_hdl_t other_hdl;
    u32 other_link_index;
+   struct mtip_security_device *sec_dev;
 
    CSMLOGDBG("mtip_start_xmit called\n");
 
    priv = netdev_priv(netdev);
    link_index = priv->link_index;
    hdl = platform_driver_priv->mtip_links[link_index]->dma_hdl;
+   sec_dev = priv->sec_dev;
 
    if(priv->link_index == MTIP_DEBUG_ETH_LINK_INDEX){
       return mtip_debug_eth_start_xmit(skb, netdev);
@@ -633,6 +635,14 @@ static int mtip_start_xmit(struct sk_buff *skb, struct net_device *netdev)
 
        // set the flag to in progress
        skb_shinfo(skb)->tx_flags |= SKBTX_IN_PROGRESS;
+   }
+
+   if (sec_dev && sec_dev->ops && sec_dev->ops->fixup_tx_skb) {
+      if (sec_dev->ops->fixup_tx_skb(skb)) {
+         ++(platform_driver_priv->mtip_links[link_index]->net_stats.tx_errors);
+         dev_kfree_skb(skb);
+         return NETDEV_TX_OK;
+      }
    }
 
    ret = mtip_dma_send_packet(netdev, hdl, skb);

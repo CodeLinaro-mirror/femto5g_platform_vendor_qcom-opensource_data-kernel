@@ -177,8 +177,12 @@ void qcom_aw_phy_an_complete_cb(enum mtip_port_type_enum port_type,
                       lane_num);
 }
 
-void qcom_aw_phy_cdr_lock_cb(u32 link_index, bool status) {
+void qcom_aw_phy_cdr_lock_ind(u32 link_index, bool status) {
   QCOM_AW_PHY_LOG_ERR("CDR lock for link_index %d, status", link_index, status);
+}
+
+void qcom_aw_phy_lane_bring_up_progress_ind(u32 link_index, bool in_progress) {
+  QCOM_AW_PHY_LOG_ERR("Lane bring up in progress: %d for link index %d", in_progress, link_index);
 }
 ssize_t qcom_aw_phy_get_prbs_result(struct file *file, char __user *buf,
                                     size_t count, loff_t *ppos){
@@ -195,8 +199,14 @@ ssize_t qcom_aw_phy_get_prbs_result(struct file *file, char __user *buf,
   }
 
   if(check_prbs_all_lanes == false){
-    min_port = rx_bist_phy_inst;
-    max_port = rx_bist_phy_inst;
+    if(rx_bist_phy_inst <= QCOM_AW_PHY_INST_FH2){
+      min_port = rx_bist_phy_inst;
+      max_port = rx_bist_phy_inst;
+    }
+    else{
+      min_port = QCOM_AW_PHY_INST_FH0;
+      max_port = QCOM_AW_PHY_INST_FH0;
+    }
   }
   else{
     min_port = QCOM_AW_PHY_INST_FH0;
@@ -262,7 +272,8 @@ ssize_t qcom_aw_phy_set_attr(struct file *file, const char __user *buf,
       ready_info.notify_ready = qcom_aw_phy_ready_cb;
       ready_info.userdata_ready = NULL;
       ready_info.notify_an_complete = qcom_aw_phy_an_complete_cb;
-      ready_info.cdr_lock_cb = qcom_aw_phy_cdr_lock_cb;
+      ready_info.cdr_lock_ind = qcom_aw_phy_cdr_lock_ind;
+      ready_info.lane_bring_up_progress_ind = qcom_aw_phy_lane_bring_up_progress_ind;
       qcom_aw_phy_driver_iface_ops.eth_phy_iface_eth_register(&ready_info,
                                                               &is_phy_ready);
       QCOM_AW_PHY_LOG_ERR("is_phy_ready %d", is_phy_ready);

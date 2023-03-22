@@ -835,7 +835,7 @@ static void mtip_mac_wrapper_set_csr_cfg(struct mtip_port_device_info* port_devi
         break;
     case MTIP_PORT_CONFIG_1x10GBASE_R:
         {
-            csr_cfg |= 0xc000;
+            csr_cfg |= 0x0;
         }
         break;
     case MTIP_PORT_CONFIG_1x10GBASE_R_FEC:
@@ -1334,7 +1334,7 @@ void mtip_mac_wrapper_register_irq(struct device *dev, unsigned int irq,
 
    CSMLOGINFO("Registering IRQ %d, %s for MAC Wrapper\n", irq, dev_name);
 
-   irqret = devm_request_irq(dev, irq, (irq_handler_t)mtip_mac_interrupt_handler, IRQF_SHARED | IRQF_TRIGGER_HIGH, dev_name, devptr);
+   irqret = devm_request_irq(dev, irq, (irq_handler_t)mtip_mac_interrupt_handler, IRQF_SHARED | IRQF_TRIGGER_HIGH | IRQF_ONESHOT, dev_name, devptr);
    if (irqret) {
        CSMLOGERR("failed to register IRQ handler irq=%d\n", irq);
        return;
@@ -1366,8 +1366,6 @@ void mtip_mac_set_interrupt_mask(u32 link_index)
 
     // set the interrupts we are interested in
     write_val  =  MTIP_MAC_INTERRUPT_PTP_TX_INTR;
-    write_val |= MTIP_MAC_INTERRUPT_LINK_DOWN_INTR;
-    write_val |= MTIP_MAC_INTERRUPT_LINK_UP_INTR;
 
     CSMLOGINFO("Setting mask: 0x%x to register 0x%x with real_link_number %d link_index %d\n", write_val, 
                real_link_number*MTIP_MAC_WRAPPER_INTERRUPT_OFFSET + MTIP_MAC_WRAPPER_INTERRUPT_MASK_REG_OFFSET, real_link_number, link_index);
@@ -1391,6 +1389,60 @@ void mtip_mac_clear_interrupt_mask(u32 link_index)
     mtip_lookup_real_link_number_by_link_index(link_index, &real_link_number);
 
     wrapper_base_addr = platform_driver_priv->devices.port_devices[port_device_index].wrapper_base_addr;
+
+    CSMLOGINFO("Setting mask: 0x%x to register 0x%x with real_link_number %d link_index %d\n", write_val, 
+               real_link_number*MTIP_MAC_WRAPPER_INTERRUPT_OFFSET + MTIP_MAC_WRAPPER_INTERRUPT_MASK_REG_OFFSET, real_link_number, link_index);
+
+    // Enable MAC interrupt
+    iowrite32(write_val,
+              wrapper_base_addr + real_link_number*MTIP_MAC_WRAPPER_INTERRUPT_OFFSET + MTIP_MAC_WRAPPER_INTERRUPT_MASK_REG_OFFSET);
+    return;
+}
+
+void mtip_mac_set_link_status_interrupt_mask(u32 link_index)
+{
+    u32 write_val = 0;
+    void __iomem *wrapper_base_addr;
+    u32 port_device_index;
+    u32 link_device_index;
+    u32 real_link_number;
+
+    mtip_lookup_device_by_link_index(link_index, &port_device_index, &link_device_index);
+
+    mtip_lookup_real_link_number_by_link_index(link_index, &real_link_number);
+
+    wrapper_base_addr = platform_driver_priv->devices.port_devices[port_device_index].wrapper_base_addr;
+
+    write_val  =  mtip_mac_get_interrupt_mask(link_index);
+    write_val |= MTIP_MAC_INTERRUPT_LINK_DOWN_INTR;
+    write_val |= MTIP_MAC_INTERRUPT_LINK_UP_INTR;
+
+    CSMLOGINFO("Setting mask: 0x%x to register 0x%x with real_link_number %d link_index %d\n", write_val, 
+               real_link_number*MTIP_MAC_WRAPPER_INTERRUPT_OFFSET + MTIP_MAC_WRAPPER_INTERRUPT_MASK_REG_OFFSET, real_link_number, link_index);
+
+    // Enable MAC interrupt
+    iowrite32(write_val,
+              wrapper_base_addr + real_link_number*MTIP_MAC_WRAPPER_INTERRUPT_OFFSET + MTIP_MAC_WRAPPER_INTERRUPT_MASK_REG_OFFSET);
+    return;
+}
+
+void mtip_mac_clear_link_status_interrupt_mask(u32 link_index)
+{
+    u32 write_val = 0;
+    void __iomem *wrapper_base_addr;
+    u32 port_device_index;
+    u32 link_device_index;
+    u32 real_link_number;
+
+    mtip_lookup_device_by_link_index(link_index, &port_device_index, &link_device_index);
+
+    mtip_lookup_real_link_number_by_link_index(link_index, &real_link_number);
+
+    wrapper_base_addr = platform_driver_priv->devices.port_devices[port_device_index].wrapper_base_addr;
+
+    write_val  =  mtip_mac_get_interrupt_mask(link_index);
+    write_val &= (~MTIP_MAC_INTERRUPT_LINK_DOWN_INTR);
+    write_val &= (~MTIP_MAC_INTERRUPT_LINK_UP_INTR);
 
     CSMLOGINFO("Setting mask: 0x%x to register 0x%x with real_link_number %d link_index %d\n", write_val, 
                real_link_number*MTIP_MAC_WRAPPER_INTERRUPT_OFFSET + MTIP_MAC_WRAPPER_INTERRUPT_MASK_REG_OFFSET, real_link_number, link_index);

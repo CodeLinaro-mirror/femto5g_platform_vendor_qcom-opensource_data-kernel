@@ -50,6 +50,8 @@
 #include "ecpri_dma_reg_dump.h"
 
 #define ECPRI_DMA_EXCEPTION_MAX_INITIAL_CREDITS (20)
+#define ECPRI_DMA_GSI_CHANNEL_STOP_SLEEP_MIN_USEC (3000)
+#define ECPRI_DMA_GSI_CHANNEL_STOP_SLEEP_MAX_USEC (5000)
 
 int ecpri_dma_plat_drv_probe(struct platform_device *pdev_p);
 
@@ -636,6 +638,10 @@ int ecpri_dma_stop_endp(struct ecpri_dma_endp_context *endp_cfg)
 			endp_cfg->endp_id, endp_cfg->gsi_id, ret);
 		return ret;
 	}
+
+	/* sleep for short period to flush DMA */
+	usleep_range(ECPRI_DMA_GSI_CHANNEL_STOP_SLEEP_MIN_USEC,
+		ECPRI_DMA_GSI_CHANNEL_STOP_SLEEP_MAX_USEC);
 
 	return ret;
 }

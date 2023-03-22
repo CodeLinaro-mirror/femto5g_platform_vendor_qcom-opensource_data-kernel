@@ -1,6 +1,6 @@
 /*
  * SPDX-License-Identifier: GPL-2.0-only
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/dmapool.h>
@@ -17,26 +17,6 @@
 
 #define ECPRI_DMA_DP_EXCEPTION_BUDGET (5)
 #define ECPRI_DMA_DP_EXCEPTION_BUFF_SIZE (1500)
-
-void ecpri_dma_dp_gsi_evt_ring_err_cb(struct gsi_evt_err_notify *notify)
-{
-	switch (notify->evt_id) {
-	case GSI_EVT_OUT_OF_BUFFERS_ERR:
-		DMAERR("Got GSI_EVT_OUT_OF_BUFFERS_ERR\n");
-		break;
-	case GSI_EVT_OUT_OF_RESOURCES_ERR:
-		DMAERR("Got GSI_EVT_OUT_OF_RESOURCES_ERR\n");
-		break;
-	case GSI_EVT_UNSUPPORTED_INTER_EE_OP_ERR:
-		DMAERR("Got GSI_EVT_UNSUPPORTED_INTER_EE_OP_ERR\n");
-		break;
-	case GSI_EVT_EVT_RING_EMPTY_ERR:
-		DMAERR("Got GSI_EVT_EVT_RING_EMPTY_ERR\n");
-		break;
-	default:
-		DMAERR("Unexpected err evt: %d\n", notify->evt_id);
-	}
-}
 
 int ecpri_dma_dp_exception_replenish(struct ecpri_dma_endp_context *endp,
 				  u32 num_to_replenish)

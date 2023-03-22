@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: GPL-2.0-only
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #ifndef ECPRISS_CORE_H_
@@ -23,7 +23,6 @@
 #include <linux/fs.h>
 #include <linux/interrupt.h>
 #include <linux/clk.h>
-
 #include "ecpri_dma_ecpri_ss.h"
 #include "eth_ecpriss_iface.h"
 #include "ecpriss_xbar.h"
@@ -182,11 +181,35 @@ typedef struct ecpriss_core_private_s {
 	ecpriss_xbar_ctx_s                   *xbar_ctx;
 	ecpriss_config_stats_s                cfg_stats;
 	ecpri_stats_timer_params_s            stats_timer_info;
+	ecpriss_hw_name_e                     ecpri_hw_ver;
 	struct mutex                          ecpriss_mutex_lock;
 	spinlock_t                            irq_lock;
 } ecpriss_core_private_s;
 
+typedef struct ecpriss_core_private_s_v2 {
+	ecpriss_core_state_e                  ecpri_state;
+	ecpriss_core_callback_flags_s        *callback_flag;
+	uint32_t                              user_pid;
+	struct sock                          *netlink_socket;
+	struct ecpri_dma_endp_mapping        *dma_endp;
+	eth_ecpriss_topology_root_s          *eth_topology_params;
+	void                                 *ecpriss_core_logbuf;
+	ecpri_events_workqueue_params_s      *events_workqueue;
+	ecpri_interrupt_workqueue_params_s   *interrupts_workqueue;
+	eth_ecpriss_topology_ready_cb        *ready_cb;
+	ecpriss_dev_mode_e                    dev_mode;
+	ecpriss_qudp_ctx_s_v2                *qudp_ctx_v2;
+	ecpriss_xbar_ctx_s_v2                *xbar_ctx_v2;
+	ecpriss_config_stats_s_v2             cfg_stats_v2;
+	ecpri_stats_timer_params_s            stats_timer_info;
+	ecpriss_hw_name_e                     ecpri_hw_ver;
+	struct mutex                          ecpriss_mutex_lock;
+	spinlock_t                            irq_lock;
+} ecpriss_core_private_s_v2;
+
+
 extern ecpriss_core_private_s *ecpriss_pdata;
+extern ecpriss_core_private_s_v2 *ecpriss_pdata_v2;
 extern ecpriss_xbar_ctx_s     xbar_ctx_g;
 extern ecpriss_qudp_ctx_s     qudp_ctx_g;
 
@@ -196,8 +219,11 @@ void ecpriss_dma_event_processing_wq(struct work_struct *work);
 void ecpriss_eth_topology_init_wq(struct work_struct *work);
 void ecpriss_interrupt_events_processing_wq(struct work_struct *work);
 int ecpriss_stats_timer_enable(int timeout);
+int ecpriss_stats_timer_enable_v2(int timeout);
 int ecpriss_stats_timer_interrupt_create(void);
+int ecpriss_stats_timer_interrupt_create_v2(void);
 void ecpriss_update_all_stats(void);
+void ecpriss_update_all_stats_v2(void);
 void ecpriss_core_set_stats_timeout_info(int val);
 int ecpriss_core_get_stats_timeout_info(void);
 #endif

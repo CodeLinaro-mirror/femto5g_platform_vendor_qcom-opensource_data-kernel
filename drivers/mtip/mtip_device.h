@@ -1,6 +1,6 @@
 //SPDX-License-Identifier: GPL-2.0-only
 /*
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  */ 
 
 #ifndef _MTIP_DEVICE_H
@@ -11,6 +11,8 @@
 #include <linux/mutex.h>
 #include <linux/phylink.h>
 
+#include "mtip_security.h"
+
 #include "ecpri_dma_eth.h"
 
 // the net device structure
@@ -20,6 +22,9 @@ struct mtip_netdev_priv {
    void __iomem           *mac_ioaddr;
    u64 hashtablebits;
    u32 priv_flags;
+
+   struct mtip_security_device *sec_dev;
+   void *sec_priv;
 
    // these are used only for RUMI E2E
    struct phy_device      *phydev;

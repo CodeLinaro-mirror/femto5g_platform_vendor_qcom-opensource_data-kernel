@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: GPL-2.0-only
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #ifndef ECPRISS_XBAR_HAL_H_
@@ -9,6 +9,8 @@
 #include "ecpriss_xbar_hwio.h"
 #include "ecpriss_xbar_hwio_def.h"
 
+#include "ecpriss_xbar_hwio_v2.h"
+#include "ecpriss_xbar_hwio_def_v2.h"
 
 /*
  * struct ipahal_context - HAL global context data
@@ -38,8 +40,18 @@ typedef struct ecpriss_xbar_hal_context {
 #define C2C_UL_TABLE_LUT_BASE_ADDRESS 0x9480000
 #define OC_RX_TABLE_LUT_BASE_ADDRESS  0x9540000
 
-#define ECPRISS_XBAR_REG_SIZE 0x8000
 #define ECPRISS_XBAR_LUT_SIZE 0x300000
+
+#define ECPRISS_XBAR_REG_SIZE 0x8000
+#define ECPRISS_XBAR_REG_BASE_ADDRESS_V2    0x9420000
+#define FH_TABLE_LUT_BASE_ADDRESS_V2     0x9500000
+#define C2C_TABLE_LUT_BASE_ADDRESS_V2    0x95C0000
+#define OC_RX_TABLE_LUT_BASE_ADDRESS_V2  0x9680000
+#define ECPRISS_XBAR_LUT_SIZE_V2 0x240000
+
+
+
+
 
 
 #define ECPRI_XBAR_XBAR_FH_RX_LUT_DMA_RING_ID_SHFT   		0
@@ -82,7 +94,8 @@ typedef struct ecpriss_xbar_lut_entries_table {
 
 typedef enum ecpriss_xbar_hw_name
 {
-	ECPRISS_XBAR_HW_v1_0,
+	ECPRISS_XBAR_HW_v1_0 = 1,
+	ECPRISS_XBAR_HW_v2_0,
 	ECPRISS_XBAR_HW_MAX
 }ecpriss_xbar_hw_name_e;
 
@@ -177,9 +190,62 @@ enum ecpriss_xbar_hal_reg_name {
 	ECPRI_XBAR_XBAR_DBG_OCRX_2_3_BUFF_WATERMARK,
 	ECPRI_XBAR_XBAR_DBG_OCTX_OC_0_1_BUFF_WATERMARK,
 	ECPRI_XBAR_XBAR_DBG_OCTX_OC_2_3_BUFF_WATERMARK,
-	ECPRI_XBAR_XBAR_MAX
-};
 
+
+	ECPRI_XBAR_CFG,
+	ECPRI_XBAR_LUT_STATUS,
+	ECPRI_XBAR_FLUSH,
+	ECPRI_XBAR_FHRX_MSG_TYPE_UPLANE_CFG,
+	ECPRI_XBAR_FHRX_MSG_TYPE_UPLANE_VALID,
+	ECPRI_XBAR_FHRX_MSG_TYPE_CPLANE_CFG,
+	ECPRI_XBAR_FHRX_MSG_TYPE_CPLANE_VALID,
+	ECPRI_XBAR_FHRX_MSG_TYPE_LUT_0,
+	ECPRI_XBAR_FHRX_MSG_TYPE_LUT_1,
+	ECPRI_XBAR_SW_IRQ_STATUS,
+	ECPRI_XBAR_SW_IRQ_MASK,
+	ECPRI_XBAR_SW_IRQ_CLR,
+	ECPRI_XBAR_LUT_XBAR_FHRX_m_LUT_n_V2,
+	ECPRI_XBAR_LUT_XBAR_C2CRX_m_LUT_n_V2,
+	ECPRI_XBAR_LUT_XBAR_OCRX_m_LUT_n_V2,
+
+	ECPRI_XBAR_DBG_FHRX_PKT_CNT_n,
+	ECPRI_XBAR_DBG_FHRX_DMA_PKT_CNT,
+	ECPRI_XBAR_DBG_FHRX_UC_PKT_CNT,
+	ECPRI_XBAR_DBG_FHRX_UC_ERR_PKT_CNT,
+	ECPRI_XBAR_DBG_FHRX_ERR_PKT_CNT,
+	ECPRI_XBAR_DBG_FHRX_OC_PKT_CNT,
+	ECPRI_XBAR_DBG_FHRX_C2C_PKT_CNT,
+	ECPRI_XBAR_DBG_FHTX_PKT_CNT_n,
+	ECPRI_XBAR_DBG_FHTX_C2C_PKT_OVF_DROP_CNT,
+	ECPRI_XBAR_DBG_FHTX_DMA_PKT_CNT,
+	ECPRI_XBAR_DBG_FHTX_UC_PKT_CNT,
+	ECPRI_XBAR_DBG_FHTX_C2C_PKT_CNT_n,
+	ECPRI_XBAR_DBG_FHTX_OC_PKT_CNT_n,
+
+
+	ECPRI_XBAR_DBG_C2CRX_PKT_CNT_n,
+	ECPRI_XBAR_DBG_C2CRX_DMA_PKT_CNT,
+	ECPRI_XBAR_DBG_C2CRX_ERR_PKT_CNT,
+	ECPRI_XBAR_DBG_C2CTX_PKT_CNT_n,
+	ECPRI_XBAR_DBG_C2CTX_FH_PKT_OVF_DROP_CNT,
+	ECPRI_XBAR_DBG_C2CTX_DMA_PKT_CNT,
+	ECPRI_XBAR_DBG_C2CRX_FH_PKT_CNT_n,
+	ECPRI_XBAR_DBG_C2CRX_OC_PKT_CNT_n,
+
+	ECPRI_XBAR_DBG_OCTX_C2C_PKT_DROP_CNT,
+	ECPRI_XBAR_DBG_OCTX_FH_PKT_DROP_CNT,
+	ECPRI_XBAR_DBG_OCTX_C2C_LEN_ERR_CNT,
+	ECPRI_XBAR_DBG_OCTX_FH_LEN_ERR_CNT,
+	ECPRI_XBAR_DBG_OCTX_PKT_CNT_n,
+	ECPRI_XBAR_DBG_OCRX_PKT_CNT_n,
+	ECPRI_XBAR_DBG_OCRX_FH_PKT_CNT_n,
+	ECPRI_XBAR_DBG_OCRX_C2C_PKT_CNT_n,
+
+	ECPRI_XBAR_LUT_XBAR_NFAPI_n,
+	ECPRI_XBAR_MAX
+
+
+};
 /*
  * struct ecpriss_hal_reg_obj - Register H/W information for specific
  * ECPRISS version
@@ -205,13 +271,7 @@ struct ecpriss_xbar_hal_reg_obj {
 	bool en_print;
 	u32 m_ofst;
 };
-
-
 extern ecpriss_xbar_hal_context_s     ecpriss_xbar_hal_ctx;
-/*
- * ecpriss_xbar_hal_read_reg_n() - Get n parameterized reg value
- */
-
 u32 ecpriss_xbar_hal_read_reg(ecpriss_xbar_hal_reg_type_e reg_type,
 		enum ecpriss_xbar_hal_reg_name reg);
 
@@ -233,10 +293,7 @@ u32 ecpriss_xbar_hal_read_reg_mn_fields(ecpriss_xbar_hal_reg_type_e reg_type,
 
 void ecpriss_xbar_hal_write_reg_n_fields(ecpriss_xbar_hal_reg_type_e reg_type,
 		enum ecpriss_xbar_hal_reg_name reg, u32 n, const void *fields);
-/*
- * ecpriss_xbar_hal_reg_name_str() - returns string that represent the register
- * @reg_name: [in] register name
- */
+
 const char *ecpriss_xbar_hal_reg_name_str(
 		enum ecpriss_xbar_hal_reg_name reg_name);
 
@@ -245,5 +302,5 @@ void ecpriss_xbar_hal_write_reg_mn_fields(ecpriss_xbar_hal_reg_type_e  reg_type,
 
 int ecpriss_xbar_hal_lut_reg_init(struct device *dev);
 
-int ecpriss_xbar_hal_reg_init(struct device *dev);
+int ecpriss_xbar_hal_reg_init(struct device *dev, ecpriss_xbar_hw_name_e hw_ver);
 #endif

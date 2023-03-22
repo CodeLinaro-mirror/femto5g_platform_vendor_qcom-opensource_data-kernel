@@ -36,16 +36,6 @@ int delay_us(int x) {
   return 0;
 }
 
-void simple_print(const char *fmt, ...) {
-  char str[200];
-  va_list args;
-
-  va_start(args, fmt);
-  vsnprintf(str, 200, fmt, args);
-  sv_print(str);
-  va_end(args);
-}
-
 int c_test_api_write(void) {
   uint32_t wval = 0x7FF;
   write_csr(0x00000000, wval);
@@ -371,7 +361,7 @@ int pmd_poll_field(mss_access_t *mss, uint32_t addr, uint32_t fld_mask,
     QCOM_AW_PHY_LOG_DBG("[pmd_poll_field]: Polling successful after %d us\n", i);
     return 0;
   } else {
-    QCOM_AW_PHY_LOG_ERR("[pmd_poll_field]: Polling timed out after %d us\n",
+    QCOM_AW_PHY_LOG_DBG("[pmd_poll_field]: Polling timed out after %d us\n",
                    timeout_us);
     return -1;
   }

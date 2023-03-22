@@ -1,7 +1,7 @@
 ﻿// SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2015-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #ifndef GSI_H
@@ -364,7 +364,7 @@ enum gsi_chan_err {
 	GSI_CHAN_OUT_OF_BUFFERS_ERR = 0x2,
 	GSI_CHAN_OUT_OF_RESOURCES_ERR = 0x3,
 	GSI_CHAN_UNSUPPORTED_INTER_EE_OP_ERR = 0x4,
-	GSI_CHAN_HWO_1_ERR = 0x5
+	GSI_CHAN_UNRECOGNIZED_PROTOCOL_ERR = 0x5
 };
 
 /**
@@ -800,8 +800,23 @@ struct __packed gsi_xfer_compl_evt {
     uint32_t resvd1		: 3;
     uint32_t code		: 8;  /* see gsi_chan_evt */
     uint32_t status		: 8;
-    uint32_t phys_port		: 4;
-    uint32_t resvd2		: 4;
+    uint32_t phys_port	: 4;
+    uint32_t redirected	: 1;
+    uint32_t resvd2		: 3;
+    uint32_t type		: 8;
+    uint32_t chid		: 8;
+};
+
+struct __packed gsi_redirected_xfer_compl_evt {
+    uint64_t xfer_ptr;
+    uint32_t len		: 21;
+    uint32_t resvd1		: 3;
+    uint32_t code		: 8;  /* see gsi_chan_evt */
+    uint32_t src_ch		: 6;
+    uint32_t src_gsi	: 2;
+    uint32_t phys_port	: 4;
+    uint32_t redirected	: 1;
+    uint32_t resvd2		: 3;
     uint32_t type		: 8;
     uint32_t chid		: 8;
 };
@@ -819,7 +834,7 @@ enum gsi_err_code {
 	GSI_UNSUPPORTED_INTER_EE_OP_ERR = 0x4,
 	GSI_EVT_RING_EMPTY_ERR = 0x5,
 	GSI_NON_ALLOCATED_EVT_ACCESS_ERR = 0x6,
-	GSI_HWO_1_ERR = 0x8
+	GSI_UNRECOGNIZED_PROTOCOL_ERR = 0x8
 };
 
 struct __packed gsi_log_err {

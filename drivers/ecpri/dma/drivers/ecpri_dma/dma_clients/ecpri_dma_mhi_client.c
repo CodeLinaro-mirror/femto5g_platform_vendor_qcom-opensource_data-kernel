@@ -1239,6 +1239,11 @@ static int ecpri_dma_mhi_memcpy_init(struct mhi_dma_function_params function)
 		return -EPERM;
 	}
 
+	/* Starting from V2 only PF has memcpy */
+	if (ecpri_dma_get_ctx_hw_ver() != ECPRI_HW_V1_0) {
+		function.function_type = MHI_DMA_FUNCTION_TYPE_PHYSICAL;
+	}
+
 	/* Get the index of VM/PF */
 	ret = ecpri_dma_mhi_get_function_context_index(
 		function, &idx, ECPRI_DMA_MHI_DMA_MEMCPY_CTX);
