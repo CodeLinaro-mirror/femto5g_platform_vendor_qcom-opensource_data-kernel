@@ -18,6 +18,8 @@ struct eip_datapath {
 
 struct eip_port {
 	int id;
+	void __iomem *base_addr;
+	u32 num_active_links;
 
 	struct eip_datapath rx;
 	struct eip_datapath tx;
