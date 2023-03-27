@@ -1170,8 +1170,8 @@ void ecpriss_update_all_stats(void)
 			ecpriss_qudp_fh_ingress_stats_update(fh,link);
 			ecpriss_qudp_fh_egress_stats_update(fh,link);
 		}
-		ecpriss_xbar_stats_update();
 	}
+	ecpriss_xbar_stats_update();
 }
 void ecpriss_update_all_stats_v2(void)
 {
@@ -1184,8 +1184,8 @@ void ecpriss_update_all_stats_v2(void)
 			ecpriss_qudp_fh_ingress_stats_update_v2(fh,link);
 			ecpriss_qudp_fh_egress_stats_update_v2(fh,link);
 		}
-		ecpriss_xbar_stats_update_v2();
 	}
+	ecpriss_xbar_stats_update_v2();
 }
 
 

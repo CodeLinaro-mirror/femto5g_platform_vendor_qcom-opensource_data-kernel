@@ -153,6 +153,10 @@ void ecpriss_xbar_stats_update(void)
 		ECPRILOGDBG("ECPRI_XBAR_XBAR_DBG_C2CTX_PKT_CNT_n val = %d link_index = %d\n",val,link_index);
 		ecpriss_pdata->xbar_ctx->stats.xbar_c2ctx_pkt_cnt[link_index] += val;
 
+
+	}
+	for(link_index=0; link_index < NUM_OF_FHP; link_index++) {
+
 		val = ecpriss_xbar_hal_read_reg_n(ECPRISS_XBAR_GLOBAL,ECPRI_XBAR_XBAR_DBG_OCRX_UNKNOWN_PCID_INFO_1_n,link_index);
 		ECPRILOGDBG("ECPRI_XBAR_XBAR_DBG_OCRX_UNKNOWN_PCID_INFO_1_n val = %d link_index = %d\n",val,link_index);
 		ecpriss_pdata->xbar_ctx->stats.ocrx_unknown_pcid_info_1_n[link_index] += val;
@@ -168,8 +172,8 @@ void ecpriss_xbar_stats_update(void)
 		val = ecpriss_xbar_hal_read_reg_n(ECPRISS_XBAR_GLOBAL,ECPRI_XBAR_XBAR_DBG_FHRX_UNKNOWN_PCID_INFO_2_n,link_index);
 		ECPRILOGDBG("ECPRI_XBAR_XBAR_DBG_FHRX_UNKNOWN_PCID_INFO_2_n val = %d link_index = %d\n",val,link_index);
 		ecpriss_pdata->xbar_ctx->stats.fhrx_unknown_pcid_info_2_n[link_index] += val;
-
 	}
+
 	for(link_index=0; link_index < XBAR_LINKS; link_index++) {
 
 		val = ecpriss_xbar_hal_read_reg_n(ECPRISS_XBAR_GLOBAL, ECPRI_XBAR_XBAR_DBG_OCTX_PKT_CNT_n,link_index);
@@ -333,25 +337,8 @@ void ecpriss_xbar_stats_update_v2(void)
 		val = ecpriss_xbar_hal_read_reg_n(ECPRISS_XBAR_GLOBAL,ECPRI_XBAR_DBG_OCRX_FH_PKT_CNT_n,link_index);
 		ECPRILOGDBG("ECPRI_XBAR_XBAR_DBG_OCRX_FH_PKT_CNT_n val = %d link_index = %d\n",val,link_index);
 		ecpriss_pdata_v2->xbar_ctx_v2->stats_v2.xbar_ocrx_fh_pkt_cnt[link_index] += val;
-
-		val = ecpriss_xbar_hal_read_reg_n(ECPRISS_XBAR_GLOBAL,ECPRI_XBAR_DBG_OCRX_UNKNOWN_PCID_INFO_1_n,link_index);
-                ECPRILOGDBG("ECPRI_XBAR_DBG_OCRX_UNKNOWN_PCID_INFO_1_n val = %d link_index = %d\n",val,link_index);
-                ecpriss_pdata_v2->xbar_ctx_v2->stats_v2.ocrx_unknown_pcid_info_1_n[link_index] = val;
-
-                val = ecpriss_xbar_hal_read_reg_n(ECPRISS_XBAR_GLOBAL,ECPRI_XBAR_DBG_OCRX_UNKNOWN_PCID_INFO_2_n,link_index);
-                ECPRILOGDBG("ECPRI_XBAR_DBG_OCRX_UNKNOWN_PCID_INFO_2_n val = %d link_index = %d\n",val,link_index);
-                ecpriss_pdata_v2->xbar_ctx_v2->stats_v2.ocrx_unknown_pcid_info_2_n[link_index] = val;
-
-                val = ecpriss_xbar_hal_read_reg_n(ECPRISS_XBAR_GLOBAL,ECPRI_XBAR_DBG_FHRX_UNKNOWN_PCID_INFO_1_n,link_index);
-                ECPRILOGDBG("ECPRI_XBAR_DBG_FHRX_UNKNOWN_PCID_INFO_1_n val = %d link_index = %d\n",val,link_index);
-                ecpriss_pdata_v2->xbar_ctx_v2->stats_v2.fhrx_unknown_pcid_info_1_n[link_index] = val;
-
-                val = ecpriss_xbar_hal_read_reg_n(ECPRISS_XBAR_GLOBAL,ECPRI_XBAR_DBG_FHRX_UNKNOWN_PCID_INFO_2_n,link_index);
-                ECPRILOGDBG("ECPRI_XBAR_DBG_FHRX_UNKNOWN_PCID_INFO_2_n val = %d link_index = %d\n",val,link_index);
-                ecpriss_pdata_v2->xbar_ctx_v2->stats_v2.fhrx_unknown_pcid_info_2_n[link_index] = val;
-
-
 	}
+
 	for(link_index=0; link_index < XBAR_LINKS; link_index++) {
 
 		val = ecpriss_xbar_hal_read_reg_n(ECPRISS_XBAR_GLOBAL, ECPRI_XBAR_DBG_OCTX_PKT_CNT_n,link_index);
@@ -378,6 +365,21 @@ void ecpriss_xbar_stats_update_v2(void)
 		ECPRILOGDBG("ECPRI_XBAR_XBAR_DBG_C2CTX_PKT_CNT_n val = %d link_index = %d\n",val,link_index);
 		ecpriss_pdata_v2->xbar_ctx_v2->stats_v2.xbar_ocrx_c2c_pkt_cnt[link_index] += val;
 
+		val = ecpriss_xbar_hal_read_reg_n(ECPRISS_XBAR_GLOBAL,ECPRI_XBAR_DBG_OCRX_UNKNOWN_PCID_INFO_1_n,link_index);
+                ECPRILOGDBG("ECPRI_XBAR_DBG_OCRX_UNKNOWN_PCID_INFO_1_n val = %d link_index = %d\n",val,link_index);
+                ecpriss_pdata_v2->xbar_ctx_v2->stats_v2.ocrx_unknown_pcid_info_1_n[link_index] = val;
+
+                val = ecpriss_xbar_hal_read_reg_n(ECPRISS_XBAR_GLOBAL,ECPRI_XBAR_DBG_OCRX_UNKNOWN_PCID_INFO_2_n,link_index);
+                ECPRILOGDBG("ECPRI_XBAR_DBG_OCRX_UNKNOWN_PCID_INFO_2_n val = %d link_index = %d\n",val,link_index);
+                ecpriss_pdata_v2->xbar_ctx_v2->stats_v2.ocrx_unknown_pcid_info_2_n[link_index] = val;
+
+                val = ecpriss_xbar_hal_read_reg_n(ECPRISS_XBAR_GLOBAL,ECPRI_XBAR_DBG_FHRX_UNKNOWN_PCID_INFO_1_n,link_index);
+                ECPRILOGDBG("ECPRI_XBAR_DBG_FHRX_UNKNOWN_PCID_INFO_1_n val = %d link_index = %d\n",val,link_index);
+                ecpriss_pdata_v2->xbar_ctx_v2->stats_v2.fhrx_unknown_pcid_info_1_n[link_index] = val;
+
+                val = ecpriss_xbar_hal_read_reg_n(ECPRISS_XBAR_GLOBAL,ECPRI_XBAR_DBG_FHRX_UNKNOWN_PCID_INFO_2_n,link_index);
+                ECPRILOGDBG("ECPRI_XBAR_DBG_FHRX_UNKNOWN_PCID_INFO_2_n val = %d link_index = %d\n",val,link_index);
+                ecpriss_pdata_v2->xbar_ctx_v2->stats_v2.fhrx_unknown_pcid_info_2_n[link_index] = val;
 
 	}
 	val = ecpriss_xbar_hal_read_reg(ECPRISS_XBAR_GLOBAL,ECPRI_XBAR_DBG_FHRX_DMA_PKT_CNT);
