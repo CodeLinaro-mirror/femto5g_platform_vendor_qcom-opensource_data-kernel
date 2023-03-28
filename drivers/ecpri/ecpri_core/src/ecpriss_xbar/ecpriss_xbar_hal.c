@@ -1202,6 +1202,117 @@ static void ecpriss_xbar_hal_reg_parse_xbar_flush_2(enum ecpriss_xbar_hal_reg_na
 	return;
 }
 
+	static void ecpriss_xbar_hal_reg_construct_xbar_flush_2
+(enum ecpriss_xbar_hal_reg_name reg, const void *fields, uint32_t* val)
+{
+	ecpri_xbar_hwio_def_ecpri_xbar_flush_s *xbar_flush
+		= (ecpri_xbar_hwio_def_ecpri_xbar_flush_s *)fields;
+
+	ECPRISS_HAL_SETFIELD_IN_REG(*val,
+			xbar_flush->flush_fh_0_tx,
+			HWIO_ECPRI_XBAR_FLUSH_FLUSH_FH_0_TX_SHFT,
+			HWIO_ECPRI_XBAR_FLUSH_FLUSH_FH_0_TX_BMSK);
+
+	ECPRISS_HAL_SETFIELD_IN_REG(*val,
+			xbar_flush->flush_fh_0_rx,
+			HWIO_ECPRI_XBAR_FLUSH_FLUSH_FH_0_RX_SHFT ,
+			HWIO_ECPRI_XBAR_FLUSH_FLUSH_FH_0_RX_BMSK);
+
+	ECPRISS_HAL_SETFIELD_IN_REG(*val,
+			xbar_flush->flush_fh_1_tx,
+			HWIO_ECPRI_XBAR_FLUSH_FLUSH_FH_1_TX_SHFT ,
+			HWIO_ECPRI_XBAR_FLUSH_FLUSH_FH_1_TX_BMSK );
+
+	ECPRISS_HAL_SETFIELD_IN_REG(*val,
+			xbar_flush->flush_fh_1_rx,
+			HWIO_ECPRI_XBAR_FLUSH_FLUSH_FH_1_RX_SHFT,
+			HWIO_ECPRI_XBAR_FLUSH_FLUSH_FH_1_RX_BMSK);
+
+	ECPRISS_HAL_SETFIELD_IN_REG(*val,
+			xbar_flush->flush_fh_2_tx,
+			HWIO_ECPRI_XBAR_FLUSH_FLUSH_FH_2_TX_SHFT,
+			HWIO_ECPRI_XBAR_FLUSH_FLUSH_FH_2_TX_BMSK);
+
+	ECPRISS_HAL_SETFIELD_IN_REG(*val,
+			xbar_flush->flush_fh_2_rx,
+			HWIO_ECPRI_XBAR_FLUSH_FLUSH_FH_2_RX_SHFT,
+			HWIO_ECPRI_XBAR_FLUSH_FLUSH_FH_2_RX_BMSK);
+
+
+	//C2C
+	ECPRISS_HAL_SETFIELD_IN_REG(*val,
+			xbar_flush->flush_c2c_0_tx,
+			HWIO_ECPRI_XBAR_FLUSH_FLUSH_C2C_0_TX_SHFT,
+			HWIO_ECPRI_XBAR_FLUSH_FLUSH_C2C_0_TX_BMSK);
+
+	ECPRISS_HAL_SETFIELD_IN_REG(*val,
+			xbar_flush->flush_c2c_0_rx,
+			HWIO_ECPRI_XBAR_FLUSH_FLUSH_C2C_0_RX_SHFT ,
+			HWIO_ECPRI_XBAR_FLUSH_FLUSH_C2C_0_RX_BMSK);
+
+	ECPRISS_HAL_SETFIELD_IN_REG(*val,
+			xbar_flush->flush_c2c_1_tx,
+			HWIO_ECPRI_XBAR_FLUSH_FLUSH_C2C_1_TX_SHFT ,
+			HWIO_ECPRI_XBAR_FLUSH_FLUSH_C2C_1_TX_BMSK );
+
+	ECPRISS_HAL_SETFIELD_IN_REG(*val,
+			xbar_flush->flush_c2c_1_rx,
+			HWIO_ECPRI_XBAR_FLUSH_FLUSH_C2C_1_RX_SHFT,
+			HWIO_ECPRI_XBAR_FLUSH_FLUSH_C2C_1_RX_BMSK);
+
+	ECPRISS_HAL_SETFIELD_IN_REG(*val,
+			xbar_flush->flush_c2c_2_tx,
+			HWIO_ECPRI_XBAR_FLUSH_FLUSH_C2C_2_TX_SHFT,
+			HWIO_ECPRI_XBAR_FLUSH_FLUSH_C2C_2_TX_BMSK);
+
+	ECPRISS_HAL_SETFIELD_IN_REG(*val,
+			xbar_flush->flush_c2c_2_rx,
+			HWIO_ECPRI_XBAR_FLUSH_FLUSH_C2C_2_RX_SHFT,
+			HWIO_ECPRI_XBAR_FLUSH_FLUSH_C2C_2_RX_BMSK);
+
+	//OC
+
+	ECPRISS_HAL_SETFIELD_IN_REG(*val,
+			xbar_flush->flush_oc_0_tx,
+			HWIO_ECPRI_XBAR_FLUSH_FLUSH_OC_0_TX_SHFT,
+			HWIO_ECPRI_XBAR_FLUSH_FLUSH_OC_0_TX_BMSK);
+
+	ECPRISS_HAL_SETFIELD_IN_REG(*val,
+			xbar_flush->flush_oc_0_rx,
+			HWIO_ECPRI_XBAR_FLUSH_FLUSH_OC_0_RX_SHFT ,
+			HWIO_ECPRI_XBAR_FLUSH_FLUSH_OC_0_RX_BMSK);
+
+	ECPRISS_HAL_SETFIELD_IN_REG(*val,
+			xbar_flush->flush_oc_1_tx,
+			HWIO_ECPRI_XBAR_FLUSH_FLUSH_OC_1_TX_SHFT ,
+			HWIO_ECPRI_XBAR_FLUSH_FLUSH_OC_1_TX_BMSK );
+
+	ECPRISS_HAL_SETFIELD_IN_REG(*val,
+			xbar_flush->flush_oc_1_rx,
+			HWIO_ECPRI_XBAR_FLUSH_FLUSH_OC_1_RX_SHFT,
+			HWIO_ECPRI_XBAR_FLUSH_FLUSH_OC_1_RX_BMSK);
+
+	ECPRISS_HAL_SETFIELD_IN_REG(*val,
+			xbar_flush->flush_oc_2_tx,
+			HWIO_ECPRI_XBAR_FLUSH_FLUSH_OC_2_TX_SHFT,
+			HWIO_ECPRI_XBAR_FLUSH_FLUSH_OC_2_TX_BMSK);
+
+	ECPRISS_HAL_SETFIELD_IN_REG(*val,
+			xbar_flush->flush_oc_2_rx,
+			HWIO_ECPRI_XBAR_FLUSH_FLUSH_OC_2_RX_SHFT,
+			HWIO_ECPRI_XBAR_FLUSH_FLUSH_OC_2_RX_BMSK);
+
+	ECPRISS_HAL_SETFIELD_IN_REG(*val,
+			xbar_flush->flush_oc_3_tx,
+			HWIO_ECPRI_XBAR_FLUSH_FLUSH_OC_3_TX_SHFT,
+			HWIO_ECPRI_XBAR_FLUSH_FLUSH_OC_3_TX_BMSK);
+
+	ECPRISS_HAL_SETFIELD_IN_REG(*val,
+			xbar_flush->flush_oc_3_rx,
+			HWIO_ECPRI_XBAR_FLUSH_FLUSH_OC_3_RX_SHFT,
+			HWIO_ECPRI_XBAR_FLUSH_FLUSH_OC_3_RX_BMSK);
+	return;
+}
 static void ecpriss_xbar_hal_reg_parse_lut_status(enum ecpriss_xbar_hal_reg_name reg, void *fields,
 		u32 val)
 {
@@ -1998,7 +2109,7 @@ static struct ecpriss_xbar_hal_reg_obj ecpriss_xbar_hal_reg_objs[ECPRISS_XBAR_HW
 		ecpriss_xbar_hal_reg_parse_lut_status_2,
 		0x09420000, 0x00000030, 0, 0, 0, 0, 0},
 	[ECPRISS_XBAR_HW_v2_0][ECPRI_XBAR_FLUSH] = {
-		ecpriss_xbar_hal_reg_construct_dummy_v2,
+		ecpriss_xbar_hal_reg_construct_xbar_flush_2,
 		ecpriss_xbar_hal_reg_parse_xbar_flush_2,
 		0x09420000, 0x0000001C, 0, 0, 0, 0, 0},
 	[ECPRISS_XBAR_HW_v2_0][ECPRI_XBAR_FHRX_MSG_TYPE_UPLANE_CFG] = {
