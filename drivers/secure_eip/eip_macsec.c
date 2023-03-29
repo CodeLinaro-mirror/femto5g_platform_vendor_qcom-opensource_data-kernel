@@ -1,7 +1,7 @@
 //SPDX-License-Identifier: GPL-2.0-only
 
 /*
-* Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+* Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
 */
 
 #include <net/macsec.h>
@@ -1120,7 +1120,8 @@ static int eip_macsec_channel_stop(bool fVerbose, bool fIngress,
 static int eip_macsec_egress_stats(bool fVerbose, unsigned int port_id,
 				   unsigned int channel,
 				   struct eip_macsec_stats *stats,
-				   enum stats_type stats_type)
+				   enum stats_type stats_type,
+				   struct macsec_context *ctx)
 {
 	SecY_Status_t SecY_Rc;
 	uint32_t link_id;
@@ -1182,22 +1183,35 @@ static int eip_macsec_egress_stats(bool fVerbose, unsigned int port_id,
 						SAStats.OutPktsTooLong.Lo,
 						SAStats.OutPktsTooLong.Hi);
 
-				stats->tx_sc_stats
-					.OutPktsProtected += STATS_2x32_TO_64(
-					SAStats.OutPktsEncryptedProtected.Lo,
-					SAStats.OutPktsEncryptedProtected.Hi);
-				stats->tx_sc_stats
-					.OutPktsEncrypted += STATS_2x32_TO_64(
-					SAStats.OutPktsEncryptedProtected.Lo,
-					SAStats.OutPktsEncryptedProtected.Hi);
-				stats->tx_sc_stats
-					.OutOctetsProtected += STATS_2x32_TO_64(
-					SAStats.OutOctetsEncryptedProtected.Lo,
-					SAStats.OutOctetsEncryptedProtected.Hi);
-				stats->tx_sc_stats
-					.OutOctetsEncrypted += STATS_2x32_TO_64(
-					SAStats.OutOctetsEncryptedProtected.Lo,
-					SAStats.OutOctetsEncryptedProtected.Hi);
+				if (ctx->secy->tx_sc.encrypt) {
+					stats->tx_sc_stats
+						.OutPktsEncrypted += STATS_2x32_TO_64(
+						SAStats.OutPktsEncryptedProtected
+							.Lo,
+						SAStats.OutPktsEncryptedProtected
+							.Hi);
+
+					stats->tx_sc_stats.OutOctetsEncrypted +=
+						STATS_2x32_TO_64(
+							SAStats.OutOctetsEncryptedProtected
+								.Lo,
+							SAStats.OutOctetsEncryptedProtected
+								.Hi);
+				} else {
+					stats->tx_sc_stats
+						.OutPktsProtected += STATS_2x32_TO_64(
+						SAStats.OutPktsEncryptedProtected
+							.Lo,
+						SAStats.OutPktsEncryptedProtected
+							.Hi);
+
+					stats->tx_sc_stats.OutOctetsProtected +=
+						STATS_2x32_TO_64(
+							SAStats.OutOctetsEncryptedProtected
+								.Lo,
+							SAStats.OutOctetsEncryptedProtected
+								.Hi);
+				}
 			}
 			if (stats_type == MACSEC_STATS_DEV) {
 				SecY_SecY_Stat_E_t SecYStats;
@@ -1912,7 +1926,7 @@ static int eip_mdo_get_dev_stats(struct macsec_context *ctx)
 		ingress_stats.dev_stats.InPktsOverrun;
 
 	eip_macsec_egress_stats(false, port_id, channel_id, &egress_stats,
-				MACSEC_STATS_DEV);
+				MACSEC_STATS_DEV, ctx);
 
 	ctx->stats.dev_stats->OutPktsUntagged +=
 		egress_stats.dev_stats.OutPktsUntagged;
@@ -1950,7 +1964,7 @@ static int eip_mdo_get_tx_sc_stats(struct macsec_context *ctx)
 		 port_id, channel_id);
 
 	eip_macsec_egress_stats(false, port_id, channel_id, &egress_stats,
-				MACSEC_STATS_TXSC);
+				MACSEC_STATS_TXSC, ctx);
 
 	ctx->stats.tx_sc_stats->OutPktsProtected +=
 		egress_stats.tx_sc_stats.OutPktsProtected;
@@ -1982,7 +1996,7 @@ static int eip_mdo_get_tx_sa_stats(struct macsec_context *ctx)
 		 port_id, channel_id);
 
 	eip_macsec_egress_stats(false, port_id, channel_id, &egress_stats,
-				MACSEC_STATS_TXSA);
+				MACSEC_STATS_TXSA, ctx);
 
 	ctx->stats.tx_sa_stats->OutPktsProtected +=
 		egress_stats.tx_sa_stats.OutPktsProtected;
