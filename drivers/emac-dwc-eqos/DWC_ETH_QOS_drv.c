@@ -1763,13 +1763,22 @@ static void DWC_ETH_QOS_configure_rx_fun_ptr(struct DWC_ETH_QOS_prv_data *pdata)
 
 static void DWC_ETH_QOS_default_common_confs(struct DWC_ETH_QOS_prv_data *pdata)
 {
+	struct phy_device *phydev = pdata->phydev;
+
 	DBGPR("-->DWC_ETH_QOS_default_common_confs\n");
 
 	pdata->drop_tx_pktburstcnt = 1;
 	pdata->mac_enable_count = 0;
 	pdata->incr_incrx = DWC_ETH_QOS_INCR_ENABLE;
-	pdata->flow_ctrl = DWC_ETH_QOS_FLOW_CTRL_TX_RX;
-	pdata->oldflow_ctrl = DWC_ETH_QOS_FLOW_CTRL_TX_RX;
+	/* Disable Flow control if PHY doesn't support FLOW ctrl */
+	if (!(phydev->supported & SUPPORTED_Pause) &&
+	    !(phydev->supported & SUPPORTED_Asym_Pause)) {
+		pdata->flow_ctrl = DWC_ETH_QOS_FLOW_CTRL_OFF;
+		pdata->oldflow_ctrl = DWC_ETH_QOS_FLOW_CTRL_OFF;
+	} else {
+		pdata->flow_ctrl = DWC_ETH_QOS_FLOW_CTRL_TX_RX;
+		pdata->oldflow_ctrl = DWC_ETH_QOS_FLOW_CTRL_TX_RX;
+	}
 	pdata->power_down = 0;
 	pdata->tx_sa_ctrl_via_desc = DWC_ETH_QOS_SA0_NONE;
 	pdata->tx_sa_ctrl_via_reg = DWC_ETH_QOS_SA0_NONE;

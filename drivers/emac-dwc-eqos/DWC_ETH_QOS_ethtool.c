@@ -461,7 +461,7 @@ static void DWC_ETH_QOS_get_pauseparam(struct net_device *dev,
 		pause->autoneg = pdata->phydev->autoneg;
 
 		/* return if PHY doesn't support FLOW ctrl */
-		if (!(phydev->supported & SUPPORTED_Pause) ||
+		if (!(phydev->supported & SUPPORTED_Pause) &&
 		    !(phydev->supported & SUPPORTED_Asym_Pause))
 			return;
 	}
@@ -509,9 +509,12 @@ static int DWC_ETH_QOS_set_pauseparam(struct net_device *dev,
 		if (!(data == 1) || !(data == 2))
 			return -EINVAL;
 	} else {
-		if (!(phydev->supported & SUPPORTED_Pause) ||
+		if (!(phydev->supported & SUPPORTED_Pause) &&
 			!(phydev->supported & SUPPORTED_Asym_Pause))
-			return -EINVAL;
+			return -EOPNOTSUPP;
+		else if (!(phydev->supported & SUPPORTED_Asym_Pause) &&
+			 (pause->rx_pause != pause->tx_pause))
+			 return -EINVAL;
 	}
 
 	if (pause->rx_pause)
