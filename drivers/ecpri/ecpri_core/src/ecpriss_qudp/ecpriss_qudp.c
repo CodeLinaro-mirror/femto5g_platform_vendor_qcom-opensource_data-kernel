@@ -2873,7 +2873,7 @@ static void ecpriss_qudp_enable_interrupts(uint8_t                 port_index,
 	return;
 }
 
-
+/*
 static void ecpriss_qudp_enable_interrupts_v2(uint8_t                 port_index,
 		uint32_t                 port_type)
 {
@@ -2976,9 +2976,33 @@ static void ecpriss_qudp_enable_interrupts_v2(uint8_t                 port_index
 
 	return;
 }
+*/
 
+static void ecpriss_qudp_disable_interrupts_v2(uint8_t                 port_index,
+		uint32_t                 port_type)
+{
+	ecpri_qudp_hwio_def_ecpri_udp_fh_udp_sw_irq_mask_0_port_p_s_v2 fh_udp_sw_irq_mask_0_port_p;
+	ecpri_qudp_hwio_def_ecpri_udp_fh_udp_sw_irq_mask_1_port_p_s_v2 fh_udp_sw_irq_mask_1_port_p;
 
+	memset(&fh_udp_sw_irq_mask_0_port_p , 0, sizeof(fh_udp_sw_irq_mask_0_port_p) );
+	memset(&fh_udp_sw_irq_mask_1_port_p , 0, sizeof(fh_udp_sw_irq_mask_1_port_p) );
 
+	if(port_type == ECPRISS_PORT_TYPE_FH) {
+
+		ecpriss_qudp_hal_write_reg_n_fields(ECPRISS_QUDP_FH,
+				ECPRI_UDP_FH_UDP_SW_IRQ_MASK_0_PORT_P_V2,
+				port_index,
+				&fh_udp_sw_irq_mask_0_port_p);
+
+		ecpriss_qudp_hal_write_reg_n_fields(ECPRISS_QUDP_FH,
+				ECPRI_UDP_FH_UDP_SW_IRQ_MASK_1_PORT_P_V2,
+				port_index,
+				&fh_udp_sw_irq_mask_1_port_p);
+
+	}
+
+	return;
+}
 
 /**
  * ecpri_qudp_set_eth_type()
@@ -3091,12 +3115,10 @@ int ecpriss_qudp_init_v2(struct device *dev)
 		ecpriss_qudp_fh_egress_cfg_reset_v2(1);
 		ecpriss_qudp_fh_egress_cfg_reset_v2(2);
 
-
 		for(port_type=0;port_type < ECPRISS_PORT_TYPE_MAX;port_type++)
 		{
 			for(port_idx=0;port_idx < ECPRISS_PORT_MAX;port_idx++)
 			{
-
 
 				ret = ecpriss_qudp_register_interrupts_v2(port_idx,port_type,dev);
 				if(ret < 0)
@@ -3104,7 +3126,7 @@ int ecpriss_qudp_init_v2(struct device *dev)
 					break;
 				}
 
-				ecpriss_qudp_enable_interrupts_v2(port_idx,port_type);
+				ecpriss_qudp_disable_interrupts_v2(port_idx,port_type);
 
 				/* ret = ecpriss_qudp_enable_stats_v2(port_idx,port_type); */
 				if(ret < 0)
@@ -3113,7 +3135,6 @@ int ecpriss_qudp_init_v2(struct device *dev)
 				}
 			}
 		}
-
 
 		ecpriss_qudp_configure_mtu_v2();
 		ecpriss_qudp_non_ecpri_dma_ring_info();
