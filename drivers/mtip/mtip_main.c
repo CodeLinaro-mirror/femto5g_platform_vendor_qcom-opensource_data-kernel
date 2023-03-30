@@ -88,6 +88,10 @@ int mtip_rumi_platform = 0;
 module_param(mtip_rumi_platform, int, S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP);
 MODULE_PARM_DESC(mtip_rumi_platform, "Platform mode to RUMI");
 
+int mtip_dma_max_rx_buff_size = MTIP_DMA_RX_BUFF_SIZE;
+module_param(mtip_dma_max_rx_buff_size, int, S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP);
+MODULE_PARM_DESC(mtip_dma_max_rx_buff_size, "SET mtip_dma_rx buff size");
+
 int mtip_lookup_link_index_by_name(char *name, u32 *link_index) {
    int i;
    struct net_device *dev;

@@ -98,12 +98,12 @@ struct net_device* macsec_eth_get_netdev_from_link(u32 link_index)
 
 EXPORT_SYMBOL(macsec_eth_get_netdev_from_link);
 
-static void post_mtip_replenish_dma_rx_buffers(struct net_device *netdev, ecpri_dma_eth_conn_hdl_t hdl, u32 num_of_pkts)
+static void post_mtip_replenish_dma_rx_buffers(struct net_device *netdev, ecpri_dma_eth_conn_hdl_t hdl, u32 num_of_buffs)
 {
    struct mtip_replenish_dma_rx_buffers_task* taskstruct = kmalloc(sizeof(struct mtip_replenish_dma_rx_buffers_task), GFP_ATOMIC);
    taskstruct->netdev = netdev;
    taskstruct->hdl = hdl;
-   taskstruct->num_of_pkts = num_of_pkts;
+   taskstruct->num_of_buffs = num_of_buffs;
    mtip_queue_work(MTIP_WORKQ_TASK_REPLENISH_RX_BUFFERS, taskstruct);
 }
 
@@ -430,6 +430,7 @@ int mtip_napi_poll(struct napi_struct *napi_ptr, int budget)
 {
    int rv = 0;
    int npackets = 0;
+   int num_buffers = 0;
    enum ecpri_dma_notify_mode setmode = ECPRI_DMA_NOTIFY_MODE_IRQ;
    struct mtip_link_info* link = container_of(napi_ptr, struct mtip_link_info, napi);
    ecpri_dma_eth_conn_hdl_t hdl = link->dma_hdl;
@@ -498,7 +499,7 @@ int mtip_napi_poll(struct napi_struct *napi_ptr, int budget)
    CSMLOGDBG("mtip_napi_poll called with budget %d for link_index %d hdl %d\n", budget, link_index, hdl);
 
    // read the packets and push into the stack
-   rv = mtip_dma_poll_rx_packets(dev, napi_ptr, hdl, budget, &npackets);
+   rv = mtip_dma_poll_rx_packets(dev, napi_ptr, hdl, budget, &npackets, &num_buffers);
 
    // HANDLE THE ERROR
    if (rv < 0)
@@ -521,7 +522,7 @@ int mtip_napi_poll(struct napi_struct *napi_ptr, int budget)
    }
 
    // replenish the rx buffers for the packets processed
-   post_mtip_replenish_dma_rx_buffers(dev, actual_handle, npackets);
+   post_mtip_replenish_dma_rx_buffers(dev, actual_handle, num_buffers);
    return npackets;
 }
 

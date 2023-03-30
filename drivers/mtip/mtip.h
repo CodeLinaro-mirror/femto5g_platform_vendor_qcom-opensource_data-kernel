@@ -12,6 +12,7 @@
 #include <linux/netdevice.h>
 
 #include "ecpri_dma_eth.h"
+#include "ecpri_dma.h"
 #include "eth_ecpriss_iface.h"
 #include "macsec_eth.h"
 
@@ -54,9 +55,13 @@
 #define MTIP_MAX_MTU_SIZE  65535
 
 // the max size of MTU for M Plane
-#define MTIP_MAX_MPLANE_MTU_SIZE 1536
+#define MTIP_MAX_MPLANE_MTU_SIZE 9198
 
-#define MTIP_DMA_RX_PACKET_SIZE 1600 /* use buffers of size 1600 */
+#define MTIP_DMA_RX_BUFF_SIZE 2500 /* use buffers of size 1600 */
+
+extern int mtip_dma_max_rx_buff_size;
+
+#define MTIP_RX_DMA_MAX_BUFFERS_PER_PACKET   4
 
 #define MTIP_TX_RING_SIZE 512
 #define MTIP_RX_RING_SIZE 512
