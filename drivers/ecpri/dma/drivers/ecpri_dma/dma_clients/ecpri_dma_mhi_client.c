@@ -630,6 +630,8 @@ static void ecpri_dma_mhi_memcpy_async_notify_comp(
 		async_pkts[i] = &async_pkts_arr[i];
 	}
 
+	/* memcpy uses single buffer packet so actual_num == num of buffers
+		no need to check for EOT */
 	ret = ecpri_dma_dp_rx_poll(endp,
 				   ECPRI_DMA_MHI_CLIENT_MEMCPY_ASYNC_BUDGET,
 				   async_pkts, &actual_num);
@@ -1576,6 +1578,9 @@ static int ecpri_dma_mhi_dma_sync_memcpy(
 	while (actual_num == 0)
 	{
 		memcpy_ctx->loop_counter++;
+
+		/* memcpy uses single buffer packet so actual_num == num of buffers
+		no need to check for EOT */
 		ret = ecpri_dma_dp_rx_poll(memcpy_ctx->sync_dest_endp, 1,
 			&pkt_wrapper, &actual_num);
 		if (ret != 0) {

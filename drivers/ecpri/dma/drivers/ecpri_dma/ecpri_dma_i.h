@@ -166,9 +166,13 @@ do {\
 #define GCC_XO_CLK_NOM_MAX (ECPRI_CLK_FREQ(19.20))
 
 /* Exception ENDP defines */
-#define ECPRI_DMA_EXCEPTION_RING_SIZE (512)
-#define ECPRI_DMA_DP_EXCEPTION_BUDGET (16)
-#define ECPRI_DMA_DP_EXCEPTION_BUFF_SIZE (1500)
+#define ECPRI_DMA_EXCEPTION_RING_SIZE			(256)
+#define ECPRI_DMA_DP_EXCEPTION_BUDGET			(16)
+#define ECPRI_DMA_DP_EXCEPTION_FH_RX_MAX_CHAIN	(4)
+/* ETH supports up to 9K jumbo packet, due to HW limitation
+	DMA can overflow to up to 4 buffers, to support 9K on 4 buffers
+	each buffer should be at least 2500 */
+#define ECPRI_DMA_DP_EXCEPTION_BUFF_SIZE		(2500)
 
 enum ecpri_dma_smmu_cb_type {
 	ECPRI_DMA_SMMU_CB_AP,
@@ -514,6 +518,7 @@ struct ecpri_dma_context {
 	struct ecpri_dma_mem_buffer*
 		exception_buffs_ptr_arr[ECPRI_DMA_EXCEPTION_RING_SIZE];
 	struct ecpri_dma_mem_buffer exception_buffs[ECPRI_DMA_EXCEPTION_RING_SIZE];
+	u32 exception_status_statistics[ECPRI_DMA_STATUS_CODE_MAX];
 };
 
 /**

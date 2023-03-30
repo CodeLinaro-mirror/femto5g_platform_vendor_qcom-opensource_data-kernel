@@ -910,6 +910,8 @@ static int ecpri_dma_eth_dp_test_util_verify_rx(ecpri_dma_eth_conn_hdl_t hdl,
 	}
 
 	while (sent_pkt_idx != num_of_pkts_sent) {
+		/* ETH tests uses single buffer packet so actual_num == num of buffers
+		no need to check for EOT */
 		ret = ecpri_dma_eth_rx_poll(hdl, ECPRI_DMA_ETH_CLIENT_UT_TEST_RX_BUDGET,
 			rx_pkts, &actual_num);
 		if (ret || !actual_num) {
@@ -1125,9 +1127,9 @@ static int ecpri_dma_eth_dp_test_util_verify_rx_large_data(
 
 	ret = ecpri_dma_eth_rx_poll(hdl, ECPRI_DMA_ETH_CLIENT_UT_TEST_RX_BUDGET,
 		rx_pkts, &actual_num);
-	if (ret || actual_num != 2) {
+	if (ret || actual_num != num_of_pkts_sent) {
 		DMA_UT_LOG(
-			"Test failed to perform Rx poll, expecting actual num = 2, got %d",
+			"Test failed to perform Rx poll, expecting actual num = 1, got %d",
 			actual_num);
 		return -EFAULT;
 	}
@@ -2472,6 +2474,10 @@ static int ecpri_dma_eth_dp_test_suite_chains_large_payload(void *priv) {
 	ret = ecpri_dma_eth_dp_test_util_verify_rx_large_data(
 		eth_client_test_suite_ctx.hdl, num_of_pkts_to_send, tx_pkts, rx_pkts,
 		ECPRI_DMA_NOTIFY_MODE_IRQ);
+	if (ret != 0) {
+		DMA_UT_TEST_FAIL_REPORT("Test failed due to Rx verify fail");
+		return -EFAULT;
+	}
 
 	if (ecpri_dma_get_ctx_hw_ver() != ECPRI_HW_V1_0) {
 		ret = ecpri_dma_eth_dp_test_util_rx_replenish(
