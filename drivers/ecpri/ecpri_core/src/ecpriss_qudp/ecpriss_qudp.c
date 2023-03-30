@@ -1770,6 +1770,53 @@ static int ecpriss_qudp_ingress_init_cfg_v2(void)
 }
 
 
+static int ecpriss_qudp_egress_init_cfg_v2(void)
+{
+	int ret = 0;
+	int port_type = 0;
+	int port_idx = 0;
+
+	for(port_type=0;port_type<ECPRISS_PORT_TYPE_MAX;port_type++)
+	{
+		if(port_type == ECPRISS_PORT_TYPE_FH)
+		{
+
+			for(port_idx=0;port_idx<ecpriss_pdata_v2->qudp_ctx_v2->num_ports;port_idx++)
+			{
+
+				ecpriss_qudp_egress_per_port_cfg_s_v2 *egress_cfg =
+					&ecpriss_pdata_v2->qudp_ctx_v2->fh_port_cfg_v2[port_idx].egress_cfg;
+
+					ecpriss_qudp_hal_read_reg_n_fields(ECPRISS_QUDP_FH ,
+						ECPRI_UDP_FH_EGRESS_CONFIG_P_V2,
+						port_idx,
+						&egress_cfg->fh_egress_config);
+
+				egress_cfg->fh_egress_config.calc_ip_udp_len_from_byte_count = 0;
+				egress_cfg->fh_egress_config.bypassed_packets_vport_action = 0;
+				egress_cfg->fh_egress_config.bypassed_packets_vport = 0;
+				egress_cfg->fh_egress_config.disable_padding_removal = 0;
+				egress_cfg->fh_egress_config.l2_encap_index_override_en = 0;
+				egress_cfg->fh_egress_config.l3_encap_index_override_en = 0;
+				egress_cfg->fh_egress_config.disable_ptp_detection = 0;
+
+				ecpriss_qudp_hal_write_reg_n_fields(ECPRISS_QUDP_FH,
+						ECPRI_UDP_FH_EGRESS_CONFIG_P_V2,
+						port_idx,
+						&egress_cfg->fh_egress_config);
+
+				ecpriss_qudp_hal_read_reg_n_fields(ECPRISS_QUDP_FH,
+						ECPRI_UDP_FH_EGRESS_CONFIG_P_V2,
+						port_idx,
+						&egress_cfg->fh_egress_config);
+
+			}
+		}
+	}
+	return ret;
+}
+
+
 /**
  *  ecpriss_qudp_rx_filter()
  *
@@ -3063,7 +3110,6 @@ int ecpriss_qudp_init_v2(struct device *dev)
 
 		ecpriss_pdata_v2->qudp_ctx_v2->state = ECPRI_QUDP_DEINIT ;
 
-		/* ecpriss_global_operation_mode_cfg(); */
 
 		ret = ecpriss_qudp_global_hal_reg_init(dev,
 				ecpriss_pdata_v2->ecpri_hw_ver);
@@ -3079,13 +3125,20 @@ int ecpriss_qudp_init_v2(struct device *dev)
 			break;
 		}
 
-		/* This is commented to enable default data path */
 		ret = ecpriss_qudp_ingress_init_cfg_v2();
 
 		if(ret < 0)
 		{
 			break;
 		}
+
+		ret = ecpriss_qudp_egress_init_cfg_v2();
+
+		if(ret < 0)
+		{
+			break;
+		}
+
 
 		ecpriss_qudp_fh_egress_cfg_reset_v2(0);
 		ecpriss_qudp_fh_egress_cfg_reset_v2(1);
