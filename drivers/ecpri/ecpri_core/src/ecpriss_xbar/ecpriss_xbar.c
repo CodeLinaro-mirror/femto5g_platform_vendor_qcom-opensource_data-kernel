@@ -574,7 +574,7 @@ static void ecpriss_xbar_flush_init()
 	/*Read Reset value*/
 	ecpriss_xbar_hal_read_reg_n_fields(ECPRISS_XBAR_GLOBAL, ECPRI_XBAR_XBAR_FLUSH,0, &xbar_flush);
 	flush_val = (int*)(&xbar_flush);
-	pr_info("Reset xbar flush val = 0x%x\n", *flush_val);
+	ECPRILOGDBG("Reset xbar flush val = 0x%x\n", *flush_val);
 
 	/*Enable Flush*/
 	xbar_flush.flush_fh_0_rx = DISABLE_BIT;
@@ -1508,7 +1508,7 @@ int ecpriss_xbar_fh_rx_lut_v2(uint32_t  port_index,
 
 			xbar_port_lut->lut_table[current_pcid_index].ul_route_to_oran = 1;
 
-			ECPRILOGERR("ecpriss_xbar_fh_rx_lut: PCID %d OC LInk ID %d Route UL Oran %d",
+			ECPRILOGDBG("ecpriss_xbar_fh_rx_lut: PCID %d OC LInk ID %d Route UL Oran %d",
 					current_pcid_index, xbar_fhrx_m_lut_n.ul_oc_link_id , xbar_fhrx_m_lut_n.ul_route_to_oran);
 
 		}else {
@@ -1520,7 +1520,7 @@ int ecpriss_xbar_fh_rx_lut_v2(uint32_t  port_index,
 				xbar_rx_cfg->xbar_rx_cfg.oc_link_id;
 			xbar_port_lut->lut_table[current_pcid_index].dl_route_to_oran = 1;
 
-			ECPRILOGERR("ecpriss_xbar_fh_rx_lut: PCID %d OC LInk ID %d Route DL Oran %d",
+			ECPRILOGDBG("ecpriss_xbar_fh_rx_lut: PCID %d OC LInk ID %d Route DL Oran %d",
 					current_pcid_index, xbar_fhrx_m_lut_n.dl_oc_link_id , xbar_fhrx_m_lut_n.dl_route_to_oran);
 
 		}
@@ -1636,7 +1636,7 @@ int ecpriss_xbar_oc_rx_lut_v2(uint32_t               port_index,
 
 		xbar_ocrx_m_lut_n.valid = 1;
 		ocrx_xbar_port_lut->lut_table[current_pcid_index].valid = 1;
-		ECPRILOGERR("ecpriss_xbar_oc_rx_lut: PCID %d L2 Index %d L3 Index  and Valid " , ocrx_xbar_port_lut->lut_table[current_pcid_index].pcid,
+		ECPRILOGDBG("ecpriss_xbar_oc_rx_lut: PCID %d L2 Index %d L3 Index  and Valid " , ocrx_xbar_port_lut->lut_table[current_pcid_index].pcid,
 				xbar_ocrx_m_lut_n.l2_encap_info , xbar_ocrx_m_lut_n.l3_encap_info , xbar_ocrx_m_lut_n.valid );
 	
 		ecpriss_xbar_hal_write_reg_mn_fields(ECPRISS_XBAR_LUT,

@@ -656,7 +656,7 @@ void ecpriss_eth_events_cb_v2(eth_ecpriss_event_e event_type,
 	struct workqueue_struct *ecpriss_wq;
 	struct work_struct *ecpriss_work;
 
-	ECPRILOGERR("ecpriss_eth_events_cb_v2 event received %d", event_type);
+	ECPRILOGDBG("ecpriss_eth_events_cb_v2 event received %d", event_type);
 
 
 	do{
