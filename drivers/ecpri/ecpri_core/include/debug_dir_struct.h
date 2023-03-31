@@ -265,11 +265,31 @@
 			xbar \
 			{ \
 				lut \
-				{ \
-					,ocrx \
-					,fhrx \
-					,c2crxDL \
-					,c2crxUL \
+				{\
+					ocrx \
+					{\
+						,fh0:ocrx_fh0\
+						,fh1:ocrx_fh1\
+						,fh2:ocrx_fh2\
+					} \
+					fhrx \
+					{\
+						,fh0:fhrx_fh0\
+						,fh1:fhrx_fh1\
+						,fh2:fhrx_fh2\
+					} \
+					c2crxDL \
+					{\
+						,fh0:c2crxDL_fh0\
+						,fh1:c2crxDL_fh1\
+						,fh2:c2crxDL_fh2\
+					} \
+					c2crxUL \
+					{\
+						,fh0:c2crxUL_fh0\
+						,fh1:c2crxUL_fh1\
+						,fh2:c2crxUL_fh2\
+					} \
 				} \
 				global \
 				{ \

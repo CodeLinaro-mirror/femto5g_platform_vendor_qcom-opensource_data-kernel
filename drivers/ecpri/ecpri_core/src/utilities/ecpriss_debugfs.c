@@ -45,7 +45,8 @@ typedef enum config_param{
 	GLOBAL_CFG
 }cfg_prm_u;
 
-
+uint32_t min_lut_index = 0;
+uint32_t max_lut_index = 299;
 /*
  * only white listed alphbates are allowed
  * { } , _  : and 0 to 9 a to z A to Z
@@ -222,6 +223,43 @@ static ssize_t config_val_to_global_ecpriss_stats_timeout(const char __user *buf
 		return -EFAULT;
 
 	ecpriss_core_set_stats_timeout_info(val);
+
+	return *count;
+}
+static ssize_t config_val_to_xbar_lut_ocrx(const char __user *buf, size_t *count, loff_t *ppos)
+{
+	char input_buf[TEMP_STR_MAX_SIZE];
+	int min_lut = -1;
+	int max_lut = -1;
+
+	if(copy_from_user(input_buf,buf,TEMP_STR_MAX_SIZE)){
+		return -EFAULT;
+	}
+
+
+	sscanf(input_buf,"%d-%d",&min_lut,&max_lut);
+
+	min_lut_index = min_lut;
+	max_lut_index = max_lut;
+
+	return *count;
+}
+static ssize_t config_val_to_xbar_lut_fhrx(const char __user *buf, size_t *count, loff_t *ppos)
+{
+	char input_buf[TEMP_STR_MAX_SIZE];
+	int min_lut = -1;
+	int max_lut = -1;
+
+	if(copy_from_user(input_buf,buf,TEMP_STR_MAX_SIZE)){
+		return -EFAULT;
+	}
+
+
+	sscanf(input_buf,"%d-%d",&min_lut,&max_lut);
+
+	min_lut_index = min_lut;
+	max_lut_index = max_lut;
+
 
 	return *count;
 }
@@ -2576,9 +2614,8 @@ static ssize_t config_val_from_registers_qudp_egress_udp_ports_v2(char __user *b
 	ret_val = copy_to_user(buf,(max_str + *ppos), *count);
 	return data_size;
 }
-static ssize_t config_val_from_registers_xbar(char __user *buf, cfg_prm_u param)
+static ssize_t config_val_from_registers_xbar(char __user *buf, cfg_prm_u param,int fh_index)
 {
-	int fh_index;
 	int pcid_index;
 	char fh_str[TEMP_STR_MAX_SIZE];
 	char pcid_str[TEMP_STR_MAX_SIZE];
@@ -2588,65 +2625,70 @@ static ssize_t config_val_from_registers_xbar(char __user *buf, cfg_prm_u param)
 
 	memset(max_str,0,sizeof(max_str));
 
+	if(min_lut_index < 0 || min_lut_index > 65534)
+		min_lut_index = 0;
+
+	if(max_lut_index > 65534)
+		max_lut_index = 299;
+
+	if(max_lut_index < min_lut_index)
+		max_lut_index = (max_lut_index > min_lut_index)? max_lut_index : min_lut_index;
+
 	ecpriss_xbar_config_stats_update();
 	switch (param){
 		case FHRX :
-			for(fh_index=0; fh_index < NUM_OF_FHP; fh_index++) {
-				for(pcid_index=0; pcid_index < LUT_INDEX; pcid_index++) {
-					if(ecpriss_pdata->cfg_stats.xbar_cfg.lut_cfg.fhrx[fh_index][pcid_index]){
-						RESET_STR(fh_str);
-						scnprintf(fh_str, TEMP_STR_MIN_SIZE, "%u", fh_index);
-						RESET_STR(pcid_str);
-						scnprintf(pcid_str, TEMP_STR_MIN_SIZE, "%u", pcid_index);
-						RESET_STR(temp_stat_val_str);
-						scnprintf(temp_stat_val_str, TEMP_STAT_VAL_STR_MAX_SIZE, "0x%x",
-								ecpriss_pdata->cfg_stats.xbar_cfg.lut_cfg.fhrx[fh_index][pcid_index]);
+			for(pcid_index=min_lut_index; pcid_index < max_lut_index; pcid_index++) {
+				if(ecpriss_pdata->cfg_stats.xbar_cfg.lut_cfg.fhrx[fh_index][pcid_index]){
+					RESET_STR(fh_str);
+					scnprintf(fh_str, TEMP_STR_MIN_SIZE, "%u", fh_index);
+					RESET_STR(pcid_str);
+					scnprintf(pcid_str, TEMP_STR_MIN_SIZE, "%u", pcid_index);
+					RESET_STR(temp_stat_val_str);
+					scnprintf(temp_stat_val_str, TEMP_STAT_VAL_STR_MAX_SIZE, "0x%x",
+							ecpriss_pdata->cfg_stats.xbar_cfg.lut_cfg.fhrx[fh_index][pcid_index]);
 
-						strlcat(max_str, "xbar_lut_fhrx_config_fh_",
-								max_str_size);
-						strlcat(max_str, fh_str,
-								max_str_size);
-						strlcat(max_str, "_pcid_",
-								max_str_size);
-						strlcat(max_str, pcid_str,
-								max_str_size);
-						strlcat(max_str, ":", max_str_size);
-						strlcat(max_str, temp_stat_val_str,
-								max_str_size);
-						strlcat(max_str, "\n",
-								max_str_size);
+					strlcat(max_str, "fh_",
+							max_str_size);
+					strlcat(max_str, fh_str,
+							max_str_size);
+					strlcat(max_str, ":",
+							max_str_size);
+					strlcat(max_str, pcid_str,
+							max_str_size);
+					strlcat(max_str, ":", max_str_size);
+					strlcat(max_str, temp_stat_val_str,
+							max_str_size);
+					strlcat(max_str, "\n",
+							max_str_size);
 
-					}
 				}
 			}
 			break;
 		case OCRX :
-			for(fh_index=0; fh_index < NUM_OF_FHP; fh_index++) {
-				for(pcid_index=0; pcid_index < LUT_INDEX; pcid_index++) {
-					if(ecpriss_pdata->cfg_stats.xbar_cfg.lut_cfg.ocrx[fh_index][pcid_index]){
-						RESET_STR(fh_str);
-						scnprintf(fh_str, TEMP_STR_MIN_SIZE, "%u", fh_index);
-						RESET_STR(pcid_str);
-						scnprintf(pcid_str, TEMP_STR_MIN_SIZE, "%u", pcid_index);
-						RESET_STR(temp_stat_val_str);
-						scnprintf(temp_stat_val_str, TEMP_STAT_VAL_STR_MAX_SIZE, "0x%x",
-								ecpriss_pdata->cfg_stats.xbar_cfg.lut_cfg.ocrx[fh_index][pcid_index]);
+			for(pcid_index=min_lut_index; pcid_index < max_lut_index; pcid_index++) {
+				if(ecpriss_pdata->cfg_stats.xbar_cfg.lut_cfg.ocrx[fh_index][pcid_index]){
+					RESET_STR(fh_str);
+					scnprintf(fh_str, TEMP_STR_MIN_SIZE, "%u", fh_index);
+					RESET_STR(pcid_str);
+					scnprintf(pcid_str, TEMP_STR_MIN_SIZE, "%u", pcid_index);
+					RESET_STR(temp_stat_val_str);
+					scnprintf(temp_stat_val_str, TEMP_STAT_VAL_STR_MAX_SIZE, "0x%x",
+							ecpriss_pdata->cfg_stats.xbar_cfg.lut_cfg.ocrx[fh_index][pcid_index]);
 
-						strlcat(max_str, "xbar_lut_ocrx_config_fh_",
-								max_str_size);
-						strlcat(max_str, fh_str,
-								max_str_size);
-						strlcat(max_str, "_pcid_",
-								max_str_size);
-						strlcat(max_str, pcid_str,
-								max_str_size);
-						strlcat(max_str, ":", max_str_size);
-						strlcat(max_str, temp_stat_val_str,
-								max_str_size);
-						strlcat(max_str, "\n",
-								max_str_size);
+					strlcat(max_str, "fh_",
+							max_str_size);
+					strlcat(max_str, fh_str,
+							max_str_size);
+					strlcat(max_str, ":",
+							max_str_size);
+					strlcat(max_str, pcid_str,
+							max_str_size);
+					strlcat(max_str, ":", max_str_size);
+					strlcat(max_str, temp_stat_val_str,
+							max_str_size);
+					strlcat(max_str, "\n",
+							max_str_size);
 
-					}
 				}
 			}
 			break;
@@ -2665,9 +2707,8 @@ static ssize_t config_val_from_registers_xbar(char __user *buf, cfg_prm_u param)
 	return ret_val;
 
 }
-static ssize_t config_val_from_registers_xbar_v2(char __user *buf, cfg_prm_u param)
+static ssize_t config_val_from_registers_xbar_v2(char __user *buf, cfg_prm_u param,int fh_index)
 {
-	int fh_index;
 	int pcid_index;
 	char fh_str[TEMP_STR_MAX_SIZE];
 	char pcid_str[TEMP_STR_MAX_SIZE];
@@ -2677,65 +2718,70 @@ static ssize_t config_val_from_registers_xbar_v2(char __user *buf, cfg_prm_u par
 
 	memset(max_str,0,sizeof(max_str));
 
+	if(min_lut_index < 0 || min_lut_index > 65534)
+		min_lut_index = 0;
+
+	if(max_lut_index > 65534)
+		max_lut_index = 299;
+
+	if(max_lut_index < min_lut_index)
+		max_lut_index = (max_lut_index > min_lut_index)? max_lut_index : min_lut_index;
+
+
 	ecpriss_xbar_config_stats_update_v2();
 	switch (param){
 		case FHRX :
-			for(fh_index=0; fh_index < NUM_OF_FHP; fh_index++) {
-				for(pcid_index=0; pcid_index < LUT_INDEX; pcid_index++) {
-					if(ecpriss_pdata_v2->cfg_stats_v2.xbar_cfg_v2.lut_cfg.fhrx[fh_index][pcid_index]){
-						RESET_STR(fh_str);
-						scnprintf(fh_str, TEMP_STR_MIN_SIZE, "%u", fh_index);
-						RESET_STR(pcid_str);
-						scnprintf(pcid_str, TEMP_STR_MIN_SIZE, "%u", pcid_index);
-						RESET_STR(temp_stat_val_str);
-						scnprintf(temp_stat_val_str, TEMP_STAT_VAL_STR_MAX_SIZE, "0x%x",
-								ecpriss_pdata_v2->cfg_stats_v2.xbar_cfg_v2.lut_cfg.fhrx[fh_index][pcid_index]);
+			for(pcid_index=min_lut_index; pcid_index < max_lut_index; pcid_index++) {
+				if(ecpriss_pdata_v2->cfg_stats_v2.xbar_cfg_v2.lut_cfg.fhrx[fh_index][pcid_index]){
+					RESET_STR(fh_str);
+					scnprintf(fh_str, TEMP_STR_MIN_SIZE, "%u", fh_index);
+					RESET_STR(pcid_str);
+					scnprintf(pcid_str, TEMP_STR_MIN_SIZE, "%u", pcid_index);
+					RESET_STR(temp_stat_val_str);
+					scnprintf(temp_stat_val_str, TEMP_STAT_VAL_STR_MAX_SIZE, "0x%x",
+						ecpriss_pdata_v2->cfg_stats_v2.xbar_cfg_v2.lut_cfg.fhrx[fh_index][pcid_index]);
 
-						strlcat(max_str, "xbar_lut_fhrx_config_fh_",
-								max_str_size);
-						strlcat(max_str, fh_str,
-								max_str_size);
-						strlcat(max_str, "_pcid_",
-								max_str_size);
-						strlcat(max_str, pcid_str,
-								max_str_size);
-						strlcat(max_str, ":", max_str_size);
-						strlcat(max_str, temp_stat_val_str,
-								max_str_size);
-						strlcat(max_str, "\n",
-								max_str_size);
-
+					strlcat(max_str, "fh_",
+							max_str_size);
+					strlcat(max_str, fh_str,
+							max_str_size);
+					strlcat(max_str, ":",
+							max_str_size);
+					strlcat(max_str, pcid_str,
+							max_str_size);
+					strlcat(max_str, ":", max_str_size);
+					strlcat(max_str, temp_stat_val_str,
+							max_str_size);
+					strlcat(max_str, "\n",
+							max_str_size);
 					}
 				}
-			}
 			break;
 		case OCRX :
-			for(fh_index=0; fh_index < NUM_OF_FHP; fh_index++) {
-				for(pcid_index=0; pcid_index < LUT_INDEX; pcid_index++) {
-					if(ecpriss_pdata_v2->cfg_stats_v2.xbar_cfg_v2.lut_cfg.ocrx[fh_index][pcid_index]){
-						RESET_STR(fh_str);
-						scnprintf(fh_str, TEMP_STR_MIN_SIZE, "%u", fh_index);
-						RESET_STR(pcid_str);
-						scnprintf(pcid_str, TEMP_STR_MIN_SIZE, "%u", pcid_index);
-						RESET_STR(temp_stat_val_str);
-						scnprintf(temp_stat_val_str, TEMP_STAT_VAL_STR_MAX_SIZE, "0x%x",
-								ecpriss_pdata_v2->cfg_stats_v2.xbar_cfg_v2.lut_cfg.ocrx[fh_index][pcid_index]);
+			for(pcid_index=min_lut_index; pcid_index < max_lut_index; pcid_index++) {
+				if(ecpriss_pdata_v2->cfg_stats_v2.xbar_cfg_v2.lut_cfg.ocrx[fh_index][pcid_index]){
+					RESET_STR(fh_str);
+					scnprintf(fh_str, TEMP_STR_MIN_SIZE, "%u", fh_index);
+					RESET_STR(pcid_str);
+					scnprintf(pcid_str, TEMP_STR_MIN_SIZE, "%u", pcid_index);
+					RESET_STR(temp_stat_val_str);
+					scnprintf(temp_stat_val_str, TEMP_STAT_VAL_STR_MAX_SIZE, "0x%x",
+							ecpriss_pdata_v2->cfg_stats_v2.xbar_cfg_v2.lut_cfg.ocrx[fh_index][pcid_index]);
 
-						strlcat(max_str, "xbar_lut_ocrx_config_fh_",
-								max_str_size);
-						strlcat(max_str, fh_str,
-								max_str_size);
-						strlcat(max_str, "_pcid_",
-								max_str_size);
-						strlcat(max_str, pcid_str,
-								max_str_size);
-						strlcat(max_str, ":", max_str_size);
-						strlcat(max_str, temp_stat_val_str,
-								max_str_size);
-						strlcat(max_str, "\n",
-								max_str_size);
+					strlcat(max_str, "fh_",
+							max_str_size);
+					strlcat(max_str, fh_str,
+							max_str_size);
+					strlcat(max_str, ":",
+							max_str_size);
+					strlcat(max_str, pcid_str,
+							max_str_size);
+					strlcat(max_str, ":", max_str_size);
+					strlcat(max_str, temp_stat_val_str,
+							max_str_size);
+					strlcat(max_str, "\n",
+							max_str_size);
 
-					}
 				}
 			}
 			break;
@@ -5145,14 +5191,14 @@ static ssize_t error_value_from_xbar(struct file *file, char __user *buf,
 
 	return count;
 }
-static ssize_t cfg_value_from_xbar_lut_fhrx(struct file *file, char __user *buf,
+static ssize_t cfg_value_from_xbar_lut_fhrx_0(struct file *file, char __user *buf,
  				 size_t count, loff_t *ppos)
 {
 	uint32_t len;
 	if(ecpriss_hw_ver == 2)
-		len = config_val_from_registers_xbar_v2(buf,FHRX);
+		len = config_val_from_registers_xbar_v2(buf,FHRX,0);
 	else
-		len = config_val_from_registers_xbar(buf,FHRX);
+		len = config_val_from_registers_xbar(buf,FHRX,0);
 
 	if((*ppos + count) > len){
 		count = len - *ppos;
@@ -5161,14 +5207,79 @@ static ssize_t cfg_value_from_xbar_lut_fhrx(struct file *file, char __user *buf,
 
 	return count;
 }
-static ssize_t cfg_value_from_xbar_lut_ocrx(struct file *file, char __user *buf,
+
+static ssize_t cfg_value_from_xbar_lut_fhrx_1(struct file *file, char __user *buf,
  				 size_t count, loff_t *ppos)
 {
 	uint32_t len;
 	if(ecpriss_hw_ver == 2)
-		len = config_val_from_registers_xbar_v2(buf,OCRX);
+		len = config_val_from_registers_xbar_v2(buf,FHRX,1);
 	else
-		len = config_val_from_registers_xbar(buf,OCRX);
+		len = config_val_from_registers_xbar(buf,FHRX,1);
+
+	if((*ppos + count) > len){
+		count = len - *ppos;
+	}
+	*ppos += count;
+
+	return count;
+}
+static ssize_t cfg_value_from_xbar_lut_fhrx_2(struct file *file, char __user *buf,
+ 				 size_t count, loff_t *ppos)
+{
+	uint32_t len;
+	if(ecpriss_hw_ver == 2)
+		len = config_val_from_registers_xbar_v2(buf,FHRX,2);
+	else
+		len = config_val_from_registers_xbar(buf,FHRX,2);
+
+	if((*ppos + count) > len){
+		count = len - *ppos;
+	}
+	*ppos += count;
+
+	return count;
+}
+static ssize_t cfg_value_from_xbar_lut_ocrx_0(struct file *file, char __user *buf,
+ 				 size_t count, loff_t *ppos)
+{
+	uint32_t len;
+	if(ecpriss_hw_ver == 2)
+		len = config_val_from_registers_xbar_v2(buf,OCRX,0);
+	else
+		len = config_val_from_registers_xbar(buf,OCRX,0);
+
+	if((*ppos + count) > len){
+		count = len - *ppos;
+	}
+	*ppos += count;
+
+	return count;
+}
+static ssize_t cfg_value_from_xbar_lut_ocrx_1(struct file *file, char __user *buf,
+ 				 size_t count, loff_t *ppos)
+{
+	uint32_t len;
+	if(ecpriss_hw_ver == 2)
+		len = config_val_from_registers_xbar_v2(buf,OCRX,1);
+	else
+		len = config_val_from_registers_xbar(buf,OCRX,1);
+
+	if((*ppos + count) > len){
+		count = len - *ppos;
+	}
+	*ppos += count;
+
+	return count;
+}
+static ssize_t cfg_value_from_xbar_lut_ocrx_2(struct file *file, char __user *buf,
+ 				 size_t count, loff_t *ppos)
+{
+	uint32_t len;
+	if(ecpriss_hw_ver == 2)
+		len = config_val_from_registers_xbar_v2(buf,OCRX,2);
+	else
+		len = config_val_from_registers_xbar(buf,OCRX,2);
 
 	if((*ppos + count) > len){
 		count = len - *ppos;
@@ -5182,9 +5293,9 @@ static ssize_t cfg_value_from_xbar_lut_c2crxul(struct file *file, char __user *b
 {
 	uint32_t len;
 	if(ecpriss_hw_ver == 2)
-		len = config_val_from_registers_xbar_v2(buf,C2CRXUL);
+		len = config_val_from_registers_xbar_v2(buf,C2CRXUL,0);
 	else
-		len = config_val_from_registers_xbar(buf,C2CRXUL);
+		len = config_val_from_registers_xbar(buf,C2CRXUL,0);
 
 	if((*ppos + count) > len){
 		count = len - *ppos;
@@ -5198,9 +5309,9 @@ static ssize_t cfg_value_from_xbar_lut_c2crxdl(struct file *file, char __user *b
 {
 	uint32_t len;
 	if(ecpriss_hw_ver == 2)
-		len = config_val_from_registers_xbar_v2(buf,C2CRXDL);
+		len = config_val_from_registers_xbar_v2(buf,C2CRXDL,0);
 	else
-		len = config_val_from_registers_xbar(buf,C2CRXDL);
+		len = config_val_from_registers_xbar(buf,C2CRXDL,0);
 
 	if((*ppos + count) > len){
 		count = len - *ppos;
@@ -5214,9 +5325,9 @@ static ssize_t cfg_value_from_xbar_global(struct file *file, char __user *buf,
 {
 	uint32_t len;
 	if(ecpriss_hw_ver == 2)
-		len = config_val_from_registers_xbar_v2(buf,GLOBAL_CFG);
+		len = config_val_from_registers_xbar_v2(buf,GLOBAL_CFG,0);
 	else
-		len = config_val_from_registers_xbar(buf,GLOBAL_CFG);
+		len = config_val_from_registers_xbar(buf,GLOBAL_CFG,0);
 	if((*ppos + count) > len){
 		count = len - *ppos;
 	}
@@ -5923,6 +6034,33 @@ static ssize_t cfg_value_to_global_ecpriss_stats_timeout(struct file *file, cons
 
 
 }
+static ssize_t cfg_value_to_xbar_lut_ocrx(struct file *file, const char __user *buf,
+		size_t count, loff_t *ppos)
+{
+	uint32_t len;
+	len = config_val_to_xbar_lut_ocrx(buf, &count , ppos);
+	if((*ppos + count) > len){
+		count = len - *ppos;
+	}
+	*ppos += count;
+	return count;
+
+
+}
+static ssize_t cfg_value_to_xbar_lut_fhrx(struct file *file, const char __user *buf,
+		size_t count, loff_t *ppos)
+{
+	uint32_t len;
+
+	len = config_val_to_xbar_lut_fhrx(buf, &count , ppos);
+	if((*ppos + count) > len){
+		count = len - *ppos;
+	}
+	*ppos += count;
+	return count;
+
+
+}
 static struct file_operations stats_fh_ops_00 = {
 	.read = stats_value_from_registers_fh_00,
 };
@@ -6004,11 +6142,29 @@ static struct file_operations error_xbar_ops = {
 	.read = error_value_from_xbar,
 };
 
-static struct file_operations cfg_xbar_lut_ops_fhrx = {
-	.read = cfg_value_from_xbar_lut_fhrx,
+static struct file_operations cfg_xbar_lut_ops_fhrx_0 = {
+	.read = cfg_value_from_xbar_lut_fhrx_0,
+	.write = cfg_value_to_xbar_lut_fhrx,
 };
-static struct file_operations cfg_xbar_lut_ops_ocrx = {
-	.read = cfg_value_from_xbar_lut_ocrx,
+static struct file_operations cfg_xbar_lut_ops_fhrx_1 = {
+	.read = cfg_value_from_xbar_lut_fhrx_1,
+	.write = cfg_value_to_xbar_lut_fhrx,
+};
+static struct file_operations cfg_xbar_lut_ops_fhrx_2 = {
+	.read = cfg_value_from_xbar_lut_fhrx_2,
+	.write = cfg_value_to_xbar_lut_fhrx,
+};
+static struct file_operations cfg_xbar_lut_ops_ocrx_0 = {
+	.read = cfg_value_from_xbar_lut_ocrx_0,
+	.write = cfg_value_to_xbar_lut_ocrx,
+};
+static struct file_operations cfg_xbar_lut_ops_ocrx_1 = {
+	.read = cfg_value_from_xbar_lut_ocrx_1,
+	.write = cfg_value_to_xbar_lut_ocrx,
+};
+static struct file_operations cfg_xbar_lut_ops_ocrx_2 = {
+	.read = cfg_value_from_xbar_lut_ocrx_2,
+	.write = cfg_value_to_xbar_lut_ocrx,
 };
 static struct file_operations cfg_xbar_lut_ops_c2crxul = {
 	.read = cfg_value_from_xbar_lut_c2crxul,
@@ -6268,19 +6424,51 @@ static struct file_operations *file_name_to_wrapper(char *filename)
 	{
 		return &error_xbar_ops;
 	}
-	else if (!strncmp(filename, "ocrx", XBAR_WRAPPER_SIZE))
+	else if (!strncmp(filename, "fh0:ocrx_fh0", XBAR_WRAPPER_SIZE))
 	{
-		return &cfg_xbar_lut_ops_ocrx;
+		return &cfg_xbar_lut_ops_ocrx_0;
 	}
-	else if (!strncmp(filename, "fhrx", XBAR_WRAPPER_SIZE))
+	else if (!strncmp(filename, "fh1:ocrx_fh1", XBAR_WRAPPER_SIZE))
 	{
-		return &cfg_xbar_lut_ops_fhrx;
+		return &cfg_xbar_lut_ops_ocrx_1;
 	}
-	else if (!strncmp(filename, "c2crxDL", XBAR_WRAPPER_SIZE))
+	else if (!strncmp(filename, "fh2:ocrx_fh2", XBAR_WRAPPER_SIZE))
+	{
+		return &cfg_xbar_lut_ops_ocrx_2;
+	}
+	else if (!strncmp(filename, "fh0:fhrx_fh0", XBAR_WRAPPER_SIZE))
+	{
+		return &cfg_xbar_lut_ops_fhrx_0;
+	}
+	else if (!strncmp(filename, "fh1:fhrx_fh1", XBAR_WRAPPER_SIZE))
+	{
+		return &cfg_xbar_lut_ops_fhrx_1;
+	}
+	else if (!strncmp(filename, "fh2:fhrx_fh2", XBAR_WRAPPER_SIZE))
+	{
+		return &cfg_xbar_lut_ops_fhrx_2;
+	}
+	else if (!strncmp(filename, "fh0:c2crxDL_fh0", XBAR_WRAPPER_SIZE))
 	{
 		return &cfg_xbar_lut_ops_c2crxdl;
 	}
-	else if (!strncmp(filename, "c2crxUL", XBAR_WRAPPER_SIZE))
+	else if (!strncmp(filename, "fh1:c2crxDL_fh1", XBAR_WRAPPER_SIZE))
+	{
+		return &cfg_xbar_lut_ops_c2crxdl;
+	}
+	else if (!strncmp(filename, "fh2:c2crxDL_fh2", XBAR_WRAPPER_SIZE))
+	{
+		return &cfg_xbar_lut_ops_c2crxdl;
+	}
+	else if (!strncmp(filename, "fh0:c2crxUL_fh0", XBAR_WRAPPER_SIZE))
+	{
+		return &cfg_xbar_lut_ops_c2crxul;
+	}
+	else if (!strncmp(filename, "fh1:c2crxUL_fh1", XBAR_WRAPPER_SIZE))
+	{
+		return &cfg_xbar_lut_ops_c2crxul;
+	}
+	else if (!strncmp(filename, "fh2:c2crxUL_fh2", XBAR_WRAPPER_SIZE))
 	{
 		return &cfg_xbar_lut_ops_c2crxul;
 	}
