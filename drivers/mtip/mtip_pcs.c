@@ -406,6 +406,38 @@ static void mtip_pcs_set_vl_registers_for_1x50gbase_R(struct mtip_link_device_in
     mtip_pcs_set_v1_register_value1(link_device, &index, 0x9b);
     mtip_pcs_set_v1_register_value0(link_device, &index, 0x79a2);
     mtip_pcs_set_v1_register_value1(link_device, &index, 0x3d);
+    mtip_pcs_set_v1_register_value0(link_device, &index, 0x7F5);
+    mtip_pcs_set_v1_register_value1(link_device, &index, 0x9);
+    mtip_pcs_set_v1_register_value0(link_device, &index, 0x14DD);
+    mtip_pcs_set_v1_register_value1(link_device, &index, 0x0C2);
+    mtip_pcs_set_v1_register_value0(link_device, &index, 0x4A9A);
+    mtip_pcs_set_v1_register_value1(link_device, &index, 0x26);
+    mtip_pcs_set_v1_register_value0(link_device, &index, 0x457B);
+    mtip_pcs_set_v1_register_value1(link_device, &index, 0x66);
+    mtip_pcs_set_v1_register_value0(link_device, &index, 0x24A0);
+    mtip_pcs_set_v1_register_value1(link_device, &index, 0x76);
+    mtip_pcs_set_v1_register_value0(link_device, &index, 0x0C968);
+    mtip_pcs_set_v1_register_value1(link_device, &index, 0x0FB);
+    mtip_pcs_set_v1_register_value0(link_device, &index, 0x6CFD);
+    mtip_pcs_set_v1_register_value1(link_device, &index, 0x99);
+    mtip_pcs_set_v1_register_value0(link_device, &index, 0x91B9);
+    mtip_pcs_set_v1_register_value1(link_device, &index, 0x55);
+    mtip_pcs_set_v1_register_value0(link_device, &index, 0x0B95C);
+    mtip_pcs_set_v1_register_value1(link_device, &index, 0x0B2);
+    mtip_pcs_set_v1_register_value0(link_device, &index, 0x0F81A);
+    mtip_pcs_set_v1_register_value1(link_device, &index, 0x0BD);
+    mtip_pcs_set_v1_register_value0(link_device, &index, 0x0C783);
+    mtip_pcs_set_v1_register_value1(link_device, &index, 0x0CA);
+    mtip_pcs_set_v1_register_value0(link_device, &index, 0x3635);
+    mtip_pcs_set_v1_register_value1(link_device, &index, 0x0CD);
+    mtip_pcs_set_v1_register_value0(link_device, &index, 0x31C4);
+    mtip_pcs_set_v1_register_value1(link_device, &index, 0x4C);
+    mtip_pcs_set_v1_register_value0(link_device, &index, 0x0D6AD);
+    mtip_pcs_set_v1_register_value1(link_device, &index, 0x0B7);
+    mtip_pcs_set_v1_register_value0(link_device, &index, 0x665F);
+    mtip_pcs_set_v1_register_value1(link_device, &index, 0x2A);
+    mtip_pcs_set_v1_register_value0(link_device, &index, 0x0F0C0);
+    mtip_pcs_set_v1_register_value1(link_device, &index, 0x0E5);
 }
 
 static void mtip_pcs_set_vl_registers_for_1x50gbase_R2(struct mtip_link_device_info* link_device)
