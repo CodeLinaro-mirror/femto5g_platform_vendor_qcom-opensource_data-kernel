@@ -407,6 +407,9 @@ static void ecpri_dma_qmi_service_q6_send_init_msg(struct work_struct* work)
 
 		}
 
+		DMAERR("QMI handshake retry number: %d \n",
+			ecpri_dma_qmi_ctx->sending_retries);
+
 		queue_delayed_work(ecpri_dma_qmi_ctx->clnt_req_wq,
 			&ecpri_dma_work_send_q6_init_msg,
 			ECPRI_DMA_QMI_COMPLETION_TIMEOUT);
@@ -434,6 +437,7 @@ static void ecpri_dma_qmi_service_q6_send_init_msg(struct work_struct* work)
 		 * which requires a kernel panic in
 		 * order to forete dumps for QMI/Q6 side analysis.
 		 */
+		ecpri_dma_assert();
 	}
 }
 
