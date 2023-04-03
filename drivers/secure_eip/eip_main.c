@@ -220,14 +220,14 @@ static int eip_port_deinit(uint32_t port_id)
 	ingress_device = GET_INGRESS_ID_FROM_PORT_ID(port_id);
 	egress_device = GET_EGRESS_ID_FROM_PORT_ID(port_id);
 
-	if (eip_device_deinit(true, true, ingress_device) < 0) {
+	if (eip_device_deinit(true, ingress_device) < 0) {
 		/* capture error */
 		LOG_CRIT("%s: failed uninit for ingress device %d ", __func__,
 			 ingress_device);
 		return -1;
 	}
 
-	if (eip_device_deinit(true, false, egress_device) < 0) {
+	if (eip_device_deinit(false, egress_device) < 0) {
 		/* capture error */
 		LOG_CRIT("%s: failed uninit for egress device %d", __func__,
 			 egress_device);
