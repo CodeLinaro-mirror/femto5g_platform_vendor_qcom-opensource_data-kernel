@@ -44,6 +44,6 @@ extern const struct macsec_ops eip_macsec_ops;
 
 void eip_macsec_initalize_priv_data(uint32_t device_id);
 
-int eip_device_deinit(bool fVerbose, bool fIngress, unsigned int device_id);
+int eip_device_deinit(bool fIngress, unsigned int device_id);
 
 #endif /* MACSEC_DEVICE_H_ */
