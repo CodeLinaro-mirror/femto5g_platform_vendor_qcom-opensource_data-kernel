@@ -28,7 +28,7 @@ void ecpriss_dma_events_cb_v2(void *user_data, enum ecpri_dma_event_type);
 void ecpriss_dma_endp_cb(void * user_data);
 void ecpriss_stats_timer_cb(struct timer_list *data);
 void ecpriss_dma_endp_cb_v2(void * user_data);
-
+static int ecpriss_ssr_events_cb(struct notifier_block *this,unsigned long code, void *data);
 
 void ecpriss_eth_events_cb(eth_ecpriss_event_e event_type,
 		eth_ecpriss_link_event_params_s *link_event_params);
@@ -36,7 +36,6 @@ void ecpriss_configure_xbar_flush(ecpriss_port_type_e port_type,ecpriss_port_idx
 void ecpriss_configure_xbar_flush_v2(ecpriss_port_type_e port_type,ecpriss_port_idx_e port_idx,eth_ecpriss_event_e event_type);
 void ecpriss_eth_events_cb_v2(eth_ecpriss_event_e event_type,
 		eth_ecpriss_link_event_params_s *link_event_params);
-
 void ecpriss_dma_ecpri_ss_log_msg_cb(void *user_data, const char *fmt, ...);
 void ecpriss_dma_ecpri_ss_log_msg_cb_v2(void *user_data, const char *fmt, ...);
 
@@ -64,10 +63,9 @@ eth_ecpriss_interface_events_cb           eth_interface_events_cb;
 struct ecpri_dma_ecpri_ss_register_params dma_ready_info;
 eth_ecpriss_link_event_params_s           link_event_params;
 /* ecpriss_stats_s                           stats_g; */
-
+struct ecpriss_ssr_nb ssr_info_g;
 
 /* DEbug Useful Data */
-
 typedef struct {
 
 	int tx_flow_cnt;
@@ -742,6 +740,19 @@ void ecpriss_dma_event_processing_wq(struct work_struct *work)
 	return;
 }
 
+
+void ecpriss_ssr_events_processing_wq(struct work_struct *work)
+{
+	uint32_t val = -1;
+	if(work == NULL) {
+		return;
+	}
+	val = atomic_read(&ecpriss_pdata_v2->ssr_info->curr_ssr_state);
+
+	ecpriss_xbar_oc_flush_enable(val);
+
+	return;
+}
 void ecpriss_interrupt_events_processing_wq(struct work_struct *work)
 {
 	if(work == NULL) {
@@ -767,7 +778,42 @@ void ecpriss_dma_events_cb_v2(void *user_data, enum ecpri_dma_event_type evt)
 }
 
 
+int ecpriss_ssr_events_cb(struct notifier_block *this,unsigned long code, void *data)
+{
+	int ret = 0;
+	struct workqueue_struct *ecpriss_wq = NULL;
+	struct work_struct *ecpriss_work = NULL;
 
+	ECPRILOGINFO("received %ld for %s\n", code,ecpriss_pdata_v2-> ssr_info->ssr_label);
+
+	switch (code) {
+		case QCOM_SSR_AFTER_SHUTDOWN:
+			atomic_set(&ecpriss_pdata_v2->ssr_info->curr_ssr_state,code);
+			break;
+	 	case QCOM_SSR_AFTER_POWERUP:
+			atomic_set(&ecpriss_pdata_v2->ssr_info->curr_ssr_state,code);
+			break;
+		default:
+			return NOTIFY_DONE;
+	}
+
+	do {
+		ecpriss_pdata_v2->callback_flag->ssr_callback_rcvd = 1;
+		ecpriss_wq =
+			ecpriss_pdata_v2->events_workqueue->kernel_events_workqueue;
+		ecpriss_work =
+			ecpriss_pdata_v2->events_workqueue->ecpriss_ssr_events_rdy_work;
+
+		ret = ecpriss_queue_work(ecpriss_wq,ecpriss_work);
+
+		if(ret < 0) {
+			ECPRILOGERR("Queue work failed\n");
+			break;
+		}
+	}while (0);
+
+ 	return NOTIFY_DONE;
+}
 void ecpriss_eth_topology_cb(void)
 {
 	int ret=0;
@@ -818,7 +864,7 @@ void ecpriss_eth_events_cb(eth_ecpriss_event_e event_type,
 	struct workqueue_struct *ecpriss_wq;
 	struct work_struct *ecpriss_work;
 
-	ECPRILOGERR("ecpriss_eth_events_cb event received %d", event_type);
+	ECPRILOGDBG("ecpriss_eth_events_cb event received %d", event_type);
 
 
 	do{
@@ -1120,7 +1166,7 @@ static int ecpriss_core_data_init_v2(void)
 	ecpriss_pdata_v2->qudp_ctx_v2->ecpriss_qudp_hal_ctx =
 		qudp_ctx_g.ecpriss_qudp_hal_ctx;
 	ecpriss_pdata_v2->xbar_ctx_v2->ecpriss_xbar_hal = xbar_ctx_g_v2.ecpriss_xbar_hal;
-
+	ecpriss_pdata_v2->ssr_info = &ssr_info_g;
 	/* ecpriss_pdata->stats = &stats_g; */
 
 	eth_topology_ready_cb = &ecpriss_eth_topology_cb_v2;
@@ -1222,6 +1268,7 @@ static int ecpriss_core_register_callbacks_v2(void)
 	int ret = 0;
 	bool ready = 0;
 	bool *is_ready = &ready;
+	void * handle;
 
 	do{
 		ret = (mtip_ecpri_ops.eth_ecpriss_register_ready_cb)
@@ -1268,6 +1315,20 @@ static int ecpriss_core_register_callbacks_v2(void)
 				break;
 			}
 		}
+		ecpriss_pdata_v2->ssr_info->ssr_label = "ecpriss_core_ssr";
+		ecpriss_pdata_v2->ssr_info->nb.notifier_call = ecpriss_ssr_events_cb;
+
+		handle = qcom_register_ssr_notifier("mpss",&ecpriss_pdata_v2->ssr_info->nb);
+
+		if (IS_ERR_OR_NULL(handle)) {
+			ECPRILOGERR("could not register for SSR notifier for %s\n failed with err %d",
+			ecpriss_pdata_v2->ssr_info->ssr_label,PTR_ERR(handle));
+				break;
+		}
+
+		ECPRILOGINFO("SSR registered successfully for %s\n",ecpriss_pdata_v2->ssr_info->ssr_label);
+		ecpriss_pdata_v2->ssr_info->notifier_handle = handle;
+
 	}while (0);
 	return ret;
 }
@@ -1613,7 +1674,7 @@ static int ecpriss_core_init_v2(struct platform_device *pdev)
 			break;
 		}
 		memset(ecpriss_pdata_v2,0,sizeof(ecpriss_core_private_s));
-
+		ecpriss_pdata_v2->pdev = pdev;
 		ret = ecpriss_clock_init(&pdev->dev);
 		if(ret < 0) {
 			ECPRILOGERR("Initialization of clock failed\n");

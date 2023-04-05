@@ -10,6 +10,8 @@ struct work_struct          ecpriss_eth_events_rdy;
 struct work_struct          ecpriss_dma_events_rdy;
 struct work_struct          ecpriss_eth_topology_events_rdy;
 struct work_struct          ecpriss_interrupt_events_rdy;
+struct work_struct          ecpriss_ssr_events_rdy;
+
 
 struct workqueue_struct     *events_workqueue;
 struct workqueue_struct     *interrupt_events_workqueue;
@@ -127,6 +129,9 @@ int ecpriss_initialize_workq_v2(void)
 		ecpriss_pdata_v2->interrupts_workqueue->ecpriss_interrupt_events_rdy_work=
 			&ecpriss_interrupt_events_rdy;
 
+		INIT_WORK(&ecpriss_ssr_events_rdy, ecpriss_ssr_events_processing_wq);
+		ecpriss_pdata_v2->events_workqueue->ecpriss_ssr_events_rdy_work=
+			&ecpriss_ssr_events_rdy;
 
 
 	} while(0);

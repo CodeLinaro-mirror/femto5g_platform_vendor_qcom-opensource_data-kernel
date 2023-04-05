@@ -816,6 +816,48 @@ static void ecpriss_xbar_flush(ecpriss_port_type_e    port_type,
 }
 #endif
 
+void ecpriss_xbar_oc_flush_enable(uint32_t ecpri_ssr_state)
+{
+	ecpri_xbar_hwio_def_ecpri_xbar_flush_s xbar_flush;
+	int *flush_val;
+	uint32_t val = -1;
+	memset(&xbar_flush,0xFF,sizeof(xbar_flush));
+
+	/*Read Reset value*/
+	ecpriss_xbar_hal_read_reg_n_fields(ECPRISS_XBAR_GLOBAL, ECPRI_XBAR_FLUSH,0, &xbar_flush);
+	flush_val = (int*)(&xbar_flush);
+	ECPRILOGINFO("%s: Reset xbar flush val = 0x%x\n",__func__,*flush_val);
+
+	/*Enable Flush*/
+	if(ecpri_ssr_state == QCOM_SSR_AFTER_SHUTDOWN) {
+		val = ENABLE_BIT;
+	}else {
+		val = DISABLE_BIT;
+	}
+
+	xbar_flush.flush_oc_0_rx = val;
+	xbar_flush.flush_oc_0_tx = val;
+	xbar_flush.flush_oc_1_rx = val;
+	xbar_flush.flush_oc_1_tx = val;
+	xbar_flush.flush_oc_2_rx = val;
+	xbar_flush.flush_oc_2_tx = val;
+	xbar_flush.flush_oc_3_rx = val;
+	xbar_flush.flush_oc_3_tx = val;
+
+	xbar_flush.reserved0 = 0;
+	xbar_flush.reserved1 = 0;
+	xbar_flush.reserved2 = 0;
+
+	ecpriss_xbar_hal_write_reg_n_fields(ECPRISS_XBAR_GLOBAL,ECPRI_XBAR_FLUSH,
+			0,
+			&xbar_flush);
+	ecpriss_pdata_v2->xbar_ctx_v2->xbar_flush_status = xbar_flush;
+
+	flush_val = (int*)(&xbar_flush);
+	ECPRILOGINFO("%s: xbar flush val after SSR event = 0x%x\n",__func__,*flush_val);
+
+	return;
+}
 void ecpriss_configure_xbar_flush_v2(ecpriss_port_type_e port_type,
                 ecpriss_port_idx_e port_idx, eth_ecpriss_event_e event_type)
 {
