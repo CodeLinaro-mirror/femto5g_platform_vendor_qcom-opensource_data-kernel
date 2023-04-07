@@ -849,11 +849,8 @@ void ecpri_dma_save_registers(void) {
 		dma.gen, ecpri_dma_exception_channel);
 	READ_DMA_REG(ECPRI_DMA_PKT_DROP_FULL,
 		dma.gen, ecpri_dma_pkt_drop_full);
-
-	if (ECPRI_HW_V1_0 == ecpri_dma_ctx->ecpri_hw_ver)
-		READ_DMA_REG(ECPRI_DMA_PKT_DROP_RE_EMPTY,
-			dma.gen, ecpri_dma_pkt_drop_re_empty);
-
+	READ_DMA_REG(ECPRI_DMA_PKT_DROP_RE_EMPTY,
+		dma.gen, ecpri_dma_pkt_drop_re_empty);
 	READ_DMA_REG(ECPRI_DMA_TPDM_CFG,
 		dma.gen, ecpri_dma_tpdm_cfg);
 
