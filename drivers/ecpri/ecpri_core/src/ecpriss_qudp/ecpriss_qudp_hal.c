@@ -4811,7 +4811,7 @@ static struct ecpriss_qudp_hal_reg_obj ecpriss_qudp_hal_reg_objs[ECPRISS_HW_MAX]
 	[ECPRISS_HW_v2_0][ECPRI_UDP_FH_INGRESS_CONFIG_P_V2] = {
 		ecpriss_qudp_hal_reg_construct_udp_fh_ingress_config_p_v2,
 		ecpriss_qudp_hal_reg_parse_udp_fh_ingress_config_p_v2,
-		0x09380000, 0x0, 0x4, 0, 0, 0, 0},
+		0x09380000, 0x0, 0, 0, 0, 0, 0},
 	[ECPRISS_HW_v2_0][ECPRI_UDP_FH_EGRESS_IPV4_FIELDS_P_V2] = {
 		ecpriss_qudp_hal_reg_construct_udp_fh_egress_ipv4_fields_p_v2,
 		ecpriss_qudp_hal_reg_parse_dummy_v2,
