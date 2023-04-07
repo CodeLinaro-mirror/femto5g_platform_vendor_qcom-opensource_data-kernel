@@ -21,7 +21,7 @@ static int ecpri_oxtor_tx_ctor_cmd(ecpri_oxtor_core_tx_cmd_cfg_s *user_cmd,
 	tx_cmd->fields.data_length = user_cmd->pkt_cfg.pkt_len;
 	tx_cmd->fields.inter_pkt_delay = user_cmd->pkt_cfg.inter_pkt_delay;
 	tx_cmd->fields.ecpri_msg_type = user_cmd->pkt_cfg.ecpri_msg_type;
-	tx_cmd->fields.first_byte_prach_hdr = user_cmd->pkt_cfg.first_byte_prach_hdr;
+
 	/* Set initData and xuId in oxtor cmd */
 	tx_cmd->fields.init_data = user_cmd->pkt_cfg.init_data;
 	tx_cmd->fields.xu_num = user_cmd->pkt_cfg.xu_id;

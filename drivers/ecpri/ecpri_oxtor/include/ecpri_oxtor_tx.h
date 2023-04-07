@@ -63,7 +63,7 @@ typedef struct
 	/**@brief should be created by using the macro ECPRI_oxtor_LINK_ID_GEN*/
 	u32 link_id : 6;             /* bits 16-21 */
 	u32 target_rx : 2;           /* bits 22-23 */
-	u32 first_byte_prach_hdr : 8;           /* bits 24-31 */
+	u32 rsvd_0_24 : 8;           /* bits 24-31 */
 
 	/* RAW WORD 1 */
 	/** @brief control the bw */

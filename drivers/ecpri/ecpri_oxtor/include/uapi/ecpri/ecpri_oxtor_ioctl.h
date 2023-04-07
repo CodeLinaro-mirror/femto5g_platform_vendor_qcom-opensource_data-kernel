@@ -79,7 +79,6 @@ typedef struct
 	uint16_t pkt_len;
 	/*Inter pkt delay*/
 	uint16_t inter_pkt_delay;
-	uint8_t first_byte_prach_hdr;
 	/*eCPRI payload init data*/
 	uint32_t  init_data;
 	/*eCPRI MSG type*/
