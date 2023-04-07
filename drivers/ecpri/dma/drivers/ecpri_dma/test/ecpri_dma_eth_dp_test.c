@@ -169,13 +169,10 @@ ecpri_dma_eth_dp_test_util_get_conn_from_hdl (ecpri_dma_eth_conn_hdl_t hdl)
 static int ecpri_dma_eth_dp_test_util_setup_dma_endps(
 	enum ecpri_dma_endp_dir dir,
 	bool enable_loopback,
-	enum ecpri_dma_endp_stream_mode mode,
-	bool exception_test)
+	enum ecpri_dma_endp_stream_mode mode)
 {
-	u32 endp_id;
-	u32 gsi_id = ECPRI_DMA_GSI_ID_0;
-	u32 lb_dest_endp = ECPRI_DMA_ETH_CLIENT_UT_DEST_ENDP_ID;
-	u32 lb_dest_gsi_id = gsi_id;
+	int endp_id;
+	int gsi_id = ECPRI_DMA_GSI_ID_0;
 
 	ecpri_hwio_def_ecpri_endp_cfg_dest_gsi_m_ch_n_u endp_cfg_dest = { 0 };
 	struct ecpri_dma_ecpri_endp_cfg_xbar_fields endp_cfg_xbar = { 0 };
@@ -216,16 +213,8 @@ static int ecpri_dma_eth_dp_test_util_setup_dma_endps(
 			else
 				endp_cfg_xbar.loopback_en = 1;
 
-			if(exception_test)
-			{
-				lb_dest_endp = ecpri_dma_ctx->exception_endp.endp_id;
-				lb_dest_gsi_id = ecpri_dma_ctx->exception_endp.gsi_id;
-			}
-
 			endp_cfg_dest.def.dest_mem_channel =
-				lb_dest_endp;
-			endp_cfg_dest.def.loopback_gid =
-				lb_dest_gsi_id;
+				ECPRI_DMA_ETH_CLIENT_UT_DEST_ENDP_ID;
 			ecpri_dma_hal_write_reg_mn(
 				ECPRI_ENDP_CFG_DEST, gsi_id, endp_id,
 				endp_cfg_dest.value);
@@ -1533,12 +1522,12 @@ static int ecpri_dma_eth_dp_test_suite_setup(void **ppriv)
 		ECPRI_DMA_ETH_CLIENT_UT_TX_USER_DATA_VAL;
 
 	ret = ecpri_dma_eth_dp_test_util_setup_dma_endps(
-		ECPRI_DMA_ENDP_DIR_SRC, true, ECPRI_DMA_ENDP_STREAM_MODE_M2S, false);
+		ECPRI_DMA_ENDP_DIR_SRC, true, ECPRI_DMA_ENDP_STREAM_MODE_M2S);
 	if (ret)
 		return ret;
 
 	ret = ecpri_dma_eth_dp_test_util_setup_dma_endps(
-		ECPRI_DMA_ENDP_DIR_DEST, true, ECPRI_DMA_ENDP_STREAM_MODE_S2M, false);
+		ECPRI_DMA_ENDP_DIR_DEST, true, ECPRI_DMA_ENDP_STREAM_MODE_S2M);
 	if (ret)
 		return ret;
 
@@ -1554,13 +1543,13 @@ static int ecpri_dma_eth_dp_test_suite_teardown(void *priv)
 	/* Once endps are stopped, remove loopback config */
 	ret = ecpri_dma_eth_dp_test_util_setup_dma_endps(
 		ECPRI_DMA_ETH_CLIENT_UT_SRC_ENDP_ID, false,
-		ECPRI_DMA_ENDP_STREAM_MODE_M2S, false);
+		ECPRI_DMA_ENDP_STREAM_MODE_M2S);
 	if (ret)
 		return ret;
 
 	ret = ecpri_dma_eth_dp_test_util_setup_dma_endps(
 		ECPRI_DMA_ETH_CLIENT_UT_DEST_ENDP_ID, false,
-		ECPRI_DMA_ENDP_STREAM_MODE_S2M, false);
+		ECPRI_DMA_ENDP_STREAM_MODE_S2M);
 	if (ret)
 		return ret;
 
@@ -1845,93 +1834,6 @@ static int ecpri_dma_eth_dp_test_suite_connect(void *priv) {
 
 	/* Deregister and check */
 	ecpri_dma_eth_deregister();
-
-	return ret;
-}
-
-static int ecpri_dma_eth_dp_test_suite_single_pkt_single_buffer_exception(void *priv) {
-	int ret = 0;
-	int num_of_pkts_to_send = 1;
-	int num_to_repelnish = 0;
-	struct ecpri_dma_pkt **tx_pkts;
-	struct ecpri_dma_pkt_completion_wrapper **rx_pkts;
-
-	DMA_UT_DBG("Start stop & reset during data test\n");
-
-	ret = ecpri_dma_eth_dp_test_util_setup_dma_endps(
-		ECPRI_DMA_ENDP_DIR_SRC, true, ECPRI_DMA_ENDP_STREAM_MODE_M2S, true);
-	if (ret)
-		return ret;
-
-	ret = ecpri_dma_eth_dp_test_util_setup_dma_endps(
-		ECPRI_DMA_ENDP_DIR_DEST, true, ECPRI_DMA_ENDP_STREAM_MODE_S2M, true);
-	if (ret)
-		return ret;
-
-	DMA_UT_DBG("Start Loopback Single packet\n");
-
-	ret = ecpri_dma_eth_dp_test_util_init();
-	if (ret != 0) {
-		DMA_UT_LOG("Failed to initialize the test\n");
-		return ret;
-	}
-
-	ret = ecpri_dma_eth_dp_test_util_prepare_test_data(num_of_pkts_to_send,
-		true, &tx_pkts, &rx_pkts);
-	if (ret != 0) {
-		DMA_UT_LOG("Failed to prepare test data\n");
-		return ret;
-	}
-
-	/* Prepare exact amount of credits equal to amount of buffers sent */
-	if (ecpri_dma_get_ctx_hw_ver() == ECPRI_HW_V1_0) {
-		ret = ecpri_dma_eth_dp_test_suite_calculate_credits(0, tx_pkts,
-			num_of_pkts_to_send, &num_to_repelnish);
-		if (ret) {
-			DMA_UT_LOG("Failed to calculate credits\n");
-			return ret;
-		}
-
-		ret = ecpri_dma_eth_dp_test_util_rx_replenish(num_to_repelnish);
-		if (ret != 0) {
-			DMA_UT_LOG("Test failed due to replenish buffers failure\n");
-			return -EFAULT;
-		}
-	}
-
-	/* Transmit single packet */
-	ret = ecpri_dma_eth_transmit(eth_client_test_suite_ctx.hdl,
-		tx_pkts, num_of_pkts_to_send, true);
-	if (ret != 0) {
-		DMA_UT_TEST_FAIL_REPORT("Failed on transmit");
-		return -EFAULT;
-	}
-
-	/* Verify single packet */
-	ret = ecpri_dma_eth_dp_test_util_wait_for_tx_comp(num_of_pkts_to_send);
-	if (ret != 0) {
-		DMA_UT_TEST_FAIL_REPORT("Test failed due to Tx timeout");
-		return -EFAULT;
-	}
-
-	/* Test clean-up */
-	ret = ecpri_dma_eth_dp_test_util_clean_up(eth_client_test_suite_ctx.hdl,
-		num_of_pkts_to_send, true, tx_pkts,
-		rx_pkts);
-	if (ret != 0) {
-		DMA_UT_LOG("Failed to clean the test\n");
-		return ret;
-	}
-
-	ret = ecpri_dma_eth_dp_test_util_setup_dma_endps(
-		ECPRI_DMA_ENDP_DIR_SRC, true, ECPRI_DMA_ENDP_STREAM_MODE_M2S, false);
-	if (ret)
-		return ret;
-
-	ret = ecpri_dma_eth_dp_test_util_setup_dma_endps(
-		ECPRI_DMA_ENDP_DIR_DEST, true, ECPRI_DMA_ENDP_STREAM_MODE_S2M, false);
-	if (ret)
-		return ret;
 
 	return ret;
 }
@@ -2648,12 +2550,12 @@ static int ecpri_dma_eth_dp_test_suite_stop_reset_durig_data(void* priv) {
 	DMA_UT_DBG("Start stop & reset during data test\n");
 
 	ret = ecpri_dma_eth_dp_test_util_setup_dma_endps(
-		ECPRI_DMA_ENDP_DIR_SRC, true, ECPRI_DMA_ENDP_STREAM_MODE_M2M, false);
+		ECPRI_DMA_ENDP_DIR_SRC, true, ECPRI_DMA_ENDP_STREAM_MODE_M2M);
 	if (ret)
 		return ret;
 
 	ret = ecpri_dma_eth_dp_test_util_setup_dma_endps(
-		ECPRI_DMA_ENDP_DIR_DEST, true, ECPRI_DMA_ENDP_STREAM_MODE_M2M, false);
+		ECPRI_DMA_ENDP_DIR_DEST, true, ECPRI_DMA_ENDP_STREAM_MODE_M2M);
 	if (ret)
 		return ret;
 
@@ -2777,12 +2679,12 @@ static int ecpri_dma_eth_dp_test_suite_stop_reset_durig_data(void* priv) {
 	}
 
 	ret = ecpri_dma_eth_dp_test_util_setup_dma_endps(
-		ECPRI_DMA_ENDP_DIR_SRC, true, ECPRI_DMA_ENDP_STREAM_MODE_M2S, false);
+		ECPRI_DMA_ENDP_DIR_SRC, true, ECPRI_DMA_ENDP_STREAM_MODE_M2S);
 	if (ret)
 		return ret;
 
 	ret = ecpri_dma_eth_dp_test_util_setup_dma_endps(
-		ECPRI_DMA_ENDP_DIR_DEST, true, ECPRI_DMA_ENDP_STREAM_MODE_S2M, false);
+		ECPRI_DMA_ENDP_DIR_DEST, true, ECPRI_DMA_ENDP_STREAM_MODE_S2M);
 	if (ret)
 		return ret;
 
@@ -2851,11 +2753,4 @@ DMA_UT_DEFINE_SUITE_START(eth_dp, "ETH DP suite",
 		"This test will verify stop & reset during data on M2S & S2M CHs.",
 		ecpri_dma_eth_dp_test_suite_stop_reset_durig_data_m2s_s2m, true,
 		ECPRI_HW_V2_0, ECPRI_HW_MAX),
-		DMA_UT_ADD_TEST(
-			single_pkt_single_buffer_exception,
-			"This test will verify the exception path by sending a single packet"
-			" with a single buffer on SRC ENDP and confirming ETH Client "
-			"received it the same on exception ENDP.",
-			ecpri_dma_eth_dp_test_suite_single_pkt_single_buffer_exception, true,
-			ECPRI_HW_V1_0, ECPRI_HW_MAX),
 } DMA_UT_DEFINE_SUITE_END(eth_dp);

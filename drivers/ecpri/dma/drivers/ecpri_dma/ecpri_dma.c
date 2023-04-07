@@ -49,6 +49,7 @@
 #include "dmahal.h"
 #include "ecpri_dma_reg_dump.h"
 
+#define ECPRI_DMA_EXCEPTION_MAX_INITIAL_CREDITS (20)
 #define ECPRI_DMA_GSI_CHANNEL_STOP_SLEEP_MIN_USEC (3000)
 #define ECPRI_DMA_GSI_CHANNEL_STOP_SLEEP_MAX_USEC (5000)
 
@@ -354,14 +355,12 @@ static void ecpri_dma_handle_gsi_differ_irq(void)
 static void ecpri_dma_exception_replenish_work(struct work_struct *work)
 {
 	int ret = 0;
-	unsigned long flags;
 	struct ecpri_dma_endp_context *ep;
 	struct ecpri_dma_exception_replenish_work_wrap *work_data =
 		container_of(work,
 			     struct ecpri_dma_exception_replenish_work_wrap,
 			     replenish_work);
 
-	spin_lock_irqsave(&ecpri_dma_ctx->exception_spinlock, flags);
 	ep = &ecpri_dma_ctx->
 		endp_ctx[ecpri_dma_ctx->exception_endp.gsi_id]
 		[ecpri_dma_ctx->exception_endp.endp_id];
@@ -376,7 +375,6 @@ static void ecpri_dma_exception_replenish_work(struct work_struct *work)
 		kfree(work_data);
 		return;
 	}
-	spin_unlock_irqrestore(&ecpri_dma_ctx->exception_spinlock, flags);
 
 	kfree(work_data);
 
@@ -396,7 +394,7 @@ static int ecpri_dma_alloc_exception_endp(void)
 	struct ecpri_dma_exception_replenish_work_wrap *work;
 	bool found_exception = false;
 	int ret = 0;
-	int endp_id, gsi_id, i;
+	int endp_id, gsi_id;
 
 	for (gsi_id = 0; gsi_id < ECPRI_DMA_GSI_NUM_MAX; gsi_id++) {
 		for (endp_id = 0; endp_id < ECPRI_DMA_ENDP_NUM_MAX; endp_id++) {
@@ -441,7 +439,7 @@ static int ecpri_dma_alloc_exception_endp(void)
 				ep->valid = true;
 				ep->endp_id = endp_id;
 				ep->gsi_id = gsi_id;
-				ep->ring_length = ECPRI_DMA_EXCEPTION_RING_SIZE;
+				ep->ring_length = gsi_ep_cfg->dma_if_aos;
 				ep->int_modt = ECPRI_DMA_EXCEPTION_ENDP_MODT;
 				ep->int_modc = ECPRI_DMA_EXCEPTION_ENDP_MODC;
 				ep->buff_size = ECPRI_DMA_EXCEPTION_ENDP_BUFF_SIZE;
@@ -475,42 +473,36 @@ static int ecpri_dma_alloc_exception_endp(void)
 					goto fail_out_cache;
 				}
 
+				ep->available_exception_pkts_cache = kmem_cache_create(
+					"DMA_EXCEPTION_PKTS_WRAPPER",
+					sizeof(struct ecpri_dma_pkt), 0, 0, NULL);
+				if (!ep->available_exception_pkts_cache) {
+					DMAERR("DMA exception pkts wrapper cache create failed\n");
+					ret = -ENOMEM;
+					goto fail_exception_pkt;
+				}
+
+				ep->available_exception_buffs_cache = kmem_cache_create(
+					"DMA_EXCEPTION_BUFFS_WRAPPER",
+					sizeof(struct ecpri_dma_mem_buffer), 0, 0, NULL);
+				if (!ep->available_exception_buffs_cache) {
+					DMAERR("DMA exception buffs wrapper cache create failed\n");
+					ret = -ENOMEM;
+					goto fail_exception_buff;
+				}
+
 				/* Fill ring with credtis */
 				work->num_to_replenish =
-					ECPRI_DMA_EXCEPTION_RING_SIZE - 1;
+					gsi_ep_cfg->dma_if_aos - 1 >
+					ECPRI_DMA_EXCEPTION_MAX_INITIAL_CREDITS ?
+					ECPRI_DMA_EXCEPTION_MAX_INITIAL_CREDITS :
+					gsi_ep_cfg->dma_if_aos - 1;
 
 				found_exception = true;
 
 				/* Save exception ENDP id for easier future access */
 				ecpri_dma_ctx->exception_endp.endp_id = endp_id;
 				ecpri_dma_ctx->exception_endp.gsi_id = gsi_id;
-				spin_lock_init(&ecpri_dma_ctx->exception_spinlock);
-
-				/* Allocate Exception packets and buffers */
-				for (i = 0; i < ECPRI_DMA_EXCEPTION_RING_SIZE; i++) {
-					ecpri_dma_ctx->exception_pkts_arr[i] =
-						&ecpri_dma_ctx->exception_pkts[i];
-					ecpri_dma_ctx->exception_pkts[i].buffs =
-						&ecpri_dma_ctx->exception_buffs_ptr_arr[i];
-					ecpri_dma_ctx->exception_pkts[i].num_of_buffers = 1;
-
-					ecpri_dma_ctx->exception_buffs_ptr_arr[i] =
-						&ecpri_dma_ctx->exception_buffs[i];
-					ecpri_dma_ctx->exception_buffs[i].virt_base =
-						dma_alloc_coherent(ecpri_dma_ctx->pdev,
-							ECPRI_DMA_DP_EXCEPTION_BUFF_SIZE,
-							&(ecpri_dma_ctx->exception_buffs[i].phys_base),
-							GFP_KERNEL);
-
-					if (!ecpri_dma_ctx->exception_buffs[i].virt_base) {
-						DMAERR("Failed to alloc exception pkt buffer\n");
-						ecpri_dma_assert();
-					}
-					ecpri_dma_ctx->exception_buffs[i].size =
-						ECPRI_DMA_DP_EXCEPTION_BUFF_SIZE;
-				}
-
-				ecpri_dma_ctx->exception_pkt_idx = 0;
 
 				queue_work(ecpri_dma_ctx->ecpri_dma_exception_wq,
 					&work->replenish_work);
@@ -526,6 +518,10 @@ static int ecpri_dma_alloc_exception_endp(void)
 
 	return ret;
 
+fail_exception_buff:
+	kmem_cache_destroy(ep->available_exception_pkts_cache);
+fail_exception_pkt:
+	kmem_cache_destroy(ep->available_outstanding_pkts_cache);
 fail_out_cache:
 	gsi_stop_channel(ep->gsi_chan_hdl);
 fail_start:
