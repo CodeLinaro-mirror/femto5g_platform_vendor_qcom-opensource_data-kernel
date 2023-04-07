@@ -1489,7 +1489,6 @@ static int __init ecpri_dma_module_init(void)
 		return -ENOMEM;
 	}
 	mutex_init(&ecpri_dma_ctx->lock);
-	mutex_init(&ecpri_dma_ctx->mhi_memcpy_setup_lock);
 
 	/* Init ready CB list */
 	INIT_LIST_HEAD(&ecpri_dma_ctx->ecpri_dma_ready_cb_list);
