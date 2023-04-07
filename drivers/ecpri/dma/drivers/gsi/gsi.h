@@ -779,8 +779,8 @@ struct __packed gsi_tre {
 	uint64_t buffer_ptr;
 	uint32_t buf_len : 21;
 	uint32_t resvd1 : 5;
-	uint32_t vf_override : 1;
 	uint32_t vf_valid : 1;
+	uint32_t pf : 1;
 	uint32_t vf_id : 4;
 	uint16_t chain:1;
 	uint16_t resvd4:7;
@@ -967,8 +967,8 @@ struct gsi_xfer_elem {
 	uint16_t flags;
 	enum gsi_xfer_elem_type type;
 	void *xfer_user_data;
-	bool vf_override;
 	bool vf_valid;
+	bool pf;
 	uint16_t vf_id;
 	bool mirror;
 	bool redirect;

@@ -3207,8 +3207,8 @@ int __gsi_populate_tre(struct gsi_chan_ctx *ctx,
 	tre.ieot = (xfer->flags & GSI_XFER_FLAG_EOT) ? 1 : 0;
 	tre.ieob = (xfer->flags & GSI_XFER_FLAG_EOB) ? 1 : 0;
 	tre.chain = (xfer->flags & GSI_XFER_FLAG_CHAIN) ? 1 : 0;
-	tre.vf_override = xfer->vf_override;
 	tre.vf_valid = xfer->vf_valid;
+	tre.pf = xfer->pf;
 	tre.vf_id = xfer->vf_id;
 	tre.mirror = xfer->mirror;
 	tre.redirect = xfer->redirect;

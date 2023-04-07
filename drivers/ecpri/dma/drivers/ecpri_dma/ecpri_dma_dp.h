@@ -1,6 +1,6 @@
 /*
  * SPDX-License-Identifier: GPL-2.0-only
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #ifndef _ECPRI_DMA_DP_H_
@@ -42,8 +42,8 @@ struct ecpri_dma_outstanding_pkt_wrapper {
 };
 
 struct ecpri_dma_dynamic_vf_params {
-	bool vf_override;
 	bool vf_valid;
+	bool is_pf;
 	u32 vf_id;
 };
 
