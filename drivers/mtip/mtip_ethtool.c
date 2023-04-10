@@ -126,6 +126,7 @@ struct mtip_ethtool_reg_offset
     enum mtip_ethtool_regs_e mtip_ethtool_regs;
 };
 
+
 struct mtip_ethtool_reg_offset mtip_ethtool_reg_offset_val[MTIP_ETHTOOL_REG_OFFSET_ARRAY_SIZE] =
 {   {0,             0x000000A0,     MTIP_ETHTOOL_MAC},
     {0,             0x000000D4,     MTIP_ETHTOOL_PCS},
@@ -558,7 +559,7 @@ static int mtip_ethtool_set_priv_flags(struct net_device *netdev, u32 flags)
     return err;
 }
 
-static void mtip_ethtool_set_msglevel(struct net_device *netdev, u32 level)
+void mtip_ethtool_set_msglevel(struct net_device *netdev, u32 level)
 {
     u32 link_index;
     u32 real_port_number;
@@ -622,7 +623,7 @@ static void mtip_ethtool_set_msglevel(struct net_device *netdev, u32 level)
     }
 }
 
-static u32 mtip_ethtool_get_msglevel(struct net_device *netdev)
+u32 mtip_ethtool_get_msglevel(struct net_device *netdev)
 {
     u32 link_index;
     u32 real_port_number;
@@ -664,9 +665,5 @@ void mtip_ethtool_set_ops(struct net_device *netdev)
    priv = netdev_priv(netdev);
    link_index = priv->link_index;
 
-   // TBD: here link_index is not yet valid
-   if(link_index == MTIP_DEBUG_ETH_LINK_INDEX)
-      netdev->ethtool_ops = mtip_debug_eth_get_ethtool_ops();
-   else
-      netdev->ethtool_ops = &mtip_ethtool_ops;
+   netdev->ethtool_ops = &mtip_ethtool_ops;
 }

@@ -30,6 +30,8 @@
 
 struct work_struct mtip_debug_eth_work;
 
+struct resource debug_port_dev_resource;
+
 static const struct of_device_id mtip_debug_eth_match[] = {
     {
         .compatible = "debug_eth_regs",
@@ -75,6 +77,48 @@ static const char * const mtip_debug_ethtool_stat_strings[] = {
 };
 
 #define MTIP_DEBUG_ETHTOOL_STATS_LEN ARRAY_SIZE(mtip_debug_ethtool_stat_strings)
+
+#define MTIP_DEBUG_ETH_ETHTOOL_REG_OFFSET_ARRAY_SIZE 16
+int mtip_debug_eth_ethtool_reg_buffer_size;
+
+enum mtip_debug_eth_ethtool_regs_e
+{
+    MTIP_DEBUG_ETH_ETHTOOL_MAC,
+    MTIP_DEBUG_ETH_ETHTOOL_PCS,
+    MTIP_DEBUG_ETH_ETHTOOL_MAC_WRAPPER,
+    MTIP_DEBUG_ETH_ETHTOOL_MAC_STATS,
+    MTIP_DEBUG_ETH_ETHTOOL_RSFEC,
+    MTIP_DEBUG_ETH_ETHTOOL_DEBUG_PORT_CSR,
+    MTIP_DEBUG_ETH_ETHTOOL_DEBUG_FUSE,
+    MTIP_DEBUG_ETH_ETHTOOL_REG_MAX
+};
+
+struct mtip_debug_eth_ethtool_reg_offset
+{
+    u32 start_offset;
+    u32 end_offset;
+    enum mtip_debug_eth_ethtool_regs_e mtip_debug_eth_ethtool_regs;
+};
+
+
+struct mtip_debug_eth_ethtool_reg_offset mtip_debug_eth_ethtool_reg_offset_val[MTIP_DEBUG_ETH_ETHTOOL_REG_OFFSET_ARRAY_SIZE] =
+{   {0,             0x000000A0,     MTIP_DEBUG_ETH_ETHTOOL_MAC},
+    {0,             0x000000D4,     MTIP_DEBUG_ETH_ETHTOOL_PCS},
+    {0x00000320,    0x0000036C,     MTIP_DEBUG_ETH_ETHTOOL_PCS},
+    {0x00000640,    0x0000068C,     MTIP_DEBUG_ETH_ETHTOOL_PCS},
+    {0x00020000,    0x00020040,     MTIP_DEBUG_ETH_ETHTOOL_PCS},
+    {0x00020100,    0x0002019C,     MTIP_DEBUG_ETH_ETHTOOL_PCS},
+    {0,             0x000002E4,     MTIP_DEBUG_ETH_ETHTOOL_MAC_WRAPPER},
+    {0,             0x00000004,     MTIP_DEBUG_ETH_ETHTOOL_MAC_STATS},
+    {0x0000040,	    0x000000B8,     MTIP_DEBUG_ETH_ETHTOOL_MAC_STATS},
+    {0x00000100,    0x000003B4,     MTIP_DEBUG_ETH_ETHTOOL_MAC_STATS},
+    {0,             0x0000007c,     MTIP_DEBUG_ETH_ETHTOOL_RSFEC},
+    {0x00000100,    0x0000012c,     MTIP_DEBUG_ETH_ETHTOOL_RSFEC},
+    {0x00000200,    0x0000023c,     MTIP_DEBUG_ETH_ETHTOOL_RSFEC},
+    {0x00000284,    0x00000290,     MTIP_DEBUG_ETH_ETHTOOL_RSFEC},
+    {0x000002C0,    0x000002D8,     MTIP_DEBUG_ETH_ETHTOOL_RSFEC},
+    {0,             0x00000200,     MTIP_DEBUG_ETH_ETHTOOL_DEBUG_PORT_CSR}
+};
 
 int mtip_debug_eth_start_xmit(struct sk_buff *skb, struct net_device *netdev) {
   pr_err("Clearing extra packets for Debug ETH Link");
@@ -133,12 +177,13 @@ int mtip_debug_eth_probe(struct platform_device *pdev) {
   bool fuse_enabled = true;
   u32 fuse_val;
   int ethernet_trace_disabled = 8;
+  struct net_device *netdev;
 
   CSMLOGINFO("mtip_debug_eth_probe called for device \"%s\"", pdev->name);
 
   // Debug Port Changes
-  debug_ret = of_property_read_u32_array(
-      pdev->dev.of_node, "qcom,debug-port-fuse", fuse_csr_regs, 2);
+   debug_ret = of_property_read_u32_array(
+       pdev->dev.of_node, "qcom,debug-fuse", fuse_csr_regs, 2);
   if (!debug_ret) {
     // Fetch the debug port fuse address
     dev_resource.start = fuse_csr_regs[0];
@@ -171,10 +216,17 @@ int mtip_debug_eth_probe(struct platform_device *pdev) {
                 debug_csr_regs[0], debug_csr_regs[1], debug_ret);
     }
 
+    //Replacing Ethtool ops for debug eth
+    CSMLOGERR("Assigning Debug ethtool ops");
+    netdev = platform_driver_priv->mtip_links[MTIP_DEBUG_ETH_LINK_INDEX]->dev;
+    netdev->ethtool_ops = mtip_debug_eth_get_ethtool_ops();
+
     // Interrupt init
     mtip_debug_eth_irq_init(pdev);
 
     mtip_debug_eth_gnl_init();
+
+    debug_port_dev_resource = dev_resource;
   }
 
   return debug_ret;
@@ -197,6 +249,150 @@ int mtip_debug_eth_register_platform_driver() {
   }
 
   return ret_val;
+}
+
+void mtip_debug_eth_ethtool_get_dev_regs
+(
+    struct platform_device* port_pdev,
+    void __iomem *dev_base_addr,
+    void *buf,
+    u32 *wr_ptr,
+    struct resource *dev_resource,
+    struct mtip_debug_eth_ethtool_reg_offset *reg_offset_array,
+    u32 reg_offset_array_idx
+)
+{
+    u32 *rbuf = (u32 *)buf;
+    u32 *reg_addr = 0x0;
+    u32 reg_offset = 0;
+
+    CSMLOGINFO("mtip_debug_eth_ethtool: mtip_get_dev_regs port base = 0x%x, port end 0x%x port size = 0x%x "
+               "Dev wr_ptr: %d addr 0x%x arry_idx %d \n",dev_resource->start, dev_resource->end,
+               resource_size(dev_resource), *wr_ptr, dev_base_addr, reg_offset_array_idx);
+
+    for (reg_offset = reg_offset_array[reg_offset_array_idx].start_offset;
+         (reg_offset <= reg_offset_array[reg_offset_array_idx].end_offset) &&
+         (*wr_ptr < mtip_debug_eth_ethtool_reg_buffer_size);)
+    {
+        reg_addr = (u32*)(dev_base_addr + reg_offset);
+        rbuf[(*wr_ptr)++] = (u32)(dev_resource->start + reg_offset);    // Reg Address
+        rbuf[(*wr_ptr)++] = (u32)ioread32(reg_addr);                    // Reg Value
+        reg_offset+=4;
+    }
+}
+
+
+static void mtip_debug_eth_ethtool_dump_regs(u32 link_index, void *buf)
+{
+    u32 wr_idx = 0;
+    u32 port_device_index;
+    u32 link_device_index;
+    struct mtip_link_device_info* link_device;
+    struct resource *dev_resource;
+    u32 mtip_reg_idx = 0;
+
+    struct platform_device* pdev;
+    void __iomem *dev_ioaddr;
+
+    CSMLOGINFO("mtip_debug_eth_ethtool: Entering mtip_debug_eth_ethtool_dump_regs with link_idx %d \n", link_index);
+
+    if (mtip_lookup_device_by_link_index(link_index, &port_device_index, &link_device_index) < 0)
+    {
+       CSMLOGERR("mtip_debug_eth_ethtool: unable to find device for link %d", link_index);
+       return;
+    }
+
+    link_device = &platform_driver_priv->devices.port_devices[port_device_index].link_devices[link_device_index];
+
+    for (mtip_reg_idx = 0; mtip_reg_idx < MTIP_DEBUG_ETH_ETHTOOL_REG_OFFSET_ARRAY_SIZE; mtip_reg_idx++)
+    {
+        switch (mtip_debug_eth_ethtool_reg_offset_val[mtip_reg_idx].mtip_debug_eth_ethtool_regs)
+        {
+            case MTIP_DEBUG_ETH_ETHTOOL_MAC:
+                dev_ioaddr = link_device->mac_ioaddr;
+                pdev = platform_driver_priv->devices.port_devices[port_device_index].link_devices[link_device_index].link_pdev;
+                dev_resource = platform_get_resource_byname(pdev, IORESOURCE_MEM, "mac");
+            break;
+
+            case MTIP_DEBUG_ETH_ETHTOOL_PCS:
+                dev_ioaddr = link_device->pcs_ioaddr;
+                pdev = platform_driver_priv->devices.port_devices[port_device_index].link_devices[link_device_index].link_pdev;
+                dev_resource = platform_get_resource_byname(pdev, IORESOURCE_MEM, "pcs");
+            break;
+
+            case MTIP_DEBUG_ETH_ETHTOOL_MAC_WRAPPER:
+                dev_ioaddr = platform_driver_priv->devices.port_devices[port_device_index].wrapper_base_addr;
+                pdev = platform_driver_priv->devices.port_devices[port_device_index].port_pdev;
+                dev_resource = platform_get_resource_byname(pdev, IORESOURCE_MEM, "mac-wrapper");
+            break;
+
+            case MTIP_DEBUG_ETH_ETHTOOL_MAC_STATS:
+                dev_ioaddr = platform_driver_priv->devices.port_devices[port_device_index].macstats_base_addr;
+                pdev = platform_driver_priv->devices.port_devices[port_device_index].port_pdev;
+                dev_resource = platform_get_resource_byname(pdev, IORESOURCE_MEM, "macstats");
+            break;
+
+            case MTIP_DEBUG_ETH_ETHTOOL_RSFEC:
+                dev_ioaddr = platform_driver_priv->devices.port_devices[port_device_index].rsfec_base_addr;
+                pdev = platform_driver_priv->devices.port_devices[port_device_index].port_pdev;
+                dev_resource = platform_get_resource_byname(pdev, IORESOURCE_MEM, "rsfec");
+            break;
+
+            case MTIP_DEBUG_ETH_ETHTOOL_DEBUG_PORT_CSR:
+                dev_ioaddr = get_debug_base_address();
+                pdev = platform_driver_priv->devices.port_devices[port_device_index].port_pdev;
+                dev_resource = &debug_port_dev_resource;
+	    break;
+
+            default:
+            break;
+        }
+
+	mtip_debug_eth_ethtool_get_dev_regs(pdev, dev_ioaddr, buf, &wr_idx, dev_resource, mtip_debug_eth_ethtool_reg_offset_val, mtip_reg_idx);
+    }
+}
+
+static void mtip_debug_eth_ethtool_get_regs(struct net_device *dev, struct ethtool_regs *regs, void *buf)
+{
+    struct mtip_netdev_priv *priv;
+    u32 link_index;
+
+    priv = netdev_priv(dev);
+    link_index = priv->link_index;
+
+    CSMLOGINFO("mtip_debug_eth_ethtool: Entering mtip_get_regs with Dev %s link_idx %d \n", dev->name, link_index);
+
+    mtip_debug_eth_ethtool_dump_regs(link_index, buf);
+}
+
+static int mtip_debug_eth_ethtool_dump_regs_len()
+{
+    u32 reg_buf_size = 0;
+    u32 mtip_reg_idx = 0;
+
+    for (mtip_reg_idx = 0; mtip_reg_idx < MTIP_DEBUG_ETH_ETHTOOL_REG_OFFSET_ARRAY_SIZE; mtip_reg_idx++)
+    {
+        // add 1 at the end to inlcude the reg at the current index as well
+        reg_buf_size += (mtip_debug_eth_ethtool_reg_offset_val[mtip_reg_idx].end_offset - mtip_debug_eth_ethtool_reg_offset_val[mtip_reg_idx].start_offset)/4 + 1;
+    }
+
+    // Multiply by 2 to add addresses of registers in buffer
+    mtip_debug_eth_ethtool_reg_buffer_size = reg_buf_size * 2;
+
+    CSMLOGDBG("mtip_debug_eth_ethtool: reg buffer size %d  total buff size %d \n",
+               reg_buf_size, mtip_debug_eth_ethtool_reg_buffer_size);
+
+    // return size in bytes
+    return (mtip_debug_eth_ethtool_reg_buffer_size * sizeof(u32));
+}
+
+static int mtip_debug_eth_ethtool_get_regs_len(struct net_device *dev)
+{
+    u32 reg_buf_size = 0;
+
+    reg_buf_size = mtip_debug_eth_ethtool_dump_regs_len();
+
+    return reg_buf_size;
 }
 
 void mtip_debug_eth_macstats_get_stats(struct net_device *netdev, u64 *data)
@@ -280,7 +476,7 @@ static int mtip_debug_eth_get_sset_count(struct net_device *netdev, int sset)
 
   switch (sset) {
     case ETH_SS_STATS:
-    return MTIP_DEBUG_ETHTOOL_STATS_LEN;
+      return MTIP_DEBUG_ETHTOOL_STATS_LEN;
   default:
     return -EOPNOTSUPP;
   }
@@ -317,12 +513,18 @@ static void mtip_debug_eth_ethtool_get_stats(struct net_device *netdev,
 }
 
 static const struct ethtool_ops mtip_debug_ethtool_ops = {
-   .begin = mtip_check_if_running,
    .get_drvinfo = mtip_getdrvinfo,
+   .get_regs = mtip_debug_eth_ethtool_get_regs,
+   .get_regs_len = mtip_debug_eth_ethtool_get_regs_len,
    .get_sset_count  = mtip_debug_eth_get_sset_count,
    .get_strings = mtip_debug_eth_get_strings,
    .get_ethtool_stats = mtip_debug_eth_ethtool_get_stats,
    .get_link_ksettings = mtip_get_link_ksettings,
+   .get_fecparam = mtip_ethtool_get_fecparam,
+   .set_fecparam = mtip_ethtool_set_fecparam,
+   .set_msglevel = mtip_ethtool_set_msglevel,
+   .get_msglevel = mtip_ethtool_get_msglevel,
+
 };
 
 const struct ethtool_ops * mtip_debug_eth_get_ethtool_ops()
