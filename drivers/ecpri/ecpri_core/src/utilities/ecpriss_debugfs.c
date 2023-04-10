@@ -33,7 +33,6 @@ typedef struct{
 	uint32_t delim_len;
 	uint32_t source_len;
 }parser_s;
-extern int ecpriss_hw_ver ;
 int isv2 = 1;
 /*****/
 // Debugfs
