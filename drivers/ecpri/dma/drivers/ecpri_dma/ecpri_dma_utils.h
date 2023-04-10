@@ -1,6 +1,6 @@
 /*
  * SPDX-License-Identifier: GPL-2.0-only
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #ifndef _ECPRI_DMA_UTILS_H_
@@ -25,6 +25,7 @@ int ecpri_dma_get_endp_mapping(enum ecpri_hw_ver ver, enum ecpri_hw_flavor flv,
     [ECPRI_DMA_GSI_NUM_MAX][ECPRI_DMA_ENDP_NUM_MAX]);
 int ecpri_dma_get_port_mapping(enum ecpri_hw_ver ver, enum ecpri_hw_flavor flv,
     struct ecpri_dma_endp_mapping *endp_map);
+int ecpri_dma_set_tx_pre_header(struct ecpri_dma_endp_context *ep);
 int ecpri_dma_enable_dma_endp(struct ecpri_dma_endp_context *ep);
 int ecpri_dma_disable_dma_endp(struct ecpri_dma_endp_context *ep);
 int ecpri_dma_setup_dma_endps(
@@ -47,6 +48,7 @@ int ecpri_dma_gsi_stop_channel(struct ecpri_dma_endp_context *ep);
 int ecpri_dma_gsi_reset_channel(struct ecpri_dma_endp_context *ep);
 int ecpri_dma_hw_init(void);
 
+u32 ecpri_dma_get_sw_ver(void);
 u32 ecpri_dma_get_ctx_hw_ver(void);
 u32 ecpri_dma_get_ctx_hw_flavor(void);
 int ecpri_dma_get_gsi_dev_hdl(unsigned long* dev_hdl);

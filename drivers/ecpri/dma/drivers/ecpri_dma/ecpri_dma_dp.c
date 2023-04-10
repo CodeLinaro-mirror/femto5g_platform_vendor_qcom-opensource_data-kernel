@@ -15,111 +15,60 @@
 #include "gsi.h"
 #include "ecpri_dma_dp.h"
 
-#define ECPRI_DMA_DP_EXCEPTION_BUDGET (5)
-#define ECPRI_DMA_DP_EXCEPTION_BUFF_SIZE (1500)
-
 int ecpri_dma_dp_exception_replenish(struct ecpri_dma_endp_context *endp,
 				  u32 num_to_replenish)
 {
 	int ret = 0;
 	int i = 0;
-	struct ecpri_dma_pkt **pkts;
+	u32 num_of_pkts_remain = num_to_replenish;
+	u32 num_of_pkts_to_send = num_to_replenish;
+	bool commit_transmit = false;
 
 	if (!endp || !endp->valid || !endp->gsi_ep_cfg->is_exception) {
 		DMAERR("Exception ENDP isn't valid");
 		return -EINVAL;
 	}
 
-	pkts = kzalloc(sizeof(*pkts) * num_to_replenish, GFP_NOWAIT);
-	if (!pkts) {
-		DMAERR("failed to alloc packets array \n");
-		return -ENOMEM;
-	}
-
-	memset(pkts, 0, sizeof(*pkts) * num_to_replenish);
-
-	for (i = 0; i < num_to_replenish; i++) {
-		pkts[i] = kmem_cache_zalloc(
-			endp->available_exception_pkts_cache, GFP_NOWAIT);
-		if (!pkts[i]) {
-			DMAERR("failed to alloc packet\n");
-			ret = -ENOMEM;
-			goto fail_alloc;
-		}
-		memset(pkts[i], 0, sizeof(*pkts[i]));
-
-		pkts[i]->buffs = kzalloc(sizeof(*pkts[i]->buffs), GFP_NOWAIT);
-		if (!pkts[i]->buffs) {
-			DMAERR("failed to alloc dma buff wrapper\n");
-			kmem_cache_free(endp->available_exception_pkts_cache,
-				pkts[i]);
-			ret = -ENOMEM;
-			goto fail_alloc;
-		}
-
-		pkts[i]->buffs[0] = kmem_cache_zalloc(
-			endp->available_exception_buffs_cache, GFP_NOWAIT);
-		if (!pkts[i]->buffs[0]) {
-			DMAERR("failed to alloc dma buff wrapper\n");
-			kmem_cache_free(endp->available_exception_pkts_cache,
-					pkts[i]);
-			kfree(pkts[i]->buffs);
-			ret = -ENOMEM;
-			goto fail_alloc;
-		}
-		memset(pkts[i]->buffs[0], 0, sizeof(*(pkts[i]->buffs[0])));
-		pkts[i]->num_of_buffers = 1;
-
-		pkts[i]->buffs[0]->virt_base =
-			dma_alloc_coherent(ecpri_dma_ctx->pdev,
-				ECPRI_DMA_DP_EXCEPTION_BUFF_SIZE,
-			&(pkts[i]->buffs[0]->phys_base), GFP_NOWAIT);
-		if (!pkts[i]->buffs[0]->virt_base) {
-			DMAERR("failed to alloc buffer\n");
-			kmem_cache_free(endp->available_exception_buffs_cache,
-					pkts[i]->buffs[0]);
-			kfree(pkts[i]->buffs);
-			kmem_cache_free(endp->available_exception_pkts_cache,
-					pkts[i]);
-			ret = -ENOMEM;
-			goto fail_alloc;
-		}
-		memset(pkts[i]->buffs[0]->virt_base, 0,
+	for (i = 0; i < num_of_pkts_remain; i++)
+	{
+		memset(ecpri_dma_ctx->
+			exception_buffs[i+ ecpri_dma_ctx->exception_pkt_idx].virt_base, 0,
 			ECPRI_DMA_DP_EXCEPTION_BUFF_SIZE);
-
-		pkts[i]->buffs[0]->size = ECPRI_DMA_DP_EXCEPTION_BUFF_SIZE;
 	}
 
-	ret = ecpri_dma_dp_transmit(endp, pkts, num_to_replenish, true);
-	if (ret) {
-		DMAERR("failed to replenish exception endp\n");
-		for (--i; i >= 0; i--) {
-			dma_free_coherent(ecpri_dma_ctx->pdev, pkts[i]->buffs[0]->size,
-				pkts[i]->buffs[0]->virt_base, pkts[i]->buffs[0]->phys_base);
-			kmem_cache_free(endp->available_exception_buffs_cache,
-				pkts[i]->buffs[0]);
-			kfree(pkts[i]->buffs);
-			kmem_cache_free(endp->available_exception_pkts_cache, pkts[i]);
+	while (num_of_pkts_remain) {
+		if (num_of_pkts_remain > ECPRI_DMA_DP_MAX_DESC) {
+			num_of_pkts_to_send = ECPRI_DMA_DP_MAX_DESC;
+			commit_transmit = false;
 		}
-		kfree(pkts);
-		return -EFAULT;
+		else {
+			num_of_pkts_to_send = num_of_pkts_remain;
+			commit_transmit = true;
+		}
+
+		if (num_of_pkts_to_send + ecpri_dma_ctx->exception_pkt_idx >
+			ECPRI_DMA_EXCEPTION_RING_SIZE)
+		{
+			num_of_pkts_to_send = ECPRI_DMA_EXCEPTION_RING_SIZE -
+				ecpri_dma_ctx->exception_pkt_idx - 1;
+			commit_transmit = false;
+		}
+
+		ret = ecpri_dma_dp_transmit(endp,
+			&ecpri_dma_ctx->exception_pkts_arr[
+				ecpri_dma_ctx->exception_pkt_idx],
+			num_of_pkts_to_send, commit_transmit);
+		if (ret) {
+			DMAERR("failed to replenish exception endp\n");
+			ecpri_dma_assert();
+		}
+		ecpri_dma_ctx->exception_pkt_idx =
+			(ecpri_dma_ctx->exception_pkt_idx + num_of_pkts_to_send) %
+			ECPRI_DMA_EXCEPTION_RING_SIZE;
+		num_of_pkts_remain -= num_of_pkts_to_send;
 	}
 
-	kfree(pkts);
 	return 0;
-
-fail_alloc:
-	/* An allocation failed, free memory backwards */
-	for (--i; i >= 0; i--) {
-		kfree(pkts[i]->buffs[0]->virt_base);
-		kmem_cache_free(endp->available_exception_buffs_cache,
-				pkts[i]->buffs);
-		kfree(pkts[i]->buffs);
-		kmem_cache_free(endp->available_exception_pkts_cache, pkts[i]);
-	}
-
-	kfree(pkts);
-	return ret;
 }
 
 static void ecpri_dma_dump_packet(char *buf, int len)
@@ -164,11 +113,11 @@ void ecpri_dma_dp_tasklet_exception_notify(unsigned long data)
 {
 	int i = 0;
 	int ret = 0;
-	struct ecpri_dma_pkt_completion_wrapper
-		exception_pkts_arr[ECPRI_DMA_DP_EXCEPTION_BUDGET];
+	struct ecpri_dma_pkt_completion_wrapper* exception_pkts_arr;
 	struct ecpri_dma_pkt_completion_wrapper **exception_pkts;
-	u32 actual_num = 0;
+	u32 actual_num = 0, actual_buff_num = 0;
 	struct ecpri_dma_endp_context *endp;
+	unsigned long flags;
 
 	endp = (struct ecpri_dma_endp_context *)data;
 
@@ -177,61 +126,73 @@ void ecpri_dma_dp_tasklet_exception_notify(unsigned long data)
 		ecpri_dma_assert();
 	}
 
-	exception_pkts = kzalloc(sizeof(struct ecpri_dma_pkt_completion_wrapper*) *
-				ECPRI_DMA_DP_EXCEPTION_BUDGET, GFP_NOWAIT);
+	exception_pkts_arr = kzalloc(
+		sizeof(struct ecpri_dma_pkt_completion_wrapper) *
+				ECPRI_DMA_DP_EXCEPTION_BUDGET *
+				ECPRI_DMA_DP_EXCEPTION_FH_RX_MAX_CHAIN, GFP_NOWAIT);
+	ecpri_dma_assert_on(!exception_pkts_arr);
+
+	exception_pkts = kzalloc(
+		sizeof(struct ecpri_dma_pkt_completion_wrapper*) *
+				ECPRI_DMA_DP_EXCEPTION_BUDGET *
+				ECPRI_DMA_DP_EXCEPTION_FH_RX_MAX_CHAIN, GFP_NOWAIT);
 	ecpri_dma_assert_on(!exception_pkts);
 
-	for (i = 0; i < ECPRI_DMA_DP_EXCEPTION_BUDGET;i++) {
+	for (i = 0; i < ECPRI_DMA_DP_EXCEPTION_BUDGET *
+		ECPRI_DMA_DP_EXCEPTION_FH_RX_MAX_CHAIN ;i++) {
 		exception_pkts[i] = &exception_pkts_arr[i];
 	}
 
-	/* Poll Exceptions & Increase exception statistics */
+	spin_lock_irqsave(&ecpri_dma_ctx->exception_spinlock, flags);
+	/* Poll Exceptions & Increase exception statistics
+		actual_num is in packets, need to check for jumbo packets */
 	ret = ecpri_dma_dp_rx_poll(endp, ECPRI_DMA_DP_EXCEPTION_BUDGET,
 				   exception_pkts, &actual_num);
 	if (ret) {
 		DMAERR("Exception endp polling failed\n");
+		kfree(exception_pkts_arr);
 		kfree(exception_pkts);
 		ecpri_dma_assert();
 	}
 	ecpri_dma_ctx->exception_stats.num_of_pkts_recieved += actual_num;
 
 	/* Credits have only one buffer so no need to check num_of_buffs */
-	for (i = 0; i < actual_num; i++) {
-		DMAERR("Got exception packet with status %d, dumping:\n",
-		       exception_pkts[i]->status_code);
+	i = 0;
+	actual_buff_num = 0;
+	while (i < actual_num) {
+		DMAERR("Got exception packet with status %d, dumping\n",
+		       exception_pkts[actual_buff_num]->status_code);
+		ecpri_dma_ctx->exception_status_statistics[
+			exception_pkts[actual_buff_num]->status_code]++;
 		//TODO: change from dump to terminal to dump to array
-		ecpri_dma_dump_packet(exception_pkts[i]->pkt->buffs[0]->virt_base,
-				      exception_pkts[i]->pkt->buffs[0]->size);
-		ecpri_dma_ctx->exception_stats.num_of_bytes_recieved +=
-			exception_pkts[i]->pkt->buffs[0]->size;
-	}
 
-	/* Free exception credits and prepare for replenish */
-	for (i = 0; i < actual_num; i++) {
-		DMADBG("Freeing exception packt: %d\n", i);
-		dma_free_coherent(ecpri_dma_ctx->pdev,
-				  exception_pkts[i]->pkt->buffs[0]->size,
-				  exception_pkts[i]->pkt->buffs[0]->virt_base,
-				  exception_pkts[i]->pkt->buffs[0]->phys_base);
-		kmem_cache_free(endp->available_exception_buffs_cache,
-				exception_pkts[i]->pkt->buffs[0]);
-		kfree(exception_pkts[i]->pkt->buffs);
-		kmem_cache_free(endp->available_exception_pkts_cache,
-				exception_pkts[i]->pkt);
+		/* Each packet may have more than one buffer, need to check for EOT */
+		do {
+			ecpri_dma_dump_packet(
+				exception_pkts[actual_buff_num]->pkt->buffs[0]->virt_base,
+				exception_pkts[actual_buff_num]->pkt->buffs[0]->size);
+			ecpri_dma_ctx->exception_stats.num_of_bytes_recieved +=
+				exception_pkts[actual_buff_num]->pkt->buffs[0]->size;
+			actual_buff_num++;
+		} while (exception_pkts[actual_buff_num]->comp_code !=
+			ECPRI_DMA_COMPLETION_CODE_EOT);
+		i++;
 	}
 
 	if(actual_num == 0) {
-		/* No more packet to poll, change back to IRQ mode */
+		/* No more packets to poll, change back to IRQ mode */
 		ret = ecpri_dma_set_endp_mode(endp, ECPRI_DMA_NOTIFY_MODE_IRQ);
 		if (ret) {
 			DMAERR("Setting exception endp to IRQ mode failed\n");
+			kfree(exception_pkts_arr);
 			kfree(exception_pkts);
 			ecpri_dma_assert();
 		}
 	} else {
-		ret = ecpri_dma_dp_exception_replenish(endp, actual_num);
+		ret = ecpri_dma_dp_exception_replenish(endp, actual_buff_num);
 		if (ret) {
 			DMAERR("Failed to replenish exception endp\n");
+			kfree(exception_pkts_arr);
 			kfree(exception_pkts);
 			ecpri_dma_assert();
 		}
@@ -240,6 +201,8 @@ void ecpri_dma_dp_tasklet_exception_notify(unsigned long data)
 		tasklet_schedule(&endp->tasklet);
 	}
 
+	spin_unlock_irqrestore(&ecpri_dma_ctx->exception_spinlock, flags);
+	kfree(exception_pkts_arr);
 	kfree(exception_pkts);
 }
 
@@ -287,14 +250,13 @@ static int ecpri_dma_dp_gen_gsi_xfer(struct ecpri_dma_pkt *pkt,
 		else
 			gsi_xfer[i].flags |= GSI_XFER_FLAG_CHAIN;
 
-		if (vf_params->vf_valid)
-		{
+		if (vf_params->vf_override) {
+			gsi_xfer[i].vf_override = vf_params->vf_override;
 			gsi_xfer[i].vf_valid = vf_params->vf_valid;
-			gsi_xfer[i].pf = vf_params->is_pf;
 			gsi_xfer[i].vf_id = vf_params->vf_id;
 		}
 
-		total_bytes += pkt->buffs[i]->size;
+		*total_bytes += pkt->buffs[i]->size;
 	}
 
 	return 0;
@@ -588,6 +550,7 @@ int ecpri_dma_dp_rx_poll(struct ecpri_dma_endp_context *endp, u32 budget,
 				struct ecpri_dma_outstanding_pkt_wrapper, link);
 
 			curr_pkt_wrapper->comp_pkt.status_code = notify[i].status;
+			curr_pkt_wrapper->comp_pkt.phys_port = notify[i].phys_port;
 			curr_pkt_wrapper->bytes_xfered = notify[i].bytes_xfered;
 
 			switch (notify[i].evt_id) {
@@ -631,8 +594,11 @@ int ecpri_dma_dp_rx_poll(struct ecpri_dma_endp_context *endp, u32 budget,
 		pkts[i]->comp_code = curr_pkt_wrapper->comp_pkt.comp_code;
 		pkts[i]->pkt = curr_pkt_wrapper->comp_pkt.pkt;
 		pkts[i]->pkt->buffs[0]->size = curr_pkt_wrapper->bytes_xfered;
-		/* Unmapping is only required for ETH S2M ENDPs */
-		if (endp->gsi_ep_cfg->stream_mode != ECPRI_DMA_ENDP_STREAM_MODE_M2M)
+		/*	Unmapping is only required for ETH S2M ENDPs
+			which are not exception ENDP */
+		if (endp->gsi_ep_cfg->stream_mode != ECPRI_DMA_ENDP_STREAM_MODE_M2M &&
+			!(endp->gsi_id == ecpri_dma_ctx->exception_endp.gsi_id &&
+				endp->endp_id == ecpri_dma_ctx->exception_endp.endp_id))
 		{
 			dma_unmap_single(ecpri_dma_ctx->pdev,
 				pkts[i]->pkt->buffs[0]->phys_base,
@@ -654,9 +620,9 @@ int ecpri_dma_dp_rx_poll(struct ecpri_dma_endp_context *endp, u32 budget,
 		}
 		endp->curr_completed_num--;
 	}
-	spin_unlock_irqrestore(&endp->spinlock, flags);
 
-	*actual_num = i;
+	*actual_num = budget - rem_budget;
+	spin_unlock_irqrestore(&endp->spinlock, flags);
 
 	return ret;
 }
@@ -702,6 +668,8 @@ int ecpri_dma_dp_transmit(struct ecpri_dma_endp_context *endp,
 	struct ecpri_dma_dynamic_vf_params vf_params;
 	struct mhi_dma_function_params* function;
 
+	memset(&vf_params, 0, sizeof(struct ecpri_dma_dynamic_vf_params));
+
 	if (!endp || !endp->valid || !pkts || num_of_pkts == 0) {
 		DMAERR("Invalid parameters\n");
 		return -EINVAL;
@@ -733,15 +701,14 @@ int ecpri_dma_dp_transmit(struct ecpri_dma_endp_context *endp,
 	}
 
 	/* Extract VF params for MHI memcpy CHs */
-	if (endp->dynamic_vf_enabled)
-	{
+	if (endp->dynamic_vf_enabled) {
 		function = (struct mhi_dma_function_params*)(pkts[0]->user_data);
-		vf_params.vf_valid = true;
+		vf_params.vf_override = true;
 
-		if (function->function_type == MHI_DMA_FUNCTION_TYPE_PHYSICAL)
-			vf_params.is_pf = true;
-		else
+		if (function->function_type == MHI_DMA_FUNCTION_TYPE_VIRTUAL) {
+			vf_params.vf_valid = true;
 			vf_params.vf_id = function->vf_id;
+		}
 	}
 
 	spin_lock_irqsave(&endp->spinlock, flags);

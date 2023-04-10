@@ -50,11 +50,11 @@
 
 void mtip_dma_ready_cb(void *user_data)
 {
-   CSMLOGINFO("mtip_dma_ready_cb\n");
+   CSMLOGDBG("mtip_dma_ready_cb\n");
 
    if (platform_driver_priv->dma_is_ready == false) 
    {
-      CSMLOGINFO("registering platform driver\n");
+      CSMLOGDBG("registering platform driver\n");
 
       // call the platform driver register
       platform_driver_priv->perr = mtip_register_platform_driver();
@@ -199,6 +199,7 @@ int mtip_connect_dma_pipe(u32 link_index, ecpri_dma_eth_conn_hdl_t* hdl)
    int rv = 0;
    struct ecpri_dma_eth_endpoint_connect_params pipe_params;
 
+   memset(&pipe_params, 0, sizeof(pipe_params));
    pipe_params.link_index = link_index;
    pipe_params.tx_ring_length = MTIP_TX_RING_SIZE;
    pipe_params.rx_ring_length = MTIP_RX_RING_SIZE;
@@ -212,7 +213,7 @@ int mtip_connect_dma_pipe(u32 link_index, ecpri_dma_eth_conn_hdl_t* hdl)
 
    if (rv >= 0)
    {
-      CSMLOGINFO("assigned connect handle %d\n", *hdl);
+      CSMLOGINFO("assigned connect handle %d to link_index: %d\n", *hdl, link_index);
    }
    return rv;
 }
@@ -227,7 +228,7 @@ int mtip_disconnect_dma_pipe(ecpri_dma_eth_conn_hdl_t hdl)
 
    if (ret >= 0)
    {
-      CSMLOGINFO("disconnected pipe with handle %d\n", hdl);
+      CSMLOGDBG("disconnected pipe with handle %d\n", hdl);
    }
    return ret;
 }
@@ -242,7 +243,7 @@ int mtip_start_dma_pipe(struct net_device *netdev, ecpri_dma_eth_conn_hdl_t hdl)
 
    if (rv >= 0)
    {
-      CSMLOGINFO("started pipe %d\n", hdl);
+      CSMLOGDBG("started pipe %d\n", hdl);
    }
 
    // set the initial set of rx buffers
@@ -262,17 +263,17 @@ int mtip_stop_dma_pipe(ecpri_dma_eth_conn_hdl_t hdl)
 
    if (rv >= 0)
    {
-      CSMLOGINFO("stopped pipe %d\n", hdl);
+      CSMLOGDBG("stopped pipe %d\n", hdl);
    }
    return rv;
 }
 
 // replenish dma buffers
-int mtip_replenish_dma_rx_buffers(struct net_device *netdev, ecpri_dma_eth_conn_hdl_t hdl, u32 num_of_pkts)
+int mtip_replenish_dma_rx_buffers(struct net_device *netdev, ecpri_dma_eth_conn_hdl_t hdl, u32 num_of_buffs)
 {
    int rv = 0;
    int j;
-   int packet_size = MTIP_DMA_RX_PACKET_SIZE;
+   int buff_size = mtip_dma_max_rx_buff_size;
    struct ecpri_dma_pkt **pkts = NULL;
    struct ecpri_dma_mem_buffer **pbuffs = NULL;
    bool commit = true;
@@ -284,13 +285,13 @@ int mtip_replenish_dma_rx_buffers(struct net_device *netdev, ecpri_dma_eth_conn_
 
    link_index = priv->link_index;
 
-   CSMLOGDBG("replenishing %d packets for hdl %d\n", num_of_pkts, hdl);
+   CSMLOGDBG("replenishing %d buffs for hdl %d\n", num_of_buffs, hdl);
 
    // replenish the rx buffers
    // allocate space to hold pkt pointers
-   pkts = (struct ecpri_dma_pkt **)kmalloc(num_of_pkts * sizeof(struct ecpri_dma_pkt *), GFP_KERNEL);
+   pkts = (struct ecpri_dma_pkt **)kmalloc(num_of_buffs * sizeof(struct ecpri_dma_pkt *), GFP_KERNEL);
 
-   for (j = 0; j < num_of_pkts; ++j)
+   for (j = 0; j < num_of_buffs; ++j)
    {
       // the dma pkt struct
       pkts[j] = (struct ecpri_dma_pkt *)kmalloc(sizeof(struct ecpri_dma_pkt), GFP_KERNEL);
@@ -298,14 +299,14 @@ int mtip_replenish_dma_rx_buffers(struct net_device *netdev, ecpri_dma_eth_conn_
       // the dma mem buffer struct
       pbuffs = (struct ecpri_dma_mem_buffer **)kmalloc(sizeof(struct ecpri_dma_mem_buffer *), GFP_KERNEL);
 
-      pbuffs[0] = (struct ecpri_dma_mem_buffer *)kmalloc(sizeof(struct ecpri_dma_mem_buffer), GFP_KERNEL);;
+      pbuffs[0] = (struct ecpri_dma_mem_buffer *)kmalloc(sizeof(struct ecpri_dma_mem_buffer), GFP_KERNEL);
 
       // HANDLE THE ERROR
 
       pkts[j]->num_of_buffers = 1;
 
       // allocate an skb where IP is aligned to 4 byte boundaries
-      skb = __netdev_alloc_skb_ip_align(netdev, packet_size, GFP_KERNEL);
+      skb = __netdev_alloc_skb_ip_align(netdev, buff_size, GFP_KERNEL);
 
       // HANDLE THE ERROR
 
@@ -314,7 +315,7 @@ int mtip_replenish_dma_rx_buffers(struct net_device *netdev, ecpri_dma_eth_conn_
 
       // allocate space for one packet
       pbuffs[0]->virt_base = skb->data;
-      pbuffs[0]->size = packet_size;
+      pbuffs[0]->size = buff_size;
       pbuffs[0]->phys_base = 0;
 
       // allocate space for one mem_buffer
@@ -323,7 +324,7 @@ int mtip_replenish_dma_rx_buffers(struct net_device *netdev, ecpri_dma_eth_conn_
    }
 
    // replenish the buffers
-   rv = (ecpri_dma_eth_driver_ops.ecpri_dma_eth_replenish_buffers)(hdl, pkts, num_of_pkts, commit);
+   rv = (ecpri_dma_eth_driver_ops.ecpri_dma_eth_replenish_buffers)(hdl, pkts, num_of_buffs, commit);
 
    if (rv < 0)
    {
@@ -346,7 +347,6 @@ static void mtip_dma_dump_packet(char* buf, int len)
    int index = 0;
 
    CSMLOGINFO("dumping packet of length: %d\n", len);
-
    CSMLOGINFO("packet dest MAC addr: %x:%x:%x:%x:%x:%x\n", buf[0], buf[1], buf[2], buf[3], buf[4], buf[5]);
    CSMLOGINFO("packet src  MAC addr: %x:%x:%x:%x:%x:%x\n", buf[6], buf[7], buf[8], buf[9], buf[10], buf[11]);
    CSMLOGINFO("packet EtherType: %x:%x\n", buf[12], buf[13]);
@@ -364,7 +364,9 @@ static void mtip_dma_dump_packet(char* buf, int len)
       index = 14;
       for (i = 0; i < num_dumps; ++i)
       {
-         CSMLOGINFO("Packet: %d, %x:%x:%x:%x:%x:%x:%x:%x\n", i, buf[index + 0], buf[index + 1], buf[index + 2], buf[index + 3], buf[index + 4], buf[index + 5], buf[index + 6], buf[index + 7]);
+         CSMLOGINFO("Packet: %d, %x:%x:%x:%x:%x:%x:%x:%x\n", i, 
+                    buf[index + 0], buf[index + 1], buf[index + 2], buf[index + 3], 
+                    buf[index + 4], buf[index + 5], buf[index + 6], buf[index + 7]);
          index += 8;
          if (index + 8 > len)
          {
@@ -506,151 +508,193 @@ static void fixup_packet(struct net_device* netdev, unsigned char* buf, struct i
    ih->check = ip_fast_csum((unsigned char *)ih, ih->ihl);
 }
 
-static int mtip_dma_process_packet(struct net_device *netdev, 
-                                   struct napi_struct *napi_ptr, 
-                                   enum ecpri_dma_status_code status_code, 
-                                   enum ecpri_dma_completion_code comp_code, 
-                                   struct ecpri_dma_pkt *pkt)
+static void mtip_dma_skb_timestamp(struct sk_buff *head_skb)
 {
-   int num_of_buffers;
-   struct ecpri_dma_mem_buffer ** buffs;
-   unsigned char* base;
-   int size;
-   int rv = 0;
-   struct sk_buff *skb;
-   struct mtip_netdev_priv* priv;
-   u32 link_index;
-   spinlock_t *lock;
-   unsigned long flags;
-   u64 timestamp;
-   u32 timestamp_secs;
-   u32 timestamp_nsecs;
-   u64* tsptr;
-   int i;
-   struct iphdr* iphdr;
-   struct mtip_security_device *sec_dev;
+    struct sk_buff *tail_skb, *next_skb;
+    unsigned char* base;
+    u64 timestamp;
+    u32 timestamp_secs;
+    u32 timestamp_nsecs;
+    u64* tsptr;
+    int size;
+    int k = 0;
 
-   priv = netdev_priv(netdev);
-
-   link_index = priv->link_index;
-   lock = &(priv->lock);
-   sec_dev = priv->sec_dev;
-
-   num_of_buffers = pkt->num_of_buffers;
-   buffs = (struct ecpri_dma_mem_buffer **)pkt->buffs;
-
-   // we expect to receive the entire packet in one buffer
-   if (num_of_buffers != 1)
+    tail_skb = head_skb;
+    next_skb = skb_shinfo(head_skb)->frag_list;
+    
+    // find the last Skb in chain
+   if (next_skb != NULL)
    {
-      CSMLOGERR("num_of_buffers %d != 1.... dropping\n", num_of_buffers);
+        for (k = 1; k < MTIP_RX_DMA_MAX_BUFFERS_PER_PACKET; k++)
+        {
+            tail_skb = next_skb;
+            next_skb = next_skb->next;
+            if(next_skb == NULL)
+            {
+                break;
+            }
+        }
+    }
 
-      // free up the data structs and return for now
-      rv = -1;
-      goto out;
-   }
+    base = tail_skb->data;
+    size = tail_skb->len;
 
-   base = buffs[0]->virt_base;
-   size = buffs[0]->size;
-   skb = (struct sk_buff*)pkt->user_data;
+    tsptr = (u64*)(base + size - 8);
+    timestamp = *tsptr;
 
-   // TBD: Handle all the error status codes here
-   // we handle the following status codes
-   if ((ECPRI_DMA_STATUS_CODE_TIMEOUT_ERROR <= status_code) && (status_code <= ECPRI_DMA_STATUS_CODE_UDP_CHECKSUM_ERROR)) 
-   {
-       CSMLOGERR("Rx packet received status code: %d ... dropping\n", status_code);
-#ifdef MTIP_DUMP_PACKETS
-       // dump the contents of the modified packet
-       mtip_dma_dump_packet(base, size);
-#endif
-       // free up the data structs and return for now
-       rv = -1;
-       goto out;
-   }
+    // number of secs is the upper 32 bits
+    timestamp_secs = (u32)(timestamp >> 32);
 
-   CSMLOGDBG("Rx packet received status code: %d\n", status_code);
+    // number of nanosecs is the lower 32 bits
+    timestamp_nsecs = (u32)(timestamp & 0xFFFFFFFF);
 
-   if (status_code == ECPRI_DMA_STATUS_CODE_PTP)
-   {
-       CSMLOGERR("Rx packet status code is PTP, packet size = %d\n", status_code, size);
+    CSMLOGDBG("Rx packet timestamp %ld, timestamp_secs %d, timestamp_nsecs %d", 
+               timestamp, timestamp_secs, timestamp_nsecs);
 
-       // the packet holds the 8 bytes TS in trailer
-       tsptr = (u64*)(base + size - 8);
-       timestamp = *tsptr;
+    // set the timestamp in the Head Skb
+    mtip_ptp_set_rx_timestamp(head_skb, timestamp_secs, timestamp_nsecs);
 
-       // number of secs is the upper 32 bits
-       timestamp_secs = (u32)(timestamp >> 32);
-
-       // number of nanosecs is the lower 32 bits
-       timestamp_nsecs = (u32)(timestamp & 0xFFFFFFFF);
-
-       CSMLOGINFO("Rx packet timestamp %ld, timestamp_secs %d, timestamp_nsecs %d", timestamp, timestamp_secs, timestamp_nsecs);
-
-       // set the timestamp in the skb
-       mtip_ptp_set_rx_timestamp(skb, timestamp_secs, timestamp_nsecs);
-
-       skb_put(skb, size - 8);
-       //skb->len = size - 8;
-   }
-   else
-   {
-       // normal packet
-       // pass it to the stack
-       skb_put(skb, size);
-       //skb->len = size;
-   }
-
-   skb->protocol = eth_type_trans(skb, netdev);
-   //skb->ip_summed = CHECKSUM_UNNECESSARY; // no need to verify checksum
-
-   spin_lock_irqsave(lock, flags);
-
-   // update rx stats
-   ++(platform_driver_priv->mtip_links[link_index]->net_stats.rx_packets);
-
-   platform_driver_priv->mtip_links[link_index]->net_stats.rx_bytes += skb->len + ETH_HLEN;
-
-   spin_unlock_irqrestore(lock, flags);
-
-   if (mtip_loopback_mode != MTIP_MODE_DEFAULT && mtip_loopback_swap_addr)
-   {
-       // fixup the packet: ONLY IF LOOPBACK IS ENABLED
-       iphdr = (struct iphdr *)(base + ETH_HLEN);
-       fixup_packet(netdev, base, iphdr, size);
-   }
-
-#ifdef MTIP_DUMP_PACKETS
-   // dump the contents of the modified packet
-   mtip_dma_dump_packet(base, size);
-#endif
-
-   if (sec_dev && sec_dev->ops && sec_dev->ops->fixup_rx_skb) {
-      if (sec_dev->ops->fixup_rx_skb(skb)) {
-         ++(platform_driver_priv->mtip_links[link_index]->net_stats.rx_errors);
-         dev_kfree_skb_any(skb);
-         goto out;
-      }
-   }
-
-   napi_gro_receive(napi_ptr, skb);
-
-out:
-   // free the container
-   for (i = 0; i < num_of_buffers; ++i) 
-   {
-       kfree(buffs[i]);
-   }
-   kfree(buffs);
-
-   kfree(pkt);
-
-   return rv;
+    //skb_put(tail_skb, size - 8);
+    tail_skb->len -= 8;
+    tail_skb->tail -= 8;
+    head_skb->len -= 8;
+    head_skb->data_len -= 8;
 }
 
-int mtip_dma_poll_rx_packets(struct net_device *netdev, struct napi_struct *napi_ptr, ecpri_dma_eth_conn_hdl_t hdl, int budget, int* npackets)
+
+
+static void mtip_dma_process_packet(
+    struct net_device *netdev, 
+    struct napi_struct *napi_ptr,
+    int num_packets,
+    struct ecpri_dma_pkt_completion_wrapper **pkts,
+    int s_idx,
+    int e_idx
+)
 {
-   int j;
-   int k;
+    int num_of_buffers;
+    struct sk_buff *head_skb, *curr_skb, *nskb; // *tail_skb;
+    int size;
+    struct ecpri_dma_pkt *pkt;
+    struct ecpri_dma_mem_buffer **buffs;
+    spinlock_t *lock;
+    unsigned long flags;
+    unsigned char* head_base;
+    struct mtip_netdev_priv* priv;
+    enum ecpri_dma_status_code status_code;
+    u32 link_index;
+    struct iphdr* iphdr_ptr;
+    struct mtip_security_device *sec_dev;
+    int k = 0;
+    int p, i; 
+
+    priv = netdev_priv(netdev);
+    link_index = priv->link_index;
+    lock = &(priv->lock);
+    sec_dev = priv->sec_dev;
+
+    status_code = pkts[s_idx]->status_code;
+    pkt = pkts[s_idx]->pkt;
+    num_of_buffers = pkt->num_of_buffers;
+    buffs = (struct ecpri_dma_mem_buffer **)pkt->buffs;
+
+    size = buffs[0]->size;
+    head_base = buffs[0]->virt_base;
+    head_skb = (struct sk_buff *)pkt->user_data;
+    curr_skb = head_skb;
+
+    skb_put(head_skb, size);    
+
+    for (k = s_idx+1; k <= e_idx; k++)
+    {
+        pkt = pkts[k]->pkt;
+        buffs = (struct ecpri_dma_mem_buffer **)pkt->buffs;
+        size = buffs[0]->size;
+        nskb = (struct sk_buff *)pkt->user_data;
+        num_of_buffers = pkt->num_of_buffers;
+        
+        if (curr_skb == head_skb)
+        {
+            skb_shinfo(curr_skb)->frag_list = nskb;
+        }
+        else
+        {
+            curr_skb->next = nskb;
+        }
+
+        curr_skb = nskb;
+        skb_put(curr_skb, size);
+
+        if (curr_skb != head_skb)
+        {
+            head_skb->len += size;
+            head_skb->data_len += size;
+            head_skb->truesize += nskb->truesize;
+        }        
+    }
+
+    // update rx stats
+    spin_lock_irqsave(lock, flags);
+    ++(platform_driver_priv->mtip_links[link_index]->net_stats.rx_packets);
+    platform_driver_priv->mtip_links[link_index]->net_stats.rx_bytes += head_skb->len +  ETH_HLEN;
+    spin_unlock_irqrestore(lock, flags);
+
+    if (status_code == ECPRI_DMA_STATUS_CODE_PTP)
+    {
+        mtip_dma_skb_timestamp(head_skb);
+    }
+
+    if (mtip_loopback_mode != MTIP_MODE_DEFAULT && mtip_loopback_swap_addr)
+    {
+       // fixup the packet: ONLY IF LOOPBACK IS ENABLED
+       iphdr_ptr = (struct iphdr *)(head_base + ETH_HLEN);
+       fixup_packet(netdev, head_base, iphdr_ptr, head_skb->len);
+    }
+
+#ifdef MTIP_DUMP_PACKETS
+   // dump the contents of the head buffer/SKB
+   mtip_dma_dump_packet(head_base, head_skb->len);
+#endif
+
+    if (sec_dev && sec_dev->ops && sec_dev->ops->fixup_rx_skb) 
+    {   
+        if (sec_dev->ops->fixup_rx_skb(head_skb)) 
+        {
+            ++(platform_driver_priv->mtip_links[link_index]->net_stats.rx_errors);
+            dev_kfree_skb_any(head_skb);
+            goto out;
+        }
+    }
+    
+    head_skb->protocol = eth_type_trans(head_skb, netdev);
+    napi_gro_receive(napi_ptr, head_skb);
+
+out:
+    // free the container
+    for (p = s_idx; p <= e_idx; p++)
+    {
+        pkt = pkts[p]->pkt;
+        buffs = (struct ecpri_dma_mem_buffer **)pkt->buffs;
+        num_of_buffers = pkt->num_of_buffers;
+        
+        for (i = 0; i < num_of_buffers; ++i)
+        {
+            kfree(buffs[i]);
+        }
+
+        //CSMLOGINFO(" Pkt free p %d \n", p);
+        kfree(buffs);
+        kfree(pkt);
+    }
+}
+ 
+
+int mtip_dma_poll_rx_packets(struct net_device *netdev, struct napi_struct *napi_ptr, ecpri_dma_eth_conn_hdl_t hdl, 
+                             int budget, int* npackets, int *num_buffers)
+{
+   int j, k, s_idx;
    int rv;
+   int num_pkt_allocs = budget*MTIP_RX_DMA_MAX_BUFFERS_PER_PACKET;
    struct ecpri_dma_pkt_completion_wrapper **pkts; 
    struct mtip_netdev_priv* priv;
    u32 link_index;
@@ -710,7 +754,7 @@ int mtip_dma_poll_rx_packets(struct net_device *netdev, struct napi_struct *napi
 
    spin_lock_irqsave(lock, flags);
 
-   pkts = (struct ecpri_dma_pkt_completion_wrapper **)kmalloc(budget * sizeof(struct ecpri_dma_pkt_completion_wrapper*), GFP_ATOMIC);
+   pkts = (struct ecpri_dma_pkt_completion_wrapper **)kmalloc(num_pkt_allocs * sizeof(struct ecpri_dma_pkt_completion_wrapper*), GFP_ATOMIC);
 
    if (pkts == NULL)
    {
@@ -719,7 +763,7 @@ int mtip_dma_poll_rx_packets(struct net_device *netdev, struct napi_struct *napi
        goto out;
    }
 
-   for (j = 0; j < budget; ++j) 
+   for (j = 0; j < num_pkt_allocs; ++j) 
    {
       pkts[j] = (struct ecpri_dma_pkt_completion_wrapper *)kmalloc(sizeof(struct ecpri_dma_pkt_completion_wrapper), GFP_ATOMIC);
 
@@ -737,7 +781,9 @@ int mtip_dma_poll_rx_packets(struct net_device *netdev, struct napi_struct *napi
    *npackets = 0;
 
    // read the packets
-   rv = (ecpri_dma_eth_driver_ops.ecpri_dma_eth_rx_poll)(actual_handle, budget, (struct ecpri_dma_pkt_completion_wrapper **)pkts, npackets);
+   rv = (ecpri_dma_eth_driver_ops.ecpri_dma_eth_rx_poll)(actual_handle, budget, 
+                                                         (struct ecpri_dma_pkt_completion_wrapper **)pkts, 
+                                                          npackets);
 
    if (rv < 0)
    {
@@ -747,15 +793,32 @@ int mtip_dma_poll_rx_packets(struct net_device *netdev, struct napi_struct *napi
    {
       CSMLOGDBG("read from hdl %d: actual read packets: %d\n", actual_handle, *npackets);
 
-      for (k = 0; k < *npackets; ++k)
+      s_idx = 0;
+      for (j = 0; j < *npackets; j++)   // loop over all packets
       {
-         // push the received skb into the stack
-          mtip_dma_process_packet(netdev, napi_ptr, pkts[k]->status_code, pkts[k]->comp_code, pkts[k]->pkt);
+          for(k = s_idx; k < (s_idx + MTIP_RX_DMA_MAX_BUFFERS_PER_PACKET); k++)  // Loop over all buffers from start idx (s_idx) to s_idx+4
+          {
+              if (pkts[k]->comp_code == ECPRI_DMA_COMPLETION_CODE_OVERFLOW)
+              {
+                  (*num_buffers)++;  // count valid buffers
+              }
+
+              if (pkts[k]->comp_code == ECPRI_DMA_COMPLETION_CODE_EOT)
+              {
+                  mtip_dma_process_packet(netdev, napi_ptr, *npackets, pkts, s_idx, k);                         
+                  (*num_buffers)++;                    
+                  break;                    // break if EOT detected
+              }                           
+          }
+          s_idx = *num_buffers;
       }
    }
+   
 
 out1:
-   for (j = 0; j < budget; ++j) {
+   
+   for (j = 0; j < num_pkt_allocs; ++j) 
+   {
       kfree(pkts[j]);
    }
    kfree(pkts);

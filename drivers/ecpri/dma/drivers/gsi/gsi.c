@@ -390,8 +390,8 @@ static void gsi_handle_ch_ctrl(int gsi_id, int ee)
 				ch_id = i + (GSI_STTS_REG_BITS * k);
 				if (ch_id >= gsi_ctx->max_ch ||
 					ch_id >= GSI_CHAN_MAX) {
-					GSIERR("invalid channel %d\n",
-						ch_id);
+					GSIERR("invalid channel ch id %d gsi id %u\n",
+						ch_id, gsi_id);
 					break;
 				}
 
@@ -400,8 +400,8 @@ static void gsi_handle_ch_ctrl(int gsi_id, int ee)
 					gsi_id, ee, ch_id, &ch_k_cntxt_0);
 				ctx->state = ch_k_cntxt_0.chstate;
 
-				GSIDBG("ch %u state updated to %u\n",
-					ch_id, ctx->state);
+				GSIDBG("ch %u gsi_id %u state updated to %u\n",
+					ch_id, gsi_id, ctx->state);
 				complete(&ctx->compl);
 				gsi_ctx->ch_dbg[gsi_id][ee][ch_id].cmd_completed++;
 			}
@@ -429,7 +429,7 @@ static void gsi_handle_ev_ctrl(int gsi_id, int ee)
 				evt_id = i + (GSI_STTS_REG_BITS * k);
 				if (evt_id >= gsi_ctx->max_ev ||
 					evt_id >= GSI_EVT_RING_MAX) {
-					GSIERR("invalid event %d\n", evt_id);
+					GSIERR("invalid event %d gsi id %u\n", evt_id, gsi_id);
 					break;
 				}
 
@@ -438,8 +438,8 @@ static void gsi_handle_ev_ctrl(int gsi_id, int ee)
 					gsi_id, ee, evt_id, &ev_ch_k_cntxt_0);
 				ctx->state = ev_ch_k_cntxt_0.chstate;
 
-				GSIDBG("evt %u state updated to %u\n",
-					evt_id, ctx->state);
+				GSIDBG("evt %u gsi id %u state updated to %u\n",
+					evt_id, gsi_id, ctx->state);
 				complete(&ctx->compl);
 			}
 		}
@@ -3207,8 +3207,8 @@ int __gsi_populate_tre(struct gsi_chan_ctx *ctx,
 	tre.ieot = (xfer->flags & GSI_XFER_FLAG_EOT) ? 1 : 0;
 	tre.ieob = (xfer->flags & GSI_XFER_FLAG_EOB) ? 1 : 0;
 	tre.chain = (xfer->flags & GSI_XFER_FLAG_CHAIN) ? 1 : 0;
+	tre.vf_override = xfer->vf_override;
 	tre.vf_valid = xfer->vf_valid;
-	tre.pf = xfer->pf;
 	tre.vf_id = xfer->vf_id;
 	tre.mirror = xfer->mirror;
 	tre.redirect = xfer->redirect;

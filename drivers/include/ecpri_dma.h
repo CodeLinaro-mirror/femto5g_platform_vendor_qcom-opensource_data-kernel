@@ -113,6 +113,8 @@ enum ecpri_dma_vm_ids {
 	ECPRI_DMA_VM_IDS_VFC,
 	ECPRI_DMA_VM_IDS_VFD,
 	ECPRI_DMA_VM_IDS_VFE,
+	ECPRI_DMA_VM_IDS_UNUSED1,
+	ECPRI_DMA_VM_IDS_UNUSED2,
 	ECPRI_DMA_VM_IDS_MAX,
 	ECPRI_DMA_VM_IDS_NONE = ECPRI_DMA_VM_IDS_MAX,
 	ECPRI_DMA_VM_IDS_MAX_V1 = ECPRI_DMA_VM_IDS_VF1,
@@ -149,6 +151,12 @@ enum ecpri_dma_status_code {
 	ECPRI_DMA_STATUS_CODE_UNSUP_ETHER_TYPE = 47,
 	ECPRI_DMA_STATUS_CODE_UNSUP_IP_PROT = 48,
 	ECPRI_DMA_STATUS_CODE_UDP_FLRT_MISS = 49,
+	ECPRI_DMA_STATUS_CODE_UDP_MAC_ADDR_HIT = 50,
+	ECPRI_DMA_STATUS_CODE_QUDP_TRAPPED_PKT_PKT_0 = 51,
+	ECPRI_DMA_STATUS_CODE_QUDP_TRAPPED_PKT_PKT_1 = 52,
+	ECPRI_DMA_STATUS_CODE_QUDP_TRAPPED_PKT_PKT_2 = 53,
+	ECPRI_DMA_STATUS_CODE_QUDP_TRAPPED_PKT_PKT_3 = 54,
+	ECPRI_DMA_STATUS_CODE_MAX,
 };
 
 /**
@@ -210,11 +218,13 @@ struct ecpri_dma_pkt {
  * @pkt: pointer to the completed packet provided by ETH driver
  * @status_code: DMA status code returned from DMA upon completion
  * @comp_code: Trasnfer completion code.
+ * @phys_port: Physical port
  */
 struct ecpri_dma_pkt_completion_wrapper {
 	struct ecpri_dma_pkt *pkt;
 	enum ecpri_dma_status_code status_code;
 	enum ecpri_dma_completion_code comp_code;
+	uint8_t phys_port;
 };
 
 /**

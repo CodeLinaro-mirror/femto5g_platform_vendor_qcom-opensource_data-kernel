@@ -52,7 +52,7 @@ void mtip_pcs_reset_pcs(struct mtip_link_device_info* link_device)
     u32 write_val = MTIP_PCS_RESET_CONTROL_BIT;
     u32 link_index = link_device->link_index;
 
-    CSMLOGINFO("Reseting PCS for link index: %d\n", link_index);
+    CSMLOGDBG("Reseting PCS for link index: %d\n", link_index);
 
     // reset the PCS
     iowrite32(write_val, pcs_ioaddr + MTIP_PCS_CONTROL_REG_OFFSET);
@@ -60,7 +60,7 @@ void mtip_pcs_reset_pcs(struct mtip_link_device_info* link_device)
     // wait for reset to complete
     mdelay(MTIP_PCS_RESET_DELAY_MSECS);
 
-    CSMLOGINFO("PCS Reset done for link index: %d\n", link_index);
+    CSMLOGDBG("PCS Reset done for link index: %d\n", link_index);
     return;
 }
 
@@ -116,7 +116,7 @@ static void mtip_pcs_set_vendor_pcs_mode(enum mtip_port_config_enum port_config,
         break;
     }
 
-    CSMLOGINFO("Setting VENDOR_PCS_MODE to: 0x%x for link_index: %d\n", vendor_pcs_mode, link_index);
+    CSMLOGDBG("Setting VENDOR_PCS_MODE to: 0x%x for link_index: %d\n", vendor_pcs_mode, link_index);
 
     // set the vendor pcs mode register
     iowrite32(vendor_pcs_mode,
@@ -125,7 +125,7 @@ static void mtip_pcs_set_vendor_pcs_mode(enum mtip_port_config_enum port_config,
     // read the value
     vendor_pcs_mode = (u32)ioread32(pcs_ioaddr + MTIP_PCS_VENDOR_PCS_MODE_OFFSET);
 
-    CSMLOGINFO("Read VENDOR_PCS_MODE: 0x%x\n", vendor_pcs_mode);
+    CSMLOGDBG("Read VENDOR_PCS_MODE: 0x%x\n", vendor_pcs_mode);
 
     return;
 }
@@ -184,7 +184,7 @@ static void mtip_pcs_set_vendor_vl_intvl(enum mtip_port_config_enum port_config,
         break;
     }
 
-    CSMLOGINFO("Setting marker_counter to 0x%x for link_index: %d", marker_counter, link_index);
+    CSMLOGDBG("Setting marker_counter to 0x%x for link_index: %d", marker_counter, link_index);
 
     // set the vendor vl intvl register
     iowrite32(marker_counter,
@@ -546,7 +546,7 @@ static void mtip_pcs_set_vl_registers(enum mtip_port_config_enum port_config, st
         break;
     }
 
-    CSMLOGINFO("Set vl registers for link_index: %d port_config: %d", link_index, port_config);
+    CSMLOGDBG("Set vl registers for link_index: %d port_config: %d", link_index, port_config);
     return;
 }
 
@@ -555,7 +555,7 @@ void mtip_pcs_reset_all_vl_registers(struct mtip_link_device_info* link_device)
     int index = 0;
     void __iomem *pcs_ioaddr = link_device->pcs_ioaddr;
 
-    CSMLOGINFO("Resetting all PCS VL registers\n");
+    CSMLOGDBG("Resetting all PCS VL registers\n");
 
     for (index = 0; index < 20; ++index) 
     {
@@ -584,7 +584,7 @@ int mtip_pcs_config_pcs(u32 link_index)
     }
 
     // configure the PCS of the link
-    CSMLOGINFO("Configuring the PCS for link_index: %d, port_device_index: %d, link_device_index: %d\n", link_index, port_device_index, link_device_index);
+    CSMLOGDBG("Configuring the PCS for link_index: %d, port_device_index: %d, link_device_index: %d\n", link_index, port_device_index, link_device_index);
 
     // reset the PCS
     mtip_pcs_reset_pcs(&platform_driver_priv->devices.port_devices[port_device_index].link_devices[link_device_index]);
@@ -629,7 +629,7 @@ int mtip_pcs_enable_loopback(u32 link_index)
     // set the loopback bit in the PCS CONTROL register
     pcs_control |= MTIP_PCS_LOOPBACK_CONTROL_BIT;
 
-    CSMLOGINFO("Setting PCS loopback on link index %d, pcs_control: 0x%x\n", link_index, pcs_control);
+    CSMLOGERR("Setting PCS loopback on link index %d, pcs_control: 0x%x\n", link_index, pcs_control);
 
     // write to the register
     iowrite32(pcs_control,
@@ -644,7 +644,7 @@ int mtip_rsfec_initialize(struct mtip_port_device_info *port_device) {
     u32 rsfec_control_val = 0;
     enum mtip_port_config_enum port_config;
 
-    CSMLOGINFO("Initializing RSFEC for port %d\n", port_device->port_type);
+    CSMLOGDBG("Initializing RSFEC for port %d\n", port_device->port_type);
 
     // this is the port configuration
     port_config = port_device->port_config;
@@ -763,7 +763,7 @@ int mtip_rsfec_initialize(struct mtip_port_device_info *port_device) {
                 break;
             }
 
-            CSMLOGINFO("Setting RSFEC addr 0x%x to 0x%x\n", MTIP_RSFEC_CONTROL_OFFSET + i * MTIP_RSFEC_LINK_OFFSET, rsfec_control_val);
+            CSMLOGDBG("Setting RSFEC addr 0x%x to 0x%x\n", MTIP_RSFEC_CONTROL_OFFSET + i * MTIP_RSFEC_LINK_OFFSET, rsfec_control_val);
 
             // set the RSFEC control register
             iowrite32(rsfec_control_val,
@@ -788,7 +788,7 @@ void mtip_pcs_enable_rsfec_for_25g_mode(struct mtip_link_device_info* link_devic
     // set PCS_VENDOR_PCS_MODE [DISABLE_MLD] = 0
     vendor_pcs_mode = MTIP_PCS_VENDOR_PCS_ENA_CLAUSE49_BIT | MTIP_PCS_VENDOR_PCS_HI_BER25_BIT; 
 
-    CSMLOGINFO("Setting VENDOR_PCS_MODE to: 0x%x\n", vendor_pcs_mode);
+    CSMLOGDBG("Setting VENDOR_PCS_MODE to: 0x%x\n", vendor_pcs_mode);
 
     // set the vendor pcs mode register
     iowrite32(vendor_pcs_mode,
@@ -818,7 +818,7 @@ void mtip_pcs_disable_rsfec_for_25g_mode(struct mtip_link_device_info* link_devi
     // set PCS_VENDOR_PCS_MODE [DISABLE_MLD] = 1
     vendor_pcs_mode = MTIP_PCS_VENDOR_PCS_ENA_CLAUSE49_BIT | MTIP_PCS_VENDOR_PCS_DISABLE_MLD_BIT | MTIP_PCS_VENDOR_PCS_HI_BER25_BIT; 
 
-    CSMLOGINFO("Setting VENDOR_PCS_MODE to: 0x%x\n", vendor_pcs_mode);
+    CSMLOGDBG("Setting VENDOR_PCS_MODE to: 0x%x\n", vendor_pcs_mode);
 
     // set the vendor pcs mode register
     iowrite32(vendor_pcs_mode,

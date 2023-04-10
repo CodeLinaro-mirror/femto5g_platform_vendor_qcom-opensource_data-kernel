@@ -266,6 +266,12 @@ struct qcom_aw_phy_config* qcom_aw_phy_get_config_info(void);
 enum qcom_aw_phy_loopback_mode_enum qcom_aw_phy_get_loopback_mode(void);
 void qcom_aw_phy_set_loopback_mode(enum qcom_aw_phy_loopback_mode_enum mode);
 int qcom_aw_phy_get_polarity_flag(void);
+void qcom_aw_phy_enable_snr_interrupt(
+                                  struct qcom_aw_phy_inst_config *phy_inst_info,
+                                  enum eth_phy_iface_phy_lane_num_enum lane);
+void qcom_aw_phy_disable_snr_interrupt(
+                                  struct qcom_aw_phy_inst_config *phy_inst_info,
+                                  enum eth_phy_iface_phy_lane_num_enum lane);
 
 #ifdef FEATURE_QCOM_AW_TEST_SYS_FS
 void qcom_aw_phy_setup_sysfs(void);

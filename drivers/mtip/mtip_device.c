@@ -98,12 +98,12 @@ struct net_device* macsec_eth_get_netdev_from_link(u32 link_index)
 
 EXPORT_SYMBOL(macsec_eth_get_netdev_from_link);
 
-static void post_mtip_replenish_dma_rx_buffers(struct net_device *netdev, ecpri_dma_eth_conn_hdl_t hdl, u32 num_of_pkts)
+static void post_mtip_replenish_dma_rx_buffers(struct net_device *netdev, ecpri_dma_eth_conn_hdl_t hdl, u32 num_of_buffs)
 {
    struct mtip_replenish_dma_rx_buffers_task* taskstruct = kmalloc(sizeof(struct mtip_replenish_dma_rx_buffers_task), GFP_ATOMIC);
    taskstruct->netdev = netdev;
    taskstruct->hdl = hdl;
-   taskstruct->num_of_pkts = num_of_pkts;
+   taskstruct->num_of_buffs = num_of_buffs;
    mtip_queue_work(MTIP_WORKQ_TASK_REPLENISH_RX_BUFFERS, taskstruct);
 }
 
@@ -124,7 +124,7 @@ void run_mtip_replenish_dma_rx_buffers(void* work_ptr)
 
    if (platform_driver_priv->mtip_links[link_index]->peak_rx_available < rx_available) 
    {
-       CSMLOGINFO("peak rx_available: %d/%d\n", rx_available, MTIP_RX_RING_SIZE);
+       CSMLOGDBG("peak rx_available: %d/%d\n", rx_available, MTIP_RX_RING_SIZE);
        platform_driver_priv->mtip_links[link_index]->peak_rx_available = rx_available;
    }
 
@@ -224,7 +224,7 @@ void run_mtip_tx_comp_cb(void* work_ptr)
       // check if this skb needs HW timestamping
       if ((skb_shinfo(skb)->tx_flags & SKBTX_IN_PROGRESS)  != 0)
       {
-          CSMLOGINFO("Tx comp cb for packet needing HW_TSTAMP\n");
+          CSMLOGDBG("Tx comp cb for packet needing HW_TSTAMP\n");
 
           // this packet needs to be timestamped
           // acquire the ptp lock
@@ -294,7 +294,7 @@ void run_mtip_tx_comp_cb(void* work_ptr)
    {
       if (netif_queue_stopped(netdev))
       {
-         CSMLOGINFO("netdev queue stopped... waking now\n");
+         CSMLOGDBG("netdev queue stopped... waking now\n");
          
          // wake the queue
          netif_wake_queue(netdev);
@@ -323,7 +323,7 @@ void run_mtip_process_link_state(void* work_ptr)
 
     if (link_up)
     {
-        CSMLOGINFO("Processing LINK_UP for link_index: %d\n", link_index);
+        CSMLOGDBG("Processing LINK_UP for link_index: %d\n", link_index);
 
         // enable tx_rx on the link
         mtip_mac_enable_tx_rx(link_index);
@@ -347,7 +347,7 @@ void run_mtip_process_link_state(void* work_ptr)
     }
     else
     {
-        CSMLOGINFO("Processing LINK_DOWN for link_index: %d\n", link_index);
+        CSMLOGDBG("Processing LINK_DOWN for link_index: %d\n", link_index);
 
         // stop the queues
         netif_tx_stop_all_queues(platform_driver_priv->mtip_links[link_index]->dev);
@@ -395,7 +395,7 @@ static int mtip_set_mac_address(struct net_device *dev, void *addr)
    link_index = priv->link_index;
    lock = &(priv->lock);
 
-   CSMLOGINFO("mtip_set_mac_address called for link_index: %d\n", link_index);
+   CSMLOGDBG("mtip_set_mac_address called for link_index: %d\n", link_index);
 
    spin_lock_irqsave(lock, flags);
    memcpy(dev->dev_addr, saddr->sa_data, ETH_ALEN);
@@ -418,7 +418,7 @@ int mtip_set_netdev_hw_mac_addr(struct net_device *netdev, u32 link_index)
 
     mtip_mac_get_mac_address_by_device(port_device_index, link_device_index, saddr);
 
-    CSMLOGINFO("Setting MAC address of link_index: %d port: %d, link: %d\n", link_index, port_device_index, link_device_index);
+    CSMLOGDBG("Setting MAC address of link_index: %d port: %d, link: %d\n", link_index, port_device_index, link_device_index);
 
     memcpy(netdev->dev_addr, saddr, ETH_ALEN);
 
@@ -430,6 +430,7 @@ int mtip_napi_poll(struct napi_struct *napi_ptr, int budget)
 {
    int rv = 0;
    int npackets = 0;
+   int num_buffers = 0;
    enum ecpri_dma_notify_mode setmode = ECPRI_DMA_NOTIFY_MODE_IRQ;
    struct mtip_link_info* link = container_of(napi_ptr, struct mtip_link_info, napi);
    ecpri_dma_eth_conn_hdl_t hdl = link->dma_hdl;
@@ -498,7 +499,7 @@ int mtip_napi_poll(struct napi_struct *napi_ptr, int budget)
    CSMLOGDBG("mtip_napi_poll called with budget %d for link_index %d hdl %d\n", budget, link_index, hdl);
 
    // read the packets and push into the stack
-   rv = mtip_dma_poll_rx_packets(dev, napi_ptr, hdl, budget, &npackets);
+   rv = mtip_dma_poll_rx_packets(dev, napi_ptr, hdl, budget, &npackets, &num_buffers);
 
    // HANDLE THE ERROR
    if (rv < 0)
@@ -517,11 +518,11 @@ int mtip_napi_poll(struct napi_struct *napi_ptr, int budget)
    }
    else
    {
-      CSMLOGINFO("Remaining in POLL mode\n");
+      CSMLOGDBG("Remaining in POLL mode\n");
    }
 
    // replenish the rx buffers for the packets processed
-   post_mtip_replenish_dma_rx_buffers(dev, actual_handle, npackets);
+   post_mtip_replenish_dma_rx_buffers(dev, actual_handle, num_buffers);
    return npackets;
 }
 
@@ -631,7 +632,7 @@ static int mtip_start_xmit(struct sk_buff *skb, struct net_device *netdev)
    // check if this packet needs timestamping
    if ((skb_shinfo(skb)->tx_flags & SKBTX_HW_TSTAMP) != 0)
    {
-       CSMLOGINFO("Tx packet needing HW_TSTAMP skb->data: 0x%lx\n", (unsigned long)skb->data);
+       CSMLOGDBG("Tx packet needing HW_TSTAMP skb->data: 0x%lx\n", (unsigned long)skb->data);
 
        // set the flag to in progress
        skb_shinfo(skb)->tx_flags |= SKBTX_IN_PROGRESS;
@@ -695,7 +696,7 @@ static void mtip_configure_hashtable(struct mtip_netdev_priv *priv, u64 original
             }
             mtip_mac_set_hashtable_entry(priv, i, val);
 
-            CSMLOGINFO("set hashtable entry: 0x%x to val: 0x%x\n", i, val);
+            CSMLOGDBG("set hashtable entry: 0x%x to val: 0x%x\n", i, val);
         }
         pattern = pattern << 1;
     }
@@ -739,7 +740,7 @@ static void mtip_generate_entry_address(struct netdev_hw_addr *ha, u8* entry_add
         *entry_address |= val;
     }
 
-    CSMLOGINFO("generated entry address: 0x%x\n", *entry_address);
+    CSMLOGDBG("generated entry address: 0x%x\n", *entry_address);
 }
 
 static void mtip_generate_hashtablebits(struct net_device *netdev, u64* hashtablebits)
@@ -755,7 +756,7 @@ static void mtip_generate_hashtablebits(struct net_device *netdev, u64* hashtabl
 
         mtip_generate_entry_address(ha, &entry_address);
 
-        CSMLOGINFO("entry address generated: 0x%x\n", entry_address);
+        CSMLOGDBG("entry address generated: 0x%x\n", entry_address);
 
         pattern = 0x1;
         // set the corresponding hashtablebit to 1
@@ -764,10 +765,10 @@ static void mtip_generate_hashtablebits(struct net_device *netdev, u64* hashtabl
         }
         *hashtablebits |= pattern;
 
-        CSMLOGINFO("hashtablebits: 0x%lx, pattern 0x%lx\n", *hashtablebits, pattern);
+        CSMLOGDBG("hashtablebits: 0x%lx, pattern 0x%lx\n", *hashtablebits, pattern);
     }
 
-    CSMLOGINFO("Final hashtablebits: 0x%lx\n", *hashtablebits);
+    CSMLOGDBG("Final hashtablebits: 0x%lx\n", *hashtablebits);
 }
 
 /* Configure Multicast and Promiscuous modes */
@@ -784,7 +785,7 @@ static void mtip_rx_mode_set(struct net_device *netdev)
    priv = netdev_priv(netdev);
    link_index = priv->link_index;
 
-   CSMLOGINFO("mtip_rx_mode_set called for link_index: %d (%d, %d, %d)\n", link_index, is_multicast_enabled, all_multi_needed, promisc_needed);
+   CSMLOGDBG("mtip_rx_mode_set called for link_index: %d (%d, %d, %d)\n", link_index, is_multicast_enabled, all_multi_needed, promisc_needed);
 
  	if (promisc_needed) 
     {
@@ -793,12 +794,12 @@ static void mtip_rx_mode_set(struct net_device *netdev)
          */ 
         // set the promiscous mode
         ret = mtip_mac_set_promisc_mode(priv, true);
-        CSMLOGINFO("Setting promiscuous mode ON for link index: %d\n", link_index);
+        CSMLOGDBG("Setting promiscuous mode ON for link index: %d\n", link_index);
  	} 
     else if ((netdev_mc_count(netdev) > MTIP_MAC_HASHTABLE_SIZE) || (all_multi_needed))
     {
         ret = mtip_mac_set_promisc_mode(priv, true);
-        CSMLOGINFO("Enabling all multicast for link index: %d\n", link_index);
+        CSMLOGDBG("Enabling all multicast for link index: %d\n", link_index);
  	} 
     else
     {
@@ -811,7 +812,7 @@ static void mtip_rx_mode_set(struct net_device *netdev)
             mtip_generate_hashtablebits(netdev, &hashtablebits);
         }
 
-        CSMLOGINFO("Setting up hashtable for multicast for link index: %d, original: 0x%lx, new: 0x%lx\n", link_index, priv->hashtablebits, hashtablebits);
+        CSMLOGDBG("Setting up hashtable for multicast for link index: %d, original: 0x%lx, new: 0x%lx\n", link_index, priv->hashtablebits, hashtablebits);
 
         // reset promisc mode
         mtip_mac_set_promisc_mode(priv, false);
@@ -845,7 +846,7 @@ static int mtip_change_mtu(struct net_device *netdev, int new_mtu)
    lock = &(priv->lock);
    link_index = priv->link_index;
 
-   CSMLOGINFO("mtip_change_mtu called for link index: %d, new_mtu: %d\n", link_index, new_mtu);
+   CSMLOGDBG("mtip_change_mtu called for link index: %d, new_mtu: %d\n", link_index, new_mtu);
 
    /* check ranges */
    if ((new_mtu < MTIP_MIN_MTU_SIZE) || (new_mtu > MTIP_MAX_MTU_SIZE))
@@ -898,7 +899,7 @@ static int mtip_open(struct net_device *netdev)
    // check number of lanes assigned to the interface
    if (platform_driver_priv->devices.port_devices[port_device_index].link_devices[link_device_index].num_lanes == 0)
    {
-       CSMLOGINFO("Number of lanes assigned to link %d is 0", link_index);
+       CSMLOGERR("Number of lanes assigned to link %d is 0", link_index);
        return -ENODEV;
    }
 
@@ -941,11 +942,11 @@ static int mtip_open(struct net_device *netdev)
                // bring up the phy
               mtip_phy_bringup_phy(link_index, sfp_port_type);
 
-              CSMLOGINFO("phy bringup done for link: %d\n", link_index);
+              CSMLOGDBG("phy bringup done for link: %d\n", link_index);
            }
            else
            {
-               CSMLOGINFO("Port: %d of link index: %d is not in CONNECTED state\n", real_port_number, link_index);
+               CSMLOGERR("Port: %d of link index: %d is not in CONNECTED state\n", real_port_number, link_index);
            }
        }
    }
@@ -989,7 +990,7 @@ static int mtip_close(struct net_device *netdev)
 
    hdl = platform_driver_priv->mtip_links[link_index]->dma_hdl;
 
-   CSMLOGINFO("mtip_close called with link_index: %d with hdl: %d\n", link_index, hdl);
+   CSMLOGDBG("mtip_close called with link_index: %d with hdl: %d\n", link_index, hdl);
 
    // do this only for RUMI E2E
    if (mtip_rumi_platform != 0) 
@@ -1009,7 +1010,7 @@ static int mtip_close(struct net_device *netdev)
           // teardown the phy
           mtip_phy_teardown_phy(link_index);
 
-          CSMLOGINFO("phy teardown done for link: %d\n", link_index);
+          CSMLOGDBG("phy teardown done for link: %d\n", link_index);
        }
    }
 
@@ -1026,7 +1027,7 @@ static int mtip_close(struct net_device *netdev)
       netif_stop_queue(netdev);
    }
 
-   CSMLOGERR("Stopping netdev queue\n");
+   CSMLOGDBG("Stopping netdev queue\n");
 
    // set the link state to CLOSE
    if (mtip_loopback_mode == MTIP_MODE_DEFAULT)
@@ -1063,7 +1064,7 @@ static int mtip_ioctl(struct net_device *netdev, struct ifreq *ifr, int cmd)
    priv = netdev_priv(netdev);
    link_index = priv->link_index;
 
-   CSMLOGINFO("mtip_ioctl called cmd: %d, link_index: %d\n", cmd, link_index);
+   CSMLOGDBG("mtip_ioctl called cmd: %d, link_index: %d\n", cmd, link_index);
 
    if (!netif_running(netdev))
       return -EINVAL;
@@ -1091,7 +1092,7 @@ static int mtip_siocdevprivate(struct net_device *netdev, struct ifreq *ifr, voi
    priv = netdev_priv(netdev);
    link_index = priv->link_index;
 
-   CSMLOGINFO("mtip_siocdevprivate called cmd: %d, link_index: %d\n", cmd, link_index);
+   CSMLOGDBG("mtip_siocdevprivate called cmd: %d, link_index: %d\n", cmd, link_index);
 
    if (!netif_running(netdev))
       return -EINVAL;
@@ -1433,6 +1434,81 @@ void mtip_netdev_reconfigure_port(u32 port_device_index, enum mtip_port_config_e
     platform_driver_priv->devices.port_devices[port_device_index].port_config = port_config;
 }
 
+int mtip_device_update_security_config(struct net_device *netdev, enum mtip_port_config_enum port_config)
+{
+    struct mtip_netdev_priv *mtip_priv = NULL;
+    struct mtip_security_device *sdev = NULL;
+    u32 num_links = 4;
+
+    mtip_priv = (struct mtip_netdev_priv *)netdev_priv(netdev);
+    sdev = mtip_priv->sec_dev;
+
+    // set the new port/lane configuration
+    switch (port_config) 
+    {
+    case MTIP_PORT_CONFIG_1x100GBASE_R:
+    case MTIP_PORT_CONFIG_1x100GBASE_R_RSFEC_LL:
+    case MTIP_PORT_CONFIG_1x100GBASE_R_RSFEC:
+    case MTIP_PORT_CONFIG_1x100GBASE_R2:
+    case MTIP_PORT_CONFIG_1x100GBASE_R2_RSFEC:
+    case MTIP_PORT_CONFIG_1x100GBASE_R4:
+    case MTIP_PORT_CONFIG_1x100GBASE_R4_RSFEC:
+    case MTIP_PORT_CONFIG_1x50GBASE_R:
+    case MTIP_PORT_CONFIG_1x50GBASE_R_RSFEC:
+    case MTIP_PORT_CONFIG_1x50GBASE_R2:
+    case MTIP_PORT_CONFIG_1x50GBASE_R2_RSFEC:
+    case MTIP_PORT_CONFIG_1x50GBASE_R2_LUAI:
+    case MTIP_PORT_CONFIG_1x50GBASE_R2_LUAI_FEC:
+    case MTIP_PORT_CONFIG_1x40GBASE_R4:
+    case MTIP_PORT_CONFIG_1x40GBASE_R4_FEC:
+    case MTIP_PORT_CONFIG_1x25GBASE_R:
+    case MTIP_PORT_CONFIG_1x25GBASE_R_FEC:
+    case MTIP_PORT_CONFIG_1x25GBASE_R_RSFEC:
+    case MTIP_PORT_CONFIG_1x10GBASE_R:
+    case MTIP_PORT_CONFIG_1x10GBASE_R_FEC:
+        {
+            num_links = 1;
+        }
+        break;
+    case MTIP_PORT_CONFIG_2x50GBASE_R:
+    case MTIP_PORT_CONFIG_2x50GBASE_R_RSFEC:
+    case MTIP_PORT_CONFIG_2x50GBASE_R2:
+    case MTIP_PORT_CONFIG_2x50GBASE_R2_FEC:
+    case MTIP_PORT_CONFIG_2x50GBASE_R2_LUAI:
+    case MTIP_PORT_CONFIG_2x50GBASE_R2_LUAI_FEC:
+        {
+            num_links = 2;
+        }
+        break;
+    case MTIP_PORT_CONFIG_4x25GBASE_R:
+    case MTIP_PORT_CONFIG_4x25GBASE_R_FEC:
+    case MTIP_PORT_CONFIG_4x25GBASE_R_RSFEC:
+    case MTIP_PORT_CONFIG_4x10GBASE_R:
+    case MTIP_PORT_CONFIG_4x10GBASE_R_FEC:
+        {
+            num_links = 4;
+        }
+        break;
+    default:
+        {
+            CSMLOGERR("Unknown port config %d", port_config);
+        }
+        break;
+    }
+
+    if (sdev) 
+    {
+        if (sdev->ops) 
+        {
+            if (sdev->ops->update_config) 
+            {
+                (sdev->ops->update_config)(sdev, num_links);
+            }
+        }
+    }
+    return num_links;
+}
+
 int mtip_netdev_set_port_config(struct net_device *netdev)
 {
     struct mtip_netdev_priv *priv;
@@ -1463,11 +1539,11 @@ int mtip_netdev_set_port_config(struct net_device *netdev)
 
     if (found == false) 
     {
-        CSMLOGINFO("No priv flags %d ON. Ignoring", pflags);
+        CSMLOGERR("No priv flags %d ON. Ignoring", pflags);
         return 0;
     }
 
-    CSMLOGINFO("Setting the port config of link index %d to %d str %s", link_index, port_config, mtip_ethtool_get_priv_flags_str(port_config));
+    CSMLOGERR("Setting the port config of link index %d to %d str %s", link_index, port_config, mtip_ethtool_get_priv_flags_str(port_config));
 
     mtip_lookup_device_by_link_index(link_index, &port_device_index, &link_device_index);
 
@@ -1478,6 +1554,9 @@ int mtip_netdev_set_port_config(struct net_device *netdev)
 
     // set the clock rates based on updated port config
     mtip_clocks_set_clock_rates(platform_driver_priv->devices.port_devices[port_device_index].port_type, port_config);
+
+    // provide an update to security driver regarding port config
+    mtip_device_update_security_config(netdev, port_config);
 
     return 0;
 }

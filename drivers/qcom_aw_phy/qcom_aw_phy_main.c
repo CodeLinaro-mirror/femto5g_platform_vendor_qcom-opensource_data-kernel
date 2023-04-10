@@ -330,10 +330,6 @@ void qcom_aw_phy_enable_interrupt(
     case QCOM_AW_PHY_AN_LINK_GOOD_LANE_1:
     case QCOM_AW_PHY_AN_LINK_GOOD_LANE_2:
     case QCOM_AW_PHY_AN_LINK_GOOD_LANE_3:
-    case QCOM_AW_PHY_SNR_VALID_LANE_0:
-    case QCOM_AW_PHY_SNR_VALID_LANE_1:
-    case QCOM_AW_PHY_SNR_VALID_LANE_2:
-    case QCOM_AW_PHY_SNR_VALID_LANE_3:
       temp_bmask |= (1 << i);
       break;
 
@@ -360,10 +356,6 @@ void qcom_aw_phy_enable_interrupt(
     case QCOM_AW_PHY_RX_SIGNAL_DETECT_ERR_LANE_1:
     case QCOM_AW_PHY_RX_SIGNAL_DETECT_ERR_LANE_2:
     case QCOM_AW_PHY_RX_SIGNAL_DETECT_ERR_LANE_3:
-    case QCOM_AW_PHY_SNR_VALID_ERR_LANE_0:
-    case QCOM_AW_PHY_SNR_VALID_ERR_LANE_1:
-    case QCOM_AW_PHY_SNR_VALID_ERR_LANE_2:
-    case QCOM_AW_PHY_SNR_VALID_ERR_LANE_3:
       temp_bmask |= (1 << i);
       break;
 
@@ -384,6 +376,76 @@ void qcom_aw_phy_enable_interrupt(
 func_exit:
   QCOM_AW_PHY_LOG_INFO("qcom_aw_phy_enable_interrupt local_err = %d",
                        local_err_val);
+
+  return;
+}
+
+/*-------------------------------------------------------------------
+* qcom_aw_phy_enable_snr_interrupt
+
+* @phy_inst_info: PHY instance pointer
+* @lane: PHY lane number
+
+* Description: This function enables the SNR valid and error
+               interrupts for the given PHY instance and lane.
+------------------------------------------------------------------- */
+void qcom_aw_phy_enable_snr_interrupt(
+    struct qcom_aw_phy_inst_config *phy_inst_info,
+    enum eth_phy_iface_phy_lane_num_enum lane) {
+  u32 val = 0;
+
+  if (!phy_inst_info || !QCOM_AW_PHY_LANE_VALID(lane)) {
+    return;
+  }
+
+  // Enable status interrupt
+  val = ioread32(phy_inst_info->wrapper_base_addr +
+                                 QCOM_AW_PHY_WRAPPER_INT_STATUS_EN_REG_OFFSET);
+  val |= (1 << (QCOM_AW_PHY_SNR_VALID_LANE_0 + lane));
+  iowrite32(val, phy_inst_info->wrapper_base_addr +
+                                 QCOM_AW_PHY_WRAPPER_INT_STATUS_EN_REG_OFFSET);
+
+  // Enable error interrupt
+  val = ioread32(phy_inst_info->wrapper_base_addr +
+                                  QCOM_AW_PHY_WRAPPER_INT_ERROR_EN_REG_OFFSET);
+  val |= (1 << (QCOM_AW_PHY_SNR_VALID_ERR_LANE_0 + lane));
+  iowrite32(val, phy_inst_info->wrapper_base_addr +
+                                  QCOM_AW_PHY_WRAPPER_INT_ERROR_EN_REG_OFFSET);
+
+  return;
+}
+
+/*-------------------------------------------------------------------
+* qcom_aw_phy_disable_snr_interrupt
+
+* @phy_inst_info: PHY instance pointer
+* @lane: PHY lane number
+
+* Description: This function disables the SNR valid and error
+               interrupts for the given PHY instance and lane.
+------------------------------------------------------------------- */
+void qcom_aw_phy_disable_snr_interrupt(
+    struct qcom_aw_phy_inst_config *phy_inst_info,
+    enum eth_phy_iface_phy_lane_num_enum lane) {
+  u32 val = 0;
+
+  if (!phy_inst_info || !QCOM_AW_PHY_LANE_VALID(lane)) {
+    return;
+  }
+
+  // Disable status interrupt
+  val = ioread32(phy_inst_info->wrapper_base_addr +
+                                 QCOM_AW_PHY_WRAPPER_INT_STATUS_EN_REG_OFFSET);
+  val &= ~(1 << (QCOM_AW_PHY_SNR_VALID_LANE_0 + lane));
+  iowrite32(val, phy_inst_info->wrapper_base_addr +
+                                 QCOM_AW_PHY_WRAPPER_INT_STATUS_EN_REG_OFFSET);
+
+  // Disable error interrupt
+  val = ioread32(phy_inst_info->wrapper_base_addr +
+                                  QCOM_AW_PHY_WRAPPER_INT_ERROR_EN_REG_OFFSET);
+  val &= ~(1 << (QCOM_AW_PHY_SNR_VALID_ERR_LANE_0 + lane));
+  iowrite32(val, phy_inst_info->wrapper_base_addr +
+                                  QCOM_AW_PHY_WRAPPER_INT_ERROR_EN_REG_OFFSET);
 
   return;
 }

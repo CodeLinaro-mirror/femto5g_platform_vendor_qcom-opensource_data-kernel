@@ -1,6 +1,6 @@
 /*
  * SPDX-License-Identifier: GPL-2.0-only
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #ifndef _ECPRI_DMA_ETH_H_
@@ -68,6 +68,7 @@ struct ecpri_dma_eth_register_params {
  * @rx_ring_length: ETH driver to provide Rx descriptor ring size
  * @p_type: Port type of the endpoints to connect
  * @tx_mod_cfg: Moderation configurations of the Tx endpoint to connect
+ * @enable_tx_pre_header: Determines if the tx pre hreader is used
 */
 struct ecpri_dma_eth_endpoint_connect_params {
 	u32 link_index;
@@ -75,6 +76,7 @@ struct ecpri_dma_eth_endpoint_connect_params {
 	u32 rx_ring_length;
 	enum ecpri_dma_endp_stream_dest p_type;
 	struct ecpri_dma_moderation_config tx_mod_cfg;
+	bool enable_tx_pre_header;
 };
 
 /**

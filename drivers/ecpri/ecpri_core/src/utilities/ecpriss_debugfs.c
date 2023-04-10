@@ -3145,7 +3145,6 @@ static ssize_t stats_value_from_registers_xbar_v2(char __user *buf)
 	char temp_stat_val_str[TEMP_STAT_VAL_STR_MAX_SIZE];
 	uint32_t temp_stat_val = 0;
 	uint32_t i = 0;
-	uint32_t j = 0;
 	uint32_t ret_val = 0;
 
 	char temp_stat_val_str_1[TEMP_STR_MAX_SIZE] =
@@ -3277,13 +3276,14 @@ static ssize_t stats_value_from_registers_xbar_v2(char __user *buf)
 
 			temp_stat_val =
 				ecpriss_pdata_v2->xbar_ctx_v2->stats_v2.xbar_fhrx_c2c_pkt_cnt[i];
-			scnprintf(temp_stat_val_str, TEMP_STAT_VAL_STR_MAX_SIZE, "%lu:",
+			scnprintf(temp_stat_val_str, TEMP_STAT_VAL_STR_MAX_SIZE, "%lu",
 					  temp_stat_val);
 
-			strlcat(final_stats_str, "{xbar_fhrx_c2c_pkt_cnt_",
+			strlcat(final_stats_str, "{xbar_fhrx_c2c_pkt_cnt_fh",
 					FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
 			strlcat(final_stats_str, fh_index,
 					FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
+			strlcat(final_stats_str, ":", FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
 			strlcat(final_stats_str, temp_stat_val_str,
 				FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
 			strlcat(final_stats_str, "}\n",
@@ -3291,13 +3291,14 @@ static ssize_t stats_value_from_registers_xbar_v2(char __user *buf)
 
 			temp_stat_val =
 				ecpriss_pdata_v2->xbar_ctx_v2->stats_v2.xbar_fhrx_oc_pkt_cnt[i];
-			scnprintf(temp_stat_val_str, TEMP_STAT_VAL_STR_MAX_SIZE, "%lu :",
+			scnprintf(temp_stat_val_str, TEMP_STAT_VAL_STR_MAX_SIZE, "%lu",
 					  temp_stat_val);
 
-			strlcat(final_stats_str, "{xbar_fhrx_oc_pkt_cnt_",
+			strlcat(final_stats_str, "{xbar_fhrx_oc_pkt_cnt_fh",
 					FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
 			strlcat(final_stats_str, fh_index,
 				FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
+			strlcat(final_stats_str, ":", FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
 			strlcat(final_stats_str, temp_stat_val_str,
 				FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
 			strlcat(final_stats_str, "}\n",
@@ -3355,7 +3356,7 @@ static ssize_t stats_value_from_registers_xbar_v2(char __user *buf)
 		scnprintf(temp_stat_val_str, TEMP_STAT_VAL_STR_MAX_SIZE, "%lu",
 				  temp_stat_val);
 
-		strlcat(final_stats_str, "{xbar_octx_pkt_cnt_",
+		strlcat(final_stats_str, "{xbar_octx_pkt_cnt_link",
 				FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
 		strlcat(final_stats_str, link_id,
 				FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
@@ -3370,7 +3371,7 @@ static ssize_t stats_value_from_registers_xbar_v2(char __user *buf)
 		scnprintf(temp_stat_val_str, TEMP_STAT_VAL_STR_MAX_SIZE, "%lu",
 				  temp_stat_val);
 
-		strlcat(final_stats_str, "{xbar_ocrx_pkt_cnt_",
+		strlcat(final_stats_str, "{xbar_ocrx_pkt_cnt_link",
 				FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
 		strlcat(final_stats_str, link_id,
 				FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
@@ -3391,7 +3392,7 @@ static ssize_t stats_value_from_registers_xbar_v2(char __user *buf)
 		scnprintf(temp_stat_val_str, TEMP_STAT_VAL_STR_MAX_SIZE, "%lu",
 				  temp_stat_val);
 
-		strlcat(final_stats_str, "{xbar_ocrx_fh_pkt_cnt_",
+		strlcat(final_stats_str, "{xbar_ocrx_fh_pkt_cnt_link",
 				FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
 		strlcat(final_stats_str, link_id,
 				FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
@@ -3412,45 +3413,138 @@ static ssize_t stats_value_from_registers_xbar_v2(char __user *buf)
 			scnprintf(temp_stat_val_str, TEMP_STAT_VAL_STR_MAX_SIZE, "%lu",
 					  temp_stat_val);
 
-			strlcat(final_stats_str, "{xbar_ocrx_c2c_pkt_cnt_",
+			strlcat(final_stats_str, "{xbar_ocrx_c2c_pkt_cnt_fh",
 					FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
 			strlcat(final_stats_str, fh_index,
 					FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
+			strlcat(final_stats_str, ":", FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
 			strlcat(final_stats_str, temp_stat_val_str,
 				FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
 			strlcat(final_stats_str, "}\n",
 					FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
 	}
 
+	temp_stat_val = ecpriss_pdata_v2->xbar_ctx_v2->stats_v2.xbar_dbg_fhrx_unknown_pcid_cnt_fhrx_0_cnt;
+        scnprintf(temp_stat_val_str, TEMP_STAT_VAL_STR_MAX_SIZE, "%lu",
+                        temp_stat_val);
+        strlcat(final_stats_str,
+                        "{xbar_dbg_fhrx_unknown_pcid_cnt-->fhrx_0_cnt :", FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
+        strlcat(final_stats_str, temp_stat_val_str,
+                        FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
+        strlcat(final_stats_str, "}\n", FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
+
+        temp_stat_val = ecpriss_pdata_v2->xbar_ctx_v2->stats_v2.xbar_dbg_fhrx_unknown_pcid_cnt_fhrx_1_cnt;
+        scnprintf(temp_stat_val_str, TEMP_STAT_VAL_STR_MAX_SIZE, "%lu",
+                        temp_stat_val);
+        strlcat(final_stats_str,
+                        "{xbar_dbg_fhrx_unknown_pcid_cnt-->fhrx_1_cnt :", FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
+        strlcat(final_stats_str, temp_stat_val_str,
+                        FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
+        strlcat(final_stats_str, "}\n", FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
+
+        temp_stat_val = ecpriss_pdata_v2->xbar_ctx_v2->stats_v2.xbar_dbg_fhrx_unknown_pcid_cnt_fhrx_2_cnt;
+        scnprintf(temp_stat_val_str, TEMP_STAT_VAL_STR_MAX_SIZE, "%lu",
+                        temp_stat_val);
+        strlcat(final_stats_str,
+                        "{xbar_dbg_fhrx_unknown_pcid_cnt-->fhrx_2_cnt :", FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
+        strlcat(final_stats_str, temp_stat_val_str,
+                        FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
+        strlcat(final_stats_str, "}\n", FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
+
+
+	temp_stat_val = ecpriss_pdata_v2->xbar_ctx_v2->stats_v2.xbar_dbg_ocrx_unknown_pcid_cnt_ocrx_fh_0_cnt;
+        scnprintf(temp_stat_val_str, TEMP_STAT_VAL_STR_MAX_SIZE, "%lu",
+                        temp_stat_val);
+        strlcat(final_stats_str,
+                        "{xbar_dbg_ocrx_unknown_pcid_cnt-->ocrx_fh_0_cnt :", FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
+        strlcat(final_stats_str, temp_stat_val_str,
+                        FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
+        strlcat(final_stats_str, "}\n", FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
+
+        temp_stat_val = ecpriss_pdata_v2->xbar_ctx_v2->stats_v2.xbar_dbg_ocrx_unknown_pcid_cnt_ocrx_fh_1_cnt;
+        scnprintf(temp_stat_val_str, TEMP_STAT_VAL_STR_MAX_SIZE, "%lu",
+                        temp_stat_val);
+        strlcat(final_stats_str,
+                        "{xbar_dbg_ocrx_unknown_pcid_cnt-->ocrx_fh_1_cnt :", FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
+        strlcat(final_stats_str, temp_stat_val_str,
+                        FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
+        strlcat(final_stats_str, "}\n", FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
+
+        temp_stat_val = ecpriss_pdata_v2->xbar_ctx_v2->stats_v2.xbar_dbg_ocrx_unknown_pcid_cnt_ocrx_fh_2_cnt;
+        scnprintf(temp_stat_val_str, TEMP_STAT_VAL_STR_MAX_SIZE, "%lu",
+                        temp_stat_val);
+        strlcat(final_stats_str,
+                        "{xbar_dbg_ocrx_unknown_pcid_cnt-->ocrx_fh_2_cnt :", FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
+        strlcat(final_stats_str, temp_stat_val_str,
+                        FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
+        strlcat(final_stats_str, "}\n", FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
+
+
+
 	for (i = 0; i < NUM_OF_FHP; i++)
 	{
-		RESET_STR(fh_index);
-		scnprintf(fh_index, TEMP_STR_MIN_SIZE, "%u", i);
+		RESET_STR(link_id);
+		scnprintf(link_id, TEMP_STR_MIN_SIZE, "%u", i);
 
-		for (j = 0; j < LUT_INDEX; j++)
-		{
-			RESET_STR(link_id);
-			scnprintf(link_id, TEMP_STR_MIN_SIZE, "%u", j);
+		temp_stat_val =
+			ecpriss_pdata_v2->xbar_ctx_v2->stats_v2.fhrx_unknown_pcid_info_1_n[i];
+		scnprintf(temp_stat_val_str, TEMP_STAT_VAL_STR_MAX_SIZE, "%x",
+				temp_stat_val);
 
-			temp_stat_val =
-				ecpriss_pdata_v2->xbar_ctx_v2->stats_v2.xbar_fh_port[i].xbar_fhrx_lut[j];
-			scnprintf(temp_stat_val_str, TEMP_STAT_VAL_STR_MAX_SIZE, "%lu",
-					  temp_stat_val);
+		strlcat(final_stats_str, "{fhrx_unknown_pcid_info_1_n_fh",
+				FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
+		strlcat(final_stats_str, link_id,
+				FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
+		strlcat(final_stats_str, ":", FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
+		strlcat(final_stats_str, temp_stat_val_str,
+				FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
+		strlcat(final_stats_str, "}\n",
+				FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
 
-			strlcat(final_stats_str, "xbar_lut_fhrx_config_fh_",
-					FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
-			strlcat(final_stats_str, fh_index,
-					FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
-			strlcat(final_stats_str, "_pcid_",
-					FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
-			strlcat(final_stats_str, link_id,
-					FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
-			strlcat(final_stats_str, ":", FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
-			strlcat(final_stats_str, temp_stat_val_str,
-					FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
-			strlcat(final_stats_str, "}\n",
-					FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
-		}
+		temp_stat_val =
+			ecpriss_pdata_v2->xbar_ctx_v2->stats_v2.fhrx_unknown_pcid_info_2_n[i];
+		scnprintf(temp_stat_val_str, TEMP_STAT_VAL_STR_MAX_SIZE, "%x",
+				temp_stat_val);
+
+		strlcat(final_stats_str, "{fhrx_unknown_pcid_info_2_n_fh",
+				FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
+		strlcat(final_stats_str, link_id,
+				FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
+		strlcat(final_stats_str, ":", FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
+		strlcat(final_stats_str, temp_stat_val_str,
+				FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
+		strlcat(final_stats_str, "}\n",
+				FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
+
+		temp_stat_val =
+			ecpriss_pdata_v2->xbar_ctx_v2->stats_v2.ocrx_unknown_pcid_info_1_n[i];
+		scnprintf(temp_stat_val_str, TEMP_STAT_VAL_STR_MAX_SIZE, "%x",
+				temp_stat_val);
+
+		strlcat(final_stats_str, "{ocrx_unknown_pcid_info_1_n_fh",
+				FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
+		strlcat(final_stats_str, link_id,
+				FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
+		strlcat(final_stats_str, ":", FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
+		strlcat(final_stats_str, temp_stat_val_str,
+				FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
+		strlcat(final_stats_str, "}\n",
+				FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
+
+		temp_stat_val =
+			ecpriss_pdata_v2->xbar_ctx_v2->stats_v2.ocrx_unknown_pcid_info_2_n[i];
+		scnprintf(temp_stat_val_str, TEMP_STAT_VAL_STR_MAX_SIZE, "%x",
+				temp_stat_val);
+		strlcat(final_stats_str, "{ocrx_unknown_pcid_info_2_n_fh",
+				FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
+		strlcat(final_stats_str, link_id,
+				FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
+		strlcat(final_stats_str, ":", FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
+		strlcat(final_stats_str, temp_stat_val_str,
+				FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
+		strlcat(final_stats_str, "}\n",
+				FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
+
 	}
 	ret_val = copy_to_user(buf,final_stats_str,FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
 
@@ -3621,8 +3715,6 @@ static ssize_t error_value_from_registers_xbar_v2(char __user *buf)
 	char temp_stat_val_str[TEMP_STAT_VAL_STR_MAX_SIZE];
 	uint32_t temp_stat_val = 0;
 	uint32_t ret_val = 0;
-	uint32_t i = 0;
-	char link_id[TEMP_STR_MAX_SIZE];
 
 	final_stats_str =
 		(char *)kzalloc(FINAL_STATS_DYNAMIC_STR_MAX_SIZE, GFP_KERNEL);
@@ -3732,286 +3824,6 @@ static ssize_t error_value_from_registers_xbar_v2(char __user *buf)
 	strlcat(final_stats_str, temp_stat_val_str,
 			FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
 	strlcat(final_stats_str, "}\n", FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
-
-	for (i = 0; i < XBAR_LINKS; i++)
-	{
-
-		RESET_STR(link_id);
-		scnprintf(link_id, TEMP_STR_MIN_SIZE, "%u", i);
-
-		temp_stat_val =
-			ecpriss_pdata->xbar_ctx->stats.xbar_octx_pkt_cnt[i];
-		scnprintf(temp_stat_val_str, TEMP_STAT_VAL_STR_MAX_SIZE, "%lu",
-				  temp_stat_val);
-
-		strlcat(final_stats_str, temp_stat_val_str,
-				FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
-		strlcat(final_stats_str, link_id,
-				FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
-		strlcat(final_stats_str, ":", FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
-		strlcat(final_stats_str, temp_stat_val_str,
-				FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
-		strlcat(final_stats_str, "}\n",
-				FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
-
-		temp_stat_val =
-			ecpriss_pdata->xbar_ctx->stats.xbar_ocrx_pkt_cnt[i];
-		scnprintf(temp_stat_val_str, TEMP_STAT_VAL_STR_MAX_SIZE, "%lu",
-				  temp_stat_val);
-
-		strlcat(final_stats_str, temp_stat_val_str,
-				FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
-		strlcat(final_stats_str, link_id,
-				FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
-		strlcat(final_stats_str, ":", FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
-		strlcat(final_stats_str, temp_stat_val_str,
-				FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
-		strlcat(final_stats_str, "}\n",
-				FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
-	}
-
-
-	temp_stat_val = ecpriss_pdata->xbar_ctx->stats.xbar_ocrx_fh_buff_watermark_fh0;
-	scnprintf(temp_stat_val_str, TEMP_STAT_VAL_STR_MAX_SIZE, "%lu",
-			  temp_stat_val);
-	strlcat(final_stats_str,
-			"{xbar_ocrx_fh_buff_watermark-->fh0 :", FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
-	strlcat(final_stats_str, temp_stat_val_str,
-			FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
-	strlcat(final_stats_str, "}\n", FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
-
-	temp_stat_val = ecpriss_pdata->xbar_ctx->stats.xbar_ocrx_fh_buff_watermark_fh1;
-	scnprintf(temp_stat_val_str, TEMP_STAT_VAL_STR_MAX_SIZE, "%lu",
-			  temp_stat_val);
-	strlcat(final_stats_str,
-			"{xbar_ocrx_fh_buff_watermark-->fh1 :", FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
-	strlcat(final_stats_str, temp_stat_val_str,
-			FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
-	strlcat(final_stats_str, "}\n", FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
-
-	temp_stat_val = ecpriss_pdata->xbar_ctx->stats.xbar_ocrx_fh_buff_watermark_fh2;
-	scnprintf(temp_stat_val_str, TEMP_STAT_VAL_STR_MAX_SIZE, "%lu",
-			  temp_stat_val);
-	strlcat(final_stats_str,
-			"{xbar_ocrx_fh_buff_watermark-->fh2 :", FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
-	strlcat(final_stats_str, temp_stat_val_str,
-			FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
-	strlcat(final_stats_str, "}\n", FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
-
-
-
-	temp_stat_val = ecpriss_pdata->xbar_ctx->stats.xbar_dbg_ocrx_0_1_buff_watermark_cc0;
-	scnprintf(temp_stat_val_str, TEMP_STAT_VAL_STR_MAX_SIZE, "%lu",
-			  temp_stat_val);
-	strlcat(final_stats_str,
-			"{xbar_dbg_ocrx_0_1_buff_watermark-->cc0 :", FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
-	strlcat(final_stats_str, temp_stat_val_str,
-			FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
-	strlcat(final_stats_str, "}\n", FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
-
-	temp_stat_val = ecpriss_pdata->xbar_ctx->stats.xbar_dbg_ocrx_0_1_buff_watermark_cc1;
-	scnprintf(temp_stat_val_str, TEMP_STAT_VAL_STR_MAX_SIZE, "%lu",
-			  temp_stat_val);
-	strlcat(final_stats_str,
-			"{xbar_dbg_ocrx_0_1_buff_watermark-->cc1 :", FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
-	strlcat(final_stats_str, temp_stat_val_str,
-			FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
-	strlcat(final_stats_str, "}\n", FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
-
-
-	temp_stat_val = ecpriss_pdata->xbar_ctx->stats.xbar_dbg_ocrx_2_3_buff_watermark_cc2;
-	scnprintf(temp_stat_val_str, TEMP_STAT_VAL_STR_MAX_SIZE, "%lu",
-			  temp_stat_val);
-	strlcat(final_stats_str,
-			"{xbar_dbg_ocrx_2_3_buff_watermark-->cc2 :", FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
-	strlcat(final_stats_str, temp_stat_val_str,
-			FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
-	strlcat(final_stats_str, "}\n", FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
-
-	temp_stat_val = ecpriss_pdata->xbar_ctx->stats.xbar_dbg_ocrx_2_3_buff_watermark_cc3;
-	scnprintf(temp_stat_val_str, TEMP_STAT_VAL_STR_MAX_SIZE, "%lu",
-			  temp_stat_val);
-	strlcat(final_stats_str,
-			"{xbar_dbg_ocrx_2_3_buff_watermark-->cc3 :", FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
-	strlcat(final_stats_str, temp_stat_val_str,
-			FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
-	strlcat(final_stats_str, "}\n", FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
-
-
-
-	temp_stat_val = ecpriss_pdata->xbar_ctx->stats.octx_oc_0_1_buff_watermark_cc0;
-	scnprintf(temp_stat_val_str, TEMP_STAT_VAL_STR_MAX_SIZE, "%lu",
-			  temp_stat_val);
-	strlcat(final_stats_str,
-			"{xbar_octx_oc_0_1_buff_watermark-->cc0 :", FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
-	strlcat(final_stats_str, temp_stat_val_str,
-			FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
-	strlcat(final_stats_str, "}\n", FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
-
-
-	temp_stat_val = ecpriss_pdata->xbar_ctx->stats.octx_oc_0_1_buff_watermark_cc1;
-	scnprintf(temp_stat_val_str, TEMP_STAT_VAL_STR_MAX_SIZE, "%lu",
-			  temp_stat_val);
-	strlcat(final_stats_str,
-			"{xbar_octx_oc_0_1_buff_watermark-->cc1 :", FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
-	strlcat(final_stats_str, temp_stat_val_str,
-			FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
-	strlcat(final_stats_str, "}\n", FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
-
-
-	temp_stat_val = ecpriss_pdata->xbar_ctx->stats.octx_oc_2_3_buff_watermark_cc2;
-	scnprintf(temp_stat_val_str, TEMP_STAT_VAL_STR_MAX_SIZE, "%lu",
-			  temp_stat_val);
-	strlcat(final_stats_str,
-			"{xbar_octx_oc_2_3_buff_watermark-->cc2 :", FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
-	strlcat(final_stats_str, temp_stat_val_str,
-			FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
-	strlcat(final_stats_str, "}\n", FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
-
-	temp_stat_val = ecpriss_pdata->xbar_ctx->stats.octx_oc_2_3_buff_watermark_cc3;
-	scnprintf(temp_stat_val_str, TEMP_STAT_VAL_STR_MAX_SIZE, "%lu",
-			  temp_stat_val);
-	strlcat(final_stats_str,
-			"{xbar_octx_oc_2_3_buff_watermark-->cc3 :", FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
-	temp_stat_val =
-		ecpriss_pdata_v2->xbar_ctx_v2->interrupt_stats_v2.fhrx_unknown_pcid;
-	scnprintf(temp_stat_val_str, TEMP_STAT_VAL_STR_MAX_SIZE, "%u",
-			  temp_stat_val);
-	strlcat(final_stats_str,
-			"{fhrx_unknown_pcid:", FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
-	strlcat(final_stats_str, temp_stat_val_str,
-			FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
-	strlcat(final_stats_str, "}\n", FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
-
-
-	temp_stat_val = ecpriss_pdata->xbar_ctx->stats.xbar_dbg_fhrx_unknown_pcid_cnt_fhrx_0_cnt;
-	scnprintf(temp_stat_val_str, TEMP_STAT_VAL_STR_MAX_SIZE, "%lu",
-			  temp_stat_val);
-	strlcat(final_stats_str,
-			"{xbar_dbg_fhrx_unknown_pcid_cnt-->fhrx_0_cnt :", FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
-	strlcat(final_stats_str, temp_stat_val_str,
-			FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
-	strlcat(final_stats_str, "}\n", FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
-
-	temp_stat_val = ecpriss_pdata->xbar_ctx->stats.xbar_dbg_fhrx_unknown_pcid_cnt_fhrx_1_cnt;
-	scnprintf(temp_stat_val_str, TEMP_STAT_VAL_STR_MAX_SIZE, "%lu",
-			  temp_stat_val);
-	strlcat(final_stats_str,
-			"{xbar_dbg_fhrx_unknown_pcid_cnt-->fhrx_1_cnt :", FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
-	temp_stat_val =
-		ecpriss_pdata_v2->xbar_ctx_v2->interrupt_stats_v2.c2crx_unkown_pcid;
-	scnprintf(temp_stat_val_str, TEMP_STAT_VAL_STR_MAX_SIZE, "%u",
-			  temp_stat_val);
-	strlcat(final_stats_str,
-			"{c2crx_unkown_pcid:", FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
-	strlcat(final_stats_str, temp_stat_val_str,
-			FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
-	strlcat(final_stats_str, "}\n", FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
-
-	temp_stat_val = ecpriss_pdata->xbar_ctx->stats.xbar_dbg_fhrx_unknown_pcid_cnt_fhrx_2_cnt;
-	scnprintf(temp_stat_val_str, TEMP_STAT_VAL_STR_MAX_SIZE, "%lu",
-			  temp_stat_val);
-	strlcat(final_stats_str,
-			"{xbar_dbg_fhrx_unknown_pcid_cnt-->fhrx_2_cnt :", FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
-	strlcat(final_stats_str, temp_stat_val_str,
-			FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
-	strlcat(final_stats_str, "}\n", FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
-
-
-	temp_stat_val = ecpriss_pdata->xbar_ctx->stats.xbar_dbg_ocrx_unknown_pcid_cnt_ocrx_fh_0_cnt;
-	scnprintf(temp_stat_val_str, TEMP_STAT_VAL_STR_MAX_SIZE, "%lu",
-			  temp_stat_val);
-	strlcat(final_stats_str,
-			"{xbar_dbg_ocrx_unknown_pcid_cnt-->ocrx_fh_0_cnt :", FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
-	strlcat(final_stats_str, temp_stat_val_str,
-			FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
-	strlcat(final_stats_str, "}\n", FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
-
-	temp_stat_val = ecpriss_pdata->xbar_ctx->stats.xbar_dbg_ocrx_unknown_pcid_cnt_ocrx_fh_1_cnt;
-	scnprintf(temp_stat_val_str, TEMP_STAT_VAL_STR_MAX_SIZE, "%lu",
-			  temp_stat_val);
-	strlcat(final_stats_str,
-			"{xbar_dbg_ocrx_unknown_pcid_cnt-->ocrx_fh_1_cnt :", FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
-	strlcat(final_stats_str, temp_stat_val_str,
-			FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
-	strlcat(final_stats_str, "}\n", FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
-
-	temp_stat_val = ecpriss_pdata->xbar_ctx->stats.xbar_dbg_ocrx_unknown_pcid_cnt_ocrx_fh_2_cnt;
-	scnprintf(temp_stat_val_str, TEMP_STAT_VAL_STR_MAX_SIZE, "%lu",
-			  temp_stat_val);
-	strlcat(final_stats_str,
-			"{xbar_dbg_ocrx_unknown_pcid_cnt-->ocrx_fh_2_cnt :", FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
-	strlcat(final_stats_str, temp_stat_val_str,
-			FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
-	strlcat(final_stats_str, "}\n", FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
-
-	for (i = 0; i < NUM_OF_FHP; i++)
-	{
-
-		RESET_STR(link_id);
-		scnprintf(link_id, TEMP_STR_MIN_SIZE, "%u", i);
-
-		temp_stat_val =
-			ecpriss_pdata->xbar_ctx->stats.fhrx_unknown_pcid_info_1_n[i];
-		scnprintf(temp_stat_val_str, TEMP_STAT_VAL_STR_MAX_SIZE, "%x",
-				  temp_stat_val);
-
-		strlcat(final_stats_str, "{fhrx_unknown_pcid_info_1_n_fh",
-				FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
-		strlcat(final_stats_str, link_id,
-				FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
-		strlcat(final_stats_str, ":", FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
-		strlcat(final_stats_str, temp_stat_val_str,
-				FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
-		strlcat(final_stats_str, "}\n",
-				FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
-
-		temp_stat_val =
-			ecpriss_pdata->xbar_ctx->stats.fhrx_unknown_pcid_info_2_n[i];
-		scnprintf(temp_stat_val_str, TEMP_STAT_VAL_STR_MAX_SIZE, "%x",
-				  temp_stat_val);
-
-		strlcat(final_stats_str, "{fhrx_unknown_pcid_info_2_n_fh",
-				FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
-		strlcat(final_stats_str, link_id,
-				FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
-		strlcat(final_stats_str, ":", FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
-		strlcat(final_stats_str, temp_stat_val_str,
-				FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
-		strlcat(final_stats_str, "}\n",
-				FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
-
-		temp_stat_val =
-			ecpriss_pdata->xbar_ctx->stats.ocrx_unknown_pcid_info_1_n[i];
-		scnprintf(temp_stat_val_str, TEMP_STAT_VAL_STR_MAX_SIZE, "%x",
-				  temp_stat_val);
-
-		strlcat(final_stats_str, "{ocrx_unknown_pcid_info_1_n_fh",
-				FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
-		strlcat(final_stats_str, link_id,
-				FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
-		strlcat(final_stats_str, ":", FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
-		strlcat(final_stats_str, temp_stat_val_str,
-				FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
-		strlcat(final_stats_str, "}\n",
-				FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
-
-		temp_stat_val =
-			ecpriss_pdata->xbar_ctx->stats.ocrx_unknown_pcid_info_2_n[i];
-		scnprintf(temp_stat_val_str, TEMP_STAT_VAL_STR_MAX_SIZE, "%x",
-				  temp_stat_val);
-
-		strlcat(final_stats_str, "{ocrx_unknown_pcid_info_2_n_fh",
-				FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
-		strlcat(final_stats_str, link_id,
-				FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
-		strlcat(final_stats_str, ":", FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
-		strlcat(final_stats_str, temp_stat_val_str,
-				FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
-		strlcat(final_stats_str, "}\n",
-				FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
-
-	}
 
 	ret_val = copy_to_user(buf,final_stats_str,FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
 
@@ -6543,7 +6355,7 @@ static struct file_operations *file_name_to_wrapper(char *filename)
 
 
 	else{
-		ECPRILOGERR("Invalid file name, no entry available\n");
+		ECPRILOGDBG("Invalid file name, no entry available\n");
 		return &dummy;
 	}
 	return NULL;

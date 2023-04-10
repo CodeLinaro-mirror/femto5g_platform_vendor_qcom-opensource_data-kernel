@@ -22,6 +22,7 @@
 #include <linux/iommu.h>
 #include <linux/version.h>
 #include <linux/clk.h>
+#include <linux/types.h>
 #include <linux/mhi_dma.h>
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 9, 0))
 #include <linux/qcom-iommu-util.h>
@@ -41,6 +42,8 @@
 #endif
 
 #define DRV_NAME "ecpri-dma"
+#define DMA_INT_MAX ((int)(~0U >> 1))
+#define DMA_INT_MIN (-DMA_INT_MAX - 1)
 
 extern struct ecpri_dma_context *ecpri_dma_ctx;
 
@@ -161,6 +164,15 @@ do {\
 /* Define for GCC max nominal clock */
 #define GCC_AHB_CLK_NOM_MAX (ECPRI_CLK_FREQ(100))
 #define GCC_XO_CLK_NOM_MAX (ECPRI_CLK_FREQ(19.20))
+
+/* Exception ENDP defines */
+#define ECPRI_DMA_EXCEPTION_RING_SIZE			(256)
+#define ECPRI_DMA_DP_EXCEPTION_BUDGET			(16)
+#define ECPRI_DMA_DP_EXCEPTION_FH_RX_MAX_CHAIN	(4)
+/* ETH supports up to 9K jumbo packet, due to HW limitation
+	DMA can overflow to up to 4 buffers, to support 9K on 4 buffers
+	each buffer should be at least 2500 */
+#define ECPRI_DMA_DP_EXCEPTION_BUFF_SIZE		(2500)
 
 enum ecpri_dma_smmu_cb_type {
 	ECPRI_DMA_SMMU_CB_AP,
@@ -301,10 +313,6 @@ struct ecpri_dma_exception_stats {
  * @available_outstanding_pkts_cache: Cache for outstanding pkts wrappers alloc
  * @available_outstanding_pkts_list: List of pkt wrappers ready to be used
  * @avail_outstanding_pkts: Size of the ready pkt wrappers list
- * @available_exception_pkts_cache: Cache for exception pkts allocation,
- *									relavent only for exception endp
- * @available_exception_buffs_cache: Cache for exception buffers allocation,
- *									 relavent only for exception endp
  * @xmit_eot_cnt: atomic var to keep track of completed packets
  * @total_pkts_recv: EP statistics regarding number of packets received
  * @total_pkts_sent: EP statistics regarding number of packets sent
@@ -313,6 +321,8 @@ struct ecpri_dma_exception_stats {
  * @spinlock: EP lock to sync accesses to EP resources
  * @l2_mhi_channel_ptr: Pointer to the MHI Channel CTX
  * @dynamic_vf_enabled: Indicating this is a memcpy ENDP with dynamic VF
+ * @tx_pre_header_enabled: Indicating whether tx pre header was enabled
+ * (tx endp only)
  *
  */
 struct ecpri_dma_endp_context {
@@ -349,8 +359,6 @@ struct ecpri_dma_endp_context {
 	struct kmem_cache *available_outstanding_pkts_cache;
 	struct list_head available_outstanding_pkts_list;
 	u32 avail_outstanding_pkts;
-	struct kmem_cache *available_exception_pkts_cache;
-	struct kmem_cache *available_exception_buffs_cache;
 	atomic_t xmit_eot_cnt;
 
 	u32 total_pkts_recv;
@@ -361,6 +369,7 @@ struct ecpri_dma_endp_context {
 	spinlock_t spinlock;
 	void* l2_mhi_channel_ptr;
 	bool dynamic_vf_enabled;
+	bool tx_pre_header_enabled;
 };
 
 /**
@@ -456,6 +465,7 @@ struct ecpri_dma_icc_paths {
   * @exception_endp: Exception ENDP number and related GSI ID
   * @ecpri_dma_exception_wq: WQ to handle Exception replenish
   * @exception_stats: Exception statistics
+  * @driver_ver: current driver SW version, used to sync with Q6
   *
   */
 struct ecpri_dma_context {
@@ -498,6 +508,17 @@ struct ecpri_dma_context {
 	struct ecpri_dma_clks clks;
 	struct ecpri_dma_icc_paths icc_paths;
 	u32 num_of_gsi;
+	u32 driver_ver;
+	struct mutex mhi_memcpy_setup_lock;
+	spinlock_t exception_spinlock;
+	u32 exception_pkt_idx;
+	struct ecpri_dma_pkt*
+		exception_pkts_arr[ECPRI_DMA_EXCEPTION_RING_SIZE];
+	struct ecpri_dma_pkt exception_pkts[ECPRI_DMA_EXCEPTION_RING_SIZE];
+	struct ecpri_dma_mem_buffer*
+		exception_buffs_ptr_arr[ECPRI_DMA_EXCEPTION_RING_SIZE];
+	struct ecpri_dma_mem_buffer exception_buffs[ECPRI_DMA_EXCEPTION_RING_SIZE];
+	u32 exception_status_statistics[ECPRI_DMA_STATUS_CODE_MAX];
 };
 
 /**

@@ -92,34 +92,49 @@ struct ecpri_dma_eth_client_endp_mapping
 	[ECPRI_HW_V2_0][ECPRI_HW_FLAVOR_DU_L2][12]   = { true, {20, 0}, {57, 0} },
 
 	/* DU-PCIe 4x9 Connections */
-	[ECPRI_HW_V2_0][ECPRI_HW_FLAVOR_DU_PCIE_4_X_9][0] = { true, {0, 0}, {37, 0} },
-	[ECPRI_HW_V2_0][ECPRI_HW_FLAVOR_DU_PCIE_4_X_9][1] = { true, {1, 0}, {38, 0} },
-	[ECPRI_HW_V2_0][ECPRI_HW_FLAVOR_DU_PCIE_4_X_9][2] = { true, {2, 0}, {39, 0} },
-	[ECPRI_HW_V2_0][ECPRI_HW_FLAVOR_DU_PCIE_4_X_9][3] =
-		{ true, {21, 0}, {ECPRI_DMA_ENDP_INVALID, 0} },
-	[ECPRI_HW_V2_0][ECPRI_HW_FLAVOR_DU_PCIE_4_X_9][4] = { true, {23, 0}, {59, 0}},
-	[ECPRI_HW_V2_0][ECPRI_HW_FLAVOR_DU_PCIE_4_X_9][5]
-	= { true, {ECPRI_DMA_ENDP_INVALID, 1}, {71, 1} },
+	[ECPRI_HW_V2_0][ECPRI_HW_FLAVOR_DU_PCIE_4_X_9][0] =  { true, {0, 0},  {37, 0} },
+	[ECPRI_HW_V2_0][ECPRI_HW_FLAVOR_DU_PCIE_4_X_9][1] =  { true, {24, 0}, {61, 0} },
+	[ECPRI_HW_V2_0][ECPRI_HW_FLAVOR_DU_PCIE_4_X_9][2] =  { true, {25, 0}, {62, 0} },
+	[ECPRI_HW_V2_0][ECPRI_HW_FLAVOR_DU_PCIE_4_X_9][3] =  { true, {26, 0}, {63, 0} },
+	[ECPRI_HW_V2_0][ECPRI_HW_FLAVOR_DU_PCIE_4_X_9][4] =  { true, {1, 0},  {38, 0} },
+	[ECPRI_HW_V2_0][ECPRI_HW_FLAVOR_DU_PCIE_4_X_9][5] =  { true, {27, 0}, {64, 0} },
+	[ECPRI_HW_V2_0][ECPRI_HW_FLAVOR_DU_PCIE_4_X_9][6] =  { true, {28, 0}, {65, 0} },
+	[ECPRI_HW_V2_0][ECPRI_HW_FLAVOR_DU_PCIE_4_X_9][7] =  { true, {29, 0}, {66, 0} },
+	[ECPRI_HW_V2_0][ECPRI_HW_FLAVOR_DU_PCIE_4_X_9][8] =  { true, {2, 0},  {39, 0} },
+	[ECPRI_HW_V2_0][ECPRI_HW_FLAVOR_DU_PCIE_4_X_9][9] =  { true, {30, 0}, {67, 0} },
+	[ECPRI_HW_V2_0][ECPRI_HW_FLAVOR_DU_PCIE_4_X_9][10] = { true, {31, 0}, {68, 0} },
+	[ECPRI_HW_V2_0][ECPRI_HW_FLAVOR_DU_PCIE_4_X_9][11] = { true, {32, 0}, {69, 0} },
+	[ECPRI_HW_V2_0][ECPRI_HW_FLAVOR_DU_PCIE_4_X_9][12] = { true, {23, 0}, {59, 0} },
 
 	/* DU-PCIe 5x6 Connections */
-	[ECPRI_HW_V2_0][ECPRI_HW_FLAVOR_DU_PCIE_5_X_6][0] = { true, {0, 0}, {37, 0} },
-	[ECPRI_HW_V2_0][ECPRI_HW_FLAVOR_DU_PCIE_5_X_6][1] = { true, {1, 0}, {38, 0} },
-	[ECPRI_HW_V2_0][ECPRI_HW_FLAVOR_DU_PCIE_5_X_6][2] = { true, {2, 0}, {39, 0} },
-	[ECPRI_HW_V2_0][ECPRI_HW_FLAVOR_DU_PCIE_5_X_6][3] =
-		{ true, {21, 0}, {ECPRI_DMA_ENDP_INVALID, 0} },
-	[ECPRI_HW_V2_0][ECPRI_HW_FLAVOR_DU_PCIE_5_X_6][4] = { true, {23, 0}, {59, 0}},
-	[ECPRI_HW_V2_0][ECPRI_HW_FLAVOR_DU_PCIE_5_X_6][5] =
-		{ true, {ECPRI_DMA_ENDP_INVALID, 1}, {69, 1} },
+	[ECPRI_HW_V2_0][ECPRI_HW_FLAVOR_DU_PCIE_5_X_6][0] =  { true, {0, 0},  {37, 0} },
+	[ECPRI_HW_V2_0][ECPRI_HW_FLAVOR_DU_PCIE_5_X_6][1] =  { true, {24, 0}, {61, 0} },
+	[ECPRI_HW_V2_0][ECPRI_HW_FLAVOR_DU_PCIE_5_X_6][2] =  { true, {25, 0}, {62, 0} },
+	[ECPRI_HW_V2_0][ECPRI_HW_FLAVOR_DU_PCIE_5_X_6][3] =  { true, {26, 0}, {63, 0} },
+	[ECPRI_HW_V2_0][ECPRI_HW_FLAVOR_DU_PCIE_5_X_6][4] =  { true, {1, 0},  {38, 0} },
+	[ECPRI_HW_V2_0][ECPRI_HW_FLAVOR_DU_PCIE_5_X_6][5] =  { true, {27, 0}, {64, 0} },
+	[ECPRI_HW_V2_0][ECPRI_HW_FLAVOR_DU_PCIE_5_X_6][6] =  { true, {28, 0}, {65, 0} },
+	[ECPRI_HW_V2_0][ECPRI_HW_FLAVOR_DU_PCIE_5_X_6][7] =  { true, {29, 0}, {66, 0} },
+	[ECPRI_HW_V2_0][ECPRI_HW_FLAVOR_DU_PCIE_5_X_6][8] =  { true, {2, 0},  {39, 0} },
+	[ECPRI_HW_V2_0][ECPRI_HW_FLAVOR_DU_PCIE_5_X_6][9] =  { true, {30, 0}, {67, 0} },
+	[ECPRI_HW_V2_0][ECPRI_HW_FLAVOR_DU_PCIE_5_X_6][10] = { true, {31, 0}, {68, 0} },
+	[ECPRI_HW_V2_0][ECPRI_HW_FLAVOR_DU_PCIE_5_X_6][11] = { true, {32, 0}, {69, 0} },
+	[ECPRI_HW_V2_0][ECPRI_HW_FLAVOR_DU_PCIE_5_X_6][12] = { true, {23, 0}, {59, 0} },
 
 	/* DU-PCIe 3x12 Connections */
-	[ECPRI_HW_V2_0][ECPRI_HW_FLAVOR_DU_PCIE_3_X_12][0] = { true, {0, 0}, {37, 0}},
-	[ECPRI_HW_V2_0][ECPRI_HW_FLAVOR_DU_PCIE_3_X_12][1] = { true, {1, 0}, {38, 0}},
-	[ECPRI_HW_V2_0][ECPRI_HW_FLAVOR_DU_PCIE_3_X_12][2] = { true, {2, 0}, {39, 0}},
-	[ECPRI_HW_V2_0][ECPRI_HW_FLAVOR_DU_PCIE_3_X_12][3]
-		= { true, {21, 0}, {ECPRI_DMA_ENDP_INVALID, 0} },
-	[ECPRI_HW_V2_0][ECPRI_HW_FLAVOR_DU_PCIE_3_X_12][4] = {true, {23, 0}, {59, 0}},
-	[ECPRI_HW_V2_0][ECPRI_HW_FLAVOR_DU_PCIE_3_X_12][5]
-		= { true, {ECPRI_DMA_ENDP_INVALID, 1}, {65, 1} },
+	[ECPRI_HW_V2_0][ECPRI_HW_FLAVOR_DU_PCIE_3_X_12][0] =  { true, {0, 0},  {37, 0} },
+	[ECPRI_HW_V2_0][ECPRI_HW_FLAVOR_DU_PCIE_3_X_12][1] =  { true, {24, 0}, {61, 0} },
+	[ECPRI_HW_V2_0][ECPRI_HW_FLAVOR_DU_PCIE_3_X_12][2] =  { true, {25, 0}, {62, 0} },
+	[ECPRI_HW_V2_0][ECPRI_HW_FLAVOR_DU_PCIE_3_X_12][3] =  { true, {26, 0}, {63, 0} },
+	[ECPRI_HW_V2_0][ECPRI_HW_FLAVOR_DU_PCIE_3_X_12][4] =  { true, {1, 0},  {38, 0} },
+	[ECPRI_HW_V2_0][ECPRI_HW_FLAVOR_DU_PCIE_3_X_12][5] =  { true, {27, 0}, {64, 0} },
+	[ECPRI_HW_V2_0][ECPRI_HW_FLAVOR_DU_PCIE_3_X_12][6] =  { true, {28, 0}, {65, 0} },
+	[ECPRI_HW_V2_0][ECPRI_HW_FLAVOR_DU_PCIE_3_X_12][7] =  { true, {29, 0}, {66, 0} },
+	[ECPRI_HW_V2_0][ECPRI_HW_FLAVOR_DU_PCIE_3_X_12][8] =  { true, {2, 0},  {39, 0} },
+	[ECPRI_HW_V2_0][ECPRI_HW_FLAVOR_DU_PCIE_3_X_12][9] =  { true, {30, 0}, {67, 0} },
+	[ECPRI_HW_V2_0][ECPRI_HW_FLAVOR_DU_PCIE_3_X_12][10] = { true, {31, 0}, {68, 0} },
+	[ECPRI_HW_V2_0][ECPRI_HW_FLAVOR_DU_PCIE_3_X_12][11] = { true, {32, 0}, {69, 0} },
+	[ECPRI_HW_V2_0][ECPRI_HW_FLAVOR_DU_PCIE_3_X_12][12] = { true, {23, 0}, {59, 0} },
 };
 
 struct ecpri_dma_eth_client_context *ecpri_dma_eth_client_ctx = NULL;
@@ -548,6 +563,18 @@ int ecpri_dma_eth_connect_endpoints(
 			ecpri_dma_eth_client_ctx->
 			link_to_endp_mapping[params->link_index].rx_endp.gsi_id);
 		return ret;
+	}
+
+	/* Enable/disable Tx header */
+	connection->tx_endp_ctx->tx_pre_header_enabled =
+		params->enable_tx_pre_header;
+
+	ret = ecpri_dma_set_tx_pre_header(connection->tx_endp_ctx);
+	if (ret != 0) {
+		DMAERR("Unable to set Tx header, ENDP ID:%d\n",
+			ecpri_dma_eth_client_ctx->
+			link_to_endp_mapping[params->link_index].tx_endp.endp_id);
+		return -EINVAL;
 	}
 
 	ret = ecpri_dma_enable_dma_endp(connection->tx_endp_ctx);

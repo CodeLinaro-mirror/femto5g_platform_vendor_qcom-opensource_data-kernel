@@ -88,6 +88,10 @@ int mtip_rumi_platform = 0;
 module_param(mtip_rumi_platform, int, S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP);
 MODULE_PARM_DESC(mtip_rumi_platform, "Platform mode to RUMI");
 
+int mtip_dma_max_rx_buff_size = MTIP_DMA_RX_BUFF_SIZE;
+module_param(mtip_dma_max_rx_buff_size, int, S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP);
+MODULE_PARM_DESC(mtip_dma_max_rx_buff_size, "SET mtip_dma_rx buff size");
+
 int mtip_lookup_link_index_by_name(char *name, u32 *link_index) {
    int i;
    struct net_device *dev;
@@ -243,7 +247,7 @@ int mtip_lookup_real_link_number_by_link_index(u32 link_index, u32* link_number)
 		*link_number = 0;
 		break;
 	case 15:
-		*link_number = 2;
+		*link_number = 1;
 		break;
 	default:
         CSMLOGERR("invalid link_index: %d\n", link_index);
@@ -354,7 +358,7 @@ int mtip_register_platform_driver(void)
 {
    int ret = 0;
 
-   CSMLOGINFO("mtip_register_platform_driver called\n");
+   CSMLOGDBG("mtip_register_platform_driver called\n");
 
    // register for the platform driver
    platform_driver_priv->perr = platform_driver_register(&ethernet_mac_platform_driver);
@@ -405,7 +409,7 @@ static int mtip_module_init(void)
    bool is_dma_ready = false;
    int ret = 0;
 
-   CSMLOGINFO("mtip_module_init called\n");
+   CSMLOGERR("mtip_module_init called\n");
 
    // process the module parameters
    // tx_delay parameter
@@ -413,10 +417,10 @@ static int mtip_module_init(void)
 	{
         if (mtip_tx_delay[i] != 0) 
         {
-            CSMLOGINFO("mtip_tx_delay[%d] = %d\n", i, mtip_tx_delay[i]);
+            CSMLOGDBG("mtip_tx_delay[%d] = %d\n", i, mtip_tx_delay[i]);
         }
 	}
-	CSMLOGINFO("mtip_tx_delay module params set for %d\n", mtip_tx_delay_argc);
+	CSMLOGDBG("mtip_tx_delay module params set for %d\n", mtip_tx_delay_argc);
 
     for (i = mtip_tx_delay_argc; i < MTIP_MAX_LINKS; ++i) {
         mtip_tx_delay[i] = TX_DELAY_DEFAULT_VAL;
@@ -427,16 +431,16 @@ static int mtip_module_init(void)
     {
         if (mtip_rx_delay[i] != 0) 
         {
-            CSMLOGINFO("mtip_rx_delay[%d] = %d\n", i, mtip_rx_delay[i]);
+            CSMLOGDBG("mtip_rx_delay[%d] = %d\n", i, mtip_rx_delay[i]);
         }
     }
-    CSMLOGINFO("mtip_rx_delay module params set for %d\n", mtip_rx_delay_argc);
+    CSMLOGDBG("mtip_rx_delay module params set for %d\n", mtip_rx_delay_argc);
 
     for (i = mtip_rx_delay_argc; i < MTIP_MAX_LINKS; ++i) {
         mtip_rx_delay[i] = RX_DELAY_DEFAULT_VAL;
     }
 
-    CSMLOGINFO("Loopback mode is %d\n", mtip_loopback_mode);
+    CSMLOGDBG("Loopback mode is %d\n", mtip_loopback_mode);
 
     if (mtip_rumi_platform != 0) 
     {
@@ -489,6 +493,7 @@ static int mtip_module_init(void)
    // HANDLE THE ERROR
    if (platform_driver_priv == NULL)
    {
+      CSMLOGERR("Unable to allocate platform_driv_priv memory!");
       ret = -ENOMEM;
       goto out;
    }
@@ -509,22 +514,22 @@ static int mtip_module_init(void)
 		"csm_mtip", 0);
 	if (platform_driver_priv->ipc_log_buf == NULL)
     {
-		CSMLOGINFO("mtip_init(): failed to create IPC log context, continue...\n");
+		CSMLOGERR("mtip_init(): failed to create IPC log context, continue...\n");
     }
     else
     {
-        CSMLOGINFO("mtip_init(): IPC log context created successfully, continue...\n");
+        CSMLOGDBG("mtip_init(): IPC log context created successfully, continue...\n");
     }
 
     platform_driver_priv->ipc_log_buf_low = ipc_log_context_create(CSM_IPC_LOG_PAGES,
 		"csm_mtip_low", 0);
     if (platform_driver_priv->ipc_log_buf_low == NULL)
     {
-		CSMLOGINFO("mtip_init(): failed to create IPC log LOW context, continue...\n");
+		CSMLOGERR("mtip_init(): failed to create IPC log LOW context, continue...\n");
     }
     else
     {
-        CSMLOGINFO("mtip_init(): IPC log context LOW created successfully, continue...\n");
+        CSMLOGDBG("mtip_init(): IPC log context LOW created successfully, continue...\n");
     }
 
    if (mtip_rumi_platform == 0) 
@@ -554,6 +559,7 @@ static int mtip_module_init(void)
    // HANDLE THE ERROR
    if (ret < 0)
    {
+      CSMLOGERR("Failed to register with DMA");
       goto cleanup;
    }
 
@@ -562,13 +568,14 @@ static int mtip_module_init(void)
 
    if (is_dma_ready) 
    {
-      CSMLOGINFO("DMA is ready: going to register platform driver\n");
+      CSMLOGDBG("DMA is ready: going to register platform driver\n");
 
       ret = mtip_register_platform_driver();
 
       // HANDLE THE ERROR
       if (ret < 0)
       {
+         CSMLOGERR("Failed to register platform driver");
          goto cleanup;
       }
    }
@@ -588,7 +595,7 @@ out:
 
 static void mtip_module_exit(void)
 {
-   CSMLOGINFO("mtip_module_exit called\n");
+   CSMLOGERR("mtip_module_exit called\n");
 
    // finalize the workq
    mtip_destroy_workq();

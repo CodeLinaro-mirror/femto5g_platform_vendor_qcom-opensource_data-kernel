@@ -1,6 +1,6 @@
 /*
  * SPDX-License-Identifier: GPL-2.0-only
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/init.h>
@@ -2043,7 +2043,6 @@ static struct ecpri_dma_hal_reg_obj ecpri_dma_hal_reg_objs[ECPRI_HW_MAX][DMA_REG
 	ecpri_dma_reg_construct_dummy, ecpri_dma_reg_parse_dummy,
 	HWIO_ECPRI_DPL_TRIG_A_n_V2_OFFS(0),
 	HWIO_ECPRI_DPL_TRIG_A_n_V2_OFFS(1) -
-	HWIO_ECPRI_DPL_TRIG_A_n_V2_OFFS(1) -
 	HWIO_ECPRI_DPL_TRIG_A_n_V2_OFFS(0), 0,
 	HWIO_ECPRI_DPL_TRIG_A_n_V2_MAXn, 0, 0,
 	HWIO_ECPRI_DPL_TRIG_A_n_V2_ATTR, 0},
@@ -2851,6 +2850,14 @@ u32 ecpri_dma_hal_read_reg_mn_fields(enum ecpri_dma_hal_reg_name reg,
 		return -EINVAL;
 	}
 
+	offset = ecpri_dma_hal_reg_objs[ecpri_dma_hal_ctx->ecpri_hw_ver][reg].offset;
+	if (offset == -1) {
+		DMAHAL_ERR("Read access to obsolete reg=%s\n",
+			ecpri_dma_hal_reg_name_str(reg));
+		WARN_ON(1);
+		return -EPERM;
+	}
+
 	if ((ecpri_dma_hal_reg_objs[ecpri_dma_hal_ctx->ecpri_hw_ver][reg].attr &
 		ECPRI_DMA_HAL_REG_ATTR_READ_ONLY) == 0) {
 		DMAHAL_ERR("Register doesn't have READ permissions reg=%u\n", reg);
@@ -2860,13 +2867,6 @@ u32 ecpri_dma_hal_read_reg_mn_fields(enum ecpri_dma_hal_reg_name reg,
 
 	DMAHAL_DBG_LOW("read from %s m=%u n=%u and parse it\n",
 		ecpri_dma_hal_reg_name_str(reg), m, n);
-	offset = ecpri_dma_hal_reg_objs[ecpri_dma_hal_ctx->ecpri_hw_ver][reg].offset;
-	if (offset == -1) {
-		DMAHAL_ERR("Read access to obsolete reg=%s\n",
-			ecpri_dma_hal_reg_name_str(reg));
-		WARN_ON(1);
-		return -EPERM;
-	}
 	offset += ecpri_dma_hal_reg_objs[ecpri_dma_hal_ctx->ecpri_hw_ver][reg].m_ofst * m;
 	offset += ecpri_dma_hal_reg_objs[ecpri_dma_hal_ctx->ecpri_hw_ver][reg].n_ofst * n;
 	val = ioread32(ecpri_dma_hal_ctx->base + offset);
@@ -2914,6 +2914,15 @@ void ecpri_dma_hal_write_reg_mn_fields(enum ecpri_dma_hal_reg_name reg, u32 m,
 		return;
 	}
 
+
+	offset = ecpri_dma_hal_reg_objs[ecpri_dma_hal_ctx->ecpri_hw_ver][reg].offset;
+	if (offset == -1) {
+		DMAHAL_ERR("Write access to obsolete reg=%s\n",
+			ecpri_dma_hal_reg_name_str(reg));
+		WARN_ON(1);
+		return;
+	}
+
 	if ((ecpri_dma_hal_reg_objs[ecpri_dma_hal_ctx->ecpri_hw_ver][reg].attr &
 		ECPRI_DMA_HAL_REG_ATTR_WRITE_ONLY) == 0) {
 		DMAHAL_ERR("Register doesn't have WRITE permissions reg=%u\n", reg);
@@ -2923,13 +2932,6 @@ void ecpri_dma_hal_write_reg_mn_fields(enum ecpri_dma_hal_reg_name reg, u32 m,
 
 	DMAHAL_DBG_LOW("write to %s m=%u n=%u after constructing it\n",
 		ecpri_dma_hal_reg_name_str(reg), m, n);
-	offset = ecpri_dma_hal_reg_objs[ecpri_dma_hal_ctx->ecpri_hw_ver][reg].offset;
-	if (offset == -1) {
-		DMAHAL_ERR("Write access to obsolete reg=%s\n",
-			ecpri_dma_hal_reg_name_str(reg));
-		WARN_ON(1);
-		return;
-	}
 	offset += ecpri_dma_hal_reg_objs[ecpri_dma_hal_ctx->ecpri_hw_ver][reg].m_ofst * m;
 	offset += ecpri_dma_hal_reg_objs[ecpri_dma_hal_ctx->ecpri_hw_ver][reg].n_ofst * n;
 	ecpri_dma_hal_reg_objs[ecpri_dma_hal_ctx->ecpri_hw_ver][reg].construct(reg, fields, &val);
@@ -3046,33 +3048,7 @@ const char *ecpri_dma_hal_reg_name_str(enum ecpri_dma_hal_reg_name reg_name)
  */
 u32 ecpri_dma_hal_read_reg_n(enum ecpri_dma_hal_reg_name reg, u32 n)
 {
-	u32 offset;
-	if (reg >= DMA_REG_MAX) {
-		DMAHAL_ERR("Invalid register reg=%u\n", reg);
-		WARN_ON(1);
-		return -EINVAL;
-	}
-
-	if ((ecpri_dma_hal_reg_objs[ecpri_dma_hal_ctx->ecpri_hw_ver][reg].attr &
-		ECPRI_DMA_HAL_REG_ATTR_READ_ONLY) == 0) {
-		DMAHAL_ERR("Register doesn't have READ permissions reg=%u\n", reg);
-		WARN_ON(1);
-		return -EINVAL;
-	}
-
-	DMAHAL_DBG_LOW("read from %s n=%u\n",
-		ecpri_dma_hal_reg_name_str(reg), n);
-
-	offset = ecpri_dma_hal_reg_objs[ecpri_dma_hal_ctx->ecpri_hw_ver][reg].offset;
-	if (offset == -1) {
-		DMAHAL_ERR("Read access to obsolete reg=%s\n",
-			ecpri_dma_hal_reg_name_str(reg));
-		WARN_ON(1);
-		return -EPERM;
-	}
-
-	offset += ecpri_dma_hal_reg_objs[ecpri_dma_hal_ctx->ecpri_hw_ver][reg].n_ofst * n;
-	return ioread32(ecpri_dma_hal_ctx->base + offset);
+	return ecpri_dma_hal_read_reg_mn(reg, 0, n);
 }
 
 /*
@@ -3122,6 +3098,14 @@ u32 ecpri_dma_hal_read_reg_mn(enum ecpri_dma_hal_reg_name reg, u32 m, u32 n)
 		return -EINVAL;
 	}
 
+	offset = ecpri_dma_hal_reg_objs[ecpri_dma_hal_ctx->ecpri_hw_ver][reg].offset;
+	if (offset == -1) {
+		DMAHAL_ERR("Read access to obsolete reg=%s\n",
+			ecpri_dma_hal_reg_name_str(reg));
+		WARN_ON_ONCE(1);
+		return -EPERM;
+	}
+
 	if ((ecpri_dma_hal_reg_objs[ecpri_dma_hal_ctx->ecpri_hw_ver][reg].attr &
 		ECPRI_DMA_HAL_REG_ATTR_READ_ONLY) == 0) {
 		DMAHAL_ERR("Register doesn't have READ permissions reg=%u\n", reg);
@@ -3131,13 +3115,6 @@ u32 ecpri_dma_hal_read_reg_mn(enum ecpri_dma_hal_reg_name reg, u32 m, u32 n)
 
 	DMAHAL_DBG_LOW("read %s m=%u n=%u\n",
 		ecpri_dma_hal_reg_name_str(reg), m, n);
-	offset = ecpri_dma_hal_reg_objs[ecpri_dma_hal_ctx->ecpri_hw_ver][reg].offset;
-	if (offset == -1) {
-		DMAHAL_ERR("Read access to obsolete reg=%s\n",
-			ecpri_dma_hal_reg_name_str(reg));
-		WARN_ON_ONCE(1);
-		return -EPERM;
-	}
 
 	offset += ecpri_dma_hal_reg_objs[ecpri_dma_hal_ctx->ecpri_hw_ver][reg].m_ofst * m;
 	offset += ecpri_dma_hal_reg_objs[ecpri_dma_hal_ctx->ecpri_hw_ver][reg].n_ofst * n;
@@ -3165,6 +3142,14 @@ void ecpri_dma_hal_write_reg_mn(enum ecpri_dma_hal_reg_name reg, u32 m, u32 n, u
 		return;
 	}
 
+	offset = ecpri_dma_hal_reg_objs[ecpri_dma_hal_ctx->ecpri_hw_ver][reg].offset;
+	if (offset == -1) {
+		DMAHAL_ERR("Write access to obsolete reg=%s\n",
+			ecpri_dma_hal_reg_name_str(reg));
+		WARN_ON(1);
+		return;
+	}
+
 	if ((ecpri_dma_hal_reg_objs[ecpri_dma_hal_ctx->ecpri_hw_ver][reg].attr &
 		ECPRI_DMA_HAL_REG_ATTR_WRITE_ONLY) == 0) {
 		DMAHAL_ERR("Register doesn't have WRITE permissions reg=%u\n", reg);
@@ -3174,13 +3159,6 @@ void ecpri_dma_hal_write_reg_mn(enum ecpri_dma_hal_reg_name reg, u32 m, u32 n, u
 
 	DMAHAL_DBG_LOW("write to %s m=%u n=%u val=%x\n",
 		ecpri_dma_hal_reg_name_str(reg), m, n, val);
-	offset = ecpri_dma_hal_reg_objs[ecpri_dma_hal_ctx->ecpri_hw_ver][reg].offset;
-	if (offset == -1) {
-		DMAHAL_ERR("Write access to obsolete reg=%s\n",
-			ecpri_dma_hal_reg_name_str(reg));
-		WARN_ON(1);
-		return;
-	}
 
 	offset += ecpri_dma_hal_reg_objs[ecpri_dma_hal_ctx->ecpri_hw_ver][reg].m_ofst * m;
 	offset += ecpri_dma_hal_reg_objs[ecpri_dma_hal_ctx->ecpri_hw_ver][reg].n_ofst * n;
@@ -3216,8 +3194,6 @@ u32 ecpri_dma_hal_get_reg_mn_ofst(enum ecpri_dma_hal_reg_name reg, u32 m, u32 n)
 		return -EINVAL;
 	}
 
-	DMAHAL_DBG_LOW("get offset of %s m=%u n=%u\n",
-		ecpri_dma_hal_reg_name_str(reg), m, n);
 	offset = ecpri_dma_hal_reg_objs[ecpri_dma_hal_ctx->ecpri_hw_ver][reg].offset;
 	if (offset == -1) {
 		DMAHAL_ERR("Access to obsolete reg=%s\n",
@@ -3225,6 +3201,9 @@ u32 ecpri_dma_hal_get_reg_mn_ofst(enum ecpri_dma_hal_reg_name reg, u32 m, u32 n)
 		WARN_ON(1);
 		return -EPERM;
 	}
+
+	DMAHAL_DBG_LOW("get offset of %s m=%u n=%u\n",
+		ecpri_dma_hal_reg_name_str(reg), m, n);
 
 	offset += ecpri_dma_hal_reg_objs[ecpri_dma_hal_ctx->ecpri_hw_ver][reg].m_ofst * m;
 	offset += ecpri_dma_hal_reg_objs[ecpri_dma_hal_ctx->ecpri_hw_ver][reg].n_ofst * n;
@@ -3246,8 +3225,6 @@ u32 ecpri_dma_hal_get_reg_max_m(enum ecpri_dma_hal_reg_name reg)
 		return -EINVAL;
 	}
 
-	DMAHAL_DBG_LOW("get max m for %s\n",
-		ecpri_dma_hal_reg_name_str(reg));
 	offset = ecpri_dma_hal_reg_objs[ecpri_dma_hal_ctx->ecpri_hw_ver][reg].offset;
 	if (offset == -1) {
 		DMAHAL_ERR("Access to obsolete reg=%s\n",
@@ -3255,6 +3232,9 @@ u32 ecpri_dma_hal_get_reg_max_m(enum ecpri_dma_hal_reg_name reg)
 		WARN_ON(1);
 		return -EPERM;
 	}
+
+	DMAHAL_DBG_LOW("get max m for %s\n",
+		ecpri_dma_hal_reg_name_str(reg));
 
 	m_end = ecpri_dma_hal_reg_objs[ecpri_dma_hal_ctx->ecpri_hw_ver][reg].m_end;
 
@@ -3275,8 +3255,6 @@ u32 ecpri_dma_hal_get_reg_max_n(enum ecpri_dma_hal_reg_name reg)
 		return -EINVAL;
 	}
 
-	DMAHAL_DBG_LOW("get max n for %s\n",
-		ecpri_dma_hal_reg_name_str(reg));
 	offset = ecpri_dma_hal_reg_objs[ecpri_dma_hal_ctx->ecpri_hw_ver][reg].offset;
 	if (offset == -1) {
 		DMAHAL_ERR("Access to obsolete reg=%s\n",
@@ -3284,6 +3262,9 @@ u32 ecpri_dma_hal_get_reg_max_n(enum ecpri_dma_hal_reg_name reg)
 		WARN_ON(1);
 		return -EPERM;
 	}
+
+	DMAHAL_DBG_LOW("get max n for %s\n",
+		ecpri_dma_hal_reg_name_str(reg));
 
 	max_n = ecpri_dma_hal_reg_objs[ecpri_dma_hal_ctx->ecpri_hw_ver][reg].n_end;
 

@@ -11,6 +11,7 @@
 #include <linux/mutex.h>
 #include <linux/phylink.h>
 
+#include "mtip.h"
 #include "mtip_security.h"
 
 #include "ecpri_dma_eth.h"
@@ -39,7 +40,7 @@ struct mtip_replenish_dma_rx_buffers_task
 {
    struct net_device * netdev;
    ecpri_dma_eth_conn_hdl_t  hdl;
-   u32                 num_of_pkts;
+   u32                 num_of_buffs;
 };
 void run_mtip_replenish_dma_rx_buffers(void* work_ptr);
 
@@ -78,5 +79,6 @@ enum mtip_link_state_enum mtip_get_link_state_by_device(u32 port_device_index, u
 int mtip_set_netdev_hw_mac_addr(struct net_device *netdev, u32 link_index);
 
 int mtip_netdev_set_port_config(struct net_device *netdev);
+int mtip_device_update_security_config(struct net_device *netdev, enum mtip_port_config_enum port_config);
 
 #endif // _MTIP_DEVICE_H

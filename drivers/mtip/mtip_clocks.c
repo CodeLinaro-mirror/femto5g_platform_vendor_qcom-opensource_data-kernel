@@ -62,7 +62,7 @@ static int mtip_clocks_setup_gcc_clocks(void)
     struct clk* pclk;
     struct device *dev = &platform_driver_priv->devices.root_pdev->dev;
 
-    CSMLOGINFO("setting up GCC clocks\n");
+    CSMLOGDBG("setting up GCC clocks\n");
 
     // enable GCC clocks
     ret = mtip_clocks_enable_clock(dev, "GCC_C2C_HM_APB_CLK", &pclk);
@@ -137,7 +137,7 @@ static int mtip_clocks_setup_gcc_clocks(void)
     platform_driver_priv->clocks.gcc_clocks[index] = pclk;
     ++index;
 
-    CSMLOGINFO("gcc clocks index: %d, arr size: %d", index, MTIP_CLOCKS_NUM_GCC_CLOCKS);
+    CSMLOGDBG("gcc clocks index: %d, arr size: %d", index, MTIP_CLOCKS_NUM_GCC_CLOCKS);
 
     return ret;
 }
@@ -149,7 +149,7 @@ static int mtip_clocks_setup_c2c_clocks(void)
     struct clk* pclk;
     struct device *dev = &platform_driver_priv->devices.root_pdev->dev;
 
-    CSMLOGINFO("setting up C2C clocks\n");
+    CSMLOGDBG("setting up C2C clocks\n");
 
     // enable C2C clocks
     ret = mtip_clocks_enable_clock(dev, "ECPRI_CC_C2C_0_HM_FF_0_CLK", &pclk);
@@ -192,7 +192,7 @@ static int mtip_clocks_setup_c2c_clocks(void)
     platform_driver_priv->clocks.ecpricc_c2c_clocks[index] = pclk;
     ++index;
 
-    CSMLOGINFO("c2c clocks index: %d, arr size: %d", index, MTIP_CLOCKS_NUM_ECPRICC_C2C_CLOCKS);
+    CSMLOGDBG("c2c clocks index: %d, arr size: %d", index, MTIP_CLOCKS_NUM_ECPRICC_C2C_CLOCKS);
 
     return ret;
 }
@@ -204,7 +204,7 @@ static int mtip_clocks_setup_dbg_clocks(void)
     struct clk* pclk;
     struct device *dev = &platform_driver_priv->devices.root_pdev->dev;
 
-    CSMLOGINFO("setting up DBG clocks\n");
+    CSMLOGDBG("setting up DBG clocks\n");
 
     // enable DBG clocks
     ret = mtip_clocks_enable_clock(dev, "ECPRI_CC_DBG_C2C_HM_FF_0_CLK", &pclk);
@@ -271,7 +271,7 @@ static int mtip_clocks_setup_dbg_clocks(void)
     platform_driver_priv->clocks.ecpricc_dbg_clocks[index] = pclk;
     ++index;
 
-    CSMLOGINFO("dbg clocks index: %d, arr size: %d", index, MTIP_CLOCKS_NUM_ECPRICC_DBG_CLOCKS);
+    CSMLOGDBG("dbg clocks index: %d, arr size: %d", index, MTIP_CLOCKS_NUM_ECPRICC_DBG_CLOCKS);
 
     return ret;
 }
@@ -283,7 +283,7 @@ static int mtip_clocks_setup_fh0_clocks(void)
     struct clk* pclk;
     struct device *dev = &platform_driver_priv->devices.root_pdev->dev;
 
-    CSMLOGINFO("setting up FH0 clocks\n");
+    CSMLOGDBG("setting up FH0 clocks\n");
 
     // enable FH0 clocks
     ret = mtip_clocks_enable_clock(dev, "ECPRI_CC_FH_0_HM_FF_0_CLK", &pclk);
@@ -358,7 +358,7 @@ static int mtip_clocks_setup_fh0_clocks(void)
     platform_driver_priv->clocks.ecpricc_fh0_clocks[index] = pclk;
     ++index;
 
-    CSMLOGINFO("fh0 clocks index: %d, arr size: %d", index, MTIP_CLOCKS_NUM_ECPRICC_FH_CLOCKS);
+    CSMLOGDBG("fh0 clocks index: %d, arr size: %d", index, MTIP_CLOCKS_NUM_ECPRICC_FH_CLOCKS);
 
     return ret;
 }
@@ -370,7 +370,7 @@ static int mtip_clocks_setup_fh1_clocks(void)
     struct clk* pclk;
     struct device *dev = &platform_driver_priv->devices.root_pdev->dev;
 
-    CSMLOGINFO("setting up FH1 clocks\n");
+    CSMLOGDBG("setting up FH1 clocks\n");
 
     // enable FH1 clocks
     ret = mtip_clocks_enable_clock(dev, "ECPRI_CC_FH_1_HM_FF_0_CLK", &pclk);
@@ -445,7 +445,7 @@ static int mtip_clocks_setup_fh1_clocks(void)
     platform_driver_priv->clocks.ecpricc_fh1_clocks[index] = pclk;
     ++index;
 
-    CSMLOGINFO("fh1 clocks index: %d, arr size: %d", index, MTIP_CLOCKS_NUM_ECPRICC_FH_CLOCKS);
+    CSMLOGDBG("fh1 clocks index: %d, arr size: %d", index, MTIP_CLOCKS_NUM_ECPRICC_FH_CLOCKS);
 
     return ret;
 }
@@ -457,7 +457,7 @@ static int mtip_clocks_setup_fh2_clocks(void)
     struct clk* pclk;
     struct device *dev = &platform_driver_priv->devices.root_pdev->dev;
 
-    CSMLOGINFO("setting up FH2 clocks\n");
+    CSMLOGDBG("setting up FH2 clocks\n");
 
     // enable FH1 clocks
     ret = mtip_clocks_enable_clock(dev, "ECPRI_CC_FH_2_HM_FF_0_CLK", &pclk);
@@ -532,7 +532,7 @@ static int mtip_clocks_setup_fh2_clocks(void)
     platform_driver_priv->clocks.ecpricc_fh2_clocks[index] = pclk;
     ++index;
 
-    CSMLOGINFO("fh2 clocks index: %d, arr size: %d", index, MTIP_CLOCKS_NUM_ECPRICC_FH_CLOCKS);
+    CSMLOGDBG("fh2 clocks index: %d, arr size: %d", index, MTIP_CLOCKS_NUM_ECPRICC_FH_CLOCKS);
 
     return ret;
 }
@@ -542,7 +542,7 @@ static int mtip_clocks_setup_fh2_clocks(void)
  */
 void mtip_clocks_setup_clocks(void)
 {
-    CSMLOGINFO("MTIP started getting clocks\n");
+    CSMLOGDBG("MTIP started getting clocks\n");
 
     mtip_clocks_setup_gcc_clocks();
 
@@ -701,11 +701,11 @@ static void mtip_clocks_set_fh0_clock_rates(enum mtip_port_config_enum port_conf
         break;
     }
 
-    CSMLOGINFO("Setting fh0 clock[%d] to %ld", ff_0_index, ff_0_rate);
-    CSMLOGINFO("Setting fh0 clock[%d] to %ld", ff_1_index, ff_1_rate);
-    CSMLOGINFO("Setting fh0 clock[%d] to %ld", ff_2_index, ff_2_rate);
-    CSMLOGINFO("Setting fh0 clock[%d] to %ld", ff_3_index, ff_3_rate);
-    CSMLOGINFO("Setting fh0 clock[%d] to %ld", hm_ref_index, hm_ref_rate);
+    CSMLOGDBG("Setting fh0 clock[%d] to %ld", ff_0_index, ff_0_rate);
+    CSMLOGDBG("Setting fh0 clock[%d] to %ld", ff_1_index, ff_1_rate);
+    CSMLOGDBG("Setting fh0 clock[%d] to %ld", ff_2_index, ff_2_rate);
+    CSMLOGDBG("Setting fh0 clock[%d] to %ld", ff_3_index, ff_3_rate);
+    CSMLOGDBG("Setting fh0 clock[%d] to %ld", hm_ref_index, hm_ref_rate);
 
     clk_set_rate(ff_0_clock, ff_0_rate);
     clk_set_rate(ff_1_clock, ff_1_rate);
@@ -857,11 +857,11 @@ static void mtip_clocks_set_fh1_clock_rates(enum mtip_port_config_enum port_conf
         break;
     }
 
-    CSMLOGINFO("Setting fh1 clock[%d] to %ld", ff_0_index, ff_0_rate);
-    CSMLOGINFO("Setting fh1 clock[%d] to %ld", ff_1_index, ff_1_rate);
-    CSMLOGINFO("Setting fh1 clock[%d] to %ld", ff_2_index, ff_2_rate);
-    CSMLOGINFO("Setting fh1 clock[%d] to %ld", ff_3_index, ff_3_rate);
-    CSMLOGINFO("Setting fh1 clock[%d] to %ld", hm_ref_index, hm_ref_rate);
+    CSMLOGDBG("Setting fh1 clock[%d] to %ld", ff_0_index, ff_0_rate);
+    CSMLOGDBG("Setting fh1 clock[%d] to %ld", ff_1_index, ff_1_rate);
+    CSMLOGDBG("Setting fh1 clock[%d] to %ld", ff_2_index, ff_2_rate);
+    CSMLOGDBG("Setting fh1 clock[%d] to %ld", ff_3_index, ff_3_rate);
+    CSMLOGDBG("Setting fh1 clock[%d] to %ld", hm_ref_index, hm_ref_rate);
 
     clk_set_rate(ff_0_clock, ff_0_rate);
     clk_set_rate(ff_1_clock, ff_1_rate);
@@ -1013,11 +1013,11 @@ static void mtip_clocks_set_fh2_clock_rates(enum mtip_port_config_enum port_conf
         break;
     }
 
-    CSMLOGINFO("Setting fh2 clock[%d] to %ld", ff_0_index, ff_0_rate);
-    CSMLOGINFO("Setting fh2 clock[%d] to %ld", ff_1_index, ff_1_rate);
-    CSMLOGINFO("Setting fh2 clock[%d] to %ld", ff_2_index, ff_2_rate);
-    CSMLOGINFO("Setting fh2 clock[%d] to %ld", ff_3_index, ff_3_rate);
-    CSMLOGINFO("Setting fh2 clock[%d] to %ld", hm_ref_index, hm_ref_rate);
+    CSMLOGDBG("Setting fh2 clock[%d] to %ld", ff_0_index, ff_0_rate);
+    CSMLOGDBG("Setting fh2 clock[%d] to %ld", ff_1_index, ff_1_rate);
+    CSMLOGDBG("Setting fh2 clock[%d] to %ld", ff_2_index, ff_2_rate);
+    CSMLOGDBG("Setting fh2 clock[%d] to %ld", ff_3_index, ff_3_rate);
+    CSMLOGDBG("Setting fh2 clock[%d] to %ld", hm_ref_index, hm_ref_rate);
 
     clk_set_rate(ff_0_clock, ff_0_rate);
     clk_set_rate(ff_1_clock, ff_1_rate);
@@ -1140,7 +1140,7 @@ static void mtip_clocks_set_c2c_clock_rates(enum mtip_port_config_enum port_conf
     case MTIP_PORT_CONFIG_4x10GBASE_R_FEC:
     default:
         {
-            CSMLOGINFO("Not changing clock rate... leaving as default");
+            CSMLOGDBG("Not changing clock rate... leaving as default");
             c2c_ff_0_rate = MTIP_ECPRI_FF_CLK_MAX_NOM;
             c2c_ff_1_rate = MTIP_ECPRI_FF_CLK_MAX_NOM;
             dbg_ff_0_rate = MTIP_ECPRI_FF_CLK_MAX_NOM;
@@ -1150,10 +1150,10 @@ static void mtip_clocks_set_c2c_clock_rates(enum mtip_port_config_enum port_conf
         break;
     }
 
-    CSMLOGINFO("Setting c2c clock[%d] to %ld", c2c_ff_0_index, c2c_ff_0_rate);
-    CSMLOGINFO("Setting c2c clock[%d] to %ld", c2c_ff_1_index, c2c_ff_1_rate);
-    CSMLOGINFO("Setting dbg clock[%d] to %ld", dbg_ff_0_index, dbg_ff_0_rate);
-    CSMLOGINFO("Setting c2c clock[%d] to %ld", c2c_hm_ref_index, c2c_hm_ref_rate);
+    CSMLOGDBG("Setting c2c clock[%d] to %ld", c2c_ff_0_index, c2c_ff_0_rate);
+    CSMLOGDBG("Setting c2c clock[%d] to %ld", c2c_ff_1_index, c2c_ff_1_rate);
+    CSMLOGDBG("Setting dbg clock[%d] to %ld", dbg_ff_0_index, dbg_ff_0_rate);
+    CSMLOGDBG("Setting c2c clock[%d] to %ld", c2c_hm_ref_index, c2c_hm_ref_rate);
 
     clk_set_rate(c2c_ff_0_clock, c2c_ff_0_rate);
     clk_set_rate(c2c_ff_1_clock, c2c_ff_1_rate);
@@ -1268,15 +1268,15 @@ static void mtip_clocks_set_dbg_clock_rates(enum mtip_port_config_enum port_conf
     case MTIP_PORT_CONFIG_1x40GBASE_R4_FEC:
     default:
         {
-            CSMLOGINFO("Not changing clock rate.. leaving at default");
+            CSMLOGDBG("Not changing clock rate.. leaving at default");
             ff_1_rate = MTIP_ECPRI_FF_CLK_MAX_NOM;
             hm_ref_rate = MTIP_ECPRI_MAC_HM_REF_CLK_MAX_NOM;
         }
         break;
     }
 
-    CSMLOGINFO("Setting dbg clock[%d] to %ld", ff_1_index, ff_1_rate);
-    CSMLOGINFO("Setting dbg clock[%d] to %ld", hm_ref_index, hm_ref_rate);
+    CSMLOGDBG("Setting dbg clock[%d] to %ld", ff_1_index, ff_1_rate);
+    CSMLOGDBG("Setting dbg clock[%d] to %ld", hm_ref_index, hm_ref_rate);
 
     clk_set_rate(ff_1_clock, ff_1_rate);
 
@@ -1292,7 +1292,7 @@ static void mtip_clocks_set_dbg_clock_rates(enum mtip_port_config_enum port_conf
  */
 void mtip_clocks_set_clock_rates(enum mtip_port_type_enum port_type, enum mtip_port_config_enum port_config)
 {
-    CSMLOGINFO("Setting clock rates for port %d with port config %d str %s", port_type, port_config, mtip_ethtool_get_priv_flags_str(port_config));
+    CSMLOGDBG("Setting clock rates for port %d with port config %d str %s", port_type, port_config, mtip_ethtool_get_priv_flags_str(port_config));
 
     switch (port_type) 
     {
