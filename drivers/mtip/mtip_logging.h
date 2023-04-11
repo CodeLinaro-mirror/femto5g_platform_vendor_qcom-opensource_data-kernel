@@ -20,6 +20,9 @@ do {\
 #define CSMLOGDBG(fmt, args...) \
 do {\
 	pr_debug(DRV_NAME " %s:%d " fmt, __func__, __LINE__, ## args); \
+    if (mtip_ethtool_debug_logging_enable) {\
+            pr_err(DRV_NAME " %s:%d " fmt, __func__, __LINE__, ## args);\
+        } \
 } while (0)
 
 #define CSMLOGERR(fmt, args...) \
