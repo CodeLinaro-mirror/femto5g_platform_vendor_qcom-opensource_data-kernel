@@ -178,19 +178,19 @@ void mtip_ptp_resolve_queues(u32 link_index)
 
 void mtip_ptp_tx_ts_lock_init(u32 link_index)
 {
-    spin_lock_init(&platform_driver_priv->mtip_links[link_index]->dev_lock);
+    spin_lock_init(&platform_driver_priv->mtip_links[link_index]->ptp_lock);
     //mutex_init(&platform_driver_priv->mtip_links[link_index]->dev_lock);
 }
 
 void mtip_ptp_tx_ts_lock_acquire(u32 link_index)
 {
-    spin_lock_irqsave(&platform_driver_priv->mtip_links[link_index]->dev_lock, platform_driver_priv->mtip_links[link_index]->flags);
+    spin_lock_irqsave(&platform_driver_priv->mtip_links[link_index]->ptp_lock, platform_driver_priv->mtip_links[link_index]->flags);
     //mutex_lock(&platform_driver_priv->mtip_links[link_index]->dev_lock);
 }
 
 void mtip_ptp_tx_ts_lock_release(u32 link_index)
 {
-    spin_unlock_irqrestore(&platform_driver_priv->mtip_links[link_index]->dev_lock, platform_driver_priv->mtip_links[link_index]->flags);
+    spin_unlock_irqrestore(&platform_driver_priv->mtip_links[link_index]->ptp_lock, platform_driver_priv->mtip_links[link_index]->flags);
     //mutex_unlock(&platform_driver_priv->mtip_links[link_index]->dev_lock);
 }
 

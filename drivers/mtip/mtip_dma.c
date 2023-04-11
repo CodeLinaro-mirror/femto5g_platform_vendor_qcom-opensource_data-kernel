@@ -132,7 +132,7 @@ void mtip_dma_rx_comp_cb(void *user_data, ecpri_dma_eth_conn_hdl_t hdl)
    }
    else
    {
-      if (platform_driver_priv->mtip_links[link_index]->state == MTIP_LINK_STATE_OPEN ||
+      if (platform_driver_priv->mtip_links[link_index]->state == MTIP_LINK_STATE_OPEN_DONE ||
           platform_driver_priv->mtip_links[link_index]->state == MTIP_LINK_STATE_UP)
       {
          link = platform_driver_priv->mtip_links[link_index];

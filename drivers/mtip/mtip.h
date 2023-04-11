@@ -20,6 +20,7 @@
 
 #include "mtip_logging.h"
 #include "eth_phy_iface.h"
+#include "transceiver_api.h"
 #include "mtip_ptp.h"
 #include "mtip_client.h"
 #include "mtip_clocks.h"
@@ -42,10 +43,17 @@
 #define MTIP_MODE_LOOPBACK         1   // This is the loopback mode. For RUMI, this is IOMACRO loopback and for SOC it is PCS LOOPBACK
 #define MTIP_MODE_PHY_LOOPBACK     2   // This is the PHY loopback mode for SOC. Not applicable for RUMI
 
+/* Setting the platform RUMI/SOC */
+#define MTIP_PLATFORM_SOC          0
+#define MTIP_PLATFORM_RUMI         1
+
 /* System Configuration */
 #define MTIP_MAX_PORTS  7          // Max of 7 ports allowed in the system
 #define MTIP_MAX_LINKS  16         // Setup for a max of 16 Ethernet links
+#define MTIP_MAX_LANES  20         // Setup for a max of 16 lanes
+
 #define MTIP_MAX_LINKS_PER_PORT 4  // Max of 4 links per port
+#define MTIP_MAX_LANES_PER_PORT 4  // Max of 4 lanes per port
 
 /* Networking Stack Configuration */
 #define MTIP_TIMEOUT     5 /* in Jiffies*/
@@ -81,7 +89,10 @@ extern int mtip_dma_max_rx_buff_size;
 // the information stored for each link device
 struct mtip_link_device_info
 {
-    // the port device platform device
+    // link device valid
+    u8 link_device_valid;
+
+    // the lane device platform device
     struct platform_device* link_pdev;
 
     // the link phandle
@@ -89,15 +100,6 @@ struct mtip_link_device_info
 
     // link indices
     u32 link_index;
-
-    // link lane speed
-    enum eth_phy_iface_phy_lane_speed_enum  lane_speed;
-
-    // the number of assigned lanes
-    u32                   num_lanes;
-
-    // link lane assignments
-    u8                    lanes[PHY_LANE_MAX];
 
     // link base mac register address
     void __iomem           *mac_ioaddr;
@@ -109,49 +111,31 @@ struct mtip_link_device_info
     const char*            link_name;
 };
 
-/*
- * mtip_port_config enum 
- *    These are the set of support PORT configurations 
- */
-enum mtip_port_config_enum
+// the information stored for each lane device
+struct mtip_lane_device_info
 {
-    MTIP_PORT_CONFIG_1x100GBASE_R,
-    MTIP_PORT_CONFIG_1x100GBASE_R_RSFEC_LL,
-    MTIP_PORT_CONFIG_1x100GBASE_R_RSFEC,
-    MTIP_PORT_CONFIG_1x100GBASE_R2,
-    MTIP_PORT_CONFIG_1x100GBASE_R2_RSFEC,
-    MTIP_PORT_CONFIG_1x100GBASE_R4,
-    MTIP_PORT_CONFIG_1x100GBASE_R4_RSFEC,
-    MTIP_PORT_CONFIG_1x50GBASE_R,
-    MTIP_PORT_CONFIG_1x50GBASE_R_RSFEC,
-    MTIP_PORT_CONFIG_2x50GBASE_R,
-    MTIP_PORT_CONFIG_2x50GBASE_R_RSFEC,
-    MTIP_PORT_CONFIG_1x50GBASE_R2,
-    MTIP_PORT_CONFIG_1x50GBASE_R2_RSFEC,
-    MTIP_PORT_CONFIG_1x50GBASE_R2_LUAI,
-    MTIP_PORT_CONFIG_1x50GBASE_R2_LUAI_FEC,
-    MTIP_PORT_CONFIG_2x50GBASE_R2,
-    MTIP_PORT_CONFIG_2x50GBASE_R2_FEC,
-    MTIP_PORT_CONFIG_2x50GBASE_R2_LUAI,
-    MTIP_PORT_CONFIG_2x50GBASE_R2_LUAI_FEC,
-    MTIP_PORT_CONFIG_1x40GBASE_R4,
-    MTIP_PORT_CONFIG_1x40GBASE_R4_FEC,
-    MTIP_PORT_CONFIG_1x25GBASE_R,
-    MTIP_PORT_CONFIG_1x25GBASE_R_FEC,
-    MTIP_PORT_CONFIG_4x25GBASE_R,
-    MTIP_PORT_CONFIG_4x25GBASE_R_FEC,
-    MTIP_PORT_CONFIG_1x25GBASE_R_RSFEC,
-    MTIP_PORT_CONFIG_4x25GBASE_R_RSFEC,
-    MTIP_PORT_CONFIG_1x10GBASE_R,
-    MTIP_PORT_CONFIG_1x10GBASE_R_FEC,
-    MTIP_PORT_CONFIG_4x10GBASE_R,
-    MTIP_PORT_CONFIG_4x10GBASE_R_FEC,
-    MTIP_PORT_CONFIG_MAX
+    // lane device valid
+    u8 lane_device_valid;
+
+    // the lane device platform device
+    struct platform_device* lane_pdev;
+
+    // the lane phandle
+    u32 lane_phandle;
+
+    // lane index
+    u32 lane_index;
+
+    // sfp phandle
+    int sfp_phandle;
 };
 
 // the information stored for each port device
 struct mtip_port_device_info
 {
+    // port device valid
+    u8 port_device_valid;
+
     // the port device platform device
     struct platform_device* port_pdev;
 
@@ -160,9 +144,6 @@ struct mtip_port_device_info
 
    // the port type
    u32 port_type;
-
-   // the port configuration
-   enum mtip_port_config_enum port_config;
 
    // the base address for the MAC Wrapper
    void __iomem          *wrapper_base_addr;
@@ -179,19 +160,19 @@ struct mtip_port_device_info
    // Base address for emulation DUT(FH instance)
    void __iomem          *dut_base_addr;
 
-   // sfp phandle
-   int                  sfp_phandle;
-
-   // consolidate port lane configuration
-   struct eth_phy_iface_phy_lane_config lane_config[PHY_LANE_MAX];
-
    // the references to links of the port
    u32 num_link_phandles;
-   u32 num_link_phandles_probed;
    u32 link_phandles[MTIP_MAX_LINKS_PER_PORT];
 
+   // the references to lanes of the port
+   u32 num_lane_phandles;
+   u32 lane_phandles[MTIP_MAX_LINKS_PER_PORT];
+
    // the link devices
-   struct mtip_link_device_info link_devices[MTIP_MAX_LINKS_PER_PORT];
+   struct mtip_link_device_info *link_devices[MTIP_MAX_LINKS_PER_PORT];
+
+   // the lane devices
+   struct mtip_lane_device_info *lane_devices[MTIP_MAX_LANES_PER_PORT];
 };
 
 /*
@@ -199,6 +180,12 @@ struct mtip_port_device_info
  */
 struct mtip_devices_info
 {
+    // platform device valid
+    u8 platform_device_valid;
+
+    // flag to indicate platform setup is complete
+    u8 platform_setup_complete;
+
     // the root platform device
     struct platform_device* root_pdev;
 
@@ -213,11 +200,16 @@ struct mtip_devices_info
 
     // the port phandles
     u32 num_port_phandles;
-    u32 num_port_phandles_probed;
     u32 port_phandles[MTIP_MAX_PORTS];
 
     // the port devices
     struct mtip_port_device_info port_devices[MTIP_MAX_PORTS];
+
+    // the link devices
+    struct mtip_link_device_info link_devices[MTIP_MAX_LINKS];
+
+    // the lane devices
+    struct mtip_lane_device_info lane_devices[MTIP_MAX_LANES];
 };
 
 /*
@@ -229,24 +221,32 @@ struct mtip_devices_info
 enum mtip_link_state_enum
 {
    MTIP_LINK_STATE_INIT = 0,
-   MTIP_LINK_STATE_OPEN,
+   MTIP_LINK_STATE_OPEN_WAITING_FOR_LANES,
    MTIP_LINK_STATE_CLOSE,
    MTIP_LINK_STATE_UP,
    MTIP_LINK_STATE_DOWN,
+   MTIP_LINK_STATE_OPEN_DONE,
+   MTIP_LINK_STATE_OPEN_FAILED,
    MTIP_LINK_STATE_MAX
 };
 
 // information relevant to each link
 struct mtip_link_info
 {
+    // the link index
+    u32 link_index;
+
+   // the link state
    enum mtip_link_state_enum state;
+
+   // the dma hdl
+   ecpri_dma_eth_conn_hdl_t dma_hdl;
+
+   // the link netdev info
    struct net_device* dev;
    struct napi_struct napi;
    struct napi_struct napi_tx;
    struct rtnl_link_stats64 net_stats;
-   ecpri_dma_eth_conn_hdl_t dma_hdl;
-   u32 port_device_index;
-   u32 link_device_index;
    bool ptp_ts_enabled;
    u8 ptp_ts_seq_num;
    struct mtip_tx_ts_list tx_ts_list;
@@ -254,8 +254,59 @@ struct mtip_link_info
    struct mtip_tx_comp_list tx_comp_list;
    u32 peak_rx_available;
    u32 active_fec;
-   spinlock_t dev_lock;
+   spinlock_t ptp_lock;
    unsigned long flags;
+
+   // link lane assignments
+   // lanes assignment complete
+   bool lanes_assignment_complete;
+
+   // the number of assigned lanes
+   u32  num_assigned_lanes;
+
+   // these are lane_indices assigned to the link
+   u32  assigned_lane_indices[PHY_LANE_MAX];
+
+   struct mutex dev_lock;
+};
+
+/*
+ * mtip_lane_state enum
+ */
+enum mtip_lane_state_enum
+{
+   MTIP_LANE_STATE_INIT = 0,
+   MTIP_LANE_STATE_CONNECTED,
+   MTIP_LANE_STATE_DISCONNECTED,
+   MTIP_LANE_STATE_MAX
+};
+
+// information relevant to each port
+struct mtip_lane_info
+{
+    // the lane index
+    u32 lane_index;
+
+    // the lane state
+    enum mtip_lane_state_enum lane_state;
+
+    // the lane information from qsfp driver
+    struct qsfp_info lane_qsfp_info;
+
+    // sfp port type
+    u32                sfp_port_type;
+
+    // link lane speed
+    enum eth_phy_iface_phy_lane_speed_enum  lane_speed;
+
+    // the phylink related to the lane
+    struct phylink         *phylink;
+    struct phylink_config   phylink_config;
+
+    // dummy ndev for the lane
+    struct net_device* lane_dummy_ndev;
+
+    spinlock_t lock;
 };
 
 /*
@@ -265,6 +316,9 @@ enum mtip_port_state_enum
 {
    MTIP_PORT_STATE_INIT = 0,
    MTIP_PORT_STATE_CONNECTED,
+   MTIP_PORT_STATE_CONNECTED_INITIATE_AN,
+   MTIP_PORT_STATE_CONNECTED_NEGOTIATION_IN_PROGRESS,
+   MTIP_PORT_STATE_CONNECTED_NEGOTIATION_DONE,
    MTIP_PORT_STATE_DISCONNECTED,
    MTIP_PORT_STATE_MAX
 };
@@ -272,13 +326,28 @@ enum mtip_port_state_enum
 // information relevant to each port
 struct mtip_port_info
 {
-    // the phylink related to the port
-    struct phylink         *phylink;
-    struct phylink_config   phylink_config;
+    // the port_type
+    u32 port_type;
+
+    // the consolidated port state
+    // what is the port state?
     enum mtip_port_state_enum port_state;
-    struct net_device* port_dummy_ndev;
-    u32                sfp_phandle;
-    u32                sfp_port_type;
+
+    // the consolidate priv flags of all links of port
+    u32 port_priv_flags;
+
+    // autoneg flag to see if autoneg is enabled
+    bool autoneg;
+
+    // the negotiated port configuration
+    enum mtip_port_config_enum port_config;
+
+    // consolidate port lane configuration
+    struct eth_phy_iface_phy_lane_config lane_config[PHY_LANE_MAX];
+
+    // the sfp port type
+    u32  sfp_port_type;
+
     spinlock_t lock;
 };
 
@@ -298,8 +367,11 @@ struct mtip_platform_driver_priv
    // information stored for each active link including netdev structs etc
    struct mtip_link_info* mtip_links[MTIP_MAX_LINKS];
 
+   // information stored for each active lane
+   struct mtip_lane_info* mtip_lanes[MTIP_MAX_LANES];
+
    // information stored for each active port
-   struct mtip_port_info * mtip_ports[MTIP_MAX_PORTS];
+   struct mtip_port_info* mtip_ports[MTIP_MAX_PORTS];
 
    // dma ready state
    bool dma_is_ready;
@@ -347,14 +419,79 @@ extern int mtip_ethtool_debug_logging_enable;
 
 // function prototypes
 int mtip_register_platform_driver(void);
+
+/*
+ * mtip_lookup_link_index_by_name 
+ *  find the link index using the interface name
+ *  rarely used
+ */
 int mtip_lookup_link_index_by_name(char* name, u32* link_index);
+
+/*
+ * mtip_lookup_link_index_by_handle 
+ *  find the link index using the dma hdl
+ *  also rarely used
+ */
 int mtip_lookup_link_index_by_handle(ecpri_dma_eth_conn_hdl_t hdl, u32* link_index);
 
-int mtip_lookup_link_index_by_device(u32* link_index, u32 port_device_index, u32 link_device_index);
+/*
+ * mtip_lookup_link_index_by_port_type_and_real_link 
+ *  find the link index using port type and real link number (between 0 and 3) 
+ */
+int mtip_lookup_link_index_by_port_type_and_real_link(u32* link_index, u32 port_type, u32 real_link_number);
+
+/*
+ * mtip_lookup_port_type_by_link_index 
+ *   find port_type of the link index 
+ */
+int mtip_lookup_port_type_by_link_index(u32 link_index, u32* port_type);
+
+/*
+ * mtip_lookup_real_link_number_by_link_index 
+ *   find the real link number (between 0 and 3) within the port of the link index 
+ */
+int mtip_lookup_real_link_number_by_link_index(u32 link_index, u32* real_link_number);
+
+/*
+ * mtip_lookup_link_index_by_device 
+ *  find the link index using port type and link device index (0 thru num_link_phandles - 1) 
+ */
+int mtip_lookup_link_index_by_device(u32* link_index, u32 port_type, u32 link_device_index);
+
+/*
+ * mtip_lookup_device_by_link_index 
+ *   find the device within a port by matching the phandle 
+ */
 int mtip_lookup_device_by_link_index(u32 link_index, u32* port_device_index, u32* link_device_index);
 
-int mtip_lookup_link_index_by_real_port_and_link(u32* link_index, u32 real_port_number, u32 real_link_number);
-int mtip_lookup_real_link_number_by_link_index(u32 link_index, u32* link_number);
-int mtip_lookup_real_port_number_by_link_index(u32 link_index, u32* port_number);
+/*
+ * mtip_lookup_lane_index_by_port_type_and_real_link 
+ *  find the lane index using port type and real lane number (between 0 and 3) 
+ */
+int mtip_lookup_lane_index_by_port_type_and_real_lane(u32* lane_index, u32 port_type, u32 real_lane_number);
+
+/*
+ * mtip_lookup_port_type_by_lane_index 
+ *   find port_type of the lane index 
+ */
+int mtip_lookup_port_type_by_lane_index(u32 lane_index, u32* port_type);
+
+/*
+ * mtip_lookup_real_lane_number_by_lane_index 
+ *   find the real lane number (between 0 and 3) within the port of the lane index 
+ */
+int mtip_lookup_real_lane_number_by_lane_index(u32 lane_index, u32* real_lane_number);
+
+/*
+ * mtip_lookup_lane_index_by_device 
+ *  find the lane index using port type and lane device index (0 thru num_lane_phandles - 1) 
+ */
+int mtip_lookup_lane_index_by_device(u32* lane_index, u32 port_type, u32 lane_device_index);
+
+/*
+ * mtip_lookup_device_by_lane_index 
+ *   find the device within a port by matching the phandle 
+ */
+int mtip_lookup_device_by_lane_index(u32 lane_index, u32* port_device_index, u32* lane_device_index);
 
 #endif // _MTIP_H

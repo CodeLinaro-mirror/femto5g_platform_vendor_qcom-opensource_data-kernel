@@ -68,15 +68,18 @@ static u32 mtip_mac_get_interrupt_status(u32 link_index)
 {
     u32 read_val = 0;
     void __iomem *wrapper_base_addr;
-    u32 port_device_index;
-    u32 link_device_index;
+    u32 port_type;
     u32 real_link_number;
 
-    mtip_lookup_device_by_link_index(link_index, &port_device_index, &link_device_index);
+    if (mtip_lookup_port_type_by_link_index(link_index, &port_type) < 0)
+    {
+        CSMLOGERR("invalid port_type for link_index %d", link_index);
+        return 0;
+    }
 
     mtip_lookup_real_link_number_by_link_index(link_index, &real_link_number);
 
-    wrapper_base_addr = platform_driver_priv->devices.port_devices[port_device_index].wrapper_base_addr;
+    wrapper_base_addr = platform_driver_priv->devices.port_devices[port_type].wrapper_base_addr;
 
     read_val = (u32)ioread32(wrapper_base_addr + real_link_number*MTIP_MAC_WRAPPER_INTERRUPT_OFFSET + MTIP_MAC_WRAPPER_INTERRUPT_STAT_REG_OFFSET);
     return read_val;
@@ -86,15 +89,18 @@ void mtip_mac_clear_interrupts(u32 link_index, u32 int_to_clear)
 {
     u32 write_val = int_to_clear;
     void __iomem *wrapper_base_addr;
-    u32 port_device_index;
-    u32 link_device_index;
+    u32 port_type;
     u32 real_link_number;
 
-    mtip_lookup_device_by_link_index(link_index, &port_device_index, &link_device_index);
+    if (mtip_lookup_port_type_by_link_index(link_index, &port_type) < 0)
+    {
+        CSMLOGERR("invalid port_type for link_index %d", link_index);
+        return;
+    }
 
     mtip_lookup_real_link_number_by_link_index(link_index, &real_link_number);
 
-    wrapper_base_addr = platform_driver_priv->devices.port_devices[port_device_index].wrapper_base_addr;
+    wrapper_base_addr = platform_driver_priv->devices.port_devices[port_type].wrapper_base_addr;
 
     CSMLOGDBG("clearing 0x%x on link_index: %d", write_val, link_index);
 
@@ -108,15 +114,18 @@ static void mtip_mac_clear_all_interrupts(u32 link_index, u32 int_to_clear)
 {
     u32 write_val = int_to_clear;
     void __iomem *wrapper_base_addr;
-    u32 port_device_index;
-    u32 link_device_index;
+    u32 port_type;
     u32 real_link_number;
 
-    mtip_lookup_device_by_link_index(link_index, &port_device_index, &link_device_index);
+    if (mtip_lookup_port_type_by_link_index(link_index, &port_type) < 0)
+    {
+        CSMLOGERR("invalid port_type for link_index %d", link_index);
+        return;
+    }
 
     mtip_lookup_real_link_number_by_link_index(link_index, &real_link_number);
 
-    wrapper_base_addr = platform_driver_priv->devices.port_devices[port_device_index].wrapper_base_addr;
+    wrapper_base_addr = platform_driver_priv->devices.port_devices[port_type].wrapper_base_addr;
 
     CSMLOGDBG("clearing all interrupts on link_index: %d", link_index);
 
@@ -154,7 +163,7 @@ static irqreturn_t mtip_mac_interrupt_handler(int irq, void *devptr)
    CSMLOGDBG("ENTER: Interrupt! handling 0x%x\n", handled_interrupts);
 
    // check if this an interrupt that needs to be handled
-   for (i = 0; i < platform_driver_priv->devices.num_port_phandles; ++i) 
+   for (i = 0; i < MTIP_MAX_PORTS; ++i) 
    {
        if (devptr == (void *)&platform_driver_priv->devices.port_devices[i]) 
        {
@@ -186,7 +195,7 @@ static irqreturn_t mtip_mac_interrupt_handler(int irq, void *devptr)
 
            // the bit for link i is set
            // there is an interrupt pending
-           mtip_lookup_link_index_by_real_port_and_link(&link_index, portptr->port_type, i);
+           mtip_lookup_link_index_by_port_type_and_real_link(&link_index, portptr->port_type, i);
 
            int_status = mtip_mac_get_interrupt_status(link_index);
            int_mask = mtip_mac_get_interrupt_mask(link_index);
@@ -378,7 +387,7 @@ u32 mtip_mac_get_frame_length(u32 port_number, u32 link_number)
     void __iomem *mac_ioaddr;
 
     // lookup the mac_ioadr for the port and link
-    mac_ioaddr = platform_driver_priv->devices.port_devices[port_number].link_devices[link_number].mac_ioaddr;
+    mac_ioaddr = platform_driver_priv->devices.port_devices[port_number].link_devices[link_number]->mac_ioaddr;
 
     frame_length = ioread32(mac_ioaddr + MTIP_MAC_FRM_LENGTH);
     return frame_length;
@@ -413,10 +422,10 @@ void mtip_mac_get_mac_address_by_device(u32 port_device_index, u32 link_device_i
    mtip_lookup_link_index_by_device(&link_index, port_device_index, link_device_index);
 
    // lookup the mac_ioadr for the port and link
-   mac_ioaddr = platform_driver_priv->devices.port_devices[port_device_index].link_devices[link_device_index].mac_ioaddr;
+   mac_ioaddr = platform_driver_priv->devices.port_devices[port_device_index].link_devices[link_device_index]->mac_ioaddr;
 
    // the link name
-   link_name = platform_driver_priv->devices.port_devices[port_device_index].link_devices[link_device_index].link_name;
+   link_name = platform_driver_priv->devices.port_devices[port_device_index].link_devices[link_device_index]->link_name;
 
    // read the lower bits
    lower = ioread32(mac_ioaddr + MTIP_MAC_MAC_ADDR_0);
@@ -448,20 +457,78 @@ void mtip_mac_set_mac_address_by_device(u32 port_device_index, u32 link_device_i
     mtip_lookup_link_index_by_device(&link_index, port_device_index, link_device_index);
 
     // the link name
-    link_name = platform_driver_priv->devices.port_devices[port_device_index].link_devices[link_device_index].link_name;
+    link_name = platform_driver_priv->devices.port_devices[port_device_index].link_devices[link_device_index]->link_name;
 
     // lookup the mac_ioadr for the port and link
-    mac_ioaddr = platform_driver_priv->devices.port_devices[port_device_index].link_devices[link_device_index].mac_ioaddr;
+    mac_ioaddr = platform_driver_priv->devices.port_devices[port_device_index].link_devices[link_device_index]->mac_ioaddr;
 
     lower = (sa_data[0]) | (sa_data[1] << 8) | (sa_data[2] << 16) | (sa_data[3] << 24);
 
     upper = (sa_data[4]) | (sa_data[5] << 8);
 
     // write the lower bits
-    iowrite32(lower, platform_driver_priv->devices.port_devices[port_device_index].link_devices[link_device_index].mac_ioaddr + MTIP_MAC_MAC_ADDR_0);
+    iowrite32(lower, platform_driver_priv->devices.port_devices[port_device_index].link_devices[link_device_index]->mac_ioaddr + MTIP_MAC_MAC_ADDR_0);
 
     // write the upper bits
-    iowrite32(upper, platform_driver_priv->devices.port_devices[port_device_index].link_devices[link_device_index].mac_ioaddr + MTIP_MAC_MAC_ADDR_1);
+    iowrite32(upper, platform_driver_priv->devices.port_devices[port_device_index].link_devices[link_device_index]->mac_ioaddr + MTIP_MAC_MAC_ADDR_1);
+
+    CSMLOGDBG("Set the MAC address for link index: %d, name: %s,  %x:%x:%x:%x:%x:%x \n", link_index, link_name, 
+               sa_data[0], sa_data[1], sa_data[2], sa_data[3], sa_data[4], sa_data[5]);
+}
+
+void mtip_mac_get_mac_address_by_link_index(u32 link_index, uint8_t sa_data[]) {
+   u32 lower = 0;
+   u32 upper = 0;
+   void __iomem *mac_ioaddr;
+   const char* link_name;
+
+   // lookup the mac_ioadr for the port and link
+   mac_ioaddr = platform_driver_priv->devices.link_devices[link_index].mac_ioaddr;
+
+   // the link name
+   link_name = platform_driver_priv->devices.link_devices[link_index].link_name;
+
+   // read the lower bits
+   lower = ioread32(mac_ioaddr + MTIP_MAC_MAC_ADDR_0);
+
+   // read the lower bits
+   upper = ioread32(mac_ioaddr + MTIP_MAC_MAC_ADDR_1);
+
+   // update the sa_addr->sa_data
+   sa_data[0] = (lower) & 0xFF;
+   sa_data[1] = (lower >> 8) & 0xFF;
+   sa_data[2] = (lower >> 16) & 0xFF;
+   sa_data[3] = (lower >> 24) & 0xFF;
+
+   sa_data[4] = (upper) & 0xFF;
+   sa_data[5] = (upper >> 8) & 0xFF;
+
+   CSMLOGDBG("Retrieved the MAC address of link index: %d, name: %s,  %x:%x:%x:%x:%x:%x \n", link_index, link_name, 
+              sa_data[0], sa_data[1], sa_data[2], sa_data[3], sa_data[4], sa_data[5]);
+}
+
+void mtip_mac_set_mac_address_by_link_index(u32 link_index, uint8_t sa_data[]) 
+{
+    u32 lower = 0;
+    u32 upper = 0;
+    void __iomem *mac_ioaddr;
+    const char* link_name;
+
+    // the link name
+    link_name = platform_driver_priv->devices.link_devices[link_index].link_name;
+
+    // lookup the mac_ioadr for the port and link
+    mac_ioaddr = platform_driver_priv->devices.link_devices[link_index].mac_ioaddr;
+
+    lower = (sa_data[0]) | (sa_data[1] << 8) | (sa_data[2] << 16) | (sa_data[3] << 24);
+
+    upper = (sa_data[4]) | (sa_data[5] << 8);
+
+    // write the lower bits
+    iowrite32(lower, platform_driver_priv->devices.link_devices[link_index].mac_ioaddr + MTIP_MAC_MAC_ADDR_0);
+
+    // write the upper bits
+    iowrite32(upper, platform_driver_priv->devices.link_devices[link_index].mac_ioaddr + MTIP_MAC_MAC_ADDR_1);
 
     CSMLOGDBG("Set the MAC address for link index: %d, name: %s,  %x:%x:%x:%x:%x:%x \n", link_index, link_name, 
                sa_data[0], sa_data[1], sa_data[2], sa_data[3], sa_data[4], sa_data[5]);
@@ -566,11 +633,18 @@ void mtip_mac_disable_tx_rx(u32 link_index)
     struct net_device* dev = platform_driver_priv->mtip_links[link_index]->dev;
     struct mtip_netdev_priv* priv = netdev_priv(dev);
     u32 command_config;
+    enum mtip_link_state_enum state;
      
     CSMLOGINFO("Disabling Tx and Rx on link_index: %d\n", link_index);
 
-    // set link state as down
-    platform_driver_priv->mtip_links[link_index]->state = MTIP_LINK_STATE_DOWN;
+    state = platform_driver_priv->mtip_links[link_index]->state;
+
+    // set the link state to DOWN if not closed
+    if (state != MTIP_LINK_STATE_CLOSE) 
+    {
+        // set link state as down
+        platform_driver_priv->mtip_links[link_index]->state = MTIP_LINK_STATE_DOWN;
+    }
 
     mac_ioaddr = priv->mac_ioaddr;
 
@@ -584,14 +658,17 @@ void mtip_mac_disable_tx_rx(u32 link_index)
 
 static void mtip_mac_set_xif_mode(struct mtip_netdev_priv *priv) {
     u32 link_index = priv->link_index;
-    u32 port_device_index;
-    u32 link_device_index;
+    u32 port_type;
     enum mtip_port_config_enum port_config;
     u32 xif_mode = MTIP_MAC_INIT_XIF_MODE_FOR_XLGMII;
 
-    mtip_lookup_device_by_link_index(link_index, &port_device_index, &link_device_index);
+    if (mtip_lookup_port_type_by_link_index(link_index, &port_type) < 0)
+    {
+        CSMLOGERR("invalid port_type for link_index %d", link_index);
+        return;
+    }
 
-    port_config = platform_driver_priv->devices.port_devices[port_device_index].port_config;
+    port_config = platform_driver_priv->mtip_ports[port_type]->port_config;
 
     switch (port_config) {
     case MTIP_PORT_CONFIG_1x25GBASE_R:
@@ -696,7 +773,8 @@ void mtip_mac_finalize(void __iomem *mac_base_addr, unsigned int irq, const char
 static u32 mtip_mac_wrapper_calendar_cfg_val(struct mtip_port_device_info* port_device)
 {
     u32 cfg_val = 0;
-    enum mtip_port_config_enum port_config = port_device->port_config;
+    u32 port_type = port_device->port_type;
+    enum mtip_port_config_enum port_config = platform_driver_priv->mtip_ports[port_type]->port_config;
 
     switch (port_config) 
     {
@@ -765,7 +843,8 @@ static void mtip_mac_wrapper_set_csr_cfg(struct mtip_port_device_info* port_devi
     // by default enable TX_CRC_APPEND for all modes
     u32 csr_cfg = MTIP_MAC_WRAPPER_CSR_CFG_REG_BASE_VAL;
     void __iomem* wrapper_base_addr = port_device->wrapper_base_addr;
-    enum mtip_port_config_enum port_config = port_device->port_config;
+    u32 port_type = port_device->port_type;
+    enum mtip_port_config_enum port_config = platform_driver_priv->mtip_ports[port_type]->port_config;
 
     switch (port_config)
     {
@@ -944,7 +1023,8 @@ static void mtip_mac_wrapper_set_pcs_mode(struct mtip_port_device_info* port_dev
 {
     u32 pcs_mode_set = 0;
     void __iomem* wrapper_base_addr = port_device->wrapper_base_addr;
-    enum mtip_port_config_enum port_config = port_device->port_config;
+    u32 port_type = port_device->port_type;
+    enum mtip_port_config_enum port_config = platform_driver_priv->mtip_ports[port_type]->port_config;
 
     switch (port_config) 
     {
@@ -1122,7 +1202,8 @@ static void mtip_mac_wrapper_set_serdes_mux_cfg(struct mtip_port_device_info* po
 {
     u32 serdes_mux_val = 0;
     void __iomem* wrapper_base_addr = port_device->wrapper_base_addr;
-    enum mtip_port_config_enum port_config = port_device->port_config;
+    u32 port_type = port_device->port_type;
+    enum mtip_port_config_enum port_config = platform_driver_priv->mtip_ports[port_type]->port_config;
 
     switch (port_config)
     {
@@ -1256,7 +1337,8 @@ void mtip_mac_wrapper_init(struct mtip_port_device_info* port_device)
 {
     void __iomem *wrapper_base_addr = port_device->wrapper_base_addr;
     u32 calendar_cfg_val;
-    enum mtip_port_config_enum port_config = port_device->port_config;
+    u32 port_type = port_device->port_type;
+    enum mtip_port_config_enum port_config = platform_driver_priv->mtip_ports[port_type]->port_config;
     u32 tx_amf_cfg_val;
 
    CSMLOGDBG("MAC Wrapper Init\n");
@@ -1329,7 +1411,7 @@ void mtip_mac_wrapper_init(struct mtip_port_device_info* port_device)
        break;
    }
 
-   CSMLOGDBG("Setting tx_amf to 0x%x for port type %d with port config %d", tx_amf_cfg_val, port_device->port_type, port_device->port_config);
+   CSMLOGDBG("Setting tx_amf to 0x%x for port type %d with port config %d", tx_amf_cfg_val, port_type, port_config);
 
    // Configure TX AMF value
    iowrite32(tx_amf_cfg_val,
@@ -1365,20 +1447,23 @@ void mtip_mac_set_interrupt_mask(u32 link_index)
 {
     u32 write_val = 0;
     void __iomem *wrapper_base_addr;
-    u32 port_device_index;
-    u32 link_device_index;
+    u32 port_type;
     u32 real_link_number;
 
-    mtip_lookup_device_by_link_index(link_index, &port_device_index, &link_device_index);
+    if (mtip_lookup_port_type_by_link_index(link_index, &port_type) < 0)
+    {
+        CSMLOGERR("invalid port_type for link_index %d", link_index);
+        return;
+    }
 
     mtip_lookup_real_link_number_by_link_index(link_index, &real_link_number);
 
-    wrapper_base_addr = platform_driver_priv->devices.port_devices[port_device_index].wrapper_base_addr;
+    wrapper_base_addr = platform_driver_priv->devices.port_devices[port_type].wrapper_base_addr;
 
     // set the interrupts we are interested in
     write_val  =  MTIP_MAC_INTERRUPT_PTP_TX_INTR;
 
-    CSMLOGINFO("Setting mask: 0x%x to register 0x%x with real_link_number %d link_index %d\n", write_val, 
+    CSMLOGDBG("Setting mask: 0x%x to register 0x%x with real_link_number %d link_index %d\n", write_val, 
                real_link_number*MTIP_MAC_WRAPPER_INTERRUPT_OFFSET + MTIP_MAC_WRAPPER_INTERRUPT_MASK_REG_OFFSET, real_link_number, link_index);
 
     // Enable MAC interrupt
@@ -1391,17 +1476,20 @@ void mtip_mac_clear_interrupt_mask(u32 link_index)
 {
     u32 write_val = 0;
     void __iomem *wrapper_base_addr;
-    u32 port_device_index;
-    u32 link_device_index;
+    u32 port_type;
     u32 real_link_number;
 
-    mtip_lookup_device_by_link_index(link_index, &port_device_index, &link_device_index);
+    if (mtip_lookup_port_type_by_link_index(link_index, &port_type) < 0)
+    {
+        CSMLOGERR("invalid port_type for link_index %d", link_index);
+        return;
+    }
 
     mtip_lookup_real_link_number_by_link_index(link_index, &real_link_number);
 
-    wrapper_base_addr = platform_driver_priv->devices.port_devices[port_device_index].wrapper_base_addr;
+    wrapper_base_addr = platform_driver_priv->devices.port_devices[port_type].wrapper_base_addr;
 
-    CSMLOGINFO("Setting mask: 0x%x to register 0x%x with real_link_number %d link_index %d\n", write_val, 
+    CSMLOGDBG("Setting mask: 0x%x to register 0x%x with real_link_number %d link_index %d\n", write_val, 
                real_link_number*MTIP_MAC_WRAPPER_INTERRUPT_OFFSET + MTIP_MAC_WRAPPER_INTERRUPT_MASK_REG_OFFSET, real_link_number, link_index);
 
     // Enable MAC interrupt
@@ -1414,15 +1502,18 @@ void mtip_mac_set_link_status_interrupt_mask(u32 link_index)
 {
     u32 write_val = 0;
     void __iomem *wrapper_base_addr;
-    u32 port_device_index;
-    u32 link_device_index;
+    u32 port_type;
     u32 real_link_number;
 
-    mtip_lookup_device_by_link_index(link_index, &port_device_index, &link_device_index);
+    if (mtip_lookup_port_type_by_link_index(link_index, &port_type) < 0)
+    {
+        CSMLOGERR("invalid port_type for link_index %d", link_index);
+        return;
+    }
 
     mtip_lookup_real_link_number_by_link_index(link_index, &real_link_number);
 
-    wrapper_base_addr = platform_driver_priv->devices.port_devices[port_device_index].wrapper_base_addr;
+    wrapper_base_addr = platform_driver_priv->devices.port_devices[port_type].wrapper_base_addr;
 
     write_val  =  mtip_mac_get_interrupt_mask(link_index);
     write_val |= MTIP_MAC_INTERRUPT_LINK_DOWN_INTR;
@@ -1441,15 +1532,18 @@ void mtip_mac_clear_link_status_interrupt_mask(u32 link_index)
 {
     u32 write_val = 0;
     void __iomem *wrapper_base_addr;
-    u32 port_device_index;
-    u32 link_device_index;
+    u32 port_type;
     u32 real_link_number;
 
-    mtip_lookup_device_by_link_index(link_index, &port_device_index, &link_device_index);
+    if (mtip_lookup_port_type_by_link_index(link_index, &port_type) < 0)
+    {
+        CSMLOGERR("invalid port_type for link_index %d", link_index);
+        return;
+    }
 
     mtip_lookup_real_link_number_by_link_index(link_index, &real_link_number);
 
-    wrapper_base_addr = platform_driver_priv->devices.port_devices[port_device_index].wrapper_base_addr;
+    wrapper_base_addr = platform_driver_priv->devices.port_devices[port_type].wrapper_base_addr;
 
     write_val  =  mtip_mac_get_interrupt_mask(link_index);
     write_val &= (~MTIP_MAC_INTERRUPT_LINK_DOWN_INTR);
@@ -1467,15 +1561,18 @@ void mtip_mac_clear_link_status_interrupt_mask(u32 link_index)
 void mtip_mac_read_timestamp(u32 link_index, u32* timestamp_secs, u32* timestamp_nsecs)
 {
     void __iomem *wrapper_base_addr;
-    u32 port_device_index;
-    u32 link_device_index;
+    u32 port_type;
     u32 real_link_number;
 
-    mtip_lookup_device_by_link_index(link_index, &port_device_index, &link_device_index);
+    if (mtip_lookup_port_type_by_link_index(link_index, &port_type) < 0)
+    {
+        CSMLOGERR("invalid port_type for link_index %d", link_index);
+        return;
+    }
 
     mtip_lookup_real_link_number_by_link_index(link_index, &real_link_number);
 
-    wrapper_base_addr = platform_driver_priv->devices.port_devices[port_device_index].wrapper_base_addr;
+    wrapper_base_addr = platform_driver_priv->devices.port_devices[port_type].wrapper_base_addr;
 
     // read the upper 32 bits
     *timestamp_secs = (u32)ioread32(wrapper_base_addr + real_link_number*MTIP_MAC_WRAPPER_TX_TS_REG_OFFSET + MTIP_MAC_WRAPPER_TX_TS1_REG_BASE_OFFSET);
@@ -1489,16 +1586,19 @@ void mtip_mac_read_timestamp(u32 link_index, u32* timestamp_secs, u32* timestamp
 void mtip_mac_read_ts_seq_num(u32 link_index, u8* ts_seq_num)
 {
     void __iomem *wrapper_base_addr;
-    u32 port_device_index;
-    u32 link_device_index;
+    u32 port_type;
     u32 real_link_number;
     u32 ts_reg_val;
 
-    mtip_lookup_device_by_link_index(link_index, &port_device_index, &link_device_index);
+    if (mtip_lookup_port_type_by_link_index(link_index, &port_type) < 0)
+    {
+        CSMLOGERR("invalid port_type for link_index %d", link_index);
+        return;
+    }
 
     mtip_lookup_real_link_number_by_link_index(link_index, &real_link_number);
 
-    wrapper_base_addr = platform_driver_priv->devices.port_devices[port_device_index].wrapper_base_addr;
+    wrapper_base_addr = platform_driver_priv->devices.port_devices[port_type].wrapper_base_addr;
 
     // read the ts sequence number
     ts_reg_val = (u32)ioread32(wrapper_base_addr + real_link_number*MTIP_MAC_WRAPPER_TX_TS_SEQ_NUM_LINK_REG_OFFSET + MTIP_MAC_WRAPPER_TX_TS_SEQ_NUM_REG_BASE_OFFSET);
@@ -1513,15 +1613,18 @@ u32 mtip_mac_get_interrupt_mask(u32 link_index)
 {
     u32 read_val = 0;
     void __iomem *wrapper_base_addr;
-    u32 port_device_index;
-    u32 link_device_index;
+    u32 port_type;
     u32 real_link_number;
 
-    mtip_lookup_device_by_link_index(link_index, &port_device_index, &link_device_index);
+    if (mtip_lookup_port_type_by_link_index(link_index, &port_type) < 0)
+    {
+        CSMLOGERR("invalid port_type for link_index %d", link_index);
+        return 0;
+    }
 
     mtip_lookup_real_link_number_by_link_index(link_index, &real_link_number);
 
-    wrapper_base_addr = platform_driver_priv->devices.port_devices[port_device_index].wrapper_base_addr;
+    wrapper_base_addr = platform_driver_priv->devices.port_devices[port_type].wrapper_base_addr;
 
     read_val = (u32)ioread32(wrapper_base_addr + real_link_number*MTIP_MAC_WRAPPER_INTERRUPT_OFFSET + MTIP_MAC_WRAPPER_INTERRUPT_MASK_REG_OFFSET);
     return read_val;
@@ -1531,19 +1634,22 @@ bool mtip_mac_wrapper_get_link_status(u32 link_index)
 {
     u32 read_val = 0;
     void __iomem *wrapper_base_addr;
-    u32 port_device_index;
-    u32 link_device_index;
+    u32 port_type;
     u32 real_link_number;
 
-    mtip_lookup_device_by_link_index(link_index, &port_device_index, &link_device_index);
+    if (mtip_lookup_port_type_by_link_index(link_index, &port_type) < 0)
+    {
+        CSMLOGERR("invalid port_type for link_index %d", link_index);
+        return false;
+    }
 
     mtip_lookup_real_link_number_by_link_index(link_index, &real_link_number);
 
-    wrapper_base_addr = platform_driver_priv->devices.port_devices[port_device_index].wrapper_base_addr;
+    wrapper_base_addr = platform_driver_priv->devices.port_devices[port_type].wrapper_base_addr;
 
     read_val = (u32)ioread32(wrapper_base_addr + MTIP_MAC_WRAPPER_CORE_STATUS_REG_OFFSET);
-    CSMLOGINFO("mtip_mac_wrapper_get_link_status link_index: %d, core status = %d, for port %d, link %d",
-               link_index, read_val, port_device_index, real_link_number);
+    CSMLOGINFO("mtip_mac_wrapper_get_link_status link_index: %d, core status = %d, for port %d, real link %d",
+               link_index, read_val, port_type, real_link_number);
 
     if (((read_val & GENMASK(9,6)) >> 6) & (1 << real_link_number))
       return true;

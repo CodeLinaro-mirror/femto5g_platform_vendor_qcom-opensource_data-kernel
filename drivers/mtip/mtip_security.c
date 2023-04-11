@@ -15,8 +15,7 @@ static void __update_security_port_config()
     struct net_device *netdev;
     struct mtip_link_info *link;
     struct mtip_netdev_priv *mtip_priv;
-    u32 port_device_index;
-    u32 link_device_index;
+    u32 port_type;
     enum mtip_port_config_enum port_config = MTIP_PORT_CONFIG_4x25GBASE_R;
 
     for (link_index = 0; link_index < MTIP_MAX_LINKS; ++link_index) {
@@ -24,11 +23,16 @@ static void __update_security_port_config()
         if (!link)
             continue;
 
+		if (mtip_lookup_port_type_by_link_index(link_index, &port_type) < 0)
+		{
+			CSMLOGERR("invalid port_type for link_index %d", link_index);
+			continue;
+		}
+
         netdev = link->dev;
         mtip_priv = (struct mtip_netdev_priv *)netdev_priv(netdev);
 
-        mtip_lookup_device_by_link_index(link_index, &port_device_index, &link_device_index);
-        port_config = platform_driver_priv->devices.port_devices[port_device_index].port_config;
+        port_config = platform_driver_priv->mtip_ports[port_type]->port_config;
 
         // provide an update to security driver regarding port config
         mtip_device_update_security_config(netdev, port_config);
@@ -36,23 +40,30 @@ static void __update_security_port_config()
 }
 
 /* Register security device recursively on all links. */
-static int __register_security_device(struct mtip_security_device *sdev, u32 link_id)
+static int __register_security_device(struct mtip_security_device *sdev, u32 link_index)
 {
-	int ret;
+	int ret = 0;
 	u32 rx_link_id, tx_link_id;
 	struct net_device *netdev;
 	struct mtip_link_info *link;
 	struct mtip_netdev_priv *mtip_priv;
+    u32 port_type;
 
-	if (link_id >= MTIP_MAX_LINKS)
+	if (link_index >= MTIP_MAX_LINKS)
 		return 0;
 
-	link = platform_driver_priv->mtip_links[link_id];
+	link = platform_driver_priv->mtip_links[link_index];
 
-	if (!link || link->port_device_index != sdev->port_id)
-		return __register_security_device(sdev, link_id + 1);
+    if (mtip_lookup_port_type_by_link_index(link_index, &port_type) < 0)
+	{
+		CSMLOGDBG("invalid port_type for link_index %d", link_index);
+		goto fail;
+	}
 
-	tx_link_id = link->link_device_index;
+	if (!link || port_type != sdev->port_id)
+		return __register_security_device(sdev, link_index + 1);
+
+	tx_link_id = link->link_index;
 #ifdef MTIP_LOOPBACK_SWAP_HANDLE
 	rx_link_id = tx_link_id ^ 0x1;
 #else
@@ -67,7 +78,7 @@ static int __register_security_device(struct mtip_security_device *sdev, u32 lin
 	if (ret)
 		goto fail;
 
-	ret = __register_security_device(sdev, link_id + 1);
+	ret = __register_security_device(sdev, link_index + 1);
 	if (ret)
 		sdev->ops->del_link(netdev);
 
@@ -106,17 +117,24 @@ EXPORT_SYMBOL(mtip_security_register_device);
  */
 void mtip_security_unregister_device(struct mtip_security_device *sdev)
 {
-	u32 link_id;
+	u32 link_index;
 	struct net_device *netdev;
 	struct mtip_link_info *link;
 	struct mtip_netdev_priv *mtip_priv;
+    u32 port_type;
 
-	for (link_id = 0; link_id < MTIP_MAX_LINKS; ++link_id) {
-		link = platform_driver_priv->mtip_links[link_id];
+	for (link_index = 0; link_index < MTIP_MAX_LINKS; ++link_index) {
+		link = platform_driver_priv->mtip_links[link_index];
 		if (!link)
 			continue;
 
-		if (sdev->port_id != link->port_device_index)
+        if (mtip_lookup_port_type_by_link_index(link_index, &port_type) < 0)
+		{
+			CSMLOGERR("invalid port_type for link_index %d", link_index);
+			continue;
+		}
+
+		if (sdev->port_id != port_type)
 			continue;
 
 		netdev = link->dev;

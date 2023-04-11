@@ -1,5 +1,6 @@
 DATACSMKERNELTOP = $(ROOTDIR)datacsm-kernel/drivers/
 MTIPDRVTOP = $(DATACSMKERNELTOP)/mtip/
+TRANSCEIVERDRIVERTOP=$(ROOTDIR)transceiver-driver/drivers/
 
 LINUX_INC +=	-Iinclude/linux
 
@@ -20,6 +21,7 @@ ccflags-y += -I$(DATACSMKERNELTOP)/include/
 ccflags-y += -I$(DATACSMKERNELTOP)/mtip/
 ccflags-y += -I$(DATACSMKERNELTOP)/mtip/debug_eth/
 ccflags-y += -I$(DATACSMKERNELTOP)/mtip/debug_eth/include/uapi/mtip_debug_eth
+ccflags-y += -I$(TRANSCEIVERDRIVERTOP)/include
 
 header-y += $(DATACSMKERNELTOP)/mtip/debug_eth/include/uapi/mtip_debug_eth/mtip_debug_eth_gnl_uapi.h
 

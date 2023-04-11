@@ -14,6 +14,8 @@
 #include "mtip_dma.h"
 #include "mtip_client.h"
 #include "mtip_ptp.h"
+#include "mtip_platform.h"
+#include "mtip_phy.h"
 
 static void mtip_workq_handler(struct work_struct *w);
 
@@ -80,6 +82,36 @@ static void mtip_workq_handler(struct work_struct *w)
       case MTIP_WORKQ_TASK_PROCESS_LINK_STATE:
           {
               run_mtip_process_link_state(work_ptr);
+          }
+          break;
+      case MTIP_WORKQ_TASK_PROCESS_LANE_UP:
+          {
+              run_mtip_process_lane_up(work_ptr);
+          }
+          break;
+      case MTIP_WORKQ_TASK_PROCESS_LANE_DOWN:
+          {
+              run_mtip_process_lane_down(work_ptr);
+          }
+          break;
+      case MTIP_WORKQ_TASK_CREATE_PHYLINK:
+          {
+              run_mtip_process_create_phylink(work_ptr);
+          }
+          break;
+      case MTIP_WORKQ_TASK_PROCESS_PORT_CONFIGURATION_USING_LANE:
+          {
+              run_mtip_process_configure_port_using_lane(work_ptr);
+          }
+          break;
+      case MTIP_WORKQ_TASK_PROCESS_PORT_CONFIGURATION_USING_LINK:
+          {
+              run_mtip_process_configure_port_using_link(work_ptr);
+          }
+          break;
+      case MTIP_WORKQ_TASK_PROCESS_AN_RESULT:
+          {
+              run_mtip_process_an_result(work_ptr);
           }
           break;
       default:

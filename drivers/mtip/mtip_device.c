@@ -54,6 +54,7 @@
 #include "mtip_phy.h"
 #include "mtip_sysfs.h"
 #include "mtip_platform.h"
+#include "eth_phy_iface.h"
 
 int macsec_eth_set_macsec_ops(const struct macsec_ops* rb_macsec_ops)
 {
@@ -115,10 +116,19 @@ void run_mtip_replenish_dma_rx_buffers(void* work_ptr)
    struct mtip_replenish_dma_rx_buffers_task* taskstruct = (struct mtip_replenish_dma_rx_buffers_task*)work_ptr;
    struct mtip_netdev_priv* priv;
    u32 link_index;
+   ecpri_dma_eth_conn_hdl_t hdl;
 
    priv = netdev_priv(taskstruct->netdev);
 
    link_index = priv->link_index;
+
+   hdl = platform_driver_priv->mtip_links[link_index]->dma_hdl;
+
+   if (hdl == -1) 
+   {
+       CSMLOGERR("invalid dma_hdl %d", hdl);
+       goto out;
+   }
 
    rv = mtip_dma_get_ring_state(taskstruct->hdl, &tx_available, &rx_available);
 
@@ -133,6 +143,7 @@ void run_mtip_replenish_dma_rx_buffers(void* work_ptr)
        rv = mtip_replenish_dma_rx_buffers(taskstruct->netdev, taskstruct->hdl, rx_available - 1);
    }
 
+out:
    // free the taskstruct
    kfree(taskstruct);
 }
@@ -508,15 +519,11 @@ static int mtip_set_mac_address(struct net_device *dev, void *addr)
 
 int mtip_set_netdev_hw_mac_addr(struct net_device *netdev, u32 link_index)
 {
-    u32 port_device_index;
-    u32 link_device_index;
     uint8_t saddr[ETH_ALEN];
 
-    mtip_lookup_device_by_link_index(link_index, &port_device_index, &link_device_index);
+    mtip_mac_get_mac_address_by_link_index(link_index, saddr);
 
-    mtip_mac_get_mac_address_by_device(port_device_index, link_device_index, saddr);
-
-    CSMLOGDBG("Setting MAC address of link_index: %d port: %d, link: %d\n", link_index, port_device_index, link_device_index);
+    CSMLOGDBG("Setting MAC address of link_index: %d\n", link_index);
 
     memcpy(netdev->dev_addr, saddr, ETH_ALEN);
 
@@ -582,7 +589,7 @@ int mtip_napi_poll(struct napi_struct *napi_ptr, int budget)
    enum ecpri_dma_notify_mode setmode = ECPRI_DMA_NOTIFY_MODE_IRQ;
    struct mtip_link_info* link = container_of(napi_ptr, struct mtip_link_info, napi);
    ecpri_dma_eth_conn_hdl_t hdl = link->dma_hdl;
-   u32 link_index;
+   u32 link_index = link->link_index;
    struct net_device* dev;
    struct mtip_netdev_priv *priv;
    ecpri_dma_eth_conn_hdl_t actual_handle = hdl;
@@ -632,15 +639,6 @@ int mtip_napi_poll(struct napi_struct *napi_ptr, int budget)
 #endif
    }
 
-   rv = mtip_lookup_link_index_by_handle(hdl, &link_index);
-
-   // HANDLE THE ERROR
-   if (rv < 0)
-   {
-      CSMLOGERR("Unable to find link_index of hdl: %d\n", hdl);
-      return 0;
-   }
-
    dev = platform_driver_priv->mtip_links[link_index]->dev;
    priv = netdev_priv(dev);
 
@@ -687,6 +685,7 @@ static int mtip_start_xmit(struct sk_buff *skb, struct net_device *netdev)
    u8 ts_seq_num = 0;
    bool send_tx_pre_header = false;
    bool send_tx_seq_num = false;
+   enum mtip_link_state_enum link_state;
    enum mtip_device_mode_enum mode = platform_driver_priv->devices.mode;
    int pending_pkt_completion_count = 0;
 
@@ -694,6 +693,20 @@ static int mtip_start_xmit(struct sk_buff *skb, struct net_device *netdev)
 
    priv = netdev_priv(netdev);
    link_index = priv->link_index;
+
+   link_state = mtip_get_link_state_by_link_index(link_index);
+
+   // we are not done opening the link
+   if ((link_state == MTIP_LINK_STATE_OPEN_WAITING_FOR_LANES) ||
+       (link_state == MTIP_LINK_STATE_OPEN_FAILED))
+   {
+       // free the skb
+       dev_kfree_skb(skb);
+
+       // drop the packet
+       return NETDEV_TX_OK;
+   }
+
    hdl = platform_driver_priv->mtip_links[link_index]->dma_hdl;
    sec_dev = priv->sec_dev;
 
@@ -767,9 +780,9 @@ static int mtip_start_xmit(struct sk_buff *skb, struct net_device *netdev)
        }
 
        // check that both links are in OPEN state
-       if ((platform_driver_priv->mtip_links[link_index]->state != MTIP_LINK_STATE_OPEN &&
+       if ((platform_driver_priv->mtip_links[link_index]->state != MTIP_LINK_STATE_OPEN_DONE &&
             platform_driver_priv->mtip_links[link_index]->state != MTIP_LINK_STATE_UP) || 
-           (platform_driver_priv->mtip_links[other_link_index]->state != MTIP_LINK_STATE_OPEN &&
+           (platform_driver_priv->mtip_links[other_link_index]->state != MTIP_LINK_STATE_OPEN_DONE &&
             platform_driver_priv->mtip_links[other_link_index]->state != MTIP_LINK_STATE_UP))
        {
           CSMLOGERR("Waiting for both interfaces to be open/up... dropping\n");
@@ -1056,17 +1069,82 @@ static int mtip_change_mtu(struct net_device *netdev, int new_mtu)
    return 0;
 }
 
+int mtip_device_open_completion(u32 link_index)
+{
+    struct net_device *netdev;
+    u32 port_type;
+    int sfp_port_type;
+    ecpri_dma_eth_conn_hdl_t hdl;
+    struct mtip_netdev_priv *priv;
+    enum mtip_port_config_enum port_config;
+
+    netdev = platform_driver_priv->mtip_links[link_index]->dev;
+
+    priv = netdev_priv(netdev);
+    hdl = platform_driver_priv->mtip_links[link_index]->dma_hdl;
+
+    if (mtip_lookup_port_type_by_link_index(link_index, &port_type) < 0)
+    {
+        CSMLOGERR("invalid port_type for link_index %d", link_index);
+        return -1;
+    }
+
+    CSMLOGINFO("device open completion called for link_index %d", link_index);
+
+    port_config = platform_driver_priv->mtip_ports[port_type]->port_config;
+
+    // check if lanes have been assigned
+    if (platform_driver_priv->mtip_links[link_index]->lanes_assignment_complete == false) 
+    {
+        CSMLOGERR("Lane assignment not complete for link_index %d", link_index);
+        return 0;
+    }
+    else if (platform_driver_priv->mtip_links[link_index]->num_assigned_lanes == 0) 
+    {
+        CSMLOGINFO("No lanes assigned for link_index %d", link_index);
+
+        mutex_lock(&platform_driver_priv->mtip_links[link_index]->dev_lock);
+
+        platform_driver_priv->mtip_links[link_index]->state = MTIP_LINK_STATE_OPEN_FAILED;
+
+        mutex_unlock(&platform_driver_priv->mtip_links[link_index]->dev_lock);
+    }
+
+    // get the sfp port type
+    sfp_port_type = platform_driver_priv->mtip_ports[port_type]->sfp_port_type;
+
+    // bring up the phy
+    mtip_phy_bringup_phy(link_index, sfp_port_type);
+
+    CSMLOGINFO("phy bringup done for link: %d\n", link_index);
+
+    mutex_lock(&platform_driver_priv->mtip_links[link_index]->dev_lock);
+
+    /* 
+     * set the link state to OPEN DONE * 
+     */
+    platform_driver_priv->mtip_links[link_index]->state = MTIP_LINK_STATE_OPEN_DONE;
+
+    mutex_unlock(&platform_driver_priv->mtip_links[link_index]->dev_lock);
+
+    /* update the security port config */
+    mtip_device_update_security_config(netdev, port_config);
+
+    /* Send update to clients */
+    post_mtip_client_send_event(ETH_ECPRISS_EVENT_UP, link_index);
+
+    return 0;
+}
+
 /* Called when the network interface is made active */
 static int mtip_open(struct net_device *netdev)
 {
-   struct mtip_netdev_priv* priv;
+   struct mtip_netdev_priv *priv;
    u32 link_index;
    ecpri_dma_eth_conn_hdl_t hdl;
-   u32 real_port_number;
    int sfp_port_type;
-   u32 port_device_index;
-   u32 link_device_index;
    enum ecpri_dma_notify_mode setmode = ECPRI_DMA_NOTIFY_MODE_IRQ;
+   u32 port_type;
 
    priv = netdev_priv(netdev);
 
@@ -1076,64 +1154,15 @@ static int mtip_open(struct net_device *netdev)
 
    CSMLOGINFO("mtip_open called for link_index: %d with hdl: %d\n", link_index, hdl);
 
-   mtip_lookup_device_by_link_index(link_index, &port_device_index, &link_device_index);
-
-   // check number of lanes assigned to the interface
-   if (platform_driver_priv->devices.port_devices[port_device_index].link_devices[link_device_index].num_lanes == 0)
+   if (mtip_lookup_port_type_by_link_index(link_index, &port_type) < 0)
    {
-       CSMLOGERR("Number of lanes assigned to link %d is 0", link_index);
-       return -ENODEV;
+      CSMLOGERR("invalid port_type for link_index %d", link_index);
+      return -ENODEV;
    }
 
-   /* 
-    * set the link state to OPEN * 
-    */
-   if (mtip_loopback_mode == MTIP_MODE_DEFAULT)
+   // first get the interface going
+   if (hdl)
    {
-      platform_driver_priv->mtip_links[link_index]->state = MTIP_LINK_STATE_OPEN;
-   }
-
-   // this is done only for the RUMI E2E
-   if (mtip_rumi_platform != 0) 
-   {
-       if (mtip_loopback_mode == MTIP_MODE_DEFAULT)
-       {
-           // Configure phylib in poll mode
-           priv->phydev->irq = PHY_POLL;
-
-           // PHYLINK-PHY binding and PHY bringup
-           phylink_connect_phy(priv->phylink, priv->phydev);
-
-           // Start the PHYLINK
-           phylink_start(priv->phylink);
-       }
-   }
-   else
-   {
-       if (mtip_loopback_mode == MTIP_MODE_DEFAULT || 
-           mtip_loopback_mode == MTIP_MODE_PHY_LOOPBACK)
-       {
-           // check if the corresponding port is in LINK_UP state
-           mtip_lookup_real_port_number_by_link_index(link_index, &real_port_number);
-
-           if (platform_driver_priv->mtip_ports[real_port_number]->port_state == MTIP_PORT_STATE_CONNECTED)
-           {
-               // get the sfp port type
-               sfp_port_type = platform_driver_priv->mtip_ports[real_port_number]->sfp_port_type;
-
-               // bring up the phy
-              mtip_phy_bringup_phy(link_index, sfp_port_type);
-
-              CSMLOGDBG("phy bringup done for link: %d\n", link_index);
-           }
-           else
-           {
-               CSMLOGERR("Port: %d of link index: %d is not in CONNECTED state\n", real_port_number, link_index);
-           }
-       }
-   }
-
-   if(hdl){
       // start the pipe
       mtip_start_dma_pipe(netdev, hdl);
 
@@ -1160,6 +1189,82 @@ static int mtip_open(struct net_device *netdev)
       netif_start_queue(netdev);
    }
 
+   // this is done only for the RUMI E2E
+   if (mtip_rumi_platform != MTIP_PLATFORM_SOC)
+   {
+      if (mtip_loopback_mode == MTIP_MODE_DEFAULT)
+      {
+         // Configure phylib in poll mode
+         priv->phydev->irq = PHY_POLL;
+
+         // PHYLINK-PHY binding and PHY bringup
+         phylink_connect_phy(priv->phylink, priv->phydev);
+
+         // Start the PHYLINK
+         phylink_start(priv->phylink);
+      }
+   }
+   else
+   {
+      // PCS looback mode
+      if (mtip_loopback_mode == MTIP_MODE_LOOPBACK)
+      {
+         // set the link in UP state
+         platform_driver_priv->mtip_links[link_index]->state = MTIP_LINK_STATE_UP;
+
+         // enable tx/rx on the link
+         mtip_mac_enable_tx_rx(link_index);
+      }
+      else
+      {
+         // the default E2E mode
+         // check if lane assignment is complete
+         if (platform_driver_priv->mtip_links[link_index]->lanes_assignment_complete == true)
+         {
+            // lane assignment is already done for the port
+            // this means the port HW has been configured already
+
+            mutex_lock(&platform_driver_priv->mtip_links[link_index]->dev_lock);
+
+            if ((platform_driver_priv->mtip_links[link_index]->state == MTIP_LINK_STATE_INIT) ||
+                (platform_driver_priv->mtip_links[link_index]->state == MTIP_LINK_STATE_CLOSE))
+            {
+               // set the state to OPEN_DONE
+               platform_driver_priv->mtip_links[link_index]->state = MTIP_LINK_STATE_OPEN_DONE;
+            }
+
+            mutex_unlock(&platform_driver_priv->mtip_links[link_index]->dev_lock);
+
+            // get the sfp port type
+            sfp_port_type = platform_driver_priv->mtip_ports[port_type]->sfp_port_type;
+
+            // bring up the phy
+            mtip_phy_bringup_phy(link_index, sfp_port_type);
+
+            CSMLOGINFO("phy bringup done for link: %d\n", link_index);
+         }
+         else
+         {
+            // lane assignment has not been done for this port
+            mutex_lock(&platform_driver_priv->mtip_links[link_index]->dev_lock);
+
+            if ((platform_driver_priv->mtip_links[link_index]->state == MTIP_LINK_STATE_INIT) ||
+                (platform_driver_priv->mtip_links[link_index]->state == MTIP_LINK_STATE_CLOSE))
+            {
+               // lane assignment is not complete yet
+               // set the state to OPEN_WAITING_FOR_LANES
+               platform_driver_priv->mtip_links[link_index]->state = MTIP_LINK_STATE_OPEN_WAITING_FOR_LANES;
+            }
+
+            mutex_unlock(&platform_driver_priv->mtip_links[link_index]->dev_lock);
+
+            CSMLOGINFO("link_index %d set to WAITING_FOR_LANES state", link_index);
+
+            post_mtip_process_configure_port_using_link(port_type, link_index);
+         }
+      }
+   }
+
    /* Send update to clients */
    post_mtip_client_send_event(ETH_ECPRISS_EVENT_UP, link_index);
 
@@ -1169,9 +1274,13 @@ static int mtip_open(struct net_device *netdev)
 /* Called when the network interface is disabled */
 static int mtip_close(struct net_device *netdev)
 {
-   struct mtip_netdev_priv* priv;
+   struct mtip_netdev_priv *priv;
    ecpri_dma_eth_conn_hdl_t hdl;
    u32 link_index;
+   u32 port_type;
+   bool all_closed = true;
+   int i;
+   u32 tmp_link_index;
 
    priv = netdev_priv(netdev);
 
@@ -1182,28 +1291,29 @@ static int mtip_close(struct net_device *netdev)
    CSMLOGDBG("mtip_close called with link_index: %d with hdl: %d\n", link_index, hdl);
 
    // do this only for RUMI E2E
-   if (mtip_rumi_platform != 0) 
+   if (mtip_rumi_platform != MTIP_PLATFORM_SOC)
    {
-       if (mtip_loopback_mode == MTIP_MODE_DEFAULT)
-       {
-           /* Stop and disconnect the PHY */
-           phylink_stop(priv->phylink);
-           phylink_disconnect_phy(priv->phylink);
-       }
+      if (mtip_loopback_mode == MTIP_MODE_DEFAULT)
+      {
+         /* Stop and disconnect the PHY */
+         phylink_stop(priv->phylink);
+         phylink_disconnect_phy(priv->phylink);
+      }
    }
    else
    {
-       if (mtip_loopback_mode == MTIP_MODE_DEFAULT || 
-           mtip_loopback_mode == MTIP_MODE_PHY_LOOPBACK)
-       {
-          // teardown the phy
-          mtip_phy_teardown_phy(link_index);
+      if (mtip_loopback_mode == MTIP_MODE_DEFAULT ||
+          mtip_loopback_mode == MTIP_MODE_PHY_LOOPBACK)
+      {
+         // teardown the phy
+         mtip_phy_teardown_phy(link_index);
 
-          CSMLOGDBG("phy teardown done for link: %d\n", link_index);
-       }
+         CSMLOGDBG("phy teardown done for link: %d\n", link_index);
+      }
    }
 
-   if(hdl){
+   if (hdl)
+   {
       // stop the pipe
       mtip_stop_dma_pipe(hdl);
 
@@ -1222,7 +1332,45 @@ static int mtip_close(struct net_device *netdev)
    // set the link state to CLOSE
    if (mtip_loopback_mode == MTIP_MODE_DEFAULT)
    {
-     platform_driver_priv->mtip_links[link_index]->state = MTIP_LINK_STATE_CLOSE;
+      mutex_lock(&platform_driver_priv->mtip_links[link_index]->dev_lock);
+
+      platform_driver_priv->mtip_links[link_index]->state = MTIP_LINK_STATE_CLOSE;
+
+      mutex_unlock(&platform_driver_priv->mtip_links[link_index]->dev_lock);
+
+      mtip_lookup_port_type_by_link_index(link_index, &port_type);
+
+      all_closed = true;
+
+      for (i = 0; i < platform_driver_priv->devices.port_devices[port_type].num_link_phandles; ++i) 
+      {
+          tmp_link_index = platform_driver_priv->devices.port_devices[port_type].link_devices[i]->link_index;
+
+          if ((platform_driver_priv->mtip_links[tmp_link_index]->state != MTIP_LINK_STATE_INIT) &&
+              (platform_driver_priv->mtip_links[tmp_link_index]->state != MTIP_LINK_STATE_CLOSE))
+          {
+              all_closed = false;
+              break;
+          }
+      }
+
+       if (all_closed) 
+       {
+           // reset the port state to INIT
+           platform_driver_priv->mtip_ports[port_type]->port_state = MTIP_PORT_STATE_INIT;
+
+           // reset all the lane assignments
+           for (i = 0; i < platform_driver_priv->devices.port_devices[port_type].num_link_phandles; ++i) 
+           {
+               tmp_link_index = platform_driver_priv->devices.port_devices[port_type].link_devices[i]->link_index;
+
+               mutex_lock(&platform_driver_priv->mtip_links[tmp_link_index]->dev_lock);
+
+               platform_driver_priv->mtip_links[tmp_link_index]->lanes_assignment_complete = false;
+
+               mutex_unlock(&platform_driver_priv->mtip_links[tmp_link_index]->dev_lock);
+           }
+       }
    }
 
    /* Send update to clients */
@@ -1238,7 +1386,7 @@ static int mtip_close(struct net_device *netdev)
  */
 static void mtip_tx_timeout(struct net_device *netdev, unsigned int txqueue)
 {
-   CSMLOGERR("mtip_tx_timeout called\n");
+   CSMLOGINFO("mtip_tx_timeout called\n");
 
    netif_trans_update(netdev); /* prevent tx timeout */
    netif_wake_queue(netdev);
@@ -1400,11 +1548,8 @@ void mtip_netdevice_init(struct net_device *dev)
    mtip_ethtool_set_ops(dev);
 }
 
-enum mtip_link_state_enum mtip_get_link_state_by_device(u32 port_device_index, u32 link_device_index)
+enum mtip_link_state_enum mtip_get_link_state_by_link_index(u32 link_index)
 {
-    u32 link_index;
-    mtip_lookup_link_index_by_device(&link_index, port_device_index, link_device_index);
-
     CSMLOGDBG("Getting link state of link index: %d\n", link_index);
 
     if (platform_driver_priv->mtip_links[link_index] == NULL) {
@@ -1415,138 +1560,127 @@ enum mtip_link_state_enum mtip_get_link_state_by_device(u32 port_device_index, u
     }
 }
 
-static void mtip_netdev_reconfigure_port_single_lane(u32 port_device_index, u32 num_links, enum eth_phy_iface_phy_lane_speed_enum lane_speed)
-{
-    int i;
-    struct mtip_port_device_info *port_device = &platform_driver_priv->devices.port_devices[port_device_index];
-    struct mtip_link_device_info* link_device;
-    u32 port_type = port_device->port_type;
-    u32 link_index;
-    u32 tmp_port_device_index;
-    u32 link_device_index;
-
-    // set the port config
-    for (i = 0; i < num_links; ++i) 
-    {
-        port_device->lane_config[i].lane_enabled = true;
-        port_device->lane_config[i].lane_speed = lane_speed;
-
-        mtip_lookup_link_index_by_real_port_and_link(&link_index, port_type, i);
-        port_device->lane_config[i].link_index = link_index;
-    }
-
-    // set the lane configurations of the links
-    for (i = 0; i < num_links; ++i) 
-    {
-        mtip_lookup_link_index_by_real_port_and_link(&link_index, port_type, i);
-
-        mtip_lookup_device_by_link_index(link_index, &tmp_port_device_index, &link_device_index);
-
-        link_device = &platform_driver_priv->devices.port_devices[tmp_port_device_index].link_devices[link_device_index];
-
-        link_device->lane_speed = lane_speed;
-        link_device->num_lanes = 1;
-        link_device->lanes[0] = i;
-    }
-}
-
-static void mtip_netdev_reconfigure_port_two_lanes(u32 port_device_index, u32 num_links, enum eth_phy_iface_phy_lane_speed_enum lane_speed)
+static void mtip_netdev_reconfigure_port
+(
+    u32 port_type,
+    u32 num_links,
+    u32 num_lanes,
+    enum eth_phy_iface_phy_lane_speed_enum lane_speed,
+    u32 real_link_index_array[MTIP_MAX_LINKS_PER_PORT],
+    u32 real_lane_index_array[MTIP_MAX_LANES_PER_PORT],
+    u32 lane_to_link_map[MTIP_MAX_LANES_PER_PORT]
+)
 {
     int i, j;
-    struct mtip_port_device_info *port_device = &platform_driver_priv->devices.port_devices[port_device_index];
-    struct mtip_link_device_info* link_device;
-    u32 port_type = port_device->port_type;
+    struct mtip_port_info* port_info = platform_driver_priv->mtip_ports[port_type];
+    struct mtip_link_info* link_info = NULL;
     u32 link_index;
-    u32 tmp_port_device_index;
-    u32 link_device_index;
+    u32 lane_index;
+    u32 real_link_index;
+    u32 mapped_real_link_index;
+    u32 real_lane_index;
+    int lane_count;
 
+    // first update the port lane_config
+    for (i = 0; i < num_lanes; ++i) 
+    {
+        real_lane_index = real_lane_index_array[i];
+
+        port_info->lane_config[real_lane_index].lane_enabled = true;
+
+        port_info->lane_config[real_lane_index].lane_speed = lane_speed;
+
+        mapped_real_link_index = lane_to_link_map[real_lane_index];
+
+        if (mtip_lookup_link_index_by_port_type_and_real_link(&link_index, port_type, mapped_real_link_index) >= 0)
+        {
+            port_info->lane_config[real_lane_index].link_index = link_index;
+        }
+        else
+        {
+            port_info->lane_config[real_lane_index].link_index = -1;
+        }
+    }
+
+    // update the assigned lane indices of all the links
     for (i = 0; i < num_links; ++i) 
     {
-        // assign two lanes to a link
-        mtip_lookup_link_index_by_real_port_and_link(&link_index, port_type, i);
+        real_link_index = real_link_index_array[i];
 
-        // set the port config
-        for (j = 0; j < 2; ++j) 
+        lane_count = 0;
+
+        if (mtip_lookup_link_index_by_port_type_and_real_link(&link_index, port_type, real_link_index) >= 0)
         {
-            port_device->lane_config[j + 2*i].lane_enabled = true;
-            port_device->lane_config[j + 2*i].lane_speed = lane_speed;
-            port_device->lane_config[j + 2*i].link_index = link_index;
+            // we need to update the assigned lane indices of link_index
+            link_info = platform_driver_priv->mtip_links[link_index];
+
+            for (j = 0; j < num_lanes; ++j) 
+            {
+                real_lane_index = real_lane_index_array[j];
+
+                mapped_real_link_index = lane_to_link_map[real_lane_index];
+                
+                if (mapped_real_link_index == real_link_index) 
+                {
+                    // this lane is to be assigned to the link
+                    if (mtip_lookup_lane_index_by_port_type_and_real_lane(&lane_index, port_type, real_lane_index) >= 0)
+                    {
+                        link_info->assigned_lane_indices[lane_count] = lane_index;
+                    }
+                    else
+                    {
+                        link_info->assigned_lane_indices[lane_count] = -1;
+                        CSMLOGERR("invalid port_type %d and real_lane %d", port_type, real_lane_index);
+                    }
+                    ++lane_count;
+                }
+            }
+
+            link_info->num_assigned_lanes = lane_count;
         }
-
-        mtip_lookup_device_by_link_index(link_index, &tmp_port_device_index, &link_device_index);
-
-        link_device = &platform_driver_priv->devices.port_devices[tmp_port_device_index].link_devices[link_device_index];
-        link_device->lane_speed = lane_speed;
-        link_device->num_lanes = 2;
-
-        // set the lane configurations of link
-        for (j = 0; j < 2; ++j) 
+        else
         {
-            link_device->lanes[j] = j + 2*i;
+            CSMLOGERR("unable to find link_index for port_type %d, real_link %d", port_type, real_link_index);
         }
     }
 }
 
-static void mtip_netdev_reconfigure_port_four_lanes(u32 port_device_index, enum eth_phy_iface_phy_lane_speed_enum lane_speed)
+void mtip_netdev_assign_port_lanes(u32 port_type)
 {
     int i;
-    struct mtip_port_device_info *port_device = &platform_driver_priv->devices.port_devices[port_device_index];
-    struct mtip_link_device_info* link_device;
-    u32 port_type = port_device->port_type;
+    struct mtip_port_device_info *port_device = &platform_driver_priv->devices.port_devices[port_type];
+    struct mtip_port_info* port_info = NULL;
+    struct mtip_link_info* link_info = NULL;
     u32 link_index;
-    u32 tmp_port_device_index;
-    u32 link_device_index;
+    enum mtip_port_config_enum port_config = platform_driver_priv->mtip_ports[port_type]->port_config;
+    u32 num_links;
+    u32 num_lanes;
+    u32 real_link_index_array[MTIP_MAX_LINKS_PER_PORT];
+    u32 real_lane_index_array[MTIP_MAX_LANES_PER_PORT];
+    u32 lane_to_link_map[MTIP_MAX_LANES_PER_PORT];
+    enum eth_phy_iface_phy_lane_speed_enum lane_speed;
 
-    // assign all the four lanes to a single link
-    mtip_lookup_link_index_by_real_port_and_link(&link_index, port_type, 0);
+    CSMLOGDBG("reconfiguring port %d to config %d", port_type, port_config);
 
-    // set the port config
-    for (i = 0; i < PHY_LANE_MAX; ++i) 
-    {
-        port_device->lane_config[i].lane_enabled = true;
-        port_device->lane_config[i].lane_speed = lane_speed;
-        port_device->lane_config[i].link_index = link_index;
-    }
-
-    mtip_lookup_device_by_link_index(link_index, &tmp_port_device_index, &link_device_index);
-
-    link_device = &platform_driver_priv->devices.port_devices[tmp_port_device_index].link_devices[link_device_index];
-    link_device->lane_speed = lane_speed;
-    link_device->num_lanes = PHY_LANE_MAX;
-
-    // set the lane configurations of link
-    for (i = 0; i < PHY_LANE_MAX; ++i) 
-    {
-        link_device->lanes[i] = i;
-    }
-}
-
-void mtip_netdev_reconfigure_port(u32 port_device_index, enum mtip_port_config_enum port_config)
-{
-    int i, j;
-    struct mtip_port_device_info *port_device = &platform_driver_priv->devices.port_devices[port_device_index];
-    struct mtip_link_device_info* link_device;
+    port_info = platform_driver_priv->mtip_ports[port_type];
 
     // clear the previous port/lane configuration
     for (i = 0; i < PHY_LANE_MAX; ++i) 
     {
-        port_device->lane_config[i].lane_enabled = false;
-        port_device->lane_config[i].lane_speed = 0;
-        port_device->lane_config[i].link_index = 0;
+        port_info->lane_config[i].lane_enabled = false;
+        port_info->lane_config[i].lane_speed = 0;
+        port_info->lane_config[i].link_index = 0;
     }
 
     // clear the lane config of all the links
     for (i = 0; i < port_device->num_link_phandles; ++i) 
     {
-        link_device = &port_device->link_devices[i];
+        link_index = port_device->link_devices[i]->link_index;
 
-        link_device->lane_speed = 0;
-        link_device->num_lanes = 0;
+        link_info = platform_driver_priv->mtip_links[link_index];
 
-        for (j = 0; j < PHY_LANE_MAX; ++j) 
-        {
-            link_device->lanes[j] = 0;
-        }
+        link_info->num_assigned_lanes = 0;
+        link_info->lanes_assignment_complete = false;
     }
 
     // set the new port/lane configuration
@@ -1556,31 +1690,181 @@ void mtip_netdev_reconfigure_port(u32 port_device_index, enum mtip_port_config_e
     case MTIP_PORT_CONFIG_1x100GBASE_R_RSFEC_LL:
     case MTIP_PORT_CONFIG_1x100GBASE_R_RSFEC:
         {
-            mtip_netdev_reconfigure_port_single_lane(port_device_index, 1, PHY_LANE_SPEED_100G);
+            num_links = 1;
+            num_lanes = 1;
+            lane_speed = PHY_LANE_SPEED_100G;
+
+            // front haul ports
+            if (port_type <= MTIP_PORT_TYPE_FH_2) 
+            {
+                real_link_index_array[0] = 0;
+
+                real_lane_index_array[0] = 0;
+
+                lane_to_link_map[0] = 0;
+            }
+            else if (port_type == MTIP_PORT_TYPE_L2) 
+            {
+                real_link_index_array[0] = 0;
+
+                real_lane_index_array[0] = 0;
+
+                lane_to_link_map[0] = 0;
+            }
+            else if (port_type == MTIP_PORT_TYPE_DEBUG) 
+            {
+                real_link_index_array[0] = 1;
+
+                real_lane_index_array[0] = 2;
+
+                lane_to_link_map[2] = 1;
+            }
         }
         break;
     case MTIP_PORT_CONFIG_1x100GBASE_R2:
     case MTIP_PORT_CONFIG_1x100GBASE_R2_RSFEC:
         {
-            mtip_netdev_reconfigure_port_two_lanes(port_device_index, 1, PHY_LANE_SPEED_50G);
+            num_links = 1;
+            num_lanes = 2;
+            lane_speed = PHY_LANE_SPEED_50G;
+
+            // front haul ports
+            if (port_type <= MTIP_PORT_TYPE_FH_2) 
+            {
+                real_link_index_array[0] = 0;
+
+                real_lane_index_array[0] = 0;
+                real_lane_index_array[1] = 1;
+
+                lane_to_link_map[0] = 0;
+                lane_to_link_map[1] = 0;
+            }
+            else if (port_type == MTIP_PORT_TYPE_L2) 
+            {
+                real_link_index_array[0] = 0;
+
+                real_lane_index_array[0] = 0;
+                real_lane_index_array[1] = 1;
+
+                lane_to_link_map[0] = 0;
+                lane_to_link_map[1] = 0;
+            }
+            else if (port_type == MTIP_PORT_TYPE_DEBUG) 
+            {
+                real_link_index_array[0] = 1;
+
+                real_lane_index_array[0] = 2;
+                real_lane_index_array[1] = 3;
+
+                lane_to_link_map[2] = 1;
+                lane_to_link_map[3] = 1;
+            }
         }
         break;
     case MTIP_PORT_CONFIG_1x100GBASE_R4:
     case MTIP_PORT_CONFIG_1x100GBASE_R4_RSFEC:
         {
-            mtip_netdev_reconfigure_port_four_lanes(port_device_index, PHY_LANE_SPEED_25G);
+            num_links = 1;
+            num_lanes = 4;
+            lane_speed = PHY_LANE_SPEED_25G;
+
+            // front haul ports
+            if (port_type <= MTIP_PORT_TYPE_FH_2) 
+            {
+                real_link_index_array[0] = 0;
+
+                real_lane_index_array[0] = 0;
+                real_lane_index_array[1] = 1;
+                real_lane_index_array[2] = 2;
+                real_lane_index_array[3] = 3;
+
+                lane_to_link_map[0] = 0;
+                lane_to_link_map[1] = 0;
+                lane_to_link_map[2] = 0;
+                lane_to_link_map[3] = 0;
+            }
+            else 
+            {
+                CSMLOGERR("config %d not supported on port_type %d", port_config, port_type);
+                goto out;
+            }
         }
         break;
     case MTIP_PORT_CONFIG_1x50GBASE_R:
     case MTIP_PORT_CONFIG_1x50GBASE_R_RSFEC:
         {
-            mtip_netdev_reconfigure_port_single_lane(port_device_index, 1, PHY_LANE_SPEED_50G);
+            num_links = 1;
+            num_lanes = 1;
+            lane_speed = PHY_LANE_SPEED_50G;
+
+            // front haul ports
+            if (port_type <= MTIP_PORT_TYPE_FH_2) 
+            {
+                real_link_index_array[0] = 0;
+
+                real_lane_index_array[0] = 0;
+
+                lane_to_link_map[0] = 0;
+            }
+            else if (port_type == MTIP_PORT_TYPE_L2) 
+            {
+                real_link_index_array[0] = 0;
+
+                real_lane_index_array[0] = 0;
+
+                lane_to_link_map[0] = 0;
+            }
+            else if (port_type == MTIP_PORT_TYPE_DEBUG) 
+            {
+                real_link_index_array[0] = 1;
+
+                real_lane_index_array[0] = 2;
+
+                lane_to_link_map[2] = 1;
+            }
         }
         break;
     case MTIP_PORT_CONFIG_2x50GBASE_R:
     case MTIP_PORT_CONFIG_2x50GBASE_R_RSFEC:
         {
-            mtip_netdev_reconfigure_port_single_lane(port_device_index, 2, PHY_LANE_SPEED_50G);
+            num_links = 2;
+            num_lanes = 2;
+            lane_speed = PHY_LANE_SPEED_50G;
+
+            // front haul ports
+            if (port_type <= MTIP_PORT_TYPE_FH_2) 
+            {
+                real_link_index_array[0] = 0;
+                real_link_index_array[1] = 1;
+
+                real_lane_index_array[0] = 0;
+                real_lane_index_array[1] = 1;
+
+                lane_to_link_map[0] = 0;
+                lane_to_link_map[1] = 1;
+            }
+            else if (port_type == MTIP_PORT_TYPE_L2) 
+            {
+                real_link_index_array[0] = 0;
+                real_link_index_array[1] = 1;
+
+                real_lane_index_array[0] = 0;
+                real_lane_index_array[1] = 2;
+
+                lane_to_link_map[0] = 0;
+                lane_to_link_map[2] = 1;
+            }
+            else if (port_type == MTIP_PORT_TYPE_DEBUG) 
+            {
+                real_link_index_array[0] = 0;
+                real_link_index_array[1] = 1;
+
+                real_lane_index_array[0] = 0;
+                real_lane_index_array[1] = 2;
+
+                lane_to_link_map[0] = 0;
+                lane_to_link_map[2] = 1;
+            }
         }
         break;
     case MTIP_PORT_CONFIG_1x50GBASE_R2:
@@ -1588,7 +1872,41 @@ void mtip_netdev_reconfigure_port(u32 port_device_index, enum mtip_port_config_e
     case MTIP_PORT_CONFIG_1x50GBASE_R2_LUAI:
     case MTIP_PORT_CONFIG_1x50GBASE_R2_LUAI_FEC:
         {
-            mtip_netdev_reconfigure_port_two_lanes(port_device_index, 1, PHY_LANE_SPEED_25G);
+            num_links = 1;
+            num_lanes = 2;
+            lane_speed = PHY_LANE_SPEED_25G;
+
+            // front haul ports
+            if (port_type <= MTIP_PORT_TYPE_FH_2) 
+            {
+                real_link_index_array[0] = 0;
+
+                real_lane_index_array[0] = 0;
+                real_lane_index_array[1] = 1;
+
+                lane_to_link_map[0] = 0;
+                lane_to_link_map[1] = 0;
+            }
+            else if (port_type == MTIP_PORT_TYPE_L2) 
+            {
+                real_link_index_array[0] = 0;
+
+                real_lane_index_array[0] = 0;
+                real_lane_index_array[1] = 1;
+
+                lane_to_link_map[0] = 0;
+                lane_to_link_map[1] = 0;
+            }
+            else if (port_type == MTIP_PORT_TYPE_DEBUG) 
+            {
+                real_link_index_array[0] = 1;
+
+                real_lane_index_array[0] = 2;
+                real_lane_index_array[1] = 3;
+
+                lane_to_link_map[2] = 1;
+                lane_to_link_map[3] = 1;
+            }
         }
         break;
     case MTIP_PORT_CONFIG_2x50GBASE_R2:
@@ -1596,60 +1914,262 @@ void mtip_netdev_reconfigure_port(u32 port_device_index, enum mtip_port_config_e
     case MTIP_PORT_CONFIG_2x50GBASE_R2_LUAI:
     case MTIP_PORT_CONFIG_2x50GBASE_R2_LUAI_FEC:
         {
-            mtip_netdev_reconfigure_port_two_lanes(port_device_index, 2, PHY_LANE_SPEED_25G);
+            num_links = 2;
+            num_lanes = 4;
+            lane_speed = PHY_LANE_SPEED_25G;
+
+            // front haul ports
+            if (port_type <= MTIP_PORT_TYPE_FH_2) 
+            {
+                real_link_index_array[0] = 0;
+                real_link_index_array[0] = 1;
+
+                real_lane_index_array[0] = 0;
+                real_lane_index_array[1] = 1;
+                real_lane_index_array[2] = 2;
+                real_lane_index_array[3] = 3;
+
+                lane_to_link_map[0] = 0;
+                lane_to_link_map[1] = 0;
+                lane_to_link_map[2] = 1;
+                lane_to_link_map[3] = 1;
+            }
+            else if (port_type == MTIP_PORT_TYPE_L2) 
+            {
+                real_link_index_array[0] = 0;
+                real_link_index_array[0] = 1;
+
+                real_lane_index_array[0] = 0;
+                real_lane_index_array[1] = 1;
+                real_lane_index_array[2] = 2;
+                real_lane_index_array[3] = 3;
+
+                lane_to_link_map[0] = 0;
+                lane_to_link_map[1] = 0;
+                lane_to_link_map[2] = 1;
+                lane_to_link_map[3] = 1;
+            }
+            else if (port_type == MTIP_PORT_TYPE_DEBUG) 
+            {
+                real_link_index_array[0] = 0;
+                real_link_index_array[0] = 1;
+
+                real_lane_index_array[0] = 0;
+                real_lane_index_array[1] = 1;
+                real_lane_index_array[2] = 2;
+                real_lane_index_array[3] = 3;
+
+                lane_to_link_map[0] = 0;
+                lane_to_link_map[1] = 0;
+                lane_to_link_map[2] = 1;
+                lane_to_link_map[3] = 1;
+            }
         }
         break;
     case MTIP_PORT_CONFIG_1x40GBASE_R4:
     case MTIP_PORT_CONFIG_1x40GBASE_R4_FEC:
         {
-            mtip_netdev_reconfigure_port_four_lanes(port_device_index, PHY_LANE_SPEED_10G);
+            num_links = 1;
+            num_lanes = 4;
+            lane_speed = PHY_LANE_SPEED_10G;
+
+            // front haul ports
+            if (port_type <= MTIP_PORT_TYPE_FH_2) 
+            {
+                real_link_index_array[0] = 0;
+
+                real_lane_index_array[0] = 0;
+                real_lane_index_array[1] = 1;
+                real_lane_index_array[2] = 2;
+                real_lane_index_array[3] = 3;
+
+                lane_to_link_map[0] = 0;
+                lane_to_link_map[1] = 0;
+                lane_to_link_map[2] = 0;
+                lane_to_link_map[3] = 0;
+            }
+            else 
+            {
+                CSMLOGERR("config %d not supported on port_type %d", port_config, port_type);
+                goto out;
+            }
         }
         break;
     case MTIP_PORT_CONFIG_1x25GBASE_R:
     case MTIP_PORT_CONFIG_1x25GBASE_R_FEC:
     case MTIP_PORT_CONFIG_1x25GBASE_R_RSFEC:
         {
-            mtip_netdev_reconfigure_port_single_lane(port_device_index, 1, PHY_LANE_SPEED_25G);
+            num_links = 1;
+            num_lanes = 1;
+            lane_speed = PHY_LANE_SPEED_25G;
+
+            // front haul ports
+            if (port_type <= MTIP_PORT_TYPE_FH_2) 
+            {
+                real_link_index_array[0] = 0;
+
+                real_lane_index_array[0] = 0;
+
+                lane_to_link_map[0] = 0;
+            }
+            else if (port_type == MTIP_PORT_TYPE_L2) 
+            {
+                real_link_index_array[0] = 0;
+
+                real_lane_index_array[0] = 0;
+
+                lane_to_link_map[0] = 0;
+            }
+            else if (port_type == MTIP_PORT_TYPE_DEBUG) 
+            {
+                real_link_index_array[0] = 1;
+
+                real_lane_index_array[0] = 2;
+
+                lane_to_link_map[2] = 1;
+            }
         }
         break;
     case MTIP_PORT_CONFIG_4x25GBASE_R:
     case MTIP_PORT_CONFIG_4x25GBASE_R_FEC:
     case MTIP_PORT_CONFIG_4x25GBASE_R_RSFEC:
         {
-            mtip_netdev_reconfigure_port_single_lane(port_device_index, 4, PHY_LANE_SPEED_25G);
+            num_links = 4;
+            num_lanes = 4;
+            lane_speed = PHY_LANE_SPEED_25G;
+
+            // front haul ports
+            if (port_type <= MTIP_PORT_TYPE_FH_2) 
+            {
+                real_link_index_array[0] = 0;
+                real_link_index_array[1] = 1;
+                real_link_index_array[2] = 2;
+                real_link_index_array[3] = 3;
+
+                real_lane_index_array[0] = 0;
+                real_lane_index_array[1] = 1;
+                real_lane_index_array[2] = 2;
+                real_lane_index_array[3] = 3;
+
+                lane_to_link_map[0] = 0;
+                lane_to_link_map[1] = 1;
+                lane_to_link_map[2] = 2;
+                lane_to_link_map[3] = 3;
+            }
+            else 
+            {
+                CSMLOGERR("config %d not supported on port_type %d", port_config, port_type);
+                goto out;
+            }
         }
         break;
     case MTIP_PORT_CONFIG_1x10GBASE_R:
     case MTIP_PORT_CONFIG_1x10GBASE_R_FEC:
         {
-            mtip_netdev_reconfigure_port_single_lane(port_device_index, 1, PHY_LANE_SPEED_10G);
+            num_links = 1;
+            num_lanes = 1;
+            lane_speed = PHY_LANE_SPEED_10G;
+
+            // front haul ports
+            if (port_type <= MTIP_PORT_TYPE_FH_2) 
+            {
+                real_link_index_array[0] = 0;
+
+                real_lane_index_array[0] = 0;
+
+                lane_to_link_map[0] = 0;
+            }
+            else if (port_type == MTIP_PORT_TYPE_L2) 
+            {
+                real_link_index_array[0] = 0;
+
+                real_lane_index_array[0] = 0;
+
+                lane_to_link_map[0] = 0;
+            }
+            else if (port_type == MTIP_PORT_TYPE_DEBUG) 
+            {
+                real_link_index_array[0] = 1;
+
+                real_lane_index_array[0] = 2;
+
+                lane_to_link_map[2] = 1;
+            }
         }
         break;
     case MTIP_PORT_CONFIG_4x10GBASE_R:
     case MTIP_PORT_CONFIG_4x10GBASE_R_FEC:
         {
-            mtip_netdev_reconfigure_port_single_lane(port_device_index, 4, PHY_LANE_SPEED_10G);
+            num_links = 4;
+            num_lanes = 4;
+            lane_speed = PHY_LANE_SPEED_10G;
+
+            // front haul ports
+            if (port_type <= MTIP_PORT_TYPE_FH_2) 
+            {
+                real_link_index_array[0] = 0;
+                real_link_index_array[1] = 1;
+                real_link_index_array[2] = 2;
+                real_link_index_array[3] = 3;
+
+                real_lane_index_array[0] = 0;
+                real_lane_index_array[1] = 1;
+                real_lane_index_array[2] = 2;
+                real_lane_index_array[3] = 3;
+
+                lane_to_link_map[0] = 0;
+                lane_to_link_map[1] = 1;
+                lane_to_link_map[2] = 2;
+                lane_to_link_map[3] = 3;
+            }
+            else 
+            {
+                CSMLOGERR("config %d not supported on port_type %d", port_config, port_type);
+                goto out;
+            }
         }
         break;
     default:
         {
             CSMLOGERR("Unknown port config %d", port_config);
+            goto out;
         }
         break;
     }
 
+    // reconfigure the port
+    mtip_netdev_reconfigure_port(port_type, num_links,num_lanes,lane_speed,real_link_index_array,real_lane_index_array,lane_to_link_map);
+
     // set the port config
-    platform_driver_priv->devices.port_devices[port_device_index].port_config = port_config;
+    platform_driver_priv->mtip_ports[port_type]->port_config = port_config;
+
+    // complete the lane assignment to all the links of port
+    for (i = 0; i < port_device->num_link_phandles; ++i) 
+    {
+        link_index = port_device->link_devices[i]->link_index;
+        link_info = platform_driver_priv->mtip_links[link_index];
+        link_info->lanes_assignment_complete = true;
+
+        CSMLOGDBG("lane assignment complete for link_index %d", link_index);
+    }
+
+out:
+    return;
 }
 
 int mtip_device_update_security_config(struct net_device *netdev, enum mtip_port_config_enum port_config)
 {
     struct mtip_netdev_priv *mtip_priv = NULL;
     struct mtip_security_device *sdev = NULL;
+    u32 port_type;
+    u32 link_index;
     u32 num_links = 4;
 
     mtip_priv = (struct mtip_netdev_priv *)netdev_priv(netdev);
     sdev = mtip_priv->sec_dev;
+    link_index = mtip_priv->link_index;
+
+    mtip_lookup_port_type_by_link_index(link_index, &port_type);
 
     // set the new port/lane configuration
     switch (port_config) 
@@ -1710,6 +2230,7 @@ int mtip_device_update_security_config(struct net_device *netdev, enum mtip_port
         {
             if (sdev->ops->update_config) 
             {
+                CSMLOGINFO("Setting security config of port_type %d to %d", port_type, num_links);
                 (sdev->ops->update_config)(sdev, num_links);
             }
         }
@@ -1717,54 +2238,18 @@ int mtip_device_update_security_config(struct net_device *netdev, enum mtip_port
     return num_links;
 }
 
-int mtip_netdev_set_port_config(struct net_device *netdev)
+int mtip_netdev_setup_port_hw(u32 port_type)
 {
-    struct mtip_netdev_priv *priv;
-    u32 link_index;
-    u32 pflags;
-    u32 port_device_index;
-    u32 link_device_index;
-    enum mtip_port_config_enum port_config = MTIP_PORT_CONFIG_4x25GBASE_R;
-    u32 pattern = 0x01;
-    bool found = false;
-    int i;
+    struct mtip_port_info* port_info = platform_driver_priv->mtip_ports[port_type];
+    enum mtip_port_config_enum port_config = port_info->port_config;
 
-    priv = netdev_priv(netdev);
-    link_index = priv->link_index;
-    pflags = priv->priv_flags;
-
-    // find the port config
-    for (i = 0; i < MTIP_PORT_CONFIG_MAX; ++i) 
-    {
-        if ((pflags & pattern) != 0) 
-        {
-            found = true;
-            port_config = i;
-            break;
-        }
-        pattern = pattern << 1;
-    }
-
-    if (found == false) 
-    {
-        CSMLOGERR("No priv flags %d ON. Ignoring", pflags);
-        return 0;
-    }
-
-    CSMLOGERR("Setting the port config of link index %d to %d str %s", link_index, port_config, mtip_ethtool_get_priv_flags_str(port_config));
-
-    mtip_lookup_device_by_link_index(link_index, &port_device_index, &link_device_index);
-
-    mtip_netdev_reconfigure_port(port_device_index, port_config);
+    CSMLOGINFO("Setting up the port HW of port_type %d to %d str %s", port_type, port_config, mtip_ethtool_get_priv_flags_str(port_config));
 
     // setup ethernet based on the updated port config
-    mtip_platform_setup_ethernet(port_device_index);
+    mtip_platform_setup_ethernet(port_type);
 
     // set the clock rates based on updated port config
-    mtip_clocks_set_clock_rates(platform_driver_priv->devices.port_devices[port_device_index].port_type, port_config);
-
-    // provide an update to security driver regarding port config
-    mtip_device_update_security_config(netdev, port_config);
+    mtip_clocks_set_clock_rates(port_type, port_config);
 
     return 0;
 }
@@ -1784,3 +2269,814 @@ u8 mtip_netdev_get_next_ptp_ts_seq_num(u32 link_index)
 
     return ts_seq_num;
 }
+
+int mtip_netdev_set_port_priv_flags(struct net_device *netdev)
+{
+    struct mtip_netdev_priv *priv;
+    u32 link_index;
+    u32 pflags;
+    u32 port_priv_flags = 0;
+    u32 port_type;
+    int i;
+    bool priv_flag_set = false;
+    bool override_default = false;
+    enum mtip_link_state_enum state;
+
+    priv = netdev_priv(netdev);
+    link_index = priv->link_index;
+
+    if (mtip_lookup_port_type_by_link_index(link_index, &port_type) < 0)
+    {
+        CSMLOGERR("invalid port_type for link_index %d", link_index);
+        return -1;
+    }
+
+    // check if any of the links of the port is open
+    for (i = 0; i < platform_driver_priv->devices.port_devices[port_type].num_link_phandles; ++i) 
+    {
+        link_index = platform_driver_priv->devices.port_devices[port_type].link_devices[i]->link_index;
+        state = platform_driver_priv->mtip_links[link_index]->state;
+
+        CSMLOGINFO("port_type %d link_index %d state %d", port_type, link_index, state);
+
+        // check if state is not INIT or CLOSE
+        if ((state == MTIP_LINK_STATE_INIT) || (state == MTIP_LINK_STATE_CLOSE))
+        {
+            // we are ok with this link
+        }
+        else
+        {
+            CSMLOGERR("port_type %d link_index %d is open. port config not updated in state %d", port_type, link_index, state);
+            return -1;
+        }
+    }
+
+    // check if priv flags of any of the links has been set using ethtool
+    for (i = 0; i < platform_driver_priv->devices.port_devices[port_type].num_link_phandles; ++i) 
+    {
+        link_index = platform_driver_priv->devices.port_devices[port_type].link_devices[i]->link_index;
+        priv = netdev_priv(platform_driver_priv->mtip_links[link_index]->dev);
+        pflags = priv->priv_flags;
+        priv_flag_set = priv->priv_flags_set;
+
+        if (priv_flag_set) 
+        {
+            // ethtool cmds have been used to override the default
+            override_default = true;
+            break;
+        }
+    }
+
+    // lookup all the links of the port
+    for (i = 0; i < platform_driver_priv->devices.port_devices[port_type].num_link_phandles; ++i) 
+    {
+        link_index = platform_driver_priv->devices.port_devices[port_type].link_devices[i]->link_index;
+        priv = netdev_priv(platform_driver_priv->mtip_links[link_index]->dev);
+    pflags = priv->priv_flags;
+        priv_flag_set = priv->priv_flags_set;
+
+        if (override_default == false) 
+        {
+        // set the port priv_flags as OR of all the link priv flags
+        port_priv_flags |= pflags;
+    }
+        else
+        {
+            if (priv_flag_set) 
+            {
+                // set the port priv_flags as OR of all the link priv flags
+                port_priv_flags |= pflags;
+            }
+            else
+            {
+                CSMLOGDBG("ignoring the default priv flags of link_index %d", link_index);
+            }
+        }
+    }
+
+    platform_driver_priv->mtip_ports[port_type]->port_priv_flags = port_priv_flags;
+
+    CSMLOGINFO("port %d priv_flags set to %d", port_type, port_priv_flags);
+
+    // clear the lane assignment of all the links
+    for (i = 0; i < platform_driver_priv->devices.port_devices[port_type].num_link_phandles; ++i) 
+    {
+        link_index = platform_driver_priv->devices.port_devices[port_type].link_devices[i]->link_index;
+        platform_driver_priv->mtip_links[link_index]->lanes_assignment_complete = false;
+        platform_driver_priv->mtip_links[link_index]->num_assigned_lanes = 0;
+
+        CSMLOGDBG("clearing link lanes for link_index %d", link_index);
+    }
+
+    CSMLOGINFO("Setting the port %d priv flags to %d", port_type, port_priv_flags);
+
+    return 0;
+}
+
+static int mtip_device_lookup_lane_cfg(u32 port_type, trx_lane_cfg* lane_cfg, trx_breakout_cfg* breakout_cfg)
+{
+    int i;
+    u32 lane_index;
+    bool connected_lane_found = false;
+    struct mtip_lane_info* lane_info = NULL;
+
+    // find a lane that is connected
+    for (i = 0; i < platform_driver_priv->devices.port_devices[port_type].num_lane_phandles; ++i) 
+    {
+        lane_index = platform_driver_priv->devices.port_devices[port_type].lane_devices[i]->lane_index;
+
+        if (platform_driver_priv->mtip_lanes[lane_index]->lane_state == MTIP_LANE_STATE_CONNECTED) 
+        {
+            connected_lane_found = true;
+            break;
+        }
+    }
+
+    if (connected_lane_found == false) 
+    {
+        CSMLOGERR("No connected lane found for port_type %d", port_type);
+        return -1;
+    }
+
+    lane_info = platform_driver_priv->mtip_lanes[lane_index];
+
+    // set the lane_cfg
+    *lane_cfg = lane_info->lane_qsfp_info.trx_laneinfo;
+    *breakout_cfg = lane_info->lane_qsfp_info.trx_bout_cfg;
+    return 0;
+}
+
+// filter the priv flags based on the current lane speed
+// and SFP module attached
+static u32 mtip_device_filter_priv_flags(u32 port_type)
+{
+    u32 filtered;
+    int i;
+    struct mtip_port_info* port_info = platform_driver_priv->mtip_ports[port_type];
+    u32 port_priv_flags = port_info->port_priv_flags;
+    u32 lane_index;
+    bool connected_lane_found = false;
+    enum eth_phy_iface_phy_lane_speed_enum  max_lane_speed;
+
+    // find a lane that is connected
+    for (i = 0; i < platform_driver_priv->devices.port_devices[port_type].num_lane_phandles; ++i) 
+    {
+        lane_index = platform_driver_priv->devices.port_devices[port_type].lane_devices[i]->lane_index;
+
+        if (platform_driver_priv->mtip_lanes[lane_index]->lane_state == MTIP_LANE_STATE_CONNECTED) 
+        {
+            connected_lane_found = true;
+            break;
+        }
+    }
+
+    if (connected_lane_found == false) 
+    {
+        CSMLOGERR("No connected lane found for port_type %d", port_type);
+        return 0;
+    }
+
+    // use the lane speed of the found lane
+    max_lane_speed = platform_driver_priv->mtip_lanes[lane_index]->lane_speed;
+
+    switch (max_lane_speed)
+    {
+    case PHY_LANE_SPEED_10G:
+       {
+          filtered = port_priv_flags & MTIP_DEVICE_PRIV_FLAGS_BIT_MASK_10G;
+       }
+       break;
+
+    case PHY_LANE_SPEED_25G:
+       {
+          filtered = port_priv_flags & MTIP_DEVICE_PRIV_FLAGS_BIT_MASK_25G;
+       }
+       break;
+
+    case PHY_LANE_SPEED_50G:
+       {
+          filtered = port_priv_flags & MTIP_DEVICE_PRIV_FLAGS_BIT_MASK_50G;
+       }
+       break;
+
+    case PHY_LANE_SPEED_100G:
+       {
+          filtered = port_priv_flags & MTIP_DEVICE_PRIV_FLAGS_BIT_MASK_100G;
+       }
+       break;
+
+    default:
+       {
+          CSMLOGERR("unknown lane speed %d for port_type %d", max_lane_speed, port_type);
+          return 0;
+       }
+       break;
+    }
+    return filtered;
+}
+
+static int mtip_device_count_priv_flag_bits(u32 port_type)
+{
+    int i;
+    int ret = 0;
+    u32 pattern = 0x1;
+    u32 pflags = mtip_device_filter_priv_flags(port_type);
+
+    for (i = 0; i < MTIP_PORT_CONFIG_MAX; ++i) 
+    {
+        if ((pflags & pattern) != 0) 
+        {
+            ++ret;
+        }
+        pattern = pattern << 1;
+    }
+    return ret;
+}
+
+// use the port priv flags to find a port configuration to use
+static u32 mtip_device_resolve_port_configuration(u32 port_type)
+{
+    int i;
+    enum mtip_port_config_enum port_config;
+    bool found = false;
+    u32 pattern = 0x1;
+    u32 pflags = mtip_device_filter_priv_flags(port_type);
+
+    // find the first port config bit that is set
+    for (i = 0; i < MTIP_PORT_CONFIG_MAX; ++i) 
+    {
+        if ((pflags & pattern) != 0) 
+        {
+            found = true;
+            port_config = i;
+            break;
+        }
+        pattern = pattern << 1;
+    }
+
+    if (found == false) 
+    {
+        CSMLOGERR("No priv flags %d ON. Ignoring", pflags);
+        return MTIP_PORT_CONFIG_MAX;
+    }
+
+    return port_config;
+}
+
+// use the port priv flags to find the best port configuration to use for optical
+static int mtip_device_resolve_port_configuration_optical(u32 port_type)
+{
+    struct mtip_port_info *port_info = platform_driver_priv->mtip_ports[port_type];
+    int bc = 0;
+    int rv = 0;
+
+    // check if sfp is optical
+    if (port_info->sfp_port_type != PORT_FIBRE) 
+    {
+        CSMLOGERR("port %d is not FIBRE [%d]", port_type, port_info->sfp_port_type);
+        return -1;
+    }
+
+    bc = mtip_device_count_priv_flag_bits(port_type);
+
+    // check that there is only one bit set in priv-flags
+    if (bc != 1) 
+    {
+        CSMLOGERR("Only one mode can be supported for optical port_type %d bc: %d priv_flags %d", port_type, bc, port_info->port_priv_flags);
+        return -1; 
+    }
+
+    // set the resolve port config
+    port_info->port_config = mtip_device_resolve_port_configuration(port_type);
+
+    // optical 4x25GBASE_R must have RSFEC
+    switch (port_info->port_config) 
+    {
+    case MTIP_PORT_CONFIG_4x25GBASE_R:
+        {
+            port_info->port_config = MTIP_PORT_CONFIG_4x25GBASE_R_RSFEC;
+        }
+        break;
+    case MTIP_PORT_CONFIG_1x25GBASE_R:
+        {
+            port_info->port_config = MTIP_PORT_CONFIG_1x25GBASE_R_RSFEC;
+        }
+        break;
+    default:
+        break;
+    }
+
+    CSMLOGINFO("setting configuration of port_type %d to %d, %s", port_type, port_info->port_config, mtip_ethtool_get_priv_flags_str(port_info->port_config));
+
+    return rv;
+}
+
+static int mtip_device_complete_port_open(u32 port_type)
+{
+    int rv = 0;
+    u32 link_index;
+    int i;
+
+    // check if any links are waiting to complete open
+    for (i = 0; i < platform_driver_priv->devices.port_devices[port_type].num_link_phandles; ++i)
+    {
+       link_index = platform_driver_priv->devices.port_devices[port_type].link_devices[i]->link_index;
+
+       if (platform_driver_priv->mtip_links[link_index] != NULL)
+       {
+          if (platform_driver_priv->mtip_links[link_index]->state == MTIP_LINK_STATE_OPEN_WAITING_FOR_LANES)
+          {
+             rv = mtip_device_open_completion(link_index);
+          }
+       }
+    }
+
+    return rv;
+}
+
+// find the highest number of lanes based on the priv flags set for the port
+static int mtip_device_calculate_num_an_lanes(u32 port_type)
+{
+   int i;
+   u32 pattern = 0x1;
+   u32 config_bit;
+   int num_an_lanes = 0;
+   int config_lanes = 0;
+   u32 port_priv_flags = mtip_device_filter_priv_flags(port_type);
+
+   for (i = 0; i < MTIP_PORT_CONFIG_MAX; ++i)
+   {
+      config_bit = port_priv_flags & pattern;
+
+      if (config_bit != 0x0)
+      {
+         config_lanes = 0;
+
+         // find the number of lanes for the config
+         switch (i)
+         {
+            // configs requiring all four lanes
+         case MTIP_PORT_CONFIG_1x100GBASE_R4:
+         case MTIP_PORT_CONFIG_1x100GBASE_R4_RSFEC:
+         case MTIP_PORT_CONFIG_2x50GBASE_R2:
+         case MTIP_PORT_CONFIG_2x50GBASE_R2_FEC:
+         case MTIP_PORT_CONFIG_2x50GBASE_R2_LUAI:
+         case MTIP_PORT_CONFIG_2x50GBASE_R2_LUAI_FEC:
+         case MTIP_PORT_CONFIG_1x40GBASE_R4:
+         case MTIP_PORT_CONFIG_1x40GBASE_R4_FEC:
+         case MTIP_PORT_CONFIG_4x25GBASE_R:
+         case MTIP_PORT_CONFIG_4x25GBASE_R_FEC:
+         case MTIP_PORT_CONFIG_4x25GBASE_R_RSFEC:
+         case MTIP_PORT_CONFIG_4x10GBASE_R:
+         case MTIP_PORT_CONFIG_4x10GBASE_R_FEC:
+            config_lanes = 4;
+            break;
+
+            // configs requiring two lanes
+         case MTIP_PORT_CONFIG_1x100GBASE_R2:
+         case MTIP_PORT_CONFIG_1x100GBASE_R2_RSFEC:
+         case MTIP_PORT_CONFIG_2x50GBASE_R:
+         case MTIP_PORT_CONFIG_2x50GBASE_R_RSFEC:
+         case MTIP_PORT_CONFIG_1x50GBASE_R2:
+         case MTIP_PORT_CONFIG_1x50GBASE_R2_RSFEC:
+         case MTIP_PORT_CONFIG_1x50GBASE_R2_LUAI:
+         case MTIP_PORT_CONFIG_1x50GBASE_R2_LUAI_FEC:
+            config_lanes = 2;
+            break;
+
+            // configs requiring only one lane
+         case MTIP_PORT_CONFIG_1x100GBASE_R:
+         case MTIP_PORT_CONFIG_1x100GBASE_R_RSFEC_LL:
+         case MTIP_PORT_CONFIG_1x100GBASE_R_RSFEC:
+         case MTIP_PORT_CONFIG_1x50GBASE_R:
+         case MTIP_PORT_CONFIG_1x50GBASE_R_RSFEC:
+         case MTIP_PORT_CONFIG_1x25GBASE_R:
+         case MTIP_PORT_CONFIG_1x25GBASE_R_FEC:
+         case MTIP_PORT_CONFIG_1x25GBASE_R_RSFEC:
+         case MTIP_PORT_CONFIG_1x10GBASE_R:
+         case MTIP_PORT_CONFIG_1x10GBASE_R_FEC:
+            config_lanes = 1;
+            break;
+         }
+
+         // update num_an_lanes if the new config requires higher
+         if (num_an_lanes < config_lanes)
+         {
+            num_an_lanes = config_lanes;
+         }
+
+         // break if we have reached maximum
+         if (num_an_lanes == 4)
+         {
+            break;
+         }
+      }
+
+      pattern = pattern << 1;
+   }
+   return num_an_lanes;
+}
+
+// There has been some change in the configuration of a port
+// this is the common function to handle all such (re)configurations
+static void mtip_device_configure_port(u32 port_type)
+{
+   u32 tmp_lane_index;
+   bool all_lanes_connected = true;
+   int i;
+   struct mtip_port_info *port_info;
+   bool set_port_config = false;
+   u32 num_links_waiting_for_lanes = 0;
+   u32 num_links_down = 0;
+   u32 link_index;
+   bool loopflag = true;
+   int bc = 0;
+   int num_an_lanes = 0;
+   u32 filtered_priv_flags = 0;
+   trx_lane_cfg lane_cfg;
+   trx_breakout_cfg breakout_cfg;
+
+   port_info = platform_driver_priv->mtip_ports[port_type];
+
+   loopflag = true;
+
+   while (loopflag)
+   {
+      CSMLOGDBG("port %d in state %d", port_type, port_info->port_state);
+
+      switch (port_info->port_state)
+      {
+      case MTIP_PORT_STATE_INIT:
+         {
+             // lookup the lane cfg
+            if (mtip_device_lookup_lane_cfg(port_type, &lane_cfg, &breakout_cfg) < 0)
+            {
+               CSMLOGERR("unable to lookup lane cfg of port_type %d", port_type);
+               loopflag = false;
+               goto out;
+            }
+
+            // check if this is a breakout cable case
+            if (lane_cfg != 0x0F)
+            {
+                // this is a breakout cable
+                CSMLOGDBG("Breakout cable case: port_type %d lane_cfg: %d breakout_cfg %d", port_type, lane_cfg, breakout_cfg);
+            }
+            else
+            {
+               // this is not a breakout cable
+               CSMLOGDBG("Not breakout cable case");
+
+               // check that all the lanes of the port are in connected state
+               all_lanes_connected = true;
+               for (i = 0; i < platform_driver_priv->devices.port_devices[port_type].num_lane_phandles; ++i)
+               {
+                  tmp_lane_index = platform_driver_priv->devices.port_devices[port_type].lane_devices[i]->lane_index;
+
+                  if (platform_driver_priv->mtip_lanes[tmp_lane_index]->lane_state != MTIP_LANE_STATE_CONNECTED)
+                  {
+                     all_lanes_connected = false;
+                     break;
+                  }
+               }
+
+               if (all_lanes_connected == false)
+               {
+                  CSMLOGINFO("Waiting for lanes to be connected");
+
+                  // stay in INIT state
+                  loopflag = false;
+                  goto out;
+               }
+
+               // all lanes of port are connected
+               CSMLOGINFO("All lanes of port: %d are connected", port_type);
+            }
+
+            // set the port to CONNECTED state and continue loop
+            port_info->port_state = MTIP_PORT_STATE_CONNECTED;
+         }
+         break;
+
+      case MTIP_PORT_STATE_CONNECTED:
+         {
+            // check if we can reconfigure the port
+            set_port_config = true;
+            num_links_waiting_for_lanes = 0;
+            num_links_down = 0;
+
+            // port can be reconfigured only if there are no links already open
+            // and there is atleast one link waiting for lane assignment
+            for (i = 0; i < platform_driver_priv->devices.port_devices[port_type].num_link_phandles; ++i)
+            {
+               link_index = platform_driver_priv->devices.port_devices[port_type].link_devices[i]->link_index;
+
+               if (platform_driver_priv->mtip_links[link_index] != NULL)
+               {
+                  // we cannot set the port config if link is already up
+                  if ((platform_driver_priv->mtip_links[link_index]->state != MTIP_LINK_STATE_INIT) &&
+                      (platform_driver_priv->mtip_links[link_index]->state != MTIP_LINK_STATE_CLOSE) &&
+                      (platform_driver_priv->mtip_links[link_index]->state != MTIP_LINK_STATE_OPEN_WAITING_FOR_LANES) &&
+                      (platform_driver_priv->mtip_links[link_index]->state != MTIP_LINK_STATE_DOWN))
+                  {
+                     set_port_config = false;
+                     break;
+                  }
+
+                  if (platform_driver_priv->mtip_links[link_index]->state == MTIP_LINK_STATE_OPEN_WAITING_FOR_LANES)
+                  {
+                     ++num_links_waiting_for_lanes;
+                  }
+                  if (platform_driver_priv->mtip_links[link_index]->state == MTIP_LINK_STATE_DOWN)
+                  {
+                     ++num_links_down;
+                  }
+               }
+            }
+
+            if (set_port_config == false)
+            {
+               CSMLOGINFO("not setting up the port for now");
+
+               // stay in connected state and exit loop
+               loopflag = false;
+               goto out;
+            }
+            if ((num_links_waiting_for_lanes == 0) && (num_links_down == 0))
+            {
+               // there are no links waiting to be assigned lanes
+               CSMLOGINFO("no links waiting for lane assignment or to be brought up");
+
+               // stay in connected and exit loop
+               loopflag = false;
+               goto out;
+            }
+            else if (num_links_down != 0)
+            {
+               // there are links that are down
+               // bring them back up
+               CSMLOGINFO("num_links_down for port_type %d is %d", port_type, num_links_down);
+
+               // go through all the links of the port that are in UP or DOWN state
+               for (i = 0; i < MTIP_MAX_LINKS_PER_PORT; ++i)
+               {
+                  if (mtip_lookup_link_index_by_port_type_and_real_link(&link_index, port_type, i) == 0)
+                  {
+                     if (platform_driver_priv->mtip_links[link_index] != NULL)
+                     {
+                        if (mtip_get_link_state_by_link_index(link_index) == MTIP_LINK_STATE_DOWN)
+                        {
+                           // bring up the phy
+                           mtip_phy_bringup_phy(link_index, platform_driver_priv->mtip_ports[port_type]->sfp_port_type);
+                        }
+                     }
+                  }
+               }
+
+               loopflag = false;
+               goto out;
+            }
+            else
+            {
+               // we can reconfigure the port and we have links waiting for lane assignment
+               // check if an optical is connected
+               if (platform_driver_priv->mtip_ports[port_type]->sfp_port_type == PORT_FIBRE)
+               {
+                  // we cannot do auto-negotiation
+                  // how do we resolve the port configuration to use?
+                  if (mtip_device_resolve_port_configuration_optical(port_type) < 0)
+                  {
+                     CSMLOGERR("Unable to resolve optical port configuration for port: %d", port_type);
+                     loopflag = false;
+                     goto out;
+                  }
+                  else
+                  {
+                     // we have a resolved port configuration
+                     // we can go ahead with the configuration
+                     loopflag = false;
+                     goto resolved;
+                  }
+               }
+               else
+               {
+                  // count the number of bits set in priv_flags
+                  bc = mtip_device_count_priv_flag_bits(port_type);
+
+                  if (bc == 0)
+                  {
+                     CSMLOGERR("Unable to resolve copper port configuration for port: %d", port_type);
+                     loopflag = false;
+                     goto out;
+                  }
+                  else
+                  {
+                     if (port_info->autoneg == true)
+                     {
+                        CSMLOGINFO("going to initiate AN for port_type %d", port_type);
+
+                        // we need to do AN
+                        // set the port state to AN in progress and continue loop
+                        port_info->port_state = MTIP_PORT_STATE_CONNECTED_INITIATE_AN;
+                     }
+                     else
+                     {
+                        // set the resolve port config
+                        port_info->port_config = mtip_device_resolve_port_configuration(port_type);
+
+                        // we can go ahead with the configuration
+                        loopflag = false;
+                        goto resolved;
+                     }
+                  }
+               }
+            }
+         }
+         break;
+
+      case MTIP_PORT_STATE_CONNECTED_INITIATE_AN:
+         {
+            port_info->port_state = MTIP_PORT_STATE_CONNECTED_NEGOTIATION_IN_PROGRESS;
+
+            num_an_lanes = mtip_device_calculate_num_an_lanes(port_type);
+
+            CSMLOGINFO("initiating AN on port_type %d with num lanes %d and priv_flags %d", port_type, num_an_lanes,
+                       platform_driver_priv->mtip_ports[port_type]->port_priv_flags);
+
+            filtered_priv_flags = mtip_device_filter_priv_flags(port_type);
+
+            // initiate AN with the PHY
+            mtip_phy_initiate_an(port_type, num_an_lanes, filtered_priv_flags);
+
+            loopflag = false;
+            goto out;
+         }
+         break;
+
+      case MTIP_PORT_STATE_CONNECTED_NEGOTIATION_IN_PROGRESS:
+         {
+            CSMLOGDBG("staying in state %d until AN callback", port_info->port_state);
+
+            loopflag = false;
+            goto out;
+         }
+         break;
+
+      case MTIP_PORT_STATE_CONNECTED_NEGOTIATION_DONE:
+         {
+            CSMLOGINFO("Negotiation done. Moving back to CONNECTED state for port_type %d", port_type);
+
+            // set the port back to CONNECTED
+            port_info->port_state = MTIP_PORT_STATE_CONNECTED;
+
+            // negotiation was successful
+            // we can go ahead with the configuration
+            loopflag = false;
+            goto resolved;
+         }
+         break;
+
+      case MTIP_PORT_STATE_DISCONNECTED:
+         {
+            CSMLOGERR("port_type %d is in DISCONNECTED state");
+            loopflag = false;
+            goto out;
+         }
+         break;
+
+      default:
+         {
+            CSMLOGERR("port_type %d in unknown state %d", port_type, port_info->port_state);
+            loopflag = false;
+            goto out;
+         }
+         break;
+      }
+
+      if (loopflag)
+      {
+         // keep looping
+         CSMLOGDBG("looping to process port_type %d new state %d", port_type, port_info->port_state);
+      }
+      else
+      {
+         // exit loop
+         CSMLOGDBG("exiting loop port_type %d state %d", port_type, port_info->port_state);
+      }
+   }
+
+resolved:
+   CSMLOGINFO("Negotiated port configuration is %d %s", port_info->port_config,
+              mtip_ethtool_get_priv_flags_str(port_info->port_config));
+
+   // for now only one port configuration will apply
+   // assign lanes to links based on chosen port configuration
+   mtip_netdev_assign_port_lanes(port_type);
+
+   // setup the MAC/PCS/Wrapper HW blocks of the port
+   mtip_netdev_setup_port_hw(port_type);
+
+   // complete the netdev open of all links pending lane assignment
+   mtip_device_complete_port_open(port_type);
+
+out:
+   return;
+}
+
+void post_mtip_process_configure_port_using_lane(u32 port_type, u32 lane_index)
+{
+   struct mtip_process_configure_port_using_lane_task* taskstruct = kmalloc(sizeof(struct mtip_process_configure_port_using_lane_task), GFP_ATOMIC);
+   taskstruct->port_type = port_type;
+   taskstruct->lane_index = lane_index;
+   mtip_queue_work(MTIP_WORKQ_TASK_PROCESS_PORT_CONFIGURATION_USING_LANE, taskstruct);
+}
+
+// There has been some change in the configuration of a port
+// This is invoked when a lane up indication is received
+// the updated port qsfp information is available
+void run_mtip_process_configure_port_using_lane(void *work_ptr)
+{
+   struct mtip_process_configure_port_using_lane_task *taskstruct = (struct mtip_process_configure_port_using_lane_task *)work_ptr;
+   u32 port_type = taskstruct->port_type;
+   u32 lane_index = taskstruct->lane_index;
+
+   // configure the port based on stored link and lane information
+   CSMLOGINFO("configuring port %d with change in lane_index: %d", port_type, lane_index);
+
+   mtip_device_configure_port(port_type);
+
+   // free the taskstruct
+   kfree(taskstruct);
+}
+
+void post_mtip_process_configure_port_using_link(u32 port_type, u32 link_index)
+{
+   struct mtip_process_configure_port_using_link_task* taskstruct = kmalloc(sizeof(struct mtip_process_configure_port_using_link_task), GFP_ATOMIC);
+   taskstruct->port_type = port_type;
+   taskstruct->link_index = link_index;
+   mtip_queue_work(MTIP_WORKQ_TASK_PROCESS_PORT_CONFIGURATION_USING_LINK, taskstruct);
+}
+
+// There has been some change in the configuration of a port
+void run_mtip_process_configure_port_using_link(void *work_ptr)
+{
+   struct mtip_process_configure_port_using_link_task *taskstruct = (struct mtip_process_configure_port_using_link_task *)work_ptr;
+   u32 port_type = taskstruct->port_type;
+   u32 link_index = taskstruct->link_index;
+
+   // configure the port based on stored link and lane information
+   CSMLOGINFO("configuring port %d with change in link_index: %d", port_type, link_index);
+
+   mtip_device_configure_port(port_type);
+
+   // free the taskstruct
+   kfree(taskstruct);
+}
+
+void post_mtip_process_an_result(enum mtip_port_type_enum port_type, bool an_result, enum mtip_port_config_enum port_config)
+{
+   struct mtip_process_an_result_task* taskstruct = kmalloc(sizeof(struct mtip_process_an_result_task), GFP_ATOMIC);
+   taskstruct->port_type = port_type;
+   taskstruct->an_result = an_result;
+   taskstruct->port_config = port_config;
+   mtip_queue_work(MTIP_WORKQ_TASK_PROCESS_AN_RESULT, taskstruct);
+}
+
+// we got the updated result of AN
+void run_mtip_process_an_result(void *work_ptr)
+{
+    struct mtip_process_an_result_task *taskstruct = (struct mtip_process_an_result_task *)work_ptr;
+    u32 port_type = taskstruct->port_type;
+    bool an_result = taskstruct->an_result;
+    enum mtip_port_config_enum port_config = taskstruct->port_config;
+
+    CSMLOGINFO("processing AN result for port_type %d with result %d config %d %s", port_type, an_result, port_config, mtip_ethtool_get_priv_flags_str(port_config));
+
+    if(an_result == false)
+    {
+        CSMLOGERR("AN failed for port_type %d", port_type);
+
+        // need to figure out what to do with AN failures
+
+        goto out;
+    }
+
+    // check that the port is waiting for AN result
+    if (platform_driver_priv->mtip_ports[port_type]->port_state != MTIP_PORT_STATE_CONNECTED_NEGOTIATION_IN_PROGRESS) 
+    {
+        CSMLOGERR("Got a spurious AN result callback in state %d for port_type %d", platform_driver_priv->mtip_ports[port_type]->port_state, port_type);
+        goto out;
+    }
+
+    // set the port config
+    platform_driver_priv->mtip_ports[port_type]->port_config = port_config;
+    platform_driver_priv->mtip_ports[port_type]->port_state = MTIP_PORT_STATE_CONNECTED_NEGOTIATION_DONE;
+
+    // configure the port with the new port config
+    mtip_device_configure_port(port_type);
+
+out:
+    // free the taskstruct
+    kfree(taskstruct);
+}
+   

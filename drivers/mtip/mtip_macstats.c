@@ -67,17 +67,17 @@ void mtip_macstats_get_stats(struct net_device *netdev, u64 *data)
     u32 link_index;
     int i = 0;
     void __iomem *macstats_base_addr;
-    u32 port_device_index;
-    u32 link_device_index;
     u32 real_link_number;
     u32 port_type;
 
     priv = netdev_priv(netdev);
     link_index = priv->link_index;
 
-    mtip_lookup_device_by_link_index(link_index, &port_device_index, &link_device_index);
-
-    port_type = platform_driver_priv->devices.port_devices[port_device_index].port_type;
+    if (mtip_lookup_port_type_by_link_index(link_index, &port_type) < 0)
+    {
+        CSMLOGERR("invalid port_type for link_index %d", link_index);
+        return;
+    }
 
     if (port_type > 2) 
     {
@@ -85,7 +85,7 @@ void mtip_macstats_get_stats(struct net_device *netdev, u64 *data)
         return;
     }
 
-    macstats_base_addr = platform_driver_priv->devices.port_devices[port_device_index].macstats_base_addr;
+    macstats_base_addr = platform_driver_priv->devices.port_devices[port_type].macstats_base_addr;
 
     mtip_lookup_real_link_number_by_link_index(link_index, &real_link_number);
 

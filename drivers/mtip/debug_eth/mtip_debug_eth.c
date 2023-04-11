@@ -189,7 +189,6 @@ int mtip_debug_eth_probe(struct platform_device *pdev) {
   bool fuse_enabled = true;
   u32 fuse_val;
   int ethernet_trace_disabled = 8;
-  struct net_device *netdev;
 
   CSMLOGINFO("mtip_debug_eth_probe called for device \"%s\"", pdev->name);
 
@@ -228,11 +227,6 @@ int mtip_debug_eth_probe(struct platform_device *pdev) {
                 debug_csr_regs[0], debug_csr_regs[1], debug_ret);
     }
 
-    //Replacing Ethtool ops for debug eth
-    CSMLOGERR("Assigning Debug ethtool ops");
-    netdev = platform_driver_priv->mtip_links[MTIP_DEBUG_ETH_LINK_INDEX]->dev;
-    netdev->ethtool_ops = mtip_debug_eth_get_ethtool_ops();
-
     // Interrupt init
     mtip_debug_eth_irq_init(pdev);
 
@@ -242,6 +236,24 @@ int mtip_debug_eth_probe(struct platform_device *pdev) {
   }
 
   return debug_ret;
+}
+
+int mtip_debug_eth_set_ethtool_ops(void)
+{
+    struct net_device *netdev;
+
+    //Replacing Ethtool ops for debug eth
+    CSMLOGERR("Assigning Debug ethtool ops");
+    if (platform_driver_priv->mtip_links[MTIP_DEBUG_ETH_LINK_INDEX] != NULL) 
+    {
+        netdev = platform_driver_priv->mtip_links[MTIP_DEBUG_ETH_LINK_INDEX]->dev;
+        netdev->ethtool_ops = mtip_debug_eth_get_ethtool_ops();
+    }
+    else
+    {
+        CSMLOGERR("link_index %d is NULL", MTIP_DEBUG_ETH_LINK_INDEX);
+    }
+    return 0;
 }
 
 int mtip_debug_eth_remove(struct platform_device *pdev) {
@@ -304,8 +316,7 @@ void mtip_debug_eth_ethtool_get_dev_regs
 static void mtip_debug_eth_ethtool_dump_regs(u32 link_index, void *buf)
 {
     u32 wr_idx = 0;
-    u32 port_device_index;
-    u32 link_device_index;
+    u32 port_type;
     struct mtip_link_device_info* link_device;
     struct resource *dev_resource;
     u32 mtip_reg_idx = 0;
@@ -315,13 +326,13 @@ static void mtip_debug_eth_ethtool_dump_regs(u32 link_index, void *buf)
 
     CSMLOGINFO("mtip_debug_eth_ethtool: Entering mtip_debug_eth_ethtool_dump_regs with link_idx %d \n", link_index);
 
-    if (mtip_lookup_device_by_link_index(link_index, &port_device_index, &link_device_index) < 0)
+    if (mtip_lookup_port_type_by_link_index(link_index, &port_type) < 0)
     {
-       CSMLOGERR("mtip_debug_eth_ethtool: unable to find device for link %d", link_index);
-       return;
+        CSMLOGERR("invalid port_type for link_index %d", link_index);
+        return;
     }
 
-    link_device = &platform_driver_priv->devices.port_devices[port_device_index].link_devices[link_device_index];
+    link_device = &platform_driver_priv->devices.link_devices[link_index];
 
     for (mtip_reg_idx = 0; mtip_reg_idx < MTIP_DEBUG_ETH_ETHTOOL_REG_OFFSET_ARRAY_SIZE; mtip_reg_idx++)
     {
@@ -329,37 +340,37 @@ static void mtip_debug_eth_ethtool_dump_regs(u32 link_index, void *buf)
         {
             case MTIP_DEBUG_ETH_ETHTOOL_MAC:
                 dev_ioaddr = link_device->mac_ioaddr;
-                pdev = platform_driver_priv->devices.port_devices[port_device_index].link_devices[link_device_index].link_pdev;
+                pdev = platform_driver_priv->devices.link_devices[link_index].link_pdev;
                 dev_resource = platform_get_resource_byname(pdev, IORESOURCE_MEM, "mac");
             break;
 
             case MTIP_DEBUG_ETH_ETHTOOL_PCS:
                 dev_ioaddr = link_device->pcs_ioaddr;
-                pdev = platform_driver_priv->devices.port_devices[port_device_index].link_devices[link_device_index].link_pdev;
+                pdev = platform_driver_priv->devices.link_devices[link_index].link_pdev;
                 dev_resource = platform_get_resource_byname(pdev, IORESOURCE_MEM, "pcs");
             break;
 
             case MTIP_DEBUG_ETH_ETHTOOL_MAC_WRAPPER:
-                dev_ioaddr = platform_driver_priv->devices.port_devices[port_device_index].wrapper_base_addr;
-                pdev = platform_driver_priv->devices.port_devices[port_device_index].port_pdev;
+                dev_ioaddr = platform_driver_priv->devices.port_devices[port_type].wrapper_base_addr;
+                pdev = platform_driver_priv->devices.port_devices[port_type].port_pdev;
                 dev_resource = platform_get_resource_byname(pdev, IORESOURCE_MEM, "mac-wrapper");
             break;
 
             case MTIP_DEBUG_ETH_ETHTOOL_MAC_STATS:
-                dev_ioaddr = platform_driver_priv->devices.port_devices[port_device_index].macstats_base_addr;
-                pdev = platform_driver_priv->devices.port_devices[port_device_index].port_pdev;
+                dev_ioaddr = platform_driver_priv->devices.port_devices[port_type].macstats_base_addr;
+                pdev = platform_driver_priv->devices.port_devices[port_type].port_pdev;
                 dev_resource = platform_get_resource_byname(pdev, IORESOURCE_MEM, "macstats");
             break;
 
             case MTIP_DEBUG_ETH_ETHTOOL_RSFEC:
-                dev_ioaddr = platform_driver_priv->devices.port_devices[port_device_index].rsfec_base_addr;
-                pdev = platform_driver_priv->devices.port_devices[port_device_index].port_pdev;
+                dev_ioaddr = platform_driver_priv->devices.port_devices[port_type].rsfec_base_addr;
+                pdev = platform_driver_priv->devices.port_devices[port_type].port_pdev;
                 dev_resource = platform_get_resource_byname(pdev, IORESOURCE_MEM, "rsfec");
             break;
 
             case MTIP_DEBUG_ETH_ETHTOOL_DEBUG_PORT_CSR:
                 dev_ioaddr = get_debug_base_address();
-                pdev = platform_driver_priv->devices.port_devices[port_device_index].port_pdev;
+                pdev = platform_driver_priv->devices.port_devices[port_type].port_pdev;
                 dev_resource = &debug_port_dev_resource;
 	    break;
 
@@ -421,8 +432,6 @@ void mtip_debug_eth_macstats_get_stats(struct net_device *netdev, u64 *data)
   int i = 0;
   void __iomem *macstats_base_addr;
   void __iomem *debug_base_address;
-  u32 port_device_index;
-  u32 link_device_index;
   u32 port_type;
 
   CSMLOGDBG("mtip_debug_eth_macstats_get_stats called \n");
@@ -431,13 +440,15 @@ void mtip_debug_eth_macstats_get_stats(struct net_device *netdev, u64 *data)
   link_index = priv->link_index;
   CSMLOGDBG("link_index in mtip_debug_eth_macstats_get_stats: %d\n",link_index);
 
-  mtip_lookup_device_by_link_index(link_index,
-                                   &port_device_index, &link_device_index);
-  port_type =
-        platform_driver_priv->devices.port_devices[port_device_index].port_type;
+  if (mtip_lookup_port_type_by_link_index(link_index, &port_type) < 0)
+  {
+    CSMLOGERR("port_type invalid for link_index %d", link_index);
+    return;
+  }
+
   CSMLOGERR("port_type : %d \n",port_type);
 
-  macstats_base_addr = platform_driver_priv->devices.port_devices[port_device_index].macstats_base_addr;
+  macstats_base_addr = platform_driver_priv->devices.port_devices[port_type].macstats_base_addr;
 
   // the Rx stats
   data[i] = mtip_macstats_read_stat(macstats_base_addr,
@@ -532,18 +543,18 @@ static void mtip_debug_eth_ethtool_get_stats(struct net_device *netdev,
 }
 
 static const struct ethtool_ops mtip_debug_ethtool_ops = {
-   .get_drvinfo = mtip_getdrvinfo,
+   .get_drvinfo = mtip_ethtool_getdrvinfo,
    .get_regs = mtip_debug_eth_ethtool_get_regs,
    .get_regs_len = mtip_debug_eth_ethtool_get_regs_len,
    .get_sset_count  = mtip_debug_eth_get_sset_count,
    .get_strings = mtip_debug_eth_get_strings,
    .get_ethtool_stats = mtip_debug_eth_ethtool_get_stats,
-   .get_link_ksettings = mtip_get_link_ksettings,
+   .get_link_ksettings = mtip_ethtool_get_link_ksettings,
+   .set_link_ksettings = mtip_ethtool_set_link_ksettings,
    .get_fecparam = mtip_ethtool_get_fecparam,
    .set_fecparam = mtip_ethtool_set_fecparam,
    .set_msglevel = mtip_ethtool_set_msglevel,
    .get_msglevel = mtip_ethtool_get_msglevel,
-
 };
 
 const struct ethtool_ops * mtip_debug_eth_get_ethtool_ops()

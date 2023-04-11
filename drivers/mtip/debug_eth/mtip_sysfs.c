@@ -233,8 +233,6 @@ void setup_common_params(void) {
   u32 upper_SA = 0;
   u32 prev_val = 0;
   int i = 0;
-  u32 port_device_index;
-  u32 link_device_index;
   unsigned int UDP_SP_DP_ARRAY[] = {DBG_UDP_SP_DP_0, DBG_UDP_SP_DP_1,
                                     DBG_UDP_SP_DP_2};
   unsigned int L2_SA_ADDR_HI_ARRAY[] = {
@@ -254,10 +252,7 @@ void setup_common_params(void) {
   }
 
   // Set up source MAC address
-  mtip_lookup_device_by_link_index(MTIP_DEBUG_ETH_LINK_INDEX,
-                                   &port_device_index, &link_device_index);
-  mtip_mac_get_mac_address_by_device(port_device_index, 
-                                     link_device_index, saddr);
+  mtip_mac_get_mac_address_by_link_index(MTIP_DEBUG_ETH_LINK_INDEX, saddr);
   for(i = 0; i < ETH_ALEN; i++)
     L2.saddr[i] = saddr[i];
 

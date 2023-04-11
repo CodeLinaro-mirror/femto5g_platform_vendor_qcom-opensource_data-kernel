@@ -16,6 +16,18 @@
 
 #include "ecpri_dma_eth.h"
 
+// For 100G lane speed all speed modes are allowed
+#define MTIP_DEVICE_PRIV_FLAGS_BIT_MASK_100G          0xFFFFFFFF
+
+// for 50G lane speed 50G, 25G and 10G lane speed modes are valid
+#define MTIP_DEVICE_PRIV_FLAGS_BIT_MASK_50G           0xFFFFFFF8
+
+// for 25G lane speed 25G and 10G lane speed modes are valid
+#define MTIP_DEVICE_PRIV_FLAGS_BIT_MASK_25G           0xFFFF9E60
+
+// for 10G lane speed, only 10G lane speed modes are valid
+#define MTIP_DEVICE_PRIV_FLAGS_BIT_MASK_10G           0xF8180000
+
 // the net device structure
 struct mtip_netdev_priv {
    u32 link_index;
@@ -24,6 +36,7 @@ struct mtip_netdev_priv {
    u64 hashtablebits;
    u32 priv_flags;
    int num_pkts_pending_completion;
+   bool priv_flags_set;
 
    struct mtip_security_device *sec_dev;
    void *sec_priv;
@@ -62,6 +75,34 @@ struct mtip_process_link_state_task
 void post_mtip_process_link_state(u32 link_index, bool link_up);
 void run_mtip_process_link_state(void* work_ptr);
 
+void post_mtip_process_configure_port_using_lane(u32 port_type, u32 lane_index);
+void run_mtip_process_configure_port_using_lane(void* workptr);
+
+struct mtip_process_configure_port_using_lane_task
+{
+    u32 port_type;
+    u32 lane_index;
+};
+
+void post_mtip_process_configure_port_using_link(u32 port_type, u32 link_index);
+void run_mtip_process_configure_port_using_link(void* workptr);
+
+struct mtip_process_configure_port_using_link_task
+{
+    u32 port_type;
+    u32 link_index;
+};
+
+void post_mtip_process_an_result(enum mtip_port_type_enum port_type, bool an_result, enum mtip_port_config_enum port_config);
+void run_mtip_process_an_result(void* workptr);
+
+struct mtip_process_an_result_task
+{
+    u32 port_type;
+    bool an_result;
+    enum mtip_port_config_enum port_config;
+};
+
 /*
  * Immediate tasks
  */
@@ -74,11 +115,16 @@ int mtip_napi_poll(struct napi_struct *napi_ptr, int budget);
 int mtip_napi_poll_tx(struct napi_struct *napi_ptr, int budget);
 void mtip_netdevice_init(struct net_device *dev);
 
-enum mtip_link_state_enum mtip_get_link_state_by_device(u32 port_device_index, u32 link_device_index);
+enum mtip_link_state_enum mtip_get_link_state_by_link_index(u32 link_index);
+
+/* completion of device open if it is deferred */
+int mtip_device_open_completion(u32 link_index);
 
 int mtip_set_netdev_hw_mac_addr(struct net_device *netdev, u32 link_index);
+int mtip_netdev_setup_port_hw(u32 port_type);
 
-int mtip_netdev_set_port_config(struct net_device *netdev);
+int mtip_netdev_set_port_priv_flags(struct net_device *netdev);
+int mtip_netdev_set_port_config(u32 port_type);
 int mtip_device_update_security_config(struct net_device *netdev, enum mtip_port_config_enum port_config);
 
 // get the next ptp ts seq num to use
