@@ -270,24 +270,32 @@ void run_mtip_tx_comp_cb(void* work_ptr)
           }
           else
           {
-              // there is a timestamp available
-              mtip_ptp_tx_ts_list_pop(link_index, &timestamp_secs, &timestamp_nsecs, &read_ts_seq_num);
+              // there are timestamps available
+              mtip_ptp_tx_ts_list_peek(link_index, &timestamp_secs, &timestamp_nsecs, &read_ts_seq_num);
 
-              if ((mode == MTIP_DEVICE_RUv2) || (mode == MTIP_DEVICE_DUv2)) 
+              // check if the timestamps match
+              if (read_ts_seq_num == pkt_ts_seq_num) 
               {
-                  // match the read_ts_seq_num and the pkt_ts_seq_num
-                  if (read_ts_seq_num != pkt_ts_seq_num)
-                  {
-                      // for now we log this error
-                      // TBD: we need a way to recover from this
-                      CSMLOGERR("Read ts_seq_num %d does not match pkt ts_seq_num %d", read_ts_seq_num, pkt_ts_seq_num);
-                  }
+                  // pop the timestamp
+                  mtip_ptp_tx_ts_list_pop(link_index, &timestamp_secs, &timestamp_nsecs, &read_ts_seq_num);
+
+                  // set the timestamp of the skb
+                  mtip_ptp_set_tx_timestamp(skb, timestamp_secs, timestamp_nsecs);
+
+                  free_skb = true;
               }
+              else 
+              {
+                  // push the skb to the list
+                  mtip_ptp_tx_ts_skb_list_push(link_index, skb, pkt_ts_seq_num);
 
-              // set the timestamp of the skb
-              mtip_ptp_set_tx_timestamp(skb, timestamp_secs, timestamp_nsecs);
+                  // don't free the skb just yet
+                  // will be handled while resolving queues as needed
+                  free_skb = false;
 
-              free_skb = true;
+                  // resolve the differences between the ts and skb queues
+                  mtip_ptp_resolve_queues(link_index);
+              }
           }
 
           // release the ptp lock

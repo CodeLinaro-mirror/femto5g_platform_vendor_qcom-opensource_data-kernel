@@ -108,6 +108,74 @@ int mtip_ptp_handle_hwtstamp_ioctl(struct ifreq *ifr, u32 link_index)
     return 0;
 }
 
+// resolve the differences between the skb and timestamp queues
+// called in the context of ts_lock
+void mtip_ptp_resolve_queues(u32 link_index)
+{
+    u8 read_ts_seq_num;
+    u8 pkt_ts_seq_num;
+    struct sk_buff* skb = NULL;
+    enum mtip_device_mode_enum mode = platform_driver_priv->devices.mode;
+    bool loopflag = true;
+    int skb_list_size;
+    int ts_list_size;
+    u32 timestamp_secs;
+    u32 timestamp_nsecs;
+
+    if ((mode == MTIP_DEVICE_RU) || (mode == MTIP_DEVICE_DU)) 
+    {
+        // we should not run into this on V1
+        CSMLOGERR("resolve queues called for V1!");
+    }
+
+    // loop through pending skbs and find matching timestamps
+    while (loopflag) 
+    {
+        skb_list_size = mtip_ptp_tx_ts_skb_list_size(link_index);
+        ts_list_size = mtip_ptp_tx_ts_list_size(link_index);
+
+        CSMLOGDBG("PTP resolving queues: skbs: %d, ts: %d", skb_list_size, ts_list_size);
+
+        // pop the top skb
+        mtip_ptp_tx_ts_skb_list_pop(link_index, &skb, &pkt_ts_seq_num);
+
+        // the timestamp list can only be later than or equal to skb list
+        // peek the top of the timestamp list
+        mtip_ptp_tx_ts_list_peek(link_index, &timestamp_secs, &timestamp_nsecs, &read_ts_seq_num);
+
+        // check if the sequence numbers match
+        if (read_ts_seq_num == pkt_ts_seq_num) 
+        {
+            // pop the timestamp
+            mtip_ptp_tx_ts_list_pop(link_index, &timestamp_secs, &timestamp_nsecs, &read_ts_seq_num);
+
+            // set the timestamp of the skb
+            mtip_ptp_set_tx_timestamp(skb, timestamp_secs, timestamp_nsecs);
+        }
+        else
+        {
+            CSMLOGERR("detected skb loss pkt seq num: %d, ts seq num: %d", pkt_ts_seq_num, read_ts_seq_num);
+
+            // set the timestamp of the skb to 0
+            // this will be ignored by the app
+            mtip_ptp_set_tx_timestamp(skb, 0, 0);
+        }
+
+        // free the skb
+        CSMLOGDBG("freeing skb: len: %d\n", skb->len);
+
+        dev_kfree_skb(skb);
+        skb = NULL;
+
+        // exit the loop if there are no more skbs or timestamps
+        if ((mtip_ptp_tx_ts_skb_list_size(link_index) == 0) || (mtip_ptp_tx_ts_list_size(link_index) == 0))
+        {
+            loopflag = false;
+            break;
+        }
+    }
+}
+
 void mtip_ptp_tx_ts_lock_init(u32 link_index)
 {
     mutex_init(&platform_driver_priv->mtip_links[link_index]->dev_lock);
@@ -224,6 +292,36 @@ int mtip_ptp_tx_ts_list_pop(u32 link_index, u32* tstamp_secs, u32* tstamp_nsecs,
    return rv;
 }
 
+int mtip_ptp_tx_ts_list_peek(u32 link_index, u32* tstamp_secs, u32* tstamp_nsecs, u8* ts_seq_num)
+{
+   int rv = 0;
+   struct mtip_tx_ts_node* tmp;
+   struct mtip_tx_ts_list *listptr = &platform_driver_priv->mtip_links[link_index]->tx_ts_list;
+
+   rv = mtip_ptp_tx_ts_list_size(link_index);
+
+   if (rv <= 0)
+   {
+      return -1;
+   }
+
+   // get the first entry
+   tmp = list_entry(listptr->head.next, struct mtip_tx_ts_node, list);
+
+   if (!list_empty(&listptr->head)) 
+   {
+       *tstamp_secs = tmp->tstamp_secs;
+       *tstamp_nsecs = tmp->tstamp_nsecs;
+       *ts_seq_num = tmp->ts_seq_num;
+   }
+   else 
+   {
+       CSMLOGERR("workq list is empty... mismatch with count\n");
+       rv = -1;
+   }
+   return rv;
+}
+
 int mtip_ptp_tx_ts_skb_list_initialize(u32 link_index)
 {
     struct mtip_tx_ts_skb_list *listptr = &platform_driver_priv->mtip_links[link_index]->tx_ts_skb_list;
@@ -323,6 +421,35 @@ int mtip_ptp_tx_ts_skb_list_pop(u32 link_index, struct sk_buff **skb, u8* ts_seq
    return rv;
 }
 
+int mtip_ptp_tx_ts_skb_list_peek(u32 link_index, struct sk_buff **skb, u8* ts_seq_num)
+{
+   int rv = 0;
+   struct mtip_tx_ts_skb_node* tmp;
+   struct mtip_tx_ts_skb_list *listptr = &platform_driver_priv->mtip_links[link_index]->tx_ts_skb_list;
+
+   rv = mtip_ptp_tx_ts_skb_list_size(link_index);
+
+   if (rv <= 0)
+   {
+      return -1;
+   }
+
+   // get the first entry
+   tmp = list_entry(listptr->head.next, struct mtip_tx_ts_skb_node, list);
+
+   if (!list_empty(&listptr->head)) 
+   {
+       *skb = tmp->skb;
+       *ts_seq_num = tmp->ts_seq_num;
+   }
+   else 
+   {
+       CSMLOGERR("workq list is empty... mismatch with count\n");
+       rv = -1;
+   }
+   return rv;
+}
+
 void post_mtip_process_timestamp(u32 link_index, u32 timestamp_secs, u32 timestamp_nsecs, u8 ts_seq_num)
 {
    struct mtip_process_timestamp_task* taskstruct = kmalloc(sizeof(struct mtip_process_timestamp_task), GFP_ATOMIC);
@@ -342,7 +469,6 @@ void run_mtip_process_timestamp(void* work_ptr)
     u8 read_ts_seq_num = taskstruct->ts_seq_num;
     u8 pkt_ts_seq_num = 0;
     struct sk_buff* skb = NULL;
-    enum mtip_device_mode_enum mode = platform_driver_priv->devices.mode;
 
     CSMLOGDBG("process tx timestamp %d, %d, read_ts_seq_num: %d\n", timestamp_secs, timestamp_nsecs, read_ts_seq_num);
 
@@ -359,27 +485,31 @@ void run_mtip_process_timestamp(void* work_ptr)
     }
     else
     {
-        // there is a pending skb
-        // set the timestamp on the skb
-        mtip_ptp_tx_ts_skb_list_pop(link_index, &skb, &pkt_ts_seq_num);
-
-        if ((mode == MTIP_DEVICE_RUv2) || (mode == MTIP_DEVICE_DUv2)) 
+        // there are pending skbs
+        mtip_ptp_tx_ts_skb_list_peek(link_index, &skb, &pkt_ts_seq_num);
+         
+        // check if the timestamps match         
+        // match the read_ts_seq_num and the pkt_ts_seq_num
+        if (read_ts_seq_num == pkt_ts_seq_num)
         {
-            // match the read_ts_seq_num and the pkt_ts_seq_num
-            if (read_ts_seq_num != pkt_ts_seq_num)
-            {
-                // for now we log this error
-                // TBD: we need a way to recover from this
-                CSMLOGERR("Read ts_seq_num %d does not match pkt ts_seq_num %d", read_ts_seq_num, pkt_ts_seq_num);
-            }
+            // the timestamps match
+            mtip_ptp_tx_ts_skb_list_pop(link_index, &skb, &pkt_ts_seq_num);
+
+            // set the timestamp of the skb
+            mtip_ptp_set_tx_timestamp(skb, timestamp_secs, timestamp_nsecs);
+
+            CSMLOGDBG("freeing skb: len: %d\n", skb->len);
+
+            dev_kfree_skb(skb);
         }
+        else
+        {
+            // queue the timestamp and ts_seq_num
+            mtip_ptp_tx_ts_list_push(link_index, timestamp_secs, timestamp_nsecs, read_ts_seq_num);
 
-        // set the timestamp of the skb
-        mtip_ptp_set_tx_timestamp(skb, timestamp_secs, timestamp_nsecs);
-
-        CSMLOGDBG("freeing skb: len: %d\n", skb->len);
-
-        dev_kfree_skb(skb);
+            // resolve the differences between the ts and skb queues
+            mtip_ptp_resolve_queues(link_index);
+        }
     }
 
     // release the lock
