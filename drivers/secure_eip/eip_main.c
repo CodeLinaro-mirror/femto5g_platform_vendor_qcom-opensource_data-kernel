@@ -26,6 +26,7 @@
 #include "adapter_secy_support.h"
 #include "adapter_cfye_support.h"
 #include "eip_log.h"
+#include "eip_debugfs.h"
 
 /* ETHSS_FHx_MACSEC_WRAPPER_CSR Init sequence offsets and recommended values*/
 #define MACSEC_WRAPPER_CFG_REG_OFFSET 0x000A8000
@@ -515,10 +516,30 @@ static int eip_probe(struct platform_device *pdev)
 	port->msec_dev.ops = &mtip_sec_ops;
 	port->msec_dev.sec_priv = port;
 	macsec_wrapper_init_config(&port->msec_dev);
-	mtip_security_register_device(&port->msec_dev);
 
+	ret = eip_debugfs_add_port(port);
+	if (ret) {
+		eip_logerr("Failed, debugfs add port %d", port->id);
+		goto fail_debugfs;
+	}
+
+	ret = mtip_security_register_device(&port->msec_dev);
+	if (ret) {
+		eip_logerr("mtip_security register_device, return error ");
+		goto fail_mtip_register_dev;
+	}
+
+	goto success;
+
+fail_mtip_register_dev:
+	eip_debugfs_remove_port(port);
+fail_debugfs:
+	wrapper_bypass_set(port->id, true);
+	eip_port_deinit(port->id);
+	return ret;
+
+success:
 	eip_loginfo("eip_main: eip device init done");
-
 	return ret;
 }
 
@@ -527,9 +548,8 @@ static int eip_remove(struct platform_device *pdev)
 	int ret = 0;
 	struct eip_port *port = (struct eip_port *)platform_get_drvdata(pdev);
 
-	LOG_CRIT("eip_main: Currently not supported ");
-
 	mtip_security_unregister_device(&port->msec_dev);
+	eip_debugfs_remove_port(port);
 
 	wrapper_bypass_set(port->id, true);
 
@@ -571,6 +591,12 @@ static int eip_module_init(void)
 	if (ret)
 		goto device_init_fail;
 
+	ret = eip_debugfs_init();
+	if (ret) {
+		pr_err("eip_main: eip_debugfs_init with error: %d\n", ret);
+		goto debugfs_init_fail;
+	}
+
 	ret = platform_driver_register(&eip_driver);
 	if (ret) {
 		pr_err("eip_main: platform_driver_register with error: %d\n",
@@ -591,6 +617,8 @@ static int eip_module_init(void)
 macsec_ops_fail:
 	platform_driver_unregister(&eip_driver);
 platform_reg_fail:
+	eip_debugfs_deinit();
+debugfs_init_fail:
 	Device_UnInitialize();
 device_init_fail:
 	eip_log_deinit();
@@ -602,6 +630,7 @@ static void eip_module_exit(void)
 {
 	printk("eip_main: eip_module_exit called\n");
 	platform_driver_unregister(&eip_driver);
+	eip_debugfs_deinit();
 	Device_UnInitialize();
 	eip_log_deinit();
 }
