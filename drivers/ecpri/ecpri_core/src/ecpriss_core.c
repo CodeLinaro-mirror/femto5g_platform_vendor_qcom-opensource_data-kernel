@@ -1085,6 +1085,7 @@ static int ecpriss_core_data_init_v2(void)
 	  2. Create the netlink socket
 	  */
 	int ret = 0;
+	int port_index;
 	ecpriss_pdata_v2->dev_mode = (ecpriss_dev_mode_e)ECPRI_HW_FLAVOR_RU;
 	ecpriss_pdata_v2->callback_flag = &callback_flag_g;
 	ecpriss_pdata_v2->ecpri_hw_ver = ecpriss_hw_ver;
@@ -1106,6 +1107,16 @@ static int ecpriss_core_data_init_v2(void)
         ECPRILOGERR("failed to create log context for ECPRISS_SS driver\n");
 	ecpriss_pdata_v2->qudp_ctx_v2 = &qudp_ctx_g_v2;
 	ecpriss_pdata_v2->xbar_ctx_v2 = &xbar_ctx_g_v2;
+
+	for (port_index = 0;port_index < MAX_PORTS;port_index++)
+	{
+	memset(&ecpriss_pdata_v2->xbar_ctx_v2->flow_ctx_v2.fh_xbar_lut[port_index].configured_pcids
+			,-1, sizeof(uint16_t) * ECPRISS_MAX_PCID_ENTRIES);
+
+	memset(&ecpriss_pdata_v2->xbar_ctx_v2->flow_ctx_v2.oc_rx_xbar_lut[port_index].configured_pcids
+			,-1, sizeof(uint16_t) * ECPRISS_MAX_PCID_ENTRIES);
+
+	}
 	ecpriss_pdata_v2->qudp_ctx_v2->ecpriss_qudp_hal_ctx =
 		qudp_ctx_g.ecpriss_qudp_hal_ctx;
 	ecpriss_pdata_v2->xbar_ctx_v2->ecpriss_xbar_hal = xbar_ctx_g_v2.ecpriss_xbar_hal;

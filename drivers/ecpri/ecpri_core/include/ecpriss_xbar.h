@@ -41,7 +41,7 @@ typedef struct ecpriss_xbar_interrupt_cfg
 
 typedef struct ecpriss_xbar_interrupt_cfg_v2
 {
-	//place holder
+	ecpri_xbar_hwio_def_ecpri_xbar_sw_irq_status_s xbar_sw_irq_status;
 }ecpriss_xbar_interrupt_cfg_s_v2;
 
 
@@ -241,6 +241,8 @@ typedef struct ecpriss_xbar_port_lut
 typedef struct ecpriss_xbar_port_lut_v2
 {
 	uint32_t	current_pcid;
+	uint16_t	num_pcid_entries;
+	uint16_t	configured_pcids[ECPRISS_MAX_PCID_ENTRIES];
 	ecpriss_xbar_pcid_flow_cfg_s_v2	lut_table[ECPRISS_MAX_PCID_ENTRIES];
 }ecpriss_xbar_port_lut_s_v2;
 
@@ -257,6 +259,8 @@ typedef struct ecpriss_xbar_oc_rx_flow_cfg
 typedef struct ecpriss_xbar_oc_rx_port_lut
 {
 	uint32_t	current_pcid;
+	uint16_t	num_pcid_entries;
+	uint16_t	configured_pcids[ECPRISS_MAX_PCID_ENTRIES];
 	ecpriss_xbar_oc_rx_flow_cfg_s	lut_table[ECPRISS_MAX_PCID_ENTRIES];
 }ecpriss_xbar_oc_rx_port_lut_s;
 
@@ -297,6 +301,11 @@ typedef struct ecpriss_xbar_ctx
 	ecpriss_xbar_hal_context_s	*ecpriss_xbar_hal;
 	bool				def_lut_cfg_done[ECPRISS_MAX_PORTS];
 }ecpriss_xbar_ctx_s;
+
+typedef struct ecpriss_xbar_global_cfg{
+	uint64_t global;
+}ecpriss_xbar_global_cfg_s;
+
 typedef struct ecpriss_xbar_ctx_v2
 {
 	ecpriss_xbar_state_e		state;
@@ -310,13 +319,11 @@ typedef struct ecpriss_xbar_ctx_v2
 	ecpriss_xbar_interrupt_stats_s_v2 interrupt_stats_v2;
 	ecpriss_flow_ctx_s_v2		flow_ctx_v2;
 	ecpriss_xbar_hal_context_s	*ecpriss_xbar_hal;
+	ecpri_xbar_hwio_def_ecpri_xbar_flush_s xbar_flush_status;
+	ecpriss_xbar_global_cfg_s	xbar_global_cfg;
 	bool				def_lut_cfg_done[ECPRISS_MAX_PORTS];
 }ecpriss_xbar_ctx_s_v2;
 
-
-typedef struct ecpriss_xbar_global_cfg{
-	uint64_t global;
-}ecpriss_xbar_global_cfg_s;
 
 typedef struct ecpriss_xbar_lut_cfg{
 	uint64_t ocrx[NUM_OF_FHP][LUT_INDEX];
@@ -508,6 +515,10 @@ void ecpriss_xbar_config_stats_update(void);
 void ecpriss_xbar_config_stats_update_v2(void);
 
 void ecpriss_xbar_destroy_interrupts_v2(void);
+#if 0
+void ecpriss_xbar_delete_pcid_entry(uint16_t *configured_pcids,uint16_t pcid_value,uint16_t num_pcid_entry);
+#endif
+
 
 
 
