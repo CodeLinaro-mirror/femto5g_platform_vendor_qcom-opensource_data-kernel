@@ -614,11 +614,11 @@ void ecpriss_qudp_ingress_config_stats_update_v2(int32_t fh_index)
 						&ecpriss_pdata_v2->cfg_stats_v2.qudp_cfg_v2.ingress.cfg.vlan[fh_index][fltr_index]);
 			}
 		}
+		ecpriss_pdata_v2->cfg_stats_v2.qudp_cfg_v2.ingress.cfg.ip_addr[fh_index][fltr_index].dst_ip0.value = 0;
+		ecpriss_pdata_v2->cfg_stats_v2.qudp_cfg_v2.ingress.cfg.ip_addr[fh_index][fltr_index].dst_ip1.value = 0;
+		ecpriss_pdata_v2->cfg_stats_v2.qudp_cfg_v2.ingress.cfg.ip_addr[fh_index][fltr_index].dst_ip2.value = 0;
+		ecpriss_pdata_v2->cfg_stats_v2.qudp_cfg_v2.ingress.cfg.ip_addr[fh_index][fltr_index].dst_ip3.value = 0;
 		if(ecpriss_pdata_v2->cfg_stats_v2.qudp_cfg_v2.ingress.cfg.global_cfg[fh_index].enable_ip_dst_filt){
-			ecpriss_pdata_v2->cfg_stats_v2.qudp_cfg_v2.ingress.cfg.ip_addr[fh_index][fltr_index].dst_ip0.value = 0;
-			ecpriss_pdata_v2->cfg_stats_v2.qudp_cfg_v2.ingress.cfg.ip_addr[fh_index][fltr_index].dst_ip1.value = 0;
-			ecpriss_pdata_v2->cfg_stats_v2.qudp_cfg_v2.ingress.cfg.ip_addr[fh_index][fltr_index].dst_ip2.value = 0;
-			ecpriss_pdata_v2->cfg_stats_v2.qudp_cfg_v2.ingress.cfg.ip_addr[fh_index][fltr_index].dst_ip3.value = 0;
 			if(ecpriss_pdata_v2->cfg_stats_v2.qudp_cfg_v2.ingress.vbits.ip_addr[fh_index].valid_bits & flag){
 				ecpriss_qudp_hal_read_reg_mn_fields(ECPRISS_QUDP_FH_FILTER,
 						ECPRI_UDP_FH_FILT_IP_DST_ADDR0_PORT_p_ENTRY_n_V2,
@@ -645,8 +645,8 @@ void ecpriss_qudp_ingress_config_stats_update_v2(int32_t fh_index)
 						&ecpriss_pdata_v2->cfg_stats_v2.qudp_cfg_v2.ingress.cfg.ip_addr[fh_index][fltr_index].dst_ip3);
 			}
 		}
+		ecpriss_pdata_v2->cfg_stats_v2.qudp_cfg_v2.ingress.cfg.udp_clss[fh_index][fltr_index].value = 0;
 		if(ecpriss_pdata_v2->cfg_stats_v2.qudp_cfg_v2.ingress.cfg.global_cfg[fh_index].enable_udp_dst_class){
-			ecpriss_pdata_v2->cfg_stats_v2.qudp_cfg_v2.ingress.cfg.udp_clss[fh_index][fltr_index].value = 0;
 			if(ecpriss_pdata_v2->cfg_stats_v2.qudp_cfg_v2.ingress.vbits.udp_clss[fh_index].valid_bits & flag){
 				ecpriss_qudp_hal_read_reg_mn_fields(ECPRISS_QUDP_FH_FILTER,
 						ECPRI_UDP_FH_UDP_CLASSIFICATION_LIST_PORT_p_ENTRY_n_V2,
@@ -655,9 +655,9 @@ void ecpriss_qudp_ingress_config_stats_update_v2(int32_t fh_index)
 						&ecpriss_pdata_v2->cfg_stats_v2.qudp_cfg_v2.ingress.cfg.udp_clss[fh_index][fltr_index]);
 			}
 		}
+		ecpriss_pdata_v2->cfg_stats_v2.qudp_cfg_v2.ingress.cfg.mac_addr[fh_index][fltr_index].mac_lsb.value = 0;
+		ecpriss_pdata_v2->cfg_stats_v2.qudp_cfg_v2.ingress.cfg.mac_addr[fh_index][fltr_index].mac_msb.value = 0;
 		if(ecpriss_pdata_v2->cfg_stats_v2.qudp_cfg_v2.ingress.cfg.global_cfg[fh_index].enable_mac_dst_check && fltr_index <= 4){
-			ecpriss_pdata_v2->cfg_stats_v2.qudp_cfg_v2.ingress.cfg.mac_addr[fh_index][fltr_index].mac_lsb.value = 0;
-			ecpriss_pdata_v2->cfg_stats_v2.qudp_cfg_v2.ingress.cfg.mac_addr[fh_index][fltr_index].mac_msb.value = 0;
 			if(ecpriss_pdata_v2->cfg_stats_v2.qudp_cfg_v2.ingress.vbits.mac_addr[fh_index].valid_bits & flag){
 				ecpriss_qudp_hal_read_reg_mn_fields(ECPRISS_QUDP_FH_FILTER,
 						ECPRI_UDP_FH_FILT_MAC_ADDRESS_LSB_PORT_p_ENTRY_n_V2,
