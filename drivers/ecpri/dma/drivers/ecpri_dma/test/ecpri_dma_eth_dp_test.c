@@ -1874,14 +1874,114 @@ static int ecpri_dma_eth_dp_test_suite_connect(void *priv) {
 	return ret;
 }
 
+static int ecpri_dma_eth_dp_test_suite_multiple_pkt_single_buffer_exception(void *priv) {
+	int ret = 0;
+	int num_of_pkts_to_send = 10;
+	int num_to_repelnish = 0;
+	struct ecpri_dma_pkt **tx_pkts;
+	struct ecpri_dma_pkt_completion_wrapper **rx_pkts;
+	u32 orig_exception_idx = 0, new_exception_idx = 0;
+
+	DMA_UT_DBG("Start multiple packets test\n");
+
+	ret = ecpri_dma_eth_dp_test_util_setup_dma_endps(
+		ECPRI_DMA_ENDP_DIR_SRC, true, ECPRI_DMA_ENDP_STREAM_MODE_M2S, true);
+	if (ret)
+		return ret;
+
+	ret = ecpri_dma_eth_dp_test_util_setup_dma_endps(
+		ECPRI_DMA_ENDP_DIR_DEST, true, ECPRI_DMA_ENDP_STREAM_MODE_S2M, true);
+	if (ret)
+		return ret;
+
+	ret = ecpri_dma_eth_dp_test_util_init(USE_DEFAULT_CONNECT_PARAMS);
+	if (ret != 0) {
+		DMA_UT_LOG("Failed to initialize the test\n");
+		return ret;
+	}
+
+	ret = ecpri_dma_eth_dp_test_util_prepare_test_data(num_of_pkts_to_send,
+		true, &tx_pkts, &rx_pkts);
+	if (ret != 0) {
+		DMA_UT_LOG("Failed to prepare test data\n");
+		return ret;
+	}
+
+	/* Prepare exact amount of credits equal to amount of buffers sent */
+	if (ecpri_dma_get_ctx_hw_ver() == ECPRI_HW_V1_0) {
+		ret = ecpri_dma_eth_dp_test_suite_calculate_credits(0, tx_pkts,
+			num_of_pkts_to_send, &num_to_repelnish);
+		if (ret) {
+			DMA_UT_LOG("Failed to calculate credits\n");
+			return ret;
+		}
+
+		ret = ecpri_dma_eth_dp_test_util_rx_replenish(num_to_repelnish);
+		if (ret != 0) {
+			DMA_UT_LOG("Test failed due to replenish buffers failure\n");
+			return -EFAULT;
+		}
+	}
+
+	orig_exception_idx = ecpri_dma_ctx->exception_pkt_idx;
+
+	/* Transmit packets */
+	ret = ecpri_dma_eth_transmit(eth_client_test_suite_ctx.hdl,
+		tx_pkts, num_of_pkts_to_send, true);
+	if (ret != 0) {
+		DMA_UT_TEST_FAIL_REPORT("Failed on transmit");
+		return -EFAULT;
+	}
+
+	/* Verify packets */
+	ret = ecpri_dma_eth_dp_test_util_wait_for_tx_comp(num_of_pkts_to_send);
+	if (ret != 0) {
+		DMA_UT_TEST_FAIL_REPORT("Test failed due to Tx timeout");
+		return -EFAULT;
+	}
+
+	new_exception_idx = ecpri_dma_ctx->exception_pkt_idx;
+
+	if (((num_of_pkts_to_send + orig_exception_idx) %
+		ECPRI_DMA_EXCEPTION_RING_SIZE) != new_exception_idx)
+	{
+		DMAERR("Test failed, orig idx: %d, new idx: %d, sent %d\n",
+			orig_exception_idx, new_exception_idx, num_of_pkts_to_send);
+		DMA_UT_TEST_FAIL_REPORT("Test failed due missing Rx exception packet");
+		return -EFAULT;
+	}
+
+	/* Test clean-up */
+	ret = ecpri_dma_eth_dp_test_util_clean_up(eth_client_test_suite_ctx.hdl,
+		num_of_pkts_to_send, true, tx_pkts,
+		rx_pkts);
+	if (ret != 0) {
+		DMA_UT_LOG("Failed to clean the test\n");
+		return ret;
+	}
+
+	ret = ecpri_dma_eth_dp_test_util_setup_dma_endps(
+		ECPRI_DMA_ENDP_DIR_SRC, true, ECPRI_DMA_ENDP_STREAM_MODE_M2S, false);
+	if (ret)
+		return ret;
+
+	ret = ecpri_dma_eth_dp_test_util_setup_dma_endps(
+		ECPRI_DMA_ENDP_DIR_DEST, true, ECPRI_DMA_ENDP_STREAM_MODE_S2M, false);
+	if (ret)
+		return ret;
+
+	return ret;
+}
+
 static int ecpri_dma_eth_dp_test_suite_single_pkt_single_buffer_exception(void *priv) {
 	int ret = 0;
 	int num_of_pkts_to_send = 1;
 	int num_to_repelnish = 0;
 	struct ecpri_dma_pkt **tx_pkts;
 	struct ecpri_dma_pkt_completion_wrapper **rx_pkts;
+	u32 orig_exception_idx = 0, new_exception_idx = 0;
 
-	DMA_UT_DBG("Start stop & reset during data test\n");
+	DMA_UT_DBG("Start single packet exception test\n");
 
 	ret = ecpri_dma_eth_dp_test_util_setup_dma_endps(
 		ECPRI_DMA_ENDP_DIR_SRC, true, ECPRI_DMA_ENDP_STREAM_MODE_M2S, true);
@@ -1924,6 +2024,8 @@ static int ecpri_dma_eth_dp_test_suite_single_pkt_single_buffer_exception(void *
 		}
 	}
 
+	orig_exception_idx = ecpri_dma_ctx->exception_pkt_idx;
+
 	/* Transmit single packet */
 	ret = ecpri_dma_eth_transmit(eth_client_test_suite_ctx.hdl,
 		tx_pkts, num_of_pkts_to_send, true);
@@ -1936,6 +2038,17 @@ static int ecpri_dma_eth_dp_test_suite_single_pkt_single_buffer_exception(void *
 	ret = ecpri_dma_eth_dp_test_util_wait_for_tx_comp(num_of_pkts_to_send);
 	if (ret != 0) {
 		DMA_UT_TEST_FAIL_REPORT("Test failed due to Tx timeout");
+		return -EFAULT;
+	}
+
+	new_exception_idx = ecpri_dma_ctx->exception_pkt_idx;
+
+	if (((num_of_pkts_to_send + orig_exception_idx) %
+		ECPRI_DMA_EXCEPTION_RING_SIZE) != new_exception_idx)
+	{
+		DMAERR("Test failed, orig idx: %d, new idx: %d, sent %d\n",
+			orig_exception_idx, new_exception_idx, num_of_pkts_to_send);
+		DMA_UT_TEST_FAIL_REPORT("Test failed due missing Rx exception packet");
 		return -EFAULT;
 	}
 
@@ -3015,6 +3128,13 @@ DMA_UT_DEFINE_SUITE_START(eth_dp, "ETH DP suite",
 		" with a single buffer on SRC ENDP and confirming ETH Client "
 		"received it the same on exception ENDP.",
 		ecpri_dma_eth_dp_test_suite_single_pkt_single_buffer_exception, true,
+		ECPRI_HW_V1_0, ECPRI_HW_MAX),
+	DMA_UT_ADD_TEST(
+		multiple_pkt_single_buffer_exception,
+		"This test will verify the exception path by sending multiple packets"
+		" with a single buffer on SRC ENDP and confirming ETH Client "
+		"received it the same on exception ENDP.",
+		ecpri_dma_eth_dp_test_suite_multiple_pkt_single_buffer_exception, true,
 		ECPRI_HW_V1_0, ECPRI_HW_MAX),
 	DMA_UT_ADD_TEST(
 		tx_pre_header,
