@@ -185,7 +185,7 @@ static void mtip_update_topology()
                         mtip_mac_get_mac_address_by_device(i, j, topology->topology_params[port_number].port_params[port].link_params[link_number].eth_mac_addr);
 
                         // set the link state
-                        topology->topology_params[port_number].port_params[port].link_params[link_number].link_state = (eth_ecpriss_link_state_e)mtip_get_link_state_by_device(i, j);
+                        topology->topology_params[port_number].port_params[port].link_params[link_number].link_state = mtip_get_link_state_by_device(i, j);
 
                         // set the link rate
                         topology->topology_params[port_number].port_params[port].link_params[link_number].link_rate = mtip_client_get_link_rate(i);
@@ -226,7 +226,7 @@ static void mtip_update_topology()
                         mtip_mac_get_mac_address_by_device(i, j, topology->topology_params[port_number].port_params[port].link_params[link_number].eth_mac_addr);
 
                         // set the link state
-                        topology->topology_params[port_number].port_params[port].link_params[link_number].link_state = (eth_ecpriss_link_state_e)mtip_get_link_state_by_device(i, j);
+                        topology->topology_params[port_number].port_params[port].link_params[link_number].link_state = mtip_get_link_state_by_device(i, j);
 
                         // set the link rate
                         topology->topology_params[port_number].port_params[port].link_params[link_number].link_rate = ETH_ECPRISS_LINK_RATE_25;
