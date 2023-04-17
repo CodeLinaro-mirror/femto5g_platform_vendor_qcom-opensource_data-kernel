@@ -35,31 +35,20 @@ typedef struct{
 }parser_s;
 extern int ecpriss_hw_ver ;
 int isv2 = 1;
-/*****/
-// Debugfs
-typedef enum config_param{
-	FHRX,
-	OCRX,
-	C2CRXUL,
-	C2CRXDL,
-	GLOBAL_CFG
-}cfg_prm_u;
-
-
 /*
  * only white listed alphbates are allowed
  * { } , _  : and 0 to 9 a to z A to Z
  */
 /*****************************************************************************/
-static void remove_whitespaces(char * str, uint32_t len)
-{
+static void remove_whitespaces(char * str, uint32_t len){
         int i,j;
 
 	if(!str){
 		ECPRILOGERR("Null pointer Input\n");
 		return;
 	}
-        for(i = 0, j=0; str[i] != '\0'; i++){
+        for(i = 0, j=0; str[i] != '\0'; i++)
+        {
 		if(i > len){
 			ECPRILOGERR("Invalid Input\n");
 			return;
@@ -71,14 +60,14 @@ static void remove_whitespaces(char * str, uint32_t len)
                                 (str[i] == '{') ||
                                 (str[i] == ',') ||
 				(str[i] == '_') ||
-				(str[i] == ':')){
+				(str[i] == ':'))
+                {
                         str[j++]= str[i];
                 }
         }
         str[j] = 0;
 }
-static char parser(parser_s *parser_in)
-{
+static char parser(parser_s *parser_in){
         int i,j,k;
 
 	if(!parser_in)
@@ -105,7 +94,8 @@ static char parser(parser_s *parser_in)
 				break;
 			}
                         if(parser_in->source[i] == parser_in->delim[k]){
-                                if(strlen(parser_in->token) == 0){
+                                if(strlen(parser_in->token) == 0)
+                                {
                                         continue;
                                 }
                                 *parser_in->index = i++;
@@ -117,8 +107,7 @@ static char parser(parser_s *parser_in)
         }
         return 0;
 }
-static void remove_firstchar(char * str, uint32_t len)
-{
+static void remove_firstchar(char * str, uint32_t len){
 	int i;
 
 	if(!str)
@@ -133,8 +122,7 @@ static void remove_firstchar(char * str, uint32_t len)
 	return;
 
 }
-static void get_file_name(char *filename, uint32_t len)
-{
+static void get_file_name(char *filename, uint32_t len){
 
 	int index = 0;
 	char token[64];
@@ -172,6 +160,16 @@ static void get_file_name(char *filename, uint32_t len)
 	scnprintf(filename, sizeof(token), "%s", token);
 	return;
 }
+/*****/
+// Debugfs
+typedef enum config_param{
+	FHRX,
+	OCRX,
+	C2CRXUL,
+	C2CRXDL,
+	GLOBAL_CFG
+}cfg_prm_u;
+
 static ssize_t config_val_from_qudp_ecpriss_filt(char __user *buf, int fh_index, size_t *count, loff_t *ppos)
 {
 	int isvlanfiltenabled = 0;
@@ -263,7 +261,8 @@ static ssize_t config_val_from_registers_qudp_ingress_mac_addr(char __user *buf,
 	int ret_val = 0;
 	static int data_size = 0;
 
-	if(*ppos == 0 ){
+	if(*ppos == 0 )
+	{
 		memset(max_str,0,sizeof(max_str));
 
 		RESET_STR(fh_str);
@@ -340,7 +339,7 @@ static ssize_t config_val_from_registers_qudp_ingress_mac_addr_v2(char __user *b
 		for(fltr_table_index = 0; fltr_table_index < NUM_OF_FLTR; fltr_table_index++){
 
 			if(ecpriss_pdata_v2->cfg_stats_v2.qudp_cfg_v2.ingress.cfg.mac_addr[fh_index][fltr_table_index].mac_msb.value ||
-					ecpriss_pdata_v2->cfg_stats_v2.qudp_cfg_v2.ingress.cfg.mac_addr[fh_index][fltr_table_index].mac_lsb.value){
+					ecpriss_pdata->cfg_stats.qudp_cfg.ingress.cfg.mac_addr[fh_index][fltr_table_index].mac_lsb.value){
 
 				RESET_STR(index_str);
 				scnprintf(index_str, TEMP_STR_MIN_SIZE, "%u", fltr_table_index);
@@ -412,7 +411,7 @@ static ssize_t config_val_from_registers_qudp_ingress_dst_ip(char __user *buf, i
 				RESET_STR(index_str);
 				scnprintf(index_str, TEMP_STR_MIN_SIZE, "%u", fltr_table_index);
 				RESET_STR(temp_stat_val_str);
-				scnprintf(temp_stat_val_str, TEMP_STAT_VAL_STR_MAX_SIZE, "0x%x",
+				scnprintf(temp_stat_val_str, TEMP_STAT_VAL_STR_MAX_SIZE, "%u",
 						ecpriss_pdata->cfg_stats.qudp_cfg.ingress.cfg.ip_addr[fh_index][fltr_table_index].dst_ip0.value);
 
 				strlcat(max_str, "dst_ip_0:1:2:3_fh_",
@@ -429,19 +428,19 @@ static ssize_t config_val_from_registers_qudp_ingress_dst_ip(char __user *buf, i
 				strlcat(max_str, "\n",
 						max_str_size);
 
-				scnprintf(temp_stat_val_str, TEMP_STAT_VAL_STR_MAX_SIZE, "0x%x",
+				scnprintf(temp_stat_val_str, TEMP_STAT_VAL_STR_MAX_SIZE, "%u",
 						ecpriss_pdata->cfg_stats.qudp_cfg.ingress.cfg.ip_addr[fh_index][fltr_table_index].dst_ip1.value);
 				strlcat(max_str, ":", max_str_size);
 				strlcat(max_str, temp_stat_val_str,
 						max_str_size);
 
-				scnprintf(temp_stat_val_str, TEMP_STAT_VAL_STR_MAX_SIZE, "0x%x",
+				scnprintf(temp_stat_val_str, TEMP_STAT_VAL_STR_MAX_SIZE, "%u",
 						ecpriss_pdata->cfg_stats.qudp_cfg.ingress.cfg.ip_addr[fh_index][fltr_table_index].dst_ip2.value);
 				strlcat(max_str, ":", max_str_size);
 				strlcat(max_str, temp_stat_val_str,
 						max_str_size);
 
-				scnprintf(temp_stat_val_str, TEMP_STAT_VAL_STR_MAX_SIZE, "0x%x",
+				scnprintf(temp_stat_val_str, TEMP_STAT_VAL_STR_MAX_SIZE, "%u",
 						ecpriss_pdata->cfg_stats.qudp_cfg.ingress.cfg.ip_addr[fh_index][fltr_table_index].dst_ip3.value);
 				strlcat(max_str, ":", max_str_size);
 				strlcat(max_str, temp_stat_val_str,
@@ -490,7 +489,7 @@ static ssize_t config_val_from_registers_qudp_ingress_dst_ip_v2(char __user *buf
 				RESET_STR(index_str);
 				scnprintf(index_str, TEMP_STR_MIN_SIZE, "%u", fltr_table_index);
 				RESET_STR(temp_stat_val_str);
-				scnprintf(temp_stat_val_str, TEMP_STAT_VAL_STR_MAX_SIZE, "0x%x",
+				scnprintf(temp_stat_val_str, TEMP_STAT_VAL_STR_MAX_SIZE, "%u",
 						ecpriss_pdata_v2->cfg_stats_v2.qudp_cfg_v2.ingress.cfg.ip_addr[fh_index][fltr_table_index].dst_ip0.value);
 
 				strlcat(max_str, "dst_ip_0:1:2:3_fh_",
@@ -507,19 +506,19 @@ static ssize_t config_val_from_registers_qudp_ingress_dst_ip_v2(char __user *buf
 				strlcat(max_str, "\n",
 						max_str_size);
 
-				scnprintf(temp_stat_val_str, TEMP_STAT_VAL_STR_MAX_SIZE, "0x%x",
+				scnprintf(temp_stat_val_str, TEMP_STAT_VAL_STR_MAX_SIZE, "%u",
 						ecpriss_pdata_v2->cfg_stats_v2.qudp_cfg_v2.ingress.cfg.ip_addr[fh_index][fltr_table_index].dst_ip1.value);
 				strlcat(max_str, ":", max_str_size);
 				strlcat(max_str, temp_stat_val_str,
 						max_str_size);
 
-				scnprintf(temp_stat_val_str, TEMP_STAT_VAL_STR_MAX_SIZE, "0x%x",
+				scnprintf(temp_stat_val_str, TEMP_STAT_VAL_STR_MAX_SIZE, "%u",
 						ecpriss_pdata_v2->cfg_stats_v2.qudp_cfg_v2.ingress.cfg.ip_addr[fh_index][fltr_table_index].dst_ip2.value);
 				strlcat(max_str, ":", max_str_size);
 				strlcat(max_str, temp_stat_val_str,
 						max_str_size);
 
-				scnprintf(temp_stat_val_str, TEMP_STAT_VAL_STR_MAX_SIZE, "0x%x",
+				scnprintf(temp_stat_val_str, TEMP_STAT_VAL_STR_MAX_SIZE, "%u",
 						ecpriss_pdata_v2->cfg_stats_v2.qudp_cfg_v2.ingress.cfg.ip_addr[fh_index][fltr_table_index].dst_ip3.value);
 				strlcat(max_str, ":", max_str_size);
 				strlcat(max_str, temp_stat_val_str,
@@ -809,99 +808,6 @@ static ssize_t config_val_from_valid_bits_filt(char __user *buf, int fh_index, s
 	return data_size;
 
 }
-
-static ssize_t config_val_from_valid_bits_filt_v2(char __user *buf, int fh_index, size_t *count, loff_t *ppos)
-{
-	char fh_str[TEMP_STR_MAX_SIZE];
-	char temp_stat_val_str[TEMP_STAT_VAL_STR_MAX_SIZE];
-	int max_str_size = MAX_STR_SIZE;
-	int ret_val = 0;
-	static int data_size = 0;
-
-	if(*ppos == 0 )
-	{
-		memset(max_str,0,sizeof(max_str));
-
-		RESET_STR(fh_str);
-		scnprintf(fh_str, TEMP_STR_MIN_SIZE, "%u", fh_index);
-
-		ecpriss_qudp_ingress_config_stats_update_v2(fh_index);
-
-
-
-		RESET_STR(temp_stat_val_str);
-		scnprintf(temp_stat_val_str, TEMP_STAT_VAL_STR_MAX_SIZE, "%x",
-				ecpriss_pdata_v2->cfg_stats_v2.qudp_cfg_v2.ingress.vbits.vlan[fh_index]);
-
-		strlcat(max_str, "vlan_valid_bits_fh_",
-				max_str_size);
-		strlcat(max_str, fh_str,
-				max_str_size);
-		strlcat(max_str, ":", max_str_size);
-		strlcat(max_str, temp_stat_val_str,
-				max_str_size);
-		strlcat(max_str, "\n",
-				max_str_size);
-
-		RESET_STR(temp_stat_val_str);
-		scnprintf(temp_stat_val_str, TEMP_STAT_VAL_STR_MAX_SIZE, "%x",
-				ecpriss_pdata_v2->cfg_stats_v2.qudp_cfg_v2.ingress.vbits.udp_clss[fh_index]);
-
-		strlcat(max_str, "udp_class_valid_bits_fh_",
-				max_str_size);
-		strlcat(max_str, fh_str,
-				max_str_size);
-		strlcat(max_str, ":", max_str_size);
-		strlcat(max_str, temp_stat_val_str,
-				max_str_size);
-		strlcat(max_str, "\n",
-				max_str_size);
-
-		RESET_STR(temp_stat_val_str);
-		scnprintf(temp_stat_val_str, TEMP_STAT_VAL_STR_MAX_SIZE, "%x",
-				ecpriss_pdata_v2->cfg_stats_v2.qudp_cfg_v2.ingress.vbits.ip_addr[fh_index]);
-
-		strlcat(max_str, "ipaddr_valid_bits_fh_",
-				max_str_size);
-		strlcat(max_str, fh_str,
-				max_str_size);
-		strlcat(max_str, ":", max_str_size);
-		strlcat(max_str, temp_stat_val_str,
-				max_str_size);
-		strlcat(max_str, "\n",
-				max_str_size);
-#if 0
-		RESET_STR(temp_stat_val_str);
-		scnprintf(temp_stat_val_str, TEMP_STAT_VAL_STR_MAX_SIZE, "%u",
-				ecpriss_pdata_v2->cfg_stats_v2.qudp_cfg_v2.ingress.vbits.mac_addr[fh_index]);
-
-		strlcat(max_str, "mac_addr_valid_bits_fh_",
-				max_str_size);
-		strlcat(max_str, fh_str,
-				max_str_size);
-		strlcat(max_str, ":", max_str_size);
-		strlcat(max_str, temp_stat_val_str,
-				max_str_size);
-		strlcat(max_str, "\n",
-				max_str_size);
-
-#endif
-
-		data_size = strlen(max_str);
-		ECPRILOGERR("strlen = %u \n",data_size);
-	}
-	if(*ppos  >= max_str_size)
-		return 0;
-
-	if( *ppos + *count > data_size)
-		*count =  data_size - *ppos;
-
-	ret_val = copy_to_user(buf,(max_str + *ppos), *count);
-	return data_size;
-
-}
-
-
 static ssize_t config_val_from_registers_qudp_ingress_vlan_v2(char __user *buf, int fh_index, size_t *count, loff_t *ppos)
 {
 	char fh_str[TEMP_STR_MAX_SIZE];
@@ -923,7 +829,7 @@ static ssize_t config_val_from_registers_qudp_ingress_vlan_v2(char __user *buf, 
 
 		for(fltr_table_index = 0; fltr_table_index < NUM_OF_FLTR; fltr_table_index++){
 
-			if(ecpriss_pdata_v2->cfg_stats_v2.qudp_cfg_v2.ingress.cfg.vlan[fh_index][fltr_table_index].value){
+			if(ecpriss_pdata->cfg_stats.qudp_cfg.ingress.cfg.vlan[fh_index][fltr_table_index].value){
 
 				RESET_STR(index_str);
 				scnprintf(index_str, TEMP_STR_MIN_SIZE, "%u", fltr_table_index);
@@ -1608,9 +1514,9 @@ static ssize_t config_val_from_registers_qudp_egress_src_ip_addr_v2(char __user 
 			 * IF any of field is non zero, print all fields.
 			 */
 			if(ecpriss_pdata_v2->cfg_stats_v2.qudp_cfg_v2.egress.src_ip_addr[fh_index][egress_table_index].ip_src0.value ||
-					ecpriss_pdata_v2->cfg_stats_v2.qudp_cfg_v2.egress.src_ip_addr[fh_index][egress_table_index].ip_src1.value ||
-					ecpriss_pdata_v2->cfg_stats_v2.qudp_cfg_v2.egress.src_ip_addr[fh_index][egress_table_index].ip_src2.value ||
-					ecpriss_pdata_v2->cfg_stats_v2.qudp_cfg_v2.egress.src_ip_addr[fh_index][egress_table_index].ip_src3.value){
+					ecpriss_pdata->cfg_stats.qudp_cfg.egress.src_ip_addr[fh_index][egress_table_index].ip_src1.value ||
+					ecpriss_pdata->cfg_stats.qudp_cfg.egress.src_ip_addr[fh_index][egress_table_index].ip_src2.value ||
+					ecpriss_pdata->cfg_stats.qudp_cfg.egress.src_ip_addr[fh_index][egress_table_index].ip_src3.value){
 
 				RESET_STR(index_str);
 				scnprintf(index_str, TEMP_STR_MIN_SIZE, "%u", egress_table_index);
@@ -5824,10 +5730,7 @@ static ssize_t cfg_value_from_valid_bits_filt_fh0(struct file *file, char __user
 {
 	uint32_t len;
 
-	if(ecpriss_hw_ver == 2)
-		len = config_val_from_valid_bits_filt_v2(buf, 0 , &count , ppos);
-	else
-		len = config_val_from_valid_bits_filt(buf, 0 , &count , ppos);
+	len = config_val_from_valid_bits_filt(buf, 0 , &count , ppos);
 	if((*ppos + count) > len){
 		count = len - *ppos;
 	}
@@ -5840,10 +5743,7 @@ static ssize_t cfg_value_from_valid_bits_filt_fh1(struct file *file, char __user
 {
 	uint32_t len;
 
-	if(ecpriss_hw_ver == 2)
-		len = config_val_from_valid_bits_filt_v2(buf, 1 , &count , ppos);
-	else
-		len = config_val_from_valid_bits_filt(buf, 1 , &count , ppos);
+	len = config_val_from_valid_bits_filt(buf, 1 , &count , ppos);
 	if((*ppos + count) > len){
 		count = len - *ppos;
 	}
@@ -5856,10 +5756,7 @@ static ssize_t cfg_value_from_valid_bits_filt_fh2(struct file *file, char __user
 {
 	uint32_t len;
 
-	if(ecpriss_hw_ver == 2)
-		len = config_val_from_valid_bits_filt_v2(buf, 2 , &count , ppos);
-	else
-		len = config_val_from_valid_bits_filt(buf, 2 , &count , ppos);
+	len = config_val_from_valid_bits_filt(buf, 2 , &count , ppos);
 	if((*ppos + count) > len){
 		count = len - *ppos;
 	}
