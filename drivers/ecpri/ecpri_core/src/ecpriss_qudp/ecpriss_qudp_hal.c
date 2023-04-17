@@ -4926,7 +4926,7 @@ static struct ecpriss_qudp_hal_reg_obj ecpriss_qudp_hal_reg_objs[ECPRISS_HW_MAX]
 	[ECPRISS_HW_v2_0][ECPRI_UDP_FH_UDP_CLASSIFICATION_LIST_PORT_p_ENTRIES_VALID_BITS_V2] = {
 		ecpriss_qudp_hal_reg_construct_udp_classification_list_port_p_entries_valid_bits_v2,
 		ecpriss_qudp_hal_reg_parse_udp_classification_list_port_p_entries_valid_bits_v2,
-		0x09380000, 0x3CC, 0x4, 0, 0, 0, 0},
+		0x09380000, 0x3CC, 0x40, 0, 0, 0, 0},
 	[ECPRISS_HW_v2_0][ECPRI_UDP_FH_FILT_MAC_ADDRESS_PORT_p_ENTRIES_VALID_BITS_V2] = {
 		ecpriss_qudp_hal_reg_construct_mac_address_list_port_p_entries_valid_bits_v2,
 		ecpriss_qudp_hal_reg_parse_mac_address_list_port_p_entries_valid_bits_v2,
