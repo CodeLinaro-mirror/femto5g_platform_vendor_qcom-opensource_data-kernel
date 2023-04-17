@@ -354,4 +354,5 @@ void ecpriss_qudp_clear_stats(uint32_t port_index,
 void ecpriss_qudp_set_ecpriss_filt_enable_info(int val);
 int ecpriss_qudp_get_ecpriss_filt_enable_info(void);
 void ecpriss_qudp_non_ecpri_dma_ring_info(void) ;
+void ecpriss_qudp_irq_destroy_v2(void);
 #endif

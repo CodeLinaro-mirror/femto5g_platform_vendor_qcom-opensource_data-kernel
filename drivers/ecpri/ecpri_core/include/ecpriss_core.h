@@ -228,4 +228,9 @@ void ecpriss_update_all_stats(void);
 void ecpriss_update_all_stats_v2(void);
 void ecpriss_core_set_stats_timeout_info(int val);
 int ecpriss_core_get_stats_timeout_info(void);
+
+void clear_debugfs_directory(void);
+void ecpriss_destroy_timers_v2(void);
+void ecpriss_destroy_ipc_log_v2(void);
+void ecpriss_unmap_xbar_qudp_v2(void);
 #endif

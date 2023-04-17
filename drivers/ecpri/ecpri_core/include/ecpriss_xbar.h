@@ -507,7 +507,7 @@ void ecpriss_xbar_stats_update_v2(void);
 void ecpriss_xbar_config_stats_update(void);
 void ecpriss_xbar_config_stats_update_v2(void);
 
-
+void ecpriss_xbar_destroy_interrupts_v2(void);
 
 
 

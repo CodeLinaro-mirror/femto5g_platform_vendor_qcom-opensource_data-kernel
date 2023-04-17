@@ -2744,7 +2744,6 @@ static int ecpriss_irq_init_v2(ecpriss_qudp_interrupt_events_e qudp_irq,
 		struct device *dev)
 {
 	int res= 0;
-
 	struct platform_device *pdev = NULL;
 	/*
 	 *	 * c2c and l2 are not supported for now
@@ -2790,6 +2789,21 @@ static int ecpriss_irq_init_v2(ecpriss_qudp_interrupt_events_e qudp_irq,
 	return res;
 }
 
+void ecpriss_qudp_irq_destroy_v2(void)
+{
+	uint32_t i = 0;
+
+	for(i=0; i < QUDP_IRQ_MAX; i++){
+		if((i == ECPRISS_UDP_FH_IRQ_PORT0) ||
+				(i == ECPRISS_UDP_FH_IRQ_PORT1) ||
+				(i == ECPRISS_UDP_FH_IRQ_PORT2)){
+
+			disable_irq_wake(qudp_irq_mapping[i]);
+			free_irq(qudp_irq_mapping[i],NULL);
+		}
+	}
+
+}
 
 /**
  * ecpri_qudp_reg_irq
@@ -2838,7 +2852,6 @@ static int ecpriss_qudp_register_interrupts_v2(uint8_t                 port_inde
 		ecpriss_port_type_e     port_type,
 		struct device						*dev)
 {
-	int res = 0;
 	do{
 		if(port_type == ECPRISS_PORT_TYPE_FH)
 		{
@@ -2868,7 +2881,7 @@ static int ecpriss_qudp_register_interrupts_v2(uint8_t                 port_inde
 	}while (0);
 
 
-	return res;
+	return 0;
 }
 
 

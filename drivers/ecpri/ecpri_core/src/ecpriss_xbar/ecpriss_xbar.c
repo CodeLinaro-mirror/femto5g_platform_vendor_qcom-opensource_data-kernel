@@ -9,6 +9,8 @@
 #define DISABLE_BIT 0
 #include "ecpriss_log.h"
 
+int xbar_irq_mapping = 0;
+
 void ecpriss_xbar_config_stats_update(void){
 	uint64_t val=0;
 	int fh_index;
@@ -1061,7 +1063,6 @@ static irqreturn_t ecpriss_xbar_isr_v2(int irq, void *ctxt)
 static int ecpriss_xbar_register_interrupts(struct device *dev)
 {
 	int res = 0;
-	int xbar_irq_mapping = 0;
 	struct platform_device *pdev = NULL;
 
 	do{
@@ -1096,9 +1097,7 @@ err:
 static int ecpriss_xbar_register_interrupts_v2(struct device *dev)
 {
 	int res = 0;
-	int xbar_irq_mapping = 0;
 	struct platform_device *pdev = NULL;
-
 	do{
 		pdev = to_platform_device(dev);
 
@@ -1124,13 +1123,17 @@ static int ecpriss_xbar_register_interrupts_v2(struct device *dev)
 				xbar_irq_mapping);
 
 	}while(0);
-
 	return 0;
 err:
 	return -1;
-	return 0;
 }
-
+void ecpriss_xbar_destroy_interrupts_v2(void)
+{
+	if(ecpriss_pdata_v2){
+		disable_irq_wake(xbar_irq_mapping);
+		free_irq(xbar_irq_mapping, NULL);
+	}
+}
 
 
 /**

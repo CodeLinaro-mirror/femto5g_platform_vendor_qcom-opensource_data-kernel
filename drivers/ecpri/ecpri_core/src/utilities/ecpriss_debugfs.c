@@ -6001,6 +6001,7 @@ static ssize_t cfg_value_to_qudp_ecpriss_filt(struct file *file, const  char __u
 		count = len - *ppos;
 	}
 	*ppos += count;
+
 	return count;
 
 }
@@ -6734,6 +6735,11 @@ int32_t setup_debugfs_directory()
         }
         return 0;
 
+}
+void clear_debugfs_directory(void)
+{
+	if(list_dv[0])
+		debugfs_remove_recursive(list_dv[0]);
 }
 /*****************************************************************************/
 #endif /* CONFIG_DEBUG_FS */

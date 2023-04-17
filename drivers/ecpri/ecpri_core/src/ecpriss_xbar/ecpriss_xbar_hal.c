@@ -2370,6 +2370,7 @@ int ecpriss_xbar_hal_reg_init(struct device *dev, ecpriss_xbar_hw_name_e hw_ver)
 			ecpriss_xbar_hal_ctx.phy_base = ECPRISS_XBAR_REG_BASE_ADDRESS;
 
 		} else {
+			ecpriss_pdata_v2->xbar_ctx_v2->ecpriss_xbar_hal = &ecpriss_xbar_hal_ctx;
 			ecpriss_xbar_hal_ctx.phy_base = ECPRISS_XBAR_REG_BASE_ADDRESS_V2;
 		}
 

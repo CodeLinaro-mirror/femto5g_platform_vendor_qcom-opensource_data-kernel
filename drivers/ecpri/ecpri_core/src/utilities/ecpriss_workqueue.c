@@ -144,11 +144,13 @@ int ecpriss_destroy_workq(void)
 {
 	do {
 		if (events_workqueue) {
+			flush_workqueue(events_workqueue);
 			destroy_workqueue(events_workqueue);
 			//events_workqueue  = NULL;
 		}
 
 		if (interrupt_events_workqueue) {
+			flush_workqueue(interrupt_events_workqueue);
 			destroy_workqueue(interrupt_events_workqueue);
 			//interrupt_events_workqueue = NULL;
 		}

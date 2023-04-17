@@ -5291,6 +5291,8 @@ int ecpriss_qudp_global_hal_reg_init(struct device *dev, ecpriss_hw_name_e hw_ve
 		if( ecpriss_qudp_hal_ctx.hw_type == ECPRISS_HW_v1_0){
 			ecpriss_qudp_hal_ctx.qudp_global_phy_base = ECPRISS_QUDP_GLOBAL_REG_BASE;
 		}else {
+			ecpriss_pdata_v2->qudp_ctx_v2->ecpriss_qudp_hal_ctx = &ecpriss_qudp_hal_ctx;
+
 			ecpriss_qudp_hal_ctx.qudp_global_phy_base = ECPRISS_QUDP_GLOBAL_REG_BASE_V2;
 		}
 		ECPRILOGINFO("Mapping  QUDP global HAL reg space : 0x%x\n", ecpriss_qudp_hal_ctx.qudp_global_phy_base);
