@@ -314,7 +314,7 @@ CfyE_Device_Init(
     Settings.ECCUncorrectableThr         = Init_p->ECCUncorrectableThr;
     Settings.fDropControlPkts            = Init_p->fDropControlPkts;
 
-    LOG_CRIT("%s device statistics counter increment enable settings:\n"
+    LOG_INFO("%s device statistics counter increment enable settings:\n"
              "\tTCAM counters: %s\n"
              "\tChannel counters: %s\n",
              ADAPTER_EIP163_DEVICE_NAME(DeviceId),
@@ -397,15 +397,15 @@ CfyE_Device_Init(
     }
 
     /* Show those capabilities not propagated to higher layer. */
-    LOG_CRIT("%s device version major/minor/patch: %d/%d/%d\n",
+    LOG_INFO("%s device version major/minor/patch: %d/%d/%d\n",
               ADAPTER_EIP163_DEVICE_NAME(DeviceId),
               Cp.EIP163_Version.MajHWRevision,
               Cp.EIP163_Version.MinHWRevision,
               Cp.EIP163_Version.HWPatchLevel);
 
-    LOG_CRIT("%s device capabilities\n", ADAPTER_EIP163_DEVICE_NAME(DeviceId));
+    LOG_INFO("%s device capabilities\n", ADAPTER_EIP163_DEVICE_NAME(DeviceId));
 
-    LOG_CRIT("\tEgress only:               %s\n"
+    LOG_INFO("\tEgress only:               %s\n"
              "\tIngress only:              %s\n"
              "\tExternal TCAM:             %s\n"
              "\tNof channels:              %d\n"
@@ -418,16 +418,16 @@ CfyE_Device_Init(
              Cp.EIP163_Options.Rules_Count,
              Cp.EIP163_Options.vPort_Count);
 
-    LOG_CRIT("%s device (EIP-217) version major/minor/patch: %d/%d/%d\n",
+    LOG_INFO("%s device (EIP-217) version major/minor/patch: %d/%d/%d\n",
               ADAPTER_EIP163_DEVICE_NAME(DeviceId),
               Cp.TCAM_Version.MajHWRevision,
               Cp.TCAM_Version.MinHWRevision,
               Cp.TCAM_Version.HWPatchLevel);
 
-    LOG_CRIT("%s device (EIP-217) capabilities\n",
+    LOG_INFO("%s device (EIP-217) capabilities\n",
              ADAPTER_EIP163_DEVICE_NAME(DeviceId));
 
-    LOG_CRIT("\tNof TCAM hit counters:            %d\n"
+    LOG_INFO("\tNof TCAM hit counters:            %d\n"
              "\tTCAM hit counter size (bits):     %d\n"
              "\tNof TCAM packet counters:         %d\n",
              Cp.TCAM_Options.TCAMHitCounters_Count,
