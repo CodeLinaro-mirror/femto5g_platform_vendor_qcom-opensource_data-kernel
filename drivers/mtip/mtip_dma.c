@@ -605,9 +605,6 @@ static void mtip_dma_process_packet(
 
     skb_put(head_skb, size);    
 
-    // set the ethernet protocol type
-    head_skb->protocol = eth_type_trans(head_skb, netdev);
-
     for (k = s_idx+1; k <= e_idx; k++)
     {
         pkt = pkts[k]->pkt;
@@ -669,6 +666,7 @@ static void mtip_dma_process_packet(
         }
     }
     
+    head_skb->protocol = eth_type_trans(head_skb, netdev);
     napi_gro_receive(napi_ptr, head_skb);
 
 out:
