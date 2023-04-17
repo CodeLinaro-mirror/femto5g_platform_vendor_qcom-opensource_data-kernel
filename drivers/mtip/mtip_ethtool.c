@@ -50,8 +50,6 @@
 #include "mtip_debug_eth.h"
 #include "mtip_client.h"
 
-int mtip_ethtool_debug_logging_enable = 0;
-
 static const char * const mtip_ethtool_stat_strings[] = {
     "EtherStatsOctets",
     "OctetsReceivedOK",
@@ -609,11 +607,6 @@ static void mtip_ethtool_set_msglevel(struct net_device *netdev, u32 level)
         }
         break;
 
-    case 5:
-        {
-            mtip_ethtool_debug_logging_enable = 1;
-        }
-        break;
     default:
         {
             CSMLOGINFO("Ignoring msglevel %d for link index: %d", level, link_index);

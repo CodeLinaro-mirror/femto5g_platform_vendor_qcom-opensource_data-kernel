@@ -333,9 +333,6 @@ extern bool mtip_loopback_enable_arp;
 // this is the extern to set if we are running on a RUMI
 extern int mtip_rumi_platform;
 
-// this is to control debug level logging
-extern int mtip_ethtool_debug_logging_enable;
-
 // function prototypes
 int mtip_register_platform_driver(void);
 int mtip_lookup_link_index_by_name(char* name, u32* link_index);
