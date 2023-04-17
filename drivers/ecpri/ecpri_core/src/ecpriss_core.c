@@ -19,6 +19,8 @@ extern struct eth_ecpriss_ops mtip_ecpri_ops;
 #define PRE_INT                       1
 
 #define MAX_NUM_FLOW 120
+#define ETH_LINK_STATE_UP 3
+#define ETH_LINK_STATE_DOWN 4
 
 int stats_timeout_ms = 250;
 void ecpriss_eth_topology_cb(void);
@@ -300,7 +302,7 @@ void ecpriss_eth_topology_init(void)
 					port_params = &eth_link_params_g.topology_params[i].port_params[port_index];
                                         for(k=0;k<num_links;k++){
 						//pr_err("port_index: %d link_index: %d link state: %d\n",port_index,k,port_params->link_params[k].link_state);
-                                                if(port_params->link_params[k].link_state == ETH_ECPRISS_LINK_STATE_UP){
+                                                if(port_params->link_params[k].link_state == ETH_LINK_STATE_UP){
                                                         link_state_flag = true;
 	                                        }
                                         }
