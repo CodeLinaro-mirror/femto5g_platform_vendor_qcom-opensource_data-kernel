@@ -101,6 +101,7 @@ Device_Initialize(
         void * CustomInitData_p)
 {
     unsigned int res;
+    unsigned int buflen;
     unsigned int DevStatCount = Device_Internal_Static_Count_Get();
     unsigned int DevCount = Device_Internal_Count_Get();
     const Device_Admin_Static_t * DevStatAdmin_p =
@@ -143,10 +144,10 @@ Device_Initialize(
                      DevStatAdmin_p[res].DevName);
             goto error_exit;
         }
-
+        buflen = strlen(DevStatAdmin_p[res].DevName)+1;
         /* Allocate and copy device name */
         DevAdmin_pp[res]->DevName =
-                Device_Internal_Alloc((unsigned int)strlen(DevStatAdmin_p[res].DevName)+1);
+                Device_Internal_Alloc(buflen);
         if (DevAdmin_pp[res]->DevName == NULL)
         {
             LOG_CRIT("%s: failed to allocate device (index %d) name %s\n",
@@ -155,7 +156,7 @@ Device_Initialize(
                      DevStatAdmin_p[res].DevName);
             goto error_exit;
         }
-        strcpy(DevAdmin_pp[res]->DevName, DevStatAdmin_p[res].DevName);
+        snprintf(DevAdmin_pp[res]->DevName, buflen,"%s", DevStatAdmin_p[res].DevName);
 
         /* Copy the rest of device data */
         DevAdmin_pp[res]->DeviceNr = DevStatAdmin_p[res].DeviceNr;
@@ -334,6 +335,7 @@ Device_Add(
     Device_Admin_t ** DevAdmin_pp = Device_Internal_Admin_Get();
     Device_Global_Admin_t * DevGlobalAdmin_p =
                         Device_Internal_Admin_Global_Get();
+    unsigned int buflen;
 
     if (!DevGlobalAdmin_p->fInitialized)
     {
@@ -387,9 +389,10 @@ Device_Add(
         return -1;
     }
 
+    buflen = strlen(Props_p->Name_p)+1;
     /* Allocate and copy device name */
     DevAdmin_pp[Index]->DevName =
-                    Device_Internal_Alloc((unsigned int)strlen(Props_p->Name_p)+1);
+                    Device_Internal_Alloc(buflen);
     if (DevAdmin_pp[Index]->DevName == NULL)
     {
         LOG_CRIT("%s: failed to allocate device (index %d) name %s\n",
@@ -400,7 +403,7 @@ Device_Add(
         DevAdmin_pp[Index] = NULL;
         return -1;
     }
-    strcpy(DevAdmin_pp[Index]->DevName, Props_p->Name_p);
+    snprintf(DevAdmin_pp[Index]->DevName, buflen,"%s", Props_p->Name_p);
 
     /* Copy the rest */
     DevAdmin_pp[Index]->FirstOfs  = Props_p->StartByteOffset;

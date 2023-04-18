@@ -2320,6 +2320,8 @@ SecY_Channel_PacketsInflight_Get(
     if (DeviceId >= ADAPTER_EIP164_MAX_NOF_DEVICES)
         return SECY_ERROR_BAD_PARAMETER;
 
+    if (ChannelId >= ADAPTER_EIP164_MAX_NOF_CHANNEL)
+        return SECY_ERROR_BAD_PARAMETER;
 #endif
 
     SecYLib_Device_Lock(DeviceId);
