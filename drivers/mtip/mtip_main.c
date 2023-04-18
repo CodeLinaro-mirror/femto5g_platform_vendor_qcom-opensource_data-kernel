@@ -309,7 +309,7 @@ MODULE_DEVICE_TABLE(of, mtip_mac_link_match);
 
 static struct platform_driver ethernet_mac_link_driver = { 
 	.probe  = mtip_link_probe,
-	.remove = mtip_platform_remove,
+	.remove = mtip_link_remove,
 	.driver = {
 		.name = "MTIP_MAC_LINK",
 		.of_match_table = of_match_ptr(mtip_mac_link_match),
@@ -325,7 +325,7 @@ MODULE_DEVICE_TABLE(of, mtip_mac_port_match);
 
 static struct platform_driver ethernet_mac_port_driver = { 
 	.probe  = mtip_port_probe,
-	.remove = mtip_platform_remove,
+	.remove = mtip_port_remove,
 	.driver = {
 		.name = "MTIP_MAC_PORT",
 		.of_match_table = of_match_ptr(mtip_mac_port_match),
@@ -341,7 +341,6 @@ MODULE_DEVICE_TABLE(of, mtip_mac_match);
 
 static struct platform_driver ethernet_mac_platform_driver = { 
 	.probe  = mtip_platform_probe,
-	.remove = mtip_platform_remove,
 	.driver = {
 		.name = "MTIP_MAC",
 		.of_match_table = of_match_ptr(mtip_mac_match),
@@ -603,9 +602,13 @@ static void mtip_module_exit(void)
    // destroy the hashmap
    mtip_hashmap_destroy();
 
+   mtip_debug_eth_unregister_platform_driver();
    if (!platform_driver_priv->perr)
-           platform_driver_unregister(&ethernet_mac_platform_driver);
-
+   {
+       platform_driver_unregister(&ethernet_mac_link_driver);
+       platform_driver_unregister(&ethernet_mac_port_driver);
+       platform_driver_unregister(&ethernet_mac_platform_driver);
+   }
    // deregister with the dma driver
    (ecpri_dma_eth_driver_ops.ecpri_dma_eth_deregister)();
 
