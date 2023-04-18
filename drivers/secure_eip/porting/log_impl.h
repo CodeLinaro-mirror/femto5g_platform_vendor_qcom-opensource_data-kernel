@@ -8,6 +8,13 @@
 
 #include "eip_log.h"
 
+#ifdef LOG_SEVERITY_MAX
+#undef LOG_SEVERITY_MAX
+#define LOG_SEVERITY_MAX LOG_SEVERITY_INFO
+#else
+#define LOG_SEVERITY_MAX LOG_SEVERITY_INFO
+#endif
+
 #define Log_Message eip_logdbg
 #define Log_FormattedMessage eip_logdbg
 
