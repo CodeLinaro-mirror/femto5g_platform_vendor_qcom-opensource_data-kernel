@@ -50,6 +50,8 @@
 #include "mtip_debug_eth.h"
 #include "mtip_client.h"
 
+int mtip_ethtool_debug_logging_enable = 0;
+
 static const char * const mtip_ethtool_stat_strings[] = {
     "EtherStatsOctets",
     "OctetsReceivedOK",
@@ -123,6 +125,7 @@ struct mtip_ethtool_reg_offset
     u32 end_offset;
     enum mtip_ethtool_regs_e mtip_ethtool_regs;
 };
+
 
 struct mtip_ethtool_reg_offset mtip_ethtool_reg_offset_val[MTIP_ETHTOOL_REG_OFFSET_ARRAY_SIZE] =
 {   {0,             0x000000A0,     MTIP_ETHTOOL_MAC},
@@ -556,7 +559,7 @@ static int mtip_ethtool_set_priv_flags(struct net_device *netdev, u32 flags)
     return err;
 }
 
-static void mtip_ethtool_set_msglevel(struct net_device *netdev, u32 level)
+void mtip_ethtool_set_msglevel(struct net_device *netdev, u32 level)
 {
     u32 link_index;
     u32 real_port_number;
@@ -607,6 +610,11 @@ static void mtip_ethtool_set_msglevel(struct net_device *netdev, u32 level)
         }
         break;
 
+    case 5:
+        {
+            mtip_ethtool_debug_logging_enable = 1;
+        }
+        break;
     default:
         {
             CSMLOGINFO("Ignoring msglevel %d for link index: %d", level, link_index);
@@ -615,7 +623,7 @@ static void mtip_ethtool_set_msglevel(struct net_device *netdev, u32 level)
     }
 }
 
-static u32 mtip_ethtool_get_msglevel(struct net_device *netdev)
+u32 mtip_ethtool_get_msglevel(struct net_device *netdev)
 {
     u32 link_index;
     u32 real_port_number;
@@ -657,9 +665,5 @@ void mtip_ethtool_set_ops(struct net_device *netdev)
    priv = netdev_priv(netdev);
    link_index = priv->link_index;
 
-   // TBD: here link_index is not yet valid
-   if(link_index == MTIP_DEBUG_ETH_LINK_INDEX)
-      netdev->ethtool_ops = mtip_debug_eth_get_ethtool_ops();
-   else
-      netdev->ethtool_ops = &mtip_ethtool_ops;
+   netdev->ethtool_ops = &mtip_ethtool_ops;
 }

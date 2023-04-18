@@ -173,6 +173,7 @@ typedef struct ecpriss_core_private_s {
 	struct ecpri_dma_endp_mapping        *dma_endp;
 	eth_ecpriss_topology_root_s          *eth_topology_params;
 	void                                 *ecpriss_core_logbuf;
+	void                                 *ecpriss_core_cfg_logbuf;
 	ecpri_events_workqueue_params_s      *events_workqueue;
 	ecpri_interrupt_workqueue_params_s   *interrupts_workqueue;
 	eth_ecpriss_topology_ready_cb        *ready_cb;
@@ -194,6 +195,7 @@ typedef struct ecpriss_core_private_s_v2 {
 	struct ecpri_dma_endp_mapping        *dma_endp;
 	eth_ecpriss_topology_root_s          *eth_topology_params;
 	void                                 *ecpriss_core_logbuf;
+	void                                 *ecpriss_core_cfg_logbuf;
 	ecpri_events_workqueue_params_s      *events_workqueue;
 	ecpri_interrupt_workqueue_params_s   *interrupts_workqueue;
 	eth_ecpriss_topology_ready_cb        *ready_cb;
@@ -212,7 +214,7 @@ extern ecpriss_core_private_s *ecpriss_pdata;
 extern ecpriss_core_private_s_v2 *ecpriss_pdata_v2;
 extern ecpriss_xbar_ctx_s     xbar_ctx_g;
 extern ecpriss_qudp_ctx_s     qudp_ctx_g;
-
+extern ecpriss_hw_name_e      ecpriss_hw_ver;
 
 void ecpriss_eth_event_processing_wq(struct work_struct *work);
 void ecpriss_dma_event_processing_wq(struct work_struct *work);

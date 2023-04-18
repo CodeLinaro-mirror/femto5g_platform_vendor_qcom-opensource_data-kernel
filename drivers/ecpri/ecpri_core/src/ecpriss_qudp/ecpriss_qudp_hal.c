@@ -986,6 +986,22 @@ static const char *ecpriss_qudp_hal_reg_name_to_str[ECPRISS_QUDP_REG_MAX+1] = {
 			egress_config->bypassed_packets_vport,
 			HWIO_ECPRI_UDP_FH_EGRESS_CONFIG_p_BYPASSED_PACKETS_VPORT_SHFT_V2,
 			HWIO_ECPRI_UDP_FH_EGRESS_CONFIG_p_BYPASSED_PACKETS_VPORT_BMSK_V2);
+	ECPRISS_HAL_SETFIELD_IN_REG(*val,
+			egress_config->disable_ptp_detection,
+			HWIO_ECPRI_UDP_FH_EGRESS_CONFIG_p_DISABLE_PTP_DETECTION_SHFT_V2,
+			HWIO_ECPRI_UDP_FH_EGRESS_CONFIG_p_DISABLE_PTP_DETECTION_BMSK_V2);
+	ECPRISS_HAL_SETFIELD_IN_REG(*val,
+			egress_config->l3_encap_index_override_en,
+			HWIO_ECPRI_UDP_FH_EGRESS_CONFIG_p_L3_ENCAP_INDEX_OVERRIDE_EN_SHFT_V2,
+			HWIO_ECPRI_UDP_FH_EGRESS_CONFIG_p_L3_ENCAP_INDEX_OVERRIDE_EN_BMSK_V2);
+	ECPRISS_HAL_SETFIELD_IN_REG(*val,
+			egress_config->l2_encap_index_override_en,
+			HWIO_ECPRI_UDP_FH_EGRESS_CONFIG_p_L2_ENCAP_INDEX_OVERRIDE_EN_SHFT_V2,
+			HWIO_ECPRI_UDP_FH_EGRESS_CONFIG_p_L2_ENCAP_INDEX_OVERRIDE_EN_BMSK_V2);
+	ECPRISS_HAL_SETFIELD_IN_REG(*val,
+			egress_config->disable_padding_removal,
+			HWIO_ECPRI_UDP_FH_EGRESS_CONFIG_p_DISABLE_PADDING_REMOVAL_SHFT_V2,
+			HWIO_ECPRI_UDP_FH_EGRESS_CONFIG_p_DISABLE_PADDING_REMOVAL_BMSK_V2);
 
 	return;
 }
@@ -4831,7 +4847,7 @@ static struct ecpriss_qudp_hal_reg_obj ecpriss_qudp_hal_reg_objs[ECPRISS_HW_MAX]
 	[ECPRISS_HW_v2_0][ECPRI_UDP_FH_EGRESS_CONFIG_P_V2] = {
 		ecpriss_qudp_hal_reg_construct_udp_fh_egress_config_p_v2,
 		ecpriss_qudp_hal_reg_parse_dummy_v2,
-		0x09380000, 0x860, 0, 0, 0, 0, 0},
+		0x09380000, 0x860, 0x4, 0, 0, 0, 0},
 	[ECPRISS_HW_v2_0][ECPRI_UDP_FH_UDP_SW_IRQ_STATUS_0_PORT_P_V2] = {
 		ecpriss_qudp_hal_reg_construct_dummy_v2,
 		ecpriss_qudp_hal_reg_parse_udp_fh_sw_irq_status_0_port_p_v2,
@@ -4910,7 +4926,7 @@ static struct ecpriss_qudp_hal_reg_obj ecpriss_qudp_hal_reg_objs[ECPRISS_HW_MAX]
 	[ECPRISS_HW_v2_0][ECPRI_UDP_FH_UDP_CLASSIFICATION_LIST_PORT_p_ENTRIES_VALID_BITS_V2] = {
 		ecpriss_qudp_hal_reg_construct_udp_classification_list_port_p_entries_valid_bits_v2,
 		ecpriss_qudp_hal_reg_parse_udp_classification_list_port_p_entries_valid_bits_v2,
-		0x09380000, 0x3CC, 0x40, 0, 0, 0, 0},
+		0x09380000, 0x3CC, 0x4, 0, 0, 0, 0},
 	[ECPRISS_HW_v2_0][ECPRI_UDP_FH_FILT_MAC_ADDRESS_PORT_p_ENTRIES_VALID_BITS_V2] = {
 		ecpriss_qudp_hal_reg_construct_mac_address_list_port_p_entries_valid_bits_v2,
 		ecpriss_qudp_hal_reg_parse_mac_address_list_port_p_entries_valid_bits_v2,

@@ -19,8 +19,6 @@ extern struct eth_ecpriss_ops mtip_ecpri_ops;
 #define PRE_INT                       1
 
 #define MAX_NUM_FLOW 120
-#define ETH_LINK_STATE_UP 3
-#define ETH_LINK_STATE_DOWN 4
 
 int stats_timeout_ms = 250;
 void ecpriss_eth_topology_cb(void);
@@ -35,6 +33,7 @@ void ecpriss_dma_endp_cb_v2(void * user_data);
 void ecpriss_eth_events_cb(eth_ecpriss_event_e event_type,
 		eth_ecpriss_link_event_params_s *link_event_params);
 void ecpriss_configure_xbar_flush(ecpriss_port_type_e port_type,ecpriss_port_idx_e port_idx,eth_ecpriss_event_e event_type);
+void ecpriss_configure_xbar_flush_v2(ecpriss_port_type_e port_type,ecpriss_port_idx_e port_idx,eth_ecpriss_event_e event_type);
 void ecpriss_eth_events_cb_v2(eth_ecpriss_event_e event_type,
 		eth_ecpriss_link_event_params_s *link_event_params);
 
@@ -106,6 +105,170 @@ static int ecpriss_core_get_hw_ver(struct platform_device *pdev)
 
 }
 
+static void ecpriss_debug_flow_info(ecpriss_packet_payload_s *packet)
+{
+
+	char cmd_buf[1024];
+	uint32_t max_str_size = 0;
+	uint32_t offset = 0;
+	uint32_t i = 0;
+	uint32_t ip_sum = 0;
+	ecpriss_flow_rx_cfg_s *flow_rx = NULL;
+	ecpriss_flow_tx_cfg_s *flow_tx = NULL;
+
+	if(!packet){
+		ECPRILOGERR("ecpriss_debug_flow_info: Null Input \n");
+		return;
+	}
+
+	max_str_size = sizeof(cmd_buf);
+	memset(cmd_buf,0,max_str_size);
+	flow_tx = &packet->flow_cfg.flow_tx_cfg;
+
+	switch((int)flow_tx->src){
+		case ECPRISS_ROUTE_SRC_OC:
+
+			offset += scnprintf(cmd_buf + offset ,max_str_size - offset ,"PCID|%u| ",flow_tx->xbar_tx_cfg.pcid);
+			offset = offset % max_str_size;
+			offset += scnprintf(cmd_buf + offset ,max_str_size - offset ,"|OC-FH| ");
+			offset = offset % max_str_size;
+			offset += scnprintf(cmd_buf + offset ,max_str_size - offset ,"Port|%u| ",flow_tx->port_index);
+			offset = offset % max_str_size;
+			offset += scnprintf(cmd_buf + offset ,max_str_size - offset ,"L2|%u| ",flow_tx->xbar_tx_cfg.l2_hdr_tbl_idx);
+			offset = offset % max_str_size;
+			if(flow_tx->xbar_tx_cfg.l3_hdr_valid)
+				offset += scnprintf(cmd_buf + offset ,max_str_size - offset ,"L3|%u| ",flow_tx->xbar_tx_cfg.l3_hdr_tbl_idx);
+			offset = offset % max_str_size;
+			offset += scnprintf(cmd_buf + offset ,max_str_size - offset ,"SM|");
+			offset = offset % max_str_size;
+			for(i=0;i<6;i++){
+				offset += scnprintf(cmd_buf + offset ,max_str_size - offset ,"%x:",flow_tx->qudp_tx_cfg.eth_hdr.src_mac_addr[i]);
+				offset = offset % max_str_size;
+			}
+			cmd_buf[offset-1]='|';
+			offset += scnprintf(cmd_buf + offset ,max_str_size - offset ," DM|");
+			offset = offset % max_str_size;
+			for(i=0;i<6;i++){
+				offset += scnprintf(cmd_buf + offset ,max_str_size - offset ,"%x:",flow_tx->qudp_tx_cfg.eth_hdr.dst_mac_addr[i]);
+				offset = offset % max_str_size;
+			}
+			cmd_buf[offset-1]='|';
+			if(flow_tx->qudp_tx_cfg.eth_hdr.is_vlan)
+				offset += scnprintf(cmd_buf + offset ,max_str_size - offset ," Vlan|%u|",flow_tx->qudp_tx_cfg.eth_hdr.vlan_data);
+			offset = offset % max_str_size;
+
+			offset += scnprintf(cmd_buf + offset ,max_str_size - offset ," |0x%x| ",flow_tx->qudp_tx_cfg.eth_hdr.orig_ethertype);
+			offset = offset % max_str_size;
+
+			if(ECPRISS_IPV4_TYPE == flow_tx->qudp_tx_cfg.ip_hdr.ip_type){
+				offset += scnprintf(cmd_buf + offset ,max_str_size - offset ,"SI|");
+				offset = offset % max_str_size;
+				for(i=0;i<4;i++){
+					offset += scnprintf(cmd_buf + offset ,max_str_size - offset ,"%u.",flow_tx->qudp_tx_cfg.ip_hdr.src_ip_addr[i]);
+					offset = offset % max_str_size;
+				}
+				--offset;
+				offset += scnprintf(cmd_buf + offset ,max_str_size - offset ,":%u| ",flow_tx->qudp_tx_cfg.ip_hdr.src_udp_port);
+				offset = offset % max_str_size;
+				offset += scnprintf(cmd_buf + offset ,max_str_size - offset ," DI|");
+				offset = offset % max_str_size;
+				for(i=0;i<4;i++){
+					offset += scnprintf(cmd_buf + offset ,max_str_size - offset ,"%u.",flow_tx->qudp_tx_cfg.ip_hdr.dst_ip_addr[i]);
+					offset = offset % max_str_size;
+				}
+				--offset;
+				offset += scnprintf(cmd_buf + offset ,max_str_size - offset ,":%u| ",flow_tx->qudp_tx_cfg.ip_hdr.dst_udp_port);
+				offset = offset % max_str_size;
+			}else if(ECPRISS_IPV6_TYPE == flow_tx->qudp_tx_cfg.ip_hdr.ip_type){
+				offset += scnprintf(cmd_buf + offset ,max_str_size - offset ,"SI|");
+				offset = offset % max_str_size;
+				for(i=0;i<16;i++){
+					offset += scnprintf(cmd_buf + offset ,max_str_size - offset ,"%x",flow_tx->qudp_tx_cfg.ip_hdr.src_ip_addr[i]);
+					offset = offset % max_str_size;
+					offset += scnprintf(cmd_buf + offset ,max_str_size - offset ,"%x:",flow_tx->qudp_tx_cfg.ip_hdr.src_ip_addr[++i]);
+					offset = offset % max_str_size;
+				}
+				--offset;
+				offset += scnprintf(cmd_buf + offset ,max_str_size - offset ,":%u| ",flow_tx->qudp_tx_cfg.ip_hdr.src_udp_port);
+				offset = offset % max_str_size;
+				offset += scnprintf(cmd_buf + offset ,max_str_size - offset ," Dip|");
+				offset = offset % max_str_size;
+				for(i=0;i<16;i++){
+					offset += scnprintf(cmd_buf + offset ,max_str_size - offset ,"%x",flow_tx->qudp_tx_cfg.ip_hdr.dst_ip_addr[i]);
+					offset = offset % max_str_size;
+					offset += scnprintf(cmd_buf + offset ,max_str_size - offset ,"%x:",flow_tx->qudp_tx_cfg.ip_hdr.dst_ip_addr[++i]);
+					offset = offset % max_str_size;
+				}
+				--offset;
+				offset += scnprintf(cmd_buf + offset ,max_str_size - offset ,":%u| ",flow_tx->qudp_tx_cfg.ip_hdr.dst_udp_port);
+				offset = offset % max_str_size;
+			}
+			break;
+
+		case ECPRISS_ROUTE_SRC_FH:
+			flow_rx = &packet->flow_cfg.flow_rx_cfg;
+
+			offset += scnprintf(cmd_buf + offset ,max_str_size - offset ,"PCID|%u| ",flow_rx->xbar_rx_cfg.flow_id);
+			offset = offset % max_str_size;
+
+			offset += scnprintf(cmd_buf + offset ,max_str_size - offset ,"|FH-OC| ");
+			offset = offset % max_str_size;
+			offset += scnprintf(cmd_buf + offset ,max_str_size - offset ,"Port|%u| ",flow_rx->port_index);
+			offset = offset % max_str_size;
+
+
+			for(i=0;i<16;i++){
+				ip_sum += flow_rx->qudp_rx_cfg.ip_dst_addr[i];
+			}
+			if(!flow_rx->qudp_rx_cfg.fltr_en_mask && (flow_rx->qudp_rx_cfg.vlan_addr_port || flow_rx->qudp_rx_cfg.udp_dst_port || ip_sum)){
+				offset += scnprintf(cmd_buf + offset ,max_str_size - offset,"|REM| ");
+				offset = offset % max_str_size;
+			}else{
+				offset += scnprintf(cmd_buf + offset ,max_str_size - offset,"|ADD| ");
+				offset = offset % max_str_size;
+			}
+			if(flow_rx->qudp_rx_cfg.vlan_addr_port)
+				offset += scnprintf(cmd_buf + offset ,max_str_size - offset ,"Vlan|%u| ",flow_rx->qudp_rx_cfg.vlan_addr_port);
+			offset = offset % max_str_size;
+			if(flow_rx->qudp_rx_cfg.udp_dst_port)
+				offset += scnprintf(cmd_buf + offset ,max_str_size - offset ,"Port|%u| ",flow_rx->qudp_rx_cfg.udp_dst_port);
+			offset = offset % max_str_size;
+
+			if(ip_sum){
+				if(ECPRISS_IPV4_TYPE == flow_rx->qudp_rx_cfg.ip_type){
+					offset += scnprintf(cmd_buf + offset ,max_str_size - offset ,"IP|");
+					offset = offset % max_str_size;
+					for(i=0;i<4;i++){
+						offset += scnprintf(cmd_buf + offset ,max_str_size - offset ,"%u.",flow_rx->qudp_rx_cfg.ip_dst_addr[i]);
+						offset = offset % max_str_size;
+					}
+					cmd_buf[offset-1]='|';
+				}else if(ECPRISS_IPV6_TYPE == flow_rx->qudp_rx_cfg.ip_type){
+					offset += scnprintf(cmd_buf + offset ,max_str_size - offset ,"IP|");
+					offset = offset % max_str_size;
+					for(i=0;i<16;i++){
+						offset += scnprintf(cmd_buf + offset ,max_str_size - offset ,"%x",flow_rx->qudp_rx_cfg.ip_dst_addr[i]);
+						offset = offset % max_str_size;
+						offset += scnprintf(cmd_buf + offset ,max_str_size - offset ,"%x:",flow_rx->qudp_rx_cfg.ip_dst_addr[++i]);
+						offset = offset % max_str_size;
+					}
+					cmd_buf[offset-1]='|';
+				}
+			}
+			if(ECPRISS_PACKET_UL == flow_rx->xbar_rx_cfg.flow_dir){
+				offset += scnprintf(cmd_buf + offset ,max_str_size - offset ,"|DIR_UL| ");
+				offset = offset % max_str_size;
+			}else if(ECPRISS_PACKET_DL == flow_rx->xbar_rx_cfg.flow_dir ){
+				offset += scnprintf(cmd_buf + offset ,max_str_size - offset ,"|DIR_DL| ");
+				offset = offset % max_str_size;
+			}
+			offset += scnprintf(cmd_buf + offset ,max_str_size - offset ,"OcLink|%u| ",flow_rx->xbar_rx_cfg.oc_link_id);
+			offset = offset % max_str_size;
+
+	}
+	cmd_buf[++offset]= 0;
+	ECPRILOGCFG("%s",cmd_buf);
+}
 /* Calls XBAR RX/TX and QUDP RX/TX depending on the msg_id of the packets */
 void ecpriss_process_packet(ecpriss_packet_payload_s *packet)
 {
@@ -118,7 +281,7 @@ void ecpriss_process_packet(ecpriss_packet_payload_s *packet)
 			ret = -ENOMEM;
 			break;
 		}
-
+		ecpriss_debug_flow_info(packet);
 		flow_tx = &packet->flow_cfg.flow_tx_cfg;
 
 		switch((int)flow_tx->src){
@@ -301,7 +464,7 @@ void ecpriss_eth_topology_init(void)
 					port_params = &eth_link_params_g.topology_params[i].port_params[port_index];
                                         for(k=0;k<num_links;k++){
 						//pr_err("port_index: %d link_index: %d link state: %d\n",port_index,k,port_params->link_params[k].link_state);
-                                                if(port_params->link_params[k].link_state == ETH_LINK_STATE_UP){
+                                                if(port_params->link_params[k].link_state == ETH_ECPRISS_LINK_STATE_UP){
                                                         link_state_flag = true;
 	                                        }
                                         }
@@ -365,13 +528,14 @@ void ecpriss_eth_topology_init(void)
 void ecpriss_eth_topology_init_v2(void)
 {
 	int ret = 0;
-	int i,j;
+	int i,j,k;
 	eth_ecpriss_dev_mode_e device_mode;
 	uint8_t port_index;
 	uint8_t num_links;
 
 	ecpriss_qudp_port_cfg_s_v2      *port_cfg_local;
-
+        eth_ecpriss_port_params_s *port_params = NULL;
+        bool link_state_flag = false;
 	do {
 		ret = (mtip_ecpri_ops.eth_ecpriss_get_topology)(&device_mode,
 				&eth_link_params_g);
@@ -391,6 +555,21 @@ void ecpriss_eth_topology_init_v2(void)
 						&ecpriss_pdata_v2->qudp_ctx_v2->fh_port_cfg_v2[port_index];
 					num_links =
 						eth_link_params_g.topology_params[i].port_params[j].num_links;
+
+					port_params = &eth_link_params_g.topology_params[i].port_params[port_index];
+                                        for(k=0;k<num_links;k++){
+						//pr_err("port_index: %d link_index: %d link state: %d\n",port_index,k,port_params->link_params[k].link_state);
+                                                if(port_params->link_params[k].link_state == ETH_ECPRISS_LINK_STATE_UP){
+                                                        link_state_flag = true;
+	                                        }
+                                        }
+                                        if(link_state_flag == true){
+                                                ecpriss_configure_xbar_flush_v2(ECPRISS_PORT_TYPE_FH,port_index,ETH_ECPRISS_EVENT_UP);
+                                        }
+                                        else{
+                                                ecpriss_configure_xbar_flush_v2(ECPRISS_PORT_TYPE_FH,port_index,ETH_ECPRISS_EVENT_DOWN);
+                                        }
+					link_state_flag = false;
 					ecpriss_eth_cpy_params_v2(port_cfg_local,
 							&eth_link_params_g,
 							port_index,
@@ -656,7 +835,7 @@ void ecpriss_eth_events_cb_v2(eth_ecpriss_event_e event_type,
 	struct workqueue_struct *ecpriss_wq;
 	struct work_struct *ecpriss_work;
 
-	ECPRILOGERR("ecpriss_eth_events_cb_v2 event received %d", event_type);
+	ECPRILOGDBG("ecpriss_eth_events_cb_v2 event received %d", event_type);
 
 
 	do{
@@ -855,6 +1034,12 @@ static int ecpriss_core_data_init(void)
                 "ecpriss_core", 0);
         if (ecpriss_pdata->ecpriss_core_logbuf == NULL)
         ECPRILOGERR("failed to create log context for ECPRISS_SS driver\n");
+
+	ecpriss_pdata->ecpriss_core_cfg_logbuf =
+        ipc_log_context_create(ECPRISS_CORE_IPC_LOG_PAGES,
+                "ecpriss_core_cfg", 0);
+        if (ecpriss_pdata->ecpriss_core_cfg_logbuf == NULL)
+        ECPRILOGERR("failed to create log context for ECPRISS_SS driver\n");
 	/* ecpriss_pdata->stats = &stats_g; */
 
 	eth_topology_ready_cb = &ecpriss_eth_topology_cb;
@@ -905,6 +1090,12 @@ static int ecpriss_core_data_init_v2(void)
         if (ecpriss_pdata_v2->ecpriss_core_logbuf == NULL)
 		ECPRILOGERR("failed to create log context for ECPRISS_SS driver\n");
 
+	ecpriss_pdata_v2->ecpriss_core_cfg_logbuf =
+        ipc_log_context_create(ECPRISS_CORE_IPC_LOG_PAGES,
+                "ecpriss_core_cfg", 0);
+        if (ecpriss_pdata_v2->ecpriss_core_cfg_logbuf == NULL)
+
+        ECPRILOGERR("failed to create log context for ECPRISS_SS driver\n");
 	ecpriss_pdata_v2->qudp_ctx_v2 = &qudp_ctx_g_v2;
 	ecpriss_pdata_v2->xbar_ctx_v2 = &xbar_ctx_g_v2;
 	ecpriss_pdata_v2->qudp_ctx_v2->ecpriss_qudp_hal_ctx =

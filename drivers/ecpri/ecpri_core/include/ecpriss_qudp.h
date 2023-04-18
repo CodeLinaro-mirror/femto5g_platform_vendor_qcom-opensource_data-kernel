@@ -89,7 +89,8 @@ typedef struct ecpriss_qudp_egress_port_cfg_v2
 {
 	uint32_t	num_l2_tbl_entries;
 	uint32_t	num_l3_tbl_entries;
-	ecpri_qudp_hwio_def_ecpri_udp_fh_egress_eth_mtu_p_s_v2   egress_eth_mtu;
+	ecpri_qudp_hwio_def_ecpri_udp_fh_egress_eth_mtu_p_s_v2 egress_eth_mtu;
+	ecpri_qudp_hwio_def_ecpri_udp_fh_egress_config_p_s_v2 fh_egress_config;
 }ecpriss_qudp_egress_per_port_cfg_s_v2;
 
 

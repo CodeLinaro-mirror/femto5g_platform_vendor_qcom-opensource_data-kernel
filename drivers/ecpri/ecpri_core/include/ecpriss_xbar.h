@@ -217,19 +217,19 @@ typedef struct ecpriss_xbar_flow_cfg
 
 typedef struct ecpriss_xbar_flow_cfg_v2
 {
-	uint32_t     pcid;
-	uint32_t     other_oc_link_id;
-	uint32_t     ul_oc_link_id;
-	uint32_t     dl_oc_link_id;
-	uint8_t      other_route_to_oran;
-	uint8_t      other_route_to_c2c;
-	uint8_t      other_route_to_dma;
-	uint8_t      dl_route_to_c2c;
-	uint8_t      dl_route_to_dma;
-	uint8_t      dl_route_to_oran;
-	uint8_t      ul_route_to_c2c;
-	uint8_t      ul_route_to_dma;
-	uint8_t      ul_route_to_oran;
+	uint32_t     pcid : 16;
+	uint32_t     other_oc_link_id : 2;
+	uint32_t     ul_oc_link_id : 2;
+	uint32_t     dl_oc_link_id : 2;
+	uint32_t      other_route_to_oran : 1;
+	uint32_t      other_route_to_c2c : 1;
+	uint32_t      other_route_to_dma : 1;
+	uint32_t      dl_route_to_c2c : 1;
+	uint32_t      dl_route_to_dma : 1;
+	uint32_t      dl_route_to_oran : 1;
+	uint32_t      ul_route_to_c2c : 1;
+	uint32_t      ul_route_to_dma : 1;
+	uint32_t      ul_route_to_oran : 1;
 }ecpriss_xbar_pcid_flow_cfg_s_v2;
 
 typedef struct ecpriss_xbar_port_lut
@@ -273,8 +273,11 @@ typedef struct ecpriss_flow_ctx
 typedef struct ecpriss_flow_ctx_v2
 {
 	ecpriss_xbar_port_lut_s_v2		fh_xbar_lut[ECPRISS_MAX_PORTS];
+
+#ifdef C2C_XBAR_LUT
 	ecpriss_xbar_port_lut_s_v2		c2c_dl_xbar_lut[ECPRISS_MAX_PORTS];
 	ecpriss_xbar_port_lut_s_v2		c2c_ul_xbar_lut[ECPRISS_MAX_PORTS];
+#endif
 	ecpriss_xbar_oc_rx_port_lut_s	oc_rx_xbar_lut[ECPRISS_MAX_PORTS];
 }ecpriss_flow_ctx_s_v2;
 

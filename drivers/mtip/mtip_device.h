@@ -81,4 +81,7 @@ int mtip_set_netdev_hw_mac_addr(struct net_device *netdev, u32 link_index);
 int mtip_netdev_set_port_config(struct net_device *netdev);
 int mtip_device_update_security_config(struct net_device *netdev, enum mtip_port_config_enum port_config);
 
+// get the next ptp ts seq num to use
+u8 mtip_netdev_get_next_ptp_ts_seq_num(u32 link_index);
+
 #endif // _MTIP_DEVICE_H
