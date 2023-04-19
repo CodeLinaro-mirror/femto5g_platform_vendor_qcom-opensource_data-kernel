@@ -439,7 +439,7 @@ SecY_Device_Init(
 
     Settings.CountIncDisCtrl     = Settings_p->CountIncDisCtrl;
 
-    LOG_CRIT("%s device statistics counter increment enable settings:\n"
+    LOG_INFO("%s device statistics counter increment enable settings:\n"
              "\tSA counters: %s\n"
              "\tIFC counters: %s\n"
              "\tIFC1 counters: %s\n"
@@ -544,15 +544,15 @@ SecY_Device_Init(
     }
 
     /* Show those capabilities not propagated to higher layer. */
-    LOG_CRIT("%s device version major/minor/patch: %d/%d/%d\n",
+    LOG_INFO("%s device version major/minor/patch: %d/%d/%d\n",
               ADAPTER_EIP164_DEVICE_NAME(DeviceId),
               Cp.EIP164_Version.MajHWRevision,
               Cp.EIP164_Version.MinHWRevision,
               Cp.EIP164_Version.HWPatchLevel);
 
-    LOG_CRIT("%s device capabilities\n", ADAPTER_EIP164_DEVICE_NAME(DeviceId));
+    LOG_INFO("%s device capabilities\n", ADAPTER_EIP164_DEVICE_NAME(DeviceId));
 
-    LOG_CRIT("\tEgress only:               %s\n"
+    LOG_INFO("\tEgress only:               %s\n"
              "\tIngress only:              %s\n"
              "\tSpare register:            %s\n"
              "\tExternal RxCAM:            %s\n"
@@ -569,16 +569,16 @@ SecY_Device_Init(
              Cp.EIP164_Options.Channel_Count,
              Cp.EIP164_Options.vPort_Count);
 
-    LOG_CRIT("%s device (EIP-66) version major/minor/patch: %d/%d/%d\n",
+    LOG_INFO("%s device (EIP-66) version major/minor/patch: %d/%d/%d\n",
               ADAPTER_EIP164_DEVICE_NAME(DeviceId),
               Cp.EIP66_Version.MajHWRevision,
               Cp.EIP66_Version.MinHWRevision,
               Cp.EIP66_Version.HWPatchLevel);
 
-    LOG_CRIT("%s device (EIP-66) capabilities\n",
+    LOG_INFO("%s device (EIP-66) capabilities\n",
              ADAPTER_EIP164_DEVICE_NAME(DeviceId));
 
-    LOG_CRIT("\tEgress only:               %s\n"
+    LOG_INFO("\tEgress only:               %s\n"
              "\tIngress only:              %s\n"
              "\tNumber of channels:        %d\n"
              "\tNumber of pipes:           %d\n",
