@@ -25,6 +25,8 @@ struct eip_port {
 	struct eip_datapath tx;
 
 	struct mtip_security_device msec_dev;
+
+	struct dentry *dbgfs_dent;
 };
 
 struct eip_channel {

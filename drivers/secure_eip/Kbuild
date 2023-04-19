@@ -46,7 +46,7 @@ ccflags-y += -I$(SECURE_EIP_TOP)/
 
 lassen_secure_eip-y += DDK/Kit/EIP163/src/eip163.o
 lassen_secure_eip-y += DDK/Kit/EIP164/src/eip164_device.o
-lassen_secure_eip-y += DDK/Kit/EIP164/src/eip164_rules.o 
+lassen_secure_eip-y += DDK/Kit/EIP164/src/eip164_rules.o
 lassen_secure_eip-y += DDK/Kit/EIP164/src/eip164_secy.o
 lassen_secure_eip-y += DDK/Kit/EIP201/src/eip201.o
 
@@ -91,3 +91,4 @@ lassen_secure_eip-y += DDK/Integration/Adapter_EIP163/src/adapter_cfye_warmboot.
 lassen_secure_eip-y += eip_macsec.o
 lassen_secure_eip-y += eip_main.o
 lassen_secure_eip-y += eip_log.o
+lassen_secure_eip-$(CONFIG_DEBUG_FS) += eip_debugfs.o
