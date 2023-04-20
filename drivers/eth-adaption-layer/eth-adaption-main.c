@@ -23,7 +23,6 @@
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 4, 0))
 #include <soc/qcom/sb_notification.h>
 #endif
-#include <linux/eth_adapt_power.h>
 #include <linux/suspend.h>
 #include <linux/pm_wakeup.h>
 
@@ -180,8 +179,8 @@ static int eth_adaption_notifier_device_event
 	{
 		if(strcmp(vlan_intf, dev->name) != 0)
 			return NOTIFY_DONE;
-		ETHADPTDBG("eth_adaption_notifier_device_event dev name %s ,%d, %d, %d\n",dev->name,event,dev->operstate,qrtr_init);
-		ETHADPTINFO("eth_adaption_notifier_device_event %d, %d, %d\n",event,qrtr_init,link_state);
+		ETHADPTDBG("eth_adaption_notifier_device_event dev name %s ,%lu, %d, %d\n",dev->name,event,dev->operstate,qrtr_init);
+		ETHADPTINFO("eth_adaption_notifier_device_event %lu, %d, %d\n",event,qrtr_init,link_state);
 		switch (event) {
 		case NETDEV_DOWN:
 			if(checkstate(QRTR_DEINIT) || checkstate(QRTR_INPROGRESS) || checkstate(QRTR_CONNFAILED))
@@ -222,7 +221,6 @@ static int eth_adaption_notifier_device_event
 			break;
 		}
 	}
-done:
 	return NOTIFY_DONE;
 }
 
@@ -426,7 +424,7 @@ static int eth_adaption_create_debugfs(void)
 					   debugfs_dir, NULL,
 					   &eth_adaption_dump);
 	if (!eth_adapt_dump || IS_ERR(eth_adapt_dump)) {
-		ETHADPTERR("Can't create eth_adapt_dump %d\n", (int)eth_adapt_dump);
+		ETHADPTERR("Can't create eth_adapt_dump %lu\n", (uintptr_t)eth_adapt_dump);
 		goto fail;
 	}
 
@@ -488,9 +486,8 @@ EXPORT_SYMBOL(eth_adaption_send);
 */
 int eth_adaption_handle_resume()
 {
-	ETHADPTDBG("eth_adapt handle resume\n");
 	int ret = 0;
-
+	ETHADPTDBG("eth_adapt handle resume\n");
 	mutex_lock(&gpio_toggle_lock);
 	if(peer_gpio_toggled == false)
 	{
@@ -696,7 +693,7 @@ static int __init eth_adaption_init(void)
 	ret = register_pm_notifier(&eth_adaption_pm_nb);
 	if (ret)
 	{
-		ETHADPTERR(" %s register_pm_notifier failed %s\n",__func__,ret);
+		ETHADPTERR(" %s register_pm_notifier failed %d\n",__func__,ret);
 	}
 
 	eth_ws = wakeup_source_register(NULL, "eth_ws");

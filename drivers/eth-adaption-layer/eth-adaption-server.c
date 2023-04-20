@@ -71,7 +71,6 @@ int eth_adaption_server_send(const char *buf, const size_t length)
 	struct msghdr msg;
 	struct kvec vec;
 	int len, written = 0, left =length;
-	mm_segment_t oldmm;
 	unsigned long flags = MSG_DONTWAIT;
 
 	if(!serv_sk.newsocket)
@@ -81,8 +80,6 @@ int eth_adaption_server_send(const char *buf, const size_t length)
 	msg.msg_control = NULL;
 	msg.msg_controllen = 0;
 	msg.msg_flags = flags;
-
-	oldmm = get_fs(); set_fs(KERNEL_DS);
 
 repeat_send:
 	vec.iov_len = left;
@@ -105,7 +102,6 @@ repeat_send:
 			goto repeat_send;
 	}
 
-	set_fs(oldmm);
 	if(serv_sk.kpi_send_data)
 	{
 #ifdef CONFIG_MSM_BOOT_TIME_MARKER
@@ -132,7 +128,6 @@ static void eth_adaption_server_receive(struct kthread_work *work)
 	struct kvec vec;
 	int len = 0;
 	int max_size = MAX_SIZE;
-	int sent;
 	void *buf;
 
 	ETHADPTDBG(KERN_ALERT "kernel server_receive called\n");
@@ -172,7 +167,7 @@ static void eth_adaption_server_receive(struct kthread_work *work)
 		eth_res.buf_addr = buf;
 		eth_res.bytes_xferd = len;
 		qcom_ethernet_qrtr_dl_cb(&eth_res);
-		ETHADPTDBG("the server says: %x %d| client_receive\n", buf,len);
+		ETHADPTDBG("the server says: %lu %d| client_receive\n", (uintptr_t)buf,len);
 	}
 	if(serv_sk.kpi_receive_data)
 	{
@@ -217,14 +212,8 @@ static void eth_adaption_server_start(struct kthread_work *work)
 	struct socket *client = NULL;
 	struct sockaddr_in *server = NULL;
 	struct sockaddr_in6 *serverv6 = NULL;
-	int reuseaddr = 1;
-	int reuseport = 1;
-	int tcpnodelay = 1;
 	int error,bin,listen;
 	int cn = -1;
-	int count = 0;
-	bool ret;
-	int keepalive = 1;
 
 	if (serv_sk.iptype == 0)
 	{
@@ -246,18 +235,16 @@ static void eth_adaption_server_start(struct kthread_work *work)
 		ETHADPTERR("\nCan`t create a socket%d\n",error);
 	}
 
-	error = kernel_setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, (char *)&reuseaddr, sizeof(reuseaddr));
-	if (error < 0)
+	if(sock == NULL)
 	{
-		ETHADPTERR("Can`t set a socket option SO_REUSEADDR  %d\n", error);
+		ETHADPTERR("\nSocket sock is NULL\n");
+		goto release;
 	}
-	error = kernel_setsockopt(sock, SOL_SOCKET, SO_REUSEPORT, (char *)&reuseport, sizeof(reuseport));
-
-	if (error < 0)
+	else
 	{
-		ETHADPTERR("Can`t set a socket option SO_REUSEPORT %d\n", error);
+		sock_set_reuseaddr(sock->sk);
+		sock_set_reuseport(sock->sk);
 	}
-
 	client = sock_alloc();
 
 	if (client == NULL)
@@ -319,36 +306,39 @@ static void eth_adaption_server_start(struct kthread_work *work)
 
 		if(cn == 0)
 		{
-				if(serv_sk.newsocket) {
-					ETHADPTERR(" going for sock cleanup");
-					eth_adaption_server_sock_cleanup();
+			if(serv_sk.newsocket) {
+				ETHADPTERR(" going for sock cleanup");
+				eth_adaption_server_sock_cleanup();
+			}
+			if(sock == NULL)
+			{
+				ETHADPTERR("\nSocket sock is NULL\n");
+				goto release;
+			}
+			else
+			{
+				sock_set_keepalive(sock->sk);
+
+				error = tcp_sock_set_keepidle(sock->sk, keepidle);
+				if(error < 0)
+				{
+					ETHADPTERR("Can`t set a socket option TCP_KEEPIDLE %d\n", error);
+					goto release;
 				}
-			error = kernel_setsockopt(sock, SOL_SOCKET, SO_KEEPALIVE, (char *)&keepalive, sizeof(keepalive));
-			if (error < 0)
-			{
-				ETHADPTERR("Can`t set a socket option SO_KEEPALIVE %d\n", error);
-				goto release;
-			}
 
-			error = kernel_setsockopt(sock, IPPROTO_TCP, TCP_KEEPIDLE, (char *)&keepidle, sizeof(keepidle));
-			if (error < 0)
-			{
-				ETHADPTERR("Can`t set a socket option TCP_KEEPIDLE %d\n", error);
-				goto release;
-			}
+				error = tcp_sock_set_keepintvl(sock->sk, keepintvl);
+				if(error < 0)
+				{
+					ETHADPTERR("Can`t set a socket option TCP_KEEPINTVL %d\n", error);
+					goto release;
+				}
 
-			error = kernel_setsockopt(sock, IPPROTO_TCP, TCP_KEEPINTVL, (char *)&keepintvl, sizeof(keepintvl));
-			if (error < 0)
-			{
-				ETHADPTERR("Can`t set a socket option TCP_KEEPINTVL %d\n", error);
-				goto release;
-			}
-
-			error = kernel_setsockopt(sock, IPPROTO_TCP, TCP_KEEPCNT, (char *)&keepcnt, sizeof(keepcnt));
-			if (error < 0)
-			{
-				ETHADPTERR("Can`t set a socket option TCP_KEEPCNT %d\n", error);
-				goto release;
+				error = tcp_sock_set_keepcnt(sock->sk, keepcnt);
+				if(error < 0)
+				{
+					ETHADPTERR("Can`t set a socket option TCP_KEEPCNT %d\n", error);
+					goto release;
+				}
 			}
 
 			serv_sk.sock = sock;
@@ -363,12 +353,9 @@ static void eth_adaption_server_start(struct kthread_work *work)
 			{
 				serv_sk.serverv6 = serverv6;
 			}
-			error = kernel_setsockopt(client, SOL_TCP, TCP_NODELAY, (char *)&tcpnodelay, sizeof(tcpnodelay));
-			if (error < 0)
-			{
-				ETHADPTERR(KERN_ALERT "Can`t set a socket option TCP_NODELAY %d\n", error);
-				return;
-			}
+
+			tcp_sock_set_nodelay(client->sk);
+
 			mutex_lock(&eam_lock);
 			if (qrtr_init == QRTR_DEINIT || qrtr_init == QRTR_INPROGRESS)
 			{

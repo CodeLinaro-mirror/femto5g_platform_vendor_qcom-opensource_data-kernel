@@ -77,7 +77,6 @@ int eth_adaption_client_send(const char *buf, const size_t length)
 	struct msghdr msg;
 	struct kvec vec;
 	int len = 0, written = 0, left = length;
-	mm_segment_t oldmm;
 	unsigned long flags = MSG_DONTWAIT;
 
 	msg.msg_name    = 0;
@@ -86,7 +85,6 @@ int eth_adaption_client_send(const char *buf, const size_t length)
 	msg.msg_controllen = 0;
 	msg.msg_flags   = flags;
 
-  oldmm = get_fs(); set_fs(KERNEL_DS);
 repeat_send:
   vec.iov_len = left;
   vec.iov_base = (char *)buf + written;
@@ -106,7 +104,6 @@ repeat_send:
 		if(left)
 			goto repeat_send;
 	}
-set_fs(oldmm);
 	if(client_sk.kpi_send_data)
 	{
 #ifdef CONFIG_MSM_BOOT_TIME_MARKER
@@ -165,7 +162,7 @@ static void eth_adaption_client_receive(struct kthread_work *work)
 	eth_res.bytes_xferd = len;
 	// send this message to qrtr.
 	qcom_ethernet_qrtr_dl_cb(&eth_res);
-	ETHADPTDBG("the server says: %x %d| client_receive\n", buf,len);
+	ETHADPTDBG("the server says: %lu %d| client_receive\n", (uintptr_t)buf,len);
 	if(client_sk.kpi_receive_data)
 	{
 #ifdef CONFIG_MSM_BOOT_TIME_MARKER
@@ -222,9 +219,7 @@ void eth_adaption_client_start(struct kthread_work *work)
 	struct socket *sockt;
 	struct sockaddr_in *server = NULL;
 	struct sockaddr_in6 *server_v6 = NULL;
-	int acc,cn,ret,sent,count;
-	int tcpnodelay = 1;
-	int keepalive = 1;
+	int acc,cn,ret;
 
 	if(client_sk.iptype == 0)
 	{
@@ -244,19 +239,21 @@ void eth_adaption_client_start(struct kthread_work *work)
 		ETHADPTDBG("cb_info_client NULL \n");
 		goto release;
 	}
-	ETHADPTDBG("client sock %d\n");
+	ETHADPTDBG("client sock %d\n",acc);
 	if(acc < 0)
 	{
 		printk(KERN_ALERT "socket failed %d\n",acc);
 		goto release;
 	}
 
-	acc = kernel_setsockopt(sockt, SOL_TCP, TCP_NODELAY, (char *)&tcpnodelay, sizeof(tcpnodelay));
-
-	if (acc < 0)
+	if(sockt == NULL)
 	{
-		ETHADPTDBG("Can`t set a socket option TCP_NODELAY %d\n", acc);
+		ETHADPTERR("\nSocket sockt is NULL\n");
 		goto release;
+	}
+	else
+	{
+		tcp_sock_set_nodelay(sockt->sk);
 	}
 
 	if(client_sk.iptype == 0)
@@ -320,31 +317,35 @@ connect:
 
 	if(cn == 0)
 	{
-		acc = kernel_setsockopt(sockt, SOL_SOCKET, SO_KEEPALIVE, (char *)&keepalive, sizeof(keepalive));
-		if (acc < 0)
+		if(sockt == NULL)
 		{
-			ETHADPTERR("Can`t set a socket option SO_KEEPALIVE %d\n", acc);
+			ETHADPTERR("\nSocket sockt is NULL\n");
 			goto release;
 		}
+		else
+		{
+			sock_set_keepalive(sockt->sk);
 
-		acc = kernel_setsockopt(sockt, IPPROTO_TCP, TCP_KEEPIDLE, (char *)&keepidle, sizeof(keepidle));
-		if (acc < 0)
-		{
-			ETHADPTERR("Can`t set a socket option TCP_KEEPIDLE %d\n", acc);
-			goto release;
-		}
-		acc = kernel_setsockopt(sockt, IPPROTO_TCP, TCP_KEEPINTVL, (char *)&keepintvl, sizeof(keepintvl));
-		if (acc < 0)
-		{
-			ETHADPTERR("Can`t set a socket option TCP_KEEPINTVL %d\n", acc);
-			goto release;
-		}
+			acc = tcp_sock_set_keepidle(sockt->sk, keepidle);
+			if(acc < 0)
+			{
+				ETHADPTERR("Can`t set a socket option TCP_KEEPIDLE %d\n", acc);
+				goto release;
+			}
 
-		acc = kernel_setsockopt(sockt, IPPROTO_TCP, TCP_KEEPCNT, (char *)&keepcnt, sizeof(keepcnt));
-		if (acc < 0)
-		{
-			ETHADPTERR("Can`t set a socket option TCP_KEEPCNT %d\n", acc);
-			goto release;
+			acc = tcp_sock_set_keepintvl(sockt->sk, keepintvl);
+			if(acc < 0)
+			{
+				ETHADPTERR("Can`t set a socket option TCP_KEEPINTVL %d\n", acc);
+				goto release;
+			}
+
+			acc = tcp_sock_set_keepcnt(sockt->sk, keepcnt);
+			if(acc < 0)
+			{
+				ETHADPTERR("Can`t set a socket option TCP_KEEPCNT %d\n", acc);
+				goto release;
+			}
 		}
 
 		client_sk.conn_socket = sockt;
