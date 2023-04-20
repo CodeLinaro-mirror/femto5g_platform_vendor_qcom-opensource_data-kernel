@@ -34,7 +34,7 @@ typedef struct{
 	uint32_t source_len;
 }parser_s;
 int isv2 = 1;
-/*****/
+
 // Debugfs
 typedef enum config_param{
 	FHRX,
@@ -1509,6 +1509,72 @@ static ssize_t config_val_from_registers_qudp_ingress_global_cfg_v2(char __user 
 					max_str_size);
 			strlcat(max_str, "\n",
 					max_str_size);
+
+			scnprintf(temp_stat_val_str, TEMP_STAT_VAL_STR_MAX_SIZE, "%u",
+					ecpriss_pdata_v2->cfg_stats_v2.qudp_cfg_v2.ingress.cfg.global_cfg[fh_index].enable_ip_dst_filt);
+
+			strlcat(max_str, "enable_ip_dst_filt_fh_",
+					max_str_size);
+			strlcat(max_str, fh_str,
+					max_str_size);
+			strlcat(max_str, ":", max_str_size);
+			strlcat(max_str, temp_stat_val_str,
+					max_str_size);
+			strlcat(max_str, "\n",
+					max_str_size);
+
+			scnprintf(temp_stat_val_str, TEMP_STAT_VAL_STR_MAX_SIZE, "%u",
+					ecpriss_pdata_v2->cfg_stats_v2.qudp_cfg_v2.ingress.cfg.global_cfg[fh_index].enable_udp_cs_check);
+
+			strlcat(max_str, "enable_udp_cs_check_fh_",
+					max_str_size);
+			strlcat(max_str, fh_str,
+					max_str_size);
+			strlcat(max_str, ":", max_str_size);
+			strlcat(max_str, temp_stat_val_str,
+					max_str_size);
+			strlcat(max_str, "\n",
+					max_str_size);
+
+			scnprintf(temp_stat_val_str, TEMP_STAT_VAL_STR_MAX_SIZE, "%u",
+					ecpriss_pdata_v2->cfg_stats_v2.qudp_cfg_v2.ingress.cfg.global_cfg[fh_index].ip_filt_miss_action);
+
+			strlcat(max_str, "ip_filt_miss_action_fh_",
+					max_str_size);
+			strlcat(max_str, fh_str,
+					max_str_size);
+			strlcat(max_str, ":", max_str_size);
+			strlcat(max_str, temp_stat_val_str,
+					max_str_size);
+			strlcat(max_str, "\n",
+					max_str_size);
+
+			scnprintf(temp_stat_val_str, TEMP_STAT_VAL_STR_MAX_SIZE, "%u",
+					ecpriss_pdata_v2->cfg_stats_v2.qudp_cfg_v2.ingress.cfg.global_cfg[fh_index].ip_len_err_action);
+
+			strlcat(max_str, "ip_len_err_action_fh_",
+					max_str_size);
+			strlcat(max_str, fh_str,
+					max_str_size);
+			strlcat(max_str, ":", max_str_size);
+			strlcat(max_str, temp_stat_val_str,
+					max_str_size);
+			strlcat(max_str, "\n",
+					max_str_size);
+
+			scnprintf(temp_stat_val_str, TEMP_STAT_VAL_STR_MAX_SIZE, "%u",
+					ecpriss_pdata_v2->cfg_stats_v2.qudp_cfg_v2.ingress.cfg.global_cfg[fh_index].vlan_filt_miss_action);
+
+			strlcat(max_str, "vlan_filt_miss_action_fh_",
+					max_str_size);
+			strlcat(max_str, fh_str,
+					max_str_size);
+			strlcat(max_str, ":", max_str_size);
+			strlcat(max_str, temp_stat_val_str,
+					max_str_size);
+			strlcat(max_str, "\n",
+					max_str_size);
+
 
 
 		data_size = strlen(max_str);
