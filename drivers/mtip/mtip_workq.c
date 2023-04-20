@@ -131,7 +131,8 @@ int mtip_initialize_workq(void)
       mtip_workq_list_initialize();
 
       // create the workq
-      mtip_wq = create_workqueue("mtip_workq");
+//      mtip_wq = create_workqueue("mtip_workq");
+      mtip_wq = alloc_workqueue("mtip_workq",  WQ_MEM_RECLAIM | WQ_UNBOUND | WQ_SYSFS | WQ_HIGHPRI, 1);
 
       // HANDLE THE ERROR
       if (mtip_wq == NULL)
