@@ -5002,76 +5002,76 @@ static struct ecpriss_qudp_hal_reg_obj ecpriss_qudp_hal_reg_objs[ECPRISS_HW_MAX]
 	[ECPRISS_HW_v2_0][ECPRI_UDP_FH_INGRESS_NUM_ETH_UDP_PACKETS_PORT_p_LINK_n_V2] = {
 		ecpriss_qudp_hal_reg_construct_dummy_v2,
 		ecpriss_qudp_hal_reg_parse_dummy_v2,
-		0x09384000, 0x0, 0x120, 0, 0, 0, 0x48},
+		0x09384000, 0x0, 0x48, 0, 0, 0, 0x120},
 	[ECPRISS_HW_v2_0][ECPRI_UDP_FH_INGRESS_FCS_ERR_PACKETS_PORT_p_LINK_n_V2] = {
 		ecpriss_qudp_hal_reg_construct_dummy_v2,
 		ecpriss_qudp_hal_reg_parse_dummy_v2,
-		0x09384000, 0x4, 0x120, 0, 0, 0, 0x48},
+		0x09384000, 0x4, 0x48, 0, 0, 0, 0x120},
 	[ECPRISS_HW_v2_0][ECPRI_UDP_FH_INGRESS_IPV4_CS_ERROR_PACKETS_PORT_p_LINK_n_V2] = {
 		ecpriss_qudp_hal_reg_construct_dummy_v2,
 		ecpriss_qudp_hal_reg_parse_dummy_v2,
-		0x09384000, 0x8, 0x120, 0, 0, 0, 0x48},
+		0x09384000, 0x8, 0x48, 0, 0, 0, 0x120},
 	[ECPRISS_HW_v2_0][ECPRI_UDP_FH_INGRESS_UDP_CS_ERROR_PACKETS_PORT_p_LINK_n_V2] = {
 		ecpriss_qudp_hal_reg_construct_dummy_v2,
 		ecpriss_qudp_hal_reg_parse_dummy_v2,
-		0x09384000, 0xC, 0x120, 0, 0, 0, 0x48},
+		0x09384000, 0xC, 0x48, 0, 0, 0, 0x120},
 	[ECPRISS_HW_v2_0][ECPRI_UDP_FH_INGRESS_IP_FILTERED_PACKETS_PORT_p_LINK_n_V2] = {
 		ecpriss_qudp_hal_reg_construct_dummy_v2,
 		ecpriss_qudp_hal_reg_parse_dummy_v2,
-		0x09384000, 0x10, 0x120, 0, 0, 0, 0x48},
+		0x09384000, 0x10, 0x48, 0, 0, 0, 0x120},
 	[ECPRISS_HW_v2_0][ECPRI_UDP_FH_INGRESS_VLAN_FILTERED_PACKETS_PORT_p_LINK_n_V2] = {
 		ecpriss_qudp_hal_reg_construct_dummy_v2,
 		ecpriss_qudp_hal_reg_parse_dummy_v2,
-		0x09384000, 0x14, 0x120, 0, 0, 0, 0x48},
+		0x09384000, 0x14, 0x48, 0, 0, 0, 0x120},
 	[ECPRISS_HW_v2_0][ECPRI_UDP_FH_INGRESS_SEC_ERR_PACKETS_PORT_p_LINK_n_V2] = {
 		ecpriss_qudp_hal_reg_construct_dummy_v2,
 		ecpriss_qudp_hal_reg_parse_dummy_v2,
-		0x09384000, 0x18, 0x120, 0, 0, 0, 0x48},
+		0x09384000, 0x18, 0x48, 0, 0, 0, 0x120},
 	[ECPRISS_HW_v2_0][ECPRI_UDP_FH_INGRESS_IP_LEN_ERR_PACKETS_PORT_p_LINK_n_V2] = {
 		ecpriss_qudp_hal_reg_construct_dummy_v2,
 		ecpriss_qudp_hal_reg_parse_dummy_v2,
-		0x09384000, 0x1C, 0x120, 0, 0, 0, 0x48},
+		0x09384000, 0x1C, 0x48, 0, 0, 0, 0x120},
 	[ECPRISS_HW_v2_0][ECPRI_UDP_FH_INGRESS_NUM_ETH_ECPRI_PACKETS_PORT_p_LINK_n_V2] = {
 		ecpriss_qudp_hal_reg_construct_dummy_v2,
 		ecpriss_qudp_hal_reg_parse_dummy_v2,
-		0x09384000, 0x20, 0x120, 0, 0, 0, 0x48},
+		0x09384000, 0x20, 0x48, 0, 0, 0, 0x120},
 	[ECPRISS_HW_v2_0][ECPRI_UDP_FH_INGRESS_NUM_ETH_PTP_PACKETS_PORT_p_LINK_n_V2] = {
 		ecpriss_qudp_hal_reg_construct_dummy_v2,
 		ecpriss_qudp_hal_reg_parse_dummy_v2,
-		0x09384000, 0x24, 0x120, 0, 0, 0, 0x48},
+		0x09384000, 0x24, 0x48, 0, 0, 0, 0x120},
 	[ECPRISS_HW_v2_0][ECPRI_UDP_FH_INGRESS_NUM_ETH_OTHER_PACKETS_PORT_p_LINK_n_V2] = {
 		ecpriss_qudp_hal_reg_construct_dummy_v2,
 		ecpriss_qudp_hal_reg_parse_dummy_v2,
-		0x09384000, 0x28, 0x120, 0, 0, 0, 0x48},
+		0x09384000, 0x28, 0x48, 0, 0, 0, 0x120},
 	[ECPRISS_HW_v2_0][ECPRI_UDP_FH_INGRESS_NUM_UDP_ECPRI_OR_NFAPI_PACKETS_PORT_p_LINK_n_V2] = {
 		ecpriss_qudp_hal_reg_construct_dummy_v2,
 		ecpriss_qudp_hal_reg_parse_dummy_v2,
-		0x09384000, 0x2C, 0x120, 0, 0, 0, 0x48},
+		0x09384000, 0x2C, 0x48, 0, 0, 0, 0x120},
 
 	[ECPRISS_HW_v2_0][ECPRI_UDP_FH_INGRESS_NUM_UDP_PTP_PACKETS_PORT_p_LINK_n_V2] = {
 		ecpriss_qudp_hal_reg_construct_dummy_v2,
 		ecpriss_qudp_hal_reg_parse_dummy_v2,
-		0x09384000, 0x30, 0x120, 0, 0, 0, 0x48},
+		0x09384000, 0x30, 0x48, 0, 0, 0, 0x120},
 	[ECPRISS_HW_v2_0][ECPRI_UDP_FH_INGRESS_NUM_UDP_OTHER_PACKETS_PORT_p_LINK_n_V2] = {
 		ecpriss_qudp_hal_reg_construct_dummy_v2,
 		ecpriss_qudp_hal_reg_parse_dummy_v2,
-		0x09384000, 0x34, 0x120, 0, 0, 0, 0x48},
+		0x09384000, 0x34, 0x48, 0, 0, 0, 0x120},
 	[ECPRISS_HW_v2_0][ECPRI_UDP_FH_EGRESS_NUM_UDP_PACKETS_PORT_p_LINK_n_V2] = {
 		ecpriss_qudp_hal_reg_construct_dummy_v2,
 		ecpriss_qudp_hal_reg_parse_dummy_v2,
-		0x09384000, 0x38, 0x120, 0, 0, 0, 0x48},
+		0x09384000, 0x38, 0x48, 0, 0, 0, 0x120},
 	[ECPRISS_HW_v2_0][ECPRI_UDP_FH_EGRESS_NUM_ETH_ONLY_PACKETS_PORT_p_LINK_n_V2] = {
 		ecpriss_qudp_hal_reg_construct_dummy_v2,
 		ecpriss_qudp_hal_reg_parse_dummy_v2,
-		0x09384000, 0x3C, 0x120, 0, 0, 0, 0x48},
+		0x09384000, 0x3C, 0x48, 0, 0, 0, 0x120},
 	[ECPRISS_HW_v2_0][ECPRI_UDP_FH_EGRESS_NUM_BYPASSED_PACKETS_PORT_p_LINK_n_V2] = {
 		ecpriss_qudp_hal_reg_construct_dummy_v2,
 		ecpriss_qudp_hal_reg_parse_dummy_v2,
-		0x09384000, 0x40, 0x120, 0, 0, 0, 0x48},
+		0x09384000, 0x40, 0x48, 0, 0, 0, 0x120},
 	[ECPRISS_HW_v2_0][ECPRI_UDP_FH_EGRESS_MTU_ERR_PACKETS_PORT_p_LINK_n_V2] = {
 		ecpriss_qudp_hal_reg_construct_dummy_v2,
 		ecpriss_qudp_hal_reg_parse_dummy_v2,
-		0x09384000, 0x44, 0x120, 0, 0, 0, 0x48},
+		0x09384000, 0x44, 0x48, 0, 0, 0, 0x120},
 	//L2 Rams
 
 	[ECPRISS_HW_v2_0][ECPRI_UDP_L2_INGRESS_NUM_ETH_UDP_PACKETS_PORT_p_LINK_n_V2] = {
