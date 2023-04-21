@@ -1185,15 +1185,33 @@ static void mtip_get_stats64(struct net_device *netdev,
  */
 static int mtip_netdev_header(struct sk_buff *skb, struct net_device *dev,
 		 unsigned short type, const void *daddr, const void *saddr,
-                 unsigned int len) {
+                 unsigned int len) 
+{
+   struct mtip_netdev_priv *priv;
+   int link_index;
    struct ethhdr *eth = (struct ethhdr *)skb_push(skb,ETH_HLEN);
+   int other_link_index;
+   struct net_device *other_dev = NULL;
 
-   CSMLOGDBG("mtip_netdev_header called\n");
+   priv = (struct mtip_netdev_priv*)netdev_priv(dev);
+   link_index = priv->link_index;
+
+   if (link_index%2 == 0) 
+   {
+       other_link_index = link_index + 1;
+   }
+   else
+   {
+       other_link_index = link_index - 1;
+   }
+
+   other_dev = platform_driver_priv->mtip_links[other_link_index]->dev;
+
+   CSMLOGDBG("mtip_netdev_header called link_index %d other_link_index %d\n", link_index, other_link_index);
    
    eth->h_proto = htons(type);
-   memcpy(eth->h_source, saddr ? saddr : dev->dev_addr, dev->addr_len);
-   memcpy(eth->h_dest,   daddr ? daddr : dev->dev_addr, dev->addr_len);
-   eth->h_dest[ETH_ALEN-1]   ^= 0x01;   /* dest is us xor 1 */
+   memcpy(eth->h_source, dev->dev_addr, dev->addr_len);
+   memcpy(eth->h_dest,   other_dev->dev_addr, other_dev->addr_len);
    return (dev->hard_header_len);
 }
 
