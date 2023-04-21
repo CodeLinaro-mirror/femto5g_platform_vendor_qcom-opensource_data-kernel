@@ -75,6 +75,8 @@ void get_file_name(char *filename) {
 		char token[64];
 		int i;
 		int iscoln = 0;
+		if (!filename)
+			return;
 		for (i = 0; filename[i] != 0 || i < 64; i++) {
 				if (filename[i] == ':') {
 						iscoln = 1;
@@ -84,8 +86,6 @@ void get_file_name(char *filename) {
 		if (!iscoln)
 				return;
 
-		if (!filename)
-				return;
 		parser(filename, ":", token, &index);
 		parser(filename, ":", token, &index);
 		remove_firstchar(token);
@@ -738,10 +738,12 @@ int setup_debugfs_directory(void) {
 				} else if (token[0] == '}' && len > 2) {
 						remove_firstchar(token);
 						curr_index--;
-						kobj_root =
-							debugfs_create_dir(token, list_dv[curr_index - 1]);
-						list_dv[curr_index] = kobj_root;
-						curr_index++;
+						if(curr_index > 0) {
+							kobj_root =
+								debugfs_create_dir(token, list_dv[curr_index - 1]);
+							list_dv[curr_index] = kobj_root;
+							curr_index++;
+						}
 				} else if (token[0] == ',' && len > 2) {
 						remove_firstchar(token);
 						fileops = file_name_to_wrapper(token);

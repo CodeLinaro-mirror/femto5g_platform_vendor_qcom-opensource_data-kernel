@@ -99,7 +99,6 @@ int ecpri_oxtor_tx_ctl_reg_cfg(const ecpri_oxtor_tx_ring_config_s* cfg ,
 	 */
 	pr_info("<ecpri_oxtor_tx_ctl_reg_cfg> getting called \n");
 	ring_ptr = &ecpri_oxtor_tx_ring_cnxt.ring_arr[ring_id];
-	oxtor_cfg.wrap_en = cfg->run_mode;
 	if (NULL == cfg)
 	{
 		pr_err("Invalid tx ring cfg");
@@ -107,6 +106,7 @@ int ecpri_oxtor_tx_ctl_reg_cfg(const ecpri_oxtor_tx_ring_config_s* cfg ,
 		return -EINVAL;
 
 	}
+	oxtor_cfg.wrap_en = cfg->run_mode;
 	ecpriss_oxtor_hal_write_reg_n_fields(ECPRI_OXTOR_REG_TYPE_BASE,
 			ECPRI_ORAN_XTOR_TX_n_CTL_REG,ring_id, &oxtor_cfg);
 
