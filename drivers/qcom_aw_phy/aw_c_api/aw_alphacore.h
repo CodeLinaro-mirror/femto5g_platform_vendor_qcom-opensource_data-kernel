@@ -434,10 +434,9 @@ int aw_pmd_anlt_auto_neg_config_set(mss_access_t *mss,
 
 int aw_pmd_anlt_auto_neg_start_set(mss_access_t *mss, uint32_t start);
 
+int aw_pmd_anlt_auto_neg_status_get (mss_access_t *mss, uint32_t * link_good);
 int aw_pmd_anlt_auto_neg_status_complete_get(mss_access_t *mss,
                                              uint32_t *an_complete);
-
-int aw_pmd_anlt_auto_neg_next_page_set(mss_access_t *mss, uint64_t an_tx_np);
 
 int aw_pmd_anlt_auto_neg_next_page_oui_compare_set(mss_access_t *mss,
                                                    uint32_t np_expected_oui);
@@ -695,5 +694,9 @@ int aw_pmd_snr_mon_enable_set(mss_access_t *mss, uint32_t nrz_mode,
 int aw_pmd_snr_vld_enable_set(mss_access_t *mss, uint32_t vld_enable);
 
 int aw_tc_sm_conv(uint32_t v, uint32_t i);
+
+int aw_pmd_anlt_auto_neg_result_get (mss_access_t *mss, uint8_t no_consortium, uint32_t * an_result);
+
+int aw_pmd_anlt_auto_neg_next_page_set(mss_access_t *mss, uint64_t an_tx_np);
 
 #endif
