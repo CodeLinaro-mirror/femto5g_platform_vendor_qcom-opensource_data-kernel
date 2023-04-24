@@ -173,7 +173,7 @@ int mtip_debug_eth_probe(struct platform_device *pdev) {
   u32 fuse_csr_regs[2];
   u32 debug_csr_regs[2];
   void __iomem *addr;
-  struct resource dev_resource;
+  struct resource dev_resource = {0};
   bool fuse_enabled = true;
   u32 fuse_val;
   int ethernet_trace_disabled = 8;
