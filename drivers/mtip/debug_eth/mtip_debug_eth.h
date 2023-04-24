@@ -35,6 +35,7 @@ int mtip_debug_eth_start_xmit(struct sk_buff *skb, struct net_device *netdev);
 int mtip_debug_eth_probe(struct platform_device *pdev);
 int mtip_debug_eth_remove(struct platform_device *pdev);
 int mtip_debug_eth_register_platform_driver(void);
+void mtip_debug_eth_unregister_platform_driver(void);
 const struct ethtool_ops * mtip_debug_eth_get_ethtool_ops(void);
 
 #endif /* MTIP_DEBUG_ETH_H */

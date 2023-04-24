@@ -168,6 +168,18 @@ static int mtip_debug_eth_irq_init(struct platform_device *pdev) {
   return res;
 }
 
+void mtip_debug_eth_irq_destroy(struct platform_device *pdev) {
+
+  int debug_irq;
+  if (pdev == NULL)
+	return;
+  debug_irq = platform_get_irq_byname(pdev, "debug-irq");
+  if(debug_irq > 0) {
+	disable_irq_wake(debug_irq);
+	free_irq(debug_irq, NULL);
+  }
+}
+
 int mtip_debug_eth_probe(struct platform_device *pdev) {
   int debug_ret = 0;
   u32 fuse_csr_regs[2];
@@ -234,6 +246,8 @@ int mtip_debug_eth_probe(struct platform_device *pdev) {
 
 int mtip_debug_eth_remove(struct platform_device *pdev) {
   mtip_debug_eth_gnl_exit();
+  mtip_debug_eth_irq_destroy(pdev);
+  del_sysfs();
   return 0; 
 }
 
@@ -249,6 +263,11 @@ int mtip_debug_eth_register_platform_driver() {
   }
 
   return ret_val;
+}
+
+void mtip_debug_eth_unregister_platform_driver(void) {
+
+    platform_driver_unregister(&mtip_debug_eth_driver);
 }
 
 void mtip_debug_eth_ethtool_get_dev_regs

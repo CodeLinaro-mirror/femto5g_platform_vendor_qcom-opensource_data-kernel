@@ -133,17 +133,19 @@ out:
 
 static int mtip_platform_cleanup_link(unsigned int link_index)
 {
-   if (platform_driver_priv->mtip_links[link_index] != NULL &&
-       platform_driver_priv->mtip_links[link_index]->dma_hdl != 0)
+   if (platform_driver_priv->mtip_links[link_index] != NULL) 
    {
-      // disconnect the pipes
-      mtip_disconnect_dma_pipe(platform_driver_priv->mtip_links[link_index]->dma_hdl);
+      if(platform_driver_priv->mtip_links[link_index]->dma_hdl != 0)
+      {
+         // disconnect the pipes
+         mtip_disconnect_dma_pipe(platform_driver_priv->mtip_links[link_index]->dma_hdl);
 
-      // remove from hashmap
-      mtip_hashmap_remove(platform_driver_priv->mtip_links[link_index]->dma_hdl);
+         // remove from hashmap
+         mtip_hashmap_remove(platform_driver_priv->mtip_links[link_index]->dma_hdl);
 
-      // reset the hdl of the link
-      platform_driver_priv->mtip_links[link_index]->dma_hdl = 0;
+         // reset the hdl of the link
+         platform_driver_priv->mtip_links[link_index]->dma_hdl = 0;
+      }
 
       kfree(platform_driver_priv->mtip_links[link_index]);
 
@@ -1512,39 +1514,38 @@ out:
    return ret;
 }
 
-int mtip_platform_remove(struct platform_device *pdev)
+int mtip_port_remove(struct platform_device *pdev)
 {
-   int result = 0;
+   CSMLOGINFO("mtip_port_remove called\n");
+   // free the ports
+   mtip_platform_cleanup_ports();
+   return 0;
+}
+
+int mtip_link_remove(struct platform_device *pdev)
+{
    int i;
-
-   CSMLOGINFO("mtip_platform_remove called\n");
-
+   CSMLOGINFO("mtip_link_remove called\n");
    // free the net devices
    for (i = 0; i < MTIP_MAX_LINKS; ++i) 
    {
-       if (platform_driver_priv->mtip_links[i] != NULL) 
+       if (platform_driver_priv->mtip_links[i]!=NULL)
+       {
+	  if(platform_driver_priv->mtip_links[i]->dev != NULL)
        {
            // unregister the netdevs
           unregister_netdev(platform_driver_priv->mtip_links[i]->dev);
 
           // free the netdevs
           free_netdev(platform_driver_priv->mtip_links[i]->dev);
+             platform_driver_priv->mtip_links[i]->dev=NULL;
        }
-   }
-
-   for (i = 0; i < MTIP_MAX_LINKS; ++i) 
-   {
-       if (platform_driver_priv->mtip_links[i] != NULL) 
-       {
            // cleanup the link
            mtip_platform_cleanup_link(i);
        }
    }
 
-   // free the ports
-   mtip_platform_cleanup_ports();
-
-   return result;
+   return 0;
 }
 
 int mtip_platform_convert_lane_speed_to_gbps(enum eth_phy_iface_phy_lane_speed_enum lane_speed)

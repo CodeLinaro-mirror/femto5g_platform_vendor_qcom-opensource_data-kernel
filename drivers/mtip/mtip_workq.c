@@ -190,6 +190,15 @@ int mtip_workq_list_finalize(void)
    // go through all the packets and pop them
 
    // free the memory allocations
+   unsigned int     work_type;
+   void*            work_ptr;
+   struct mtip_send_ready_task* taskstruct = NULL;
+   while(mtip_workq_list_size())
+   {
+	mtip_workq_list_pop(&work_type, &work_ptr);
+	taskstruct = (struct mtip_send_ready_task*)work_ptr;
+	kfree(taskstruct);
+   }
    return 0;
 }
 

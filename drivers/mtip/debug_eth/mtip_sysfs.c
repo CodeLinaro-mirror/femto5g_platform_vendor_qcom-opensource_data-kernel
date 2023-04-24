@@ -844,6 +844,21 @@ int setup_sysfs(void __iomem *addr, struct device *dev) {
   return 0;
 }
 
+void del_sysfs(void) {
+
+	sysfs_remove_PacketFifo(kobj_FIFO_7);
+	sysfs_remove_PacketFifo(kobj_FIFO_6);
+	sysfs_remove_PacketFifo(kobj_FIFO_5);
+	sysfs_remove_StreamingFifo(kobj_FIFO_4);
+	sysfs_remove_StreamingFifo(kobj_FIFO_3);
+	sysfs_remove_StreamingFifo(kobj_FIFO_2);
+	sysfs_remove_StreamingFifo(kobj_FIFO_1);
+	sysfs_remove_StreamingFifo(kobj_FIFO_0);
+	sysfs_remove_L3headers(kobj_ref_L3headers);
+	sysfs_remove_L2headers(kobj_ref_L2headers);
+	sysfs_remove_generic_dir_structure(kobj_root);
+}
+
 /*
 Function responsible for the static allocation of the AXI Address Range of the
 corrseponding FIFO's at the beginning. */
@@ -1745,6 +1760,14 @@ int sysfs_create_generic_dir_structure(struct kobject *kobj_ref) {
   return -1;
 }
 
+void sysfs_remove_generic_dir_structure(struct kobject *kobj_ref) {
+
+	sysfs_remove_file(kobj_ref, &enabled_attr.attr);
+	kobject_del(kobj_ref);
+	kobject_put(kobj_ref);
+	kobj_ref=NULL;
+}
+
 int sysfs_create_L2headers(struct kobject *kobj_ref) {
   if (sysfs_create_file(kobj_ref, &saddr_attr.attr)) {
     CSMLOGINFO("Unable to create the sysfs file...\n");
@@ -1758,6 +1781,16 @@ int sysfs_create_L2headers(struct kobject *kobj_ref) {
 
   return -1;
 }
+
+void sysfs_remove_L2headers(struct kobject *kobj_ref) {
+
+	sysfs_remove_file(kobj_ref, &daddr_attr.attr);
+	sysfs_remove_file(kobj_ref, &saddr_attr.attr);
+	kobject_del(kobj_ref);
+	kobject_put(kobj_ref);
+	kobj_ref=NULL;
+}
+
 
 int sysfs_create_L3headers(struct kobject *kobj_ref) {
   if (sysfs_create_file(kobj_ref, &saddr_attr.attr)) {
@@ -1781,6 +1814,17 @@ int sysfs_create_L3headers(struct kobject *kobj_ref) {
   }
 
   return -1;
+}
+
+void sysfs_remove_L3headers(struct kobject *kobj_ref) {
+
+	sysfs_remove_file(kobj_ref, &dport_attr.attr);
+	sysfs_remove_file(kobj_ref, &sport_attr.attr);
+	sysfs_remove_file(kobj_ref, &daddr_attr.attr);
+	sysfs_remove_file(kobj_ref, &saddr_attr.attr);
+	kobject_del(kobj_ref);
+	kobject_put(kobj_ref);
+	kobj_ref=NULL;
 }
 
 int sysfs_create_StreamingFifo(struct kobject *kobj_ref) {
@@ -1832,6 +1876,22 @@ int sysfs_create_StreamingFifo(struct kobject *kobj_ref) {
   return -1;
 }
 
+void sysfs_remove_StreamingFifo(struct kobject *kobj_ref) {
+
+	sysfs_remove_file(kobj_ref, &vlanID_attr.attr);
+	sysfs_remove_file(kobj_ref, &Timeout_attr.attr);
+	sysfs_remove_file(kobj_ref, &Threshold_attr.attr);
+	sysfs_remove_file(kobj_ref, &OverFlowInterrupt_attr.attr);
+	sysfs_remove_file(kobj_ref, &AddrRange_attr_end.attr);
+	sysfs_remove_file(kobj_ref, &AddrRange_attr_start.attr);
+	sysfs_remove_file(kobj_ref, &txcount_attr.attr);
+	sysfs_remove_file(kobj_ref, &flush_attr.attr);
+	sysfs_remove_file(kobj_ref, &status_attr.attr);
+	kobject_del(kobj_ref);
+	kobject_put(kobj_ref);
+	kobj_ref=NULL;
+}
+
 int sysfs_create_PacketFifo(struct kobject *kobj_ref) {
   if (sysfs_create_file(kobj_ref, &status_attr.attr)) {
     CSMLOGINFO("Unable to create the sysfs file...\n");
@@ -1869,6 +1929,20 @@ int sysfs_create_PacketFifo(struct kobject *kobj_ref) {
   }
 
   return -1;
+}
+
+void sysfs_remove_PacketFifo(struct kobject *kobj_ref) {
+
+	sysfs_remove_file(kobj_ref, &vlanID_attr.attr);
+	sysfs_remove_file(kobj_ref, &OverFlowInterrupt_attr.attr);
+	sysfs_remove_file(kobj_ref, &AddrRange_attr_end.attr);
+	sysfs_remove_file(kobj_ref, &AddrRange_attr_start.attr);
+	sysfs_remove_file(kobj_ref, &txcount_attr.attr);
+	sysfs_remove_file(kobj_ref, &flush_attr.attr);
+	sysfs_remove_file(kobj_ref, &status_attr.attr);
+	kobject_del(kobj_ref);
+	kobject_put(kobj_ref);
+	kobj_ref=NULL;
 }
 
 unsigned int is_delim(char c, char *delim) {
