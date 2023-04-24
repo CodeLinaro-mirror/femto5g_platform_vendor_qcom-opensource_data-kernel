@@ -23,6 +23,7 @@
 
 #include "eip_device.h"
 #include "eip_macsec.h"
+#include "eip_ipsec.h"
 #include "adapter_secy_support.h"
 #include "adapter_cfye_support.h"
 #include "eip_log.h"
@@ -366,6 +367,8 @@ static int eip_mtip_add_link(struct net_device *ndev,
 		    link->rx.ch, tx_sec->port_id, link->tx.dp->devid,
 		    link->tx.ch);
 
+	eip_ipsec_init_link(link);
+
 	mtip_security_set_priv(ndev, link);
 
 	return 0;
@@ -375,8 +378,7 @@ static void eip_mtip_del_link(struct net_device *ndev)
 {
 	struct eip_link *link = (struct eip_link *)mtip_security_get_priv(ndev);
 
-	/* Necessary cleanup */
-
+	eip_ipsec_deinit_link(link);
 	kfree(link);
 }
 
@@ -416,12 +418,24 @@ static int eip_mtip_disable_bypass(struct net_device *ndev)
 		(struct eip_link *)mtip_security_get_priv(ndev), false);
 }
 
+static int eip_mtip_fixup_rx_skb(struct sk_buff *skb)
+{
+	return eip_ipsec_fixup_rx_skb(skb);
+}
+
+static int eip_mtip_fixup_tx_skb(struct sk_buff *skb)
+{
+	return eip_ipsec_fixup_tx_skb(skb);
+}
+
 static struct mtip_security_ops mtip_sec_ops = {
 	.add_link = eip_mtip_add_link,
 	.del_link = eip_mtip_del_link,
 	.enable_bypass = eip_mtip_enable_bypass,
 	.disable_bypass = eip_mtip_disable_bypass,
-	.update_config = eip_mtip_link_config
+	.update_config = eip_mtip_link_config,
+	.fixup_rx_skb = eip_mtip_fixup_rx_skb,
+	.fixup_tx_skb = eip_mtip_fixup_tx_skb,
 };
 
 static int eip_probe(struct platform_device *pdev)
