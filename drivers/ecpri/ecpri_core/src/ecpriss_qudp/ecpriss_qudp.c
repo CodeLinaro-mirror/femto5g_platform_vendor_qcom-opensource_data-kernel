@@ -2888,7 +2888,7 @@ static int ecpriss_qudp_register_interrupts_v2(uint8_t                 port_inde
 }
 
 
-
+/*
 static void ecpriss_qudp_enable_interrupts(uint8_t                 port_index,
 		uint32_t                 port_type)
 {
@@ -2979,6 +2979,33 @@ static void ecpriss_qudp_enable_interrupts(uint8_t                 port_index,
 		fh_udp_sw_irq_mask_1_port_p.ingress_trap_rule_2_link_3 = 1;
 		fh_udp_sw_irq_mask_1_port_p.ingress_trap_rule_3_link_3 = 1;
 		fh_udp_sw_irq_mask_1_port_p.ingress_last_in_chain_non_local_dst_packet_link_3 = 1;
+
+		ecpriss_qudp_hal_write_reg_n_fields(ECPRISS_QUDP_FH,
+				ECPRI_UDP_FH_UDP_SW_IRQ_MASK_0_PORT_P,
+				port_index,
+				&fh_udp_sw_irq_mask_0_port_p);
+
+		ecpriss_qudp_hal_write_reg_n_fields(ECPRISS_QUDP_FH,
+				ECPRI_UDP_FH_UDP_SW_IRQ_MASK_1_PORT_P,
+				port_index,
+				&fh_udp_sw_irq_mask_1_port_p);
+
+	}
+
+	return;
+}
+*/
+
+static void ecpriss_qudp_disable_interrupts(uint8_t                 port_index,
+		uint32_t                 port_type)
+{
+	ecpri_qudp_hwio_def_ecpri_udp_fh_udp_sw_irq_mask_0_port_p_s fh_udp_sw_irq_mask_0_port_p;
+	ecpri_qudp_hwio_def_ecpri_udp_fh_udp_sw_irq_mask_1_port_p_s fh_udp_sw_irq_mask_1_port_p;
+
+	memset(&fh_udp_sw_irq_mask_0_port_p , 0, sizeof(fh_udp_sw_irq_mask_0_port_p) );
+	memset(&fh_udp_sw_irq_mask_1_port_p , 0, sizeof(fh_udp_sw_irq_mask_1_port_p) );
+
+	if(port_type == ECPRISS_PORT_TYPE_FH) {
 
 		ecpriss_qudp_hal_write_reg_n_fields(ECPRISS_QUDP_FH,
 				ECPRI_UDP_FH_UDP_SW_IRQ_MASK_0_PORT_P,
@@ -3181,7 +3208,7 @@ int ecpriss_qudp_init(struct device *dev)
 					break;
 				}
 
-				ecpriss_qudp_enable_interrupts(port_idx,port_type);
+				ecpriss_qudp_disable_interrupts(port_idx,port_type);
 
 				/* ret = ecpriss_qudp_enable_stats(port_idx,port_type); */
 				if(ret < 0)
