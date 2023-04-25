@@ -195,7 +195,7 @@ int mtip_debug_eth_probe(struct platform_device *pdev) {
 
   // Debug Port Changes
    debug_ret = of_property_read_u32_array(
-       pdev->dev.of_node, "qcom,debug-fuse", fuse_csr_regs, 2);
+       pdev->dev.of_node, "qcom,debug-port-fuse", fuse_csr_regs, 2);
   if (!debug_ret) {
     // Fetch the debug port fuse address
     dev_resource.start = fuse_csr_regs[0];
