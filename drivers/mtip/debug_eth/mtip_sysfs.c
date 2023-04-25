@@ -679,7 +679,7 @@ void setup_diag_vlanID(u_int8_t fifo_num, u_int16_t vlanID) {
 
 mtip_debug_eth_gnl_params get_diag_result(u_int8_t fifo_num) {
 
-  mtip_debug_eth_gnl_params mtip_debug_eth_gnl_params_tbl;
+  mtip_debug_eth_gnl_params mtip_debug_eth_gnl_params_tbl = {0};
   int i = 0;
 
   mtip_debug_eth_gnl_params_tbl.fifo_num = fifo_num;
