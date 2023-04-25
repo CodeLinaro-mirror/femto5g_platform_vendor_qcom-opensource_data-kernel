@@ -1412,6 +1412,10 @@ int ecpriss_xbar_cold_init(struct device *dev)
 	int ret = 0;
 	do{
 
+		if(ecpriss_pdata == NULL) {
+			break;
+		}
+
 		ret = ecpriss_xbar_hal_reg_init(dev,
 			(ecpriss_xbar_hw_name_e)ecpriss_pdata->ecpri_hw_ver);
 		if(ret < 0)
@@ -1462,6 +1466,10 @@ int ecpriss_xbar_cold_init_v2(struct device *dev)
 {
 	int ret = 0;
 	do{
+
+		if(ecpriss_pdata_v2 == NULL) {
+			break;
+		}
 
 		ret = ecpriss_xbar_hal_reg_init(dev,
 			(ecpriss_xbar_hw_name_e)ecpriss_pdata_v2->ecpri_hw_ver);

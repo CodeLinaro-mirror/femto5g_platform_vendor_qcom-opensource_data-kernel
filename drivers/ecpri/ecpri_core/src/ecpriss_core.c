@@ -1666,6 +1666,7 @@ static int ecpriss_core_probe(struct platform_device *pdev)
 
 	if(pdev == NULL) {
 		ret = -ENOMEM;
+		return ret;
 	}
 	hw_ver = ecpriss_core_get_hw_ver(pdev);
 

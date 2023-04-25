@@ -6767,18 +6767,21 @@ int32_t setup_debugfs_directory()
 			}
                 }else if( token[0] == '}'  && len > 2)
                 {
-			remove_firstchar(token, sizeof(token));
-			//ECPRILOGERR("token after removal: %s\n",token);
-			//ECPRILOGERR("Curr_index = %u, inserting %s, parent was %u", curr_index, token, curr_index-1);
-			//ECPRILOGERR("Decresing cur_index -1\n");
-				curr_index--;
-			//ECPRILOGERR("inserting at Curr_index = %u, inserting %s, parent was %u", curr_index, token, curr_index-1);
-			kobj_root = debugfs_create_dir(token, list_dv[curr_index -1 ]);
-			list_dv[curr_index] = kobj_root;
-				//ECPRILOGERR("Incremmting cur_index +1\n");
-				curr_index++;
+				remove_firstchar(token, sizeof(token));
+				//ECPRILOGERR("token after removal: %s\n",token);
+				//ECPRILOGERR("Curr_index = %u, inserting %s, parent was %u", curr_index, token, curr_index-1);
+				//ECPRILOGERR("Decresing cur_index -1\n");
+					curr_index--;
+			if(curr_index > 0){
+				//ECPRILOGERR("inserting at Curr_index = %u, inserting %s, parent was %u", curr_index, token, curr_index-1);
+				kobj_root = debugfs_create_dir(token, list_dv[curr_index -1 ]);
+				list_dv[curr_index] = kobj_root;
+					//ECPRILOGERR("Incremmting cur_index +1\n");
+					curr_index++;
+			}
 
                 }else if(token[0] == ',' && len > 2){
+
 			// we want to create file
 			remove_firstchar(token, sizeof(token));
 			//ECPRILOGERR("token after removal: %s\n",token);
