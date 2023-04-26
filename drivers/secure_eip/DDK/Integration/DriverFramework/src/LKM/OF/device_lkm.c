@@ -8,7 +8,7 @@
 
 /*****************************************************************************
 * Copyright (c) 2010-2021 by Rambus, Inc. and/or its subsidiaries.
-* Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.  
+* Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
 * This program is free software: you can redistribute it and/or modify
 * it under the terms of the GNU General Public License as published by
 * the Free Software Foundation, either version 2 of the License, or
@@ -72,6 +72,8 @@
 /* Linux Kernel Module interface */
 #include "lkm.h"
 #endif
+
+#include "eip_reg.h"
 
 /* Linux Kernel API */
 #include <linux/platform_device.h>  /* platform_*, */
@@ -663,6 +665,7 @@ Device_Read32Check(
 #endif
 
         smp_rmb();
+        eip_cache_register(Device_p->DeviceNr/2, DeviceByteOffset, Value);
     }
 
 #ifdef HWPAL_ENABLE_HA_SIMULATION
@@ -779,6 +782,7 @@ Device_Write32(
 #endif
 
         smp_wmb();
+        eip_cache_register(Device_p->DeviceNr/2, DeviceByteOffset, Value);
     }
 
     return 0;
@@ -862,6 +866,7 @@ Device_Read32Array(
 #endif
 
             smp_rmb();
+            eip_cache_register(Device_p->DeviceNr/2, DeviceByteOffset, Value);
 
 #ifdef HWPAL_DEVICE_ENABLE_SWAP
             /* swap endianness if required */
@@ -996,7 +1001,7 @@ Device_Write32Array(
 #endif
 
             smp_wmb();
-
+            eip_cache_register(Device_p->DeviceNr/2, DeviceByteOffset, Value);
             DeviceByteOffset += 4;
         } /* for */
     }

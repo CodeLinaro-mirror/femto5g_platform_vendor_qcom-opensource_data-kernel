@@ -27,6 +27,7 @@
 #include "adapter_cfye_support.h"
 #include "eip_log.h"
 #include "eip_debugfs.h"
+#include "eip_reg.h"
 
 /* ETHSS_FHx_MACSEC_WRAPPER_CSR Init sequence offsets and recommended values*/
 #define MACSEC_WRAPPER_CFG_REG_OFFSET 0x000A8000
@@ -61,6 +62,7 @@ extern void Device_SetPlatform(uint32_t __iomem *BaseAddr_p,
 			       uint32_t device_id);
 
 #define MAX_CHANNELS_PER_PORT 4
+#define REG_SIZE 0x100000
 
 static const struct of_device_id eip_match[] = {
 	{
@@ -84,6 +86,26 @@ struct eip_device {
 #define EIP_CLK_NOM_MAX (EIP_CLK_FREQ(200.0))
 
 struct eip_device eip_device_platform_data[EIP_MAX_PORT];
+struct eip_port *eip_ports[EIP_MAX_PORT];
+uint32_t eip_reg_dump[EIP_MAX_PORT][REG_SIZE / sizeof(uint32_t)];
+
+void eip_cache_register(unsigned int port_id, unsigned int byte_offset,
+			uint32_t val)
+{
+	if ((port_id < EIP_MAX_PORT) && (byte_offset < REG_SIZE)) {
+		eip_reg_dump[port_id][byte_offset / 4] = val;
+	} else {
+		eip_logerr("Invalid Index: port_id: %d, byte_offset: %d ",
+			   port_id, byte_offset);
+	}
+}
+
+static void eip_reg_write(struct eip_port *port, unsigned int offset,
+			  uint32_t val)
+{
+	writel(val, port->base_addr + offset);
+	eip_cache_register(port->id, offset, val);
+}
 
 static void eip_secy_cfye_spinlock_init(void)
 {
@@ -238,18 +260,15 @@ static int eip_port_deinit(uint32_t port_id)
 	return 0;
 }
 
-static inline void wrapper_bypass_set(u32 port_id, bool enable)
+static inline void wrapper_bypass_set(struct eip_port *port, bool enable)
 {
 	u32 enable_val;
 
 	enable_val =
 		enable ? EIP_WRAPPER_BYPASS_ENABLE : EIP_WRAPPER_BYPASS_DISABLE;
-	writel(enable_val, eip_device_platform_data[port_id].eip_base +
-				   WRAPPER_MACSEC_BYPASS_REG_OFFSET);
+	eip_reg_write(port, WRAPPER_MACSEC_BYPASS_REG_OFFSET, enable_val);
 	pr_info(" eip_main: wrapper bypass ddr = 0x%x, val = %d \n",
-		eip_device_platform_data[port_id].eip_base +
-			WRAPPER_MACSEC_BYPASS_REG_OFFSET,
-		enable_val);
+		port->base_addr + WRAPPER_MACSEC_BYPASS_REG_OFFSET, enable_val);
 }
 
 static int eip_mtip_link_config(struct mtip_security_device *sdev,
@@ -280,10 +299,10 @@ static int eip_mtip_link_config(struct mtip_security_device *sdev,
 		eip_logerr("Invalid link configuration %d\n", active_links);
 		return -EINVAL;
 	}
-	writel(mcsc_calendar_val, port->base_addr + MCSC_CALENDAR_CFG_REG);
+	eip_reg_write(port, MCSC_CALENDAR_CFG_REG, mcsc_calendar_val);
 	eip_logdbg("MCSC_CALENDAR_CFG_REG  ddr = 0x%X, Write val = 0x%X\n",
 		   port->base_addr + MCSC_CALENDAR_CFG_REG, mcsc_calendar_val);
-	writel(mcsc_eip218_amf_val, port->base_addr + MCSC_EIP218_AMF_CFG_REG);
+	eip_reg_write(port, MCSC_EIP218_AMF_CFG_REG, mcsc_eip218_amf_val);
 	eip_logdbg("MCSC_EIP218_AMF_CFG_REG  ddr = 0x%X, Write val = 0x%X\n",
 		   port->base_addr + MCSC_EIP218_AMF_CFG_REG,
 		   mcsc_eip218_amf_val);
@@ -298,46 +317,46 @@ static inline void macsec_wrapper_init_config(struct mtip_security_device *sdev)
 	u32 val;
 	struct eip_port *port = (struct eip_port *)sdev->sec_priv;
 	val = RATE_CTRL_BUF_EN;
-	writel(val, port->base_addr + MACSEC_WRAPPER_CFG_REG_OFFSET);
+	eip_reg_write(port, MACSEC_WRAPPER_CFG_REG_OFFSET, val);
 	pr_info(" eip_main: MACSEC_WRAPPER_CFG_REG  ddr = 0x%x, val = %d \n",
 		port->base_addr + MACSEC_WRAPPER_CFG_REG_OFFSET, val);
 
 	val = AMF_CFG_REG_VAL;
-	writel(val, port->base_addr + MCSC_AMF_CFG_REG);
+	eip_reg_write(port, MCSC_AMF_CFG_REG, val);
 	pr_info(" eip_main: MCSC_AMF_CFG_REG  ddr = 0x%x, val = %d \n",
 		port->base_addr + MCSC_AMF_CFG_REG, val);
 
 	val = MCSC_CALENDAR_CFG_REG_VAL_4_LINKS;
-	writel(val, port->base_addr + MCSC_CALENDAR_CFG_REG);
+	eip_reg_write(port, MCSC_CALENDAR_CFG_REG, val);
 	eip_logdbg("MCSC_CALENDAR_CFG_REG  ddr = 0x%X, Write val = 0x%X\n",
 		   port->base_addr + MCSC_CALENDAR_CFG_REG, val);
 
 	val = MCSC_EIP218_AMF_CFG_REG_VAL_4_LINKS;
-	writel(val, port->base_addr + MCSC_EIP218_AMF_CFG_REG);
+	eip_reg_write(port, MCSC_EIP218_AMF_CFG_REG, val);
 	eip_logdbg("MCSC_EIP218_AMF_CFG_REG  ddr = 0x%X, Write val = 0x%X\n",
 		   port->base_addr + MCSC_EIP218_AMF_CFG_REG, val);
 
 	val = EIP218_CONTROL_IFG_BYTES | EIP218_CONTROL_MODULO_8 |
 	      EIP218_CONTROL_MODE_SELECT;
-	writel(val, port->base_addr + ETHSS_FH0_EIP218_0_CONTROL);
+	eip_reg_write(port, ETHSS_FH0_EIP218_0_CONTROL, val);
 	pr_info(" eip_main: ETHSS_FH0_EIP218_0_CONTROL  ddr = 0x%x, val = %d \n",
 		port->base_addr + ETHSS_FH0_EIP218_0_CONTROL, val);
 
 	val = EIP218_CONTROL_IFG_BYTES | EIP218_CONTROL_MODULO_8 |
 	      EIP218_CONTROL_MODE_SELECT;
-	writel(val, port->base_addr + ETHSS_FH0_EIP218_1_CONTROL);
+	eip_reg_write(port, ETHSS_FH0_EIP218_1_CONTROL, val);
 	pr_info(" eip_main: ETHSS_FH0_EIP218_1_CONTROL  ddr = 0x%x, val = %d \n",
 		port->base_addr + ETHSS_FH0_EIP218_1_CONTROL, val);
 
 	val = EIP218_CONTROL_IFG_BYTES | EIP218_CONTROL_MODULO_8 |
 	      EIP218_CONTROL_MODE_SELECT;
-	writel(val, port->base_addr + ETHSS_FH0_EIP218_2_CONTROL);
+	eip_reg_write(port, ETHSS_FH0_EIP218_2_CONTROL, val);
 	pr_info(" eip_main: ETHSS_FH0_EIP218_2_CONTROL  ddr = 0x%x, val = %d \n",
 		port->base_addr + ETHSS_FH0_EIP218_2_CONTROL, val);
 
 	val = EIP218_CONTROL_IFG_BYTES | EIP218_CONTROL_MODULO_8 |
 	      EIP218_CONTROL_MODE_SELECT;
-	writel(val, port->base_addr + ETHSS_FH0_EIP218_3_CONTROL);
+	eip_reg_write(port, ETHSS_FH0_EIP218_3_CONTROL, val);
 	pr_info(" eip_main: ETHSS_FH0_EIP218_3_CONTROL  ddr = 0x%x, val = %d \n",
 		port->base_addr + ETHSS_FH0_EIP218_3_CONTROL, val);
 }
@@ -482,6 +501,7 @@ static int eip_probe(struct platform_device *pdev)
 		return PTR_ERR(eip_device_platform_data[port_id].eip_base);
 	}
 	port->base_addr = eip_device_platform_data[port_id].eip_base;
+	eip_ports[port_id] = port;
 
 	/* Get IRQ details */
 	irq_resource =
@@ -504,7 +524,7 @@ static int eip_probe(struct platform_device *pdev)
 	Device_SetPlatform(eip_device_platform_data[port_id].eip_base,
 			   eip_device_platform_data[port_id].egress_device_id);
 
-	wrapper_bypass_set(port_id, false);
+	wrapper_bypass_set(port, false);
 
 	ret = eip_port_init(port_id);
 	if (ret < 0) {
@@ -551,12 +571,14 @@ static int eip_remove(struct platform_device *pdev)
 	mtip_security_unregister_device(&port->msec_dev);
 	eip_debugfs_remove_port(port);
 
-	wrapper_bypass_set(port->id, true);
+	wrapper_bypass_set(port, true);
 
 	ret = eip_port_deinit(port->id);
 	if (!ret)
 		LOG_CRIT("eip_main: Device %d uniniatlized succesfully",
 			 port->id);
+
+	eip_ports[port->id] = NULL;
 
 	return ret;
 }
