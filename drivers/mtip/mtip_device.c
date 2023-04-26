@@ -201,12 +201,10 @@ void post_mtip_tx_comp_cb(void *user_data, ecpri_dma_eth_conn_hdl_t hdl, struct 
    mtip_queue_work(MTIP_WORKQ_TASK_TX_COMP_CB, taskstruct);
 }
 
-void run_mtip_tx_comp_cb(void* work_ptr)
+void mtip_process_tx_comp_cb(ecpri_dma_eth_conn_hdl_t hdl, struct mtip_dma_tx_comp_params *tx_comp_params)
 {
    int i;
    int j;
-   struct mtip_tx_comp_cb_task* taskstruct = (struct mtip_tx_comp_cb_task*)work_ptr;
-   ecpri_dma_eth_conn_hdl_t hdl;
    struct ecpri_dma_pkt_completion_wrapper **comp_pkts;
    u32 num_of_completed;
    struct ecpri_dma_pkt_completion_wrapper *comp;
@@ -222,21 +220,14 @@ void run_mtip_tx_comp_cb(void* work_ptr)
    u32 timestamp_nsecs;
    u8 pkt_ts_seq_num = 0;
    u8 read_ts_seq_num = 0;
-   struct ecpri_dma_tx_header *pre_header_buff = NULL;
+   struct ecpri_dma_tx_header *pre_header_buff;
    enum mtip_device_mode_enum mode = platform_driver_priv->devices.mode;
    int pending_pkt_completion_count = 0;
 
-   if (taskstruct == NULL) 
-   {
-       CSMLOGERR("taskstruct is NULL\n");
-       return;
-   }
+   comp_pkts = tx_comp_params->local_comp_pkts;
+   num_of_completed = tx_comp_params->num_of_completed;
 
-   hdl = taskstruct->hdl;
-   comp_pkts = taskstruct->comp_pkts;
-   num_of_completed = taskstruct->num_of_completed;
-
-   CSMLOGDBG("Tx comp callback for hdl: %d, num_of_completed: %d\n", hdl, num_of_completed);
+   //CSMLOGDBG("Tx comp callback for hdl: %d, num_of_completed: %d\n", hdl, num_of_completed);
 
    // process the Tx completions
    for (i = 0; i < num_of_completed; ++i)
@@ -248,7 +239,7 @@ void run_mtip_tx_comp_cb(void* work_ptr)
       if (pkt == NULL)
       {
           CSMLOGERR("Got a NULL pkt\n");
-          goto out;
+          continue;
       }
 
       skb = (struct sk_buff*)pkt->user_data;
@@ -256,10 +247,10 @@ void run_mtip_tx_comp_cb(void* work_ptr)
       if (skb == NULL)
       {
           CSMLOGERR("Got a NULL skb\n");
-          goto out;
+          continue;
       }
 
-      CSMLOGDBG("Tx comp for hdl: %d, skb->data: 0x%lx mode %d \n", hdl, (unsigned long)skb->data, mode);
+      //CSMLOGDBG("Tx comp for hdl: %d, skb->data: 0x%lx mode %d \n", hdl, (unsigned long)skb->data, mode);
 
       // store the netdev
       netdev = skb->dev;
@@ -279,7 +270,7 @@ void run_mtip_tx_comp_cb(void* work_ptr)
           if(num_of_buffers == 2)
           {
               pre_header_buff = (struct ecpri_dma_tx_header *)buffs[0]->virt_base;
-              if (pre_header_buff->timestamp_packet == 0x1)
+              if (pre_header_buff->timestamp_packet == true)
               {
                   pkt_ts_seq_num = (u8)pre_header_buff->timestamp_tag & MTIP_PKT_TS_SEQ_MASK;
               }
@@ -345,17 +336,15 @@ void run_mtip_tx_comp_cb(void* work_ptr)
           mtip_ptp_tx_ts_lock_release(link_index);
       }
       
-      if (free_skb == true) {
+      if (free_skb == true)
+      {
           // no Tx timestamping needed for this packet
-          CSMLOGDBG("freeing skb hdl: %d, len: %d\n", hdl, skb->len);
+          //CSMLOGDBG("freeing skb hdl: %d, len: %d\n", hdl, skb->len);
 
           dev_kfree_skb(skb);
       }
 
-      buffs = (struct ecpri_dma_mem_buffer **)pkt->buffs;
-      num_of_buffers = pkt->num_of_buffers;
-
-      CSMLOGDBG("i: %d, buffers: %d\n", i, num_of_buffers);
+      //CSMLOGDBG("i: %d, buffers: %d\n", i, num_of_buffers);
 
       for (j = 0; j < num_of_buffers; ++j) {
          // free the mem buffer
@@ -413,9 +402,6 @@ void run_mtip_tx_comp_cb(void* work_ptr)
       }
    }
 
-out:
-   // free the taskstruct
-   kfree(taskstruct);
 }
 
 void post_mtip_process_link_state(u32 link_index, bool link_up)
@@ -535,6 +521,56 @@ int mtip_set_netdev_hw_mac_addr(struct net_device *netdev, u32 link_index)
     memcpy(netdev->dev_addr, saddr, ETH_ALEN);
 
     return 0;
+}
+
+int mtip_napi_poll_tx(struct napi_struct *napi_ptr, int budget)
+{
+    int rv = 0;
+    int npackets = 0;
+    u32 link_index;
+    u32 list_counter;
+    struct net_device* dev;
+    struct mtip_netdev_priv *priv;
+    unsigned int tx_comp_list_size;
+    struct mtip_dma_tx_comp_params tx_comp_params;
+    struct mtip_link_info* link = container_of(napi_ptr, struct mtip_link_info, napi_tx);
+    ecpri_dma_eth_conn_hdl_t hdl = link->dma_hdl;
+
+    rv = mtip_lookup_link_index_by_handle(hdl, &link_index);
+
+    // HANDLE THE ERROR
+    if (rv < 0)
+    {
+        CSMLOGERR("Unable to find link_index of hdl: %d\n", hdl);
+        return 0;
+    }
+
+    dev = platform_driver_priv->mtip_links[link_index]->dev;
+    priv = netdev_priv(dev);
+
+    tx_comp_list_size = mtip_dma_tx_comp_list_size(link_index);
+
+    //CSMLOGDBG(" budget %d for link_index %d hdl %d list_size %d \n", budget, link_index, hdl, tx_comp_list_size);
+
+    if (tx_comp_list_size > 0)
+    {
+        for (list_counter = 0; list_counter < tx_comp_list_size; list_counter++ )
+        {
+            mtip_dma_tx_comp_list_pop(link_index, &tx_comp_params);
+            mtip_process_tx_comp_cb(hdl, &tx_comp_params);
+            npackets += tx_comp_params.num_of_completed;
+        }
+    }
+
+    /*CSMLOGDBG(" budget %d for link_index %d hdl %d list_size %d npackets %d \n",
+              budget, link_index, hdl, tx_comp_list_size, npackets);*/
+
+    if (npackets < budget)
+    {
+        napi_complete(napi_ptr);
+    }
+
+    return npackets;
 }
 
 /* NAPI Poll function */
@@ -1114,6 +1150,7 @@ static int mtip_open(struct net_device *netdev)
        * enable napi
        */
       napi_enable(&(platform_driver_priv->mtip_links[link_index]->napi));
+      napi_enable(&(platform_driver_priv->mtip_links[link_index]->napi_tx));
 
       /* 
        * Start the interface's transmit queue 
@@ -1174,6 +1211,7 @@ static int mtip_close(struct net_device *netdev)
        * disable napi
        */
       napi_disable(&(platform_driver_priv->mtip_links[link_index]->napi));
+      napi_disable(&(platform_driver_priv->mtip_links[link_index]->napi_tx));
 
       /* release ports, irq and such -- like fops->close */
       netif_stop_queue(netdev);

@@ -69,7 +69,7 @@ static void mtip_workq_handler(struct work_struct *w)
          break;
       case MTIP_WORKQ_TASK_TX_COMP_CB:
           {
-              run_mtip_tx_comp_cb(work_ptr);
+              //run_mtip_tx_comp_cb(work_ptr);
           }
           break;
       case MTIP_WORKQ_TASK_PROCESS_TIMESTAMP:

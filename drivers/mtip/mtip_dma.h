@@ -15,6 +15,38 @@
 // this is the extern to connect to dma driver
 extern struct ecpri_dma_eth_ops ecpri_dma_eth_driver_ops;
 
+struct mtip_dma_tx_comp_params
+{
+    void     *user_data;
+    ecpri_dma_eth_conn_hdl_t hdl;
+    struct ecpri_dma_pkt_completion_wrapper **local_comp_pkts;
+    u32 num_of_completed;
+};
+
+
+struct mtip_tx_comp_node
+{
+   struct list_head list;
+   struct mtip_dma_tx_comp_params tx_comp_params;
+};
+
+/*
+ * list of TX comp call backs
+ */
+struct mtip_tx_comp_list
+{
+  struct list_head head;
+  unsigned int count;
+};
+
+int mtip_dma_tx_comp_list_initialize(u32 link_index);
+//int mtip_dma_tx_comp_list_finalize(u32 link_index);
+int mtip_dma_tx_comp_list_size(u32 link_index);
+int mtip_dma_tx_comp_list_push(u32 link_index, void *user_data, ecpri_dma_eth_conn_hdl_t hdl, 
+                               struct ecpri_dma_pkt_completion_wrapper **comp_pkts, 
+                               u32 num_of_completed);
+int mtip_dma_tx_comp_list_pop(u32 link_index, struct mtip_dma_tx_comp_params *tx_comp_params);
+
 void mtip_dma_ready_cb(void *user_data);
 void mtip_dma_rx_comp_cb(void *user_data, ecpri_dma_eth_conn_hdl_t hdl);
 void mtip_dma_tx_comp_cb(void *user_data, ecpri_dma_eth_conn_hdl_t hdl, struct ecpri_dma_pkt_completion_wrapper **comp_pkts, u32 num_of_completed);

@@ -242,6 +242,7 @@ struct mtip_link_info
    enum mtip_link_state_enum state;
    struct net_device* dev;
    struct napi_struct napi;
+   struct napi_struct napi_tx;
    struct rtnl_link_stats64 net_stats;
    ecpri_dma_eth_conn_hdl_t dma_hdl;
    u32 port_device_index;
@@ -250,9 +251,11 @@ struct mtip_link_info
    u8 ptp_ts_seq_num;
    struct mtip_tx_ts_list tx_ts_list;
    struct mtip_tx_ts_skb_list tx_ts_skb_list;
+   struct mtip_tx_comp_list tx_comp_list;
    u32 peak_rx_available;
    u32 active_fec;
-   struct mutex dev_lock;
+   spinlock_t dev_lock;
+   unsigned long flags;
 };
 
 /*

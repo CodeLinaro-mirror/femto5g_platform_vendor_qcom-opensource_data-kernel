@@ -97,6 +97,7 @@ static int mtip_platform_setup_link(unsigned int port_device_index, unsigned int
 
    // initialize the PTP lists for the link index
    mtip_ptp_initialize(link_index);
+   mtip_dma_tx_comp_list_initialize(link_index);
 
    // set the link state to INIT
    platform_driver_priv->mtip_links[link_index]->state = MTIP_LINK_STATE_INIT;
@@ -1440,6 +1441,7 @@ static int mtip_platform_setup(void)
           // add the mtip_napi_rx
           // this needs to be done before register netdev
           netif_napi_add(platform_driver_priv->mtip_links[i]->dev, &(platform_driver_priv->mtip_links[i]->napi), mtip_napi_poll, MTIP_NAPI_WEIGHT);
+          netif_napi_add(platform_driver_priv->mtip_links[i]->dev, &(platform_driver_priv->mtip_links[i]->napi_tx), mtip_napi_poll_tx, MTIP_NAPI_WEIGHT);
 
           CSMLOGDBG("mtip_devs[%d] = 0x%lx with link_index = %d\n", i, (unsigned long)platform_driver_priv->mtip_links[i]->dev, priv->link_index);
        }

@@ -165,13 +165,128 @@ void mtip_dma_rx_comp_cb(void *user_data, ecpri_dma_eth_conn_hdl_t hdl)
    }
 }
 
-// tx completion callback
+int mtip_dma_tx_comp_list_initialize(u32 link_index)
+{
+    struct mtip_tx_comp_list *listptr = &platform_driver_priv->mtip_links[link_index]->tx_comp_list;
+
+   // initialize the head
+    INIT_LIST_HEAD(&listptr->head);
+
+   listptr->count = 0;
+   return 0;
+}
+
+/*nt mtip_dma_tx_comp_list_finalize(u32 link_index)
+{
+   // go through all the packets and pop them
+
+   // free the memory allocations
+   return 0;
+}*/
+
+int mtip_dma_tx_comp_list_size(u32 link_index)
+{
+   int rv;
+   struct mtip_tx_comp_list *listptr = &platform_driver_priv->mtip_links[link_index]->tx_comp_list;
+
+   rv = listptr->count;
+   return rv;
+}
+
+int mtip_dma_tx_comp_list_push(u32 link_index, void *user_data, ecpri_dma_eth_conn_hdl_t hdl,
+                               struct ecpri_dma_pkt_completion_wrapper **comp_pkts,
+                               u32 num_of_completed)
+{
+   int rv = 0;
+   struct mtip_tx_comp_node* node = NULL;
+   struct mtip_tx_comp_list *listptr = &platform_driver_priv->mtip_links[link_index]->tx_comp_list;
+
+   // allocate a workq node
+   node = kmalloc(sizeof(struct mtip_tx_comp_node), GFP_ATOMIC);
+
+   // HANDLE THE ERROR
+   if (node == NULL)
+   {
+      rv = -ENOMEM;
+      goto out;
+   }
+
+   // init the list
+   INIT_LIST_HEAD(&node->list);
+
+   node->tx_comp_params.user_data = user_data;
+   node->tx_comp_params.hdl = hdl;
+   node->tx_comp_params.local_comp_pkts = comp_pkts;
+   node->tx_comp_params.num_of_completed = num_of_completed;
+
+   list_add_tail(&node->list, &listptr->head);
+   ++listptr->count;
+
+   //CSMLOGDBG(" link_index %d hdl %d num_of_completed: %d, counter: %d \n", link_index,hdl, num_of_completed, listptr->count);
+
+out:
+   return rv;
+}
+
+int mtip_dma_tx_comp_list_pop(u32 link_index, struct mtip_dma_tx_comp_params *tx_comp_params)
+{
+   int rv = 0;
+   struct mtip_tx_comp_node* tmp;
+   struct mtip_tx_comp_list *listptr = &platform_driver_priv->mtip_links[link_index]->tx_comp_list;
+
+   rv = mtip_dma_tx_comp_list_size(link_index);
+
+   if (rv <= 0)
+   {
+      return -1;
+   }
+
+   // get the first entry
+   tmp = list_entry(listptr->head.next, struct mtip_tx_comp_node, list);
+
+   if (!list_empty(&listptr->head))
+   {
+      // delete the head
+      list_del(&tmp->list);
+
+      --listptr->count;
+   }
+   else {
+      rv = -1;
+   }
+
+   if (rv == -1)
+   {
+      CSMLOGERR("workq list is empty... mismatch with count\n");
+   }
+   else
+   {
+       tx_comp_params->user_data = tmp->tx_comp_params.user_data;
+       tx_comp_params->hdl = tmp->tx_comp_params.hdl;
+       tx_comp_params->local_comp_pkts = tmp->tx_comp_params.local_comp_pkts;
+       tx_comp_params->num_of_completed = tmp->tx_comp_params.num_of_completed;
+
+      // free the node
+      kfree(tmp);
+   }
+
+   //CSMLOGDBG(" link_index %d num_of_completed: %d, counter: %d \n", link_index, tx_comp_params->num_of_completed, listptr->count);
+
+   return rv;
+}
+
 void mtip_dma_tx_comp_cb(void *user_data, ecpri_dma_eth_conn_hdl_t hdl, struct ecpri_dma_pkt_completion_wrapper **comp_pkts, u32 num_of_completed)
 {
     int i;
     struct ecpri_dma_pkt_completion_wrapper **local_comp_pkts;
+    u32 link_index;
+    struct mtip_link_info* link;
+    struct net_device *netdev;
+    struct mtip_netdev_priv* priv;
+    spinlock_t *lock;
+    unsigned long flags;
 
-    CSMLOGDBG("mtip_dma_tx_comp_cb hdl: %d, num: %d\n", hdl, num_of_completed);
+    //CSMLOGDBG(" hdl: %d, num_of_completed: %d\n", hdl, num_of_completed);
 
     if (num_of_completed == 0)
     {
@@ -181,7 +296,8 @@ void mtip_dma_tx_comp_cb(void *user_data, ecpri_dma_eth_conn_hdl_t hdl, struct e
     // copy the pointers
     local_comp_pkts = (struct ecpri_dma_pkt_completion_wrapper **)kmalloc(num_of_completed * sizeof(struct ecpri_dma_pkt_completion_wrapper *), GFP_ATOMIC);
 
-    for (i = 0; i < num_of_completed; ++i) {
+    for (i = 0; i < num_of_completed; ++i)
+    {
         // allocate teh completion wrapper
         local_comp_pkts[i] = mtip_dma_alloc_completion_wrapper(GFP_ATOMIC);
 
@@ -190,7 +306,38 @@ void mtip_dma_tx_comp_cb(void *user_data, ecpri_dma_eth_conn_hdl_t hdl, struct e
         local_comp_pkts[i]->comp_code = comp_pkts[i]->comp_code;
     }
 
-    post_mtip_tx_comp_cb(user_data, hdl, local_comp_pkts, num_of_completed);
+    if (mtip_lookup_link_index_by_handle(hdl, &link_index) < 0)
+    {
+      CSMLOGERR("unable to find link_index for handle: %d ..ignoring\n", hdl);
+    }
+    else
+    {
+         mtip_dma_tx_comp_list_push(link_index, user_data, hdl, local_comp_pkts, num_of_completed);
+
+         link = platform_driver_priv->mtip_links[link_index];
+         netdev = link->dev;
+
+         //CSMLOGDBG("napi schedule for hdl: %d, link_index: %d \n", hdl, link_index);
+
+         priv = netdev_priv(netdev);
+         lock = &(priv->lock);
+
+         spin_lock_irqsave(lock, flags);
+
+         // schedule napi
+         if (napi_schedule_prep(&(link->napi_tx)))
+         {
+            __napi_schedule(&(link->napi_tx));
+
+            // set to POLL mode
+            //setmode = ECPRI_DMA_NOTIFY_MODE_POLL;
+
+            // set the rx mode to POLL
+            //mtip_set_rx_mode_immediate(hdl, setmode);
+         }
+
+         spin_unlock_irqrestore(lock, flags);
+    }
 }
 
 // connect pipe

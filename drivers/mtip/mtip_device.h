@@ -52,8 +52,6 @@ struct mtip_tx_comp_cb_task
     struct ecpri_dma_pkt_completion_wrapper **comp_pkts;
     u32 num_of_completed;
 };
-void post_mtip_tx_comp_cb(void *user_data, ecpri_dma_eth_conn_hdl_t hdl, struct ecpri_dma_pkt_completion_wrapper **comp_pkts, u32 num_of_completed);
-void run_mtip_tx_comp_cb(void* work_ptr);
 
 struct mtip_process_link_state_task
 {
@@ -73,6 +71,7 @@ void mtip_set_rx_mode_immediate(ecpri_dma_eth_conn_hdl_t hdl, enum ecpri_dma_not
  * Functions exposed by mtip_device
  */
 int mtip_napi_poll(struct napi_struct *napi_ptr, int budget);
+int mtip_napi_poll_tx(struct napi_struct *napi_ptr, int budget);
 void mtip_netdevice_init(struct net_device *dev);
 
 enum mtip_link_state_enum mtip_get_link_state_by_device(u32 port_device_index, u32 link_device_index);
