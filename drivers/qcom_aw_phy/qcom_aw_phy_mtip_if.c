@@ -264,7 +264,12 @@ void qcom_aw_phy_handle_cdr_lock_status(
     qcom_aw_phy_notify_lane_bring_up_progress_to_mac(phy_inst_info, lane, false);
 
     /* Start listening to SNR valid/error interrupts */
-    qcom_aw_phy_enable_snr_interrupt(phy_inst_info, lane);
+    for(i=PHY_LANE_0; i<PHY_LANE_MAX; i++){
+      if(phy_inst_info->lane_params[i].lane_config.lane_enabled == true &&
+        eth_link_index == phy_inst_info->lane_params[i].lane_config.link_index){
+        qcom_aw_phy_enable_snr_interrupt(phy_inst_info, i);
+      }
+    }
   }
 
   return;
@@ -862,6 +867,8 @@ int qcom_aw_phy_mac_link_status(enum mtip_port_type_enum port_type,
       mutex_lock(&phy_inst_info->lane_lock[lane_num]);
       if(phy_inst_info->lane_params[lane_num].link_status != status){
         phy_inst_info->lane_params[lane_num].link_status = status;
+        QCOM_AW_PHY_LOG_ERR("PHY instance %d, lane %d, status %d, ",
+                            phy_inst_type, lane_num, status);
         notify_flag = true;
       }
       mutex_unlock(&phy_inst_info->lane_lock[lane_num]);
