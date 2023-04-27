@@ -949,6 +949,7 @@ static int mtip_open(struct net_device *netdev)
    int sfp_port_type;
    u32 port_device_index;
    u32 link_device_index;
+   enum ecpri_dma_notify_mode setmode = ECPRI_DMA_NOTIFY_MODE_IRQ;
 
    priv = netdev_priv(netdev);
 
@@ -1020,7 +1021,13 @@ static int mtip_open(struct net_device *netdev)
       mtip_start_dma_pipe(netdev, hdl);
 
       // set the netdev MAC address from the HW
-       mtip_set_netdev_hw_mac_addr(netdev, link_index);
+      mtip_set_netdev_hw_mac_addr(netdev, link_index);
+
+      // set to POLL mode
+      setmode = ECPRI_DMA_NOTIFY_MODE_IRQ;
+ 
+      // set the rx mode to POLL
+      mtip_set_rx_mode_immediate(hdl, setmode);
 
       /*
        * enable napi
