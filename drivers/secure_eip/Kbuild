@@ -11,6 +11,7 @@ ccflags-y += -DCONFIG_LASSEN_SECURE_EIP
 ccflags-y += -DSECURE_MACSEC_DEBUG
 ccflags-y += -DHWPAL_STRICT_ARGS_CHECK
 ccflags-y += -DADAPTER_EIP164_STRICT_ARGS
+ccflags-y += -DADAPTER_EIP163_STRICT_ARGS
 ccflags-y += -DDRIVER_IPSEC
 
 ccflags-y += -Wno-error

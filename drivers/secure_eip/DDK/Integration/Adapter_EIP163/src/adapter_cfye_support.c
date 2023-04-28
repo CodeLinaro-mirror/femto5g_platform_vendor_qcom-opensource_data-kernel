@@ -576,6 +576,9 @@ CfyELib_vPortHandle_IsValid(
         return true;
     else
         return false;
+#else
+    IDENTIFIER_NOT_USED(vPortDscr_p);
+    return true;
 #endif /* ADAPTER_EIP163_DBG */
 
 #else
@@ -654,6 +657,9 @@ CfyELib_RuleHandle_IsValid(
         return true;
     else
         return false;
+#else
+    IDENTIFIER_NOT_USED(RuleDscr_p);
+    return true;
 #endif /* ADAPTER_EIP163_DBG */
 
 #else
