@@ -149,6 +149,48 @@ void mtip_set_rx_mode_immediate(ecpri_dma_eth_conn_hdl_t hdl, enum ecpri_dma_not
     }
 }
 
+// reset the number of pkts waiting for completion
+static int mtip_device_reset_pkt_completion_count(struct net_device *netdev)
+{
+    unsigned long flags;
+    struct mtip_netdev_priv* priv;
+    spinlock_t *lock;
+
+    priv = netdev_priv(netdev);
+    lock = &(priv->lock);
+
+    spin_lock_irqsave(lock, flags);
+    priv->num_pkts_pending_completion = 0;
+    spin_unlock_irqrestore(lock, flags);
+    return 0;
+}
+
+// update the completion count
+static int mtip_device_update_pkt_completion_count(struct net_device *netdev, int count)
+{
+    unsigned long flags;
+    struct mtip_netdev_priv* priv;
+    spinlock_t *lock;
+
+    priv = netdev_priv(netdev);
+    lock = &(priv->lock);
+
+    spin_lock_irqsave(lock, flags);
+    priv->num_pkts_pending_completion += count;
+    spin_unlock_irqrestore(lock, flags);
+    return 0;
+}
+
+// get the completion count
+static int mtip_device_get_pkt_completion_count(struct net_device *netdev)
+{
+    struct mtip_netdev_priv* priv;
+
+    priv = netdev_priv(netdev);
+
+    return priv->num_pkts_pending_completion;
+}
+
 void post_mtip_tx_comp_cb(void *user_data, ecpri_dma_eth_conn_hdl_t hdl, struct ecpri_dma_pkt_completion_wrapper **comp_pkts, u32 num_of_completed)
 {
    struct mtip_tx_comp_cb_task* taskstruct = kmalloc(sizeof(struct mtip_tx_comp_cb_task), GFP_ATOMIC);
@@ -182,6 +224,7 @@ void run_mtip_tx_comp_cb(void* work_ptr)
    u8 read_ts_seq_num = 0;
    struct ecpri_dma_tx_header *pre_header_buff = NULL;
    enum mtip_device_mode_enum mode = platform_driver_priv->devices.mode;
+   int pending_pkt_completion_count = 0;
 
    if (taskstruct == NULL) 
    {
@@ -326,6 +369,9 @@ void run_mtip_tx_comp_cb(void* work_ptr)
       kfree(pkt);
    }
 
+   // decrement the pkt completion count
+   mtip_device_update_pkt_completion_count(netdev, (-1*(int)num_of_completed));
+
    // free the completion wrappers
    for (i = 0; i < num_of_completed; ++i)
    {
@@ -335,13 +381,21 @@ void run_mtip_tx_comp_cb(void* work_ptr)
    // free the container of comp_pkts
    kfree(comp_pkts);
 
-   // check if there is space for at least one packet
-   // should be true since we just got a comp cb
-   if (mtip_dma_tx_available(hdl) == true)
+   pending_pkt_completion_count = mtip_device_get_pkt_completion_count(netdev);
+
+   if (pending_pkt_completion_count < 0) 
+   {
+       mtip_device_reset_pkt_completion_count(netdev);
+       pending_pkt_completion_count = 0;
+   }
+
+   // check if we need to flow control the interface
+   if ((mtip_dma_tx_available(hdl) == true) &&
+       (pending_pkt_completion_count < (MTIP_TX_RING_SIZE - MTIP_TX_PACKET_AVAILABILITY_THRESHOLD)))
    {
       if (netif_queue_stopped(netdev))
       {
-         CSMLOGDBG("netdev queue stopped... waking now\n");
+         CSMLOGERR("waking queue for link_index %d", link_index);
          
          // wake the queue
          netif_wake_queue(netdev);
@@ -587,6 +641,7 @@ static int mtip_start_xmit(struct sk_buff *skb, struct net_device *netdev)
    bool send_tx_pre_header = false;
    bool send_tx_seq_num = false;
    enum mtip_device_mode_enum mode = platform_driver_priv->devices.mode;
+   int pending_pkt_completion_count = 0;
 
    CSMLOGDBG("mtip_start_xmit called\n");
 
@@ -723,16 +778,31 @@ static int mtip_start_xmit(struct sk_buff *skb, struct net_device *netdev)
       return NETDEV_TX_BUSY;
    }
 
+   // increment the pkt completion count
+   mtip_device_update_pkt_completion_count(netdev, 1);
+
+   pending_pkt_completion_count = mtip_device_get_pkt_completion_count(netdev);
+
+   if (pending_pkt_completion_count < 0) 
+   {
+       mtip_device_reset_pkt_completion_count(netdev);
+       pending_pkt_completion_count = 0;
+   }
+
    // commit the packet
    mtip_dma_tx_commit(hdl);
 
-   // check if there is space for at least one packet
-   if (mtip_dma_tx_available(hdl) == false)
+   // check if we need to flow control the interface
+   if ((mtip_dma_tx_available(hdl) == false) ||
+       (pending_pkt_completion_count >= (MTIP_TX_RING_SIZE - MTIP_TX_PACKET_AVAILABILITY_THRESHOLD)))
    {
-      // wait for space to become available
-      netif_stop_queue(netdev);
+       if (!netif_queue_stopped(netdev))
+       {
+           CSMLOGERR("stopping queue for link_index %d", link_index);
 
-      CSMLOGERR("Tx ring full when queue awake\n");
+           // wait for space to become available
+           netif_stop_queue(netdev);
+       }
    }
    return NETDEV_TX_OK;
 }

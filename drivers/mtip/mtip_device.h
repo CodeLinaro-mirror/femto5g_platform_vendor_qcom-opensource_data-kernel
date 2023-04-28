@@ -23,6 +23,7 @@ struct mtip_netdev_priv {
    void __iomem           *mac_ioaddr;
    u64 hashtablebits;
    u32 priv_flags;
+   int num_pkts_pending_completion;
 
    struct mtip_security_device *sec_dev;
    void *sec_priv;
