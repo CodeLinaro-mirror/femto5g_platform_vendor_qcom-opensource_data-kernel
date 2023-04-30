@@ -8233,13 +8233,15 @@ int ecpri_dma_gsi_release_channel(struct ecpri_dma_endp_context *ep)
 			DMAERR("Error deallocating event: %d\n", gsi_res);
 			return gsi_res;
 		}
+
+		if (!ep->is_endp_mhi_l2) {
+			dma_free_coherent(gsi_dev, ep->gsi_mem_info.evt_ring_len,
+				ep->gsi_mem_info.evt_ring_base_vaddr,
+				ep->gsi_mem_info.evt_ring_base_addr);
+		}
 	}
 
-	if (!ep->is_endp_mhi_l2) {
-		dma_free_coherent(gsi_dev, ep->gsi_mem_info.evt_ring_len,
-		ep->gsi_mem_info.evt_ring_base_vaddr,
-		ep->gsi_mem_info.evt_ring_base_addr);
-	}
+	ep->valid = false;
 
 	atomic_set(&ep->disconnect_in_progress, 0);
 

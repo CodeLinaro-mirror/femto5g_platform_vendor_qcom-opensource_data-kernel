@@ -286,6 +286,36 @@ struct ecpri_dma_gsi_ep_mem_info {
 struct ecpri_dma_exception_stats {
 	u32 num_of_pkts_recieved;
 	u32 num_of_bytes_recieved;
+	u32 exception_status_statistics[ECPRI_DMA_STATUS_CODE_MAX];
+};
+
+/**
+ * struct ecpri_dma_exception_context - DMA exception info
+ *
+ * exception_endp - tuple with GSI ID and ENDP ID for exception ENDP
+ * ecpri_dma_exception_wq - WQ to handle buffers replenish
+ * exception_stats - histogram of status codes arrived on exception ENDP
+ * exception_spinlock - spinlock protecting exception resources
+ * exception_pkt_idx - index of current exception packet
+ * exception_pkts_arr - array of pointers to exception packets
+ * exception_pkts - array of exception packets
+ * exception_buffs_ptr_arr - array of pointers to buffers
+ * exception_buffs - array of buffers
+ * ep - exception endp context pointer
+ */
+struct ecpri_dma_exception_context {
+	struct ecpri_dma_endp_gsi_tuple exception_endp;
+	struct workqueue_struct* ecpri_dma_exception_wq;
+	struct ecpri_dma_exception_stats exception_stats;
+	spinlock_t exception_spinlock;
+	u32 exception_pkt_idx;
+	struct ecpri_dma_pkt*
+		exception_pkts_arr[ECPRI_DMA_EXCEPTION_RING_SIZE];
+	struct ecpri_dma_pkt exception_pkts[ECPRI_DMA_EXCEPTION_RING_SIZE];
+	struct ecpri_dma_mem_buffer*
+		exception_buffs_ptr_arr[ECPRI_DMA_EXCEPTION_RING_SIZE];
+	struct ecpri_dma_mem_buffer exception_buffs[ECPRI_DMA_EXCEPTION_RING_SIZE];
+	struct ecpri_dma_endp_context* ep;
 };
 
 /**
@@ -470,9 +500,6 @@ struct ecpri_dma_icc_paths {
   * @ecpri_dma_num_endps: Number of endps
   * @endp_map: ENDP configuration mapping matching to current flavor & version
   * @endp_ctx: ENDP context array
-  * @exception_endp: Exception ENDP number and related GSI ID
-  * @ecpri_dma_exception_wq: WQ to handle Exception replenish
-  * @exception_stats: Exception statistics
   * @driver_ver: current driver SW version, used to sync with Q6
   *
   */
@@ -507,26 +534,16 @@ struct ecpri_dma_context {
 	enum gsi_ver gsi_ver;
 	unsigned long gsi_dev_hdl;
 	u32 ecpri_dma_num_endps;
-	const struct dma_gsi_ep_config (*endp_map)[ECPRI_DMA_GSI_NUM_MAX][ECPRI_DMA_ENDP_NUM_MAX];
+	const struct dma_gsi_ep_config (*endp_map)[ECPRI_DMA_GSI_NUM_MAX]
+		[ECPRI_DMA_ENDP_NUM_MAX];
 	struct ecpri_dma_endp_context
 		endp_ctx[ECPRI_DMA_GSI_NUM_MAX][ECPRI_DMA_ENDP_NUM_MAX];
-	struct ecpri_dma_endp_gsi_tuple exception_endp;
-	struct workqueue_struct *ecpri_dma_exception_wq;
-	struct ecpri_dma_exception_stats exception_stats;
+	struct ecpri_dma_exception_context exception_ctx;
 	struct ecpri_dma_clks clks;
 	struct ecpri_dma_icc_paths icc_paths;
 	u32 num_of_gsi;
 	u32 driver_ver;
 	struct mutex mhi_memcpy_setup_lock;
-	spinlock_t exception_spinlock;
-	u32 exception_pkt_idx;
-	struct ecpri_dma_pkt*
-		exception_pkts_arr[ECPRI_DMA_EXCEPTION_RING_SIZE];
-	struct ecpri_dma_pkt exception_pkts[ECPRI_DMA_EXCEPTION_RING_SIZE];
-	struct ecpri_dma_mem_buffer*
-		exception_buffs_ptr_arr[ECPRI_DMA_EXCEPTION_RING_SIZE];
-	struct ecpri_dma_mem_buffer exception_buffs[ECPRI_DMA_EXCEPTION_RING_SIZE];
-	u32 exception_status_statistics[ECPRI_DMA_STATUS_CODE_MAX];
 };
 
 /**

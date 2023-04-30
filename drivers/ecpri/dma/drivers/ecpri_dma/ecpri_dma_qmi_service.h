@@ -47,5 +47,6 @@ struct ecpri_dma_qmi_context {
 
 int ecpri_dma_qmi_service_init(void);
 int ecpri_dma_qmi_send_q6_msg(void);
+void ecpri_dma_qmi_service_exit(void);
 
 #endif /* _ECPRI_DMA_QMI_SERVICE_H_ */
