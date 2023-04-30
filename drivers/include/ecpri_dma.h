@@ -14,6 +14,19 @@
  */
 #define ECPRI_DMA_RESOURCE_NAME_MAX 32
 
+
+/**
+ * max number of LTE VFs
+ */
+#define ECPRI_DMA_LTE_VF_MAX (5)
+
+
+/**
+ * max number of topologies
+ */
+#define ECPRI_DMA_TOPOLOGIES_NUMBER_MAX \
+	(ECPRI_DMA_ENDP_STREAM_DEST_MAX + ECPRI_DMA_LTE_VF_MAX)
+
 /**
  * enum ecpri_hw_ver - eCPRI hardware version type
  * @ECPRI_HW_NONE: eCPRI hardware version not defined
@@ -72,7 +85,8 @@ enum ecpri_dma_endp_stream_dest {
 	ECPRI_DMA_ENDP_STREAM_DEST_C2C = 1,
 	ECPRI_DMA_ENDP_STREAM_DEST_L2 = 2,
 	ECPRI_DMA_ENDP_STREAM_DEST_FH_EXCEPTION = 3,
-	ECPRI_DMA_ENDP_STREAM_DEST_MAX = 4,
+	ECPRI_DMA_ENDP_STREAM_DEST_FH_LTE = 4,
+	ECPRI_DMA_ENDP_STREAM_DEST_MAX,
 };
 
 /**
