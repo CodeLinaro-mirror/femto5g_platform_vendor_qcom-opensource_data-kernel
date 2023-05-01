@@ -3,7 +3,6 @@
  * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
-#include <net/esp.h>
 #include <net/xfrm.h>
 #include <crypto/aead.h>
 

@@ -209,7 +209,6 @@ static int __secy_set_mode(unsigned int devid, unsigned int channel, bool ipsec)
 
 static int eip_ipsec_set_mode(struct eip_xfrm_state *eip_xs, bool ipsec)
 {
-	int rc;
 	unsigned int devid = eip_devid(eip_xs->channel);
 	unsigned int channel = eip_chid(eip_xs->channel);
 
@@ -586,7 +585,7 @@ static int eip_xdo_dev_state_add(struct xfrm_state *xs)
 	eip_xs->ilink = ilink;
 
 	eip_xs->xs = xs;
-	eip_xs->inbound = !!(xs->xso.flags & XFRM_OFFLOAD_INBOUND);
+	eip_xs->inbound = (xs->xso.dir == XFRM_DEV_OFFLOAD_IN);
 	eip_xs->sa_tag.etype = cpu_to_be16(eip_satag_etype);
 	eip_xs->channel = eip_xs->inbound ? &ilink->link->rx : &ilink->link->tx;
 
@@ -652,7 +651,7 @@ static void eip_xdo_dev_state_free(struct xfrm_state *xs)
 
 	pr_debug("EIP IPSEC: %s\n", __func__);
 
-	xs->xso.offload_handle = NULL;
+	xs->xso.offload_handle = 0;
 	kfree_sensitive(eip_xs);
 }
 
