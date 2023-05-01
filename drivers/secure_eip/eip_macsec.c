@@ -398,7 +398,7 @@ static int eip_macsec_config_default_vport(unsigned int device_id,
 {
 	struct macsec_device_info *dev_info_p;
 	u32 port_id;
-	int rc;
+	int rc = 0;
 
 	port_id = GET_PORT_ID_FROM_DEVICE_ID(device_id);
 	if (port_id >= EIP_MAX_PORT) {
@@ -758,11 +758,10 @@ static int eip_macsec_config_sa(bool fIngress, unsigned int device_id,
 static int eip_macsec_add_sa(bool fIngress, unsigned int device_id,
 			     unsigned int Channel, struct macsec_context *ctx)
 {
-	int rc;
+	int rc = 0;
 	CfyE_vPort_t vPortParams;
 	SecY_SA_t *SA_Params;
 	CfyE_Rule_t RuleParams;
-	SecY_Status_t SecY_Rc;
 
 	uint8_t sa_idx = ctx->sa.assoc_num;
 	struct macsec_per_channel_info *ch_info_p =
@@ -840,21 +839,20 @@ static int eip_macsec_add_sa(bool fIngress, unsigned int device_id,
 	/*SA Creation*/
 	if (fIngress) // Ingress
 	{
-		SecY_Rc = SecY_SA_Add(device_id, ch_info_p->vPortIndex,
-				      &SecY_SAHandle, SA_Params);
-		if (SecY_Rc != SECY_STATUS_OK) {
-			eip_logerr("Failed, SecY_SA_Add()=%d\n", SecY_Rc);
+		rc = SecY_SA_Add(device_id, ch_info_p->vPortIndex,
+				 &SecY_SAHandle, SA_Params);
+		if (rc != SECY_STATUS_OK) {
+			eip_logerr("Failed, SecY_SA_Add()=%d\n", rc);
 			goto error_exit;
 		}
 		eip_loginfo(" Ingress SA_ADDED device id = %d", device_id);
 		ch_info_p->active[sa_idx] = ctx->sa.rx_sa->active;
 	} else {
 		if (!ch_info_p->egress_init_flag) {
-			SecY_Rc = SecY_SA_Add(device_id, ch_info_p->vPortIndex,
-					      &SecY_SAHandle, SA_Params);
-			if (SecY_Rc != SECY_STATUS_OK) {
-				eip_logerr("Failed, SecY_SA_Add()=%d\n",
-					   SecY_Rc);
+			rc = SecY_SA_Add(device_id, ch_info_p->vPortIndex,
+					 &SecY_SAHandle, SA_Params);
+			if (rc != SECY_STATUS_OK) {
+				eip_logerr("Failed, SecY_SA_Add()=%d\n", rc);
 				goto error_exit;
 			}
 			ch_info_p->egress_init_flag = 1;
@@ -869,21 +867,20 @@ static int eip_macsec_add_sa(bool fIngress, unsigned int device_id,
 			eip_loginfo("ch_info_p->sa_active_idx = %d",
 				    ch_info_p->sa_active_idx);
 
-			SecY_Rc = SecY_SA_Active_E_Get(device_id,
-						       ch_info_p->vPortIndex,
-						       &Active_SecY_SAHandle);
-			if (SecY_Rc != SECY_STATUS_OK) {
-				eip_logerr("SecY_SA_Active_E_Get()=%d\n",
-					   SecY_Rc);
+			rc = SecY_SA_Active_E_Get(device_id,
+						  ch_info_p->vPortIndex,
+						  &Active_SecY_SAHandle);
+			if (rc != SECY_STATUS_OK) {
+				eip_logerr("SecY_SA_Active_E_Get()=%d\n", rc);
 				goto error_exit;
 			}
 
-			SecY_Rc = SecY_SA_Chain(device_id, Active_SecY_SAHandle,
-						&SecY_SAHandle, SA_Params);
-			if (SecY_Rc != SECY_STATUS_OK) {
+			rc = SecY_SA_Chain(device_id, Active_SecY_SAHandle,
+					   &SecY_SAHandle, SA_Params);
+			if (rc != SECY_STATUS_OK) {
 				LOG_CRIT(
 					"DA_MACSEC: Failed, SecY_SA_Chain()=%d\n",
-					SecY_Rc);
+					rc);
 				goto error_exit;
 			}
 			eip_loginfo("Egress SA_Chained device id = %d\n",
@@ -1548,7 +1545,7 @@ static int eip_mdo_upd_rxsa(struct macsec_context *ctx)
 	struct macsec_per_channel_info *ch_info_p = NULL;
 	SecY_SAHandle_t SAHandles_Ingress[4] = { SecY_SAHandle_NULL };
 	SecY_Status_t SecY_Rc = SECY_STATUS_OK;
-	uint32_t SA_Words[24];
+	uint32_t SA_Words[2] = { 0 };
 	uint8_t i;
 
 	dump_rxsa(ctx);
@@ -1888,7 +1885,7 @@ static int eip_mdo_get_tx_sa_stats(struct macsec_context *ctx)
 	struct macsec_per_channel_info *ch_info_p = NULL;
 	struct eip_macsec_stats egress_stats;
 	SecY_SAHandle_t Active_SecY_SAHandle;
-	uint32_t SA_Words[24];
+	uint32_t SA_Words[2] = { 0 };
 
 	if (ctx->prepare) {
 		return 0;
