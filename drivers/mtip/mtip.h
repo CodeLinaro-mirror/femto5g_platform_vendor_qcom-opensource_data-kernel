@@ -23,6 +23,7 @@
 #include "mtip_ptp.h"
 #include "mtip_client.h"
 #include "mtip_clocks.h"
+#include "mtip_dma.h"
 
 // the driver name
 #define MTIP_MAC_DRIVER                 "MTIP_MAC"
@@ -320,6 +321,10 @@ struct mtip_platform_driver_priv
 
     // IPC log buffer low
     void* ipc_log_buf_low;
+
+    // array of lists of dma allocations
+    // static array of lists for allocations
+    struct mtip_dma_alloc_struct mtip_dma_alloc_array[MTIP_DMA_ALLOC_LIST_MAX];
 };
 
 // extern declarations

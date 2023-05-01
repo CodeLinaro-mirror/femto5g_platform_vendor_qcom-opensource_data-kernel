@@ -531,6 +531,12 @@ static int mtip_module_init(void)
         CSMLOGDBG("mtip_init(): IPC log context LOW created successfully, continue...\n");
     }
 
+    // initialize the dma array of allocs
+    for (i = 0; i < MTIP_DMA_ALLOC_LIST_MAX; ++i) 
+    {
+        mtip_dma_alloc_initialize(i);
+    }
+
    if (mtip_rumi_platform == 0) 
    {
        // register with the PHY
@@ -594,6 +600,7 @@ out:
 
 static void mtip_module_exit(void)
 {
+   int i;
    CSMLOGERR("mtip_module_exit called\n");
 
    // finalize the workq
@@ -601,6 +608,12 @@ static void mtip_module_exit(void)
 
    // destroy the hashmap
    mtip_hashmap_destroy();
+
+   // finalize the dma array of allocs
+   for (i = 0; i < MTIP_DMA_ALLOC_LIST_MAX; ++i) 
+   {
+       mtip_dma_alloc_finalize(i);
+   }
 
    mtip_debug_eth_unregister_platform_driver();
    if (!platform_driver_priv->perr)

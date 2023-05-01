@@ -285,7 +285,7 @@ void run_mtip_tx_comp_cb(void* work_ptr)
               }
 
               // free the pre header buff
-              kfree(pre_header_buff);
+              mtip_dma_free_tx_header(pre_header_buff);
           }
       }
 
@@ -359,14 +359,25 @@ void run_mtip_tx_comp_cb(void* work_ptr)
 
       for (j = 0; j < num_of_buffers; ++j) {
          // free the mem buffer
-         kfree(buffs[j]);
+         mtip_dma_free_mem_buffer(buffs[j]);
       }
 
       // free the container
-      kfree(buffs);
+      if (num_of_buffers == 1) 
+      {
+          mtip_dma_free_mem_buffer_single_ptr(buffs);
+      }
+      else if (num_of_buffers == 2) 
+      {
+          mtip_dma_free_mem_buffer_dual_ptr(buffs);
+      }
+      else
+      {
+          CSMLOGERR("invalid number of buffers %d", num_of_buffers);
+      }
 
       // free the dma pkt
-      kfree(pkt);
+      mtip_dma_free_dma_pkt(pkt);
    }
 
    // decrement the pkt completion count
@@ -375,10 +386,10 @@ void run_mtip_tx_comp_cb(void* work_ptr)
    // free the completion wrappers
    for (i = 0; i < num_of_completed; ++i)
    {
-      kfree(comp_pkts[i]);
+      mtip_dma_free_completion_wrapper(comp_pkts[i]);
    }
 
-   // free the container of comp_pkts
+   // free the container of comp_pkts using kfree
    kfree(comp_pkts);
 
    pending_pkt_completion_count = mtip_device_get_pkt_completion_count(netdev);
