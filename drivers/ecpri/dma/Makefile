@@ -7,6 +7,9 @@ ccflags-y += -I$(ECPRIDMADRVTOP)/ecpri_dma
 ccflags-y += -I$(ECPRIDMADRVTOP)/ecpri_dma/dump
 ccflags-y += -I$(ECPRIDMADRVTOP)/ecpri_dma/dmahal
 ccflags-y += -I$(ECPRIDMADRVTOP)/ecpri_dma/dma_clients
+ifeq ($(ECPRI_PERF),1)
+	ccflags-y += -DECPRI_NO_PRINTS
+endif
 
 gsim-m +=	drivers/gsi/gsi.o \
 			drivers/gsi/gsihal/gsihal.o \
