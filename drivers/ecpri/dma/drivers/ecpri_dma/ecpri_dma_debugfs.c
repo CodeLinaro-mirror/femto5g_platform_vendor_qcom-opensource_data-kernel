@@ -412,11 +412,12 @@ static ssize_t ecpri_dma_link_stat_read(struct file *file, char __user *ubuf,
 		 tx_endp->total_bytes_sent, rx_endp->total_bytes_recv);
 
 	nbytes += scnprintf(dbg_buff + nbytes, count - nbytes,
-		"Tx endpoint ID: %d GSI ID: %d GSI Channel: %d EE: %d\n",
+		"Tx endpoint ID: %d GSI ID: %d GSI Channel: %d EE: %d Poll enabled:%d\n",
 			tx_endp->endp_id,
 			tx_endp->gsi_id,
 			tx_endp->gsi_ep_cfg->dma_gsi_chan_num,
-			tx_endp->gsi_ep_cfg->ee);
+			tx_endp->gsi_ep_cfg->ee,
+			tx_endp->enable_tx_poll);
 
 	nbytes += scnprintf(dbg_buff + nbytes, count - nbytes,
 		"Rx endpoint ID: %d GSI ID: %d GSI channel: %d EE: %d\n",

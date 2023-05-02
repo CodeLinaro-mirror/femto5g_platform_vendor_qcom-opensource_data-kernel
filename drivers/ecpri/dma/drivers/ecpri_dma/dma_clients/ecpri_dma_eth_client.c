@@ -238,6 +238,46 @@ static void dma_eth_client_tx_comp_hdlr(
 	DMADBG_LOW("Exit\n");
 }
 
+static void dma_eth_client_tx_poll_comp_hdlr(
+	struct ecpri_dma_endp_context *endp,
+	struct ecpri_dma_pkt_completion_wrapper **comp_pkt,
+	u32 num_of_completed)
+{
+	struct ecpri_dma_eth_client_connection *connection;
+
+	DMADBG_LOW("Begin\n");
+
+	if (!ecpri_dma_eth_client_ctx
+	    || !ecpri_dma_eth_client_ctx->is_eth_ready) {
+		DMAERR("Context not initialized\n");
+		return;
+	}
+
+	/* Retrieve Connection */
+	connection = ecpri_dma_eth_client_get_conn_from_hdl(endp->hdl);
+	if (!connection || !connection->valid) {
+		DMAERR("Connection invalid handle:%x, ENDP ID:%d\n", endp->hdl,
+			endp->endp_id);
+		return;
+	}
+
+	if (connection->tx_notify_mode == ECPRI_DMA_NOTIFY_MODE_IRQ) {
+		/* Move connection to POLL mode, GSI alredy moved to poll */
+		connection->tx_notify_mode = ECPRI_DMA_NOTIFY_MODE_POLL;
+
+		/* Handle IRQ mode */
+		ecpri_dma_eth_client_ctx->tx_irq_comp_cb(
+			ecpri_dma_eth_client_ctx->tx_irq_comp_cb_user_data,
+			connection->hdl);
+	}
+	else {
+		/* Handle POLL mode*/
+		connection->received_tx_irq_during_poll++;
+	}
+
+	DMADBG_LOW("Exit\n");
+}
+
 static void dma_eth_client_rx_comp_hdlr(
 	struct ecpri_dma_endp_context *endp,
 	struct ecpri_dma_pkt_completion_wrapper **comp_pkt,
@@ -364,6 +404,7 @@ int ecpri_dma_eth_register(struct ecpri_dma_eth_register_params *ready_info,
 
 	DMADBG_LOW("Begin\n");
 
+	/* Params are mandatory except for ready_info->notify_tx_comp_irq */
 	if (!ready_info || !ready_info->notify_ready
 	    || !ready_info->notify_rx_comp || !ready_info->notify_tx_comp
 	    || !is_dma_ready) {
@@ -398,6 +439,11 @@ int ecpri_dma_eth_register(struct ecpri_dma_eth_register_params *ready_info,
 		= ready_info->notify_rx_comp;
 	ecpri_dma_eth_client_ctx->rx_comp_cb_user_data
 		= ready_info->userdata_rx;
+
+	ecpri_dma_eth_client_ctx->tx_irq_comp_cb
+		= ready_info->notify_tx_comp_irq;
+	ecpri_dma_eth_client_ctx->tx_irq_comp_cb_user_data
+		= ready_info->userdata_tx_irq;
 
 	/* Check DMA driver state */
 
@@ -489,6 +535,9 @@ void ecpri_dma_eth_deregister(void)
 	ecpri_dma_eth_client_ctx->rx_comp_cb            = NULL;
 	ecpri_dma_eth_client_ctx->rx_comp_cb_user_data  = NULL;
 
+	ecpri_dma_eth_client_ctx->tx_irq_comp_cb = NULL;
+	ecpri_dma_eth_client_ctx->tx_irq_comp_cb_user_data = NULL;
+
 	DMADBG_LOW("Exit\n");
 }
 
@@ -498,7 +547,9 @@ int ecpri_dma_eth_connect_endpoints(
 {
 	int ret = 0;
 	struct ecpri_dma_eth_client_connection *connection;
-	struct ecpri_dma_moderation_config rx_mod_cfg = { 1, 0 };
+	struct ecpri_dma_moderation_config irq_mod_cfg = { 1, 0 };
+	struct ecpri_dma_moderation_config* curr_tx_mod_cfg;
+	client_notify_comp tx_notify_comp;
 
 	DMADBG_LOW("Begin\n");
 
@@ -531,13 +582,24 @@ int ecpri_dma_eth_connect_endpoints(
 		return -EINVAL;
 	}
 
+	connection->enable_tx_poll = params->enable_tx_poll;
+
+	if (connection->enable_tx_poll) {
+		curr_tx_mod_cfg = &irq_mod_cfg;
+		tx_notify_comp = &dma_eth_client_tx_poll_comp_hdlr;
+	}
+	else {
+		curr_tx_mod_cfg = &params->tx_mod_cfg;
+		tx_notify_comp = &dma_eth_client_tx_comp_hdlr;
+	}
+
 	ret = ecpri_dma_alloc_endp(
 		ecpri_dma_eth_client_ctx->
 		link_to_endp_mapping[params->link_index].tx_endp.gsi_id,
 		ecpri_dma_eth_client_ctx->
 		link_to_endp_mapping[params->link_index].tx_endp.endp_id,
-		params->tx_ring_length, &params->tx_mod_cfg, false,
-		&dma_eth_client_tx_comp_hdlr);
+		params->tx_ring_length, curr_tx_mod_cfg, false,
+		tx_notify_comp, connection->enable_tx_poll);
 
 	if (ret != 0) {
 		DMAERR("Unable to allocate Tx ENDP, ENDP ID:%d, GSI ID %d\n",
@@ -553,8 +615,8 @@ int ecpri_dma_eth_connect_endpoints(
 		link_to_endp_mapping[params->link_index].rx_endp.gsi_id,
 		ecpri_dma_eth_client_ctx->
 		link_to_endp_mapping[params->link_index].rx_endp.endp_id,
-		params->rx_ring_length, &rx_mod_cfg, false,
-		&dma_eth_client_rx_comp_hdlr);
+		params->rx_ring_length, &irq_mod_cfg, false,
+		&dma_eth_client_rx_comp_hdlr, false);
 
 	if (ret != 0) {
 		DMAERR("Unable to allocate Rx ENDP, ENDP ID:%d, GSI ID %d\n",
@@ -605,6 +667,7 @@ int ecpri_dma_eth_connect_endpoints(
 	connection->p_type = params->p_type;
 	connection->link_idx = params->link_index;
 	connection->rx_notify_mode = ECPRI_DMA_NOTIFY_MODE_IRQ;
+	connection->tx_notify_mode = ECPRI_DMA_NOTIFY_MODE_IRQ;
 
 	connection->tx_mod_cfg.moderation_counter_threshold =
 		params->tx_mod_cfg.moderation_counter_threshold;
@@ -679,7 +742,8 @@ int ecpri_dma_eth_disconnect_endpoints(ecpri_dma_eth_conn_hdl_t hdl)
 	connection->valid = false;
 	connection->hdl = 0;
 	connection->p_type = 0;
-	connection->rx_notify_mode = 0;
+	connection->rx_notify_mode = ECPRI_DMA_NOTIFY_MODE_IRQ;
+	connection->tx_notify_mode = ECPRI_DMA_NOTIFY_MODE_IRQ;
 	connection->link_idx = 0;
 	connection->received_irq_during_poll = 0;
 	connection->tx_mod_cfg.moderation_timer_threshold = 0;
@@ -974,7 +1038,7 @@ int ecpri_dma_eth_rx_mode_set(ecpri_dma_eth_conn_hdl_t hdl,
 
 	if (!connection->valid) {
 		DMAERR("Connection invalid handle:%x, ENDP ID:%d\n", hdl,
-			connection->tx_endp_ctx->endp_id);
+			connection->rx_endp_ctx->endp_id);
 		return -EINVAL;
 	}
 
@@ -1016,7 +1080,7 @@ int ecpri_dma_eth_rx_mode_get(ecpri_dma_eth_conn_hdl_t hdl,
 
 	if (!connection->valid) {
 		DMAERR("Connection invalid handle:%x, ENDP ID:%d\n", hdl,
-			connection->tx_endp_ctx->endp_id);
+			connection->rx_endp_ctx->endp_id);
 		return -EINVAL;
 	}
 
@@ -1054,15 +1118,139 @@ int ecpri_dma_eth_rx_poll(ecpri_dma_eth_conn_hdl_t hdl, u32 budget,
 
 	if (!connection->valid) {
 		DMAERR("Connection invalid handle:%x, ENDP ID:%d\n", hdl,
-			connection->tx_endp_ctx->endp_id);
+			connection->rx_endp_ctx->endp_id);
 		return -EINVAL;
 	}
 
-	ret = ecpri_dma_dp_rx_poll(connection->rx_endp_ctx, budget, pkts,
+	ret = ecpri_dma_dp_poll(connection->rx_endp_ctx, budget, pkts,
 		actual_num);
 	if (ret != 0) {
 		DMAERR("Unable to perform Rx Poll, handle:%x, ENDP ID:%d\n", hdl,
 			connection->rx_endp_ctx->endp_id);
+		return -EINVAL;
+	}
+
+	DMADBG_LOW("Exit\n");
+
+	return ret;
+}
+
+int ecpri_dma_eth_tx_mode_set(ecpri_dma_eth_conn_hdl_t hdl,
+	enum ecpri_dma_notify_mode mode)
+{
+	int ret = 0;
+	struct ecpri_dma_eth_client_connection *connection;
+
+	DMADBG_LOW("Begin\n");
+
+	if(mode >= ECPRI_DMA_NOTIFY_MODE_MAX) {
+		DMAERR("Invalid parameters\n");
+		return -EINVAL;
+	}
+
+	/* Retrieve Connection */
+	connection = ecpri_dma_eth_client_get_conn_from_hdl(hdl);
+	if (!connection) {
+		DMAERR("NULL pointer to connection\n");
+		return -EINVAL;
+	}
+
+	if (!connection->valid) {
+		DMAERR("Connection invalid handle:%x, ENDP ID:%d\n", hdl,
+			connection->tx_endp_ctx->endp_id);
+		return -EINVAL;
+	}
+
+	connection->tx_notify_mode = mode;
+
+	ret = ecpri_dma_set_endp_mode(connection->tx_endp_ctx, mode);
+	if (ret != 0) {
+		DMAERR("Unable to set Tx mode, handle:%x, ENDP ID:%d,"
+		       "Current mode: %d, New mode: %d, \n", hdl,
+			connection->tx_endp_ctx->endp_id,
+			connection->tx_notify_mode, mode);
+		return -EINVAL;
+	}
+
+	DMADBG_LOW("Exit\n");
+
+	return ret;
+}
+
+int ecpri_dma_eth_tx_mode_get(ecpri_dma_eth_conn_hdl_t hdl,
+	enum ecpri_dma_notify_mode *mode)
+{
+	int ret = 0;
+	struct ecpri_dma_eth_client_connection *connection;
+
+	DMADBG_LOW("Begin\n");
+
+	if(!mode) {
+		DMAERR("Invalid parameters\n");
+		return -EINVAL;
+	}
+
+	/* Retrieve Connection */
+	connection = ecpri_dma_eth_client_get_conn_from_hdl(hdl);
+	if (!connection) {
+		DMAERR("NULL pointer to connection\n");
+		return -EINVAL;
+	}
+
+	if (!connection->valid) {
+		DMAERR("Connection invalid handle:%x, ENDP ID:%d\n", hdl,
+			connection->tx_endp_ctx->endp_id);
+		return -EINVAL;
+	}
+
+	ret = ecpri_dma_get_endp_mode(connection->tx_endp_ctx, mode);
+	if (ret != 0) {
+		DMAERR("Unable to get Tx mode, handle:%x, ENDP ID:%d\n", hdl,
+			connection->tx_endp_ctx->endp_id);
+		return -EINVAL;
+	}
+
+	DMADBG_LOW("Exit\n");
+
+	return ret;
+}
+
+int ecpri_dma_eth_tx_poll(ecpri_dma_eth_conn_hdl_t hdl, u32 budget,
+	struct ecpri_dma_pkt_completion_wrapper **pkts, u32 *actual_num)
+{
+	int ret = 0;
+	struct ecpri_dma_eth_client_connection *connection;
+
+	DMADBG_LOW("Begin\n");
+
+	if (!pkts || !actual_num) {
+		DMAERR("Invalid parameters\n");
+		return -EINVAL;
+	}
+
+	/* Retrieve Connection */
+	connection = ecpri_dma_eth_client_get_conn_from_hdl(hdl);
+	if (!connection) {
+		DMAERR("NULL pointer to connection\n");
+		return -EINVAL;
+	}
+
+	if (!connection->valid) {
+		DMAERR("Connection invalid handle:%x, ENDP ID:%d\n", hdl,
+			connection->tx_endp_ctx->endp_id);
+		return -EINVAL;
+	}
+
+	if (!connection->enable_tx_poll) {
+		DMAERR("Connection tx poll not enabled handle:%x\n", hdl);
+		return -EPERM;
+	}
+
+	ret = ecpri_dma_dp_poll(connection->tx_endp_ctx, budget, pkts,
+		actual_num);
+	if (ret != 0) {
+		DMAERR("Unable to perform Tx Poll, handle:%x, ENDP ID:%d\n", hdl,
+			connection->tx_endp_ctx->endp_id);
 		return -EINVAL;
 	}
 
@@ -1175,6 +1363,9 @@ const struct ecpri_dma_eth_ops ecpri_dma_eth_driver_ops = {
 .ecpri_dma_eth_rx_poll = ecpri_dma_eth_rx_poll,
 .ecpri_dma_eth_replenish_buffers = ecpri_dma_eth_replenish_buffers,
 .ecpri_dma_eth_query_stats = ecpri_dma_eth_query_stats,
+.ecpri_dma_eth_tx_mode_set = ecpri_dma_eth_tx_mode_set,
+.ecpri_dma_eth_tx_mode_get = ecpri_dma_eth_tx_mode_get,
+.ecpri_dma_eth_tx_poll = ecpri_dma_eth_tx_poll,
 };
 
 EXPORT_SYMBOL(ecpri_dma_eth_driver_ops);

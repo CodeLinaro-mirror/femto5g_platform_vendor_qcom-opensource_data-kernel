@@ -634,7 +634,7 @@ static void ecpri_dma_mhi_memcpy_async_notify_comp(
 
 	/* memcpy uses single buffer packet so actual_num == num of buffers
 		no need to check for EOT */
-	ret = ecpri_dma_dp_rx_poll(endp,
+	ret = ecpri_dma_dp_poll(endp,
 				   ECPRI_DMA_MHI_CLIENT_MEMCPY_ASYNC_BUDGET,
 				   async_pkts, &actual_num);
 	if (ret) {
@@ -708,7 +708,7 @@ static int ecpri_dma_mhi_alloc_sync_async_endps(
 		endp_ctx[gsi_id][sync_src_endp_id].eventless_endp = true;
 
 	ret = ecpri_dma_alloc_endp(gsi_id, sync_src_endp_id,
-		ECPRI_DMA_MHI_MEMCPY_RLEN, mod_cfg, false, NULL);
+		ECPRI_DMA_MHI_MEMCPY_RLEN, mod_cfg, false, NULL, false);
 	if (ret != 0) {
 		DMAERR("Unable to allocate SYNC_SRC ENDP, endp_id: %d\n",
 			sync_src_endp_id);
@@ -717,7 +717,7 @@ static int ecpri_dma_mhi_alloc_sync_async_endps(
 
 	ret = ecpri_dma_alloc_endp(gsi_id,
 		sync_dest_endp_id, ECPRI_DMA_MHI_MEMCPY_RLEN,
-		mod_cfg, false, NULL);
+		mod_cfg, false, NULL, false);
 	if (ret != 0) {
 		DMAERR("Unable to allocate SYNC_DEST ENDP, endp_id: %d\n",
 			sync_dest_endp_id);
@@ -741,7 +741,7 @@ static int ecpri_dma_mhi_alloc_sync_async_endps(
 		endp_ctx[gsi_id][async_src_endp_id].eventless_endp = true;
 	ret = ecpri_dma_alloc_endp(gsi_id,
 		async_src_endp_id, ECPRI_DMA_MHI_MEMCPY_RLEN,
-		mod_cfg, false, NULL);
+		mod_cfg, false, NULL, false);
 	if (ret != 0) {
 		DMAERR("Unable to allocate ASYNC_SRC ENDP, endp_id: %d\n",
 			async_src_endp_id);
@@ -751,7 +751,7 @@ static int ecpri_dma_mhi_alloc_sync_async_endps(
 	ret = ecpri_dma_alloc_endp(gsi_id,
 		async_dest_endp_id, ECPRI_DMA_MHI_MEMCPY_RLEN,
 		mod_cfg, false,
-		ecpri_dma_mhi_memcpy_async_notify_comp);
+		ecpri_dma_mhi_memcpy_async_notify_comp, false);
 	if (ret != 0) {
 		DMAERR("Unable to allocate ASYNC_DEST ENDP, endp_id: %d\n",
 			async_dest_endp_id);
@@ -1524,7 +1524,7 @@ static int ecpri_dma_mhi_dma_sync_memcpy(
 
 		/* memcpy uses single buffer packet so actual_num == num of buffers
 		no need to check for EOT */
-		ret = ecpri_dma_dp_rx_poll(memcpy_ctx->sync_dest_endp, 1,
+		ret = ecpri_dma_dp_poll(memcpy_ctx->sync_dest_endp, 1,
 			&pkt_wrapper, &actual_num);
 		if (ret != 0) {
 			DMAERR("Unable to poll\n");
@@ -2602,7 +2602,7 @@ static int ecpri_dma_mhi_client_connect_internal(
 
 	ret = ecpri_dma_alloc_endp(channel->endp_ctx->gsi_id,
 		channel->endp_ctx->endp_id, channel->rlen,
-		&mod_cfg, channel->is_over_pcie, NULL);
+		&mod_cfg, channel->is_over_pcie, NULL, false);
 	if (ret != 0) {
 		DMAERR("Failed to allocate endp %d\n", channel->endp_ctx->endp_id);
 		goto fail_al_endp;
