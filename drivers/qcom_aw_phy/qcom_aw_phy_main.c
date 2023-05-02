@@ -70,6 +70,44 @@ struct qcom_aw_phy_config *qcom_aw_phy_get_config_info(void) {
 }
 
 /*-------------------------------------------------------------------
+* qcom_aw_phy_get_inst_config
+
+* Description: This function returns the PHY instance information.
+------------------------------------------------------------------- */
+struct qcom_aw_phy_inst_config *qcom_aw_phy_get_inst_config(enum qcom_aw_phy_instance_enum port) {
+	struct qcom_aw_phy_config *phy_config_info = NULL;
+	if(!QCOM_AW_PHY_INST_VALID(port))
+		goto func_ret;
+	phy_config_info=qcom_aw_phy_get_config_info();
+	if(phy_config_info!=NULL){
+		return &phy_config_info->phy_inst_config_info[port];
+	}
+func_ret:
+	return NULL;
+}
+
+/*-------------------------------------------------------------------
+* qcom_aw_phy_get_lane_params
+
+* Description: This function returns the lane param information.
+------------------------------------------------------------------- */
+struct qcom_aw_lane_params *qcom_aw_phy_get_lane_params(enum qcom_aw_phy_instance_enum port, enum eth_phy_iface_phy_lane_num_enum lane) {
+	struct qcom_aw_phy_config *phy_config_info = NULL;
+	struct qcom_aw_phy_inst_config *phy_inst_info = NULL;
+	if(!QCOM_AW_PHY_INST_VALID(port) || !QCOM_AW_PHY_LANE_VALID(lane))
+		goto func_ret;
+	phy_config_info=qcom_aw_phy_get_config_info();
+	if(phy_config_info!=NULL){
+		phy_inst_info = &phy_config_info->phy_inst_config_info[port];
+		if(phy_inst_info!=NULL){
+			return &phy_inst_info->lane_params[lane];
+		}
+	}
+func_ret:
+	return NULL;
+}
+
+/*-------------------------------------------------------------------
 * qcom_aw_phy_get_loopback_mode
 
 * Description: This function returns the loopback config for AW PHY.
@@ -94,6 +132,10 @@ void qcom_aw_phy_set_loopback_mode(enum qcom_aw_phy_loopback_mode_enum mode) {
 ----------------------------------------------------------------------- */
 int qcom_aw_phy_get_polarity_flag(void) {
   return qcom_aw_phy_toggle_polarity;
+}
+
+int qcom_aw_phy_get_ref_clk_mode(void) {
+  return qcom_aw_phy_ref_clk_mode;
 }
 
 /*-------------------------------------------------------------------
@@ -844,12 +886,6 @@ static void qcom_aw_phy_hw_init() {
       qcom_aw_phy_load_hexfile(
           &mss, "/lib/firmware/qcom_aw_phy/eth_custom_rates_1.hex");
 
-      pmd_read_addr(&mss,0x80000000, &version_raw);
-      QCOM_AW_PHY_LOG_INFO("FW loaded : Version MAJOR = %d "
-                           "Version MINOR = %d Version PATCH = %d\n",
-                           (version_raw >> 16) & 0xFF,
-                           (version_raw >> 8) & 0xFF, version_raw & 0xFF);
-
 #ifndef FEATURE_QCOM_AW_RUMI_SW
       /* Register for PHY status IRQ */
       ret_val = devm_request_irq(
@@ -872,6 +908,15 @@ static void qcom_aw_phy_hw_init() {
 #endif
     }
   }
+  pmd_read_addr(&mss,0x80000000, &version_raw);
+  phy_config_info->fw_major_ver= ((version_raw >> 16) & 0xFF);
+  phy_config_info->fw_minor_ver= ((version_raw >> 8) & 0xFF);
+  phy_config_info->fw_patch_ver= (version_raw & 0xFF);
+  QCOM_AW_PHY_LOG_INFO("FW loaded : Version MAJOR = %d "
+                       "Version MINOR = %d Version PATCH = %d\n",
+                       (version_raw >> 16) & 0xFF,
+                       (version_raw >> 8) & 0xFF, version_raw & 0xFF);
+
 
   QCOM_AW_PHY_LOG_INFO("PHY IRQ register done\n");
 
