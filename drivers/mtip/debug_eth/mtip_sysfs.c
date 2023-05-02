@@ -904,11 +904,9 @@ void setup_StreamingFIFO(int index) {
       STREAM_FIFO_TIMER_3, STREAM_FIFO_TIMER_4};
 
   CSMLOGINFO("Setup Streaming FIFO Called \n");
-  if (STREAM_FIFO_THRESHOLD_ARRAY[index] <= MAXIMUM_PACKET_SIZE) {
-    value |= ((STREAM_FIFO_THRESHOLD_ARRAY[index] / BYTE_PER_WATERMARK_UNIT) &
+  value |= ((STREAM_FIFO_THRESHOLD_ARRAY[index] / BYTE_PER_WATERMARK_UNIT) &
               GENMASK(15, 0));
-    iowrite32(value, debug_port_base_address + fifo_registers[index]);
-  }
+  iowrite32(value, debug_port_base_address + fifo_registers[index]);
   iowrite32(STREAM_TIMEOUT_ARRAY[index],
             debug_port_base_address + stream_fifo_registers[index]);
   CSMLOGINFO("Setup Streaming FIFO Ends \n");
@@ -1566,7 +1564,12 @@ ssize_t sysfs_show_Threshold(struct kobject *kobj, struct kobj_attribute *attr,
 
 ssize_t sysfs_store_Threshold(struct kobject *kobj, struct kobj_attribute *attr,
                               const char *buf, size_t count) {
+  unsigned int temp;
   CSMLOGINFO(KERN_INFO " Reading - sysfs store func...%s \n", kobj->name);
+  sscanf(buf, "%d", &temp);
+  if (temp < MINIMUM_PACKET_SIZE || temp > MAXIMUM_PACKET_SIZE)
+    return EINVAL;
+
   if (!strncmp(kobj->name, "FIFO_0", Kobj_Name_FIFO_Size)) {
     sscanf(buf, "%d", &F0.Threshold);
     setup_StreamingFIFO(FIFO_0);
