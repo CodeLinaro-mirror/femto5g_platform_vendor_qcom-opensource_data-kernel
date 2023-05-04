@@ -300,6 +300,7 @@
 			{ \
 				,ecpriss_filt \
 				,ecpriss_stats_timeout \
+				,ecpriss_clear_stats \
 			} \
 		} \
 	} \
