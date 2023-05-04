@@ -12,6 +12,7 @@
 #include <linux/clk.h>
 #include <linux/of.h>
 #include <linux/spinlock.h>
+#include <linux/panic_notifier.h>
 
 #include "cs_driver.h"
 #include "device_mgmt.h"
@@ -88,6 +89,11 @@ struct eip_device {
 
 struct eip_device eip_device_platform_data[EIP_MAX_PORT];
 struct eip_port *eip_ports[EIP_MAX_PORT];
+
+static const unsigned int dump_regs_list[] = {
+	0x5410, 0x5414, 0xAD10, 0xAD14, 0xAD10, 0xAD14,
+};
+
 uint32_t eip_reg_dump[EIP_MAX_PORT][REG_SIZE / sizeof(uint32_t)];
 
 void eip_cache_register(unsigned int port_id, unsigned int byte_offset,
@@ -101,12 +107,45 @@ void eip_cache_register(unsigned int port_id, unsigned int byte_offset,
 	}
 }
 
+static uint32_t eip_reg_read(struct eip_port *port, unsigned int offset)
+{
+	uint32_t val;
+	val = readl(port->base_addr + offset);
+	eip_cache_register(port->id, offset, val);
+	return val;
+}
+
 static void eip_reg_write(struct eip_port *port, unsigned int offset,
 			  uint32_t val)
 {
 	writel(val, port->base_addr + offset);
 	eip_cache_register(port->id, offset, val);
 }
+
+static void eip_read_reg_list(struct eip_port *port)
+{
+	unsigned int i;
+	for (i = 0; i < ARRAY_SIZE(dump_regs_list); i++) {
+		(void)eip_reg_read(port, dump_regs_list[i]);
+	}
+}
+
+static int eip_panic_notifier(struct notifier_block *this, unsigned long event,
+			      void *ptr)
+{
+	unsigned int i = 0;
+	eip_loginfo("eip panic notifier entry");
+	for (i = 0; i < EIP_MAX_PORT; i++) {
+		if (eip_ports[i]->base_addr)
+			eip_read_reg_list(eip_ports[i]);
+	}
+	eip_loginfo("eip panic notifier exit");
+	return NOTIFY_DONE;
+}
+
+static struct notifier_block eip_panic_nb = {
+	.notifier_call = eip_panic_notifier,
+};
 
 static void eip_secy_cfye_spinlock_init(void)
 {
@@ -568,7 +607,7 @@ static int eip_probe(struct platform_device *pdev)
 fail_mtip_register_dev:
 	eip_debugfs_remove_port(port);
 fail_debugfs:
-	wrapper_bypass_set(port->id, true);
+	wrapper_bypass_set(port, true);
 	eip_port_deinit(port->id);
 	return ret;
 
@@ -639,6 +678,14 @@ static int eip_module_init(void)
 		       ret);
 		goto platform_reg_fail;
 	}
+
+	ret = atomic_notifier_chain_register(&panic_notifier_list,
+					     &eip_panic_nb);
+	if (ret) {
+		eip_logerr("Failed to add into panic notifier chain");
+		goto panic_notifier_fail;
+	}
+
 	ret = macsec_eth_set_macsec_ops(&eip_macsec_ops);
 	if (ret) {
 		pr_err("eip_main: macsec_eth_set_macsec_ops failed with ret %d\n",
@@ -651,6 +698,8 @@ static int eip_module_init(void)
 	return ret;
 
 macsec_ops_fail:
+	atomic_notifier_chain_unregister(&panic_notifier_list, &eip_panic_nb);
+panic_notifier_fail:
 	platform_driver_unregister(&eip_driver);
 platform_reg_fail:
 	eip_debugfs_deinit();
@@ -665,6 +714,7 @@ device_init_fail:
 static void eip_module_exit(void)
 {
 	printk("eip_main: eip_module_exit called\n");
+	atomic_notifier_chain_unregister(&panic_notifier_list, &eip_panic_nb);
 	platform_driver_unregister(&eip_driver);
 	eip_debugfs_deinit();
 	Device_UnInitialize();
