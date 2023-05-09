@@ -1052,17 +1052,57 @@ void ecpriss_panic_notifr_handler(void)
 	ECPRILOGERR("ecpriss_pdata->xbar_ctx->stats.xbar_dbg_ocrx_2_3_buff_watermark_cc2 : %u ",ecpriss_pdata->xbar_ctx->stats.xbar_dbg_ocrx_2_3_buff_watermark_cc2);
 	ECPRILOGERR("ecpriss_pdata->xbar_ctx->stats.xbar_dbg_ocrx_2_3_buff_watermark_cc3 : %u ",ecpriss_pdata->xbar_ctx->stats.xbar_dbg_ocrx_2_3_buff_watermark_cc3);
 }
+void ecpriss_panic_notifr_handler_v2(void)
+{
+    int i;
+	ECPRILOGERR("ecpriss_hw_ver : %u",ecpriss_hw_ver);
 
+	ECPRILOGERR("ecpriss_pdata_v2->dev_mode : %u",ecpriss_pdata_v2->dev_mode);
+
+	ECPRILOGERR("ecpriss_pdata_v2->callback_flag->eth_link_callback_rcvd  : %u ",ecpriss_pdata_v2->callback_flag->eth_link_callback_rcvd);
+	ECPRILOGERR("ecpriss_pdata_v2->callback_flag->dma_callback_rcvd : %u ",ecpriss_pdata_v2->callback_flag->dma_callback_rcvd);
+	ECPRILOGERR("ecpriss_pdata_v2->callback_flag->ssr_callback_rcvd : %u ",ecpriss_pdata_v2->callback_flag->ssr_callback_rcvd);
+	ECPRILOGERR("ecpriss_pdata_v2->callback_flag->macsec_callback_rcvd : %u ",ecpriss_pdata_v2->callback_flag->macsec_callback_rcvd);
+
+	ECPRILOGERR("ecpriss_pdata_v2->qudp_ctx->state : %u",ecpriss_pdata_v2->qudp_ctx_v2->state);
+	ECPRILOGERR("ecpriss_pdata_v2->xbar_ctx->state : %u",ecpriss_pdata_v2->xbar_ctx_v2->state);
+	ECPRILOGERR("ecpriss_pdata_v2->state : %u",ecpriss_pdata_v2->ecpri_state);
+
+	for(i=0;i<XBAR_LINKS;i++)
+	{
+		ECPRILOGERR("ecpriss_pdata_v2->xbar_ctx->stats.xbar_octx_pkt_cnt[%d]  : %u",i,ecpriss_pdata_v2->xbar_ctx_v2->stats_v2.xbar_octx_pkt_cnt[i]);
+        ECPRILOGERR(" ecpriss_pdata_v2->xbar_ctx->stats.xbar_ocrx_pkt_cnt[%d] : %u",i,ecpriss_pdata_v2->xbar_ctx_v2->stats_v2.xbar_ocrx_pkt_cnt[i]);
+	}
+
+	ECPRILOGERR("ecpriss_pdata_v2->xbar_ctx->stats.xbar_ocrx_fh_buff_watermark_fh0  : %u ",ecpriss_pdata_v2->xbar_ctx_v2->stats_v2.xbar_ocrx_fh_buff_watermark_fh0);
+	ECPRILOGERR("Vecpriss_pdata_v2->xbar_ctx->stats.xbar_ocrx_fh_buff_watermark_fh1 : %u ",ecpriss_pdata_v2->xbar_ctx_v2->stats_v2.xbar_ocrx_fh_buff_watermark_fh1);
+	ECPRILOGERR("ecpriss_pdata_v2->xbar_ctx->stats.xbar_ocrx_fh_buff_watermark_fh2  : %u ",ecpriss_pdata_v2->xbar_ctx_v2->stats_v2.xbar_ocrx_fh_buff_watermark_fh2);
+
+	ECPRILOGERR("ecpriss_pdata_v2->xbar_ctx->stats.octx_oc_0_1_buff_watermark_cc0 : %u ",ecpriss_pdata_v2->xbar_ctx_v2->stats_v2.octx_oc_0_1_buff_watermark_cc0);
+	ECPRILOGERR("ecpriss_pdata_v2->xbar_ctx->stats.octx_oc_0_1_buff_watermark_cc1 : %u ",ecpriss_pdata_v2->xbar_ctx_v2->stats_v2.octx_oc_0_1_buff_watermark_cc1);
+	ECPRILOGERR("ecpriss_pdata_v2->xbar_ctx->stats.octx_oc_2_3_buff_watermark_cc2 : %u ",ecpriss_pdata_v2->xbar_ctx_v2->stats_v2.octx_oc_2_3_buff_watermark_cc2);
+	ECPRILOGERR("ecpriss_pdata_v2->xbar_ctx->stats.octx_oc_2_3_buff_watermark_cc3 : %u ",ecpriss_pdata_v2->xbar_ctx_v2->stats_v2.octx_oc_2_3_buff_watermark_cc3);
+
+	ECPRILOGERR("ecpriss_pdata_v2->xbar_ctx->stats.xbar_dbg_ocrx_0_1_buff_watermark_cc0 : %u ",ecpriss_pdata_v2->xbar_ctx_v2->stats_v2.xbar_dbg_ocrx_0_1_buff_watermark_cc0);
+	ECPRILOGERR("ecpriss_pdata_v2->xbar_ctx->stats.xbar_dbg_ocrx_0_1_buff_watermark_cc1 : %u ",ecpriss_pdata_v2->xbar_ctx_v2->stats_v2.xbar_dbg_ocrx_0_1_buff_watermark_cc1);
+	ECPRILOGERR("ecpriss_pdata_v2->xbar_ctx->stats.xbar_dbg_ocrx_2_3_buff_watermark_cc2 : %u ",ecpriss_pdata_v2->xbar_ctx_v2->stats_v2.xbar_dbg_ocrx_2_3_buff_watermark_cc2);
+	ECPRILOGERR("ecpriss_pdata_v2->xbar_ctx->stats.xbar_dbg_ocrx_2_3_buff_watermark_cc3 : %u ",ecpriss_pdata_v2->xbar_ctx_v2->stats_v2.xbar_dbg_ocrx_2_3_buff_watermark_cc3);
+}
 static int ecpriss_panic_notifier(struct notifier_block *this,unsigned long event, void *ptr)
 {
 	/*Panic Notifier Handler for Ecpriss Module*/
-	ecpriss_panic_notifr_handler();
+	if(ecpriss_hw_ver == ECPRISS_HW_v2_0){
+		ecpriss_panic_notifr_handler_v2();
+	}else {
+		ecpriss_panic_notifr_handler();
+	}
 	return 0;
 }
 static struct notifier_block ecpriss_panic =
 {
   .notifier_call  = ecpriss_panic_notifier,
 };
+
 
 static int ecpriss_core_data_init(void)
 {
@@ -1140,6 +1180,7 @@ static int ecpriss_core_data_init_v2(void)
 	ecpriss_pdata_v2->events_workqueue = &events_workqueue_g;
 	ecpriss_pdata_v2->interrupts_workqueue = &interrupts_workqueue_g;
 	spin_lock_init(&ecpriss_pdata_v2->irq_lock);
+	atomic_notifier_chain_register(&panic_notifier_list,&ecpriss_panic);
 	ecpriss_pdata_v2->ecpriss_core_logbuf =
         ipc_log_context_create(ECPRISS_CORE_IPC_LOG_PAGES,
                 "ecpriss_core", 0);
