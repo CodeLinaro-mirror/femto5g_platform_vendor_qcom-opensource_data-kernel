@@ -452,7 +452,7 @@ static ssize_t config_val_from_registers_qudp_ingress_mac_addr_v2(char __user *b
 
 		ecpriss_qudp_ingress_config_stats_update_v2(fh_index);
 
-		for(fltr_table_index = 0; fltr_table_index < NUM_OF_FLTR; fltr_table_index++){
+		for(fltr_table_index = 0; fltr_table_index < MAX_MAC_FILTER_ENTRIES; fltr_table_index++){
 
 			if(ecpriss_pdata_v2->cfg_stats_v2.qudp_cfg_v2.ingress.cfg.mac_addr[fh_index][fltr_table_index].mac_msb.value ||
 					ecpriss_pdata_v2->cfg_stats_v2.qudp_cfg_v2.ingress.cfg.mac_addr[fh_index][fltr_table_index].mac_lsb.value){
@@ -985,9 +985,9 @@ static ssize_t config_val_from_valid_bits_filt_v2(char __user *buf, int fh_index
 				max_str_size);
 		strlcat(max_str, "\n",
 				max_str_size);
-#if 0
+
 		RESET_STR(temp_stat_val_str);
-		scnprintf(temp_stat_val_str, TEMP_STAT_VAL_STR_MAX_SIZE, "%u",
+		scnprintf(temp_stat_val_str, TEMP_STAT_VAL_STR_MAX_SIZE, "%x",
 				ecpriss_pdata_v2->cfg_stats_v2.qudp_cfg_v2.ingress.vbits.mac_addr[fh_index]);
 
 		strlcat(max_str, "mac_addr_valid_bits_fh_",
@@ -1000,7 +1000,6 @@ static ssize_t config_val_from_valid_bits_filt_v2(char __user *buf, int fh_index
 		strlcat(max_str, "\n",
 				max_str_size);
 
-#endif
 
 		data_size = strlen(max_str);
 		ECPRILOGERR("strlen = %u \n",data_size);
