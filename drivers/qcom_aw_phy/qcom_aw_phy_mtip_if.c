@@ -163,12 +163,12 @@ int qcom_aw_phy_setup(
     goto func_exit;
   }
 
+  // Reset the number of lanes to 0
+  phy_inst_info->num_lanes = 0;
+
   for (i = 0; i < PHY_LANE_MAX; i++) {
 
     mutex_lock(&phy_inst_info->lane_lock[i]);
-
-    // Reset the number of lanes to 0
-    phy_inst_info->num_lanes = 0;
 
     phy_lane_params = &phy_inst_info->lane_params[i];
 
