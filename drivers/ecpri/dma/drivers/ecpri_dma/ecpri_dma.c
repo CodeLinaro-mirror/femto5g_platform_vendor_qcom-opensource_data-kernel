@@ -143,7 +143,6 @@ static int ecpri_dma_smmu_ap_cb_probe(struct device *dev)
 {
 	struct ecpri_dma_smmu_cb_ctx *cb =
 		ecpri_dma_get_smmu_ctx(ECPRI_DMA_SMMU_CB_AP);
-	int fast = 0;
 	int bypass = 0;
 	u32 iova_ap_mapping[2];
 
@@ -205,10 +204,9 @@ static int ecpri_dma_smmu_ap_cb_probe(struct device *dev)
 	/* TODO: Uncomment once iommu_domain_get_attr API is added for Lassen
 	iommu_domain_get_attr(cb->iommu_domain, DOMAIN_ATTR_S1_BYPASS, &bypass);
 	iommu_domain_get_attr(cb->iommu_domain, DOMAIN_ATTR_FAST, &fast);
-	*/
-
 	DMADBG("AP CB PROBE dev=%px DOMAIN ATTRS bypass=%d fast=%d\n",
 		dev, bypass, fast);
+	*/
 
 	ecpri_dma_ctx->s1_bypass_arr[ECPRI_DMA_SMMU_CB_AP] = (bypass != 0);
 
@@ -1395,7 +1393,6 @@ fail_mem_ctx:
 int ecpri_dma_plat_drv_probe(struct platform_device *pdev_p)
 {
 	int result;
-	struct device *dev = &pdev_p->dev;
 
 	/*
 	 * eCPRI DMA probe function can be called for multiple times as the
@@ -1428,7 +1425,7 @@ int ecpri_dma_plat_drv_probe(struct platform_device *pdev_p)
 	}
 
 	DMADBG("eCPRI DMA driver probing started\n");
-	DMADBG("dev->of_node->name = %s\n", dev->of_node->name);
+	DMADBG("dev->of_node->name = %s\n", pdev_p->dev.of_node->name);
 
 	result = ecpri_dma_get_dts_configuration(pdev_p, &ecpri_dma_res);
 	if (result) {

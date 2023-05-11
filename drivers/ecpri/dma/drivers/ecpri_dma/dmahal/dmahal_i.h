@@ -11,7 +11,10 @@
 
 #define DMAHAL_DRV_NAME "ecpri_dma_hal"
 
-#define DMAHAL_DBG(fmt, args...) \
+#ifdef ECPRI_NO_PRINTS
+	#define DMAHAL_DBG(fmt, args...)
+#else
+	#define DMAHAL_DBG(fmt, args...) \
 	do { \
 		pr_debug(DMAHAL_DRV_NAME " %s:%d " fmt, __func__, __LINE__, \
 			## args); \
@@ -20,15 +23,19 @@
 		DMA_IPC_LOGGING(ecpri_dma_get_ipc_logbuf_low(), \
 			DMAHAL_DRV_NAME " %s:%d " fmt, ## args); \
 	} while (0)
+#endif
 
-#define DMAHAL_DBG_LOW(fmt, args...) \
-	do { \
-		pr_debug(DMAHAL_DRV_NAME " %s:%d " fmt, __func__, __LINE__, \
-			## args); \
-		DMA_IPC_LOGGING(ecpri_dma_get_ipc_logbuf_low(), \
-			DMAHAL_DRV_NAME " %s:%d " fmt, ## args); \
-	} while (0)
-
+#ifdef ECPRI_NO_PRINTS
+	#define DMAHAL_DBG_LOW(fmt, args...)
+#else
+	#define DMAHAL_DBG_LOW(fmt, args...) \
+		do { \
+			pr_debug(DMAHAL_DRV_NAME " %s:%d " fmt, __func__, __LINE__, \
+				## args); \
+			DMA_IPC_LOGGING(ecpri_dma_get_ipc_logbuf_low(), \
+				DMAHAL_DRV_NAME " %s:%d " fmt, ## args); \
+		} while (0)
+#endif
 #define DMAHAL_ERR(fmt, args...) \
 	do { \
 		pr_err(DMAHAL_DRV_NAME " %s:%d " fmt, __func__, __LINE__, \
@@ -49,15 +56,23 @@
 				DMAHAL_DRV_NAME " %s:%d " fmt, ## args); \
 		} while (0)
 
-#define DMAHAL_DBG_REG(fmt, args...) \
-	do { \
-		pr_err(fmt, ## args); \
-		DMA_IPC_LOGGING(ecpri_dma_hal_ctx->regdumpbuf, \
-			" %s:%d " fmt, ## args); \
-	} while (0)
+#ifdef ECPRI_NO_PRINTS
+	#define DMAHAL_DBG_REG(fmt, args...)
+#else
+	#define DMAHAL_DBG_REG(fmt, args...) \
+		do { \
+			pr_err(fmt, ## args); \
+			DMA_IPC_LOGGING(ecpri_dma_hal_ctx->regdumpbuf, \
+				" %s:%d " fmt, ## args); \
+		} while (0)
+#endif
 
-#define DMAHAL_DBG_REG_IPC_ONLY(fmt, args...) \
-		DMA_IPC_LOGGING(ecpri_dma_hal_ctx->regdumpbuf, " %s:%d " fmt, ## args)
+#ifdef ECPRI_NO_PRINTS
+	#define DMAHAL_DBG_REG_IPC_ONLY(fmt, args...)
+#else
+	#define DMAHAL_DBG_REG_IPC_ONLY(fmt, args...) \
+			DMA_IPC_LOGGING(ecpri_dma_hal_ctx->regdumpbuf, " %s:%d " fmt, ## args)
+#endif
 
 #define DMAHAL_MEM_ALLOC(__size, __is_atomic_ctx) \
 	(kzalloc((__size), ((__is_atomic_ctx) ? GFP_ATOMIC : GFP_KERNEL)))
