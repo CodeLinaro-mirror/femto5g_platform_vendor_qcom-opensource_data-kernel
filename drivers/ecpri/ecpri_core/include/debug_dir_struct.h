@@ -1,4 +1,4 @@
-#ifdef CONFIG_DEBUG_FS
+#ifndef NO_DEBUGFS_PERF
 #define TREE "\
 { \
 	ecpri_ss \

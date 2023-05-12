@@ -1781,7 +1781,7 @@ static int ecpriss_core_probe(struct platform_device *pdev)
 	/*
 	 * Debug FS Init
 	 */
-#ifdef CONFIG_DEBUG_FS
+#ifndef NO_DEBUGFS_PERF
 	setup_debugfs_directory();
 #endif
 	ECPRILOGDBG("ecpriss_core_probe(): End\n");
