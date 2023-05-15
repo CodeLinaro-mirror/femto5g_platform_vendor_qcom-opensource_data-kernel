@@ -3,7 +3,7 @@
  */
 
 /* global includes */
-
+#ifndef NO_DEBUGFS_PERF
 #include <ecpri_oxtor_debugfs.h>
 #include <linux/debugfs.h> /* debugfs addition*/
 #include <linux/file.h>
@@ -759,3 +759,5 @@ int setup_debugfs_directory(void) {
 		}
 		return 0;
 }
+
+#endif /* NO_DEBUGFS_PERF */

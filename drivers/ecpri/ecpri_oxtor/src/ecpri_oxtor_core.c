@@ -700,7 +700,9 @@ static int ecpri_oxtor_core_probe(struct platform_device *pdev)
 	pr_info("ecpri_oxtor_core_probe()\n");
 	ecpri_oxtor_init(pdev);
 	pr_info("ecpri_oxtor_core_probe(): Completed\n");
+#ifndef NO_DEBUGFS_PERF
 	setup_debugfs_directory();
+#endif
 	return 0;
 }
 
