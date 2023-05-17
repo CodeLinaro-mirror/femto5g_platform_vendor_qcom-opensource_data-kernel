@@ -67,7 +67,9 @@ enum qcom_aw_phy_debug_fs_cmd{
   RX_CDR_CHECKER,
   ENABLE_RX_BIST,
   CHECK_PRBS_ALL_LANES,
-  SET_EQ_MODE
+  SET_EQ_MODE,
+  SET_PORT_CONFIG_MASK,
+  INITIATE_AN,
 };
 
 int                                        qcom_aw_phy_attr_val;
@@ -88,6 +90,7 @@ uint32_t                               err_count_overflow[12] = {0};
 uint64_t                               err_count[12] = {0};
 uint64_t                               ber[12] = {0};
 bool                                   check_prbs_all_lanes = false;
+uint32_t                               port_config_mask = 0x800000;
 
 uint32_t                               tx_fir_main_or_max[QCOM_AW_PHY_INST_MAX] = {0};
 
@@ -177,22 +180,23 @@ void qcom_aw_phy_del_sysfs() {
 }
 
 void qcom_aw_phy_ready_cb(void *udata) {
-  QCOM_AW_PHY_LOG_ERR("qcom_aw_phy_ready_cb");
+  QCOM_AW_PHY_LOG_DBG("qcom_aw_phy_ready_cb");
 }
 
-void qcom_aw_phy_an_complete_cb(enum mtip_port_type_enum port_type,
-                                enum eth_phy_iface_phy_lane_num_enum lane_num) {
+void qcom_aw_phy_an_result_cb(enum mtip_port_type_enum port_type,
+                                      bool an_result,
+                                      enum mtip_port_config_enum port_config) {
 
-  QCOM_AW_PHY_LOG_ERR("qcom_aw_phy_an_complete_cb port %d, lane %d", port_type,
-                      lane_num);
+  QCOM_AW_PHY_LOG_DBG("qcom_aw_phy_an_result_cb port %d, result %d, config %d",
+                      port_type, an_result, port_config);
 }
 
 void qcom_aw_phy_cdr_lock_ind(u32 link_index, bool status) {
-  QCOM_AW_PHY_LOG_ERR("CDR lock for link_index %d, status", link_index, status);
+  QCOM_AW_PHY_LOG_DBG("CDR lock for link_index %d, status %d", link_index, status);
 }
 
 void qcom_aw_phy_lane_bring_up_progress_ind(u32 link_index, bool in_progress) {
-  QCOM_AW_PHY_LOG_ERR("Lane bring up in progress: %d for link index %d", in_progress, link_index);
+  QCOM_AW_PHY_LOG_DBG("Lane bring up in progress: %d for link index %d", in_progress, link_index);
 }
 ssize_t qcom_aw_phy_get_prbs_result(struct file *file, char __user *buf,
                                     size_t count, loff_t *ppos){
@@ -281,7 +285,7 @@ ssize_t qcom_aw_phy_set_attr(struct file *file, const char __user *buf,
       QCOM_AW_PHY_LOG_ERR("Register");
       ready_info.notify_ready = qcom_aw_phy_ready_cb;
       ready_info.userdata_ready = NULL;
-      ready_info.notify_an_complete = qcom_aw_phy_an_complete_cb;
+      ready_info.notify_an_result = qcom_aw_phy_an_result_cb;
       ready_info.cdr_lock_ind = qcom_aw_phy_cdr_lock_ind;
       ready_info.lane_bring_up_progress_ind = qcom_aw_phy_lane_bring_up_progress_ind;
       qcom_aw_phy_driver_iface_ops.eth_phy_iface_eth_register(&ready_info,
@@ -358,10 +362,7 @@ ssize_t qcom_aw_phy_set_attr(struct file *file, const char __user *buf,
 
     case AN_DONE_CB:
       QCOM_AW_PHY_LOG_ERR("AN done callback simulation");
-      for (i = PHY_LANE_0; i < num_lanes; i++) {
-        qcom_aw_phy_notify_an_complete(
-                               qcom_aw_phy_mac_port_to_phy_inst(port_type), i);
-      }
+      // TBD
       break;
 
     case NES_LB:
@@ -698,6 +699,20 @@ ssize_t qcom_aw_phy_set_attr(struct file *file, const char __user *buf,
         phy_inst_info = &phy_config_info->phy_inst_config_info[i];
         phy_inst_info->phy_eq_mode = eq_mode;
       }
+      break;
+
+    case SET_PORT_CONFIG_MASK:
+      token = qcom_aw_phy_strtok(NULL, ',', &save_ptr);
+      sscanf(token, "%d", &port_config_mask);
+      QCOM_AW_PHY_LOG_ERR("Port config mask set to 0x%x", port_config_mask);
+      break;
+
+
+    case INITIATE_AN:
+      QCOM_AW_PHY_LOG_ERR("Initiate AN");
+      qcom_aw_phy_driver_iface_ops.eth_phy_iface_initiate_an(port_type,
+                                                             num_lanes,
+                                                             port_config_mask);
       break;
 
     default:

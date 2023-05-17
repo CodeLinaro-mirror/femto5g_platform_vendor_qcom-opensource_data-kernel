@@ -171,34 +171,19 @@ int aw_pmd_anlt_auto_neg_start_set(mss_access_t *mss, uint32_t start) {
   return AW_ERR_CODE_NONE;
 }
 
+int aw_pmd_anlt_auto_neg_status_get (mss_access_t *mss, uint32_t * link_good){
+
+    CHECK(pmd_read_field(mss, ETH_ANLT_STATUS_ADDR, ETH_ANLT_STATUS_AN_LINK_GOOD_MASK, ETH_ANLT_STATUS_AN_LINK_GOOD_OFFSET, link_good));
+
+    return AW_ERR_CODE_NONE;
+}
+
 int aw_pmd_anlt_auto_neg_status_complete_get(mss_access_t *mss,
                                              uint32_t *an_complete) {
 
   CHECK(pmd_read_field(mss, ETH_AN_STAT_ADDR,
                        ETH_AN_STAT_AN_MR_AUTONEG_COMPLETE_MASK,
                        ETH_AN_STAT_AN_MR_AUTONEG_COMPLETE_OFFSET, an_complete));
-
-  return AW_ERR_CODE_NONE;
-}
-
-int aw_pmd_anlt_auto_neg_next_page_set(mss_access_t *mss, uint64_t an_tx_np) {
-  uint32_t an_mr_np_tx_1 = (an_tx_np & 0xFFFF);
-  uint32_t an_mr_np_tx_2 = (an_tx_np >> 16) & 0xFFFF;
-  uint32_t an_mr_np_tx_3 = (an_tx_np >> 32) & 0xFFFF;
-
-  CHECK(pmd_write_field(mss, ETH_AN_NP_REG1_ADDR,
-                        ETH_AN_NP_REG1_AN_MR_NP_TX_1_MASK,
-                        ETH_AN_NP_REG1_AN_MR_NP_TX_1_OFFSET, an_mr_np_tx_1));
-  CHECK(pmd_write_field(mss, ETH_AN_NP_REG2_ADDR,
-                        ETH_AN_NP_REG2_AN_MR_NP_TX_2_MASK,
-                        ETH_AN_NP_REG2_AN_MR_NP_TX_2_OFFSET, an_mr_np_tx_2));
-  CHECK(pmd_write_field(mss, ETH_AN_NP_REG3_ADDR,
-                        ETH_AN_NP_REG3_AN_MR_NP_TX_3_MASK,
-                        ETH_AN_NP_REG3_AN_MR_NP_TX_3_OFFSET, an_mr_np_tx_3));
-
-  CHECK(pmd_write_field(mss, ETH_AN_NP_REG3_ADDR,
-                        ETH_AN_NP_REG3_AN_MR_NEXT_PAGE_LOADED_MASK,
-                        ETH_AN_NP_REG3_AN_MR_NEXT_PAGE_LOADED_OFFSET, 1));
 
   return AW_ERR_CODE_NONE;
 }
@@ -1818,6 +1803,7 @@ int aw_pmd_iso_request_tx_state_change(mss_access_t *mss, aw_pstate_t tx_pstate,
                                        uint32_t timeout_us) {
   int poll_result;
   //USR_PRINTF("Setting TX rate/width/pstate\n");
+  aw_pmd_iso_tx_reset_set(mss, 0);
   aw_pmd_iso_tx_reset_set(mss, 1);
   aw_pmd_iso_tx_rate_set(mss, tx_rate);
   aw_pmd_iso_tx_width_set(mss, tx_width);
@@ -1850,6 +1836,7 @@ int aw_pmd_iso_request_rx_state_change(mss_access_t *mss, aw_pstate_t rx_pstate,
                                        uint32_t timeout_us) {
   int poll_result;
   //USR_PRINTF("Setting RX rate/width/pstate\n");
+  aw_pmd_iso_rx_reset_set(mss, 0);
   aw_pmd_iso_rx_reset_set(mss, 1);
   aw_pmd_iso_rx_rate_set(mss, rx_rate);
   aw_pmd_iso_rx_width_set(mss, rx_width);
@@ -2175,3 +2162,90 @@ int aw_pmd_snr_vld_enable_set(mss_access_t *mss, uint32_t vld_enable) {
                         RX_SNR_REG1_VLD_ENABLE_A_OFFSET, vld_enable));
   return AW_ERR_CODE_NONE;
 }
+
+int aw_pmd_anlt_auto_neg_result_get (mss_access_t *mss, uint8_t no_consortium, uint32_t * an_result){
+
+    uint32_t an_link_good;
+    uint32_t an_spec_1;
+    uint32_t an_spec_2;
+    uint32_t an_spec_3;
+    uint32_t an_spec_4;
+    uint32_t an_spec;
+    uint32_t an_econ_spec_1;
+    int cntr=0, i=0, bit=0;
+    uint32_t temp_an_result;
+
+    CHECK(pmd_read_check_field(mss, ETH_ANLT_STATUS_ADDR, ETH_ANLT_STATUS_AN_LINK_GOOD_MASK, ETH_ANLT_STATUS_AN_LINK_GOOD_OFFSET, RD_EQ, &an_link_good,  1, 0 ));
+
+    if(no_consortium == 1) {
+        CHECK(pmd_read_field(mss, ETH_AN_RESULT_REG1_ADDR, ETH_AN_RESULT_REG1_AN_SPEC_1_MASK, ETH_AN_RESULT_REG1_AN_SPEC_1_OFFSET, &an_spec_1));
+        CHECK(pmd_read_field(mss, ETH_AN_RESULT_REG1_ADDR, ETH_AN_RESULT_REG1_AN_SPEC_2_MASK, ETH_AN_RESULT_REG1_AN_SPEC_2_OFFSET, &an_spec_2));
+        CHECK(pmd_read_field(mss, ETH_AN_RESULT_REG1_ADDR, ETH_AN_RESULT_REG1_AN_SPEC_3_MASK, ETH_AN_RESULT_REG1_AN_SPEC_3_OFFSET, &an_spec_3));
+        CHECK(pmd_read_field(mss, ETH_AN_RESULT_REG2_ADDR, ETH_AN_RESULT_REG2_AN_SPEC_4_MASK, ETH_AN_RESULT_REG2_AN_SPEC_4_OFFSET, &an_spec_4));
+
+        an_spec = an_spec_1;
+        an_spec = (an_spec_2 << 3)  | an_spec;
+        an_spec = (an_spec_3 << 5)  | an_spec;
+        an_spec = (an_spec_4 << 13) | an_spec;
+
+        // there should only be 1 bit that is 1, all other bits should be 0
+        for (i = 0 ; i < 32 ; i++){
+            bit = (an_spec >> i) & 1;
+            if (bit == 1){
+                cntr++;
+                temp_an_result = i;
+            }
+        }
+        if (cntr != 1){
+            return AW_ERR_CODE_BAD_STATE;
+        }
+
+        *an_result = temp_an_result;
+    } else if (no_consortium == 0) {
+
+        CHECK(pmd_read_field(mss, ETH_AN_RESULT_REG2_ADDR, ETH_AN_RESULT_REG2_AN_ECON_SPEC_MASK, ETH_AN_RESULT_REG2_AN_ECON_SPEC_OFFSET, &an_econ_spec_1));
+        an_spec = an_econ_spec_1;
+
+        for (i = 0 ; i < 5 ; i++) {
+            bit = (an_spec >> i) & 1;
+            if (bit == 1) {
+                cntr++;
+                temp_an_result = i;
+            }
+        }
+        if (cntr != 1) {
+            return AW_ERR_CODE_BAD_STATE;
+        }
+
+        *an_result = temp_an_result;
+    } else {
+        USR_PRINTF("ERROR: Please set no_consortium field to either 0 or 1. Other values not accepted \n");
+        return AW_ERR_CODE_BAD_STATE;
+    }
+
+    return AW_ERR_CODE_NONE;
+}
+
+int aw_pmd_anlt_auto_neg_next_page_set(mss_access_t *mss, uint64_t an_tx_np) {
+  uint32_t an_mr_np_tx_1 = (an_tx_np & 0xFFFF);
+  uint32_t an_mr_np_tx_2 = (an_tx_np >> 16) & 0xFFFF;
+  uint32_t an_mr_np_tx_3 = (an_tx_np >> 32) & 0xFFFF;
+
+  CHECK(pmd_write_field(mss, ETH_AN_NP_REG1_ADDR,
+                        ETH_AN_NP_REG1_AN_MR_NP_TX_1_MASK,
+                        ETH_AN_NP_REG1_AN_MR_NP_TX_1_OFFSET, an_mr_np_tx_1));
+  CHECK(pmd_write_field(mss, ETH_AN_NP_REG2_ADDR,
+                        ETH_AN_NP_REG2_AN_MR_NP_TX_2_MASK,
+                        ETH_AN_NP_REG2_AN_MR_NP_TX_2_OFFSET, an_mr_np_tx_2));
+  CHECK(pmd_write_field(mss, ETH_AN_NP_REG3_ADDR,
+                        ETH_AN_NP_REG3_AN_MR_NP_TX_3_MASK,
+                        ETH_AN_NP_REG3_AN_MR_NP_TX_3_OFFSET, an_mr_np_tx_3));
+
+  //now that NP is loaded, trigger NP
+  CHECK(pmd_write_field(mss, ETH_AN_NP_REG3_ADDR,
+                        ETH_AN_NP_REG3_AN_MR_NEXT_PAGE_LOADED_MASK,
+                        ETH_AN_NP_REG3_AN_MR_NEXT_PAGE_LOADED_OFFSET, 1));
+
+  return AW_ERR_CODE_NONE;
+}
+

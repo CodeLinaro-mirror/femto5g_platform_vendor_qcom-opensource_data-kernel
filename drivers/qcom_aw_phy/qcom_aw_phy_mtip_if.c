@@ -68,7 +68,7 @@ int qcom_aw_phy_mtip_register(
   QCOM_AW_PHY_LOG_INFO("qcom_aw_phy_mtip_register !");
 
   if (!ready_info || !ready_info->notify_ready ||
-      !ready_info->notify_an_complete || !is_phy_ready) {
+      !ready_info->notify_an_result || !is_phy_ready) {
     ret_val = EINVAL;
     local_err_val = LOCAL_ERROR_0;
     goto func_exit;
@@ -90,7 +90,7 @@ int qcom_aw_phy_mtip_register(
   }
 
   /* Register AN complete callback */
-  qcom_aw_phy_mtip_if_info_s.an_complete_cb = ready_info->notify_an_complete;
+  qcom_aw_phy_mtip_if_info_s.notify_an_result = ready_info->notify_an_result;
 
   /* Register CDR lock success callback */
   qcom_aw_phy_mtip_if_info_s.cdr_lock_ind = ready_info->cdr_lock_ind;
@@ -275,89 +275,672 @@ void qcom_aw_phy_handle_cdr_lock_status(
   return;
 }
 
-/*-------------------------------------------------------------------
-* qcom_aw_phy_bringup_anlt_mode
+void qcom_aw_phy_reset_anlt(mss_access_t *mss) {
+  aw_pmd_anlt_link_training_reset(mss);
+  aw_pmd_anlt_auto_neg_start_set(mss, 0);
+  aw_pmd_iso_tx_reset_set(mss, 0);
+  aw_pmd_iso_tx_reset_set(mss, 1);
+  aw_pmd_iso_rx_reset_set(mss, 0);
+  aw_pmd_iso_rx_reset_set(mss, 1);
+  return;
+}
 
-* @mss: PHY address and offset
-* @lane: PHY lane number
-* @config: Phy lane config
-
-* Description: This function brings up the lanes in ANLT mode
-------------------------------------------------------------------- */
-int qcom_aw_phy_bringup_anlt_mode(mss_access_t *mss,
-                                  enum eth_phy_iface_phy_lane_num_enum lane,
-                                  struct qcom_aw_phy_lane_speed_config config) {
-  uint32_t lt_running;
-  uint32_t lt_done;
-  uint32_t lt_training_failure;
-  uint32_t lt_rx_ready;
-  uint32_t an_complete;
-  uint32_t mod = 0;
-  uint32_t adv_ability[19];
-  uint32_t fec_ability[5];
-  uint8_t cntr;
+int qcom_aw_phy_configure_speed_mode(
+                                  struct qcom_aw_phy_inst_config *phy_inst_info,
+                                  uint32_t port_config_mask){
+  enum mtip_port_config_enum i = MTIP_PORT_CONFIG_1x100GBASE_R;
   int ret_val = 0;
 
-  aw_pmd_rxeq_prbs_set(mss, 0);
-  aw_pmd_anlt_link_training_en_set(mss, 1);
-  aw_pmd_anlt_logical_lane_num_set(
-      mss, lane, 0); // 3rd param set to 0 for multi lane, set to 1 for 1 lane
+  QCOM_AW_PHY_LOG_ERR("PHY %d, port_config = 0x%x",
+                      phy_inst_info->phy_inst, port_config_mask);
 
-  aw_pmd_anlt_auto_neg_config_set(
-      mss, 0, 1, 1); // 3rd param set to 1 for multi lane, set to 0 for 1 lane,
-                     // 2nd param 0 for mission mode
-  aw_pmd_anlt_link_training_prbs_seed_set(mss, config.clause, 0);
+  memset(phy_inst_info->an_params.adv_ability, 0 ,
+         sizeof(uint32_t)*PHY_SPEED_SPEC_MAX);
+  memset(phy_inst_info->an_params.fec_ability, 0 ,
+         sizeof(uint32_t)*PHY_FEC_SPEC_MAX);
 
-  if (config.mod_tech == QCOM_AW_PHY_MOD_TECH_PAM4)
-    mod = 1;
-  aw_pmd_anlt_link_training_config_set(mss, config.width, config.clause, mod);
+  for(i=MTIP_PORT_CONFIG_1x100GBASE_R; i<MTIP_PORT_CONFIG_MAX; i++){
+    if(port_config_mask & (1<<i)){
+      switch(i){
+        case MTIP_PORT_CONFIG_1x100GBASE_R:
+        case MTIP_PORT_CONFIG_1x100GBASE_R_RSFEC_LL:
+        case MTIP_PORT_CONFIG_1x100GBASE_R_RSFEC:
+          phy_inst_info->an_params.adv_ability[PHY_SPEED_SPEC_100G_BASE_K_CR] = 1;
+          break;
 
-  /* Pass in 1 to the appropriate technology in the below array
-  Ex : For tech5 pass 19bit array [0,0,0,0,1,0...0] */
-  for (cntr = 0; cntr < 19; cntr++) {
-    if (cntr == 18) {
-      adv_ability[cntr] = 1;
-    } else {
-      adv_ability[cntr] = 0;
+
+        case MTIP_PORT_CONFIG_1x100GBASE_R2:
+        case MTIP_PORT_CONFIG_1x100GBASE_R2_RSFEC:
+          phy_inst_info->an_params.adv_ability[PHY_SPEED_SPEC_100G_BASE_K_CR2] = 1;
+          break;
+
+        case MTIP_PORT_CONFIG_1x100GBASE_R4:
+        case MTIP_PORT_CONFIG_1x100GBASE_R4_RSFEC:
+          phy_inst_info->an_params.adv_ability[PHY_SPEED_SPEC_100G_BASE_KR4] = 1;
+          phy_inst_info->an_params.adv_ability[PHY_SPEED_SPEC_100G_BASE_CR4] = 1;
+          break;
+
+        case MTIP_PORT_CONFIG_1x50GBASE_R:
+        case MTIP_PORT_CONFIG_1x50GBASE_R_RSFEC:
+        case MTIP_PORT_CONFIG_2x50GBASE_R:
+        case MTIP_PORT_CONFIG_2x50GBASE_R_RSFEC:
+          phy_inst_info->an_params.adv_ability[PHY_SPEED_SPEC_50G_BASE_K_CR] = 1;
+          break;
+
+        case MTIP_PORT_CONFIG_1x50GBASE_R2:
+        case MTIP_PORT_CONFIG_1x50GBASE_R2_RSFEC:
+        case MTIP_PORT_CONFIG_1x50GBASE_R2_LUAI:
+        case MTIP_PORT_CONFIG_1x50GBASE_R2_LUAI_FEC:
+        case MTIP_PORT_CONFIG_2x50GBASE_R2:
+        case MTIP_PORT_CONFIG_2x50GBASE_R2_FEC:
+        case MTIP_PORT_CONFIG_2x50GBASE_R2_LUAI:
+        case MTIP_PORT_CONFIG_2x50GBASE_R2_LUAI_FEC:
+          //TBD - Consortium mode
+          break;
+
+        case MTIP_PORT_CONFIG_1x40GBASE_R4:
+        case MTIP_PORT_CONFIG_1x40GBASE_R4_FEC:
+          phy_inst_info->an_params.adv_ability[PHY_SPEED_SPEC_40G_BASE_KR4] = 1;
+          phy_inst_info->an_params.adv_ability[PHY_SPEED_SPEC_40G_BASE_CR4] = 1;
+          break;
+
+        case MTIP_PORT_CONFIG_1x25GBASE_R:
+        case MTIP_PORT_CONFIG_4x25GBASE_R:
+          phy_inst_info->an_params.adv_ability[PHY_SPEED_SPEC_25G_BASE_K_CR] = 1;
+          phy_inst_info->an_params.adv_ability[PHY_SPEED_SPEC_25G_BASE_K_CR_S] = 1;
+          break;
+
+        case MTIP_PORT_CONFIG_1x25GBASE_R_FEC:
+        case MTIP_PORT_CONFIG_4x25GBASE_R_FEC:
+          phy_inst_info->an_params.adv_ability[PHY_SPEED_SPEC_25G_BASE_K_CR] = 1;
+          phy_inst_info->an_params.adv_ability[PHY_SPEED_SPEC_25G_BASE_K_CR_S] = 1;
+          phy_inst_info->an_params.fec_ability[PHY_25G_BASE_R_FEC] = 1;
+          break;
+
+        case MTIP_PORT_CONFIG_1x25GBASE_R_RSFEC:
+        case MTIP_PORT_CONFIG_4x25GBASE_R_RSFEC:
+          phy_inst_info->an_params.adv_ability[PHY_SPEED_SPEC_25G_BASE_K_CR] = 1;
+          phy_inst_info->an_params.adv_ability[PHY_SPEED_SPEC_25G_BASE_K_CR_S] = 1;
+          phy_inst_info->an_params.fec_ability[PHY_25G_RS_FEC] = 1;
+          break;
+
+        case MTIP_PORT_CONFIG_1x10GBASE_R:
+        case MTIP_PORT_CONFIG_4x10GBASE_R:
+          phy_inst_info->an_params.adv_ability[PHY_SPEED_SPEC_10G_BASE_KR] = 1;
+          break;
+
+        case MTIP_PORT_CONFIG_1x10GBASE_R_FEC:
+        case MTIP_PORT_CONFIG_4x10GBASE_R_FEC:
+          phy_inst_info->an_params.adv_ability[PHY_SPEED_SPEC_10G_BASE_KR] = 1;
+          phy_inst_info->an_params.fec_ability[PHY_10G_BASE_R_FEC] = 1;
+          break;
+
+        default:
+          break;
+      }
     }
   }
 
-  /*5bit FEC Array to advertize FEC abiliy*/
-  for (cntr = 0; cntr < 5; cntr++) {
-    fec_ability[cntr] = 1;
+  return ret_val;
+}
+
+enum mtip_port_config_enum qcom_aw_phy_an_result_to_debug_port_config(
+                                struct qcom_aw_phy_inst_config *phy_inst_info){
+
+  switch(phy_inst_info->an_params.an_result[PHY_LANE_2]){
+
+  // TBD - to add FEC modes
+
+    case PHY_SPEED_SPEC_10G_BASE_KR:
+      return MTIP_PORT_CONFIG_1x10GBASE_R;
+
+    case PHY_SPEED_SPEC_25G_BASE_K_CR_S:
+    case PHY_SPEED_SPEC_25G_BASE_K_CR:
+      return MTIP_PORT_CONFIG_1x25GBASE_R;
+
+    case PHY_SPEED_SPEC_50G_BASE_K_CR:
+      if(phy_inst_info->an_params.an_result[PHY_LANE_3] ==
+                                                 PHY_SPEED_SPEC_50G_BASE_K_CR){
+         return MTIP_PORT_CONFIG_2x50GBASE_R;
+      }
+      else{
+        return MTIP_PORT_CONFIG_1x50GBASE_R;
+      }
+
+    case PHY_SPEED_SPEC_100G_BASE_K_CR2:
+      return MTIP_PORT_CONFIG_1x100GBASE_R2;
+
+    case PHY_SPEED_SPEC_100G_BASE_K_CR:
+      return MTIP_PORT_CONFIG_1x100GBASE_R;
+
+    default:
+      return MTIP_PORT_CONFIG_MAX;
   }
 
-  aw_pmd_anlt_auto_neg_adv_ability_set(mss, adv_ability, fec_ability,
-                                       0); // Check 2nd and 3rd params
-  aw_pmd_iso_tx_reset_set(mss, 1);
-  aw_pmd_iso_rx_reset_set(mss, 1);
-  aw_pmd_anlt_auto_neg_start_set(mss, 1);
+  return MTIP_PORT_CONFIG_MAX;
+}
 
-  mdelay(1000);
+enum mtip_port_config_enum qcom_aw_phy_an_result_to_port_config(
+                                struct qcom_aw_phy_inst_config *phy_inst_info){
 
-  aw_pmd_anlt_auto_neg_status_complete_get(mss, &an_complete);
+  if(phy_inst_info->phy_inst == QCOM_AW_PHY_INST_DEBUG)
+    return qcom_aw_phy_an_result_to_debug_port_config(phy_inst_info);
 
-  if (an_complete == 0) {
-    QCOM_AW_PHY_LOG_ERR("AN failed, need to debug!");
-  } else {
-    QCOM_AW_PHY_LOG_INFO("AN complete link is up");
+  switch(phy_inst_info->an_params.an_result[PHY_LANE_0]){
+
+    case PHY_SPEED_SPEC_10G_BASE_KR:
+      if((phy_inst_info->an_params.mac_port_config_mask & (1<<MTIP_PORT_CONFIG_4x10GBASE_R)) ||
+         (phy_inst_info->an_params.mac_port_config_mask & (1<<MTIP_PORT_CONFIG_4x10GBASE_R_FEC))){
+
+         if(phy_inst_info->an_params.fec_ability[PHY_10G_BASE_R_FEC] == 1 &&
+            phy_inst_info->an_params.lp_fec_ability[PHY_LANE_0][PHY_10G_BASE_R_FEC] == 1){
+           phy_inst_info->an_params.an_fec_result[PHY_LANE_0] = PHY_10G_BASE_R_FEC;
+           phy_inst_info->an_params.an_fec_result[PHY_LANE_1] = PHY_10G_BASE_R_FEC;
+           phy_inst_info->an_params.an_fec_result[PHY_LANE_2] = PHY_10G_BASE_R_FEC;
+           phy_inst_info->an_params.an_fec_result[PHY_LANE_3] = PHY_10G_BASE_R_FEC;
+           return MTIP_PORT_CONFIG_4x10GBASE_R_FEC;
+         }
+         else
+           return MTIP_PORT_CONFIG_4x10GBASE_R;
+      }
+      else{
+        if(phy_inst_info->an_params.fec_ability[PHY_10G_BASE_R_FEC] == 1 &&
+           phy_inst_info->an_params.lp_fec_ability[PHY_LANE_0][PHY_10G_BASE_R_FEC] == 1){
+          phy_inst_info->an_params.an_fec_result[PHY_LANE_0] = PHY_10G_BASE_R_FEC;
+          return MTIP_PORT_CONFIG_1x10GBASE_R_FEC;
+        }
+        else
+          return MTIP_PORT_CONFIG_1x10GBASE_R;
+      }
+
+    case PHY_SPEED_SPEC_40G_BASE_KR4:
+    case PHY_SPEED_SPEC_40G_BASE_CR4:
+      if(phy_inst_info->an_params.fec_ability[PHY_10G_BASE_R_FEC] == 1 &&
+         phy_inst_info->an_params.lp_fec_ability[PHY_LANE_0][PHY_10G_BASE_R_FEC] == 1){
+        phy_inst_info->an_params.an_fec_result[PHY_LANE_0] = PHY_10G_BASE_R_FEC;
+        return MTIP_PORT_CONFIG_1x40GBASE_R4_FEC;
+      }
+      else
+        return MTIP_PORT_CONFIG_1x40GBASE_R4;
+
+    case PHY_SPEED_SPEC_100G_BASE_KR4:
+    case PHY_SPEED_SPEC_100G_BASE_CR4:
+      return MTIP_PORT_CONFIG_1x100GBASE_R4;
+
+    case PHY_SPEED_SPEC_25G_BASE_K_CR_S:
+    case PHY_SPEED_SPEC_25G_BASE_K_CR:
+      if((phy_inst_info->an_params.mac_port_config_mask & (1<<MTIP_PORT_CONFIG_4x25GBASE_R)) ||
+         (phy_inst_info->an_params.mac_port_config_mask & (1<<MTIP_PORT_CONFIG_4x25GBASE_R_RSFEC)) ||
+         (phy_inst_info->an_params.mac_port_config_mask & (1<<MTIP_PORT_CONFIG_4x25GBASE_R_FEC))){
+
+        if(phy_inst_info->an_params.fec_ability[PHY_25G_RS_FEC] == 1 &&
+           phy_inst_info->an_params.lp_fec_ability[PHY_LANE_0][PHY_25G_RS_FEC] == 1){
+          phy_inst_info->an_params.an_fec_result[PHY_LANE_0] = PHY_25G_RS_FEC;
+          phy_inst_info->an_params.an_fec_result[PHY_LANE_1] = PHY_25G_RS_FEC;
+          phy_inst_info->an_params.an_fec_result[PHY_LANE_2] = PHY_25G_RS_FEC;
+          phy_inst_info->an_params.an_fec_result[PHY_LANE_3] = PHY_25G_RS_FEC;
+          return MTIP_PORT_CONFIG_4x25GBASE_R_RSFEC;
+        }
+        else if(phy_inst_info->an_params.fec_ability[PHY_25G_BASE_R_FEC] == 1 &&
+           phy_inst_info->an_params.lp_fec_ability[PHY_LANE_0][PHY_25G_BASE_R_FEC] == 1){
+          phy_inst_info->an_params.an_fec_result[PHY_LANE_0] = PHY_25G_BASE_R_FEC;
+          phy_inst_info->an_params.an_fec_result[PHY_LANE_1] = PHY_25G_BASE_R_FEC;
+          phy_inst_info->an_params.an_fec_result[PHY_LANE_2] = PHY_25G_BASE_R_FEC;
+          phy_inst_info->an_params.an_fec_result[PHY_LANE_3] = PHY_25G_BASE_R_FEC;
+          return MTIP_PORT_CONFIG_4x25GBASE_R_FEC;
+        }
+        else
+          return MTIP_PORT_CONFIG_4x25GBASE_R;
+      }
+      else{
+        if(phy_inst_info->an_params.fec_ability[PHY_25G_RS_FEC] == 1 &&
+           phy_inst_info->an_params.lp_fec_ability[PHY_LANE_0][PHY_25G_RS_FEC] == 1){
+          phy_inst_info->an_params.an_fec_result[PHY_LANE_0] = PHY_25G_RS_FEC;
+          return MTIP_PORT_CONFIG_1x25GBASE_R_RSFEC;
+        }
+        else if(phy_inst_info->an_params.fec_ability[PHY_25G_BASE_R_FEC] == 1 &&
+                phy_inst_info->an_params.lp_fec_ability[PHY_LANE_0][PHY_25G_BASE_R_FEC] == 1){
+          phy_inst_info->an_params.an_fec_result[PHY_LANE_0] = PHY_25G_BASE_R_FEC;
+          return MTIP_PORT_CONFIG_1x25GBASE_R_FEC;
+        }
+        else
+          return MTIP_PORT_CONFIG_1x25GBASE_R;
+        }
+
+    case PHY_SPEED_SPEC_50G_BASE_K_CR:
+      if((phy_inst_info->an_params.mac_port_config_mask & (1<<MTIP_PORT_CONFIG_2x50GBASE_R))){
+         return MTIP_PORT_CONFIG_2x50GBASE_R;
+      }
+      else{
+        return MTIP_PORT_CONFIG_1x50GBASE_R;
+      }
+
+    case PHY_SPEED_SPEC_100G_BASE_K_CR2:
+      return MTIP_PORT_CONFIG_1x100GBASE_R2;
+
+    case PHY_SPEED_SPEC_100G_BASE_K_CR:
+      return MTIP_PORT_CONFIG_1x100GBASE_R;
+
+    default:
+      return MTIP_PORT_CONFIG_MAX;
   }
 
-  mdelay(1000);
+  return MTIP_PORT_CONFIG_MAX;
+}
 
-  aw_pmd_anlt_link_training_status_get(mss, &lt_running, &lt_done,
-                                       &lt_training_failure, &lt_rx_ready);
-  if (lt_training_failure == 1) {
-    QCOM_AW_PHY_LOG_ERR("LT failed, need to debug!");
+int qcom_aw_phy_get_num_lanes_for_speed_mode(int speed_mode){
+
+  switch(speed_mode){
+    case PHY_SPEED_SPEC_10G_BASE_KR:
+    case PHY_SPEED_SPEC_25G_BASE_K_CR_S:
+    case PHY_SPEED_SPEC_25G_BASE_K_CR:
+    case PHY_SPEED_SPEC_50G_BASE_K_CR:
+    case PHY_SPEED_SPEC_100G_BASE_K_CR:
+      return 1;
+
+    case PHY_SPEED_SPEC_100G_BASE_K_CR2:
+      return 2;
+
+    case PHY_SPEED_SPEC_40G_BASE_KR4:
+    case PHY_SPEED_SPEC_40G_BASE_CR4:
+    case PHY_SPEED_SPEC_100G_BASE_KR4:
+    case PHY_SPEED_SPEC_100G_BASE_CR4:
+      return 4;
+
+    default:
+      return 0;
   }
 
-  if (lt_done == 0) {
-    QCOM_AW_PHY_LOG_ERR("LT did not finish, try increasing delay");
-  } else {
-    QCOM_AW_PHY_LOG_INFO("LT completed\n");
+  return 0;
+}
+
+
+bool qcom_aw_phy_is_an_adv_multi_lane_enabled(
+                                uint32_t adv_ability[PHY_SPEED_SPEC_MAX]){
+  if((adv_ability[PHY_SPEED_SPEC_100G_BASE_KR4] == 1) ||
+     (adv_ability[PHY_SPEED_SPEC_100G_BASE_CR4] == 1) ||
+     (adv_ability[PHY_SPEED_SPEC_40G_BASE_KR4] == 1) ||
+     (adv_ability[PHY_SPEED_SPEC_40G_BASE_CR4] == 1) ||
+     (adv_ability[PHY_SPEED_SPEC_100G_BASE_K_CR2] == 1)){
+    return true;
+  }
+
+  return false;
+}
+
+bool qcom_aw_phy_is_an_adv_single_lane_enabled(
+                                uint32_t adv_ability[PHY_SPEED_SPEC_MAX]){
+  if((adv_ability[PHY_SPEED_SPEC_10G_BASE_KR] == 1) ||
+     (adv_ability[PHY_SPEED_SPEC_25G_BASE_K_CR_S] == 1) ||
+     (adv_ability[PHY_SPEED_SPEC_25G_BASE_K_CR] == 1) ||
+     (adv_ability[PHY_SPEED_SPEC_50G_BASE_K_CR] == 1) ||
+     (adv_ability[PHY_SPEED_SPEC_100G_BASE_K_CR] == 1)){
+    return true;
+  }
+
+  return false;
+}
+
+int qcom_aw_phy_get_an_adv_ability_mask(int* an_adv_ability) {
+
+  int i=0;
+  int an_adv_ability_mask=0;
+
+  for(i=0; i<PHY_SPEED_SPEC_MAX; i++){
+    if(an_adv_ability[i]){
+      an_adv_ability_mask |= (1<<i);
+    }
+  }
+
+  return an_adv_ability_mask;
+}
+
+int qcom_aw_phy_get_an_fec_ability_mask(int* an_fec_ability) {
+
+  int i=0;
+  int an_fec_ability_mask=0;
+
+  for(i=0; i<PHY_FEC_SPEC_MAX; i++){
+    if(an_fec_ability[i]){
+      an_fec_ability_mask |= (1<<i);
+    }
+  }
+
+  return an_fec_ability_mask;
+}
+
+/*-------------------------------------------------------------------
+* qcom_aw_phy_perform_an
+
+* Description: This function brings up the lanes in ANLT mode
+------------------------------------------------------------------- */
+int qcom_aw_phy_perform_an(
+                                struct qcom_aw_phy_inst_config *phy_inst_info,
+                                uint32_t adv_ability[PHY_SPEED_SPEC_MAX],
+                                uint32_t fec_ability[PHY_FEC_SPEC_MAX]) {
+  mss_access_t mss = {.phy_offset = 0, .lane_offset = 0};
+  enum eth_phy_iface_phy_lane_num_enum lane = PHY_LANE_0;
+  uint32_t an_no_attached = 1;
+  uint32_t status_check_disable = 0;
+  uint32_t next_page_en = 0;
+  mss_access_t temp_mss = {0};
+  int i=0, start_lane=PHY_LANE_0, end_lane=PHY_LANE_MAX;
+  enum local_error_enum local_err_val = LOCAL_ERROR_INVALID;
+  aw_err_code_t aw_err_val = AW_ERR_CODE_NONE;
+  int ret_val = 0;
+
+  QCOM_AW_PHY_LOG_INFO(
+      "Performing AN for PHY %d, lane %d, AN adv ability 0x%x, "
+      "FEC ability 0x%x, AN state %d",
+      phy_inst_info->phy_inst,
+      phy_inst_info->an_params.current_lane,
+      qcom_aw_phy_get_an_adv_ability_mask(adv_ability),
+      qcom_aw_phy_get_an_fec_ability_mask(fec_ability),
+      phy_inst_info->an_params.an_state[phy_inst_info->an_params.current_lane]);
+
+  /* Current lane on which AN needs to be performed - To be set by the caller */
+  lane = phy_inst_info->an_params.current_lane;
+
+  /* Setup PHY offset */
+  mss.phy_offset = temp_mss.phy_offset = phy_inst_info->base_addr;
+  pmd_set_lane(&mss, lane);
+
+  /* Multi lane config check */
+  if(qcom_aw_phy_is_an_adv_multi_lane_enabled(adv_ability)){
+
+    an_no_attached = 0;
+
+    /* TBD, based on the BaseR config, start and end lane needs to be revised
+       Currently, end lane is hard coded to PHY_LANE_MAX */
+    start_lane = lane;
+
+    for(i=start_lane; i < end_lane; i++){
+
+      pmd_set_lane(&temp_mss, i);
+
+      /* Lane Isolation */
+      aw_err_val = aw_pmd_isolate_lane_set(&temp_mss, 1);
+      if (aw_err_val != AW_ERR_CODE_NONE) {
+        ret_val = EIO;
+        local_err_val = LOCAL_ERROR_0;
+      }
+
+      /* Notify MAC to stop listening to PCS link interrupts */
+      qcom_aw_phy_notify_lane_bring_up_progress_to_mac(phy_inst_info, i, true);
+
+      /* Stop listening to SNR valid/error interrupts */
+      qcom_aw_phy_disable_snr_interrupt(phy_inst_info, i);
+
+      /* Reset TX and RX lanes */
+      aw_pmd_iso_tx_reset_set(&temp_mss, 1);
+      aw_pmd_iso_rx_reset_set(&temp_mss, 1);
+
+      /* For multi lane, set the logical lane starting from 0 for start(master)
+         lane and keep on incrementing for the next(slave) lanes */
+      aw_pmd_anlt_logical_lane_num_set(&temp_mss, i-start_lane, an_no_attached);
+
+      aw_pmd_rx_background_adapt_enable_set(&temp_mss, 1);
+
+      aw_pmd_anlt_auto_neg_start_set(&temp_mss, 0);
+
+      /* Clock needs to be set as 156MHz */
+      aw_pmd_anlt_ms_per_ck_set(&temp_mss, 156249);
+    }
+  }
+  /* Single lane */
+  else if(qcom_aw_phy_is_an_adv_single_lane_enabled(adv_ability)){
+
+    pmd_set_lane(&temp_mss, lane);
+
+    /* Lane Isolation */
+    aw_err_val = aw_pmd_isolate_lane_set(&temp_mss, 1);
+    if (aw_err_val != AW_ERR_CODE_NONE) {
+      ret_val = EIO;
+      local_err_val = LOCAL_ERROR_1;
+    }
+
+    /* Notify MAC to stop listening to PCS link interrupts */
+    qcom_aw_phy_notify_lane_bring_up_progress_to_mac(phy_inst_info, lane, true);
+
+    /* Stop listening to SNR valid/error interrupts */
+    qcom_aw_phy_disable_snr_interrupt(phy_inst_info, lane);
+
+    /* Reset TX and RX lanes */
+    aw_pmd_iso_tx_reset_set(&temp_mss, 1);
+    aw_pmd_iso_rx_reset_set(&temp_mss, 1);
+
+    /* For single lane, set the logical lane to 0 always as it will be the
+       master lane */
+    aw_pmd_anlt_logical_lane_num_set(&temp_mss, i, an_no_attached);
+
+    aw_pmd_rx_background_adapt_enable_set(&temp_mss, 1);
+
+    aw_pmd_anlt_auto_neg_start_set(&temp_mss, 0);
+
+    /* Clock needs to be set as 156MHz */
+    aw_pmd_anlt_ms_per_ck_set(&temp_mss, 156249);
+  }
+  else{
+    ret_val = EIO;
+    local_err_val = LOCAL_ERROR_2;
+    goto func_exit;
+  }
+
+  /* Status check disable flag should be 0, can be modified for debugging if
+     needed. Next page enabled needs to be set for some 3ed party servers and
+     consortium speed modes */
+  aw_pmd_anlt_auto_neg_config_set(&mss, status_check_disable, next_page_en, 1);
+
+  QCOM_AW_PHY_LOG_DBG("Starting AN with adv ability 0x%x and FEC 0x%x",
+                      qcom_aw_phy_get_an_adv_ability_mask(adv_ability),
+                      qcom_aw_phy_get_an_fec_ability_mask(fec_ability));
+
+  aw_pmd_anlt_auto_neg_adv_ability_set(&mss, adv_ability, fec_ability, 0);
+
+  /* If multi lane is enabled, need to start LT and AN for all lanes, but
+     master lane needs to be brought up only at the end */
+  if(qcom_aw_phy_is_an_adv_multi_lane_enabled(adv_ability)){
+    for(i=start_lane+1; i < end_lane; i++){
+      pmd_set_lane(&temp_mss, i);
+      aw_pmd_anlt_link_training_en_set(&temp_mss, 1);
+      aw_pmd_anlt_auto_neg_start_set(&temp_mss, 1);
+    }
+  }
+
+  /* Enable LT and AN for master lane */
+  aw_pmd_anlt_link_training_en_set(&mss, 1);
+  aw_pmd_anlt_auto_neg_start_set(&mss, 1);
+
+  func_exit:
+  if(local_err_val != LOCAL_ERROR_INVALID){
+    QCOM_AW_PHY_LOG_ERR("returns %d with local error %d and aw_error %d",
+                        ret_val, local_err_val, aw_err_val);
   }
 
   return ret_val;
+}
+
+/*-------------------------------------------------------------------
+* qcom_aw_phy_initiate_an
+
+* @port_type: MAC port type
+* @num_lanes: Number of lanes active/supported on this port
+* @port_config_mask: Port configuration to be advertised
+
+* Description: This function initiates AN procedure to negotiate the
+speed with peer and decide the port configuration.
+------------------------------------------------------------------- */
+int qcom_aw_phy_initiate_an(enum mtip_port_type_enum port_type,
+                                      int num_lanes,
+                                      uint32_t port_config_mask) {
+  struct qcom_aw_phy_config *phy_config_info = NULL;
+  enum qcom_aw_phy_instance_enum phy_inst_type = QCOM_AW_PHY_INST_MAX;
+  struct qcom_aw_phy_inst_config *phy_inst_info = NULL;
+  mss_access_t mss = {.phy_offset = 0, .lane_offset = 0};
+  int i = 0;
+  enum local_error_enum local_err_val = LOCAL_ERROR_INVALID;
+  aw_err_code_t aw_err_val = AW_ERR_CODE_NONE;
+  int ret_val = 0;
+
+  /* Get the PHY instance type for the provided port */
+  phy_inst_type = qcom_aw_phy_mac_port_to_phy_inst(port_type);
+  if (phy_inst_type == QCOM_AW_PHY_INST_MAX) {
+    ret_val = EINVAL;
+    local_err_val = LOCAL_ERROR_0;
+    goto func_exit;
+  }
+
+  phy_config_info = qcom_aw_phy_get_config_info();
+  if (!phy_config_info) {
+    ret_val = EINVAL;
+    local_err_val = LOCAL_ERROR_1;
+    goto func_exit;
+  }
+
+  /* Get the PHY instance info for the passed instance type */
+  phy_inst_info = &phy_config_info->phy_inst_config_info[phy_inst_type];
+  if (phy_inst_info->valid == false) {
+    ret_val = EINVAL;
+    local_err_val = LOCAL_ERROR_2;
+    goto func_exit;
+  }
+
+  mutex_lock(&phy_inst_info->phy_inst_lock);
+
+  /* Setup PHY offset */
+  mss.phy_offset = phy_inst_info->base_addr;
+
+  /* Common isolate */
+  aw_err_val = aw_pmd_isolate_cmn_set(&mss, 1);
+  if (aw_err_val != AW_ERR_CODE_NONE) {
+    ret_val = EIO;
+    local_err_val = LOCAL_ERROR_3;
+    mutex_unlock(&phy_inst_info->phy_inst_lock);
+    goto func_exit;
+  }
+
+  /* Common Lane Bring up */
+  aw_err_val =
+      aw_pmd_iso_request_cmn_state_change(&mss, AW_CMN_P0, CMN_ACK_TIMEOUT_US);
+  if (aw_err_val != AW_ERR_CODE_NONE) {
+    ret_val = EIO;
+    local_err_val = LOCAL_ERROR_4;
+    mutex_unlock(&phy_inst_info->phy_inst_lock);
+    goto func_exit;
+  }
+
+  /* Convert the MAC level port config to PHY lane speed mode */
+  if (qcom_aw_phy_configure_speed_mode(phy_inst_info, port_config_mask) != 0) {
+    ret_val = EINVAL;
+    local_err_val = LOCAL_ERROR_5;
+    goto func_exit;
+  }
+
+  QCOM_AW_PHY_LOG_INFO(
+     "Initiating AN on MAC Port %d, AN adv ability 0x%x, FEC ability 0x%x",
+     port_type,
+     qcom_aw_phy_get_an_adv_ability_mask(phy_inst_info->an_params.adv_ability),
+     qcom_aw_phy_get_an_fec_ability_mask(phy_inst_info->an_params.fec_ability));
+
+  /* Hard code the master lane number as 2 for Debug port */
+  if(port_type == MTIP_PORT_TYPE_DEBUG)
+    phy_inst_info->an_params.current_lane = PHY_LANE_2;
+  else
+    phy_inst_info->an_params.current_lane = PHY_LANE_0;
+
+  phy_inst_info->an_params.num_lanes = num_lanes;
+  phy_inst_info->an_params.mac_port_config_mask = port_config_mask;
+
+  /* Reset the AN result and FEC modes for fresh AN */
+  for(i=PHY_LANE_0; i<PHY_LANE_MAX; i++){
+    phy_inst_info->an_params.an_result[i] = -1;
+    phy_inst_info->an_params.an_fec_result[i] = -1;
+    memset(phy_inst_info->an_params.lp_fec_ability[i], 0,
+           sizeof(uint32_t) * PHY_FEC_SPEC_MAX);
+  }
+
+  /* Move the AN state to START and proceed with AN */
+  phy_inst_info->an_params.an_state[phy_inst_info->an_params.current_lane] =
+                                                             PHY_AN_STATE_START;
+  qcom_aw_phy_perform_an(phy_inst_info, phy_inst_info->an_params.adv_ability,
+                         phy_inst_info->an_params.fec_ability);
+
+  mutex_unlock(&phy_inst_info->phy_inst_lock);
+
+func_exit:
+  if(local_err_val != LOCAL_ERROR_INVALID){
+    QCOM_AW_PHY_LOG_ERR("returns %d with local error %d and aw_error %d",
+                        ret_val, local_err_val, aw_err_val);
+  }
+
+  return ret_val;
+}
+
+/*-------------------------------------------------------------------
+* qcom_aw_phy_bringup_anlt_mode
+
+* Description: This function brings up the PHY lanes in ANLT mode
+               To be called after AN is done for master lane and
+               port config is calculated.
+------------------------------------------------------------------- */
+int qcom_aw_phy_bringup_anlt_mode(mss_access_t *mss,
+                                struct qcom_aw_phy_inst_config *phy_inst_info,
+                                bool lanes_enabled[PHY_LANE_MAX]){
+  enum eth_phy_iface_phy_lane_num_enum i = PHY_LANE_0;
+  enum eth_phy_iface_phy_lane_num_enum ref_lane;
+  int ret_val = 0;
+  uint32_t temp_adv_ability[PHY_SPEED_SPEC_MAX];
+  uint32_t temp_fec_ability[PHY_FEC_SPEC_MAX];
+
+  memset(temp_adv_ability, 0, PHY_SPEED_SPEC_MAX*sizeof(uint32_t));
+  memset(temp_fec_ability, 0, PHY_FEC_SPEC_MAX*sizeof(uint32_t));
+
+  /* For Debug port, hard code the master lane as lane 2 */
+  if(phy_inst_info->phy_inst == QCOM_AW_PHY_INST_DEBUG)
+    ref_lane = PHY_LANE_2;
+  else
+    ref_lane = PHY_LANE_0;
+
+  while(i<PHY_LANE_MAX){
+
+    /* Skip bring up if lane is not enabled from MAC side,
+       or if AN result for master lane is not valid */
+    if(lanes_enabled[i] == false ||
+       phy_inst_info->an_params.an_result[ref_lane] == -1){
+       i++;
+      continue;
+    }
+
+    /* Skip AN for reference lane as it was already done with initiate
+       procedure */
+    if(i == ref_lane){
+      i += qcom_aw_phy_get_num_lanes_for_speed_mode(
+                                 phy_inst_info->an_params.an_result[ref_lane]);
+      continue;
+    }
+
+    QCOM_AW_PHY_LOG_DBG("ANLT for PHY %d lane %d with speed mode %d FEC %d",
+                        phy_inst_info->phy_inst, i,
+                        phy_inst_info->an_params.an_result[ref_lane],
+                        phy_inst_info->an_params.an_fec_result[ref_lane]);
+
+    /* Use the result from master lane to advertise for the remaining lanes
+       of this port */
+    temp_adv_ability[phy_inst_info->an_params.an_result[ref_lane]] = 1;
+    temp_fec_ability[phy_inst_info->an_params.an_fec_result[ref_lane]] = 1;
+    phy_inst_info->an_params.current_lane = i;
+
+    qcom_aw_phy_perform_an(phy_inst_info, temp_adv_ability, temp_fec_ability);
+
+    /* If multi lane is enabled, multiple lanes will be brought up as part of
+       the previous AN. So, based on the negotiated speed mode, need to jump to
+       the next master lane of this config. */
+    i += qcom_aw_phy_get_num_lanes_for_speed_mode(
+                                  phy_inst_info->an_params.an_result[ref_lane]);
+  }
+
+  return ret_val;
+
 }
 
 /*-------------------------------------------------------------------
@@ -602,7 +1185,6 @@ int qcom_aw_phy_bringup(enum mtip_port_type_enum port_type,
 
   QCOM_AW_PHY_LOG_INFO("MAC Port %d has sfp port %d", port_type, sfp_port_type);
   phy_inst_info->sfp_port_type = sfp_port_type;
-  phy_inst_info->bring_up_status = true;
 
   /* Setup PHY offset */
   mss.phy_offset = phy_inst_info->base_addr;
@@ -625,6 +1207,13 @@ int qcom_aw_phy_bringup(enum mtip_port_type_enum port_type,
     local_err_val = LOCAL_ERROR_4;
     mutex_unlock(&phy_inst_info->phy_inst_lock);
     goto func_exit;
+  }
+
+  if (phy_inst_info->phy_eq_mode == QCOM_AW_PHY_ANLT_MODE) {
+    qcom_aw_phy_bringup_anlt_mode(&mss, phy_inst_info, lanes_enabled);
+    phy_inst_info->bring_up_status = true;
+    mutex_unlock(&phy_inst_info->phy_inst_lock);
+    return ret_val;
   }
 
   for (lane = PHY_LANE_0; lane < PHY_LANE_MAX; lane++) {
@@ -676,9 +1265,7 @@ int qcom_aw_phy_bringup(enum mtip_port_type_enum port_type,
     qcom_aw_phy_get_lane_speed_config(phy_lane_params->lane_config.lane_speed,
                                       &config);
 
-    if (phy_inst_info->phy_eq_mode == QCOM_AW_PHY_ANLT_MODE) {
-      qcom_aw_phy_bringup_anlt_mode(&mss, lane, config);
-    } else if (phy_inst_info->phy_eq_mode == QCOM_AW_PHY_LT_MODE) {
+    if (phy_inst_info->phy_eq_mode == QCOM_AW_PHY_LT_MODE) {
       qcom_aw_phy_bringup_lt_mode(&mss, phy_inst_info, lane, config);
     } else if (phy_inst_info->phy_eq_mode == QCOM_AW_PHY_MANUAL_EQ_MODE) {
       qcom_aw_phy_bringup_manual_eq_mode(&mss, phy_inst_info, lane, config);
@@ -686,6 +1273,8 @@ int qcom_aw_phy_bringup(enum mtip_port_type_enum port_type,
 
     mutex_unlock(&phy_inst_info->lane_lock[lane]);
   }
+
+  phy_inst_info->bring_up_status = true;
 
   mutex_unlock(&phy_inst_info->phy_inst_lock);
 
@@ -750,12 +1339,14 @@ int qcom_aw_phy_teardown(enum mtip_port_type_enum port_type,
   /* Setup PHY offset */
   mss.phy_offset = phy_inst_info->base_addr;
 
+  phy_inst_info->bring_up_status = false;
+
   for (lane = PHY_LANE_0; lane < PHY_LANE_MAX; lane++) {
     /* Check if lane is valid for this MAC instance */
     if (lanes_enabled[lane] == false)
       continue;
 
- /* Get the lane specific info for the provided lane */
+   /* Get the lane specific info for the provided lane */
     phy_lane_params = &phy_inst_info->lane_params[lane];
     if (phy_lane_params->lane_config.lane_enabled == false) {
       ret_val = EINVAL;
@@ -775,15 +1366,18 @@ int qcom_aw_phy_teardown(enum mtip_port_type_enum port_type,
     qcom_aw_phy_get_lane_speed_config(phy_lane_params->lane_config.lane_speed,
                                       &config);
 
+    /* Reset AN and LT */
+    qcom_aw_phy_reset_anlt(&mss);
+
     /* TX power down */
     aw_err_val = aw_pmd_iso_request_tx_state_change(
         &mss, AW_PD, config.rate, config.width, TX_ACK_TIMEOUT_US);
     if (aw_err_val != AW_ERR_CODE_NONE) {
       ret_val = EIO;
       local_err_val = LOCAL_ERROR_4;
+      phy_inst_info->cdr_lock_status_flag[lane] = CDR_LOCK_NONE;
       mutex_unlock(&phy_inst_info->lane_lock[lane]);
-      mutex_unlock(&phy_inst_info->phy_inst_lock);
-      goto func_exit;
+      continue;
     }
 
     /* RX power down */
@@ -792,9 +1386,9 @@ int qcom_aw_phy_teardown(enum mtip_port_type_enum port_type,
     if (aw_err_val != AW_ERR_CODE_NONE) {
       ret_val = EIO;
       local_err_val = LOCAL_ERROR_5;
+      phy_inst_info->cdr_lock_status_flag[lane] = CDR_LOCK_NONE;
       mutex_unlock(&phy_inst_info->lane_lock[lane]);
-      mutex_unlock(&phy_inst_info->phy_inst_lock);
-      goto func_exit;
+      continue;
     }
 
     /* Check for CDR lock de-assertion */
@@ -812,8 +1406,6 @@ int qcom_aw_phy_teardown(enum mtip_port_type_enum port_type,
 
     mutex_unlock(&phy_inst_info->lane_lock[lane]);
   }
-
-  phy_inst_info->bring_up_status = false;
 
   mutex_unlock(&phy_inst_info->phy_inst_lock);
 
@@ -892,40 +1484,250 @@ func_exit:
 }
 
 /*-------------------------------------------------------------------
-* qcom_aw_phy_notify_an_complete
+* qcom_aw_phy_handle_an_done
 
-* @phy_inst: PHY instance type(FH/C2C/Debug)
-  * @lane_num: Lane number
-
-* Description: This function notifies AN complete to MAC.
+* Description: Generated upon interrupt trigger indicating AN has
+               finished along with link training.
 ------------------------------------------------------------------- */
-void qcom_aw_phy_notify_an_complete(
-    enum qcom_aw_phy_instance_enum phy_inst,
-    enum eth_phy_iface_phy_lane_num_enum lane_num) {
-  enum mtip_port_type_enum mac_port_type;
-
-  if (!QCOM_AW_PHY_INST_VALID(phy_inst) || !QCOM_AW_PHY_LANE_VALID(lane_num))
-    QCOM_AW_PHY_LOG_ERR("Invalid PHY instance/lane. AN Notification failed.");
-
-  mac_port_type = qcom_aw_phy_inst_to_mac_port(phy_inst);
-
-  qcom_aw_phy_mtip_if_info_s.an_complete_cb(mac_port_type, lane_num);
-}
-
-void qcom_aw_phy_handle_an_complete(struct work_struct *work){
+void qcom_aw_phy_handle_an_done(struct work_struct *work){
   struct delayed_work *delayed_work_item = to_delayed_work(work);
   struct qcom_aw_phy_work_q_params *wq_params =
      container_of(delayed_work_item, struct qcom_aw_phy_work_q_params, wq_item);
+  enum qcom_aw_phy_instance_enum phy_inst;
+  enum eth_phy_iface_phy_lane_num_enum lane_num;
+  struct qcom_aw_phy_config *phy_config_info = NULL;
+  struct qcom_aw_phy_inst_config *phy_inst_info = NULL;
+  mss_access_t mss = {.phy_offset = 0, .lane_offset = 0};
+  mss_access_t temp_mss = {.phy_offset = 0, .lane_offset = 0};
+  uint32_t lt_running;
+  uint32_t lt_done;
+  uint32_t lt_training_failure;
+  uint32_t lt_rx_ready;
+  int num_lanes=0, i=0;
 
   if(!wq_params){
     QCOM_AW_PHY_LOG_ERR("Invalid work queue structure!");
     return;
   }
 
-  QCOM_AW_PHY_LOG_ERR("AN done rcvd for PHY %d lane %d",
+  QCOM_AW_PHY_LOG_DBG("AN done rcvd for PHY %d lane %d",
                       wq_params->phy_inst, wq_params->lane_num);
 
-  qcom_aw_phy_notify_an_complete(wq_params->phy_inst, wq_params->lane_num);
+  phy_inst = wq_params->phy_inst;
+  lane_num = wq_params->lane_num;
+
+  if (!QCOM_AW_PHY_INST_VALID(phy_inst) || !QCOM_AW_PHY_LANE_VALID(lane_num))
+    QCOM_AW_PHY_LOG_ERR("Invalid PHY instance/lane. AN Done failed.");
+
+  phy_config_info = qcom_aw_phy_get_config_info();
+  if (!phy_config_info) {
+    return;
+  }
+
+  /* Get the PHY instance info for the passed instance type */
+  phy_inst_info = &phy_config_info->phy_inst_config_info[phy_inst];
+  if (phy_inst_info->valid == false) {
+    return;
+  }
+
+  mutex_lock(&phy_inst_info->phy_inst_lock);
+
+  /* Setup PHY offset */
+  mss.phy_offset = temp_mss.phy_offset = phy_inst_info->base_addr;
+
+  mutex_lock(&phy_inst_info->lane_lock[lane_num]);
+
+  /* Set the lane offset */
+  pmd_set_lane(&mss, lane_num);
+
+  /* Check the LT status */
+  aw_pmd_anlt_link_training_status_get(&mss, &lt_running, &lt_done,
+                                       &lt_training_failure, &lt_rx_ready);
+  if (lt_training_failure == 1)
+    QCOM_AW_PHY_LOG_ERR("LT failed, need to debug!");
+
+  if (lt_done == 0)
+    QCOM_AW_PHY_LOG_ERR("LT did not finish, try increasing delay");
+  else{
+    QCOM_AW_PHY_LOG_DBG("LT completed");
+    phy_inst_info->an_params.an_state[lane_num] = PHY_AN_STATE_DONE;
+    if(AW_ERR_CODE_NONE == aw_pmd_rx_check_cdr_lock(&mss, RX_CDR_TIMEOUT_US)){
+      qcom_aw_phy_handle_cdr_lock_status(phy_inst_info, lane_num,
+                                         CDR_LOCK_SUCCESS);
+    }
+    else{
+      qcom_aw_phy_handle_cdr_lock_status(phy_inst_info, lane_num,
+                                         CDR_LOCK_FAILURE);
+    }
+
+    /* Fetch the CDR lock for slave lanes also */
+    num_lanes = qcom_aw_phy_get_num_lanes_for_speed_mode(
+                                  phy_inst_info->an_params.an_result[lane_num]);
+    if(num_lanes > 1){
+      for(i=lane_num+1; i< lane_num+num_lanes;i++){
+
+        /* Set the lane offset */
+        pmd_set_lane(&temp_mss, i);
+
+        phy_inst_info->an_params.an_state[i] = PHY_AN_STATE_DONE;
+
+        if(AW_ERR_CODE_NONE ==
+                        aw_pmd_rx_check_cdr_lock(&temp_mss, RX_CDR_TIMEOUT_US)){
+          qcom_aw_phy_handle_cdr_lock_status(phy_inst_info, i,
+                                             CDR_LOCK_SUCCESS);
+        }
+        else{
+          qcom_aw_phy_handle_cdr_lock_status(phy_inst_info, i,
+                                             CDR_LOCK_FAILURE);
+        }
+      }
+    }
+  }
+
+  mutex_unlock(&phy_inst_info->lane_lock[lane_num]);
+  mutex_unlock(&phy_inst_info->phy_inst_lock);
+
+  kfree(wq_params);
+  return;
+}
+
+/*-------------------------------------------------------------------
+* qcom_aw_phy_handle_an_link_good
+
+* Description: Generated upon interrupt trigger indicating speed
+has been negotiated via AN.
+------------------------------------------------------------------- */
+void qcom_aw_phy_handle_an_link_good(struct work_struct *work){
+  struct delayed_work *delayed_work_item = to_delayed_work(work);
+  struct qcom_aw_phy_work_q_params *wq_params =
+     container_of(delayed_work_item, struct qcom_aw_phy_work_q_params, wq_item);
+  struct qcom_aw_phy_config *phy_config_info = NULL;
+  struct qcom_aw_phy_inst_config *phy_inst_info = NULL;
+  mss_access_t mss = {.phy_offset = 0, .lane_offset = 0};
+  mss_access_t temp_mss = {.phy_offset = 0, .lane_offset = 0};
+  uint32_t an_complete;
+  uint32_t lp_ability;
+  enum mtip_port_config_enum port_config_result = MTIP_PORT_CONFIG_MAX;
+  bool an_result = false;
+  int i = 0;
+
+  if(!wq_params){
+    QCOM_AW_PHY_LOG_ERR("Invalid work queue structure!");
+    return;
+  }
+
+  QCOM_AW_PHY_LOG_DBG("AN link good rcvd for PHY %d lane %d",
+                      wq_params->phy_inst, wq_params->lane_num);
+
+  if (!QCOM_AW_PHY_INST_VALID(wq_params->phy_inst) ||
+      !QCOM_AW_PHY_LANE_VALID(wq_params->lane_num)){
+    QCOM_AW_PHY_LOG_ERR("Invalid PHY instance/lane. AN Notification failed.");
+  }
+
+  phy_config_info = qcom_aw_phy_get_config_info();
+  if (!phy_config_info) {
+    return;
+  }
+
+  /* Get the PHY instance info for the passed instance type */
+  phy_inst_info = &phy_config_info->phy_inst_config_info[wq_params->phy_inst];
+  if (phy_inst_info->valid == false) {
+    return;
+  }
+
+  mutex_lock(&phy_inst_info->phy_inst_lock);
+  mutex_lock(&phy_inst_info->lane_lock[wq_params->lane_num]);
+
+  /* Setup PHY offset */
+  mss.phy_offset = temp_mss.phy_offset = phy_inst_info->base_addr;
+  pmd_set_lane(&mss, wq_params->lane_num);
+
+  /* Fecth the AN status */
+  aw_pmd_anlt_auto_neg_status_get(&mss, &an_complete);
+  if (an_complete == 0)
+    QCOM_AW_PHY_LOG_ERR("AN failed, need to debug!");
+  else
+    QCOM_AW_PHY_LOG_DBG("AN link good");
+
+  /* TBD - Handle the no_consortium flag(2nd parameter) */
+  aw_pmd_anlt_auto_neg_result_get(&mss, 1,
+                      &phy_inst_info->an_params.an_result[wq_params->lane_num]);
+
+  /* Read the link partner ability */
+  pmd_read_field(&mss, ETH_AN_LP_ADV_ABILITY_REG3_ADDR,
+                 ETH_AN_LP_ADV_ABILITY_REG3_AN_MR_LP_ADV_ABILITY_3_MASK,
+                 ETH_AN_LP_ADV_ABILITY_REG3_AN_MR_LP_ADV_ABILITY_3_OFFSET,
+                 &lp_ability);
+
+  QCOM_AW_PHY_LOG_DBG("Link partner ability = 0x%x", lp_ability);
+
+  /* Fetch the FEC capability from LP ability */
+  for(i=11;i<=15;i++){
+    if((1<<i) & lp_ability)
+      phy_inst_info->an_params.lp_fec_ability[wq_params->lane_num][i-11] = 1;
+  }
+
+  /* AN failure handling */
+  if(phy_inst_info->an_params.an_result[wq_params->lane_num] == -1){
+
+    QCOM_AW_PHY_LOG_ERR("AN failed!");
+    for(i=wq_params->lane_num; i<PHY_LANE_MAX; i++){
+      pmd_set_lane(&temp_mss, i);
+      qcom_aw_phy_reset_anlt(&temp_mss);
+    }
+
+    phy_inst_info->an_params.an_state[wq_params->lane_num] =
+                                                           PHY_AN_STATE_FAILURE;
+    goto func_exit;
+  }
+  // AN success after PCS reconfiguration, or AN retry
+  else if(phy_inst_info->an_params.an_state[wq_params->lane_num] ==
+                                                      PHY_AN_STATE_PCS_CONFIG ||
+          phy_inst_info->an_params.an_state[wq_params->lane_num] ==
+                                                      PHY_AN_STATE_LINK_GOOD){
+    phy_inst_info->an_params.an_state[wq_params->lane_num] =
+                                                         PHY_AN_STATE_LINK_GOOD;
+    goto func_exit;
+  }
+  // AN success for the first try
+  else{
+    if(phy_inst_info->an_params.an_state[wq_params->lane_num] ==
+                                                            PHY_AN_STATE_START){
+      QCOM_AW_PHY_LOG_INFO(
+              "AN result successful, configured speed = %d, FEC = 0x%x",
+              phy_inst_info->an_params.an_result[wq_params->lane_num],
+              qcom_aw_phy_get_an_fec_ability_mask(
+                 phy_inst_info->an_params.lp_fec_ability[wq_params->lane_num]));
+      phy_inst_info->an_params.an_state[wq_params->lane_num] =
+                                                        PHY_AN_STATE_PCS_CONFIG;
+    }
+  }
+
+  /* Convert the AN result to MAC port config type */
+  port_config_result = qcom_aw_phy_an_result_to_port_config(phy_inst_info);
+
+  QCOM_AW_PHY_LOG_INFO("Port_config_result = %d, Port config mask =0x%x",
+                       port_config_result,
+                       phy_inst_info->an_params.mac_port_config_mask);
+
+  /* AN result callback if calculated port config is valid and is configured */
+  if(port_config_result != MTIP_PORT_CONFIG_MAX &&
+     (phy_inst_info->an_params.mac_port_config_mask & (1<<port_config_result))){
+    phy_inst_info->phy_eq_mode = QCOM_AW_PHY_ANLT_MODE;
+    an_result = true;
+    /* Notify AN result to MAC */
+    qcom_aw_phy_mtip_if_info_s.notify_an_result(
+                        qcom_aw_phy_inst_to_mac_port(phy_inst_info->phy_inst),
+                        an_result, port_config_result);
+  }
+  else{
+    /* Wait for remote end to come up, or change the config and bring up
+       ethernet interface again to re-initiate AN */
+  }
+
+func_exit:
+  mutex_unlock(&phy_inst_info->lane_lock[wq_params->lane_num]);
+  mutex_unlock(&phy_inst_info->phy_inst_lock);
 
   kfree(wq_params);
   return;
@@ -976,7 +1778,8 @@ void qcom_aw_phy_handle_rx_sig_detect(struct work_struct *work){
 
   mutex_lock(&phy_inst_info->phy_inst_lock);
 
-  if(phy_inst_info->bring_up_status == false) {
+  if(phy_inst_info->bring_up_status == false ||
+     phy_inst_info->phy_eq_mode != QCOM_AW_PHY_MANUAL_EQ_MODE) {
     ret_val = EINVAL;
     local_err_val = LOCAL_ERROR_4;
     mutex_unlock(&phy_inst_info->phy_inst_lock);
@@ -1017,9 +1820,16 @@ void qcom_aw_phy_handle_rx_sig_detect(struct work_struct *work){
     qcom_aw_phy_disable_snr_interrupt(phy_inst_info, lane);
 
     if (phy_inst_info->phy_eq_mode == QCOM_AW_PHY_ANLT_MODE) {
-      //TODO
+      //qcom_aw_phy_reset_anlt(&mss);
+      pmd_write_field(&mss, ETH_AN_CTRL_REG1_ADDR,
+                      ETH_AN_CTRL_REG1_AN_MR_RESTART_NEGOTIATION_MASK,
+                      ETH_AN_CTRL_REG1_AN_MR_RESTART_NEGOTIATION_OFFSET, 1);
+      pmd_write_field(&mss, ETH_AN_CTRL_REG1_ADDR,
+                      ETH_AN_CTRL_REG1_AN_MR_RESTART_NEGOTIATION_MASK,
+                      ETH_AN_CTRL_REG1_AN_MR_RESTART_NEGOTIATION_OFFSET, 0);
     }
     else if (phy_inst_info->phy_eq_mode == QCOM_AW_PHY_LT_MODE) {
+      //qcom_aw_phy_reset_anlt(&mss);
       pmd_write_field(&mss, ETH_LT_CTRL_ADDR,
                       ETH_LT_CTRL_LT_MR_RESTART_TRAINING_MASK,
                       ETH_LT_CTRL_LT_MR_RESTART_TRAINING_OFFSET, 1);
@@ -1149,6 +1959,7 @@ const struct eth_phy_iface_ops qcom_aw_phy_driver_iface_ops = {
     .eth_phy_iface_phy_bringup = qcom_aw_phy_bringup,
     .eth_phy_iface_phy_teardown = qcom_aw_phy_teardown,
     .eth_phy_iface_notify_mac_link_status = qcom_aw_phy_mac_link_status,
+    .eth_phy_iface_initiate_an = qcom_aw_phy_initiate_an,
 };
 
 EXPORT_SYMBOL(qcom_aw_phy_driver_iface_ops);

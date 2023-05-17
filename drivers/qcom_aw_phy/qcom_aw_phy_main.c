@@ -115,6 +115,8 @@ static irqreturn_t qcom_aw_phy_interrupt_handler(int irq, void *devptr) {
   enum local_error_enum local_err_val = LOCAL_ERROR_INVALID;
   int ret_val = IRQ_HANDLED;
   struct qcom_aw_phy_work_q_params *wq_params = NULL;
+  mss_access_t mss = {.phy_offset = 0, .lane_offset = 0};
+  uint64_t tx_np_data = 1ULL;
 
   // check if this an interrupt that needs to be handled
   for (i = QCOM_AW_PHY_INST_FH0; i < QCOM_AW_PHY_INST_MAX; i++)
@@ -225,7 +227,7 @@ static irqreturn_t qcom_aw_phy_interrupt_handler(int irq, void *devptr) {
           wq_params->lane_num = i;
           wq_params->user_data = (void*)true;
           queue_delayed_work(qcom_aw_phy_config_info.wq, &wq_params->wq_item,
-                             RX_SIGNAL_DETECT_RETRY_DELAY_TIMER);
+                             msecs_to_jiffies(RX_SIGNAL_DETECT_RETRY_DELAY_TIMER));
         }
         clear |= (1<<i);
         break;
@@ -240,10 +242,11 @@ static irqreturn_t qcom_aw_phy_interrupt_handler(int irq, void *devptr) {
           QCOM_AW_PHY_LOG_ERR("Malloc failed!");
         else{
           INIT_DELAYED_WORK(&wq_params->wq_item,
-                            qcom_aw_phy_handle_an_complete);
+                            qcom_aw_phy_handle_an_done);
           wq_params->phy_inst = phy_inst_info->phy_inst;
           wq_params->lane_num = i - QCOM_AW_PHY_AN_DONE_LANE_0;
-          queue_delayed_work(qcom_aw_phy_config_info.wq, &wq_params->wq_item, 0);
+          queue_delayed_work(qcom_aw_phy_config_info.wq, &wq_params->wq_item,
+                             msecs_to_jiffies(10));
         }
         clear |= (1<<i);
         break;
@@ -252,7 +255,29 @@ static irqreturn_t qcom_aw_phy_interrupt_handler(int irq, void *devptr) {
       case QCOM_AW_PHY_AN_LINK_GOOD_LANE_1:
       case QCOM_AW_PHY_AN_LINK_GOOD_LANE_2:
       case QCOM_AW_PHY_AN_LINK_GOOD_LANE_3:
-        // NO-OP, just to monitor the link state transition
+        wq_params = kmalloc(sizeof(struct qcom_aw_phy_work_q_params),
+                            GFP_ATOMIC);
+        if(!wq_params)
+          QCOM_AW_PHY_LOG_ERR("Malloc failed!");
+        else{
+          INIT_DELAYED_WORK(&wq_params->wq_item,
+                           qcom_aw_phy_handle_an_link_good);
+          wq_params->phy_inst = phy_inst_info->phy_inst;
+          wq_params->lane_num = i - QCOM_AW_PHY_AN_LINK_GOOD_LANE_0;
+          queue_delayed_work(qcom_aw_phy_config_info.wq, &wq_params->wq_item, 0);
+        }
+        clear |= (1<<i);
+        break;
+
+      case QCOM_AW_PHY_AN_NEW_PAGE_LANE_0:
+      case QCOM_AW_PHY_AN_NEW_PAGE_LANE_1:
+      case QCOM_AW_PHY_AN_NEW_PAGE_LANE_2:
+      case QCOM_AW_PHY_AN_NEW_PAGE_LANE_3:
+        QCOM_AW_PHY_LOG_DBG("AN new page for lane %d",
+                            i - QCOM_AW_PHY_AN_NEW_PAGE_LANE_0);
+        mss.phy_offset = phy_inst_info->base_addr;
+        pmd_set_lane(&mss, i-QCOM_AW_PHY_AN_NEW_PAGE_LANE_0);
+        aw_pmd_anlt_auto_neg_next_page_set(&mss, tx_np_data);
         clear |= (1<<i);
         break;
 
@@ -330,6 +355,10 @@ void qcom_aw_phy_enable_interrupt(
     case QCOM_AW_PHY_AN_LINK_GOOD_LANE_1:
     case QCOM_AW_PHY_AN_LINK_GOOD_LANE_2:
     case QCOM_AW_PHY_AN_LINK_GOOD_LANE_3:
+    case QCOM_AW_PHY_AN_NEW_PAGE_LANE_0:
+    case QCOM_AW_PHY_AN_NEW_PAGE_LANE_1:
+    case QCOM_AW_PHY_AN_NEW_PAGE_LANE_2:
+    case QCOM_AW_PHY_AN_NEW_PAGE_LANE_3:
       temp_bmask |= (1 << i);
       break;
 
@@ -1038,6 +1067,10 @@ static int qcom_aw_phy_inst_probe(struct platform_device *pdev) {
   /* Get the PHY equalization mode */
   phy_inst_info->phy_eq_mode =
       QCOM_AW_PHY_MANUAL_EQ_MODE; // Default value for now
+
+  /* Default AN adv ability set to 25G_BaseR */
+  phy_inst_info->an_params.adv_ability[PHY_SPEED_SPEC_25G_BASE_K_CR_S] = 1;
+  phy_inst_info->an_params.adv_ability[PHY_SPEED_SPEC_25G_BASE_K_CR] = 1;
 
   /* Get the IRQ info */
   phy_inst_info->phy_status_irq = platform_get_irq_byname(pdev, "phy-irq");
