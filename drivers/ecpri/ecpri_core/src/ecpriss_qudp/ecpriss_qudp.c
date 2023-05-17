@@ -3293,6 +3293,8 @@ int ecpriss_qudp_init_v2(struct device *dev)
 
 		ecpriss_qudp_configure_mtu_v2();
 		ecpriss_qudp_non_ecpri_dma_ring_info();
+		ecpriss_filtering_enabled = 1;
+
 		ecpriss_pdata_v2->qudp_ctx_v2->state = ECPRI_QUDP_READY ;
 
 	}while (0);
