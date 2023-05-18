@@ -28,8 +28,9 @@
 
 /* Module level feature definitions */
 //#define FEATURE_QCOM_AW_RUMI_SW
+#ifdef CONFIG_DEBUG_FS
 #define FEATURE_QCOM_AW_TEST_SYS_FS
-
+#endif
 /* Macro to validate the lane number */
 #define QCOM_AW_PHY_LANE_VALID(lane) ((lane >= PHY_LANE_0) && \
                                       (lane < PHY_LANE_MAX))
@@ -291,6 +292,9 @@ struct qcom_aw_phy_config{
 	struct workqueue_struct         *wq;
 	void                            *phy_ipc_log_buf;
 	void                            *phy_ipc_log_buf_low;
+	uint32_t			fw_major_ver;
+	uint32_t			fw_minor_ver;
+	uint32_t			fw_patch_ver;
 };
 
 /* PHY lane speed config - Rate, width, LTCS clause, Modulation technique*/
@@ -312,9 +316,12 @@ struct qcom_aw_phy_work_q_params{
 };
 
 struct qcom_aw_phy_config* qcom_aw_phy_get_config_info(void);
+struct qcom_aw_phy_inst_config *qcom_aw_phy_get_inst_config(enum qcom_aw_phy_instance_enum port);
+struct qcom_aw_lane_params *qcom_aw_phy_get_lane_params(enum qcom_aw_phy_instance_enum port, enum eth_phy_iface_phy_lane_num_enum lane);
 enum qcom_aw_phy_loopback_mode_enum qcom_aw_phy_get_loopback_mode(void);
 void qcom_aw_phy_set_loopback_mode(enum qcom_aw_phy_loopback_mode_enum mode);
 int qcom_aw_phy_get_polarity_flag(void);
+int qcom_aw_phy_get_ref_clk_mode(void);
 void qcom_aw_phy_enable_snr_interrupt(
                                   struct qcom_aw_phy_inst_config *phy_inst_info,
                                   enum eth_phy_iface_phy_lane_num_enum lane);
@@ -335,6 +342,7 @@ ssize_t qcom_aw_phy_set_tx_eq_val(struct file *file, const char __user *buf,
                              size_t count, loff_t *ppos);
 ssize_t qcom_aw_phy_get_tx_eq_val(struct file *file, char __user *buf,
                                     size_t count, loff_t *ppos);
+int32_t setup_phy_status_debugfs_directory(void);
 #endif /* FEATURE_QCOM_AW_TEST_SYS_FS */
 
 #endif /* QCOM_AW_PHY_MAIN_H */
