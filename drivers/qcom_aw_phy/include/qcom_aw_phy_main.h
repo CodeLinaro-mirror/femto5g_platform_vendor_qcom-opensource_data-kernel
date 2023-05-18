@@ -28,8 +28,9 @@
 
 /* Module level feature definitions */
 //#define FEATURE_QCOM_AW_RUMI_SW
+#ifdef CONFIG_DEBUG_FS
 #define FEATURE_QCOM_AW_TEST_SYS_FS
-
+#endif
 /* Macro to validate the lane number */
 #define QCOM_AW_PHY_LANE_VALID(lane) ((lane >= PHY_LANE_0) && \
                                       (lane < PHY_LANE_MAX))
@@ -86,6 +87,10 @@ enum qcom_aw_phy_int_status_bit_enum{
 	QCOM_AW_PHY_AN_LINK_GOOD_LANE_1      = 9,
 	QCOM_AW_PHY_AN_LINK_GOOD_LANE_2      = 10,
 	QCOM_AW_PHY_AN_LINK_GOOD_LANE_3      = 11,
+	QCOM_AW_PHY_AN_NEW_PAGE_LANE_0       = 12,
+	QCOM_AW_PHY_AN_NEW_PAGE_LANE_1       = 13,
+	QCOM_AW_PHY_AN_NEW_PAGE_LANE_2       = 14,
+	QCOM_AW_PHY_AN_NEW_PAGE_LANE_3       = 15,
 	QCOM_AW_PHY_SNR_VALID_LANE_0         = 20,
 	QCOM_AW_PHY_SNR_VALID_LANE_1         = 21,
 	QCOM_AW_PHY_SNR_VALID_LANE_2         = 22,
@@ -200,6 +205,37 @@ enum qcom_aw_phy_cdr_lock_lane_status{
 	CDR_LOCK_SUCCESS = 1
 };
 
+enum qcom_aw_phy_speed_spec_enum {
+	PHY_SPEED_SPEC_10G_BASE_KR = 2,
+	PHY_SPEED_SPEC_40G_BASE_KR4 = 3,
+	PHY_SPEED_SPEC_40G_BASE_CR4 = 4,
+	PHY_SPEED_SPEC_100G_BASE_KR4 = 7,
+	PHY_SPEED_SPEC_100G_BASE_CR4 = 8,
+	PHY_SPEED_SPEC_25G_BASE_K_CR_S = 9,
+	PHY_SPEED_SPEC_25G_BASE_K_CR = 10,
+	PHY_SPEED_SPEC_50G_BASE_K_CR = 13,
+	PHY_SPEED_SPEC_100G_BASE_K_CR2 = 14,
+	PHY_SPEED_SPEC_100G_BASE_K_CR = 16,
+	PHY_SPEED_SPEC_MAX = 20
+};
+
+enum qcom_aw_phy_fec_spec_enum {
+	PHY_100G_BASE_P_RSFEC = 0,
+	PHY_25G_RS_FEC = 1,
+	PHY_25G_BASE_R_FEC = 2,
+	PHY_10G_BASE_R_FEC = 4,
+	PHY_FEC_SPEC_MAX
+};
+
+enum qcom_aw_phy_an_state_enum {
+	PHY_AN_STATE_NONE = 0,
+	PHY_AN_STATE_START = 1,
+	PHY_AN_STATE_PCS_CONFIG = 2,
+	PHY_AN_STATE_LINK_GOOD = 3,
+	PHY_AN_STATE_DONE = 4,
+	PHY_AN_STATE_FAILURE = 5
+};
+
 /* Lane Params - Lane specific information */
 struct qcom_aw_lane_params{
 	struct eth_phy_iface_phy_lane_config   lane_config;
@@ -207,6 +243,19 @@ struct qcom_aw_lane_params{
 	uint32_t                               snr_valid_intr;
 	uint32_t                               an_link_good_intr;
 	uint32_t                               an_done_intr;
+};
+
+/* AN Params - AN specific information */
+struct qcom_aw_phy_an_params{
+	uint32_t                              adv_ability[PHY_SPEED_SPEC_MAX];
+	uint32_t                              fec_ability[PHY_FEC_SPEC_MAX];
+	enum qcom_aw_phy_an_state_enum        an_state[PHY_LANE_MAX];
+	int                                   an_result[PHY_LANE_MAX];
+	int                                   an_fec_result[PHY_LANE_MAX];
+	uint32_t                              lp_fec_ability[PHY_LANE_MAX][PHY_FEC_SPEC_MAX];
+	int                                   num_lanes;
+	enum eth_phy_iface_phy_lane_num_enum  current_lane;
+	uint32_t                              mac_port_config_mask;
 };
 
 /* PHY Instance Config - Config info for a particular PHY instance */
@@ -226,6 +275,7 @@ struct qcom_aw_phy_inst_config{
 	bool                              bring_up_status;
 	struct mutex                      phy_inst_lock;
 	int                               sfp_port_type;
+	struct qcom_aw_phy_an_params      an_params;
 };
 
 /* PHY Config - Config for all PHY instances at device level(DU/RU) */
@@ -242,6 +292,9 @@ struct qcom_aw_phy_config{
 	struct workqueue_struct         *wq;
 	void                            *phy_ipc_log_buf;
 	void                            *phy_ipc_log_buf_low;
+	uint32_t			fw_major_ver;
+	uint32_t			fw_minor_ver;
+	uint32_t			fw_patch_ver;
 };
 
 /* PHY lane speed config - Rate, width, LTCS clause, Modulation technique*/
@@ -263,9 +316,12 @@ struct qcom_aw_phy_work_q_params{
 };
 
 struct qcom_aw_phy_config* qcom_aw_phy_get_config_info(void);
+struct qcom_aw_phy_inst_config *qcom_aw_phy_get_inst_config(enum qcom_aw_phy_instance_enum port);
+struct qcom_aw_lane_params *qcom_aw_phy_get_lane_params(enum qcom_aw_phy_instance_enum port, enum eth_phy_iface_phy_lane_num_enum lane);
 enum qcom_aw_phy_loopback_mode_enum qcom_aw_phy_get_loopback_mode(void);
 void qcom_aw_phy_set_loopback_mode(enum qcom_aw_phy_loopback_mode_enum mode);
 int qcom_aw_phy_get_polarity_flag(void);
+int qcom_aw_phy_get_ref_clk_mode(void);
 void qcom_aw_phy_enable_snr_interrupt(
                                   struct qcom_aw_phy_inst_config *phy_inst_info,
                                   enum eth_phy_iface_phy_lane_num_enum lane);
@@ -282,6 +338,11 @@ ssize_t qcom_aw_phy_get_attr(struct file *file, char __user *buf,
                              size_t count, loff_t *ppos) ;
 ssize_t qcom_aw_phy_get_prbs_result(struct file *file, char __user *buf,
                                     size_t count, loff_t *ppos);
+ssize_t qcom_aw_phy_set_tx_eq_val(struct file *file, const char __user *buf,
+                             size_t count, loff_t *ppos);
+ssize_t qcom_aw_phy_get_tx_eq_val(struct file *file, char __user *buf,
+                                    size_t count, loff_t *ppos);
+int32_t setup_phy_status_debugfs_directory(void);
 #endif /* FEATURE_QCOM_AW_TEST_SYS_FS */
 
 #endif /* QCOM_AW_PHY_MAIN_H */

@@ -38,27 +38,35 @@
 				## args); \
 	} while (0)
 
-#define GSIDBG(fmt, args...) \
-	do { \
-		dev_dbg(gsi_ctx->dev, "%s:%d " fmt, __func__, __LINE__, \
-		## args);\
-		if (gsi_ctx) { \
-			GSI_IPC_LOGGING(gsi_ctx->ipc_logbuf, \
-				"%s:%d " fmt, ## args); \
-			GSI_IPC_LOGGING(gsi_ctx->ipc_logbuf_low, \
-				"%s:%d " fmt, ## args); \
-		} \
-	} while (0)
+#ifdef ECPRI_NO_PRINTS
+	#define GSIDBG(fmt, args...)
+#else
+	#define GSIDBG(fmt, args...) \
+		do { \
+			dev_dbg(gsi_ctx->dev, "%s:%d " fmt, __func__, __LINE__, \
+			## args);\
+			if (gsi_ctx) { \
+				GSI_IPC_LOGGING(gsi_ctx->ipc_logbuf, \
+					"%s:%d " fmt, ## args); \
+				GSI_IPC_LOGGING(gsi_ctx->ipc_logbuf_low, \
+					"%s:%d " fmt, ## args); \
+			} \
+		} while (0)
+#endif
 
-#define GSIDBG_LOW(fmt, args...) \
-	do { \
-		dev_dbg(gsi_ctx->dev, "%s:%d " fmt, __func__, __LINE__, \
-		## args);\
-		if (gsi_ctx) { \
-			GSI_IPC_LOGGING(gsi_ctx->ipc_logbuf_low, \
-				"%s:%d " fmt, ## args); \
-		} \
-	} while (0)
+#ifdef ECPRI_NO_PRINTS
+	#define GSIDBG_LOW(fmt, args...)
+#else
+	#define GSIDBG_LOW(fmt, args...) \
+		do { \
+			dev_dbg(gsi_ctx->dev, "%s:%d " fmt, __func__, __LINE__, \
+			## args);\
+			if (gsi_ctx) { \
+				GSI_IPC_LOGGING(gsi_ctx->ipc_logbuf_low, \
+					"%s:%d " fmt, ## args); \
+			} \
+		} while (0)
+#endif
 
 #define GSIERR(fmt, args...) \
 	do { \

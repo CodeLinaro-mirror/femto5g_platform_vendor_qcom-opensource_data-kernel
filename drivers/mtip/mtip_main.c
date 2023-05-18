@@ -72,7 +72,7 @@ int mtip_rx_delay_argc = 0;
 module_param_array(mtip_rx_delay, int, &mtip_rx_delay_argc, S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP);
 MODULE_PARM_DESC(mtip_rx_delay, "Receive delay array for RGMII IO Macro");
 
-int mtip_loopback_mode = 0;
+int mtip_loopback_mode = MTIP_MODE_DEFAULT;
 module_param(mtip_loopback_mode, int, S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP);
 MODULE_PARM_DESC(mtip_loopback_mode, "Loopback mode of the driver");
 
@@ -84,7 +84,7 @@ bool mtip_loopback_enable_arp = false;
 module_param(mtip_loopback_enable_arp, bool, S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP);
 MODULE_PARM_DESC(mtip_loopback_enable_arp, "Enable ARP in loopback mode");
 
-int mtip_rumi_platform = 0;
+int mtip_rumi_platform = MTIP_PLATFORM_SOC;
 module_param(mtip_rumi_platform, int, S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP);
 MODULE_PARM_DESC(mtip_rumi_platform, "Platform mode to RUMI");
 
@@ -111,14 +111,11 @@ int mtip_lookup_link_index_by_name(char *name, u32 *link_index) {
            if (platform_driver_priv->mtip_links[i]->dev != NULL) {
 
              dev = (platform_driver_priv->mtip_links[i]->dev);
-
-#ifdef COMPILE_THIS
              if (strncmp(name, dev->name, IFNAMSIZ) == 0) {
                 *link_index = i;
                 ret = 0;
                 break;
              }
-#endif
        }
       }
    }
@@ -135,132 +132,69 @@ int mtip_lookup_link_index_by_handle(ecpri_dma_eth_conn_hdl_t hdl, u32 *link_ind
    return mtip_hashmap_find(hdl, link_index);
 }
 
-int mtip_lookup_link_index_by_device(u32* link_index, u32 port_device_index, u32 link_device_index)
-{
-    *link_index = platform_driver_priv->devices.port_devices[port_device_index].link_devices[link_device_index].link_index;
-    return 0;
-}
-
-int mtip_lookup_device_by_link_index(u32 link_index, u32* port_device_index, u32* link_device_index)
-{
-    if (platform_driver_priv->mtip_links[link_index] != NULL)
-    {
-        *port_device_index = platform_driver_priv->mtip_links[link_index]->port_device_index;
-        *link_device_index = platform_driver_priv->mtip_links[link_index]->link_device_index;
-        return 0;
-    }
-    return -1;
-}
-
 /*
- * lookup the link index by the real port and link number 
- * This may not be the same as the order of ports/links in the devicetree 
+ * lookup the link index by the port_type and link number 
+ * For example link_index 10 maps to port_type 2 and real_link_number 2 
  */
-int mtip_lookup_link_index_by_real_port_and_link(u32* link_index, u32 real_port_number, u32 real_link_number)
+int mtip_lookup_link_index_by_port_type_and_real_link(u32* link_index, u32 port_type, u32 real_link_number)
 {
 	int ret = 0;
-	if (real_port_number <= MTIP_PORT_TYPE_FH_2)
+    u32 tmp_port_type;
+
+	if (port_type <= MTIP_PORT_TYPE_FH_2)
 	{
 		// front haul port
 		if (real_link_number >= 4)
 		{
-            CSMLOGERR("invalid link number: %d for port %d:\n", real_link_number, real_port_number);
+            CSMLOGERR("invalid link number: %d for port %d:\n", real_link_number, port_type);
 			ret = -1;
+            goto out;
 		}
         else
         {
-            *link_index = 4*real_port_number + real_link_number;
+            *link_index = 4*port_type + real_link_number;
         }
 	}
-	else if (real_port_number < MTIP_PORT_TYPE_MAX)
+	else if (port_type < MTIP_PORT_TYPE_MAX)
 	{
         if (real_link_number >= 2)
         {
-            CSMLOGERR("invalid link number: %d for port %d:\n", real_link_number, real_port_number);
+            CSMLOGDBG("invalid link number: %d for port %d:\n", real_link_number, port_type);
             ret = -1;
+            goto out;
         }
         else
         {
-            *link_index = 12 + 2*(real_port_number - MTIP_PORT_TYPE_L2) + real_link_number;
+            *link_index = 12 + 2*(port_type - MTIP_PORT_TYPE_L2) + real_link_number;
         }
 	}
 	else
 	{
-        CSMLOGERR("invalid port_number: %d\n", real_port_number);
+        CSMLOGERR("invalid port_number: %d\n", port_type);
 		ret = -1;
+        goto out;
 	}
+
+    // cross check that link_index maps to the port
+    if (mtip_lookup_port_type_by_link_index(*link_index, &tmp_port_type) < 0)
+    {
+        ret = -1;
+        goto out;
+    }
+    else if (tmp_port_type != port_type) 
+    {
+        ret = -1;
+        goto out;
+    }
+
+out:
 	return ret;
 }
 
 /*
- * lookup the real link number from the link index 
- * This may not be the same as the order in the device tree 
+ * lookup the port_type from the link index 
  */
-int mtip_lookup_real_link_number_by_link_index(u32 link_index, u32* link_number)
-{
-	int ret = 0;
-	switch(link_index)
-	{
-	case 0:
-		*link_number = 0;
-		break;
-	case 1:
-		*link_number = 1;
-		break;
-	case 2:
-		*link_number = 2;
-		break;
-	case 3:
-		*link_number = 3;
-		break;
-	case 4:
-		*link_number = 0;
-		break;
-	case 5:
-		*link_number = 1;
-		break;
-	case 6:
-		*link_number = 2;
-		break;
-	case 7:
-		*link_number = 3;
-		break;
-	case 8:
-		*link_number = 0;
-		break;
-	case 9:
-		*link_number = 1;
-		break;
-	case 10:
-		*link_number = 2;
-		break;
-	case 11:
-		*link_number = 3;
-		break;
-	case 12:
-		*link_number = 0;
-		break;
-	case 13:
-		*link_number = 1;
-		break;
-	case 14:
-		*link_number = 0;
-		break;
-	case 15:
-		*link_number = 1;
-		break;
-	default:
-        CSMLOGERR("invalid link_index: %d\n", link_index);
-	    ret = -1;
-		break;
-	}
-	return ret;
-}
-
-/*
- * lookup the real port number from the link index 
- */
-int mtip_lookup_real_port_number_by_link_index(u32 link_index, u32* port_number)
+int mtip_lookup_port_type_by_link_index(u32 link_index, u32* port_type)
 {
     int ret = 0;
 
@@ -270,34 +204,317 @@ int mtip_lookup_real_port_number_by_link_index(u32 link_index, u32* port_number)
     case 1:
     case 2:
     case 3:
-        *port_number = MTIP_PORT_TYPE_FH_0;
+        *port_type = MTIP_PORT_TYPE_FH_0;
         break;
     case 4:
     case 5:
     case 6:
     case 7:
-        *port_number = MTIP_PORT_TYPE_FH_1;
+        *port_type = MTIP_PORT_TYPE_FH_1;
         break;
     case 8:
     case 9:
     case 10:
     case 11:
-        *port_number = MTIP_PORT_TYPE_FH_2;
+        *port_type = MTIP_PORT_TYPE_FH_2;
         break;
     case 12:
-        *port_number = MTIP_PORT_TYPE_L2;
+        *port_type = MTIP_PORT_TYPE_L2;
         break;
     case 15:
-        *port_number = MTIP_PORT_TYPE_DEBUG;
+        *port_type = MTIP_PORT_TYPE_DEBUG;
         break;
     case 14:
     case 13:
     default:
-        CSMLOGERR("invalid link_index: %d\n", link_index);
+        CSMLOGDBG("invalid link_index: %d\n", link_index);
         ret = -1;
         break;
     }
     return ret;
+}
+
+/*
+ * lookup the real link number from the link index 
+ * for example, link_index 7 will have the real link number 3 
+ */
+int mtip_lookup_real_link_number_by_link_index(u32 link_index, u32* real_link_number)
+{
+	int ret = 0;
+	switch(link_index)
+	{
+	case 0:
+		*real_link_number = 0;
+		break;
+	case 1:
+		*real_link_number = 1;
+		break;
+	case 2:
+		*real_link_number = 2;
+		break;
+	case 3:
+		*real_link_number = 3;
+		break;
+	case 4:
+		*real_link_number = 0;
+		break;
+	case 5:
+		*real_link_number = 1;
+		break;
+	case 6:
+		*real_link_number = 2;
+		break;
+	case 7:
+		*real_link_number = 3;
+		break;
+	case 8:
+		*real_link_number = 0;
+		break;
+	case 9:
+		*real_link_number = 1;
+		break;
+	case 10:
+		*real_link_number = 2;
+		break;
+	case 11:
+		*real_link_number = 3;
+		break;
+	case 12:
+		*real_link_number = 0;
+		break;
+	case 15:
+		*real_link_number = 1;
+		break;
+    case 13:
+    case 14:
+	default:
+        CSMLOGERR("invalid link_index: %d\n", link_index);
+	    ret = -1;
+		break;
+	}
+	return ret;
+}
+
+/*
+ * mtip_lookup_link_index_by_device 
+ *  find the link index within a port and the link_device_index (0 thru num_link_phandles - 1) 
+ */
+int mtip_lookup_link_index_by_device(u32* link_index, u32 port_type, u32 link_device_index)
+{
+    if (port_type >= MTIP_MAX_PORTS) 
+    {
+        CSMLOGERR("port_type %d out of bounds %d", port_type, MTIP_MAX_PORTS);
+        return -1;
+    }
+
+    if (link_device_index >= platform_driver_priv->devices.port_devices[port_type].num_link_phandles)
+    {
+        CSMLOGERR("link_device_index %d out of bounds %d", link_device_index, platform_driver_priv->devices.port_devices[port_type].num_link_phandles);
+        return -1;
+    }
+
+    *link_index = platform_driver_priv->devices.port_devices[port_type].link_devices[link_device_index]->link_index;
+    return 0;
+}
+
+/*
+ * mtip_lookup_device_by_link_index 
+ *  find the port_type and the link_device_index (between 0 and num_phandles - 1) 
+ */
+int mtip_lookup_device_by_link_index(u32 link_index, u32* port_type, u32* link_device_index)
+{
+    int i;
+    u32 link_phandle;
+
+    if (mtip_lookup_port_type_by_link_index(link_index, port_type) < 0) 
+    {
+        CSMLOGDBG("Could not find port_type of link_index: %d", link_index);
+        return -1;
+    }
+
+    link_phandle = platform_driver_priv->devices.link_devices[link_index].link_phandle;
+
+    for (i = 0; i < platform_driver_priv->devices.port_devices[*port_type].num_link_phandles; ++i) 
+    {
+        if (link_phandle == platform_driver_priv->devices.port_devices[*port_type].link_phandles[i]) 
+        {
+            *link_device_index = i;
+        return 0;
+    }
+    }
+    return -1;
+}
+
+/*
+ * lookup the lane index by the port_type and lane number 
+ * For example lane_index 10 maps to port_type 2 and real_lane_number 2 
+ */
+int mtip_lookup_lane_index_by_port_type_and_real_lane(u32 *lane_index, u32 port_type, u32 real_lane_number)
+{
+	int ret = 0;
+	if (port_type <= MTIP_PORT_TYPE_FH_2)
+	{
+		// front haul port
+		if (real_lane_number >= 4)
+		{
+            CSMLOGERR("invalid lane number: %d for port %d:\n", real_lane_number, port_type);
+			ret = -1;
+		}
+        else
+        {
+         *lane_index = 4 * port_type + real_lane_number;
+        }
+	}
+	else if (port_type == MTIP_PORT_TYPE_L2)
+	{
+        if (real_lane_number >= 4)
+        {
+            CSMLOGERR("invalid lane number: %d for port %d:\n", real_lane_number, port_type);
+            ret = -1;
+        }
+        else
+        {
+            *lane_index = 12 + real_lane_number;
+        }
+	}
+    else if (port_type == MTIP_PORT_TYPE_DEBUG)
+    {
+        // only real_lane_number 2 and 3 are valid for DEBUGETH
+        if ((real_lane_number == 2) || (real_lane_number == 3))
+        {
+            *lane_index = 16 + real_lane_number;
+        }
+	else
+	{
+         CSMLOGDBG("invalid lane number: %d for port %d:\n", real_lane_number, port_type);
+            ret = -1;
+        }
+    }
+	else
+	{
+        CSMLOGERR("invalid port_number: %d\n", port_type);
+		ret = -1;
+	}
+	return ret;
+}
+
+/*
+ * lookup the port_type from the lane index 
+ */
+int mtip_lookup_port_type_by_lane_index(u32 lane_index, u32* port_type)
+{
+	int ret = 0;
+
+    switch (lane_index) 
+	{
+	case 0:
+	case 1:
+	case 2:
+	case 3:
+        *port_type = MTIP_PORT_TYPE_FH_0;
+		break;
+	case 4:
+	case 5:
+	case 6:
+	case 7:
+        *port_type = MTIP_PORT_TYPE_FH_1;
+		break;
+	case 8:
+	case 9:
+	case 10:
+	case 11:
+        *port_type = MTIP_PORT_TYPE_FH_2;
+		break;
+	case 12:
+	case 13:
+	case 14:
+    case 15:
+        *port_type = MTIP_PORT_TYPE_L2;
+		break;
+    case 18:
+    case 19:
+        *port_type = MTIP_PORT_TYPE_DEBUG;
+		break;
+    case 16:
+    case 17:
+	default:
+        CSMLOGERR("invalid lane_index: %d\n", lane_index);
+	    ret = -1;
+		break;
+	}
+	return ret;
+}
+
+/*
+ * lookup the real lane number from the lane index 
+ * for example, lane_index 7 will have the real lane number 3 
+ */
+int mtip_lookup_real_lane_number_by_lane_index(u32 lane_index, u32* real_lane_number)
+{
+    int ret = 0;
+
+    if (lane_index >= MTIP_MAX_LANES) 
+    {
+        CSMLOGERR("invalid lane_index %d", lane_index);
+        ret = -1;
+    }
+    else 
+    {
+        *real_lane_number = lane_index%4;
+    }
+    return ret;
+}
+
+/*
+ * mtip_lookup_lane_index_by_device 
+ *  find the lane index within a port and the lane_device_index (0 thru num_lane_phandles - 1) 
+ */
+int mtip_lookup_lane_index_by_device(u32* lane_index, u32 port_type, u32 lane_device_index)
+{
+    if (port_type >= MTIP_MAX_PORTS) 
+    {
+        CSMLOGERR("port_type %d out of bounds %d", port_type, MTIP_MAX_PORTS);
+        return -1;
+    }
+
+    if (lane_device_index >= platform_driver_priv->devices.port_devices[port_type].num_lane_phandles)
+    {
+        CSMLOGERR("lane_device_index %d out of bounds %d", lane_device_index, platform_driver_priv->devices.port_devices[port_type].num_lane_phandles);
+        return -1;
+    }
+
+    *lane_index = platform_driver_priv->devices.port_devices[port_type].lane_devices[lane_device_index]->lane_index;
+    return 0;
+}
+
+/*
+ * mtip_lookup_device_by_lane_index 
+ *  find the port_type and the lane_device_index (between 0 and num_phandles - 1) 
+ */
+int mtip_lookup_device_by_lane_index(u32 lane_index, u32* port_type, u32* lane_device_index)
+{
+    int i;
+    u32 lane_phandle;
+
+    CSMLOGERR("lookup_device by lane_index called");
+
+    if (mtip_lookup_port_type_by_lane_index(lane_index, port_type) < 0) 
+    {
+        CSMLOGERR("Could not find port_type of lane_index: %d", lane_index);
+        return -1;
+    }
+
+    lane_phandle = platform_driver_priv->devices.lane_devices[lane_index].lane_phandle;
+
+    for (i = 0; i < platform_driver_priv->devices.port_devices[*port_type].num_lane_phandles; ++i) 
+    {
+        if (lane_phandle == platform_driver_priv->devices.port_devices[*port_type].lane_phandles[i]) 
+        {
+            *lane_device_index = i;
+            return 0;
+        }
+    }
+    return -1;
 }
 
 static const struct of_device_id mtip_mac_link_match[] = {
@@ -309,10 +526,26 @@ MODULE_DEVICE_TABLE(of, mtip_mac_link_match);
 
 static struct platform_driver ethernet_mac_link_driver = { 
 	.probe  = mtip_link_probe,
-	.remove = mtip_platform_remove,
+	.remove = mtip_link_remove,
 	.driver = {
 		.name = "MTIP_MAC_LINK",
 		.of_match_table = of_match_ptr(mtip_mac_link_match),
+	},
+};
+
+static const struct of_device_id mtip_mac_lane_match[] = {
+    { .compatible = "mtip-mac-lane", },
+    { }
+};
+
+MODULE_DEVICE_TABLE(of, mtip_mac_lane_match);
+
+static struct platform_driver ethernet_mac_lane_driver = { 
+	.probe  = mtip_lane_probe,
+	.remove = mtip_lane_remove,
+	.driver = {
+		.name = "MTIP_MAC_LANE",
+		.of_match_table = of_match_ptr(mtip_mac_lane_match),
 	},
 };
 
@@ -325,7 +558,7 @@ MODULE_DEVICE_TABLE(of, mtip_mac_port_match);
 
 static struct platform_driver ethernet_mac_port_driver = { 
 	.probe  = mtip_port_probe,
-	.remove = mtip_platform_remove,
+	.remove = mtip_port_remove,
 	.driver = {
 		.name = "MTIP_MAC_PORT",
 		.of_match_table = of_match_ptr(mtip_mac_port_match),
@@ -341,7 +574,7 @@ MODULE_DEVICE_TABLE(of, mtip_mac_match);
 
 static struct platform_driver ethernet_mac_platform_driver = { 
 	.probe  = mtip_platform_probe,
-	.remove = mtip_platform_remove,
+    .remove = mtip_platform_remove,
 	.driver = {
 		.name = "MTIP_MAC",
 		.of_match_table = of_match_ptr(mtip_mac_match),
@@ -398,8 +631,18 @@ int mtip_register_platform_driver(void)
       return ret;
    }
 
-   mtip_debug_eth_register_platform_driver();
+   // register for lane devices
+   // register for the lane driver
+   platform_driver_priv->perr = platform_driver_register(&ethernet_mac_lane_driver);
 
+   // HANDLE THE ERROR
+   if (platform_driver_priv->perr < 0)
+   {
+      ret = platform_driver_priv->perr;
+
+      CSMLOGERR("platform_driver_register for lane with error: %d\n", ret);
+      return ret;
+   }
    return ret;
 }
 
@@ -442,7 +685,7 @@ static int mtip_module_init(void)
 
     CSMLOGDBG("Loopback mode is %d\n", mtip_loopback_mode);
 
-    if (mtip_rumi_platform != 0) 
+    if (mtip_rumi_platform != MTIP_PLATFORM_SOC) 
     {
         if (mtip_loopback_mode != MTIP_MODE_DEFAULT)
         {
@@ -532,7 +775,13 @@ static int mtip_module_init(void)
         CSMLOGDBG("mtip_init(): IPC log context LOW created successfully, continue...\n");
     }
 
-   if (mtip_rumi_platform == 0) 
+    // initialize the dma array of allocs
+    for (i = 0; i < MTIP_DMA_ALLOC_LIST_MAX; ++i) 
+    {
+        mtip_dma_alloc_initialize(i);
+    }
+
+   if (mtip_rumi_platform == MTIP_PLATFORM_SOC) 
    {
        // register with the PHY
        mtip_phy_register_eth();
@@ -579,6 +828,10 @@ static int mtip_module_init(void)
          goto cleanup;
       }
    }
+
+   // register the debug eth platform driver
+   mtip_debug_eth_register_platform_driver();
+
    goto out;
 
 cleanup:
@@ -595,6 +848,7 @@ out:
 
 static void mtip_module_exit(void)
 {
+   int i;
    CSMLOGERR("mtip_module_exit called\n");
 
    // finalize the workq
@@ -603,13 +857,24 @@ static void mtip_module_exit(void)
    // destroy the hashmap
    mtip_hashmap_destroy();
 
-   if (!platform_driver_priv->perr)
-           platform_driver_unregister(&ethernet_mac_platform_driver);
+   // finalize the dma array of allocs
+   for (i = 0; i < MTIP_DMA_ALLOC_LIST_MAX; ++i) 
+   {
+       mtip_dma_alloc_finalize(i);
+   }
 
+   mtip_debug_eth_unregister_platform_driver();
+   if (!platform_driver_priv->perr)
+   {
+       platform_driver_unregister(&ethernet_mac_link_driver);
+       platform_driver_unregister(&ethernet_mac_lane_driver);
+       platform_driver_unregister(&ethernet_mac_port_driver);
+       platform_driver_unregister(&ethernet_mac_platform_driver);
+   }
    // deregister with the dma driver
    (ecpri_dma_eth_driver_ops.ecpri_dma_eth_deregister)();
 
-   if (mtip_rumi_platform == 0) 
+   if (mtip_rumi_platform == MTIP_PLATFORM_SOC) 
    {
        // dergister with the phy driver
        mtip_phy_deregister_eth();
@@ -619,8 +884,11 @@ static void mtip_module_exit(void)
 		ipc_log_context_destroy(platform_driver_priv->ipc_log_buf);
    if (platform_driver_priv->ipc_log_buf_low)
         ipc_log_context_destroy(platform_driver_priv->ipc_log_buf_low);
+
+   // free the platform driver priv
    kfree(platform_driver_priv);
    platform_driver_priv = NULL;
+
    return;
 }
 

@@ -233,8 +233,6 @@ void setup_common_params(void) {
   u32 upper_SA = 0;
   u32 prev_val = 0;
   int i = 0;
-  u32 port_device_index;
-  u32 link_device_index;
   unsigned int UDP_SP_DP_ARRAY[] = {DBG_UDP_SP_DP_0, DBG_UDP_SP_DP_1,
                                     DBG_UDP_SP_DP_2};
   unsigned int L2_SA_ADDR_HI_ARRAY[] = {
@@ -254,10 +252,7 @@ void setup_common_params(void) {
   }
 
   // Set up source MAC address
-  mtip_lookup_device_by_link_index(MTIP_DEBUG_ETH_LINK_INDEX,
-                                   &port_device_index, &link_device_index);
-  mtip_mac_get_mac_address_by_device(port_device_index, 
-                                     link_device_index, saddr);
+  mtip_mac_get_mac_address_by_link_index(MTIP_DEBUG_ETH_LINK_INDEX, saddr);
   for(i = 0; i < ETH_ALEN; i++)
     L2.saddr[i] = saddr[i];
 
@@ -679,7 +674,7 @@ void setup_diag_vlanID(u_int8_t fifo_num, u_int16_t vlanID) {
 
 mtip_debug_eth_gnl_params get_diag_result(u_int8_t fifo_num) {
 
-  mtip_debug_eth_gnl_params mtip_debug_eth_gnl_params_tbl;
+  mtip_debug_eth_gnl_params mtip_debug_eth_gnl_params_tbl = {0};
   int i = 0;
 
   mtip_debug_eth_gnl_params_tbl.fifo_num = fifo_num;
@@ -844,6 +839,21 @@ int setup_sysfs(void __iomem *addr, struct device *dev) {
   return 0;
 }
 
+void del_sysfs(void) {
+
+	sysfs_remove_PacketFifo(kobj_FIFO_7);
+	sysfs_remove_PacketFifo(kobj_FIFO_6);
+	sysfs_remove_PacketFifo(kobj_FIFO_5);
+	sysfs_remove_StreamingFifo(kobj_FIFO_4);
+	sysfs_remove_StreamingFifo(kobj_FIFO_3);
+	sysfs_remove_StreamingFifo(kobj_FIFO_2);
+	sysfs_remove_StreamingFifo(kobj_FIFO_1);
+	sysfs_remove_StreamingFifo(kobj_FIFO_0);
+	sysfs_remove_L3headers(kobj_ref_L3headers);
+	sysfs_remove_L2headers(kobj_ref_L2headers);
+	sysfs_remove_generic_dir_structure(kobj_root);
+}
+
 /*
 Function responsible for the static allocation of the AXI Address Range of the
 corrseponding FIFO's at the beginning. */
@@ -889,11 +899,9 @@ void setup_StreamingFIFO(int index) {
       STREAM_FIFO_TIMER_3, STREAM_FIFO_TIMER_4};
 
   CSMLOGINFO("Setup Streaming FIFO Called \n");
-  if (STREAM_FIFO_THRESHOLD_ARRAY[index] <= MAXIMUM_PACKET_SIZE) {
-    value |= ((STREAM_FIFO_THRESHOLD_ARRAY[index] / BYTE_PER_WATERMARK_UNIT) &
+  value |= ((STREAM_FIFO_THRESHOLD_ARRAY[index] / BYTE_PER_WATERMARK_UNIT) &
               GENMASK(15, 0));
-    iowrite32(value, debug_port_base_address + fifo_registers[index]);
-  }
+  iowrite32(value, debug_port_base_address + fifo_registers[index]);
   iowrite32(STREAM_TIMEOUT_ARRAY[index],
             debug_port_base_address + stream_fifo_registers[index]);
   CSMLOGINFO("Setup Streaming FIFO Ends \n");
@@ -1551,7 +1559,12 @@ ssize_t sysfs_show_Threshold(struct kobject *kobj, struct kobj_attribute *attr,
 
 ssize_t sysfs_store_Threshold(struct kobject *kobj, struct kobj_attribute *attr,
                               const char *buf, size_t count) {
+  unsigned int temp;
   CSMLOGINFO(KERN_INFO " Reading - sysfs store func...%s \n", kobj->name);
+  sscanf(buf, "%d", &temp);
+  if (temp < MINIMUM_PACKET_SIZE || temp > MAXIMUM_PACKET_SIZE)
+    return EINVAL;
+
   if (!strncmp(kobj->name, "FIFO_0", Kobj_Name_FIFO_Size)) {
     sscanf(buf, "%d", &F0.Threshold);
     setup_StreamingFIFO(FIFO_0);
@@ -1745,6 +1758,14 @@ int sysfs_create_generic_dir_structure(struct kobject *kobj_ref) {
   return -1;
 }
 
+void sysfs_remove_generic_dir_structure(struct kobject *kobj_ref) {
+
+	sysfs_remove_file(kobj_ref, &enabled_attr.attr);
+	kobject_del(kobj_ref);
+	kobject_put(kobj_ref);
+	kobj_ref=NULL;
+}
+
 int sysfs_create_L2headers(struct kobject *kobj_ref) {
   if (sysfs_create_file(kobj_ref, &saddr_attr.attr)) {
     CSMLOGINFO("Unable to create the sysfs file...\n");
@@ -1758,6 +1779,16 @@ int sysfs_create_L2headers(struct kobject *kobj_ref) {
 
   return -1;
 }
+
+void sysfs_remove_L2headers(struct kobject *kobj_ref) {
+
+	sysfs_remove_file(kobj_ref, &daddr_attr.attr);
+	sysfs_remove_file(kobj_ref, &saddr_attr.attr);
+	kobject_del(kobj_ref);
+	kobject_put(kobj_ref);
+	kobj_ref=NULL;
+}
+
 
 int sysfs_create_L3headers(struct kobject *kobj_ref) {
   if (sysfs_create_file(kobj_ref, &saddr_attr.attr)) {
@@ -1781,6 +1812,17 @@ int sysfs_create_L3headers(struct kobject *kobj_ref) {
   }
 
   return -1;
+}
+
+void sysfs_remove_L3headers(struct kobject *kobj_ref) {
+
+	sysfs_remove_file(kobj_ref, &dport_attr.attr);
+	sysfs_remove_file(kobj_ref, &sport_attr.attr);
+	sysfs_remove_file(kobj_ref, &daddr_attr.attr);
+	sysfs_remove_file(kobj_ref, &saddr_attr.attr);
+	kobject_del(kobj_ref);
+	kobject_put(kobj_ref);
+	kobj_ref=NULL;
 }
 
 int sysfs_create_StreamingFifo(struct kobject *kobj_ref) {
@@ -1832,6 +1874,22 @@ int sysfs_create_StreamingFifo(struct kobject *kobj_ref) {
   return -1;
 }
 
+void sysfs_remove_StreamingFifo(struct kobject *kobj_ref) {
+
+	sysfs_remove_file(kobj_ref, &vlanID_attr.attr);
+	sysfs_remove_file(kobj_ref, &Timeout_attr.attr);
+	sysfs_remove_file(kobj_ref, &Threshold_attr.attr);
+	sysfs_remove_file(kobj_ref, &OverFlowInterrupt_attr.attr);
+	sysfs_remove_file(kobj_ref, &AddrRange_attr_end.attr);
+	sysfs_remove_file(kobj_ref, &AddrRange_attr_start.attr);
+	sysfs_remove_file(kobj_ref, &txcount_attr.attr);
+	sysfs_remove_file(kobj_ref, &flush_attr.attr);
+	sysfs_remove_file(kobj_ref, &status_attr.attr);
+	kobject_del(kobj_ref);
+	kobject_put(kobj_ref);
+	kobj_ref=NULL;
+}
+
 int sysfs_create_PacketFifo(struct kobject *kobj_ref) {
   if (sysfs_create_file(kobj_ref, &status_attr.attr)) {
     CSMLOGINFO("Unable to create the sysfs file...\n");
@@ -1869,6 +1927,20 @@ int sysfs_create_PacketFifo(struct kobject *kobj_ref) {
   }
 
   return -1;
+}
+
+void sysfs_remove_PacketFifo(struct kobject *kobj_ref) {
+
+	sysfs_remove_file(kobj_ref, &vlanID_attr.attr);
+	sysfs_remove_file(kobj_ref, &OverFlowInterrupt_attr.attr);
+	sysfs_remove_file(kobj_ref, &AddrRange_attr_end.attr);
+	sysfs_remove_file(kobj_ref, &AddrRange_attr_start.attr);
+	sysfs_remove_file(kobj_ref, &txcount_attr.attr);
+	sysfs_remove_file(kobj_ref, &flush_attr.attr);
+	sysfs_remove_file(kobj_ref, &status_attr.attr);
+	kobject_del(kobj_ref);
+	kobject_put(kobj_ref);
+	kobj_ref=NULL;
 }
 
 unsigned int is_delim(char c, char *delim) {

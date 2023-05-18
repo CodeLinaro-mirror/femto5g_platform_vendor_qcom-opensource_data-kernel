@@ -410,6 +410,7 @@
 /** Maximum number of EIP-164 devices supported by the driver. */
 #ifdef DRIVER_MAX_NOF_EIP164_DEVICES
 #define ADAPTER_EIP164_MAX_NOF_DEVICES DRIVER_MAX_NOF_EIP164_DEVICES
+#define ADAPTER_EIP164_MAX_NOF_CHANNEL 32
 #endif
 
 /** Name of the EIP-164 device 0. */

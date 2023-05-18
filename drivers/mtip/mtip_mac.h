@@ -161,8 +161,11 @@ u32 mtip_mac_get_frame_length(u32 port_number, u32 link_number);
 
 void mtip_mac_set_mac_address(struct mtip_netdev_priv* priv, 
                                          struct sockaddr *saddr);
-void mtip_mac_get_mac_address_by_device(u32 port_device_index, u32 link_device_index, uint8_t saddr[]);
-void mtip_mac_set_mac_address_by_device(u32 port_device_index, u32 link_device_index, uint8_t saddr[]);
+//void mtip_mac_get_mac_address_by_device(u32 port_device_index, u32 link_device_index, uint8_t saddr[]);
+//void mtip_mac_set_mac_address_by_device(u32 port_device_index, u32 link_device_index, uint8_t saddr[]);
+
+void mtip_mac_get_mac_address_by_link_index(u32 link_index, uint8_t saddr[]);
+void mtip_mac_set_mac_address_by_link_index(u32 link_index, uint8_t saddr[]);
 
 int mtip_mac_set_promisc_mode(struct mtip_netdev_priv *priv, bool mode);
 void mtip_mac_set_hashtable_entry(struct mtip_netdev_priv *priv, u8 entry_address, u8 val);

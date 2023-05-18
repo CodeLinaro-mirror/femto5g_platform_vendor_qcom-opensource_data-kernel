@@ -165,7 +165,7 @@ MemXS_Device_Info_Get(
     if (DeviceInfo_p == NULL)
         return MEMXS_INVALID_PARAMETER;
 
-    if (DeviceIndex > MemXS_Device_Count)
+    if (DeviceIndex >= MemXS_Device_Count)
         return MEMXS_INVALID_PARAMETER;
 
     DeviceInfo_p->Index    = DeviceIndex;

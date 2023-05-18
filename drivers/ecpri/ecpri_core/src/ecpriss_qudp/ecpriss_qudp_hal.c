@@ -488,6 +488,11 @@ static const char *ecpriss_qudp_hal_reg_name_to_str[ECPRISS_QUDP_REG_MAX+1] = {
 			HWIO_ECPRI_UDP_FH_INGRESS_CONFIG_p_ENABLE_UDP_CS_CHECK_BMSK_V2);
 
 	ECPRISS_HAL_SETFIELD_IN_REG(*val,
+			ingress_config_p->enable_ip_len_check,
+			HWIO_ECPRI_UDP_FH_INGRESS_CONFIG_p_ENABLE_IP_LEN_CHECK_SHFT_V2,
+			HWIO_ECPRI_UDP_FH_INGRESS_CONFIG_p_ENABLE_IP_LEN_CHECK_BMSK_V2);
+
+	ECPRISS_HAL_SETFIELD_IN_REG(*val,
 			ingress_config_p->ipv4_cs_err_action,
 			HWIO_ECPRI_UDP_FH_INGRESS_CONFIG_p_IPV4_CS_ERR_ACTION_SHFT_V2,
 			HWIO_ECPRI_UDP_FH_INGRESS_CONFIG_p_IPV4_CS_ERR_ACTION_BMSK_V2);
@@ -522,6 +527,15 @@ static const char *ecpriss_qudp_hal_reg_name_to_str[ECPRISS_QUDP_REG_MAX+1] = {
 			HWIO_ECPRI_UDP_FH_INGRESS_CONFIG_p_VLAN_FILT_MISS_ACTION_SHFT_V2,
 			HWIO_ECPRI_UDP_FH_INGRESS_CONFIG_p_VLAN_FILT_MISS_ACTION_BMSK_V2);
 
+	ECPRISS_HAL_SETFIELD_IN_REG(*val,
+			ingress_config_p->ip_filt_miss_action,
+			HWIO_ECPRI_UDP_FH_INGRESS_CONFIG_p_IP_FILT_MISS_ACTION_SHFT_V2,
+			HWIO_ECPRI_UDP_FH_INGRESS_CONFIG_p_IP_FILT_MISS_ACTION_BMSK_V2);
+
+	ECPRISS_HAL_SETFIELD_IN_REG(*val,
+			ingress_config_p->enable_mac_dst_check,
+			HWIO_ECPRI_UDP_FH_INGRESS_CONFIG_p_ENABLE_MAC_DST_CHECK_SHFT_V2,
+			HWIO_ECPRI_UDP_FH_INGRESS_CONFIG_p_ENABLE_MAC_DST_CHECK_BMSK_V2);
 
 	ECPRISS_HAL_SETFIELD_IN_REG(*val,
 			ingress_config_p->use_external_not_local_mac_dst,
@@ -674,6 +688,10 @@ static const char *ecpriss_qudp_hal_reg_name_to_str[ECPRISS_QUDP_REG_MAX+1] = {
 			HWIO_ECPRI_UDP_FH_INGRESS_CONFIG_p_ENABLE_UDP_CS_CHECK_SHFT_V2,
 			HWIO_ECPRI_UDP_FH_INGRESS_CONFIG_p_ENABLE_UDP_CS_CHECK_BMSK_V2);
 
+	ingress_config_p->enable_ip_len_check = ECPRISS_HAL_GETFIELD_FROM_REG(val,
+			HWIO_ECPRI_UDP_FH_INGRESS_CONFIG_p_ENABLE_IP_LEN_CHECK_SHFT_V2,
+			HWIO_ECPRI_UDP_FH_INGRESS_CONFIG_p_ENABLE_IP_LEN_CHECK_BMSK_V2);
+
 	ingress_config_p->ipv4_cs_err_action = ECPRISS_HAL_GETFIELD_FROM_REG(val,
 			HWIO_ECPRI_UDP_FH_INGRESS_CONFIG_p_IPV4_CS_ERR_ACTION_SHFT_V2,
 			HWIO_ECPRI_UDP_FH_INGRESS_CONFIG_p_IPV4_CS_ERR_ACTION_BMSK_V2);
@@ -706,6 +724,9 @@ static const char *ecpriss_qudp_hal_reg_name_to_str[ECPRISS_QUDP_REG_MAX+1] = {
 			HWIO_ECPRI_UDP_FH_INGRESS_CONFIG_p_VLAN_FILT_MISS_ACTION_SHFT_V2,
 			HWIO_ECPRI_UDP_FH_INGRESS_CONFIG_p_VLAN_FILT_MISS_ACTION_BMSK_V2);
 
+	ingress_config_p->ip_filt_miss_action = ECPRISS_HAL_GETFIELD_FROM_REG(val,
+			HWIO_ECPRI_UDP_FH_INGRESS_CONFIG_p_IP_FILT_MISS_ACTION_SHFT_V2,
+			HWIO_ECPRI_UDP_FH_INGRESS_CONFIG_p_IP_FILT_MISS_ACTION_BMSK_V2);
 
 	ingress_config_p->use_external_not_local_mac_dst = ECPRISS_HAL_GETFIELD_FROM_REG(val,
 			HWIO_ECPRI_UDP_FH_INGRESS_CONFIG_p_USE_EXTERNAL_NOT_LOCAL_MAC_DST_SHFT_V2,
@@ -5002,76 +5023,76 @@ static struct ecpriss_qudp_hal_reg_obj ecpriss_qudp_hal_reg_objs[ECPRISS_HW_MAX]
 	[ECPRISS_HW_v2_0][ECPRI_UDP_FH_INGRESS_NUM_ETH_UDP_PACKETS_PORT_p_LINK_n_V2] = {
 		ecpriss_qudp_hal_reg_construct_dummy_v2,
 		ecpriss_qudp_hal_reg_parse_dummy_v2,
-		0x09384000, 0x0, 0x120, 0, 0, 0, 0x48},
+		0x09384000, 0x0, 0x48, 0, 0, 0, 0x120},
 	[ECPRISS_HW_v2_0][ECPRI_UDP_FH_INGRESS_FCS_ERR_PACKETS_PORT_p_LINK_n_V2] = {
 		ecpriss_qudp_hal_reg_construct_dummy_v2,
 		ecpriss_qudp_hal_reg_parse_dummy_v2,
-		0x09384000, 0x4, 0x120, 0, 0, 0, 0x48},
+		0x09384000, 0x4, 0x48, 0, 0, 0, 0x120},
 	[ECPRISS_HW_v2_0][ECPRI_UDP_FH_INGRESS_IPV4_CS_ERROR_PACKETS_PORT_p_LINK_n_V2] = {
 		ecpriss_qudp_hal_reg_construct_dummy_v2,
 		ecpriss_qudp_hal_reg_parse_dummy_v2,
-		0x09384000, 0x8, 0x120, 0, 0, 0, 0x48},
+		0x09384000, 0x8, 0x48, 0, 0, 0, 0x120},
 	[ECPRISS_HW_v2_0][ECPRI_UDP_FH_INGRESS_UDP_CS_ERROR_PACKETS_PORT_p_LINK_n_V2] = {
 		ecpriss_qudp_hal_reg_construct_dummy_v2,
 		ecpriss_qudp_hal_reg_parse_dummy_v2,
-		0x09384000, 0xC, 0x120, 0, 0, 0, 0x48},
+		0x09384000, 0xC, 0x48, 0, 0, 0, 0x120},
 	[ECPRISS_HW_v2_0][ECPRI_UDP_FH_INGRESS_IP_FILTERED_PACKETS_PORT_p_LINK_n_V2] = {
 		ecpriss_qudp_hal_reg_construct_dummy_v2,
 		ecpriss_qudp_hal_reg_parse_dummy_v2,
-		0x09384000, 0x10, 0x120, 0, 0, 0, 0x48},
+		0x09384000, 0x10, 0x48, 0, 0, 0, 0x120},
 	[ECPRISS_HW_v2_0][ECPRI_UDP_FH_INGRESS_VLAN_FILTERED_PACKETS_PORT_p_LINK_n_V2] = {
 		ecpriss_qudp_hal_reg_construct_dummy_v2,
 		ecpriss_qudp_hal_reg_parse_dummy_v2,
-		0x09384000, 0x14, 0x120, 0, 0, 0, 0x48},
+		0x09384000, 0x14, 0x48, 0, 0, 0, 0x120},
 	[ECPRISS_HW_v2_0][ECPRI_UDP_FH_INGRESS_SEC_ERR_PACKETS_PORT_p_LINK_n_V2] = {
 		ecpriss_qudp_hal_reg_construct_dummy_v2,
 		ecpriss_qudp_hal_reg_parse_dummy_v2,
-		0x09384000, 0x18, 0x120, 0, 0, 0, 0x48},
+		0x09384000, 0x18, 0x48, 0, 0, 0, 0x120},
 	[ECPRISS_HW_v2_0][ECPRI_UDP_FH_INGRESS_IP_LEN_ERR_PACKETS_PORT_p_LINK_n_V2] = {
 		ecpriss_qudp_hal_reg_construct_dummy_v2,
 		ecpriss_qudp_hal_reg_parse_dummy_v2,
-		0x09384000, 0x1C, 0x120, 0, 0, 0, 0x48},
+		0x09384000, 0x1C, 0x48, 0, 0, 0, 0x120},
 	[ECPRISS_HW_v2_0][ECPRI_UDP_FH_INGRESS_NUM_ETH_ECPRI_PACKETS_PORT_p_LINK_n_V2] = {
 		ecpriss_qudp_hal_reg_construct_dummy_v2,
 		ecpriss_qudp_hal_reg_parse_dummy_v2,
-		0x09384000, 0x20, 0x120, 0, 0, 0, 0x48},
+		0x09384000, 0x20, 0x48, 0, 0, 0, 0x120},
 	[ECPRISS_HW_v2_0][ECPRI_UDP_FH_INGRESS_NUM_ETH_PTP_PACKETS_PORT_p_LINK_n_V2] = {
 		ecpriss_qudp_hal_reg_construct_dummy_v2,
 		ecpriss_qudp_hal_reg_parse_dummy_v2,
-		0x09384000, 0x24, 0x120, 0, 0, 0, 0x48},
+		0x09384000, 0x24, 0x48, 0, 0, 0, 0x120},
 	[ECPRISS_HW_v2_0][ECPRI_UDP_FH_INGRESS_NUM_ETH_OTHER_PACKETS_PORT_p_LINK_n_V2] = {
 		ecpriss_qudp_hal_reg_construct_dummy_v2,
 		ecpriss_qudp_hal_reg_parse_dummy_v2,
-		0x09384000, 0x28, 0x120, 0, 0, 0, 0x48},
+		0x09384000, 0x28, 0x48, 0, 0, 0, 0x120},
 	[ECPRISS_HW_v2_0][ECPRI_UDP_FH_INGRESS_NUM_UDP_ECPRI_OR_NFAPI_PACKETS_PORT_p_LINK_n_V2] = {
 		ecpriss_qudp_hal_reg_construct_dummy_v2,
 		ecpriss_qudp_hal_reg_parse_dummy_v2,
-		0x09384000, 0x2C, 0x120, 0, 0, 0, 0x48},
+		0x09384000, 0x2C, 0x48, 0, 0, 0, 0x120},
 
 	[ECPRISS_HW_v2_0][ECPRI_UDP_FH_INGRESS_NUM_UDP_PTP_PACKETS_PORT_p_LINK_n_V2] = {
 		ecpriss_qudp_hal_reg_construct_dummy_v2,
 		ecpriss_qudp_hal_reg_parse_dummy_v2,
-		0x09384000, 0x30, 0x120, 0, 0, 0, 0x48},
+		0x09384000, 0x30, 0x48, 0, 0, 0, 0x120},
 	[ECPRISS_HW_v2_0][ECPRI_UDP_FH_INGRESS_NUM_UDP_OTHER_PACKETS_PORT_p_LINK_n_V2] = {
 		ecpriss_qudp_hal_reg_construct_dummy_v2,
 		ecpriss_qudp_hal_reg_parse_dummy_v2,
-		0x09384000, 0x34, 0x120, 0, 0, 0, 0x48},
+		0x09384000, 0x34, 0x48, 0, 0, 0, 0x120},
 	[ECPRISS_HW_v2_0][ECPRI_UDP_FH_EGRESS_NUM_UDP_PACKETS_PORT_p_LINK_n_V2] = {
 		ecpriss_qudp_hal_reg_construct_dummy_v2,
 		ecpriss_qudp_hal_reg_parse_dummy_v2,
-		0x09384000, 0x38, 0x120, 0, 0, 0, 0x48},
+		0x09384000, 0x38, 0x48, 0, 0, 0, 0x120},
 	[ECPRISS_HW_v2_0][ECPRI_UDP_FH_EGRESS_NUM_ETH_ONLY_PACKETS_PORT_p_LINK_n_V2] = {
 		ecpriss_qudp_hal_reg_construct_dummy_v2,
 		ecpriss_qudp_hal_reg_parse_dummy_v2,
-		0x09384000, 0x3C, 0x120, 0, 0, 0, 0x48},
+		0x09384000, 0x3C, 0x48, 0, 0, 0, 0x120},
 	[ECPRISS_HW_v2_0][ECPRI_UDP_FH_EGRESS_NUM_BYPASSED_PACKETS_PORT_p_LINK_n_V2] = {
 		ecpriss_qudp_hal_reg_construct_dummy_v2,
 		ecpriss_qudp_hal_reg_parse_dummy_v2,
-		0x09384000, 0x40, 0x120, 0, 0, 0, 0x48},
+		0x09384000, 0x40, 0x48, 0, 0, 0, 0x120},
 	[ECPRISS_HW_v2_0][ECPRI_UDP_FH_EGRESS_MTU_ERR_PACKETS_PORT_p_LINK_n_V2] = {
 		ecpriss_qudp_hal_reg_construct_dummy_v2,
 		ecpriss_qudp_hal_reg_parse_dummy_v2,
-		0x09384000, 0x44, 0x120, 0, 0, 0, 0x48},
+		0x09384000, 0x44, 0x48, 0, 0, 0, 0x120},
 	//L2 Rams
 
 	[ECPRISS_HW_v2_0][ECPRI_UDP_L2_INGRESS_NUM_ETH_UDP_PACKETS_PORT_p_LINK_n_V2] = {
@@ -5291,6 +5312,8 @@ int ecpriss_qudp_global_hal_reg_init(struct device *dev, ecpriss_hw_name_e hw_ve
 		if( ecpriss_qudp_hal_ctx.hw_type == ECPRISS_HW_v1_0){
 			ecpriss_qudp_hal_ctx.qudp_global_phy_base = ECPRISS_QUDP_GLOBAL_REG_BASE;
 		}else {
+			ecpriss_pdata_v2->qudp_ctx_v2->ecpriss_qudp_hal_ctx = &ecpriss_qudp_hal_ctx;
+
 			ecpriss_qudp_hal_ctx.qudp_global_phy_base = ECPRISS_QUDP_GLOBAL_REG_BASE_V2;
 		}
 		ECPRILOGINFO("Mapping  QUDP global HAL reg space : 0x%x\n", ecpriss_qudp_hal_ctx.qudp_global_phy_base);

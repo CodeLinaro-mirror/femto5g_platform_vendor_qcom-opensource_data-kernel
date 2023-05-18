@@ -14,6 +14,8 @@
 #include "mtip_dma.h"
 #include "mtip_client.h"
 #include "mtip_ptp.h"
+#include "mtip_platform.h"
+#include "mtip_phy.h"
 
 static void mtip_workq_handler(struct work_struct *w);
 
@@ -69,7 +71,7 @@ static void mtip_workq_handler(struct work_struct *w)
          break;
       case MTIP_WORKQ_TASK_TX_COMP_CB:
           {
-              run_mtip_tx_comp_cb(work_ptr);
+              //run_mtip_tx_comp_cb(work_ptr);
           }
           break;
       case MTIP_WORKQ_TASK_PROCESS_TIMESTAMP:
@@ -80,6 +82,36 @@ static void mtip_workq_handler(struct work_struct *w)
       case MTIP_WORKQ_TASK_PROCESS_LINK_STATE:
           {
               run_mtip_process_link_state(work_ptr);
+          }
+          break;
+      case MTIP_WORKQ_TASK_PROCESS_LANE_UP:
+          {
+              run_mtip_process_lane_up(work_ptr);
+          }
+          break;
+      case MTIP_WORKQ_TASK_PROCESS_LANE_DOWN:
+          {
+              run_mtip_process_lane_down(work_ptr);
+          }
+          break;
+      case MTIP_WORKQ_TASK_CREATE_PHYLINK:
+          {
+              run_mtip_process_create_phylink(work_ptr);
+          }
+          break;
+      case MTIP_WORKQ_TASK_PROCESS_PORT_CONFIGURATION_USING_LANE:
+          {
+              run_mtip_process_configure_port_using_lane(work_ptr);
+          }
+          break;
+      case MTIP_WORKQ_TASK_PROCESS_PORT_CONFIGURATION_USING_LINK:
+          {
+              run_mtip_process_configure_port_using_link(work_ptr);
+          }
+          break;
+      case MTIP_WORKQ_TASK_PROCESS_AN_RESULT:
+          {
+              run_mtip_process_an_result(work_ptr);
           }
           break;
       default:
@@ -131,7 +163,8 @@ int mtip_initialize_workq(void)
       mtip_workq_list_initialize();
 
       // create the workq
-      mtip_wq = create_workqueue("mtip_workq");
+//      mtip_wq = create_workqueue("mtip_workq");
+      mtip_wq = alloc_workqueue("mtip_workq",  WQ_MEM_RECLAIM | WQ_UNBOUND | WQ_SYSFS | WQ_HIGHPRI, 1);
 
       // HANDLE THE ERROR
       if (mtip_wq == NULL)
@@ -189,6 +222,15 @@ int mtip_workq_list_finalize(void)
    // go through all the packets and pop them
 
    // free the memory allocations
+   unsigned int     work_type;
+   void*            work_ptr;
+   struct mtip_send_ready_task* taskstruct = NULL;
+   while(mtip_workq_list_size())
+   {
+	mtip_workq_list_pop(&work_type, &work_ptr);
+	taskstruct = (struct mtip_send_ready_task*)work_ptr;
+	kfree(taskstruct);
+   }
    return 0;
 }
 

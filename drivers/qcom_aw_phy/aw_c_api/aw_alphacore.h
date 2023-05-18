@@ -108,10 +108,11 @@ typedef struct aw_an_spec_s {
   uint32_t an_def_spec_rate[28];
 
   uint32_t an_def_an_rate;
-
   aw_an_newdef_t newdef1;
   aw_an_newdef_t newdef2;
   aw_an_newdef_t newdef3;
+  aw_an_newdef_t newdef4;
+
 } aw_an_spec_t;
 
 typedef struct aw_lt_status_s {
@@ -227,7 +228,9 @@ typedef struct aw_slicers_s {
 } aw_slicers_t;
 
 typedef struct aw_dsp_param_s {
+
     uint32_t dc_offset;
+
     uint32_t dfe;
     aw_ffe_t ffe;
     aw_ffe_signed_t s_ffe;
@@ -431,10 +434,9 @@ int aw_pmd_anlt_auto_neg_config_set(mss_access_t *mss,
 
 int aw_pmd_anlt_auto_neg_start_set(mss_access_t *mss, uint32_t start);
 
+int aw_pmd_anlt_auto_neg_status_get (mss_access_t *mss, uint32_t * link_good);
 int aw_pmd_anlt_auto_neg_status_complete_get(mss_access_t *mss,
                                              uint32_t *an_complete);
-
-int aw_pmd_anlt_auto_neg_next_page_set(mss_access_t *mss, uint64_t an_tx_np);
 
 int aw_pmd_anlt_auto_neg_next_page_oui_compare_set(mss_access_t *mss,
                                                    uint32_t np_expected_oui);
@@ -486,8 +488,12 @@ int aw_pmd_rx_termination_set(mss_access_t *mss,
 int aw_pmd_force_signal_detect_config_set(mss_access_t *mss,
                                           aw_force_sigdet_mode_t sigdet_mode);
 
+int aw_pmd_txfir_ovr_set(mss_access_t *mss, uint32_t txfir_ovr);
+
 int aw_pmd_txfir_config_set(mss_access_t *mss, aw_txfir_config_t *txfir_cfg,
                             uint32_t fir_ovr_enable);
+
+int aw_pmd_txfir_config_get(mss_access_t *mss, aw_txfir_config_t *txfir_cfg);
 
 int aw_pmd_tx_pam4_precoder_override_set(mss_access_t *mss, uint32_t en);
 
@@ -514,7 +520,8 @@ int aw_pmd_rx_polarity_set(mss_access_t *mss, uint32_t rx_pol_flip);
 
 int aw_pmd_rx_dfe_adapt_set(mss_access_t *mss, uint32_t dfe_adapt_enable);
 
-int aw_pmd_rx_background_adapt_enable_set(mss_access_t *mss, uint32_t rx_background_adapt);
+int aw_pmd_rx_background_adapt_enable_set(mss_access_t *mss,
+                                          uint32_t rx_background_adapt);
 
 int aw_pmd_rxeq_prbs_set(mss_access_t *mss, uint32_t prbs_en);
 
@@ -660,9 +667,6 @@ int aw_pmd_eqeval_incdec_get(mss_access_t *mss, uint32_t *incdec);
 int aw_pmd_rx_equalize(mss_access_t *mss, aw_eq_type_t eq_type,
                        uint32_t timeout_us);
 
-int aw_pmd_rd_data_pipeline_stages_set(mss_access_t *mss, 
-                                       uint32_t stages) ;
-
 typedef enum {
   AW_TB_DCOFFSET = 0,
   AW_TB_TBUS = 1,
@@ -670,6 +674,12 @@ typedef enum {
 } aw_pmd_tracebuffer_mode_t;
 
 int aw_pmd_nep_loopback_set(mss_access_t *mss, uint32_t nep_loopback_enable);
+
+int aw_pmd_rd_data_pipeline_stages_set(mss_access_t *mss, uint32_t stages);
+
+int aw_pmd_rx_cdr_lock_get(mss_access_t *mss, uint32_t *rx_cdr_lock);
+
+int aw_pmd_enable_pam4_mode(mss_access_t *mss, int enable);
 
 int aw_pmd_snr_vld_hys_thresh_set_from_target_snr(mss_access_t *mss,
                                                   uint32_t target_snr_low,
@@ -685,10 +695,8 @@ int aw_pmd_snr_vld_enable_set(mss_access_t *mss, uint32_t vld_enable);
 
 int aw_tc_sm_conv(uint32_t v, uint32_t i);
 
-int aw_pmd_rx_cdr_lock_get(mss_access_t *mss, uint32_t *rx_cdr_lock);
+int aw_pmd_anlt_auto_neg_result_get (mss_access_t *mss, uint8_t no_consortium, uint32_t * an_result);
 
-int aw_pmd_pam4_enable(mss_access_t *mss, uint32_t enable);
-
-int aw_pmd_set_rx_spare(mss_access_t *mss, uint32_t value);
+int aw_pmd_anlt_auto_neg_next_page_set(mss_access_t *mss, uint64_t an_tx_np);
 
 #endif

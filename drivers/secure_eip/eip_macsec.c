@@ -141,30 +141,30 @@ static CfyE_RuleHandle_t CfyE_RuleHandle;
 
 static void dump_txsc(struct macsec_context *ctx)
 {
-	LOG_CRIT("****************** %s********************\n", __func__);
+	LOG_INFO("****************** %s********************\n", __func__);
 	if (ctx->secy == NULL) {
 		LOG_CRIT("ctx->secy NULL, return;");
 		return;
 	}
-	LOG_CRIT(
+	LOG_INFO(
 		"active %d \n encoding sa %d\n encrypt %d \n send_sci %d\n endstation %d \n scb %d \n",
 		ctx->secy->tx_sc.active, ctx->secy->tx_sc.encoding_sa,
 		ctx->secy->tx_sc.encrypt, ctx->secy->tx_sc.send_sci,
 		ctx->secy->tx_sc.end_station, ctx->secy->tx_sc.scb);
-	LOG_CRIT("sa[0] 0x%x\n sa[1] 0x%x\n sa[2] 0x%x\n",
+	LOG_INFO("sa[0] 0x%x\n sa[1] 0x%x\n sa[2] 0x%x\n",
 		 ctx->secy->tx_sc.sa[0], ctx->secy->tx_sc.sa[1],
 		 ctx->secy->tx_sc.sa[2]);
 }
 
 static void dump_rxsc(struct macsec_context *ctx)
 {
-	LOG_CRIT("****************** %s********************\n", __func__);
+	LOG_INFO("****************** %s********************\n", __func__);
 
 	if (ctx->rx_sc == NULL) {
 		LOG_CRIT("ctx->rx_sc is NULL; return;");
 		return;
 	}
-	LOG_CRIT(
+	LOG_INFO(
 		" next ptr 0x%x\n sci 0x%x \n active %d \n sa[0] 0x%x\n, sa[1] 0x%x\n sa[2] 0x%x\n",
 		ctx->rx_sc->next, ctx->rx_sc->sci, ctx->rx_sc->active,
 		ctx->rx_sc->sa[0], ctx->rx_sc->sa[1], ctx->rx_sc->sa[2]);
@@ -172,12 +172,12 @@ static void dump_rxsc(struct macsec_context *ctx)
 
 static void dump_secy(struct macsec_context *ctx)
 {
-	LOG_CRIT("****************** %s********************\n", __func__);
-	LOG_CRIT("AN = %d\n", ctx->sa.assoc_num);
-	LOG_CRIT(" n_rx_sc = %d\n sci = 0x%x\n validate frames = %d\n",
+	LOG_INFO("****************** %s********************\n", __func__);
+	LOG_INFO("AN = %d\n", ctx->sa.assoc_num);
+	LOG_INFO(" n_rx_sc = %d\n sci = 0x%x\n validate frames = %d\n",
 		 ctx->secy->n_rx_sc, ctx->secy->sci,
 		 ctx->secy->validate_frames);
-	LOG_CRIT(
+	LOG_INFO(
 		" xpn %d \n operational = %d\n protect_frames = %d \n replay_protect = %d\n replay_window = %d\n",
 		ctx->secy->xpn, ctx->secy->operational,
 		ctx->secy->protect_frames, ctx->secy->replay_protect,
@@ -189,14 +189,14 @@ static void dump_secy(struct macsec_context *ctx)
 static void dump_rxsa(struct macsec_context *ctx)
 {
 	/* Dump the received RX SA details */
-	LOG_CRIT("****************** %s********************\n", __func__);
+	LOG_INFO("****************** %s********************\n", __func__);
 
-	LOG_CRIT("AN = %d\n", ctx->sa.assoc_num);
+	LOG_INFO("AN = %d\n", ctx->sa.assoc_num);
 	if (ctx->sa.rx_sa == NULL) {
 		LOG_CRIT("ctx->sa.rx_sa is NULL; return ");
 		return;
 	}
-	LOG_CRIT(
+	LOG_INFO(
 		"ssci = %d\n next_pn = %d\n sc ptr 0x%x\n active = %d \n refcnt %d\n",
 		ctx->sa.rx_sa->ssci, ctx->sa.rx_sa->next_pn, ctx->sa.rx_sa->sc,
 		ctx->sa.rx_sa->active, ctx->sa.rx_sa->refcnt);
@@ -204,13 +204,13 @@ static void dump_rxsa(struct macsec_context *ctx)
 
 static void dump_txsa(struct macsec_context *ctx)
 {
-	LOG_CRIT("****************** %s********************\n", __func__);
-	LOG_CRIT("AN = %d\n", ctx->sa.assoc_num);
+	LOG_INFO("****************** %s********************\n", __func__);
+	LOG_INFO("AN = %d\n", ctx->sa.assoc_num);
 	if (ctx->sa.tx_sa == NULL) {
 		LOG_CRIT("ctx->sa.tx_sa is NULL; return ");
 		return;
 	}
-	LOG_CRIT("ssci = %d\n next_pn = %d\n active = %d \n refcnt %d\n",
+	LOG_INFO("ssci = %d\n next_pn = %d\n active = %d \n refcnt %d\n",
 		 ctx->sa.tx_sa->ssci, ctx->sa.tx_sa->next_pn,
 		 ctx->sa.tx_sa->active, ctx->sa.tx_sa->refcnt);
 }
@@ -226,44 +226,44 @@ static void dump_ctx_values(struct macsec_context *ctx, bool dump)
 		return;
 	}
 
-	LOG_CRIT(
+	LOG_INFO(
 		"%s: n_rx_sc = %d \n sci = %lu \n key_len = %d \n icv_len = %d\n",
 		__func__, ctx->secy->n_rx_sc, ctx->secy->sci,
 		ctx->secy->key_len, ctx->secy->icv_len);
-	LOG_CRIT(
+	LOG_INFO(
 		"validate_frames = %d\n xpn=%d \n operational = %d \nprotect_frames=%d\n replay_protect = %d\n",
 		ctx->secy->validate_frames, ctx->secy->xpn,
 		ctx->secy->operational, ctx->secy->protect_frames,
 		ctx->secy->replay_protect);
-	LOG_CRIT(
+	LOG_INFO(
 		"replay_window = %d\n tx_sc->active = %d\n tx_sc->encoding_sa = %d\n tx_sc->encrypt = %d\n tx_sc->send_sci=%d",
 		ctx->secy->replay_window, ctx->secy->tx_sc.active,
 		ctx->secy->tx_sc.encoding_sa, ctx->secy->tx_sc.encrypt,
 		ctx->secy->tx_sc.send_sci);
-	LOG_CRIT("tx_sc->end_station = %d\n", ctx->secy->tx_sc.end_station);
+	LOG_INFO("tx_sc->end_station = %d\n", ctx->secy->tx_sc.end_station);
 
-	LOG_CRIT("ctx->rx_sc =0x%x\n ctx->sa.rx_sa 0x%x\n ctx->sa.tx_sa 0x%x\n",
+	LOG_INFO("ctx->rx_sc =0x%x\n ctx->sa.rx_sa 0x%x\n ctx->sa.tx_sa 0x%x\n",
 		 ctx->rx_sc, ctx->sa.rx_sa, ctx->sa.tx_sa);
 	{
 		uint32_t i = 0;
 
 		for (i = 0; i < 4; ++i) // MAX SA of 4
 		{
-			LOG_CRIT("tx_sc->sa[0]= 0x%x\n ",
+			LOG_INFO("tx_sc->sa[0]= 0x%x\n ",
 				 ctx->secy->tx_sc.sa[i]);
 
 			if (ctx->secy->tx_sc.sa[i] != NULL) {
 				uint8_t j = 0;
 				for (j = 0; j < MACSEC_KEYID_LEN; ++j)
-					LOG_CRIT("Key [j]=%d",
+					LOG_INFO("Key [j]=%d",
 						 ctx->secy->tx_sc.sa[i]
 							 ->key.id[j]);
 			}
 		}
 		if (NULL == ctx->secy->rx_sc) {
-			LOG_CRIT("WPA NULL NULL return rx_Sc ");
+			LOG_INFO("WPA NULL NULL return rx_Sc ");
 		} else {
-			LOG_CRIT(
+			LOG_INFO(
 				"WPA rx_Sc = 0x%x rx_sc->sci =0x%x rx_sc->sa[0]=0x%x rx_sc->sa[1]=0x%x rx_sc->sa[2]=0x%x\n",
 				ctx->secy->rx_sc, ctx->secy->rx_sc->sci,
 				ctx->secy->rx_sc->sa[0],
@@ -380,7 +380,7 @@ void eip_macsec_initalize_priv_data(uint32_t device_id)
 	/* Initialize channel info params to NULL */
 	for (sa = 0; sa < MACSEC_MAX_SA; ++sa) {
 		eip_link_id = MACSEC_GET_LINK_ID(device_id, sa);
-		LOG_CRIT("%d Device's Link id %d", device_id, eip_link_id);
+		LOG_INFO("%d Device's Link id %d", device_id, eip_link_id);
 		ch_info_p = &macsec_priv_data.channel_info[eip_link_id];
 		ch_info_p->CfyE_RuleHandle[sa] = CfyE_RuleHandle_NULL;
 		ch_info_p->SecY_SAHandle[sa] = SecY_SAHandle_NULL;
@@ -398,7 +398,7 @@ static int eip_macsec_config_default_vport(unsigned int device_id,
 {
 	struct macsec_device_info *dev_info_p;
 	u32 port_id;
-	int rc;
+	int rc = 0;
 
 	port_id = GET_PORT_ID_FROM_DEVICE_ID(device_id);
 	if (port_id >= EIP_MAX_PORT) {
@@ -758,11 +758,10 @@ static int eip_macsec_config_sa(bool fIngress, unsigned int device_id,
 static int eip_macsec_add_sa(bool fIngress, unsigned int device_id,
 			     unsigned int Channel, struct macsec_context *ctx)
 {
-	int rc;
+	int rc = 0;
 	CfyE_vPort_t vPortParams;
 	SecY_SA_t *SA_Params;
 	CfyE_Rule_t RuleParams;
-	SecY_Status_t SecY_Rc;
 
 	uint8_t sa_idx = ctx->sa.assoc_num;
 	struct macsec_per_channel_info *ch_info_p =
@@ -804,7 +803,7 @@ static int eip_macsec_add_sa(bool fIngress, unsigned int device_id,
 		CfyE_vPortIndex_Get(CfyE_vPortHandle, &vPortIndex);
 		ch_info_p->vPortIndex = vPortIndex;
 
-		LOG_CRIT(
+		LOG_INFO(
 			"%s: Secy Add handle 0x%xpk vport index %d secy_index %d\n",
 			__func__, ch_info_p->SecY_SAHandle[ctx->sa.assoc_num],
 			ch_info_p->vPort[ctx->sa.assoc_num], ctx->sa.assoc_num);
@@ -840,21 +839,20 @@ static int eip_macsec_add_sa(bool fIngress, unsigned int device_id,
 	/*SA Creation*/
 	if (fIngress) // Ingress
 	{
-		SecY_Rc = SecY_SA_Add(device_id, ch_info_p->vPortIndex,
-				      &SecY_SAHandle, SA_Params);
-		if (SecY_Rc != SECY_STATUS_OK) {
-			eip_logerr("Failed, SecY_SA_Add()=%d\n", SecY_Rc);
+		rc = SecY_SA_Add(device_id, ch_info_p->vPortIndex,
+				 &SecY_SAHandle, SA_Params);
+		if (rc != SECY_STATUS_OK) {
+			eip_logerr("Failed, SecY_SA_Add()=%d\n", rc);
 			goto error_exit;
 		}
 		eip_loginfo(" Ingress SA_ADDED device id = %d", device_id);
 		ch_info_p->active[sa_idx] = ctx->sa.rx_sa->active;
 	} else {
 		if (!ch_info_p->egress_init_flag) {
-			SecY_Rc = SecY_SA_Add(device_id, ch_info_p->vPortIndex,
-					      &SecY_SAHandle, SA_Params);
-			if (SecY_Rc != SECY_STATUS_OK) {
-				eip_logerr("Failed, SecY_SA_Add()=%d\n",
-					   SecY_Rc);
+			rc = SecY_SA_Add(device_id, ch_info_p->vPortIndex,
+					 &SecY_SAHandle, SA_Params);
+			if (rc != SECY_STATUS_OK) {
+				eip_logerr("Failed, SecY_SA_Add()=%d\n", rc);
 				goto error_exit;
 			}
 			ch_info_p->egress_init_flag = 1;
@@ -869,21 +867,20 @@ static int eip_macsec_add_sa(bool fIngress, unsigned int device_id,
 			eip_loginfo("ch_info_p->sa_active_idx = %d",
 				    ch_info_p->sa_active_idx);
 
-			SecY_Rc = SecY_SA_Active_E_Get(device_id,
-						       ch_info_p->vPortIndex,
-						       &Active_SecY_SAHandle);
-			if (SecY_Rc != SECY_STATUS_OK) {
-				eip_logerr("SecY_SA_Active_E_Get()=%d\n",
-					   SecY_Rc);
+			rc = SecY_SA_Active_E_Get(device_id,
+						  ch_info_p->vPortIndex,
+						  &Active_SecY_SAHandle);
+			if (rc != SECY_STATUS_OK) {
+				eip_logerr("SecY_SA_Active_E_Get()=%d\n", rc);
 				goto error_exit;
 			}
 
-			SecY_Rc = SecY_SA_Chain(device_id, Active_SecY_SAHandle,
-						&SecY_SAHandle, SA_Params);
-			if (SecY_Rc != SECY_STATUS_OK) {
+			rc = SecY_SA_Chain(device_id, Active_SecY_SAHandle,
+					   &SecY_SAHandle, SA_Params);
+			if (rc != SECY_STATUS_OK) {
 				LOG_CRIT(
 					"DA_MACSEC: Failed, SecY_SA_Chain()=%d\n",
-					SecY_Rc);
+					rc);
 				goto error_exit;
 			}
 			eip_loginfo("Egress SA_Chained device id = %d\n",
@@ -946,11 +943,11 @@ int eip_device_deinit(bool fIngress, unsigned int device_id)
 
 	for (sa = 0; sa < MACSEC_MAX_SA; sa++) {
 		eip_link_id = MACSEC_GET_LINK_ID(device_id, sa);
-		LOG_CRIT("%d Port id's Link id %d", device_id, eip_link_id);
+		LOG_INFO("%d Port id's Link id %d", device_id, eip_link_id);
 		ch_info_p = &macsec_priv_data.channel_info[eip_link_id];
 		if (!CfyE_RuleHandle_IsSame(ch_info_p->CfyE_RuleHandle[sa],
 					    CfyE_RuleHandle_NULL)) {
-			LOG_CRIT("device id %d CfyE_RuleHandle[%d] = 0x%x",
+			LOG_INFO("device id %d CfyE_RuleHandle[%d] = 0x%x",
 				 device_id, sa, ch_info_p->CfyE_RuleHandle[sa]);
 			CfyE_Rule_Disable(device_id,
 					  ch_info_p->CfyE_RuleHandle[sa], true);
@@ -960,7 +957,7 @@ int eip_device_deinit(bool fIngress, unsigned int device_id)
 		}
 		if (!CfyE_vPortHandle_IsSame(ch_info_p->CfyE_vPortHandle[sa],
 					     CfyE_vPortHandle_NULL)) {
-			LOG_CRIT("device id %d CfyE_vPortHandle[%d] = 0x%x",
+			LOG_INFO("device id %d CfyE_vPortHandle[%d] = 0x%x",
 				 device_id, sa,
 				 ch_info_p->CfyE_vPortHandle[sa]);
 			CfyE_vPort_Remove(device_id,
@@ -969,7 +966,7 @@ int eip_device_deinit(bool fIngress, unsigned int device_id)
 		}
 		if (!SecY_SAHandle_IsSame(&ch_info_p->SecY_SAHandle[sa],
 					  &SecY_SAHandle_NULL)) {
-			LOG_CRIT("device id %d SecY_SAHandle[%d] = 0x%x",
+			LOG_INFO("device id %d SecY_SAHandle[%d] = 0x%x",
 				 device_id, sa, ch_info_p->SecY_SAHandle[sa]);
 			SecY_SA_Remove(device_id, ch_info_p->SecY_SAHandle[sa]);
 			ch_info_p->SecY_SAHandle[sa] = SecY_SAHandle_NULL;
@@ -1548,7 +1545,7 @@ static int eip_mdo_upd_rxsa(struct macsec_context *ctx)
 	struct macsec_per_channel_info *ch_info_p = NULL;
 	SecY_SAHandle_t SAHandles_Ingress[4] = { SecY_SAHandle_NULL };
 	SecY_Status_t SecY_Rc = SECY_STATUS_OK;
-	uint32_t SA_Words[24];
+	uint32_t SA_Words[2] = { 0 };
 	uint8_t i;
 
 	dump_rxsa(ctx);
@@ -1888,7 +1885,7 @@ static int eip_mdo_get_tx_sa_stats(struct macsec_context *ctx)
 	struct macsec_per_channel_info *ch_info_p = NULL;
 	struct eip_macsec_stats egress_stats;
 	SecY_SAHandle_t Active_SecY_SAHandle;
-	uint32_t SA_Words[24];
+	uint32_t SA_Words[2] = { 0 };
 
 	if (ctx->prepare) {
 		return 0;

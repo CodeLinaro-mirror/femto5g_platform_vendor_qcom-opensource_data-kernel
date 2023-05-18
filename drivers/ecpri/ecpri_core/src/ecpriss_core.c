@@ -28,7 +28,7 @@ void ecpriss_dma_events_cb_v2(void *user_data, enum ecpri_dma_event_type);
 void ecpriss_dma_endp_cb(void * user_data);
 void ecpriss_stats_timer_cb(struct timer_list *data);
 void ecpriss_dma_endp_cb_v2(void * user_data);
-
+static int ecpriss_ssr_events_cb(struct notifier_block *this,unsigned long code, void *data);
 
 void ecpriss_eth_events_cb(eth_ecpriss_event_e event_type,
 		eth_ecpriss_link_event_params_s *link_event_params);
@@ -36,7 +36,6 @@ void ecpriss_configure_xbar_flush(ecpriss_port_type_e port_type,ecpriss_port_idx
 void ecpriss_configure_xbar_flush_v2(ecpriss_port_type_e port_type,ecpriss_port_idx_e port_idx,eth_ecpriss_event_e event_type);
 void ecpriss_eth_events_cb_v2(eth_ecpriss_event_e event_type,
 		eth_ecpriss_link_event_params_s *link_event_params);
-
 void ecpriss_dma_ecpri_ss_log_msg_cb(void *user_data, const char *fmt, ...);
 void ecpriss_dma_ecpri_ss_log_msg_cb_v2(void *user_data, const char *fmt, ...);
 
@@ -64,10 +63,9 @@ eth_ecpriss_interface_events_cb           eth_interface_events_cb;
 struct ecpri_dma_ecpri_ss_register_params dma_ready_info;
 eth_ecpriss_link_event_params_s           link_event_params;
 /* ecpriss_stats_s                           stats_g; */
-
+struct ecpriss_ssr_nb ssr_info_g;
 
 /* DEbug Useful Data */
-
 typedef struct {
 
 	int tx_flow_cnt;
@@ -81,6 +79,17 @@ ecpri_flow_cfg gecpri_flow_cfg = {0};
 
 static int ecpriss_core_remove(struct platform_device *pdev)
 {
+	if(ECPRISS_HW_v2_0 == ecpriss_hw_ver){
+		clear_debugfs_directory();
+		dma_ecpri_ss_driver_ops.ecpri_dma_ecpri_ss_deregister();
+		ecpriss_qudp_irq_destroy_v2();
+		ecpriss_xbar_destroy_interrupts_v2();
+		ecpriss_destroy_workq();
+		ecpriss_destroy_timers_v2();
+		ecpriss_destroy_ipc_log_v2();
+		ecpriss_unmap_xbar_qudp_v2();
+		netlink_kernel_release(ecpriss_pdata_v2->netlink_socket);
+	}
 	return 0;
 }
 
@@ -731,6 +740,19 @@ void ecpriss_dma_event_processing_wq(struct work_struct *work)
 	return;
 }
 
+
+void ecpriss_ssr_events_processing_wq(struct work_struct *work)
+{
+	uint32_t val = -1;
+	if(work == NULL) {
+		return;
+	}
+	val = atomic_read(&ecpriss_pdata_v2->ssr_info->curr_ssr_state);
+
+	ecpriss_xbar_oc_flush_enable(val);
+
+	return;
+}
 void ecpriss_interrupt_events_processing_wq(struct work_struct *work)
 {
 	if(work == NULL) {
@@ -756,7 +778,42 @@ void ecpriss_dma_events_cb_v2(void *user_data, enum ecpri_dma_event_type evt)
 }
 
 
+int ecpriss_ssr_events_cb(struct notifier_block *this,unsigned long code, void *data)
+{
+	int ret = 0;
+	struct workqueue_struct *ecpriss_wq = NULL;
+	struct work_struct *ecpriss_work = NULL;
 
+	ECPRILOGINFO("received %ld for %s\n", code,ecpriss_pdata_v2-> ssr_info->ssr_label);
+
+	switch (code) {
+		case QCOM_SSR_AFTER_SHUTDOWN:
+			atomic_set(&ecpriss_pdata_v2->ssr_info->curr_ssr_state,code);
+			break;
+	 	case QCOM_SSR_AFTER_POWERUP:
+			atomic_set(&ecpriss_pdata_v2->ssr_info->curr_ssr_state,code);
+			break;
+		default:
+			return NOTIFY_DONE;
+	}
+
+	do {
+		ecpriss_pdata_v2->callback_flag->ssr_callback_rcvd = 1;
+		ecpriss_wq =
+			ecpriss_pdata_v2->events_workqueue->kernel_events_workqueue;
+		ecpriss_work =
+			ecpriss_pdata_v2->events_workqueue->ecpriss_ssr_events_rdy_work;
+
+		ret = ecpriss_queue_work(ecpriss_wq,ecpriss_work);
+
+		if(ret < 0) {
+			ECPRILOGERR("Queue work failed\n");
+			break;
+		}
+	}while (0);
+
+ 	return NOTIFY_DONE;
+}
 void ecpriss_eth_topology_cb(void)
 {
 	int ret=0;
@@ -807,7 +864,7 @@ void ecpriss_eth_events_cb(eth_ecpriss_event_e event_type,
 	struct workqueue_struct *ecpriss_wq;
 	struct work_struct *ecpriss_work;
 
-	ECPRILOGERR("ecpriss_eth_events_cb event received %d", event_type);
+	ECPRILOGDBG("ecpriss_eth_events_cb event received %d", event_type);
 
 
 	do{
@@ -995,17 +1052,57 @@ void ecpriss_panic_notifr_handler(void)
 	ECPRILOGERR("ecpriss_pdata->xbar_ctx->stats.xbar_dbg_ocrx_2_3_buff_watermark_cc2 : %u ",ecpriss_pdata->xbar_ctx->stats.xbar_dbg_ocrx_2_3_buff_watermark_cc2);
 	ECPRILOGERR("ecpriss_pdata->xbar_ctx->stats.xbar_dbg_ocrx_2_3_buff_watermark_cc3 : %u ",ecpriss_pdata->xbar_ctx->stats.xbar_dbg_ocrx_2_3_buff_watermark_cc3);
 }
+void ecpriss_panic_notifr_handler_v2(void)
+{
+    int i;
+	ECPRILOGERR("ecpriss_hw_ver : %u",ecpriss_hw_ver);
 
+	ECPRILOGERR("ecpriss_pdata_v2->dev_mode : %u",ecpriss_pdata_v2->dev_mode);
+
+	ECPRILOGERR("ecpriss_pdata_v2->callback_flag->eth_link_callback_rcvd  : %u ",ecpriss_pdata_v2->callback_flag->eth_link_callback_rcvd);
+	ECPRILOGERR("ecpriss_pdata_v2->callback_flag->dma_callback_rcvd : %u ",ecpriss_pdata_v2->callback_flag->dma_callback_rcvd);
+	ECPRILOGERR("ecpriss_pdata_v2->callback_flag->ssr_callback_rcvd : %u ",ecpriss_pdata_v2->callback_flag->ssr_callback_rcvd);
+	ECPRILOGERR("ecpriss_pdata_v2->callback_flag->macsec_callback_rcvd : %u ",ecpriss_pdata_v2->callback_flag->macsec_callback_rcvd);
+
+	ECPRILOGERR("ecpriss_pdata_v2->qudp_ctx->state : %u",ecpriss_pdata_v2->qudp_ctx_v2->state);
+	ECPRILOGERR("ecpriss_pdata_v2->xbar_ctx->state : %u",ecpriss_pdata_v2->xbar_ctx_v2->state);
+	ECPRILOGERR("ecpriss_pdata_v2->state : %u",ecpriss_pdata_v2->ecpri_state);
+
+	for(i=0;i<XBAR_LINKS;i++)
+	{
+		ECPRILOGERR("ecpriss_pdata_v2->xbar_ctx->stats.xbar_octx_pkt_cnt[%d]  : %u",i,ecpriss_pdata_v2->xbar_ctx_v2->stats_v2.xbar_octx_pkt_cnt[i]);
+        ECPRILOGERR(" ecpriss_pdata_v2->xbar_ctx->stats.xbar_ocrx_pkt_cnt[%d] : %u",i,ecpriss_pdata_v2->xbar_ctx_v2->stats_v2.xbar_ocrx_pkt_cnt[i]);
+	}
+
+	ECPRILOGERR("ecpriss_pdata_v2->xbar_ctx->stats.xbar_ocrx_fh_buff_watermark_fh0  : %u ",ecpriss_pdata_v2->xbar_ctx_v2->stats_v2.xbar_ocrx_fh_buff_watermark_fh0);
+	ECPRILOGERR("Vecpriss_pdata_v2->xbar_ctx->stats.xbar_ocrx_fh_buff_watermark_fh1 : %u ",ecpriss_pdata_v2->xbar_ctx_v2->stats_v2.xbar_ocrx_fh_buff_watermark_fh1);
+	ECPRILOGERR("ecpriss_pdata_v2->xbar_ctx->stats.xbar_ocrx_fh_buff_watermark_fh2  : %u ",ecpriss_pdata_v2->xbar_ctx_v2->stats_v2.xbar_ocrx_fh_buff_watermark_fh2);
+
+	ECPRILOGERR("ecpriss_pdata_v2->xbar_ctx->stats.octx_oc_0_1_buff_watermark_cc0 : %u ",ecpriss_pdata_v2->xbar_ctx_v2->stats_v2.octx_oc_0_1_buff_watermark_cc0);
+	ECPRILOGERR("ecpriss_pdata_v2->xbar_ctx->stats.octx_oc_0_1_buff_watermark_cc1 : %u ",ecpriss_pdata_v2->xbar_ctx_v2->stats_v2.octx_oc_0_1_buff_watermark_cc1);
+	ECPRILOGERR("ecpriss_pdata_v2->xbar_ctx->stats.octx_oc_2_3_buff_watermark_cc2 : %u ",ecpriss_pdata_v2->xbar_ctx_v2->stats_v2.octx_oc_2_3_buff_watermark_cc2);
+	ECPRILOGERR("ecpriss_pdata_v2->xbar_ctx->stats.octx_oc_2_3_buff_watermark_cc3 : %u ",ecpriss_pdata_v2->xbar_ctx_v2->stats_v2.octx_oc_2_3_buff_watermark_cc3);
+
+	ECPRILOGERR("ecpriss_pdata_v2->xbar_ctx->stats.xbar_dbg_ocrx_0_1_buff_watermark_cc0 : %u ",ecpriss_pdata_v2->xbar_ctx_v2->stats_v2.xbar_dbg_ocrx_0_1_buff_watermark_cc0);
+	ECPRILOGERR("ecpriss_pdata_v2->xbar_ctx->stats.xbar_dbg_ocrx_0_1_buff_watermark_cc1 : %u ",ecpriss_pdata_v2->xbar_ctx_v2->stats_v2.xbar_dbg_ocrx_0_1_buff_watermark_cc1);
+	ECPRILOGERR("ecpriss_pdata_v2->xbar_ctx->stats.xbar_dbg_ocrx_2_3_buff_watermark_cc2 : %u ",ecpriss_pdata_v2->xbar_ctx_v2->stats_v2.xbar_dbg_ocrx_2_3_buff_watermark_cc2);
+	ECPRILOGERR("ecpriss_pdata_v2->xbar_ctx->stats.xbar_dbg_ocrx_2_3_buff_watermark_cc3 : %u ",ecpriss_pdata_v2->xbar_ctx_v2->stats_v2.xbar_dbg_ocrx_2_3_buff_watermark_cc3);
+}
 static int ecpriss_panic_notifier(struct notifier_block *this,unsigned long event, void *ptr)
 {
 	/*Panic Notifier Handler for Ecpriss Module*/
-	ecpriss_panic_notifr_handler();
+	if(ecpriss_hw_ver == ECPRISS_HW_v2_0){
+		ecpriss_panic_notifr_handler_v2();
+	}else {
+		ecpriss_panic_notifr_handler();
+	}
 	return 0;
 }
 static struct notifier_block ecpriss_panic =
 {
   .notifier_call  = ecpriss_panic_notifier,
 };
+
 
 static int ecpriss_core_data_init(void)
 {
@@ -1041,7 +1138,6 @@ static int ecpriss_core_data_init(void)
         if (ecpriss_pdata->ecpriss_core_cfg_logbuf == NULL)
         ECPRILOGERR("failed to create log context for ECPRISS_SS driver\n");
 	/* ecpriss_pdata->stats = &stats_g; */
-
 	eth_topology_ready_cb = &ecpriss_eth_topology_cb;
 	eth_interface_events_cb = &ecpriss_eth_events_cb;
 	do {
@@ -1075,6 +1171,7 @@ static int ecpriss_core_data_init_v2(void)
 	  2. Create the netlink socket
 	  */
 	int ret = 0;
+	int port_index;
 	ecpriss_pdata_v2->dev_mode = (ecpriss_dev_mode_e)ECPRI_HW_FLAVOR_RU;
 	ecpriss_pdata_v2->callback_flag = &callback_flag_g;
 	ecpriss_pdata_v2->ecpri_hw_ver = ecpriss_hw_ver;
@@ -1083,7 +1180,7 @@ static int ecpriss_core_data_init_v2(void)
 	ecpriss_pdata_v2->events_workqueue = &events_workqueue_g;
 	ecpriss_pdata_v2->interrupts_workqueue = &interrupts_workqueue_g;
 	spin_lock_init(&ecpriss_pdata_v2->irq_lock);
-
+	atomic_notifier_chain_register(&panic_notifier_list,&ecpriss_panic);
 	ecpriss_pdata_v2->ecpriss_core_logbuf =
         ipc_log_context_create(ECPRISS_CORE_IPC_LOG_PAGES,
                 "ecpriss_core", 0);
@@ -1094,14 +1191,23 @@ static int ecpriss_core_data_init_v2(void)
         ipc_log_context_create(ECPRISS_CORE_IPC_LOG_PAGES,
                 "ecpriss_core_cfg", 0);
         if (ecpriss_pdata_v2->ecpriss_core_cfg_logbuf == NULL)
-
         ECPRILOGERR("failed to create log context for ECPRISS_SS driver\n");
 	ecpriss_pdata_v2->qudp_ctx_v2 = &qudp_ctx_g_v2;
 	ecpriss_pdata_v2->xbar_ctx_v2 = &xbar_ctx_g_v2;
+
+	for (port_index = 0;port_index < MAX_PORTS;port_index++)
+	{
+	memset(&ecpriss_pdata_v2->xbar_ctx_v2->flow_ctx_v2.fh_xbar_lut[port_index].configured_pcids
+			,-1, sizeof(uint16_t) * ECPRISS_MAX_PCID_ENTRIES);
+
+	memset(&ecpriss_pdata_v2->xbar_ctx_v2->flow_ctx_v2.oc_rx_xbar_lut[port_index].configured_pcids
+			,-1, sizeof(uint16_t) * ECPRISS_MAX_PCID_ENTRIES);
+
+	}
 	ecpriss_pdata_v2->qudp_ctx_v2->ecpriss_qudp_hal_ctx =
 		qudp_ctx_g.ecpriss_qudp_hal_ctx;
 	ecpriss_pdata_v2->xbar_ctx_v2->ecpriss_xbar_hal = xbar_ctx_g_v2.ecpriss_xbar_hal;
-
+	ecpriss_pdata_v2->ssr_info = &ssr_info_g;
 	/* ecpriss_pdata->stats = &stats_g; */
 
 	eth_topology_ready_cb = &ecpriss_eth_topology_cb_v2;
@@ -1203,12 +1309,14 @@ static int ecpriss_core_register_callbacks_v2(void)
 	int ret = 0;
 	bool ready = 0;
 	bool *is_ready = &ready;
+	void * handle;
 
 	do{
 		ret = (mtip_ecpri_ops.eth_ecpriss_register_ready_cb)
 			(eth_topology_ready_cb, is_ready);
 
 		if (ret < 0) {
+			ECPRILOGERR("callback registration for mtip register_ready_cb failed\n");
 			break;
 		}
 
@@ -1216,6 +1324,7 @@ static int ecpriss_core_register_callbacks_v2(void)
 			(eth_interface_events_cb);
 
 		if (ret < 0) {
+			ECPRILOGERR("callback registration for mtip register_events_cb failed\n");
 			break;
 		}
 
@@ -1233,6 +1342,7 @@ static int ecpriss_core_register_callbacks_v2(void)
 		ret = (dma_ecpri_ss_driver_ops.ecpri_dma_ecpri_ss_register)
 			(&dma_ready_info,is_ready);
 		if (ret < 0) {
+			ECPRILOGERR("callback registration for dma dma_ecpri_ss_register failed\n");
 			break;
 		}
 
@@ -1242,9 +1352,24 @@ static int ecpriss_core_register_callbacks_v2(void)
 			ret = ecpriss_dma_endp_config_v2();
 
 			if(ret < 0) {
+				ECPRILOGERR("callback registration for dma dma_callback_rcvd failed\n");
 				break;
 			}
 		}
+		ecpriss_pdata_v2->ssr_info->ssr_label = "ecpriss_core_ssr";
+		ecpriss_pdata_v2->ssr_info->nb.notifier_call = ecpriss_ssr_events_cb;
+
+		handle = qcom_register_ssr_notifier("mpss",&ecpriss_pdata_v2->ssr_info->nb);
+
+		if (IS_ERR_OR_NULL(handle)) {
+			ECPRILOGERR("could not register for SSR notifier for %s\n failed with err %d",
+			ecpriss_pdata_v2->ssr_info->ssr_label,PTR_ERR(handle));
+				break;
+		}
+
+		ECPRILOGINFO("SSR registered successfully for %s\n",ecpriss_pdata_v2->ssr_info->ssr_label);
+		ecpriss_pdata_v2->ssr_info->notifier_handle = handle;
+
 	}while (0);
 	return ret;
 }
@@ -1495,6 +1620,12 @@ int ecpriss_stats_timer_enable_v2(int timeout)
 	}while (0);
 	return ret;
 }
+void ecpriss_destroy_timers_v2(void)
+{
+	if(ecpriss_pdata_v2){
+		del_timer_sync(&ecpriss_pdata_v2->stats_timer_info.stats_timer);
+	}
+}
 
 
 static int ecpriss_core_init(struct platform_device *pdev)
@@ -1584,13 +1715,12 @@ static int ecpriss_core_init_v2(struct platform_device *pdev)
 			break;
 		}
 		memset(ecpriss_pdata_v2,0,sizeof(ecpriss_core_private_s));
-
+		ecpriss_pdata_v2->pdev = pdev;
 		ret = ecpriss_clock_init(&pdev->dev);
 		if(ret < 0) {
 			ECPRILOGERR("Initialization of clock failed\n");
 			break;
 		}
-
 		ret = ecpriss_core_data_init_v2();
 		if(ret < 0) {
 			ECPRILOGERR("Initialization of pdata failed\n");
@@ -1635,10 +1765,11 @@ static int ecpriss_core_probe(struct platform_device *pdev)
 	ecpriss_hw_name_e hw_ver;
 
 	ECPRILOGDBG("ecpriss_core_probe(): Start \n");
+
 	if(pdev == NULL) {
 		ret = -ENOMEM;
+		return ret;
 	}
-
 	hw_ver = ecpriss_core_get_hw_ver(pdev);
 
 	if(hw_ver == ECPRISS_HW_v1_0) {
@@ -1689,23 +1820,42 @@ static int __init ecpriss_core_module_init(void)
 
 static void __exit ecpriss_core_module_exit(void)
 {
-	if(ecpriss_hw_ver == ECPRISS_HW_v1_0){
-		ecpriss_stats_timer_disable();
-		del_timer(&ecpriss_pdata->stats_timer_info.stats_timer);
 
-		if (ecpriss_pdata->netlink_socket) {
-			netlink_kernel_release(ecpriss_pdata->netlink_socket);
-		}
-	}else{
-		ecpriss_stats_timer_disable_v2();
-		del_timer(&ecpriss_pdata_v2->stats_timer_info.stats_timer);
+	pr_err("ecpriss_core_module_exit():Exit \n");
 
-		if (ecpriss_pdata_v2->netlink_socket) {
-			netlink_kernel_release(ecpriss_pdata_v2->netlink_socket);
-		}
+	platform_driver_unregister(&ecpriss_core_driver);
+
+	return;
+}
+void ecpriss_destroy_ipc_log_v2(void)
+{
+	if(ecpriss_pdata_v2){
+		if(ecpriss_pdata_v2->ecpriss_core_logbuf)
+			ipc_log_context_destroy(ecpriss_pdata_v2->ecpriss_core_logbuf);
+
+		if(ecpriss_pdata_v2->ecpriss_core_cfg_logbuf)
+			ipc_log_context_destroy(ecpriss_pdata_v2->ecpriss_core_cfg_logbuf);
 	}
 }
+void ecpriss_unmap_xbar_qudp_v2(void)
+{
+	if(ecpriss_pdata_v2){
 
+		if(ecpriss_pdata_v2->qudp_ctx_v2->ecpriss_qudp_hal_ctx->fh_rams_base)
+			iounmap(ecpriss_pdata_v2->qudp_ctx_v2->ecpriss_qudp_hal_ctx->fh_rams_base);
+		if(ecpriss_pdata_v2->qudp_ctx_v2->ecpriss_qudp_hal_ctx->fh_filter_base)
+			iounmap(ecpriss_pdata_v2->qudp_ctx_v2->ecpriss_qudp_hal_ctx->fh_filter_base);
+		if(ecpriss_pdata_v2->qudp_ctx_v2->ecpriss_qudp_hal_ctx->fh_base)
+			iounmap(ecpriss_pdata_v2->qudp_ctx_v2->ecpriss_qudp_hal_ctx->fh_base);
+		if(ecpriss_pdata_v2->qudp_ctx_v2->ecpriss_qudp_hal_ctx->global_base)
+			iounmap(ecpriss_pdata_v2->qudp_ctx_v2->ecpriss_qudp_hal_ctx->global_base);
+
+		if(ecpriss_pdata_v2->xbar_ctx_v2->ecpriss_xbar_hal->base)
+			iounmap(ecpriss_pdata_v2->xbar_ctx_v2->ecpriss_xbar_hal->base);
+		if(ecpriss_pdata_v2->xbar_ctx_v2->ecpriss_xbar_hal->lut_base)
+			iounmap(ecpriss_pdata_v2->xbar_ctx_v2->ecpriss_xbar_hal->lut_base);
+	}
+}
 #if 0
 void ecpriss_dump_pdata(void)
 {

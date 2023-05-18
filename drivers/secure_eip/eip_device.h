@@ -25,6 +25,8 @@ struct eip_port {
 	struct eip_datapath tx;
 
 	struct mtip_security_device msec_dev;
+
+	struct dentry *dbgfs_dent;
 };
 
 struct eip_channel {
@@ -40,6 +42,8 @@ struct eip_link {
 	struct net_device *ndev;
 	struct eip_channel rx;
 	struct eip_channel tx;
+
+	void *ipsec_priv;
 };
 
 #endif /* _EIP_DEVICE_H_ */

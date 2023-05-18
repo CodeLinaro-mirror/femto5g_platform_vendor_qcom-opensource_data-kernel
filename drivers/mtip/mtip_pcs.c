@@ -605,55 +605,53 @@ void mtip_pcs_reset_all_vl_registers(struct mtip_link_device_info* link_device)
 
 int mtip_pcs_config_pcs(u32 link_index)
 {
-    u32 port_device_index;
-    u32 link_device_index;
     enum mtip_port_config_enum port_config;
+    u32 port_type;
 
-    if (mtip_lookup_device_by_link_index(link_index, &port_device_index, &link_device_index) < 0)
+    if (mtip_lookup_port_type_by_link_index(link_index, &port_type) < 0)
     {
-       CSMLOGERR("unable to find device for link %d", link_index);
-       return -ENODEV;
+        CSMLOGERR("invalid port_type for link_index %d", link_index);
+        return -1;
     }
 
     // configure the PCS of the link
-    CSMLOGDBG("Configuring the PCS for link_index: %d, port_device_index: %d, link_device_index: %d\n", link_index, port_device_index, link_device_index);
+    CSMLOGDBG("Configuring the PCS for link_index: %d, port_type: %d", link_index, port_type);
 
     // reset the PCS
-    mtip_pcs_reset_pcs(&platform_driver_priv->devices.port_devices[port_device_index].link_devices[link_device_index]);
+    mtip_pcs_reset_pcs(&platform_driver_priv->devices.link_devices[link_index]);
 
     // set the default active fec to OFF
     platform_driver_priv->mtip_links[link_index]->active_fec = ETHTOOL_FEC_OFF;
 
     // this is the port configuration
-    port_config = platform_driver_priv->devices.port_devices[port_device_index].port_config;
+    port_config = platform_driver_priv->mtip_ports[port_type]->port_config;
 
     // program the vendor pcs mode register
-    mtip_pcs_set_vendor_pcs_mode(port_config, &platform_driver_priv->devices.port_devices[port_device_index].link_devices[link_device_index]);
+    mtip_pcs_set_vendor_pcs_mode(port_config, &platform_driver_priv->devices.link_devices[link_index]);
 
     // program the vendor vl intvl register
-    mtip_pcs_set_vendor_vl_intvl(port_config, &platform_driver_priv->devices.port_devices[port_device_index].link_devices[link_device_index]);
+    mtip_pcs_set_vendor_vl_intvl(port_config, &platform_driver_priv->devices.link_devices[link_index]);
 
     // program the vendor vl registers
-    mtip_pcs_set_vl_registers(port_config, &platform_driver_priv->devices.port_devices[port_device_index].link_devices[link_device_index]);
+    mtip_pcs_set_vl_registers(port_config, &platform_driver_priv->devices.link_devices[link_index]);
 
     return 0;
 }
 
 int mtip_pcs_enable_loopback(u32 link_index)
 {
-    u32 port_device_index;
-    u32 link_device_index;
+    u32 port_type;
     void __iomem *pcs_ioaddr;
     u32 pcs_control;
 
-    if (mtip_lookup_device_by_link_index(link_index, &port_device_index, &link_device_index) < 0)
+    if (mtip_lookup_port_type_by_link_index(link_index, &port_type) < 0)
     {
-        CSMLOGERR("Unable to find device for link index: %d\n", link_index);
+        CSMLOGERR("invalid port_type for link_index %d", link_index);
         return -1;
     }
 
     // set the loopback bit in the PCS corresponding to the link
-    pcs_ioaddr = platform_driver_priv->devices.port_devices[port_device_index].link_devices[link_device_index].pcs_ioaddr;
+    pcs_ioaddr = platform_driver_priv->devices.link_devices[link_index].pcs_ioaddr;
 
     // read the control register
     pcs_control = (u32)ioread32(pcs_ioaddr + MTIP_PCS_CONTROL_REG_OFFSET);
@@ -669,21 +667,24 @@ int mtip_pcs_enable_loopback(u32 link_index)
     return 0;
 }
 
-
 int mtip_rsfec_initialize(struct mtip_port_device_info *port_device) {
     int i;
     void __iomem *rsfec_base_addr = port_device->rsfec_base_addr;
     u32 rsfec_control_val = 0;
     enum mtip_port_config_enum port_config;
+    u32 port_type = port_device->port_type;
+    struct mtip_port_info* port_info = NULL;
 
-    CSMLOGDBG("Initializing RSFEC for port %d\n", port_device->port_type);
+    CSMLOGDBG("Initializing RSFEC for port %d\n", port_type);
 
     // this is the port configuration
-    port_config = port_device->port_config;
+    port_config = platform_driver_priv->mtip_ports[port_type]->port_config;
+
+    port_info = platform_driver_priv->mtip_ports[port_type];
 
     for (i = 0; i < PHY_LANE_MAX; ++i) 
     {
-        if (port_device->lane_config[i].lane_enabled) 
+        if (port_info->lane_config[i].lane_enabled) 
         {
             // lane is enabled
             switch (port_config) {

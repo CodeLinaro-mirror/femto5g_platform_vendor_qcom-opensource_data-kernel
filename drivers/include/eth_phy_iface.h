@@ -33,6 +33,46 @@ enum mtip_port_type_enum
    MTIP_PORT_TYPE_MAX
 };
 
+/*
+ * mtip_port_config enum 
+ *    These are the set of support PORT configurations 
+ */
+enum mtip_port_config_enum
+{
+   MTIP_PORT_CONFIG_1x100GBASE_R,
+   MTIP_PORT_CONFIG_1x100GBASE_R_RSFEC_LL,
+   MTIP_PORT_CONFIG_1x100GBASE_R_RSFEC,
+   MTIP_PORT_CONFIG_1x100GBASE_R2,
+   MTIP_PORT_CONFIG_1x100GBASE_R2_RSFEC,
+   MTIP_PORT_CONFIG_1x100GBASE_R4,
+   MTIP_PORT_CONFIG_1x100GBASE_R4_RSFEC,
+   MTIP_PORT_CONFIG_2x50GBASE_R,
+   MTIP_PORT_CONFIG_2x50GBASE_R_RSFEC,
+   MTIP_PORT_CONFIG_2x50GBASE_R2,
+   MTIP_PORT_CONFIG_2x50GBASE_R2_FEC,
+   MTIP_PORT_CONFIG_2x50GBASE_R2_LUAI,
+   MTIP_PORT_CONFIG_2x50GBASE_R2_LUAI_FEC,
+   MTIP_PORT_CONFIG_1x50GBASE_R,
+   MTIP_PORT_CONFIG_1x50GBASE_R_RSFEC,
+   MTIP_PORT_CONFIG_1x50GBASE_R2,
+   MTIP_PORT_CONFIG_1x50GBASE_R2_RSFEC,
+   MTIP_PORT_CONFIG_1x50GBASE_R2_LUAI,
+   MTIP_PORT_CONFIG_1x50GBASE_R2_LUAI_FEC,
+   MTIP_PORT_CONFIG_1x40GBASE_R4,
+   MTIP_PORT_CONFIG_1x40GBASE_R4_FEC,
+   MTIP_PORT_CONFIG_4x25GBASE_R,
+   MTIP_PORT_CONFIG_4x25GBASE_R_FEC,
+   MTIP_PORT_CONFIG_4x25GBASE_R_RSFEC,
+   MTIP_PORT_CONFIG_1x25GBASE_R,
+   MTIP_PORT_CONFIG_1x25GBASE_R_FEC,
+   MTIP_PORT_CONFIG_1x25GBASE_R_RSFEC,
+   MTIP_PORT_CONFIG_4x10GBASE_R,
+   MTIP_PORT_CONFIG_4x10GBASE_R_FEC,
+   MTIP_PORT_CONFIG_1x10GBASE_R,
+   MTIP_PORT_CONFIG_1x10GBASE_R_FEC,
+   MTIP_PORT_CONFIG_MAX
+};
+
 /* Enum to identify the lane number within a PHY instance */
 enum eth_phy_iface_phy_lane_num_enum
 {
@@ -63,9 +103,10 @@ struct eth_phy_iface_phy_lane_config
 
 typedef void (*eth_phy_iface_phy_ready_cb)(void *user_data);
 
-typedef void (*eth_phy_iface_an_complete_cb)(
+typedef void (*eth_phy_iface_an_result_cb)(
 	                            enum mtip_port_type_enum port_type,
-	                            enum eth_phy_iface_phy_lane_num_enum lane_num);
+	                            bool an_result,
+	                            enum mtip_port_config_enum port_config);
 
 typedef void (*eth_phy_iface_cdr_lock_ind)(u32 link_index, bool status);
 
@@ -75,8 +116,7 @@ typedef void (*eth_phy_iface_lane_bring_up_progress_ind)(
 /* struct eth_phy_iface_eth_register_params - PHY readiness parameters
  * @notify_ready:   PHY ready callback
  * @userdata_ready: userdata for PHY ready callback
- * @notify_an_complete:   AN complete callback(link fully up,
-                          including LT and PCS)
+ * @notify_an_result:   AN result callback
  * @cdr_lock_ind: CDR lock success/failure indication across PHY lanes
                   mapped to a particular MAC link
  * @lane_bring_up_progress_ind: Indication that at least one of the lanes 
@@ -85,7 +125,7 @@ typedef void (*eth_phy_iface_lane_bring_up_progress_ind)(
 struct eth_phy_iface_eth_register_params {
 	eth_phy_iface_phy_ready_cb                notify_ready;
 	void                                     *userdata_ready;
-	eth_phy_iface_an_complete_cb              notify_an_complete;
+	eth_phy_iface_an_result_cb                notify_an_result;
 	eth_phy_iface_cdr_lock_ind                cdr_lock_ind;
 	eth_phy_iface_lane_bring_up_progress_ind  lane_bring_up_progress_ind;
 };
@@ -101,6 +141,9 @@ struct eth_phy_iface_eth_register_params {
  * @eth_phy_iface_phy_teardown:  Tears down PHY lanes associated with the given
                                  MAC instance
  * @eth_phy_iface_notify_mac_link_status: Indicates MAC link status(up/down)
+ * @eth_phy_iface_initiate_an: Initiate AN at port level with the speed modes
+                               to be advertised for the number of lanes
+                               passed as argument.
  */
 struct eth_phy_iface_ops {
 	int (*eth_phy_iface_eth_register)(
@@ -118,6 +161,9 @@ struct eth_phy_iface_ops {
 	                                     enum mtip_port_type_enum port_type,
 	                                     bool lanes_enabled[PHY_LANE_MAX],
 	                                     bool status);
+	int (*eth_phy_iface_initiate_an)(enum mtip_port_type_enum port_type,
+	                                 int num_lanes,
+	                                 uint32_t port_config_mask);
 };
 
 #endif // _ETH_PHY_IFACE_H

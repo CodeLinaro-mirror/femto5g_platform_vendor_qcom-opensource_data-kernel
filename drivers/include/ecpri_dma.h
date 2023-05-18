@@ -182,7 +182,7 @@ enum ecpri_dma_notify_mode {
  * struct ecpri_dma_moderation_config - DMA Tx endpoint parameters
  *
  * @moderation_counter_threshold: Threshold for moderation counter.
- * @moderation_timer_threshold: Threshold for moderation timer in msec.
+ * @moderation_timer_threshold: Threshold for moderation timer in cycles.
  */
 struct ecpri_dma_moderation_config {
 	u32 moderation_counter_threshold;

@@ -132,7 +132,7 @@ void mtip_dma_rx_comp_cb(void *user_data, ecpri_dma_eth_conn_hdl_t hdl)
    }
    else
    {
-      if (platform_driver_priv->mtip_links[link_index]->state == MTIP_LINK_STATE_OPEN ||
+      if (platform_driver_priv->mtip_links[link_index]->state == MTIP_LINK_STATE_OPEN_DONE ||
           platform_driver_priv->mtip_links[link_index]->state == MTIP_LINK_STATE_UP)
       {
          link = platform_driver_priv->mtip_links[link_index];
@@ -165,13 +165,128 @@ void mtip_dma_rx_comp_cb(void *user_data, ecpri_dma_eth_conn_hdl_t hdl)
    }
 }
 
-// tx completion callback
+int mtip_dma_tx_comp_list_initialize(u32 link_index)
+{
+    struct mtip_tx_comp_list *listptr = &platform_driver_priv->mtip_links[link_index]->tx_comp_list;
+
+   // initialize the head
+    INIT_LIST_HEAD(&listptr->head);
+
+   listptr->count = 0;
+   return 0;
+}
+
+/*nt mtip_dma_tx_comp_list_finalize(u32 link_index)
+{
+   // go through all the packets and pop them
+
+   // free the memory allocations
+   return 0;
+}*/
+
+int mtip_dma_tx_comp_list_size(u32 link_index)
+{
+   int rv;
+   struct mtip_tx_comp_list *listptr = &platform_driver_priv->mtip_links[link_index]->tx_comp_list;
+
+   rv = listptr->count;
+   return rv;
+}
+
+int mtip_dma_tx_comp_list_push(u32 link_index, void *user_data, ecpri_dma_eth_conn_hdl_t hdl,
+                               struct ecpri_dma_pkt_completion_wrapper **comp_pkts,
+                               u32 num_of_completed)
+{
+   int rv = 0;
+   struct mtip_tx_comp_node* node = NULL;
+   struct mtip_tx_comp_list *listptr = &platform_driver_priv->mtip_links[link_index]->tx_comp_list;
+
+   // allocate a workq node
+   node = kmalloc(sizeof(struct mtip_tx_comp_node), GFP_ATOMIC);
+
+   // HANDLE THE ERROR
+   if (node == NULL)
+   {
+      rv = -ENOMEM;
+      goto out;
+   }
+
+   // init the list
+   INIT_LIST_HEAD(&node->list);
+
+   node->tx_comp_params.user_data = user_data;
+   node->tx_comp_params.hdl = hdl;
+   node->tx_comp_params.local_comp_pkts = comp_pkts;
+   node->tx_comp_params.num_of_completed = num_of_completed;
+
+   list_add_tail(&node->list, &listptr->head);
+   ++listptr->count;
+
+   //CSMLOGDBG(" link_index %d hdl %d num_of_completed: %d, counter: %d \n", link_index,hdl, num_of_completed, listptr->count);
+
+out:
+   return rv;
+}
+
+int mtip_dma_tx_comp_list_pop(u32 link_index, struct mtip_dma_tx_comp_params *tx_comp_params)
+{
+   int rv = 0;
+   struct mtip_tx_comp_node* tmp;
+   struct mtip_tx_comp_list *listptr = &platform_driver_priv->mtip_links[link_index]->tx_comp_list;
+
+   rv = mtip_dma_tx_comp_list_size(link_index);
+
+   if (rv <= 0)
+   {
+      return -1;
+   }
+
+   // get the first entry
+   tmp = list_entry(listptr->head.next, struct mtip_tx_comp_node, list);
+
+   if (!list_empty(&listptr->head))
+   {
+      // delete the head
+      list_del(&tmp->list);
+
+      --listptr->count;
+   }
+   else {
+      rv = -1;
+   }
+
+   if (rv == -1)
+   {
+      CSMLOGERR("workq list is empty... mismatch with count\n");
+   }
+   else
+   {
+       tx_comp_params->user_data = tmp->tx_comp_params.user_data;
+       tx_comp_params->hdl = tmp->tx_comp_params.hdl;
+       tx_comp_params->local_comp_pkts = tmp->tx_comp_params.local_comp_pkts;
+       tx_comp_params->num_of_completed = tmp->tx_comp_params.num_of_completed;
+
+      // free the node
+      kfree(tmp);
+   }
+
+   //CSMLOGDBG(" link_index %d num_of_completed: %d, counter: %d \n", link_index, tx_comp_params->num_of_completed, listptr->count);
+
+   return rv;
+}
+
 void mtip_dma_tx_comp_cb(void *user_data, ecpri_dma_eth_conn_hdl_t hdl, struct ecpri_dma_pkt_completion_wrapper **comp_pkts, u32 num_of_completed)
 {
     int i;
     struct ecpri_dma_pkt_completion_wrapper **local_comp_pkts;
+    u32 link_index;
+    struct mtip_link_info* link;
+    struct net_device *netdev;
+    struct mtip_netdev_priv* priv;
+    spinlock_t *lock;
+    unsigned long flags;
 
-    CSMLOGDBG("mtip_dma_tx_comp_cb hdl: %d, num: %d\n", hdl, num_of_completed);
+    //CSMLOGDBG(" hdl: %d, num_of_completed: %d\n", hdl, num_of_completed);
 
     if (num_of_completed == 0)
     {
@@ -181,16 +296,48 @@ void mtip_dma_tx_comp_cb(void *user_data, ecpri_dma_eth_conn_hdl_t hdl, struct e
     // copy the pointers
     local_comp_pkts = (struct ecpri_dma_pkt_completion_wrapper **)kmalloc(num_of_completed * sizeof(struct ecpri_dma_pkt_completion_wrapper *), GFP_ATOMIC);
 
-    for (i = 0; i < num_of_completed; ++i) {
+    for (i = 0; i < num_of_completed; ++i)
+    {
         // allocate teh completion wrapper
-        local_comp_pkts[i] = (struct ecpri_dma_pkt_completion_wrapper *)kmalloc(sizeof(struct ecpri_dma_pkt_completion_wrapper), GFP_ATOMIC);
+        local_comp_pkts[i] = mtip_dma_alloc_completion_wrapper(GFP_ATOMIC);
 
         local_comp_pkts[i]->pkt = comp_pkts[i]->pkt;
         local_comp_pkts[i]->status_code = comp_pkts[i]->status_code;
         local_comp_pkts[i]->comp_code = comp_pkts[i]->comp_code;
     }
 
-    post_mtip_tx_comp_cb(user_data, hdl, local_comp_pkts, num_of_completed);
+    if (mtip_lookup_link_index_by_handle(hdl, &link_index) < 0)
+    {
+      CSMLOGERR("unable to find link_index for handle: %d ..ignoring\n", hdl);
+    }
+    else
+    {
+         mtip_dma_tx_comp_list_push(link_index, user_data, hdl, local_comp_pkts, num_of_completed);
+
+         link = platform_driver_priv->mtip_links[link_index];
+         netdev = link->dev;
+
+         //CSMLOGDBG("napi schedule for hdl: %d, link_index: %d \n", hdl, link_index);
+
+         priv = netdev_priv(netdev);
+         lock = &(priv->lock);
+
+         spin_lock_irqsave(lock, flags);
+
+         // schedule napi
+         if (napi_schedule_prep(&(link->napi_tx)))
+         {
+            __napi_schedule(&(link->napi_tx));
+
+            // set to POLL mode
+            //setmode = ECPRI_DMA_NOTIFY_MODE_POLL;
+
+            // set the rx mode to POLL
+            //mtip_set_rx_mode_immediate(hdl, setmode);
+         }
+
+         spin_unlock_irqrestore(lock, flags);
+    }
 }
 
 // connect pipe
@@ -300,12 +447,12 @@ int mtip_replenish_dma_rx_buffers(struct net_device *netdev, ecpri_dma_eth_conn_
    for (j = 0; j < num_of_buffs; ++j)
    {
       // the dma pkt struct
-      pkts[j] = (struct ecpri_dma_pkt *)kmalloc(sizeof(struct ecpri_dma_pkt), GFP_KERNEL);
+      pkts[j] = mtip_dma_alloc_dma_pkt(GFP_KERNEL);
 
       // the dma mem buffer struct
-      pbuffs = (struct ecpri_dma_mem_buffer **)kmalloc(sizeof(struct ecpri_dma_mem_buffer *), GFP_KERNEL);
+      pbuffs = mtip_dma_alloc_mem_buffer_single_ptr(GFP_KERNEL);
 
-      pbuffs[0] = (struct ecpri_dma_mem_buffer *)kmalloc(sizeof(struct ecpri_dma_mem_buffer), GFP_KERNEL);
+      pbuffs[0] = mtip_dma_alloc_mem_buffer(GFP_KERNEL);
 
       // HANDLE THE ERROR
 
@@ -339,7 +486,7 @@ int mtip_replenish_dma_rx_buffers(struct net_device *netdev, ecpri_dma_eth_conn_
       // free all the allocated memory
    }
 
-   // we can now free the pkts
+   // we can now free the pkts using kfree
    kfree(pkts);
    return 0;
 }
@@ -406,24 +553,29 @@ int mtip_dma_send_packet(struct net_device *netdev, ecpri_dma_eth_conn_hdl_t hdl
    lock = &(priv->lock);
 
    // allocate space to hold dma_pkt pointers
-   pkts = (struct ecpri_dma_pkt**)kmalloc(sizeof(struct ecpri_dma_pkt*), GFP_ATOMIC);
+   pkts = mtip_dma_alloc_dma_pkt_ptr(GFP_ATOMIC);
 
-   pkts[0] = (struct ecpri_dma_pkt *)kmalloc(sizeof(struct ecpri_dma_pkt), GFP_ATOMIC);
+   pkts[0] = mtip_dma_alloc_dma_pkt(GFP_ATOMIC);
 
    if (send_tx_pre_header == true)
    {
        num_buffers = 2;
+       buffs = mtip_dma_alloc_mem_buffer_dual_ptr(GFP_ATOMIC);
+   }
+   else
+   {
+       num_buffers = 1;
+       buffs = mtip_dma_alloc_mem_buffer_single_ptr(GFP_ATOMIC);
    }
 
-   buffs = (struct ecpri_dma_mem_buffer **)kmalloc(num_buffers * sizeof(struct ecpri_dma_mem_buffer*), GFP_ATOMIC);
 
    if (send_tx_pre_header == true)
    {
-       pre_header_buff = (struct ecpri_dma_tx_header *)kmalloc(sizeof(struct ecpri_dma_tx_header), GFP_ATOMIC);
+       pre_header_buff = mtip_dma_alloc_tx_header(GFP_ATOMIC);
        memset(pre_header_buff, 0, sizeof(struct ecpri_dma_tx_header));
 
-       buffs[0] = (struct ecpri_dma_mem_buffer *)kmalloc(sizeof(struct ecpri_dma_mem_buffer), GFP_ATOMIC);
-       buffs[1] = (struct ecpri_dma_mem_buffer *)kmalloc(sizeof(struct ecpri_dma_mem_buffer), GFP_ATOMIC);
+       buffs[0] = mtip_dma_alloc_mem_buffer(GFP_ATOMIC);
+       buffs[1] = mtip_dma_alloc_mem_buffer(GFP_ATOMIC);
 
        // set enable bit (Bit 33) and put time stamp seq num in bit 34:36
        if (send_tx_seq_num == true)
@@ -445,7 +597,7 @@ int mtip_dma_send_packet(struct net_device *netdev, ecpri_dma_eth_conn_hdl_t hdl
    }
    else
    {
-       buffs[0] = (struct ecpri_dma_mem_buffer *)kmalloc(sizeof(struct ecpri_dma_mem_buffer), GFP_ATOMIC);
+       buffs[0] = mtip_dma_alloc_mem_buffer(GFP_ATOMIC);
 
        // update the buffs
        buffs[0]->size = skb->len;
@@ -482,7 +634,7 @@ int mtip_dma_send_packet(struct net_device *netdev, ecpri_dma_eth_conn_hdl_t hdl
    }
 
    // free the container
-   kfree(pkts);
+   mtip_dma_free_dma_pkt_ptr(pkts);
    return res;
 }
 
@@ -732,12 +884,12 @@ out:
         
         for (i = 0; i < num_of_buffers; ++i)
         {
-            kfree(buffs[i]);
+            mtip_dma_free_mem_buffer(buffs[i]);
         }
 
         //CSMLOGINFO(" Pkt free p %d \n", p);
-        kfree(buffs);
-        kfree(pkt);
+        mtip_dma_free_mem_buffer_single_ptr(buffs);
+        mtip_dma_free_dma_pkt(pkt);
     }
 }
  
@@ -818,7 +970,7 @@ int mtip_dma_poll_rx_packets(struct net_device *netdev, struct napi_struct *napi
 
    for (j = 0; j < num_pkt_allocs; ++j) 
    {
-      pkts[j] = (struct ecpri_dma_pkt_completion_wrapper *)kmalloc(sizeof(struct ecpri_dma_pkt_completion_wrapper), GFP_ATOMIC);
+      pkts[j] = mtip_dma_alloc_completion_wrapper(GFP_ATOMIC);
 
        if (pkts[j] == NULL)
        {
@@ -872,8 +1024,11 @@ out1:
    
    for (j = 0; j < num_pkt_allocs; ++j) 
    {
-      kfree(pkts[j]);
+       // free the completion wrappers
+       mtip_dma_free_completion_wrapper(pkts[j]);
    }
+
+   // this is freed using kfree
    kfree(pkts);
 
 out:
@@ -888,3 +1043,384 @@ int mtip_dma_get_ring_state(ecpri_dma_eth_conn_hdl_t hdl, u32* tx_available, u32
     rv = (ecpri_dma_eth_driver_ops.ecpri_dma_eth_rx_ring_state)(hdl, rx_available);
     return rv;
 }
+
+/* COMPLETION WRAPPER */
+static void mtip_dma_alloc_completion_wrapper_ctor(void *arg)
+{
+	struct ecpri_dma_pkt_completion_wrapper* node = arg;
+
+	memset(node, 0, sizeof(struct ecpri_dma_pkt_completion_wrapper));
+}
+
+static int mtip_dma_alloc_completion_wrapper_initialize(void)
+{
+    u32 index = MTIP_DMA_ALLOC_LIST_PKT_COMPLETION_WRAPPER;
+
+    platform_driver_priv->mtip_dma_alloc_array[index].cachep = kmem_cache_create("comp_wrap_node",
+            sizeof(struct ecpri_dma_pkt_completion_wrapper), 0,
+            SLAB_PANIC | SLAB_RECLAIM_ACCOUNT,
+            mtip_dma_alloc_completion_wrapper_ctor);
+    return 0;
+}
+
+int mtip_dma_alloc_completion_wrapper_finalize(void)
+{
+    u32 index = MTIP_DMA_ALLOC_LIST_PKT_COMPLETION_WRAPPER;
+
+    kmem_cache_destroy(platform_driver_priv->mtip_dma_alloc_array[index].cachep);
+    return 0;
+}
+
+struct ecpri_dma_pkt_completion_wrapper* mtip_dma_alloc_completion_wrapper(gfp_t flags)
+{
+    u32 index = MTIP_DMA_ALLOC_LIST_PKT_COMPLETION_WRAPPER;
+    return (struct ecpri_dma_pkt_completion_wrapper*)kmem_cache_alloc(platform_driver_priv->mtip_dma_alloc_array[index].cachep, flags);
+}
+
+void mtip_dma_free_completion_wrapper(struct ecpri_dma_pkt_completion_wrapper* ptr)
+{
+    u32 index = MTIP_DMA_ALLOC_LIST_PKT_COMPLETION_WRAPPER;
+    kmem_cache_free(platform_driver_priv->mtip_dma_alloc_array[index].cachep, (void *)ptr);
+}
+/* COMPLETION WRAPPER */
+
+/* DMA PKT PTR */
+static void mtip_dma_alloc_dma_pkt_ptr_ctor(void *arg)
+{
+	struct ecpri_dma_pkt** node = arg;
+
+	memset(node, 0, sizeof(struct ecpri_dma_pkt*));
+}
+
+static int mtip_dma_alloc_dma_pkt_ptr_initialize(void)
+{
+    u32 index = MTIP_DMA_ALLOC_LIST_PKT_PTR;
+
+    platform_driver_priv->mtip_dma_alloc_array[index].cachep = kmem_cache_create("dma_pkt_ptr_node",
+            sizeof(struct ecpri_dma_pkt*), 0,
+            SLAB_PANIC | SLAB_RECLAIM_ACCOUNT,
+            mtip_dma_alloc_dma_pkt_ptr_ctor);
+    return 0;
+}
+
+int mtip_dma_alloc_dma_pkt_ptr_finalize(void)
+{
+    u32 index = MTIP_DMA_ALLOC_LIST_PKT_PTR;
+
+    kmem_cache_destroy(platform_driver_priv->mtip_dma_alloc_array[index].cachep);
+    return 0;
+}
+
+struct ecpri_dma_pkt** mtip_dma_alloc_dma_pkt_ptr(gfp_t flags)
+{
+    u32 index = MTIP_DMA_ALLOC_LIST_PKT_PTR;
+    return (struct ecpri_dma_pkt**)kmem_cache_alloc(platform_driver_priv->mtip_dma_alloc_array[index].cachep, flags);
+}
+
+void mtip_dma_free_dma_pkt_ptr(struct ecpri_dma_pkt** ptr)
+{    
+    u32 index = MTIP_DMA_ALLOC_LIST_PKT_PTR;
+    kmem_cache_free(platform_driver_priv->mtip_dma_alloc_array[index].cachep, (void *)ptr);
+}
+/* DMA PKT PTR */
+
+/* DMA PKT */
+static void mtip_dma_alloc_dma_pkt_ctor(void *arg)
+{
+	struct ecpri_dma_pkt* node = arg;
+
+	memset(node, 0, sizeof(struct ecpri_dma_pkt));
+}
+
+static int mtip_dma_alloc_dma_pkt_initialize(void)
+{
+    u32 index = MTIP_DMA_ALLOC_LIST_PKT;
+
+    platform_driver_priv->mtip_dma_alloc_array[index].cachep = kmem_cache_create("dma_pkt_node",
+            sizeof(struct ecpri_dma_pkt), 0,
+            SLAB_PANIC | SLAB_RECLAIM_ACCOUNT,
+            mtip_dma_alloc_dma_pkt_ctor);
+    return 0;
+}
+
+int mtip_dma_alloc_dma_pkt_finalize(void)
+{
+    u32 index = MTIP_DMA_ALLOC_LIST_PKT;
+
+    kmem_cache_destroy(platform_driver_priv->mtip_dma_alloc_array[index].cachep);
+    return 0;
+}
+
+struct ecpri_dma_pkt* mtip_dma_alloc_dma_pkt(gfp_t flags)
+{
+    u32 index = MTIP_DMA_ALLOC_LIST_PKT;
+    return (struct ecpri_dma_pkt*)kmem_cache_alloc(platform_driver_priv->mtip_dma_alloc_array[index].cachep, flags);
+}
+
+void mtip_dma_free_dma_pkt(struct ecpri_dma_pkt* ptr)
+{    
+    u32 index = MTIP_DMA_ALLOC_LIST_PKT;
+    kmem_cache_free(platform_driver_priv->mtip_dma_alloc_array[index].cachep, (void *)ptr);
+}
+/* DMA PKT */
+
+/* MEM BUFFER SINGLE PTR */
+static void mtip_dma_alloc_mem_buffer_single_ptr_ctor(void *arg)
+{
+	struct ecpri_dma_mem_buffer** node = arg;
+
+	memset(node, 0, sizeof(struct ecpri_dma_mem_buffer*));
+}
+
+static int mtip_dma_alloc_mem_buffer_single_ptr_initialize(void)
+{
+    u32 index = MTIP_DMA_ALLOC_LIST_MEM_BUFFER_SINGLE_PTR;
+
+    platform_driver_priv->mtip_dma_alloc_array[index].cachep = kmem_cache_create("mbuf_sing_node",
+            sizeof(struct ecpri_dma_mem_buffer*), 0,
+            SLAB_PANIC | SLAB_RECLAIM_ACCOUNT,
+            mtip_dma_alloc_mem_buffer_single_ptr_ctor);
+    return 0;
+}
+
+int mtip_dma_alloc_mem_buffer_single_ptr_finalize(void)
+{
+    u32 index = MTIP_DMA_ALLOC_LIST_MEM_BUFFER_SINGLE_PTR;
+
+    kmem_cache_destroy(platform_driver_priv->mtip_dma_alloc_array[index].cachep);
+    return 0;
+}
+
+struct ecpri_dma_mem_buffer** mtip_dma_alloc_mem_buffer_single_ptr(gfp_t flags)
+{
+    u32 index = MTIP_DMA_ALLOC_LIST_MEM_BUFFER_SINGLE_PTR;
+    return (struct ecpri_dma_mem_buffer**)kmem_cache_alloc(platform_driver_priv->mtip_dma_alloc_array[index].cachep, flags);
+}
+
+void mtip_dma_free_mem_buffer_single_ptr(struct ecpri_dma_mem_buffer** ptr)
+{    
+    u32 index = MTIP_DMA_ALLOC_LIST_MEM_BUFFER_SINGLE_PTR;
+    kmem_cache_free(platform_driver_priv->mtip_dma_alloc_array[index].cachep, (void *)ptr);
+}
+/* MEM BUFFER SINGLE PTR */
+
+/* MEM BUFFER DUAL PTR */
+static void mtip_dma_alloc_mem_buffer_dual_ptr_ctor(void *arg)
+{
+	struct ecpri_dma_mem_buffer** node = arg;
+
+	memset(node, 0, 2*sizeof(struct ecpri_dma_mem_buffer*));
+}
+
+static int mtip_dma_alloc_mem_buffer_dual_ptr_initialize(void)
+{
+    u32 index = MTIP_DMA_ALLOC_LIST_MEM_BUFFER_DUAL_PTR;
+
+    platform_driver_priv->mtip_dma_alloc_array[index].cachep = kmem_cache_create("mbuf_dual_node",
+            2*sizeof(struct ecpri_dma_mem_buffer*), 0,
+            SLAB_PANIC | SLAB_RECLAIM_ACCOUNT,
+            mtip_dma_alloc_mem_buffer_dual_ptr_ctor);
+    return 0;
+}
+
+int mtip_dma_alloc_mem_buffer_dual_ptr_finalize(void)
+{
+    u32 index = MTIP_DMA_ALLOC_LIST_MEM_BUFFER_DUAL_PTR;
+
+    kmem_cache_destroy(platform_driver_priv->mtip_dma_alloc_array[index].cachep);
+    return 0;
+}
+
+struct ecpri_dma_mem_buffer** mtip_dma_alloc_mem_buffer_dual_ptr(gfp_t flags)
+{
+    u32 index = MTIP_DMA_ALLOC_LIST_MEM_BUFFER_DUAL_PTR;
+    return (struct ecpri_dma_mem_buffer**)kmem_cache_alloc(platform_driver_priv->mtip_dma_alloc_array[index].cachep, flags);
+}
+
+void mtip_dma_free_mem_buffer_dual_ptr(struct ecpri_dma_mem_buffer** ptr)
+{    
+    u32 index = MTIP_DMA_ALLOC_LIST_MEM_BUFFER_DUAL_PTR;
+    kmem_cache_free(platform_driver_priv->mtip_dma_alloc_array[index].cachep, (void *)ptr);
+}
+/* MEM BUFFER DUAL PTR */
+
+/* MEM BUFFER */
+static void mtip_dma_alloc_mem_buffer_ctor(void *arg)
+{
+	struct ecpri_dma_mem_buffer* node = arg;
+
+	memset(node, 0, sizeof(struct ecpri_dma_mem_buffer));
+}
+
+static int mtip_dma_alloc_mem_buffer_initialize(void)
+{
+    u32 index = MTIP_DMA_ALLOC_LIST_MEM_BUFFER;
+
+    platform_driver_priv->mtip_dma_alloc_array[index].cachep = kmem_cache_create("mem_buf_node",
+            sizeof(struct ecpri_dma_mem_buffer), 0,
+            SLAB_PANIC | SLAB_RECLAIM_ACCOUNT,
+            mtip_dma_alloc_mem_buffer_ctor);
+    return 0;
+}
+
+int mtip_dma_alloc_mem_buffer_finalize(void)
+{
+    u32 index = MTIP_DMA_ALLOC_LIST_MEM_BUFFER;
+
+    kmem_cache_destroy(platform_driver_priv->mtip_dma_alloc_array[index].cachep);
+    return 0;
+}
+
+struct ecpri_dma_mem_buffer* mtip_dma_alloc_mem_buffer(gfp_t flags)
+{
+    u32 index = MTIP_DMA_ALLOC_LIST_MEM_BUFFER;
+    return (struct ecpri_dma_mem_buffer*)kmem_cache_alloc(platform_driver_priv->mtip_dma_alloc_array[index].cachep, flags);
+}
+
+void mtip_dma_free_mem_buffer(struct ecpri_dma_mem_buffer* ptr)
+{    
+    u32 index = MTIP_DMA_ALLOC_LIST_MEM_BUFFER;
+    kmem_cache_free(platform_driver_priv->mtip_dma_alloc_array[index].cachep, (void *)ptr);
+}
+/* MEM BUFFER */
+
+/* TX HEADER */
+static void mtip_dma_alloc_tx_header_ctor(void *arg)
+{
+	struct ecpri_dma_tx_header* node = arg;
+
+	memset(node, 0, sizeof(struct ecpri_dma_tx_header));
+}
+
+static int mtip_dma_alloc_tx_header_initialize(void)
+{
+    u32 index = MTIP_DMA_ALLOC_LIST_TX_HEADER;
+
+    platform_driver_priv->mtip_dma_alloc_array[index].cachep = kmem_cache_create("tx_hdr_node",
+            sizeof(struct ecpri_dma_tx_header), 0,
+            SLAB_PANIC | SLAB_RECLAIM_ACCOUNT,
+            mtip_dma_alloc_tx_header_ctor);
+    return 0;
+}
+
+int mtip_dma_alloc_tx_header_finalize(void)
+{
+    u32 index = MTIP_DMA_ALLOC_LIST_TX_HEADER;
+
+    kmem_cache_destroy(platform_driver_priv->mtip_dma_alloc_array[index].cachep);
+    return 0;
+}
+
+struct ecpri_dma_tx_header* mtip_dma_alloc_tx_header(gfp_t flags)
+{
+    u32 index = MTIP_DMA_ALLOC_LIST_TX_HEADER;
+    return (struct ecpri_dma_tx_header*)kmem_cache_alloc(platform_driver_priv->mtip_dma_alloc_array[index].cachep, flags);
+}
+
+void mtip_dma_free_tx_header(struct ecpri_dma_tx_header* ptr)
+{    
+    u32 index = MTIP_DMA_ALLOC_LIST_TX_HEADER;
+    kmem_cache_free(platform_driver_priv->mtip_dma_alloc_array[index].cachep, (void *)ptr);
+}
+/* TX HEADER */
+
+int mtip_dma_alloc_initialize(u32 index)
+{
+    int rv;
+
+    switch (index) 
+    {
+    case MTIP_DMA_ALLOC_LIST_PKT_COMPLETION_WRAPPER:
+        {
+            rv = mtip_dma_alloc_completion_wrapper_initialize();
+        }
+        break;
+    case MTIP_DMA_ALLOC_LIST_PKT_PTR:
+        {
+            rv = mtip_dma_alloc_dma_pkt_ptr_initialize();
+        }
+        break;
+    case MTIP_DMA_ALLOC_LIST_PKT:
+        {
+            rv = mtip_dma_alloc_dma_pkt_initialize();
+        }
+        break;
+    case MTIP_DMA_ALLOC_LIST_MEM_BUFFER_SINGLE_PTR:
+        {
+            rv = mtip_dma_alloc_mem_buffer_single_ptr_initialize();
+        }
+        break;
+    case MTIP_DMA_ALLOC_LIST_MEM_BUFFER_DUAL_PTR:
+        {
+            rv = mtip_dma_alloc_mem_buffer_dual_ptr_initialize();
+        }
+        break;
+    case MTIP_DMA_ALLOC_LIST_MEM_BUFFER:
+        {
+            rv = mtip_dma_alloc_mem_buffer_initialize();
+        }
+        break;
+    case MTIP_DMA_ALLOC_LIST_TX_HEADER:
+        {
+            rv = mtip_dma_alloc_tx_header_initialize();
+        }
+        break;
+    default:
+        {
+            rv = -1;
+        }
+        break;
+    }
+    return rv;
+}
+
+int mtip_dma_alloc_finalize(u32 index)
+{
+    int rv;
+
+    switch (index) 
+    {
+    case MTIP_DMA_ALLOC_LIST_PKT_COMPLETION_WRAPPER:
+        {
+            rv = mtip_dma_alloc_completion_wrapper_finalize();
+        }
+        break;
+    case MTIP_DMA_ALLOC_LIST_PKT_PTR:
+        {
+            rv = mtip_dma_alloc_dma_pkt_ptr_finalize();
+        }
+        break;
+    case MTIP_DMA_ALLOC_LIST_PKT:
+        {
+            rv = mtip_dma_alloc_dma_pkt_finalize();
+        }
+        break;
+    case MTIP_DMA_ALLOC_LIST_MEM_BUFFER_SINGLE_PTR:
+        {
+            rv = mtip_dma_alloc_mem_buffer_single_ptr_finalize();
+        }
+        break;
+    case MTIP_DMA_ALLOC_LIST_MEM_BUFFER_DUAL_PTR:
+        {
+            rv = mtip_dma_alloc_mem_buffer_dual_ptr_finalize();
+        }
+        break;
+    case MTIP_DMA_ALLOC_LIST_MEM_BUFFER:
+        {
+            rv = mtip_dma_alloc_mem_buffer_finalize();
+        }
+        break;
+    case MTIP_DMA_ALLOC_LIST_TX_HEADER:
+        {
+            rv = mtip_dma_alloc_tx_header_finalize();
+        }
+        break;
+    default:
+        {
+            rv = -1;
+        }
+        break;
+    }
+    return rv;
+}
+

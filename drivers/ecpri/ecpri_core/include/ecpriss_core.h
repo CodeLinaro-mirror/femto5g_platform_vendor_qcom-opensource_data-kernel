@@ -23,6 +23,9 @@
 #include <linux/fs.h>
 #include <linux/interrupt.h>
 #include <linux/clk.h>
+#include <linux/notifier.h>
+#include <soc/qcom/subsystem_notif.h>
+#include <linux/remoteproc/qcom_rproc.h>
 #include "ecpri_dma_ecpri_ss.h"
 #include "eth_ecpriss_iface.h"
 #include "ecpriss_xbar.h"
@@ -122,6 +125,7 @@ typedef struct ecpri_kernel_events_workqueue_params
 	struct work_struct          *ecpriss_eth_events_rdy_work;
 	struct work_struct          *ecpriss_dma_events_rdy_work;
 	struct work_struct          *ecpriss_eth_topology_events_rdy_work;
+	struct work_struct          *ecpriss_ssr_events_rdy_work;
 	struct workqueue_struct     *kernel_events_workqueue;
 }ecpri_events_workqueue_params_s;
 
@@ -152,6 +156,12 @@ typedef struct ecpri_stats_timer_params
 	uint8_t stats_timer_running;
 }ecpri_stats_timer_params_s;
 
+struct ecpriss_ssr_nb {
+	const char *ssr_label;
+	void *notifier_handle;
+	struct notifier_block nb;
+	atomic_t curr_ssr_state;
+};
 
 /**
  * struct ecpri_dma_endp_cfg - DMA endpoint configurations
@@ -205,6 +215,8 @@ typedef struct ecpriss_core_private_s_v2 {
 	ecpriss_config_stats_s_v2             cfg_stats_v2;
 	ecpri_stats_timer_params_s            stats_timer_info;
 	ecpriss_hw_name_e                     ecpri_hw_ver;
+	struct ecpriss_ssr_nb		     *ssr_info;
+	struct platform_device		     *pdev;
 	struct mutex                          ecpriss_mutex_lock;
 	spinlock_t                            irq_lock;
 } ecpriss_core_private_s_v2;
@@ -217,6 +229,7 @@ extern ecpriss_qudp_ctx_s     qudp_ctx_g;
 extern ecpriss_hw_name_e      ecpriss_hw_ver;
 
 void ecpriss_eth_event_processing_wq(struct work_struct *work);
+void ecpriss_ssr_events_processing_wq(struct work_struct *work);
 void ecpriss_dma_event_processing_wq(struct work_struct *work);
 void ecpriss_eth_topology_init_wq(struct work_struct *work);
 void ecpriss_interrupt_events_processing_wq(struct work_struct *work);
@@ -228,4 +241,10 @@ void ecpriss_update_all_stats(void);
 void ecpriss_update_all_stats_v2(void);
 void ecpriss_core_set_stats_timeout_info(int val);
 int ecpriss_core_get_stats_timeout_info(void);
+
+void clear_debugfs_directory(void);
+void ecpriss_destroy_timers_v2(void);
+void ecpriss_destroy_ipc_log_v2(void);
+void ecpriss_unmap_xbar_qudp_v2(void);
+void ecpriss_xbar_oc_flush_enable(uint32_t code);
 #endif

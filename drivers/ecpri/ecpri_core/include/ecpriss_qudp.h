@@ -88,7 +88,16 @@ typedef struct ecpriss_qudp_egress_port_cfg
 typedef struct ecpriss_qudp_egress_port_cfg_v2
 {
 	uint32_t	num_l2_tbl_entries;
+	bool		l2_tbl_valid_entry[NUM_EGRESS_ENTRY];
 	uint32_t	num_l3_tbl_entries;
+	bool		l3_tbl_valid_entry[NUM_EGRESS_ENTRY];
+	ecpri_qudp_hwio_def_ecpri_udp_fh_egress_udp_ports_port_p_entry_n_s_v2 udp_ports[NUM_EGRESS_ENTRY];
+	ecpri_qudp_hwio_def_ecpri_udp_fh_egress_vlan_ethertype_port_p_entry_n_s_v2  vlan_ethertype[NUM_EGRESS_ENTRY];
+	ecpri_qudp_hwio_def_ecpri_udp_fh_egress_eth_dst0_port_p_entry_n_s_v2 eth_dst0_port[NUM_EGRESS_ENTRY];
+        ecpri_qudp_hwio_def_ecpri_udp_fh_egress_eth_src1_dst1_port_p_entry_n_s_v2 eth_src1_dst1_port[NUM_EGRESS_ENTRY];
+        ecpri_qudp_hwio_def_ecpri_udp_fh_egress_eth_src0_port_p_entry_n_s_v2 eth_src0_port[NUM_EGRESS_ENTRY];
+	ecpriss_dst_ip_addr_cfg_s_v2 dst_ip_addr[NUM_EGRESS_ENTRY];
+	ecpriss_src_ip_addr_cfg_s_v2 src_ip_addr[NUM_EGRESS_ENTRY];
 	ecpri_qudp_hwio_def_ecpri_udp_fh_egress_eth_mtu_p_s_v2 egress_eth_mtu;
 	ecpri_qudp_hwio_def_ecpri_udp_fh_egress_config_p_s_v2 fh_egress_config;
 }ecpriss_qudp_egress_per_port_cfg_s_v2;
@@ -116,7 +125,8 @@ typedef struct ecpriss_qudp_interrupt_cfg
 }ecpriss_qudp_interrupt_cfg_s;
 typedef struct ecpriss_qudp_interrupt_cfg_v2
 {
-	//place holder
+	ecpri_qudp_hwio_def_ecpri_udp_fh_udp_sw_irq_status_0_port_p_s_v2 fh_udp_sw_irq_status_0_port_p;
+	ecpri_qudp_hwio_def_ecpri_udp_fh_udp_sw_irq_status_1_port_p_s_v2 fh_udp_sw_irq_status_1_port_p;
 }ecpriss_qudp_interrupt_cfg_s_v2;
 
 
@@ -354,4 +364,5 @@ void ecpriss_qudp_clear_stats(uint32_t port_index,
 void ecpriss_qudp_set_ecpriss_filt_enable_info(int val);
 int ecpriss_qudp_get_ecpriss_filt_enable_info(void);
 void ecpriss_qudp_non_ecpri_dma_ring_info(void) ;
+void ecpriss_qudp_irq_destroy_v2(void);
 #endif

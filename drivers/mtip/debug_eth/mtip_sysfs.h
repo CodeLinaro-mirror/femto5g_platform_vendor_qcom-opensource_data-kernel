@@ -110,6 +110,7 @@
 #define FLUSH_DONE_PACKET 0x101C00
 #define FLUSH_DONE_STREAM 0x10001F
 #define MAXIMUM_PACKET_SIZE 1500
+#define MINIMUM_PACKET_SIZE 32
 #define BYTE_PER_WATERMARK_UNIT 32
 #define VLAN_TAG_ENABLED_BIT 16
 #define MAX_FIFO_COUNT 8
@@ -190,6 +191,7 @@ void setup_diag_vlanID(u_int8_t fifo_num, u_int16_t vlanID);
 mtip_debug_eth_gnl_params get_diag_result(u_int8_t fifo_num);
 
 int setup_sysfs(void __iomem *addr, struct device *dev);
+void del_sysfs(void);
 void setup_AXI_Address_Range(int index);
 void setup_StreamingFIFO(int index);
 ssize_t sysfs_show_enabled(struct kobject *kobj, struct kobj_attribute *attr,
@@ -249,5 +251,10 @@ int sysfs_create_L2headers(struct kobject *kobj_ref);
 int sysfs_create_L3headers(struct kobject *kobj_ref);
 int sysfs_create_StreamingFifo(struct kobject *kobj_ref);
 int sysfs_create_PacketFifo(struct kobject *kobj_ref);
+void sysfs_remove_generic_dir_structure(struct kobject *kobj_ref);
+void sysfs_remove_L2headers(struct kobject *kobj_ref);
+void sysfs_remove_L3headers(struct kobject *kobj_ref);
+void sysfs_remove_StreamingFifo(struct kobject *kobj_ref);
+void sysfs_remove_PacketFifo(struct kobject *kobj_ref);
 unsigned int is_delim(char c, char *delim);
 char *mtip_sysfs_strtok(char *srcString, char *delim);

@@ -80,30 +80,30 @@ static const char* const mtip_ethtool_priv_flags_str_arr[] = {
     "1x100GBASE_R2_RSFEC",
     "1x100GBASE_R4",
     "1x100GBASE_R4_RSFEC",
-    "1x50GBASE_R",
-    "1x50GBASE_R_RSFEC",
     "2x50GBASE_R",
     "2x50GBASE_R_RSFEC",
-    "1x50GBASE_R2",
-    "1x50GBASE_R2_RSFEC",
-    "1x50GBASE_R2_LUAI",
-    "1x50GBASE_R2_LUAI_FEC",
     "2x50GBASE_R2",
     "2x50GBASE_R2_FEC",
     "2x50GBASE_R2_LUAI",
     "2x50GBASE_R2_LUAI_FEC",
+    "1x50GBASE_R",
+    "1x50GBASE_R_RSFEC",
+    "1x50GBASE_R2",
+    "1x50GBASE_R2_RSFEC",
+    "1x50GBASE_R2_LUAI",
+    "1x50GBASE_R2_LUAI_FEC",
     "1x40GBASE_R4",
     "1x40GBASE_R4_FEC",
-    "1x25GBASE_R",
-    "1x25GBASE_R_FEC",
     "4x25GBASE_R",
     "4x25GBASE_R_FEC",
-    "1x25GBASE_R_RSFEC",
     "4x25GBASE_R_RSFEC",
-    "1x10GBASE_R",
-    "1x10GBASE_R_FEC",
+    "1x25GBASE_R",
+    "1x25GBASE_R_FEC",
+    "1x25GBASE_R_RSFEC",
     "4x10GBASE_R",
     "4x10GBASE_R_FEC",
+    "1x10GBASE_R",
+    "1x10GBASE_R_FEC",
 };
 
 #define MTIP_ETHTOOL_REG_OFFSET_ARRAY_SIZE 14
@@ -151,7 +151,7 @@ const char* mtip_ethtool_get_priv_flags_str(u32 index)
     return mtip_ethtool_priv_flags_str_arr[index];
 }
 
-static int mtip_get_sset_count(struct net_device *netdev, int sset)
+static int mtip_ethtool_get_sset_count(struct net_device *netdev, int sset)
 {
     CSMLOGDBG("ethtool: get_sset_count %d, %d\n", sset, MTIP_ETHTOOL_STATS_LEN);
 
@@ -165,7 +165,7 @@ static int mtip_get_sset_count(struct net_device *netdev, int sset)
 	}
 }
 
-static void mtip_get_strings(struct net_device *netdev, u32 stringset, u8 *data)
+static void mtip_ethtool_get_strings(struct net_device *netdev, u32 stringset, u8 *data)
 {
     int i;
     CSMLOGDBG("ethtool: get_strings stringset %d, %d\n", stringset, MTIP_ETHTOOL_STATS_LEN);
@@ -198,13 +198,16 @@ static void mtip_ethtool_get_stats(struct net_device *netdev, struct ethtool_sta
     mtip_macstats_get_stats(netdev, data);
 }
 
-int mtip_check_if_running(struct net_device *dev)
+bool mtip_check_if_running(struct net_device *dev)
 {
+    bool rv = false;
     CSMLOGDBG("ethtool: check_if_running\n");
 
-	if (!netif_running(dev))
-		return -EBUSY;
-	return 0;
+	if (netif_running(dev))
+    {
+        rv = true;
+    }
+    return rv;
 }
 
 void mtip_ethtool_get_dev_regs
@@ -240,56 +243,55 @@ void mtip_ethtool_get_dev_regs
 static void mtip_ethtool_dump_regs(u32 link_index, void *buf)
 {
     u32 wr_idx = 0;
-    u32 port_device_index;
-    u32 link_device_index;
     struct mtip_link_device_info* link_device;
     struct resource *dev_resource;
     u32 mtip_reg_idx = 0;
+    u32 port_type;
 
     struct platform_device* pdev;
     void __iomem *dev_ioaddr;
 
     CSMLOGINFO("mtip_ethtool: Entering mtip_ethtool_dump_regs with link_idx %d \n", link_index);
 
-    if (mtip_lookup_device_by_link_index(link_index, &port_device_index, &link_device_index) < 0)
+    link_device = &platform_driver_priv->devices.link_devices[link_index];
+
+    if (mtip_lookup_port_type_by_link_index(link_index, &port_type) < 0)
     {
-       CSMLOGERR("mtip_ethtool: unable to find device for link %d", link_index);
-       return;
+        CSMLOGERR("invalid port_type for link_index %d", link_index);
+        return;
     }
 
-    link_device = &platform_driver_priv->devices.port_devices[port_device_index].link_devices[link_device_index];
-    
-    for (mtip_reg_idx = 0; mtip_reg_idx < MTIP_ETHTOOL_REG_OFFSET_ARRAY_SIZE; mtip_reg_idx++)
+    for (mtip_reg_idx = MTIP_ETHTOOL_MAC; mtip_reg_idx < MTIP_ETHTOOL_REG_MAX; mtip_reg_idx++)
     {
         switch (mtip_ethtool_reg_offset_val[mtip_reg_idx].mtip_ethtool_regs)
         {
             case MTIP_ETHTOOL_MAC:
                 dev_ioaddr = link_device->mac_ioaddr;
-                pdev = platform_driver_priv->devices.port_devices[port_device_index].link_devices[link_device_index].link_pdev;
+                pdev = platform_driver_priv->devices.link_devices[link_index].link_pdev;
                 dev_resource = platform_get_resource_byname(pdev, IORESOURCE_MEM, "mac");
             break;
 
             case MTIP_ETHTOOL_PCS:
                 dev_ioaddr = link_device->pcs_ioaddr;
-                pdev = platform_driver_priv->devices.port_devices[port_device_index].link_devices[link_device_index].link_pdev;
+                pdev = platform_driver_priv->devices.link_devices[link_index].link_pdev;
                 dev_resource = platform_get_resource_byname(pdev, IORESOURCE_MEM, "pcs");
             break;
 
             case MTIP_ETHTOOL_MAC_WRAPPER:
-                dev_ioaddr = platform_driver_priv->devices.port_devices[port_device_index].wrapper_base_addr;
-                pdev = platform_driver_priv->devices.port_devices[port_device_index].port_pdev;
+                dev_ioaddr = platform_driver_priv->devices.port_devices[port_type].wrapper_base_addr;
+                pdev = platform_driver_priv->devices.port_devices[port_type].port_pdev;
                 dev_resource = platform_get_resource_byname(pdev, IORESOURCE_MEM, "mac-wrapper");
             break;
 
             case MTIP_ETHTOOL_MAC_STATS:
-                dev_ioaddr = platform_driver_priv->devices.port_devices[port_device_index].macstats_base_addr;
-                pdev = platform_driver_priv->devices.port_devices[port_device_index].port_pdev;
+                dev_ioaddr = platform_driver_priv->devices.port_devices[port_type].macstats_base_addr;
+                pdev = platform_driver_priv->devices.port_devices[port_type].port_pdev;
                 dev_resource = platform_get_resource_byname(pdev, IORESOURCE_MEM, "macstats");
             break;
 
             case MTIP_ETHTOOL_RSFEC:
-                dev_ioaddr = platform_driver_priv->devices.port_devices[port_device_index].rsfec_base_addr;
-                pdev = platform_driver_priv->devices.port_devices[port_device_index].port_pdev;
+                dev_ioaddr = platform_driver_priv->devices.port_devices[port_type].rsfec_base_addr;
+                pdev = platform_driver_priv->devices.port_devices[port_type].port_pdev;
                 dev_resource = platform_get_resource_byname(pdev, IORESOURCE_MEM, "rsfec");
             break;
 
@@ -344,7 +346,7 @@ static int mtip_ethtool_get_regs_len(struct net_device *dev)
     return reg_buf_size;
 }
 
-void mtip_getdrvinfo(struct net_device *dev, struct ethtool_drvinfo *info)
+void mtip_ethtool_getdrvinfo(struct net_device *dev, struct ethtool_drvinfo *info)
 {
     CSMLOGDBG("ethtool: getdrvinfo\n");
 
@@ -352,39 +354,103 @@ void mtip_getdrvinfo(struct net_device *dev, struct ethtool_drvinfo *info)
 	strlcpy(info->version, MTIP_MAC_DRIVER_VERSION, sizeof(info->version));
 }
 
-int mtip_get_link_ksettings(struct net_device *dev, struct ethtool_link_ksettings *cmd)
+int mtip_ethtool_get_link_ksettings(struct net_device *dev, struct ethtool_link_ksettings *cmd)
 {
     struct mtip_netdev_priv *priv;
     u32 link_index;
-    u32 port_device_index;
-    u32 link_device_index;
-    struct mtip_link_device_info* link_device;
+    struct mtip_link_info* link_info;
+    u32 port_type;
+    struct mtip_port_info* port_info;
+    int lane_speed = 0;
+    int i;
 
     priv = netdev_priv(dev);
     link_index = priv->link_index;
 
     CSMLOGDBG("ethtool: get_link_ksettings for link_index: %d\n", link_index);
 
-	if (!netif_running(dev)) {
-		CSMLOGERR("%s: interface is disabled: we cannot track "
-		"link speed / duplex setting\n", dev->name);
-		return -EBUSY;
-	}
+    link_info = platform_driver_priv->mtip_links[link_index];
 
-    if (mtip_lookup_device_by_link_index(link_index, &port_device_index, &link_device_index) < 0)
+    if (mtip_lookup_port_type_by_link_index(link_index, &port_type) < 0)
     {
-       CSMLOGERR("unable to find device for link %d", link_index);
-       return -ENODEV;
+        CSMLOGERR("invalid port_type for link_index %d", link_index);
+        return -EINVAL;
     }
 
-    link_device = &platform_driver_priv->devices.port_devices[port_device_index].link_devices[link_device_index];
+    port_info = platform_driver_priv->mtip_ports[port_type];
 
-    cmd->base.speed = mtip_platform_convert_lane_speed_to_gbps(link_device->lane_speed) * link_device->num_lanes;
+    cmd->base.duplex = true;
+    if (port_info->autoneg == true) 
+    {
+        CSMLOGDBG("autoneg is ON");
+        cmd->base.autoneg = AUTONEG_ENABLE;
+    }
+    else
+    {
+        CSMLOGDBG("autoneg is OFF");
+        cmd->base.autoneg = AUTONEG_DISABLE;
+    }
+
+    if (link_info->num_assigned_lanes == 0) 
+    {
+        cmd->base.speed = 0;
+    }
+    else
+    {
+        lane_speed = 0;
+        for (i = 0; i < PHY_LANE_MAX; ++i) 
+        {
+            if ((port_info->lane_config[i].link_index == link_index) &&
+                (port_info->lane_config[i].lane_enabled))
+            {
+                lane_speed += mtip_platform_convert_lane_speed_to_gbps(port_info->lane_config[i].lane_speed);
+            }
+        }
+        CSMLOGDBG("lane speed is %d", lane_speed);
+        cmd->base.speed = lane_speed;
+    }
 
     return 0;
 }
 
-static int mtip_get_ts_info(struct net_device *ndev, struct ethtool_ts_info *info)
+int mtip_ethtool_set_link_ksettings(struct net_device *netdev, const struct ethtool_link_ksettings *cmd)
+{
+    struct mtip_netdev_priv *priv;
+    u32 link_index;
+    struct mtip_link_info* link_info;
+    u32 port_type;
+    struct mtip_port_info* port_info;
+
+    priv = netdev_priv(netdev);
+    link_index = priv->link_index;
+
+    CSMLOGDBG("ethtool: set_link_ksettings for link_index: %d\n", link_index);
+
+    link_info = platform_driver_priv->mtip_links[link_index];
+
+    if (mtip_lookup_port_type_by_link_index(link_index, &port_type) < 0)
+    {
+        CSMLOGERR("invalid port_type for link_index %d", link_index);
+        return -EINVAL;
+    }
+
+    port_info = platform_driver_priv->mtip_ports[port_type];
+
+    // set link settings can be used to change autoneg to off/on
+    if (cmd->base.autoneg == AUTONEG_DISABLE) 
+    {
+        CSMLOGDBG("setting autoneg OFF on port_type %d", port_type);
+        port_info->autoneg = false;
+    }
+    else
+    {
+        CSMLOGDBG("setting autoneg ON on port_type %d", port_type);
+        port_info->autoneg = true;
+    }
+    return 0;
+}
+
+static int mtip_ethtool_get_ts_info(struct net_device *ndev, struct ethtool_ts_info *info)
 {
     CSMLOGDBG("ethtool: getting ts info\n");
 
@@ -436,8 +502,7 @@ int	mtip_ethtool_set_fecparam(struct net_device* netdev, struct ethtool_fecparam
     u32 fec = pfec->fec;
     struct mtip_netdev_priv *priv;
     u32 link_index;
-    u32 port_device_index;
-    u32 link_device_index;
+    u32 port_type;
     struct mtip_port_device_info* port_device = NULL;
     struct mtip_link_device_info* link_device = NULL;
     int i;
@@ -447,12 +512,14 @@ int	mtip_ethtool_set_fecparam(struct net_device* netdev, struct ethtool_fecparam
 
     CSMLOGDBG("Setting FEC parameter for link index: %d, cmd: %d, active: %d, fec: %d", link_index, cmd, active_fec, fec);
 
-    mtip_lookup_device_by_link_index(link_index, &port_device_index, &link_device_index);
-
-    CSMLOGDBG("link index: %d, port_device: %d, link_device: %d", link_index, port_device_index, link_device_index);
+    if (mtip_lookup_port_type_by_link_index(link_index, &port_type) < 0)
+    {
+        CSMLOGERR("invalid port_type for link_index %d", link_index);
+        return -1;
+    }
 
     // set the port_device
-    port_device = &platform_driver_priv->devices.port_devices[port_device_index];
+    port_device = &platform_driver_priv->devices.port_devices[port_type];
 
     // check the value of the active_fec
     if (fec == ETHTOOL_FEC_OFF) 
@@ -466,7 +533,7 @@ int	mtip_ethtool_set_fecparam(struct net_device* netdev, struct ethtool_fecparam
         // disable rsfec in pcs
         for (i = 0; i < port_device->num_link_phandles; ++i)
         {
-            link_device = &port_device->link_devices[i];
+            link_device = port_device->link_devices[i];
             mtip_pcs_disable_rsfec_for_25g_mode(link_device);
         }
     }
@@ -481,7 +548,7 @@ int	mtip_ethtool_set_fecparam(struct net_device* netdev, struct ethtool_fecparam
         // enable rsfec in the pcs
         for (i = 0; i < port_device->num_link_phandles; ++i)
         {
-            link_device = &port_device->link_devices[i];
+            link_device = port_device->link_devices[i];
             mtip_pcs_enable_rsfec_for_25g_mode(link_device);
         }
     }
@@ -549,63 +616,118 @@ static int mtip_ethtool_set_priv_flags(struct net_device *netdev, u32 flags)
         return -EINVAL;
     }
 
+    // mark that priv flags have been set using ethtool
+    priv->priv_flags_set = true;
+
     for (pflag = 0; pflag < MTIP_ETHTOOL_PRIV_FLAGS_LEN; pflag++) {
         err = mtip_ethtool_handle_pflag(netdev, flags, pflag);
         if (err)
             break;
     }
 
-    mtip_netdev_set_port_config(netdev);
+    mtip_netdev_set_port_priv_flags(netdev);
     return err;
 }
 
 void mtip_ethtool_set_msglevel(struct net_device *netdev, u32 level)
 {
+    int i;
     u32 link_index;
-    u32 real_port_number;
+    u32 lane_index;
+    u32 port_type;
     struct mtip_netdev_priv *priv;
+    struct qsfp_info trx_info;
 
     priv = netdev_priv(netdev);
     link_index = priv->link_index;
 
     // check if the corresponding port is in LINK_UP state
-    mtip_lookup_real_port_number_by_link_index(link_index, &real_port_number);
+    if (mtip_lookup_port_type_by_link_index(link_index, &port_type) < 0)
+    {
+        CSMLOGERR("invalid link_index: %d", link_index);
+    }
+    else
+    {
+        CSMLOGINFO("Set msglvl for link_index: %d, port_type: %d", link_index, port_type);
+    }
+
+    trx_info.trx_module_type = TRX_QSFP_PLS_QSFP28_QSFP56;
+    trx_info.trx_speed = TRX_LANE_SPEED_25G;
+    trx_info.trx_laneinfo = 0;
+    trx_info.trx_bout_cfg = 0;
 
     switch (level)
     {
     case 0:
         {
-            CSMLOGINFO("Using set msglevel %d to toggle PHYLINK state to NOT CONNECTED for link index %d", level, link_index);
-            platform_driver_priv->mtip_ports[real_port_number]->port_state = MTIP_PORT_STATE_DISCONNECTED;
+            // call handle lane down for all lanes of the port
+            for (i = 0; i < platform_driver_priv->devices.port_devices[port_type].num_lane_phandles; ++i)
+            {
+                if (platform_driver_priv->devices.port_devices[port_type].lane_devices[i] != NULL) 
+                {
+                    lane_index = platform_driver_priv->devices.port_devices[port_type].lane_devices[i]->lane_index;
+
+                    memcpy(&platform_driver_priv->mtip_lanes[lane_index]->lane_qsfp_info, &trx_info, sizeof(struct qsfp_info));
+                    post_mtip_phy_handle_lane_down(lane_index);
+                }
+                else
+                {
+                    CSMLOGERR("lane device[%d] is NULL for port_type: %d link_index: %d", i, port_type, link_index);
+                }
+            }
         }
         break;
 
     case 1:
         {
-            CSMLOGINFO("Using set msglevel %d to set PHYLINK state to CONNECTED for DAC link index %d", level, link_index);
-            platform_driver_priv->mtip_ports[real_port_number]->port_state = MTIP_PORT_STATE_CONNECTED;
+            // call handle lane up for all lanes of the port with DAC
+            for (i = 0; i < platform_driver_priv->devices.port_devices[port_type].num_lane_phandles; ++i)
+            {
+                if (platform_driver_priv->devices.port_devices[port_type].lane_devices[i] != NULL) 
+                {
+                    lane_index = platform_driver_priv->devices.port_devices[port_type].lane_devices[i]->lane_index;
 
-            platform_driver_priv->mtip_ports[real_port_number]->sfp_port_type = PORT_DA;
+                    memcpy(&platform_driver_priv->mtip_lanes[lane_index]->lane_qsfp_info, &trx_info, sizeof(struct qsfp_info));
+                    post_mtip_phy_handle_lane_up(lane_index, PORT_DA, PHY_LANE_SPEED_25G);
+                }
+                else
+                {
+                    CSMLOGERR("lane device[%d] is NULL for port_type: %d link_index: %d", i, port_type, link_index);
+                }
+            }
         }
         break;
 
     case 2:
         {
-            CSMLOGINFO("Using set msglevel %d to set PHYLINK state to CONNECTED for FIBRE link index %d", level, link_index);
-            platform_driver_priv->mtip_ports[real_port_number]->port_state = MTIP_PORT_STATE_CONNECTED;
+            // call handle lane up for all lanes of the port with FIBER
+            for (i = 0; i < platform_driver_priv->devices.port_devices[port_type].num_lane_phandles; ++i)
+            {
+                if (platform_driver_priv->devices.port_devices[port_type].lane_devices[i] != NULL) 
+                {
+                    lane_index = platform_driver_priv->devices.port_devices[port_type].lane_devices[i]->lane_index;
 
-            platform_driver_priv->mtip_ports[real_port_number]->sfp_port_type = PORT_FIBRE;
+                    memcpy(&platform_driver_priv->mtip_lanes[lane_index]->lane_qsfp_info, &trx_info, sizeof(struct qsfp_info));
+                    post_mtip_phy_handle_lane_up(lane_index, PORT_FIBRE, PHY_LANE_SPEED_25G);
+                }
+                else
+                {
+                    CSMLOGERR("lane device[%d] is NULL for port_type: %d link_index: %d", i, port_type, link_index);
+                }
+            }
         }
         break;
 
     case 3:
         {
+            // print the information about the platform
             mtip_platform_print_platform();
         }
         break;
 
     case 4:
         {
+            // print the information about the topology
             mtip_print_topology(platform_driver_priv->topology);
         }
         break;
@@ -615,6 +737,35 @@ void mtip_ethtool_set_msglevel(struct net_device *netdev, u32 level)
             mtip_ethtool_debug_logging_enable = 1;
         }
         break;
+
+    case 7:
+        {
+            // print the information about the ports
+            mtip_platform_print_devices();
+        }
+        break;
+
+    case 8:
+        {
+            // print the information about the ports
+            mtip_platform_print_ports();
+        }
+        break;
+
+    case 9:
+        {
+            // print the information about the links
+            mtip_platform_print_links();
+        }
+        break;
+
+    case 10:
+        {
+            // print the information about the lanes
+            mtip_platform_print_lanes();
+        }
+        break;
+
     default:
         {
             CSMLOGINFO("Ignoring msglevel %d for link index: %d", level, link_index);
@@ -626,27 +777,32 @@ void mtip_ethtool_set_msglevel(struct net_device *netdev, u32 level)
 u32 mtip_ethtool_get_msglevel(struct net_device *netdev)
 {
     u32 link_index;
-    u32 real_port_number;
+    u32 port_type;
     struct mtip_netdev_priv *priv;
 
     priv = netdev_priv(netdev);
     link_index = priv->link_index;
 
     // check if the corresponding port is in LINK_UP state
-    mtip_lookup_real_port_number_by_link_index(link_index, &real_port_number);
+    if (mtip_lookup_port_type_by_link_index(link_index, &port_type) < 0)
+    {
+        CSMLOGERR("invalid port_type for link_index %d", link_index);
+        return 0;
+    }
 
-    return platform_driver_priv->mtip_ports[real_port_number]->port_state;
+    return platform_driver_priv->mtip_ports[port_type]->port_state;
 }
 
 static const struct ethtool_ops mtip_ethtool_ops = {
-   .get_drvinfo = mtip_getdrvinfo,
+   .get_drvinfo = mtip_ethtool_getdrvinfo,
    .get_regs = mtip_ethtool_get_regs,
    .get_regs_len = mtip_ethtool_get_regs_len,
-   .get_sset_count  = mtip_get_sset_count,
-   .get_strings = mtip_get_strings,
+   .get_sset_count  = mtip_ethtool_get_sset_count,
+   .get_strings = mtip_ethtool_get_strings,
    .get_ethtool_stats = mtip_ethtool_get_stats,
-   .get_ts_info = mtip_get_ts_info,
-   .get_link_ksettings = mtip_get_link_ksettings,
+   .get_ts_info = mtip_ethtool_get_ts_info,
+   .get_link_ksettings = mtip_ethtool_get_link_ksettings,
+   .set_link_ksettings = mtip_ethtool_set_link_ksettings,
    .get_priv_flags = mtip_ethtool_get_priv_flags,
    .set_priv_flags = mtip_ethtool_set_priv_flags,
    .get_fecparam = mtip_ethtool_get_fecparam,

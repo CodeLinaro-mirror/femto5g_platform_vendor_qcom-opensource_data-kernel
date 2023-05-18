@@ -49,7 +49,7 @@ uint32_t aw_width_decoder(uint32_t width_encoded) {
   } else if (width_encoded == 1) {
     width = 10;
   } else if (width_encoded == 0) {
-    width = 64;
+    width = 8;
   } else {
     USR_PRINTF("ERROR: Invalid width encoding\n");
     return 0;
@@ -99,20 +99,16 @@ int aw_pmd_anlt_auto_neg_adv_ability_set(mss_access_t *mss,
   uint32_t ability_2_temp = 0;
   int i;
 
-  for (i = 0; i <= 18; i++) {
+  for (i = 0; i <= 19; i++) {
     if (i <= 10 && adv_ability[i] == 1) {
-
       ability_1_temp = ability_1_temp | (1 << (i + 5));
-
-    } else if (i > 10 && i <= 18 && adv_ability[i] == 1) {
-
+    } else if (i > 10 && i <= 19 && adv_ability[i] == 1) {
       ability_2_temp = ability_2_temp | (1 << (i - 11));
     }
   }
 
   for (i = 0; i <= 4; i++) {
     if (fec_ability[i] == 1) {
-
       ability_2_temp = ability_2_temp | (1 << (i + 11));
     }
   }
@@ -175,34 +171,19 @@ int aw_pmd_anlt_auto_neg_start_set(mss_access_t *mss, uint32_t start) {
   return AW_ERR_CODE_NONE;
 }
 
+int aw_pmd_anlt_auto_neg_status_get (mss_access_t *mss, uint32_t * link_good){
+
+    CHECK(pmd_read_field(mss, ETH_ANLT_STATUS_ADDR, ETH_ANLT_STATUS_AN_LINK_GOOD_MASK, ETH_ANLT_STATUS_AN_LINK_GOOD_OFFSET, link_good));
+
+    return AW_ERR_CODE_NONE;
+}
+
 int aw_pmd_anlt_auto_neg_status_complete_get(mss_access_t *mss,
                                              uint32_t *an_complete) {
 
   CHECK(pmd_read_field(mss, ETH_AN_STAT_ADDR,
                        ETH_AN_STAT_AN_MR_AUTONEG_COMPLETE_MASK,
                        ETH_AN_STAT_AN_MR_AUTONEG_COMPLETE_OFFSET, an_complete));
-
-  return AW_ERR_CODE_NONE;
-}
-
-int aw_pmd_anlt_auto_neg_next_page_set(mss_access_t *mss, uint64_t an_tx_np) {
-  uint32_t an_mr_np_tx_1 = (an_tx_np & 0xFFFF);
-  uint32_t an_mr_np_tx_2 = (an_tx_np >> 16) & 0xFFFF;
-  uint32_t an_mr_np_tx_3 = (an_tx_np >> 32) & 0xFFFF;
-
-  CHECK(pmd_write_field(mss, ETH_AN_NP_REG1_ADDR,
-                        ETH_AN_NP_REG1_AN_MR_NP_TX_1_MASK,
-                        ETH_AN_NP_REG1_AN_MR_NP_TX_1_OFFSET, an_mr_np_tx_1));
-  CHECK(pmd_write_field(mss, ETH_AN_NP_REG2_ADDR,
-                        ETH_AN_NP_REG2_AN_MR_NP_TX_2_MASK,
-                        ETH_AN_NP_REG2_AN_MR_NP_TX_2_OFFSET, an_mr_np_tx_2));
-  CHECK(pmd_write_field(mss, ETH_AN_NP_REG3_ADDR,
-                        ETH_AN_NP_REG3_AN_MR_NP_TX_3_MASK,
-                        ETH_AN_NP_REG3_AN_MR_NP_TX_3_OFFSET, an_mr_np_tx_3));
-
-  CHECK(pmd_write_field(mss, ETH_AN_NP_REG3_ADDR,
-                        ETH_AN_NP_REG3_AN_MR_NEXT_PAGE_LOADED_MASK,
-                        ETH_AN_NP_REG3_AN_MR_NEXT_PAGE_LOADED_OFFSET, 1));
 
   return AW_ERR_CODE_NONE;
 }
@@ -555,12 +536,6 @@ int aw_pmd_force_signal_detect_config_set(mss_access_t *mss,
   }
 }
 
-int aw_pmd_txfir_ovr_set(mss_access_t *mss, uint32_t txfir_ovr) {
-  CHECK(pmd_write_field(mss, FIR_ADDR, FIR_OVR_EN_A_MASK, FIR_OVR_EN_A_OFFSET,
-                        txfir_ovr));
-  return AW_ERR_CODE_NONE;
-}
-
 int aw_pmd_txfir_config_set(mss_access_t *mss, aw_txfir_config_t *txfir_cfg,
                             uint32_t fir_ovr_enable) {
   uint32_t cm3_mask = 0x7;
@@ -622,6 +597,37 @@ int aw_pmd_txfir_config_set(mss_access_t *mss, aw_txfir_config_t *txfir_cfg,
   return AW_ERR_CODE_NONE;
 }
 
+int aw_pmd_txfir_ovr_set(mss_access_t *mss, uint32_t txfir_ovr) {
+  CHECK(pmd_write_field(mss, FIR_ADDR, FIR_OVR_EN_A_MASK, FIR_OVR_EN_A_OFFSET,
+                        txfir_ovr));
+  return AW_ERR_CODE_NONE;
+}
+
+int aw_pmd_txfir_config_get(mss_access_t *mss, aw_txfir_config_t *txfir_cfg) {
+  int cm3_mask = 0x00000007;
+  int cm2_mask = 0x00000038;
+  int cm1_mask = 0x000007c0;
+  int max_mask = 0x0001f800;
+  int c1_mask = 0x003e0000;
+  int32_t max_ele = 0;
+  uint32_t rdval;
+  CHECK(pmd_read_field(mss, TX_FIR_RDREG_ADDR, TX_FIR_RDREG_AFE_VAL_NT_MASK,
+                       TX_FIR_RDREG_AFE_VAL_NT_OFFSET, &rdval));
+  txfir_cfg->CM3 = (rdval & cm3_mask);
+  txfir_cfg->CM2 = (rdval & cm2_mask) >> 3;
+  txfir_cfg->CM1 = (rdval & cm1_mask) >> 6;
+  max_ele = (rdval & max_mask) >> 11;
+  txfir_cfg->C1 = (rdval & c1_mask) >> 17;
+  if (txfir_cfg->main_or_max == 0) {
+    txfir_cfg->C0 = max_ele + 1 - txfir_cfg->C1 - txfir_cfg->CM1 -
+                    txfir_cfg->CM2 - txfir_cfg->CM3;
+  } else {
+    txfir_cfg->C0 = max_ele;
+  }
+
+  return AW_ERR_CODE_NONE;
+}
+
 int aw_pmd_tx_pam4_precoder_override_set(mss_access_t *mss, uint32_t en) {
 
   CHECK(pmd_write_field(mss, TX_DATAPATH_REG2_ADDR,
@@ -671,7 +677,7 @@ int aw_pmd_remote_loopback_set(mss_access_t *mss,
   (void)remote_loopback_enable;
   USR_PRINTF(
       "ERROR: aw_pmd_remote_loopback_set - function implementation has been "
-      "deprecated, use aw_pmd_fep_clock_set & aw_pmd_fep_dat_set\n");
+      "deprecated, use aw_pmd_fep_clock_set & aw_pmd_fep_data_set\n");
   return AW_ERR_CODE_NONE;
 }
 
@@ -902,15 +908,18 @@ int aw_pmd_rx_dfe_adapt_set(mss_access_t *mss, uint32_t dfe_adapt_enable) {
   return AW_ERR_CODE_NONE;
 }
 
-int aw_pmd_rx_background_adapt_enable_set(mss_access_t *mss, uint32_t rx_background_adapt)
-{
-    if (rx_background_adapt == 1){
-        CHECK(pmd_write_field(mss, RXMFSM_CTRL_ADDR, RXMFSM_CTRL_RXMFSM_EQBK_POWER_STATE_MASK, RXMFSM_CTRL_RXMFSM_EQBK_POWER_STATE_OFFSET, 0));
-    }
-    else {
-        CHECK(pmd_write_field(mss, RXMFSM_CTRL_ADDR, RXMFSM_CTRL_RXMFSM_EQBK_POWER_STATE_MASK, RXMFSM_CTRL_RXMFSM_EQBK_POWER_STATE_OFFSET, 7));
-    }
-    return AW_ERR_CODE_NONE;
+int aw_pmd_rx_background_adapt_enable_set(mss_access_t *mss,
+                                          uint32_t rx_background_adapt) {
+  if (rx_background_adapt == 1) {
+    CHECK(pmd_write_field(mss, RXMFSM_CTRL_ADDR,
+                          RXMFSM_CTRL_RXMFSM_EQBK_POWER_STATE_MASK,
+                          RXMFSM_CTRL_RXMFSM_EQBK_POWER_STATE_OFFSET, 0));
+  } else {
+    CHECK(pmd_write_field(mss, RXMFSM_CTRL_ADDR,
+                          RXMFSM_CTRL_RXMFSM_EQBK_POWER_STATE_MASK,
+                          RXMFSM_CTRL_RXMFSM_EQBK_POWER_STATE_OFFSET, 7));
+  }
+  return AW_ERR_CODE_NONE;
 }
 
 int aw_pmd_rxeq_prbs_set(mss_access_t *mss, uint32_t prbs_en) {
@@ -1145,6 +1154,13 @@ int aw_pmd_rx_chk_err_count_state_clear(mss_access_t *mss) {
   CHECK(pmd_write_field(mss, RX_DATABIST_TOP_REG1_ADDR,
                         RX_DATABIST_TOP_REG1_ERROR_CNT_CLR_A_MASK,
                         RX_DATABIST_TOP_REG1_ERROR_CNT_CLR_A_OFFSET, 0));
+  return AW_ERR_CODE_NONE;
+}
+
+int aw_pmd_enable_pam4_mode(mss_access_t *mss, int enable) {
+  CHECK(pmd_write_field(mss, TX_DATAPATH_REG1_ADDR,
+                        TX_DATAPATH_REG1_PAM4_MODE_A_MASK,
+                        TX_DATAPATH_REG1_PAM4_MODE_A_OFFSET, enable));
   return AW_ERR_CODE_NONE;
 }
 
@@ -1787,6 +1803,7 @@ int aw_pmd_iso_request_tx_state_change(mss_access_t *mss, aw_pstate_t tx_pstate,
                                        uint32_t timeout_us) {
   int poll_result;
   //USR_PRINTF("Setting TX rate/width/pstate\n");
+  aw_pmd_iso_tx_reset_set(mss, 0);
   aw_pmd_iso_tx_reset_set(mss, 1);
   aw_pmd_iso_tx_rate_set(mss, tx_rate);
   aw_pmd_iso_tx_width_set(mss, tx_width);
@@ -1819,6 +1836,7 @@ int aw_pmd_iso_request_rx_state_change(mss_access_t *mss, aw_pstate_t rx_pstate,
                                        uint32_t timeout_us) {
   int poll_result;
   //USR_PRINTF("Setting RX rate/width/pstate\n");
+  aw_pmd_iso_rx_reset_set(mss, 0);
   aw_pmd_iso_rx_reset_set(mss, 1);
   aw_pmd_iso_rx_rate_set(mss, rx_rate);
   aw_pmd_iso_rx_width_set(mss, rx_width);
@@ -2046,15 +2064,24 @@ int aw_pmd_rx_equalize(mss_access_t *mss, aw_eq_type_t eq_type,
   }
 }
 
-int aw_pmd_rd_data_pipeline_stages_set(mss_access_t *mss,
-                                                      uint32_t stages) {
-    CHECK(pmd_write_field(mss, SRAM0_CFG_ADDR,
-                          SRAM0_CFG_RD_DATA_PIPELINE_STAGES_A_MASK,
-                          SRAM0_CFG_RD_DATA_PIPELINE_STAGES_A_OFFSET, stages));
+int aw_pmd_rd_data_pipeline_stages_set(mss_access_t *mss, uint32_t stages) {
+  CHECK(pmd_write_field(mss, SRAM0_CFG_ADDR,
+                        SRAM0_CFG_RD_DATA_PIPELINE_STAGES_A_MASK,
+                        SRAM0_CFG_RD_DATA_PIPELINE_STAGES_A_OFFSET, stages));
 #if AW_NUM_LANES == 16
-    CHECK(pmd_write_field(mss, SRAM1_CFG_ADDR, SRAM1_CFG_RD_DATA_PIPELINE_STAGES_A_MASK, SRAM1_CFG_RD_DATA_PIPELINE_STAGES_A_OFFSET, stages));
+  CHECK(pmd_write_field(mss, SRAM1_CFG_ADDR,
+                        SRAM1_CFG_RD_DATA_PIPELINE_STAGES_A_MASK,
+                        SRAM1_CFG_RD_DATA_PIPELINE_STAGES_A_OFFSET, stages));
 #endif
     return AW_ERR_CODE_NONE;
+}
+
+int aw_pmd_rx_cdr_lock_get(mss_access_t *mss, uint32_t *rx_cdr_lock) {
+  CHECK(pmd_read_field(mss, DIG_SOC_LANE_STAT_REG1_ADDR,
+                       DIG_SOC_LANE_STAT_REG1_OCTL_RX_DATA_VLD_MASK,
+                       DIG_SOC_LANE_STAT_REG1_OCTL_RX_DATA_VLD_OFFSET,
+                       rx_cdr_lock));
+  return AW_ERR_CODE_NONE;
 }
 
 int aw_pmd_rx_gray_code_mapping_set(mss_access_t *mss, uint8_t gray_code_map) {
@@ -2136,19 +2163,89 @@ int aw_pmd_snr_vld_enable_set(mss_access_t *mss, uint32_t vld_enable) {
   return AW_ERR_CODE_NONE;
 }
 
-int aw_pmd_pam4_enable(mss_access_t *mss, uint32_t enable) {
+int aw_pmd_anlt_auto_neg_result_get (mss_access_t *mss, uint8_t no_consortium, uint32_t * an_result){
 
-    CHECK(pmd_write_field(mss, RX_CNTRL_REG2_ADDR, RX_CNTRL_REG2_RX_GRAY_ENA_NT_MASK, RX_CNTRL_REG2_RX_GRAY_ENA_NT_OFFSET, enable));
-    CHECK(pmd_write_field(mss, TX_DATAPATH_REG1_ADDR, TX_DATAPATH_REG1_GRAY_CODE_ENABLE_A_MASK, TX_DATAPATH_REG1_GRAY_CODE_ENABLE_A_OFFSET, enable));
-    CHECK(pmd_write_field(mss, TX_DATAPATH_REG2_ADDR, TX_DATAPATH_REG2_PAMCODE_OVR_EN_A_MASK, TX_DATAPATH_REG2_PAMCODE_OVR_EN_A_OFFSET, enable));
+    uint32_t an_link_good;
+    uint32_t an_spec_1;
+    uint32_t an_spec_2;
+    uint32_t an_spec_3;
+    uint32_t an_spec_4;
+    uint32_t an_spec;
+    uint32_t an_econ_spec_1;
+    int cntr=0, i=0, bit=0;
+    uint32_t temp_an_result;
+
+    CHECK(pmd_read_check_field(mss, ETH_ANLT_STATUS_ADDR, ETH_ANLT_STATUS_AN_LINK_GOOD_MASK, ETH_ANLT_STATUS_AN_LINK_GOOD_OFFSET, RD_EQ, &an_link_good,  1, 0 ));
+
+    if(no_consortium == 1) {
+        CHECK(pmd_read_field(mss, ETH_AN_RESULT_REG1_ADDR, ETH_AN_RESULT_REG1_AN_SPEC_1_MASK, ETH_AN_RESULT_REG1_AN_SPEC_1_OFFSET, &an_spec_1));
+        CHECK(pmd_read_field(mss, ETH_AN_RESULT_REG1_ADDR, ETH_AN_RESULT_REG1_AN_SPEC_2_MASK, ETH_AN_RESULT_REG1_AN_SPEC_2_OFFSET, &an_spec_2));
+        CHECK(pmd_read_field(mss, ETH_AN_RESULT_REG1_ADDR, ETH_AN_RESULT_REG1_AN_SPEC_3_MASK, ETH_AN_RESULT_REG1_AN_SPEC_3_OFFSET, &an_spec_3));
+        CHECK(pmd_read_field(mss, ETH_AN_RESULT_REG2_ADDR, ETH_AN_RESULT_REG2_AN_SPEC_4_MASK, ETH_AN_RESULT_REG2_AN_SPEC_4_OFFSET, &an_spec_4));
+
+        an_spec = an_spec_1;
+        an_spec = (an_spec_2 << 3)  | an_spec;
+        an_spec = (an_spec_3 << 5)  | an_spec;
+        an_spec = (an_spec_4 << 13) | an_spec;
+
+        // there should only be 1 bit that is 1, all other bits should be 0
+        for (i = 0 ; i < 32 ; i++){
+            bit = (an_spec >> i) & 1;
+            if (bit == 1){
+                cntr++;
+                temp_an_result = i;
+            }
+        }
+        if (cntr != 1){
+            return AW_ERR_CODE_BAD_STATE;
+        }
+
+        *an_result = temp_an_result;
+    } else if (no_consortium == 0) {
+
+        CHECK(pmd_read_field(mss, ETH_AN_RESULT_REG2_ADDR, ETH_AN_RESULT_REG2_AN_ECON_SPEC_MASK, ETH_AN_RESULT_REG2_AN_ECON_SPEC_OFFSET, &an_econ_spec_1));
+        an_spec = an_econ_spec_1;
+
+        for (i = 0 ; i < 5 ; i++) {
+            bit = (an_spec >> i) & 1;
+            if (bit == 1) {
+                cntr++;
+                temp_an_result = i;
+            }
+        }
+        if (cntr != 1) {
+            return AW_ERR_CODE_BAD_STATE;
+        }
+
+        *an_result = temp_an_result;
+    } else {
+        USR_PRINTF("ERROR: Please set no_consortium field to either 0 or 1. Other values not accepted \n");
+        return AW_ERR_CODE_BAD_STATE;
+    }
 
     return AW_ERR_CODE_NONE;
 }
 
-int aw_pmd_set_rx_spare(mss_access_t *mss, uint32_t value) {
+int aw_pmd_anlt_auto_neg_next_page_set(mss_access_t *mss, uint64_t an_tx_np) {
+  uint32_t an_mr_np_tx_1 = (an_tx_np & 0xFFFF);
+  uint32_t an_mr_np_tx_2 = (an_tx_np >> 16) & 0xFFFF;
+  uint32_t an_mr_np_tx_3 = (an_tx_np >> 32) & 0xFFFF;
 
-    CHECK(pmd_write_field(mss, RX_ADDR, RX_SPARE_NT_MASK, RX_SPARE_NT_OFFSET, value));
+  CHECK(pmd_write_field(mss, ETH_AN_NP_REG1_ADDR,
+                        ETH_AN_NP_REG1_AN_MR_NP_TX_1_MASK,
+                        ETH_AN_NP_REG1_AN_MR_NP_TX_1_OFFSET, an_mr_np_tx_1));
+  CHECK(pmd_write_field(mss, ETH_AN_NP_REG2_ADDR,
+                        ETH_AN_NP_REG2_AN_MR_NP_TX_2_MASK,
+                        ETH_AN_NP_REG2_AN_MR_NP_TX_2_OFFSET, an_mr_np_tx_2));
+  CHECK(pmd_write_field(mss, ETH_AN_NP_REG3_ADDR,
+                        ETH_AN_NP_REG3_AN_MR_NP_TX_3_MASK,
+                        ETH_AN_NP_REG3_AN_MR_NP_TX_3_OFFSET, an_mr_np_tx_3));
 
-    return AW_ERR_CODE_NONE;
+  //now that NP is loaded, trigger NP
+  CHECK(pmd_write_field(mss, ETH_AN_NP_REG3_ADDR,
+                        ETH_AN_NP_REG3_AN_MR_NEXT_PAGE_LOADED_MASK,
+                        ETH_AN_NP_REG3_AN_MR_NEXT_PAGE_LOADED_OFFSET, 1));
+
+  return AW_ERR_CODE_NONE;
 }
 

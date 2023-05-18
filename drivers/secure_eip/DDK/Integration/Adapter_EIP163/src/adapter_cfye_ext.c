@@ -825,7 +825,7 @@ CfyE_Diag_Channel_Dump(
         ZEROINIT(EgressHeader);
 #endif
         ZEROINIT(SecTAG_Parser);
-
+        ZEROINIT(DevExceptions);
         ZEROINIT(DeviceParams);
         ZEROINIT(EtherAddr);
         ZEROINIT(CP);

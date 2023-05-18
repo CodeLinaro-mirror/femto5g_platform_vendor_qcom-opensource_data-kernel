@@ -70,6 +70,44 @@ struct qcom_aw_phy_config *qcom_aw_phy_get_config_info(void) {
 }
 
 /*-------------------------------------------------------------------
+* qcom_aw_phy_get_inst_config
+
+* Description: This function returns the PHY instance information.
+------------------------------------------------------------------- */
+struct qcom_aw_phy_inst_config *qcom_aw_phy_get_inst_config(enum qcom_aw_phy_instance_enum port) {
+	struct qcom_aw_phy_config *phy_config_info = NULL;
+	if(!QCOM_AW_PHY_INST_VALID(port))
+		goto func_ret;
+	phy_config_info=qcom_aw_phy_get_config_info();
+	if(phy_config_info!=NULL){
+		return &phy_config_info->phy_inst_config_info[port];
+	}
+func_ret:
+	return NULL;
+}
+
+/*-------------------------------------------------------------------
+* qcom_aw_phy_get_lane_params
+
+* Description: This function returns the lane param information.
+------------------------------------------------------------------- */
+struct qcom_aw_lane_params *qcom_aw_phy_get_lane_params(enum qcom_aw_phy_instance_enum port, enum eth_phy_iface_phy_lane_num_enum lane) {
+	struct qcom_aw_phy_config *phy_config_info = NULL;
+	struct qcom_aw_phy_inst_config *phy_inst_info = NULL;
+	if(!QCOM_AW_PHY_INST_VALID(port) || !QCOM_AW_PHY_LANE_VALID(lane))
+		goto func_ret;
+	phy_config_info=qcom_aw_phy_get_config_info();
+	if(phy_config_info!=NULL){
+		phy_inst_info = &phy_config_info->phy_inst_config_info[port];
+		if(phy_inst_info!=NULL){
+			return &phy_inst_info->lane_params[lane];
+		}
+	}
+func_ret:
+	return NULL;
+}
+
+/*-------------------------------------------------------------------
 * qcom_aw_phy_get_loopback_mode
 
 * Description: This function returns the loopback config for AW PHY.
@@ -96,6 +134,10 @@ int qcom_aw_phy_get_polarity_flag(void) {
   return qcom_aw_phy_toggle_polarity;
 }
 
+int qcom_aw_phy_get_ref_clk_mode(void) {
+  return qcom_aw_phy_ref_clk_mode;
+}
+
 /*-------------------------------------------------------------------
 * qcom_aw_phy_interrupt_handler
 
@@ -115,6 +157,8 @@ static irqreturn_t qcom_aw_phy_interrupt_handler(int irq, void *devptr) {
   enum local_error_enum local_err_val = LOCAL_ERROR_INVALID;
   int ret_val = IRQ_HANDLED;
   struct qcom_aw_phy_work_q_params *wq_params = NULL;
+  mss_access_t mss = {.phy_offset = 0, .lane_offset = 0};
+  uint64_t tx_np_data = 1ULL;
 
   // check if this an interrupt that needs to be handled
   for (i = QCOM_AW_PHY_INST_FH0; i < QCOM_AW_PHY_INST_MAX; i++)
@@ -225,7 +269,7 @@ static irqreturn_t qcom_aw_phy_interrupt_handler(int irq, void *devptr) {
           wq_params->lane_num = i;
           wq_params->user_data = (void*)true;
           queue_delayed_work(qcom_aw_phy_config_info.wq, &wq_params->wq_item,
-                             RX_SIGNAL_DETECT_RETRY_DELAY_TIMER);
+                             msecs_to_jiffies(RX_SIGNAL_DETECT_RETRY_DELAY_TIMER));
         }
         clear |= (1<<i);
         break;
@@ -240,10 +284,11 @@ static irqreturn_t qcom_aw_phy_interrupt_handler(int irq, void *devptr) {
           QCOM_AW_PHY_LOG_ERR("Malloc failed!");
         else{
           INIT_DELAYED_WORK(&wq_params->wq_item,
-                            qcom_aw_phy_handle_an_complete);
+                            qcom_aw_phy_handle_an_done);
           wq_params->phy_inst = phy_inst_info->phy_inst;
           wq_params->lane_num = i - QCOM_AW_PHY_AN_DONE_LANE_0;
-          queue_delayed_work(qcom_aw_phy_config_info.wq, &wq_params->wq_item, 0);
+          queue_delayed_work(qcom_aw_phy_config_info.wq, &wq_params->wq_item,
+                             msecs_to_jiffies(10));
         }
         clear |= (1<<i);
         break;
@@ -252,7 +297,29 @@ static irqreturn_t qcom_aw_phy_interrupt_handler(int irq, void *devptr) {
       case QCOM_AW_PHY_AN_LINK_GOOD_LANE_1:
       case QCOM_AW_PHY_AN_LINK_GOOD_LANE_2:
       case QCOM_AW_PHY_AN_LINK_GOOD_LANE_3:
-        // NO-OP, just to monitor the link state transition
+        wq_params = kmalloc(sizeof(struct qcom_aw_phy_work_q_params),
+                            GFP_ATOMIC);
+        if(!wq_params)
+          QCOM_AW_PHY_LOG_ERR("Malloc failed!");
+        else{
+          INIT_DELAYED_WORK(&wq_params->wq_item,
+                           qcom_aw_phy_handle_an_link_good);
+          wq_params->phy_inst = phy_inst_info->phy_inst;
+          wq_params->lane_num = i - QCOM_AW_PHY_AN_LINK_GOOD_LANE_0;
+          queue_delayed_work(qcom_aw_phy_config_info.wq, &wq_params->wq_item, 0);
+        }
+        clear |= (1<<i);
+        break;
+
+      case QCOM_AW_PHY_AN_NEW_PAGE_LANE_0:
+      case QCOM_AW_PHY_AN_NEW_PAGE_LANE_1:
+      case QCOM_AW_PHY_AN_NEW_PAGE_LANE_2:
+      case QCOM_AW_PHY_AN_NEW_PAGE_LANE_3:
+        QCOM_AW_PHY_LOG_DBG("AN new page for lane %d",
+                            i - QCOM_AW_PHY_AN_NEW_PAGE_LANE_0);
+        mss.phy_offset = phy_inst_info->base_addr;
+        pmd_set_lane(&mss, i-QCOM_AW_PHY_AN_NEW_PAGE_LANE_0);
+        aw_pmd_anlt_auto_neg_next_page_set(&mss, tx_np_data);
         clear |= (1<<i);
         break;
 
@@ -330,6 +397,10 @@ void qcom_aw_phy_enable_interrupt(
     case QCOM_AW_PHY_AN_LINK_GOOD_LANE_1:
     case QCOM_AW_PHY_AN_LINK_GOOD_LANE_2:
     case QCOM_AW_PHY_AN_LINK_GOOD_LANE_3:
+    case QCOM_AW_PHY_AN_NEW_PAGE_LANE_0:
+    case QCOM_AW_PHY_AN_NEW_PAGE_LANE_1:
+    case QCOM_AW_PHY_AN_NEW_PAGE_LANE_2:
+    case QCOM_AW_PHY_AN_NEW_PAGE_LANE_3:
       temp_bmask |= (1 << i);
       break;
 
@@ -844,12 +915,6 @@ static void qcom_aw_phy_hw_init() {
       qcom_aw_phy_load_hexfile(
           &mss, "/lib/firmware/qcom_aw_phy/eth_custom_rates_1.hex");
 
-      pmd_read_addr(&mss,0x80000000, &version_raw);
-      QCOM_AW_PHY_LOG_INFO("FW loaded : Version MAJOR = %d "
-                           "Version MINOR = %d Version PATCH = %d\n",
-                           (version_raw >> 16) & 0xFF,
-                           (version_raw >> 8) & 0xFF, version_raw & 0xFF);
-
 #ifndef FEATURE_QCOM_AW_RUMI_SW
       /* Register for PHY status IRQ */
       ret_val = devm_request_irq(
@@ -872,6 +937,15 @@ static void qcom_aw_phy_hw_init() {
 #endif
     }
   }
+  pmd_read_addr(&mss,0x80000000, &version_raw);
+  phy_config_info->fw_major_ver= ((version_raw >> 16) & 0xFF);
+  phy_config_info->fw_minor_ver= ((version_raw >> 8) & 0xFF);
+  phy_config_info->fw_patch_ver= (version_raw & 0xFF);
+  QCOM_AW_PHY_LOG_INFO("FW loaded : Version MAJOR = %d "
+                       "Version MINOR = %d Version PATCH = %d\n",
+                       (version_raw >> 16) & 0xFF,
+                       (version_raw >> 8) & 0xFF, version_raw & 0xFF);
+
 
   QCOM_AW_PHY_LOG_INFO("PHY IRQ register done\n");
 
@@ -1038,6 +1112,10 @@ static int qcom_aw_phy_inst_probe(struct platform_device *pdev) {
   /* Get the PHY equalization mode */
   phy_inst_info->phy_eq_mode =
       QCOM_AW_PHY_MANUAL_EQ_MODE; // Default value for now
+
+  /* Default AN adv ability set to 25G_BaseR */
+  phy_inst_info->an_params.adv_ability[PHY_SPEED_SPEC_25G_BASE_K_CR_S] = 1;
+  phy_inst_info->an_params.adv_ability[PHY_SPEED_SPEC_25G_BASE_K_CR] = 1;
 
   /* Get the IRQ info */
   phy_inst_info->phy_status_irq = platform_get_irq_byname(pdev, "phy-irq");

@@ -12,6 +12,7 @@
 #include <linux/clk.h>
 #include <linux/of.h>
 #include <linux/spinlock.h>
+#include <linux/panic_notifier.h>
 
 #include "cs_driver.h"
 #include "device_mgmt.h"
@@ -23,9 +24,12 @@
 
 #include "eip_device.h"
 #include "eip_macsec.h"
+#include "eip_ipsec.h"
 #include "adapter_secy_support.h"
 #include "adapter_cfye_support.h"
 #include "eip_log.h"
+#include "eip_debugfs.h"
+#include "eip_reg.h"
 
 /* ETHSS_FHx_MACSEC_WRAPPER_CSR Init sequence offsets and recommended values*/
 #define MACSEC_WRAPPER_CFG_REG_OFFSET 0x000A8000
@@ -60,6 +64,7 @@ extern void Device_SetPlatform(uint32_t __iomem *BaseAddr_p,
 			       uint32_t device_id);
 
 #define MAX_CHANNELS_PER_PORT 4
+#define REG_SIZE 0x100000
 
 static const struct of_device_id eip_match[] = {
 	{
@@ -83,6 +88,64 @@ struct eip_device {
 #define EIP_CLK_NOM_MAX (EIP_CLK_FREQ(200.0))
 
 struct eip_device eip_device_platform_data[EIP_MAX_PORT];
+struct eip_port *eip_ports[EIP_MAX_PORT];
+
+static const unsigned int dump_regs_list[] = {
+	0x5410, 0x5414, 0xAD10, 0xAD14, 0xAD10, 0xAD14,
+};
+
+uint32_t eip_reg_dump[EIP_MAX_PORT][REG_SIZE / sizeof(uint32_t)];
+
+void eip_cache_register(unsigned int port_id, unsigned int byte_offset,
+			uint32_t val)
+{
+	if ((port_id < EIP_MAX_PORT) && (byte_offset < REG_SIZE)) {
+		eip_reg_dump[port_id][byte_offset / 4] = val;
+	} else {
+		eip_logerr("Invalid Index: port_id: %d, byte_offset: %d ",
+			   port_id, byte_offset);
+	}
+}
+
+static uint32_t eip_reg_read(struct eip_port *port, unsigned int offset)
+{
+	uint32_t val;
+	val = readl(port->base_addr + offset);
+	eip_cache_register(port->id, offset, val);
+	return val;
+}
+
+static void eip_reg_write(struct eip_port *port, unsigned int offset,
+			  uint32_t val)
+{
+	writel(val, port->base_addr + offset);
+	eip_cache_register(port->id, offset, val);
+}
+
+static void eip_read_reg_list(struct eip_port *port)
+{
+	unsigned int i;
+	for (i = 0; i < ARRAY_SIZE(dump_regs_list); i++) {
+		(void)eip_reg_read(port, dump_regs_list[i]);
+	}
+}
+
+static int eip_panic_notifier(struct notifier_block *this, unsigned long event,
+			      void *ptr)
+{
+	unsigned int i = 0;
+	eip_loginfo("eip panic notifier entry");
+	for (i = 0; i < EIP_MAX_PORT; i++) {
+		if (eip_ports[i]->base_addr)
+			eip_read_reg_list(eip_ports[i]);
+	}
+	eip_loginfo("eip panic notifier exit");
+	return NOTIFY_DONE;
+}
+
+static struct notifier_block eip_panic_nb = {
+	.notifier_call = eip_panic_notifier,
+};
 
 static void eip_secy_cfye_spinlock_init(void)
 {
@@ -237,18 +300,15 @@ static int eip_port_deinit(uint32_t port_id)
 	return 0;
 }
 
-static inline void wrapper_bypass_set(u32 port_id, bool enable)
+static inline void wrapper_bypass_set(struct eip_port *port, bool enable)
 {
 	u32 enable_val;
 
 	enable_val =
 		enable ? EIP_WRAPPER_BYPASS_ENABLE : EIP_WRAPPER_BYPASS_DISABLE;
-	writel(enable_val, eip_device_platform_data[port_id].eip_base +
-				   WRAPPER_MACSEC_BYPASS_REG_OFFSET);
+	eip_reg_write(port, WRAPPER_MACSEC_BYPASS_REG_OFFSET, enable_val);
 	pr_info(" eip_main: wrapper bypass ddr = 0x%x, val = %d \n",
-		eip_device_platform_data[port_id].eip_base +
-			WRAPPER_MACSEC_BYPASS_REG_OFFSET,
-		enable_val);
+		port->base_addr + WRAPPER_MACSEC_BYPASS_REG_OFFSET, enable_val);
 }
 
 static int eip_mtip_link_config(struct mtip_security_device *sdev,
@@ -279,10 +339,10 @@ static int eip_mtip_link_config(struct mtip_security_device *sdev,
 		eip_logerr("Invalid link configuration %d\n", active_links);
 		return -EINVAL;
 	}
-	writel(mcsc_calendar_val, port->base_addr + MCSC_CALENDAR_CFG_REG);
+	eip_reg_write(port, MCSC_CALENDAR_CFG_REG, mcsc_calendar_val);
 	eip_logdbg("MCSC_CALENDAR_CFG_REG  ddr = 0x%X, Write val = 0x%X\n",
 		   port->base_addr + MCSC_CALENDAR_CFG_REG, mcsc_calendar_val);
-	writel(mcsc_eip218_amf_val, port->base_addr + MCSC_EIP218_AMF_CFG_REG);
+	eip_reg_write(port, MCSC_EIP218_AMF_CFG_REG, mcsc_eip218_amf_val);
 	eip_logdbg("MCSC_EIP218_AMF_CFG_REG  ddr = 0x%X, Write val = 0x%X\n",
 		   port->base_addr + MCSC_EIP218_AMF_CFG_REG,
 		   mcsc_eip218_amf_val);
@@ -297,46 +357,46 @@ static inline void macsec_wrapper_init_config(struct mtip_security_device *sdev)
 	u32 val;
 	struct eip_port *port = (struct eip_port *)sdev->sec_priv;
 	val = RATE_CTRL_BUF_EN;
-	writel(val, port->base_addr + MACSEC_WRAPPER_CFG_REG_OFFSET);
+	eip_reg_write(port, MACSEC_WRAPPER_CFG_REG_OFFSET, val);
 	pr_info(" eip_main: MACSEC_WRAPPER_CFG_REG  ddr = 0x%x, val = %d \n",
 		port->base_addr + MACSEC_WRAPPER_CFG_REG_OFFSET, val);
 
 	val = AMF_CFG_REG_VAL;
-	writel(val, port->base_addr + MCSC_AMF_CFG_REG);
+	eip_reg_write(port, MCSC_AMF_CFG_REG, val);
 	pr_info(" eip_main: MCSC_AMF_CFG_REG  ddr = 0x%x, val = %d \n",
 		port->base_addr + MCSC_AMF_CFG_REG, val);
 
 	val = MCSC_CALENDAR_CFG_REG_VAL_4_LINKS;
-	writel(val, port->base_addr + MCSC_CALENDAR_CFG_REG);
+	eip_reg_write(port, MCSC_CALENDAR_CFG_REG, val);
 	eip_logdbg("MCSC_CALENDAR_CFG_REG  ddr = 0x%X, Write val = 0x%X\n",
 		   port->base_addr + MCSC_CALENDAR_CFG_REG, val);
 
 	val = MCSC_EIP218_AMF_CFG_REG_VAL_4_LINKS;
-	writel(val, port->base_addr + MCSC_EIP218_AMF_CFG_REG);
+	eip_reg_write(port, MCSC_EIP218_AMF_CFG_REG, val);
 	eip_logdbg("MCSC_EIP218_AMF_CFG_REG  ddr = 0x%X, Write val = 0x%X\n",
 		   port->base_addr + MCSC_EIP218_AMF_CFG_REG, val);
 
 	val = EIP218_CONTROL_IFG_BYTES | EIP218_CONTROL_MODULO_8 |
 	      EIP218_CONTROL_MODE_SELECT;
-	writel(val, port->base_addr + ETHSS_FH0_EIP218_0_CONTROL);
+	eip_reg_write(port, ETHSS_FH0_EIP218_0_CONTROL, val);
 	pr_info(" eip_main: ETHSS_FH0_EIP218_0_CONTROL  ddr = 0x%x, val = %d \n",
 		port->base_addr + ETHSS_FH0_EIP218_0_CONTROL, val);
 
 	val = EIP218_CONTROL_IFG_BYTES | EIP218_CONTROL_MODULO_8 |
 	      EIP218_CONTROL_MODE_SELECT;
-	writel(val, port->base_addr + ETHSS_FH0_EIP218_1_CONTROL);
+	eip_reg_write(port, ETHSS_FH0_EIP218_1_CONTROL, val);
 	pr_info(" eip_main: ETHSS_FH0_EIP218_1_CONTROL  ddr = 0x%x, val = %d \n",
 		port->base_addr + ETHSS_FH0_EIP218_1_CONTROL, val);
 
 	val = EIP218_CONTROL_IFG_BYTES | EIP218_CONTROL_MODULO_8 |
 	      EIP218_CONTROL_MODE_SELECT;
-	writel(val, port->base_addr + ETHSS_FH0_EIP218_2_CONTROL);
+	eip_reg_write(port, ETHSS_FH0_EIP218_2_CONTROL, val);
 	pr_info(" eip_main: ETHSS_FH0_EIP218_2_CONTROL  ddr = 0x%x, val = %d \n",
 		port->base_addr + ETHSS_FH0_EIP218_2_CONTROL, val);
 
 	val = EIP218_CONTROL_IFG_BYTES | EIP218_CONTROL_MODULO_8 |
 	      EIP218_CONTROL_MODE_SELECT;
-	writel(val, port->base_addr + ETHSS_FH0_EIP218_3_CONTROL);
+	eip_reg_write(port, ETHSS_FH0_EIP218_3_CONTROL, val);
 	pr_info(" eip_main: ETHSS_FH0_EIP218_3_CONTROL  ddr = 0x%x, val = %d \n",
 		port->base_addr + ETHSS_FH0_EIP218_3_CONTROL, val);
 }
@@ -365,6 +425,8 @@ static int eip_mtip_add_link(struct net_device *ndev,
 		    link->rx.ch, tx_sec->port_id, link->tx.dp->devid,
 		    link->tx.ch);
 
+	eip_ipsec_init_link(link);
+
 	mtip_security_set_priv(ndev, link);
 
 	return 0;
@@ -374,8 +436,7 @@ static void eip_mtip_del_link(struct net_device *ndev)
 {
 	struct eip_link *link = (struct eip_link *)mtip_security_get_priv(ndev);
 
-	/* Necessary cleanup */
-
+	eip_ipsec_deinit_link(link);
 	kfree(link);
 }
 
@@ -415,12 +476,24 @@ static int eip_mtip_disable_bypass(struct net_device *ndev)
 		(struct eip_link *)mtip_security_get_priv(ndev), false);
 }
 
+static int eip_mtip_fixup_rx_skb(struct sk_buff *skb)
+{
+	return eip_ipsec_fixup_rx_skb(skb);
+}
+
+static int eip_mtip_fixup_tx_skb(struct sk_buff *skb)
+{
+	return eip_ipsec_fixup_tx_skb(skb);
+}
+
 static struct mtip_security_ops mtip_sec_ops = {
 	.add_link = eip_mtip_add_link,
 	.del_link = eip_mtip_del_link,
 	.enable_bypass = eip_mtip_enable_bypass,
 	.disable_bypass = eip_mtip_disable_bypass,
-	.update_config = eip_mtip_link_config
+	.update_config = eip_mtip_link_config,
+	.fixup_rx_skb = eip_mtip_fixup_rx_skb,
+	.fixup_tx_skb = eip_mtip_fixup_tx_skb,
 };
 
 static int eip_probe(struct platform_device *pdev)
@@ -481,6 +554,7 @@ static int eip_probe(struct platform_device *pdev)
 		return PTR_ERR(eip_device_platform_data[port_id].eip_base);
 	}
 	port->base_addr = eip_device_platform_data[port_id].eip_base;
+	eip_ports[port_id] = port;
 
 	/* Get IRQ details */
 	irq_resource =
@@ -503,7 +577,7 @@ static int eip_probe(struct platform_device *pdev)
 	Device_SetPlatform(eip_device_platform_data[port_id].eip_base,
 			   eip_device_platform_data[port_id].egress_device_id);
 
-	wrapper_bypass_set(port_id, false);
+	wrapper_bypass_set(port, false);
 
 	ret = eip_port_init(port_id);
 	if (ret < 0) {
@@ -515,10 +589,30 @@ static int eip_probe(struct platform_device *pdev)
 	port->msec_dev.ops = &mtip_sec_ops;
 	port->msec_dev.sec_priv = port;
 	macsec_wrapper_init_config(&port->msec_dev);
-	mtip_security_register_device(&port->msec_dev);
 
+	ret = eip_debugfs_add_port(port);
+	if (ret) {
+		eip_logerr("Failed, debugfs add port %d", port->id);
+		goto fail_debugfs;
+	}
+
+	ret = mtip_security_register_device(&port->msec_dev);
+	if (ret) {
+		eip_logerr("mtip_security register_device, return error ");
+		goto fail_mtip_register_dev;
+	}
+
+	goto success;
+
+fail_mtip_register_dev:
+	eip_debugfs_remove_port(port);
+fail_debugfs:
+	wrapper_bypass_set(port, true);
+	eip_port_deinit(port->id);
+	return ret;
+
+success:
 	eip_loginfo("eip_main: eip device init done");
-
 	return ret;
 }
 
@@ -527,16 +621,17 @@ static int eip_remove(struct platform_device *pdev)
 	int ret = 0;
 	struct eip_port *port = (struct eip_port *)platform_get_drvdata(pdev);
 
-	LOG_CRIT("eip_main: Currently not supported ");
-
 	mtip_security_unregister_device(&port->msec_dev);
+	eip_debugfs_remove_port(port);
 
-	wrapper_bypass_set(port->id, true);
+	wrapper_bypass_set(port, true);
 
 	ret = eip_port_deinit(port->id);
 	if (!ret)
 		LOG_CRIT("eip_main: Device %d uniniatlized succesfully",
 			 port->id);
+
+	eip_ports[port->id] = NULL;
 
 	return ret;
 }
@@ -571,12 +666,26 @@ static int eip_module_init(void)
 	if (ret)
 		goto device_init_fail;
 
+	ret = eip_debugfs_init();
+	if (ret) {
+		pr_err("eip_main: eip_debugfs_init with error: %d\n", ret);
+		goto debugfs_init_fail;
+	}
+
 	ret = platform_driver_register(&eip_driver);
 	if (ret) {
 		pr_err("eip_main: platform_driver_register with error: %d\n",
 		       ret);
 		goto platform_reg_fail;
 	}
+
+	ret = atomic_notifier_chain_register(&panic_notifier_list,
+					     &eip_panic_nb);
+	if (ret) {
+		eip_logerr("Failed to add into panic notifier chain");
+		goto panic_notifier_fail;
+	}
+
 	ret = macsec_eth_set_macsec_ops(&eip_macsec_ops);
 	if (ret) {
 		pr_err("eip_main: macsec_eth_set_macsec_ops failed with ret %d\n",
@@ -589,8 +698,12 @@ static int eip_module_init(void)
 	return ret;
 
 macsec_ops_fail:
+	atomic_notifier_chain_unregister(&panic_notifier_list, &eip_panic_nb);
+panic_notifier_fail:
 	platform_driver_unregister(&eip_driver);
 platform_reg_fail:
+	eip_debugfs_deinit();
+debugfs_init_fail:
 	Device_UnInitialize();
 device_init_fail:
 	eip_log_deinit();
@@ -601,7 +714,9 @@ device_init_fail:
 static void eip_module_exit(void)
 {
 	printk("eip_main: eip_module_exit called\n");
+	atomic_notifier_chain_unregister(&panic_notifier_list, &eip_panic_nb);
 	platform_driver_unregister(&eip_driver);
+	eip_debugfs_deinit();
 	Device_UnInitialize();
 	eip_log_deinit();
 }

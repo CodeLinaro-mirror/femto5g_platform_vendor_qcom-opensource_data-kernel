@@ -21,4 +21,6 @@
 
 #define AW_POWERGATE_HIER_EN 0
 
+#define AW_POWERGATE_HIER_EN 0
+
 #endif

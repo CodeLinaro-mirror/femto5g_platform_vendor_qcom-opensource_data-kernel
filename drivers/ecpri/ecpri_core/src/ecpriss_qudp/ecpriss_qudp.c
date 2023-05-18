@@ -614,11 +614,11 @@ void ecpriss_qudp_ingress_config_stats_update_v2(int32_t fh_index)
 						&ecpriss_pdata_v2->cfg_stats_v2.qudp_cfg_v2.ingress.cfg.vlan[fh_index][fltr_index]);
 			}
 		}
+		ecpriss_pdata_v2->cfg_stats_v2.qudp_cfg_v2.ingress.cfg.ip_addr[fh_index][fltr_index].dst_ip0.value = 0;
+		ecpriss_pdata_v2->cfg_stats_v2.qudp_cfg_v2.ingress.cfg.ip_addr[fh_index][fltr_index].dst_ip1.value = 0;
+		ecpriss_pdata_v2->cfg_stats_v2.qudp_cfg_v2.ingress.cfg.ip_addr[fh_index][fltr_index].dst_ip2.value = 0;
+		ecpriss_pdata_v2->cfg_stats_v2.qudp_cfg_v2.ingress.cfg.ip_addr[fh_index][fltr_index].dst_ip3.value = 0;
 		if(ecpriss_pdata_v2->cfg_stats_v2.qudp_cfg_v2.ingress.cfg.global_cfg[fh_index].enable_ip_dst_filt){
-			ecpriss_pdata_v2->cfg_stats_v2.qudp_cfg_v2.ingress.cfg.ip_addr[fh_index][fltr_index].dst_ip0.value = 0;
-			ecpriss_pdata_v2->cfg_stats_v2.qudp_cfg_v2.ingress.cfg.ip_addr[fh_index][fltr_index].dst_ip1.value = 0;
-			ecpriss_pdata_v2->cfg_stats_v2.qudp_cfg_v2.ingress.cfg.ip_addr[fh_index][fltr_index].dst_ip2.value = 0;
-			ecpriss_pdata_v2->cfg_stats_v2.qudp_cfg_v2.ingress.cfg.ip_addr[fh_index][fltr_index].dst_ip3.value = 0;
 			if(ecpriss_pdata_v2->cfg_stats_v2.qudp_cfg_v2.ingress.vbits.ip_addr[fh_index].valid_bits & flag){
 				ecpriss_qudp_hal_read_reg_mn_fields(ECPRISS_QUDP_FH_FILTER,
 						ECPRI_UDP_FH_FILT_IP_DST_ADDR0_PORT_p_ENTRY_n_V2,
@@ -645,8 +645,8 @@ void ecpriss_qudp_ingress_config_stats_update_v2(int32_t fh_index)
 						&ecpriss_pdata_v2->cfg_stats_v2.qudp_cfg_v2.ingress.cfg.ip_addr[fh_index][fltr_index].dst_ip3);
 			}
 		}
+		ecpriss_pdata_v2->cfg_stats_v2.qudp_cfg_v2.ingress.cfg.udp_clss[fh_index][fltr_index].value = 0;
 		if(ecpriss_pdata_v2->cfg_stats_v2.qudp_cfg_v2.ingress.cfg.global_cfg[fh_index].enable_udp_dst_class){
-			ecpriss_pdata_v2->cfg_stats_v2.qudp_cfg_v2.ingress.cfg.udp_clss[fh_index][fltr_index].value = 0;
 			if(ecpriss_pdata_v2->cfg_stats_v2.qudp_cfg_v2.ingress.vbits.udp_clss[fh_index].valid_bits & flag){
 				ecpriss_qudp_hal_read_reg_mn_fields(ECPRISS_QUDP_FH_FILTER,
 						ECPRI_UDP_FH_UDP_CLASSIFICATION_LIST_PORT_p_ENTRY_n_V2,
@@ -655,9 +655,9 @@ void ecpriss_qudp_ingress_config_stats_update_v2(int32_t fh_index)
 						&ecpriss_pdata_v2->cfg_stats_v2.qudp_cfg_v2.ingress.cfg.udp_clss[fh_index][fltr_index]);
 			}
 		}
+		ecpriss_pdata_v2->cfg_stats_v2.qudp_cfg_v2.ingress.cfg.mac_addr[fh_index][fltr_index].mac_lsb.value = 0;
+		ecpriss_pdata_v2->cfg_stats_v2.qudp_cfg_v2.ingress.cfg.mac_addr[fh_index][fltr_index].mac_msb.value = 0;
 		if(ecpriss_pdata_v2->cfg_stats_v2.qudp_cfg_v2.ingress.cfg.global_cfg[fh_index].enable_mac_dst_check && fltr_index <= 4){
-			ecpriss_pdata_v2->cfg_stats_v2.qudp_cfg_v2.ingress.cfg.mac_addr[fh_index][fltr_index].mac_lsb.value = 0;
-			ecpriss_pdata_v2->cfg_stats_v2.qudp_cfg_v2.ingress.cfg.mac_addr[fh_index][fltr_index].mac_msb.value = 0;
 			if(ecpriss_pdata_v2->cfg_stats_v2.qudp_cfg_v2.ingress.vbits.mac_addr[fh_index].valid_bits & flag){
 				ecpriss_qudp_hal_read_reg_mn_fields(ECPRISS_QUDP_FH_FILTER,
 						ECPRI_UDP_FH_FILT_MAC_ADDRESS_LSB_PORT_p_ENTRY_n_V2,
@@ -2380,6 +2380,9 @@ static irqreturn_t ecpriss_qudp_isr_v2(int irq, void *ctxt)
 				port_index,
 				&fh_udp_sw_irq_status_1_port_p);
 
+		memcpy(&ecpriss_pdata_v2->qudp_ctx_v2->fh_port_cfg_v2[port_index].interrupt_cfg_v2.fh_udp_sw_irq_status_0_port_p,&fh_udp_sw_irq_status_0_port_p,sizeof(fh_udp_sw_irq_status_0_port_p));
+		memcpy(&ecpriss_pdata_v2->qudp_ctx_v2->fh_port_cfg_v2[port_index].interrupt_cfg_v2.fh_udp_sw_irq_status_1_port_p,&fh_udp_sw_irq_status_1_port_p,sizeof(fh_udp_sw_irq_status_1_port_p));
+
 		if(fh_udp_sw_irq_status_0_port_p.ingress_vlan_filtered_packet_link_0) {
 			fh_udp_sw_irq_clr_0_port_p.ingress_vlan_filtered_packet_link_0 = 1;
 			ecpriss_pdata_v2->qudp_ctx_v2->fh_port_cfg_v2[port_index].interrupt_stats_v2.ingress_vlan_filtered_packet_link[0]++;
@@ -2744,7 +2747,6 @@ static int ecpriss_irq_init_v2(ecpriss_qudp_interrupt_events_e qudp_irq,
 		struct device *dev)
 {
 	int res= 0;
-
 	struct platform_device *pdev = NULL;
 	/*
 	 *	 * c2c and l2 are not supported for now
@@ -2790,6 +2792,21 @@ static int ecpriss_irq_init_v2(ecpriss_qudp_interrupt_events_e qudp_irq,
 	return res;
 }
 
+void ecpriss_qudp_irq_destroy_v2(void)
+{
+	uint32_t i = 0;
+
+	for(i=0; i < QUDP_IRQ_MAX; i++){
+		if((i == ECPRISS_UDP_FH_IRQ_PORT0) ||
+				(i == ECPRISS_UDP_FH_IRQ_PORT1) ||
+				(i == ECPRISS_UDP_FH_IRQ_PORT2)){
+
+			disable_irq_wake(qudp_irq_mapping[i]);
+			free_irq(qudp_irq_mapping[i],NULL);
+		}
+	}
+
+}
 
 /**
  * ecpri_qudp_reg_irq
@@ -2838,7 +2855,6 @@ static int ecpriss_qudp_register_interrupts_v2(uint8_t                 port_inde
 		ecpriss_port_type_e     port_type,
 		struct device						*dev)
 {
-	int res = 0;
 	do{
 		if(port_type == ECPRISS_PORT_TYPE_FH)
 		{
@@ -2868,11 +2884,11 @@ static int ecpriss_qudp_register_interrupts_v2(uint8_t                 port_inde
 	}while (0);
 
 
-	return res;
+	return 0;
 }
 
 
-
+/*
 static void ecpriss_qudp_enable_interrupts(uint8_t                 port_index,
 		uint32_t                 port_type)
 {
@@ -2963,6 +2979,33 @@ static void ecpriss_qudp_enable_interrupts(uint8_t                 port_index,
 		fh_udp_sw_irq_mask_1_port_p.ingress_trap_rule_2_link_3 = 1;
 		fh_udp_sw_irq_mask_1_port_p.ingress_trap_rule_3_link_3 = 1;
 		fh_udp_sw_irq_mask_1_port_p.ingress_last_in_chain_non_local_dst_packet_link_3 = 1;
+
+		ecpriss_qudp_hal_write_reg_n_fields(ECPRISS_QUDP_FH,
+				ECPRI_UDP_FH_UDP_SW_IRQ_MASK_0_PORT_P,
+				port_index,
+				&fh_udp_sw_irq_mask_0_port_p);
+
+		ecpriss_qudp_hal_write_reg_n_fields(ECPRISS_QUDP_FH,
+				ECPRI_UDP_FH_UDP_SW_IRQ_MASK_1_PORT_P,
+				port_index,
+				&fh_udp_sw_irq_mask_1_port_p);
+
+	}
+
+	return;
+}
+*/
+
+static void ecpriss_qudp_disable_interrupts(uint8_t                 port_index,
+		uint32_t                 port_type)
+{
+	ecpri_qudp_hwio_def_ecpri_udp_fh_udp_sw_irq_mask_0_port_p_s fh_udp_sw_irq_mask_0_port_p;
+	ecpri_qudp_hwio_def_ecpri_udp_fh_udp_sw_irq_mask_1_port_p_s fh_udp_sw_irq_mask_1_port_p;
+
+	memset(&fh_udp_sw_irq_mask_0_port_p , 0, sizeof(fh_udp_sw_irq_mask_0_port_p) );
+	memset(&fh_udp_sw_irq_mask_1_port_p , 0, sizeof(fh_udp_sw_irq_mask_1_port_p) );
+
+	if(port_type == ECPRISS_PORT_TYPE_FH) {
 
 		ecpriss_qudp_hal_write_reg_n_fields(ECPRISS_QUDP_FH,
 				ECPRI_UDP_FH_UDP_SW_IRQ_MASK_0_PORT_P,
@@ -3165,7 +3208,7 @@ int ecpriss_qudp_init(struct device *dev)
 					break;
 				}
 
-				ecpriss_qudp_enable_interrupts(port_idx,port_type);
+				ecpriss_qudp_disable_interrupts(port_idx,port_type);
 
 				/* ret = ecpriss_qudp_enable_stats(port_idx,port_type); */
 				if(ret < 0)
@@ -3250,6 +3293,8 @@ int ecpriss_qudp_init_v2(struct device *dev)
 
 		ecpriss_qudp_configure_mtu_v2();
 		ecpriss_qudp_non_ecpri_dma_ring_info();
+		ecpriss_filtering_enabled = 1;
+
 		ecpriss_pdata_v2->qudp_ctx_v2->state = ECPRI_QUDP_READY ;
 
 	}while (0);
@@ -3790,14 +3835,21 @@ static bool ecpriss_qudp_fh_rx_udp_filter_cfg(uint32_t port_index, ecpriss_qudp_
 int ecpriss_qudp_fh_rx_filter_cfg(uint32_t port_index, ecpriss_qudp_rx_cfg_s *rx_cfg)
 {
 	bool ret = false;
-
-	ret = ecpriss_qudp_fh_rx_ip_filter_cfg(port_index, rx_cfg);
-	if(ret == false){
-		ECPRILOGERR("IP filter Config validation failed \n");
+	if(ecpriss_filtering_enabled){
+		ret = ecpriss_qudp_fh_rx_ip_filter_cfg(port_index, rx_cfg);
+		if(ret == false){
+			ECPRILOGERR("IP filter Config validation failed \n");
+		}
+	}else{
+		ECPRILOGERR("Global filter config is disabled, Can't config IP filter \n");
 	}
-	ret = ecpriss_qudp_fh_rx_vlan_filter_cfg(port_index, rx_cfg);
-	if(ret == false){
-		ECPRILOGERR("Vlan filter config validation failed \n");
+	if(ecpriss_filtering_enabled){
+		ret = ecpriss_qudp_fh_rx_vlan_filter_cfg(port_index, rx_cfg);
+		if(ret == false){
+			ECPRILOGERR("Vlan filter config validation failed \n");
+		}
+	}else{
+		ECPRILOGERR("Global filter config is disabled, Can't config VLAN filter \n");
 	}
 	ret = ecpriss_qudp_fh_rx_udp_filter_cfg(port_index, rx_cfg);
 	if(ret == false){
@@ -4177,14 +4229,21 @@ static bool ecpriss_qudp_fh_rx_udp_filter_cfg_v2(uint32_t port_index, ecpriss_qu
 int ecpriss_qudp_fh_rx_filter_cfg_v2(uint32_t port_index, ecpriss_qudp_rx_cfg_s *rx_cfg)
 {
 	bool ret = false;
-
-	ret = ecpriss_qudp_fh_rx_ip_filter_cfg_v2(port_index, rx_cfg);
-	if(ret == false){
-		ECPRILOGERR("IP filter Config validation failed \n");
+	if(ecpriss_filtering_enabled){
+		ret = ecpriss_qudp_fh_rx_ip_filter_cfg_v2(port_index, rx_cfg);
+		if(ret == false){
+			ECPRILOGERR("IP filter Config validation failed \n");
+		}
+	}else{
+		ECPRILOGERR("Global filter config is disabled, Can't config IP filter \n");
 	}
-	ret = ecpriss_qudp_fh_rx_vlan_filter_cfg_v2(port_index, rx_cfg);
-	if(ret == false){
-		ECPRILOGERR("Vlan filter config validation failed \n");
+	if(ecpriss_filtering_enabled){
+		ret = ecpriss_qudp_fh_rx_vlan_filter_cfg_v2(port_index, rx_cfg);
+		if(ret == false){
+			ECPRILOGERR("Vlan filter config validation failed \n");
+		}
+	}else{
+		ECPRILOGERR("Global filter config is disabled, Can't config VLAN filter \n");
 	}
 	ret = ecpriss_qudp_fh_rx_udp_filter_cfg_v2(port_index, rx_cfg);
 	if(ret == false){
@@ -4725,6 +4784,8 @@ int ecpriss_qudp_fh_tx_hdr_ins_cfg_v2(uint32_t               port_index,
 	ecpri_qudp_hwio_def_ecpri_udp_fh_egress_sa_tag_ip_tos_misc_port_p_entry_n_s_v2   ip_opts = {0};
 
 
+	ecpriss_qudp_egress_per_port_cfg_s_v2 *qudp_egress_port =
+		&ecpriss_pdata_v2->qudp_ctx_v2->fh_port_cfg_v2[port_index].egress_cfg;
 	do
 	{
 		if(tx_cfg == NULL) {
@@ -4745,6 +4806,8 @@ int ecpriss_qudp_fh_tx_hdr_ins_cfg_v2(uint32_t               port_index,
 				tx_cfg->l2_hdr_tbl_idx,
 				&eth_dst0_port);
 
+		memcpy(&qudp_egress_port->eth_dst0_port[tx_cfg->l2_hdr_tbl_idx],&eth_dst0_port,sizeof(eth_dst0_port));
+
 		eth_src1_dst1_port.dst_msb = ((tx_cfg->eth_hdr.dst_mac_addr[1]) | (tx_cfg->eth_hdr.dst_mac_addr[0] << 8));
 		eth_src1_dst1_port.src_msb = ((tx_cfg->eth_hdr.src_mac_addr[1]) | (tx_cfg->eth_hdr.src_mac_addr[0] << 8));
 
@@ -4756,6 +4819,7 @@ int ecpriss_qudp_fh_tx_hdr_ins_cfg_v2(uint32_t               port_index,
 				&eth_src1_dst1_port);
 
 
+		memcpy(&qudp_egress_port->eth_src1_dst1_port[tx_cfg->l2_hdr_tbl_idx],&eth_src1_dst1_port,sizeof(eth_src1_dst1_port));
 
 		eth_src0_port.value = ((tx_cfg->eth_hdr.src_mac_addr[5]) | (tx_cfg->eth_hdr.src_mac_addr[4] << 8)
 				| (tx_cfg->eth_hdr.src_mac_addr[3] << 16) | (tx_cfg->eth_hdr.src_mac_addr[2]) << 24);
@@ -4767,6 +4831,7 @@ int ecpriss_qudp_fh_tx_hdr_ins_cfg_v2(uint32_t               port_index,
 				port_index,
 				tx_cfg->l2_hdr_tbl_idx,
 				&eth_src0_port);
+		memcpy(&qudp_egress_port->eth_src0_port[tx_cfg->l2_hdr_tbl_idx],&eth_src0_port,sizeof(eth_src0_port));
 
 		vlan_ethertype_port.ethertype = tx_cfg->eth_hdr.orig_ethertype;
 
@@ -4778,6 +4843,7 @@ int ecpriss_qudp_fh_tx_hdr_ins_cfg_v2(uint32_t               port_index,
 				tx_cfg->l2_hdr_tbl_idx,
 				&vlan_ethertype_port);
 
+		memcpy(&qudp_egress_port->vlan_ethertype[tx_cfg->l2_hdr_tbl_idx],&vlan_ethertype_port,sizeof(vlan_ethertype_port));
 		vport_misc_port.vport = tx_cfg->eth_hdr.vport;
 
 		vport_misc_port.has_vlan = tx_cfg->eth_hdr.is_vlan;
@@ -4801,6 +4867,9 @@ int ecpriss_qudp_fh_tx_hdr_ins_cfg_v2(uint32_t               port_index,
 					tx_cfg->l3_hdr_tbl_idx,
 					&ip_src0);
 
+
+			memcpy(&qudp_egress_port->src_ip_addr[tx_cfg->l3_hdr_tbl_idx].ip_src0,&ip_src0,sizeof(ip_src0));
+
 			ip_dst0.value |= ((tx_cfg->ip_hdr.dst_ip_addr[3]) | (tx_cfg->ip_hdr.dst_ip_addr[2] << 8) | (tx_cfg->ip_hdr.dst_ip_addr[1] << 16)
 					| (tx_cfg->ip_hdr.dst_ip_addr[0] << 24));
 
@@ -4809,6 +4878,7 @@ int ecpriss_qudp_fh_tx_hdr_ins_cfg_v2(uint32_t               port_index,
 					port_index,
 					tx_cfg->l3_hdr_tbl_idx,
 					&ip_dst0);
+			memcpy(&qudp_egress_port->dst_ip_addr[tx_cfg->l3_hdr_tbl_idx].ip_dst0,&ip_dst0,sizeof(ip_dst0));
 
 			if(tx_cfg->ip_hdr.ip_type == ECPRISS_IPV6_TYPE)
 			{
@@ -4821,6 +4891,7 @@ int ecpriss_qudp_fh_tx_hdr_ins_cfg_v2(uint32_t               port_index,
 						port_index,
 						tx_cfg->l3_hdr_tbl_idx,
 						&ip_src1);
+			memcpy(&qudp_egress_port->src_ip_addr[tx_cfg->l3_hdr_tbl_idx].ip_src1,&ip_src1,sizeof(ip_src0));
 
 				ip_src2.value |= ((tx_cfg->ip_hdr.src_ip_addr[11]) | (tx_cfg->ip_hdr.src_ip_addr[10] << 8) | (tx_cfg->ip_hdr.src_ip_addr[9] << 16)
 						| (tx_cfg->ip_hdr.src_ip_addr[8] << 24));
@@ -4831,6 +4902,7 @@ int ecpriss_qudp_fh_tx_hdr_ins_cfg_v2(uint32_t               port_index,
 						tx_cfg->l3_hdr_tbl_idx,
 						&ip_src2);
 
+			memcpy(&qudp_egress_port->src_ip_addr[tx_cfg->l3_hdr_tbl_idx].ip_src2,&ip_src0,sizeof(ip_src2));
 				ip_src3.value |= ((tx_cfg->ip_hdr.src_ip_addr[15]) | (tx_cfg->ip_hdr.src_ip_addr[14] << 8) | (tx_cfg->ip_hdr.src_ip_addr[13] << 16)
 						| (tx_cfg->ip_hdr.src_ip_addr[12] << 24));
 
@@ -4840,6 +4912,7 @@ int ecpriss_qudp_fh_tx_hdr_ins_cfg_v2(uint32_t               port_index,
 						tx_cfg->l3_hdr_tbl_idx,
 						&ip_src3);
 
+			memcpy(&qudp_egress_port->src_ip_addr[tx_cfg->l3_hdr_tbl_idx].ip_src3,&ip_src0,sizeof(ip_src3));
 				ip_dst1.value |= ((tx_cfg->ip_hdr.dst_ip_addr[7]) | (tx_cfg->ip_hdr.dst_ip_addr[6] << 8) | (tx_cfg->ip_hdr.dst_ip_addr[5] << 16)
 						| (tx_cfg->ip_hdr.dst_ip_addr[4] << 24));
 
@@ -4848,6 +4921,7 @@ int ecpriss_qudp_fh_tx_hdr_ins_cfg_v2(uint32_t               port_index,
 						port_index,
 						tx_cfg->l3_hdr_tbl_idx,
 						&ip_dst1);
+			memcpy(&qudp_egress_port->dst_ip_addr[tx_cfg->l3_hdr_tbl_idx].ip_dst1,&ip_dst1,sizeof(ip_dst1));
 
 				ip_dst2.value |= ((tx_cfg->ip_hdr.dst_ip_addr[11]) | (tx_cfg->ip_hdr.dst_ip_addr[10] << 8) | (tx_cfg->ip_hdr.dst_ip_addr[9] << 16)
 						| (tx_cfg->ip_hdr.dst_ip_addr[8] << 24));
@@ -4858,6 +4932,7 @@ int ecpriss_qudp_fh_tx_hdr_ins_cfg_v2(uint32_t               port_index,
 						tx_cfg->l3_hdr_tbl_idx,
 						&ip_dst2);
 
+			memcpy(&qudp_egress_port->dst_ip_addr[tx_cfg->l3_hdr_tbl_idx].ip_dst2,&ip_dst2,sizeof(ip_dst2));
 				ip_dst3.value |= ((tx_cfg->ip_hdr.dst_ip_addr[15]) | (tx_cfg->ip_hdr.dst_ip_addr[14] << 8) | (tx_cfg->ip_hdr.dst_ip_addr[13] << 16)
 						| (tx_cfg->ip_hdr.dst_ip_addr[12] << 24));
 
@@ -4866,6 +4941,8 @@ int ecpriss_qudp_fh_tx_hdr_ins_cfg_v2(uint32_t               port_index,
 						port_index,
 						tx_cfg->l3_hdr_tbl_idx,
 						&ip_dst3);
+
+			memcpy(&qudp_egress_port->dst_ip_addr[tx_cfg->l3_hdr_tbl_idx].ip_dst3,&ip_dst3,sizeof(ip_dst3));
 
 			}
 
@@ -4878,6 +4955,7 @@ int ecpriss_qudp_fh_tx_hdr_ins_cfg_v2(uint32_t               port_index,
 					tx_cfg->l3_hdr_tbl_idx,
 					&udp_port);
 
+		memcpy(&qudp_egress_port->udp_ports[tx_cfg->l3_hdr_tbl_idx],&udp_port,sizeof(udp_port));
 
 			ip_opts.sa_tag_data = tx_cfg->ip_hdr.sa_tag_data ;
 			ip_opts.tos = tx_cfg->ip_hdr.tos;
@@ -4892,8 +4970,16 @@ int ecpriss_qudp_fh_tx_hdr_ins_cfg_v2(uint32_t               port_index,
 				port_index,
 				tx_cfg->l3_hdr_tbl_idx,
 				&ip_opts);
-		}
 
+		if(!qudp_egress_port->l3_tbl_valid_entry[tx_cfg->l3_hdr_tbl_idx]){
+			qudp_egress_port->l3_tbl_valid_entry[tx_cfg->l3_hdr_tbl_idx] = true;
+			qudp_egress_port->num_l3_tbl_entries++;
+		}
+		}
+		if(!qudp_egress_port->l2_tbl_valid_entry[tx_cfg->l2_hdr_tbl_idx]){
+			qudp_egress_port->l2_tbl_valid_entry[tx_cfg->l2_hdr_tbl_idx] = true;
+			qudp_egress_port->num_l2_tbl_entries++;
+		}
 	}while(0);
 	return 0;
 }

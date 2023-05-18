@@ -34,7 +34,7 @@ typedef struct{
 	uint32_t source_len;
 }parser_s;
 int isv2 = 1;
-/*****/
+
 // Debugfs
 typedef enum config_param{
 	FHRX,
@@ -1509,6 +1509,72 @@ static ssize_t config_val_from_registers_qudp_ingress_global_cfg_v2(char __user 
 					max_str_size);
 			strlcat(max_str, "\n",
 					max_str_size);
+
+			scnprintf(temp_stat_val_str, TEMP_STAT_VAL_STR_MAX_SIZE, "%u",
+					ecpriss_pdata_v2->cfg_stats_v2.qudp_cfg_v2.ingress.cfg.global_cfg[fh_index].enable_ip_dst_filt);
+
+			strlcat(max_str, "enable_ip_dst_filt_fh_",
+					max_str_size);
+			strlcat(max_str, fh_str,
+					max_str_size);
+			strlcat(max_str, ":", max_str_size);
+			strlcat(max_str, temp_stat_val_str,
+					max_str_size);
+			strlcat(max_str, "\n",
+					max_str_size);
+
+			scnprintf(temp_stat_val_str, TEMP_STAT_VAL_STR_MAX_SIZE, "%u",
+					ecpriss_pdata_v2->cfg_stats_v2.qudp_cfg_v2.ingress.cfg.global_cfg[fh_index].enable_udp_cs_check);
+
+			strlcat(max_str, "enable_udp_cs_check_fh_",
+					max_str_size);
+			strlcat(max_str, fh_str,
+					max_str_size);
+			strlcat(max_str, ":", max_str_size);
+			strlcat(max_str, temp_stat_val_str,
+					max_str_size);
+			strlcat(max_str, "\n",
+					max_str_size);
+
+			scnprintf(temp_stat_val_str, TEMP_STAT_VAL_STR_MAX_SIZE, "%u",
+					ecpriss_pdata_v2->cfg_stats_v2.qudp_cfg_v2.ingress.cfg.global_cfg[fh_index].ip_filt_miss_action);
+
+			strlcat(max_str, "ip_filt_miss_action_fh_",
+					max_str_size);
+			strlcat(max_str, fh_str,
+					max_str_size);
+			strlcat(max_str, ":", max_str_size);
+			strlcat(max_str, temp_stat_val_str,
+					max_str_size);
+			strlcat(max_str, "\n",
+					max_str_size);
+
+			scnprintf(temp_stat_val_str, TEMP_STAT_VAL_STR_MAX_SIZE, "%u",
+					ecpriss_pdata_v2->cfg_stats_v2.qudp_cfg_v2.ingress.cfg.global_cfg[fh_index].ip_len_err_action);
+
+			strlcat(max_str, "ip_len_err_action_fh_",
+					max_str_size);
+			strlcat(max_str, fh_str,
+					max_str_size);
+			strlcat(max_str, ":", max_str_size);
+			strlcat(max_str, temp_stat_val_str,
+					max_str_size);
+			strlcat(max_str, "\n",
+					max_str_size);
+
+			scnprintf(temp_stat_val_str, TEMP_STAT_VAL_STR_MAX_SIZE, "%u",
+					ecpriss_pdata_v2->cfg_stats_v2.qudp_cfg_v2.ingress.cfg.global_cfg[fh_index].vlan_filt_miss_action);
+
+			strlcat(max_str, "vlan_filt_miss_action_fh_",
+					max_str_size);
+			strlcat(max_str, fh_str,
+					max_str_size);
+			strlcat(max_str, ":", max_str_size);
+			strlcat(max_str, temp_stat_val_str,
+					max_str_size);
+			strlcat(max_str, "\n",
+					max_str_size);
+
 
 
 		data_size = strlen(max_str);
@@ -6001,6 +6067,7 @@ static ssize_t cfg_value_to_qudp_ecpriss_filt(struct file *file, const  char __u
 		count = len - *ppos;
 	}
 	*ppos += count;
+
 	return count;
 
 }
@@ -6700,18 +6767,21 @@ int32_t setup_debugfs_directory()
 			}
                 }else if( token[0] == '}'  && len > 2)
                 {
-			remove_firstchar(token, sizeof(token));
-			//ECPRILOGERR("token after removal: %s\n",token);
-			//ECPRILOGERR("Curr_index = %u, inserting %s, parent was %u", curr_index, token, curr_index-1);
-			//ECPRILOGERR("Decresing cur_index -1\n");
-				curr_index--;
-			//ECPRILOGERR("inserting at Curr_index = %u, inserting %s, parent was %u", curr_index, token, curr_index-1);
-			kobj_root = debugfs_create_dir(token, list_dv[curr_index -1 ]);
-			list_dv[curr_index] = kobj_root;
-				//ECPRILOGERR("Incremmting cur_index +1\n");
-				curr_index++;
+				remove_firstchar(token, sizeof(token));
+				//ECPRILOGERR("token after removal: %s\n",token);
+				//ECPRILOGERR("Curr_index = %u, inserting %s, parent was %u", curr_index, token, curr_index-1);
+				//ECPRILOGERR("Decresing cur_index -1\n");
+					curr_index--;
+			if(curr_index > 0){
+				//ECPRILOGERR("inserting at Curr_index = %u, inserting %s, parent was %u", curr_index, token, curr_index-1);
+				kobj_root = debugfs_create_dir(token, list_dv[curr_index -1 ]);
+				list_dv[curr_index] = kobj_root;
+					//ECPRILOGERR("Incremmting cur_index +1\n");
+					curr_index++;
+			}
 
                 }else if(token[0] == ',' && len > 2){
+
 			// we want to create file
 			remove_firstchar(token, sizeof(token));
 			//ECPRILOGERR("token after removal: %s\n",token);
@@ -6734,6 +6804,11 @@ int32_t setup_debugfs_directory()
         }
         return 0;
 
+}
+void clear_debugfs_directory(void)
+{
+	if(list_dv[0])
+		debugfs_remove_recursive(list_dv[0]);
 }
 /*****************************************************************************/
 #endif /* CONFIG_DEBUG_FS */

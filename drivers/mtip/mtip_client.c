@@ -48,9 +48,9 @@
 #include "mtip_workq.h"
 #include "mtip_mac.h"
 
-static eth_ecpriss_link_rate_e mtip_client_get_link_rate(u32 port_device_index)
+static eth_ecpriss_link_rate_e mtip_client_get_link_rate(u32 port_type)
 {
-    enum mtip_port_config_enum port_config = platform_driver_priv->devices.port_devices[port_device_index].port_config;
+    enum mtip_port_config_enum port_config = platform_driver_priv->mtip_ports[port_type]->port_config;
     eth_ecpriss_link_rate_e link_rate = ETH_ECPRISS_LINK_RATE_25;
 
     switch (port_config) 
@@ -116,6 +116,57 @@ static eth_ecpriss_link_rate_e mtip_client_get_link_rate(u32 port_device_index)
     return link_rate;
 }
 
+static eth_ecpriss_link_state_e mtip_client_get_link_state_by_link_index(u32 link_index)
+{
+    enum mtip_link_state_enum link_state;
+    eth_ecpriss_link_state_e retval;
+
+    link_state = mtip_get_link_state_by_link_index(link_index);
+
+    switch (link_state) 
+    {
+    case MTIP_LINK_STATE_INIT:
+        {
+            retval = ETH_ECPRISS_LINK_STATE_INIT;
+        }
+        break;
+    case MTIP_LINK_STATE_CLOSE:
+        {
+            retval = ETH_ECPRISS_LINK_STATE_CLOSE;
+        }
+        break;
+    case MTIP_LINK_STATE_UP:
+        {
+            retval = ETH_ECPRISS_LINK_STATE_UP;
+        }
+        break;
+    case MTIP_LINK_STATE_DOWN:
+        {
+            retval = ETH_ECPRISS_LINK_STATE_DOWN;
+        }
+        break;
+    case MTIP_LINK_STATE_OPEN_WAITING_FOR_LANES:
+    case MTIP_LINK_STATE_OPEN_DONE:
+        {
+            retval = ETH_ECPRISS_LINK_STATE_OPEN;
+        }
+        break;
+    case MTIP_LINK_STATE_OPEN_FAILED:
+        {
+            retval = ETH_ECPRISS_LINK_STATE_DOWN;
+        }
+        break;
+    default:
+        {
+            retval = ETH_ECPRISS_LINK_STATE_DOWN;
+        }
+        break;
+    }
+
+    CSMLOGDBG("setting link index %d link state %d to ecpri %d", link_index, link_state, retval);
+    return retval;
+}
+
 static void mtip_update_topology()
 {
     int i, j;
@@ -125,6 +176,7 @@ static void mtip_update_topology()
     unsigned long flags;
     spinlock_t *lock = &platform_driver_priv->driver_lock;
     u32 port = 0;
+    u32 link_index;
 
     CSMLOGDBG("Updating topology\n");
 
@@ -155,102 +207,108 @@ static void mtip_update_topology()
     topology->topology_params[ETH_ECPRISS_PORT_TYPE_L2].port_type = ETH_ECPRISS_PORT_TYPE_L2;
 
     // go through the ports
-    for (i = 0; i < platform_driver_priv->devices.num_port_phandles; ++i)
+    for (i = 0; i < MTIP_MAX_PORTS; ++i)
     {
-        switch (platform_driver_priv->devices.port_devices[i].port_type)
+        if (platform_driver_priv->devices.port_devices[i].port_device_valid)
         {
-        case MTIP_PORT_TYPE_FH_0:
-        case MTIP_PORT_TYPE_FH_1:
-        case MTIP_PORT_TYPE_FH_2:
+            switch (platform_driver_priv->devices.port_devices[i].port_type)
             {
-                port_number = ETH_ECPRISS_PORT_TYPE_FH;
-                port = topology->topology_params[port_number].num_ports;
-
-                topology->topology_params[port_number].port_params[port].port_index = platform_driver_priv->devices.port_devices[i].port_type;
-
-                link_number = 0;
-
-                for (j = 0; j < platform_driver_priv->devices.port_devices[i].num_link_phandles; ++j)
+            case MTIP_PORT_TYPE_FH_0:
+            case MTIP_PORT_TYPE_FH_1:
+            case MTIP_PORT_TYPE_FH_2:
                 {
-                    if (platform_driver_priv->devices.port_devices[i].link_devices[j].mac_ioaddr != NULL)
+                    port_number = ETH_ECPRISS_PORT_TYPE_FH;
+                    port = topology->topology_params[port_number].num_ports;
+
+                    topology->topology_params[port_number].port_params[port].port_index = platform_driver_priv->devices.port_devices[i].port_type;
+
+                    link_number = 0;
+
+                    for (j = 0; j < platform_driver_priv->devices.port_devices[i].num_link_phandles; ++j)
                     {
-                        // set the link index
-                        topology->topology_params[port_number].port_params[port].link_params[link_number].link_index 
-                            = platform_driver_priv->devices.port_devices[i].link_devices[j].link_index;
+                        if (platform_driver_priv->devices.port_devices[i].link_devices[j]->mac_ioaddr != NULL)
+                        {
+                            link_index = platform_driver_priv->devices.port_devices[i].link_devices[j]->link_index;
 
-                        // get the MTU that has been set in the HW register for this port, link
-                        topology->topology_params[port_number].port_params[port].link_params[link_number].link_mtu = mtip_mac_get_frame_length(i, j);
+                            // set the link index
+                            topology->topology_params[port_number].port_params[port].link_params[link_number].link_index 
+                                = link_index;
 
-                        // get the eth_addr
-                        mtip_mac_get_mac_address_by_device(i, j, topology->topology_params[port_number].port_params[port].link_params[link_number].eth_mac_addr);
+                            // get the MTU that has been set in the HW register for this port, link
+                            topology->topology_params[port_number].port_params[port].link_params[link_number].link_mtu = mtip_mac_get_frame_length(i, j);
 
-                        // set the link state
-                        topology->topology_params[port_number].port_params[port].link_params[link_number].link_state = (eth_ecpriss_link_state_e)mtip_get_link_state_by_device(i, j);
+                            // get the eth_addr
+                            mtip_mac_get_mac_address_by_link_index(link_index, topology->topology_params[port_number].port_params[port].link_params[link_number].eth_mac_addr);
 
-                        // set the link rate
-                        topology->topology_params[port_number].port_params[port].link_params[link_number].link_rate = mtip_client_get_link_rate(i);
+                            // set the link state
+                            topology->topology_params[port_number].port_params[port].link_params[link_number].link_state = mtip_client_get_link_state_by_link_index(link_index);
 
-                        // increment the link number
-                        ++link_number;
+                            // set the link rate
+                            topology->topology_params[port_number].port_params[port].link_params[link_number].link_rate = mtip_client_get_link_rate(platform_driver_priv->devices.port_devices[i].port_type);
+
+                            // increment the link number
+                            ++link_number;
+                        }
+
+                        // set the num links
+                        topology->topology_params[port_number].port_params[port].num_links = platform_driver_priv->devices.port_devices[i].num_link_phandles;
                     }
 
-                    // set the num links
-                    topology->topology_params[port_number].port_params[port].num_links = platform_driver_priv->devices.port_devices[i].num_link_phandles;
+                    // increment the FH port type
+                    ++topology->topology_params[port_number].num_ports;
                 }
-
-                // increment the FH port type
-                ++topology->topology_params[port_number].num_ports;
-            }
-            break;
-        case MTIP_PORT_TYPE_L2:
-            {
-                port_number = ETH_ECPRISS_PORT_TYPE_L2;
-                port = topology->topology_params[port_number].num_ports;
-
-                topology->topology_params[port_number].port_params[port].port_index = platform_driver_priv->devices.port_devices[i].port_type;
-
-                link_number = 0;
-
-                for (j = 0; j < platform_driver_priv->devices.port_devices[i].num_link_phandles; ++j)
+                break;
+            case MTIP_PORT_TYPE_L2:
                 {
-                    if (platform_driver_priv->devices.port_devices[i].link_devices[j].mac_ioaddr != NULL)
+                    port_number = ETH_ECPRISS_PORT_TYPE_L2;
+                    port = topology->topology_params[port_number].num_ports;
+
+                    topology->topology_params[port_number].port_params[port].port_index = platform_driver_priv->devices.port_devices[i].port_type;
+
+                    link_number = 0;
+
+                    for (j = 0; j < platform_driver_priv->devices.port_devices[i].num_link_phandles; ++j)
                     {
-                        // set the link index
-                        topology->topology_params[port_number].port_params[port].link_params[link_number].link_index 
-                            = platform_driver_priv->devices.port_devices[i].link_devices[j].link_index;
+                        if (platform_driver_priv->devices.port_devices[i].link_devices[j]->mac_ioaddr != NULL)
+                        {
+                            link_index = platform_driver_priv->devices.port_devices[i].link_devices[j]->link_index;
 
-                        // get the MTU that has been set in the HW register for this port, link
-                        topology->topology_params[port_number].port_params[port].link_params[link_number].link_mtu = mtip_mac_get_frame_length(i, j);
+                            // set the link index
+                            topology->topology_params[port_number].port_params[port].link_params[link_number].link_index 
+                                = link_index;
 
-                        // get the eth_addr
-                        mtip_mac_get_mac_address_by_device(i, j, topology->topology_params[port_number].port_params[port].link_params[link_number].eth_mac_addr);
+                            // get the MTU that has been set in the HW register for this port, link
+                            topology->topology_params[port_number].port_params[port].link_params[link_number].link_mtu = mtip_mac_get_frame_length(i, j);
 
-                        // set the link state
-                        topology->topology_params[port_number].port_params[port].link_params[link_number].link_state = (eth_ecpriss_link_state_e)mtip_get_link_state_by_device(i, j);
+                            // get the eth_addr
+                            mtip_mac_get_mac_address_by_link_index(link_index, topology->topology_params[port_number].port_params[port].link_params[link_number].eth_mac_addr);
 
-                        // set the link rate
-                        topology->topology_params[port_number].port_params[port].link_params[link_number].link_rate = ETH_ECPRISS_LINK_RATE_25;
+                            // set the link state
+                            topology->topology_params[port_number].port_params[port].link_params[link_number].link_state = mtip_client_get_link_state_by_link_index(link_index);
 
-                        // increment the link number
-                        ++link_number;
+                            // set the link rate
+                            topology->topology_params[port_number].port_params[port].link_params[link_number].link_rate = ETH_ECPRISS_LINK_RATE_25;
+
+                            // increment the link number
+                            ++link_number;
+                        }
+
+                        // set the num links
+                        topology->topology_params[port_number].port_params[port].num_links = platform_driver_priv->devices.port_devices[i].num_link_phandles;
                     }
 
-                    // set the num links
-                    topology->topology_params[port_number].port_params[port].num_links = platform_driver_priv->devices.port_devices[i].num_link_phandles;
+                    // increment the FH port type
+                    ++topology->topology_params[port_number].num_ports;
                 }
-
-                // increment the FH port type
-                ++topology->topology_params[port_number].num_ports;
+                break;
+            case MTIP_PORT_TYPE_DEBUG:
+            default:
+                {
+                    CSMLOGDBG("Ignoring port of type: %d", platform_driver_priv->devices.port_devices[i].port_type);
+                }
+                break;
             }
-            break;
-        case MTIP_PORT_TYPE_DEBUG:
-        default:
-            {
-                CSMLOGDBG("Ignoring port of type: %d", platform_driver_priv->devices.port_devices[i].port_type);
-            }
-            break;
         }
-
     }
 
     spin_unlock_irqrestore(lock, flags);
