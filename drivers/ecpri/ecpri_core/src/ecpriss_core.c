@@ -1192,6 +1192,7 @@ static int ecpriss_core_data_init_v2(void)
                 "ecpriss_core_cfg", 0);
         if (ecpriss_pdata_v2->ecpriss_core_cfg_logbuf == NULL)
         ECPRILOGERR("failed to create log context for ECPRISS_SS driver\n");
+	mutex_init(&ecpriss_pdata_v2->ecpriss_mutex_lock);
 	ecpriss_pdata_v2->qudp_ctx_v2 = &qudp_ctx_g_v2;
 	ecpriss_pdata_v2->xbar_ctx_v2 = &xbar_ctx_g_v2;
 
@@ -1479,7 +1480,6 @@ void ecpriss_update_all_stats(void)
 {
 	int fh = 0;
 	int link = 0;
-
 	for ( fh = 0 ; fh < MAX_PORTS; fh++) {
 
 		for (link = 0; link < MAX_MAC_LINKS; link++){
@@ -1493,7 +1493,7 @@ void ecpriss_update_all_stats_v2(void)
 {
 	int fh = 0;
 	int link = 0;
-
+	mutex_lock(&ecpriss_pdata_v2->ecpriss_mutex_lock);
 	for ( fh = 0 ; fh < MAX_PORTS; fh++) {
 
 		for (link = 0; link < MAX_MAC_LINKS; link++){
@@ -1502,6 +1502,7 @@ void ecpriss_update_all_stats_v2(void)
 		}
 	}
 	ecpriss_xbar_stats_update_v2();
+	mutex_unlock(&ecpriss_pdata_v2->ecpriss_mutex_lock);
 }
 
 
