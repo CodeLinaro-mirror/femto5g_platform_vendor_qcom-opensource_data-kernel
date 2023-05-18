@@ -90,9 +90,8 @@ static void ecpri_dma_q6_clnt_svc_event_notify_svc_exit(struct qmi_handle* qmi,
 static void ecpri_dma_q6_clnt_svc_exit(struct work_struct* work)
 {
 	if (ecpri_dma_qmi_ctx != NULL) {
-		ecpri_dma_qmi_ctx->server_sq.sq_family = 0;
-		ecpri_dma_qmi_ctx->server_sq.sq_node = 0;
-		ecpri_dma_qmi_ctx->server_sq.sq_port = 0;
+		ecpri_dma_qmi_ctx->q6_disconnected = true;
+		DMADBG("Q6 disconnected\n");
 	}
 }
 
@@ -117,6 +116,7 @@ int ecpri_dma_qmi_service_init(void)
 	ecpri_dma_qmi_ctx->q6_init_cmplt = false;
 	ecpri_dma_qmi_ctx->q6_response_recv = false;
 	ecpri_dma_qmi_ctx->q6_registered = false;
+	ecpri_dma_qmi_ctx->q6_disconnected = false;
 	ecpri_dma_qmi_ctx->wq_stop = false;
 	ecpri_dma_qmi_ctx->sending_retries = 0;
 
