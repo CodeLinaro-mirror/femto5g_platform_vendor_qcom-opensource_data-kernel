@@ -42,6 +42,7 @@ struct ecpri_dma_qmi_context {
 	bool q6_response_recv;
 	bool q6_registered;
 	bool wq_stop;
+	bool q6_disconnected;
 };
 
 int ecpri_dma_qmi_service_init(void);
