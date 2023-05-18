@@ -32,8 +32,7 @@ int ecpri_dma_dp_exception_replenish(struct ecpri_dma_endp_context *endp,
 	for (i = 0; i < num_of_pkts_remain; i++)
 	{
 		memset(ecpri_dma_ctx->
-			exception_buffs[(i + ecpri_dma_ctx->exception_pkt_idx) %
-			ECPRI_DMA_EXCEPTION_RING_SIZE].virt_base, 0,
+			exception_buffs[i+ ecpri_dma_ctx->exception_pkt_idx].virt_base, 0,
 			ECPRI_DMA_DP_EXCEPTION_BUFF_SIZE);
 	}
 
@@ -51,7 +50,7 @@ int ecpri_dma_dp_exception_replenish(struct ecpri_dma_endp_context *endp,
 			ECPRI_DMA_EXCEPTION_RING_SIZE)
 		{
 			num_of_pkts_to_send = ECPRI_DMA_EXCEPTION_RING_SIZE -
-				ecpri_dma_ctx->exception_pkt_idx;
+				ecpri_dma_ctx->exception_pkt_idx - 1;
 			commit_transmit = false;
 		}
 
