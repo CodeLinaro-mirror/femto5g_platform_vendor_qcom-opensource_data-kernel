@@ -1341,6 +1341,9 @@ int qcom_aw_phy_teardown(enum mtip_port_type_enum port_type,
 
   phy_inst_info->bring_up_status = false;
 
+  /* Reset the equalization mode to default */
+  phy_inst_info->phy_eq_mode = QCOM_AW_PHY_MANUAL_EQ_MODE;
+
   for (lane = PHY_LANE_0; lane < PHY_LANE_MAX; lane++) {
     /* Check if lane is valid for this MAC instance */
     if (lanes_enabled[lane] == false)
