@@ -1,0 +1,3 @@
+obj-m += rmnet_bam.o
+
+rmnet_bam-y := msm_rmnet_bam.o
