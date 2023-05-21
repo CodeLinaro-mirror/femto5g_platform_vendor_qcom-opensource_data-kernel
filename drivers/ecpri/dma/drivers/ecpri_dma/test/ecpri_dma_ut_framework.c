@@ -1,6 +1,6 @@
 /*
  * SPDX-License-Identifier: GPL-2.0-only
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/mutex.h>
@@ -924,7 +924,7 @@ static int ecpri_dma_ut_framework_init(void)
 
 	ecpri_dma_assert_on(!ecpri_dma_ut_ctx);
 
-#ifdef CONFIG_DEBUG_FS
+#if defined(CONFIG_DEBUG_FS) && !defined(ECPRI_NO_PRINTS)
 	ecpri_dma_ut_ctx->ecpri_dma_dbgfs_root = ecpri_dma_debugfs_get_root();
 #endif
 	if (!ecpri_dma_ut_ctx->ecpri_dma_dbgfs_root) {

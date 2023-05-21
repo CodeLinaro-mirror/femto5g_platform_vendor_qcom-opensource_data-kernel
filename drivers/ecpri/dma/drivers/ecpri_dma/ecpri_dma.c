@@ -879,7 +879,7 @@ static int ecpri_dma_post_init(void)
 	/* Init panic handler */
 	ecpri_dma_register_panic_hdlr();
 
-#ifdef CONFIG_DEBUG_FS
+#if defined(CONFIG_DEBUG_FS) && !defined(ECPRI_NO_PRINTS)
 	ecpri_dma_debugfs_init();
 #endif
 
