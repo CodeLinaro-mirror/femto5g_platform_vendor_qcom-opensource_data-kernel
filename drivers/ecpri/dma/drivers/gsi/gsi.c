@@ -58,7 +58,7 @@
 
 #define GSI_MIN_HDL_ID			1
 
-#ifndef CONFIG_DEBUG_FS
+#if !defined(CONFIG_DEBUG_FS) || defined(ECPRI_NO_PRINTS)
 void gsi_debugfs_init(void)
 {
 }
