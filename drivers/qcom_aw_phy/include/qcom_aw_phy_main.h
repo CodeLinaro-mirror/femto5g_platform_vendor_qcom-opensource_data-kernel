@@ -28,7 +28,7 @@
 
 /* Module level feature definitions */
 //#define FEATURE_QCOM_AW_RUMI_SW
-#ifdef CONFIG_DEBUG_FS
+#ifndef NO_DEBUGFS_PERF
 #define FEATURE_QCOM_AW_TEST_SYS_FS
 #endif
 /* Macro to validate the lane number */
