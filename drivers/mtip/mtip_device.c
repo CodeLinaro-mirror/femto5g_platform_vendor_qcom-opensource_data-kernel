@@ -102,6 +102,12 @@ EXPORT_SYMBOL(macsec_eth_get_netdev_from_link);
 static void post_mtip_replenish_dma_rx_buffers(struct net_device *netdev, ecpri_dma_eth_conn_hdl_t hdl, u32 num_of_buffs)
 {
    struct mtip_replenish_dma_rx_buffers_task* taskstruct = kmalloc(sizeof(struct mtip_replenish_dma_rx_buffers_task), GFP_ATOMIC);
+
+   if(taskstruct == NULL)
+   {
+	CSMLOGERR("memory alloc failed\n");
+	return;
+   }
    taskstruct->netdev = netdev;
    taskstruct->hdl = hdl;
    taskstruct->num_of_buffs = num_of_buffs;
@@ -205,6 +211,11 @@ static int mtip_device_get_pkt_completion_count(struct net_device *netdev)
 void post_mtip_tx_comp_cb(void *user_data, ecpri_dma_eth_conn_hdl_t hdl, struct ecpri_dma_pkt_completion_wrapper **comp_pkts, u32 num_of_completed)
 {
    struct mtip_tx_comp_cb_task* taskstruct = kmalloc(sizeof(struct mtip_tx_comp_cb_task), GFP_ATOMIC);
+   if(taskstruct == NULL)
+   {
+	CSMLOGERR("memory alloc failed\n");
+	return;
+   }
    taskstruct->user_data = user_data;
    taskstruct->hdl = hdl;
    taskstruct->comp_pkts = comp_pkts;
@@ -225,7 +236,7 @@ void mtip_process_tx_comp_cb(ecpri_dma_eth_conn_hdl_t hdl, struct mtip_dma_tx_co
    unsigned int num_of_buffers;
    struct net_device *netdev = NULL;
    struct mtip_netdev_priv *priv;
-   u32 link_index;
+   u32 link_index = 0;
    bool free_skb = true;
    u32 timestamp_secs;
    u32 timestamp_nsecs;
@@ -380,6 +391,11 @@ void mtip_process_tx_comp_cb(ecpri_dma_eth_conn_hdl_t hdl, struct mtip_dma_tx_co
       mtip_dma_free_dma_pkt(pkt);
    }
 
+   if(netdev == NULL)
+   {
+     return;
+   }
+
    // decrement the pkt completion count
    mtip_device_update_pkt_completion_count(netdev, (-1*(int)num_of_completed));
 
@@ -418,6 +434,11 @@ void mtip_process_tx_comp_cb(ecpri_dma_eth_conn_hdl_t hdl, struct mtip_dma_tx_co
 void post_mtip_process_link_state(u32 link_index, bool link_up)
 {
    struct mtip_process_link_state_task* taskstruct = kmalloc(sizeof(struct mtip_process_link_state_task), GFP_ATOMIC);
+   if(taskstruct == NULL)
+   {
+	CSMLOGERR("memory alloc failed\n");
+	return;
+   }
    taskstruct->link_index = link_index;
    taskstruct->link_up = link_up;
    mtip_queue_work(MTIP_WORKQ_TASK_PROCESS_LINK_STATE, taskstruct);
@@ -679,7 +700,7 @@ static int mtip_start_xmit(struct sk_buff *skb, struct net_device *netdev)
    ecpri_dma_eth_conn_hdl_t hdl;
    struct mtip_netdev_priv *priv;
    int ret;
-   ecpri_dma_eth_conn_hdl_t other_hdl;
+   ecpri_dma_eth_conn_hdl_t other_hdl = 0;
    u32 other_link_index;
    struct mtip_security_device *sec_dev;
    u8 ts_seq_num = 0;
@@ -1149,6 +1170,12 @@ static int mtip_open(struct net_device *netdev)
    priv = netdev_priv(netdev);
 
    link_index = priv->link_index;
+
+   if(link_index >= MTIP_MAX_LINKS)
+   {
+     CSMLOGERR("invalid link_index %d", link_index);
+     return -ENODEV;
+   }
 
    hdl = platform_driver_priv->mtip_links[link_index]->dma_hdl;
 
@@ -2986,6 +3013,11 @@ out:
 void post_mtip_process_configure_port_using_lane(u32 port_type, u32 lane_index)
 {
    struct mtip_process_configure_port_using_lane_task* taskstruct = kmalloc(sizeof(struct mtip_process_configure_port_using_lane_task), GFP_ATOMIC);
+   if(taskstruct == NULL)
+   {
+	CSMLOGERR("memory alloc failed\n");
+	return;
+   }
    taskstruct->port_type = port_type;
    taskstruct->lane_index = lane_index;
    mtip_queue_work(MTIP_WORKQ_TASK_PROCESS_PORT_CONFIGURATION_USING_LANE, taskstruct);
@@ -3012,6 +3044,11 @@ void run_mtip_process_configure_port_using_lane(void *work_ptr)
 void post_mtip_process_configure_port_using_link(u32 port_type, u32 link_index)
 {
    struct mtip_process_configure_port_using_link_task* taskstruct = kmalloc(sizeof(struct mtip_process_configure_port_using_link_task), GFP_ATOMIC);
+      if(taskstruct == NULL)
+   {
+	CSMLOGERR("memory alloc failed\n");
+	return;
+   }
    taskstruct->port_type = port_type;
    taskstruct->link_index = link_index;
    mtip_queue_work(MTIP_WORKQ_TASK_PROCESS_PORT_CONFIGURATION_USING_LINK, taskstruct);
@@ -3036,6 +3073,11 @@ void run_mtip_process_configure_port_using_link(void *work_ptr)
 void post_mtip_process_an_result(enum mtip_port_type_enum port_type, bool an_result, enum mtip_port_config_enum port_config)
 {
    struct mtip_process_an_result_task* taskstruct = kmalloc(sizeof(struct mtip_process_an_result_task), GFP_ATOMIC);
+   if(taskstruct == NULL)
+   {
+	CSMLOGERR("memory alloc failed\n");
+	return;
+   }
    taskstruct->port_type = port_type;
    taskstruct->an_result = an_result;
    taskstruct->port_config = port_config;

@@ -622,6 +622,7 @@ int mtip_port_probe(struct platform_device *pdev)
     u32             phandle;
     u32             port_type;
     struct mtip_port_device_info port_device;
+    struct mtip_port_device_info *tmp_port_device;
     struct resource *wrapper_resource;
     struct resource *irq_resource;
     int             link_entries;
@@ -631,6 +632,7 @@ int mtip_port_probe(struct platform_device *pdev)
     struct resource dev_resource;
     u32             dut_base_regs[2];
 
+    memset(&port_device, 0, sizeof(struct mtip_port_device_info));
     CSMLOGDBG("mtip_port_probe called of device \"%s\"\n", pdev->name);
 
     port_device.port_pdev = pdev;
@@ -645,7 +647,10 @@ int mtip_port_probe(struct platform_device *pdev)
         CSMLOGERR(":get resource failed for port-type\n");
         return -ENODEV;
     }
-
+    if(port_type < MTIP_PORT_TYPE_FH_0 || port_type >= MTIP_PORT_TYPE_MAX) {
+        CSMLOGERR("Invalid port-type\n");
+        return -EINVAL;
+    }
     // copy the port type
     port_device.port_type = port_type;
    CSMLOGINFO("port type is %d\n", port_device.port_type);
@@ -784,7 +789,24 @@ int mtip_port_probe(struct platform_device *pdev)
    spin_lock_irqsave(lock, flags);
 
     // copy the port device based on port_type
-    memcpy(&platform_driver_priv->devices.port_devices[port_type], &port_device, sizeof(struct mtip_port_device_info));
+    tmp_port_device = &platform_driver_priv->devices.port_devices[port_type];
+    tmp_port_device->port_pdev = port_device.port_pdev;
+    tmp_port_device->port_phandle = port_device.port_phandle;
+    tmp_port_device->port_type = port_device.port_type;
+    tmp_port_device->wrapper_base_addr = port_device.wrapper_base_addr;
+    tmp_port_device->macstats_base_addr = port_device.macstats_base_addr;
+    tmp_port_device->rsfec_base_addr = port_device.rsfec_base_addr;
+    tmp_port_device->wrapper_irq = port_device.wrapper_irq;
+    tmp_port_device->dut_base_addr = port_device.dut_base_addr;
+    tmp_port_device->num_link_phandles = port_device.num_link_phandles;
+    for (i = 0; i < port_device.num_link_phandles; ++i) {
+        tmp_port_device->link_phandles[i] = port_device.link_phandles[i];
+    }
+    tmp_port_device->num_lane_phandles = port_device.num_lane_phandles;
+    for (i = 0; i < port_device.num_lane_phandles; ++i) {
+        tmp_port_device->lane_phandles[i] = port_device.lane_phandles[i];
+    }
+    tmp_port_device->port_device_valid = port_device.port_device_valid; 
 
    spin_unlock_irqrestore(lock, flags);
 
@@ -1335,7 +1357,7 @@ static int mtip_platform_setup(void)
    for (i = 0; i < MTIP_MAX_PORTS; ++i)
    {
       // allocate the mtip_links and connect to dma
-      for (j = 0; j < platform_driver_priv->devices.port_devices[i].num_link_phandles; ++j)
+      for (j = 0; (j < platform_driver_priv->devices.port_devices[i].num_link_phandles) && (j < MTIP_MAX_LINKS_PER_PORT); ++j)
       {
          // check if this is a valid link
          if (platform_driver_priv->devices.port_devices[i].link_devices[j]->link_device_valid != 0)
@@ -1355,7 +1377,7 @@ static int mtip_platform_setup(void)
       }
 
       // allocate the mtip_lanes
-      for (j = 0; j < platform_driver_priv->devices.port_devices[i].num_lane_phandles; ++j)
+      for (j = 0; (j < platform_driver_priv->devices.port_devices[i].num_lane_phandles) && (j < MTIP_MAX_LINKS_PER_PORT); ++j)
       {
          // check if this is a valid lane`
          if (platform_driver_priv->devices.port_devices[i].lane_devices[j]->lane_device_valid != 0)
@@ -1593,6 +1615,11 @@ out:
 void post_mtip_process_create_phylink(void)
 {
    struct mtip_process_create_phylink_task* taskstruct = kmalloc(sizeof(struct mtip_process_create_phylink_task), GFP_ATOMIC);
+   if(taskstruct == NULL)
+   {
+       CSMLOGERR("memory alloc failed\n");
+       return;
+   }
    taskstruct->value = 0;
    mtip_queue_work(MTIP_WORKQ_TASK_CREATE_PHYLINK, taskstruct);
 }
