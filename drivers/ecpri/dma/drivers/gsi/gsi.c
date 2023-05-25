@@ -1084,7 +1084,7 @@ int gsi_register_device(struct gsi_per_props* props, unsigned long* dev_hdl)
 	}
 
 	spin_lock_init(&gsi_ctx->slock);
-	gsi_ctx->per = *props;
+	memcpy(&gsi_ctx->per, props, sizeof(gsi_ctx->per));
 	if (props->intr == GSI_INTR_IRQ) {
 		for (gsi_id = 0; gsi_id < props->num_of_gsi; gsi_id++) {
 			for (i = 0; i < GSI_EE_MAX; i++)
@@ -4277,6 +4277,33 @@ subsys_initcall(gsi_init);
  */
 static void __exit gsi_exit(void)
 {
+	int gsi_id = 0, ee = 0;
+	struct device* dev = gsi_ctx->dev;
+
+	/* DMA driver is unloaded first, all CHs are deallocated */
+
+	GSIDBG("Start driver unload\n");
+
+	/* Disable IRQs */
+	for (gsi_id = 0; gsi_id < gsi_ctx->per.num_of_gsi; gsi_id++) {
+		for (ee = 0; ee < GSI_EE_MAX; ee++) {
+			if (ee == GSI_Q6_EE || !gsi_ctx->per.irq[gsi_id][ee])
+				continue;
+
+			disable_irq_wake(gsi_ctx->per.irq[gsi_id][ee]);
+			devm_free_irq(gsi_ctx->dev, gsi_ctx->per.irq[gsi_id][ee],
+				&gsi_ctx->irq_arr[gsi_id][ee]);
+		}
+	}
+
+	/* Unmap base*/
+	gsi_unmap_base();
+
+	GSIDBG("Driver unloaded\n");
+
+	devm_kfree(dev, gsi_ctx);
+	gsi_ctx = NULL;
+
 	if (running_emulation && pdev)
 		platform_device_unregister(pdev);
 	platform_driver_unregister(&msm_gsi_driver);

@@ -235,10 +235,15 @@ static struct notifier_block ecpri_dma_panic_blk = {
 	.priority = INT_MAX,
 };
 
-
 static void ecpri_dma_register_panic_hdlr(void)
 {
 	atomic_notifier_chain_register(&panic_notifier_list,
+		&ecpri_dma_panic_blk);
+}
+
+static void ecpri_dma_unregister_panic_hdlr(void)
+{
+	atomic_notifier_chain_unregister(&panic_notifier_list,
 		&ecpri_dma_panic_blk);
 }
 
@@ -364,10 +369,10 @@ static void ecpri_dma_exception_replenish_work(struct work_struct *work)
 			     struct ecpri_dma_exception_replenish_work_wrap,
 			     replenish_work);
 
-	spin_lock_irqsave(&ecpri_dma_ctx->exception_spinlock, flags);
+	spin_lock_irqsave(&ecpri_dma_ctx->exception_ctx.exception_spinlock, flags);
 	ep = &ecpri_dma_ctx->
-		endp_ctx[ecpri_dma_ctx->exception_endp.gsi_id]
-		[ecpri_dma_ctx->exception_endp.endp_id];
+		endp_ctx[ecpri_dma_ctx->exception_ctx.exception_endp.gsi_id]
+		[ecpri_dma_ctx->exception_ctx.exception_endp.endp_id];
 
 	DMADBG("replenish %d credits to exception\n",
 	       work_data->num_to_replenish);
@@ -377,10 +382,10 @@ static void ecpri_dma_exception_replenish_work(struct work_struct *work)
 	if (ret) {
 		DMAERR("Failed to replenish exception endp\n");
 		kfree(work_data);
-		spin_unlock_irqrestore(&ecpri_dma_ctx->exception_spinlock, flags);
+		spin_unlock_irqrestore(&ecpri_dma_ctx->exception_ctx.exception_spinlock, flags);
 		return;
 	}
-	spin_unlock_irqrestore(&ecpri_dma_ctx->exception_spinlock, flags);
+	spin_unlock_irqrestore(&ecpri_dma_ctx->exception_ctx.exception_spinlock, flags);
 
 	kfree(work_data);
 
@@ -486,37 +491,43 @@ static int ecpri_dma_alloc_exception_endp(void)
 				found_exception = true;
 
 				/* Save exception ENDP id for easier future access */
-				ecpri_dma_ctx->exception_endp.endp_id = endp_id;
-				ecpri_dma_ctx->exception_endp.gsi_id = gsi_id;
-				spin_lock_init(&ecpri_dma_ctx->exception_spinlock);
+				ecpri_dma_ctx->exception_ctx.exception_endp.endp_id = endp_id;
+				ecpri_dma_ctx->exception_ctx.exception_endp.gsi_id = gsi_id;
+				ecpri_dma_ctx->exception_ctx.ep = ep;
+				spin_lock_init(&ecpri_dma_ctx->exception_ctx.exception_spinlock);
 
 				/* Allocate Exception packets and buffers */
 				for (i = 0; i < ECPRI_DMA_EXCEPTION_RING_SIZE; i++) {
-					ecpri_dma_ctx->exception_pkts_arr[i] =
-						&ecpri_dma_ctx->exception_pkts[i];
-					ecpri_dma_ctx->exception_pkts[i].buffs =
-						&ecpri_dma_ctx->exception_buffs_ptr_arr[i];
-					ecpri_dma_ctx->exception_pkts[i].num_of_buffers = 1;
+					ecpri_dma_ctx->exception_ctx.exception_pkts_arr[i] =
+						&ecpri_dma_ctx->exception_ctx.exception_pkts[i];
+					ecpri_dma_ctx->exception_ctx.exception_pkts[i].buffs =
+						&ecpri_dma_ctx->exception_ctx.
+						exception_buffs_ptr_arr[i];
+					ecpri_dma_ctx->exception_ctx.
+						exception_pkts[i].num_of_buffers = 1;
 
-					ecpri_dma_ctx->exception_buffs_ptr_arr[i] =
-						&ecpri_dma_ctx->exception_buffs[i];
-					ecpri_dma_ctx->exception_buffs[i].virt_base =
+					ecpri_dma_ctx->exception_ctx.exception_buffs_ptr_arr[i] =
+						&ecpri_dma_ctx->exception_ctx.exception_buffs[i];
+					ecpri_dma_ctx->exception_ctx.
+						exception_buffs[i].virt_base =
 						dma_alloc_coherent(ecpri_dma_ctx->pdev,
 							ECPRI_DMA_DP_EXCEPTION_BUFF_SIZE,
-							&(ecpri_dma_ctx->exception_buffs[i].phys_base),
+							&(ecpri_dma_ctx->exception_ctx.
+								exception_buffs[i].phys_base),
 							GFP_KERNEL);
 
-					if (!ecpri_dma_ctx->exception_buffs[i].virt_base) {
+					if (!ecpri_dma_ctx->exception_ctx.
+						exception_buffs[i].virt_base) {
 						DMAERR("Failed to alloc exception pkt buffer\n");
 						ecpri_dma_assert();
 					}
-					ecpri_dma_ctx->exception_buffs[i].size =
+					ecpri_dma_ctx->exception_ctx.exception_buffs[i].size =
 						ECPRI_DMA_DP_EXCEPTION_BUFF_SIZE;
 				}
 
-				ecpri_dma_ctx->exception_pkt_idx = 0;
+				ecpri_dma_ctx->exception_ctx.exception_pkt_idx = 0;
 
-				queue_work(ecpri_dma_ctx->ecpri_dma_exception_wq,
+				queue_work(ecpri_dma_ctx->exception_ctx.ecpri_dma_exception_wq,
 					&work->replenish_work);
 				break;
 			}
@@ -729,8 +740,6 @@ int ecpri_dma_dealloc_endp(struct ecpri_dma_endp_context *endp_cfg)
 	kmem_cache_destroy(endp_cfg->available_outstanding_pkts_cache);
 	endp_cfg->curr_outstanding_num = 0;
 	endp_cfg->curr_completed_num = 0;
-
-	endp_cfg->valid = false;
 
 	return ret;
 }
@@ -1362,9 +1371,10 @@ static int ecpri_dma_pre_init(const struct ecpri_dma_plat_drv_res *resource_p,
 	}
 
 	/* Init exception replenish WQ*/
-	ecpri_dma_ctx->ecpri_dma_exception_wq = create_singlethread_workqueue(
-		"ecpri_dma_exception_wq");
-	if (!ecpri_dma_ctx->ecpri_dma_exception_wq) {
+	ecpri_dma_ctx->exception_ctx.ecpri_dma_exception_wq =
+		create_singlethread_workqueue(
+		"exception_ctx.ecpri_dma_exception_wq");
+	if (!ecpri_dma_ctx->exception_ctx.ecpri_dma_exception_wq) {
 		DMAERR("workqueue creation failed\n");
 		return -ENOMEM;
 	}
@@ -1511,11 +1521,129 @@ static int __init ecpri_dma_module_init(void)
 }
 subsys_initcall(ecpri_dma_module_init);
 
+static void ecpri_dma_dealloc_exception(void)
+{
+	int ret = 0, i = 0;
+
+	ret = ecpri_dma_stop_endp(
+		ecpri_dma_ctx->exception_ctx.ep);
+	if (ret != 0) {
+		DMAERR("Unable to stop exception endpoint, ENDP ID:%d\n",
+			ecpri_dma_ctx->exception_ctx.ep->endp_id);
+		ecpri_dma_assert();
+	}
+
+	ret = ecpri_dma_reset_endp(
+		ecpri_dma_ctx->exception_ctx.ep);
+	if (ret != 0) {
+		DMAERR("Unable to reset exception endpoint, ENDP ID:%d\n",
+			ecpri_dma_ctx->exception_ctx.ep->endp_id);
+		ecpri_dma_assert();
+	}
+
+	ret = ecpri_dma_dealloc_endp(
+		ecpri_dma_ctx->exception_ctx.ep);
+	if (ret != 0) {
+		DMAERR("Unable to dealloc exception endpoint, ENDP ID:%d\n",
+			ecpri_dma_ctx->exception_ctx.ep->endp_id);
+		ecpri_dma_assert();
+	}
+
+	/* Destroy WQ */
+	destroy_workqueue(
+		ecpri_dma_ctx->exception_ctx.ecpri_dma_exception_wq);
+
+	/* Free buffers */
+	for (i = 0; i < ECPRI_DMA_EXCEPTION_RING_SIZE; i++) {
+		dma_free_coherent(ecpri_dma_ctx->pdev,
+			ECPRI_DMA_DP_EXCEPTION_BUFF_SIZE,
+			ecpri_dma_ctx->exception_ctx.exception_buffs[i].virt_base,
+			ecpri_dma_ctx->exception_ctx.exception_buffs[i].phys_base);
+	}
+}
+
 static void __exit ecpri_dma_module_exit(void)
 {
-	platform_driver_unregister(&ecpri_dma_plat_drv);
+	enum ecpri_hw_flavor hw_flavor = ecpri_dma_get_ctx_hw_flavor();
+	int endp_id = 0, gsi_id = 0;
+	struct ecpri_dma_endp_context* curr_endp = NULL;
+	int ret = 0;
+
+	DMADBG("Start driver unload\n");
+
+	if (ECPRI_HW_FLAVOR_RU != hw_flavor &&
+		ECPRI_HW_FLAVOR_DU_L2 != hw_flavor) {
+		DMAERR(
+			"eCPRI DMA driver cannot be unloaded on PCIe flavor. flv=%d\n",
+			hw_flavor);
+		ecpri_dma_assert();
+	}
+
+	/* Stop, reset and dealloc exception */
+	ecpri_dma_dealloc_exception();
+
+	/* Verify all CHs are stopped */
+	for (gsi_id = 0; gsi_id < ecpri_dma_ctx->num_of_gsi; gsi_id++) {
+		for (endp_id = 0; endp_id < ECPRI_DMA_ENDP_NUM_MAX; endp_id++) {
+			curr_endp = &(ecpri_dma_ctx->endp_ctx[gsi_id][endp_id]);
+
+			if (!curr_endp->valid || !curr_endp->gsi_ep_cfg ||
+				curr_endp->gsi_ep_cfg->ee == ECPRI_DMA_EE_Q6)
+				continue;
+
+			if (gsi_get_chan_state(curr_endp->gsi_chan_hdl) ==
+				GSI_CHAN_STATE_STARTED) {
+				ret = ecpri_dma_stop_endp(curr_endp);
+				if (ret != 0) {
+					DMAERR("Unable to stop endpoint, ENDP ID:%d, GSI ID:%d\n",
+						curr_endp->endp_id, curr_endp->gsi_id);
+					ecpri_dma_assert();
+				}
+			}
+
+			if (gsi_get_chan_state(curr_endp->gsi_chan_hdl) ==
+				GSI_CHAN_STATE_STOPPED) {
+				ret = ecpri_dma_reset_endp(curr_endp);
+				if (ret != 0) {
+					DMAERR("Unable to reset endpoint, ENDP ID:%d, GSI ID:%d\n",
+						curr_endp->endp_id, curr_endp->gsi_id);
+					ecpri_dma_assert();
+				}
+			}
+
+			if (gsi_get_chan_state(curr_endp->gsi_chan_hdl) ==
+				GSI_CHAN_STATE_ALLOCATED) {
+				ret = ecpri_dma_dealloc_endp(curr_endp);
+				if (ret != 0) {
+					DMAERR("Unable to dealloc endpoint, ENDP ID:%d, GSI ID:%d\n",
+						curr_endp->endp_id, curr_endp->gsi_id);
+					ecpri_dma_assert();
+				}
+			}
+		}
+	}
+
+	/* Un-register IRQs */
+	ecpri_dma_interrupts_destroy(ecpri_dma_ctx->ecpri_dma_irq,
+		&ecpri_dma_ctx->master_pdev->dev);
+
+	/* Close QMI service */
+	ecpri_dma_qmi_service_exit();
+
+	ecpri_dma_unregister_panic_hdlr();
+
+	/* Unmap MMIO */
+	iounmap(ecpri_dma_ctx->mmio);
+	ecpri_dma_ctx->mmio = NULL;
+
+	DMADBG("Driver unloaded\n");
+
+	/* Free Driver context */
 	kfree(ecpri_dma_ctx);
 	ecpri_dma_ctx = NULL;
+
+	/* Unregister driver */
+	platform_driver_unregister(&ecpri_dma_plat_drv);
 }
 module_exit(ecpri_dma_module_exit);
 
