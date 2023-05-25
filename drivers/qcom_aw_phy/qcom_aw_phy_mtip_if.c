@@ -1519,18 +1519,20 @@ void qcom_aw_phy_handle_an_done(struct work_struct *work){
   phy_inst = wq_params->phy_inst;
   lane_num = wq_params->lane_num;
 
-  if (!QCOM_AW_PHY_INST_VALID(phy_inst) || !QCOM_AW_PHY_LANE_VALID(lane_num))
+  if (!QCOM_AW_PHY_INST_VALID(phy_inst) || !QCOM_AW_PHY_LANE_VALID(lane_num)){
     QCOM_AW_PHY_LOG_ERR("Invalid PHY instance/lane. AN Done failed.");
+    goto func_exit;
+  }
 
   phy_config_info = qcom_aw_phy_get_config_info();
   if (!phy_config_info) {
-    return;
+    goto func_exit;
   }
 
   /* Get the PHY instance info for the passed instance type */
   phy_inst_info = &phy_config_info->phy_inst_config_info[phy_inst];
   if (phy_inst_info->valid == false) {
-    return;
+    goto func_exit;
   }
 
   mutex_lock(&phy_inst_info->phy_inst_lock);
@@ -1590,6 +1592,7 @@ void qcom_aw_phy_handle_an_done(struct work_struct *work){
   mutex_unlock(&phy_inst_info->lane_lock[lane_num]);
   mutex_unlock(&phy_inst_info->phy_inst_lock);
 
+func_exit:
   kfree(wq_params);
   return;
 }
