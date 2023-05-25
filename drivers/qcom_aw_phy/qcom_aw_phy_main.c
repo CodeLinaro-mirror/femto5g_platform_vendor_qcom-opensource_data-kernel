@@ -159,6 +159,7 @@ static irqreturn_t qcom_aw_phy_interrupt_handler(int irq, void *devptr) {
   struct qcom_aw_phy_work_q_params *wq_params = NULL;
   mss_access_t mss = {.phy_offset = 0, .lane_offset = 0};
   uint64_t tx_np_data = 1ULL;
+  bool error_rx_sig_det[PHY_LANE_MAX] = {false};
 
   // check if this an interrupt that needs to be handled
   for (i = QCOM_AW_PHY_INST_FH0; i < QCOM_AW_PHY_INST_MAX; i++)
@@ -184,6 +185,9 @@ static irqreturn_t qcom_aw_phy_interrupt_handler(int irq, void *devptr) {
   intr_error = ioread32(phy_inst_info->wrapper_base_addr +
                         QCOM_AW_PHY_WRAPPER_INT_ERROR_REG_OFFSET);
 
+  if(intr_status==0 && intr_error==0)
+    return ret_val;
+
   QCOM_AW_PHY_LOG_DBG(
       "Interrupt received for PHY instance %d, status %x, error %x",
       phy_inst_info->phy_inst, intr_status, intr_error);
@@ -199,18 +203,7 @@ static irqreturn_t qcom_aw_phy_interrupt_handler(int irq, void *devptr) {
       case QCOM_AW_PHY_RX_SIGNAL_DETECT_ERR_LANE_1:
       case QCOM_AW_PHY_RX_SIGNAL_DETECT_ERR_LANE_2:
       case QCOM_AW_PHY_RX_SIGNAL_DETECT_ERR_LANE_3:
-        wq_params = kmalloc(sizeof(struct qcom_aw_phy_work_q_params),
-                            GFP_ATOMIC);
-        if(!wq_params)
-          QCOM_AW_PHY_LOG_ERR("Malloc failed!");
-        else{
-          INIT_DELAYED_WORK(&wq_params->wq_item,
-                            qcom_aw_phy_handle_rx_sig_detect);
-          wq_params->phy_inst = phy_inst_info->phy_inst;
-          wq_params->lane_num = i - QCOM_AW_PHY_RX_SIGNAL_DETECT_ERR_LANE_0;
-          wq_params->user_data = (void*)true;
-          queue_delayed_work(qcom_aw_phy_config_info.wq, &wq_params->wq_item, 0);
-        }
+        error_rx_sig_det[i - QCOM_AW_PHY_RX_SIGNAL_DETECT_ERR_LANE_0] = true;
         clear |= (1<<i);
         break;
 
@@ -251,25 +244,23 @@ static irqreturn_t qcom_aw_phy_interrupt_handler(int irq, void *devptr) {
     temp_bmask = intr_status & (1 << i);
     if (temp_bmask) {
       switch (i) {
-
       case QCOM_AW_PHY_RX_SIGNAL_DETECT_LANE_0:
       case QCOM_AW_PHY_RX_SIGNAL_DETECT_LANE_1:
       case QCOM_AW_PHY_RX_SIGNAL_DETECT_LANE_2:
       case QCOM_AW_PHY_RX_SIGNAL_DETECT_LANE_3:
-        QCOM_AW_PHY_LOG_DBG("RX signal detect interrupt received for lane %d",
-                            i - QCOM_AW_PHY_RX_SIGNAL_DETECT_LANE_0);
-        wq_params = kmalloc(sizeof(struct qcom_aw_phy_work_q_params),
-                            GFP_ATOMIC);
-        if(!wq_params)
-          QCOM_AW_PHY_LOG_ERR("Malloc failed!");
-        else{
-          INIT_DELAYED_WORK(&wq_params->wq_item,
-                            qcom_aw_phy_handle_rx_sig_detect);
-          wq_params->phy_inst = phy_inst_info->phy_inst;
-          wq_params->lane_num = i;
-          wq_params->user_data = (void*)true;
-          queue_delayed_work(qcom_aw_phy_config_info.wq, &wq_params->wq_item,
-                             msecs_to_jiffies(RX_SIGNAL_DETECT_RETRY_DELAY_TIMER));
+         if(error_rx_sig_det[i-QCOM_AW_PHY_RX_SIGNAL_DETECT_LANE_0] == false){
+           wq_params = kmalloc(sizeof(struct qcom_aw_phy_work_q_params),
+                              GFP_ATOMIC);
+          if(!wq_params)
+            QCOM_AW_PHY_LOG_ERR("Malloc failed!");
+          else{
+            INIT_DELAYED_WORK(&wq_params->wq_item,
+                              qcom_aw_phy_handle_rx_sig_detect);
+            wq_params->phy_inst = phy_inst_info->phy_inst;
+            wq_params->lane_num = i;
+            queue_delayed_work(qcom_aw_phy_config_info.wq, &wq_params->wq_item,
+                               0);
+          }
         }
         clear |= (1<<i);
         break;
