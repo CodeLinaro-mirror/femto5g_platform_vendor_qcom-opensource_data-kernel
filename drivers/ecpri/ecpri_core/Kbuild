@@ -22,6 +22,10 @@ ccflags-y += -I$(ECPRIDRVTOP)/include/
 ccflags-y += -I$(ECPRIDRVTOP)/include/uapi/ecpri/
 ccflags-y += -I$(ECPRIDRVTOP)/include/hal
 
+ifeq ($(ECPRI_PERF),1)
+ccflags-y += -DNO_DEBUGFS_PERF
+endif
+
 header-y += $(ECPRIDRVTOP)/include/uapi/ecpri/ecpriss_flow.h
 
 ifeq ($(call cc-option-yn, -Wmaybe-uninitialized),y)
