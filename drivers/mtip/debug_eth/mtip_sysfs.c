@@ -461,7 +461,7 @@ void setup_diag_addr_range(u_int8_t fifo_num, u_int32_t addr_range_start,
     break;
   }
 }
-void setup_diag_port(u_int8_t src_port, u_int8_t dest_port) {
+void setup_diag_port(u_int16_t src_port, u_int16_t dest_port) {
   int data;
   int index;
   int val;
@@ -530,7 +530,7 @@ void setup_diag_flush(u_int8_t fifo_num) {
   sysfs_store_flush_register_set(fifo_num,&val);
 }
 
-void setup_diag_threshold(u_int8_t fifo_num, u_int8_t threshold) {
+void setup_diag_threshold(u_int8_t fifo_num, u_int16_t threshold) {
 
   int value = 0;
   unsigned int fifo_registers[] = {
@@ -540,7 +540,7 @@ void setup_diag_threshold(u_int8_t fifo_num, u_int8_t threshold) {
   pr_err("setup_diag_threshold called with fifo_num :%d threshold : %d \n",
          fifo_num, threshold);
 
-  if (threshold <= MAXIMUM_PACKET_SIZE) {
+  if (threshold >= MINIMUM_PACKET_SIZE && threshold <= MAXIMUM_PACKET_SIZE) {
     value |= ((threshold / BYTE_PER_WATERMARK_UNIT) & GENMASK(15, 0));
 
     switch (fifo_num) {
@@ -568,7 +568,7 @@ void setup_diag_threshold(u_int8_t fifo_num, u_int8_t threshold) {
   }
 }
 
-void setup_diag_timeout(u_int8_t fifo_num, u_int8_t timeout) {
+void setup_diag_timeout(u_int8_t fifo_num, u_int32_t timeout) {
 
   unsigned int STREAM_TIMEOUT_ARRAY[] = {F0.Timeout, F1.Timeout, F2.Timeout,
                                          F3.Timeout, F4.Timeout};
@@ -632,6 +632,7 @@ void setup_diag_vlanID_register_set(u_int16_t vlanID, u_int32_t reg1,
 }
 void setup_diag_vlanID(u_int8_t fifo_num, u_int16_t vlanID) {
 
+if(vlanID >= MINIMUM_VLANID && vlanID <= MAXIMUM_VLANID) {
   switch (fifo_num) {
 
   case FIFO_0:
@@ -670,6 +671,7 @@ void setup_diag_vlanID(u_int8_t fifo_num, u_int16_t vlanID) {
     CSMLOGERR("Fifo num should be < 8");
     break;
   }
+ }
 }
 
 mtip_debug_eth_gnl_params get_diag_result(u_int8_t fifo_num) {
@@ -1712,31 +1714,36 @@ void sysfs_store_vlanID_Register_Set(const char *buf, u64 *FIFO_vlanID, u32 reg1
 
 ssize_t sysfs_store_vlanID(struct kobject *kobj, struct kobj_attribute *attr,
                            const char *buf, size_t count) {
+
+  unsigned int temp;
   CSMLOGINFO(KERN_INFO " Reading - sysfs store func...%s \n", kobj->name);
-  if (!strncmp(kobj->name, "FIFO_0", Kobj_Name_FIFO_Size)) {
-    sysfs_store_vlanID_Register_Set(buf, &F0.vlanID, VLAN_TAG_0,
-                                          L2_SA_ADDR_HI_0);
-  } else if (!strncmp(kobj->name, "FIFO_1", Kobj_Name_FIFO_Size)) {
-    sysfs_store_vlanID_Register_Set(buf, &F1.vlanID, VLAN_TAG_1,
-                                          L2_SA_ADDR_HI_1);
-  } else if (!strncmp(kobj->name, "FIFO_2", Kobj_Name_FIFO_Size)) {
-    sysfs_store_vlanID_Register_Set(buf, &F2.vlanID, VLAN_TAG_2,
-                                          L2_SA_ADDR_HI_2);
-  } else if (!strncmp(kobj->name, "FIFO_3", Kobj_Name_FIFO_Size)) {
-    sysfs_store_vlanID_Register_Set(buf, &F3.vlanID, VLAN_TAG_3,
-                                          L2_SA_ADDR_HI_3);
-  } else if (!strncmp(kobj->name, "FIFO_4", Kobj_Name_FIFO_Size)) {
-    sysfs_store_vlanID_Register_Set(buf, &F4.vlanID, VLAN_TAG_4,
-                                          L2_SA_ADDR_HI_4);
-  } else if (!strncmp(kobj->name, "FIFO_5", Kobj_Name_FIFO_Size)) {
-    sysfs_store_vlanID_Register_Set(buf, &F5.vlanID, VLAN_TAG_5,
-                                          L2_SA_ADDR_HI_5);
-  } else if (!strncmp(kobj->name, "FIFO_6", Kobj_Name_FIFO_Size)) {
-    sysfs_store_vlanID_Register_Set(buf, &F6.vlanID, VLAN_TAG_6,
-                                          L2_SA_ADDR_HI_6);
-  } else if (!strncmp(kobj->name, "FIFO_7", Kobj_Name_FIFO_Size)) {
-    sysfs_store_vlanID_Register_Set(buf, &F7.vlanID, VLAN_TAG_7,
-                                          L2_SA_ADDR_HI_7);
+  sscanf(buf, "%d", &temp);
+  if(temp >= MINIMUM_VLANID && temp <= MAXIMUM_VLANID) {
+   if (!strncmp(kobj->name, "FIFO_0", Kobj_Name_FIFO_Size)) {
+     sysfs_store_vlanID_Register_Set(buf, &F0.vlanID, VLAN_TAG_0,
+                                           L2_SA_ADDR_HI_0);
+   } else if (!strncmp(kobj->name, "FIFO_1", Kobj_Name_FIFO_Size)) {
+     sysfs_store_vlanID_Register_Set(buf, &F1.vlanID, VLAN_TAG_1,
+                                           L2_SA_ADDR_HI_1);
+   } else if (!strncmp(kobj->name, "FIFO_2", Kobj_Name_FIFO_Size)) {
+     sysfs_store_vlanID_Register_Set(buf, &F2.vlanID, VLAN_TAG_2,
+                                           L2_SA_ADDR_HI_2);
+   } else if (!strncmp(kobj->name, "FIFO_3", Kobj_Name_FIFO_Size)) {
+     sysfs_store_vlanID_Register_Set(buf, &F3.vlanID, VLAN_TAG_3,
+                                           L2_SA_ADDR_HI_3);
+   } else if (!strncmp(kobj->name, "FIFO_4", Kobj_Name_FIFO_Size)) {
+     sysfs_store_vlanID_Register_Set(buf, &F4.vlanID, VLAN_TAG_4,
+                                           L2_SA_ADDR_HI_4);
+   } else if (!strncmp(kobj->name, "FIFO_5", Kobj_Name_FIFO_Size)) {
+     sysfs_store_vlanID_Register_Set(buf, &F5.vlanID, VLAN_TAG_5,
+                                           L2_SA_ADDR_HI_5);
+   } else if (!strncmp(kobj->name, "FIFO_6", Kobj_Name_FIFO_Size)) {
+     sysfs_store_vlanID_Register_Set(buf, &F6.vlanID, VLAN_TAG_6,
+                                           L2_SA_ADDR_HI_6);
+   } else if (!strncmp(kobj->name, "FIFO_7", Kobj_Name_FIFO_Size)) {
+     sysfs_store_vlanID_Register_Set(buf, &F7.vlanID, VLAN_TAG_7,
+                                           L2_SA_ADDR_HI_7);
+   }
   }
   return count;
 }

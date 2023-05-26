@@ -54,14 +54,14 @@ typedef struct {
   u_int8_t dest_l2_addr[6];
   u_int32_t addr_range_start;
   u_int32_t addr_range_end;
-  u_int8_t source_port;
-  u_int8_t dest_port;
+  u_int16_t source_port;
+  u_int16_t dest_port;
   u_int8_t flush;
-  u_int8_t threshold;
-  u_int8_t timeout;
+  u_int16_t threshold;
+  u_int32_t timeout;
   u_int16_t vlanID;
   u_int8_t status;
-  u_int8_t txcount;
+  u_int32_t txcount;
 } mtip_debug_eth_gnl_params;
 
 #endif /* MTIP_DEBUG_ETH_GNL_UAPI_H */
