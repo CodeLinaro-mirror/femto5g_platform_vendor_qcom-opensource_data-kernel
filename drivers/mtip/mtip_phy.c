@@ -104,6 +104,11 @@ static void mtip_phy_cdr_lock_ind(u32 link_index, bool status)
     CSMLOGINFO("CDR lock indication for link_index %d, status %d\n",
               link_index, status);
 
+    if (mtip_loopback_mode == MTIP_MODE_PHY_LOOPBACK)
+    {
+        return;
+    }
+
     if (mtip_mac_wrapper_get_link_status(link_index) == true) 
     {
         post_mtip_process_link_state(link_index, true);
@@ -307,6 +312,12 @@ int mtip_phy_bringup_phy(u32 link_index, int sfp_port_type)
     // bringup the phy for the specified lanes
     rv = (qcom_aw_phy_driver_iface_ops.eth_phy_iface_phy_bringup)(port_type, lanes_enabled, sfp_port_type);
 
+    // enable tx_rx on the link by default for PHY loopback
+    if (mtip_loopback_mode == MTIP_MODE_PHY_LOOPBACK)
+    {
+        post_mtip_process_link_state(link_index, true);
+    }
+
     CSMLOGDBG("phy bringup returned rv %d", rv);
     return rv;
 }
@@ -337,7 +348,11 @@ int mtip_phy_teardown_phy(u32 link_index)
     CSMLOGINFO("phy teardown done for link_index %d rv %d", link_index, ret_val);
 
     // disable tx_rx on the link
-    post_mtip_process_link_state(link_index, false);
+    if (mtip_loopback_mode == MTIP_MODE_DEFAULT)
+    {
+        post_mtip_process_link_state(link_index, false);
+    }
+
     return ret_val;
 }
 

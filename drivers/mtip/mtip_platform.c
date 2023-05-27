@@ -1493,7 +1493,7 @@ static int mtip_platform_setup(void)
    }
 
    // handle the special case of loopback
-   if (mtip_loopback_mode == MTIP_MODE_LOOPBACK) 
+   if (mtip_loopback_mode != MTIP_MODE_DEFAULT)
    {
        // we are doing some sort of loopback
        // assign lanes to links and set mode to 4x25GBASE_R
@@ -1543,6 +1543,13 @@ static int mtip_platform_setup(void)
 
                // set the port sfp as DAC
                platform_driver_priv->mtip_ports[i]->sfp_port_type = PORT_DA;
+
+               for (j = 0; j < PHY_LANE_MAX; ++j) 
+               {
+                   platform_driver_priv->mtip_ports[i]->lane_config[j].lane_enabled = true;
+                   platform_driver_priv->mtip_ports[i]->lane_config[j].lane_speed = PHY_LANE_SPEED_25G;
+                   platform_driver_priv->mtip_ports[i]->lane_config[j].link_index = (i*PHY_LANE_MAX) + j;
+               }
            }
        }
 
