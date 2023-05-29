@@ -3316,7 +3316,7 @@ static void remove_whitespaces(char * str, uint32_t len)
 	}
 	str[j] = 0;
 }
-static char parser(parser_s *parser_in)
+static char string_parser(parser_s *parser_in)
 {
 	int i,j,k;
 
@@ -3406,8 +3406,8 @@ static void get_file_name(char *filename, uint32_t len)
 	parser_in.delim_len = 1;
 	parser_in.source_len = len;
 
-	parser(&parser_in);
-	parser(&parser_in);
+	string_parser(&parser_in);
+	string_parser(&parser_in);
 	remove_firstchar(token, sizeof(token));
 	scnprintf(filename, sizeof(token), "%s", token);
 	return;
@@ -3945,7 +3945,7 @@ int32_t setup_phy_status_debugfs_directory()
 	parser_in.delim_len = 4;
 	parser_in.source_len = sizeof(input_string);
 
-	my_delm = parser(&parser_in);
+	my_delm = string_parser(&parser_in);
 	while (my_delm != 0)
 	{
 		len= strlen(token);
@@ -4000,7 +4000,7 @@ int32_t setup_phy_status_debugfs_directory()
 			QCOM_AW_PHY_LOG_DBG("Curr_index = %u, inserting Nothing, parent was %u", curr_index,  curr_index+1);
 			curr_index--;
 		}
-		my_delm = parser(&parser_in);
+		my_delm = string_parser(&parser_in);
 	}
 	QCOM_AW_PHY_LOG_INFO("Debugfs directory Structure for phy status created successfully...\n");
 	return 0;
