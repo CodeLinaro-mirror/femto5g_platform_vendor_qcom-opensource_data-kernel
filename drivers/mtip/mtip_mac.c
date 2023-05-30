@@ -605,61 +605,30 @@ void mtip_mac_set_hashtable_entry(struct mtip_netdev_priv *priv, u8 entry_addres
    CSMLOGDBG("Setting hashtable of link index: %d, address: %d to %d\n", link_index, entry_address, write_val);
 }
 
-void mtip_mac_enable_tx_rx(u32 link_index)
+void mtip_mac_link_up(u32 link_index)
 {
-    void __iomem *mac_ioaddr;
-    struct net_device* dev = platform_driver_priv->mtip_links[link_index]->dev;
-    struct mtip_netdev_priv* priv = netdev_priv(dev);
-    u32 command_config;
-
     // Don't enable TX/RX if the link has been closed
     if (platform_driver_priv->mtip_links[link_index]->state == MTIP_LINK_STATE_CLOSE) 
     {
         return;
     }
 
-    CSMLOGINFO("Enabling Tx and Rx on link_index: %d\n", link_index);
+    CSMLOGINFO("MAC/PCS link up on link_index: %d\n", link_index);
 
     // set the link state as up
     platform_driver_priv->mtip_links[link_index]->state = MTIP_LINK_STATE_UP;
-
-    mac_ioaddr = priv->mac_ioaddr;
-
-    command_config = (u32)ioread32(mac_ioaddr + MTIP_MAC_COMMAND_CONFIG);
-
-    command_config |= (MTIP_MAC_COMMAND_CONFIG_ENABLE_TX | MTIP_MAC_COMMAND_CONFIG_ENABLE_RX);
-
-   // configure the mac for operation
-   iowrite32(command_config, mac_ioaddr + MTIP_MAC_COMMAND_CONFIG);
 }
 
-void mtip_mac_disable_tx_rx(u32 link_index)
+void mtip_mac_link_down(u32 link_index)
 {
-    void __iomem *mac_ioaddr;
-    struct net_device* dev = platform_driver_priv->mtip_links[link_index]->dev;
-    struct mtip_netdev_priv* priv = netdev_priv(dev);
-    u32 command_config;
-    enum mtip_link_state_enum state;
-     
-    CSMLOGINFO("Disabling Tx and Rx on link_index: %d\n", link_index);
-
-    state = platform_driver_priv->mtip_links[link_index]->state;
+    CSMLOGINFO("MAC/PCS link down on link_index: %d\n", link_index);
 
     // set the link state to DOWN if not closed
-    if (state != MTIP_LINK_STATE_CLOSE) 
+    if (platform_driver_priv->mtip_links[link_index]->state != MTIP_LINK_STATE_CLOSE) 
     {
         // set link state as down
         platform_driver_priv->mtip_links[link_index]->state = MTIP_LINK_STATE_DOWN;
     }
-
-    mac_ioaddr = priv->mac_ioaddr;
-
-    command_config = (u32)ioread32(mac_ioaddr + MTIP_MAC_COMMAND_CONFIG);
-
-    command_config &= (~(MTIP_MAC_COMMAND_CONFIG_ENABLE_TX | MTIP_MAC_COMMAND_CONFIG_ENABLE_RX));
-
-   // configure the mac for operation
-   iowrite32(command_config, mac_ioaddr + MTIP_MAC_COMMAND_CONFIG);
 }
 
 static void mtip_mac_set_xif_mode(struct mtip_netdev_priv *priv) {

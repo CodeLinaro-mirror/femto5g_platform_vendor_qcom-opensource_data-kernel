@@ -434,8 +434,8 @@ void run_mtip_process_link_state(void* work_ptr)
     {
         CSMLOGDBG("Processing LINK_UP for link_index: %d\n", link_index);
 
-        // enable tx_rx on the link
-        mtip_mac_enable_tx_rx(link_index);
+        // Process MAC link up state
+        mtip_mac_link_up(link_index);
 
         // wake queues
         netif_tx_wake_all_queues(dev);
@@ -461,8 +461,8 @@ void run_mtip_process_link_state(void* work_ptr)
         // stop the queues
         netif_tx_stop_all_queues(platform_driver_priv->mtip_links[link_index]->dev);
 
-        // disable tx_rx on the link
-        mtip_mac_disable_tx_rx(link_index);
+        // Process MAC link down state
+        mtip_mac_link_down(link_index);
 
         if(link_index == MTIP_DEBUG_ETH_LINK_INDEX)
         {
@@ -1212,8 +1212,8 @@ static int mtip_open(struct net_device *netdev)
          // set the link in UP state
          platform_driver_priv->mtip_links[link_index]->state = MTIP_LINK_STATE_UP;
 
-         // enable tx/rx on the link
-         mtip_mac_enable_tx_rx(link_index);
+         // Process MAC link up state
+         mtip_mac_link_up(link_index);
       }
       else
       {

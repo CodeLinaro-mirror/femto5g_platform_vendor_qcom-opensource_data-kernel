@@ -37,7 +37,7 @@
  */
 #define MTIP_MAC_RESET                            0x00001800
 
-#define MTIP_MAC_INIT_COMMAND_CONFIG              0x00000800      // was 0x00002810
+#define MTIP_MAC_INIT_COMMAND_CONFIG              0x02000803      // was 0x00002810
 
 #define MTIP_MAC_COMMAND_CONFIG_ENABLE_TX         0x00000001
 #define MTIP_MAC_COMMAND_CONFIG_ENABLE_RX         0x00000002
@@ -152,8 +152,8 @@ void mtip_mac_wrapper_init(struct mtip_port_device_info* port_device);
 
 void mtip_mac_wrapper_pcs_mode_control(struct mtip_port_device_info* port_device);
 
-void mtip_mac_enable_tx_rx(u32 link_index);
-void mtip_mac_disable_tx_rx(u32 link_index);
+void mtip_mac_link_up(u32 link_index);
+void mtip_mac_link_down(u32 link_index);
 
 void mtip_mac_set_frame_length(struct mtip_netdev_priv* priv, 
                                          u32 frame_length);
