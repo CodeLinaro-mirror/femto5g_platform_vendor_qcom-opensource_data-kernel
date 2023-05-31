@@ -9333,32 +9333,31 @@ int ecpri_dma_gsi_setup_event_ring(struct ecpri_dma_endp_context *ep,
 	gsi_evt_ring_props.intf = GSI_EVT_CHTYPE_MHI_EV;
 
 	if (ep->is_endp_mhi_l2 && ep->l2_mhi_channel_ptr != NULL) {
-			channel = ep->l2_mhi_channel_ptr;
-			if (channel->state == ECPRI_DMA_HW_MHI_CHANNEL_STATE_INVALID) {
-				gsi_evt_ring_props.msi_irq = GSI_INTR_MSI;
-				gsi_evt_ring_props.int_modt = channel->ev_ctx_host.intmodt *
-					ECPRI_DMA_MHI_SLEEP_CLK_RATE_KHZ;
-				gsi_evt_ring_props.int_modc = channel->ev_ctx_host.intmodc;
-				gsi_evt_ring_props.intvec = ((channel->msi_config->data
-					& ~channel->msi_config->mask) |
-					(channel->ev_ctx_host.msivec & channel->msi_config->mask));
-				gsi_evt_ring_props.ring_len = channel->ev_ctx_host.rlen;
-				gsi_evt_ring_props.ring_base_addr =
-					ECPRI_DMA_MHI_HOST_ADDR_COND(
-						channel->ev_ctx_host.rbase, ep);
+		channel = ep->l2_mhi_channel_ptr;
 
-				msi_addr = ((uint64_t)channel->msi_config->addr_hi << 32 |
-					channel->msi_config->addr_low);
-				gsi_evt_ring_props.msi_addr =
-					ECPRI_DMA_MHI_HOST_ADDR_COND(msi_addr, ep);
+		gsi_evt_ring_props.msi_irq = GSI_INTR_MSI;
+		gsi_evt_ring_props.int_modt = channel->ev_ctx_host.intmodt *
+			ECPRI_DMA_MHI_SLEEP_CLK_RATE_KHZ;
+		gsi_evt_ring_props.int_modc = channel->ev_ctx_host.intmodc;
+		gsi_evt_ring_props.intvec = ((channel->msi_config->data
+			& ~channel->msi_config->mask) |
+			(channel->ev_ctx_host.msivec & channel->msi_config->mask));
+		gsi_evt_ring_props.ring_len = channel->ev_ctx_host.rlen;
+		gsi_evt_ring_props.ring_base_addr =
+			ECPRI_DMA_MHI_HOST_ADDR_COND(
+				channel->ev_ctx_host.rbase, ep);
 
-				rp_update_addr = channel->ev_context_addr +
-					offsetof(struct ecpri_dma_mhi_host_ev_ctx, rp);
-				gsi_evt_ring_props.rp_update_addr =
-					ECPRI_DMA_MHI_HOST_ADDR_COND(rp_update_addr, ep);
-				DMADBG("RP Update address: 0x%x\n",
-					gsi_evt_ring_props.rp_update_addr);
-			}
+		msi_addr = ((uint64_t)channel->msi_config->addr_hi << 32 |
+			channel->msi_config->addr_low);
+		gsi_evt_ring_props.msi_addr =
+			ECPRI_DMA_MHI_HOST_ADDR_COND(msi_addr, ep);
+
+		rp_update_addr = channel->ev_context_addr +
+			offsetof(struct ecpri_dma_mhi_host_ev_ctx, rp);
+		gsi_evt_ring_props.rp_update_addr =
+			ECPRI_DMA_MHI_HOST_ADDR_COND(rp_update_addr, ep);
+		DMADBG("RP Update address: 0x%x\n",
+			gsi_evt_ring_props.rp_update_addr);
 	}
 	else {
 		gsi_evt_ring_props.intr = GSI_INTR_IRQ;
@@ -9576,18 +9575,17 @@ int ecpri_dma_gsi_release_channel(struct ecpri_dma_endp_context *ep)
 		ep->gsi_mem_info.chan_ring_base_addr);
 	}
 
-	if (!ep->eventless_endp) {
+	/* MHI doesn't dealloc events */
+	if (!ep->eventless_endp && !ep->is_endp_mhi_l2) {
 		gsi_res = gsi_dealloc_evt_ring(ep->gsi_evt_ring_hdl);
 		if (gsi_res != GSI_STATUS_SUCCESS) {
 			DMAERR("Error deallocating event: %d\n", gsi_res);
 			return gsi_res;
 		}
 
-		if (!ep->is_endp_mhi_l2) {
-			dma_free_coherent(gsi_dev, ep->gsi_mem_info.evt_ring_len,
-				ep->gsi_mem_info.evt_ring_base_vaddr,
-				ep->gsi_mem_info.evt_ring_base_addr);
-		}
+		dma_free_coherent(gsi_dev, ep->gsi_mem_info.evt_ring_len,
+			ep->gsi_mem_info.evt_ring_base_vaddr,
+			ep->gsi_mem_info.evt_ring_base_addr);
 	}
 
 	ep->valid = false;

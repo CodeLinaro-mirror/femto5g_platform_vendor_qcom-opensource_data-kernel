@@ -1648,6 +1648,13 @@ int gsi_alloc_evt_ring(struct gsi_evt_ring_props *props, unsigned long dev_hdl,
 	}
 
 	ctx = &gsi_ctx->evtr[props->gsi_id][props->ee][evt_id];
+
+	if (ctx->hdl) {
+		/* EV already allocated */
+		*evt_ring_hdl = ctx->hdl;
+		return GSI_STATUS_SUCCESS;
+	}
+
 	memset(ctx, 0, sizeof(*ctx));
 	mutex_init(&ctx->mlock);
 	init_completion(&ctx->compl);
@@ -1802,6 +1809,8 @@ int gsi_dealloc_evt_ring(unsigned long evt_ring_hdl)
 		 */
 		GSI_ASSERT();
 	}
+	ctx->hdl = 0;
+
 	up(&gsi_ctx->sem);
 
 	if (!ctx->props.evchid_valid) {
@@ -2939,6 +2948,7 @@ int gsi_dealloc_channel(unsigned long chan_hdl)
 
 	devm_kfree(gsi_ctx->dev, ctx->user_data);
 	ctx->allocated = false;
+	ctx->hdl = 0;
 	if (ctx->evtr) {
 		atomic_dec(&ctx->evtr->chan_ref_cnt);
 		ctx->evtr->num_of_chan_allocated--;
@@ -4277,10 +4287,46 @@ subsys_initcall(gsi_init);
  */
 static void __exit gsi_exit(void)
 {
-	int gsi_id = 0, ee = 0;
+	int gsi_id = 0, ee = 0, ch = 0;
 	struct device* dev = gsi_ctx->dev;
+	struct gsi_chan_ctx* ch_ctx;
+	struct gsi_evt_ctx* ev_ctx;
 
-	/* DMA driver is unloaded first, all CHs are deallocated */
+	/* Verify all CHs and EVs are deallocated */
+	for (gsi_id = 0; gsi_id < gsi_ctx->per.num_of_gsi; gsi_id++) {
+		for (ee = 0; ee < GSI_EE_MAX; ee++) {
+			for (ch = 0; ch < GSI_CHAN_MAX; ch++) {
+				ch_ctx = &gsi_ctx->chan[gsi_id][ee][ch];
+				if (ch_ctx->hdl) {
+					if (ch_ctx->state == GSI_CHAN_STATE_STARTED)
+						gsi_stop_channel(ch_ctx->hdl);
+
+					if (ch_ctx->state == GSI_CHAN_STATE_STOPPED)
+						gsi_reset_channel(ch_ctx->hdl);
+
+					if (ch_ctx->state == GSI_CHAN_STATE_ALLOCATED)
+						gsi_dealloc_channel(ch_ctx->hdl);
+
+					if (ch_ctx->state != GSI_CHAN_STATE_NOT_ALLOCATED) {
+						GSIERR("Unexpected channel state %d\n",
+							ch_ctx->state);
+						GSI_ASSERT();
+					}
+				}
+			}
+		}
+	}
+
+	for (gsi_id = 0; gsi_id < gsi_ctx->per.num_of_gsi; gsi_id++) {
+		for (ee = 0; ee < GSI_EE_MAX; ee++) {
+			for (ch = 0; ch < GSI_CHAN_MAX; ch++) {
+				ev_ctx = &gsi_ctx->evtr[gsi_id][ee][ch];
+				if (ev_ctx->hdl) {
+					gsi_dealloc_evt_ring(ev_ctx->hdl);
+				}
+			}
+		}
+	}
 
 	GSIDBG("Start driver unload\n");
 

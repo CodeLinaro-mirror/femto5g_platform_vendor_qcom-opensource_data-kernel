@@ -659,21 +659,7 @@ static int ecpri_dma_eth_dp_test_disconnect_endpoints(
 		return -EINVAL;
 	}
 
-	/* Disabling endpoints in DMA HW */
-	ret = ecpri_dma_disable_dma_endp(connection->tx_endp_ctx);
-	if (ret != 0) {
-		DMAERR("Unable to disable channel - Tx, ENDP ID:%d\n",
-			connection->tx_endp_ctx->endp_id);
-		return -EINVAL;
-	}
 	connection->tx_endp_ctx->hdl = 0;
-
-	ret = ecpri_dma_disable_dma_endp(connection->rx_endp_ctx);
-	if (ret != 0) {
-		DMAERR("Unable to disable channel - Rx, ENDP ID:%d\n",
-			connection->rx_endp_ctx->endp_id);
-		return -EINVAL;
-	}
 	connection->rx_endp_ctx->hdl = 0;
 
 	connection->valid = false;

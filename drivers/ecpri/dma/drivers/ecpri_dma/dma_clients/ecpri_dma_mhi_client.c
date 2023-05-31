@@ -1026,63 +1026,6 @@ static int ecpri_dma_mhi_stop_memcpy_endps(int idx)
 }
 
 /**
- * ecpri_dma_mhi_disable_memcpy_endps() - Helper function to disable endpnts
- *
- */
-static int ecpri_dma_mhi_disable_memcpy_endps(int idx)
-{
-	int ret = 0;
-
-	int sync_src_endp_id = ECPRI_DMA_MHI_INVALID_ENDP_ID;
-	int sync_dest_endp_id = ECPRI_DMA_MHI_INVALID_ENDP_ID;
-	int async_src_endp_id = ECPRI_DMA_MHI_INVALID_ENDP_ID;
-	int async_dest_endp_id = ECPRI_DMA_MHI_INVALID_ENDP_ID;
-	enum ecpri_dma_gsi_id gsi_id = ECPRI_DMA_GSI_ID_0;
-
-	ecpri_dma_mhi_get_sync_async_endp_ids(&sync_src_endp_id,
-		&sync_dest_endp_id, &async_src_endp_id, &async_dest_endp_id, idx);
-
-	ret = ecpri_dma_disable_dma_endp(
-		&ecpri_dma_ctx->endp_ctx[gsi_id][sync_src_endp_id]);
-	if (ret != 0) {
-		DMAERR("Unable to disable endpoint %d, gsi_id %d\n",
-			sync_src_endp_id, gsi_id);
-		return ret;
-	}
-
-	ret = ecpri_dma_disable_dma_endp(
-		&ecpri_dma_ctx->endp_ctx[gsi_id][sync_dest_endp_id]);
-	if (ret != 0) {
-		DMAERR("Unable to disable endpoint %d, gsi_id %d\n",
-			sync_dest_endp_id, gsi_id);
-		return ret;
-	}
-
-	/* Skip the VMs */
-	if (async_src_endp_id == ECPRI_DMA_MHI_INVALID_ENDP_ID ||
-		async_dest_endp_id == ECPRI_DMA_MHI_INVALID_ENDP_ID)
-		return ret;
-
-	ret = ecpri_dma_disable_dma_endp(
-		&ecpri_dma_ctx->endp_ctx[gsi_id][async_src_endp_id]);
-	if (ret != 0) {
-		DMAERR("Unable to disable endpoint %d, gsi_id %d\n",
-			async_src_endp_id, gsi_id);
-		return ret;
-	}
-
-	ret = ecpri_dma_disable_dma_endp(
-		&ecpri_dma_ctx->endp_ctx[gsi_id][async_dest_endp_id]);
-	if (ret != 0) {
-		DMAERR("Unable to disable endpoint %d, gsi_id %d\n",
-			async_dest_endp_id, gsi_id);
-		return ret;
-	}
-
-	return ret;
-}
-
-/**
  * ecpri_dma_mhi_dealloc_memcpy_endps() - Helper function to dealloc endpnts
  *
  */
@@ -1403,13 +1346,6 @@ static void ecpri_dma_mhi_memcpy_destroy(
 	ret = ecpri_dma_mhi_reset_memcpy_endps(idx);
 	if (ret != 0) {
 		DMAERR("Unable to reset endps\n");
-		ecpri_dma_assert();
-	}
-
-	/* Disable endpoints */
-	ret = ecpri_dma_mhi_disable_memcpy_endps(idx);
-	if (ret != 0) {
-		DMAERR("Unable to disable GSI endps\n");
 		ecpri_dma_assert();
 	}
 
@@ -2843,7 +2779,7 @@ static int ecpri_dma_mhi_dma_connect_endp(
 	channel->msi_config =
 		&ecpri_dma_mhi_client_ctx[idx]->msi_config;
 	channel->rlen = channel->ch_ctx_host.rlen;
-	channel->rlen = channel->ev_ctx_host.rlen;
+	channel->ev_rlen = channel->ev_ctx_host.rlen;
 	channel->int_modt = channel->ev_ctx_host.intmodt;
 	channel->int_modc = channel->ev_ctx_host.intmodc;
 
@@ -2949,16 +2885,6 @@ static int ecpri_dma_mhi_dma_disconnect_endp(
 		DMAERR("Unable to reset endp, endp_id: %d\n",
 			channel->endp_ctx->endp_id);
 		return ret;
-	}
-
-	/* Disable */
-	if (ecpri_dma_get_ctx_hw_ver() != ECPRI_HW_V1_0) {
-		ret = ecpri_dma_disable_dma_endp(channel->endp_ctx);
-		if (ret != 0) {
-			DMAERR("Unable to disable endpoint %d\n",
-				channel->endp_ctx->endp_id);
-			ecpri_dma_assert();
-		}
 	}
 
 	/* Dealloc */
