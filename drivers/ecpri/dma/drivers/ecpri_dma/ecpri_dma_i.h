@@ -238,6 +238,7 @@ union dma_xbar_cfg_tid_u {
  * @dest: For M2M SRC ENDPs matching DEST, for M2S ENDP matching DEST Stream.
  * @is_exception: True if ENDP is exception endp.
  * @nfapi_dest_vm_id: For M2S nFAPI ENDP matching VM ID.
+ * @lte_enable: should this traffic should be configured for LTE
  */
 struct dma_gsi_ep_config {
 	bool valid;
@@ -254,6 +255,7 @@ struct dma_gsi_ep_config {
 	u32 dest;
 	bool is_exception;
 	enum ecpri_dma_vm_ids nfapi_dest_vm_id;
+	bool lte_enable;
 };
 
 /**

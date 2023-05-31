@@ -29,6 +29,7 @@ enum ecpri_dma_ring_type {
 	ECPRI_DMA_RING_TYPE_IPC_A55,
 	ECPRI_DMA_RING_TYPE_IPC_Q6,
 	ECPRI_DMA_RING_TYPE_C2C_DEFAULT,
+	ECPRI_DMA_RING_TYPE_LTE_DEFAULT,
 	ECPRI_DMA_RING_TYPE_MAX
 };
 
@@ -82,7 +83,7 @@ struct ecpri_dma_ecpri_ss_register_params {
  *
  * @link_index:       Link index corresponding to the DMA channel, -1
  *                    for exception packets
- * @nfapi_vm_id:      VM ID associated with the Q6 DMA channel for L2
+ * @vm_id:      VM ID associated with the Q6 DMA channel for L2
  * @dma_ring_type:    DMA ring type associated with the particular
  *                    DMA channel
  * @src_dma_ring_id:  SRC DMA ring ID associated for the given DMA channel
@@ -93,7 +94,7 @@ struct ecpri_dma_ecpri_ss_register_params {
  */
 struct ecpri_dma_ring_params {
 	u32 link_index;
-	enum ecpri_dma_vm_ids nfapi_vm_id;
+	enum ecpri_dma_vm_ids vm_id;
 	enum ecpri_dma_ring_type dma_ring_type;
 	u32 src_dma_ring_id;
 	u32 src_dma_ring_gsi_id;
@@ -142,7 +143,7 @@ struct ecpri_dma_endp_mapping {
 	enum ecpri_hw_flavor flv;
 	u32 num_of_port_types;
 	struct ecpri_dma_topology_params
-		topology_params[ECPRI_DMA_ENDP_STREAM_DEST_MAX];
+		topology_params[ECPRI_DMA_TOPOLOGIES_NUMBER_MAX];
 };
 
 
