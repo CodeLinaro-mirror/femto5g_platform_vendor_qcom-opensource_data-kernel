@@ -1345,30 +1345,35 @@ static int mtip_close(struct net_device *netdev)
       for (i = 0; i < platform_driver_priv->devices.port_devices[port_type].num_link_phandles; ++i) 
       {
           tmp_link_index = platform_driver_priv->devices.port_devices[port_type].link_devices[i]->link_index;
-
-          if ((platform_driver_priv->mtip_links[tmp_link_index]->state != MTIP_LINK_STATE_INIT) &&
+          mutex_lock(&platform_driver_priv->mtip_links[link_index]->dev_lock);
+          if ((platform_driver_priv->mtip_links[tmp_link_index]) && (platform_driver_priv->mtip_links[tmp_link_index]->state != MTIP_LINK_STATE_INIT) &&
               (platform_driver_priv->mtip_links[tmp_link_index]->state != MTIP_LINK_STATE_CLOSE))
           {
               all_closed = false;
+              mutex_unlock(&platform_driver_priv->mtip_links[link_index]->dev_lock);
               break;
           }
+          mutex_unlock(&platform_driver_priv->mtip_links[link_index]->dev_lock);
       }
 
        if (all_closed) 
        {
            // reset the port state to INIT
-           platform_driver_priv->mtip_ports[port_type]->port_state = MTIP_PORT_STATE_INIT;
+	   if(platform_driver_priv->mtip_ports[port_type]) {
+              platform_driver_priv->mtip_ports[port_type]->port_state = MTIP_PORT_STATE_INIT;
+	   }
 
            // reset all the lane assignments
            for (i = 0; i < platform_driver_priv->devices.port_devices[port_type].num_link_phandles; ++i) 
            {
                tmp_link_index = platform_driver_priv->devices.port_devices[port_type].link_devices[i]->link_index;
 
-               mutex_lock(&platform_driver_priv->mtip_links[tmp_link_index]->dev_lock);
+               if(platform_driver_priv->mtip_links[tmp_link_index]) {
+                   mutex_lock(&platform_driver_priv->mtip_links[tmp_link_index]->dev_lock);
 
-               platform_driver_priv->mtip_links[tmp_link_index]->lanes_assignment_complete = false;
-
-               mutex_unlock(&platform_driver_priv->mtip_links[tmp_link_index]->dev_lock);
+                   platform_driver_priv->mtip_links[tmp_link_index]->lanes_assignment_complete = false;
+                   mutex_unlock(&platform_driver_priv->mtip_links[tmp_link_index]->dev_lock);
+               }
            }
        }
    }

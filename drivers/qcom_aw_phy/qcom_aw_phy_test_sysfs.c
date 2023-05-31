@@ -189,8 +189,6 @@ void qcom_aw_phy_del_sysfs() {
 
   /* deleting the directory structure in /sys/kernel/debug */
   debugfs_remove_recursive(dobj);
-  if(list_dv[0])
-    debugfs_remove_recursive(list_dv[0]);
   return;
 }
 
