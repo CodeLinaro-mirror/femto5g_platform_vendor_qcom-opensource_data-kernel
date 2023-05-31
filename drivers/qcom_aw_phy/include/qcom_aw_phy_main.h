@@ -240,6 +240,7 @@ enum qcom_aw_phy_an_state_enum {
 struct qcom_aw_lane_params{
 	struct eth_phy_iface_phy_lane_config   lane_config;
 	bool                                   link_status;
+	bool                                   lane_bring_up_status;
 	uint32_t                               snr_valid_intr;
 	uint32_t                               an_link_good_intr;
 	uint32_t                               an_done_intr;
