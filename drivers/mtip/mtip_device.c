@@ -468,9 +468,9 @@ void run_mtip_process_link_state(void* work_ptr)
 
         // carrier is on
         if (!netif_carrier_ok(dev)) {
- 			netif_carrier_on(dev);
- 			netdev_info(dev, "Link is Up\n");
- 		}
+            netif_carrier_on(dev);
+            netdev_info(dev, "Link is Up\n");
+        }
 
         // tell all the clients of the link status update
         post_mtip_client_send_event(ETH_ECPRISS_EVENT_UP, link_index);
@@ -490,10 +490,10 @@ void run_mtip_process_link_state(void* work_ptr)
             mtip_sysfs_mac_link_status(false);
         }
 
-		if (netif_carrier_ok(dev)) {
- 			netif_carrier_off(dev);
- 			netdev_info(dev, "Link is Down\n");
- 		}
+        if (netif_carrier_ok(dev)) {
+            netif_carrier_off(dev);
+            netdev_info(dev, "Link is Down\n");
+        }
 
         // tell all the clients of the link status update
         post_mtip_client_send_event(ETH_ECPRISS_EVENT_DOWN, link_index);
@@ -1186,6 +1186,9 @@ static int mtip_open(struct net_device *netdev)
       CSMLOGERR("invalid port_type for link_index %d", link_index);
       return -ENODEV;
    }
+
+   // Initialize the carrier state as off
+   netif_carrier_off(netdev);
 
    // first get the interface going
    if (hdl)

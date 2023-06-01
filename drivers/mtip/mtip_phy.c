@@ -60,6 +60,8 @@ extern struct eth_phy_iface_ops qcom_aw_phy_driver_iface_ops;
 
 struct mtip_delayed_work_q_params *delayed_wq_params[MTIP_MAX_LINKS] = {NULL};
 
+u8 mtip_phy_retry_num[MTIP_MAX_LINKS] = {0};
+
 /* 
  * qsfp_eth_get_link_type: returns sfp port type
  * based on values defined in ethtool.h
@@ -75,7 +77,8 @@ struct mtip_delayed_work_q_params *delayed_wq_params[MTIP_MAX_LINKS] = {NULL};
 extern int qsfp_eth_get_link_type(u32 qsfp_phandle, u8* link_info);
 
 // PCS level retry delay to bring up PHY lane
-#define MTIP_PHY_RETRY_TIMER     10000
+#define MTIP_PHY_RETRY_TIMER       2000
+#define MTIP_PHY_RETRIES_MAX_NUM   5
 
 static void mtip_phy_ready_cb(void *user_data)
 {
@@ -125,6 +128,7 @@ static void mtip_phy_cdr_lock_ind(u32 link_index, bool status)
     {
         post_mtip_process_link_state(link_index, true);
         mtip_phy_lane_bring_up_progress_ind(link_index, false);
+        mtip_phy_retry_num[link_index] = 0;
     }
     else if(status == true)
     {
@@ -269,6 +273,7 @@ void mtip_phy_retry_phy_bringup(struct work_struct *work)
 
     if(mtip_mac_wrapper_get_link_status(link_index) == true)
     {
+        mtip_phy_retry_num[link_index] = 0;
         post_mtip_process_link_state(link_index, true);
         mtip_phy_lane_bring_up_progress_ind(link_index, false);
         goto func_exit;
@@ -277,6 +282,18 @@ void mtip_phy_retry_phy_bringup(struct work_struct *work)
     if (mtip_lookup_port_type_by_link_index(link_index, &port_type) < 0)
     {
         CSMLOGERR("invalid port_type for link_index %d", link_index);
+        goto func_exit;
+    }
+
+    mtip_phy_retry_num[link_index]++;
+    if(mtip_phy_retry_num[link_index] >= MTIP_PHY_RETRIES_MAX_NUM){
+
+        CSMLOGERR("Max retries done for link_index %d", link_index);
+        mtip_phy_retry_num[link_index] = 0;
+
+        // notify phy that PCS link is down after max retries
+        mtip_phy_notify_link_status(link_index, false);
+
         goto func_exit;
     }
 
@@ -361,6 +378,12 @@ int mtip_phy_teardown_phy(u32 link_index)
     if (mtip_loopback_mode == MTIP_MODE_DEFAULT)
     {
         post_mtip_process_link_state(link_index, false);
+    }
+
+    // Clear the retry count if interface has been torn down
+    if(platform_driver_priv->mtip_links[link_index]->state == MTIP_LINK_STATE_CLOSE)
+    {
+        mtip_phy_retry_num[link_index] = 0;
     }
 
     return ret_val;

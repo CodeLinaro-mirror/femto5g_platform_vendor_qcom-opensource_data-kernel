@@ -1058,6 +1058,8 @@ int qcom_aw_phy_bringup_manual_eq_mode(
     enum eth_phy_iface_phy_lane_num_enum lane,
     struct qcom_aw_phy_lane_speed_config config) {
   aw_txfir_config_t txfir_cfg = {0};
+  struct qcom_aw_phy_config *phy_config_info = NULL;
+  struct qcom_aw_phy_work_q_params *wq_params = NULL;
   enum local_error_enum local_err_val = LOCAL_ERROR_INVALID;
   aw_err_code_t aw_err_val = AW_ERR_CODE_NONE;
   int ret_val = 0;
@@ -1127,6 +1129,28 @@ int qcom_aw_phy_bringup_manual_eq_mode(
   }
   else{
     qcom_aw_phy_handle_cdr_lock_status(phy_inst_info, lane, CDR_LOCK_FAILURE);
+
+    phy_config_info = qcom_aw_phy_get_config_info();
+    if (!phy_config_info) {
+      ret_val = EINVAL;
+      local_err_val = LOCAL_ERROR_2;
+      goto func_exit;
+    }
+
+    /* If CDR lock fails in the first attempt, requeue a 2nd attempt, post
+    which retries will be done at PCS level, or based on RX SIG interrupts*/
+    wq_params = kmalloc(sizeof(struct qcom_aw_phy_work_q_params),
+                        GFP_ATOMIC);
+    if(!wq_params)
+      QCOM_AW_PHY_LOG_ERR("Malloc failed!");
+    else{
+      INIT_DELAYED_WORK(&wq_params->wq_item,
+                        qcom_aw_phy_handle_rx_sig_detect);
+      wq_params->phy_inst = phy_inst_info->phy_inst;
+      wq_params->lane_num = lane;
+      queue_delayed_work(phy_config_info->wq, &wq_params->wq_item,
+                         msecs_to_jiffies(10));
+    }
   }
 
 func_exit:
@@ -1489,8 +1513,11 @@ int qcom_aw_phy_mac_link_status(enum mtip_port_type_enum port_type,
         QCOM_AW_PHY_LOG_ERR("PHY instance %d, lane %d, status %d, ",
                             phy_inst_type, lane_num, status);
         notify_flag = true;
-        phy_inst_info->cdr_lock_status_flag[lane_num] = CDR_LOCK_NONE;
       }
+
+      if(!status)
+        phy_inst_info->cdr_lock_status_flag[lane_num] = CDR_LOCK_NONE;
+
       mutex_unlock(&phy_inst_info->lane_lock[lane_num]);
     }
   }
