@@ -626,6 +626,9 @@ int mtip_pcs_config_pcs(u32 link_index)
     // this is the port configuration
     port_config = platform_driver_priv->mtip_ports[port_type]->port_config;
 
+    mtip_pcs_update_active_fec(link_index, port_config,
+                               platform_driver_priv->mtip_ports[port_type]->sfp_port_type);
+
     // program the vendor pcs mode register
     mtip_pcs_set_vendor_pcs_mode(port_config, &platform_driver_priv->devices.link_devices[link_index]);
 
@@ -863,6 +866,72 @@ void mtip_pcs_disable_rsfec_for_25g_mode(struct mtip_link_device_info* link_devi
     // set the vendor vl intvl register
     iowrite32(marker_counter,
               pcs_ioaddr + MTIP_PCS_VENDOR_VL_INTVL_OFFSET);
+    return;
+}
+
+void mtip_pcs_update_active_fec(u32 link_index,
+                                       enum mtip_port_config_enum port_config,
+                                       u32  sfp_port_type) {
+
+    u32 active_fec;
+
+    switch (port_config) {
+    case MTIP_PORT_CONFIG_1x50GBASE_R:
+    case MTIP_PORT_CONFIG_1x50GBASE_R_RSFEC:
+    case MTIP_PORT_CONFIG_2x50GBASE_R:
+    case MTIP_PORT_CONFIG_2x50GBASE_R_RSFEC:
+    case MTIP_PORT_CONFIG_1x25GBASE_R_RSFEC:
+    case MTIP_PORT_CONFIG_4x25GBASE_R_RSFEC:
+    case MTIP_PORT_CONFIG_1x100GBASE_R:
+    case MTIP_PORT_CONFIG_1x100GBASE_R_RSFEC_LL:
+    case MTIP_PORT_CONFIG_1x100GBASE_R_RSFEC:
+    case MTIP_PORT_CONFIG_1x100GBASE_R2:
+    case MTIP_PORT_CONFIG_1x100GBASE_R2_RSFEC:
+    case MTIP_PORT_CONFIG_1x100GBASE_R4:
+    case MTIP_PORT_CONFIG_1x100GBASE_R4_RSFEC:
+    case MTIP_PORT_CONFIG_1x50GBASE_R2:
+    case MTIP_PORT_CONFIG_1x50GBASE_R2_RSFEC:
+    case MTIP_PORT_CONFIG_2x50GBASE_R2:
+    case MTIP_PORT_CONFIG_2x50GBASE_R2_FEC:
+    case MTIP_PORT_CONFIG_2x50GBASE_R2_LUAI:
+    case MTIP_PORT_CONFIG_2x50GBASE_R2_LUAI_FEC:
+    case MTIP_PORT_CONFIG_1x40GBASE_R4:
+    case MTIP_PORT_CONFIG_1x40GBASE_R4_FEC:
+        {
+            active_fec = ETHTOOL_FEC_RS;
+        }
+        break;
+
+    case MTIP_PORT_CONFIG_1x25GBASE_R:
+    case MTIP_PORT_CONFIG_4x25GBASE_R:
+        {
+            if(sfp_port_type == PORT_FIBRE)
+                active_fec = ETHTOOL_FEC_RS;
+            else
+                active_fec = ETHTOOL_FEC_OFF;
+        }
+        break;
+
+    case MTIP_PORT_CONFIG_1x50GBASE_R2_LUAI:
+    case MTIP_PORT_CONFIG_1x50GBASE_R2_LUAI_FEC:
+    case MTIP_PORT_CONFIG_1x25GBASE_R_FEC:
+    case MTIP_PORT_CONFIG_4x25GBASE_R_FEC:
+    case MTIP_PORT_CONFIG_1x10GBASE_R:
+    case MTIP_PORT_CONFIG_1x10GBASE_R_FEC:
+    case MTIP_PORT_CONFIG_4x10GBASE_R:
+    case MTIP_PORT_CONFIG_4x10GBASE_R_FEC:
+    default:
+        {
+            active_fec = ETHTOOL_FEC_OFF;
+        }
+        break;
+    }
+
+    CSMLOGINFO("Setting active FEC(4=OFF, 8=RS) to %d for link_index: %d",
+               active_fec, link_index);
+
+    platform_driver_priv->mtip_links[link_index]->active_fec = active_fec;
+
     return;
 }
 
