@@ -2301,13 +2301,12 @@ int mtip_netdev_set_port_priv_flags(struct net_device *netdev)
 {
     struct mtip_netdev_priv *priv;
     u32 link_index;
-    u32 pflags;
     u32 port_priv_flags = 0;
     u32 port_type;
     int i;
-    bool priv_flag_set = false;
-    bool override_default = false;
     enum mtip_link_state_enum state;
+    u32 port_link0_index;
+    u32 temp_link_index;
 
     priv = netdev_priv(netdev);
     link_index = priv->link_index;
@@ -2321,10 +2320,10 @@ int mtip_netdev_set_port_priv_flags(struct net_device *netdev)
     // check if any of the links of the port is open
     for (i = 0; i < platform_driver_priv->devices.port_devices[port_type].num_link_phandles; ++i) 
     {
-        link_index = platform_driver_priv->devices.port_devices[port_type].link_devices[i]->link_index;
-        state = platform_driver_priv->mtip_links[link_index]->state;
+        temp_link_index = platform_driver_priv->devices.port_devices[port_type].link_devices[i]->link_index;
+        state = platform_driver_priv->mtip_links[temp_link_index]->state;
 
-        CSMLOGINFO("port_type %d link_index %d state %d", port_type, link_index, state);
+        CSMLOGINFO("port_type %d link_index %d state %d", port_type, temp_link_index, state);
 
         // check if state is not INIT or CLOSE
         if ((state == MTIP_LINK_STATE_INIT) || (state == MTIP_LINK_STATE_CLOSE))
@@ -2333,66 +2332,30 @@ int mtip_netdev_set_port_priv_flags(struct net_device *netdev)
         }
         else
         {
-            CSMLOGERR("port_type %d link_index %d is open. port config not updated in state %d", port_type, link_index, state);
+            CSMLOGERR("port_type %d link_index %d is open. port config not updated in state %d", port_type, temp_link_index, state);
             return -1;
         }
     }
 
-    // check if priv flags of any of the links has been set using ethtool
-    for (i = 0; i < platform_driver_priv->devices.port_devices[port_type].num_link_phandles; ++i) 
+    // Process only for link 0 of the port
+    port_link0_index = platform_driver_priv->devices.port_devices[port_type].link_devices[0]->link_index;
+    priv = netdev_priv(platform_driver_priv->mtip_links[port_link0_index]->dev);
+    port_priv_flags = priv->priv_flags;
+    if (link_index != port_link0_index) 
     {
-        link_index = platform_driver_priv->devices.port_devices[port_type].link_devices[i]->link_index;
-        priv = netdev_priv(platform_driver_priv->mtip_links[link_index]->dev);
-        pflags = priv->priv_flags;
-        priv_flag_set = priv->priv_flags_set;
-
-        if (priv_flag_set) 
-        {
-            // ethtool cmds have been used to override the default
-            override_default = true;
-            break;
-        }
-    }
-
-    // lookup all the links of the port
-    for (i = 0; i < platform_driver_priv->devices.port_devices[port_type].num_link_phandles; ++i) 
-    {
-        link_index = platform_driver_priv->devices.port_devices[port_type].link_devices[i]->link_index;
-        priv = netdev_priv(platform_driver_priv->mtip_links[link_index]->dev);
-    pflags = priv->priv_flags;
-        priv_flag_set = priv->priv_flags_set;
-
-        if (override_default == false) 
-        {
-        // set the port priv_flags as OR of all the link priv flags
-        port_priv_flags |= pflags;
-    }
-        else
-        {
-            if (priv_flag_set) 
-            {
-                // set the port priv_flags as OR of all the link priv flags
-                port_priv_flags |= pflags;
-            }
-            else
-            {
-                CSMLOGDBG("ignoring the default priv flags of link_index %d", link_index);
-            }
-        }
+        CSMLOGDBG("ignoring the default priv flags of link_index %d", link_index);
     }
 
     platform_driver_priv->mtip_ports[port_type]->port_priv_flags = port_priv_flags;
 
-    CSMLOGINFO("port %d priv_flags set to %d", port_type, port_priv_flags);
-
     // clear the lane assignment of all the links
     for (i = 0; i < platform_driver_priv->devices.port_devices[port_type].num_link_phandles; ++i) 
     {
-        link_index = platform_driver_priv->devices.port_devices[port_type].link_devices[i]->link_index;
-        platform_driver_priv->mtip_links[link_index]->lanes_assignment_complete = false;
-        platform_driver_priv->mtip_links[link_index]->num_assigned_lanes = 0;
+        temp_link_index = platform_driver_priv->devices.port_devices[port_type].link_devices[i]->link_index;
+        platform_driver_priv->mtip_links[temp_link_index]->lanes_assignment_complete = false;
+        platform_driver_priv->mtip_links[temp_link_index]->num_assigned_lanes = 0;
 
-        CSMLOGDBG("clearing link lanes for link_index %d", link_index);
+        CSMLOGDBG("clearing link lanes for link_index %d", temp_link_index);
     }
 
     CSMLOGINFO("Setting the port %d priv flags to %d", port_type, port_priv_flags);
