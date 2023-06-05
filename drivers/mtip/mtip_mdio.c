@@ -66,8 +66,8 @@ void mtip_mdio_link_up(struct phylink_config *config,
    // Delay tuning for RX and TX
    mtip_dut_rx_tx_delay_tuning(link_index);
 
-   // Enable TX and RX on MAC
-   mtip_mac_enable_tx_rx(link_index);
+   // Process MAC link up state
+   mtip_mac_link_up(link_index);
 
    if(priv->link_index == MTIP_DEBUG_ETH_LINK_INDEX)
       mtip_sysfs_mac_link_status(true);
@@ -82,8 +82,8 @@ void mtip_mdio_link_down(struct phylink_config *config, unsigned int mode,
 
    CSMLOGINFO("mtip_mac_link_down for MAC index %d", link_index);
 
-   // Disable TX and RX on MAC
-   mtip_mac_disable_tx_rx(link_index);
+   // Process MAC link down state
+   mtip_mac_link_down(link_index);
 
    if(priv->link_index == MTIP_DEBUG_ETH_LINK_INDEX)
       mtip_sysfs_mac_link_status(false);
