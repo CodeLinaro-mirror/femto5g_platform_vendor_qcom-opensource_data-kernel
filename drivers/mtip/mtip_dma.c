@@ -295,6 +295,11 @@ void mtip_dma_tx_comp_cb(void *user_data, ecpri_dma_eth_conn_hdl_t hdl, struct e
 
     // copy the pointers
     local_comp_pkts = (struct ecpri_dma_pkt_completion_wrapper **)kmalloc(num_of_completed * sizeof(struct ecpri_dma_pkt_completion_wrapper *), GFP_ATOMIC);
+    if(local_comp_pkts == NULL)
+    {
+      CSMLOGERR("memory alloc failed\n");
+      return;
+    }
 
     for (i = 0; i < num_of_completed; ++i)
     {
@@ -443,6 +448,11 @@ int mtip_replenish_dma_rx_buffers(struct net_device *netdev, ecpri_dma_eth_conn_
    // replenish the rx buffers
    // allocate space to hold pkt pointers
    pkts = (struct ecpri_dma_pkt **)kmalloc(num_of_buffs * sizeof(struct ecpri_dma_pkt *), GFP_KERNEL);
+   if(pkts == NULL)
+   {
+	CSMLOGERR("memory alloc failed\n");
+	return -1;
+   }
 
    for (j = 0; j < num_of_buffs; ++j)
    {

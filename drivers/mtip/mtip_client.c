@@ -224,7 +224,7 @@ static void mtip_update_topology()
 
                     link_number = 0;
 
-                    for (j = 0; j < platform_driver_priv->devices.port_devices[i].num_link_phandles; ++j)
+                    for (j = 0; (j < platform_driver_priv->devices.port_devices[i].num_link_phandles) && (j < MTIP_MAX_LINKS_PER_PORT) ; ++j)
                     {
                         if (platform_driver_priv->devices.port_devices[i].link_devices[j]->mac_ioaddr != NULL)
                         {
@@ -267,7 +267,7 @@ static void mtip_update_topology()
 
                     link_number = 0;
 
-                    for (j = 0; j < platform_driver_priv->devices.port_devices[i].num_link_phandles; ++j)
+                    for (j = 0; (j < platform_driver_priv->devices.port_devices[i].num_link_phandles) && (j < MTIP_MAX_LINKS_PER_PORT); ++j)
                     {
                         if (platform_driver_priv->devices.port_devices[i].link_devices[j]->mac_ioaddr != NULL)
                         {
@@ -355,6 +355,11 @@ void run_mtip_client_send_ready(void* work_ptr)
 void post_mtip_client_send_event(eth_ecpriss_event_e event, u32 link_index)
 {
    struct mtip_send_event_task* taskstruct = kmalloc(sizeof(struct mtip_send_event_task), GFP_ATOMIC);
+   if(taskstruct == NULL)
+   {
+	CSMLOGERR("memory alloc failed\n");
+	return;
+   }
    taskstruct->event = event;
    taskstruct->link_index = link_index;
 

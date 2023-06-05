@@ -456,6 +456,11 @@ int mtip_ptp_tx_ts_skb_list_peek(u32 link_index, struct sk_buff **skb, u8* ts_se
 void post_mtip_process_timestamp(u32 link_index, u32 timestamp_secs, u32 timestamp_nsecs, u8 ts_seq_num)
 {
    struct mtip_process_timestamp_task* taskstruct = kmalloc(sizeof(struct mtip_process_timestamp_task), GFP_ATOMIC);
+   if(taskstruct == NULL)
+   {
+	CSMLOGERR("memory alloc failed\n");
+	return;
+   }
    taskstruct->link_index = link_index;
    taskstruct->timestamp_secs = timestamp_secs;
    taskstruct->timestamp_nsecs = timestamp_nsecs;

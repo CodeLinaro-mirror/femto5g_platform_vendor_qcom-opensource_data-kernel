@@ -580,6 +580,11 @@ static void mtip_phy_handle_lane_down(u32 lane_index)
 void post_mtip_phy_handle_lane_up(u32 lane_index, u8 sfp_port_type, enum eth_phy_iface_phy_lane_speed_enum lane_speed)
 {
     struct mtip_process_lane_up* taskstruct = kmalloc(sizeof(struct mtip_process_lane_up), GFP_ATOMIC);
+    if(taskstruct == NULL)
+    {
+      CSMLOGERR("memory alloc failed\n");
+      return;
+    }
     taskstruct->lane_index = lane_index;
     taskstruct->sfp_port_type = sfp_port_type;
     taskstruct->lane_speed = lane_speed;
@@ -602,6 +607,11 @@ void run_mtip_process_lane_up(void* workptr)
 void post_mtip_phy_handle_lane_down(u32 lane_index)
 {
     struct mtip_process_lane_down* taskstruct = kmalloc(sizeof(struct mtip_process_lane_down), GFP_ATOMIC);
+    if(taskstruct == NULL)
+    {
+      CSMLOGERR("memory alloc failed\n");
+      return;
+   }
     taskstruct->lane_index = lane_index;
     mtip_queue_work(MTIP_WORKQ_TASK_PROCESS_LANE_DOWN, taskstruct);
 }
