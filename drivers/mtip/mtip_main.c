@@ -24,6 +24,7 @@
 #include <linux/dma-mapping.h>
 #include <linux/bitrev.h>
 #include <linux/slab.h>
+#include <linux/panic_notifier.h>
 
 MODULE_LICENSE("GPL v2");
 
@@ -57,6 +58,8 @@ MODULE_LICENSE("GPL v2");
 #include "mtip_phy.h"
 #include "mtip_dut.h"
 #include "mtip_debug_eth.h"
+#include "mtip_macstats.h"
+#include "mtip_ethtool.h"
 
 /* Global variables of the driver */
 struct mtip_platform_driver_priv* platform_driver_priv = NULL;
@@ -646,6 +649,54 @@ int mtip_register_platform_driver(void)
    return ret;
 }
 
+static void mtip_save_eth_stats(void)
+{
+    int i,j;
+    char ** ethtool_stat_strings = NULL;
+    u64 temp_val[DEBUG_ETHTOOL_STAT_STRINGS_LEN] = {0};
+    ethtool_stat_strings = get_mtip_debug_ethtool_stat_strings();
+
+    for(i = 0; i < MTIP_MAX_LINKS; i++)
+    {
+        //getting stats of fh ports
+        if(i < 12)
+        {  
+            mtip_macstats_get_stats(platform_driver_priv->mtip_links[i]->dev, (u64 *)temp_val);
+        }
+        //getting stats of debug ports
+        else if(i == 15)
+        {
+            mtip_debug_eth_macstats_get_stats(platform_driver_priv->mtip_links[i]->dev, (u64 *)temp_val);
+        }
+        else
+        {
+            continue;
+        }
+        for(j = 0; j < DEBUG_ETHTOOL_STAT_STRINGS_LEN; j++)
+        {
+            //breaking the loop for fh ports when loop exceeds stats string length
+            if(i < 12 && j >= ETHTOOL_STAT_STRINGS_LEN)
+            {
+                break;
+            }
+            memcpy(platform_driver_priv->mtip_links[i]->stats[j].stats_name, ethtool_stat_strings[j], strlen(ethtool_stat_strings[j]));
+            platform_driver_priv->mtip_links[i]->stats[j].stats_value = temp_val[j];
+        }
+    }
+}
+
+static int mtip_panic_notifier(struct notifier_block *this, unsigned long event, void *ptr)
+{
+    mtip_save_eth_stats();
+    return NOTIFY_DONE;
+}
+
+
+
+static struct notifier_block mtip_panic_blk = {
+	.notifier_call = mtip_panic_notifier,
+};
+
 static int mtip_module_init(void)
 {
    int i;
@@ -841,6 +892,9 @@ static int mtip_module_init(void)
 
    // register the debug eth platform driver
    mtip_debug_eth_register_platform_driver();
+
+   // register panic notifier
+   atomic_notifier_chain_register(&panic_notifier_list, &mtip_panic_blk);
 
    goto out;
 
