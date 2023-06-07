@@ -609,14 +609,14 @@ static void eip_xdo_dev_state_delete(struct xfrm_state *xs)
 	CfyE_Status_t cfye_rc;
 	struct eip_xfrm_state *eip_xs =
 		(struct eip_xfrm_state *)xs->xso.offload_handle;
-	struct eip_ipsec_link *ilink = eip_xs->ilink;
+	struct eip_ipsec_link *ilink;
 	unsigned int devid;
-
-	pr_debug("EIP IPSEC: %s\n", __func__);
 
 	if (!eip_xs)
 		return;
 
+	pr_debug("EIP IPSEC: %s\n", __func__);
+	ilink = eip_xs->ilink;
 	write_lock_bh(&ilink->lock);
 	list_del(&eip_xs->eip_xs_l);
 	write_unlock_bh(&ilink->lock);
