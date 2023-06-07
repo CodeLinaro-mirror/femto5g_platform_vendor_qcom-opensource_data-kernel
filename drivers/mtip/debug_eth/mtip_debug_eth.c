@@ -18,6 +18,7 @@
 #include <linux/platform_device.h>
 #include <linux/skbuff.h>
 #include <linux/types.h>
+#include <linux/nvmem-consumer.h>
 
 #include "mtip.h"
 #include "mtip_device.h"
@@ -182,33 +183,42 @@ void mtip_debug_eth_irq_destroy(struct platform_device *pdev) {
 
 int mtip_debug_eth_probe(struct platform_device *pdev) {
   int debug_ret = 0;
-  u32 fuse_csr_regs[2];
+  //u32 fuse_csr_regs[2];
   u32 debug_csr_regs[2];
   void __iomem *addr;
   struct resource dev_resource = {0};
   bool fuse_enabled = true;
   u32 fuse_val;
   int ethernet_trace_disabled = 8;
+  u32 *buf;
+  size_t len;
+  struct nvmem_cell *cell;
 
   CSMLOGINFO("mtip_debug_eth_probe called for device \"%s\"", pdev->name);
-
-  // Debug Port Changes
-   debug_ret = of_property_read_u32_array(
-       pdev->dev.of_node, "qcom,debug-port-fuse", fuse_csr_regs, 2);
-  if (!debug_ret) {
-    // Fetch the debug port fuse address
-    dev_resource.start = fuse_csr_regs[0];
-    dev_resource.end = fuse_csr_regs[0] + fuse_csr_regs[1];
-    dev_resource.flags = IORESOURCE_MEM;
-    dev_resource.parent = dev_resource.child = dev_resource.sibling = NULL;
-    addr = devm_ioremap_resource(&pdev->dev, &dev_resource);
-    fuse_val = (u32)ioread32(addr);
-    CSMLOGERR("fuse val is %d",fuse_val);
-    if (fuse_val & (1 << ethernet_trace_disabled))
-    {
-	    fuse_enabled = false;
-     }
+  cell = nvmem_cell_get(&pdev->dev, "debug_port_fuse");
+  if (IS_ERR(cell)){
+    CSMLOGERR("%s: Unable to get debug_port_fuse from devicetree\n",__func__);
+    return -EINVAL;
   }
+
+  buf = (u32 *)nvmem_cell_read(cell, &len);
+  CSMLOGDBG("len = %d\n",len);
+
+  if (IS_ERR(buf) || (len != 4)){
+    nvmem_cell_put(cell);
+    if(!IS_ERR(buf)){
+      kfree(buf);
+    }
+    CSMLOGERR("%s: Unable to read debug_port_fuse value \n",__func__);
+    return -EINVAL;
+  }
+
+  fuse_val = buf[0];
+  CSMLOGDBG("fuse val is %d",fuse_val);
+  if (fuse_val & (1 << ethernet_trace_disabled))
+  {
+    fuse_enabled = false;
+   }
 
   if (fuse_enabled) {
     debug_ret = of_property_read_u32_array(
@@ -226,6 +236,9 @@ int mtip_debug_eth_probe(struct platform_device *pdev) {
                 "debug_csr_regs[1] = %x, ret: %d\n",
                 debug_csr_regs[0], debug_csr_regs[1], debug_ret);
     }
+
+    kfree(buf);
+    nvmem_cell_put(cell);
 
     // Interrupt init
     mtip_debug_eth_irq_init(pdev);

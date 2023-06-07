@@ -41,6 +41,7 @@
 #include <linux/skbuff.h>
 #include <linux/of.h>
 #include <linux/ethtool.h>
+#include <linux/nvmem-consumer.h>
 
 #include "mtip_platform.h"
 #include "mtip_dma.h"
@@ -827,9 +828,7 @@ int mtip_platform_probe(struct platform_device *pdev)
     int port_entries;
     int port_count;
     u32 phandle;
-    u32 fuse_addr[2];
     u32 fuse_bit_offset;
-    struct resource dev_resource;
 
     CSMLOGDBG("mtip_platform_probe called for device: \"%s\"\n", pdev->name);
 
@@ -874,23 +873,6 @@ int mtip_platform_probe(struct platform_device *pdev)
 
     if (mtip_rumi_platform == MTIP_PLATFORM_SOC) 
     {
-        // read the MAC address fuse addresses
-        result = of_property_read_u32_array(pdev->dev.of_node, "qcom,mac-address-fuse", fuse_addr, 2);
-
-        if (result < 0) {
-            CSMLOGERR("Unable to read mac-address-fuse, result: %d\n", result);
-            return -ENODEV;
-        }
-        CSMLOGDBG("fuse_addr[0] : %x, fuse_addr[1] = %x, ret: %d\n", fuse_addr[0], fuse_addr[1], result);
-
-        dev_resource.start = fuse_addr[0];
-        dev_resource.end = fuse_addr[0] + fuse_addr[1];
-        dev_resource.flags = IORESOURCE_MEM;
-        dev_resource.parent = dev_resource.child = dev_resource.sibling = NULL;
-
-        // set the fuse base address
-        platform_driver_priv->devices.fuse_base_addr = devm_ioremap_resource(&pdev->dev, &dev_resource);
-
         // read the MAC address fuse bit offset
         result = of_property_read_u32(pdev->dev.of_node, "qcom,mac-address-bit-offset", &fuse_bit_offset);
 
@@ -982,29 +964,50 @@ static int mtip_platform_set_mac_addresses_for_rumi(void)
 
 static u8 mtip_platform_read_fuse_mac_info_version(void)
 {
-    void __iomem *fuse_base_addr;
     u8 fuse_bit_offset;
     u64 first_fuse_word;
     u8 version;
+    struct nvmem_cell *cell;
+    u64 *buf;
+    size_t len;
 
+    CSMLOGDBG("mtip_platform_read_fuse_mac_info_version");
     // the start address is
-    fuse_base_addr = platform_driver_priv->devices.fuse_base_addr;
     fuse_bit_offset = platform_driver_priv->devices.fuse_bit_offset;
 
-    CSMLOGDBG("Going to read version info from fuse: 0x%lx\n", (unsigned long)fuse_base_addr);
+    cell = nvmem_cell_get(&((platform_driver_priv->devices.root_pdev)->dev), "mac_fuse");
+    if (IS_ERR(cell)){
+      CSMLOGERR("%s:Unable to get mac_fuse from devicetree \n",__func__);
+      return -EINVAL;
+    }
 
-    // read the first 64 bits
-    first_fuse_word = ioread64(fuse_base_addr);
+   buf = (u64 *)nvmem_cell_read(cell, &len);
+   CSMLOGDBG("len = %d\n",len);
 
-    // shift the fuse word by fuse_bit_offset
-    first_fuse_word = (first_fuse_word >> fuse_bit_offset);
+   if (IS_ERR(buf) || (len != 16)){
+     nvmem_cell_put(cell);
+     if(!IS_ERR(buf)){
+       kfree(buf);
+     }
+     CSMLOGERR("%s: Unable to read mac_fuse value \n",__func__);
+     return -EINVAL;
+   }
 
-    // the version will be the first three bits
-    version = (u8)((first_fuse_word) & 0x7);
+   // read the first 64 bits
+   first_fuse_word = buf[0];
 
-    CSMLOGDBG("FUSE version: %d\n", version);
+   // shift the fuse word by fuse_bit_offset
+   first_fuse_word = (first_fuse_word >> fuse_bit_offset);
 
-    return version;
+   // the version will be the first three bits
+   version = (u8)((first_fuse_word) & 0x7);
+
+   kfree(buf);
+   nvmem_cell_put(cell);
+
+   CSMLOGINFO("FUSE version: %d\n", version);
+
+   return version;
 }
 
 static int mtip_platform_read_fuse_version1_info(u32* oui,
@@ -1013,17 +1016,19 @@ static int mtip_platform_read_fuse_version1_info(u32* oui,
                                                   u32* start_secondary_nic,
                                                   u8* num_secondary_macs)
 {
-    void __iomem *fuse_base_addr;
     u8 fuse_bit_offset;
     u64 first_fuse_word;
     u64 second_fuse_word;
+    struct nvmem_cell *cell;
+    u64 *buf;
+    size_t len;
 
     // set as default
     *num_macs = 0;
     *num_secondary_macs = 0;
+    CSMLOGDBG("mtip_platform_read_fuse_version1_info called");
 
     // the start address is
-    fuse_base_addr = platform_driver_priv->devices.fuse_base_addr;
     fuse_bit_offset = platform_driver_priv->devices.fuse_bit_offset;
 
     // version 1 will always start at fuse_bit_offset = 0
@@ -1033,8 +1038,26 @@ static int mtip_platform_read_fuse_version1_info(u32* oui,
         return -1;
     }
 
+    cell = nvmem_cell_get(&((platform_driver_priv->devices.root_pdev)->dev), "mac_fuse");
+    if (IS_ERR(cell)){
+      CSMLOGERR("%s: Unable to get mac_fuse from devicetree \n",__func__);
+      return -EINVAL;
+    }
+
+    buf = (u64 *)nvmem_cell_read(cell, &len);
+    CSMLOGDBG("len = %d\n",len);
+	
+    if (IS_ERR(buf) || (len != 16)){
+      nvmem_cell_put(cell);
+      if(!IS_ERR(buf)){
+        kfree(buf);
+      }
+      CSMLOGERR("%s: Unable to read mac_fuse value \n",__func__);
+      return -EINVAL;
+    }
+
     // read the first 64 bits
-    first_fuse_word = ioread64(fuse_base_addr);
+    first_fuse_word = buf[0];
 
     // shift by 3 bits for version
     first_fuse_word = (first_fuse_word >> 3);
@@ -1060,8 +1083,30 @@ static int mtip_platform_read_fuse_version1_info(u32* oui,
 
     CSMLOGDBG("Number of MAC addresses is %d\n", *num_macs);
 
+    kfree(buf);
+    nvmem_cell_put(cell);
+
     // read the second 64 bits
-    second_fuse_word = ioread64(fuse_base_addr + sizeof(u64));
+
+    cell = nvmem_cell_get(&((platform_driver_priv->devices.root_pdev)->dev), "mac_fuse_second");
+    if (IS_ERR(cell)){
+      CSMLOGERR("%s: Unable to get mac_fuse_second from devicetree \n",__func__);
+      return -EINVAL;
+    }
+
+    buf = (u64 *)nvmem_cell_read(cell, &len);
+    CSMLOGDBG("len = %d\n",len);
+	
+    if (IS_ERR(buf) || (len != 8)){
+      nvmem_cell_put(cell);
+      if(!IS_ERR(buf)){
+       kfree(buf);
+      }
+     CSMLOGERR("%s: Unable to read mac_fuse_second value \n",__func__);
+     return -EINVAL;
+    }
+
+    second_fuse_word = buf[0];
 
     // set the secondary nic
     *start_secondary_nic = (u32)(second_fuse_word & 0xFFFFFF);
@@ -1075,6 +1120,9 @@ static int mtip_platform_read_fuse_version1_info(u32* oui,
     *num_secondary_macs = (u8)(second_fuse_word & 0x1F);
 
     CSMLOGDBG("Num secondary MAC Addresses: %d\n", *num_secondary_macs);
+
+    kfree(buf);
+    nvmem_cell_put(cell);
 
     return 0;
 }
