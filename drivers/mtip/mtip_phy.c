@@ -58,6 +58,8 @@ struct eth_phy_iface_eth_register_params mtip_phy_eth_params;
 
 extern struct eth_phy_iface_ops qcom_aw_phy_driver_iface_ops;
 
+struct mtip_delayed_work_q_params *delayed_wq_params[MTIP_MAX_LINKS] = {NULL};
+
 /* 
  * qsfp_eth_get_link_type: returns sfp port type
  * based on values defined in ethtool.h
@@ -97,10 +99,20 @@ static void mtip_phy_an_result_cb(enum mtip_port_type_enum port_type, bool an_re
     return;
 }
 
+void mtip_phy_lane_bring_up_progress_ind(u32 link_index, bool in_progress)
+{
+    CSMLOGINFO("Lane bring up progress: %d for link index %d", in_progress, link_index);
+
+    if(in_progress)
+        mtip_mac_clear_link_status_interrupt_mask(link_index);
+    else
+        mtip_mac_set_link_status_interrupt_mask(link_index);
+
+    return;
+}
+
 static void mtip_phy_cdr_lock_ind(u32 link_index, bool status)
 {
-    struct mtip_delayed_work_q_params *wq_params;
-
     CSMLOGINFO("CDR lock indication for link_index %d, status %d\n",
               link_index, status);
 
@@ -112,32 +124,23 @@ static void mtip_phy_cdr_lock_ind(u32 link_index, bool status)
     if (mtip_mac_wrapper_get_link_status(link_index) == true) 
     {
         post_mtip_process_link_state(link_index, true);
+        mtip_phy_lane_bring_up_progress_ind(link_index, false);
     }
     else if(status == true)
     {
-        wq_params = kmalloc(sizeof(struct mtip_delayed_work_q_params),
-                            GFP_ATOMIC);
-        if(!wq_params)
+        delayed_wq_params[link_index] =
+                              kmalloc(sizeof(struct mtip_delayed_work_q_params),
+                                      GFP_ATOMIC);
+        if(!delayed_wq_params[link_index])
             CSMLOGERR("Malloc failed!");
         else{
-            INIT_DELAYED_WORK(&wq_params->wq_item,
+            INIT_DELAYED_WORK(&delayed_wq_params[link_index]->wq_item,
                               mtip_phy_retry_phy_bringup);
-            wq_params->link_index = link_index;
-            mtip_workq_queue_delayed_work(wq_params, MTIP_PHY_RETRY_TIMER);
+            delayed_wq_params[link_index]->link_index = link_index;
+            mtip_workq_queue_delayed_work(delayed_wq_params[link_index],
+                                          MTIP_PHY_RETRY_TIMER);
         }
     }
-
-    return;
-}
-
-void mtip_phy_lane_bring_up_progress_ind(u32 link_index, bool in_progress)
-{
-    CSMLOGINFO("Lane bring up progress: %d for link index %d", in_progress, link_index);
-
-    if(in_progress)
-        mtip_mac_clear_link_status_interrupt_mask(link_index);
-    else
-        mtip_mac_set_link_status_interrupt_mask(link_index);
 
     return;
 }
@@ -252,30 +255,37 @@ void mtip_phy_retry_phy_bringup(struct work_struct *work)
     struct mtip_delayed_work_q_params *wq_params =
         container_of(delayed_work_item, struct mtip_delayed_work_q_params, wq_item);
     u32 port_type;
+    u32 link_index = wq_params->link_index;
 
-    if(platform_driver_priv->mtip_links[wq_params->link_index]->state == MTIP_LINK_STATE_CLOSE)
+    if(platform_driver_priv->mtip_links[link_index]->state == MTIP_LINK_STATE_CLOSE)
     {
-      goto func_exit;
+        goto func_exit;
     }
 
-    if(mtip_mac_wrapper_get_link_status(wq_params->link_index) == true)
-    {
-      post_mtip_process_link_state(wq_params->link_index, true);
-      goto func_exit;
+    if(delayed_wq_params[link_index] != wq_params){
+        CSMLOGINFO("Work mismatch, dropping");
+        goto func_exit;
     }
 
-    if (mtip_lookup_port_type_by_link_index(wq_params->link_index, &port_type) < 0)
+    if(mtip_mac_wrapper_get_link_status(link_index) == true)
     {
-        CSMLOGERR("invalid port_type for link_index %d", wq_params->link_index);
+        post_mtip_process_link_state(link_index, true);
+        mtip_phy_lane_bring_up_progress_ind(link_index, false);
+        goto func_exit;
+    }
+
+    if (mtip_lookup_port_type_by_link_index(link_index, &port_type) < 0)
+    {
+        CSMLOGERR("invalid port_type for link_index %d", link_index);
         goto func_exit;
     }
 
     CSMLOGDBG("mtip_phy_retry_phy_bringup with link: %d, port: %d\n",
-               wq_params->link_index, port_type);
+               link_index, port_type);
 
-    mtip_phy_teardown_phy(wq_params->link_index);
-    mtip_phy_bringup_phy(wq_params->link_index,
-         platform_driver_priv->mtip_ports[port_type]->sfp_port_type);
+    mtip_phy_teardown_phy(link_index);
+    mtip_phy_bringup_phy(link_index,
+                    platform_driver_priv->mtip_ports[port_type]->sfp_port_type);
 
 func_exit:
     kfree(wq_params);

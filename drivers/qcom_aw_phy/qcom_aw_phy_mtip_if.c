@@ -261,7 +261,7 @@ void qcom_aw_phy_handle_cdr_lock_status(
 
   if(eth_level_status == true){
     /* Notify MAC to start listening to PCS link interrupts */
-    qcom_aw_phy_notify_lane_bring_up_progress_to_mac(phy_inst_info, lane, false);
+    //qcom_aw_phy_notify_lane_bring_up_progress_to_mac(phy_inst_info, lane, false);
 
     /* Start listening to SNR valid/error interrupts */
     for(i=PHY_LANE_0; i<PHY_LANE_MAX; i++){
@@ -1489,6 +1489,7 @@ int qcom_aw_phy_mac_link_status(enum mtip_port_type_enum port_type,
         QCOM_AW_PHY_LOG_ERR("PHY instance %d, lane %d, status %d, ",
                             phy_inst_type, lane_num, status);
         notify_flag = true;
+        phy_inst_info->cdr_lock_status_flag[lane_num] = CDR_LOCK_NONE;
       }
       mutex_unlock(&phy_inst_info->lane_lock[lane_num]);
     }
@@ -1833,15 +1834,9 @@ void qcom_aw_phy_handle_rx_sig_detect(struct work_struct *work){
   /* Set the lane offset */
   pmd_set_lane(&mss, lane);
 
-  /* Reset the CDR lock status flag if error interrupt is received */
-  if(false == (bool)wq_params->user_data){
-    QCOM_AW_PHY_LOG_ERR("RX signal detect error received for PHY %d lane %d",
-                        phy_inst_info->phy_inst, lane);
-    phy_inst_info->cdr_lock_status_flag[lane] = CDR_LOCK_NONE;
-  }
   /* Retry lane bring up if detect interrupt is received and PCS link is down */
-  else if((phy_inst_info->lane_params[lane].link_status == false) &&
-          (phy_inst_info->cdr_lock_status_flag[lane] != CDR_LOCK_SUCCESS)){
+  if((phy_inst_info->lane_params[lane].link_status == false) &&
+     (phy_inst_info->cdr_lock_status_flag[lane] != CDR_LOCK_SUCCESS)){
 
     QCOM_AW_PHY_LOG_INFO("Retry for PHY %d, lane %d",
                          wq_params->phy_inst, wq_params->lane_num);
