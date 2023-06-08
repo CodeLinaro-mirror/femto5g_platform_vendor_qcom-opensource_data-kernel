@@ -1127,8 +1127,6 @@ int mtip_phy_destroy_phylink(u32 lane_index)
        if(platform_driver_priv->mtip_lanes[lane_index]->lane_dummy_ndev)
           free_netdev(platform_driver_priv->mtip_lanes[lane_index]->lane_dummy_ndev);
     }
-    // free the allocated memory for the mtip_port
-    kfree(platform_driver_priv->mtip_lanes[lane_index]);
 
     return 0;
 }

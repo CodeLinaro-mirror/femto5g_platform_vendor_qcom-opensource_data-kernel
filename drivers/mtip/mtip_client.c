@@ -523,6 +523,23 @@ eth_ecpriss_status_e mtip_eth_register_events_cb(eth_ecpriss_interface_events_cb
     spin_unlock_irqrestore(lock, flags);
     return ret;
 }
+eth_ecpriss_status_e mtip_eth_deregister_events_cb()
+{
+    eth_ecpriss_status_e ret = ETH_ECPRISS_STATUS_SUCCESS;
+    int i;
+    unsigned long flags;
+    spinlock_t *lock = &platform_driver_priv->driver_lock;
+
+    spin_lock_irqsave(lock, flags);
+
+    // find the next open spot
+    for (i = 0; i < MTIP_MAX_CLIENTS; ++i) {
+            platform_driver_priv->clients[i].events_cb = NULL;
+    }
+
+    spin_unlock_irqrestore(lock, flags);
+    return ret;
+}
 
 eth_ecpriss_status_e mtip_eth_register_ready_cb(eth_ecpriss_topology_ready_cb ready_cb, bool *is_ready)
 {
