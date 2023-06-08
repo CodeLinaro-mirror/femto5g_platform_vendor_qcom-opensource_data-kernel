@@ -306,6 +306,14 @@ static int eip_ipsec_set_secpath(struct sk_buff *skb)
 	sp->olen++;
 
 	xo = xfrm_offload(skb);
+	if (!xo) {
+		pr_err("EIP IPSEC: Failed to xfrm_offload status of skb\n");
+		sp->olen--;
+		sp->xvec[--sp->len] = NULL;
+		xfrm_state_put(xs);
+		return -EFAULT;
+	}
+
 	xo->status = CRYPTO_SUCCESS;
 	xo->flags = CRYPTO_DONE;
 

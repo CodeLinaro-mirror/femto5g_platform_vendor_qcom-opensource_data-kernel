@@ -1969,7 +1969,7 @@ static int eip_mdo_get_rx_sa_stats(struct macsec_context *ctx)
 	struct macsec_per_channel_info *ch_info_p = NULL;
 	SecY_SAHandle_t SAHandles_Ingress[4] = { SecY_SAHandle_NULL };
 	SecY_Status_t SecY_Rc = SECY_STATUS_OK;
-	uint32_t SA_Words[24];
+	uint32_t SA_Words[2] = { 0 };
 	uint8_t i;
 
 	if (ctx->prepare) {
