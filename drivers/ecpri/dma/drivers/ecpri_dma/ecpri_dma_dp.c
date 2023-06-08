@@ -36,6 +36,12 @@ int ecpri_dma_dp_exception_replenish(struct ecpri_dma_endp_context *endp,
 			ecpri_dma_ctx->exception_ctx.exception_pkt_idx) %
 			ECPRI_DMA_EXCEPTION_RING_SIZE].virt_base, 0,
 			ECPRI_DMA_DP_EXCEPTION_BUFF_SIZE);
+
+		ecpri_dma_ctx->
+			exception_ctx.exception_buffs[(i +
+				ecpri_dma_ctx->exception_ctx.exception_pkt_idx) %
+				ECPRI_DMA_EXCEPTION_RING_SIZE].size =
+				ECPRI_DMA_DP_EXCEPTION_BUFF_SIZE;
 	}
 
 	while (num_of_pkts_remain) {
@@ -762,6 +768,14 @@ int ecpri_dma_dp_transmit(struct ecpri_dma_endp_context *endp,
 	}
 
 	for (i = 0; i < num_of_pkts; i++) {
+
+		/* Verify number of buffers passed */
+		if (pkts[i]->num_of_buffers == 0) {
+			DMAERR("Pkt has 0 buffers, index: %d \n", i);
+			spin_unlock_irqrestore(&endp->spinlock, flags);
+			return -EINVAL;
+		}
+
 		/* Verify all packets have chains smaller than TLV fifo size */
 		if (pkts[i]->num_of_buffers > endp->gsi_ep_cfg->dma_if_tlv) {
 			DMAERR("Chain too long for one packet, discarding all\n");
