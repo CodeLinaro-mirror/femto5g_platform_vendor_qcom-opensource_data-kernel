@@ -1188,7 +1188,10 @@ static int mtip_open(struct net_device *netdev)
    }
 
    // Initialize the carrier state as off
-   netif_carrier_off(netdev);
+   if (mtip_loopback_mode == MTIP_MODE_DEFAULT)
+   {
+      netif_carrier_off(netdev);
+   }
 
    // first get the interface going
    if (hdl)
