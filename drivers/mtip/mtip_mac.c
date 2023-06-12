@@ -1583,7 +1583,31 @@ void mtip_mac_read_ts_seq_num(u32 link_index, u8* ts_seq_num)
     *ts_seq_num = (u8)(ts_reg_val & 0x0000000F);
     return;
 }
+void mtip_mac_read_tx_ts_stat_reg(u32 link_index, u8* tx_ts_stat)
+{
+    void __iomem *wrapper_base_addr;
+    u32 port_type;
+    u32 real_link_number;
+    u32 ts_reg_val;
 
+    if (mtip_lookup_port_type_by_link_index(link_index, &port_type) < 0)
+    {
+        CSMLOGERR("invalid port_type for link_index %d", link_index);
+        return;
+    }
+
+    mtip_lookup_real_link_number_by_link_index(link_index, &real_link_number);
+
+    wrapper_base_addr = platform_driver_priv->devices.port_devices[port_type].wrapper_base_addr;
+
+    // read the ts status register value for checking underflow and overflow of H.W timestamp queue
+    ts_reg_val = (u32)ioread32(wrapper_base_addr + real_link_number*MTIP_MAC_WRAPPER_TX_TS_STAT_REG_OFFSET + MTIP_MAC_WRAPPER_TX_TS_STAT_REG_BASE_OFFSET);
+
+    // the ts status value are the bottom two bits
+    // as defined in IPCAT
+    *tx_ts_stat = (u8)(ts_reg_val & 0x0000000F);
+    return;
+}
 u32 mtip_mac_get_interrupt_mask(u32 link_index)
 {
     u32 read_val = 0;

@@ -483,7 +483,10 @@ void run_mtip_process_timestamp(void* work_ptr)
     // bottom half of process a timestamp
     // acquire the lock
     mtip_ptp_tx_ts_lock_acquire(link_index);
-
+    CSMLOGPTP("hw_ts_seq_num=%d,timestamp_secs=%d, timestamp_nsecs=%d,ts_list_size=%d, \
+       skb_list_size=%d[%s]\n",read_ts_seq_num,timestamp_secs, \
+       timestamp_nsecs,mtip_ptp_tx_ts_list_size(link_index), \
+       mtip_ptp_tx_ts_skb_list_size(link_index),__func__);
     // check if there is an skb pending
     if (mtip_ptp_tx_ts_skb_list_size(link_index) == 0)
     {
