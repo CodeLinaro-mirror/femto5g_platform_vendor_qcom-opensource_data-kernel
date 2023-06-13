@@ -80,7 +80,9 @@ ecpri_flow_cfg gecpri_flow_cfg = {0};
 static int ecpriss_core_remove(struct platform_device *pdev)
 {
 	if(ECPRISS_HW_v2_0 == ecpriss_hw_ver){
+#ifndef NO_DEBUGFS_PERF
 		clear_debugfs_directory();
+#endif
 		dma_ecpri_ss_driver_ops.ecpri_dma_ecpri_ss_deregister();
 		ecpriss_qudp_irq_destroy_v2();
 		ecpriss_xbar_destroy_interrupts_v2();
