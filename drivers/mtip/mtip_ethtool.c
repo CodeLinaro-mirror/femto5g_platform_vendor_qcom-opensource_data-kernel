@@ -644,7 +644,7 @@ void mtip_ethtool_set_msglevel(struct net_device *netdev, u32 level)
     u32 lane_index;
     u32 port_type;
     struct mtip_netdev_priv *priv;
-    struct qsfp_info trx_info;
+    struct qsfp_info trx_info = {0};
 
     priv = netdev_priv(netdev);
     link_index = priv->link_index;
