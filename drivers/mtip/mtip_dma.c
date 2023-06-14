@@ -726,7 +726,7 @@ static void mtip_dma_skb_timestamp(struct sk_buff *head_skb)
     int size;
     int k = 0;
     bool fragmented_packet = false;
-
+    char* tmp=NULL;
     tail_skb = head_skb;
     next_skb = skb_shinfo(head_skb)->frag_list;
     
@@ -760,7 +760,10 @@ static void mtip_dma_skb_timestamp(struct sk_buff *head_skb)
 
     CSMLOGDBG("Rx packet timestamp %ld, timestamp_secs %d, timestamp_nsecs %d", 
                timestamp, timestamp_secs, timestamp_nsecs);
-
+    tmp=(char*)head_skb->data;
+    CSMLOGPTP("pkt_type=%x,seq_id=%x%x,skb=0x%lx,timestamp_secs=%d,timestamp_nsecs \
+       \n",tmp[46],tmp[44],tmp[45],(unsigned long)head_skb->data, \
+       timestamp_secs,timestamp_nsecs,__func__);
     // set the timestamp in the Head Skb
     mtip_ptp_set_rx_timestamp(head_skb, timestamp_secs, timestamp_nsecs);
 

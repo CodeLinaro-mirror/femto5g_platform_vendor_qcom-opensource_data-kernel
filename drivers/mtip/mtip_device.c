@@ -246,9 +246,9 @@ void mtip_process_tx_comp_cb(ecpri_dma_eth_conn_hdl_t hdl, struct mtip_dma_tx_co
    enum mtip_device_mode_enum mode = platform_driver_priv->devices.mode;
    int pending_pkt_completion_count = 0;
 
+   char *tmp=NULL;
    comp_pkts = tx_comp_params->local_comp_pkts;
    num_of_completed = tx_comp_params->num_of_completed;
-
    //CSMLOGDBG("Tx comp callback for hdl: %d, num_of_completed: %d\n", hdl, num_of_completed);
 
    // process the Tx completions
@@ -313,7 +313,11 @@ void mtip_process_tx_comp_cb(ecpri_dma_eth_conn_hdl_t hdl, struct mtip_dma_tx_co
           // this packet needs to be timestamped
           // acquire the ptp lock
           mtip_ptp_tx_ts_lock_acquire(link_index);
-
+	  tmp=(char*)(skb->data);
+          CSMLOGPTP("pkt_type=%x,seq_id=%x%x,skb=%lx,pkt_ts_seq_num=%d,ts_list_size=%d,\
+            skb_list_size=%d [%s]\n",tmp[46],tmp[44],tmp[45],(unsigned long)skb->data, \
+            pkt_ts_seq_num,mtip_ptp_tx_ts_list_size(link_index), \
+            mtip_ptp_tx_ts_skb_list_size(link_index),__func__);
           // check if there is a timestamp available
           if (mtip_ptp_tx_ts_list_size(link_index) == 0)
           {
@@ -709,7 +713,13 @@ static int mtip_start_xmit(struct sk_buff *skb, struct net_device *netdev)
    enum mtip_link_state_enum link_state;
    enum mtip_device_mode_enum mode = platform_driver_priv->devices.mode;
    int pending_pkt_completion_count = 0;
-
+   char* tmp=NULL;
+   u8 skb_ts_seq_num = 0;
+   struct sk_buff* tmp_skb = NULL;
+   u8 tmp_ts_seq_num = 0;
+   u8 tx_ts_stat=0;
+   u32 timestamp_secs;
+   u32 timestamp_nsecs;
    CSMLOGDBG("mtip_start_xmit called\n");
 
    priv = netdev_priv(netdev);
@@ -821,17 +831,52 @@ static int mtip_start_xmit(struct sk_buff *skb, struct net_device *netdev)
    {
        send_tx_pre_header = true;
    }
-
+   tmp=(char*)skb->data;
    // check if this packet needs timestamping
    if ((skb_shinfo(skb)->tx_flags & SKBTX_HW_TSTAMP) != 0)
    {
        CSMLOGDBG("Tx packet needing HW_TSTAMP skb->data: 0x%lx\n", (unsigned long)skb->data);
-
        // check if we need to send sequence number
        if ((mode == MTIP_DEVICE_RUv2) || (mode == MTIP_DEVICE_DUv2)) 
        {
            ts_seq_num = mtip_netdev_get_next_ptp_ts_seq_num(link_index);
            send_tx_seq_num = true;
+       }
+       CSMLOGPTP("pkt_type=%x,seq_id=%x%x,skb=0x%lx,pkt_ts_seq_num=%d, \
+       ts_list_size=%d,skb_list_size=%d[%s]\n",tmp[46], \
+       tmp[44],tmp[45],(unsigned long)skb->data,ts_seq_num,\
+       mtip_ptp_tx_ts_list_size(link_index),mtip_ptp_tx_ts_skb_list_size(link_index) \
+       ,__func__);
+
+       if(mtip_ptp_tx_ts_skb_list_size(link_index)!=0)
+       {
+           mtip_ptp_tx_ts_lock_acquire(link_index);
+           while(mtip_ptp_tx_ts_skb_list_size(link_index)!=0)
+           {
+               //CSMLOGPTP("ptdebug1\n");
+               mtip_ptp_tx_ts_skb_list_pop(link_index, &tmp_skb, &skb_ts_seq_num);
+               mtip_ptp_set_tx_timestamp(tmp_skb, 0, 0);
+               dev_kfree_skb(tmp_skb);
+               CSMLOGPTP("Flushing pending tx_ts_skb_list\n");
+           }
+           //CSMLOGPTP("ptdebug3\n");
+           mtip_mac_read_timestamp(link_index, &timestamp_secs, &timestamp_nsecs);
+           //CSMLOGPTP("ptdebug4\n");
+           mtip_mac_read_tx_ts_stat_reg(link_index,&tx_ts_stat);
+           CSMLOGPTP("timestamp_nsecs=%d,tx_ts_stat=%x\n",timestamp_nsecs,tx_ts_stat);
+           while(tx_ts_stat!=2)
+           {
+               //CSMLOGPTP("ptdebug6\n");
+               if ((mode == MTIP_DEVICE_RUv2) || (mode == MTIP_DEVICE_DUv2))
+               {
+                   mtip_mac_read_ts_seq_num(link_index, &tmp_ts_seq_num);
+               }
+               mtip_mac_read_timestamp(link_index, &timestamp_secs, &timestamp_nsecs);
+               mtip_mac_read_tx_ts_stat_reg(link_index,&tx_ts_stat);
+               CSMLOGPTP("Pending h.w TS FIFO timestamp_nsecs=%d,tx_ts_stat=%x\n",timestamp_nsecs,tx_ts_stat);
+           }
+           // release the ptp lock
+           mtip_ptp_tx_ts_lock_release(link_index);
        }
 
        // set the flag to in progress

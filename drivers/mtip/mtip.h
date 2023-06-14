@@ -393,6 +393,7 @@ struct mtip_platform_driver_priv
 
     // IPC log buffer
     void* ipc_log_buf;
+    void* ipc_ptp_log_buf;
 
     // IPC log buffer low
     void* ipc_log_buf_low;

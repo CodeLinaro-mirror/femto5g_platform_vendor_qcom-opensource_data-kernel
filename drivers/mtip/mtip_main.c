@@ -763,6 +763,16 @@ static int mtip_module_init(void)
     {
         CSMLOGDBG("mtip_init(): IPC log context created successfully, continue...\n");
     }
+   platform_driver_priv->ipc_ptp_log_buf = ipc_log_context_create(CSM_IPC_LOG_PAGES,
+		"csm_ptp_mtip", 0);
+	if (platform_driver_priv->ipc_ptp_log_buf == NULL)
+    {
+		CSMLOGERR("mtip_init(): failed to create IPC log context, continue...\n");
+    }
+    else
+    {
+        CSMLOGDBG("mtip_init(): IPC log context created successfully, continue...\n");
+    }
 
     platform_driver_priv->ipc_log_buf_low = ipc_log_context_create(CSM_IPC_LOG_PAGES,
 		"csm_mtip_low", 0);
