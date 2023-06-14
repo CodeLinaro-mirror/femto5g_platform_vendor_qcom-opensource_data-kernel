@@ -280,6 +280,100 @@ static void ecpriss_debug_flow_info(ecpriss_packet_payload_s *packet)
 	cmd_buf[++offset]= 0;
 	ECPRILOGCFG("%s",cmd_buf);
 }
+
+void ecpriss_process_packet_decfg(ecpriss_packet_payload_s *packet, ecpriss_message_id_e message_id)
+{
+	int ret=0;
+	ecpriss_flow_rx_cfg_s *flow_rx = NULL;
+	ecpriss_flow_tx_cfg_s *flow_tx = NULL;
+
+	do{
+		if(packet == NULL) {
+			ret = -ENOMEM;
+			break;
+		}
+		flow_tx = &packet->flow_cfg.flow_tx_cfg;
+
+		switch((int)flow_tx->src){
+			case ECPRISS_ROUTE_SRC_OC:
+				if(ecpriss_hw_ver == ECPRISS_HW_v2_0) {
+					if(message_id == ECPRISS_MESSAGE_FLOW_DECFG) {
+
+						ret = ecpriss_xbar_oc_rx_lut_decfg_v2(
+								flow_tx->port_index,
+								flow_tx);
+
+						if(ret < 0) {
+							ECPRILOGERR("OCRX lut de-configuration failed for port: %d, PCID:%d\n",flow_tx->port_index,flow_tx->xbar_tx_cfg.pcid);
+							break;
+						}
+					}
+					if(message_id == ECPRISS_MESSAGE_FLOW_TRANSP_DECFG) {
+						ret = ecpriss_qudp_fh_tx_hdr_decfg_v2(
+								flow_tx->port_index,
+								&flow_tx->qudp_tx_cfg);
+
+						if(ret < 0) {
+							ECPRILOGERR("FHRX header de-configuration failed for port: %d\n",flow_tx->port_index);
+							break;
+						}
+
+						ret = ecpriss_xbar_oc_rx_lut_decfg_v2(
+								flow_tx->port_index,
+								flow_tx);
+
+						if(ret < 0) {
+							ECPRILOGERR("OCRX lut de-configuration failed for port: %d, PCID:%d\n",flow_tx->port_index,flow_tx->xbar_tx_cfg.pcid);
+							break;
+						}
+					}
+				}
+
+
+				break;
+
+			case ECPRISS_ROUTE_SRC_FH:
+				if(ecpriss_hw_ver == ECPRISS_HW_v2_0) {
+					flow_rx = &packet->flow_cfg.flow_rx_cfg;
+					if(message_id == ECPRISS_MESSAGE_FLOW_DECFG) {
+
+						ret = ecpriss_xbar_fh_rx_lut_decfg_v2(
+								flow_rx->port_index,
+								flow_rx);
+
+						if(ret < 0) {
+							ECPRILOGERR("FHRX lut de-configuration failed for port: %d, PCID:%d\n",flow_tx->port_index,flow_rx->xbar_rx_cfg.flow_id);
+							break;
+						}
+					}
+					if (message_id == ECPRISS_MESSAGE_FLOW_TRANSP_DECFG) {
+						ret = ecpriss_qudp_fh_rx_filter_decfg_v2(
+								flow_rx->port_index,
+								&flow_rx->qudp_rx_cfg);
+
+						if(ret < 0) {
+							ECPRILOGERR("QUDP filter de-configuration failed Port: %d\n",flow_rx->port_index);
+							break;
+						}
+						ret = ecpriss_xbar_fh_rx_lut_decfg_v2(
+								flow_rx->port_index,
+								flow_rx);
+						if(ret < 0) {
+							ECPRILOGERR("FHRX lut de-configuration failed for port: %d, PCID:%d\n",flow_tx->port_index,flow_rx->xbar_rx_cfg.flow_id);
+							break;
+						}
+					}
+				}
+
+				break;
+			default:
+				break;
+
+		}
+	}while (0);
+	return;
+}
+
 /* Calls XBAR RX/TX and QUDP RX/TX depending on the msg_id of the packets */
 void ecpriss_process_packet(ecpriss_packet_payload_s *packet)
 {

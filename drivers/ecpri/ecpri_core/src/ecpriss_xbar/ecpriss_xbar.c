@@ -1634,7 +1634,7 @@ int ecpriss_xbar_fh_rx_lut(uint32_t  port_index,
 }
 
 
-#if 0
+
 void ecpriss_xbar_delete_pcid_entry(uint16_t *configured_pcids, uint16_t pcid_value,uint16_t num_pcid_entry)
 {
 
@@ -1659,7 +1659,56 @@ void ecpriss_xbar_delete_pcid_entry(uint16_t *configured_pcids, uint16_t pcid_va
 	return;
 
 }
-#endif
+
+
+int ecpriss_xbar_fh_rx_lut_decfg_v2(uint32_t  port_index,
+		ecpriss_flow_rx_cfg_s *xbar_rx_cfg)
+{
+	int current_pcid_index;
+	int ret = 0;
+	ecpri_xbar_hwio_def_ecpri_xbar_fhrx_m_lut_n_s xbar_fhrx_m_lut_n;
+	ecpriss_xbar_port_lut_s_v2 *xbar_port_lut = NULL;
+	current_pcid_index = 0;
+
+	if(port_index >= ECPRISS_PORT_MAX) {
+		ECPRILOGERR("Invalid port_index passed\n");
+		return -1;
+	}
+
+	do{
+		if(xbar_rx_cfg == NULL) {
+			ret = -ENOMEM;
+			break;
+		}
+		memset(&xbar_fhrx_m_lut_n,
+				0,
+				sizeof(xbar_fhrx_m_lut_n));
+
+
+		current_pcid_index = xbar_rx_cfg->xbar_rx_cfg.flow_id;
+
+		xbar_port_lut = &ecpriss_pdata_v2->xbar_ctx_v2->flow_ctx_v2.fh_xbar_lut[port_index];
+
+		ecpriss_xbar_delete_pcid_entry(xbar_port_lut->configured_pcids,current_pcid_index,xbar_port_lut->num_pcid_entries);
+
+		xbar_port_lut->num_pcid_entries--;
+
+
+		ecpriss_pdata_v2->xbar_ctx_v2->flow_ctx_v2.fh_xbar_lut[port_index].lut_table[current_pcid_index] = (ecpriss_xbar_pcid_flow_cfg_s_v2){0};
+
+		ecpriss_pdata_v2->cfg_stats_v2.xbar_cfg_v2.lut_cfg.fhrx[port_index][current_pcid_index] = 0;
+
+		ecpriss_xbar_hal_write_reg_mn_fields(ECPRISS_XBAR_LUT,
+				ECPRI_XBAR_LUT_XBAR_FHRX_m_LUT_n_V2,
+				port_index,
+				current_pcid_index,
+				&xbar_fhrx_m_lut_n);
+
+		ECPRILOGDBG("fhrx lut cleared for pcid %d\n",current_pcid_index);
+
+	}while (0);
+	return ret;
+}
 
 int ecpriss_xbar_fh_rx_lut_v2(uint32_t  port_index,
 		ecpriss_flow_rx_cfg_s *xbar_rx_cfg)
@@ -1835,12 +1884,55 @@ int ecpriss_xbar_oc_rx_lut_v2(uint32_t               port_index,
 		ocrx_xbar_port_lut->lut_table[current_pcid_index].valid = 1;
 		ECPRILOGDBG("ecpriss_xbar_oc_rx_lut: PCID %d L2 Index %d L3 Index  and Valid " , ocrx_xbar_port_lut->lut_table[current_pcid_index].pcid,
 				xbar_ocrx_m_lut_n.l2_encap_info , xbar_ocrx_m_lut_n.l3_encap_info , xbar_ocrx_m_lut_n.valid );
-	
+
 		ecpriss_xbar_hal_write_reg_mn_fields(ECPRISS_XBAR_LUT,
 				ECPRI_XBAR_LUT_XBAR_OCRX_m_LUT_n_V2,
 				port_index,
 				current_pcid_index,
 				&xbar_ocrx_m_lut_n);
+	}while (0);
+	return ret;
+}
+
+int ecpriss_xbar_oc_rx_lut_decfg_v2(uint32_t               port_index,
+		ecpriss_flow_tx_cfg_s *xbar_tx_cfg)
+{
+	int     current_pcid_index;
+	ecpriss_xbar_oc_rx_port_lut_s *ocrx_xbar_port_lut = NULL;
+	int ret = 0;
+	ecpri_xbar_hwio_def_ecpri_xbar_ocrx_m_lut_n_s xbar_ocrx_m_lut_n ;
+
+	if(port_index >= ECPRISS_PORT_MAX) {
+		ECPRILOGERR("Invalid port_index passed\n");
+		return -1;
+	}
+
+	do{
+		if(xbar_tx_cfg == NULL) {
+			ret = -ENOMEM;
+			break;
+		}
+
+		memset(&xbar_ocrx_m_lut_n,
+				0,
+				sizeof(xbar_ocrx_m_lut_n));
+
+		ocrx_xbar_port_lut = &ecpriss_pdata_v2->xbar_ctx_v2->flow_ctx_v2.oc_rx_xbar_lut[port_index];
+
+		current_pcid_index = xbar_tx_cfg->xbar_tx_cfg.pcid;
+
+		ecpriss_xbar_delete_pcid_entry(ocrx_xbar_port_lut->configured_pcids, current_pcid_index,ocrx_xbar_port_lut->num_pcid_entries);
+
+		ocrx_xbar_port_lut->num_pcid_entries--;
+
+		ecpriss_pdata_v2->xbar_ctx_v2->flow_ctx_v2.oc_rx_xbar_lut[port_index].lut_table[current_pcid_index] = (ecpriss_xbar_oc_rx_flow_cfg_s){0};
+		ecpriss_pdata_v2->cfg_stats_v2.xbar_cfg_v2.lut_cfg.ocrx[port_index][current_pcid_index] = 0;
+		ecpriss_xbar_hal_write_reg_mn_fields(ECPRISS_XBAR_LUT,
+				ECPRI_XBAR_LUT_XBAR_OCRX_m_LUT_n_V2,
+				port_index,
+				current_pcid_index,
+				&xbar_ocrx_m_lut_n);
+		ECPRILOGDBG("ocrx_lut cleared for pcid %d\n",current_pcid_index);
 	}while (0);
 	return ret;
 }

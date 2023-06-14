@@ -50,7 +50,41 @@ void ecpriss_netlink_send_netlink_message(int client_id,
 void ecpriss_netlink_process_packet(ecpriss_packet_s *packet)
 {
 	if(packet) {
-		ecpriss_process_packet(&packet->payload);
+		switch(packet->header.message_id){
+			case ECPRISS_MESSAGE_FLOW_CFG:
+				ecpriss_process_packet(&packet->payload);
+				break;
+			case ECPRISS_MESSAGE_TRANSPORT_CFG:
+				ecpriss_process_packet(&packet->payload);
+				break;
+			case ECPRISS_MESSAGE_FLOW_RECFG:
+				ecpriss_process_packet(&packet->payload);
+				break;
+			case ECPRISS_MESSAGE_TRANSPORT_RECFG:
+				ecpriss_process_packet(&packet->payload);
+				break;
+			case ECPRISS_MESSAGE_FLOW_DECFG:
+				ecpriss_process_packet_decfg(&packet->payload,ECPRISS_MESSAGE_FLOW_DECFG);
+				break;
+			case ECPRISS_MESSAGE_TRANSPORT_DECFG:
+				ecpriss_process_packet_decfg(&packet->payload,ECPRISS_MESSAGE_TRANSPORT_DECFG);
+				break;
+			case ECPRISS_MESSAGE_RESPONSE:
+				ecpriss_process_packet(&packet->payload);
+				break;
+			case ECPRISS_MESSAGE_EVENT:
+				ecpriss_process_packet(&packet->payload);
+				break;
+			case ECPRISS_MESSAGE_TEST:
+				ecpriss_process_packet(&packet->payload);
+				break;
+			case ECPRISS_MESSAGE_FLOW_TRANSP_DECFG:
+				ecpriss_process_packet_decfg(&packet->payload,ECPRISS_MESSAGE_FLOW_TRANSP_DECFG);
+				break;
+			default:
+				ECPRILOGERR("Invalid message type: %s \n",packet->header.message_id);
+				break;
+		}
 	}
 	return;
 }

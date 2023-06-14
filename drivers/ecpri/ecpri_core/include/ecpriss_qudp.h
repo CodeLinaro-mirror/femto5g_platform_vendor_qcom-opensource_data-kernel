@@ -307,8 +307,12 @@ void debug_qudp_ingress_config_v2(void);
 void debug_qudp_egress_config_v2(void);
 
 
+int ecpriss_qudp_fh_tx_hdr_decfg_v2(uint32_t               port_index,
+		ecpriss_qudp_tx_cfg_s *tx_cfg);
 
 
+int ecpriss_qudp_fh_rx_filter_decfg_v2(uint32_t               port_index,
+		ecpriss_qudp_rx_cfg_s *rx_cfg);
 
 
 
