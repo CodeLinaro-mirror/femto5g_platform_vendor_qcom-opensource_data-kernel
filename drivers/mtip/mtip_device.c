@@ -848,7 +848,7 @@ static int mtip_start_xmit(struct sk_buff *skb, struct net_device *netdev)
        mtip_ptp_tx_ts_list_size(link_index),mtip_ptp_tx_ts_skb_list_size(link_index) \
        ,__func__);
 
-       if(mtip_ptp_tx_ts_skb_list_size(link_index)!=0)
+       if(mtip_ptp_tx_ts_skb_list_size(link_index)!=0 || mtip_ptp_tx_ts_list_size(link_index) != 0)
        {
            mtip_ptp_tx_ts_lock_acquire(link_index);
            while(mtip_ptp_tx_ts_skb_list_size(link_index)!=0)
@@ -859,6 +859,12 @@ static int mtip_start_xmit(struct sk_buff *skb, struct net_device *netdev)
                dev_kfree_skb(tmp_skb);
                CSMLOGPTP("Flushing pending tx_ts_skb_list\n");
            }
+           while(mtip_ptp_tx_ts_list_size(link_index)!=0)
+           {
+	       // pop the timestamp
+               mtip_ptp_tx_ts_list_pop(link_index, &timestamp_secs, &timestamp_nsecs, &tmp_ts_seq_num);
+               CSMLOGPTP("Flushing pending tx_ts_list\n");
+	   }
            //CSMLOGPTP("ptdebug3\n");
            mtip_mac_read_timestamp(link_index, &timestamp_secs, &timestamp_nsecs);
            //CSMLOGPTP("ptdebug4\n");
