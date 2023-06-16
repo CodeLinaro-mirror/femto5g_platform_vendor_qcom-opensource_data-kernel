@@ -611,13 +611,7 @@ void mtip_mac_enable_tx_rx(u32 link_index)
     struct net_device* dev = platform_driver_priv->mtip_links[link_index]->dev;
     struct mtip_netdev_priv* priv = netdev_priv(dev);
     u32 command_config;
-
-    // Don't enable TX/RX if the link has been closed
-    if (platform_driver_priv->mtip_links[link_index]->state == MTIP_LINK_STATE_CLOSE) 
-    {
-        return;
-    }
-
+     
     CSMLOGINFO("Enabling Tx and Rx on link_index: %d\n", link_index);
 
     // set the link state as up
