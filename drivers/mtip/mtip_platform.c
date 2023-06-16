@@ -216,8 +216,8 @@ static int mtip_platform_setup_port(u32 port_type)
        // check if this is the DEBUG ETH port
        if (port_type != MTIP_PORT_TYPE_DEBUG)
        {
-          // the default is to disable autoneg
-          platform_driver_priv->mtip_ports[port_type]->autoneg = false;
+          // the default is to enable autoneg
+          platform_driver_priv->mtip_ports[port_type]->autoneg = true;
 
           // set the default port configs
           // THIS IS TBD
