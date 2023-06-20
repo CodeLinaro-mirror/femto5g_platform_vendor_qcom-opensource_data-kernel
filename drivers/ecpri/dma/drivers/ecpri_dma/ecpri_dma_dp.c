@@ -514,6 +514,7 @@ void ecpri_dma_dp_rx_comp_hdlr(struct gsi_chan_xfer_notify *notify)
 	switch (notify->evt_id) {
 	case GSI_CHAN_EVT_EOT:
 	case GSI_CHAN_EVT_OVERFLOW:
+	case GSI_CHAN_EVT_EOB:
 		comp_pkt = notify->xfer_user_data;
 		endp = comp_pkt->endp;
 
@@ -542,6 +543,7 @@ void ecpri_dma_dp_tx_comp_hdlr(struct gsi_chan_xfer_notify *notify)
 
 	switch (notify->evt_id) {
 	case GSI_CHAN_EVT_EOT:
+	case GSI_CHAN_EVT_EOB:
 		comp_pkt = notify->xfer_user_data;
 		comp_pkt->xfer_done = true;
 		endp = comp_pkt->endp;
