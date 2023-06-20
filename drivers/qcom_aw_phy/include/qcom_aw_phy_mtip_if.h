@@ -17,7 +17,7 @@
 
 //Default timeouts (slow sim)
 #define CMN_ACK_TIMEOUT_US           2000
-#define TX_ACK_TIMEOUT_US            6000
+#define TX_ACK_TIMEOUT_US            3000
 #define TX_ACK_P1_TIMEOUT_US         1100
 #define TX_ACK_P2_TIMEOUT_US         900
 #define RX_ACK_TIMEOUT_US            1200
