@@ -224,7 +224,7 @@ static void mtip_update_topology()
 
                     link_number = 0;
 
-                    for (j = 0; j < platform_driver_priv->devices.port_devices[i].num_link_phandles; ++j)
+                    for (j = 0; (j < platform_driver_priv->devices.port_devices[i].num_link_phandles) && (j < MTIP_MAX_LINKS_PER_PORT) ; ++j)
                     {
                         if (platform_driver_priv->devices.port_devices[i].link_devices[j]->mac_ioaddr != NULL)
                         {
@@ -267,7 +267,7 @@ static void mtip_update_topology()
 
                     link_number = 0;
 
-                    for (j = 0; j < platform_driver_priv->devices.port_devices[i].num_link_phandles; ++j)
+                    for (j = 0; (j < platform_driver_priv->devices.port_devices[i].num_link_phandles) && (j < MTIP_MAX_LINKS_PER_PORT); ++j)
                     {
                         if (platform_driver_priv->devices.port_devices[i].link_devices[j]->mac_ioaddr != NULL)
                         {
@@ -355,6 +355,11 @@ void run_mtip_client_send_ready(void* work_ptr)
 void post_mtip_client_send_event(eth_ecpriss_event_e event, u32 link_index)
 {
    struct mtip_send_event_task* taskstruct = kmalloc(sizeof(struct mtip_send_event_task), GFP_ATOMIC);
+   if(taskstruct == NULL)
+   {
+	CSMLOGERR("memory alloc failed\n");
+	return;
+   }
    taskstruct->event = event;
    taskstruct->link_index = link_index;
 
@@ -513,6 +518,23 @@ eth_ecpriss_status_e mtip_eth_register_events_cb(eth_ecpriss_interface_events_cb
             platform_driver_priv->clients[i].events_cb = events_cb;
             ret = ETH_ECPRISS_STATUS_SUCCESS;
         }
+    }
+
+    spin_unlock_irqrestore(lock, flags);
+    return ret;
+}
+eth_ecpriss_status_e mtip_eth_deregister_events_cb()
+{
+    eth_ecpriss_status_e ret = ETH_ECPRISS_STATUS_SUCCESS;
+    int i;
+    unsigned long flags;
+    spinlock_t *lock = &platform_driver_priv->driver_lock;
+
+    spin_lock_irqsave(lock, flags);
+
+    // find the next open spot
+    for (i = 0; i < MTIP_MAX_CLIENTS; ++i) {
+            platform_driver_priv->clients[i].events_cb = NULL;
     }
 
     spin_unlock_irqrestore(lock, flags);

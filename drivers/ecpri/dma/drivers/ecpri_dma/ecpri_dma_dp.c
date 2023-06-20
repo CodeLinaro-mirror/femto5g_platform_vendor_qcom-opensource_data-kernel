@@ -32,9 +32,16 @@ int ecpri_dma_dp_exception_replenish(struct ecpri_dma_endp_context *endp,
 	for (i = 0; i < num_of_pkts_remain; i++)
 	{
 		memset(ecpri_dma_ctx->
-			exception_buffs[(i + ecpri_dma_ctx->exception_pkt_idx) %
+			exception_ctx.exception_buffs[(i +
+			ecpri_dma_ctx->exception_ctx.exception_pkt_idx) %
 			ECPRI_DMA_EXCEPTION_RING_SIZE].virt_base, 0,
 			ECPRI_DMA_DP_EXCEPTION_BUFF_SIZE);
+
+		ecpri_dma_ctx->
+			exception_ctx.exception_buffs[(i +
+				ecpri_dma_ctx->exception_ctx.exception_pkt_idx) %
+				ECPRI_DMA_EXCEPTION_RING_SIZE].size =
+				ECPRI_DMA_DP_EXCEPTION_BUFF_SIZE;
 	}
 
 	while (num_of_pkts_remain) {
@@ -47,24 +54,24 @@ int ecpri_dma_dp_exception_replenish(struct ecpri_dma_endp_context *endp,
 			commit_transmit = true;
 		}
 
-		if (num_of_pkts_to_send + ecpri_dma_ctx->exception_pkt_idx >
+		if (num_of_pkts_to_send + ecpri_dma_ctx->exception_ctx.exception_pkt_idx >
 			ECPRI_DMA_EXCEPTION_RING_SIZE)
 		{
 			num_of_pkts_to_send = ECPRI_DMA_EXCEPTION_RING_SIZE -
-				ecpri_dma_ctx->exception_pkt_idx;
+				ecpri_dma_ctx->exception_ctx.exception_pkt_idx;
 			commit_transmit = false;
 		}
 
 		ret = ecpri_dma_dp_transmit(endp,
-			&ecpri_dma_ctx->exception_pkts_arr[
-				ecpri_dma_ctx->exception_pkt_idx],
+			&ecpri_dma_ctx->exception_ctx.exception_pkts_arr[
+				ecpri_dma_ctx->exception_ctx.exception_pkt_idx],
 			num_of_pkts_to_send, commit_transmit);
 		if (ret) {
 			DMAERR("failed to replenish exception endp\n");
 			ecpri_dma_assert();
 		}
-		ecpri_dma_ctx->exception_pkt_idx =
-			(ecpri_dma_ctx->exception_pkt_idx + num_of_pkts_to_send) %
+		ecpri_dma_ctx->exception_ctx.exception_pkt_idx =
+			(ecpri_dma_ctx->exception_ctx.exception_pkt_idx + num_of_pkts_to_send) %
 			ECPRI_DMA_EXCEPTION_RING_SIZE;
 		num_of_pkts_remain -= num_of_pkts_to_send;
 	}
@@ -114,7 +121,7 @@ void ecpri_dma_dp_tasklet_exception_notify(unsigned long data)
 {
 	int i = 0;
 	int ret = 0;
-	struct ecpri_dma_pkt_completion_wrapper* exception_pkts_arr;
+	struct ecpri_dma_pkt_completion_wrapper *exception_pkts_arr;
 	struct ecpri_dma_pkt_completion_wrapper **exception_pkts;
 	u32 actual_num = 0, actual_buff_num = 0;
 	struct ecpri_dma_endp_context *endp;
@@ -122,9 +129,19 @@ void ecpri_dma_dp_tasklet_exception_notify(unsigned long data)
 
 	endp = (struct ecpri_dma_endp_context *)data;
 
-	if (!endp || !endp->valid || !endp->gsi_ep_cfg->is_exception) {
+	if (unlikely(!endp || !endp->gsi_ep_cfg->is_exception)) {
 		DMAERR("Exception pkt recieved on non exception endp\n");
 		ecpri_dma_assert();
+	}
+
+	if (unlikely(atomic_read(&endp->disconnect_in_progress))) {
+		DMAERR("ENDP disconnect in progress\n");
+		return;
+	}
+
+	if (unlikely(!endp->valid)) {
+		DMAERR("ENDP in non-valid state\n");
+		return;
 	}
 
 	exception_pkts_arr = kzalloc(
@@ -144,7 +161,7 @@ void ecpri_dma_dp_tasklet_exception_notify(unsigned long data)
 		exception_pkts[i] = &exception_pkts_arr[i];
 	}
 
-	spin_lock_irqsave(&ecpri_dma_ctx->exception_spinlock, flags);
+	spin_lock_irqsave(&ecpri_dma_ctx->exception_ctx.exception_spinlock, flags);
 	/* Poll Exceptions & Increase exception statistics
 		actual_num is in packets, need to check for jumbo packets */
 	ret = ecpri_dma_dp_rx_poll(endp, ECPRI_DMA_DP_EXCEPTION_BUDGET,
@@ -155,7 +172,8 @@ void ecpri_dma_dp_tasklet_exception_notify(unsigned long data)
 		kfree(exception_pkts);
 		ecpri_dma_assert();
 	}
-	ecpri_dma_ctx->exception_stats.num_of_pkts_recieved += actual_num;
+	ecpri_dma_ctx->exception_ctx.exception_stats.num_of_pkts_recieved +=
+		actual_num;
 
 	/* Credits have only one buffer so no need to check num_of_buffs */
 	i = 0;
@@ -163,7 +181,8 @@ void ecpri_dma_dp_tasklet_exception_notify(unsigned long data)
 	while (i < actual_num) {
 		DMAERR("Got exception packet with status %d, dumping\n",
 		       exception_pkts[actual_buff_num]->status_code);
-		ecpri_dma_ctx->exception_status_statistics[
+		ecpri_dma_ctx->exception_ctx.exception_stats.
+			exception_status_statistics[
 			exception_pkts[actual_buff_num]->status_code]++;
 		//TODO: change from dump to terminal to dump to array
 
@@ -172,7 +191,8 @@ void ecpri_dma_dp_tasklet_exception_notify(unsigned long data)
 			ecpri_dma_dump_packet(
 				exception_pkts[actual_buff_num]->pkt->buffs[0]->virt_base,
 				exception_pkts[actual_buff_num]->pkt->buffs[0]->size);
-			ecpri_dma_ctx->exception_stats.num_of_bytes_recieved +=
+			ecpri_dma_ctx->exception_ctx.exception_stats.
+				num_of_bytes_recieved +=
 				exception_pkts[actual_buff_num]->pkt->buffs[0]->size;
 			actual_buff_num++;
 		} while (exception_pkts[actual_buff_num]->comp_code !=
@@ -202,7 +222,7 @@ void ecpri_dma_dp_tasklet_exception_notify(unsigned long data)
 		tasklet_schedule(&endp->tasklet);
 	}
 
-	spin_unlock_irqrestore(&ecpri_dma_ctx->exception_spinlock, flags);
+	spin_unlock_irqrestore(&ecpri_dma_ctx->exception_ctx.exception_spinlock, flags);
 	kfree(exception_pkts_arr);
 	kfree(exception_pkts);
 }
@@ -276,6 +296,21 @@ void ecpri_dma_tasklet_rx_done(unsigned long data)
 	struct ecpri_dma_endp_context *endp;
 
 	endp = (struct ecpri_dma_endp_context *)data;
+	if (unlikely(!endp)) {
+		DMAERR("NULL ENDP ptr in tasklet\n");
+		ecpri_dma_assert();
+	}
+
+	if (unlikely(atomic_read(&endp->disconnect_in_progress))) {
+		DMAERR("ENDP disconnect in progress\n");
+		return;
+	}
+
+	if (unlikely(!endp->valid)) {
+		DMAERR("ENDP in non-valid state\n");
+		return;
+	}
+
 	DMADBG("Notify Rx ENDP %d on completion\n", endp->endp_id);
 	/* Notify client on Rx completion */
 	if (endp->notify_comp != NULL) {
@@ -310,9 +345,19 @@ void ecpri_dma_tasklet_transmit_done(unsigned long data)
 
 	endp = (struct ecpri_dma_endp_context *)data;
 
-	if (!endp) {
-		DMAERR("tasklet on unknown endp\n");
+	if (unlikely(!endp)) {
+		DMAERR("NULL ENDP ptr in tasklet\n");
 		ecpri_dma_assert();
+	}
+
+	if (unlikely(atomic_read(&endp->disconnect_in_progress))) {
+		DMAERR("ENDP disconnect in progress\n");
+		return;
+	}
+
+	if (unlikely(!endp->valid)) {
+		DMAERR("ENDP in non-valid state\n");
+		return;
 	}
 
 	num_of_completed = atomic_read(&endp->xmit_eot_cnt);
@@ -598,8 +643,10 @@ int ecpri_dma_dp_rx_poll(struct ecpri_dma_endp_context *endp, u32 budget,
 		/*	Unmapping is only required for ETH S2M ENDPs
 			which are not exception ENDP */
 		if (endp->gsi_ep_cfg->stream_mode != ECPRI_DMA_ENDP_STREAM_MODE_M2M &&
-			!(endp->gsi_id == ecpri_dma_ctx->exception_endp.gsi_id &&
-				endp->endp_id == ecpri_dma_ctx->exception_endp.endp_id))
+			!(endp->gsi_id == ecpri_dma_ctx->exception_ctx.
+				exception_endp.gsi_id &&
+				endp->endp_id == ecpri_dma_ctx->exception_ctx.
+				exception_endp.endp_id))
 		{
 			dma_unmap_single(ecpri_dma_ctx->pdev,
 				pkts[i]->pkt->buffs[0]->phys_base,
@@ -714,13 +761,21 @@ int ecpri_dma_dp_transmit(struct ecpri_dma_endp_context *endp,
 
 	spin_lock_irqsave(&endp->spinlock, flags);
 
-	if (unlikely(atomic_read(&endp->disconnect_in_progress))) {
+	if (unlikely(atomic_read(&endp->disconnect_in_progress)) || !endp->valid) {
 		DMAERR("Pipe disconnect in progress dropping the packet\n");
 		spin_unlock_irqrestore(&endp->spinlock, flags);
 		return -EFAULT;
 	}
 
 	for (i = 0; i < num_of_pkts; i++) {
+
+		/* Verify number of buffers passed */
+		if (pkts[i]->num_of_buffers == 0) {
+			DMAERR("Pkt has 0 buffers, index: %d \n", i);
+			spin_unlock_irqrestore(&endp->spinlock, flags);
+			return -EINVAL;
+		}
+
 		/* Verify all packets have chains smaller than TLV fifo size */
 		if (pkts[i]->num_of_buffers > endp->gsi_ep_cfg->dma_if_tlv) {
 			DMAERR("Chain too long for one packet, discarding all\n");

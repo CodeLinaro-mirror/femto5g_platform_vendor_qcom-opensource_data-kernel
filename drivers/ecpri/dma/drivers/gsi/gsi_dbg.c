@@ -1,9 +1,10 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2015-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
+#if defined(CONFIG_DEBUG_FS) && !defined(ECPRI_NO_PRINTS)
 #include <linux/completion.h>
 #include <linux/debugfs.h>
 #include <linux/dma-mapping.h>
@@ -866,3 +867,4 @@ void gsi_debugfs_init(void)
 fail:
 	debugfs_remove_recursive(dent);
 }
+#endif //defined(CONFIG_DEBUG_FS) && !defined(ECPRI_NO_PRINTS)

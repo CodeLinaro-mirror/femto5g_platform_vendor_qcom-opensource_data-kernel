@@ -21,6 +21,10 @@ ccflags-y += -I$(DATACSMKERNELTOP)/include/
 ccflags-y += -I$(ECPRIOXTOR)/include/
 ccflags-y += -I$(ECPRIOXTOR)/include/uapi/ecpri/
 
+ifeq ($(ECPRI_PERF),1)
+ccflags-y += -DNO_DEBUGFS_PERF
+endif
+
 header-y += $(ECPRIOXTOR)/include/uapi/ecpri/ecpriss_flow.h
 
 ifeq ($(call cc-option-yn, -Wmaybe-uninitialized),y)

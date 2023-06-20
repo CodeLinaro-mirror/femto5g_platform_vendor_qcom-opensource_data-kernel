@@ -5,6 +5,7 @@
 #ifndef ECPRISS_DEBUGFS_H_
 #define ECPRISS_DEBUGFS_H_
 
+#ifndef NO_DEBUGFS_PERF
 
 #include <linux/string.h>
 #include <linux/types.h>
@@ -30,4 +31,6 @@
 
 int setup_debugfs_directory(void);
 
-#endif
+#endif /* NO_DEBUGFS_PERF */
+
+#endif /* ECPRISS_DEBUGFS_H_ */

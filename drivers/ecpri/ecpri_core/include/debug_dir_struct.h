@@ -1,4 +1,4 @@
-#ifdef CONFIG_DEBUG_FS
+#ifndef NO_DEBUGFS_PERF
 #define TREE "\
 { \
 	ecpri_ss \
@@ -300,6 +300,7 @@
 			{ \
 				,ecpriss_filt \
 				,ecpriss_stats_timeout \
+				,ecpriss_clear_stats \
 			} \
 		} \
 	} \

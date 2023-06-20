@@ -456,6 +456,11 @@ int mtip_ptp_tx_ts_skb_list_peek(u32 link_index, struct sk_buff **skb, u8* ts_se
 void post_mtip_process_timestamp(u32 link_index, u32 timestamp_secs, u32 timestamp_nsecs, u8 ts_seq_num)
 {
    struct mtip_process_timestamp_task* taskstruct = kmalloc(sizeof(struct mtip_process_timestamp_task), GFP_ATOMIC);
+   if(taskstruct == NULL)
+   {
+	CSMLOGERR("memory alloc failed\n");
+	return;
+   }
    taskstruct->link_index = link_index;
    taskstruct->timestamp_secs = timestamp_secs;
    taskstruct->timestamp_nsecs = timestamp_nsecs;
@@ -478,7 +483,10 @@ void run_mtip_process_timestamp(void* work_ptr)
     // bottom half of process a timestamp
     // acquire the lock
     mtip_ptp_tx_ts_lock_acquire(link_index);
-
+    CSMLOGPTP("hw_ts_seq_num=%d,timestamp_secs=%d, timestamp_nsecs=%d,ts_list_size=%d, \
+       skb_list_size=%d[%s]\n",read_ts_seq_num,timestamp_secs, \
+       timestamp_nsecs,mtip_ptp_tx_ts_list_size(link_index), \
+       mtip_ptp_tx_ts_skb_list_size(link_index),__func__);
     // check if there is an skb pending
     if (mtip_ptp_tx_ts_skb_list_size(link_index) == 0)
     {

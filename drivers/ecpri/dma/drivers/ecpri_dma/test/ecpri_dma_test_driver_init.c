@@ -202,7 +202,8 @@ static int ecpri_dma_test_driver_init_dma_paths(void *priv)
 							"Excepetion ENDP isn't configured as expected");
 						return -EFAULT;
 					}
-					if (ecpri_dma_ctx->exception_endp.endp_id != endp_id) {
+					if (ecpri_dma_ctx->exception_ctx.exception_endp.endp_id !=
+						endp_id) {
 						DMA_UT_LOG(
 							"ENDP %d is expected to be exception ENDP\n",
 							endp_id);

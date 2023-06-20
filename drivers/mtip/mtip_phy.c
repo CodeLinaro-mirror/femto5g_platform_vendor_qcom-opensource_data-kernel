@@ -58,6 +58,10 @@ struct eth_phy_iface_eth_register_params mtip_phy_eth_params;
 
 extern struct eth_phy_iface_ops qcom_aw_phy_driver_iface_ops;
 
+struct mtip_delayed_work_q_params *delayed_wq_params[MTIP_MAX_LINKS] = {NULL};
+
+u8 mtip_phy_retry_num[MTIP_MAX_LINKS] = {0};
+
 /* 
  * qsfp_eth_get_link_type: returns sfp port type
  * based on values defined in ethtool.h
@@ -73,7 +77,8 @@ extern struct eth_phy_iface_ops qcom_aw_phy_driver_iface_ops;
 extern int qsfp_eth_get_link_type(u32 qsfp_phandle, u8* link_info);
 
 // PCS level retry delay to bring up PHY lane
-#define MTIP_PHY_RETRY_TIMER     10000
+#define MTIP_PHY_RETRY_TIMER       2000
+#define MTIP_PHY_RETRIES_MAX_NUM   5
 
 static void mtip_phy_ready_cb(void *user_data)
 {
@@ -97,34 +102,6 @@ static void mtip_phy_an_result_cb(enum mtip_port_type_enum port_type, bool an_re
     return;
 }
 
-static void mtip_phy_cdr_lock_ind(u32 link_index, bool status)
-{
-    struct mtip_delayed_work_q_params *wq_params;
-
-    CSMLOGINFO("CDR lock indication for link_index %d, status %d\n",
-              link_index, status);
-
-    if (mtip_mac_wrapper_get_link_status(link_index) == true) 
-    {
-        post_mtip_process_link_state(link_index, true);
-    }
-    else if(status == true)
-    {
-        wq_params = kmalloc(sizeof(struct mtip_delayed_work_q_params),
-                            GFP_ATOMIC);
-        if(!wq_params)
-            CSMLOGERR("Malloc failed!");
-        else{
-            INIT_DELAYED_WORK(&wq_params->wq_item,
-                              mtip_phy_retry_phy_bringup);
-            wq_params->link_index = link_index;
-            mtip_workq_queue_delayed_work(wq_params, MTIP_PHY_RETRY_TIMER);
-        }
-    }
-
-    return;
-}
-
 void mtip_phy_lane_bring_up_progress_ind(u32 link_index, bool in_progress)
 {
     CSMLOGINFO("Lane bring up progress: %d for link index %d", in_progress, link_index);
@@ -133,6 +110,41 @@ void mtip_phy_lane_bring_up_progress_ind(u32 link_index, bool in_progress)
         mtip_mac_clear_link_status_interrupt_mask(link_index);
     else
         mtip_mac_set_link_status_interrupt_mask(link_index);
+
+    return;
+}
+
+static void mtip_phy_cdr_lock_ind(u32 link_index, bool status)
+{
+    CSMLOGINFO("CDR lock indication for link_index %d, status %d\n",
+              link_index, status);
+
+    if (mtip_loopback_mode == MTIP_MODE_PHY_LOOPBACK)
+    {
+        return;
+    }
+
+    if (mtip_mac_wrapper_get_link_status(link_index) == true) 
+    {
+        post_mtip_process_link_state(link_index, true);
+        mtip_phy_lane_bring_up_progress_ind(link_index, false);
+        mtip_phy_retry_num[link_index] = 0;
+    }
+    else if(status == true)
+    {
+        delayed_wq_params[link_index] =
+                              kmalloc(sizeof(struct mtip_delayed_work_q_params),
+                                      GFP_ATOMIC);
+        if(!delayed_wq_params[link_index])
+            CSMLOGERR("Malloc failed!");
+        else{
+            INIT_DELAYED_WORK(&delayed_wq_params[link_index]->wq_item,
+                              mtip_phy_retry_phy_bringup);
+            delayed_wq_params[link_index]->link_index = link_index;
+            mtip_workq_queue_delayed_work(delayed_wq_params[link_index],
+                                          MTIP_PHY_RETRY_TIMER);
+        }
+    }
 
     return;
 }
@@ -247,30 +259,50 @@ void mtip_phy_retry_phy_bringup(struct work_struct *work)
     struct mtip_delayed_work_q_params *wq_params =
         container_of(delayed_work_item, struct mtip_delayed_work_q_params, wq_item);
     u32 port_type;
+    u32 link_index = wq_params->link_index;
 
-    if(platform_driver_priv->mtip_links[wq_params->link_index]->state == MTIP_LINK_STATE_CLOSE)
+    if(platform_driver_priv->mtip_links[link_index]->state == MTIP_LINK_STATE_CLOSE)
     {
-      goto func_exit;
+        goto func_exit;
     }
 
-    if(mtip_mac_wrapper_get_link_status(wq_params->link_index) == true)
-    {
-      post_mtip_process_link_state(wq_params->link_index, true);
-      goto func_exit;
+    if(delayed_wq_params[link_index] != wq_params){
+        CSMLOGINFO("Work mismatch, dropping");
+        goto func_exit;
     }
 
-    if (mtip_lookup_port_type_by_link_index(wq_params->link_index, &port_type) < 0)
+    if(mtip_mac_wrapper_get_link_status(link_index) == true)
     {
-        CSMLOGERR("invalid port_type for link_index %d", wq_params->link_index);
+        mtip_phy_retry_num[link_index] = 0;
+        post_mtip_process_link_state(link_index, true);
+        mtip_phy_lane_bring_up_progress_ind(link_index, false);
+        goto func_exit;
+    }
+
+    if (mtip_lookup_port_type_by_link_index(link_index, &port_type) < 0)
+    {
+        CSMLOGERR("invalid port_type for link_index %d", link_index);
+        goto func_exit;
+    }
+
+    mtip_phy_retry_num[link_index]++;
+    if(mtip_phy_retry_num[link_index] >= MTIP_PHY_RETRIES_MAX_NUM){
+
+        CSMLOGERR("Max retries done for link_index %d", link_index);
+        mtip_phy_retry_num[link_index] = 0;
+
+        // notify phy that PCS link is down after max retries
+        mtip_phy_notify_link_status(link_index, false);
+
         goto func_exit;
     }
 
     CSMLOGDBG("mtip_phy_retry_phy_bringup with link: %d, port: %d\n",
-               wq_params->link_index, port_type);
+               link_index, port_type);
 
-    mtip_phy_teardown_phy(wq_params->link_index);
-    mtip_phy_bringup_phy(wq_params->link_index,
-         platform_driver_priv->mtip_ports[port_type]->sfp_port_type);
+    mtip_phy_teardown_phy(link_index);
+    mtip_phy_bringup_phy(link_index,
+                    platform_driver_priv->mtip_ports[port_type]->sfp_port_type);
 
 func_exit:
     kfree(wq_params);
@@ -307,6 +339,12 @@ int mtip_phy_bringup_phy(u32 link_index, int sfp_port_type)
     // bringup the phy for the specified lanes
     rv = (qcom_aw_phy_driver_iface_ops.eth_phy_iface_phy_bringup)(port_type, lanes_enabled, sfp_port_type);
 
+    // enable tx_rx on the link by default for PHY loopback
+    if (mtip_loopback_mode == MTIP_MODE_PHY_LOOPBACK)
+    {
+        post_mtip_process_link_state(link_index, true);
+    }
+
     CSMLOGDBG("phy bringup returned rv %d", rv);
     return rv;
 }
@@ -337,7 +375,17 @@ int mtip_phy_teardown_phy(u32 link_index)
     CSMLOGINFO("phy teardown done for link_index %d rv %d", link_index, ret_val);
 
     // disable tx_rx on the link
-    post_mtip_process_link_state(link_index, false);
+    if (mtip_loopback_mode == MTIP_MODE_DEFAULT)
+    {
+        post_mtip_process_link_state(link_index, false);
+    }
+
+    // Clear the retry count if interface has been torn down
+    if(platform_driver_priv->mtip_links[link_index]->state == MTIP_LINK_STATE_CLOSE)
+    {
+        mtip_phy_retry_num[link_index] = 0;
+    }
+
     return ret_val;
 }
 
@@ -565,6 +613,11 @@ static void mtip_phy_handle_lane_down(u32 lane_index)
 void post_mtip_phy_handle_lane_up(u32 lane_index, u8 sfp_port_type, enum eth_phy_iface_phy_lane_speed_enum lane_speed)
 {
     struct mtip_process_lane_up* taskstruct = kmalloc(sizeof(struct mtip_process_lane_up), GFP_ATOMIC);
+    if(taskstruct == NULL)
+    {
+      CSMLOGERR("memory alloc failed\n");
+      return;
+    }
     taskstruct->lane_index = lane_index;
     taskstruct->sfp_port_type = sfp_port_type;
     taskstruct->lane_speed = lane_speed;
@@ -587,6 +640,11 @@ void run_mtip_process_lane_up(void* workptr)
 void post_mtip_phy_handle_lane_down(u32 lane_index)
 {
     struct mtip_process_lane_down* taskstruct = kmalloc(sizeof(struct mtip_process_lane_down), GFP_ATOMIC);
+    if(taskstruct == NULL)
+    {
+      CSMLOGERR("memory alloc failed\n");
+      return;
+   }
     taskstruct->lane_index = lane_index;
     mtip_queue_work(MTIP_WORKQ_TASK_PROCESS_LANE_DOWN, taskstruct);
 }
@@ -1092,8 +1150,6 @@ int mtip_phy_destroy_phylink(u32 lane_index)
        if(platform_driver_priv->mtip_lanes[lane_index]->lane_dummy_ndev)
           free_netdev(platform_driver_priv->mtip_lanes[lane_index]->lane_dummy_ndev);
     }
-    // free the allocated memory for the mtip_port
-    kfree(platform_driver_priv->mtip_lanes[lane_index]);
 
     return 0;
 }

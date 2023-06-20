@@ -21,6 +21,10 @@ ccflags-y += -I$(AWPHYRVTOP)
 ccflags-y += -I$(AWPHYRVTOP)/include/
 ccflags-y += -I$(AWPHYRVTOP)/include/uapi/qcom_aw_phy/
 
+ifeq ($(ECPRI_PERF),1)
+ccflags-y += -DNO_DEBUGFS_PERF
+endif
+
 header-y += $(AWPHYRVTOP)/include/uapi/qcom_aw_phy/qcom_aw_phy_gnl_uapi.h
 header-y += $(AWPHYRVTOP)/include/uapi/qcom_aw_phy/qcom_prbs_aw_phy_gnl_uapi.h
 

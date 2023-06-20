@@ -217,10 +217,9 @@ static int ecpri_dma_eth_dp_test_util_setup_dma_endps(
 			else
 				endp_cfg_xbar.loopback_en = 1;
 
-			if(exception_test)
-			{
-				lb_dest_endp = ecpri_dma_ctx->exception_endp.endp_id;
-				lb_dest_gsi_id = ecpri_dma_ctx->exception_endp.gsi_id;
+			if(exception_test) {
+				lb_dest_endp = ecpri_dma_ctx->exception_ctx.exception_endp.endp_id;
+				lb_dest_gsi_id = ecpri_dma_ctx->exception_ctx.exception_endp.gsi_id;
 			}
 
 			endp_cfg_dest.def.dest_mem_channel =
@@ -1923,7 +1922,7 @@ static int ecpri_dma_eth_dp_test_suite_multiple_pkt_single_buffer_exception(void
 		}
 	}
 
-	orig_exception_idx = ecpri_dma_ctx->exception_pkt_idx;
+	orig_exception_idx = ecpri_dma_ctx->exception_ctx.exception_pkt_idx;
 
 	/* Transmit packets */
 	ret = ecpri_dma_eth_transmit(eth_client_test_suite_ctx.hdl,
@@ -1940,7 +1939,7 @@ static int ecpri_dma_eth_dp_test_suite_multiple_pkt_single_buffer_exception(void
 		return -EFAULT;
 	}
 
-	new_exception_idx = ecpri_dma_ctx->exception_pkt_idx;
+	new_exception_idx = ecpri_dma_ctx->exception_ctx.exception_pkt_idx;
 
 	if (((num_of_pkts_to_send + orig_exception_idx) %
 		ECPRI_DMA_EXCEPTION_RING_SIZE) != new_exception_idx)
@@ -2024,7 +2023,7 @@ static int ecpri_dma_eth_dp_test_suite_single_pkt_single_buffer_exception(void *
 		}
 	}
 
-	orig_exception_idx = ecpri_dma_ctx->exception_pkt_idx;
+	orig_exception_idx = ecpri_dma_ctx->exception_ctx.exception_pkt_idx;
 
 	/* Transmit single packet */
 	ret = ecpri_dma_eth_transmit(eth_client_test_suite_ctx.hdl,
@@ -2041,7 +2040,7 @@ static int ecpri_dma_eth_dp_test_suite_single_pkt_single_buffer_exception(void *
 		return -EFAULT;
 	}
 
-	new_exception_idx = ecpri_dma_ctx->exception_pkt_idx;
+	new_exception_idx = ecpri_dma_ctx->exception_ctx.exception_pkt_idx;
 
 	if (((num_of_pkts_to_send + orig_exception_idx) %
 		ECPRI_DMA_EXCEPTION_RING_SIZE) != new_exception_idx)

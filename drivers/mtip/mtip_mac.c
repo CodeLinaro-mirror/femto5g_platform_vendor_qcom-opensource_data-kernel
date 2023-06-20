@@ -605,55 +605,30 @@ void mtip_mac_set_hashtable_entry(struct mtip_netdev_priv *priv, u8 entry_addres
    CSMLOGDBG("Setting hashtable of link index: %d, address: %d to %d\n", link_index, entry_address, write_val);
 }
 
-void mtip_mac_enable_tx_rx(u32 link_index)
+void mtip_mac_link_up(u32 link_index)
 {
-    void __iomem *mac_ioaddr;
-    struct net_device* dev = platform_driver_priv->mtip_links[link_index]->dev;
-    struct mtip_netdev_priv* priv = netdev_priv(dev);
-    u32 command_config;
-     
-    CSMLOGINFO("Enabling Tx and Rx on link_index: %d\n", link_index);
+    // Don't enable TX/RX if the link has been closed
+    if (platform_driver_priv->mtip_links[link_index]->state == MTIP_LINK_STATE_CLOSE) 
+    {
+        return;
+    }
+
+    CSMLOGINFO("MAC/PCS link up on link_index: %d\n", link_index);
 
     // set the link state as up
     platform_driver_priv->mtip_links[link_index]->state = MTIP_LINK_STATE_UP;
-
-    mac_ioaddr = priv->mac_ioaddr;
-
-    command_config = (u32)ioread32(mac_ioaddr + MTIP_MAC_COMMAND_CONFIG);
-
-    command_config |= (MTIP_MAC_COMMAND_CONFIG_ENABLE_TX | MTIP_MAC_COMMAND_CONFIG_ENABLE_RX);
-
-   // configure the mac for operation
-   iowrite32(command_config, mac_ioaddr + MTIP_MAC_COMMAND_CONFIG);
 }
 
-void mtip_mac_disable_tx_rx(u32 link_index)
+void mtip_mac_link_down(u32 link_index)
 {
-    void __iomem *mac_ioaddr;
-    struct net_device* dev = platform_driver_priv->mtip_links[link_index]->dev;
-    struct mtip_netdev_priv* priv = netdev_priv(dev);
-    u32 command_config;
-    enum mtip_link_state_enum state;
-     
-    CSMLOGINFO("Disabling Tx and Rx on link_index: %d\n", link_index);
-
-    state = platform_driver_priv->mtip_links[link_index]->state;
+    CSMLOGINFO("MAC/PCS link down on link_index: %d\n", link_index);
 
     // set the link state to DOWN if not closed
-    if (state != MTIP_LINK_STATE_CLOSE) 
+    if (platform_driver_priv->mtip_links[link_index]->state != MTIP_LINK_STATE_CLOSE) 
     {
         // set link state as down
         platform_driver_priv->mtip_links[link_index]->state = MTIP_LINK_STATE_DOWN;
     }
-
-    mac_ioaddr = priv->mac_ioaddr;
-
-    command_config = (u32)ioread32(mac_ioaddr + MTIP_MAC_COMMAND_CONFIG);
-
-    command_config &= (~(MTIP_MAC_COMMAND_CONFIG_ENABLE_TX | MTIP_MAC_COMMAND_CONFIG_ENABLE_RX));
-
-   // configure the mac for operation
-   iowrite32(command_config, mac_ioaddr + MTIP_MAC_COMMAND_CONFIG);
 }
 
 static void mtip_mac_set_xif_mode(struct mtip_netdev_priv *priv) {
@@ -1608,7 +1583,31 @@ void mtip_mac_read_ts_seq_num(u32 link_index, u8* ts_seq_num)
     *ts_seq_num = (u8)(ts_reg_val & 0x0000000F);
     return;
 }
+void mtip_mac_read_tx_ts_stat_reg(u32 link_index, u8* tx_ts_stat)
+{
+    void __iomem *wrapper_base_addr;
+    u32 port_type;
+    u32 real_link_number;
+    u32 ts_reg_val;
 
+    if (mtip_lookup_port_type_by_link_index(link_index, &port_type) < 0)
+    {
+        CSMLOGERR("invalid port_type for link_index %d", link_index);
+        return;
+    }
+
+    mtip_lookup_real_link_number_by_link_index(link_index, &real_link_number);
+
+    wrapper_base_addr = platform_driver_priv->devices.port_devices[port_type].wrapper_base_addr;
+
+    // read the ts status register value for checking underflow and overflow of H.W timestamp queue
+    ts_reg_val = (u32)ioread32(wrapper_base_addr + real_link_number*MTIP_MAC_WRAPPER_TX_TS_STAT_REG_OFFSET + MTIP_MAC_WRAPPER_TX_TS_STAT_REG_BASE_OFFSET);
+
+    // the ts status value are the bottom two bits
+    // as defined in IPCAT
+    *tx_ts_stat = (u8)(ts_reg_val & 0x0000000F);
+    return;
+}
 u32 mtip_mac_get_interrupt_mask(u32 link_index)
 {
     u32 read_val = 0;

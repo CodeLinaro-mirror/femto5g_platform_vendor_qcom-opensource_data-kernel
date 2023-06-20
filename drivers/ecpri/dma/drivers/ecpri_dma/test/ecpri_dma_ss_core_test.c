@@ -5,6 +5,8 @@
 
 #include "ecpri_dma_utils.h"
 #include "ecpri_dma_ss_core.h"
+#include "ecpri_hwio_def.h"
+#include "dmahal_reg.h"
 #include "ecpri_dma_ut_framework.h"
 
 extern struct ecpri_dma_ss_core_context* ecpri_dma_ss_core_ctx;
@@ -121,7 +123,157 @@ static int ecpri_dma_ss_core_client_test_suite_setup(void** ppriv)
 static int ecpri_dma_ss_core_client_test_suite_teardown(void* priv)
 {
 	DMA_UT_DBG("Start Teardown\n");
+	return 0;
+}
 
+/**
+ * ecpri_dma_verify_endp_lte_config() -
+ * Test LTE endpoint configuration
+*/
+int ecpri_dma_ss_core_client_test_lte_config(void * priv)
+{
+
+	enum ecpri_hw_ver ver = 0;
+	enum ecpri_hw_flavor flv =0;
+	struct ecpri_dma_endp_mapping *port_topology;
+	struct ecpri_dma_topology_params *cur_destination = 0;
+	struct ecpri_dma_port_params *cur_port = 0;
+	struct ecpri_dma_ring_params *cur_link = 0;
+	int result;
+	u32 endp_id;
+	u32 gsi_id;
+	int i = 0;
+	int j = 0;
+	int k = 0;
+	ecpri_hwio_def_ecpri_endp_lte_cfg_gsi_m_ch_n_u lte_cfg = { 0 };
+	bool is_lte_in_topology[ECPRI_DMA_GSI_NUM_MAX][ECPRI_DMA_ENDP_NUM_MAX] = {0};
+	bool is_lte_enabled_expected;
+
+	const struct dma_gsi_ep_config \
+		(*test_endp_map_ptr)[ECPRI_DMA_GSI_NUM_MAX][ECPRI_DMA_ENDP_NUM_MAX] = {0};
+
+	/* Get current HW */
+	ver = ecpri_dma_get_ctx_hw_ver();
+	flv = ecpri_dma_get_ctx_hw_flavor();
+
+	port_topology = kzalloc(
+		sizeof(struct ecpri_dma_endp_mapping), GFP_KERNEL);
+
+	/* Get endpoints */
+	result =
+		ecpri_dma_get_endp_mapping(
+			ver,
+			flv,
+			&test_endp_map_ptr);
+
+	if (result < 0) {
+		DMA_UT_ERR("Failed to get endpoint mapping\n");
+		kfree(port_topology);
+		return result;
+	}
+
+	result = ecpri_dma_get_port_mapping(
+		ver,
+		flv,
+		port_topology);
+
+	if (result < 0) {
+		DMA_UT_ERR("Failed to get port mapping\n");
+		kfree(port_topology);
+		return result;
+	}
+
+	/* Scan the destinations supported by this topology */
+	for(i = 0; i < port_topology->num_of_port_types; i++) {
+
+		/* Get current destination */
+		cur_destination =
+		(struct ecpri_dma_topology_params *)&port_topology->topology_params[i];
+
+		/* Process only FH LTE destinations */
+		if (ECPRI_DMA_ENDP_STREAM_DEST_FH_LTE ==
+				cur_destination->port_type) {
+
+				/* Scan each port for this destination */
+				for (j = 0; j < cur_destination->num_of_ports; j++) {
+
+					/* Get current port*/
+					cur_port = &cur_destination->dma_port_param[j];
+
+					/* Scan port's links*/
+					for(k = 0; k < cur_port->num_of_rings; k++) {
+						cur_link = &cur_port->dma_rings_param[k];
+
+						endp_id = cur_link->dest_dma_ring_id;
+						gsi_id = cur_link->dest_dma_ring_gsi_id;
+
+						/* Remember dest endpoint is LTE */
+						is_lte_in_topology[gsi_id][endp_id] = true;
+
+						endp_id = cur_link->src_dma_ring_id;
+						gsi_id = cur_link->src_dma_ring_gsi_id;
+
+						/* Remember src endpoint is LTE */
+						is_lte_in_topology[gsi_id][endp_id] = true;
+
+					}
+				}
+		}
+	}
+
+	/* Check for config differences between topology and endpoint maps */
+	for (gsi_id = 0; gsi_id < ECPRI_DMA_GSI_NUM_MAX; gsi_id++)
+		for (endp_id = 0; endp_id < ECPRI_DMA_ENDP_NUM_MAX; endp_id++) {
+
+			/* Check for differences between topology and endp maps*/
+			if((*test_endp_map_ptr)[gsi_id][endp_id].lte_enable !=
+				is_lte_in_topology[gsi_id][endp_id]) {
+
+				DMA_UT_ERR("Endpoint gsi id:%d endp id:%d "
+						"configuration mismatch "
+						"between topology and endpoint mapping\n",
+						 gsi_id, endp_id);
+
+				kfree(port_topology);
+				return -EFAULT;
+			}
+
+			/* Verify LTE endpoints are not M2M*/
+			if (ECPRI_DMA_ENDP_STREAM_MODE_M2M ==
+				(*test_endp_map_ptr)[gsi_id][endp_id].stream_mode){
+
+			 	DMA_UT_ERR("Endpoint gsi id:%d endp id:%d "
+						"configuration is M2M\n",
+						gsi_id, endp_id);
+
+				kfree(port_topology);
+				return -EFAULT;
+			}
+
+			if (ECPRI_DMA_ENDP_DIR_DEST ==
+				(*test_endp_map_ptr)[gsi_id][endp_id].dir)
+
+				is_lte_enabled_expected =
+					(*test_endp_map_ptr)[gsi_id][endp_id].lte_enable;
+			 else
+				is_lte_enabled_expected = false;
+
+			/* Check register value */
+			lte_cfg.value = ecpri_dma_hal_read_reg_mn(
+					ECPRI_DMA_ENDP_LTE_CFG_GSI_m_CH_n, gsi_id, endp_id);
+
+			/* Check register matches configuration */
+			if (is_lte_enabled_expected != lte_cfg.def.is_lte) {
+			 	DMA_UT_ERR("Endpoint gsi id:%d endp id:%d "
+						"configuration mismatch "
+						"between register value and configuration %d\n",
+						gsi_id, endp_id, is_lte_enabled_expected);
+
+				kfree(port_topology);
+				return -EFAULT;
+			}
+		}
+	kfree(port_topology);
 	return 0;
 }
 
@@ -202,4 +354,10 @@ DMA_UT_DEFINE_SUITE_START(ss_core_client, "SS Core Client suite",
 		" of the SS Core Client.",
 		ecpri_dma_ss_core_client_test_suite_registration, true,
 		ECPRI_HW_V1_0, ECPRI_HW_MAX),
+	DMA_UT_ADD_TEST(
+		lte_testing,
+		"This test will verify LTE endpoint configuration",
+		ecpri_dma_ss_core_client_test_lte_config, true,
+		ECPRI_HW_V2_0, ECPRI_HW_MAX),
+
 } DMA_UT_DEFINE_SUITE_END(ss_core_client);

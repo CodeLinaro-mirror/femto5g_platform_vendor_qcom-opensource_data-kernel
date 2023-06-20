@@ -69,4 +69,8 @@ int mtip_rsfec_initialize(struct mtip_port_device_info* port_device);
 void mtip_pcs_enable_rsfec_for_25g_mode(struct mtip_link_device_info* link_device);
 void mtip_pcs_disable_rsfec_for_25g_mode(struct mtip_link_device_info* link_device);
 
+void mtip_pcs_update_active_fec(u32 link_index,
+                                            enum mtip_port_config_enum port_config,
+                                            u32  sfp_port_type);
+
 #endif // _MTIP_PCS_H

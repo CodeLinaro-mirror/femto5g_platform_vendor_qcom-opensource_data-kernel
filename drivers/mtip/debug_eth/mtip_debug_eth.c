@@ -318,11 +318,11 @@ static void mtip_debug_eth_ethtool_dump_regs(u32 link_index, void *buf)
     u32 wr_idx = 0;
     u32 port_type;
     struct mtip_link_device_info* link_device;
-    struct resource *dev_resource;
+    struct resource *dev_resource = NULL;
     u32 mtip_reg_idx = 0;
 
     struct platform_device* pdev;
-    void __iomem *dev_ioaddr;
+    void __iomem *dev_ioaddr = NULL;
 
     CSMLOGINFO("mtip_debug_eth_ethtool: Entering mtip_debug_eth_ethtool_dump_regs with link_idx %d \n", link_index);
 
@@ -377,8 +377,10 @@ static void mtip_debug_eth_ethtool_dump_regs(u32 link_index, void *buf)
             default:
             break;
         }
-
-	mtip_debug_eth_ethtool_get_dev_regs(pdev, dev_ioaddr, buf, &wr_idx, dev_resource, mtip_debug_eth_ethtool_reg_offset_val, mtip_reg_idx);
+      if((dev_ioaddr != NULL) && (dev_resource != NULL))
+      {
+        mtip_debug_eth_ethtool_get_dev_regs(pdev, dev_ioaddr, buf, &wr_idx, dev_resource, mtip_debug_eth_ethtool_reg_offset_val, mtip_reg_idx);
+      }
     }
 }
 

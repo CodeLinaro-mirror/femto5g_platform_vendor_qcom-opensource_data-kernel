@@ -37,7 +37,7 @@
  */
 #define MTIP_MAC_RESET                            0x00001800
 
-#define MTIP_MAC_INIT_COMMAND_CONFIG              0x00000800      // was 0x00002810
+#define MTIP_MAC_INIT_COMMAND_CONFIG              0x02000803      // was 0x00002810
 
 #define MTIP_MAC_COMMAND_CONFIG_ENABLE_TX         0x00000001
 #define MTIP_MAC_COMMAND_CONFIG_ENABLE_RX         0x00000002
@@ -67,7 +67,8 @@
 
 #define MTIP_MAC_WRAPPER_TX_TS_SEQ_NUM_REG_BASE_OFFSET   0x00000388
 #define MTIP_MAC_WRAPPER_TX_TS_SEQ_NUM_LINK_REG_OFFSET   0x00000004
-
+#define MTIP_MAC_WRAPPER_TX_TS_STAT_REG_BASE_OFFSET      0x0000003C
+#define MTIP_MAC_WRAPPER_TX_TS_STAT_REG_OFFSET           0x00000004
 #define MTIP_MAC_WRAPPER_INTERRUPT_STAT_REG_OFFSET       0x00000250
 #define MTIP_MAC_WRAPPER_INTERRUPT_MASK_REG_OFFSET       0x00000254
 #define MTIP_MAC_WRAPPER_INTERRUPT_CLR_REG_OFFSET        0x00000258
@@ -152,8 +153,8 @@ void mtip_mac_wrapper_init(struct mtip_port_device_info* port_device);
 
 void mtip_mac_wrapper_pcs_mode_control(struct mtip_port_device_info* port_device);
 
-void mtip_mac_enable_tx_rx(u32 link_index);
-void mtip_mac_disable_tx_rx(u32 link_index);
+void mtip_mac_link_up(u32 link_index);
+void mtip_mac_link_down(u32 link_index);
 
 void mtip_mac_set_frame_length(struct mtip_netdev_priv* priv, 
                                          u32 frame_length);
@@ -175,7 +176,7 @@ void mtip_mac_wrapper_register_irq(struct device *dev, unsigned int irq,
 
 void mtip_mac_read_timestamp(u32 link_index, u32* timestamp_secs, u32* timestamp_nsecs);
 void mtip_mac_read_ts_seq_num(u32 link_index, u8* ts_seq);
-
+void mtip_mac_read_tx_ts_stat_reg(u32 link_index, u8* tx_ts_stat);
 void mtip_mac_set_interrupt_mask(u32 link_index);
 void mtip_mac_clear_interrupt_mask(u32 link_index);
 void mtip_mac_set_link_status_interrupt_mask(u32 link_index);

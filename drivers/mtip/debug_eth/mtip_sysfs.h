@@ -109,6 +109,8 @@
 #define DBG_ETH_DBG_FIFO_STATUS 0x00000158
 #define FLUSH_DONE_PACKET 0x101C00
 #define FLUSH_DONE_STREAM 0x10001F
+#define MINIMUM_VLANID 1
+#define MAXIMUM_VLANID 4094
 #define MAXIMUM_PACKET_SIZE 1500
 #define MINIMUM_PACKET_SIZE 32
 #define BYTE_PER_WATERMARK_UNIT 32
@@ -146,8 +148,8 @@ struct StreamingFifo {
   unsigned int AddrRange_Start;
   unsigned int AddrRange_End;
   unsigned int OverFlowInterrupt;
-  unsigned int Threshold;
   unsigned int Timeout;
+  u16 Threshold;
   u64 vlanID;
 };
 
@@ -181,10 +183,10 @@ void setup_diag_l3_daddr(u_int8_t *l3_daddr);
 void setup_diag_l2_daddr(u_int8_t *l2_daddr);
 void setup_diag_addr_range(u_int8_t fifo_num, u_int32_t addr_range_start,
                            u_int32_t addr_range_end);
-void setup_diag_port(u_int8_t src_port, u_int8_t dest_port);
+void setup_diag_port(u_int16_t src_port, u_int16_t dest_port);
 void setup_diag_flush(u_int8_t fifo_num);
-void setup_diag_threshold(u_int8_t fifo_num, u_int8_t threshold);
-void setup_diag_timeout(u_int8_t fifo_num, u_int8_t timeout);
+void setup_diag_threshold(u_int8_t fifo_num, u_int16_t threshold);
+void setup_diag_timeout(u_int8_t fifo_num, u_int32_t timeout);
 void setup_diag_vlanID_register_set(u_int16_t vlanID, u_int32_t reg1,
                                     u_int32_t reg2);
 void setup_diag_vlanID(u_int8_t fifo_num, u_int16_t vlanID);

@@ -763,6 +763,16 @@ static int mtip_module_init(void)
     {
         CSMLOGDBG("mtip_init(): IPC log context created successfully, continue...\n");
     }
+   platform_driver_priv->ipc_ptp_log_buf = ipc_log_context_create(CSM_IPC_LOG_PAGES,
+		"csm_ptp_mtip", 0);
+	if (platform_driver_priv->ipc_ptp_log_buf == NULL)
+    {
+		CSMLOGERR("mtip_init(): failed to create IPC log context, continue...\n");
+    }
+    else
+    {
+        CSMLOGDBG("mtip_init(): IPC log context created successfully, continue...\n");
+    }
 
     platform_driver_priv->ipc_log_buf_low = ipc_log_context_create(CSM_IPC_LOG_PAGES,
 		"csm_mtip_low", 0);
@@ -848,20 +858,12 @@ out:
 
 static void mtip_module_exit(void)
 {
-   int i;
+   //int i;
    CSMLOGERR("mtip_module_exit called\n");
-
-   // finalize the workq
-   mtip_destroy_workq();
 
    // destroy the hashmap
    mtip_hashmap_destroy();
-
-   // finalize the dma array of allocs
-   for (i = 0; i < MTIP_DMA_ALLOC_LIST_MAX; ++i) 
-   {
-       mtip_dma_alloc_finalize(i);
-   }
+   mtip_eth_deregister_events_cb();
 
    mtip_debug_eth_unregister_platform_driver();
    if (!platform_driver_priv->perr)
@@ -879,7 +881,16 @@ static void mtip_module_exit(void)
        // dergister with the phy driver
        mtip_phy_deregister_eth();
    }
-
+   /* memory leak needs to be fixed later */
+   // finalize the dma array of allocs
+   /*for (i = 0; i < MTIP_DMA_ALLOC_LIST_MAX; ++i) 
+   {
+       mtip_dma_alloc_finalize(i);
+   }
+*/
+   // finalize the workq
+   mtip_destroy_workq();
+   
    if (platform_driver_priv->ipc_log_buf)
 		ipc_log_context_destroy(platform_driver_priv->ipc_log_buf);
    if (platform_driver_priv->ipc_log_buf_low)

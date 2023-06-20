@@ -23,7 +23,7 @@
 #define STATS_2x32_TO_64(stat_field_Lo, stat_field_Hi)                         \
 	(((u64)stat_field_Hi << 32) | stat_field_Lo)
 #define SECY_FRAME_VALIDATE_DEFAULT SECY_FRAME_VALIDATE_STRICT
-#define vPORT_INDEX_NOT_INITIALIZE -1
+#define vPORT_INDEX_NOT_INITIALIZE 0xFFFFFFFF
 #define SA_PN_SEQ_OFFSET 14
 #define SA_WORD_COUNT 2
 #define MAX_CHANNELS_PER_PORT 4
@@ -559,85 +559,71 @@ static int eip_macsec_upd_secy(unsigned int egress_device_id,
 			       unsigned int channel_id,
 			       struct macsec_context *ctx)
 {
-	SecY_SAHandle_t Active_SecY_SAHandle = SecY_SAHandle_NULL;
-	SecY_Status_t SecY_Rc = SECY_ERROR_NOT_IMPLEMENTED;
+	SecY_Status_t SecY_Rc = SECY_STATUS_OK;
 	struct macsec_per_channel_info *ch_info_p = NULL;
 	SecY_SA_t *SA_Params;
-	SecY_SAHandle_t SAHandles_Ingress[4];
-	uint8_t i;
 
 	// Egress
 	ch_info_p = get_eip_channel_info(egress_device_id, channel_id);
 	SA_Params = &ch_info_p->SA_Params[ctx->sa.assoc_num];
 
-	SecY_Rc = SecY_SA_Active_E_Get(egress_device_id, ch_info_p->vPortIndex,
-				       &Active_SecY_SAHandle);
-	if (SecY_Rc != SECY_STATUS_OK) {
-		eip_logerr("SecY_SA_Active_E_Get()=%d\n", SecY_Rc);
-		return -EINVAL;
-	}
-	SA_Params->Params.Egress.fProtectFrames = ctx->secy->protect_frames;
-	SA_Params->Params.Egress.fIncludeSCI = ctx->secy->tx_sc.send_sci;
-	SA_Params->Params.Egress.fConfProtect = ctx->secy->tx_sc.encrypt;
-	SA_Params->Params.Egress.fUseSCB = ctx->secy->tx_sc.scb;
-	SA_Params->Params.Egress.fUseES = ctx->secy->tx_sc.end_station;
+	if (!SecY_SAHandle_IsSame(&ch_info_p->SecY_SAHandle[ctx->sa.assoc_num],
+				  &SecY_SAHandle_NULL)) {
+		SA_Params->Params.Egress.fProtectFrames =
+			ctx->secy->protect_frames;
+		SA_Params->Params.Egress.fIncludeSCI =
+			ctx->secy->tx_sc.send_sci;
+		SA_Params->Params.Egress.fConfProtect =
+			ctx->secy->tx_sc.encrypt;
+		SA_Params->Params.Egress.fUseSCB = ctx->secy->tx_sc.scb;
+		SA_Params->Params.Egress.fUseES = ctx->secy->tx_sc.end_station;
 
-	SecY_Rc = SecY_SA_Update(egress_device_id, Active_SecY_SAHandle,
-				 SA_Params);
-	if (SecY_Rc != SECY_STATUS_OK) {
-		eip_logerr("Engress Failed, SecY_SA_Update()=%d\n", SecY_Rc);
-		return SecY_Rc;
+		SecY_Rc = SecY_SA_Update(
+			egress_device_id,
+			ch_info_p->SecY_SAHandle[ctx->sa.assoc_num], SA_Params);
+		if (SecY_Rc != SECY_STATUS_OK) {
+			eip_logerr("Engress Failed, SecY_SA_Update()=%d\n",
+				   SecY_Rc);
+			return SecY_Rc;
+		}
 	}
 
 	// Ingress
 	ch_info_p = get_eip_channel_info(ingress_device_id, channel_id);
 	SA_Params = &ch_info_p->SA_Params[ctx->sa.assoc_num];
-	eip_loginfo("Ingress settings: device %d vport %d SCI_P = 0x%x",
-		    ingress_device_id, ch_info_p->vPortIndex,
-		    &ch_info_p->SCI_p[0]);
+	if (!SecY_SAHandle_IsSame(&ch_info_p->SecY_SAHandle[ctx->sa.assoc_num],
+				  &SecY_SAHandle_NULL)) {
+		eip_loginfo("Ingress settings: device %d vport %d SCI_P = 0x%x",
+			    ingress_device_id, ch_info_p->vPortIndex,
+			    &ch_info_p->SCI_p[0]);
 
-	for (i = 0; i < MACSEC_MAX_SA; i++) {
-		SAHandles_Ingress[i] = SecY_SAHandle_NULL;
-	}
-	SecY_Rc = SecY_SA_Active_I_Get(ingress_device_id, ch_info_p->vPortIndex,
-				       (uint8_t *)&ch_info_p->SCI_p[0],
-				       SAHandles_Ingress);
-	if (SecY_Rc != SECY_STATUS_OK) {
-		eip_logerr("SecY_SA_Active_I_Get()=%d\n", SecY_Rc);
-		return -EINVAL;
-	}
-
-	switch (ctx->secy->validate_frames) {
-	case MACSEC_VALIDATE_DISABLED:
-		SA_Params->Params.Ingress.ValidateFramesTagged =
-			SECY_FRAME_VALIDATE_DISABLE;
-		break;
-	case MACSEC_VALIDATE_CHECK:
-		SA_Params->Params.Ingress.ValidateFramesTagged =
-			SECY_FRAME_VALIDATE_CHECK;
-		break;
-	case MACSEC_VALIDATE_STRICT:
-	default:
-		SA_Params->Params.Ingress.ValidateFramesTagged =
-			SECY_FRAME_VALIDATE_DEFAULT;
-		eip_loginfo("Setting it to Default!");
-		break;
-	}
-	SA_Params->Params.Ingress.fReplayProtect = ctx->secy->replay_protect;
-	SA_Params->Params.Ingress.SCI_p = (uint8_t *)&ctx->secy->sci;
-	SA_Params->Params.Ingress.AN = ctx->sa.assoc_num;
-	for (i = 0; i < MACSEC_MAX_SA; i++) {
-		if (!SecY_SAHandle_IsSame(&SAHandles_Ingress[i],
-					  &SecY_SAHandle_NULL)) {
-			SecY_Rc =
-				SecY_SA_Update(ingress_device_id,
-					       SAHandles_Ingress[i], SA_Params);
-			if (SecY_Rc != SECY_STATUS_OK) {
-				eip_logerr(
-					"Ingress Failed, SecY_SA_Update()=%d\n",
-					SecY_Rc);
-				return SecY_Rc;
-			}
+		switch (ctx->secy->validate_frames) {
+		case MACSEC_VALIDATE_DISABLED:
+			SA_Params->Params.Ingress.ValidateFramesTagged =
+				SECY_FRAME_VALIDATE_DISABLE;
+			break;
+		case MACSEC_VALIDATE_CHECK:
+			SA_Params->Params.Ingress.ValidateFramesTagged =
+				SECY_FRAME_VALIDATE_CHECK;
+			break;
+		case MACSEC_VALIDATE_STRICT:
+		default:
+			SA_Params->Params.Ingress.ValidateFramesTagged =
+				SECY_FRAME_VALIDATE_DEFAULT;
+			eip_loginfo("Setting it to Default!");
+			break;
+		}
+		SA_Params->Params.Ingress.fReplayProtect =
+			ctx->secy->replay_protect;
+		SA_Params->Params.Ingress.SCI_p = (uint8_t *)&ctx->secy->sci;
+		SA_Params->Params.Ingress.AN = ctx->sa.assoc_num;
+		SecY_Rc = SecY_SA_Update(
+			ingress_device_id,
+			ch_info_p->SecY_SAHandle[ctx->sa.assoc_num], SA_Params);
+		if (SecY_Rc != SECY_STATUS_OK) {
+			eip_logerr("Ingress Failed, SecY_SA_Update()=%d\n",
+				   SecY_Rc);
+			return SecY_Rc;
 		}
 	}
 	return SecY_Rc;
@@ -1062,9 +1048,9 @@ static int eip_macsec_egress_stats(unsigned int port_id, unsigned int channel,
 	SecY_Status_t SecY_Rc;
 	unsigned int egress_device_id;
 	struct macsec_per_channel_info *ch_info_p = NULL;
-	SecY_SAHandle_t Active_SecY_SAHandle = SecY_SAHandle_NULL;
 	SecY_SA_Stat_E_t SAStats;
 	SecY_SecY_Stat_E_t SecYStats;
+	uint32_t SA_Words[2] = { 0 };
 
 	ZEROINIT(SecYStats);
 	ZEROINIT(SAStats);
@@ -1072,65 +1058,81 @@ static int eip_macsec_egress_stats(unsigned int port_id, unsigned int channel,
 	egress_device_id = GET_EGRESS_ID_FROM_DEVICE_ID(port_id);
 	ch_info_p = get_eip_channel_info(egress_device_id, channel);
 
-	SecY_Rc = SecY_SA_Active_E_Get(egress_device_id, ch_info_p->vPortIndex,
-				       &Active_SecY_SAHandle);
-	if (SecY_Rc != SECY_STATUS_OK) {
-		eip_logerr("SecY_SA_Active_E_Get()=%d\n", SecY_Rc);
-		return SecY_Rc;
-	}
-	SecY_Rc = SecY_SA_Statistics_E_Get(
-		egress_device_id, Active_SecY_SAHandle, &SAStats, true);
-	if (SecY_Rc != SECY_STATUS_OK) {
-		eip_logerr("Failed, SecY_SA_Statistics_E_Get()=%d\n", SecY_Rc);
-		return SecY_Rc;
-	}
-	switch (stats_type) {
-	case MACSEC_STATS_TXSC:
-	case MACSEC_STATS_TXSA: {
-		if (ctx->secy->tx_sc.encrypt) {
-			stats->tx_sc_stats.OutPktsEncrypted = STATS_2x32_TO_64(
-				SAStats.OutPktsEncryptedProtected.Lo,
-				SAStats.OutPktsEncryptedProtected.Hi);
-			stats->tx_sc_stats.OutOctetsEncrypted =
-				STATS_2x32_TO_64(
-					SAStats.OutOctetsEncryptedProtected.Lo,
-					SAStats.OutOctetsEncryptedProtected.Hi);
-			stats->tx_sa_stats.OutPktsEncrypted = STATS_2x32_TO_64(
-				SAStats.OutPktsEncryptedProtected.Lo,
-				SAStats.OutPktsEncryptedProtected.Hi);
-		} else {
-			stats->tx_sc_stats.OutPktsProtected = STATS_2x32_TO_64(
-				SAStats.OutPktsEncryptedProtected.Lo,
-				SAStats.OutPktsEncryptedProtected.Hi);
-			stats->tx_sc_stats.OutOctetsProtected =
-				STATS_2x32_TO_64(
-					SAStats.OutOctetsEncryptedProtected.Lo,
-					SAStats.OutOctetsEncryptedProtected.Hi);
-			stats->tx_sa_stats.OutPktsProtected = STATS_2x32_TO_64(
-				SAStats.OutPktsEncryptedProtected.Lo,
-				SAStats.OutPktsEncryptedProtected.Hi);
-		}
-	} break;
-	case MACSEC_STATS_DEV: {
-		/* Read the SecY ingress statistics counters. */
-		/* Sync with the SecY device to get the exact counters values */
-		SecY_Rc = SecY_SecY_Statistics_E_Get(egress_device_id,
-						     ch_info_p->vPortIndex,
-						     &SecYStats, true);
+	if (!SecY_SAHandle_IsSame(&ch_info_p->SecY_SAHandle[ctx->sa.assoc_num],
+				  &SecY_SAHandle_NULL)) {
+		SecY_Rc = SecY_SA_Read(
+			egress_device_id,
+			ch_info_p->SecY_SAHandle[ctx->sa.assoc_num], 0, 1,
+			SA_Words);
 		if (SecY_Rc != SECY_STATUS_OK) {
-			eip_logerr("Failed, SecY_SecY_Statistics_E_Get()=%d\n",
+			LOG_CRIT("SecY_SA_Read returned error %d\n", SecY_Rc);
+			return SecY_Rc;
+		}
+		ctx->secy->tx_sc.encoding_sa = (SA_Words[0] >> 26) & 0x3;
+
+		SecY_Rc = SecY_SA_Statistics_E_Get(
+			egress_device_id,
+			ch_info_p->SecY_SAHandle[ctx->sa.assoc_num], &SAStats,
+			true);
+		if (SecY_Rc != SECY_STATUS_OK) {
+			eip_logerr("Failed, SecY_SA_Statistics_E_Get()=%d\n",
 				   SecY_Rc);
 			return SecY_Rc;
 		}
-		stats->dev_stats.OutPktsUntagged =
-			STATS_2x32_TO_64(SecYStats.OutPktsUntagged.Lo,
-					 SecYStats.OutPktsUntagged.Hi);
-		stats->dev_stats.OutPktsTooLong = STATS_2x32_TO_64(
-			SAStats.OutPktsTooLong.Lo, SAStats.OutPktsTooLong.Hi);
-	} break;
-	default:
-		eip_logerr("Invalid option %d", stats_type);
-		break;
+		switch (stats_type) {
+		case MACSEC_STATS_TXSC:
+		case MACSEC_STATS_TXSA: {
+			if (ctx->secy->tx_sc.encrypt) {
+				stats->tx_sc_stats
+					.OutPktsEncrypted = STATS_2x32_TO_64(
+					SAStats.OutPktsEncryptedProtected.Lo,
+					SAStats.OutPktsEncryptedProtected.Hi);
+				stats->tx_sc_stats
+					.OutOctetsEncrypted = STATS_2x32_TO_64(
+					SAStats.OutOctetsEncryptedProtected.Lo,
+					SAStats.OutOctetsEncryptedProtected.Hi);
+				stats->tx_sa_stats
+					.OutPktsEncrypted = STATS_2x32_TO_64(
+					SAStats.OutPktsEncryptedProtected.Lo,
+					SAStats.OutPktsEncryptedProtected.Hi);
+			} else {
+				stats->tx_sc_stats
+					.OutPktsProtected = STATS_2x32_TO_64(
+					SAStats.OutPktsEncryptedProtected.Lo,
+					SAStats.OutPktsEncryptedProtected.Hi);
+				stats->tx_sc_stats
+					.OutOctetsProtected = STATS_2x32_TO_64(
+					SAStats.OutOctetsEncryptedProtected.Lo,
+					SAStats.OutOctetsEncryptedProtected.Hi);
+				stats->tx_sa_stats
+					.OutPktsProtected = STATS_2x32_TO_64(
+					SAStats.OutPktsEncryptedProtected.Lo,
+					SAStats.OutPktsEncryptedProtected.Hi);
+			}
+		} break;
+		case MACSEC_STATS_DEV: {
+			/* Read the SecY ingress statistics counters. */
+			/* Sync with the SecY device to get the exact counters values */
+			SecY_Rc = SecY_SecY_Statistics_E_Get(
+				egress_device_id, ch_info_p->vPortIndex,
+				&SecYStats, true);
+			if (SecY_Rc != SECY_STATUS_OK) {
+				eip_logerr(
+					"Failed, SecY_SecY_Statistics_E_Get()=%d\n",
+					SecY_Rc);
+				return SecY_Rc;
+			}
+			stats->dev_stats.OutPktsUntagged =
+				STATS_2x32_TO_64(SecYStats.OutPktsUntagged.Lo,
+						 SecYStats.OutPktsUntagged.Hi);
+			stats->dev_stats.OutPktsTooLong =
+				STATS_2x32_TO_64(SAStats.OutPktsTooLong.Lo,
+						 SAStats.OutPktsTooLong.Hi);
+		} break;
+		default:
+			eip_logerr("Invalid option %d", stats_type);
+			break;
+		}
 	}
 
 	return 0;
@@ -1176,7 +1178,7 @@ static int eip_macsec_ingress_stats(unsigned int port_id, unsigned int channel,
 				/* Found current active Ingress SA */
 				/* Read the SA ingress statistics counters, */
 				/* request device synchronization before reading out the statistics */
-				eip_logerr("active_sa_idx = %d", active_sa_idx);
+				// eip_logerr("active_sa_idx = %d", active_sa_idx);
 				SecY_Rc = SecY_SA_Statistics_I_Get(
 					ingress_device_id,
 					ch_info_p->SecY_SAHandle[active_sa_idx],
@@ -1252,33 +1254,35 @@ static int eip_macsec_ingress_stats(unsigned int port_id, unsigned int channel,
 	case MACSEC_STATS_DEV: {
 		/* Read the SecY ingress statistics counters. */
 		/* Sync with the SecY device to get the exact counters values */
-		if (ch_info_p->vPortIndex == vPORT_INDEX_NOT_INITIALIZE) {
-			eip_logerr("vPort is not initialized yet\n");
-			return -EINVAL;
+		if (ch_info_p->vPortIndex != vPORT_INDEX_NOT_INITIALIZE) {
+			SecY_Rc = SecY_SecY_Statistics_I_Get(
+				ingress_device_id, ch_info_p->vPortIndex,
+				&SecYStats, true);
+			if (SecY_Rc != SECY_STATUS_OK) {
+				eip_logerr(
+					"Failed, SecY_SecY_Statistics_I_Get()=%d\n",
+					SecY_Rc);
+				return SecY_Rc;
+			}
+			stats->dev_stats.InPktsUntagged =
+				STATS_2x32_TO_64(SecYStats.InPktsUntagged.Lo,
+						 SecYStats.InPktsUntagged.Lo);
+			stats->dev_stats.InPktsNoTag =
+				STATS_2x32_TO_64(SecYStats.InPktsNoTag.Lo,
+						 SecYStats.InPktsNoTag.Hi);
+			stats->dev_stats.InPktsBadTag =
+				STATS_2x32_TO_64(SecYStats.InPktsBadTag.Lo,
+						 SecYStats.InPktsBadTag.Hi);
+			stats->dev_stats.InPktsUnknownSCI =
+				STATS_2x32_TO_64(SecYStats.InPktsUnknownSCI.Lo,
+						 SecYStats.InPktsUnknownSCI.Hi);
+			stats->dev_stats.InPktsNoSCI =
+				STATS_2x32_TO_64(SecYStats.InPktsNoSCI.Lo,
+						 SecYStats.InPktsNoSCI.Hi);
+			stats->dev_stats.InPktsOverrun = STATS_2x32_TO_64(
+				SecYStats.InPktsTransformError.Lo,
+				SecYStats.InPktsTransformError.Hi);
 		}
-		SecY_Rc = SecY_SecY_Statistics_I_Get(ingress_device_id,
-						     ch_info_p->vPortIndex,
-						     &SecYStats, true);
-		if (SecY_Rc != SECY_STATUS_OK) {
-			eip_logerr("Failed, SecY_SecY_Statistics_I_Get()=%d\n",
-				   SecY_Rc);
-			return SecY_Rc;
-		}
-		stats->dev_stats.InPktsUntagged =
-			STATS_2x32_TO_64(SecYStats.InPktsUntagged.Lo,
-					 SecYStats.InPktsUntagged.Lo);
-		stats->dev_stats.InPktsNoTag = STATS_2x32_TO_64(
-			SecYStats.InPktsNoTag.Lo, SecYStats.InPktsNoTag.Hi);
-		stats->dev_stats.InPktsBadTag = STATS_2x32_TO_64(
-			SecYStats.InPktsBadTag.Lo, SecYStats.InPktsBadTag.Hi);
-		stats->dev_stats.InPktsUnknownSCI =
-			STATS_2x32_TO_64(SecYStats.InPktsUnknownSCI.Lo,
-					 SecYStats.InPktsUnknownSCI.Hi);
-		stats->dev_stats.InPktsNoSCI = STATS_2x32_TO_64(
-			SecYStats.InPktsNoSCI.Lo, SecYStats.InPktsNoSCI.Hi);
-		stats->dev_stats.InPktsOverrun =
-			STATS_2x32_TO_64(SecYStats.InPktsTransformError.Lo,
-					 SecYStats.InPktsTransformError.Hi);
 	} break;
 	default:
 		eip_logerr("Invalid option %d", stats_type);
@@ -1822,11 +1826,8 @@ static int eip_mdo_get_tx_sc_stats(struct macsec_context *ctx)
 	unsigned int egress_device, port_id, channel_id;
 	uint32_t link_index;
 	struct eip_macsec_stats egress_stats;
-	SecY_SAHandle_t Active_SecY_SAHandle = SecY_SAHandle_NULL;
 	struct macsec_per_channel_info *ch_info_p = NULL;
 	SecY_Status_t SecY_Rc = SECY_STATUS_OK;
-	unsigned int sa_index = 0xFF;
-	uint32_t SA_Words[24];
 
 	if (ctx->prepare) {
 		return 0;
@@ -1840,23 +1841,6 @@ static int eip_mdo_get_tx_sc_stats(struct macsec_context *ctx)
 		    port_id, channel_id);
 
 	ch_info_p = get_eip_channel_info(egress_device, channel_id);
-
-	SecY_Rc = SecY_SA_Active_E_Get(egress_device, ch_info_p->vPortIndex,
-				       &Active_SecY_SAHandle);
-	if (SecY_Rc != SECY_STATUS_OK) {
-		eip_logerr("SecY_SA_Active_E_Get()=%d\n", SecY_Rc);
-		return SecY_Rc;
-	}
-	SecY_Rc = SecY_SA_Read(egress_device, Active_SecY_SAHandle, 0, 1,
-			       SA_Words);
-	if (SecY_Rc != SECY_STATUS_OK) {
-		LOG_CRIT("SecY_SA_Read returned error %d\n", SecY_Rc);
-		return SecY_Rc;
-	}
-	sa_index = (SA_Words[0] >> 26) & 0x3;
-	eip_loginfo("SA_Word[0] = %x : SA = %x", SA_Words[0], sa_index);
-
-	ctx->secy->tx_sc.encoding_sa = sa_index;
 
 	SecY_Rc = eip_macsec_egress_stats(port_id, channel_id, &egress_stats,
 					  MACSEC_STATS_TXSC, ctx);
@@ -1884,7 +1868,6 @@ static int eip_mdo_get_tx_sa_stats(struct macsec_context *ctx)
 	SecY_Status_t SecY_Rc = SECY_STATUS_OK;
 	struct macsec_per_channel_info *ch_info_p = NULL;
 	struct eip_macsec_stats egress_stats;
-	SecY_SAHandle_t Active_SecY_SAHandle;
 	uint32_t SA_Words[2] = { 0 };
 
 	if (ctx->prepare) {
@@ -1912,22 +1895,21 @@ static int eip_mdo_get_tx_sa_stats(struct macsec_context *ctx)
 
 	ch_info_p = get_eip_channel_info(egress_device, channel_id);
 
-	Active_SecY_SAHandle = SecY_SAHandle_NULL;
-	SecY_Rc = SecY_SA_Active_E_Get(egress_device, ch_info_p->vPortIndex,
-				       &Active_SecY_SAHandle);
-	if (SecY_Rc != SECY_STATUS_OK) {
-		eip_logerr("SecY_SA_Active_E_Get()=%d\n", SecY_Rc);
-		return SecY_Rc;
+	if (!SecY_SAHandle_IsSame(&ch_info_p->SecY_SAHandle[ctx->sa.assoc_num],
+				  &SecY_SAHandle_NULL)) {
+		SecY_Rc = SecY_SA_Read(
+			egress_device,
+			ch_info_p->SecY_SAHandle[ctx->sa.assoc_num],
+			SA_PN_SEQ_OFFSET, SA_WORD_COUNT, SA_Words);
+		if (SecY_Rc != SECY_STATUS_OK) {
+			eip_logerr("SecY_SA_Read returned error %d\n", SecY_Rc);
+			return SecY_Rc;
+		}
+		ctx->sa.tx_sa->next_pn =
+			STATS_2x32_TO_64(SA_Words[0], SA_Words[1]);
+		eip_loginfo("Next PN Seq0 = %d : Seq1 = %d", SA_Words[0],
+			    SA_Words[1]);
 	}
-	SecY_Rc = SecY_SA_Read(egress_device, Active_SecY_SAHandle,
-			       SA_PN_SEQ_OFFSET, SA_WORD_COUNT, SA_Words);
-	if (SecY_Rc != SECY_STATUS_OK) {
-		eip_logerr("SecY_SA_Read returned error %d\n", SecY_Rc);
-		return SecY_Rc;
-	}
-	ctx->sa.tx_sa->next_pn = STATS_2x32_TO_64(SA_Words[0], SA_Words[1]);
-	eip_loginfo("Next PN Seq0 = %d : Seq1 = %d", SA_Words[0], SA_Words[1]);
-
 	return SecY_Rc;
 }
 
@@ -1987,7 +1969,7 @@ static int eip_mdo_get_rx_sa_stats(struct macsec_context *ctx)
 	struct macsec_per_channel_info *ch_info_p = NULL;
 	SecY_SAHandle_t SAHandles_Ingress[4] = { SecY_SAHandle_NULL };
 	SecY_Status_t SecY_Rc = SECY_STATUS_OK;
-	uint32_t SA_Words[24];
+	uint32_t SA_Words[2] = { 0 };
 	uint8_t i;
 
 	if (ctx->prepare) {

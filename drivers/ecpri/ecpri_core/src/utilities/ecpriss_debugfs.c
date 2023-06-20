@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0-only
  * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  */
-#ifdef CONFIG_DEBUG_FS
+#ifndef NO_DEBUGFS_PERF
 /* global includes */
 #include <linux/fcntl.h>
 #include <linux/string.h>
@@ -355,6 +355,7 @@ static ssize_t config_val_from_registers_qudp_ingress_mac_addr(char __user *buf,
 	ret_val = copy_to_user(buf,(max_str + *ppos), *count);
 	return data_size;
 }
+
 static ssize_t config_val_from_registers_qudp_ingress_mac_addr_v2(char __user *buf, int fh_index, size_t *count, loff_t *ppos)
 {
 	char fh_str[TEMP_STR_MAX_SIZE];
@@ -6124,8 +6125,34 @@ static ssize_t cfg_value_to_xbar_lut_fhrx(struct file *file, const char __user *
 	}
 	*ppos += count;
 	return count;
+}
 
-
+void ecpriss_clear_all_qudp_stats(void)
+{
+	int i;
+	// clearing QUDP stats for FH port
+	for(i =0;i < MAX_PORTS; i++)
+	{
+	memset(&ecpriss_pdata_v2->qudp_ctx_v2->fh_port_cfg_v2[i].stats_v2,0,sizeof(ecpriss_qudp_stats_v2));
+	}
+}
+void ecpriss_clear_all_xbar_stats(void)
+{
+   // clearing XBAR stats
+   memset(&ecpriss_pdata_v2->xbar_ctx_v2->stats_v2,0,sizeof(ecpriss_xbar_stats_s_v2));
+}
+void ecpriss_clear_all_stats(void)
+{
+   mutex_lock(&ecpriss_pdata_v2->ecpriss_mutex_lock);
+   ecpriss_clear_all_qudp_stats();
+   ecpriss_clear_all_xbar_stats();
+   mutex_unlock(&ecpriss_pdata_v2->ecpriss_mutex_lock);
+}
+static ssize_t cfg_value_to_ecpriss_clear_stats(struct file *file, const char __user *buf,
+		size_t count, loff_t *ppos)
+{
+	ecpriss_clear_all_stats();
+	return count;
 }
 static struct file_operations stats_fh_ops_00 = {
 	.read = stats_value_from_registers_fh_00,
@@ -6367,7 +6394,9 @@ static struct file_operations qudp_ecpriss_filt_config = {
 	.read = cfg_value_from_qudp_ecpriss_filt,
 	.write = cfg_value_to_qudp_ecpriss_filt,
 };
-
+static struct file_operations global_ecpriss_clear_stats_config={
+	 .write=cfg_value_to_ecpriss_clear_stats,
+};
 static struct file_operations global_stats_timeout_config = {
 	.read = cfg_value_from_global_ecpriss_stats_timeout,
 	.write = cfg_value_to_global_ecpriss_stats_timeout,
@@ -6481,6 +6510,10 @@ static struct file_operations *file_name_to_wrapper(char *filename)
 	else if (!strncmp(filename, "ecpriss_filt", XBAR_WRAPPER_SIZE))
 	{
 		return &qudp_ecpriss_filt_config;
+	}
+	else if(!strncmp(filename, "ecpriss_clear_stats", XBAR_WRAPPER_SIZE))
+	{
+		return &global_ecpriss_clear_stats_config;
 	}
 	else if (!strncmp(filename, "xb:stats", XBAR_WRAPPER_SIZE))
 	{

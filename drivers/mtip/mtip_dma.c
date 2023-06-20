@@ -295,6 +295,11 @@ void mtip_dma_tx_comp_cb(void *user_data, ecpri_dma_eth_conn_hdl_t hdl, struct e
 
     // copy the pointers
     local_comp_pkts = (struct ecpri_dma_pkt_completion_wrapper **)kmalloc(num_of_completed * sizeof(struct ecpri_dma_pkt_completion_wrapper *), GFP_ATOMIC);
+    if(local_comp_pkts == NULL)
+    {
+      CSMLOGERR("memory alloc failed\n");
+      return;
+    }
 
     for (i = 0; i < num_of_completed; ++i)
     {
@@ -443,6 +448,11 @@ int mtip_replenish_dma_rx_buffers(struct net_device *netdev, ecpri_dma_eth_conn_
    // replenish the rx buffers
    // allocate space to hold pkt pointers
    pkts = (struct ecpri_dma_pkt **)kmalloc(num_of_buffs * sizeof(struct ecpri_dma_pkt *), GFP_KERNEL);
+   if(pkts == NULL)
+   {
+	CSMLOGERR("memory alloc failed\n");
+	return -1;
+   }
 
    for (j = 0; j < num_of_buffs; ++j)
    {
@@ -716,7 +726,7 @@ static void mtip_dma_skb_timestamp(struct sk_buff *head_skb)
     int size;
     int k = 0;
     bool fragmented_packet = false;
-
+    char* tmp=NULL;
     tail_skb = head_skb;
     next_skb = skb_shinfo(head_skb)->frag_list;
     
@@ -750,7 +760,10 @@ static void mtip_dma_skb_timestamp(struct sk_buff *head_skb)
 
     CSMLOGDBG("Rx packet timestamp %ld, timestamp_secs %d, timestamp_nsecs %d", 
                timestamp, timestamp_secs, timestamp_nsecs);
-
+    tmp=(char*)head_skb->data;
+    CSMLOGPTP("pkt_type=%x,seq_id=%x%x,skb=0x%lx,timestamp_secs=%d,timestamp_nsecs \
+       \n",tmp[46],tmp[44],tmp[45],(unsigned long)head_skb->data, \
+       timestamp_secs,timestamp_nsecs,__func__);
     // set the timestamp in the Head Skb
     mtip_ptp_set_rx_timestamp(head_skb, timestamp_secs, timestamp_nsecs);
 
