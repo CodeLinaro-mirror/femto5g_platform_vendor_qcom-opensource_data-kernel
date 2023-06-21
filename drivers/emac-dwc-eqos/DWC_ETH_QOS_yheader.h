@@ -2025,6 +2025,7 @@ struct DWC_ETH_QOS_prv_data {
 	/* L3/L4 filter parameters */
 	int num_l3_l4_filters;
 	int l3_l4_filters_limit;
+	bool dma_rx_int_disabled;
 };
 
 struct ip_params {

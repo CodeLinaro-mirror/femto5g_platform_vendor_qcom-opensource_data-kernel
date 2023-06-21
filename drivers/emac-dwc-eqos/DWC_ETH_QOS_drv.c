@@ -620,6 +620,7 @@ void DWC_ETH_QOS_disable_all_ch_rx_interrpt(
 			 continue;
 		hw_if->disable_rx_interrupt(qinx);
 	}
+	pdata->dma_rx_int_disabled = true;
 
 	DBGPR("<--DWC_ETH_QOS_disable_all_ch_rx_interrpt\n");
 }
@@ -637,6 +638,7 @@ void DWC_ETH_QOS_enable_all_ch_rx_interrpt(
 		  continue;
 		hw_if->enable_rx_interrupt(qinx);
 	}
+	pdata->dma_rx_int_disabled = false;
 
 	DBGPR("<--DWC_ETH_QOS_enable_all_ch_rx_interrpt\n");
 }
@@ -7239,6 +7241,10 @@ INT DWC_ETH_QOS_powerup(struct net_device *dev, UINT caller)
 	/* Start TX DMA in HW before SW TX */
 	DWC_ETH_QOS_start_all_ch_tx_dma(pdata);
 	netif_tx_start_all_queues(dev);
+
+	if(pdata->dma_rx_int_disabled) {
+		DWC_ETH_QOS_enable_all_ch_rx_interrpt(pdata);
+	}
 
 	mutex_unlock(&pdata->pmt_lock);
 
