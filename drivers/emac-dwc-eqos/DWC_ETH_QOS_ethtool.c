@@ -464,6 +464,10 @@ static void DWC_ETH_QOS_get_pauseparam(struct net_device *dev,
 		return -ENODEV;
 	}
 
+	if(dwc_eth_qos_res_data.ext_phy) {
+		EMACERR("External PHY is used\n");
+		return -ENODEV;
+	}
 	pause->rx_pause = 0;
 	pause->tx_pause = 0;
 
@@ -517,6 +521,11 @@ static int DWC_ETH_QOS_set_pauseparam(struct net_device *dev,
 	if (dwc_eth_qos_res_data.mac2mac_en) {
 		EMACERR("%s: %s: PHY is not registered\n",
 			__func__, dev->name);
+		return -ENODEV;
+	}
+
+	if(dwc_eth_qos_res_data.ext_phy) {
+		EMACERR("External PHY is used\n");
 		return -ENODEV;
 	}
 
@@ -665,6 +674,11 @@ static int DWC_ETH_QOS_getsettings(struct net_device *dev,
 		return -ENODEV;
 	}
 
+	if(dwc_eth_qos_res_data.ext_phy) {
+		EMACERR("External PHY is used\n");
+		return -ENODEV;
+	}
+
 	if (pdata->hw_feat.pcs_sel) {
 		if (!pdata->pcs_link) {
 			ethtool_cmd_speed_set(cmd, SPEED_UNKNOWN);
@@ -784,6 +798,10 @@ static int DWC_ETH_QOS_setsettings(struct net_device *dev,
 			__func__, dev->name);
 		return -ENODEV;
 	}
+	if(dwc_eth_qos_res_data.ext_phy) {
+		EMACERR("External PHY is used\n");
+		return -ENODEV;
+	}
 
 	cmd_speed = ethtool_cmd_speed(cmd);
 	EMACDBG("speed: %u cmd->autoneg: %d\n", cmd_speed, cmd->autoneg);
@@ -861,6 +879,11 @@ static void DWC_ETH_QOS_get_wol(struct net_device *dev,
 		return -ENODEV;
 	}
 
+	if(dwc_eth_qos_res_data.ext_phy) {
+		EMACERR("External PHY is used\n");
+		return -ENODEV;
+	}
+
 	phy_ethtool_get_wol(pdata->phydev, wol);
 
 	spin_lock_irq(&pdata->lock);
@@ -894,6 +917,11 @@ static int DWC_ETH_QOS_set_wol(struct net_device *dev,
 	struct DWC_ETH_QOS_prv_data *pdata = netdev_priv(dev);
 	u32 emac_wol_support = WAKE_MAGIC | WAKE_UCAST;
 	int ret = 0;
+
+	if(dwc_eth_qos_res_data.ext_phy) {
+		EMACERR("External PHY is used\n");
+		return -ENODEV;
+	}
 
 	if (dwc_eth_qos_res_data.mac2mac_en || !pdata->phydev) {
 		EMACERR("%s: Phy is not registered\n", dev->name);
@@ -1195,7 +1223,7 @@ static void DWC_ETH_QOS_get_ethtool_stats(
 	}
 
 	/* update phy reg read val*/
-	if(!dwc_eth_qos_res_data.mac2mac_en) {
+	if(!dwc_eth_qos_res_data.mac2mac_en && !dwc_eth_qos_res_data.ext_phy) {
 		DWC_ETH_QOS_ethtool_phyregs_read(pdata);
 
 		for (i = 0; i < DWC_ETH_QOS_PHYREGS_READ_LEN; i++) {

@@ -497,7 +497,7 @@ static void setup_config_registers(struct DWC_ETH_QOS_prv_data *pdata,
 	else
 		hw_if->set_half_duplex();
 
-	if(!dwc_eth_qos_res_data.mac2mac_en)
+	if(!dwc_eth_qos_res_data.mac2mac_en && !dwc_eth_qos_res_data.ext_phy)
 		phydev->duplex = duplex;
 
 	pdata->oldduplex = duplex;
@@ -521,7 +521,7 @@ static void setup_config_registers(struct DWC_ETH_QOS_prv_data *pdata,
 		break;
 	}
 
-	if(!dwc_eth_qos_res_data.mac2mac_en)
+	if(!dwc_eth_qos_res_data.mac2mac_en && !dwc_eth_qos_res_data.ext_phy)
 		pdata->phydev->speed = speed;
 
 	pdata->speed  = speed;
@@ -597,6 +597,12 @@ static ssize_t loopback_handling_config(struct device *dev,
 		return -EOPNOTSUPP;
 	}
 
+	if (config == ENABLE_PHY_LOOPBACK &&
+	    dwc_eth_qos_res_data.ext_phy) {
+		EMACERR("Not supported with ext phy enabled\n");
+		return -EOPNOTSUPP;
+	}
+
 	/*Argument validation*/
 	if (config == ENABLE_IO_MACRO_LOOPBACK ||
 	    config == ENABLE_MAC_LOOPBACK || config == ENABLE_PHY_LOOPBACK) {
@@ -640,7 +646,7 @@ static ssize_t loopback_handling_config(struct device *dev,
 	    config > DISABLE_LOOPBACK) {
 		/*Backup old speed & duplex*/
 		pdata->backup_speed = pdata->speed;
-		if (dwc_eth_qos_res_data.mac2mac_en)
+		if (dwc_eth_qos_res_data.mac2mac_en || dwc_eth_qos_res_data.ext_phy)
 			pdata->backup_duplex = pdata->oldduplex;
 		else
 			pdata->backup_duplex = pdata->phydev->duplex;
@@ -722,11 +728,81 @@ static ssize_t read_loopback_config(struct device *dev,
 						"Invalid LOOPBACK Config\n");
 }
 
+static ssize_t read_ext_phy_link_status(struct device *dev,
+			    struct device_attribute *attr,
+			    char *user_buf)
+{
+	if(dwc_eth_qos_res_data.ext_phy_link)
+		return scnprintf(user_buf, 100,
+				"Link is Up");
+	else
+		return scnprintf(user_buf, 100,
+				"Link is Down");
+}
+
+static ssize_t write_ext_phy_link_status(struct device *dev,
+			      struct device_attribute *attr,
+			      const char *user_buf, size_t count)
+{
+	char *in_buf;
+	int buf_len = 2000;
+	unsigned long ret;
+	int link = 0;
+	int speed = 0;
+	int duplex = 0;
+	unsigned int val = 0;
+	int err;
+	struct net_device *ndev = to_net_dev(dev);
+	struct DWC_ETH_QOS_prv_data *pdata = netdev_priv(ndev);
+	struct hw_if_struct *hw_if = &pdata->hw_if;
+
+	ret = sscanf(user_buf, "%d", &link);
+	EMACINFO("link status = %d\n", link);
+
+	if(dwc_eth_qos_res_data.ext_phy_link == link)
+		return count;
+
+	dwc_eth_qos_res_data.ext_phy_link = link;
+	if(link == 1) {
+		switch (dwc_eth_qos_res_data.ext_phy_speed) {
+			case SPEED_1000:
+				hw_if->set_gmii_speed();
+				break;
+			case SPEED_100:
+				hw_if->set_mii_speed_100();
+				break;
+			case SPEED_10:
+				hw_if->set_mii_speed_10();
+				break;
+			default:
+				speed = SPEED_UNKNOWN;
+				EMACDBG("unknown speed\n");
+				break;
+		}
+		pdata->speed = dwc_eth_qos_res_data.ext_phy_speed;
+		DWC_ETH_QOS_fix_mac_speed(pdata, dwc_eth_qos_res_data.ext_phy_speed);
+		netif_carrier_on(ndev);
+		if (pdata->ipa_enabled && netif_running(ndev))
+				 DWC_ETH_QOS_ipa_offload_event_handler(pdata, EV_PHY_LINK_UP);
+		pdata->hw_if.start_mac_tx_rx();
+	} else if (link == 0){
+		if (pdata->ipa_enabled)
+			DWC_ETH_QOS_ipa_offload_event_handler(pdata, EV_PHY_LINK_DOWN);
+		pdata->hw_if.stop_mac_tx_rx();
+		netif_carrier_off(ndev);
+		DWC_ETH_QOS_set_clk_and_bus_config(pdata, SPEED_10);
+	}
+	return count;
+}
+
 static DEVICE_ATTR(phy_off, 0644,
 	read_phy_off, phy_off_config);
 
 static DEVICE_ATTR(loopback_enable_mode, 0644,
 	read_loopback_config, loopback_handling_config);
+
+static DEVICE_ATTR(ext_phy_link_status, 0644,
+	read_ext_phy_link_status, write_ext_phy_link_status);
 
 static ssize_t write_ipc_emac_log_ctxt_low(struct file *file,
 	const char __user *buf, size_t count, loff_t *data)
@@ -956,7 +1032,7 @@ int DWC_ETH_QOS_create_debugfs(struct DWC_ETH_QOS_prv_data *pdata)
 		return -ENOMEM;
 	}
 
-	if(!dwc_eth_qos_res_data.mac2mac_en) {
+	if(!dwc_eth_qos_res_data.mac2mac_en && !dwc_eth_qos_res_data.ext_phy) {
 		node = debugfs_create_file("phy_reg_dump", S_IRUSR, pdata->debugfs_dir,
 					pdata, &fops_phy_reg_dump);
 		if (!node || IS_ERR(node)) {
@@ -1589,15 +1665,27 @@ static int DWC_ETH_QOS_get_dts_config(struct platform_device *pdev)
 		EMACDBG("ptp_pps_avb_class_b_irq = %d\n", dwc_eth_qos_res_data.ptp_pps_avb_class_b_irq);
 	}
 
+	if (of_property_read_bool(pdev->dev.of_node, "ext-phy"))
+		dwc_eth_qos_res_data.ext_phy = 1;
+
+	if (of_property_read_u32(pdev->dev.of_node, "ext-phy-speed",
+				 &dwc_eth_qos_res_data.ext_phy_speed))
+		dwc_eth_qos_res_data.ext_phy_speed = -1;
+	else
+		EMACINFO("ext-phy-speed = %d\n",
+			   dwc_eth_qos_res_data.ext_phy_speed);
+
 	dwc_eth_qos_res_data.early_eth_en = 0;
-	if(pparams.is_valid_mac_addr &&
-	   (pparams.is_valid_ipv4_addr || pparams.is_valid_ipv6_addr)) {
-		/* For 1000BASE-T mode, auto-negotiation is required and
+	if(!dwc_eth_qos_res_data.ext_phy) {
+		if(pparams.is_valid_mac_addr &&
+	    	(pparams.is_valid_ipv4_addr || pparams.is_valid_ipv6_addr)) {
+			/* For 1000BASE-T mode, auto-negotiation is required and
 			always used to establish a link.
 			Configure phy and MAC in 100Mbps mode with autoneg disable
 			as link up takes more time with autoneg enabled  */
-		dwc_eth_qos_res_data.early_eth_en = 1;
-		EMACINFO("Early ethernet is enabled\n");
+			dwc_eth_qos_res_data.early_eth_en = 1;
+			EMACINFO("Early ethernet is enabled\n");
+		}
 	}
 
 	dwc_eth_qos_res_data.phyad_change = 0;
@@ -1626,7 +1714,7 @@ static int DWC_ETH_QOS_get_dts_config(struct platform_device *pdev)
 		EMACINFO("mac2mac rgmii speed = %d\n",
 			   dwc_eth_qos_res_data.mac2mac_rgmii_speed);
 
-	if(!dwc_eth_qos_res_data.mac2mac_en) {
+	if(!dwc_eth_qos_res_data.mac2mac_en && !dwc_eth_qos_res_data.ext_phy) {
 		ret = DWC_ETH_QOS_get_phy_intr_config(pdev);
 		if (ret)
 			goto err_out;
@@ -1636,12 +1724,12 @@ static int DWC_ETH_QOS_get_dts_config(struct platform_device *pdev)
 	ret = DWC_ETH_QOS_get_per_ch_config(pdev);
 #endif
 
-	if (of_property_read_bool(pdev->dev.of_node, "qcom,phy-intr-redirect")) {
-		dwc_eth_qos_res_data.is_gpio_phy_intr_redirect = true;
-		EMACDBG("qcom,phy-intr-redirect 124 present\n");
-	}
+	if(!dwc_eth_qos_res_data.ext_phy && !dwc_eth_qos_res_data.mac2mac_en) {
+		if (of_property_read_bool(pdev->dev.of_node, "qcom,phy-intr-redirect")) {
+			dwc_eth_qos_res_data.is_gpio_phy_intr_redirect = true;
+			EMACDBG("qcom,phy-intr-redirect 124 present\n");
+		}
 
-	if(!dwc_eth_qos_res_data.mac2mac_en) {
 		if (of_property_read_bool(pdev->dev.of_node, "qcom,phy-reset")) {
 			dwc_eth_qos_res_data.is_gpio_phy_reset = true;
 			EMACDBG("qcom,phy-reset present\n");
@@ -2211,12 +2299,13 @@ static void DWC_ETH_QOS_disable_regulators(void)
 		dwc_eth_qos_res_data.reg_rgmii = NULL;
 	}
 
-	if (dwc_eth_qos_res_data.reg_emac_phy) {
-		regulator_disable(dwc_eth_qos_res_data.reg_emac_phy);
-		devm_regulator_put(dwc_eth_qos_res_data.reg_emac_phy);
-		dwc_eth_qos_res_data.reg_emac_phy = NULL;
+	if(!dwc_eth_qos_res_data.ext_phy) {
+		if (dwc_eth_qos_res_data.reg_emac_phy) {
+			regulator_disable(dwc_eth_qos_res_data.reg_emac_phy);
+			devm_regulator_put(dwc_eth_qos_res_data.reg_emac_phy);
+			dwc_eth_qos_res_data.reg_emac_phy = NULL;
+		}
 	}
-
 	if (dwc_eth_qos_res_data.reg_rgmii_io_pads) {
 		regulator_disable(dwc_eth_qos_res_data.reg_rgmii_io_pads);
 		devm_regulator_put(dwc_eth_qos_res_data.reg_rgmii_io_pads);
@@ -2251,37 +2340,38 @@ static int DWC_ETH_QOS_init_regulators(struct device *dev)
 		EMACDBG("Enabled <%s>\n", EMAC_GDSC_EMAC_NAME);
 	}
 
-	if (of_property_read_bool(dev->of_node, "vreg_emac_phy-supply")) {
-		dwc_eth_qos_res_data.reg_emac_phy =
-			devm_regulator_get(dev, EMAC_VREG_EMAC_PHY_NAME);
-		if (IS_ERR(dwc_eth_qos_res_data.reg_emac_phy)) {
-			EMACERR("Cannot get <%s>\n", EMAC_VREG_EMAC_PHY_NAME);
-			ret = PTR_ERR(dwc_eth_qos_res_data.reg_emac_phy);
-			goto reg_error;
-		}
-		if (dwc_eth_qos_res_data.phyad_change) {
-			/* Specific load needs to be voted for vreg_emac_phy-supply in this case*/
-			ret = regulator_set_load(dwc_eth_qos_res_data.reg_emac_phy, 1000);
-			if (ret < 0) {
-				EMACERR("Unable to set HPM of vreg_emac_phy:%d\n", ret);
+	if(!dwc_eth_qos_res_data.ext_phy) {
+		if (of_property_read_bool(dev->of_node, "vreg_emac_phy-supply")) {
+			dwc_eth_qos_res_data.reg_emac_phy =
+				devm_regulator_get(dev, EMAC_VREG_EMAC_PHY_NAME);
+			if (IS_ERR(dwc_eth_qos_res_data.reg_emac_phy)) {
+				EMACERR("Cannot get <%s>\n", EMAC_VREG_EMAC_PHY_NAME);
+				ret = PTR_ERR(dwc_eth_qos_res_data.reg_emac_phy);
 				goto reg_error;
 			}
-			/* Specific voltage needs to be voted for vreg_emac_phy-supply in this case*/
-			ret = regulator_set_voltage(dwc_eth_qos_res_data.reg_emac_phy, 3075000,
-								3200000);
+			if (dwc_eth_qos_res_data.phyad_change) {
+				/* Specific load needs to be voted for vreg_emac_phy-supply in this case*/
+				ret = regulator_set_load(dwc_eth_qos_res_data.reg_emac_phy, 1000);
+				if (ret < 0) {
+					EMACERR("Unable to set HPM of vreg_emac_phy:%d\n", ret);
+					goto reg_error;
+				}
+				/* Specific voltage needs to be voted for vreg_emac_phy-supply in this case*/
+				ret = regulator_set_voltage(dwc_eth_qos_res_data.reg_emac_phy, 3075000,
+									3200000);
+				if (ret) {
+					EMACERR("Unable to set voltage for vreg_emac_phy:%d\n", ret);
+					goto reg_error;
+				}
+			}
+			ret = regulator_enable(dwc_eth_qos_res_data.reg_emac_phy);
 			if (ret) {
-				EMACERR("Unable to set voltage for vreg_emac_phy:%d\n", ret);
+				EMACERR("Can not enable <%s>\n", EMAC_VREG_EMAC_PHY_NAME);
 				goto reg_error;
 			}
+			EMACDBG("Enabled <%s>\n",EMAC_VREG_EMAC_PHY_NAME );
 		}
-		ret = regulator_enable(dwc_eth_qos_res_data.reg_emac_phy);
-		if (ret) {
-			EMACERR("Can not enable <%s>\n", EMAC_VREG_EMAC_PHY_NAME);
-			goto reg_error;
-		}
-		EMACDBG("Enabled <%s>\n",EMAC_VREG_EMAC_PHY_NAME );
 	}
-
 	if (of_property_read_bool(dev->of_node, "vreg_rgmii_io_pads-supply")) {
 		dwc_eth_qos_res_data.reg_rgmii_io_pads =
 			devm_regulator_get(dev, EMAC_VREG_RGMII_IO_PADS_NAME);
@@ -2513,7 +2603,7 @@ static int DWC_ETH_QOS_init_gpios(struct device *dev)
 		}
 	}
 
-	if(!dwc_eth_qos_res_data.mac2mac_en) {
+	if(!dwc_eth_qos_res_data.ext_phy && !dwc_eth_qos_res_data.mac2mac_en) {
 		if (dwc_eth_qos_res_data.is_gpio_phy_reset &&
 			!dwc_eth_qos_res_data.phyad_change) {
 			ret = setup_gpio_output_common(
@@ -3237,7 +3327,7 @@ static int DWC_ETH_QOS_configure_netdevice(struct platform_device *pdev)
 	pdata->rgmii_reg_base_address =
 		dwc_eth_qos_res_data.rgmii_mem_base;
 
-	if(!dwc_eth_qos_res_data.mac2mac_en) {
+	if(!dwc_eth_qos_res_data.mac2mac_en && !dwc_eth_qos_res_data.ext_phy) {
 		if (of_property_read_bool(pdev->dev.of_node,
 				"emac-phy-off-suspend")) {
 			/* Read emac core version value from dtsi */
@@ -3320,7 +3410,7 @@ static int DWC_ETH_QOS_configure_netdevice(struct platform_device *pdev)
 	EMACDBG("EMAC Bit mask is %d\n", dma_bit_mask);
 
 	/* Get WOL status from device tree */
-	if(!dwc_eth_qos_res_data.mac2mac_en)
+	if(!dwc_eth_qos_res_data.mac2mac_en && !dwc_eth_qos_res_data.ext_phy)
 		pdata->en_wol = of_property_read_bool(pdev->dev.of_node,
 						      "enable-wol");
 
@@ -3348,12 +3438,12 @@ static int DWC_ETH_QOS_configure_netdevice(struct platform_device *pdev)
 
 	pdata->interface = DWC_ETH_QOS_get_io_macro_phy_interface(pdata);
 
-	if(!dwc_eth_qos_res_data.mac2mac_en)
+	if(!dwc_eth_qos_res_data.mac2mac_en && !dwc_eth_qos_res_data.ext_phy)
 		pdata->enable_phy_intr = phy_interrupt_en;
 
 	DWC_ETH_QOS_mac_rec_init(pdata);
 	/* Bypass PHYLIB for TBI, RTBI and SGMII interface */
-	if(!dwc_eth_qos_res_data.mac2mac_en) {
+	if(!dwc_eth_qos_res_data.mac2mac_en && !dwc_eth_qos_res_data.ext_phy) {
 		if (pdata->hw_feat.sma_sel == 1) {
 			do {
 			ret = DWC_ETH_QOS_mdio_register(dev);
@@ -3373,7 +3463,7 @@ static int DWC_ETH_QOS_configure_netdevice(struct platform_device *pdev)
 
 #ifndef DWC_ETH_QOS_CONFIG_PGTEST
 	/* enabling and registration of irq with magic wakeup */
-	if(!dwc_eth_qos_res_data.mac2mac_en) {
+	if(!dwc_eth_qos_res_data.mac2mac_en && !dwc_eth_qos_res_data.ext_phy) {
 		if (pdata->hw_feat.mgk_sel == 1) {
 			device_set_wakeup_capable(&pdev->dev, 1);
 			pdata->wolopts = WAKE_MAGIC;
@@ -3551,7 +3641,7 @@ static int DWC_ETH_QOS_configure_netdevice(struct platform_device *pdev)
  err_out_pg_failed:
 #endif
 	if (pdata->hw_feat.sma_sel == 1) {
-		if(!dwc_eth_qos_res_data.mac2mac_en)
+		if(!dwc_eth_qos_res_data.mac2mac_en && !dwc_eth_qos_res_data.ext_phy)
 			DWC_ETH_QOS_mdio_unregister(dev);
 	}
 
@@ -3891,7 +3981,7 @@ int DWC_ETH_QOS_remove(struct platform_device *pdev)
 
 	DWC_ETH_QOS_remove_emac_rec_device_node(pdata);
 
-	if (pdata->hw_feat.sma_sel == 1)
+	if (!dwc_eth_qos_res_data.ext_phy && pdata->hw_feat.sma_sel == 1)
 		DWC_ETH_QOS_mdio_unregister(dev);
 
 #ifdef DWC_ETH_QOS_CONFIG_PTP
@@ -3933,7 +4023,8 @@ int DWC_ETH_QOS_remove(struct platform_device *pdev)
 	DWC_ETH_QOS_disable_clks(&pdev->dev);
 	DWC_ETH_QOS_disable_ptp_clk(&pdev->dev);
 	DWC_ETH_QOS_disable_regulators();
-	DWC_ETH_QOS_free_gpios();
+	if(!dwc_eth_qos_res_data.ext_phy)
+		DWC_ETH_QOS_free_gpios();
 	DWC_ETH_QOS_iounmap();
 
 	EMACDBG("<-- DWC_ETH_QOS_remove\n");
@@ -3959,6 +4050,12 @@ int DWC_ETH_QOS_remove_sysfs(struct platform_device *pdev)
 			  &dev_attr_loopback_enable_mode.attr);
 	EMACDBG("loopback_enable_mode sysfs node removed successfully\n");
 
+	if(dwc_eth_qos_res_data.ext_phy) {
+		sysfs_remove_file(&netdev->dev.kobj,
+					  &dev_attr_ext_phy_link_status.attr);
+
+			EMACINFO("ext_phy_link_status sysfs node removed\n");
+	}
 	return 0;
 }
 
@@ -3974,7 +4071,7 @@ int DWC_ETH_QOS_create_sysfs(struct platform_device *pdev)
 		return -EINVAL;
 	}
 
-	if(!dwc_eth_qos_res_data.mac2mac_en) {
+	if(!dwc_eth_qos_res_data.mac2mac_en && !dwc_eth_qos_res_data.ext_phy) {
 		ret = sysfs_create_file(&netdev->dev.kobj,
 						&dev_attr_phy_off.attr);
 		if (ret) {
@@ -3991,6 +4088,16 @@ int DWC_ETH_QOS_create_sysfs(struct platform_device *pdev)
 		goto fail;
 	}
 	EMACDBG("loopback_enable_mode sysfs node created successfully\n");
+
+	if(dwc_eth_qos_res_data.ext_phy) {
+		ret = sysfs_create_file(&netdev->dev.kobj,
+					&dev_attr_ext_phy_link_status.attr);
+		if (ret) {
+			EMACERR("unable to create ext_phy_link_status sysfs node\n");
+			goto fail;
+		}
+		EMACERR("ext_phy_link_status sysfs node created successfully\n");
+	}
 
 	return ret;
 
@@ -4115,6 +4222,14 @@ static INT DWC_ETH_QOS_suspend(struct platform_device *pdev, pm_message_t state)
 			DWC_ETH_QOS_phy_power_off(pdata);
 		}
 	}
+
+	if(dwc_eth_qos_res_data.ext_phy) {
+		sysfs_remove_file(&dev->dev.kobj,
+				  &dev_attr_ext_phy_link_status.attr);
+
+		EMACDBG("ext_phy_link_status sysfs node removed\n");
+	}
+
 	pdata->print_kpi = 0;
 	EMACKPI("M - Ethernet suspend end");
 	EMACDBG("<--DWC_ETH_QOS_suspend ret = %d\n", ret);
@@ -4203,6 +4318,15 @@ static INT DWC_ETH_QOS_resume(struct platform_device *pdev)
 		DWC_ETH_QOS_mac2mac_adjust_link(dwc_eth_qos_res_data.mac2mac_rgmii_speed, pdata);
 		dwc_eth_qos_res_data.mac2mac_link = 1;
 		netif_carrier_on(dev);
+	}
+
+	if(dwc_eth_qos_res_data.ext_phy) {
+		ret = sysfs_create_file(&dev->dev.kobj,
+					&dev_attr_ext_phy_link_status.attr);
+		if (ret) {
+			EMACERR("unable to create ext_phy_link_status sysfs node\n");
+		} else
+			EMACDBG("ext_phy_link_status sysfs node created successfully\n");
 	}
 
 	EMACKPI("M - Ethernet resume end");
