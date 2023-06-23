@@ -5,6 +5,7 @@
 #include "ecpri_oxtor_core.h"
 #include "ecpri_oxtor_rx.h"
 #include "ecpri_oxtor_hal.h"
+#include "ecpri_oxtor_log.h"
 
 ecpri_oxtor_rx_ring_cntxt_s ecpri_oxtor_rx_ring_cnxt;
 
@@ -39,7 +40,7 @@ int ecpri_oxtor_rx_get_stats(u32 ring_id)
 
 	ring_ptr->ring_stats.recv_pkts_cnt = pkt_cnt.pkt_cnt;
 
-	pr_info("RX: count[%d] %d\n",ring_id,pkt_cnt.pkt_cnt);
+	ECPRISS_OXTOR_LOG_INFO("RX: count[%d] %d\n",ring_id,pkt_cnt.pkt_cnt);
 return ecpri_oxtor_rx_ring_cnxt.ring_arr[ring_id].ring_stats.recv_pkts_cnt;
 }
 

@@ -17,8 +17,9 @@
 #include "ecpri_oxtor_rx.h"
 #include "ecpri_oxtor_cache.h"
 #include "ecpri_oxtor_debugfs.h"
+#include "ecpri_oxtor_log.h"
 
-#define ECPRISS_CORE_IPC_LOG_PAGES   50
+#define ECPRI_OXTOR_IPC_LOG_PAGES   50
 #define DEVICE_NAME "ecpri_oxtor"
 #define MOD_INC_USE_COUNT
 #define MOD_DEC_USE_COUNT
@@ -32,6 +33,8 @@ ecpri_oxtor_cache g_cache;
 ecpri_oxtor_stats_s stats_data;
 
 ecpri_oxtor_core_cntxt_s     ecpri_oxtor_core_cntxt;
+ecpri_oxtor_core_cntxt_s *ecpri_oxtor_core_context = &ecpri_oxtor_core_cntxt;
+
 ecpri_oxtor_irq_wq_params_s  irq_wq_s;
 char* ecpri_oxtor_interface_name = DEVICE_NAME;
 
@@ -50,7 +53,7 @@ static int ecpri_oxtor_core_ioctl_init(void);
 static void ecpri_oxtor_free_cmd(ecpri_oxtor_core_cfg_s *oxtor_cmd)
 {
 	if(!oxtor_cmd){
-		pr_err("Null Pointer \n");
+		ECPRISS_OXTOR_LOG_ERR("Null Pointer \n");
 		return;
 	}
 	if(oxtor_cmd->tx_cmd_cfg){
@@ -64,7 +67,7 @@ static void ecpri_oxtor_init_cache(ecpri_oxtor_cache *oxtor_cache)
 	int i = 0;
 
 	if(!oxtor_cache){
-		pr_err("Null Pointer oxtor_cache \n");
+		ECPRISS_OXTOR_LOG_ERR("Null Pointer oxtor_cache \n");
 		return;
 	}
 	memset(oxtor_cache, 0,sizeof(ecpri_oxtor_cache));
@@ -77,7 +80,7 @@ static void ecpri_oxtor_init_cache(ecpri_oxtor_cache *oxtor_cache)
 		oxtor_cache->cache_info[i].data.ioctl_cmd_state =
 			ECPRI_OXTOR_IOCTL_DEFAULT_S;
 	}
-	pr_info("GLobal Cache init phase done\n");
+	ECPRISS_OXTOR_LOG_INFO("GLobal Cache init phase done\n");
 	return;
 }
 
@@ -91,14 +94,14 @@ static int ecpri_oxtor_core_open(struct inode *inode, struct file *filp)
 	ecpri_oxtor_core_cntxt.device_info.ref++;
 	MOD_INC_USE_COUNT;
 
-	pr_info("ecpri_oxtor device file open\n");
+	ECPRISS_OXTOR_LOG_INFO("ecpri_oxtor device file open\n");
 
 	return 0;
 }
 
 static int ecpri_oxtor_core_release(struct inode *inode, struct file *filp)
 {
-	pr_info("ecpri_oxtor device file closed\n");
+	ECPRISS_OXTOR_LOG_INFO("ecpri_oxtor device file closed\n");
 
 	ecpri_oxtor_core_cntxt.device_info.ref--;
 
@@ -134,7 +137,7 @@ static int ecpri_oxtor_core_init(void)
 
 	ecpri_oxtor_core_cntxt_s  *core_cntxt_ptr = &ecpri_oxtor_core_cntxt;
 
-	pr_info(" Executing oxtor core init \n");
+	ECPRISS_OXTOR_LOG_INFO(" Executing oxtor core init \n");
 
 	/* Initialize ecpriss_oxtor_hal_ctx */
 
@@ -160,7 +163,7 @@ function to enable bits of kbyte_cnt_control register
 	ecpri_oran_xtor_hwio_def_ecpri_oran_xtor_rx_kbyte_cnt_ctl_s reg_obj_s;
 	reg_obj_s.clr = clear;
 	reg_obj_s.en = enable;
-	pr_err("function: ecpri_oxtor_kb_cnt_ctl_register_write: clear=%d, enable=%d\n",clear,enable);
+	ECPRISS_OXTOR_LOG_ERR("function: ecpri_oxtor_kb_cnt_ctl_register_write: clear=%d, enable=%d\n",clear,enable);
 	ecpriss_oxtor_hal_write_reg_n_fields(ECPRI_OXTOR_REG_TYPE_BASE,
 	ECPRI_ORAN_XTOR_RX_KBYTE_CNT_CTL ,0, &reg_obj_s);
 	return 0;
@@ -173,50 +176,58 @@ static int ecpri_oxtor_init(struct platform_device *pdev)
 	memset(&ecpri_oxtor_core_cntxt,0,sizeof(ecpri_oxtor_core_cntxt_s));
 
 	do {
+		ecpri_oxtor_core_cntxt.ecpri_oxtor_logbuf =
+			ipc_log_context_create(ECPRI_OXTOR_IPC_LOG_PAGES,
+                "ecpri_oxtor", 0);
+
+		if(ecpri_oxtor_core_cntxt.ecpri_oxtor_logbuf == NULL){
+			ECPRISS_OXTOR_LOG_ERR("Failed to create log context for ecpri_oxtor\n");
+			break;
+		}
 
 		ret = ecpri_oxtor_core_ioctl_init();
 		if(ret < 0) {
-			pr_err("Ioctl init failed\n");
+			ECPRISS_OXTOR_LOG_ERR("Ioctl init failed\n");
 			break;
 		}
 
 		ret = of_property_read_u32(pdev->dev.of_node, "qcom,ecpri-oxtor-hw-ver",
 				      &ecpri_oxtor_core_cntxt.hw_ver);
 		if(ret < 0) {
-			pr_err("Reading HW Version Failed\n");
+			ECPRISS_OXTOR_LOG_ERR("Reading HW Version Failed\n");
 			break;
 		}
 
-		pr_err("ecpri_oxtor: HW Ver %d\n",ecpri_oxtor_core_cntxt.hw_ver);
+		ECPRISS_OXTOR_LOG_ERR("ecpri_oxtor: HW Ver %d\n",ecpri_oxtor_core_cntxt.hw_ver);
 
 		ret = ecpri_oxtor_core_init();
 		if(ret < 0) {
-			pr_err("Work queue init failed\n");
+			ECPRISS_OXTOR_LOG_ERR("Work queue init failed\n");
 			break;
 		}
 		/*
 		   ret = ecpri_oxtor_workq_init();
 		   if(ret < 0) {
-		   pr_err("Work queue init failed\n");
+		   ECPRISS_OXTOR_LOG_ERR("Work queue init failed\n");
 		   break;
 		   }
 		   */
 		ret = ecpri_oxtor_tx_init();
 		if(ret < 0) {
-			pr_err("Tx Init failed\n");
+			ECPRISS_OXTOR_LOG_ERR("Tx Init failed\n");
 			break;
 		}
 		else{
-			pr_err("ecpri_oxtor_tx_init()\n");
+			ECPRISS_OXTOR_LOG_ERR("ecpri_oxtor_tx_init()\n");
 		}
 
 		ret = ecpri_oxtor_rx_init();
 		if(ret < 0) {
-			pr_err("Tx Init failed\n");
+			ECPRISS_OXTOR_LOG_ERR("Tx Init failed\n");
 			break;
 		}
 		else{
-			pr_err("ecpri_oxtor_rx_init()\n");
+			ECPRISS_OXTOR_LOG_ERR("ecpri_oxtor_rx_init()\n");
 		}
 
 		/* Init Global cache */
@@ -232,20 +243,20 @@ static int ecpri_oxtor_core_validate_config(ecpri_oxtor_core_cfg_s *var)
 	u8 i = 0;
 
 	if(!var){
-		pr_err("Null Pointer var \n");
+		ECPRISS_OXTOR_LOG_ERR("Null Pointer var \n");
 		return -1;
 	}
 	if (var->test_mode < ECPRI_OXTOR_TEST_MODE_TX_ONLY ||
 			var->test_mode > ECPRI_OXTOR_TEST_MODE_MAX){
-		pr_err("Ivalid Data var->test_mode = %d\n", var->test_mode);
+		ECPRISS_OXTOR_LOG_ERR("Ivalid Data var->test_mode = %d\n", var->test_mode);
 		return -1;
 	}
 	if (var->num_cmds < 0 || var->num_cmds > U32_MAX){
-		pr_err("Ivalid Data var->num_cmds = %d\n", var->num_cmds);
+		ECPRISS_OXTOR_LOG_ERR("Ivalid Data var->num_cmds = %d\n", var->num_cmds);
 		return -1;
 	}
 	if (var->tx_cmd_cfg == NULL){
-		pr_err("Null Pointer var->tx_cmd_cfg \n");
+		ECPRISS_OXTOR_LOG_ERR("Null Pointer var->tx_cmd_cfg \n");
 		return -1;
 	}
 
@@ -253,14 +264,14 @@ static int ecpri_oxtor_core_validate_config(ecpri_oxtor_core_cfg_s *var)
 
 		if (var->tx_cmd_cfg[i].pkt_cfg.xu_id < 0  ||
 				var->tx_cmd_cfg[i].pkt_cfg.xu_id > U32_MAX){
-			pr_err("Invalid var->tx_cmd_cfg[%d].pkt_cfg.xu_id ="
+			ECPRISS_OXTOR_LOG_ERR("Invalid var->tx_cmd_cfg[%d].pkt_cfg.xu_id ="
 					"%d\n",i,
 					var->tx_cmd_cfg[i].pkt_cfg.xu_id);
 			return -1;
 		}
 		if (var->tx_cmd_cfg[i].pkt_cfg.pkt_len < 0  ||
 				var->tx_cmd_cfg[i].pkt_cfg.pkt_len > U16_MAX){
-			pr_err("Invalid var->tx_cmd_cfg[%d].pkt_cfg.pkt_len ="
+			ECPRISS_OXTOR_LOG_ERR("Invalid var->tx_cmd_cfg[%d].pkt_cfg.pkt_len ="
 					"%d\n",i,
 					var->tx_cmd_cfg[i].pkt_cfg.pkt_len);
 			return -1;
@@ -268,7 +279,7 @@ static int ecpri_oxtor_core_validate_config(ecpri_oxtor_core_cfg_s *var)
 		if (var->tx_cmd_cfg[i].pkt_cfg.inter_pkt_delay < 0  ||
 				var->tx_cmd_cfg[i].pkt_cfg.inter_pkt_delay >
 				U16_MAX){
-			pr_err("Invalid"
+			ECPRISS_OXTOR_LOG_ERR("Invalid"
 				"var->tx_cmd_cfg[%d].pkt_cfg.inter_pkt_delay ="
 				"%d\n",i,
 				var->tx_cmd_cfg[i].pkt_cfg.inter_pkt_delay);
@@ -277,7 +288,7 @@ static int ecpri_oxtor_core_validate_config(ecpri_oxtor_core_cfg_s *var)
 		if (var->tx_cmd_cfg[i].pkt_cfg.init_data < 0  ||
 				var->tx_cmd_cfg[i].pkt_cfg.inter_pkt_delay >
 				U32_MAX){
-			pr_err("Invalid var->tx_cmd_cfg[%d].pkt_cfg.init_data ="
+			ECPRISS_OXTOR_LOG_ERR("Invalid var->tx_cmd_cfg[%d].pkt_cfg.init_data ="
 					"%d\n",i,
 					var->tx_cmd_cfg[i].pkt_cfg.init_data);
 			return -1;
@@ -285,7 +296,7 @@ static int ecpri_oxtor_core_validate_config(ecpri_oxtor_core_cfg_s *var)
 		if (var->tx_cmd_cfg[i].pkt_cfg.ecpri_msg_type < 0  ||
 				var->tx_cmd_cfg[i].pkt_cfg.ecpri_msg_type >
 				U8_MAX){
-			pr_err("Invalid"
+			ECPRISS_OXTOR_LOG_ERR("Invalid"
 				"var->tx_cmd_cfg[%d].pkt_cfg.ecpri_msg_type ="
 				"%d\n",i,
 				var->tx_cmd_cfg[i].pkt_cfg.ecpri_msg_type);
@@ -294,14 +305,14 @@ static int ecpri_oxtor_core_validate_config(ecpri_oxtor_core_cfg_s *var)
 		if (var->tx_cmd_cfg[i].pkt_cfg.ring_wrap_en < 0  ||
 				var->tx_cmd_cfg[i].pkt_cfg.ring_wrap_en >
 				U8_MAX){
-			pr_err("Invali var->tx_cmd_cfg[%d].pkt_cfg.ring_wrap_en"
+			ECPRISS_OXTOR_LOG_ERR("Invali var->tx_cmd_cfg[%d].pkt_cfg.ring_wrap_en"
 				"= %d\n",
 				var->tx_cmd_cfg[i].pkt_cfg.ring_wrap_en);
 			return -1;
 		}
 		if (var->tx_cmd_cfg[i].flow_cfg.pcid < 0  ||
 				var->tx_cmd_cfg[i].flow_cfg.pcid > U16_MAX){
-			pr_err("Invalid var->tx_cmd_cfg[%d].flow_cfg.pcid ="
+			ECPRISS_OXTOR_LOG_ERR("Invalid var->tx_cmd_cfg[%d].flow_cfg.pcid ="
 					"%d\n",i,
 					var->tx_cmd_cfg[i].flow_cfg.pcid);
 			return -1;
@@ -310,7 +321,7 @@ static int ecpri_oxtor_core_validate_config(ecpri_oxtor_core_cfg_s *var)
 				ECPRI_OXTOR_CORE_LINK_ID_PORT_TYPE_FH  ||
 				var->tx_cmd_cfg[i].flow_cfg.port_type >
 				ECPRI_OXTOR_CORE_LINK_ID_PORT_TYPE_OC){
-			pr_err("Invalid var->tx_cmd_cfg[%d].flow_cfg.port_type="
+			ECPRISS_OXTOR_LOG_ERR("Invalid var->tx_cmd_cfg[%d].flow_cfg.port_type="
 					"%d\n",i,
 					var->tx_cmd_cfg[i].flow_cfg.pcid);
 			return -1;
@@ -319,7 +330,7 @@ static int ecpri_oxtor_core_validate_config(ecpri_oxtor_core_cfg_s *var)
 				ECPRI_OXTOR_CORE_LINK_ID_PORT_0  ||
 				var->tx_cmd_cfg[i].flow_cfg.port_type >
 				ECPRI_OXTOR_CORE_LINK_ID_PORT_2){
-			pr_err("Invalid var->tx_cmd_cfg[%d].flow_cfg.port_idx ="
+			ECPRISS_OXTOR_LOG_ERR("Invalid var->tx_cmd_cfg[%d].flow_cfg.port_idx ="
 					"%d\n",i,
 					var->tx_cmd_cfg[i].flow_cfg.port_idx);
 			return -1;
@@ -328,7 +339,7 @@ static int ecpri_oxtor_core_validate_config(ecpri_oxtor_core_cfg_s *var)
 				ECPRI_OXTOR_CORE_LINK_ID_INDEX_0  ||
 				var->tx_cmd_cfg[i].flow_cfg.link_idx >
 				ECPRI_OXTOR_CORE_LINK_ID_INDEX_3){
-			pr_err("Invalid var->tx_cmd_cfg[%d].flow_cfg.link_idx ="
+			ECPRISS_OXTOR_LOG_ERR("Invalid var->tx_cmd_cfg[%d].flow_cfg.link_idx ="
 					"%d\n",i,
 					var->tx_cmd_cfg[i].flow_cfg.link_idx);
 			return -1;
@@ -336,7 +347,7 @@ static int ecpri_oxtor_core_validate_config(ecpri_oxtor_core_cfg_s *var)
 		if (var->tx_cmd_cfg[i].flow_cfg.tx_oc_link_id < 0  ||
 				var->tx_cmd_cfg[i].flow_cfg.tx_oc_link_id >
 				U32_MAX){
-			pr_err("Invalid"
+			ECPRISS_OXTOR_LOG_ERR("Invalid"
 				"var->tx_cmd_cfg[%d].flow_cfg.tx_oc_link_id ="
 				"%d\n",i,
 				var->tx_cmd_cfg[i].flow_cfg.tx_oc_link_id);
@@ -344,7 +355,7 @@ static int ecpri_oxtor_core_validate_config(ecpri_oxtor_core_cfg_s *var)
 		}
 		if (var->tx_cmd_cfg[i].pkt_cfg.xu_id < 0  ||
 				var->tx_cmd_cfg[i].pkt_cfg.xu_id > U32_MAX){
-			pr_err("Invalid"
+			ECPRISS_OXTOR_LOG_ERR("Invalid"
 				"var->tx_cmd_cfg[%d].flow_cfg.rx_oc_link_id ="
 				"%d\n",i,
 				var->tx_cmd_cfg[i].flow_cfg.rx_oc_link_id);
@@ -353,7 +364,7 @@ static int ecpri_oxtor_core_validate_config(ecpri_oxtor_core_cfg_s *var)
 	}
 
 	if (var->rx_cfg.dummy < 0  || var->rx_cfg.dummy > U32_MAX){
-		pr_err("Invalid var->rx_cfg.dummy = %d\n",var->rx_cfg.dummy);
+		ECPRISS_OXTOR_LOG_ERR("Invalid var->rx_cfg.dummy = %d\n",var->rx_cfg.dummy);
 		return -1;
 	}
 	return 0;
@@ -388,12 +399,12 @@ static long ecpri_oxtor_core_ioctl_hdlr(struct file *filp, unsigned int cmd,
 					,DEVICE_NAME);
 			if(copy_from_user(&var, (ecpri_oxtor_core_cfg_s *)arg,
 						sizeof(var))){
-				pr_err("copy_from_user_failed in ioctls\n");
+				ECPRISS_OXTOR_LOG_ERR("copy_from_user_failed in ioctls\n");
 				return 0;
 			}
 			/* We can not pass more than 30 commands */
 			if(var.num_cmds < 1 || var.num_cmds >30*4){
-				pr_err("Invalid Number of commands %d \n",
+				ECPRISS_OXTOR_LOG_ERR("Invalid Number of commands %d \n",
 						var.num_cmds);
 				return 0;
 			}
@@ -402,17 +413,17 @@ static long ecpri_oxtor_core_ioctl_hdlr(struct file *filp, unsigned int cmd,
 					sizeof(ecpri_oxtor_core_tx_cmd_cfg_s),
 					GFP_KERNEL);
 			if(!var.tx_cmd_cfg){
-				pr_err("kmalloc failed \n");
+				ECPRISS_OXTOR_LOG_ERR("kmalloc failed \n");
 				return 0;
 			}
 			if(copy_from_user(var.tx_cmd_cfg, bck, var.num_cmds *
 					sizeof(ecpri_oxtor_core_tx_cmd_cfg_s))){
-				pr_err("copy_from_user_failed in ioctls\n");
+				ECPRISS_OXTOR_LOG_ERR("copy_from_user_failed in ioctls\n");
 				return 0;
 			}
 
 			for (i = 0; i < var.num_cmds; i++){
-				pr_info(
+				ECPRISS_OXTOR_LOG_INFO(
 				"var.test_mode = %d \n"
 				"var.num_cmds = %d \n\n"
 				"var.tx_cmd_cfg[%d].pkt_cfg \n\t"
@@ -460,7 +471,7 @@ static long ecpri_oxtor_core_ioctl_hdlr(struct file *filp, unsigned int cmd,
 				 * Validate the Cmd Data
 				 */
 				if (ecpri_oxtor_core_validate_config(&var)){
-					pr_err(
+					ECPRISS_OXTOR_LOG_ERR(
 					"Data we got i IOCTL is invalid \n");
 					/*
 					 * not sure about ioctl codes, need to
@@ -474,7 +485,7 @@ static long ecpri_oxtor_core_ioctl_hdlr(struct file *filp, unsigned int cmd,
 				if(0 != ecpri_oxtor_tx_ring_queue_cmd (
 				var.tx_cmd_cfg[i] ,
 				var.tx_cmd_cfg[i].flow_cfg.tx_oc_link_id)){
-					pr_err("Commit failed \n");
+					ECPRISS_OXTOR_LOG_ERR("Commit failed \n");
 					return -1;
 				}
 				if(!
@@ -507,7 +518,7 @@ static long ecpri_oxtor_core_ioctl_hdlr(struct file *filp, unsigned int cmd,
 
 			if(g_cache.cache_info[arr_idx].index != -1){
 				/* Already data present */
-				pr_info("Already data available, Free it \n");
+				ECPRISS_OXTOR_LOG_INFO("Already data available, Free it \n");
 				ecpri_oxtor_free_cmd(
 				&g_cache.cache_info[arr_idx].data.ioctl_cmds);
 				memset(
@@ -524,10 +535,10 @@ static long ecpri_oxtor_core_ioctl_hdlr(struct file *filp, unsigned int cmd,
 		case ECPRI_OXTOR_IOCTL_START :/*Commit commnads to TX packets*/
 			if(copy_from_user(&data,(ecpri_oxtor_start_cfg_s *)arg,
 						sizeof(data))){
-				pr_err("copy_from_user_failed in ioctls\n");
+				ECPRISS_OXTOR_LOG_ERR("copy_from_user_failed in ioctls\n");
 				return 0;
 			}
-			pr_info("data.start_test_mode = %d\n"
+			ECPRISS_OXTOR_LOG_INFO("data.start_test_mode = %d\n"
 					"data.num_of_cmds = %d\n"
 					"data.tx_oc_link_id = %d\n",
 					data.start_test_mode,
@@ -546,14 +557,14 @@ static long ecpri_oxtor_core_ioctl_hdlr(struct file *filp, unsigned int cmd,
 		case ECPRI_OXTOR_IOCTL_RESET : /* Reset Tx Rings */
 			if(copy_from_user(&reset_ring_id,(u32 *)arg,
 						sizeof(reset_ring_id))){
-				pr_err("copy_from_user_failed in ioctls\n");
+				ECPRISS_OXTOR_LOG_ERR("copy_from_user_failed in ioctls\n");
 				return 0;
 			}
 			/*
 			 * If Wrap mode is enabled for any of the ring id
 			 * set the flag
 			 */
-			pr_info("Resetting the oxtor and wrap mode\n");
+			ECPRISS_OXTOR_LOG_INFO("Resetting the oxtor and wrap mode\n");
 			wrap_cfg.run_mode = ECPRI_OXTOR_RING_MODE_ONE_TIME;
 			ecpri_oxtor_tx_ctl_reg_cfg(&wrap_cfg, reset_ring_id);
 
@@ -564,12 +575,12 @@ static long ecpri_oxtor_core_ioctl_hdlr(struct file *filp, unsigned int cmd,
 			ecpri_oxtor_tx_get_status(reset_ring_id);
 			stats_data.tx_count[reset_ring_id] =
 				ecpri_oxtor_tx_get_stats(reset_ring_id);
-			pr_info("TX: ring_id[ %d ], TX: stats [ %d ]\n",
+			ECPRISS_OXTOR_LOG_INFO("TX: ring_id[ %d ], TX: stats [ %d ]\n",
 					reset_ring_id,
 					stats_data.tx_count[reset_ring_id]);
 			stats_data.rx_count[reset_ring_id] =
 				ecpri_oxtor_rx_get_stats(reset_ring_id);
-			pr_info("RX: ring_id[ %d ], RX: stats [ %d ]\n",
+			ECPRISS_OXTOR_LOG_INFO("RX: ring_id[ %d ], RX: stats [ %d ]\n",
 					reset_ring_id,
 					stats_data.rx_count[reset_ring_id]);
 
@@ -599,17 +610,17 @@ static long ecpri_oxtor_core_ioctl_hdlr(struct file *filp, unsigned int cmd,
 
 			if(copy_to_user((ecpri_oxtor_stats_s *)arg, &stats_data,
 						sizeof(stats_data))){
-				pr_err("copy_to_user_failed in ioctls\n");
+				ECPRISS_OXTOR_LOG_ERR("copy_to_user_failed in ioctls\n");
 				return 0;
 			}
-			pr_info("Stats are send to application\n");
-			pr_info("Ringid   TX_count   RX_count\n");
+			ECPRISS_OXTOR_LOG_INFO("Stats are send to application\n");
+			ECPRISS_OXTOR_LOG_INFO("Ringid   TX_count   RX_count\n");
 			for(i = 0; i < 4; i++){
-				pr_info("0x0%x 0x0%x 0x0%x\n",i,
+				ECPRISS_OXTOR_LOG_INFO("0x0%x 0x0%x 0x0%x\n",i,
 						stats_data.tx_count[i],
 						stats_data.rx_count[i]);
 			}
-			pr_info("\nEND OF TABLE\n");
+			ECPRISS_OXTOR_LOG_INFO("\nEND OF TABLE\n");
 
 			/* Global cache update */
 			g_cache.cache_info[arr_idx].data.ioctl_cmd_state =
@@ -626,13 +637,13 @@ static long ecpri_oxtor_core_ioctl_hdlr(struct file *filp, unsigned int cmd,
 		case ECPRI_OXTOR_IOCTL_BANDWIDTH_ENABLE:
 			ecpri_oxtor_kb_cnt_ctl_register_write(BW_CNT_CLEAR_SET, BW_CNT_DISABLE);
 			ecpri_oxtor_kb_cnt_ctl_register_write(BW_CNT_CLEAR_RESET, BW_CNT_ENABLE);
-			pr_info("KB_CNT_REG clear bit set to 1 followed by enable bit set to 1\n");
+			ECPRISS_OXTOR_LOG_INFO("KB_CNT_REG clear bit set to 1 followed by enable bit set to 1\n");
 			break;
 
 		case ECPRI_OXTOR_IOCTL_BANDWIDTH_DISABLE:
-			pr_info("stop_bw_cal: setting enable bit to 0 for stopping Qtimer\n");
+			ECPRISS_OXTOR_LOG_INFO("stop_bw_cal: setting enable bit to 0 for stopping Qtimer\n");
 			ecpri_oxtor_kb_cnt_ctl_register_write(BW_CNT_CLEAR_RESET, BW_CNT_DISABLE);
-			pr_info("Enable bit of KBYTE_CNT_CTL register set to 0\n");
+			ECPRISS_OXTOR_LOG_INFO("Enable bit of KBYTE_CNT_CTL register set to 0\n");
 			break;
 
 
@@ -644,20 +655,20 @@ static long ecpri_oxtor_core_ioctl_hdlr(struct file *filp, unsigned int cmd,
 				tx_kbyte_received = ecpri_oxtor_tx_get_bandwidth(i);
 				if(tx_kbyte_received == -1)
 				{
-					pr_err("Ring_ptr for ring id %d is NULL\n",i);
+					ECPRISS_OXTOR_LOG_ERR("Ring_ptr for ring id %d is NULL\n",i);
 					rx_kbyte_cnt.rx_kbyte[i] = -1;
 					goto IOCTL_RET;
 				}
 				else
 					rx_kbyte_cnt.rx_kbyte[i] = tx_kbyte_received;
 			}
-			pr_info("ring_id  KB_CNT");
+			ECPRISS_OXTOR_LOG_INFO("ring_id  KB_CNT");
 
 			for(i = 0; i < 4; i++){
-				pr_info("0x0%x 0x0%x\n",i,
+				ECPRISS_OXTOR_LOG_INFO("0x0%x 0x0%x\n",i,
 						rx_kbyte_cnt.rx_kbyte[i]);
 			}
-			pr_info("End of the table");
+			ECPRISS_OXTOR_LOG_INFO("End of the table");
 
 
 			memset(&bw_timer_delta_lsb,0,sizeof(bw_timer_delta_lsb));
@@ -668,8 +679,8 @@ static long ecpri_oxtor_core_ioctl_hdlr(struct file *filp, unsigned int cmd,
 			ecpriss_oxtor_hal_read_reg_n_fields(ECPRI_ORAN_XTOR_RX_KBYTE_CNT_QTIMER_DELTA_1,0, (void*)&bw_timer_delta_msb);
 
 
-			pr_info("time register lsb value (clock diff) = 0x0%x \n",bw_timer_delta_lsb.qtimer_lsb);
-			pr_info("time register msb value =0x0%x\n",bw_timer_delta_msb.qtimer_msb);
+			ECPRISS_OXTOR_LOG_INFO("time register lsb value (clock diff) = 0x0%x \n",bw_timer_delta_lsb.qtimer_lsb);
+			ECPRISS_OXTOR_LOG_INFO("time register msb value =0x0%x\n",bw_timer_delta_msb.qtimer_msb);
 			timer_value |=bw_timer_delta_msb.qtimer_msb;
 			timer_value = timer_value << 32;
 			timer_value |= bw_timer_delta_lsb.qtimer_lsb;
@@ -677,12 +688,12 @@ static long ecpri_oxtor_core_ioctl_hdlr(struct file *filp, unsigned int cmd,
 			qtimer_bw_time_sec = timer_value / ECPRI_OXTOR_QTIMER_FREQ_HZ;
 			rx_kbyte_cnt.timer_val = qtimer_bw_time_sec;
 
-			pr_info("bw_timer_value in seconds = %lld",qtimer_bw_time_sec);
-			pr_info("timer value = 0x0%x\n",timer_value);
+			ECPRISS_OXTOR_LOG_INFO("bw_timer_value in seconds = %lld",qtimer_bw_time_sec);
+			ECPRISS_OXTOR_LOG_INFO("timer value = 0x0%x\n",timer_value);
 
 			IOCTL_RET: if(copy_to_user((ecpri_oxtor_bw_rx_kbyte_val_s *)arg, &rx_kbyte_cnt,
 						sizeof(rx_kbyte_cnt))){
-				pr_err("copy_to_user_failed in ioctls\n");
+				ECPRISS_OXTOR_LOG_ERR("copy_to_user_failed in ioctls\n");
 				return 0;
 			}
 
@@ -697,9 +708,9 @@ static long ecpri_oxtor_core_ioctl_hdlr(struct file *filp, unsigned int cmd,
 
 static int ecpri_oxtor_core_probe(struct platform_device *pdev)
 {
-	pr_info("ecpri_oxtor_core_probe()\n");
+	ECPRISS_OXTOR_LOG_INFO("ecpri_oxtor_core_probe()\n");
 	ecpri_oxtor_init(pdev);
-	pr_info("ecpri_oxtor_core_probe(): Completed\n");
+	ECPRISS_OXTOR_LOG_INFO("ecpri_oxtor_core_probe(): Completed\n");
 #ifndef NO_DEBUGFS_PERF
 	setup_debugfs_directory();
 #endif
@@ -732,7 +743,7 @@ static struct platform_driver ecpri_oxtor_core_driver = {
 
 static int __init ecpri_oxtor_core_module_init(void)
 {
-	pr_info("ecpri_oxtor_core_module_init()\n");
+	ECPRISS_OXTOR_LOG_INFO("ecpri_oxtor_core_module_init()\n");
 	return platform_driver_register(&ecpri_oxtor_core_driver);
 }
 
@@ -743,19 +754,19 @@ static int ecpri_oxtor_core_ioctl_init(void)
 
 	dev_info_ptr  = &ecpri_oxtor_core_cntxt.device_info;
 
-	pr_info("Executing ecpri_oxtor_core_ioctl_init\n");
+	ECPRISS_OXTOR_LOG_INFO("Executing ecpri_oxtor_core_ioctl_init\n");
 
 	/*Allocate Major number*/
 	if((alloc_chrdev_region(&(dev_info_ptr->ecpri_oxtor_dev), 0, 1,
 					"ecpri_oxtor")) <0){
-		pr_err("Cannot allocate major number\n");
+		ECPRISS_OXTOR_LOG_ERR("Cannot allocate major number\n");
 		return -1;
 	}
 
 	dev_info_ptr->major_num = MAJOR(dev_info_ptr->ecpri_oxtor_dev);
 	dev_info_ptr->minor_num = MINOR(dev_info_ptr->ecpri_oxtor_dev);
 
-	pr_info("Major = %d Minor = %d \n",dev_info_ptr->major_num,
+	ECPRISS_OXTOR_LOG_INFO("Major = %d Minor = %d \n",dev_info_ptr->major_num,
 			dev_info_ptr->minor_num);
 
 	/*Create cdev structure*/
@@ -767,7 +778,7 @@ static int ecpri_oxtor_core_ioctl_init(void)
 	/*Adding character device to the system*/
 	if((cdev_add(&(dev_info_ptr->ecpri_oxtor_cdev),
 					dev_info_ptr->ecpri_oxtor_dev,1)) < 0){
-		pr_err("Cannot add the device to the system\n");
+		ECPRISS_OXTOR_LOG_ERR("Cannot add the device to the system\n");
 		goto r_unreg;
 	}
 	/*Creating struct class*/
@@ -806,7 +817,7 @@ static void __exit ecpri_oxtor_core_module_exit(void)
 
 	dev_info_ptr  = &ecpri_oxtor_core_cntxt.device_info;
 
-	pr_info("ecpri oxtor driver exit!\n");
+	ECPRISS_OXTOR_LOG_INFO("ecpri oxtor driver exit!\n");
 
 	device_destroy(dev_info_ptr->dev_class,dev_info_ptr->ecpri_oxtor_dev);
 	class_destroy(dev_info_ptr->dev_class);

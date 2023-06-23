@@ -5,6 +5,7 @@
 #include "ecpri_oxtor_core.h"
 #include "ecpri_oxtor_tx.h"
 #include "ecpri_oxtor_hal.h"
+#include "ecpri_oxtor_log.h"
 
 ecpri_oxtor_tx_ring_cntxt_s ecpri_oxtor_tx_ring_cnxt;
 
@@ -101,7 +102,7 @@ int ecpri_oxtor_tx_ctl_reg_cfg(const ecpri_oxtor_tx_ring_config_s* cfg ,
 	ring_ptr = &ecpri_oxtor_tx_ring_cnxt.ring_arr[ring_id];
 	if (NULL == cfg)
 	{
-		pr_err("Invalid tx ring cfg");
+		ECPRISS_OXTOR_LOG_ERR("Invalid tx ring cfg");
 		WARN_ON(1);
 		return -EINVAL;
 
@@ -179,7 +180,7 @@ int ecpri_oxtor_tx_ring_reset(u32 ring_id)
 	result = ecpri_oxtor_tx_stop(ring_id, timeout_ms);
 	if(0 != result)
 	{
-		pr_err("Error in tx stop process");
+		ECPRISS_OXTOR_LOG_ERR("Error in tx stop process");
 		WARN_ON(1);
 		return -EINVAL;
 	}
@@ -296,7 +297,7 @@ int ecpri_oxtor_tx_ring_queue_cmd(ecpri_oxtor_core_tx_cmd_cfg_s user_cmd,
 	int res;
 	/* TODO: Mayank, update variables with more intutive names */
 
-	pr_err("ring_id %d \n",
+	ECPRISS_OXTOR_LOG_ERR("ring_id %d \n",
 			ring_id);
 	/* TODO: Mayank, ring management code to be there */
 	ring_ptr= &ecpri_oxtor_tx_ring_cnxt.ring_arr[ring_id];
@@ -304,12 +305,12 @@ int ecpri_oxtor_tx_ring_queue_cmd(ecpri_oxtor_core_tx_cmd_cfg_s user_cmd,
 	tx_cmd = &ring_ptr->cmd_arr[ring_ptr->wr_idx];
 	cmd_idx = ring_ptr->wr_idx;
 
-	pr_err("ecpri_oxtor_tx_ring_queue_cmd ()\n");
+	ECPRISS_OXTOR_LOG_ERR("ecpri_oxtor_tx_ring_queue_cmd ()\n");
 	pr_info("ring_ptr->numValid = %d \n", ring_ptr->numValid);
 
 	if( tx_cmd == NULL )
 	{
-		pr_err("No free tx_cmd ring to queue ");
+		ECPRISS_OXTOR_LOG_ERR("No free tx_cmd ring to queue ");
 		WARN_ON(1);
 		return -EINVAL;
 
@@ -347,12 +348,12 @@ int ecpri_oxtor_tx_ring_commit(u32 num_cmd, u32 ring_id)
 	data_idxs_reg_s;
 	ecpri_oxtor_tx_ring_s *ring_ptr = NULL;
 
-	pr_err("ecpri_oxtor_tx_ring_commit(): num_cmds %d ring_id %d \n",
+	ECPRISS_OXTOR_LOG_ERR("ecpri_oxtor_tx_ring_commit(): num_cmds %d ring_id %d \n",
 			num_cmd, ring_id);
 
 	ring_ptr= &ecpri_oxtor_tx_ring_cnxt.ring_arr[ring_id];
 
-	pr_err(
+	ECPRISS_OXTOR_LOG_ERR(
 		"m_numValid[%u] m_lastPostedIdx[%u] num_cmds_to_post[%u]",
 		ring_ptr->numValid, ring_ptr->last_commit_idx, num_cmd);
 
@@ -360,7 +361,7 @@ int ecpri_oxtor_tx_ring_commit(u32 num_cmd, u32 ring_id)
 	 * what was submitted to hw ring mem */
 	if ( (ring_ptr->numValid - ring_ptr->last_commit_idx ) < num_cmd )
 	{
-		pr_err("no new commands to submit the oxtor ring.\n");
+		ECPRISS_OXTOR_LOG_ERR("no new commands to submit the oxtor ring.\n");
 		WARN_ON(1);
 		return -EINVAL;
 	}
@@ -372,7 +373,7 @@ int ecpri_oxtor_tx_ring_commit(u32 num_cmd, u32 ring_id)
 
 	if ( data_idxs_reg_s.rd_idx != ring_ptr->last_commit_idx)
 	{
-		pr_err("tx ring is not stopped before starting it with"
+		ECPRISS_OXTOR_LOG_ERR("tx ring is not stopped before starting it with"
 		"new commands\n ring_id[%u] hw_read_idx[%u] m_lastPostedIdx[%u]"
 		,ring_id, data_idxs_reg_s.rd_idx, ring_ptr->last_commit_idx);
 		WARN_ON(1);
@@ -417,7 +418,7 @@ int ecpri_oxtor_tx_ring_commit(u32 num_cmd, u32 ring_id)
 
 	if ( data_idxs_reg_s.wr_idx != ring_ptr->last_commit_idx )
 	{
-		pr_err("Reg write failed data_idxs_reg_s->rd_idx = %d,
+		ECPRISS_OXTOR_LOG_ERR("Reg write failed data_idxs_reg_s->rd_idx = %d,
 				lastPostedIdx = %d ",
 				data_idxs_reg_s.wr_idx,
 				ring_ptr->last_commit_idx );
@@ -445,7 +446,7 @@ static int ecpri_oxtor_tx_stop_reset(u32 ring_id )
 	result = ecpri_oxtor_tx_stop(ring_id, timeout_ms);
 	if(0 != result)
 	{
-		pr_err("Error in tx stop process");
+		ECPRISS_OXTOR_LOG_ERR("Error in tx stop process");
 		WARN_ON(1);
 		return -EINVAL;
 	}
@@ -465,7 +466,7 @@ static int ecpri_oxtor_tx_stop_reset(u32 ring_id )
 			ring_id);
 	if(0 != result)
 	{
-		pr_err("Error in tx stop process");
+		ECPRISS_OXTOR_LOG_ERR("Error in tx stop process");
 		WARN_ON(1);
 		return -EINVAL;
 	}
@@ -483,7 +484,7 @@ int ecpri_oxtor_tx_get_bandwidth(u32 ring_id)
 
 	if(ring_ptr == NULL)
 	{
-		pr_err("Null value\n");
+		ECPRISS_OXTOR_LOG_ERR("Null value\n");
 		return -1;
 	}
 
