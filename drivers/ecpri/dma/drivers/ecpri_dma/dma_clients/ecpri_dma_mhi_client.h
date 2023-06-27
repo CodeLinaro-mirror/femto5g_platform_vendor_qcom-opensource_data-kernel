@@ -245,6 +245,16 @@ struct ecpri_dma_mhi_xfer_wrapper {
 	struct mhi_dma_function_params function;
 };
 
+struct ecpri_dma_mhi_async_wq_work_type {
+	struct work_struct work;
+	struct ecpri_dma_mhi_xfer_wrapper* xfer_desc;
+};
+
+struct ecpri_dma_mhi_wq_work_type {
+	struct work_struct work;
+	struct ecpri_dma_mhi_client_context* ctx;
+};
+
 /**
  * struct ecpri_dma_mhi_memcpy_context - MHI Memcpy context
  *
@@ -266,6 +276,8 @@ struct ecpri_dma_mhi_xfer_wrapper {
  * @cbs_list: list of user callbacks and data
  * @loop_counter: Loop counter for sync_memcopy (statistics)
  * @xfer_wrapper_cache: cache of ecpri_dma_mhi_xfer_wrapper structs
+ * @async_work_wp: index of free async_work to write work into
+ * @async_work_rp: index of next async_work to handle
  */
 struct ecpri_dma_mhi_memcpy_context {
 	spinlock_t lock;
@@ -286,16 +298,9 @@ struct ecpri_dma_mhi_memcpy_context {
 	struct list_head cbs_list;
 	u32 loop_counter;
 	struct kmem_cache* xfer_wrapper_cache;
-};
-
-struct ecpri_dma_mhi_async_wq_work_type {
-	struct work_struct work;
-	struct ecpri_dma_mhi_xfer_wrapper *xfer_desc;
-};
-
-struct ecpri_dma_mhi_wq_work_type {
-	struct work_struct work;
-	struct ecpri_dma_mhi_client_context* ctx;
+	struct ecpri_dma_mhi_async_wq_work_type async_work[ECPRI_DMA_MHI_MEMCPY_RLEN];
+	u32 async_work_wp;
+	u32 async_work_rp;
 };
 
 

@@ -459,18 +459,18 @@ struct ecpri_dma_reg_save_gsi_gen_ee_s {
 		ee_n_cntxt_type_irq;
 	ecpri_gsi_hwio_def_gsi_ee_n_cntxt_type_irq_msk_u
 		ee_n_cntxt_type_irq_msk;
-	GEN_REGS_ARRAY_2D(ecpri_gsi_hwio_def_gsi_ee_n_cntxt_src_gsi_ch_irq_k_u,
-		GSI_EE_n_CNTXT_SRC_GSI_CH_IRQ_k) ee_n_cntxt_src_gsi_ch_irq_k;
-	GEN_REGS_ARRAY_2D(ecpri_gsi_hwio_def_gsi_ee_n_cntxt_src_ev_ch_irq_k_u,
-		GSI_EE_n_CNTXT_SRC_EV_CH_IRQ_k)	ee_n_cntxt_src_ev_ch_irq_k;
-	GEN_REGS_ARRAY_2D(ecpri_gsi_hwio_def_gsi_ee_n_cntxt_src_gsi_ch_irq_msk_k_u,
-		GSI_EE_n_CNTXT_SRC_GSI_CH_IRQ_MSK_k) ee_n_cntxt_src_gsi_ch_irq_msk_k;
-	GEN_REGS_ARRAY_2D(ecpri_gsi_hwio_def_gsi_ee_n_cntxt_src_ev_ch_irq_msk_k_u,
-		GSI_EE_n_CNTXT_SRC_EV_CH_IRQ_MSK_k)	ee_n_cntxt_src_ev_ch_irq_msk_k;
-	GEN_REGS_ARRAY_2D(ecpri_gsi_hwio_def_gsi_ee_n_cntxt_src_ieob_irq_k_u,
-		GSI_EE_n_CNTXT_SRC_IEOB_IRQ_k) ee_n_cntxt_src_ieob_irq_k;
-	GEN_REGS_ARRAY_2D(ecpri_gsi_hwio_def_gsi_ee_n_cntxt_src_ieob_irq_msk_k_u,
-		GSI_EE_n_CNTXT_SRC_IEOB_IRQ_MSK_k) ee_n_cntxt_src_ieob_irq_msk_k;
+	ecpri_gsi_hwio_def_gsi_ee_n_cntxt_src_gsi_ch_irq_k_u
+		ee_n_cntxt_src_gsi_ch_irq_k;
+	ecpri_gsi_hwio_def_gsi_ee_n_cntxt_src_ev_ch_irq_k_u
+		ee_n_cntxt_src_ev_ch_irq_k;
+	ecpri_gsi_hwio_def_gsi_ee_n_cntxt_src_gsi_ch_irq_msk_k_u
+		ee_n_cntxt_src_gsi_ch_irq_msk_k;
+	ecpri_gsi_hwio_def_gsi_ee_n_cntxt_src_ev_ch_irq_msk_k_u
+		ee_n_cntxt_src_ev_ch_irq_msk_k;
+	ecpri_gsi_hwio_def_gsi_ee_n_cntxt_src_ieob_irq_k_u
+		ee_n_cntxt_src_ieob_irq_k;
+	ecpri_gsi_hwio_def_gsi_ee_n_cntxt_src_ieob_irq_msk_k_u
+		ee_n_cntxt_src_ieob_irq_msk_k;
 	ecpri_gsi_hwio_def_gsi_ee_n_cntxt_gsi_irq_stts_u
 		ee_n_cntxt_gsi_irq_stts;
 	ecpri_gsi_hwio_def_gsi_ee_n_cntxt_glob_irq_stts_u
@@ -1177,18 +1177,18 @@ void ecpri_dma_save_registers(void) {
 				gsi[gsi_id].gen_ee[ee], ee_n_int_vec, gsi_id, ee);
 		}
 
-		READ_GSI_REG_ARR_N_K(GSI_EE_n_CNTXT_SRC_GSI_CH_IRQ_k, gsi[gsi_id].gen_ee[ee],
-			ee_n_cntxt_src_gsi_ch_irq_k, gsi_id);
-		READ_GSI_REG_ARR_N_K(GSI_EE_n_CNTXT_SRC_EV_CH_IRQ_k, gsi[gsi_id].gen_ee[ee],
-			ee_n_cntxt_src_ev_ch_irq_k, gsi_id);
-		READ_GSI_REG_ARR_N_K(GSI_EE_n_CNTXT_SRC_GSI_CH_IRQ_MSK_k, gsi[gsi_id].gen_ee[ee],
-			ee_n_cntxt_src_gsi_ch_irq_msk_k, gsi_id);
-		READ_GSI_REG_ARR_N_K(GSI_EE_n_CNTXT_SRC_EV_CH_IRQ_MSK_k, gsi[gsi_id].gen_ee[ee],
-			ee_n_cntxt_src_ev_ch_irq_msk_k, gsi_id);
-		READ_GSI_REG_ARR_N_K(GSI_EE_n_CNTXT_SRC_IEOB_IRQ_k, gsi[gsi_id].gen_ee[ee],
-			ee_n_cntxt_src_ieob_irq_k, gsi_id);
-		READ_GSI_REG_ARR_N_K(GSI_EE_n_CNTXT_SRC_IEOB_IRQ_MSK_k, gsi[gsi_id].gen_ee[ee],
-			ee_n_cntxt_src_ieob_irq_msk_k, gsi_id);
+		READ_GSI_REG_N_K(GSI_EE_n_CNTXT_SRC_GSI_CH_IRQ_k, gsi[gsi_id].gen_ee[ee],
+			ee_n_cntxt_src_gsi_ch_irq_k, gsi_id, ee, 0);
+		READ_GSI_REG_N_K(GSI_EE_n_CNTXT_SRC_EV_CH_IRQ_k, gsi[gsi_id].gen_ee[ee],
+			ee_n_cntxt_src_ev_ch_irq_k, gsi_id, ee, 0);
+		READ_GSI_REG_N_K(GSI_EE_n_CNTXT_SRC_GSI_CH_IRQ_MSK_k, gsi[gsi_id].gen_ee[ee],
+			ee_n_cntxt_src_gsi_ch_irq_msk_k, gsi_id, ee, 0);
+		READ_GSI_REG_N_K(GSI_EE_n_CNTXT_SRC_EV_CH_IRQ_MSK_k, gsi[gsi_id].gen_ee[ee],
+			ee_n_cntxt_src_ev_ch_irq_msk_k, gsi_id, ee, 0);
+		READ_GSI_REG_N_K(GSI_EE_n_CNTXT_SRC_IEOB_IRQ_k, gsi[gsi_id].gen_ee[ee],
+			ee_n_cntxt_src_ieob_irq_k, gsi_id, ee, 0);
+		READ_GSI_REG_N_K(GSI_EE_n_CNTXT_SRC_IEOB_IRQ_MSK_k, gsi[gsi_id].gen_ee[ee],
+			ee_n_cntxt_src_ieob_irq_msk_k, gsi_id, ee, 0);
 
 		/* ch_cntxt */
 		for (ee = 0; ee < ECPRI_DMA_MAX_EE; ee++) {
