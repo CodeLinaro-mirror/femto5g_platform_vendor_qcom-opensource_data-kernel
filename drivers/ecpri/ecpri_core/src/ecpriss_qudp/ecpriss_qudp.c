@@ -7,6 +7,7 @@
 #include "ecpriss_log.h"
 
 volatile int ecpriss_filtering_enabled = 0;
+volatile int ecpriss_qudp_ingress_action = ECPRISS_QUDP_ACTION_DISCARD;
 
 
 #define ECPRISS_ETH_QUDP_MTU_SIZE_V4   9000 
@@ -1800,14 +1801,14 @@ static int ecpriss_qudp_ingress_init_cfg_v2(void)
 						port_idx,
 						&ingress_cfg->fh_ingress_config);
 
-				ingress_cfg->fh_ingress_config.ipv4_cs_err_action = 1;
-				ingress_cfg->fh_ingress_config.udp_cs_err_action = 1;
-				ingress_cfg->fh_ingress_config.fcs_err_action = 1;
-				ingress_cfg->fh_ingress_config.pkt_err_action = 1;
-				ingress_cfg->fh_ingress_config.ip_len_err_action = 1;
-				ingress_cfg->fh_ingress_config.vlan_filt_miss_action = 1;
-				ingress_cfg->fh_ingress_config.ip_filt_miss_action = 1;
-				ingress_cfg->fh_ingress_config.non_local_dst_action = 1;
+				ingress_cfg->fh_ingress_config.ipv4_cs_err_action = ECPRISS_QUDP_ACTION_DISCARD;
+				ingress_cfg->fh_ingress_config.udp_cs_err_action = ECPRISS_QUDP_ACTION_DISCARD;
+				ingress_cfg->fh_ingress_config.fcs_err_action = ECPRISS_QUDP_ACTION_DISCARD;
+				ingress_cfg->fh_ingress_config.pkt_err_action = ECPRISS_QUDP_ACTION_DISCARD;
+				ingress_cfg->fh_ingress_config.ip_len_err_action = ECPRISS_QUDP_ACTION_DISCARD;
+				ingress_cfg->fh_ingress_config.vlan_filt_miss_action = ECPRISS_QUDP_ACTION_DISCARD;
+				ingress_cfg->fh_ingress_config.ip_filt_miss_action = ECPRISS_QUDP_ACTION_DISCARD;
+				ingress_cfg->fh_ingress_config.non_local_dst_action = ECPRISS_QUDP_ACTION_DISCARD;
 
 				ecpriss_qudp_hal_write_reg_n_fields(ECPRISS_QUDP_FH,
 						ECPRI_UDP_FH_INGRESS_CONFIG_P_V2,
@@ -1828,6 +1829,52 @@ static int ecpriss_qudp_ingress_init_cfg_v2(void)
 	return ret;
 }
 
+int ecpriss_qudp_ingress_init_cfg_modify_v2(int action)
+{
+	int ret = 0;
+	int port_type = 0;
+	int port_idx = 0;
+
+
+
+	for(port_type=0;port_type<ECPRISS_PORT_TYPE_MAX;port_type++)
+	{
+		if(port_type == ECPRISS_PORT_TYPE_FH)
+		{
+
+			for(port_idx=0;port_idx<ecpriss_pdata_v2->qudp_ctx_v2->num_ports;port_idx++)
+			{
+
+				ecpriss_qudp_ingress_per_port_cfg_s_v2       *ingress_cfg =
+					&ecpriss_pdata_v2->qudp_ctx_v2->fh_port_cfg_v2[port_idx].ingress_port_cfg;
+
+				ecpriss_qudp_hal_read_reg_n_fields(ECPRISS_QUDP_FH ,
+						ECPRI_UDP_FH_INGRESS_CONFIG_P_V2,
+						port_idx,
+						&ingress_cfg->fh_ingress_config);
+
+				ingress_cfg->fh_ingress_config.ipv4_cs_err_action = action;
+				ingress_cfg->fh_ingress_config.udp_cs_err_action = action;
+				ingress_cfg->fh_ingress_config.fcs_err_action = action;
+				ingress_cfg->fh_ingress_config.pkt_err_action = action;
+				ingress_cfg->fh_ingress_config.ip_len_err_action = action;
+				ingress_cfg->fh_ingress_config.vlan_filt_miss_action = action;
+				ingress_cfg->fh_ingress_config.ip_filt_miss_action = action;
+				ingress_cfg->fh_ingress_config.non_local_dst_action = action;
+
+				ECPRILOGINFO("ecpriss_qudp_ingress_init_cfg_modify_v2: action %d\n",action);
+
+				ecpriss_qudp_hal_write_reg_n_fields(ECPRISS_QUDP_FH,
+						ECPRI_UDP_FH_INGRESS_CONFIG_P_V2,
+						port_idx,
+						&ingress_cfg->fh_ingress_config);
+
+
+			}
+		}
+	}
+	return ret;
+}
 
 static int ecpriss_qudp_egress_init_cfg_v2(void)
 {
@@ -4985,7 +5032,22 @@ int ecpriss_qudp_fh_tx_hdr_ins_cfg_v2(uint32_t               port_index,
 }
 
 
+int ecpriss_qudp_get_ingress_action(void)
+{
+	return ecpriss_qudp_ingress_action;
+}
+void ecpriss_qudp_set_ingress_action(int val)
+{
+	int ret = 0;
+	ecpriss_qudp_ingress_action = val;
 
+	ret = ecpriss_qudp_ingress_init_cfg_modify_v2(ecpriss_qudp_ingress_action);
+
+	if(ret != 0)
+		ECPRILOGINFO("ecpriss_qudp_ingress_init_action modify failed\n");
+
+	return;
+}
 
 
 #ifdef UNUSED

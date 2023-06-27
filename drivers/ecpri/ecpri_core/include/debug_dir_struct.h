@@ -301,6 +301,7 @@
 				,ecpriss_filt \
 				,ecpriss_stats_timeout \
 				,ecpriss_clear_stats \
+				,ecpriss_config_qudp_ingress_action \
 			} \
 		} \
 	} \
