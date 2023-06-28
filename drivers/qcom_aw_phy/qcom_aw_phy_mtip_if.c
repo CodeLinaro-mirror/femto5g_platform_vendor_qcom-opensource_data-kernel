@@ -453,20 +453,6 @@ enum mtip_port_config_enum qcom_aw_phy_an_result_to_port_config(
           return MTIP_PORT_CONFIG_1x10GBASE_R;
       }
 
-    case PHY_SPEED_SPEC_40G_BASE_KR4:
-    case PHY_SPEED_SPEC_40G_BASE_CR4:
-      if(phy_inst_info->an_params.fec_ability[PHY_10G_BASE_R_FEC] == 1 &&
-         phy_inst_info->an_params.lp_fec_ability[PHY_LANE_0][PHY_10G_BASE_R_FEC] == 1){
-        phy_inst_info->an_params.an_fec_result[PHY_LANE_0] = PHY_10G_BASE_R_FEC;
-        return MTIP_PORT_CONFIG_1x40GBASE_R4_FEC;
-      }
-      else
-        return MTIP_PORT_CONFIG_1x40GBASE_R4;
-
-    case PHY_SPEED_SPEC_100G_BASE_KR4:
-    case PHY_SPEED_SPEC_100G_BASE_CR4:
-      return MTIP_PORT_CONFIG_1x100GBASE_R4;
-
     case PHY_SPEED_SPEC_25G_BASE_K_CR_S:
     case PHY_SPEED_SPEC_25G_BASE_K_CR:
       if((phy_inst_info->an_params.mac_port_config_mask & (1<<MTIP_PORT_CONFIG_4x25GBASE_R)) ||
@@ -507,19 +493,43 @@ enum mtip_port_config_enum qcom_aw_phy_an_result_to_port_config(
           return MTIP_PORT_CONFIG_1x25GBASE_R;
         }
 
+    case PHY_SPEED_SPEC_40G_BASE_KR4:
+    case PHY_SPEED_SPEC_40G_BASE_CR4:
+      if(phy_inst_info->an_params.mac_port_config_mask & (1<<MTIP_PORT_CONFIG_1x40GBASE_R4_FEC))
+        return MTIP_PORT_CONFIG_1x40GBASE_R4_FEC;
+      else
+        return MTIP_PORT_CONFIG_1x40GBASE_R4;
+
     case PHY_SPEED_SPEC_50G_BASE_K_CR:
-      if((phy_inst_info->an_params.mac_port_config_mask & (1<<MTIP_PORT_CONFIG_2x50GBASE_R))){
-         return MTIP_PORT_CONFIG_2x50GBASE_R;
-      }
-      else{
+      if(phy_inst_info->an_params.mac_port_config_mask & (1<<MTIP_PORT_CONFIG_2x50GBASE_R_RSFEC))
+        return MTIP_PORT_CONFIG_2x50GBASE_R_RSFEC;
+      else if(phy_inst_info->an_params.mac_port_config_mask & (1<<MTIP_PORT_CONFIG_2x50GBASE_R))
+       return MTIP_PORT_CONFIG_2x50GBASE_R;
+      else if(phy_inst_info->an_params.mac_port_config_mask & (1<<MTIP_PORT_CONFIG_1x50GBASE_R_RSFEC))
+        return MTIP_PORT_CONFIG_1x50GBASE_R_RSFEC;
+      else
         return MTIP_PORT_CONFIG_1x50GBASE_R;
-      }
+
+    case PHY_SPEED_SPEC_100G_BASE_KR4:
+    case PHY_SPEED_SPEC_100G_BASE_CR4:
+      if(phy_inst_info->an_params.mac_port_config_mask & (1<<MTIP_PORT_CONFIG_1x100GBASE_R4_RSFEC))
+        return MTIP_PORT_CONFIG_1x100GBASE_R4_RSFEC;
+      else
+        return MTIP_PORT_CONFIG_1x100GBASE_R4;
 
     case PHY_SPEED_SPEC_100G_BASE_K_CR2:
-      return MTIP_PORT_CONFIG_1x100GBASE_R2;
+      if(phy_inst_info->an_params.mac_port_config_mask & (1<<MTIP_PORT_CONFIG_1x100GBASE_R2_RSFEC))
+        return MTIP_PORT_CONFIG_1x100GBASE_R2_RSFEC;
+      else
+       return MTIP_PORT_CONFIG_1x100GBASE_R2;
 
     case PHY_SPEED_SPEC_100G_BASE_K_CR:
-      return MTIP_PORT_CONFIG_1x100GBASE_R;
+      if(phy_inst_info->an_params.mac_port_config_mask & (1<<MTIP_PORT_CONFIG_1x100GBASE_R_RSFEC))
+        return MTIP_PORT_CONFIG_1x100GBASE_R_RSFEC;
+      else if(phy_inst_info->an_params.mac_port_config_mask & (1<<MTIP_PORT_CONFIG_1x100GBASE_R_RSFEC_LL))
+        return MTIP_PORT_CONFIG_1x100GBASE_R_RSFEC_LL;
+      else
+       return MTIP_PORT_CONFIG_1x100GBASE_R;
 
     default:
       return MTIP_PORT_CONFIG_MAX;
