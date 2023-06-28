@@ -159,7 +159,7 @@ static irqreturn_t qcom_aw_phy_interrupt_handler(int irq, void *devptr) {
   struct qcom_aw_phy_work_q_params *wq_params = NULL;
   mss_access_t mss = {.phy_offset = 0, .lane_offset = 0};
   uint64_t tx_np_data = 1ULL;
-  bool error_rx_sig_det[PHY_LANE_MAX] = {false};
+  uint32_t rx_sig_detect_rd_val= 0;
 
   // check if this an interrupt that needs to be handled
   for (i = QCOM_AW_PHY_INST_FH0; i < QCOM_AW_PHY_INST_MAX; i++)
@@ -198,15 +198,6 @@ static irqreturn_t qcom_aw_phy_interrupt_handler(int irq, void *devptr) {
     temp_bmask = intr_error & (1 << i);
     if (temp_bmask) {
       switch (i) {
-
-      case QCOM_AW_PHY_RX_SIGNAL_DETECT_ERR_LANE_0:
-      case QCOM_AW_PHY_RX_SIGNAL_DETECT_ERR_LANE_1:
-      case QCOM_AW_PHY_RX_SIGNAL_DETECT_ERR_LANE_2:
-      case QCOM_AW_PHY_RX_SIGNAL_DETECT_ERR_LANE_3:
-        error_rx_sig_det[i - QCOM_AW_PHY_RX_SIGNAL_DETECT_ERR_LANE_0] = true;
-        clear |= (1<<i);
-        break;
-
       case QCOM_AW_PHY_SNR_VALID_ERR_LANE_0:
       case QCOM_AW_PHY_SNR_VALID_ERR_LANE_1:
       case QCOM_AW_PHY_SNR_VALID_ERR_LANE_2:
@@ -248,7 +239,14 @@ static irqreturn_t qcom_aw_phy_interrupt_handler(int irq, void *devptr) {
       case QCOM_AW_PHY_RX_SIGNAL_DETECT_LANE_1:
       case QCOM_AW_PHY_RX_SIGNAL_DETECT_LANE_2:
       case QCOM_AW_PHY_RX_SIGNAL_DETECT_LANE_3:
-         if(error_rx_sig_det[i-QCOM_AW_PHY_RX_SIGNAL_DETECT_LANE_0] == false){
+         mss.phy_offset = phy_inst_info->base_addr;
+         pmd_set_lane(&mss, i-QCOM_AW_PHY_RX_SIGNAL_DETECT_LANE_0);
+         pmd_read_field(&mss, DIG_SOC_LANE_STAT_REG3_ADDR,
+                        DIG_SOC_LANE_STAT_REG3_ODAT_RX_SIGNAL_DETECT_A_MASK,
+                        DIG_SOC_LANE_STAT_REG3_ODAT_RX_SIGNAL_DETECT_A_OFFSET,
+                        &rx_sig_detect_rd_val);
+
+         if(rx_sig_detect_rd_val == 1){
            wq_params = kmalloc(sizeof(struct qcom_aw_phy_work_q_params),
                               GFP_ATOMIC);
           if(!wq_params)
@@ -409,6 +407,7 @@ void qcom_aw_phy_enable_interrupt(
       "Status interrupt enabled for PHY instance %d, bitmask %x",
       phy_inst_info->phy_inst, temp_bmask);
 
+#if 0
   // Enable error interrupt
   temp_bmask = 0;
   for (i = QCOM_AW_PHY_INT_ERROR_BIT_MIN; i < QCOM_AW_PHY_INT_ERROR_BIT_MAX;
@@ -434,6 +433,7 @@ void qcom_aw_phy_enable_interrupt(
   QCOM_AW_PHY_LOG_INFO(
       "Error interrupt enabled for PHY instance %d, bitmask %x",
       phy_inst_info->phy_inst, temp_bmask);
+#endif
 
 func_exit:
   QCOM_AW_PHY_LOG_INFO("qcom_aw_phy_enable_interrupt local_err = %d",
