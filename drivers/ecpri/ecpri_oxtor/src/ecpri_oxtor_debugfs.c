@@ -8,7 +8,7 @@
 #include <linux/debugfs.h> /* debugfs addition*/
 #include <linux/file.h>
 #include <linux/fs.h>
-
+#include "ecpri_oxtor_log.h"
 #include "code.h"
 
 #undef pr_fmt
@@ -104,7 +104,7 @@ ssize_t stats_value_from_registers_oxtor_rx(char __user *buf, int ring_id) {
 			(char *)kzalloc(FINAL_STATS_DYNAMIC_STR_MAX_SIZE, GFP_KERNEL);
 
 		if (!final_stats_str) {
-				pr_err("Memory allocation failure \n");
+				ECPRISS_OXTOR_LOG_ERR("Memory allocation failure \n");
 				goto err;
 		}
 		RESET_STR(temp_stat_val_str);
@@ -287,7 +287,7 @@ ssize_t stats_value_from_registers_oxtor_rx(char __user *buf, int ring_id) {
 				FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
 		strlcat(final_stats_str, "\n", FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
 
-		pr_info("RX ring info : %s \n", final_stats_str);
+		ECPRISS_OXTOR_LOG_INFO("RX ring info : %s \n", final_stats_str);
 
 		ret_val = copy_to_user(buf, final_stats_str,
 							   FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
@@ -312,7 +312,7 @@ ssize_t stats_value_from_registers_oxtor_tx(char __user *buf, int ring_id) {
 			(char *)kzalloc(FINAL_STATS_DYNAMIC_STR_MAX_SIZE, GFP_KERNEL);
 
 		if (!final_stats_str) {
-				pr_err("Memory allocation failure \n");
+				ECPRISS_OXTOR_LOG_ERR("Memory allocation failure \n");
 				goto err;
 		}
 		RESET_STR(temp_stat_val_str);
@@ -702,7 +702,7 @@ static struct file_operations *file_name_to_wrapper(char *filename) {
 		} else if (!strncmp(filename, "oxtr:interrupts:rx3", FH_WRAPPER_SIZE)) {
 				return &interrupts_oxtor_rx_3;
 		} else {
-				pr_err("Invalid file name, no entry available\n");
+				ECPRISS_OXTOR_LOG_ERR("Invalid file name, no entry available\n");
 				return &dummy;
 		}
 		return NULL;

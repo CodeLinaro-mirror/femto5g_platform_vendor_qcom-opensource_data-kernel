@@ -18,6 +18,7 @@
 #include <net/net_namespace.h>
 #include <net/netlink.h>
 #include "ecpri_oxtor_hal.h"
+#include "ecpri_oxtor_log.h"
 
 static const char
 *ecpriss_oxtor_hal_reg_name_to_str[ECPRI_OXTOR_OXTOR_MAX + 1] = {
@@ -130,7 +131,7 @@ int ecpriss_oxtor_hal_ctx_init(int hw_ver) {
 const char *
 ecpriss_oxtor_hal_reg_name_str(enum ecpriss_oxtor_hal_reg_name reg_name) {
 	if (reg_name < 0 || reg_name >= ECPRI_OXTOR_OXTOR_MAX) {
-		pr_err("requested name of invalid reg=%d\n", reg_name);
+		ECPRISS_OXTOR_LOG_ERR("requested name of invalid reg=%d\n", reg_name);
 		return "Invalid Register";
 	}
 
@@ -1331,7 +1332,7 @@ ecpriss_oxtor_hal_reg_objs[ECPRISS_OXTOR_HW_MAX][ECPRI_OXTOR_OXTOR_MAX] = {
 uint32_t ecpri_oxtor_hal_reg_read(ecpri_oxtor_hal_reg_type_e reg_type,
 		u32 offset, u32 *val) {
 	if (!val) {
-		pr_err("Null pointer\n");
+		ECPRISS_OXTOR_LOG_ERR("Null pointer\n");
 		return -1;
 	}
 	if (reg_type == ECPRI_OXTOR_REG_TYPE_GLOBAL) {
@@ -1365,12 +1366,12 @@ u32 ecpriss_oxtor_hal_read_reg_n(enum ecpriss_oxtor_hal_reg_name reg, u32 n) {
 	int val = 0;
 	u32 base;
 	if (reg >= ECPRI_OXTOR_OXTOR_MAX) {
-		pr_err("Invalid register reg=%u\n", reg);
+		ECPRISS_OXTOR_LOG_ERR("Invalid register reg=%u\n", reg);
 		WARN_ON(1);
 		return -EINVAL;
 	}
 
-	pr_info("read from %s n=%u\n", ecpriss_oxtor_hal_reg_name_str(reg), n);
+	ECPRISS_OXTOR_LOG_INFO("read from %s n=%u\n", ecpriss_oxtor_hal_reg_name_str(reg), n);
 
 	base =
 		ecpriss_oxtor_hal_reg_objs[ecpriss_oxtor_hal_ctx.hw_type][reg].base;
@@ -1378,7 +1379,7 @@ u32 ecpriss_oxtor_hal_read_reg_n(enum ecpriss_oxtor_hal_reg_name reg, u32 n) {
 		.offset;
 
 	if (offset == -1) {
-		pr_err("Read access to obsolete reg=%s\n",
+		ECPRISS_OXTOR_LOG_ERR("Read access to obsolete reg=%s\n",
 				ecpriss_oxtor_hal_reg_name_str(reg));
 		WARN_ON(1);
 		return -EPERM;
@@ -1400,12 +1401,12 @@ u32 ecpriss_oxtor_hal_read_reg_mn(enum ecpriss_oxtor_hal_reg_name reg, u32 m,
 	int val = 0;
 	u32 base;
 	if (reg >= ECPRI_OXTOR_OXTOR_MAX) {
-		pr_err("Invalid register reg=%u\n", reg);
+		ECPRISS_OXTOR_LOG_ERR("Invalid register reg=%u\n", reg);
 		WARN_ON(1);
 		return -EINVAL;
 	}
 
-	pr_info("read %s m=%u n=%u\n", ecpriss_oxtor_hal_reg_name_str(reg), m,
+	ECPRISS_OXTOR_LOG_INFO("read %s m=%u n=%u\n", ecpriss_oxtor_hal_reg_name_str(reg), m,
 			n);
 
 	base =
@@ -1413,7 +1414,7 @@ u32 ecpriss_oxtor_hal_read_reg_mn(enum ecpriss_oxtor_hal_reg_name reg, u32 m,
 	offset = ecpriss_oxtor_hal_reg_objs[ecpriss_oxtor_hal_ctx.hw_type][reg]
 		.offset;
 	if (offset == -1) {
-		pr_err("Read access to obsolete reg=%s\n",
+		ECPRISS_OXTOR_LOG_ERR("Read access to obsolete reg=%s\n",
 				ecpriss_oxtor_hal_reg_name_str(reg));
 		WARN_ON_ONCE(1);
 		return -EPERM;
@@ -1439,12 +1440,12 @@ void ecpriss_oxtor_hal_write_reg_mn(enum ecpriss_oxtor_hal_reg_name reg, u32 m,
 	u32 base;
 
 	if (reg >= ECPRI_OXTOR_OXTOR_MAX) {
-		pr_err("Invalid register reg=%u\n", reg);
+		ECPRISS_OXTOR_LOG_ERR("Invalid register reg=%u\n", reg);
 		WARN_ON(1);
 		return;
 	}
 
-	pr_info("write to %s m=%u n=%u val=%u\n",
+	ECPRISS_OXTOR_LOG_INFO("write to %s m=%u n=%u val=%u\n",
 			ecpriss_oxtor_hal_reg_name_str(reg), m, n, val);
 
 	base =
@@ -1452,7 +1453,7 @@ void ecpriss_oxtor_hal_write_reg_mn(enum ecpriss_oxtor_hal_reg_name reg, u32 m,
 	offset = ecpriss_oxtor_hal_reg_objs[ecpriss_oxtor_hal_ctx.hw_type][reg]
 		.offset;
 	if (offset == -1) {
-		pr_err("Write access to obsolete reg=%s\n",
+		ECPRISS_OXTOR_LOG_ERR("Write access to obsolete reg=%s\n",
 				ecpriss_oxtor_hal_reg_name_str(reg));
 		WARN_ON(1);
 		return;
@@ -1478,12 +1479,12 @@ void ecpriss_oxtor_hal_write_reg_mn_fields(enum ecpriss_oxtor_hal_reg_name reg,
 	u32 val = 0;
 	u32 base;
 	if (reg >= ECPRI_OXTOR_OXTOR_MAX) {
-		pr_err("Invalid register reg=%u\n", reg);
+		ECPRISS_OXTOR_LOG_ERR("Invalid register reg=%u\n", reg);
 		WARN_ON(1);
 		return;
 	}
 
-	pr_info("write to %s m=%u n=%u val=%u\n",
+	ECPRISS_OXTOR_LOG_INFO("write to %s m=%u n=%u val=%u\n",
 			ecpriss_oxtor_hal_reg_name_str(reg), m, n, val);
 
 	base =
@@ -1491,7 +1492,7 @@ void ecpriss_oxtor_hal_write_reg_mn_fields(enum ecpriss_oxtor_hal_reg_name reg,
 	offset = ecpriss_oxtor_hal_reg_objs[ecpriss_oxtor_hal_ctx.hw_type][reg]
 		.offset;
 	if (offset == -1) {
-		pr_err("Write access to obsolete reg=%s\n",
+		ECPRISS_OXTOR_LOG_ERR("Write access to obsolete reg=%s\n",
 				ecpriss_oxtor_hal_reg_name_str(reg));
 		WARN_ON(1);
 		return;
@@ -1516,18 +1517,18 @@ u32 ecpriss_oxtor_hal_read_reg_mn_fields(enum ecpriss_oxtor_hal_reg_name reg,
 	u32 base;
 
 	if (!fields) {
-		pr_err("Input error fields\n");
+		ECPRISS_OXTOR_LOG_ERR("Input error fields\n");
 		WARN_ON(1);
 		return -EINVAL;
 	}
 
 	if (reg >= ECPRI_OXTOR_OXTOR_MAX) {
-		pr_err("Invalid register reg=%u\n", reg);
+		ECPRISS_OXTOR_LOG_ERR("Invalid register reg=%u\n", reg);
 		WARN_ON(1);
 		return -EINVAL;
 	}
 
-	pr_info("read from %s n=%u and parse it\n",
+	ECPRISS_OXTOR_LOG_INFO("read from %s n=%u and parse it\n",
 			ecpriss_oxtor_hal_reg_name_str(reg), n);
 
 	base =
@@ -1535,7 +1536,7 @@ u32 ecpriss_oxtor_hal_read_reg_mn_fields(enum ecpriss_oxtor_hal_reg_name reg,
 	offset = ecpriss_oxtor_hal_reg_objs[ecpriss_oxtor_hal_ctx.hw_type][reg]
 		.offset;
 	if (offset == -1) {
-		pr_err("Read access to obsolete reg=%s\n",
+		ECPRISS_OXTOR_LOG_ERR("Read access to obsolete reg=%s\n",
 				ecpriss_oxtor_hal_reg_name_str(reg));
 		WARN_ON(1);
 		return -EPERM;
@@ -1563,25 +1564,25 @@ u32 ecpriss_oxtor_hal_read_reg_n_fields(enum ecpriss_oxtor_hal_reg_name reg,
 	u32 base;
 
 	if (!fields) {
-		pr_err("Input error fields\n");
+		ECPRISS_OXTOR_LOG_ERR("Input error fields\n");
 		WARN_ON(1);
 		return -EINVAL;
 	}
 
 	if (reg >= ECPRI_OXTOR_OXTOR_MAX) {
-		pr_err("Invalid register reg=%u\n", reg);
+		ECPRISS_OXTOR_LOG_ERR("Invalid register reg=%u\n", reg);
 		WARN_ON(1);
 		return -EINVAL;
 	}
 
-	pr_info("read from %s n=%u and parse it\n",
+	ECPRISS_OXTOR_LOG_INFO("read from %s n=%u and parse it\n",
 			ecpriss_oxtor_hal_reg_name_str(reg), n);
 	base =
 		ecpriss_oxtor_hal_reg_objs[ecpriss_oxtor_hal_ctx.hw_type][reg].base;
 	offset = ecpriss_oxtor_hal_reg_objs[ecpriss_oxtor_hal_ctx.hw_type][reg]
 		.offset;
 	if (offset == -1) {
-		pr_err("Read access to obsolete reg=%s\n",
+		ECPRISS_OXTOR_LOG_ERR("Read access to obsolete reg=%s\n",
 				ecpriss_oxtor_hal_reg_name_str(reg));
 		WARN_ON(1);
 		return -EPERM;
@@ -1593,7 +1594,7 @@ u32 ecpriss_oxtor_hal_read_reg_n_fields(enum ecpriss_oxtor_hal_reg_name reg,
 	 * base += offset;
 	 * val =ioread32(&base);
 	 * Mayank hardcoding ECPRI_OXTOR_REG_TYPE_BASE,
-	 * pr_info("BASE TYPE IS : ECPRI_OXTOR_REG_TYPE_GLOBAL\n");
+	 * ECPRISS_OXTOR_LOG_INFO("BASE TYPE IS : ECPRI_OXTOR_REG_TYPE_GLOBAL\n");
 	 * ecpri_oxtor_hal_reg_read(ECPRI_OXTOR_REG_TYPE_GLOBAL, base, &val);
 	 */
 	ecpri_oxtor_hal_reg_read(ECPRI_OXTOR_REG_TYPE_BASE, offset, &val);
@@ -1613,25 +1614,25 @@ void ecpriss_oxtor_hal_write_reg_n_fields(ecpri_oxtor_hal_reg_type_e reg_type,
 	u32 base;
 
 	if (!fields) {
-		pr_err("Input error fields=%pK\n", fields);
+		ECPRISS_OXTOR_LOG_ERR("Input error fields=%pK\n", fields);
 		WARN_ON(1);
 		return;
 	}
 
 	if (reg >= ECPRI_OXTOR_OXTOR_MAX) {
-		pr_err("Invalid register reg=%u\n", reg);
+		ECPRISS_OXTOR_LOG_ERR("Invalid register reg=%u\n", reg);
 		WARN_ON(1);
 		return;
 	}
 
-	pr_info("write to %s n=%u after constructing it\n",
+	ECPRISS_OXTOR_LOG_INFO("write to %s n=%u after constructing it\n",
 			ecpriss_oxtor_hal_reg_name_str(reg), n);
 	base =
 		ecpriss_oxtor_hal_reg_objs[ecpriss_oxtor_hal_ctx.hw_type][reg].base;
 	offset = ecpriss_oxtor_hal_reg_objs[ecpriss_oxtor_hal_ctx.hw_type][reg]
 		.offset;
 	if (offset == -1) {
-		pr_err("Write access to obsolete reg=%s\n",
+		ECPRISS_OXTOR_LOG_ERR("Write access to obsolete reg=%s\n",
 				ecpriss_oxtor_hal_reg_name_str(reg));
 		WARN_ON(1);
 		return;
@@ -1655,18 +1656,18 @@ u32 ecpriss_oxtor_hal_read_reg_mnk_fields(enum ecpriss_oxtor_hal_reg_name reg,
 	u32 base;
 
 	if (!fields) {
-		pr_err("Input error fields\n");
+		ECPRISS_OXTOR_LOG_ERR("Input error fields\n");
 		WARN_ON(1);
 		return -EINVAL;
 	}
 
 	if (reg >= ECPRI_OXTOR_OXTOR_MAX) {
-		pr_err("Invalid register reg=%u\n", reg);
+		ECPRISS_OXTOR_LOG_ERR("Invalid register reg=%u\n", reg);
 		WARN_ON(1);
 		return -EINVAL;
 	}
 
-	pr_info("read from %s n=%u and parse it\n",
+	ECPRISS_OXTOR_LOG_INFO("read from %s n=%u and parse it\n",
 			ecpriss_oxtor_hal_reg_name_str(reg), n);
 
 	base =
@@ -1674,7 +1675,7 @@ u32 ecpriss_oxtor_hal_read_reg_mnk_fields(enum ecpriss_oxtor_hal_reg_name reg,
 	offset = ecpriss_oxtor_hal_reg_objs[ecpriss_oxtor_hal_ctx.hw_type][reg]
 		.offset;
 	if (offset == -1) {
-		pr_err("Read access to obsolete reg=%s\n",
+		ECPRISS_OXTOR_LOG_ERR("Read access to obsolete reg=%s\n",
 				ecpriss_oxtor_hal_reg_name_str(reg));
 		WARN_ON(1);
 		return -EPERM;
@@ -1710,12 +1711,12 @@ void ecpriss_oxtor_hal_write_reg_mnk_fields(ecpri_oxtor_hal_reg_type_e reg_type,
 	u32 val = 0;
 	u32 base;
 	if (reg >= ECPRI_OXTOR_OXTOR_MAX) {
-		pr_err("Invalid register reg=%u\n", reg);
+		ECPRISS_OXTOR_LOG_ERR("Invalid register reg=%u\n", reg);
 		WARN_ON(1);
 		return;
 	}
 
-	pr_info("write to %s m=%u n=%u val=%u\n",
+	ECPRISS_OXTOR_LOG_INFO("write to %s m=%u n=%u val=%u\n",
 			ecpriss_oxtor_hal_reg_name_str(reg), m, n, val);
 
 	base =
@@ -1723,7 +1724,7 @@ void ecpriss_oxtor_hal_write_reg_mnk_fields(ecpri_oxtor_hal_reg_type_e reg_type,
 	offset = ecpriss_oxtor_hal_reg_objs[ecpriss_oxtor_hal_ctx.hw_type][reg]
 		.offset;
 	if (offset == -1) {
-		pr_err("Write access to obsolete reg=%s\n",
+		ECPRISS_OXTOR_LOG_ERR("Write access to obsolete reg=%s\n",
 				ecpriss_oxtor_hal_reg_name_str(reg));
 		WARN_ON(1);
 		return;
