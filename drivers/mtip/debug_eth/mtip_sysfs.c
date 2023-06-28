@@ -570,8 +570,6 @@ void setup_diag_threshold(u_int8_t fifo_num, u_int16_t threshold) {
 
 void setup_diag_timeout(u_int8_t fifo_num, u_int32_t timeout) {
 
-  unsigned int STREAM_TIMEOUT_ARRAY[] = {F0.Timeout, F1.Timeout, F2.Timeout,
-                                         F3.Timeout, F4.Timeout};
   unsigned int stream_fifo_registers[] = {
       STREAM_FIFO_TIMER_0, STREAM_FIFO_TIMER_1, STREAM_FIFO_TIMER_2,
       STREAM_FIFO_TIMER_3, STREAM_FIFO_TIMER_4};
@@ -600,7 +598,7 @@ void setup_diag_timeout(u_int8_t fifo_num, u_int32_t timeout) {
     break;
   }
 
-  iowrite32(STREAM_TIMEOUT_ARRAY[fifo_num],
+  iowrite32(timeout,
             debug_port_base_address + stream_fifo_registers[fifo_num]);
 }
 
