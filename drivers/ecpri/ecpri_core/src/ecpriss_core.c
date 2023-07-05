@@ -86,8 +86,8 @@ static int ecpriss_core_remove(struct platform_device *pdev)
 		dma_ecpri_ss_driver_ops.ecpri_dma_ecpri_ss_deregister();
 		ecpriss_qudp_irq_destroy_v2();
 		ecpriss_xbar_destroy_interrupts_v2();
-		ecpriss_destroy_workq();
 		ecpriss_destroy_timers_v2();
+		ecpriss_destroy_workq();
 		ecpriss_destroy_ipc_log_v2();
 		ecpriss_unmap_xbar_qudp_v2();
 		netlink_kernel_release(ecpriss_pdata_v2->netlink_socket);
