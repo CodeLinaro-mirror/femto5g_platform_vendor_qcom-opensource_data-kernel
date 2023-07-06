@@ -1228,11 +1228,15 @@ static void __exit qcom_aw_phy_exit(void) {
   qcom_aw_phy_del_sysfs();
 #endif
 
-  if(qcom_aw_phy_config_info.phy_ipc_log_buf)
+  if(qcom_aw_phy_config_info.phy_ipc_log_buf){
     ipc_log_context_destroy(qcom_aw_phy_config_info.phy_ipc_log_buf);
+    qcom_aw_phy_config_info.phy_ipc_log_buf = NULL;
+  }
 
-  if(qcom_aw_phy_config_info.phy_ipc_log_buf_low)
+  if(qcom_aw_phy_config_info.phy_ipc_log_buf_low){
     ipc_log_context_destroy(qcom_aw_phy_config_info.phy_ipc_log_buf_low);
+    qcom_aw_phy_config_info.phy_ipc_log_buf_low = NULL;
+  }
 
   platform_driver_unregister(&qcom_aw_phy_inst_driver);
 
