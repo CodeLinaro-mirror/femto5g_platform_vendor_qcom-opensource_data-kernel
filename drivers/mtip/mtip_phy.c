@@ -1154,4 +1154,25 @@ int mtip_phy_destroy_phylink(u32 lane_index)
     return 0;
 }
 
+trx_link_length_range mtip_phy_get_trx_link_length_range(struct mtip_port_device_info* port_device)
+{
+    int i;
+    u32 port_type = port_device->port_type;
+    u32 lane_index;
+
+    // find a lane that is connected
+    for (i = 0; i < port_device->num_lane_phandles; ++i) 
+    {
+        lane_index = port_device->lane_devices[i]->lane_index;
+
+        if (platform_driver_priv->mtip_lanes[lane_index]->lane_state == MTIP_LANE_STATE_CONNECTED) 
+        {
+            CSMLOGINFO("mtip_phy_get_trx_link_length_range %d for port %d",
+                      platform_driver_priv->mtip_lanes[lane_index]->lane_qsfp_info.trx_link_length_range, port_type);
+            return platform_driver_priv->mtip_lanes[lane_index]->lane_qsfp_info.trx_link_length_range;
+        }
+    }
+
+    return TRX_LINK_UNKNOWN;
+}
 
