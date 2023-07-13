@@ -319,6 +319,11 @@ struct ecpri_dma_tx_header
 
 typedef void (*ecpri_dma_ready_cb)(void *user_data);
 
+/** ecpri_dma_status_code_to_str() - return the string represnetaion os the status code
+ * @status_code: status code to translate to string
+ */
+const char *ecpri_dma_status_code_to_str(enum ecpri_dma_status_code status_code);
+
 /* Architecture API functions */
 
 #endif //_ECPRI_DMA_H_

@@ -599,7 +599,9 @@ int ecpri_dma_dp_rx_poll(struct ecpri_dma_endp_context *endp, u32 budget,
 
 			curr_pkt_wrapper->comp_pkt.status_code = notify[i].status;
 			curr_pkt_wrapper->comp_pkt.phys_port = notify[i].phys_port;
+
 			curr_pkt_wrapper->bytes_xfered = notify[i].bytes_xfered;
+			endp->total_bytes_recv += notify[i].bytes_xfered;
 
 			switch (notify[i].evt_id) {
 			case GSI_CHAN_EVT_EOT:

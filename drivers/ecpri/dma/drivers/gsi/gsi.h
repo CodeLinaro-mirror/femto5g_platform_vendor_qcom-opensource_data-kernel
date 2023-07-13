@@ -1548,6 +1548,18 @@ int gsi_query_msi_addr(unsigned long chan_hdl, phys_addr_t *addr);
 void gsi_dump_ch_info(unsigned long chan_hdl);
 
 /**
+* gsi_dump_ch_info - channel information.
+*
+* @chan_id: channel id
+* @buf: pointer to buffer
+* @buf_size: buffer's size
+* @Return void
+*/
+int gsi_dump_ch_info_to_buffer(unsigned long chan_hdl,
+	u8* buf, size_t buf_size);
+
+
+/**
  * gsi_get_hw_profiling_stats() - Query GSI HW profiling stats
  * @stats:	[out] stats blob from client populated by driver
  *
