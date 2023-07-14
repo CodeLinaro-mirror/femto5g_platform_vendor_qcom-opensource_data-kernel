@@ -358,7 +358,7 @@ static int ecpri_dma_qmi_service_init_q6_send_msg(void)
 	ecpri_dma_qmi_ctx->q6_init_sent);
 
 	ecpri_dma_qmi_ctx->send_q6_init = false;
-	DMADBG("end_q6_init: %d\n",
+	DMADBG("send_q6_init: %d\n",
 	ecpri_dma_qmi_ctx->send_q6_init);
 
 	mutex_unlock(&ecpri_dma_qmi_ctx->lock);

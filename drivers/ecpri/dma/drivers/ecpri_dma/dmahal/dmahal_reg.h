@@ -467,4 +467,20 @@ static inline u32 ecpri_dma_hal_get_reg_ofst(enum ecpri_dma_hal_reg_name reg)
  */
 u32 ecpri_dma_hal_get_reg_base(void);
 
+/**
+ecpri_dma_hal_get_reg_max_m() - get max m value
+@reg: register name
+Return max m value
+*/
+u32 ecpri_dma_hal_get_reg_max_m(enum ecpri_dma_hal_reg_name reg);
+
+/**
+ecpri_dma_hal_get_reg_max_n() - get max m value
+@reg: register name
+Return max n value
+
+*/
+u32 ecpri_dma_hal_get_reg_max_n(enum ecpri_dma_hal_reg_name reg);
+
+
 #endif /* _DMAHAL_REG_H_ */

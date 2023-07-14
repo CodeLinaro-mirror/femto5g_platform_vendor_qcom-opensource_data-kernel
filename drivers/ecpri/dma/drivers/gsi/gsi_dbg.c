@@ -15,7 +15,7 @@
 #include "gsihal.h"
 
 #define GSI_MAX_MSG_LEN 4096
-
+#define GSI_MAX_READ_BLOCK (3000)
 #define TERR(fmt, args...) \
 		pr_err("%s:%d " fmt, __func__, __LINE__, ## args)
 #define TDBG(fmt, args...) \
@@ -26,24 +26,139 @@
 static struct dentry *dent;
 static char dbg_buff[GSI_MAX_MSG_LEN];
 static void *gsi_ipc_logbuf_low;
+static uint32_t gsi_ch_dump_last_index = 0;
+static uint32_t arg1, arg2, arg3, arg4;
+static uint32_t gsi_dump_stats_min, gsi_dump_stats_max;
+static int gsi_dump_stats_ch_id;
+static int gsi_dump_stats_ee;
+static int gsi_dump_stats_gsi_id;
+static bool gsi_read_finished = false;
 
 static void gsi_wq_print_dp_stats(struct work_struct *work);
 static DECLARE_DELAYED_WORK(gsi_print_dp_stats_work, gsi_wq_print_dp_stats);
 static void gsi_wq_update_dp_stats(struct work_struct *work);
 static DECLARE_DELAYED_WORK(gsi_update_dp_stats_work, gsi_wq_update_dp_stats);
 
-static ssize_t gsi_dump_evt(struct file *file,
-		const char __user *buf, size_t count, loff_t *ppos)
+static ssize_t gsi_dump_evt_read(struct file *file,
+	char __user *ubuf, size_t count, loff_t *ppos)
 {
-	u32 arg1;
-	u32 arg2;
-	u32 arg3;
-	u32 arg4;
-	unsigned long missing;
-	char *sptr, *token;
+	int ret;
+	int nbytes = 0;
 	uint32_t val;
 	struct gsi_evt_ctx *ctx;
 	uint16_t i;
+	loff_t pos = 0;
+
+	if (gsi_read_finished) {
+		return 0;
+	}
+
+	nbytes += scnprintf(dbg_buff + nbytes, GSI_MAX_MSG_LEN - nbytes,
+	"arg1=%u arg2=%u arg3=%u arg4=%u\n", arg1, arg2, arg3, arg4);
+
+	if (arg1 >= gsi_ctx->max_ev) {
+		nbytes += scnprintf(dbg_buff + nbytes, GSI_MAX_MSG_LEN - nbytes,
+		"invalid evt ring id %u\n", arg1);
+
+		ret =  simple_read_from_buffer(ubuf, nbytes + 1, ppos, dbg_buff, count);
+		return ret;
+	}
+
+	/* For first entry */
+	if (0 == gsi_ch_dump_last_index) {
+		val = gsihal_read_reg_pnk(GSI_EE_n_EV_CH_k_CNTXT_0,
+			arg3, arg2, arg1);
+		nbytes += scnprintf(dbg_buff + nbytes, GSI_MAX_MSG_LEN - nbytes,"EV%2d EE%d GSI ID %d CTX0  0x%x\n", arg1, arg2, arg3, val);
+
+		val = gsihal_read_reg_pnk(GSI_EE_n_EV_CH_k_CNTXT_1,
+			arg3, arg2, arg1);
+		nbytes += scnprintf(dbg_buff + nbytes, GSI_MAX_MSG_LEN - nbytes,"EV%2d EE%d GSI ID %d CTX1  0x%x\n", arg1, arg2, arg3, val);
+		val = gsihal_read_reg_pnk(GSI_EE_n_EV_CH_k_CNTXT_2,
+			arg3, arg2, arg1);
+		nbytes += scnprintf(dbg_buff + nbytes, GSI_MAX_MSG_LEN - nbytes,"EV%2d EE%d GSI ID %d CTX2  0x%x\n", arg1, arg2, arg3, val);
+		val = gsihal_read_reg_pnk(GSI_EE_n_EV_CH_k_CNTXT_3,
+			arg3, arg2, arg1);
+		nbytes += scnprintf(dbg_buff + nbytes, GSI_MAX_MSG_LEN - nbytes,"EV%2d EE%d GSI ID %d CTX3  0x%x\n", arg1, arg2, arg3, val);
+		val = gsihal_read_reg_pnk(GSI_EE_n_EV_CH_k_CNTXT_4,
+			arg3, arg2, arg1);
+		nbytes += scnprintf(dbg_buff + nbytes, GSI_MAX_MSG_LEN - nbytes,"EV%2d EE%d GSI ID %d CTX4  0x%x\n", arg1, arg2, arg3, val);
+		val = gsihal_read_reg_pnk(GSI_EE_n_EV_CH_k_CNTXT_5,
+			arg3, arg2, arg1);
+		nbytes += scnprintf(dbg_buff + nbytes, GSI_MAX_MSG_LEN - nbytes,"EV%2d EE%d GSI ID %d CTX5  0x%x\n", arg1, arg2, arg3, val);
+		val = gsihal_read_reg_pnk(GSI_EE_n_EV_CH_k_CNTXT_6,
+			arg3, arg2, arg1);
+		nbytes += scnprintf(dbg_buff + nbytes, GSI_MAX_MSG_LEN - nbytes,"EV%2d EE%d GSI ID %d CTX6  0x%x\n", arg1, arg2, arg3, val);
+		val = gsihal_read_reg_pnk(GSI_EE_n_EV_CH_k_CNTXT_7,
+			arg3, arg2, arg1);
+		nbytes += scnprintf(dbg_buff + nbytes, GSI_MAX_MSG_LEN - nbytes,"EV%2d EE%d GSI ID %d CTX7  0x%x\n", arg1, arg2, arg3, val);
+		val = gsihal_read_reg_pnk(GSI_EE_n_EV_CH_k_CNTXT_8,
+			arg3, arg2, arg1);
+		nbytes += scnprintf(dbg_buff + nbytes, GSI_MAX_MSG_LEN - nbytes,"EV%2d EE%d GSI ID %d CTX8  0x%x\n", arg1, arg2, arg3, val);
+		val = gsihal_read_reg_pnk(GSI_EE_n_EV_CH_k_CNTXT_9,
+			arg3, arg2, arg1);
+		nbytes += scnprintf(dbg_buff + nbytes, GSI_MAX_MSG_LEN - nbytes,"EV%2d EE%d GSI ID %d CTX9  0x%x\n", arg1, arg2, arg3, val);
+		val = gsihal_read_reg_pnk(GSI_EE_n_EV_CH_k_CNTXT_10,
+			arg3, arg2, arg1);
+		nbytes += scnprintf(dbg_buff + nbytes, GSI_MAX_MSG_LEN - nbytes,"EV%2d EE%d GSI ID %d CTX10 0x%x\n", arg1, arg2, arg3, val);
+		val = gsihal_read_reg_pnk(GSI_EE_n_EV_CH_k_CNTXT_11,
+			arg3, arg2, arg1);
+		nbytes += scnprintf(dbg_buff + nbytes, GSI_MAX_MSG_LEN - nbytes,"EV%2d EE%d GSI ID %d CTX11 0x%x\n", arg1, arg2, arg3, val);
+		val = gsihal_read_reg_pnk(GSI_EE_n_EV_CH_k_CNTXT_12,
+			arg3, arg2, arg1);
+		nbytes += scnprintf(dbg_buff + nbytes, GSI_MAX_MSG_LEN - nbytes,"EV%2d EE%d GSI ID %d CTX12 0x%x\n", arg1, arg2, arg3, val);
+		val = gsihal_read_reg_pnk(GSI_EE_n_EV_CH_k_CNTXT_13,
+			arg3, arg2, arg1);
+		nbytes += scnprintf(dbg_buff + nbytes, GSI_MAX_MSG_LEN - nbytes,"EV%2d EE%d GSI ID %d CTX13 0x%x\n", arg1, arg2, arg3, val);
+		val = gsihal_read_reg_pnk(GSI_EE_n_EV_CH_k_SCRATCH_0,
+			arg3, arg2, arg1);
+		nbytes += scnprintf(dbg_buff + nbytes, GSI_MAX_MSG_LEN - nbytes,"EV%2d EE%d GSI ID %d SCR0  0x%x\n", arg1, arg2, arg3, val);
+		val = gsihal_read_reg_pnk(GSI_EE_n_EV_CH_k_SCRATCH_1,
+			arg3, arg2, arg1);
+		nbytes += scnprintf(dbg_buff + nbytes, GSI_MAX_MSG_LEN - nbytes, "EV%2d EE%d GSI ID %d SCR1  0x%x\n", arg1, arg2, arg3, val);
+	}
+
+	gsi_read_finished = true;
+
+	if (arg4) {
+		ctx = &gsi_ctx->evtr[arg3][arg2][arg1];
+
+		if (ctx->props.ring_base_vaddr) {
+			for (i = gsi_ch_dump_last_index; i < ctx->props.ring_len / 16; i++) {
+				nbytes += scnprintf(dbg_buff + nbytes, GSI_MAX_MSG_LEN - nbytes,"EV%2d EE%d GSI ID %d (0x%08llx) %08x %08x %08x %08x\n",
+				arg1, arg2, arg3, ctx->props.ring_base_addr + i * 16,
+				*(u32 *)((u8 *)ctx->props.ring_base_vaddr +
+					i * 16 + 0),
+				*(u32 *)((u8 *)ctx->props.ring_base_vaddr +
+					i * 16 + 4),
+				*(u32 *)((u8 *)ctx->props.ring_base_vaddr +
+					i * 16 + 8),
+				*(u32 *)((u8 *)ctx->props.ring_base_vaddr +
+					i * 16 + 12));
+
+				if (nbytes > GSI_MAX_READ_BLOCK) {
+					gsi_read_finished = false;
+					break;
+				}
+			}
+
+			gsi_ch_dump_last_index = i + 1;
+
+		} else {
+			nbytes += scnprintf(dbg_buff + nbytes, GSI_MAX_MSG_LEN - nbytes,
+			"No VA supplied for event ring id %u\n", arg1);
+		}
+	}
+
+	ret = simple_read_from_buffer(ubuf,  nbytes + 1, &pos, dbg_buff, count);
+	return ret;
+}
+
+
+static ssize_t gsi_dump_evt_write(struct file *file,
+		const char __user *buf, size_t count, loff_t *ppos)
+{
+	unsigned long missing;
+	char *sptr, *token;
 
 	if (count >= sizeof(dbg_buff))
 		return -EINVAL;
@@ -59,6 +174,7 @@ static ssize_t gsi_dump_evt(struct file *file,
 	token = strsep(&sptr, " ");
 	if (!token)
 		return -EINVAL;
+
 	if (kstrtou32(token, 0, &arg1))
 		return -EINVAL;
 
@@ -87,62 +203,45 @@ static ssize_t gsi_dump_evt(struct file *file,
 		return -EINVAL;
 	}
 
-	val = gsihal_read_reg_pnk(GSI_EE_n_EV_CH_k_CNTXT_0,
-		arg3, arg2, arg1);
-	TERR("EV%2d EE%d GSI ID %d CTX0  0x%x\n", arg1, arg2, arg3, val);
-	val = gsihal_read_reg_pnk(GSI_EE_n_EV_CH_k_CNTXT_1,
-		arg3, arg2, arg1);
-	TERR("EV%2d EE%d GSI ID %d CTX1  0x%x\n", arg1, arg2, arg3, val);
-	val = gsihal_read_reg_pnk(GSI_EE_n_EV_CH_k_CNTXT_2,
-		arg3, arg2, arg1);
-	TERR("EV%2d EE%d GSI ID %d CTX2  0x%x\n", arg1, arg2, arg3, val);
-	val = gsihal_read_reg_pnk(GSI_EE_n_EV_CH_k_CNTXT_3,
-		arg3, arg2, arg1);
-	TERR("EV%2d EE%d GSI ID %d CTX3  0x%x\n", arg1, arg2, arg3, val);
-	val = gsihal_read_reg_pnk(GSI_EE_n_EV_CH_k_CNTXT_4,
-		arg3, arg2, arg1);
-	TERR("EV%2d EE%d GSI ID %d CTX4  0x%x\n", arg1, arg2, arg3, val);
-	val = gsihal_read_reg_pnk(GSI_EE_n_EV_CH_k_CNTXT_5,
-		arg3, arg2, arg1);
-	TERR("EV%2d EE%d GSI ID %d CTX5  0x%x\n", arg1, arg2, arg3, val);
-	val = gsihal_read_reg_pnk(GSI_EE_n_EV_CH_k_CNTXT_6,
-		arg3, arg2, arg1);
-	TERR("EV%2d EE%d GSI ID %d CTX6  0x%x\n", arg1, arg2, arg3, val);
-	val = gsihal_read_reg_pnk(GSI_EE_n_EV_CH_k_CNTXT_7,
-		arg3, arg2, arg1);
-	TERR("EV%2d EE%d GSI ID %d CTX7  0x%x\n", arg1, arg2, arg3, val);
-	val = gsihal_read_reg_pnk(GSI_EE_n_EV_CH_k_CNTXT_8,
-		arg3, arg2, arg1);
-	TERR("EV%2d EE%d GSI ID %d CTX8  0x%x\n", arg1, arg2, arg3, val);
-	val = gsihal_read_reg_pnk(GSI_EE_n_EV_CH_k_CNTXT_9,
-		arg3, arg2, arg1);
-	TERR("EV%2d EE%d GSI ID %d CTX9  0x%x\n", arg1, arg2, arg3, val);
-	val = gsihal_read_reg_pnk(GSI_EE_n_EV_CH_k_CNTXT_10,
-		arg3, arg2, arg1);
-	TERR("EV%2d EE%d GSI ID %d CTX10 0x%x\n", arg1, arg2, arg3, val);
-	val = gsihal_read_reg_pnk(GSI_EE_n_EV_CH_k_CNTXT_11,
-		arg3, arg2, arg1);
-	TERR("EV%2d EE%d GSI ID %d CTX11 0x%x\n", arg1, arg2, arg3, val);
-	val = gsihal_read_reg_pnk(GSI_EE_n_EV_CH_k_CNTXT_12,
-		arg3, arg2, arg1);
-	TERR("EV%2d EE%d GSI ID %d CTX12 0x%x\n", arg1, arg2, arg3, val);
-	val = gsihal_read_reg_pnk(GSI_EE_n_EV_CH_k_CNTXT_13,
-		arg3, arg2, arg1);
-	TERR("EV%2d EE%d GSI ID %d CTX13 0x%x\n", arg1, arg2, arg3, val);
-	val = gsihal_read_reg_pnk(GSI_EE_n_EV_CH_k_SCRATCH_0,
-		arg3, arg2, arg1);
-	TERR("EV%2d EE%d GSI ID %d SCR0  0x%x\n", arg1, arg2, arg3, val);
-	val = gsihal_read_reg_pnk(GSI_EE_n_EV_CH_k_SCRATCH_1,
-		arg3, arg2, arg1);
-	TERR("EV%2d EE%d GSI ID %d SCR1  0x%x\n", arg1, arg2, arg3, val);
+	/* Reset loop position */
+	gsi_ch_dump_last_index = 0;
+	gsi_read_finished = false;
+
+	return count;
+}
+
+static ssize_t gsi_ch_dump_read(struct file *file,
+	char __user *ubuf, size_t count, loff_t *ppos)
+{
+	int ret;
+	u32 nbytes = 0;
+	int i = 0;
+	struct gsi_chan_ctx *ctx;
+	loff_t pos = 0;
+
+	if (gsi_read_finished) {
+		return 0;
+	}
+
+	ctx = &gsi_ctx->chan[arg3][arg2][arg1];
+
+	/* Dump GSI info on first access*/
+	if (0 == gsi_ch_dump_last_index) {
+		nbytes += scnprintf(dbg_buff + nbytes, GSI_MAX_MSG_LEN - nbytes,
+		"arg1 %d, arg2 %d arg3 %d arg4 %d ring_base_vaddr %d ring_len %d\n",
+		arg1, arg2 ,arg3, arg4, ctx->props.ring_base_vaddr, ctx->props.ring_len);
+
+		nbytes += gsi_dump_ch_info_to_buffer(ctx->hdl, dbg_buff + nbytes, GSI_MAX_MSG_LEN);
+	}
+
+	gsi_read_finished = true;
 
 	if (arg4) {
-		ctx = &gsi_ctx->evtr[arg3][arg2][arg1];
-
 		if (ctx->props.ring_base_vaddr) {
-			for (i = 0; i < ctx->props.ring_len / 16; i++)
-				TERR("EV%2d EE%d GSI ID %d (0x%08llx) %08x %08x %08x %08x\n",
-				arg1, arg2, arg3, ctx->props.ring_base_addr + i * 16,
+
+			for (i = gsi_ch_dump_last_index; i < ctx->props.ring_len / 16; i++) {
+				nbytes += scnprintf(dbg_buff + nbytes, GSI_MAX_MSG_LEN - nbytes,"CH%2d (0x%08llx) %08x %08x %08x %08x\n",
+				arg1, ctx->props.ring_base_addr + i * 16,
 				*(u32 *)((u8 *)ctx->props.ring_base_vaddr +
 					i * 16 + 0),
 				*(u32 *)((u8 *)ctx->props.ring_base_vaddr +
@@ -151,25 +250,155 @@ static ssize_t gsi_dump_evt(struct file *file,
 					i * 16 + 8),
 				*(u32 *)((u8 *)ctx->props.ring_base_vaddr +
 					i * 16 + 12));
+
+				if (nbytes > GSI_MAX_READ_BLOCK) {
+					gsi_read_finished = false;
+					break;
+				}
+			}
+			gsi_ch_dump_last_index = i + 1;
+
 		} else {
-			TERR("No VA supplied for event ring id %u\n", arg1);
+			nbytes += scnprintf(dbg_buff + nbytes, GSI_MAX_MSG_LEN - nbytes,"No VA supplied for chan id %u\n", arg1);
 		}
 	}
 
+	if (0 == nbytes) {
+		gsi_ch_dump_last_index = 0;
+		return 0;
+	}
+
+	ret = simple_read_from_buffer(ubuf, nbytes + 1, &pos, dbg_buff, count);
+	return ret;
+}
+
+
+static ssize_t gsi_ch_dump_write(struct file *file,
+		const char __user *buf, size_t count, loff_t *ppos)
+{
+	unsigned long missing;
+	char *sptr, *token;
+	if (count >= sizeof(dbg_buff))
+		return -EINVAL;
+
+	missing = copy_from_user(dbg_buff, buf, count);
+	if (missing)
+		return -EFAULT;
+
+	dbg_buff[count] = '\0';
+
+	sptr = dbg_buff;
+
+	token = strsep(&sptr, " ");
+	if (!token)
+		return -EINVAL;
+
+	if (kstrtou32(token, 0, &arg1))
+		return -EINVAL;
+
+	token = strsep(&sptr, " ");
+	if (!token)
+		return -EINVAL;
+
+	if (kstrtou32(token, 0, &arg2))
+		return -EINVAL;
+
+	token = strsep(&sptr, " ");
+	if (!token)
+		return -EINVAL;
+
+	if (kstrtou32(token, 0, &arg3))
+		return -EINVAL;
+
+	token = strsep(&sptr, " ");
+	if (!token)
+		return -EINVAL;
+
+	if (kstrtou32(token, 0, &arg4))
+		return -EINVAL;
+
+	TERR("arg1=%u arg2=%u arg3=%u arg4=%u\n", arg1, arg2, arg3, arg4);
+
+	if (arg1 >= gsi_ctx->max_ch) {
+		TERR("invalid chan id %u\n", arg1);
+		return -EINVAL;
+	}
+
+	gsi_ch_dump_last_index = 0;
+	gsi_read_finished = false;
 	return count;
 }
 
-static ssize_t gsi_dump_ch(struct file *file,
+static int gsi_ch_dump_stats(u8* dbg_buff, struct gsi_chan_ctx *ctx)
+{
+	int nbytes = 0;
+
+	if (!ctx->allocated)
+		return nbytes;
+
+	nbytes += scnprintf(dbg_buff + nbytes, GSI_MAX_MSG_LEN - nbytes, "CH%2d:\n", ctx->props.ch_id);
+	nbytes += scnprintf(dbg_buff + nbytes, GSI_MAX_MSG_LEN - nbytes, "queued=%lu compl=%lu\n",
+		ctx->stats.queued,
+		ctx->stats.completed);
+	nbytes += scnprintf(dbg_buff + nbytes, GSI_MAX_MSG_LEN - nbytes, "cb->poll=%lu poll->cb=%lu poll_pend_irq=%lu\n",
+		ctx->stats.callback_to_poll,
+		ctx->stats.poll_to_callback,
+		ctx->stats.poll_pending_irq);
+	nbytes += scnprintf(dbg_buff + nbytes, GSI_MAX_MSG_LEN - nbytes, "invalid_tre_error=%lu\n",
+		ctx->stats.invalid_tre_error);
+	nbytes += scnprintf(dbg_buff + nbytes, GSI_MAX_MSG_LEN - nbytes, "poll_ok=%lu poll_empty=%lu\n",
+		ctx->stats.poll_ok, ctx->stats.poll_empty);
+	if (ctx->evtr)
+		nbytes += scnprintf(dbg_buff + nbytes, GSI_MAX_MSG_LEN - nbytes, "compl_evt=%lu\n",
+			ctx->evtr->stats.completed);
+	nbytes += scnprintf(dbg_buff + nbytes, GSI_MAX_MSG_LEN - nbytes, "userdata_in_use=%lu\n", ctx->stats.userdata_in_use);
+
+	nbytes += scnprintf(dbg_buff + nbytes, GSI_MAX_MSG_LEN - nbytes, "ch_below_lo=%lu\n", ctx->stats.dp.ch_below_lo);
+	nbytes += scnprintf(dbg_buff + nbytes, GSI_MAX_MSG_LEN - nbytes, "ch_below_hi=%lu\n", ctx->stats.dp.ch_below_hi);
+	nbytes += scnprintf(dbg_buff + nbytes, GSI_MAX_MSG_LEN - nbytes, "ch_above_hi=%lu\n", ctx->stats.dp.ch_above_hi);
+	nbytes += scnprintf(dbg_buff + nbytes, GSI_MAX_MSG_LEN - nbytes, "time_empty=%lums\n", ctx->stats.dp.empty_time);
+	nbytes += scnprintf(dbg_buff + nbytes, GSI_MAX_MSG_LEN - nbytes, "\n");
+
+	return nbytes;
+}
+
+static ssize_t gsi_dump_stats_read(struct file *file,
+	char __user *ubuf, size_t count, loff_t *ppos)
+{
+	int ret;
+	u32 nbytes = 0;
+	int ch_id;
+	loff_t pos = 0;
+
+	if (gsi_read_finished) {
+		return 0;
+	}
+
+	gsi_read_finished = true;
+
+	for (ch_id = gsi_dump_stats_min; ch_id < gsi_dump_stats_max; ch_id++) {
+		nbytes += gsi_ch_dump_stats(dbg_buff + nbytes,
+			&gsi_ctx->chan[gsi_dump_stats_gsi_id][gsi_dump_stats_ee][ch_id]);
+
+		if (nbytes > GSI_MAX_READ_BLOCK) {
+			gsi_read_finished = false;
+			break;
+		}
+	}
+
+	/* Remember last read channel*/
+	gsi_dump_stats_min = ch_id + 1;
+
+	ret = simple_read_from_buffer(ubuf, nbytes + 1, &pos, dbg_buff, count);
+	return ret;
+}
+
+static ssize_t gsi_dump_stats_write(struct file *file,
 		const char __user *buf, size_t count, loff_t *ppos)
 {
-	u32 arg1;
-	u32 arg2;
-	u32 arg3;
-	u32 arg4;
+
 	unsigned long missing;
 	char *sptr, *token;
-	struct gsi_chan_ctx *ctx;
-	uint16_t i;
 
 	if (count >= sizeof(dbg_buff))
 		return -EINVAL;
@@ -185,123 +414,47 @@ static ssize_t gsi_dump_ch(struct file *file,
 	token = strsep(&sptr, " ");
 	if (!token)
 		return -EINVAL;
-	if (kstrtou32(token, 0, &arg1))
+
+	if (kstrtos32(token, 0, &gsi_dump_stats_ch_id))
 		return -EINVAL;
 
 	token = strsep(&sptr, " ");
 	if (!token)
 		return -EINVAL;
-	if (kstrtou32(token, 0, &arg2))
+
+	if (kstrtos32(token, 0, &gsi_dump_stats_gsi_id))
 		return -EINVAL;
 
 	token = strsep(&sptr, " ");
 	if (!token)
 		return -EINVAL;
-	if (kstrtou32(token, 0, &arg3))
+
+	if (kstrtos32(token, 0, &gsi_dump_stats_ee))
 		return -EINVAL;
 
-	token = strsep(&sptr, " ");
-	if (!token)
+	if (gsi_dump_stats_ch_id == -1) {
+		gsi_dump_stats_min = 0;
+		gsi_dump_stats_max = gsi_ctx->max_ch;
+
+	} else if (gsi_dump_stats_ch_id < 0 || gsi_dump_stats_ch_id >= gsi_ctx->max_ch) {
+		TERR("Error: channel id is out of range [%d].\n",
+		gsi_dump_stats_ch_id);
 		return -EINVAL;
-	if (kstrtou32(token, 0, &arg4))
+
+	} else if (
+		!gsi_ctx->chan[gsi_dump_stats_gsi_id][gsi_dump_stats_ee] [gsi_dump_stats_ch_id].allocated) {
+		TERR("Error: requested channel isn't allocated [%d].\n",
+		 gsi_dump_stats_ch_id);
 		return -EINVAL;
 
-	TDBG("arg1=%u arg2=%u arg3=%u arg4=%u\n", arg1, arg2, arg3, arg4);
-
-	if (arg1 >= gsi_ctx->max_ch) {
-		TERR("invalid chan id %u\n", arg1);
-		return -EINVAL;
-	}
-
-	ctx = &gsi_ctx->chan[arg3][arg2][arg1];
-	gsi_dump_ch_info(ctx->hdl);
-
-	if (arg4) {
-		if (ctx->props.ring_base_vaddr) {
-			for (i = 0; i < ctx->props.ring_len / 16; i++)
-				TERR("CH%2d (0x%08llx) %08x %08x %08x %08x\n",
-				arg1, ctx->props.ring_base_addr + i * 16,
-				*(u32 *)((u8 *)ctx->props.ring_base_vaddr +
-					i * 16 + 0),
-				*(u32 *)((u8 *)ctx->props.ring_base_vaddr +
-					i * 16 + 4),
-				*(u32 *)((u8 *)ctx->props.ring_base_vaddr +
-					i * 16 + 8),
-				*(u32 *)((u8 *)ctx->props.ring_base_vaddr +
-					i * 16 + 12));
-		} else {
-			TERR("No VA supplied for chan id %u\n", arg1);
-		}
-	}
-
-	return count;
-}
-
-static void gsi_dump_ch_stats(struct gsi_chan_ctx *ctx)
-{
-	if (!ctx->allocated)
-		return;
-
-	PRT_STAT("CH%2d:\n", ctx->props.ch_id);
-	PRT_STAT("queued=%lu compl=%lu\n",
-		ctx->stats.queued,
-		ctx->stats.completed);
-	PRT_STAT("cb->poll=%lu poll->cb=%lu poll_pend_irq=%lu\n",
-		ctx->stats.callback_to_poll,
-		ctx->stats.poll_to_callback,
-		ctx->stats.poll_pending_irq);
-	PRT_STAT("invalid_tre_error=%lu\n",
-		ctx->stats.invalid_tre_error);
-	PRT_STAT("poll_ok=%lu poll_empty=%lu\n",
-		ctx->stats.poll_ok, ctx->stats.poll_empty);
-	if (ctx->evtr)
-		PRT_STAT("compl_evt=%lu\n",
-			ctx->evtr->stats.completed);
-	PRT_STAT("userdata_in_use=%lu\n", ctx->stats.userdata_in_use);
-
-	PRT_STAT("ch_below_lo=%lu\n", ctx->stats.dp.ch_below_lo);
-	PRT_STAT("ch_below_hi=%lu\n", ctx->stats.dp.ch_below_hi);
-	PRT_STAT("ch_above_hi=%lu\n", ctx->stats.dp.ch_above_hi);
-	PRT_STAT("time_empty=%lums\n", ctx->stats.dp.empty_time);
-	PRT_STAT("\n");
-}
-
-static ssize_t gsi_dump_stats(struct file *file,
-		const char __user *buf, size_t count, loff_t *ppos)
-{
-	int ch_id, ee, gsi_id;
-	int min, max, ret;
-
-	ret = kstrtos32_from_user(buf, count, 0, &ch_id);
-	if (ret)
-		return ret;
-
-	ret = kstrtos32_from_user(buf, count, 0, &ee);
-	if (ret)
-		return ret;
-
-	ret = kstrtos32_from_user(buf, count, 0, &gsi_id);
-	if (ret)
-		return ret;
-
-	if (ch_id == -1) {
-		min = 0;
-		max = gsi_ctx->max_ch;
-	} else if (ch_id < 0 || ch_id >= gsi_ctx->max_ch ||
-		   !gsi_ctx->chan[gsi_id][ee][ch_id].allocated) {
-		goto error;
 	} else {
-		min = ch_id;
-		max = ch_id + 1;
+		gsi_dump_stats_min = gsi_dump_stats_ch_id;
+		gsi_dump_stats_max = gsi_dump_stats_ch_id + 1;
 	}
 
-	for (ch_id = min; ch_id < max; ch_id++)
-		gsi_dump_ch_stats(&gsi_ctx->chan[gsi_id][ee][ch_id]);
-
+	/* Reset read flag */
+	gsi_read_finished = false;
 	return count;
-error:
-	TERR("Usage: echo ch_id > stats. Use -1 for all\n");
-	return -EINVAL;
 }
 
 static int gsi_dbg_create_stats_wq(void)
@@ -331,12 +484,16 @@ static ssize_t gsi_enable_dp_stats(struct file *file,
 	int ch_id, ee, gsi_id;
 	bool enable;
 	int ret;
+	char *sptr, *token;
+
 
 	if (count >= sizeof(dbg_buff))
 		goto error;
 
 	if (copy_from_user(dbg_buff, buf, count))
 		goto error;
+
+	sptr = dbg_buff;
 
 	dbg_buff[count] = '\0';
 
@@ -345,17 +502,37 @@ static ssize_t gsi_enable_dp_stats(struct file *file,
 
 	enable = (dbg_buff[0] == '+');
 
-	if (kstrtos32(dbg_buff + 1, 0, &ch_id))
+	/* Skip +/- argments */
+	sptr = dbg_buff + 2;
+
+	token = strsep(&sptr, " ");
+	if (!token)
 		goto error;
 
-	if (kstrtos32(dbg_buff + 1, 0, &ee))
+
+	if (kstrtou32(token, 0, &ch_id))
 		goto error;
 
-	if (kstrtos32(dbg_buff + 1, 0, &gsi_id))
+
+	token = strsep(&sptr, " ");
+	if (!token)
+		goto error;
+
+
+	if (kstrtou32(token, 0, &gsi_id))
+		goto error;
+
+
+	token = strsep(&sptr, " ");
+	if (!token)
+		goto error;
+
+
+	if (kstrtou32(token, 0, &ee))
 		goto error;
 
 	if (ch_id < 0 || ch_id >= gsi_ctx->max_ch ||
-	    !gsi_ctx->chan[gsi_id][ee][ch_id].allocated) {
+		!gsi_ctx->chan[gsi_id][ee][ch_id].allocated) {
 		goto error;
 	}
 
@@ -363,6 +540,7 @@ static ssize_t gsi_enable_dp_stats(struct file *file,
 		TERR("ch_%d: already enabled/disabled\n", ch_id);
 		return -EINVAL;
 	}
+
 	gsi_ctx->chan[gsi_id][ee][ch_id].enable_dp_stats = enable;
 
 	if (enable)
@@ -410,33 +588,36 @@ static ssize_t gsi_set_max_elem_dp_stats(struct file *file,
 	sptr = dbg_buff;
 
 	token = strsep(&sptr, " ");
-	if (!token) {
-		TERR("\n");
+	if (!token)
 		goto error;
-	}
 
-	if (kstrtou32(token, 0, &ch_id)) {
-		TERR("\n");
+	if (kstrtou32(token, 0, &ch_id))
 		goto error;
-	}
 
-	if (kstrtou32(token, 0, &ee)) {
-		TERR("\n");
+	token = strsep(&sptr, " ");
+	if (!token)
 		goto error;
-	}
 
-	if (kstrtou32(token, 0, &gsi_id)) {
-		TERR("\n");
+	if (kstrtou32(token, 0, &gsi_id))
 		goto error;
-	}
+
+	token = strsep(&sptr, " ");
+	if (!token)
+		goto error;
+
+	if (kstrtou32(token, 0, &ee))
+		goto error;
+
 
 	token = strsep(&sptr, " ");
 	if (!token) {
 		/* get */
 		if (kstrtou32(dbg_buff, 0, &ch_id))
 			goto error;
+
 		if (ch_id >= gsi_ctx->max_ch)
 			goto error;
+
 		PRT_STAT("ch %d: max_re_expected=%d\n", ch_id,
 			gsi_ctx->chan[gsi_id][ee][ch_id].props.max_re_expected);
 		return count;
@@ -473,9 +654,11 @@ static void gsi_wq_print_dp_stats(struct work_struct *work)
 		{
 			if (ee == GSI_Q6_EE)
 				continue;
+
 			for (ch_id = 0; ch_id < gsi_ctx->max_ch; ch_id++) {
 				if (gsi_ctx->chan[gsi_id][ee][ch_id].print_dp_stats)
-					gsi_dump_ch_stats(&gsi_ctx->chan[gsi_id][ee][ch_id]);
+					gsi_ch_dump_stats(dbg_buff, &gsi_ctx->chan[gsi_id][ee][ch_id]);
+					TERR("%s\n", dbg_buff);
 			}
 		}
 	}
@@ -541,20 +724,55 @@ static void gsi_wq_update_dp_stats(struct work_struct *work)
 static ssize_t gsi_rst_stats(struct file *file,
 		const char __user *buf, size_t count, loff_t *ppos)
 {
-	int ch_id, ee, gsi_id;
-	int min, max, ret;
 
-	ret = kstrtos32_from_user(buf, count, 0, &ch_id);
-	if (ret)
-		return ret;
+	u32 ch_id, ee, gsi_id;
+	unsigned long missing;
+	char *sptr, *token;
+	int min, max;
 
-	ret = kstrtos32_from_user(buf, count, 0, &ee);
-	if (ret)
-		return ret;
+	if (count >= sizeof(dbg_buff))
+		goto error;
 
-	ret = kstrtos32_from_user(buf, count, 0, &gsi_id);
-	if (ret)
-		return ret;
+	missing = copy_from_user(dbg_buff, buf, count);
+	if (missing)
+		goto error;
+
+	dbg_buff[count] = '\0';
+
+	sptr = dbg_buff;
+
+	token = strsep(&sptr, " ");
+	if (!token) {
+		TERR("\n");
+		goto error;
+	}
+
+	if (kstrtou32(token, 0, &ch_id)) {
+		TERR("\n");
+		goto error;
+	}
+
+	token = strsep(&sptr, " ");
+	if (!token) {
+		TERR("\n");
+		goto error;
+	}
+
+	if (kstrtou32(token, 0, &gsi_id)) {
+		TERR("\n");
+		goto error;
+	}
+
+	token = strsep(&sptr, " ");
+	if (!token) {
+		TERR("\n");
+		goto error;
+	}
+
+	if (kstrtou32(token, 0, &ee)) {
+		TERR("\n");
+		goto error;
+	}
 
 	if (ch_id == -1) {
 		min = 0;
@@ -583,6 +801,7 @@ static ssize_t gsi_print_dp_stats(struct file *file,
 	int ch_id, ee, gsi_id;
 	bool enable;
 	int ret;
+	char *sptr, *token;
 
 	if (count >= sizeof(dbg_buff))
 		goto error;
@@ -597,17 +816,47 @@ static ssize_t gsi_print_dp_stats(struct file *file,
 
 	enable = (dbg_buff[0] == '+');
 
-	if (kstrtos32(dbg_buff + 1, 0, &ch_id))
+	if (count >= sizeof(dbg_buff))
 		goto error;
 
-	if (kstrtos32(dbg_buff + 1, 0, &ee))
-		goto error;
+	/* Skip +/- argments */
+	sptr = dbg_buff + 2;
 
-	if (kstrtos32(dbg_buff + 1, 0, &gsi_id))
+	token = strsep(&sptr, " ");
+	if (!token) {
+		TERR("\n");
 		goto error;
+	}
+
+	if (kstrtou32(token, 0, &ch_id)) {
+		TERR("\n");
+		goto error;
+	}
+
+	token = strsep(&sptr, " ");
+	if (!token) {
+		TERR("\n");
+		goto error;
+	}
+
+	if (kstrtou32(token, 0, &gsi_id)) {
+		TERR("\n");
+		goto error;
+	}
+
+	token = strsep(&sptr, " ");
+	if (!token) {
+		TERR("\n");
+		goto error;
+	}
+
+	if (kstrtou32(token, 0, &ee)) {
+		TERR("\n");
+		goto error;
+	}
 
 	if (ch_id < 0 || ch_id >= gsi_ctx->max_ch ||
-	    !gsi_ctx->chan[gsi_id][ee][ch_id].allocated) {
+		!gsi_ctx->chan[gsi_id][ee][ch_id].allocated) {
 		goto error;
 	}
 
@@ -615,6 +864,7 @@ static ssize_t gsi_print_dp_stats(struct file *file,
 		TERR("ch_%d: already enabled/disabled\n", ch_id);
 		return -EINVAL;
 	}
+
 	gsi_ctx->chan[gsi_id][ee][ch_id].print_dp_stats = enable;
 
 	if (enable)
@@ -631,7 +881,7 @@ static ssize_t gsi_print_dp_stats(struct file *file,
 		cancel_delayed_work_sync(&gsi_print_dp_stats_work);
 		queue_delayed_work(gsi_ctx->dp_stat_wq,
 			&gsi_print_dp_stats_work, msecs_to_jiffies(10));
-	} else if (!enable && gsi_ctx->num_ch_dp_stats == 0) {
+	} else if (!enable && gsi_ctx->num_ch_dp_stats <= 0) {
 		gsi_dbg_destroy_stats_wq();
 	}
 
@@ -673,9 +923,11 @@ static ssize_t gsi_read_gsi_hw_profiling_stats(struct file *file,
 	char __user *buf, size_t count, loff_t *ppos)
 {
 	struct gsi_hw_profiling_data stats;
-	int nbytes, cnt = 0;
+	int nbytes = 0;
 	u64 totalCycles = 0, util = 0;
 	u32 gsi_id;
+	int ret;
+	loff_t pos = 0;
 
 	for (gsi_id = 0; gsi_id < gsi_ctx->num_of_gsi; gsi_id++)
 	{
@@ -691,7 +943,7 @@ static ssize_t gsi_read_gsi_hw_profiling_stats(struct file *file,
 			else
 				util = 0;
 
-			nbytes = scnprintf(dbg_buff, GSI_MAX_MSG_LEN,
+			nbytes += scnprintf(dbg_buff + nbytes, GSI_MAX_MSG_LEN,
 				"Results for GSI ID %d\n"
 				"bp_count=0x%llx\n"
 				"bp_and_pending_count=0x%llx\n"
@@ -706,50 +958,55 @@ static ssize_t gsi_read_gsi_hw_profiling_stats(struct file *file,
 				stats.mcs_idle_cnt[gsi_id],
 				totalCycles,
 				util);
-			cnt += nbytes;
 		}
 		else {
-			nbytes = scnprintf(dbg_buff, GSI_MAX_MSG_LEN,
+			nbytes += scnprintf(dbg_buff + nbytes, GSI_MAX_MSG_LEN,
 				"Fail to read GSI HW Profiling stats\n");
-			cnt += nbytes;
 		}
 	}
-
-	return simple_read_from_buffer(buf, count, ppos, dbg_buff, cnt);
+	ret = simple_read_from_buffer(buf, nbytes + 1, &pos, dbg_buff, count);
+	return 0;
 }
 
 static ssize_t gsi_read_gsi_fw_version(struct file *file,
 	char __user *buf, size_t count, loff_t *ppos)
 {
 	struct gsi_fw_version ver;
-	int nbytes, cnt = 0;
+	int nbytes = 0;
+	int cnt = 0;
+	loff_t pos = 0;
+	int ret;
 
 	if (!gsi_get_fw_version(&ver)) {
-		nbytes = scnprintf(dbg_buff, GSI_MAX_MSG_LEN,
+		nbytes += scnprintf(dbg_buff, GSI_MAX_MSG_LEN,
 			"hw=%d\nflavor=%d\nfw=%d\n",
 			ver.hw,
 			ver.flavor,
 			ver.fw);
 		cnt += nbytes;
 	} else {
-		nbytes = scnprintf(dbg_buff, GSI_MAX_MSG_LEN,
+		nbytes += scnprintf(dbg_buff, GSI_MAX_MSG_LEN,
 			"Fail to read GSI FW version\n");
 		cnt += nbytes;
 	}
 
-	return simple_read_from_buffer(buf, count, ppos, dbg_buff, cnt);
+	ret = simple_read_from_buffer(buf, nbytes, &pos, dbg_buff, count);
+	return 0;
 }
 
 static const struct file_operations gsi_ev_dump_ops = {
-	.write = gsi_dump_evt,
+	.write = gsi_dump_evt_write,
+	.read =  gsi_dump_evt_read
 };
 
 static const struct file_operations gsi_ch_dump_ops = {
-	.write = gsi_dump_ch,
+	.write = gsi_ch_dump_write,
+	.read =  gsi_ch_dump_read
 };
 
 static const struct file_operations gsi_stats_ops = {
-	.write = gsi_dump_stats,
+	.write = gsi_dump_stats_write,
+	.read =  gsi_dump_stats_read
 };
 
 static const struct file_operations gsi_enable_dp_stats_ops = {
@@ -785,6 +1042,7 @@ void gsi_debugfs_init(void)
 	static struct dentry *dfile;
 	const mode_t write_only_mode = 0220;
 	const mode_t read_only_mode = 0440;
+	const mode_t read_write_mode = 0664;
 
 	dent = debugfs_create_dir("gsi", 0);
 	if (IS_ERR(dent)) {
@@ -792,21 +1050,21 @@ void gsi_debugfs_init(void)
 		return;
 	}
 
-	dfile = debugfs_create_file("ev_dump", write_only_mode,
+	dfile = debugfs_create_file("ev_dump", read_write_mode,
 			dent, 0, &gsi_ev_dump_ops);
 	if (!dfile || IS_ERR(dfile)) {
 		TERR("fail to create ev_dump file\n");
 		goto fail;
 	}
 
-	dfile = debugfs_create_file("ch_dump", write_only_mode,
+	dfile = debugfs_create_file("ch_dump", read_write_mode,
 			dent, 0, &gsi_ch_dump_ops);
 	if (!dfile || IS_ERR(dfile)) {
 		TERR("fail to create ch_dump file\n");
 		goto fail;
 	}
 
-	dfile = debugfs_create_file("stats", write_only_mode, dent,
+	dfile = debugfs_create_file("stats", read_write_mode, dent,
 			0, &gsi_stats_ops);
 	if (!dfile || IS_ERR(dfile)) {
 		TERR("fail to create stats file\n");
