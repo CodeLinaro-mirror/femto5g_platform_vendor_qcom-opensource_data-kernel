@@ -1108,12 +1108,18 @@ int qcom_aw_phy_bringup_manual_eq_mode(
   }
 
   // TX FIR Config
-  txfir_cfg.CM3 = 0;
-  txfir_cfg.CM2 = 0;
-  txfir_cfg.CM1 = 0;
-  txfir_cfg.C0 = 60;
-  txfir_cfg.C1 = 0;
-  txfir_cfg.main_or_max = 1;
+#ifdef FEATURE_QCOM_AW_TEST_SYS_FS
+  if(qcom_aw_phy_get_tx_fir_val(phy_inst_info->phy_inst, (void*)&txfir_cfg) == false)
+#endif
+  {
+    txfir_cfg.CM3 = 0;
+    txfir_cfg.CM2 = 0;
+    txfir_cfg.CM1 = 0;
+    txfir_cfg.C0 = 63;
+    txfir_cfg.C1 = 0;
+    txfir_cfg.main_or_max = 1;
+  }
+
   aw_pmd_txfir_config_set(mss, &txfir_cfg, 1);
 
   aw_pmd_rx_background_adapt_enable_set(mss, 1);
@@ -1949,12 +1955,18 @@ void qcom_aw_phy_handle_rx_sig_detect(struct work_struct *work){
       }
 
       // TX FIR Config
-      txfir_cfg.CM3 = 0;
-      txfir_cfg.CM2 = 0;
-      txfir_cfg.CM1 = 0;
-      txfir_cfg.C0 = 60;
-      txfir_cfg.C1 = 0;
-      txfir_cfg.main_or_max = 1;
+#ifdef FEATURE_QCOM_AW_TEST_SYS_FS
+      if(qcom_aw_phy_get_tx_fir_val(phy_inst_info->phy_inst, (void*)&txfir_cfg) == false)
+#endif
+      {
+        txfir_cfg.CM3 = 0;
+        txfir_cfg.CM2 = 0;
+        txfir_cfg.CM1 = 0;
+        txfir_cfg.C0 = 63;
+        txfir_cfg.C1 = 0;
+        txfir_cfg.main_or_max = 1;
+      }
+
       aw_pmd_txfir_config_set(&mss, &txfir_cfg, 1);
 
       aw_pmd_rx_background_adapt_enable_set(&mss, 1);
