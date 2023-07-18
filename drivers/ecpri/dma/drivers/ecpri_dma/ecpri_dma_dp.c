@@ -130,7 +130,7 @@ void ecpri_dma_dp_tasklet_exception_notify(unsigned long data)
 	endp = (struct ecpri_dma_endp_context *)data;
 
 	if (unlikely(!endp || !endp->gsi_ep_cfg->is_exception)) {
-		DMAERR("Exception pkt recieved on non exception endp\n");
+		DMAERR("Exception pkt received on non exception endp\n");
 		ecpri_dma_assert();
 	}
 
@@ -172,7 +172,7 @@ void ecpri_dma_dp_tasklet_exception_notify(unsigned long data)
 		kfree(exception_pkts);
 		ecpri_dma_assert();
 	}
-	ecpri_dma_ctx->exception_ctx.exception_stats.num_of_pkts_recieved +=
+	ecpri_dma_ctx->exception_ctx.exception_stats.num_of_pkts_received +=
 		actual_num;
 
 	/* Credits have only one buffer so no need to check num_of_buffs */
@@ -192,7 +192,7 @@ void ecpri_dma_dp_tasklet_exception_notify(unsigned long data)
 				exception_pkts[actual_buff_num]->pkt->buffs[0]->virt_base,
 				exception_pkts[actual_buff_num]->pkt->buffs[0]->size);
 			ecpri_dma_ctx->exception_ctx.exception_stats.
-				num_of_bytes_recieved +=
+				num_of_bytes_received +=
 				exception_pkts[actual_buff_num]->pkt->buffs[0]->size;
 			actual_buff_num++;
 		} while (exception_pkts[actual_buff_num]->comp_code !=
@@ -234,7 +234,7 @@ void ecpri_dma_dp_exception_endp_notify_completion(
 {
 	int ret = 0;
 	if (!endp || !endp->valid || !endp->gsi_ep_cfg->is_exception) {
-		DMAERR("Exception pkt recieved on non exception endp");
+		DMAERR("Exception pkt received on non exception endp");
 		ecpri_dma_assert();
 	}
 
@@ -482,7 +482,7 @@ int ecpri_dma_set_endp_mode(struct ecpri_dma_endp_context *endp,
 		}
 		break;
 	default:
-		DMAERR("Invalid ENDP Notify mode recieved\n");
+		DMAERR("Invalid ENDP Notify mode received\n");
 		return -EINVAL;
 		break;
 	}
@@ -508,7 +508,7 @@ void ecpri_dma_dp_rx_comp_hdlr(struct gsi_chan_xfer_notify *notify)
 	struct ecpri_dma_endp_context *endp;
 	int ret = 0;
 
-	DMADBG_LOW("event code %d recieved for CH %d\n", notify->evt_id,
+	DMADBG_LOW("event code %d received for CH %d\n", notify->evt_id,
 		notify->chid);
 
 	switch (notify->evt_id) {
@@ -538,7 +538,7 @@ void ecpri_dma_dp_tx_comp_hdlr(struct gsi_chan_xfer_notify *notify)
 	struct ecpri_dma_outstanding_pkt_wrapper *comp_pkt;
 	struct ecpri_dma_endp_context *endp;
 
-	DMADBG_LOW("event code %d recieved for CH %d\n", notify->evt_id,
+	DMADBG_LOW("event code %d received for CH %d\n", notify->evt_id,
 		   notify->chid);
 
 	switch (notify->evt_id) {

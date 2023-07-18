@@ -50,7 +50,7 @@ static s8 dev_connection = 0;
 static s8 dev_port = 0;
 static s8 dev_link = 0;
 
-static bool is_first_call = true;
+static bool is_read_in_progress = true;
 
 
 static ssize_t ecpri_dma_write_ep_reg(struct file *file, const char __user *buf,
@@ -151,7 +151,7 @@ static ssize_t ecpri_dma_read_ep_reg(struct file *file, char __user *ubuf,
 	bool break_loop = false;
 
 	/* Set read ranges in the first access to read */
-	if (is_first_call == true) {
+	if (is_read_in_progress == true) {
 
 		if (ep_reg_idx < 0) {
 			endp_start = 0;
@@ -166,7 +166,7 @@ static ssize_t ecpri_dma_read_ep_reg(struct file *file, char __user *ubuf,
 			gsi_end = gsi_start;
 		}
 
-		is_first_call = false;
+		is_read_in_progress = false;
 	}
 
 	/* Initialize byte counter */
@@ -198,7 +198,7 @@ static ssize_t ecpri_dma_read_ep_reg(struct file *file, char __user *ubuf,
 	if (nbytes == 0) {
 
 		/* Reset read operation */
-		is_first_call = true;
+		is_read_in_progress = true;
 		return 0;
 	}
 
@@ -227,8 +227,8 @@ static ssize_t ecpri_dma_read_exception(struct file *file, char __user *ubuf,
 	int nbytes = 0;
 	int cnt = 0;
 	int i;
-	u32 num_of_pkts_recieved;
-	u32 num_of_bytes_recieved;
+	u32 num_of_pkts_received;
+	u32 num_of_bytes_received;
 	u32 *exception_status_statistics_ptr;
 	struct ecpri_dma_endp_context* except_endp = NULL;
 
@@ -238,11 +238,16 @@ static ssize_t ecpri_dma_read_exception(struct file *file, char __user *ubuf,
 		return -EINVAL;
 	}
 
-	num_of_pkts_recieved =
-		ecpri_dma_ctx->exception_ctx.exception_stats.num_of_pkts_recieved;
+	if (!is_read_in_progress) {
+		is_read_in_progress = true;
+		return 0;
+	}
 
-	num_of_bytes_recieved =
-		ecpri_dma_ctx->exception_ctx.exception_stats.num_of_bytes_recieved;
+	num_of_pkts_received =
+		ecpri_dma_ctx->exception_ctx.exception_stats.num_of_pkts_received;
+
+	num_of_bytes_received =
+		ecpri_dma_ctx->exception_ctx.exception_stats.num_of_bytes_received;
 
 	exception_status_statistics_ptr =
 		ecpri_dma_ctx->exception_ctx.exception_stats.exception_status_statistics;
@@ -279,24 +284,19 @@ static ssize_t ecpri_dma_read_exception(struct file *file, char __user *ubuf,
 	}
 
 	nbytes += scnprintf(dbg_buff + nbytes, count - nbytes,
-		"Number of exception packets received: %d\n", num_of_pkts_recieved);
+		"Number of exception packets received: %d\n", num_of_pkts_received);
 
 	nbytes += scnprintf(dbg_buff + nbytes, count - nbytes,
-		"Total of recieved bytes: %d\n", num_of_bytes_recieved);
+		"Total of received bytes: %d\n", num_of_bytes_received);
 
 	/* Copy data to user buffer */
 	cnt = simple_read_from_buffer(ubuf, nbytes + 1, ppos, dbg_buff, count);
 
-	if (is_first_call) {
-		is_first_call = false;
-		return cnt;
-	} else {
-		is_first_call = true;
-		return 0;
-	}
+	is_read_in_progress = false;
+	return cnt;
 }
 
-static ssize_t ecpri_dma_write_link_stat(struct file *file, const char __user *buf,
+static ssize_t ecpri_dma_link_stat_write(struct file *file, const char __user *buf,
 		size_t count, loff_t *ppos)
 {
 	s8 dev;
@@ -310,37 +310,46 @@ static ssize_t ecpri_dma_write_link_stat(struct file *file, const char __user *b
 
 	/* Copy user data to debug buffer */
 	missing = copy_from_user(dbg_buff, buf, count);
-	if (missing)
-		return -EFAULT;
+	if (missing) {
+		DMAERR("Failed to read user input\n");
+		return count;
+	}
 
 	/* Terminate debug buffer */
 	dbg_buff[count] = '\0';
 
 	/* Convert device string to number */
-	if (kstrtos8(&dbg_buff[strlen(dev_str)], 0, &dev))
-		return -EINVAL;
+	if (kstrtos8(&dbg_buff[strlen(dev_str)], 0, &dev)) {
+		DMAERR("Failed to convert device string to number\n");
+		return count;
+	}
 
 	/* Extract port and link of the device */
 	dev_port = dev / 10;
 	dev_link = dev % 10;
 
 	if (dev_port  < 0 || dev_link < 0) {
-		DMAERR("bad params specified port: %d link: %d\n", dev_port, dev_link);
+		DMAERR("Bad params specified port: %d link: %d\n", dev_port, dev_link);
+		dev_connection = -EINVAL;
 		return count;
 	}
 
 	if ((dev_link >= links_per_port) || (dev_link + dev_port * links_per_port) >= 12) {
-		DMAERR("invalid link port combination link: %d port: %d", dev_link, dev_port);
-		return -EINVAL;
+		DMAERR("Invalid link port combination link: %d port: %d", dev_link, dev_port);
+		dev_connection = -EINVAL;
+		return count;
 	}
 
 	/* Calculate connection entry */
 	dev_connection = dev_link + (dev_port * links_per_port);
 
+	/* Reset file read */
+	is_read_in_progress = true;
+
 	return count;
 }
 
-static ssize_t ecpri_dma_read_link_stat(struct file *file, char __user *ubuf,
+static ssize_t ecpri_dma_link_stat_read(struct file *file, char __user *ubuf,
 		size_t count, loff_t *ppos)
 {
 	int nbytes = 0;
@@ -350,6 +359,27 @@ static ssize_t ecpri_dma_read_link_stat(struct file *file, char __user *ubuf,
 	struct ecpri_dma_eth_client_endp_mapping *current_map = NULL;
 	struct ecpri_dma_endp_context* tx_endp = NULL;
 	struct ecpri_dma_endp_context* rx_endp = NULL;
+
+	/* Exit on repeated call */
+	if (!is_read_in_progress) {
+		is_read_in_progress = true;
+		return 0;
+	}
+
+	/* Verify connection */
+	if (is_read_in_progress) {
+		if (-EINVAL == dev_connection) {
+			nbytes += scnprintf(dbg_buff + nbytes, count - nbytes,
+				"Wrong device provided\n");
+
+			cnt = simple_read_from_buffer(ubuf, nbytes + 1,
+				ppos, dbg_buff, count);
+
+			is_read_in_progress = false;
+
+			return cnt;
+		}
+	}
 
 	/* Get HW */
 	hw_ver = ecpri_dma_ctx->ecpri_hw_ver;
@@ -374,11 +404,11 @@ static ssize_t ecpri_dma_read_link_stat(struct file *file, char __user *ubuf,
 		"DMA ENDPs associated with eth%d%d stats:\n", dev_port, dev_link);
 
 	nbytes += scnprintf(dbg_buff + nbytes, count - nbytes,
-		"Packets sent: %d recieved: %d\n",
+		"Packets sent: %d received: %d\n",
 		tx_endp->total_pkts_sent, rx_endp->total_pkts_recv);
 
 	nbytes += scnprintf(dbg_buff + nbytes, count - nbytes,
-		"Bytes sent: %d recieved: %d\n",
+		"Bytes sent: %d received: %d\n",
 		 tx_endp->total_bytes_sent, rx_endp->total_bytes_recv);
 
 	nbytes += scnprintf(dbg_buff + nbytes, count - nbytes,
@@ -398,13 +428,8 @@ static ssize_t ecpri_dma_read_link_stat(struct file *file, char __user *ubuf,
 	/* Copy data to user buffer */
 	cnt = simple_read_from_buffer(ubuf, nbytes + 1, ppos, dbg_buff, count);
 
-	if (is_first_call) {
-		is_first_call = false;
-		return cnt;
-	} else {
-		is_first_call = true;
-		return 0;
-	}
+	is_read_in_progress = false;
+	return cnt;
 }
 
 static ssize_t ecpri_dma_read_qmi_info(struct file *file, char __user *ubuf,
@@ -412,6 +437,12 @@ static ssize_t ecpri_dma_read_qmi_info(struct file *file, char __user *ubuf,
 {
 	int nbytes = 0;
 	int cnt = 0;
+
+	/* Exit on repeated call */
+	if (!is_read_in_progress) {
+		is_read_in_progress = true;
+		return 0;
+	}
 
 	nbytes += scnprintf(dbg_buff + nbytes, count, "QMI info:\n");
 
@@ -446,13 +477,8 @@ static ssize_t ecpri_dma_read_qmi_info(struct file *file, char __user *ubuf,
 	/* Copy data to user buffer */
 	cnt = simple_read_from_buffer(ubuf, nbytes + 1, ppos, dbg_buff, count);
 
-	if (is_first_call) {
-		is_first_call = false;
-		return cnt;
-	} else {
-		is_first_call = true;
-		return 0;
-	}
+	is_read_in_progress = false;
+	return cnt;
 }
 
 static ssize_t ecpri_dma_read_dma_stat(struct file *file, char __user *ubuf,
@@ -462,12 +488,21 @@ static ssize_t ecpri_dma_read_dma_stat(struct file *file, char __user *ubuf,
 	int cnt = 0;
 	int m, n;
 
+	if (!is_read_in_progress) {
+		is_read_in_progress = true;
+		return 0;
+	}
+
+	/* Verify HW version */
 	if (ecpri_dma_ctx->ecpri_hw_ver < ECPRI_HW_V2_0) {
 
 		nbytes += scnprintf(dbg_buff + nbytes, count,
 			"DMA stats registers are only availble in Lassen V2 and above\n");
 
 		cnt = simple_read_from_buffer(ubuf, nbytes, ppos, dbg_buff, count);
+
+		is_read_in_progress = false;
+
 		return cnt;
 	}
 
@@ -535,13 +570,13 @@ static ssize_t ecpri_dma_read_dma_stat(struct file *file, char __user *ubuf,
 	"ECPRI_DMA_STATUS_LTE_PKT_DROP_TLV_FIFO_EMPTY=0x%x\n",
 	ecpri_dma_hal_read_reg(ECPRI_DMA_STATUS_LTE_PKT_DROP_TLV_FIFO_EMPTY));
 
-	for (m=0; m < ecpri_dma_hal_get_reg_max_m(ECPRI_DMA_STATUS_XBAR_RX_PORT_m); m++)
+	for (m=0; m <= ecpri_dma_hal_get_reg_max_n(ECPRI_DMA_STATUS_XBAR_RX_PORT_m); m++)
 		nbytes += scnprintf(dbg_buff + nbytes, count - nbytes,
 		"ECPRI_DMA_STATUS_XBAR_RX_PORT_%d=0x%x\n", m,
 		ecpri_dma_hal_read_reg_n(ECPRI_DMA_STATUS_XBAR_RX_PORT_m, m));
 
-	for (m = 0; m < ecpri_dma_hal_get_reg_max_m(ECPRI_DMA_STATUS_DST_DROP_PKT_GSI_m_REG_n); m++)
-		for (n = 0; n < ecpri_dma_hal_get_reg_max_n(ECPRI_DMA_STATUS_DST_DROP_PKT_GSI_m_REG_n); n++)
+	for (m = 0; m <= ecpri_dma_hal_get_reg_max_m(ECPRI_DMA_STATUS_DST_DROP_PKT_GSI_m_REG_n); m++)
+		for (n = 0; n <= ecpri_dma_hal_get_reg_max_n(ECPRI_DMA_STATUS_DST_DROP_PKT_GSI_m_REG_n); n++)
 			nbytes += scnprintf(dbg_buff + nbytes, count - nbytes,
 			"ECPRI_DMA_STATUS_DST_DROP_PKT_GSI_%d_REG_%d=0x%x\n", m, n,
 			ecpri_dma_hal_read_reg_mn(ECPRI_DMA_STATUS_DST_DROP_PKT_GSI_m_REG_n, m, n));
@@ -549,13 +584,8 @@ static ssize_t ecpri_dma_read_dma_stat(struct file *file, char __user *ubuf,
 	/* Copy data to user buffer */
 	cnt = simple_read_from_buffer(ubuf, nbytes + 1, ppos, dbg_buff, count);
 
-	if (is_first_call) {
-		is_first_call = false;
-		return cnt;
-	} else {
-		is_first_call = true;
-		return 0;
-	}
+	is_read_in_progress = false;
+	return cnt;
 }
 
 static const struct ecpri_dma_debugfs_file debugfs_files[] = {
@@ -570,8 +600,8 @@ static const struct ecpri_dma_debugfs_file debugfs_files[] = {
 		}
 	},{
 		"linkstat", DMA_READ_WRITE_MODE, NULL, {
-			.read = ecpri_dma_read_link_stat,
-			.write = ecpri_dma_write_link_stat
+			.read = ecpri_dma_link_stat_read,
+			.write = ecpri_dma_link_stat_write
 		}
 	}, {
 		"qmi", DMA_READ_ONLY_MODE, NULL, {
