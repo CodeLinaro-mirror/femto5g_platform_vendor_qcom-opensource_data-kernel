@@ -253,6 +253,7 @@ struct mtip_link_info
    struct mtip_tx_ts_skb_list tx_ts_skb_list;
    struct mtip_tx_comp_list tx_comp_list;
    u32 peak_rx_available;
+   u32 config_fec;
    u32 active_fec;
    spinlock_t ptp_lock;
    unsigned long flags;

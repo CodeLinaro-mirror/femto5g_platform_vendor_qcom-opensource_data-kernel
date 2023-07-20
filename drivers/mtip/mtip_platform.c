@@ -110,6 +110,9 @@ static int mtip_platform_setup_link(unsigned int port_device_index, unsigned int
    // set the link state to INIT
    platform_driver_priv->mtip_links[link_index]->state = MTIP_LINK_STATE_INIT;
 
+   platform_driver_priv->mtip_links[link_index]->config_fec = ETHTOOL_FEC_NONE;
+   platform_driver_priv->mtip_links[link_index]->active_fec = ETHTOOL_FEC_OFF;
+
    if(link_index != MTIP_DEBUG_ETH_LINK_INDEX){
       // connect to the dma pipe
       rv = mtip_connect_dma_pipe(link_index, &hdl);

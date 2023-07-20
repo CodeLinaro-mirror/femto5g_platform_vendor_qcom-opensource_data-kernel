@@ -620,9 +620,6 @@ int mtip_pcs_config_pcs(u32 link_index)
     // reset the PCS
     mtip_pcs_reset_pcs(&platform_driver_priv->devices.link_devices[link_index]);
 
-    // set the default active fec to OFF
-    platform_driver_priv->mtip_links[link_index]->active_fec = ETHTOOL_FEC_OFF;
-
     // this is the port configuration
     port_config = platform_driver_priv->mtip_ports[port_type]->port_config;
 
@@ -874,52 +871,53 @@ void mtip_pcs_update_active_fec(u32 link_index,
                                        u32  sfp_port_type) {
 
     u32 active_fec;
+    u32 port_type;
+
+    if(mtip_lookup_port_type_by_link_index(link_index, &port_type) < 0)
+        return;
 
     switch (port_config) {
-    case MTIP_PORT_CONFIG_1x50GBASE_R:
-    case MTIP_PORT_CONFIG_1x50GBASE_R_RSFEC:
-    case MTIP_PORT_CONFIG_2x50GBASE_R:
-    case MTIP_PORT_CONFIG_2x50GBASE_R_RSFEC:
-    case MTIP_PORT_CONFIG_1x25GBASE_R_RSFEC:
-    case MTIP_PORT_CONFIG_4x25GBASE_R_RSFEC:
     case MTIP_PORT_CONFIG_1x100GBASE_R:
     case MTIP_PORT_CONFIG_1x100GBASE_R_RSFEC_LL:
     case MTIP_PORT_CONFIG_1x100GBASE_R_RSFEC:
     case MTIP_PORT_CONFIG_1x100GBASE_R2:
     case MTIP_PORT_CONFIG_1x100GBASE_R2_RSFEC:
-    case MTIP_PORT_CONFIG_1x100GBASE_R4:
     case MTIP_PORT_CONFIG_1x100GBASE_R4_RSFEC:
-    case MTIP_PORT_CONFIG_1x50GBASE_R2:
-    case MTIP_PORT_CONFIG_1x50GBASE_R2_RSFEC:
+    case MTIP_PORT_CONFIG_2x50GBASE_R:
+    case MTIP_PORT_CONFIG_2x50GBASE_R_RSFEC:
     case MTIP_PORT_CONFIG_2x50GBASE_R2:
     case MTIP_PORT_CONFIG_2x50GBASE_R2_FEC:
     case MTIP_PORT_CONFIG_2x50GBASE_R2_LUAI:
     case MTIP_PORT_CONFIG_2x50GBASE_R2_LUAI_FEC:
-    case MTIP_PORT_CONFIG_1x40GBASE_R4:
-    case MTIP_PORT_CONFIG_1x40GBASE_R4_FEC:
+    case MTIP_PORT_CONFIG_1x50GBASE_R:
+    case MTIP_PORT_CONFIG_1x50GBASE_R_RSFEC:
+    case MTIP_PORT_CONFIG_1x50GBASE_R2:
+    case MTIP_PORT_CONFIG_1x50GBASE_R2_RSFEC:
+    case MTIP_PORT_CONFIG_1x50GBASE_R2_LUAI:
+    case MTIP_PORT_CONFIG_1x50GBASE_R2_LUAI_FEC:
+    case MTIP_PORT_CONFIG_1x25GBASE_R_RSFEC:
+    case MTIP_PORT_CONFIG_4x25GBASE_R_RSFEC:
         {
             active_fec = ETHTOOL_FEC_RS;
         }
         break;
 
+    case MTIP_PORT_CONFIG_1x100GBASE_R4:
     case MTIP_PORT_CONFIG_1x25GBASE_R:
     case MTIP_PORT_CONFIG_4x25GBASE_R:
         {
-            if(sfp_port_type == PORT_FIBRE)
-                active_fec = ETHTOOL_FEC_RS;
-            else
-                active_fec = ETHTOOL_FEC_OFF;
+            active_fec = ETHTOOL_FEC_OFF;
         }
         break;
 
-    case MTIP_PORT_CONFIG_1x50GBASE_R2_LUAI:
-    case MTIP_PORT_CONFIG_1x50GBASE_R2_LUAI_FEC:
-    case MTIP_PORT_CONFIG_1x25GBASE_R_FEC:
+    case MTIP_PORT_CONFIG_1x40GBASE_R4:
+    case MTIP_PORT_CONFIG_1x40GBASE_R4_FEC:
     case MTIP_PORT_CONFIG_4x25GBASE_R_FEC:
-    case MTIP_PORT_CONFIG_1x10GBASE_R:
-    case MTIP_PORT_CONFIG_1x10GBASE_R_FEC:
+    case MTIP_PORT_CONFIG_1x25GBASE_R_FEC:
     case MTIP_PORT_CONFIG_4x10GBASE_R:
     case MTIP_PORT_CONFIG_4x10GBASE_R_FEC:
+    case MTIP_PORT_CONFIG_1x10GBASE_R:
+    case MTIP_PORT_CONFIG_1x10GBASE_R_FEC:
     default:
         {
             active_fec = ETHTOOL_FEC_OFF;
