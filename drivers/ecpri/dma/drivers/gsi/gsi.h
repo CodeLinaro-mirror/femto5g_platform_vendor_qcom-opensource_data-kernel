@@ -850,8 +850,7 @@ struct __packed gsi_log_err {
 	uint32_t arg2:4;
 	uint32_t arg1:4;
 	uint32_t code:4;
-	uint32_t resvd:3;
-	uint32_t virt_idx:5;
+	uint32_t virt_idx:8;
 	uint32_t err_type:4;
 	uint32_t ee:4;
 };
@@ -1547,6 +1546,18 @@ int gsi_query_msi_addr(unsigned long chan_hdl, phys_addr_t *addr);
 * @Return void
 */
 void gsi_dump_ch_info(unsigned long chan_hdl);
+
+/**
+* gsi_dump_ch_info - channel information.
+*
+* @chan_id: channel id
+* @buf: pointer to buffer
+* @buf_size: buffer's size
+* @Return void
+*/
+int gsi_dump_ch_info_to_buffer(unsigned long chan_hdl,
+	u8* buf, size_t buf_size);
+
 
 /**
  * gsi_get_hw_profiling_stats() - Query GSI HW profiling stats

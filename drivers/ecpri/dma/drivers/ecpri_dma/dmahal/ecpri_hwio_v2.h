@@ -2821,7 +2821,7 @@
 #define HWIO_ECPRI_STATUS_XBAR_RX_PORT_m_PHYS(m)                                                                     (ECPRI_DMA_NON_SECURED_REG_BASE_PHYS + 0X204 + (0x4*(m)))
 #define HWIO_ECPRI_STATUS_XBAR_RX_PORT_m_OFFS(m)                                                                     (ECPRI_DMA_NON_SECURED_REG_BASE_OFFS + 0X204 + (0x4*(m)))
 #define HWIO_ECPRI_STATUS_XBAR_RX_PORT_m_RMSK                                                                          0xff03ff
-#define HWIO_ECPRI_STATUS_XBAR_RX_PORT_m_MAXm                                                                                 5
+#define HWIO_ECPRI_DMA_STATUS_XBAR_RX_PORT_m_V2_MAXn                                                                                 5
 #define HWIO_ECPRI_STATUS_XBAR_RX_PORT_m_ATTR                                                                                     0x1
 #define HWIO_ECPRI_STATUS_XBAR_RX_PORT_m_INI(m)                \
                 in_dword_masked(HWIO_ECPRI_STATUS_XBAR_RX_PORT_m_ADDR(m), HWIO_ECPRI_STATUS_XBAR_RX_PORT_m_RMSK)
@@ -3019,8 +3019,8 @@
 #define HWIO_ECPRI_STATUS_DST_DROP_PKT_GSI_m_REG_n_PHYS(m,n)                                                         (ECPRI_DMA_NON_SECURED_REG_BASE_PHYS + 0XE0B0 + (0x8*(m)) + (0x4*(n)))
 #define HWIO_ECPRI_STATUS_DST_DROP_PKT_GSI_m_REG_n_OFFS(m,n)                                                         (ECPRI_DMA_NON_SECURED_REG_BASE_OFFS + 0XE0B0 + (0x8*(m)) + (0x4*(n)))
 #define HWIO_ECPRI_STATUS_DST_DROP_PKT_GSI_m_REG_n_RMSK                                                              0xffffffff
-#define HWIO_ECPRI_STATUS_DST_DROP_PKT_GSI_m_REG_n_MAXm                                                                       2
-#define HWIO_ECPRI_STATUS_DST_DROP_PKT_GSI_m_REG_n_MAXn                                                                       1
+#define HWIO_ECPRI_DMA_STATUS_DST_DROP_PKT_GSI_m_REG_n_V2_GSI_m_REG_n_MAXm                                                                       2
+#define HWIO_ECPRI_DMA_STATUS_DST_DROP_PKT_GSI_m_REG_n_V2_GSI_m_REG_n_MAXn                                                                       1
 #define HWIO_ECPRI_STATUS_DST_DROP_PKT_GSI_m_REG_n_ATTR                                                                           0x1
 #define HWIO_ECPRI_STATUS_DST_DROP_PKT_GSI_m_REG_n_INI2(m,n)                \
                 in_dword_masked(HWIO_ECPRI_STATUS_DST_DROP_PKT_GSI_m_REG_n_ADDR(m,n), HWIO_ECPRI_STATUS_DST_DROP_PKT_GSI_m_REG_n_RMSK)

@@ -20,11 +20,10 @@
 #include <linux/of.h>
 #include <linux/regulator/consumer.h>
 #include <linux/pinctrl/consumer.h>
-
-#include "eth_phy_iface.h"
-
 #include <linux/sysfs.h> /* sysfs addition*/
 #include <linux/kobject.h>
+
+#include "eth_phy_iface.h"
 
 /* Module level feature definitions */
 //#define FEATURE_QCOM_AW_RUMI_SW
@@ -343,6 +342,8 @@ ssize_t qcom_aw_phy_set_tx_eq_val(struct file *file, const char __user *buf,
                              size_t count, loff_t *ppos);
 ssize_t qcom_aw_phy_get_tx_eq_val(struct file *file, char __user *buf,
                                     size_t count, loff_t *ppos);
+bool qcom_aw_phy_get_tx_fir_val(enum qcom_aw_phy_instance_enum tx_bist_phy_inst,
+                                void* txfir_cfg);
 int32_t setup_phy_status_debugfs_directory(void);
 #endif /* FEATURE_QCOM_AW_TEST_SYS_FS */
 

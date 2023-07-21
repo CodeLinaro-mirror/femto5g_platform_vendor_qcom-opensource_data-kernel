@@ -1648,6 +1648,13 @@ int gsi_alloc_evt_ring(struct gsi_evt_ring_props *props, unsigned long dev_hdl,
 	}
 
 	ctx = &gsi_ctx->evtr[props->gsi_id][props->ee][evt_id];
+
+	if (ctx->hdl) {
+		/* EV already allocated */
+		*evt_ring_hdl = ctx->hdl;
+		return GSI_STATUS_SUCCESS;
+	}
+
 	memset(ctx, 0, sizeof(*ctx));
 	mutex_init(&ctx->mlock);
 	init_completion(&ctx->compl);
@@ -1802,6 +1809,8 @@ int gsi_dealloc_evt_ring(unsigned long evt_ring_hdl)
 		 */
 		GSI_ASSERT();
 	}
+	ctx->hdl = 0;
+
 	up(&gsi_ctx->sem);
 
 	if (!ctx->props.evchid_valid) {
@@ -2645,6 +2654,145 @@ void gsi_dump_ch_info(unsigned long chan_hdl)
 }
 EXPORT_SYMBOL(gsi_dump_ch_info);
 
+int gsi_dump_ch_info_to_buffer(unsigned long chan_hdl, u8* buf, size_t buf_size)
+{
+	u32 val;
+	int gsi_id = 0;
+	int ch_id = 0;
+	int ee = 0;
+	struct gsi_chan_ctx* ctx = NULL;
+	int nbytes = 0;
+
+	if (!gsi_ctx) {
+		pr_err("%s:%d gsi context not allocated\n", __func__, __LINE__);
+		return -EINVAL;
+	}
+
+	ctx = __gsi_get_ch_ctx_from_hdl(chan_hdl);
+	if (!ctx) {
+		GSIERR("bad params chan_hdl=%lu\n", chan_hdl);
+		return -EINVAL;
+	}
+
+	gsi_id = ctx->props.gsi_id;
+	ch_id = ctx->props.ch_id;
+	ee = ctx->props.ee;
+
+	val = gsihal_read_reg_pnk(GSI_EE_n_GSI_CH_k_CNTXT_0,
+		gsi_id, ee, ch_id);
+	nbytes += scnprintf(buf + nbytes, buf_size - nbytes,
+	"CH%2d EE%d CTX0  0x%x\n", ch_id, ee, val);
+
+	val = gsihal_read_reg_pnk(GSI_EE_n_GSI_CH_k_CNTXT_1,
+		gsi_id, ee, ch_id);
+	nbytes += scnprintf(buf + nbytes, buf_size - nbytes,
+	"CH%2d EE%d CTX1  0x%x\n", ch_id, ee, val);
+
+	val = gsihal_read_reg_pnk(GSI_EE_n_GSI_CH_k_CNTXT_2,
+		gsi_id, ee, ch_id);
+	nbytes += scnprintf(buf + nbytes, buf_size - nbytes,
+	"CH%2d EE%d CTX2  0x%x\n", ch_id, ee, val);
+
+	val = gsihal_read_reg_pnk(GSI_EE_n_GSI_CH_k_CNTXT_3,
+		gsi_id, ee, ch_id);
+	nbytes += scnprintf(buf + nbytes, buf_size - nbytes,
+	"CH%2d EE%d CTX3  0x%x\n", ch_id, ee, val);
+
+	val = gsihal_read_reg_pnk(GSI_EE_n_GSI_CH_k_CNTXT_4,
+		gsi_id, ee, ch_id);
+	nbytes += scnprintf(buf + nbytes, buf_size - nbytes,
+	"CH%2d EE%d CTX4  0x%x\n", ch_id, ee, val);
+
+	val = gsihal_read_reg_pnk(GSI_EE_n_GSI_CH_k_CNTXT_5,
+		gsi_id, ee, ch_id);
+	nbytes += scnprintf(buf + nbytes, buf_size - nbytes,
+	"CH%2d EE%d CTX5  0x%x\n", ch_id, ee, val);
+
+	val = gsihal_read_reg_pnk(GSI_EE_n_GSI_CH_k_CNTXT_6,
+		gsi_id, ee, ch_id);
+	nbytes += scnprintf(buf + nbytes, buf_size - nbytes,
+	"CH%2d EE%d CTX6  0x%x\n", ch_id, ee, val);
+
+	val = gsihal_read_reg_pnk(GSI_EE_n_GSI_CH_k_CNTXT_7,
+		gsi_id, ee, ch_id);
+	nbytes += scnprintf(buf + nbytes, buf_size - nbytes,
+	"CH%2d EE%d CTX7  0x%x\n", ch_id, ee, val);
+
+	val = gsihal_read_reg_pnk(GSI_EE_n_GSI_CH_k_CNTXT_8,
+		gsi_id, ee, ch_id);
+	nbytes += scnprintf(buf + nbytes, buf_size - nbytes,
+	"CH%2d EE%d CTX8  0x%x\n", ch_id, ee, val);
+
+	val = gsihal_read_reg_pnk(GSI_EE_n_GSI_CH_k_RE_FETCH_READ_PTR,
+		gsi_id, ee, ch_id);
+	nbytes += scnprintf(buf + nbytes, buf_size - nbytes,
+	"CH%2d EE%d REFRP 0x%x\n", ch_id, ee, val);
+
+	val = gsihal_read_reg_pnk(GSI_EE_n_GSI_CH_k_RE_FETCH_WRITE_PTR,
+		gsi_id, ee, ch_id);
+	nbytes += scnprintf(buf + nbytes, buf_size - nbytes,
+	"CH%2d EE%d REFWP 0x%x\n", ch_id, ee, val);
+
+	val = gsihal_read_reg_pnk(GSI_EE_n_GSI_CH_k_QOS,
+		gsi_id, ee, ch_id);
+	nbytes += scnprintf(buf + nbytes, buf_size - nbytes,
+	"CH%2d EE%d QOS   0x%x\n", ch_id, ee, val);
+
+	val = gsihal_read_reg_pnk(GSI_EE_n_GSI_CH_k_SCRATCH_0,
+		gsi_id, ee, ch_id);
+	nbytes += scnprintf(buf + nbytes, buf_size - nbytes,
+	"CH%2d EE%d SCR0  0x%x\n", ch_id, ee, val);
+
+	val = gsihal_read_reg_pnk(GSI_EE_n_GSI_CH_k_SCRATCH_1,
+		gsi_id, ee, ch_id);
+	nbytes += scnprintf(buf + nbytes, buf_size - nbytes,
+	"CH%2d EE%d SCR1  0x%x\n", ch_id, ee, val);
+
+	val = gsihal_read_reg_pnk(GSI_EE_n_GSI_CH_k_SCRATCH_2,
+		gsi_id, ee, ch_id);
+	nbytes += scnprintf(buf + nbytes, buf_size - nbytes,
+	"CH%2d EE%d SCR2  0x%x\n", ch_id, ee, val);
+
+	val = gsihal_read_reg_pnk(GSI_EE_n_GSI_CH_k_SCRATCH_3,
+		gsi_id, ee, ch_id);
+	nbytes += scnprintf(buf + nbytes, buf_size - nbytes,
+	"CH%2d EE%d SCR3  0x%x\n", ch_id, ee, val);
+
+	val = gsihal_read_reg_pnk(GSI_EE_n_GSI_CH_k_SCRATCH_4,
+		gsi_id, ee, ch_id);
+	nbytes += scnprintf(buf + nbytes, buf_size - nbytes,
+	"CH%2d EE%d SCR4  0x%x\n", ch_id, ee, val);
+
+	val = gsihal_read_reg_pnk(GSI_EE_n_GSI_CH_k_SCRATCH_5,
+		gsi_id, ee, ch_id);
+	nbytes += scnprintf(buf + nbytes, buf_size - nbytes,
+	"CH%2d EE%d SCR5  0x%x\n", ch_id, ee, val);
+
+	val = gsihal_read_reg_pnk(GSI_EE_n_GSI_CH_k_SCRATCH_6,
+		gsi_id, ee, ch_id);
+	nbytes += scnprintf(buf + nbytes, buf_size - nbytes,
+	"CH%2d EE%d SCR6  0x%x\n", ch_id, ee, val);
+
+	val = gsihal_read_reg_pnk(GSI_EE_n_GSI_CH_k_SCRATCH_7,
+		gsi_id, ee, ch_id);
+	nbytes += scnprintf(buf + nbytes, buf_size - nbytes,
+	"CH%2d EE%d SCR7  0x%x\n", ch_id, ee, val);
+
+	val = gsihal_read_reg_pnk(GSI_EE_n_GSI_CH_k_SCRATCH_8,
+		gsi_id, ee, ch_id);
+	nbytes += scnprintf(buf + nbytes, buf_size - nbytes,
+	"CH%2d EE%d SCR8  0x%x\n", ch_id, ee, val);
+
+	val = gsihal_read_reg_pnk(GSI_EE_n_GSI_CH_k_SCRATCH_9,
+		gsi_id, ee, ch_id);
+	nbytes += scnprintf(buf + nbytes, buf_size - nbytes,
+	"CH%2d EE%d SCR9  0x%x\n", ch_id, ee, val);
+
+	return nbytes;
+}
+EXPORT_SYMBOL(gsi_dump_ch_info_to_buffer);
+
+
 int gsi_stop_channel(unsigned long chan_hdl)
 {
 	enum gsi_ch_cmd_opcode op = GSI_CH_STOP;
@@ -2939,6 +3087,7 @@ int gsi_dealloc_channel(unsigned long chan_hdl)
 
 	devm_kfree(gsi_ctx->dev, ctx->user_data);
 	ctx->allocated = false;
+	ctx->hdl = 0;
 	if (ctx->evtr) {
 		atomic_dec(&ctx->evtr->chan_ref_cnt);
 		ctx->evtr->num_of_chan_allocated--;
@@ -4277,10 +4426,46 @@ subsys_initcall(gsi_init);
  */
 static void __exit gsi_exit(void)
 {
-	int gsi_id = 0, ee = 0;
+	int gsi_id = 0, ee = 0, ch = 0;
 	struct device* dev = gsi_ctx->dev;
+	struct gsi_chan_ctx* ch_ctx;
+	struct gsi_evt_ctx* ev_ctx;
 
-	/* DMA driver is unloaded first, all CHs are deallocated */
+	/* Verify all CHs and EVs are deallocated */
+	for (gsi_id = 0; gsi_id < gsi_ctx->per.num_of_gsi; gsi_id++) {
+		for (ee = 0; ee < GSI_EE_MAX; ee++) {
+			for (ch = 0; ch < GSI_CHAN_MAX; ch++) {
+				ch_ctx = &gsi_ctx->chan[gsi_id][ee][ch];
+				if (ch_ctx->hdl) {
+					if (ch_ctx->state == GSI_CHAN_STATE_STARTED)
+						gsi_stop_channel(ch_ctx->hdl);
+
+					if (ch_ctx->state == GSI_CHAN_STATE_STOPPED)
+						gsi_reset_channel(ch_ctx->hdl);
+
+					if (ch_ctx->state == GSI_CHAN_STATE_ALLOCATED)
+						gsi_dealloc_channel(ch_ctx->hdl);
+
+					if (ch_ctx->state != GSI_CHAN_STATE_NOT_ALLOCATED) {
+						GSIERR("Unexpected channel state %d\n",
+							ch_ctx->state);
+						GSI_ASSERT();
+					}
+				}
+			}
+		}
+	}
+
+	for (gsi_id = 0; gsi_id < gsi_ctx->per.num_of_gsi; gsi_id++) {
+		for (ee = 0; ee < GSI_EE_MAX; ee++) {
+			for (ch = 0; ch < GSI_CHAN_MAX; ch++) {
+				ev_ctx = &gsi_ctx->evtr[gsi_id][ee][ch];
+				if (ev_ctx->hdl) {
+					gsi_dealloc_evt_ring(ev_ctx->hdl);
+				}
+			}
+		}
+	}
 
 	GSIDBG("Start driver unload\n");
 

@@ -365,6 +365,7 @@ struct ecpri_dma_exception_context {
  * @dynamic_vf_enabled: Indicating this is a memcpy ENDP with dynamic VF
  * @tx_pre_header_enabled: Indicating whether tx pre header was enabled
  * (tx endp only)
+ * @total_bytes_recv: EP statistics regarding number of bytes recieved
  *
  */
 struct ecpri_dma_endp_context {
@@ -402,16 +403,15 @@ struct ecpri_dma_endp_context {
 	struct list_head available_outstanding_pkts_list;
 	u32 avail_outstanding_pkts;
 	atomic_t xmit_eot_cnt;
-
 	u32 total_pkts_recv;
 	u32 total_pkts_sent;
 	u32 total_bytes_sent;
-
 	struct tasklet_struct tasklet;
 	spinlock_t spinlock;
 	void* l2_mhi_channel_ptr;
 	bool dynamic_vf_enabled;
 	bool tx_pre_header_enabled;
+	u32 total_bytes_recv;
 };
 
 /**

@@ -13,6 +13,13 @@
 #define QUDP_IRQ_MAX                6
 #define ECPRISS_MAX_LINKS           4
 #define MAX_QUDP_WM_ENTRY    10
+
+#define ECPRISS_QUDP_ACTION_PASS_TO_UC 0
+#define ECPRISS_QUDP_ACTION_PASS_TO_A55 1
+#define ECPRISS_QUDP_ACTION_DISCARD 2
+#define ECPRISS_QUDP_ACTION_PASS_TO_REMOTE 3
+#define ECPRISS_QUDP_ACTION_CONTINUE 4
+
 typedef enum
 {
 	ECPRISS_UDP_C2C_IRQ_PORT0,
@@ -300,8 +307,12 @@ void debug_qudp_ingress_config_v2(void);
 void debug_qudp_egress_config_v2(void);
 
 
+int ecpriss_qudp_fh_tx_hdr_decfg_v2(uint32_t               port_index,
+		ecpriss_qudp_tx_cfg_s *tx_cfg);
 
 
+int ecpriss_qudp_fh_rx_filter_decfg_v2(uint32_t               port_index,
+		ecpriss_qudp_rx_cfg_s *rx_cfg);
 
 
 
@@ -365,4 +376,9 @@ void ecpriss_qudp_set_ecpriss_filt_enable_info(int val);
 int ecpriss_qudp_get_ecpriss_filt_enable_info(void);
 void ecpriss_qudp_non_ecpri_dma_ring_info(void) ;
 void ecpriss_qudp_irq_destroy_v2(void);
+int ecpriss_qudp_ingress_init_cfg_modify_v2(int action);
+
+int ecpriss_qudp_get_ingress_action(void);
+void ecpriss_qudp_set_ingress_action(int val);
+
 #endif

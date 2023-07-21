@@ -62,6 +62,7 @@ typedef struct{
 
 	ecpri_oxtor_tx_ring_cntxt_s *tx_ring_cntxt_ptr;
 	ecpri_oxtor_rx_ring_cntxt_s *rx_ring_cntxt_ptr;
+	void			    *ecpri_oxtor_logbuf;
 	/* eCPRI HW Version*/
 	int hw_ver;
 
@@ -103,4 +104,5 @@ typedef struct
 	struct workqueue_struct     *ecpriss_interrupts_workq;
 }ecpri_oxtor_irq_wq_params_s;
 
+extern ecpri_oxtor_core_cntxt_s *ecpri_oxtor_core_context;
 #endif /* ECPRISS_CORE_H_ */

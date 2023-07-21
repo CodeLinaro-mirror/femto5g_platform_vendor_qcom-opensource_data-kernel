@@ -868,8 +868,8 @@ static void mtip_module_exit(void)
    mtip_debug_eth_unregister_platform_driver();
    if (!platform_driver_priv->perr)
    {
-       platform_driver_unregister(&ethernet_mac_link_driver);
        platform_driver_unregister(&ethernet_mac_lane_driver);
+       platform_driver_unregister(&ethernet_mac_link_driver);
        platform_driver_unregister(&ethernet_mac_port_driver);
        platform_driver_unregister(&ethernet_mac_platform_driver);
    }

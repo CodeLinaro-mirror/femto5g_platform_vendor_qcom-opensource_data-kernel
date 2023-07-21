@@ -508,6 +508,14 @@ int ecpriss_xbar_fh_rx_lut_v2(uint32_t port_index,
 
 int ecpriss_xbar_oc_rx_lut_v2(uint32_t port_index,
 		ecpriss_flow_tx_cfg_s *xbar_tx_cfg);
+
+
+int ecpriss_xbar_fh_rx_lut_decfg_v2(uint32_t port_index,
+		ecpriss_flow_rx_cfg_s *xbar_rx_cfg);
+
+int ecpriss_xbar_oc_rx_lut_decfg_v2(uint32_t port_index,
+		ecpriss_flow_tx_cfg_s *xbar_tx_cfg);
+
 void ecpriss_xbar_non_ecpri_lut_cfg(void);
 void ecpriss_xbar_stats_update(void);
 void ecpriss_xbar_stats_update_v2(void);
@@ -515,9 +523,8 @@ void ecpriss_xbar_config_stats_update(void);
 void ecpriss_xbar_config_stats_update_v2(void);
 
 void ecpriss_xbar_destroy_interrupts_v2(void);
-#if 0
+
 void ecpriss_xbar_delete_pcid_entry(uint16_t *configured_pcids,uint16_t pcid_value,uint16_t num_pcid_entry);
-#endif
 
 
 

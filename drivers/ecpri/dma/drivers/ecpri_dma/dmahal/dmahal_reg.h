@@ -174,6 +174,7 @@ enum ecpri_dma_hal_reg_name {
     ECPRI_DMA_UNIT_CLK_ENABLE,
     ECPRI_DMA_LTE_CFG,
     ECPRI_DMA_STATUS_LTE_PKT_DROP_TLV_FIFO_EMPTY,
+    ECPRI_DMA_STATUS_PKT_DROP_TLV_FIFO_EMPTY,
     ECPRI_DMA_LTE_LATENCY_BUFFER_WORD,
     ECPRI_DMA1_THROTTLE_THROTTLE_0_CNTRL,
     ECPRI_DMA1_THROTTLE_THROTTLE_0_CGC_CNTRL,
@@ -289,6 +290,7 @@ enum ecpri_dma_hal_reg_name {
     ECPRI_DMA0_THROTTLE_BWMON_BWMON_INTR_TARGET,
     ECPRI_DMA0_THROTTLE_BWMON_BWMON_DEBUG_CNTL,
     ECPRI_DMA0_THROTTLE_BWMON_BWMON_DEBUG_READBACK,
+    ECPRI_STATUS_PKT_DROP_FULL,
     DMA_REG_MAX,
 };
 
@@ -464,5 +466,21 @@ static inline u32 ecpri_dma_hal_get_reg_ofst(enum ecpri_dma_hal_reg_name reg)
  * Get the register base address
  */
 u32 ecpri_dma_hal_get_reg_base(void);
+
+/**
+ecpri_dma_hal_get_reg_max_m() - get max m value
+@reg: register name
+Return max m value
+*/
+u32 ecpri_dma_hal_get_reg_max_m(enum ecpri_dma_hal_reg_name reg);
+
+/**
+ecpri_dma_hal_get_reg_max_n() - get max m value
+@reg: register name
+Return max n value
+
+*/
+u32 ecpri_dma_hal_get_reg_max_n(enum ecpri_dma_hal_reg_name reg);
+
 
 #endif /* _DMAHAL_REG_H_ */

@@ -261,7 +261,7 @@ static void mtip_ethtool_dump_regs(u32 link_index, void *buf)
         return;
     }
 
-    for (mtip_reg_idx = MTIP_ETHTOOL_MAC; mtip_reg_idx < MTIP_ETHTOOL_REG_MAX; mtip_reg_idx++)
+    for (mtip_reg_idx = 0; mtip_reg_idx < MTIP_ETHTOOL_REG_OFFSET_ARRAY_SIZE; mtip_reg_idx++)
     {
         switch (mtip_ethtool_reg_offset_val[mtip_reg_idx].mtip_ethtool_regs)
         {

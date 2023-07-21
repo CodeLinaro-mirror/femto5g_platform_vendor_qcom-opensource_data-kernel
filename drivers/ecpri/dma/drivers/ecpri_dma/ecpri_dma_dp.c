@@ -514,6 +514,7 @@ void ecpri_dma_dp_rx_comp_hdlr(struct gsi_chan_xfer_notify *notify)
 	switch (notify->evt_id) {
 	case GSI_CHAN_EVT_EOT:
 	case GSI_CHAN_EVT_OVERFLOW:
+	case GSI_CHAN_EVT_EOB:
 		comp_pkt = notify->xfer_user_data;
 		endp = comp_pkt->endp;
 
@@ -542,6 +543,7 @@ void ecpri_dma_dp_tx_comp_hdlr(struct gsi_chan_xfer_notify *notify)
 
 	switch (notify->evt_id) {
 	case GSI_CHAN_EVT_EOT:
+	case GSI_CHAN_EVT_EOB:
 		comp_pkt = notify->xfer_user_data;
 		comp_pkt->xfer_done = true;
 		endp = comp_pkt->endp;
@@ -597,7 +599,9 @@ int ecpri_dma_dp_rx_poll(struct ecpri_dma_endp_context *endp, u32 budget,
 
 			curr_pkt_wrapper->comp_pkt.status_code = notify[i].status;
 			curr_pkt_wrapper->comp_pkt.phys_port = notify[i].phys_port;
+
 			curr_pkt_wrapper->bytes_xfered = notify[i].bytes_xfered;
+			endp->total_bytes_recv += notify[i].bytes_xfered;
 
 			switch (notify[i].evt_id) {
 			case GSI_CHAN_EVT_EOT:

@@ -183,10 +183,6 @@ struct ecpri_dma_reg_save_dma_gen_s {
 };
 
 struct ecpri_dma_reg_save_dma_gen_ee_s {
-	ecpri_hwio_def_ecpri_irq_stts_ee_n_u
-		irq_stts_ee_n[GEN_ARR_SIZE_n(ECPRI_IRQ_STTS_EE_n)];
-	ecpri_hwio_def_ecpri_irq_en_ee_n_u
-		irq_en_ee_n[GEN_ARR_SIZE_n(ECPRI_IRQ_EN_EE_n)];
 	ecpri_hwio_def_ecpri_gsi_ee_vfid_gsi_m_ee_n_u
 		gsi_ee_vfid_n;
 };
@@ -194,6 +190,8 @@ struct ecpri_dma_reg_save_dma_gen_ee_s {
 struct ecpri_dma_reg_save_dma_dbg_s {
 	ecpri_hwio_def_ecpri_irq_stts_ee_n_u
 		ecpri_irq_stts_ee_n[GEN_ARR_SIZE_n(ECPRI_IRQ_STTS_EE_n)];
+	ecpri_hwio_def_ecpri_irq_en_ee_n_u
+		irq_en_ee_n[GEN_ARR_SIZE_n(ECPRI_IRQ_EN_EE_n)];
 	ecpri_hwio_def_ecpri_snoc_monitoring_cfg_u
 		ecpri_snoc_monitoring_cfg;
 	ecpri_hwio_def_ecpri_qmb0_snoc_monitor_cnt_u
@@ -212,6 +210,35 @@ struct ecpri_dma_reg_save_dma_dbg_s {
 		ecpri_dst_ackmngr_cmdq_count_mn
 		[GEN_GSI_m_CH_n_ARR_SIZE_m(ECPRI_DST_ACKMNGR_CMDQ_COUNT)]
 		[GEN_GSI_m_CH_n_ARR_SIZE_n(ECPRI_DST_ACKMNGR_CMDQ_COUNT)];
+};
+
+struct ecpri_dma_reg_save_dma_status_s {
+	ecpri_hwio_def_ecpri_status_xbar_fh_port_rx_u status_xbar_fh_port_rx;
+	ecpri_hwio_def_ecpri_status_xbar_fh_port_tx_u status_xbar_fh_port_tx;
+	ecpri_hwio_def_ecpri_status_xbar_c2c_port_rx_u status_xbar_c2c_port_rx;
+	ecpri_hwio_def_ecpri_status_xbar_c2c_port_tx_u status_xbar_c2c_port_tx;
+	ecpri_hwio_def_ecpri_status_gsi0_a_u status_gsi0_a;
+	ecpri_hwio_def_ecpri_status_gsi0_b_u status_gsi0_b;
+	ecpri_hwio_def_ecpri_status_gsi1_a_u status_gsi1_a;
+	ecpri_hwio_def_ecpri_status_gsi1_b_u status_gsi1_b;
+	ecpri_hwio_def_ecpri_status_gsi2_a_u status_gsi2_a;
+	ecpri_hwio_def_ecpri_status_gsi2_b_u status_gsi2_b;
+	ecpri_hwio_def_ecpri_status_xbar_rx_port_m_u status_xbar_rx_port_m
+		[GEN_ARR_SIZE_n(ECPRI_DMA_STATUS_XBAR_RX_PORT_m)];
+	ecpri_hwio_def_ecpri_status_xbar_rx_drop_u status_xbar_rx_drop;
+	ecpri_hwio_def_ecpri_status_lte_pkt_drop_full_u
+		status_lte_pkt_drop_full;
+	ecpri_hwio_def_ecpri_status_pkt_drop_full_u status_pkt_drop_full;
+	ecpri_hwio_def_ecpri_status_pkt_drop_tlv_fifo_empty_u
+		status_pkt_drop_tlv_fifo_empty;
+	ecpri_hwio_def_ecpri_status_dst_drop_pkt_gsi_m_reg_n_u
+		status_dst_drop_pkt_gsi_m_reg_n
+		[GEN_GSI_m_REG_n_ARR_SIZE_m(ECPRI_DMA_STATUS_DST_DROP_PKT_GSI_m_REG_n)]
+		[GEN_GSI_m_REG_n_ARR_SIZE_n(ECPRI_DMA_STATUS_DST_DROP_PKT_GSI_m_REG_n)];
+	ecpri_hwio_def_ecpri_status_dst_drop_pkt_clear_u
+		status_dst_drop_pkt_clear;
+	ecpri_hwio_def_ecpri_status_lte_pkt_drop_tlv_fifo_empty_u
+		status_lte_pkt_drop_tlv_fifo_empty;
 };
 
 struct ecpri_dma_reg_save_dma_endps_s {
@@ -241,6 +268,8 @@ struct ecpri_dma_reg_save_dma_endps_s {
 		ecpri_endp_gsi_if_fifo_cfg_aos_n;
 	ecpri_hwio_def_ecpri_endp_cfg_vfid_gsi_m_ch_n_u
 		ecpri_endp_cfg_vfid_n;
+	ecpri_hwio_def_ecpri_endp_lte_cfg_gsi_m_ch_n_u
+		ecpri_endp_lte_cfg_gsi_m_ch_n;
 };
 
 struct ecpri_dma_reg_save_dma_nfapi_cfg_s {
@@ -392,9 +421,10 @@ struct ecpri_dma_reg_save_dma_markers_s {
 
 struct dma_regs_save_hierarchy_s {
 	struct ecpri_dma_reg_save_dma_gen_s     gen;
-	// TODO: ASK: these we will allocate using defines (MAX_EE, MAX_ENDP, etc)?
-	struct ecpri_dma_reg_save_dma_gen_ee_s  gen_ee[ECPRI_DMA_MAX_EE];
+	struct ecpri_dma_reg_save_dma_gen_ee_s  gen_ee[ECPRI_DMA_GSI_NUM_MAX]
+		[ECPRI_DMA_MAX_EE];
 	struct ecpri_dma_reg_save_dma_dbg_s     dbg;
+	struct ecpri_dma_reg_save_dma_status_s	status;
 	struct ecpri_dma_reg_save_dma_endps_s
 		endps[ECPRI_DMA_GSI_NUM_MAX][ECPRI_DMA_ENDP_NUM_MAX];
 	struct ecpri_dma_reg_save_dma_nfapi_s   nfapi;
@@ -858,16 +888,17 @@ void ecpri_dma_save_registers(void) {
 		dma.gen, ecpri_dma_tpdm_cfg);
 
 	/* DMA gen_ee */
-	READ_DMA_REG_ARR_N(ECPRI_IRQ_STTS_EE_n, dma.gen_ee[ee], irq_stts_ee_n);
-	READ_DMA_REG_ARR_N(ECPRI_IRQ_EN_EE_n, dma.gen_ee[ee], irq_en_ee_n);
-	for (ee = 0; ee < ECPRI_DMA_MAX_EE; ee++) {
-		READ_DMA_REG_N(ECPRI_GSI_EE_VFID,
-			dma.gen_ee[ee], gsi_ee_vfid_n, ee);
+	for (gsi_id = 0; gsi_id < ecpri_dma_ctx->num_of_gsi; gsi_id++) {
+		for (ee = 0; ee < ECPRI_DMA_MAX_EE; ee++) {
+			READ_DMA_REG_M_N(ECPRI_GSI_EE_VFID,
+				dma.gen_ee[gsi_id][ee], gsi_ee_vfid_n, gsi_id, ee);
+		}
 	}
 
 	/* DMA dbg */
 	READ_DMA_REG_ARR_N(ECPRI_IRQ_STTS_EE_n,
 		dma.dbg, ecpri_irq_stts_ee_n);
+	READ_DMA_REG_ARR_N(ECPRI_IRQ_EN_EE_n, dma.dbg, irq_en_ee_n);
 	READ_DMA_REG_ARR_GSI_M_REG_N(ECPRI_DST_ACKMNGR_CMDQ_STATUS_EMPTY,
 		dma.dbg, ecpri_dst_ackmngr_cmdq_status_empty_mn);
 	READ_DMA_REG_ARR_GSI_M_CH_N(ECPRI_DST_ACKMNGR_CMDQ_COUNT,
@@ -883,11 +914,48 @@ void ecpri_dma_save_registers(void) {
 	READ_DMA_REG(ECPRI_DST_ACKMNGR_CMDQ_STATUS,
 		dma.dbg, ecpri_dst_ackmngr_cmdq_status);
 
-	/* DMA endps */
-	for (gsi_id = 0; gsi_id < ECPRI_DMA_GSI_NUM_MAX; gsi_id++) {
-		if (gsi_id >= ecpri_dma_ctx->num_of_gsi)
-			break;
+	/* DMA status */
+	if (ecpri_dma_ctx->ecpri_hw_ver > ECPRI_HW_V1_0) {
+		READ_DMA_REG(ECPRI_DMA_STATUS_XBAR_FH_PORT_RX,
+			dma.status, status_xbar_fh_port_rx);
+		READ_DMA_REG(ECPRI_DMA_STATUS_XBAR_FH_PORT_TX,
+			dma.status, status_xbar_fh_port_tx);
+		READ_DMA_REG(ECPRI_DMA_STATUS_XBAR_C2C_PORT_RX,
+			dma.status, status_xbar_c2c_port_rx);
+		READ_DMA_REG(ECPRI_DMA_STATUS_XBAR_C2C_PORT_TX,
+			dma.status, status_xbar_c2c_port_tx);
+		READ_DMA_REG(ECPRI_DMA_STATUS_GSI0_A,
+			dma.status, status_gsi0_a);
+		READ_DMA_REG(ECPRI_DMA_STATUS_GSI0_B,
+			dma.status, status_gsi0_b);
+		READ_DMA_REG(ECPRI_DMA_STATUS_GSI1_A,
+			dma.status, status_gsi1_a);
+		READ_DMA_REG(ECPRI_DMA_STATUS_GSI1_B,
+			dma.status, status_gsi1_b);
+		READ_DMA_REG(ECPRI_DMA_STATUS_GSI2_A,
+			dma.status, status_gsi2_a);
+		READ_DMA_REG(ECPRI_DMA_STATUS_GSI2_B,
+			dma.status, status_gsi2_b);
+		READ_DMA_REG_ARR_N(ECPRI_DMA_STATUS_XBAR_RX_PORT_m,
+			dma.status, status_xbar_rx_port_m);
+		READ_DMA_REG(ECPRI_DMA_STATUS_XBAR_RX_DROP,
+			dma.status, status_xbar_rx_drop);
+		READ_DMA_REG(ECPRI_DMA_STATUS_LTE_PKT_DROP_FULL,
+			dma.status, status_lte_pkt_drop_full);
+		READ_DMA_REG(ECPRI_STATUS_PKT_DROP_FULL,
+			dma.status, status_pkt_drop_full);
+		READ_DMA_REG(ECPRI_DMA_STATUS_PKT_DROP_TLV_FIFO_EMPTY,
+			dma.status, status_pkt_drop_tlv_fifo_empty);
+		READ_DMA_REG_ARR_GSI_M_REG_N(ECPRI_DMA_STATUS_DST_DROP_PKT_GSI_m_REG_n,
+			dma.status, status_dst_drop_pkt_gsi_m_reg_n);
+		READ_DMA_REG(ECPRI_DMA_STATUS_DST_DROP_PKT_CLEAR,
+			dma.status, status_dst_drop_pkt_clear);
+		READ_DMA_REG(ECPRI_DMA_STATUS_LTE_PKT_DROP_TLV_FIFO_EMPTY,
+			dma.status, status_lte_pkt_drop_tlv_fifo_empty);
+	}
 
+	/* DMA endps */
+	for (gsi_id = 0; gsi_id < ecpri_dma_ctx->num_of_gsi; gsi_id++) {
 		for (endp_id = 0; endp_id < ECPRI_DMA_ENDP_NUM_MAX; endp_id++) {
 			READ_DMA_REG_M_N(ECPRI_ENDP_CFG_DEST,
 				dma.endps[gsi_id][endp_id], ecpri_endp_cfg_dest,
@@ -927,6 +995,11 @@ void ecpri_dma_save_registers(void) {
 				gsi_id, endp_id);
 			READ_DMA_REG_M_N(ECPRI_ENDP_CFG_VFID, dma.endps[gsi_id][endp_id],
 				ecpri_endp_cfg_vfid_n, gsi_id, endp_id);
+
+			if (ecpri_dma_ctx->ecpri_hw_ver > ECPRI_HW_V1_0)
+				READ_DMA_REG_M_N(ECPRI_DMA_ENDP_LTE_CFG_GSI_m_CH_n,
+					dma.endps[gsi_id][endp_id],
+					ecpri_endp_lte_cfg_gsi_m_ch_n, gsi_id, endp_id);
 		}
 	}
 	/* DMA nfapi */
@@ -1049,10 +1122,7 @@ void ecpri_dma_save_registers(void) {
 		dma.markers, ecpri_red_marker_above_en_mn);
 	
 	/* Save GSI registers */
-	for (gsi_id = 0; gsi_id < ECPRI_DMA_GSI_NUM_MAX; gsi_id++) {
-		if (gsi_id >= ecpri_dma_ctx->num_of_gsi)
-			break;
-
+	for (gsi_id = 0; gsi_id < ecpri_dma_ctx->num_of_gsi; gsi_id++) {
 		ecpri_dma_reg_save.gsi[gsi_id].fw_ver =
 			gsihal_read_reg_pn(GSI_GSI_INST_RAM_n, gsi_id,
 				ECPRI_DMA_REG_SAVE_FW_VER_ROW);

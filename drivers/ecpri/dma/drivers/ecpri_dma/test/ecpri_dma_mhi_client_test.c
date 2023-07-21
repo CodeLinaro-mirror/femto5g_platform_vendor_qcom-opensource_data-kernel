@@ -1502,21 +1502,10 @@ void ecpri_dma_mhi_client_test_destroy_data_context(int idx)
 	u32 hw_flavor = ecpri_dma_get_ctx_hw_flavor();
 	u32 first_src_ch, first_dest_ch, ch_id_diff;
 
-	if (ecpri_dma_mhi_client_test_mapping[hw_ver][hw_flavor][idx].type ==
-		ECPRI_DMA_MHI_CLIENT_TEST_VF_TYPE_FAPI)
-	{
-		first_src_ch = ECPRI_DMA_MHI_TEST_FAPI_FRST_SRC_CHANNEL_ID;
-		first_dest_ch = ECPRI_DMA_MHI_TEST_FAPI_FRST_DEST_CHANNEL_ID;
-		ch_id_diff = ecpri_dma_mhi_client_test_mapping
-			[hw_ver][hw_flavor][idx].num_of_hw_chs_pairs;
-	}
-	else
-	{
-		first_src_ch = ECPRI_DMA_MHI_TEST_FH_FRST_SRC_CHANNEL_ID;
-		first_dest_ch = ecpri_dma_mhi_client_test_mapping
-			[hw_ver][hw_flavor][idx].num_of_hw_chs_pairs;
-		ch_id_diff = ECPRI_DMA_MHI_TEST_FH_CHANNEL_ID_DIFF;
-	}
+	first_src_ch = ECPRI_DMA_MHI_TEST_FAPI_FRST_SRC_CHANNEL_ID;
+	first_dest_ch = ECPRI_DMA_MHI_TEST_FAPI_FRST_DEST_CHANNEL_ID;
+	ch_id_diff = ecpri_dma_mhi_client_test_mapping
+		[hw_ver][hw_flavor][idx].num_of_hw_chs_pairs;
 
 	/* Destroy DEST data buffer */
 	dma_free_coherent(ecpri_dma_ctx->pdev,
@@ -1564,21 +1553,10 @@ static int ecpri_dma_mhi_client_test_setup_channels(int idx)
 
 	DMA_UT_DBG("Entry setup_channels VF ID %d\n", idx);
 
-	if (ecpri_dma_mhi_client_test_mapping[hw_ver][hw_flavor][idx].type ==
-		ECPRI_DMA_MHI_CLIENT_TEST_VF_TYPE_FAPI)
-	{
-		first_src_ch = ECPRI_DMA_MHI_TEST_FAPI_FRST_SRC_CHANNEL_ID;
-		first_dest_ch = ECPRI_DMA_MHI_TEST_FAPI_FRST_DEST_CHANNEL_ID;
-		ch_id_diff = ecpri_dma_mhi_client_test_mapping
-			[hw_ver][hw_flavor][idx].num_of_hw_chs_pairs;
-	}
-	else
-	{
-		first_src_ch = ECPRI_DMA_MHI_TEST_FH_FRST_SRC_CHANNEL_ID;
-		first_dest_ch = ecpri_dma_mhi_client_test_mapping
-			[hw_ver][hw_flavor][idx].num_of_hw_chs_pairs;
-		ch_id_diff = ECPRI_DMA_MHI_TEST_FH_CHANNEL_ID_DIFF;
-	}
+	first_src_ch = ECPRI_DMA_MHI_TEST_FAPI_FRST_SRC_CHANNEL_ID;
+	first_dest_ch = ECPRI_DMA_MHI_TEST_FAPI_FRST_DEST_CHANNEL_ID;
+	ch_id_diff = ecpri_dma_mhi_client_test_mapping
+		[hw_ver][hw_flavor][idx].num_of_hw_chs_pairs;
 
 	/* Config Channels Context */
 	for (endp_pair_id = 0;
@@ -3482,18 +3460,8 @@ static int ecpri_dma_mhi_client_test_suite_connect_endp_vm(void* priv)
 		return -EPERM;
 	}
 
-	if (ecpri_dma_mhi_client_test_mapping[hw_ver][hw_flavor][idx].type ==
-		ECPRI_DMA_MHI_CLIENT_TEST_VF_TYPE_FAPI)
-	{
-		first_src_ch = ECPRI_DMA_MHI_TEST_FAPI_FRST_SRC_CHANNEL_ID;
-		first_dest_ch = ECPRI_DMA_MHI_TEST_FAPI_FRST_DEST_CHANNEL_ID;
-	}
-	else
-	{
-		first_src_ch = ECPRI_DMA_MHI_TEST_FH_FRST_SRC_CHANNEL_ID;
-		first_dest_ch = ecpri_dma_mhi_client_test_mapping
-			[hw_ver][hw_flavor][idx].num_of_hw_chs_pairs;
-	}
+	first_src_ch = ECPRI_DMA_MHI_TEST_FAPI_FRST_SRC_CHANNEL_ID;
+	first_dest_ch = ECPRI_DMA_MHI_TEST_FAPI_FRST_DEST_CHANNEL_ID;
 
 	/* Create connect params */
 	ecpri_dma_mhi_client_test_utils_create_conn_params(
@@ -3826,18 +3794,8 @@ ecpri_dma_mhi_client_test_suite_hw_ch_vm_single_packet_single_buffer(void* priv)
 		return -EFAULT;
 	}
 
-	if (ecpri_dma_mhi_client_test_mapping[hw_ver][hw_flavor][idx].type ==
-		ECPRI_DMA_MHI_CLIENT_TEST_VF_TYPE_FAPI)
-	{
-		first_src_ch = ECPRI_DMA_MHI_TEST_FAPI_FRST_SRC_CHANNEL_ID;
-		first_dest_ch = ECPRI_DMA_MHI_TEST_FAPI_FRST_DEST_CHANNEL_ID;
-	}
-	else
-	{
-		first_src_ch = ECPRI_DMA_MHI_TEST_FH_FRST_SRC_CHANNEL_ID;
-		first_dest_ch = ecpri_dma_mhi_client_test_mapping
-			[hw_ver][hw_flavor][idx].num_of_hw_chs_pairs;
-	}
+	first_src_ch = ECPRI_DMA_MHI_TEST_FAPI_FRST_SRC_CHANNEL_ID;
+	first_dest_ch = ECPRI_DMA_MHI_TEST_FAPI_FRST_DEST_CHANNEL_ID;
 
 	/* Invoke connect_endp and verify - for first pair */
 	ret = ecpri_dma_mhi_utils_connect_and_verify_endps(&ctx->function,

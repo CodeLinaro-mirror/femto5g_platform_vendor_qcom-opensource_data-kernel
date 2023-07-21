@@ -454,14 +454,18 @@ void run_mtip_process_link_state(void* work_ptr)
     u32 link_index = taskstruct->link_index;
     bool link_up = taskstruct->link_up;
     struct net_device *dev = platform_driver_priv->mtip_links[link_index]->dev;
+    ecpri_dma_eth_conn_hdl_t dma_handle = 0;
+    enum ecpri_dma_notify_mode setmode = ECPRI_DMA_NOTIFY_MODE_IRQ;
 
+    dma_handle = platform_driver_priv->mtip_links[link_index]->dma_hdl;
     if (link_up)
     {
         CSMLOGDBG("Processing LINK_UP for link_index: %d\n", link_index);
 
         // Process MAC link up state
         mtip_mac_link_up(link_index);
-
+        // set the rx mode to IRQ
+        mtip_set_rx_mode_immediate(dma_handle, setmode);
         // wake queues
         netif_tx_wake_all_queues(dev);
 
