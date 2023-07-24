@@ -709,19 +709,15 @@ static void mtip_phy_phy_validate(struct phylink_config *config,
 
     CSMLOGINFO("phy validate read sfp_port_type %d for sfp_phandle %d", sfp_port_type, sfp_phandle);
 
-    if (sfp_port_type != PORT_FIBRE) 
+    // if sfp port type is OTHER, force it to be PORT_DA
+    if (sfp_port_type == PORT_OTHER)
     {
-        CSMLOGINFO("validate processing done for lane_index %d sfp_port_type %d", lane_index, sfp_port_type);
-        return;
+        sfp_port_type = PORT_DA;
     }
-
-    CSMLOGDBG("reading qsfp info for optical cable in validate");
 
     // set the sfp port_type of the lane
     platform_driver_priv->mtip_lanes[lane_index]->sfp_port_type = sfp_port_type;
 
-    // if sfp port type is FIBRE
-    // treat it as lane up since FIBRE will not send an explcit lane up until lane is brought up
     // transceiver lane supported speed
     ret = qsfp_trx_get_lane_speed(sfp_phandle, &qsfp_speed);
     if(ret == 0)
@@ -872,12 +868,6 @@ static void mtip_phy_phylink_lane_up(struct phylink_config *config,
    qsfp_trx_get_lane_type(sfp_phandle, &sfp_port_type);
 
    CSMLOGDBG("read sfp_port_type %d for sfp_phandle %d", sfp_port_type, sfp_phandle);
-
-   if (sfp_port_type == PORT_FIBRE) 
-   {
-       CSMLOGINFO("skipping lane_up for optical");
-       return;
-   }
 
    // if sfp port type is OTHER, force it to be PORT_DA
    if (sfp_port_type == PORT_OTHER)
@@ -1174,5 +1164,38 @@ trx_link_length_range mtip_phy_get_trx_link_length_range(struct mtip_port_device
     }
 
     return TRX_LINK_UNKNOWN;
+}
+
+void mtip_phy_notify_eth_event_to_trx(u32 link_index, bool enable)
+{
+    enum mtip_port_type_enum port_type;
+    bool lanes_enabled[PHY_LANE_MAX];
+    int i;
+    u32 lane_index;
+    u32 sfp_phandle[MAX_ETH_LANES] = {0};
+    u8 sfp_lane_count = 0;
+
+    if (mtip_lookup_port_type_by_link_index(link_index, &port_type) < 0)
+    {
+        CSMLOGERR("invalid port_type for link_index %d", link_index);
+        return;
+    }
+
+    mtip_phy_get_lanes_of_link(link_index, lanes_enabled);
+
+    for (i = 0; i < PHY_LANE_MAX; ++i)
+    {
+        if(lanes_enabled[i] == true){
+            mtip_lookup_lane_index_by_port_type_and_real_lane(&lane_index, port_type, i);
+            sfp_phandle[sfp_lane_count++] = platform_driver_priv->devices.lane_devices[lane_index].sfp_phandle;
+            CSMLOGERR("eth_event %d for link_index %d = lane %d = sfp_phandle=%d",
+                      enable, link_index, lane_index, sfp_phandle[sfp_lane_count-1]);
+        }
+    }
+
+    // Indicate transceiver driver about interface bring up
+    qsfp_trx_ifconfig_notifier(enable, sfp_phandle);
+
+    return;
 }
 
