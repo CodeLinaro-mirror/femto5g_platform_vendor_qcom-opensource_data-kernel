@@ -72,8 +72,8 @@ extern int mtip_dma_max_rx_buff_size;
 
 #define MTIP_RX_DMA_MAX_BUFFERS_PER_PACKET   4
 
-#define MTIP_TX_RING_SIZE 512
-#define MTIP_RX_RING_SIZE 512
+#define MTIP_TX_RING_SIZE 2048
+#define MTIP_RX_RING_SIZE 2048
 
 #define MTIP_TX_MOD_COUNTER_THRESHOLD 32
 #define MTIP_TX_MOD_TIMER_THRESHOLD   10
