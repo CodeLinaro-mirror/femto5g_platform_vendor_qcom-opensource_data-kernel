@@ -3963,7 +3963,7 @@ int32_t setup_phy_status_debugfs_directory()
 	while (my_delm != 0)
 	{
 		len= strlen(token);
-		QCOM_AW_PHY_LOG_ERR("token: %s\n",token);
+		QCOM_AW_PHY_LOG_DBG("token: %s\n",token);
 
 		if(token[0] == '{' && len >2)
 		{
