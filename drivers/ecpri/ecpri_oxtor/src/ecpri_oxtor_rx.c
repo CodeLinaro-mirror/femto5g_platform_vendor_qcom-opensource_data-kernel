@@ -59,3 +59,16 @@ int ecpri_oxtor_rx_ring_reset(u32 ring_id)
 	return 0;
 
 }
+uint32_t ecpri_oxtor_rx_get_latency(u32 ring_id)
+{
+	ecpri_oran_xtor_hwio_def_ecpri_oran_xtor_rx_n_error_dump_reg_packet_latency_s rx_n_error_dump_reg_packet_latency;
+	memset(&rx_n_error_dump_reg_packet_latency,0,
+	sizeof(ecpri_oran_xtor_hwio_def_ecpri_oran_xtor_rx_n_error_dump_reg_packet_latency_s));
+    /*
+	setting the 0x9429024 register value red;
+	*/
+	ecpriss_oxtor_hal_read_reg_n_fields(ECPRI_ORAN_XTOR_RX_n_ERROR_DUMP_REG_PACKET_LATENCY, ring_id , (void*) &rx_n_error_dump_reg_packet_latency);
+	ECPRISS_OXTOR_LOG_ERR(" Inside rx_get_latency ");
+	ECPRISS_OXTOR_LOG_ERR(" Value of latency extracted 0x0%x \n",rx_n_error_dump_reg_packet_latency.actual_latency);
+	return rx_n_error_dump_reg_packet_latency.actual_latency;
+}

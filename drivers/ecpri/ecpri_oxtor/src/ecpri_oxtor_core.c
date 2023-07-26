@@ -31,6 +31,8 @@ extern ecpriss_oxtor_hal_context_s ecpriss_oxtor_hal_ctx;
 
 ecpri_oxtor_cache g_cache;
 ecpri_oxtor_stats_s stats_data;
+ecpri_oxtor_latency_val_s latency_measurement;
+
 
 ecpri_oxtor_core_cntxt_s     ecpri_oxtor_core_cntxt;
 ecpri_oxtor_core_cntxt_s *ecpri_oxtor_core_context = &ecpri_oxtor_core_cntxt;
@@ -49,6 +51,78 @@ static long ecpri_oxtor_core_ioctl_hdlr(struct file *filp, unsigned int cmd,
 		unsigned long arg);
 static int ecpri_oxtor_core_probe(struct platform_device *pdev);
 static int ecpri_oxtor_core_ioctl_init(void);
+static int ecpri_oxtor_core_latency_cfg_en(int);
+
+static int ecpri_oxtor_core_latency_cfg_en(int ring_id)
+{
+	/*
+	 * Adding for register
+	 * ECPRI_ORAN_XTOR_RX_n_CTL_REG,
+	 * ECPRI_ORAN_XTOR_RX_n_MAX_LATENCY_EXPECTED
+	 */
+	ecpri_oran_xtor_hwio_def_ecpri_oran_xtor_rx_n_ctl_reg_s rx_n_ctl_reg_s;
+	ecpri_oran_xtor_hwio_def_ecpri_oran_xtor_rx_n_max_latency_expected_s rx_n_max_latency_expected_s;
+
+	memset(&rx_n_ctl_reg_s,0,sizeof(ecpri_oran_xtor_hwio_def_ecpri_oran_xtor_rx_n_ctl_reg_s));
+	memset(&rx_n_max_latency_expected_s,0,sizeof(ecpri_oran_xtor_hwio_def_ecpri_oran_xtor_rx_n_max_latency_expected_s));
+
+	if(ring_id < 0 || ring_id > 3){
+		return -1;
+	}
+
+	/*
+	 * Calculate Latency Value
+	 */
+	ecpriss_oxtor_hal_read_reg_n_fields(ECPRI_ORAN_XTOR_RX_n_CTL_REG,ring_id,(void*) &rx_n_ctl_reg_s);
+
+	ECPRISS_OXTOR_LOG_ERR("RX: latency_error_value[%d] %d \n",rx_n_ctl_reg_s.latency_err_en,ring_id);
+
+	/*
+	 * Setting Value for latency_err_en field to 1
+	 */
+	rx_n_ctl_reg_s.latency_err_en=1;
+	ecpriss_oxtor_hal_write_reg_n_fields(ECPRI_OXTOR_REG_TYPE_BASE,
+			ECPRI_ORAN_XTOR_RX_n_CTL_REG, ring_id ,(void*) &rx_n_ctl_reg_s);
+	ECPRISS_OXTOR_LOG_ERR("RX: latency_error_value[%d] %d \n",rx_n_ctl_reg_s.latency_err_en
+			,ring_id);
+
+	ecpriss_oxtor_hal_write_reg_n_fields
+		(
+		 ECPRI_OXTOR_REG_TYPE_BASE,
+		 ECPRI_ORAN_XTOR_RX_n_CTL_REG, ring_id ,(void*) &rx_n_ctl_reg_s
+		);
+
+	ECPRISS_OXTOR_LOG_ERR("RX: latency_error_value[%d] %d \n",rx_n_ctl_reg_s.latency_err_en,ring_id);
+
+	ecpriss_oxtor_hal_read_reg_n_fields
+		(
+		 ECPRI_ORAN_XTOR_RX_n_MAX_LATENCY_EXPECTED,
+		 ring_id,(void*) &rx_n_max_latency_expected_s
+		);
+
+	ECPRISS_OXTOR_LOG_ERR("RX: max_latency[%d] %d \n",rx_n_max_latency_expected_s.max_latency,ring_id);
+
+	/*
+	 * Setting Value for max_latency field to 255
+	 */
+
+	rx_n_max_latency_expected_s.max_latency=255;
+	ecpriss_oxtor_hal_write_reg_n_fields(ECPRI_OXTOR_REG_TYPE_BASE,
+			ECPRI_ORAN_XTOR_RX_n_MAX_LATENCY_EXPECTED, ring_id ,(void*) &rx_n_max_latency_expected_s);
+	ECPRISS_OXTOR_LOG_ERR("RX: max_latency[%d] %d \n",rx_n_max_latency_expected_s.max_latency
+			,ring_id);
+
+	ecpriss_oxtor_hal_write_reg_n_fields
+		(
+		 ECPRI_OXTOR_REG_TYPE_BASE,
+		 ECPRI_ORAN_XTOR_RX_n_MAX_LATENCY_EXPECTED,
+		 ring_id ,(void*) &rx_n_max_latency_expected_s
+		);
+
+	ECPRISS_OXTOR_LOG_ERR("RX: max_latency[%d] %d \n",rx_n_max_latency_expected_s.max_latency,ring_id);
+
+	return 1;
+}
 
 static void ecpri_oxtor_free_cmd(ecpri_oxtor_core_cfg_s *oxtor_cmd)
 {
@@ -173,6 +247,7 @@ function to enable bits of kbyte_cnt_control register
 static int ecpri_oxtor_init(struct platform_device *pdev)
 {
 	int ret = 0;
+	int i;
 	memset(&ecpri_oxtor_core_cntxt,0,sizeof(ecpri_oxtor_core_cntxt_s));
 
 	do {
@@ -202,8 +277,18 @@ static int ecpri_oxtor_init(struct platform_device *pdev)
 
 		ret = ecpri_oxtor_core_init();
 		if(ret < 0) {
-			ECPRISS_OXTOR_LOG_ERR("Work queue init failed\n");
+			pr_err("Ecpri Oxtor init failed\n");
 			break;
+		}
+
+		for(i=0;i < ECPRI_OXTOR_RX_CHANNELS_MAX ; i++)
+		{
+		    ret = ecpri_oxtor_core_latency_cfg_en(i);
+		    if(ret < 0)
+		    {
+		       pr_err("Ecpri Oxtor Core Latency Configuration Failed\n");
+		       break;
+		    }
 		}
 		/*
 		   ret = ecpri_oxtor_workq_init();
@@ -593,10 +678,29 @@ static long ecpri_oxtor_core_ioctl_hdlr(struct file *filp, unsigned int cmd,
 
 			break;
 
+        case ECPRI_OXTOR_IOCTL_GET_LATENCY :
+		   	ECPRISS_OXTOR_LOG_ERR("Inside switch case");
+
+			for(ring_id=0 ; ring_id < ECPRI_OXTOR_RX_CHANNELS_MAX; ring_id++)
+			{
+                                latency_measurement.latency_val[ring_id] =
+				ecpri_oxtor_rx_get_latency(ring_id);
+				ECPRISS_OXTOR_LOG_ERR("Latency ring[%u] = 0x%x\n",ring_id,latency_measurement.latency_val[ring_id]);
+			}
+			//latency_measurement.latency_val=ecpri_oxtor_rx_get_latency(0);
+
+			if(copy_to_user((ecpri_oxtor_latency_val_s *)arg, &latency_measurement,
+						sizeof(latency_measurement)))
+			{
+				ECPRISS_OXTOR_LOG_ERR("copy_to_user_failed in ioctls\n");
+				return 0;
+			}
+
+		    break;
 		/* This should be called just after RESET command */
 		case ECPRI_OXTOR_IOCTL_GET_STATS :
 
-			for(ring_id = 0 ; ring_id <4; ring_id++){
+			for(ring_id = 0 ; ring_id < ECPRI_OXTOR_RX_CHANNELS_MAX; ring_id++){
 
 				ecpri_oxtor_tx_get_status(ring_id);
 

@@ -43,7 +43,9 @@ static const char
 	"ECPRI_ORAN_XTOR_RX_n_ERROR_DUMP_3_REG",
 	"ECPRI_ORAN_XTOR_TX_n_BACKPRESSURE_CNT_REG",
 	"ECPRI_ORAN_XTOR_TX_n_PKT_CNT_REG",
-	"ECPRI_OXTOR_OXTOR_MAX"};
+	"ECPRI_ORAN_XTOR_RX_n_ERROR_DUMP_REG_PACKET_LATENCY",
+	"ECPRI_OXTOR_OXTOR_MAX"
+	};
 
 ecpriss_oxtor_hal_context_s ecpriss_oxtor_hal_ctx;
 
@@ -700,6 +702,7 @@ static void ecpriss_oxtor_hal_reg_parse_rx_kbyte_cnt_qtimer_delta_1(
 	return;
 }
 
+
 static void ecpriss_oxtor_hal_reg_construct_rx_n_error_reg(
 		enum ecpriss_oxtor_hal_reg_name reg, const void *fields, u32 *val) {
 
@@ -763,6 +766,7 @@ static void ecpriss_oxtor_hal_reg_construct_rx_kbyte_cnt_qtimer_delta_1(
 			HWIO_ECPRI_ORAN_XTOR_RX_KBYTE_CNT_QTIMER_DELTA_1_QTIMER_MSB_BMSK);
 	return;
 }
+
 static void ecpriss_oxtor_hal_reg_construct_rx_kbyte_cnt_qtimer_delta_0(
 		enum ecpriss_oxtor_hal_reg_name reg, const void *fields, u32 *val) {
 	ecpri_oran_xtor_hwio_def_ecpri_oran_xtor_rx_kbyte_cnt_qtimer_delta_0_s
@@ -1202,6 +1206,20 @@ static void ecpriss_oxtor_hal_reg_parse_rx_n_pkt_cnt_reg(
 	return;
 }
 
+static void ecpriss_oxtor_hal_reg_construct_rx_n_error_dump_reg_packet_latency(
+		enum ecpriss_oxtor_hal_reg_name reg, const void *fields, u32 *val) {
+	ecpri_oran_xtor_hwio_def_ecpri_oran_xtor_rx_n_error_dump_reg_packet_latency_s
+		*rx_n_error_dump_reg_packet_latency_s =
+		(ecpri_oran_xtor_hwio_def_ecpri_oran_xtor_rx_n_error_dump_reg_packet_latency_s *)
+		fields;
+
+	ECPRISS_HAL_SETFIELD_IN_REG(
+			*val, rx_n_error_dump_reg_packet_latency_s->actual_latency,
+			HWIO_ECPRI_ORAN_XTOR_RX_n_ERROR_DUMP_REG_PACKET_LATENCY_ACTUAL_LATENCY_SHFT,
+			HWIO_ECPRI_ORAN_XTOR_RX_n_ERROR_DUMP_REG_PACKET_LATENCY_ACTUAL_LATENCY_BMSK);
+	return;
+}
+
 static void ecpriss_oxtor_hal_reg_construct_tx_n_rd_idx_wrap_cnt_reg(
 		enum ecpriss_oxtor_hal_reg_name reg, const void *fields, u32 *val) {
 
@@ -1228,6 +1246,21 @@ static void ecpriss_oxtor_hal_reg_parse_tx_n_rd_idx_wrap_cnt_reg(
 	wrap_cnt->rd_idx_wrap_cnt = ECPRISS_HAL_GETFIELD_FROM_REG(
 			val, HWIO_ECPRI_ORAN_XTOR_TX_n_RD_IDX_WRAP_CNT_RD_IDX_WRAP_CNT_SHFT,
 			HWIO_ECPRI_ORAN_XTOR_TX_n_RD_IDX_WRAP_CNT_RD_IDX_WRAP_CNT_BMSK);
+
+	return;
+}
+
+static void ecpriss_oxtor_hal_reg_parse_rx_n_error_dump_reg_packet_latency(
+		enum ecpriss_oxtor_hal_reg_name reg, void *fields, u32 val) {
+	ecpri_oran_xtor_hwio_def_ecpri_oran_xtor_rx_n_error_dump_reg_packet_latency_s
+		*rx_n_error_dump_reg_packet_latency_s =
+		(ecpri_oran_xtor_hwio_def_ecpri_oran_xtor_rx_n_error_dump_reg_packet_latency_s
+		 *)fields;
+
+	rx_n_error_dump_reg_packet_latency_s->actual_latency =
+		ECPRISS_HAL_GETFIELD_FROM_REG(
+				val, HWIO_ECPRI_ORAN_XTOR_RX_n_ERROR_DUMP_REG_PACKET_LATENCY_ACTUAL_LATENCY_SHFT,
+				HWIO_ECPRI_ORAN_XTOR_RX_n_ERROR_DUMP_REG_PACKET_LATENCY_ACTUAL_LATENCY_BMSK);
 
 	return;
 }
@@ -1327,6 +1360,10 @@ ecpriss_oxtor_hal_reg_objs[ECPRISS_OXTOR_HW_MAX][ECPRI_OXTOR_OXTOR_MAX] = {
 	{ecpriss_oxtor_hal_reg_construct_tx_n_rd_idx_wrap_cnt_reg,
 		ecpriss_oxtor_hal_reg_parse_tx_n_rd_idx_wrap_cnt_reg, 0x09228000,
 		0x00000290, 0x300, 0, 0, 0, 0, 0},
+	[ECPRISS_OXTOR_HW_v1_0][ECPRI_ORAN_XTOR_RX_n_ERROR_DUMP_REG_PACKET_LATENCY] =
+	{ecpriss_oxtor_hal_reg_construct_rx_n_error_dump_reg_packet_latency,
+		ecpriss_oxtor_hal_reg_parse_rx_n_error_dump_reg_packet_latency, 0x09428000, 0x00001024,
+		0x200, 0, 0, 0, 0, 0}
 };
 
 uint32_t ecpri_oxtor_hal_reg_read(ecpri_oxtor_hal_reg_type_e reg_type,
