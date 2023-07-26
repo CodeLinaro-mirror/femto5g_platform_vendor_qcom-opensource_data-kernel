@@ -2477,7 +2477,7 @@ static int mtip_device_lookup_lane_cfg(u32 port_type, trx_lane_cfg* lane_cfg, tr
 
 // filter the priv flags based on the current lane speed
 // and SFP module attached
-static u32 mtip_device_filter_priv_flags(u32 port_type)
+u32 mtip_device_filter_priv_flags(u32 port_type)
 {
     u32 filtered;
     int i;

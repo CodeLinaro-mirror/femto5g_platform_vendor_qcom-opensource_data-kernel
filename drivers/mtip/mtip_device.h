@@ -130,4 +130,6 @@ int mtip_device_update_security_config(struct net_device *netdev, enum mtip_port
 // get the next ptp ts seq num to use
 u8 mtip_netdev_get_next_ptp_ts_seq_num(u32 link_index);
 
+u32 mtip_device_filter_priv_flags(u32 port_type);
+
 #endif // _MTIP_DEVICE_H
