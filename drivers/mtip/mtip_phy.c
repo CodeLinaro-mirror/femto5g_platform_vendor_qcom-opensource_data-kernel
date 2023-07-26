@@ -261,6 +261,12 @@ void mtip_phy_retry_phy_bringup(struct work_struct *work)
     u32 port_type;
     u32 link_index = wq_params->link_index;
 
+    if(link_index >= MTIP_MAX_LINKS)
+    {
+      CSMLOGERR("invalid link_index %d\n", link_index);
+      goto func_exit;
+    }
+
     if(platform_driver_priv->mtip_links[link_index]->state == MTIP_LINK_STATE_CLOSE)
     {
         goto func_exit;

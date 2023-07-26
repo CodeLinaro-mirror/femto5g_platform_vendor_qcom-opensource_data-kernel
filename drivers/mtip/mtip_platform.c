@@ -483,7 +483,7 @@ int mtip_link_probe(struct platform_device *pdev)
 {
     int ret = 0;
     int 			result = 0;
-    struct mtip_link_device_info link_device;
+    struct mtip_link_device_info link_device = {0};
     struct resource *resource;
     unsigned long flags;
     spinlock_t *lock = &platform_driver_priv->driver_lock;

@@ -228,6 +228,11 @@ void qcom_aw_phy_handle_cdr_lock_status(
   QCOM_AW_PHY_LOG_INFO("CDR lock status %d for PHY %d, lane %d",
                        lane_level_status, phy_inst_info->phy_inst, lane);
 
+  if(lane >= PHY_LANE_MAX)
+  {
+    QCOM_AW_PHY_LOG_ERR("Operation on an Invalid lane %d",lane);
+    return;
+  }
   phy_inst_info->cdr_lock_status_flag[lane] = lane_level_status;
   eth_link_index = phy_inst_info->lane_params[lane].lane_config.link_index;
 
@@ -1625,7 +1630,7 @@ void qcom_aw_phy_handle_an_done(struct work_struct *work){
     num_lanes = qcom_aw_phy_get_num_lanes_for_speed_mode(
                                   phy_inst_info->an_params.an_result[lane_num]);
     if(num_lanes > 1){
-      for(i=lane_num+1; i< lane_num+num_lanes;i++){
+      for(i=lane_num+1; (i< lane_num+num_lanes) && (i < PHY_LANE_MAX);i++){
 
         /* Set the lane offset */
         pmd_set_lane(&temp_mss, i);
