@@ -374,11 +374,15 @@ static int __rmnet_open(struct net_device *dev)
 	struct rmnet_private *p = netdev_priv(dev);
 
 	DBG0("[%s] __rmnet_open()\n", dev->name);
+	pr_err("ld_debug: %s: %s\n", __func__, dev->name);
 
 	if (p->device_up == DEVICE_UNINITIALIZED) {
+		pr_err("ld_debug: %s: bam_dmux_open\n", __func__);
 		r = msm_bam_dmux_open(p->ch_id, dev, bam_notify);
 		if (r < 0) {
 			DBG0("%s: ch=%d failed with rc %d\n",
+					__func__, p->ch_id, r);
+			pr_err("ld_debug: %s: ch=%d failed with rc %d\n",
 					__func__, p->ch_id, r);
 			return -ENODEV;
 		}
