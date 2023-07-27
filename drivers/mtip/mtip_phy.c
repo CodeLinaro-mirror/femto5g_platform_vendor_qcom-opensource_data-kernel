@@ -711,7 +711,11 @@ static void mtip_phy_phy_validate(struct phylink_config *config,
     }
 
     // ask the qsfp driver about the sfp port type
-    qsfp_trx_get_lane_type(sfp_phandle, &sfp_port_type);
+    if (qsfp_trx_get_lane_type(sfp_phandle, &sfp_port_type) < 0)
+    {
+       CSMLOGDBG("TRX not initialized yet, ignoring event for lane: %d\n", lane_index);
+       return;
+    }
 
     CSMLOGINFO("phy validate read sfp_port_type %d for sfp_phandle %d", sfp_port_type, sfp_phandle);
 
