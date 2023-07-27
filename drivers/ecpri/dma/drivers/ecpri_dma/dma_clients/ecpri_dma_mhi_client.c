@@ -3041,3 +3041,31 @@ int ecpri_dma_mhi_provide_ops()
 {
 	return mhi_dma_provide_ops(&ecpri_dma_mhi_driver_ops);
 }
+
+int ecpri_dma_mhi_get_vf_id(struct ecpri_dma_mhi_ee_gsi_tuple *ee_gsi_tuple)
+{
+	int hw_ver = ecpri_dma_get_ctx_hw_ver();
+	enum ecpri_dma_vm_ids vf_id;
+	int max_vf_id;
+
+	/* Validate input*/
+	if (NULL == ee_gsi_tuple)
+		return -EINVAL;
+
+	/* Get max vf_id by HW version version */
+	if (hw_ver == ECPRI_HW_V1_0)
+		max_vf_id = ECPRI_DMA_VM_IDS_MAX_V1;
+	else
+		max_vf_id = ECPRI_DMA_VM_IDS_MAX;
+
+	/* Find VF id*/
+	for (vf_id = ECPRI_DMA_VM_IDS_VM0; vf_id < max_vf_id; vf_id++)
+		if ((ecpri_dma_mhi_function_map[vf_id].ee_id == ee_gsi_tuple->ee_id) &&
+			(ecpri_dma_mhi_function_map[vf_id].gsi_id == ee_gsi_tuple->gsi_id))
+				break;
+
+	if (max_vf_id == vf_id)
+		return ECPRI_DMA_VM_IDS_NONE;
+	else
+		return vf_id;
+}

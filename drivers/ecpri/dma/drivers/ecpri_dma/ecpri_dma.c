@@ -52,7 +52,6 @@
 
 #define ECPRI_DMA_GSI_CHANNEL_STOP_SLEEP_MIN_USEC (3000)
 #define ECPRI_DMA_GSI_CHANNEL_STOP_SLEEP_MAX_USEC (5000)
-#define ECPRI_DMA_DRIVER_VERSION (1)
 
 int ecpri_dma_plat_drv_probe(struct platform_device *pdev_p);
 
@@ -634,7 +633,7 @@ int ecpri_dma_reset_endp(struct ecpri_dma_endp_context *endp_cfg)
 
 	ret = ecpri_dma_gsi_reset_channel(endp_cfg);
 	if (ret) {
-		DMADBG("Stop ENDP %d for GSI ID %d failed with code %d\n",
+		DMADBG("Reset ENDP %d for GSI ID %d failed with code %d\n",
 			endp_cfg->endp_id, endp_cfg->gsi_id, ret);
 		return ret;
 	}
@@ -651,12 +650,27 @@ int ecpri_dma_stop_endp(struct ecpri_dma_endp_context *endp_cfg)
 		return -EINVAL;
 	}
 
+	DMADBG("Stopping ENDP %d for GSI ID %d \n",
+				endp_cfg->endp_id, endp_cfg->gsi_id);
+
+	if(endp_cfg->gsi_ep_cfg->dir == ECPRI_DMA_ENDP_DIR_DEST)
+		ecpri_dma_qmi_service_send_ch_cmd_q6(
+		endp_cfg,
+		QMI_ECPRI_CH_CMD_TYPE_STOP_V01,
+		ECPRI_DMA_QMI_MSG_SYNC);
+
 	ret = ecpri_dma_gsi_stop_channel(endp_cfg);
 	if (ret) {
 		DMADBG("Stop ENDP %d for GSI ID %d failed with code %d\n",
 			endp_cfg->endp_id, endp_cfg->gsi_id, ret);
 		return ret;
 	}
+
+	if(endp_cfg->gsi_ep_cfg->dir == ECPRI_DMA_ENDP_DIR_SRC)
+		ecpri_dma_qmi_service_send_ch_cmd_q6(
+		endp_cfg,
+		QMI_ECPRI_CH_CMD_TYPE_STOP_V01,
+		ECPRI_DMA_QMI_MSG_ASYNC);
 
 	/* sleep for short period to flush DMA */
 	usleep_range(ECPRI_DMA_GSI_CHANNEL_STOP_SLEEP_MIN_USEC,
@@ -675,12 +689,21 @@ int ecpri_dma_start_endp(struct ecpri_dma_endp_context *endp_cfg)
 		return -EINVAL;
 	}
 
+	DMADBG("Starting ENDP %d for GSI ID %d\n",
+				endp_cfg->endp_id, endp_cfg->gsi_id);
+
 	ret = ecpri_dma_gsi_start_channel(endp_cfg);
 	if (ret) {
-		DMADBG("Stop ENDP %d for GSI ID %d failed with code %d\n",
+		DMADBG("Start ENDP %d for GSI ID %d failed with code %d\n",
 			endp_cfg->endp_id, endp_cfg->gsi_id, ret);
 		return ret;
 	}
+
+	if(ecpri_dma_qmi_get_sw_ver() >= ECPRI_DMA_QMI_SW_V3)
+		ecpri_dma_qmi_service_send_ch_cmd_q6(
+			endp_cfg,
+			QMI_ECPRI_CH_CMD_TYPE_START_V01,
+			ECPRI_DMA_QMI_MSG_SYNC);
 
 	return ret;
 }
@@ -1305,9 +1328,6 @@ static int ecpri_dma_pre_init(const struct ecpri_dma_plat_drv_res *resource_p,
 		"ecpri_dma_low", 0);
 	if (ecpri_dma_ctx->logbuf_low == NULL)
 		DMADBG("failed to create IPC log, continue...\n");
-
-	/* Set Driver SW version - used for sync with Q6 */
-	ecpri_dma_ctx->driver_ver = ECPRI_DMA_DRIVER_VERSION;
 
 	/* Set master pdev and pdev*/
 	ecpri_dma_ctx->master_pdev = dma_pdev;
