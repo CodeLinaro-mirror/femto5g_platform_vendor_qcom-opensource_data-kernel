@@ -1598,7 +1598,7 @@ static int mtip_platform_setup(void)
                platform_driver_priv->mtip_lanes[i]->sfp_port_type = PORT_DA;
 
                // set the lane speed as 25GBASE
-               platform_driver_priv->mtip_lanes[i]->lane_speed = PHY_LANE_SPEED_25G;
+               platform_driver_priv->mtip_lanes[i]->lane_speed = PHY_LANE_SPEED_100G;
            }
        }
 

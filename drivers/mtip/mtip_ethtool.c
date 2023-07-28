@@ -928,7 +928,7 @@ void mtip_ethtool_set_msglevel(struct net_device *netdev, u32 level)
                     lane_index = platform_driver_priv->devices.port_devices[port_type].lane_devices[i]->lane_index;
 
                     memcpy(&platform_driver_priv->mtip_lanes[lane_index]->lane_qsfp_info, &trx_info, sizeof(struct qsfp_info));
-                    post_mtip_phy_handle_lane_up(lane_index, PORT_DA, PHY_LANE_SPEED_25G);
+                    post_mtip_phy_handle_lane_up(lane_index, PORT_DA, PHY_LANE_SPEED_100G);
                 }
                 else
                 {
@@ -948,7 +948,7 @@ void mtip_ethtool_set_msglevel(struct net_device *netdev, u32 level)
                     lane_index = platform_driver_priv->devices.port_devices[port_type].lane_devices[i]->lane_index;
 
                     memcpy(&platform_driver_priv->mtip_lanes[lane_index]->lane_qsfp_info, &trx_info, sizeof(struct qsfp_info));
-                    post_mtip_phy_handle_lane_up(lane_index, PORT_FIBRE, PHY_LANE_SPEED_25G);
+                    post_mtip_phy_handle_lane_up(lane_index, PORT_FIBRE, PHY_LANE_SPEED_100G);
                 }
                 else
                 {
