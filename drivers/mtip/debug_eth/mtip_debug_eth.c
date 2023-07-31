@@ -51,7 +51,7 @@ static struct platform_driver mtip_debug_eth_driver = {
         },
 };
 
-static const char * const mtip_debug_ethtool_stat_strings[] = {
+const char * const mtip_debug_ethtool_stat_strings[] = {
     "EtherStatsOctets",
     "OctetsReceivedOK",
     "VLANReceivedOK",
@@ -575,5 +575,10 @@ static const struct ethtool_ops mtip_debug_ethtool_ops = {
 const struct ethtool_ops * mtip_debug_eth_get_ethtool_ops()
 {
   return &mtip_debug_ethtool_ops;
+}
+
+char ** get_mtip_debug_ethtool_stat_strings()
+{
+    return (char **) mtip_debug_ethtool_stat_strings;
 }
 

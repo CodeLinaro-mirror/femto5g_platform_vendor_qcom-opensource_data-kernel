@@ -19,5 +19,4 @@ int mtip_ethtool_set_fecparam(struct net_device* netdev, struct ethtool_fecparam
 void mtip_ethtool_set_msglevel(struct net_device *netdev, u32 level);
 u32 mtip_ethtool_get_msglevel(struct net_device *netdev);
 
-
 #endif // _MTIP_ETHTOOL_H

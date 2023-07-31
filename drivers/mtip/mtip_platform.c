@@ -281,9 +281,11 @@ static int mtip_platform_cleanup_link(unsigned int link_index)
          platform_driver_priv->mtip_links[link_index]->dma_hdl = 0;
       }
 
-      kfree(platform_driver_priv->mtip_links[link_index]);
-
-      platform_driver_priv->mtip_links[link_index] = NULL;
+      if(platform_driver_priv->mtip_links[link_index] != NULL)
+      {
+        kfree(platform_driver_priv->mtip_links[link_index]);
+        platform_driver_priv->mtip_links[link_index] = NULL;
+      }
    }
    return 0;
 }
