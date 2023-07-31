@@ -285,7 +285,7 @@ void qcom_aw_phy_dump_registers(void) {
   }
 
   for (phy_inst_type = QCOM_AW_PHY_INST_FH0;
-       phy_inst_type < QCOM_AW_PHY_INST_FH1;
+       phy_inst_type < QCOM_AW_PHY_INST_MAX;
        phy_inst_type++) { // change it for all PHYs later
     phy_inst_info = &phy_config_info->phy_inst_config_info[phy_inst_type];
 

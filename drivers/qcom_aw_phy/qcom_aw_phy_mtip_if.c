@@ -1333,9 +1333,11 @@ int qcom_aw_phy_teardown(enum mtip_port_type_enum port_type,
   struct qcom_aw_phy_inst_config *phy_inst_info = NULL;
   struct qcom_aw_lane_params *phy_lane_params = NULL;
   enum eth_phy_iface_phy_lane_num_enum lane = PHY_LANE_0;
+  enum eth_phy_iface_phy_lane_num_enum lane_temp = PHY_LANE_0;
   mss_access_t mss = {.phy_offset = 0, .lane_offset = 0};
   struct qcom_aw_phy_lane_speed_config config;
   int poll_result;
+  int start_lane=PHY_LANE_0, end_lane=PHY_LANE_MAX;
   enum local_error_enum local_err_val = LOCAL_ERROR_INVALID;
   aw_err_code_t aw_err_val = AW_ERR_CODE_NONE;
   int ret_val = 0;
@@ -1434,6 +1436,45 @@ int qcom_aw_phy_teardown(enum mtip_port_type_enum port_type,
     phy_inst_info->lane_params[lane].rx_sig_detect_status = false;
 
     mutex_unlock(&phy_inst_info->lane_lock[lane]);
+  }
+
+  /* To handle ANLT cleanup for lanes on which AN was initiated but lane bring
+     up was not triggered */
+  for (lane = PHY_LANE_0; lane < PHY_LANE_MAX; lane++) {
+
+    /* If single lane speed mode was advertised, then reset ANLT only for that
+       lane, else reset ANLT on all lanes */
+    start_lane = lane;
+    if(qcom_aw_phy_is_an_adv_single_lane_enabled(
+                                        phy_inst_info->an_params.adv_ability)){
+      end_lane = lane + 1;
+    }
+    else{
+      end_lane = PHY_LANE_MAX;
+    }
+
+    if (phy_inst_info->an_params.an_state[lane] == PHY_AN_STATE_START){
+
+      /* Loop through all the applicable lanes and reset ANLT */
+      for (lane_temp = start_lane; lane_temp < end_lane; lane_temp++) {
+
+        mutex_lock(&phy_inst_info->lane_lock[lane_temp]);
+
+        /* Set the lane offset */
+        pmd_set_lane(&mss, lane_temp);
+
+        QCOM_AW_PHY_LOG_INFO("Reset ANLT lane %d on port %d!", lane_temp, port_type);
+
+        /* Reset AN and LT */
+        qcom_aw_phy_reset_anlt(&mss);
+
+        mutex_unlock(&phy_inst_info->lane_lock[lane_temp]);
+      }
+    }
+
+    /* If reset has been processed for all the lanes, then break */
+    if(end_lane == PHY_LANE_MAX)
+      break;
   }
 
   for (lane = PHY_LANE_0; lane < PHY_LANE_MAX; lane++) {
