@@ -34,6 +34,10 @@ extern struct DWC_ETH_QOS_res_data dwc_eth_qos_res_data;
 #define IPA_PIPE_MIN_BW 0
 #define NTN_IPA_DBG_MAX_MSG_LEN 3000
 static char buf[3000];
+static struct class *emac_ipa_class;
+static dev_t emac_ipa_dev_num;
+static struct cdev *emac_ipa_cdev;
+static struct device *emac_ipa_dev;
 
 #define IPA_LOCK() mutex_lock(&pdata->prv_ipa.ipa_lock)
 #define IPA_UNLOCK() mutex_unlock(&pdata->prv_ipa.ipa_lock)
@@ -1617,6 +1621,42 @@ int DWC_ETH_QOS_ipa_create_debugfs(struct DWC_ETH_QOS_prv_data *pdata)
 		goto fail;
 	}
 
+	ret = alloc_chrdev_region(&emac_ipa_dev_num, 0, 1, "emac_ipa");
+	if (ret) {
+		EMACERR("alloc_chrdev_region error for node %s\n","emac_ipa");
+		goto alloc_emac_ipa_chrdev_region_fail;
+	}
+
+	emac_ipa_cdev = cdev_alloc();
+	if (!emac_ipa_cdev) {
+		ret = -ENOMEM;
+		EMACERR("failed to alloc emac_ipa cdev\n");
+		goto fail_alloc_emac_ipa_cdev;
+	}
+
+	cdev_init(emac_ipa_cdev,NULL);
+
+	ret = cdev_add(emac_ipa_cdev,emac_ipa_dev_num,1);
+	if (ret < 0) {
+		EMACERR("emac_ipa cdev_add err=%d\n", -ret);
+		goto emac_ipa_cdev_add_fail;
+	}
+
+	emac_ipa_class = class_create(THIS_MODULE,"emac_ipa");
+	if (!emac_ipa_class) {
+		ret = -ENODEV;
+		EMACERR("failed to create emac_ipa class\n");
+		goto fail_create_emac_ipa_class;
+	}
+
+	emac_ipa_dev = device_create(emac_ipa_class, NULL,
+	emac_ipa_dev_num, NULL, "emac_ipa");
+	if (!emac_ipa_dev) {
+		ret = -EINVAL;
+		EMACERR("failed to create emac_ipa device\n");
+		goto fail_create_emac_ipa_device;
+	}
+
 	if(!pdata || !pdata->debugfs_dir) {
 		EMACERR( "Null Param %s \n", __func__);
 		return -1;
@@ -1646,6 +1686,15 @@ int DWC_ETH_QOS_ipa_create_debugfs(struct DWC_ETH_QOS_prv_data *pdata)
 fail:
 	DWC_ETH_QOS_ipa_cleanup_debugfs(pdata);
 	return -ENOMEM;
+fail_create_emac_ipa_device:
+	class_destroy(emac_ipa_class);
+fail_create_emac_ipa_class:
+	cdev_del(emac_ipa_cdev);
+emac_ipa_cdev_add_fail:
+fail_alloc_emac_ipa_cdev:
+	unregister_chrdev_region(emac_ipa_dev_num, 1);
+alloc_emac_ipa_chrdev_region_fail:
+	return ret;
 }
 
 /**
@@ -1659,6 +1708,13 @@ int DWC_ETH_QOS_ipa_cleanup_debugfs(struct DWC_ETH_QOS_prv_data *pdata)
 {
 	struct DWC_ETH_QOS_prv_ipa_data *ntn_ipa = &pdata->prv_ipa;
 	struct net_device *netdev = platform_get_drvdata(pdata->pdev);
+
+	if (emac_ipa_dev) {
+		device_destroy(emac_ipa_class, emac_ipa_dev_num);
+		class_destroy(emac_ipa_class);
+		cdev_del(emac_ipa_cdev);
+		unregister_chrdev_region(emac_ipa_dev_num, 1);
+	}
 
 	sysfs_remove_file(&netdev->dev.kobj,
 			  &dev_attr_suspend_ipa_offload.attr);
