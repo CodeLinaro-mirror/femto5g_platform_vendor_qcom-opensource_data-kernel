@@ -1,6 +1,6 @@
 //SPDX-License-Identifier: GPL-2.0-only
 /*
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  */ 
 
 #include <linux/init.h>
@@ -54,6 +54,8 @@
 #include "mtip_ethtool.h"
 #include "mtip_phy.h"
 #include "mtip_notifr.h"
+#include "mtip_debug_eth.h"
+#include "eth_phy_iface.h"
 
 static u32 mtip_mac_get_interrupt_summary(struct mtip_port_device_info* port_device)
 {
@@ -1188,6 +1190,13 @@ static void mtip_mac_wrapper_set_serdes_mux_cfg(struct mtip_port_device_info* po
     u32 port_type = port_device->port_type;
     enum mtip_port_config_enum port_config = platform_driver_priv->mtip_ports[port_type]->port_config;
 
+
+    if(port_type == MTIP_PORT_TYPE_DEBUG && !check_if_valid_port_config_for_debug_eth(port_config))
+    {
+        CSMLOGERR("config %d not supported on port_type %d", port_config, port_type);
+        return;
+    }
+
     switch (port_config)
     {
     case MTIP_PORT_CONFIG_1x100GBASE_R:
@@ -1290,9 +1299,18 @@ static void mtip_mac_wrapper_set_serdes_mux_cfg(struct mtip_port_device_info* po
 
     CSMLOGDBG("Setting SERDES MUX CFG to: 0x%x\n", serdes_mux_val);
 
-    // set the serdes mux val register
+    // set the serdes mux val register for debug port
+    if(port_type == MTIP_PORT_TYPE_DEBUG)
+    {
+        iowrite32(serdes_mux_val,
+              wrapper_base_addr + MTIP_DBG_MAC_WRAPPER_SERDES_MUX_CFG1_OFFSET);
+    }
+    // set the serdes mux val register for fh ports
+    else
+    {
     iowrite32(serdes_mux_val,
               wrapper_base_addr + MTIP_MAC_WRAPPER_SERDES_MUX_CFG_OFFSET);
+    }
     return;
 }
 

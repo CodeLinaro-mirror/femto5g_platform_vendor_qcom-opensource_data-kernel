@@ -891,6 +891,11 @@ static void qcom_aw_phy_hw_init() {
       qcom_aw_phy_load_hexfile(
           &mss, "/lib/firmware/qcom_aw_phy/eth_custom_rates_1.hex");
 
+      if(phy_inst_type == QCOM_AW_PHY_INST_DEBUG){
+        iowrite32(0x4, phy_inst_info->wrapper_base_addr +
+                             QCOM_AW_PHY_WRAPPER_PHY_ICTL_AN_MASTER_CFG_OFFSET);
+      }
+
 #ifndef FEATURE_QCOM_AW_RUMI_SW
       /* Register for PHY status IRQ */
       ret_val = devm_request_irq(

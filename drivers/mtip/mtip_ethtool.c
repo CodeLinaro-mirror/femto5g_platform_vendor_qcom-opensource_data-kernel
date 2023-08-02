@@ -1,6 +1,6 @@
 //SPDX-License-Identifier: GPL-2.0-only
 /*
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  */ 
 
 #include <linux/init.h>
@@ -804,7 +804,7 @@ int	mtip_ethtool_set_fecparam(struct net_device* netdev, struct ethtool_fecparam
     return 0;
 }
 
-static u32 mtip_ethtool_get_priv_flags(struct net_device *netdev)
+u32 mtip_ethtool_get_priv_flags(struct net_device *netdev)
 {
     struct mtip_netdev_priv *priv;
     u32 link_index;
@@ -818,15 +818,7 @@ static u32 mtip_ethtool_get_priv_flags(struct net_device *netdev)
     return priv->priv_flags;
 }
 
-#define MTIP_ETHTOOL_SET_PFLAG(params, pflag, enable)			\
- 	do {							\
- 		if (enable)					\
- 			(params)->priv_flags |= BIT(pflag);		\
- 		else						\
- 			(params)->priv_flags &= ~(BIT(pflag));	\
-	} while (0)
-
-static int mtip_ethtool_handle_pflag(struct net_device *netdev,
+int mtip_ethtool_handle_pflag(struct net_device *netdev,
 			      u32 wanted_flags,
 			      u32 flag)
 {
@@ -841,15 +833,22 @@ static int mtip_ethtool_handle_pflag(struct net_device *netdev,
 	return 0;
 }
 
-static int mtip_ethtool_set_priv_flags(struct net_device *netdev, u32 flags)
+int mtip_ethtool_set_priv_flags(struct net_device *netdev, u32 flags)
 {
     struct mtip_netdev_priv *priv;
     u32 link_index;
     u32 pflag;
     int err;
+    int port_config_index = 0, temp_flag = flags;
 
     priv = netdev_priv(netdev);
     link_index = priv->link_index;
+
+    //extracting which bit of flag is set
+    while (temp_flag >>= 1)
+    {
+        ++port_config_index;
+    }
 
     CSMLOGDBG("Set priv called for link index: %d with flags: 0x%x", link_index, flags);
 
@@ -857,6 +856,13 @@ static int mtip_ethtool_set_priv_flags(struct net_device *netdev, u32 flags)
     {
         CSMLOGERR("Set priv called when running for link_index: %d", link_index);
         return -EINVAL;
+    }
+
+    //checking for valid port config for debugeth
+    if(link_index == MTIP_DEBUG_ETH_LINK_INDEX && !check_if_valid_port_config_for_debug_eth(port_config_index))
+    {
+        CSMLOGERR("config not supported on debug port");
+        return 0;
     }
 
     // mark that priv flags have been set using ethtool

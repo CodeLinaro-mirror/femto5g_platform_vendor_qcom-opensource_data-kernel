@@ -1,6 +1,6 @@
 //SPDX-License-Identifier: GPL-2.0-only
 /*
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  */ 
 
 #ifndef _MTIP_MAC_H
@@ -83,6 +83,7 @@
 #define MTIP_MAC_WRAPPER_CSR_CONFIG_OFFSET               0x00000000
 #define MTIP_MAC_WRAPPER_PCS_MODE_SET_OFFSET             0x00000010
 #define MTIP_MAC_WRAPPER_SERDES_MUX_CFG_OFFSET           0x0000004C
+#define MTIP_DBG_MAC_WRAPPER_SERDES_MUX_CFG1_OFFSET      0x00000054
 
 #define MTIP_MAC_WRAPPER_CORE_STATUS_REG_OFFSET          0x00000004
 
