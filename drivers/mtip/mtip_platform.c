@@ -1580,9 +1580,6 @@ static int mtip_platform_setup(void)
 
                // set the lane_index to be the same as link_index
                platform_driver_priv->mtip_links[i]->assigned_lane_indices[0] = i;
-
-               // set lane assignment as complete
-               platform_driver_priv->mtip_links[i]->lanes_assignment_complete = true;
            }
        }
 
@@ -1625,15 +1622,6 @@ static int mtip_platform_setup(void)
                    platform_driver_priv->mtip_ports[i]->lane_config[j].lane_speed = PHY_LANE_SPEED_25G;
                    platform_driver_priv->mtip_ports[i]->lane_config[j].link_index = (i*PHY_LANE_MAX) + j;
                }
-           }
-       }
-
-       // setup the ethernet for loopback
-       for (i = 0; i < MTIP_MAX_PORTS; ++i) 
-       {
-           if (platform_driver_priv->mtip_ports[i] != NULL) 
-           {
-               mtip_platform_setup_ethernet(i);
            }
        }
    }

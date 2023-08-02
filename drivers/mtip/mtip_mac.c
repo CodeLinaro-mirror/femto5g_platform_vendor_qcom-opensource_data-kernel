@@ -707,7 +707,8 @@ void mtip_mac_initialize(struct mtip_netdev_priv *priv)
    // configure the mac for operation
    iowrite32(MTIP_MAC_INIT_COMMAND_CONFIG, priv->mac_ioaddr + MTIP_MAC_COMMAND_CONFIG);
 
-   if (mtip_loopback_mode != MTIP_MODE_DEFAULT)
+   // Process link up only for PCS loopback mode
+   if (mtip_loopback_mode == MTIP_MODE_LOOPBACK)
    {
        post_mtip_process_link_state(link_index, true);
    }

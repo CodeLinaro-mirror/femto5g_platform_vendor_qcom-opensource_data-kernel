@@ -1299,12 +1299,17 @@ static int mtip_open(struct net_device *netdev)
    }
    else
    {
+      // Change the state for PCS loopback
+      if (mtip_loopback_mode == MTIP_MODE_LOOPBACK)
+         platform_driver_priv->mtip_links[link_index]->state = MTIP_LINK_STATE_OPEN_WAITING_FOR_LANES;
+
+      // For PCS/PHY loopback mode, configure port based on the speed modes set
+      if (mtip_loopback_mode != MTIP_MODE_DEFAULT)
+         mtip_device_configure_port(port_type);
+
       // PCS looback mode
       if (mtip_loopback_mode == MTIP_MODE_LOOPBACK)
       {
-         // set the link in UP state
-         platform_driver_priv->mtip_links[link_index]->state = MTIP_LINK_STATE_UP;
-
          // Process MAC link up state
          mtip_mac_link_up(link_index);
       }
@@ -1411,6 +1416,12 @@ static int mtip_close(struct net_device *netdev)
          // Notify TRX driver to disable TX
          mtip_phy_notify_eth_event_to_trx(link_index, IFCFG_DISABLE);
       }
+      // PCS looback mode
+      else
+      {
+         // Process MAC link down state
+         mtip_mac_link_down(link_index);
+      }
    }
 
    if (hdl)
@@ -1431,52 +1442,49 @@ static int mtip_close(struct net_device *netdev)
    CSMLOGDBG("Stopping netdev queue\n");
 
    // set the link state to CLOSE
-   if (mtip_loopback_mode == MTIP_MODE_DEFAULT)
+   mutex_lock(&platform_driver_priv->mtip_links[link_index]->dev_lock);
+
+   platform_driver_priv->mtip_links[link_index]->state = MTIP_LINK_STATE_CLOSE;
+
+   mutex_unlock(&platform_driver_priv->mtip_links[link_index]->dev_lock);
+
+   mtip_lookup_port_type_by_link_index(link_index, &port_type);
+
+   all_closed = true;
+
+   for (i = 0; i < platform_driver_priv->devices.port_devices[port_type].num_link_phandles; ++i) 
    {
-      mutex_lock(&platform_driver_priv->mtip_links[link_index]->dev_lock);
+       tmp_link_index = platform_driver_priv->devices.port_devices[port_type].link_devices[i]->link_index;
+       mutex_lock(&platform_driver_priv->mtip_links[link_index]->dev_lock);
+       if ((platform_driver_priv->mtip_links[tmp_link_index]) && (platform_driver_priv->mtip_links[tmp_link_index]->state != MTIP_LINK_STATE_INIT) &&
+           (platform_driver_priv->mtip_links[tmp_link_index]->state != MTIP_LINK_STATE_CLOSE))
+       {
+           all_closed = false;
+           mutex_unlock(&platform_driver_priv->mtip_links[link_index]->dev_lock);
+           break;
+       }
+       mutex_unlock(&platform_driver_priv->mtip_links[link_index]->dev_lock);
+   }
 
-      platform_driver_priv->mtip_links[link_index]->state = MTIP_LINK_STATE_CLOSE;
-
-      mutex_unlock(&platform_driver_priv->mtip_links[link_index]->dev_lock);
-
-      mtip_lookup_port_type_by_link_index(link_index, &port_type);
-
-      all_closed = true;
-
-      for (i = 0; i < platform_driver_priv->devices.port_devices[port_type].num_link_phandles; ++i) 
-      {
-          tmp_link_index = platform_driver_priv->devices.port_devices[port_type].link_devices[i]->link_index;
-          mutex_lock(&platform_driver_priv->mtip_links[link_index]->dev_lock);
-          if ((platform_driver_priv->mtip_links[tmp_link_index]) && (platform_driver_priv->mtip_links[tmp_link_index]->state != MTIP_LINK_STATE_INIT) &&
-              (platform_driver_priv->mtip_links[tmp_link_index]->state != MTIP_LINK_STATE_CLOSE))
-          {
-              all_closed = false;
-              mutex_unlock(&platform_driver_priv->mtip_links[link_index]->dev_lock);
-              break;
-          }
-          mutex_unlock(&platform_driver_priv->mtip_links[link_index]->dev_lock);
+   if (all_closed) 
+   {
+       // reset the port state to INIT
+      if(platform_driver_priv->mtip_ports[port_type]) {
+         platform_driver_priv->mtip_ports[port_type]->port_state = MTIP_PORT_STATE_INIT;
       }
 
-       if (all_closed) 
-       {
-           // reset the port state to INIT
-	   if(platform_driver_priv->mtip_ports[port_type]) {
-              platform_driver_priv->mtip_ports[port_type]->port_state = MTIP_PORT_STATE_INIT;
-	   }
+      // reset all the lane assignments
+      for (i = 0; i < platform_driver_priv->devices.port_devices[port_type].num_link_phandles; ++i) 
+      {
+         tmp_link_index = platform_driver_priv->devices.port_devices[port_type].link_devices[i]->link_index;
 
-           // reset all the lane assignments
-           for (i = 0; i < platform_driver_priv->devices.port_devices[port_type].num_link_phandles; ++i) 
-           {
-               tmp_link_index = platform_driver_priv->devices.port_devices[port_type].link_devices[i]->link_index;
+         if(platform_driver_priv->mtip_links[tmp_link_index]) {
+            mutex_lock(&platform_driver_priv->mtip_links[tmp_link_index]->dev_lock);
 
-               if(platform_driver_priv->mtip_links[tmp_link_index]) {
-                   mutex_lock(&platform_driver_priv->mtip_links[tmp_link_index]->dev_lock);
-
-                   platform_driver_priv->mtip_links[tmp_link_index]->lanes_assignment_complete = false;
-                   mutex_unlock(&platform_driver_priv->mtip_links[tmp_link_index]->dev_lock);
-               }
-           }
-       }
+            platform_driver_priv->mtip_links[tmp_link_index]->lanes_assignment_complete = false;
+            mutex_unlock(&platform_driver_priv->mtip_links[tmp_link_index]->dev_lock);
+         }
+      }
    }
 
    /* Send update to clients */
@@ -2806,7 +2814,7 @@ static int mtip_device_calculate_num_an_lanes(u32 port_type)
 
 // There has been some change in the configuration of a port
 // this is the common function to handle all such (re)configurations
-static void mtip_device_configure_port(u32 port_type)
+void mtip_device_configure_port(u32 port_type)
 {
    u32 tmp_lane_index;
    bool all_lanes_connected = true;

@@ -74,7 +74,7 @@ struct mtip_process_link_state_task
 
 void post_mtip_process_link_state(u32 link_index, bool link_up);
 void run_mtip_process_link_state(void* work_ptr);
-
+void mtip_device_configure_port(u32 port_type);
 void post_mtip_process_configure_port_using_lane(u32 port_type, u32 lane_index);
 void run_mtip_process_configure_port_using_lane(void* workptr);
 
