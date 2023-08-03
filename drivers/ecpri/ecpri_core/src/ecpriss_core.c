@@ -20,6 +20,10 @@ extern struct eth_ecpriss_ops mtip_ecpri_ops;
 
 #define MAX_NUM_FLOW 120
 
+int disable_xbar_dma_fh_same_prio = false;
+module_param(disable_xbar_dma_fh_same_prio, int, S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP);
+MODULE_PARM_DESC(disable_xbar_dma_fh_same_prio, "XBAR FH and DMA Priority Configuration");
+
 int stats_timeout_ms = 250;
 void ecpriss_eth_topology_cb(void);
 void ecpriss_eth_topology_cb_v2(void);
@@ -1313,6 +1317,8 @@ static int ecpriss_core_data_init_v2(void)
 	mutex_init(&ecpriss_pdata_v2->ecpriss_mutex_lock);
 	ecpriss_pdata_v2->qudp_ctx_v2 = &qudp_ctx_g_v2;
 	ecpriss_pdata_v2->xbar_ctx_v2 = &xbar_ctx_g_v2;
+
+	ecpriss_pdata_v2->xbar_ctx_v2->disable_xbar_dma_fh_same_prio = disable_xbar_dma_fh_same_prio;
 
 	for (port_index = 0;port_index < MAX_PORTS;port_index++)
 	{
