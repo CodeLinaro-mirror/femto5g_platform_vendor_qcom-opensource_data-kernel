@@ -369,10 +369,13 @@ void mtip_ethtool_get_supported_speed_modes(struct mtip_port_info* port_info, st
             case MTIP_PORT_CONFIG_1x100GBASE_R_RSFEC:
             case MTIP_PORT_CONFIG_1x100GBASE_R_RSFEC_LL:
             {
+// These bits are not currently supported, need to add back once kernel adds support
+#if 0
                 linkmode_set_bit(ETHTOOL_LINK_MODE_100000baseCR_Full_BIT, supported);
                 linkmode_set_bit(ETHTOOL_LINK_MODE_100000baseSR_Full_BIT, supported);
                 linkmode_set_bit(ETHTOOL_LINK_MODE_100000baseDR_Full_BIT, supported);
                 linkmode_set_bit(ETHTOOL_LINK_MODE_100000baseLR_ER_FR_Full_BIT, supported);
+#endif
             }
             break;
 
