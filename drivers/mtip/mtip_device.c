@@ -1383,6 +1383,9 @@ static int mtip_close(struct net_device *netdev)
    bool all_closed = true;
    int i;
    u32 tmp_link_index;
+   u32 real_lane = 0;
+   u32 lane_index;
+   u32 sfp_phandle[MAX_ETH_LANES] = {0};
 
    priv = netdev_priv(netdev);
 
@@ -1391,6 +1394,8 @@ static int mtip_close(struct net_device *netdev)
    hdl = platform_driver_priv->mtip_links[link_index]->dma_hdl;
 
    CSMLOGDBG("mtip_close called with link_index: %d with hdl: %d\n", link_index, hdl);
+
+   mtip_lookup_port_type_by_link_index(link_index, &port_type);
 
    // do this only for RUMI E2E
    if (mtip_rumi_platform != MTIP_PLATFORM_SOC)
@@ -1415,6 +1420,19 @@ static int mtip_close(struct net_device *netdev)
          // rtnl_lock not needed here as it will be already acquired by the NW stack
          // Notify TRX driver to disable TX
          mtip_phy_notify_eth_event_to_trx(link_index, IFCFG_DISABLE);
+
+         // Notify TRX driver to disable TX on primary lane if AN was in progress
+         if(platform_driver_priv->mtip_ports[port_type]->port_state == MTIP_PORT_STATE_CONNECTED_NEGOTIATION_IN_PROGRESS)
+         {
+            if(port_type == MTIP_PORT_TYPE_DEBUG)
+            {
+               real_lane = 2;
+            }
+
+            mtip_lookup_lane_index_by_port_type_and_real_lane(&lane_index, port_type, real_lane);
+            sfp_phandle[real_lane] = platform_driver_priv->devices.lane_devices[lane_index].sfp_phandle;
+            qsfp_trx_ifconfig_notifier(IFCFG_DISABLE, sfp_phandle);
+         }
       }
       // PCS looback mode
       else
@@ -1447,8 +1465,6 @@ static int mtip_close(struct net_device *netdev)
    platform_driver_priv->mtip_links[link_index]->state = MTIP_LINK_STATE_CLOSE;
 
    mutex_unlock(&platform_driver_priv->mtip_links[link_index]->dev_lock);
-
-   mtip_lookup_port_type_by_link_index(link_index, &port_type);
 
    all_closed = true;
 
@@ -2831,6 +2847,9 @@ void mtip_device_configure_port(u32 port_type)
    trx_lane_cfg lane_cfg;
    trx_breakout_cfg breakout_cfg;
    u32 real_link = 0;
+   u32 real_lane = 0;
+   u32 lane_index;
+   u32 sfp_phandle[MAX_ETH_LANES] = {0};
 
    port_info = platform_driver_priv->mtip_ports[port_type];
 
@@ -3047,7 +3066,10 @@ void mtip_device_configure_port(u32 port_type)
             filtered_priv_flags = mtip_device_filter_priv_flags(port_type);
 
             if(port_type == MTIP_PORT_TYPE_DEBUG)
+            {
                real_link = 1;
+               real_lane = 2;
+            }
 
             // Get the link index of the first link for this port
             if(mtip_lookup_link_index_by_port_type_and_real_link(&link_index, port_type, real_link) == 0)
@@ -3061,6 +3083,13 @@ void mtip_device_configure_port(u32 port_type)
                   filtered_priv_flags |= (1<<MTIP_PORT_CONFIG_1x100GBASE_R4_RSFEC);
                }
             }
+
+            // Notify TRX driver to enable TX, for the primary lane used for AN
+            rtnl_lock();
+            mtip_lookup_lane_index_by_port_type_and_real_lane(&lane_index, port_type, real_lane);
+            sfp_phandle[real_lane] = platform_driver_priv->devices.lane_devices[lane_index].sfp_phandle;
+            qsfp_trx_ifconfig_notifier(IFCFG_ENABLE, sfp_phandle);
+            rtnl_unlock();
 
             // initiate AN with the PHY
             mtip_phy_initiate_an(port_type, num_an_lanes, filtered_priv_flags);
