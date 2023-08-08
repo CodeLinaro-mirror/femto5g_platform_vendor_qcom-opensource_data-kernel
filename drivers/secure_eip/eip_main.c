@@ -220,6 +220,7 @@ static int eip_device_init(bool fVerbose, bool fIngress, unsigned int device_id)
 	/* Non-matching SA flow packet processing rules */
 	/* Default rule is to drop non-matching SA packets */
 	SecY_Settings.DropBypass.DropType = SECY_SA_DROP_PKT_ERROR;
+	SecY_Settings.IngressHdrEtype = eip_satag_etype;
 
 	rc = SecY_Device_Init(device_id,
 			      fIngress ? SECY_ROLE_INGRESS : SECY_ROLE_EGRESS,
