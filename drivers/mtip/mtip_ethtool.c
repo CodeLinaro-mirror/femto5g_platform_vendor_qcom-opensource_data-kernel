@@ -1075,6 +1075,20 @@ void mtip_ethtool_set_msglevel(struct net_device *netdev, u32 level)
         }
         break;
 
+    case 11:
+        {
+            // Set TX compliance to disable retry attempts for PHY lane bring up
+            mtip_phy_set_tx_compliance(true);
+        }
+        break;
+
+    case 12:
+        {
+            // Unset TX compliance to enable retry attempts for PHY lane bring up
+            mtip_phy_set_tx_compliance(false);
+        }
+        break;
+
     default:
         {
             CSMLOGINFO("Ignoring msglevel %d for link index: %d", level, link_index);

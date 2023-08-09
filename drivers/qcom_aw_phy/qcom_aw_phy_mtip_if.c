@@ -21,6 +21,8 @@
 
 struct qcom_aw_phy_mtip_if_info qcom_aw_phy_mtip_if_info_s = {0};
 
+extern int qcom_aw_phy_tx_compliance_flag;
+
 /*-------------------------------------------------------------------
 * Function Definitions
 ------------------------------------------------------------------- */
@@ -394,6 +396,10 @@ func_exit:
   }
 
   return ret_val;
+}
+
+void qcom_aw_phy_set_tx_compliance(bool flag){
+  qcom_aw_phy_tx_compliance_flag = flag;
 }
 
 int qcom_aw_phy_configure_speed_mode(
@@ -1269,6 +1275,11 @@ int qcom_aw_phy_bringup_manual_eq_mode(
   /* Delay before checking RX CDR lock post equalization */
   mdelay(500);
 
+  /* RX CDR lock check not needed if lane bring up is disabled for
+     TX compliance test */
+  if(qcom_aw_phy_tx_compliance_flag)
+    return ret_val;
+
   // Check CDR Lock
   if(AW_ERR_CODE_NONE == aw_pmd_rx_check_cdr_lock(mss, RX_CDR_TIMEOUT_US)){
     qcom_aw_phy_handle_cdr_lock_status(phy_inst_info, lane, CDR_LOCK_SUCCESS);
@@ -1923,6 +1934,11 @@ void qcom_aw_phy_handle_rx_sig_detect(struct work_struct *work){
   enum local_error_enum local_err_val = LOCAL_ERROR_INVALID;
   int ret_val = 0;
 
+  /* PHY lane retry based on RX signal detect not needed for TX
+     compliance test */
+  if(qcom_aw_phy_tx_compliance_flag)
+    goto func_exit;
+
   /* Ignore for loopback mode */
   if (qcom_aw_phy_get_loopback_mode() != QCOM_AW_PHY_NO_LB){
     ret_val = EINVAL;
@@ -2158,6 +2174,7 @@ const struct eth_phy_iface_ops qcom_aw_phy_driver_iface_ops = {
     .eth_phy_iface_notify_mac_link_status = qcom_aw_phy_mac_link_status,
     .eth_phy_iface_initiate_an = qcom_aw_phy_initiate_an,
     .eth_phy_iface_reset_phy_sm = qcom_aw_phy_reset_phy_sm,
+    .eth_phy_iface_set_tx_compliance = qcom_aw_phy_set_tx_compliance,
 };
 
 EXPORT_SYMBOL(qcom_aw_phy_driver_iface_ops);

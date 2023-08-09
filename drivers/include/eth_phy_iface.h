@@ -146,6 +146,8 @@ struct eth_phy_iface_eth_register_params {
                                to be advertised for the number of lanes
                                passed as argument.
  * @eth_phy_iface_reset_phy_sm: Resets PHY state machine at port level.
+ * @eth_phy_iface_set_tx_compliance: Indicates PHY to operate in TX only
+                                     compliance mode.
  */
 struct eth_phy_iface_ops {
 	int (*eth_phy_iface_eth_register)(
@@ -168,6 +170,7 @@ struct eth_phy_iface_ops {
 	                                 int num_lanes,
 	                                 uint32_t port_config_mask);
 	int (*eth_phy_iface_reset_phy_sm)(enum mtip_port_type_enum port_type);
+	void (*eth_phy_iface_set_tx_compliance)(bool flag);
 };
 
 #endif // _ETH_PHY_IFACE_H

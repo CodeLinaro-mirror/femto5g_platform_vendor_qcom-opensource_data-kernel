@@ -550,6 +550,13 @@ int mtip_phy_reset_phy_sm(u32 port_type)
     return (qcom_aw_phy_driver_iface_ops.eth_phy_iface_reset_phy_sm)(port_type);
 }
 
+void mtip_phy_set_tx_compliance(bool flag)
+{
+    CSMLOGDBG("Compliance setting for PHY configured as: %d", flag);
+    qcom_aw_phy_driver_iface_ops.eth_phy_iface_set_tx_compliance(flag);
+    return;
+}
+
 static int mtip_phy_find_matching_lane(struct phylink_config *config, u32* lane_index)
 {
     struct mtip_lanedev_priv* priv;

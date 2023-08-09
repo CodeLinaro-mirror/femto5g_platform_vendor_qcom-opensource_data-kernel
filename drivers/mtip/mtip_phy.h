@@ -35,6 +35,7 @@ int mtip_phy_teardown_phy(u32 link_index);
 int mtip_phy_notify_link_status(u32 link_index, bool status);
 int mtip_phy_initiate_an(u32 port_type, int num_lanes, u32 port_config_mask);
 int mtip_phy_reset_phy_sm(u32 port_type);
+void mtip_phy_set_tx_compliance(bool flag);
 
 void post_mtip_phy_handle_lane_up(u32 lane_index, u8 sfp_port_type, enum eth_phy_iface_phy_lane_speed_enum lane_speed);
 void run_mtip_process_lane_up(void* workptr);

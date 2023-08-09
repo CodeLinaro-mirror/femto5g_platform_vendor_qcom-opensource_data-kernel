@@ -59,6 +59,10 @@ module_param(qcom_aw_phy_toggle_polarity, int,
 MODULE_PARM_DESC(qcom_aw_phy_toggle_polarity,
                  "Toggle PHY TX/RX polarity");
 
+/* Module parameter to disable lane tear down as part of
+   retry procedure for TX compliance tests */
+bool qcom_aw_phy_tx_compliance_flag = false;
+
 /*-------------------------------------------------------------------
 * Function Definitions
 ------------------------------------------------------------------- */
