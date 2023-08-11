@@ -30,4 +30,7 @@ void eip_macsec_initalize_priv_data(uint32_t device_id);
 
 int eip_device_deinit(bool fIngress, unsigned int device_id);
 
+void eip_macsec_init_link(struct eip_link *link);
+void eip_macsec_deinit_link(struct eip_link *link);
+
 #endif /* MACSEC_DEVICE_H_ */

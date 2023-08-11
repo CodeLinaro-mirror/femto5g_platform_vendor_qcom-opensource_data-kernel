@@ -426,6 +426,7 @@ static int eip_mtip_add_link(struct net_device *ndev,
 		    link->tx.ch);
 
 	eip_ipsec_init_link(link);
+	eip_macsec_init_link(link);
 
 	mtip_security_set_priv(ndev, link);
 
@@ -437,6 +438,7 @@ static void eip_mtip_del_link(struct net_device *ndev)
 	struct eip_link *link = (struct eip_link *)mtip_security_get_priv(ndev);
 
 	eip_ipsec_deinit_link(link);
+	eip_macsec_deinit_link(link);
 	kfree(link);
 }
 
@@ -639,10 +641,11 @@ static int eip_remove(struct platform_device *pdev)
 static struct platform_driver eip_driver = {
 	.probe = eip_probe,
 	.remove = eip_remove,
-	.driver = {
-		   .name = "secure-eip",
-		   .of_match_table = of_match_ptr(eip_match),
-		   },
+	.driver =
+		{
+			.name = "secure-eip",
+			.of_match_table = of_match_ptr(eip_match),
+		},
 };
 
 MODULE_DEVICE_TABLE(of, eip_match);
@@ -686,19 +689,10 @@ static int eip_module_init(void)
 		goto panic_notifier_fail;
 	}
 
-	ret = macsec_eth_set_macsec_ops(&eip_macsec_ops);
-	if (ret) {
-		pr_err("eip_main: macsec_eth_set_macsec_ops failed with ret %d\n",
-		       ret);
-		goto macsec_ops_fail;
-	}
-
 	pr_info("eip_main: secure eip_module_init ret %d\n", ret);
 
 	return ret;
 
-macsec_ops_fail:
-	atomic_notifier_chain_unregister(&panic_notifier_list, &eip_panic_nb);
 panic_notifier_fail:
 	platform_driver_unregister(&eip_driver);
 platform_reg_fail:

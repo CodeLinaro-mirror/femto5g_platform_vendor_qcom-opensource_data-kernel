@@ -2153,3 +2153,17 @@ const struct macsec_ops eip_macsec_ops = {
 	.mdo_get_rx_sc_stats = eip_mdo_get_rx_sc_stats,
 	.mdo_get_rx_sa_stats = eip_mdo_get_rx_sa_stats
 };
+
+void eip_macsec_init_link(struct eip_link *link)
+{
+	struct net_device *net_dev = link->ndev;
+	net_dev->macsec_ops = &eip_macsec_ops;
+	net_dev->features |= NETIF_F_HW_MACSEC;
+}
+
+void eip_macsec_deinit_link(struct eip_link *link)
+{
+	struct net_device *net_dev = link->ndev;
+	net_dev->macsec_ops = NULL;
+	net_dev->features &= ~NETIF_F_HW_MACSEC;
+}
