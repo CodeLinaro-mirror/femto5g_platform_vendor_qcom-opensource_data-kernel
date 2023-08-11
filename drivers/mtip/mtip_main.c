@@ -919,6 +919,9 @@ static void mtip_module_exit(void)
    mtip_hashmap_destroy();
    mtip_eth_deregister_events_cb();
 
+   // deregister panic notifier
+   atomic_notifier_chain_unregister(&panic_notifier_list, &mtip_panic_blk);
+
    mtip_debug_eth_unregister_platform_driver();
    if (!platform_driver_priv->perr)
    {
