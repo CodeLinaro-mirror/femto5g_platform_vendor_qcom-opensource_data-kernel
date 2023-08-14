@@ -77,12 +77,29 @@ typedef struct {
 
 ecpri_flow_cfg gecpri_flow_cfg = {0};
 
+static int ecpriss_panic_notifier(struct notifier_block *this,unsigned long event, void *ptr)
+{
+	/*Panic Notifier Handler for Ecpriss Module*/
+	if(ecpriss_hw_ver == ECPRISS_HW_v2_0){
+		ecpriss_panic_notifr_handler_v2();
+	}else {
+		ecpriss_panic_notifr_handler();
+	}
+	return 0;
+}
+
+static struct notifier_block ecpriss_panic =
+{
+  .notifier_call  = ecpriss_panic_notifier,
+};
+
 static int ecpriss_core_remove(struct platform_device *pdev)
 {
 	if(ECPRISS_HW_v2_0 == ecpriss_hw_ver){
 #ifndef NO_DEBUGFS_PERF
 		clear_debugfs_directory();
 #endif
+		atomic_notifier_chain_unregister(&panic_notifier_list, &ecpriss_panic);
 		dma_ecpri_ss_driver_ops.ecpri_dma_ecpri_ss_deregister();
 		ecpriss_qudp_irq_destroy_v2();
 		ecpriss_xbar_destroy_interrupts_v2();
@@ -1184,21 +1201,6 @@ void ecpriss_panic_notifr_handler_v2(void)
 	ECPRILOGERR("ecpriss_pdata_v2->xbar_ctx->stats.xbar_dbg_ocrx_2_3_buff_watermark_cc2 : %u ",ecpriss_pdata_v2->xbar_ctx_v2->stats_v2.xbar_dbg_ocrx_2_3_buff_watermark_cc2);
 	ECPRILOGERR("ecpriss_pdata_v2->xbar_ctx->stats.xbar_dbg_ocrx_2_3_buff_watermark_cc3 : %u ",ecpriss_pdata_v2->xbar_ctx_v2->stats_v2.xbar_dbg_ocrx_2_3_buff_watermark_cc3);
 }
-static int ecpriss_panic_notifier(struct notifier_block *this,unsigned long event, void *ptr)
-{
-	/*Panic Notifier Handler for Ecpriss Module*/
-	if(ecpriss_hw_ver == ECPRISS_HW_v2_0){
-		ecpriss_panic_notifr_handler_v2();
-	}else {
-		ecpriss_panic_notifr_handler();
-	}
-	return 0;
-}
-static struct notifier_block ecpriss_panic =
-{
-  .notifier_call  = ecpriss_panic_notifier,
-};
-
 
 static int ecpriss_core_data_init(void)
 {
