@@ -11,6 +11,7 @@
 #include "api_secy_ext.h"
 #include "api_cfye_ext.h"
 #include "macsec_eth.h"
+#include <linux/mutex.h>
 
 #include "aes.h"
 
@@ -78,6 +79,7 @@ struct macsec_per_channel_info {
 struct macsec_priv_data_info {
 	struct macsec_device_info device_info[EIP_MAX_PORT];
 	struct macsec_per_channel_info channel_info[MACSEC_MAX_LINK_IDS];
+	struct mutex macsec_priv_lock;
 };
 
 enum stats_type {
@@ -130,15 +132,35 @@ static inline void get_egress_params_from_link_id(u32 link_index, u32 *port_id,
 static inline struct macsec_per_channel_info *
 get_eip_channel_info(unsigned int device_id, unsigned int channel_id)
 {
+	struct macsec_per_channel_info *temp_ch_info;
 	unsigned int temp_eip_link_id =
 		MACSEC_GET_LINK_ID(device_id, channel_id);
-	return &macsec_priv_data.channel_info[temp_eip_link_id];
+
+	mutex_lock(&macsec_priv_data.macsec_priv_lock);
+	temp_ch_info = &macsec_priv_data.channel_info[temp_eip_link_id];
+	mutex_unlock(&macsec_priv_data.macsec_priv_lock);
+
+	return temp_ch_info;
 }
 
-static SecY_SAHandle_t SecY_SAHandle;
-static CfyE_vPortHandle_t CfyE_vPortHandle;
-static unsigned int vPortIndex;
-static CfyE_RuleHandle_t CfyE_RuleHandle;
+static inline struct macsec_device_info *
+get_eip_device_info(unsigned int device_id)
+{
+	struct macsec_device_info *temp_device_info;
+	u32 port_id;
+	port_id = GET_PORT_ID_FROM_DEVICE_ID(device_id);
+
+	if (port_id >= EIP_MAX_PORT) {
+		LOG_CRIT("%s: Invalid device ID %d", __func__, port_id);
+		return NULL;
+	} else {
+		mutex_lock(&macsec_priv_data.macsec_priv_lock);
+		temp_device_info = &macsec_priv_data.device_info[port_id];
+		mutex_unlock(&macsec_priv_data.macsec_priv_lock);
+	}
+
+	return temp_device_info;
+}
 
 #ifdef SECURE_MACSEC_DEBUG
 
@@ -264,10 +286,10 @@ static void dump_ctx_values(struct macsec_context *ctx, bool dump)
 			}
 		}
 		if (NULL == ctx->secy->rx_sc) {
-			LOG_INFO("WPA NULL NULL return rx_Sc ");
+			LOG_INFO("rx_sc is null ");
 		} else {
 			LOG_INFO(
-				"WPA rx_Sc = 0x%x rx_sc->sci =0x%x rx_sc->sa[0]=0x%x rx_sc->sa[1]=0x%x rx_sc->sa[2]=0x%x\n",
+				"rx_sc = 0x%x rx_sc->sci =0x%x rx_sc->sa[0]=0x%x rx_sc->sa[1]=0x%x rx_sc->sa[2]=0x%x\n",
 				ctx->secy->rx_sc, ctx->secy->rx_sc->sci,
 				ctx->secy->rx_sc->sa[0],
 				ctx->secy->rx_sc->sa[1],
@@ -306,7 +328,7 @@ static int get_encoding_sa(const unsigned int device_id,
 	SecY_SAHandle_t Active_SecY_SAHandle = SecY_SAHandle_NULL;
 	uint32_t SA_Words = 0x00;
 
-	SecY_Rc = SecY_SA_Active_E_Get(device_id, vPortIndex,
+	SecY_Rc = SecY_SA_Active_E_Get(device_id, vport_idx,
 				       &Active_SecY_SAHandle);
 	if (SecY_Rc != SECY_STATUS_OK) {
 		eip_logerr("SecY_SA_Active_E_Get()=%d\n", SecY_Rc);
@@ -401,14 +423,13 @@ static uint32_t *eip_macsec_build_sa(const da_sa_params_t *const params,
 
 void eip_macsec_initalize_priv_data(uint32_t device_id)
 {
-	uint32_t eip_link_id, sa;
+	uint32_t sa;
 	struct macsec_per_channel_info *ch_info_p = NULL;
 
+	mutex_init(&macsec_priv_data.macsec_priv_lock);
 	/* Initialize channel info params to NULL */
 	for (sa = 0; sa < MACSEC_MAX_SA; ++sa) {
-		eip_link_id = MACSEC_GET_LINK_ID(device_id, sa);
-		LOG_INFO("%d Device's Link id %d", device_id, eip_link_id);
-		ch_info_p = &macsec_priv_data.channel_info[eip_link_id];
+		ch_info_p = get_eip_channel_info(device_id, sa);
 		ch_info_p->CfyE_RuleHandle[sa] = CfyE_RuleHandle_NULL;
 		ch_info_p->SecY_SAHandle[sa] = SecY_SAHandle_NULL;
 		ch_info_p->CfyE_vPortHandle[sa] = CfyE_vPortHandle_NULL;
@@ -424,15 +445,13 @@ static int eip_macsec_config_default_vport(unsigned int device_id,
 					   struct macsec_context *ctx)
 {
 	struct macsec_device_info *dev_info_p;
-	u32 port_id;
 	int rc = 0;
+	unsigned int vPortIndex = 0;
 
-	port_id = GET_PORT_ID_FROM_DEVICE_ID(device_id);
-	if (port_id >= EIP_MAX_PORT) {
-		LOG_CRIT("%s: Invalid device ID %d", __func__, port_id);
+	dev_info_p = get_eip_device_info(device_id);
+
+	if (dev_info_p == NULL) {
 		return -EINVAL;
-	} else {
-		dev_info_p = &macsec_priv_data.device_info[port_id];
 	}
 
 	/* Configure control packet and VLAN parsers, as well as default vPorts
@@ -518,6 +537,8 @@ static int eip_macsec_delete_sa(bool fIngress, unsigned int device_id,
 	struct macsec_per_channel_info *ch_info_p;
 	SecY_SA_Stat_E_t Egress_SAStats;
 	SecY_SA_Stat_I_t Ingress_SAStats;
+	uint8_t i = 0;
+	uint8_t flag_sa_all_null = 0;
 
 	ZEROINIT(Egress_SAStats);
 	ZEROINIT(Ingress_SAStats);
@@ -529,10 +550,6 @@ static int eip_macsec_delete_sa(bool fIngress, unsigned int device_id,
 		LOG_CRIT("%s: Invalid SA/AN received ", __func__, sa);
 		return false;
 	}
-	if (ch_info_p->active[sa]) {
-		eip_logerr("Current SA %d is active sa, Can't remove it", sa);
-		return false;
-	}
 
 	if (!SecY_SAHandle_IsSame(&ch_info_p->SecY_SAHandle[sa],
 				  &SecY_SAHandle_NULL)) {
@@ -542,7 +559,7 @@ static int eip_macsec_delete_sa(bool fIngress, unsigned int device_id,
 			eip_logerr("Failed, SecY_SA_Remove()=%d\n", SecY_Rc);
 		}
 		ch_info_p->SecY_SAHandle[sa] = SecY_SAHandle_NULL;
-		ch_info_p->active[sa] = 0;
+
 		eip_loginfo("Deleted SecY_SA %d SA device_id = %d", sa,
 			    device_id);
 	} else {
@@ -552,6 +569,19 @@ static int eip_macsec_delete_sa(bool fIngress, unsigned int device_id,
 	if (!rc) {
 		ch_info_p->associated[sa] = false;
 	}
+
+	for (i = 0; i < MACSEC_MAX_SA; ++i) {
+		//check for not NULL
+		if (!SecY_SAHandle_IsSame(&ch_info_p->SecY_SAHandle[i],
+					  &SecY_SAHandle_NULL)) {
+			flag_sa_all_null = 1;
+			break;
+		}
+	}
+
+	if (!flag_sa_all_null)
+		ch_info_p->egress_init_flag = 0;
+
 	return rc;
 }
 
@@ -569,6 +599,8 @@ static int eip_macsec_add_secy(bool fIngress, unsigned int device_id,
 
 	memcpy(&ch_info_p->secy_sci, &ctx->secy->sci, sizeof(sci_t));
 
+	ch_info_p->device_id = device_id;
+	ch_info_p->channel = Channel;
 	/* Add default cfye port and secy port */
 	if (eip_macsec_config_default_vport(device_id, Channel, ctx) < 0) {
 		LOG_CRIT("%s: Ingress mode Device_ID %d FAILED\n", __func__,
@@ -775,6 +807,10 @@ static int eip_macsec_add_sa(bool fIngress, unsigned int device_id,
 	CfyE_vPort_t vPortParams;
 	SecY_SA_t *SA_Params;
 	CfyE_Rule_t RuleParams;
+	SecY_SAHandle_t SecY_SAHandle;
+	CfyE_vPortHandle_t CfyE_vPortHandle;
+	CfyE_RuleHandle_t CfyE_RuleHandle;
+	unsigned int vPortIndex = vPORT_INDEX_NOT_INITIALIZE;
 
 	uint8_t sa_idx = ctx->sa.assoc_num;
 	struct macsec_per_channel_info *ch_info_p =
@@ -813,10 +849,16 @@ static int eip_macsec_add_sa(bool fIngress, unsigned int device_id,
 		}
 
 		/* Now get vPort index to use when installing SA: */
-		CfyE_vPortIndex_Get(CfyE_vPortHandle, &vPortIndex);
+		rc = CfyE_vPortIndex_Get(CfyE_vPortHandle, &vPortIndex);
+		if (rc != CFYE_STATUS_OK) {
+			eip_logerr(
+				"%s: Failed, CfyE_vPortIndex_Get()=%d device = %d, channel = %d",
+				__func__, rc, device_id, Channel);
+			goto error_exit;
+		}
 		ch_info_p->vPortIndex = vPortIndex;
 
-		LOG_INFO(
+		eip_loginfo(
 			"%s: Secy Add handle 0x%xpk vport index %d secy_index %d\n",
 			__func__, ch_info_p->SecY_SAHandle[ctx->sa.assoc_num],
 			ch_info_p->vPort[ctx->sa.assoc_num], ctx->sa.assoc_num);
@@ -950,14 +992,11 @@ error_exit:
 
 int eip_device_deinit(bool fIngress, unsigned int device_id)
 {
-	unsigned int eip_link_id;
 	uint32_t sa;
 	struct macsec_per_channel_info *ch_info_p;
 
 	for (sa = 0; sa < MACSEC_MAX_SA; sa++) {
-		eip_link_id = MACSEC_GET_LINK_ID(device_id, sa);
-		LOG_INFO("%d Port id's Link id %d", device_id, eip_link_id);
-		ch_info_p = &macsec_priv_data.channel_info[eip_link_id];
+		ch_info_p = get_eip_channel_info(device_id, sa);
 		if (!CfyE_RuleHandle_IsSame(ch_info_p->CfyE_RuleHandle[sa],
 					    CfyE_RuleHandle_NULL)) {
 			LOG_INFO("device id %d CfyE_RuleHandle[%d] = 0x%x",
@@ -1088,8 +1127,9 @@ static int eip_macsec_egress_stats(unsigned int port_id, unsigned int channel,
 	SecY_Rc = get_encoding_sa(egress_device_id, ch_info_p->vPortIndex,
 				  &active_sa);
 	if (SecY_Rc != SECY_STATUS_OK) {
-		eip_logerr("Failed, get_encoding_sa()=%d", SecY_Rc);
-		return SecY_Rc;
+		eip_logerr(
+			"Failed, get_encoding_sa()=%d dev id = %d, channel = %d ",
+			SecY_Rc, egress_device_id, channel);
 	}
 
 	ctx->secy->tx_sc.encoding_sa = active_sa;
@@ -1468,6 +1508,10 @@ static int eip_mdo_upd_secy(struct macsec_context *ctx)
 	unsigned int ingress_device, egress_device, port_id, channel_id;
 	uint32_t link_index;
 
+	if (ctx->prepare) {
+		return 0;
+	}
+
 	dump_secy(ctx);
 
 	macsec_eth_lookup_eth_link_by_netdev(ctx->netdev, &link_index);
@@ -1477,9 +1521,6 @@ static int eip_mdo_upd_secy(struct macsec_context *ctx)
 
 	eip_loginfo("%s: Link %d Device %d Channel %d \n", __func__, link_index,
 		    port_id, channel_id);
-	if (ctx->prepare) {
-		return 0;
-	}
 
 	return eip_macsec_upd_secy(egress_device, ingress_device, channel_id,
 				   ctx);
@@ -1492,7 +1533,10 @@ static int eip_mdo_del_secy(struct macsec_context *ctx)
 	u32 index;
 	struct macsec_per_channel_info *ch_info_p = NULL;
 
-	eip_loginfo("Called!!!");
+	if (ctx->prepare) {
+		return 0;
+	}
+
 	dump_secy(ctx);
 
 	macsec_eth_lookup_eth_link_by_netdev(ctx->netdev, &link_index);
@@ -1536,6 +1580,10 @@ static int eip_mdo_add_rxsc(struct macsec_context *ctx)
 {
 	unsigned int ingress_device, port_id, channel_id;
 	uint32_t link_index;
+
+	if (ctx->prepare) {
+		return 0;
+	}
 
 	dump_rxsc(ctx);
 
@@ -1584,6 +1632,10 @@ static int eip_mdo_del_rxsc(struct macsec_context *ctx)
 	struct macsec_per_channel_info *ch_info_p = NULL;
 	unsigned int ingress_device, port_id, channel_id;
 	uint32_t link_index;
+
+	if (ctx->prepare) {
+		return 0;
+	}
 
 	macsec_eth_lookup_eth_link_by_netdev(ctx->netdev, &link_index);
 	get_ingress_params_from_link_id(link_index, &port_id, &ingress_device,
@@ -1638,6 +1690,10 @@ static int eip_mdo_upd_rxsa(struct macsec_context *ctx)
 	uint32_t SA_Words[2] = { 0 };
 	uint8_t i;
 
+	if (ctx->prepare) {
+		return 0;
+	}
+
 	dump_rxsa(ctx);
 
 	macsec_eth_lookup_eth_link_by_netdev(ctx->netdev, &link_index);
@@ -1672,6 +1728,8 @@ static int eip_mdo_upd_rxsa(struct macsec_context *ctx)
 			break;
 		}
 	}
+	ctx->sa.rx_sa->next_pn = STATS_2x32_TO_64(SA_Words[0], SA_Words[1]);
+	eip_loginfo("Next_PN Seq0 = %d : Seq1 = %d", SA_Words[0], SA_Words[1]);
 
 	return SecY_Rc;
 }
@@ -1711,7 +1769,6 @@ static int eip_mdo_add_txsa(struct macsec_context *ctx)
 		return 0;
 	}
 
-	eip_loginfo("CALLED!!!");
 	dump_txsa(ctx);
 
 	macsec_eth_lookup_eth_link_by_netdev(ctx->netdev, &link_index);
@@ -1745,10 +1802,12 @@ static int eip_mdo_upd_txsa(struct macsec_context *ctx)
 	struct macsec_per_channel_info *ch_info_p = NULL;
 	uint8_t sa_idx = ctx->sa.assoc_num;
 	SecY_SA_t *new_SA_Params;
-	SecY_SAHandle_t Active_SecY_SAHandle;
-	uint32_t SA_Words[24];
+	SecY_SAHandle_t Active_SecY_SAHandle, new_SecY_SAHandle;
+	uint32_t SA_Words[2];
 
-	eip_loginfo("%s: called \n", __func__);
+	if (ctx->prepare) {
+		return 0;
+	}
 
 	dump_txsa(ctx);
 
@@ -1757,6 +1816,7 @@ static int eip_mdo_upd_txsa(struct macsec_context *ctx)
 				       &channel_id);
 	ch_info_p = get_eip_channel_info(egress_device, channel_id);
 	new_SA_Params = &ch_info_p->SA_Params[sa_idx];
+	new_SecY_SAHandle = ch_info_p->SecY_SAHandle[sa_idx];
 	eip_loginfo(
 		"ch_info_p->sa_active_idx = %d, ch_info_p->active[sa_idx] = %s, ctx->sa.tx_sa->active = %s \n",
 		ch_info_p->sa_active_idx,
@@ -1768,22 +1828,20 @@ static int eip_mdo_upd_txsa(struct macsec_context *ctx)
 	*/
 	if (!ch_info_p->active[sa_idx] && ctx->sa.tx_sa->active) {
 		Active_SecY_SAHandle = SecY_SAHandle_NULL;
-		SecY_Rc = SecY_SA_Active_E_Get(
-			egress_device,
-			ch_info_p->vPort[ch_info_p->sa_active_idx],
-			&Active_SecY_SAHandle);
+		SecY_Rc = SecY_SA_Active_E_Get(egress_device,
+					       ch_info_p->vPortIndex,
+					       &Active_SecY_SAHandle);
 		if (SecY_Rc != SECY_STATUS_OK) {
 			eip_logerr("SecY_SA_Active_E_Get()=%d\n", SecY_Rc);
 			return SecY_Rc;
 		}
 		SecY_Rc = SecY_SA_Switch(egress_device, Active_SecY_SAHandle,
-					 SecY_SAHandle, new_SA_Params);
+					 new_SecY_SAHandle, new_SA_Params);
 
 		if (SecY_Rc != SECY_STATUS_OK) {
 			eip_logerr("SecY_SA_Switch()=%d\n", SecY_Rc);
 			return SecY_Rc;
 		}
-		ch_info_p->SecY_SAHandle[sa_idx] = SecY_SAHandle;
 		ch_info_p->sa_active_idx = sa_idx;
 		eip_loginfo(
 			"SA_Switched! egress_device id = %d, active_sa idx = %d\n",
@@ -1821,7 +1879,7 @@ static int eip_mdo_del_txsa(struct macsec_context *ctx)
 	if (ctx->prepare) {
 		return 0;
 	}
-	eip_loginfo("Called!!!");
+
 	dump_txsa(ctx);
 
 	macsec_eth_lookup_eth_link_by_netdev(ctx->netdev, &link_index);
@@ -1832,8 +1890,8 @@ static int eip_mdo_del_txsa(struct macsec_context *ctx)
 		    port_id, channel_id);
 
 	if (eip_macsec_delete_sa(false, egress_device, channel_id, ctx) < 0) {
-		eip_loginfo("%s: Egress mode Device_ID %d Channel %d FAILED\n",
-			    __func__, egress_device, channel_id);
+		eip_logerr("%s: Egress mode Device_ID %d Channel %d FAILED\n",
+			   __func__, egress_device, channel_id);
 		return -EINVAL;
 	}
 	return 0;
