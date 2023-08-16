@@ -415,10 +415,10 @@ static int eip_mtip_add_link(struct net_device *ndev,
 
 	link->ndev = ndev;
 	link->rx.dp = &rx_port->rx;
-	link->rx.ch = rx_link;
+	link->rx.ch = GET_CHANNEL_ID_FROM_LINK_IDX(rx_link);
 
 	link->tx.dp = &tx_port->tx;
-	link->tx.ch = tx_link;
+	link->tx.ch = GET_CHANNEL_ID_FROM_LINK_IDX(tx_link);
 
 	eip_logcrit("Seure_EIP: %s %s rx = (%u, %u, %u), tx = (%u, %u, %u)\n",
 		    __func__, ndev->name, rx_sec->port_id, link->rx.dp->devid,
