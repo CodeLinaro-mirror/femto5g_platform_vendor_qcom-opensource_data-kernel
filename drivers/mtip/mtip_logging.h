@@ -8,6 +8,7 @@
 
 
 #include <linux/ipc_logging.h>
+#include "mtip.h"
 
 #define CSM_IPC_LOG_PAGES 50
 

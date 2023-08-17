@@ -56,6 +56,7 @@
 #include "mtip_platform.h"
 #include "eth_phy_iface.h"
 
+#include "mtip_notifr.h"
 int macsec_eth_set_macsec_ops(const struct macsec_ops* rb_macsec_ops)
 {
     int i;
@@ -1230,7 +1231,6 @@ static int mtip_open(struct net_device *netdev)
    priv = netdev_priv(netdev);
 
    link_index = priv->link_index;
-
    if(link_index >= MTIP_MAX_LINKS)
    {
      CSMLOGERR("invalid link_index %d", link_index);
@@ -1369,7 +1369,7 @@ static int mtip_open(struct net_device *netdev)
 
    /* Send update to clients */
    post_mtip_client_send_event(ETH_ECPRISS_EVENT_UP, link_index);
-
+   mtip_snd_event_notification(link_index, IF_UP);
    return 0;
 }
 
@@ -1505,6 +1505,7 @@ static int mtip_close(struct net_device *netdev)
 
    /* Send update to clients */
    post_mtip_client_send_event(ETH_ECPRISS_EVENT_DOWN, link_index);
+   mtip_snd_event_notification(link_index, IF_DOWN);
    return 0;
 }
 

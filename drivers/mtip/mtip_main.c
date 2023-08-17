@@ -60,9 +60,12 @@ MODULE_LICENSE("GPL v2");
 #include "mtip_debug_eth.h"
 #include "mtip_macstats.h"
 #include "mtip_ethtool.h"
+#include "mtip_notifr.h"
 
 /* Global variables of the driver */
 struct mtip_platform_driver_priv* platform_driver_priv = NULL;
+struct mtip_delayed_work_q_params delayed_wq_notifr_param_v;
+struct mtip_delayed_work_q_params *delayed_wq_notifr_param = &delayed_wq_notifr_param_v;
 
 /* Module parameters */
 int mtip_tx_delay[MTIP_MAX_LINKS];
@@ -646,6 +649,9 @@ int mtip_register_platform_driver(void)
       CSMLOGERR("platform_driver_register for lane with error: %d\n", ret);
       return ret;
    }
+   mtip_fault_notifr_init();
+   INIT_DELAYED_WORK(&delayed_wq_notifr_param->wq_item, mtip_fault_notifr_status);
+   mtip_workq_queue_delayed_work(delayed_wq_notifr_param, MTIP_NOTIFY_TIMER);
    return ret;
 }
 

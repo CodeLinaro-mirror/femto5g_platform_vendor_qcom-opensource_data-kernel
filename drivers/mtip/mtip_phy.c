@@ -53,6 +53,9 @@
 #include "mtip_workq.h"
 #include "mtip_sysfs.h"
 #include "mtip_ethtool.h"
+#include "mtip_notifr.h"
+
+extern struct mtip_delayed_work_q_params *delayed_wq_notifr_param;
 
 struct eth_phy_iface_eth_register_params mtip_phy_eth_params;
 
@@ -307,6 +310,41 @@ void mtip_phy_retry_phy_bringup(struct work_struct *work)
 
 func_exit:
     kfree(wq_params);
+    return;
+}
+
+void mtip_fault_notifr_status(struct work_struct *work)
+{
+    u32 link_index = 0;
+    u32 port_type = 0;
+    void __iomem *wrapper_base_addr;
+    u32 port_link_id = 0;
+    u32 read_val;
+
+    for(port_type = MTIP_PORT_TYPE_FH_0;  port_type <= MTIP_PORT_TYPE_FH_2; port_type++){
+
+        wrapper_base_addr = platform_driver_priv->devices.port_devices[port_type].wrapper_base_addr;
+
+        read_val = (u32)ioread32(wrapper_base_addr + MTIP_MAC_WRAPPER_CORE_STATUS_REG_OFFSET);
+
+        for(link_index=0 ; link_index < MTIP_MAX_LINKS_PER_PORT; link_index++){
+
+            mtip_lookup_link_index_by_port_type_and_real_link(&port_link_id, port_type, link_index);
+
+            if(platform_driver_priv->mtip_links[port_link_id]->state == MTIP_LINK_STATE_CLOSE){
+                continue;
+            }
+
+            if (((read_val & GENMASK(5,2)) >> 2) & (1 << link_index)){
+
+                mtip_snd_event_notification(port_link_id, HIGH_BER_SET);
+            }else{
+                mtip_snd_event_notification(port_link_id, HIGH_BER_CLR);
+            }
+        }
+    }
+    mtip_workq_queue_delayed_work(delayed_wq_notifr_param , MTIP_NOTIFY_TIMER);
+
     return;
 }
 
