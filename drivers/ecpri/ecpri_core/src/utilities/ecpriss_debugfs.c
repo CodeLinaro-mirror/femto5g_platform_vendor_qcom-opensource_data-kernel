@@ -135,7 +135,6 @@ static void remove_firstchar(char * str, uint32_t len)
 }
 static void get_file_name(char *filename, uint32_t len)
 {
-
 	int index = 0;
 	char token[64];
 	int i = 0;
@@ -147,7 +146,7 @@ static void get_file_name(char *filename, uint32_t len)
 		return ;
 	}
 
-	for(i=0; filename[i] !=0 || i < len ;i++){
+	for(i=0; len && filename[i] !=0 ;i++){
 		if(filename[i] ==  ':'){
 			iscoln = 1;
 			break;
@@ -156,8 +155,6 @@ static void get_file_name(char *filename, uint32_t len)
 	if(!iscoln)
 		return;
 
-	if(!filename)
-		return;
 	parser_in.source = filename;
 	parser_in.delim = ":";
 	parser_in.token = token;
