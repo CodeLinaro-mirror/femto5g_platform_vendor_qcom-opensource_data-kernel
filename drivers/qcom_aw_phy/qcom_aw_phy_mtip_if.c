@@ -1122,6 +1122,8 @@ int qcom_aw_phy_bringup_manual_eq_mode(
 
   aw_pmd_txfir_config_set(mss, &txfir_cfg, 1);
 
+  aw_pmd_rx_background_adapt_enable_set(mss, 1);
+
   /* Configuration for Near End Serial Loopback mode */
   if (qcom_aw_phy_get_loopback_mode() == QCOM_AW_PHY_NEAR_END_SERIAL_LB) {
     QCOM_AW_PHY_LOG_INFO("Configuring PHY for near end serial LB");
@@ -1133,8 +1135,6 @@ int qcom_aw_phy_bringup_manual_eq_mode(
 
   // RX Equalization - Check aw_eq_type_e enum
   aw_pmd_rx_equalize(mss, AW_EQ_FULL_DIR, RX_LINKEVAL_FULL_TIMEOUT_US);
-
-  aw_pmd_rx_background_adapt_enable_set(mss, 1);
 
   /* Delay before checking RX CDR lock post equalization */
   mdelay(500);
@@ -1969,13 +1969,13 @@ void qcom_aw_phy_handle_rx_sig_detect(struct work_struct *work){
 
       aw_pmd_txfir_config_set(&mss, &txfir_cfg, 1);
 
+      aw_pmd_rx_background_adapt_enable_set(&mss, 1);
+
       /* Delay before triggering RX equalization */
       mdelay(500);
 
       // RX Equalization - Check aw_eq_type_e enum
       aw_pmd_rx_equalize(&mss, AW_EQ_FULL_DIR, RX_LINKEVAL_FULL_TIMEOUT_US);
-
-      aw_pmd_rx_background_adapt_enable_set(&mss, 1);
 
       /* Delay before checking RX CDR lock post equalization */
       mdelay(500);

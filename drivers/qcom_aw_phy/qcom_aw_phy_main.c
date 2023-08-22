@@ -257,7 +257,7 @@ static irqreturn_t qcom_aw_phy_interrupt_handler(int irq, void *devptr) {
             wq_params->phy_inst = phy_inst_info->phy_inst;
             wq_params->lane_num = i;
             queue_delayed_work(qcom_aw_phy_config_info.wq, &wq_params->wq_item,
-                               msecs_to_jiffies(500));
+                               0);
           }
         }
         clear |= (1<<i);
