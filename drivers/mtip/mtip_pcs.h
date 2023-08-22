@@ -1,6 +1,6 @@
 //SPDX-License-Identifier: GPL-2.0-only
 /*
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  */ 
 
 #ifndef _MTIP_PCS_H
@@ -40,6 +40,10 @@
 
 // RSFEC register offsets
 #define MTIP_RSFEC_CONTROL_OFFSET               0x00000000
+#define MTIP_RSFEC_DEC_THRESH_OFFSET            0x0000001C
+#define MTIP_RSFEC_DEC_THRESH_4X25G_VAL         0x00000033
+#define MTIP_RSFEC_DEC_THRESH_POR_VAL           0x00000019
+
 
 #define MTIP_RSFEC_LINK_OFFSET                  0x00000020
 
