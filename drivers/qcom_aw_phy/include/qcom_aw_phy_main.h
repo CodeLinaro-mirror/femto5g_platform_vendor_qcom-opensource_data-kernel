@@ -235,14 +235,6 @@ enum qcom_aw_phy_an_state_enum {
 	PHY_AN_STATE_FAILURE = 5
 };
 
-/* Work structure to be passed to work queue for deferred processing */
-struct qcom_aw_phy_work_q_params{
-	struct delayed_work                    wq_item;
-	enum qcom_aw_phy_instance_enum         phy_inst;
-	enum eth_phy_iface_phy_lane_num_enum   lane_num;
-	void                                  *user_data;
-};
-
 /* Lane Params - Lane specific information */
 struct qcom_aw_lane_params{
 	struct eth_phy_iface_phy_lane_config   lane_config;
@@ -251,7 +243,6 @@ struct qcom_aw_lane_params{
 	uint32_t                               snr_valid_intr;
 	uint32_t                               an_link_good_intr;
 	uint32_t                               an_done_intr;
-	bool                                   rx_sig_detect_status;
 };
 
 /* AN Params - AN specific information */
@@ -301,11 +292,9 @@ struct qcom_aw_phy_config{
 	struct workqueue_struct         *wq;
 	void                            *phy_ipc_log_buf;
 	void                            *phy_ipc_log_buf_low;
-	uint32_t                         fw_major_ver;
-	uint32_t                         fw_minor_ver;
-	uint32_t                         fw_patch_ver;
-	struct workqueue_struct          *rx_sig_detect_wq;
-	struct qcom_aw_phy_work_q_params rx_sig_detect_wq_item;
+	uint32_t			fw_major_ver;
+	uint32_t			fw_minor_ver;
+	uint32_t			fw_patch_ver;
 };
 
 /* PHY lane speed config - Rate, width, LTCS clause, Modulation technique*/
@@ -316,6 +305,14 @@ struct qcom_aw_phy_lane_speed_config{
 	enum qcom_aw_phy_mod_tech_enum   mod_tech;
 	unsigned long                    synce_cmux_clk_rate;
 	unsigned long                    synce_div_clk_src_rate;
+};
+
+/* Work structure to be passed to work queue for deferred processing */
+struct qcom_aw_phy_work_q_params{
+	struct delayed_work                    wq_item;
+	enum qcom_aw_phy_instance_enum         phy_inst;
+	enum eth_phy_iface_phy_lane_num_enum   lane_num;
+	void                                  *user_data;
 };
 
 struct qcom_aw_phy_config* qcom_aw_phy_get_config_info(void);
