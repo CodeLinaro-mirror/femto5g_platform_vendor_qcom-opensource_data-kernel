@@ -2570,15 +2570,6 @@ static u32 mtip_device_resolve_port_configuration(u32 port_type)
     bool found = false;
     u32 pattern = 0x1;
     u32 pflags = mtip_device_filter_priv_flags(port_type);
-    u32 link_index;
-    u32 real_link = 0;
-
-    if(port_type == MTIP_PORT_TYPE_DEBUG)
-      real_link = 1;
-
-    // Get the link index of the first link for this port
-    if(mtip_lookup_link_index_by_port_type_and_real_link(&link_index, port_type, real_link) < 0)
-        return MTIP_PORT_CONFIG_MAX;
 
     // find the first port config bit that is set
     for (i = 0; i < MTIP_PORT_CONFIG_MAX; ++i) 
@@ -2598,40 +2589,6 @@ static u32 mtip_device_resolve_port_configuration(u32 port_type)
         return MTIP_PORT_CONFIG_MAX;
     }
 
-    switch (port_config) 
-    {
-    case MTIP_PORT_CONFIG_4x25GBASE_R:
-        {
-            if(platform_driver_priv->mtip_links[link_index]->config_fec == ETHTOOL_FEC_RS){
-                port_config = MTIP_PORT_CONFIG_4x25GBASE_R_RSFEC;
-            }
-        }
-        break;
-    case MTIP_PORT_CONFIG_1x25GBASE_R:
-        {
-            if(platform_driver_priv->mtip_links[link_index]->config_fec == ETHTOOL_FEC_RS){
-                port_config = MTIP_PORT_CONFIG_1x25GBASE_R_RSFEC;
-            }
-        }
-        break;
-
-    case MTIP_PORT_CONFIG_1x100GBASE_R4:
-        {
-            /* For 100G_R4, default mode to be used is with RSFEC enabled
-               unless set as OFF by ethtool set-priv-flags, or if
-               DR module is used */
-            if(((platform_driver_priv->mtip_links[link_index]->config_fec == ETHTOOL_FEC_NONE) &&
-                (mtip_phy_get_trx_link_length_range(&platform_driver_priv->devices.port_devices[port_type]) != TRX_DR)) ||
-                (platform_driver_priv->mtip_links[link_index]->config_fec == ETHTOOL_FEC_RS)){
-                port_config = MTIP_PORT_CONFIG_1x100GBASE_R4_RSFEC;
-            }
-        }
-        break;
-
-    default:
-        break;
-    }
-
     return port_config;
 }
 
@@ -2641,11 +2598,6 @@ static int mtip_device_resolve_port_configuration_optical(u32 port_type)
     struct mtip_port_info *port_info = platform_driver_priv->mtip_ports[port_type];
     int bc = 0;
     int rv = 0;
-    u32 link_index;
-    u32 real_link = 0;
-
-    if(port_type == MTIP_PORT_TYPE_DEBUG)
-      real_link = 1;
 
     // check if sfp is optical
     if (port_info->sfp_port_type != PORT_FIBRE) 
@@ -2663,10 +2615,6 @@ static int mtip_device_resolve_port_configuration_optical(u32 port_type)
         return -1; 
     }
 
-    // Get the link index of the first link for this port
-    if(mtip_lookup_link_index_by_port_type_and_real_link(&link_index, port_type, real_link) < 0)
-        return -1;
-
     // set the resolve port config
     port_info->port_config = mtip_device_resolve_port_configuration(port_type);
 
@@ -2675,18 +2623,12 @@ static int mtip_device_resolve_port_configuration_optical(u32 port_type)
     {
     case MTIP_PORT_CONFIG_4x25GBASE_R:
         {
-            if(platform_driver_priv->mtip_links[link_index]->config_fec == ETHTOOL_FEC_RS ||
-               platform_driver_priv->mtip_links[link_index]->config_fec == ETHTOOL_FEC_NONE){
-                port_info->port_config = MTIP_PORT_CONFIG_4x25GBASE_R_RSFEC;
-            }
+            port_info->port_config = MTIP_PORT_CONFIG_4x25GBASE_R_RSFEC;
         }
         break;
     case MTIP_PORT_CONFIG_1x25GBASE_R:
         {
-            if(platform_driver_priv->mtip_links[link_index]->config_fec == ETHTOOL_FEC_RS ||
-               platform_driver_priv->mtip_links[link_index]->config_fec == ETHTOOL_FEC_NONE){
-                port_info->port_config = MTIP_PORT_CONFIG_1x25GBASE_R_RSFEC;
-            }
+            port_info->port_config = MTIP_PORT_CONFIG_1x25GBASE_R_RSFEC;
         }
         break;
     default:
@@ -2822,7 +2764,6 @@ static void mtip_device_configure_port(u32 port_type)
    u32 filtered_priv_flags = 0;
    trx_lane_cfg lane_cfg;
    trx_breakout_cfg breakout_cfg;
-   u32 real_link = 0;
 
    port_info = platform_driver_priv->mtip_ports[port_type];
 
@@ -3037,22 +2978,6 @@ static void mtip_device_configure_port(u32 port_type)
                        platform_driver_priv->mtip_ports[port_type]->port_priv_flags);
 
             filtered_priv_flags = mtip_device_filter_priv_flags(port_type);
-
-            if(port_type == MTIP_PORT_TYPE_DEBUG)
-               real_link = 1;
-
-            // Get the link index of the first link for this port
-            if(mtip_lookup_link_index_by_port_type_and_real_link(&link_index, port_type, real_link) == 0)
-            {
-               /* For 100G_R4, default mode to be used is with RSFEC enabled
-                  unless set as OFF by ethtool set-priv-flags */
-               if((filtered_priv_flags & (1<<MTIP_PORT_CONFIG_1x100GBASE_R4)) &&
-                  ((platform_driver_priv->mtip_links[link_index]->config_fec == ETHTOOL_FEC_NONE) ||
-                   (platform_driver_priv->mtip_links[link_index]->config_fec == ETHTOOL_FEC_RS))){
-                  filtered_priv_flags &= ~(1<<MTIP_PORT_CONFIG_1x100GBASE_R4);
-                  filtered_priv_flags |= (1<<MTIP_PORT_CONFIG_1x100GBASE_R4_RSFEC);
-               }
-            }
 
             // initiate AN with the PHY
             mtip_phy_initiate_an(port_type, num_an_lanes, filtered_priv_flags);

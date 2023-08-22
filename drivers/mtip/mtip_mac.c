@@ -1031,12 +1031,15 @@ static void mtip_mac_wrapper_set_pcs_mode(struct mtip_port_device_info* port_dev
         break;
     case MTIP_PORT_CONFIG_1x100GBASE_R4:
         {
-            pcs_mode_set =  0x40000;
+            if(mtip_phy_get_trx_link_length_range(port_device) == TRX_DR)
+                pcs_mode_set =  0x40000;
+            else
+                pcs_mode_set =  0x4000F;
         }
         break;
     case MTIP_PORT_CONFIG_1x100GBASE_R4_RSFEC:
         {
-            pcs_mode_set =  0x4000F;
+            pcs_mode_set =  0x4000f;
         }
         break;
     case MTIP_PORT_CONFIG_1x40GBASE_R4:

@@ -529,9 +529,6 @@ int	mtip_ethtool_set_fecparam(struct net_device* netdev, struct ethtool_fecparam
         // find the port corresponding to the link
         CSMLOGDBG("Going to set FEC OFF for link_index: %d", link_index);
 
-        // set the configured fec
-        platform_driver_priv->mtip_links[link_index]->config_fec = ETHTOOL_FEC_OFF;
-
         // turn FEC to OFF
         mtip_mac_wrapper_disable_rsfec_for_25g_mode(port_device);
 
@@ -546,9 +543,6 @@ int	mtip_ethtool_set_fecparam(struct net_device* netdev, struct ethtool_fecparam
     {
         // find the port corresponding to the link
         CSMLOGDBG("Going to set FEC RS for link_index: %d", link_index);
-
-        // set the configured fec
-        platform_driver_priv->mtip_links[link_index]->config_fec = ETHTOOL_FEC_RS;
 
         // turn on RS FEC
         mtip_mac_wrapper_enable_rsfec_for_25g_mode(port_device);
