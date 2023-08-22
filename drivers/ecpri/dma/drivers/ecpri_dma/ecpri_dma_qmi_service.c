@@ -261,13 +261,6 @@ ecpri_dma_qmi_service_q6_client_event_notify_new(struct qmi_handle* qmi,
 		service->service, service->version, service->instance,
 		service->node, service->port);
 
-
-	if ((service->service != ECPRI_DMA_Q6_SERVICE_SVC_ID) ||
-		(service->instance != ECPRI_DMA_Q6_SERVICE_INS_ID))  {
-			DMADBG("Non supported QMI service notification, no further action.\n");
-			return 0;
-	}
-
 	if (!ecpri_dma_qmi_ctx) {
 		DMAERR("QMI service isn't ready\n");
 		return -EPERM;
@@ -326,8 +319,6 @@ static int ecpri_dma_qmi_service_init_q6_send_msg(void)
 	if (!ecpri_dma_qmi_ctx->q6_clnt)
 		return -EINVAL;
 
-	DMADBG("QMI send message started\n");
-
 	/* Create request */
 	ret = qmi_txn_init(
 		ecpri_dma_qmi_ctx->q6_clnt,
@@ -352,13 +343,11 @@ static int ecpri_dma_qmi_service_init_q6_send_msg(void)
 		&req);
 
 	if (unlikely(!ecpri_dma_qmi_ctx->q6_clnt)) {
-		DMAERR("QMI Q6 client is NULL\n");
 		mutex_unlock(&ecpri_dma_qmi_ctx->lock);
 		return -EINVAL;
 	}
 
 	if (ret < 0) {
-		DMAERR("QMI send request failed error: %d\n", ret);
 		qmi_txn_cancel(&txn);
 		mutex_unlock(&ecpri_dma_qmi_ctx->lock);
 		return ret;
@@ -375,7 +364,7 @@ static int ecpri_dma_qmi_service_init_q6_send_msg(void)
 	mutex_unlock(&ecpri_dma_qmi_ctx->lock);
 
 	ret = qmi_txn_wait(&txn,
-		msecs_to_jiffies(ECPRI_DMA_QMI_RESPONSE_TIMEOUT));
+		msecs_to_jiffies(ECPRI_DMA_QMI_COMPLETION_TIMEOUT));
 
 	if (ret >= 0) {
 		ecpri_dma_qmi_ctx->q6_response_recv = true;
@@ -448,6 +437,7 @@ static void ecpri_dma_qmi_service_q6_send_init_msg(struct work_struct* work)
 		 * which requires a kernel panic in
 		 * order to forete dumps for QMI/Q6 side analysis.
 		 */
+		ecpri_dma_assert();
 	}
 }
 
@@ -462,7 +452,7 @@ static void ecpri_dma_handle_indication(struct qmi_handle* qmi_handle,
 	(struct ecpri_init_modem_driver_cmplt_ind_msg_v01*)decoded_msg;
 
 	ecpri_dma_qmi_ctx->q6_indication_recv = true;
-	DMADBG("q6_indication_recv: %d\n",
+	DMADBG("6_indication_recv: %d\n",
 	ecpri_dma_qmi_ctx->q6_indication_recv);
 
 	DMADBG("Indication: driver mode - %d driver valid - %d\n",
