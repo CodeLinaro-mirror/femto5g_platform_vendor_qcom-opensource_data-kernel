@@ -1189,9 +1189,6 @@ int mtip_device_open_completion(u32 link_index)
     // get the sfp port type
     sfp_port_type = platform_driver_priv->mtip_ports[port_type]->sfp_port_type;
 
-    // Notify TRX driver to enable TX
-    mtip_phy_notify_eth_event_to_trx(link_index, IFCFG_ENABLE);
-
     // bring up the phy
     mtip_phy_bringup_phy(link_index, sfp_port_type);
 
@@ -1329,9 +1326,6 @@ static int mtip_open(struct net_device *netdev)
             // get the sfp port type
             sfp_port_type = platform_driver_priv->mtip_ports[port_type]->sfp_port_type;
 
-            // Notify TRX driver to enable TX
-            mtip_phy_notify_eth_event_to_trx(link_index, IFCFG_ENABLE);
-
             // bring up the phy
             mtip_phy_bringup_phy(link_index, sfp_port_type);
 
@@ -1403,9 +1397,6 @@ static int mtip_close(struct net_device *netdev)
          mtip_phy_teardown_phy(link_index);
 
          CSMLOGDBG("phy teardown done for link: %d\n", link_index);
-
-         // Notify TRX driver to disable TX
-         mtip_phy_notify_eth_event_to_trx(link_index, IFCFG_DISABLE);
       }
    }
 
@@ -2891,9 +2882,6 @@ static void mtip_device_configure_port(u32 port_type)
                      {
                         if (mtip_get_link_state_by_link_index(link_index) == MTIP_LINK_STATE_DOWN)
                         {
-                           // Notify TRX driver to enable TX
-                           mtip_phy_notify_eth_event_to_trx(link_index, IFCFG_ENABLE);
-
                            // bring up the phy
                            mtip_phy_bringup_phy(link_index, platform_driver_priv->mtip_ports[port_type]->sfp_port_type);
                         }
