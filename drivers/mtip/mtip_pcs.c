@@ -1,7 +1,7 @@
 //SPDX-License-Identifier: GPL-2.0-only
 /*
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
- */ 
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ */
 
 #include <linux/init.h>
 #include <linux/module.h>
@@ -671,6 +671,7 @@ int mtip_rsfec_initialize(struct mtip_port_device_info *port_device) {
     int i;
     void __iomem *rsfec_base_addr = port_device->rsfec_base_addr;
     u32 rsfec_control_val = 0;
+    u32 rsfec_dec_thresh = MTIP_RSFEC_DEC_THRESH_POR_VAL;
     enum mtip_port_config_enum port_config;
     u32 port_type = port_device->port_type;
     struct mtip_port_info* port_info = NULL;
@@ -740,9 +741,9 @@ int mtip_rsfec_initialize(struct mtip_port_device_info *port_device) {
             case MTIP_PORT_CONFIG_1x25GBASE_R_RSFEC:
             case MTIP_PORT_CONFIG_4x25GBASE_R_RSFEC:
                 {
-                    rsfec_control_val = MTIP_RSFEC_CONTROL_TC_PAD_VALUE_BIT;
-                }
-                break;
+                    rsfec_control_val = 0;
+                    rsfec_dec_thresh = MTIP_RSFEC_DEC_THRESH_4X25G_VAL;
+                } break;
 
             case MTIP_PORT_CONFIG_1x50GBASE_R2_LUAI:
             case MTIP_PORT_CONFIG_1x50GBASE_R2_LUAI_FEC:
@@ -797,11 +798,20 @@ int mtip_rsfec_initialize(struct mtip_port_device_info *port_device) {
             }
 
             CSMLOGDBG("Setting RSFEC addr 0x%x to 0x%x\n", MTIP_RSFEC_CONTROL_OFFSET + i * MTIP_RSFEC_LINK_OFFSET, rsfec_control_val);
+            CSMLOGDBG("Setting RSFEC dec thresh addr 0x%x to 0x%x\n",
+                       MTIP_RSFEC_DEC_THRESH_OFFSET + i * MTIP_RSFEC_LINK_OFFSET,
+                       rsfec_dec_thresh);
 
             // set the RSFEC control register
-            iowrite32(rsfec_control_val,
-                      rsfec_base_addr + MTIP_RSFEC_CONTROL_OFFSET + i * MTIP_RSFEC_LINK_OFFSET);
-        }
+           iowrite32(rsfec_control_val,
+                     rsfec_base_addr + MTIP_RSFEC_CONTROL_OFFSET + i * MTIP_RSFEC_LINK_OFFSET);
+
+           // set the RSFEC decoder threshold register
+           iowrite32(rsfec_dec_thresh,
+                     rsfec_base_addr + MTIP_RSFEC_DEC_THRESH_OFFSET +
+                     i * MTIP_RSFEC_LINK_OFFSET);
+
+	}
     }
     return 0;
 }
