@@ -1804,7 +1804,6 @@ int aw_pmd_iso_request_tx_state_change(mss_access_t *mss, aw_pstate_t tx_pstate,
   int poll_result;
   //USR_PRINTF("Setting TX rate/width/pstate\n");
   aw_pmd_iso_tx_reset_set(mss, 0);
-  udelay(100);
   aw_pmd_iso_tx_reset_set(mss, 1);
   aw_pmd_iso_tx_rate_set(mss, tx_rate);
   aw_pmd_iso_tx_width_set(mss, tx_width);
@@ -1838,7 +1837,6 @@ int aw_pmd_iso_request_rx_state_change(mss_access_t *mss, aw_pstate_t rx_pstate,
   int poll_result;
   //USR_PRINTF("Setting RX rate/width/pstate\n");
   aw_pmd_iso_rx_reset_set(mss, 0);
-  udelay(100);
   aw_pmd_iso_rx_reset_set(mss, 1);
   aw_pmd_iso_rx_rate_set(mss, rx_rate);
   aw_pmd_iso_rx_width_set(mss, rx_width);

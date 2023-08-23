@@ -52,7 +52,6 @@
 #include "mtip_ptp.h"
 #include "mtip_workq.h"
 #include "mtip_ethtool.h"
-#include "mtip_phy.h"
 
 static u32 mtip_mac_get_interrupt_summary(struct mtip_port_device_info* port_device)
 {
@@ -1031,15 +1030,12 @@ static void mtip_mac_wrapper_set_pcs_mode(struct mtip_port_device_info* port_dev
         break;
     case MTIP_PORT_CONFIG_1x100GBASE_R4:
         {
-            if(mtip_phy_get_trx_link_length_range(port_device) == TRX_DR)
-                pcs_mode_set =  0x40000;
-            else
-                pcs_mode_set =  0x4000F;
+            pcs_mode_set =  0x4000F;
         }
         break;
     case MTIP_PORT_CONFIG_1x100GBASE_R4_RSFEC:
         {
-            pcs_mode_set =  0x4000f;
+            pcs_mode_set =  0x4f00f;
         }
         break;
     case MTIP_PORT_CONFIG_1x40GBASE_R4:
