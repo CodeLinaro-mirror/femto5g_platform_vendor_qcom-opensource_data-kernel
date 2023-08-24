@@ -53,6 +53,9 @@
 #include "mtip_workq.h"
 #include "mtip_sysfs.h"
 #include "mtip_ethtool.h"
+#include "mtip_notifr.h"
+
+extern struct mtip_delayed_work_q_params *delayed_wq_notifr_param;
 
 struct eth_phy_iface_eth_register_params mtip_phy_eth_params;
 
@@ -118,11 +121,6 @@ static void mtip_phy_cdr_lock_ind(u32 link_index, bool status)
 {
     CSMLOGINFO("CDR lock indication for link_index %d, status %d\n",
               link_index, status);
-
-    if (mtip_loopback_mode == MTIP_MODE_PHY_LOOPBACK)
-    {
-        return;
-    }
 
     if (mtip_mac_wrapper_get_link_status(link_index) == true) 
     {
@@ -261,6 +259,12 @@ void mtip_phy_retry_phy_bringup(struct work_struct *work)
     u32 port_type;
     u32 link_index = wq_params->link_index;
 
+    if(link_index >= MTIP_MAX_LINKS)
+    {
+      CSMLOGERR("invalid link_index %d\n", link_index);
+      goto func_exit;
+    }
+
     if(platform_driver_priv->mtip_links[link_index]->state == MTIP_LINK_STATE_CLOSE)
     {
         goto func_exit;
@@ -309,6 +313,41 @@ func_exit:
     return;
 }
 
+void mtip_fault_notifr_status(struct work_struct *work)
+{
+    u32 link_index = 0;
+    u32 port_type = 0;
+    void __iomem *wrapper_base_addr;
+    u32 port_link_id = 0;
+    u32 read_val;
+
+    for(port_type = MTIP_PORT_TYPE_FH_0;  port_type <= MTIP_PORT_TYPE_FH_2; port_type++){
+
+        wrapper_base_addr = platform_driver_priv->devices.port_devices[port_type].wrapper_base_addr;
+
+        read_val = (u32)ioread32(wrapper_base_addr + MTIP_MAC_WRAPPER_CORE_STATUS_REG_OFFSET);
+
+        for(link_index=0 ; link_index < MTIP_MAX_LINKS_PER_PORT; link_index++){
+
+            mtip_lookup_link_index_by_port_type_and_real_link(&port_link_id, port_type, link_index);
+
+            if(platform_driver_priv->mtip_links[port_link_id]->state == MTIP_LINK_STATE_CLOSE){
+                continue;
+            }
+
+            if (((read_val & GENMASK(5,2)) >> 2) & (1 << link_index)){
+
+                mtip_snd_event_notification(port_link_id, HIGH_BER_SET);
+            }else{
+                mtip_snd_event_notification(port_link_id, HIGH_BER_CLR);
+            }
+        }
+    }
+    mtip_workq_queue_delayed_work(delayed_wq_notifr_param , MTIP_NOTIFY_TIMER);
+
+    return;
+}
+
 int mtip_phy_bringup_phy(u32 link_index, int sfp_port_type)
 {
     enum mtip_port_type_enum port_type;
@@ -338,12 +377,6 @@ int mtip_phy_bringup_phy(u32 link_index, int sfp_port_type)
 
     // bringup the phy for the specified lanes
     rv = (qcom_aw_phy_driver_iface_ops.eth_phy_iface_phy_bringup)(port_type, lanes_enabled, sfp_port_type);
-
-    // enable tx_rx on the link by default for PHY loopback
-    if (mtip_loopback_mode == MTIP_MODE_PHY_LOOPBACK)
-    {
-        post_mtip_process_link_state(link_index, true);
-    }
 
     CSMLOGDBG("phy bringup returned rv %d", rv);
     return rv;
@@ -705,23 +738,23 @@ static void mtip_phy_phy_validate(struct phylink_config *config,
     }
 
     // ask the qsfp driver about the sfp port type
-    qsfp_trx_get_lane_type(sfp_phandle, &sfp_port_type);
+    if (qsfp_trx_get_lane_type(sfp_phandle, &sfp_port_type) < 0)
+    {
+       CSMLOGDBG("TRX not initialized yet, ignoring event for lane: %d\n", lane_index);
+       return;
+    }
 
     CSMLOGINFO("phy validate read sfp_port_type %d for sfp_phandle %d", sfp_port_type, sfp_phandle);
 
-    if (sfp_port_type != PORT_FIBRE) 
+    // if sfp port type is OTHER, force it to be PORT_DA
+    if (sfp_port_type == PORT_OTHER)
     {
-        CSMLOGINFO("validate processing done for lane_index %d sfp_port_type %d", lane_index, sfp_port_type);
-        return;
+        sfp_port_type = PORT_DA;
     }
-
-    CSMLOGDBG("reading qsfp info for optical cable in validate");
 
     // set the sfp port_type of the lane
     platform_driver_priv->mtip_lanes[lane_index]->sfp_port_type = sfp_port_type;
 
-    // if sfp port type is FIBRE
-    // treat it as lane up since FIBRE will not send an explcit lane up until lane is brought up
     // transceiver lane supported speed
     ret = qsfp_trx_get_lane_speed(sfp_phandle, &qsfp_speed);
     if(ret == 0)
@@ -872,12 +905,6 @@ static void mtip_phy_phylink_lane_up(struct phylink_config *config,
    qsfp_trx_get_lane_type(sfp_phandle, &sfp_port_type);
 
    CSMLOGDBG("read sfp_port_type %d for sfp_phandle %d", sfp_port_type, sfp_phandle);
-
-   if (sfp_port_type == PORT_FIBRE) 
-   {
-       CSMLOGINFO("skipping lane_up for optical");
-       return;
-   }
 
    // if sfp port type is OTHER, force it to be PORT_DA
    if (sfp_port_type == PORT_OTHER)
@@ -1154,4 +1181,58 @@ int mtip_phy_destroy_phylink(u32 lane_index)
     return 0;
 }
 
+trx_link_length_range mtip_phy_get_trx_link_length_range(struct mtip_port_device_info* port_device)
+{
+    int i;
+    u32 port_type = port_device->port_type;
+    u32 lane_index;
+
+    // find a lane that is connected
+    for (i = 0; i < port_device->num_lane_phandles; ++i) 
+    {
+        lane_index = port_device->lane_devices[i]->lane_index;
+
+        if (platform_driver_priv->mtip_lanes[lane_index]->lane_state == MTIP_LANE_STATE_CONNECTED) 
+        {
+            CSMLOGINFO("mtip_phy_get_trx_link_length_range %d for port %d",
+                      platform_driver_priv->mtip_lanes[lane_index]->lane_qsfp_info.trx_link_length_range, port_type);
+            return platform_driver_priv->mtip_lanes[lane_index]->lane_qsfp_info.trx_link_length_range;
+        }
+    }
+
+    return TRX_LINK_UNKNOWN;
+}
+
+void mtip_phy_notify_eth_event_to_trx(u32 link_index, bool enable)
+{
+    enum mtip_port_type_enum port_type;
+    bool lanes_enabled[PHY_LANE_MAX];
+    int i;
+    u32 lane_index;
+    u32 sfp_phandle[MAX_ETH_LANES] = {0};
+    u8 sfp_lane_count = 0;
+
+    if (mtip_lookup_port_type_by_link_index(link_index, &port_type) < 0)
+    {
+        CSMLOGERR("invalid port_type for link_index %d", link_index);
+        return;
+    }
+
+    mtip_phy_get_lanes_of_link(link_index, lanes_enabled);
+
+    for (i = 0; i < PHY_LANE_MAX; ++i)
+    {
+        if(lanes_enabled[i] == true){
+            mtip_lookup_lane_index_by_port_type_and_real_lane(&lane_index, port_type, i);
+            sfp_phandle[sfp_lane_count++] = platform_driver_priv->devices.lane_devices[lane_index].sfp_phandle;
+            CSMLOGERR("eth_event %d for link_index %d = lane %d = sfp_phandle=%d",
+                      enable, link_index, lane_index, sfp_phandle[sfp_lane_count-1]);
+        }
+    }
+
+    // Indicate transceiver driver about interface bring up
+    qsfp_trx_ifconfig_notifier(enable, sfp_phandle);
+
+    return;
+}
 

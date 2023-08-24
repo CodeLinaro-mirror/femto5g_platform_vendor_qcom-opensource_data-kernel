@@ -52,6 +52,8 @@
 #include "mtip_ptp.h"
 #include "mtip_workq.h"
 #include "mtip_ethtool.h"
+#include "mtip_phy.h"
+#include "mtip_notifr.h"
 
 static u32 mtip_mac_get_interrupt_summary(struct mtip_port_device_info* port_device)
 {
@@ -617,6 +619,9 @@ void mtip_mac_link_up(u32 link_index)
 
     // set the link state as up
     platform_driver_priv->mtip_links[link_index]->state = MTIP_LINK_STATE_UP;
+
+    //send a notification to ldmm.ko
+    mtip_snd_event_notification(link_index, PCS_IF_UP);
 }
 
 void mtip_mac_link_down(u32 link_index)
@@ -629,6 +634,8 @@ void mtip_mac_link_down(u32 link_index)
         // set link state as down
         platform_driver_priv->mtip_links[link_index]->state = MTIP_LINK_STATE_DOWN;
     }
+    //send a notification to ldmm.ko
+    mtip_snd_event_notification(link_index, PCS_IF_DOWN);
 }
 
 static void mtip_mac_set_xif_mode(struct mtip_netdev_priv *priv) {
@@ -706,7 +713,8 @@ void mtip_mac_initialize(struct mtip_netdev_priv *priv)
    // configure the mac for operation
    iowrite32(MTIP_MAC_INIT_COMMAND_CONFIG, priv->mac_ioaddr + MTIP_MAC_COMMAND_CONFIG);
 
-   if (mtip_loopback_mode != MTIP_MODE_DEFAULT)
+   // Process link up only for PCS loopback mode
+   if (mtip_loopback_mode == MTIP_MODE_LOOPBACK)
    {
        post_mtip_process_link_state(link_index, true);
    }
@@ -1030,12 +1038,12 @@ static void mtip_mac_wrapper_set_pcs_mode(struct mtip_port_device_info* port_dev
         break;
     case MTIP_PORT_CONFIG_1x100GBASE_R4:
         {
-            pcs_mode_set =  0x4000F;
+            pcs_mode_set =  0x40000;
         }
         break;
     case MTIP_PORT_CONFIG_1x100GBASE_R4_RSFEC:
         {
-            pcs_mode_set =  0x4f00f;
+            pcs_mode_set =  0x4000F;
         }
         break;
     case MTIP_PORT_CONFIG_1x40GBASE_R4:

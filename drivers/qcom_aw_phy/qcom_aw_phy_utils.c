@@ -189,7 +189,8 @@ char *qcom_aw_phy_strtok(char *in_string, const char ch, char **out_string){
 * Description: This function does the firmware loading from hex file
 ------------------------------------------------------------------- */
 int qcom_aw_phy_load_hexfile(mss_access_t *mss, char *fileName) {
-  uint32_t value, addr;
+  uint32_t value = 0; 
+  uint32_t addr = 0;
   struct file *file;
   char line[18], *token;
   loff_t pos = 0;
@@ -210,9 +211,13 @@ int qcom_aw_phy_load_hexfile(mss_access_t *mss, char *fileName) {
     }
 
     token = qcom_aw_phy_strtok(line, ',', &save_ptr);
-    sscanf(token, "%x", &addr);
+    if(token != NULL) {
+      sscanf(token, "%x", &addr); 
+    }
     token = qcom_aw_phy_strtok(NULL, ',', &save_ptr);
-    sscanf(token, "%x", &value);
+    if(token != NULL) {
+      sscanf(token, "%x", &value); 
+    }
 
     pmd_write_addr(mss, addr, value);
   } while (len >= 0);
@@ -280,7 +285,7 @@ void qcom_aw_phy_dump_registers(void) {
   }
 
   for (phy_inst_type = QCOM_AW_PHY_INST_FH0;
-       phy_inst_type < QCOM_AW_PHY_INST_FH1;
+       phy_inst_type < QCOM_AW_PHY_INST_MAX;
        phy_inst_type++) { // change it for all PHYs later
     phy_inst_info = &phy_config_info->phy_inst_config_info[phy_inst_type];
 

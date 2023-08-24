@@ -1,0 +1,48 @@
+
+DATACSMKERNELTOP = $(ROOTDIR)datacsm-kernel/drivers
+LDMM = $(DATACSMKERNELTOP)/common/lassen_data_modules_mgr
+
+LINUX_INC +=	-Iinclude/linux
+
+CDEFINES +=	-DANI_LITTLE_BYTE_ENDIAN \
+	-DANI_LITTLE_BIT_ENDIAN \
+	-DDOT11F_LITTLE_ENDIAN_HOST \
+	-DANI_COMPILER_TYPE_GCC \
+	-DANI_OS_TYPE_ANDROID=6 \
+	-DPTT_SOCK_SVC_ENABLE \
+	-Wall\
+	-Werror\
+	-D__linux__
+
+KBUILD_CPPFLAGS += $(CDEFINES)
+
+ccflags-y += $(LINUX_INC)
+ccflags-y += -I$(DATACSMKERNELTOP)/include/
+ccflags-y += -I$(LDMM)/include/
+ccflags-y += -I$(LDMM)/include/uapi/ldmm/
+
+ifeq ($(ECPRI_PERF),1)
+ccflags-y += -DNO_DEBUGFS_PERF
+endif
+
+header-y += $(LDMM)/include/uapi/ldmm/ldmm_genl.h
+
+ifeq ($(call cc-option-yn, -Wmaybe-uninitialized),y)
+EXTRA_CFLAGS += -Wmaybe-uninitialized
+endif
+
+ifeq ($(call cc-option-yn, -Wheader-guard),y)
+EXTRA_CFLAGS += -Wheader-guard
+endif
+
+ifneq ($(MODNAME), qdsp6v2)
+CHIP_NAME ?= $(MODNAME)
+CDEFINES += -DMULTI_IF_NAME=\"$(CHIP_NAME)\"
+endif
+
+obj-$(CONFIG_LASSEN_DATA_MODULES_MGR) += ldmm.o
+ldmm-$(CONFIG_LASSEN_DATA_MODULES_MGR) += \
+		src/ldmm_netlink.o \
+		src/ldmm_notifier.o \
+		src/ldmm.o
+

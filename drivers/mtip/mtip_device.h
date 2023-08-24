@@ -74,7 +74,7 @@ struct mtip_process_link_state_task
 
 void post_mtip_process_link_state(u32 link_index, bool link_up);
 void run_mtip_process_link_state(void* work_ptr);
-
+void mtip_device_configure_port(u32 port_type);
 void post_mtip_process_configure_port_using_lane(u32 port_type, u32 lane_index);
 void run_mtip_process_configure_port_using_lane(void* workptr);
 
@@ -129,5 +129,7 @@ int mtip_device_update_security_config(struct net_device *netdev, enum mtip_port
 
 // get the next ptp ts seq num to use
 u8 mtip_netdev_get_next_ptp_ts_seq_num(u32 link_index);
+
+u32 mtip_device_filter_priv_flags(u32 port_type);
 
 #endif // _MTIP_DEVICE_H

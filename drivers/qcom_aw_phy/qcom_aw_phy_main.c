@@ -159,7 +159,6 @@ static irqreturn_t qcom_aw_phy_interrupt_handler(int irq, void *devptr) {
   struct qcom_aw_phy_work_q_params *wq_params = NULL;
   mss_access_t mss = {.phy_offset = 0, .lane_offset = 0};
   uint64_t tx_np_data = 1ULL;
-  uint32_t rx_sig_detect_rd_val= 0;
 
   // check if this an interrupt that needs to be handled
   for (i = QCOM_AW_PHY_INST_FH0; i < QCOM_AW_PHY_INST_MAX; i++)
@@ -235,34 +234,6 @@ static irqreturn_t qcom_aw_phy_interrupt_handler(int irq, void *devptr) {
     temp_bmask = intr_status & (1 << i);
     if (temp_bmask) {
       switch (i) {
-      case QCOM_AW_PHY_RX_SIGNAL_DETECT_LANE_0:
-      case QCOM_AW_PHY_RX_SIGNAL_DETECT_LANE_1:
-      case QCOM_AW_PHY_RX_SIGNAL_DETECT_LANE_2:
-      case QCOM_AW_PHY_RX_SIGNAL_DETECT_LANE_3:
-         mss.phy_offset = phy_inst_info->base_addr;
-         pmd_set_lane(&mss, i-QCOM_AW_PHY_RX_SIGNAL_DETECT_LANE_0);
-         pmd_read_field(&mss, DIG_SOC_LANE_STAT_REG3_ADDR,
-                        DIG_SOC_LANE_STAT_REG3_ODAT_RX_SIGNAL_DETECT_A_MASK,
-                        DIG_SOC_LANE_STAT_REG3_ODAT_RX_SIGNAL_DETECT_A_OFFSET,
-                        &rx_sig_detect_rd_val);
-
-         if(rx_sig_detect_rd_val == 1){
-           wq_params = kmalloc(sizeof(struct qcom_aw_phy_work_q_params),
-                              GFP_ATOMIC);
-          if(!wq_params)
-            QCOM_AW_PHY_LOG_ERR("Malloc failed!");
-          else{
-            INIT_DELAYED_WORK(&wq_params->wq_item,
-                              qcom_aw_phy_handle_rx_sig_detect);
-            wq_params->phy_inst = phy_inst_info->phy_inst;
-            wq_params->lane_num = i;
-            queue_delayed_work(qcom_aw_phy_config_info.wq, &wq_params->wq_item,
-                               0);
-          }
-        }
-        clear |= (1<<i);
-        break;
-
       case QCOM_AW_PHY_AN_DONE_LANE_0:
       case QCOM_AW_PHY_AN_DONE_LANE_1:
       case QCOM_AW_PHY_AN_DONE_LANE_2:
@@ -374,10 +345,6 @@ void qcom_aw_phy_enable_interrupt(
   for (i = QCOM_AW_PHY_INT_STATUS_BIT_MIN; i < QCOM_AW_PHY_INT_STATUS_BIT_MAX;
        i++) {
     switch (i) {
-    case QCOM_AW_PHY_RX_SIGNAL_DETECT_LANE_0:
-    case QCOM_AW_PHY_RX_SIGNAL_DETECT_LANE_1:
-    case QCOM_AW_PHY_RX_SIGNAL_DETECT_LANE_2:
-    case QCOM_AW_PHY_RX_SIGNAL_DETECT_LANE_3:
     case QCOM_AW_PHY_AN_DONE_LANE_0:
     case QCOM_AW_PHY_AN_DONE_LANE_1:
     case QCOM_AW_PHY_AN_DONE_LANE_2:
@@ -888,6 +855,21 @@ static void qcom_aw_phy_hw_init() {
     goto func_exit;
   }
 
+  if(qcom_aw_phy_loopback_mode == QCOM_AW_PHY_NO_LB){
+    /* Allocate and start workqueue for RX signal detect handling */
+    phy_config_info->rx_sig_detect_wq =
+                    create_singlethread_workqueue("qcom_aw_phy_rx_sig_det_wq");
+    if (!phy_config_info->rx_sig_detect_wq) {
+      local_err_val = LOCAL_ERROR_2;
+      goto func_exit;
+    }
+
+    INIT_DELAYED_WORK(&phy_config_info->rx_sig_detect_wq_item.wq_item,
+                      qcom_aw_phy_handle_rx_sig_detect);
+    queue_delayed_work(phy_config_info->rx_sig_detect_wq,
+                       &phy_config_info->rx_sig_detect_wq_item.wq_item, 0);
+  }
+
   for (phy_inst_type = QCOM_AW_PHY_INST_FH0;
        phy_inst_type < QCOM_AW_PHY_INST_MAX; phy_inst_type++) {
     phy_inst_info = &phy_config_info->phy_inst_config_info[phy_inst_type];
@@ -913,13 +895,13 @@ static void qcom_aw_phy_hw_init() {
           (irq_handler_t)qcom_aw_phy_interrupt_handler,
           IRQF_SHARED | IRQF_TRIGGER_HIGH | IRQF_ONESHOT, NULL, phy_inst_info);
       if (ret_val) {
-        local_err_val = LOCAL_ERROR_2;
+        local_err_val = LOCAL_ERROR_3;
         goto func_exit;
       }
 
       ret_val = enable_irq_wake(phy_inst_info->phy_status_irq);
       if (ret_val) {
-        local_err_val = LOCAL_ERROR_3;
+        local_err_val = LOCAL_ERROR_4;
         goto func_exit;
       }
 
@@ -1220,6 +1202,12 @@ static void __exit qcom_aw_phy_exit(void) {
   }
 
   destroy_workqueue(qcom_aw_phy_config_info.wq);
+
+  if (qcom_aw_phy_config_info.rx_sig_detect_wq != NULL) {
+    cancel_delayed_work_sync(
+                      &qcom_aw_phy_config_info.rx_sig_detect_wq_item.wq_item);
+    destroy_workqueue(qcom_aw_phy_config_info.rx_sig_detect_wq);
+  }
 
   qcom_aw_phy_gnl_exit();
   qcom_aw_phy_prbs_gnl_exit();

@@ -247,4 +247,6 @@ void ecpriss_destroy_timers_v2(void);
 void ecpriss_destroy_ipc_log_v2(void);
 void ecpriss_unmap_xbar_qudp_v2(void);
 void ecpriss_xbar_oc_flush_enable(uint32_t code);
+void ecpriss_panic_notifr_handler_v2(void);
+void ecpriss_panic_notifr_handler(void);
 #endif

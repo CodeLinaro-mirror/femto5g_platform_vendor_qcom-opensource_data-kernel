@@ -13,3 +13,4 @@ obj-$(CONFIG_ECPRI_OXTOR) += drivers/ecpri/ecpri_oxtor/
 obj-$(CONFIG_LASSEN_MACSEC) += drivers/macsec/
 obj-$(CONFIG_LASSEN_SECURE_EIP) += drivers/secure_eip/
 obj-$(CONFIG_LASSEN_QCOM_AW_PHY) += drivers/qcom_aw_phy/
+obj-$(CONFIG_LASSEN_DATA_MODULES_MGR) += drivers/common/lassen_data_modules_mgr/

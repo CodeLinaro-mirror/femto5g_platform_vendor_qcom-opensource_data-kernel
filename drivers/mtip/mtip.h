@@ -72,8 +72,8 @@ extern int mtip_dma_max_rx_buff_size;
 
 #define MTIP_RX_DMA_MAX_BUFFERS_PER_PACKET   4
 
-#define MTIP_TX_RING_SIZE 512
-#define MTIP_RX_RING_SIZE 512
+#define MTIP_TX_RING_SIZE 2048
+#define MTIP_RX_RING_SIZE 2048
 
 #define MTIP_TX_MOD_COUNTER_THRESHOLD 32
 #define MTIP_TX_MOD_TIMER_THRESHOLD   10
@@ -82,7 +82,9 @@ extern int mtip_dma_max_rx_buff_size;
 
 #define MTIP_TSC_OFFSET_VAL          0x00000013  // TSC OFFSET REGISTER VALUE TO BE SET AFTER BRING UP IS COMPLETE
 #define MTIP_DEBUG_ETH_LINK_INDEX     15
-
+#define ETHTOOL_STAT_STRINGS_LEN 15
+#define DEBUG_ETHTOOL_STAT_STRINGS_LEN 23
+#define STATS_NAME_LEN 20
 /*
  * Information related to the devices in the device tree
  */
@@ -230,6 +232,14 @@ enum mtip_link_state_enum
    MTIP_LINK_STATE_MAX
 };
 
+//information related to ethtool stats of each link
+struct eth_stats
+{
+    char stats_name[STATS_NAME_LEN];
+    u64 stats_value;
+
+};
+
 // information relevant to each link
 struct mtip_link_info
 {
@@ -253,6 +263,7 @@ struct mtip_link_info
    struct mtip_tx_ts_skb_list tx_ts_skb_list;
    struct mtip_tx_comp_list tx_comp_list;
    u32 peak_rx_available;
+   u32 config_fec;
    u32 active_fec;
    spinlock_t ptp_lock;
    unsigned long flags;
@@ -268,6 +279,7 @@ struct mtip_link_info
    u32  assigned_lane_indices[PHY_LANE_MAX];
 
    struct mutex dev_lock;
+   struct eth_stats stats[DEBUG_ETHTOOL_STAT_STRINGS_LEN];
 };
 
 /*

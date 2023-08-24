@@ -228,6 +228,11 @@ void qcom_aw_phy_handle_cdr_lock_status(
   QCOM_AW_PHY_LOG_INFO("CDR lock status %d for PHY %d, lane %d",
                        lane_level_status, phy_inst_info->phy_inst, lane);
 
+  if(lane >= PHY_LANE_MAX)
+  {
+    QCOM_AW_PHY_LOG_ERR("Operation on an Invalid lane %d",lane);
+    return;
+  }
   phy_inst_info->cdr_lock_status_flag[lane] = lane_level_status;
   eth_link_index = phy_inst_info->lane_params[lane].lane_config.link_index;
 
@@ -1068,8 +1073,6 @@ int qcom_aw_phy_bringup_manual_eq_mode(
     enum eth_phy_iface_phy_lane_num_enum lane,
     struct qcom_aw_phy_lane_speed_config config) {
   aw_txfir_config_t txfir_cfg = {0};
-  struct qcom_aw_phy_config *phy_config_info = NULL;
-  struct qcom_aw_phy_work_q_params *wq_params = NULL;
   enum local_error_enum local_err_val = LOCAL_ERROR_INVALID;
   aw_err_code_t aw_err_val = AW_ERR_CODE_NONE;
   int ret_val = 0;
@@ -1122,8 +1125,6 @@ int qcom_aw_phy_bringup_manual_eq_mode(
 
   aw_pmd_txfir_config_set(mss, &txfir_cfg, 1);
 
-  aw_pmd_rx_background_adapt_enable_set(mss, 1);
-
   /* Configuration for Near End Serial Loopback mode */
   if (qcom_aw_phy_get_loopback_mode() == QCOM_AW_PHY_NEAR_END_SERIAL_LB) {
     QCOM_AW_PHY_LOG_INFO("Configuring PHY for near end serial LB");
@@ -1136,6 +1137,8 @@ int qcom_aw_phy_bringup_manual_eq_mode(
   // RX Equalization - Check aw_eq_type_e enum
   aw_pmd_rx_equalize(mss, AW_EQ_FULL_DIR, RX_LINKEVAL_FULL_TIMEOUT_US);
 
+  aw_pmd_rx_background_adapt_enable_set(mss, 1);
+
   /* Delay before checking RX CDR lock post equalization */
   mdelay(500);
 
@@ -1145,28 +1148,6 @@ int qcom_aw_phy_bringup_manual_eq_mode(
   }
   else{
     qcom_aw_phy_handle_cdr_lock_status(phy_inst_info, lane, CDR_LOCK_FAILURE);
-
-    phy_config_info = qcom_aw_phy_get_config_info();
-    if (!phy_config_info) {
-      ret_val = EINVAL;
-      local_err_val = LOCAL_ERROR_2;
-      goto func_exit;
-    }
-
-    /* If CDR lock fails in the first attempt, requeue a 2nd attempt, post
-    which retries will be done at PCS level, or based on RX SIG interrupts*/
-    wq_params = kmalloc(sizeof(struct qcom_aw_phy_work_q_params),
-                        GFP_ATOMIC);
-    if(!wq_params)
-      QCOM_AW_PHY_LOG_ERR("Malloc failed!");
-    else{
-      INIT_DELAYED_WORK(&wq_params->wq_item,
-                        qcom_aw_phy_handle_rx_sig_detect);
-      wq_params->phy_inst = phy_inst_info->phy_inst;
-      wq_params->lane_num = lane;
-      queue_delayed_work(phy_config_info->wq, &wq_params->wq_item,
-                         msecs_to_jiffies(10));
-    }
   }
 
 func_exit:
@@ -1319,7 +1300,10 @@ int qcom_aw_phy_bringup(enum mtip_port_type_enum port_type,
     mutex_unlock(&phy_inst_info->lane_lock[lane]);
   }
 
-  phy_inst_info->bring_up_status = true;
+  /* First lane bring up for this PHY instance */
+  if(phy_inst_info->bring_up_status == false){
+    phy_inst_info->bring_up_status = true;
+  }
 
   mutex_unlock(&phy_inst_info->phy_inst_lock);
 
@@ -1349,9 +1333,11 @@ int qcom_aw_phy_teardown(enum mtip_port_type_enum port_type,
   struct qcom_aw_phy_inst_config *phy_inst_info = NULL;
   struct qcom_aw_lane_params *phy_lane_params = NULL;
   enum eth_phy_iface_phy_lane_num_enum lane = PHY_LANE_0;
+  enum eth_phy_iface_phy_lane_num_enum lane_temp = PHY_LANE_0;
   mss_access_t mss = {.phy_offset = 0, .lane_offset = 0};
   struct qcom_aw_phy_lane_speed_config config;
   int poll_result;
+  int start_lane=PHY_LANE_0, end_lane=PHY_LANE_MAX;
   enum local_error_enum local_err_val = LOCAL_ERROR_INVALID;
   aw_err_code_t aw_err_val = AW_ERR_CODE_NONE;
   int ret_val = 0;
@@ -1447,8 +1433,48 @@ int qcom_aw_phy_teardown(enum mtip_port_type_enum port_type,
 
     phy_inst_info->cdr_lock_status_flag[lane] = CDR_LOCK_NONE;
     phy_inst_info->lane_params[lane].lane_bring_up_status = false;
+    phy_inst_info->lane_params[lane].rx_sig_detect_status = false;
 
     mutex_unlock(&phy_inst_info->lane_lock[lane]);
+  }
+
+  /* To handle ANLT cleanup for lanes on which AN was initiated but lane bring
+     up was not triggered */
+  for (lane = PHY_LANE_0; lane < PHY_LANE_MAX; lane++) {
+
+    /* If single lane speed mode was advertised, then reset ANLT only for that
+       lane, else reset ANLT on all lanes */
+    start_lane = lane;
+    if(qcom_aw_phy_is_an_adv_single_lane_enabled(
+                                        phy_inst_info->an_params.adv_ability)){
+      end_lane = lane + 1;
+    }
+    else{
+      end_lane = PHY_LANE_MAX;
+    }
+
+    if (phy_inst_info->an_params.an_state[lane] == PHY_AN_STATE_START){
+
+      /* Loop through all the applicable lanes and reset ANLT */
+      for (lane_temp = start_lane; lane_temp < end_lane; lane_temp++) {
+
+        mutex_lock(&phy_inst_info->lane_lock[lane_temp]);
+
+        /* Set the lane offset */
+        pmd_set_lane(&mss, lane_temp);
+
+        QCOM_AW_PHY_LOG_INFO("Reset ANLT lane %d on port %d!", lane_temp, port_type);
+
+        /* Reset AN and LT */
+        qcom_aw_phy_reset_anlt(&mss);
+
+        mutex_unlock(&phy_inst_info->lane_lock[lane_temp]);
+      }
+    }
+
+    /* If reset has been processed for all the lanes, then break */
+    if(end_lane == PHY_LANE_MAX)
+      break;
   }
 
   for (lane = PHY_LANE_0; lane < PHY_LANE_MAX; lane++) {
@@ -1533,6 +1559,8 @@ int qcom_aw_phy_mac_link_status(enum mtip_port_type_enum port_type,
 
       if(!status)
         phy_inst_info->cdr_lock_status_flag[lane_num] = CDR_LOCK_NONE;
+      else
+        phy_inst_info->cdr_lock_status_flag[lane_num] = CDR_LOCK_SUCCESS;
 
       mutex_unlock(&phy_inst_info->lane_lock[lane_num]);
     }
@@ -1643,7 +1671,7 @@ void qcom_aw_phy_handle_an_done(struct work_struct *work){
     num_lanes = qcom_aw_phy_get_num_lanes_for_speed_mode(
                                   phy_inst_info->an_params.an_result[lane_num]);
     if(num_lanes > 1){
-      for(i=lane_num+1; i< lane_num+num_lanes;i++){
+      for(i=lane_num+1; (i< lane_num+num_lanes) && (i < PHY_LANE_MAX);i++){
 
         /* Set the lane offset */
         pmd_set_lane(&temp_mss, i);
@@ -1821,11 +1849,13 @@ void qcom_aw_phy_handle_rx_sig_detect(struct work_struct *work){
      container_of(delayed_work_item, struct qcom_aw_phy_work_q_params, wq_item);
   struct qcom_aw_phy_config *phy_config_info = NULL;
   struct qcom_aw_phy_inst_config *phy_inst_info = NULL;
+  enum qcom_aw_phy_instance_enum phy_inst_type = QCOM_AW_PHY_INST_FH0;
   enum eth_phy_iface_phy_lane_num_enum lane = PHY_LANE_0;
   mss_access_t mss = {.phy_offset = 0, .lane_offset = 0};
   aw_txfir_config_t txfir_cfg = {0};
   int cdr_lock_status = 0;
   struct qcom_aw_phy_lane_speed_config config;
+  int temp_rd_val = 0;
   aw_err_code_t aw_err_val = AW_ERR_CODE_NONE;
   enum local_error_enum local_err_val = LOCAL_ERROR_INVALID;
   int ret_val = 0;
@@ -1850,158 +1880,173 @@ void qcom_aw_phy_handle_rx_sig_detect(struct work_struct *work){
     goto func_exit;
   }
 
-  /* Get the PHY instance info for the passed instance type */
-  phy_inst_info = &phy_config_info->phy_inst_config_info[wq_params->phy_inst];
-  if (phy_inst_info->valid == false) {
-    ret_val = EINVAL;
-    local_err_val = LOCAL_ERROR_3;
-    goto func_exit;
-  }
+  for (phy_inst_type = QCOM_AW_PHY_INST_FH0;
+       phy_inst_type < QCOM_AW_PHY_INST_MAX; phy_inst_type++){
 
-  lane = wq_params->lane_num;
+    /* Get the PHY instance info for the passed instance type */
+    phy_inst_info = &phy_config_info->phy_inst_config_info[phy_inst_type];
+    if (!phy_inst_info || phy_inst_info->valid == false) {
+      continue;
+    }
 
-  mutex_lock(&phy_inst_info->phy_inst_lock);
-  mutex_lock(&phy_inst_info->lane_lock[lane]);
+    mutex_lock(&phy_inst_info->phy_inst_lock);
 
-  if(phy_inst_info->lane_params[lane].lane_bring_up_status == false ||
-     phy_inst_info->phy_eq_mode != QCOM_AW_PHY_MANUAL_EQ_MODE) {
-    ret_val = EINVAL;
-    local_err_val = LOCAL_ERROR_4;
+    if (phy_inst_info->bring_up_status == false) {
+      mutex_unlock(&phy_inst_info->phy_inst_lock);
+      continue;
+    }
+
+    for(lane = PHY_LANE_0; lane < PHY_LANE_MAX; lane++){
+
+      mutex_lock(&phy_inst_info->lane_lock[lane]);
+
+      if(phy_inst_info->lane_params[lane].lane_bring_up_status == false ||
+         phy_inst_info->phy_eq_mode != QCOM_AW_PHY_MANUAL_EQ_MODE) {
+        mutex_unlock(&phy_inst_info->lane_lock[lane]);
+        continue;
+      }
+
+      /* Setup PHY offset */
+      mss.phy_offset = phy_inst_info->base_addr;
+      /* Set the lane offset */
+      pmd_set_lane(&mss, lane);
+
+      pmd_read_field(&mss, DIG_SOC_LANE_STAT_REG3_ADDR,
+                     DIG_SOC_LANE_STAT_REG3_ODAT_RX_SIGNAL_DETECT_A_MASK,
+                     DIG_SOC_LANE_STAT_REG3_ODAT_RX_SIGNAL_DETECT_A_OFFSET,
+                     &temp_rd_val);
+
+      if(temp_rd_val == 0) {
+        phy_inst_info->lane_params[lane].rx_sig_detect_status = false;
+        mutex_unlock(&phy_inst_info->lane_lock[lane]);
+        continue;
+      }
+
+      if(phy_inst_info->lane_params[lane].rx_sig_detect_status == true) {
+        mutex_unlock(&phy_inst_info->lane_lock[lane]);
+        continue;
+      }
+
+      /* Retry lane bring up if detect interrupt is received and PCS link is down */
+      if((phy_inst_info->lane_params[lane].link_status == false) &&
+         (phy_inst_info->cdr_lock_status_flag[lane] != CDR_LOCK_SUCCESS)){
+
+        /*QCOM_AW_PHY_LOG_INFO("Retry for PHY %d, lane %d",
+                             wq_params->phy_inst, lane);*/
+
+        /* Get lane rate and width based on the speed. */
+        qcom_aw_phy_get_lane_speed_config(
+                          phy_inst_info->lane_params[lane].lane_config.lane_speed,
+                          &config);
+
+        // Notify MAC to stop listening to link status interrupts
+        qcom_aw_phy_notify_lane_bring_up_progress_to_mac(phy_inst_info, lane, true);
+
+        /* Stop listening to SNR valid/error interrupts */
+        qcom_aw_phy_disable_snr_interrupt(phy_inst_info, lane);
+
+        if (phy_inst_info->phy_eq_mode == QCOM_AW_PHY_ANLT_MODE) {
+          //qcom_aw_phy_reset_anlt(&mss);
+          pmd_write_field(&mss, ETH_AN_CTRL_REG1_ADDR,
+                          ETH_AN_CTRL_REG1_AN_MR_RESTART_NEGOTIATION_MASK,
+                          ETH_AN_CTRL_REG1_AN_MR_RESTART_NEGOTIATION_OFFSET, 1);
+          pmd_write_field(&mss, ETH_AN_CTRL_REG1_ADDR,
+                          ETH_AN_CTRL_REG1_AN_MR_RESTART_NEGOTIATION_MASK,
+                          ETH_AN_CTRL_REG1_AN_MR_RESTART_NEGOTIATION_OFFSET, 0);
+        }
+        else if (phy_inst_info->phy_eq_mode == QCOM_AW_PHY_LT_MODE) {
+          //qcom_aw_phy_reset_anlt(&mss);
+          pmd_write_field(&mss, ETH_LT_CTRL_ADDR,
+                          ETH_LT_CTRL_LT_MR_RESTART_TRAINING_MASK,
+                          ETH_LT_CTRL_LT_MR_RESTART_TRAINING_OFFSET, 1);
+          pmd_write_field(&mss, ETH_LT_CTRL_ADDR,
+                          ETH_LT_CTRL_LT_MR_RESTART_TRAINING_MASK,
+                          ETH_LT_CTRL_LT_MR_RESTART_TRAINING_OFFSET, 0);
+        }
+        else if (phy_inst_info->phy_eq_mode == QCOM_AW_PHY_MANUAL_EQ_MODE) {
+          /* TX power down */
+          aw_err_val = aw_pmd_iso_request_tx_state_change(
+              &mss, AW_PD, config.rate, config.width, TX_ACK_TIMEOUT_US);
+          if (aw_err_val != AW_ERR_CODE_NONE) {
+            mutex_unlock(&phy_inst_info->lane_lock[lane]);
+            continue;
+          }
+
+          /* RX power down */
+          aw_err_val = aw_pmd_iso_request_rx_state_change(
+              &mss, AW_PD, config.rate, config.width, RX_ACK_TIMEOUT_US);
+          if (aw_err_val != AW_ERR_CODE_NONE) {
+            mutex_unlock(&phy_inst_info->lane_lock[lane]);
+            continue;
+          }
+
+          /* TX power up */
+          aw_err_val = aw_pmd_iso_request_tx_state_change(
+              &mss, AW_P0, config.rate, config.width, TX_ACK_TIMEOUT_US);
+          if (aw_err_val != AW_ERR_CODE_NONE) {
+            mutex_unlock(&phy_inst_info->lane_lock[lane]);
+            continue;
+          }
+
+          /* RX power up */
+          aw_err_val = aw_pmd_iso_request_rx_state_change(
+              &mss, AW_P0, config.rate, config.width, RX_ACK_TIMEOUT_US);
+          if (aw_err_val != AW_ERR_CODE_NONE) {
+            mutex_unlock(&phy_inst_info->lane_lock[lane]);
+            continue;
+          }
+
+          // TX FIR Config
+    #ifdef FEATURE_QCOM_AW_TEST_SYS_FS
+          if(qcom_aw_phy_get_tx_fir_val(phy_inst_info->phy_inst,
+                                        (void*)&txfir_cfg) == false)
+    #endif
+          {
+            txfir_cfg.CM3 = 0;
+            txfir_cfg.CM2 = 0;
+            txfir_cfg.CM1 = 0;
+            txfir_cfg.C0 = 63;
+            txfir_cfg.C1 = 0;
+            txfir_cfg.main_or_max = 1;
+          }
+
+          aw_pmd_txfir_config_set(&mss, &txfir_cfg, 1);
+
+          /* Delay before triggering RX equalization */
+          mdelay(500);
+
+          // RX Equalization - Check aw_eq_type_e enum
+          aw_pmd_rx_equalize(&mss, AW_EQ_FULL_DIR, RX_LINKEVAL_FULL_TIMEOUT_US);
+
+          aw_pmd_rx_background_adapt_enable_set(&mss, 1);
+
+          /* Delay before checking RX CDR lock post equalization */
+          mdelay(500);
+        }
+
+        cdr_lock_status = aw_pmd_rx_check_cdr_lock(&mss, RX_CDR_TIMEOUT_US);
+        if(cdr_lock_status == AW_ERR_CODE_NONE){
+          qcom_aw_phy_handle_cdr_lock_status(phy_inst_info, lane,
+                                             CDR_LOCK_SUCCESS);
+          phy_inst_info->lane_params[lane].rx_sig_detect_status = true;
+        }
+        else{
+          qcom_aw_phy_handle_cdr_lock_status(phy_inst_info, lane,
+                                             CDR_LOCK_FAILURE);
+        }
+      }
+
+      mutex_unlock(&phy_inst_info->lane_lock[lane]);
+    }
+
     mutex_unlock(&phy_inst_info->phy_inst_lock);
-    mutex_unlock(&phy_inst_info->lane_lock[lane]);
-    goto func_exit;
   }
-
-  /* Setup PHY offset */
-  mss.phy_offset = phy_inst_info->base_addr;
-  /* Set the lane offset */
-  pmd_set_lane(&mss, lane);
-
-  /* Retry lane bring up if detect interrupt is received and PCS link is down */
-  if((phy_inst_info->lane_params[lane].link_status == false) &&
-     (phy_inst_info->cdr_lock_status_flag[lane] != CDR_LOCK_SUCCESS)){
-
-    QCOM_AW_PHY_LOG_INFO("Retry for PHY %d, lane %d",
-                         wq_params->phy_inst, wq_params->lane_num);
-
-    /* Get lane rate and width based on the speed. */
-    qcom_aw_phy_get_lane_speed_config(
-                        phy_inst_info->lane_params[lane].lane_config.lane_speed,
-                        &config);
-
-    // Notify MAC to stop listening to link status interrupts
-    qcom_aw_phy_notify_lane_bring_up_progress_to_mac(phy_inst_info, lane, true);
-
-    /* Stop listening to SNR valid/error interrupts */
-    qcom_aw_phy_disable_snr_interrupt(phy_inst_info, lane);
-
-    if (phy_inst_info->phy_eq_mode == QCOM_AW_PHY_ANLT_MODE) {
-      //qcom_aw_phy_reset_anlt(&mss);
-      pmd_write_field(&mss, ETH_AN_CTRL_REG1_ADDR,
-                      ETH_AN_CTRL_REG1_AN_MR_RESTART_NEGOTIATION_MASK,
-                      ETH_AN_CTRL_REG1_AN_MR_RESTART_NEGOTIATION_OFFSET, 1);
-      pmd_write_field(&mss, ETH_AN_CTRL_REG1_ADDR,
-                      ETH_AN_CTRL_REG1_AN_MR_RESTART_NEGOTIATION_MASK,
-                      ETH_AN_CTRL_REG1_AN_MR_RESTART_NEGOTIATION_OFFSET, 0);
-    }
-    else if (phy_inst_info->phy_eq_mode == QCOM_AW_PHY_LT_MODE) {
-      //qcom_aw_phy_reset_anlt(&mss);
-      pmd_write_field(&mss, ETH_LT_CTRL_ADDR,
-                      ETH_LT_CTRL_LT_MR_RESTART_TRAINING_MASK,
-                      ETH_LT_CTRL_LT_MR_RESTART_TRAINING_OFFSET, 1);
-      pmd_write_field(&mss, ETH_LT_CTRL_ADDR,
-                      ETH_LT_CTRL_LT_MR_RESTART_TRAINING_MASK,
-                      ETH_LT_CTRL_LT_MR_RESTART_TRAINING_OFFSET, 0);
-    }
-    else if (phy_inst_info->phy_eq_mode == QCOM_AW_PHY_MANUAL_EQ_MODE) {
-      /* TX power down */
-      aw_err_val = aw_pmd_iso_request_tx_state_change(
-          &mss, AW_PD, config.rate, config.width, TX_ACK_TIMEOUT_US);
-      if (aw_err_val != AW_ERR_CODE_NONE) {
-        ret_val = EIO;
-        local_err_val = LOCAL_ERROR_5;
-        mutex_unlock(&phy_inst_info->lane_lock[lane]);
-        mutex_unlock(&phy_inst_info->phy_inst_lock);
-        goto func_exit;
-      }
-
-      /* RX power down */
-      aw_err_val = aw_pmd_iso_request_rx_state_change(
-          &mss, AW_PD, config.rate, config.width, RX_ACK_TIMEOUT_US);
-      if (aw_err_val != AW_ERR_CODE_NONE) {
-        ret_val = EIO;
-        local_err_val = LOCAL_ERROR_6;
-        mutex_unlock(&phy_inst_info->lane_lock[lane]);
-        mutex_unlock(&phy_inst_info->phy_inst_lock);
-        goto func_exit;
-      }
-
-      /* TX power up */
-      aw_err_val = aw_pmd_iso_request_tx_state_change(
-          &mss, AW_P0, config.rate, config.width, TX_ACK_TIMEOUT_US);
-      if (aw_err_val != AW_ERR_CODE_NONE) {
-        ret_val = EIO;
-        local_err_val = LOCAL_ERROR_7;
-        goto func_exit;
-      }
-
-      /* RX power up */
-      aw_err_val = aw_pmd_iso_request_rx_state_change(
-          &mss, AW_P0, config.rate, config.width, RX_ACK_TIMEOUT_US);
-      if (aw_err_val != AW_ERR_CODE_NONE) {
-        ret_val = EIO;
-        local_err_val = LOCAL_ERROR_8;
-        goto func_exit;
-      }
-
-      // TX FIR Config
-#ifdef FEATURE_QCOM_AW_TEST_SYS_FS
-      if(qcom_aw_phy_get_tx_fir_val(phy_inst_info->phy_inst, (void*)&txfir_cfg) == false)
-#endif
-      {
-        txfir_cfg.CM3 = 0;
-        txfir_cfg.CM2 = 0;
-        txfir_cfg.CM1 = 0;
-        txfir_cfg.C0 = 63;
-        txfir_cfg.C1 = 0;
-        txfir_cfg.main_or_max = 1;
-      }
-
-      aw_pmd_txfir_config_set(&mss, &txfir_cfg, 1);
-
-      aw_pmd_rx_background_adapt_enable_set(&mss, 1);
-
-      /* Delay before triggering RX equalization */
-      mdelay(500);
-
-      // RX Equalization - Check aw_eq_type_e enum
-      aw_pmd_rx_equalize(&mss, AW_EQ_FULL_DIR, RX_LINKEVAL_FULL_TIMEOUT_US);
-
-      /* Delay before checking RX CDR lock post equalization */
-      mdelay(500);
-    }
-
-    cdr_lock_status = aw_pmd_rx_check_cdr_lock(&mss, RX_CDR_TIMEOUT_US);
-
-    if(cdr_lock_status == AW_ERR_CODE_NONE){
-      qcom_aw_phy_handle_cdr_lock_status(phy_inst_info, lane, CDR_LOCK_SUCCESS);
-    }
-    else{
-      qcom_aw_phy_handle_cdr_lock_status(phy_inst_info, lane,
-                                         CDR_LOCK_FAILURE);
-    }
-  }
-
-  mutex_unlock(&phy_inst_info->lane_lock[lane]);
-  mutex_unlock(&phy_inst_info->phy_inst_lock);
 
 func_exit:
-  if(local_err_val != LOCAL_ERROR_INVALID){
-    QCOM_AW_PHY_LOG_DBG("%s: returns %d with local error %d",
-                        __func__, ret_val, local_err_val);
+  if(phy_config_info && wq_params){
+    queue_delayed_work(phy_config_info->rx_sig_detect_wq,
+                       &wq_params->wq_item, msecs_to_jiffies(1000));
   }
-
-  kfree(wq_params);
 
   return;
 }

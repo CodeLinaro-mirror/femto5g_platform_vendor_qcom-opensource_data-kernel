@@ -57,6 +57,7 @@ lassen_mtip-y += mtip_mdio.o
 lassen_mtip-y += mtip_pcs.o
 lassen_mtip-y += mtip_phy.o
 lassen_mtip-y += mtip_security.o
+lassen_mtip-y += mtip_notifr.o
 lassen_mtip-y += debug_eth/mtip_debug_eth.o
 lassen_mtip-y += debug_eth/mtip_sysfs.o
 lassen_mtip-y += debug_eth/mtip_debug_eth_gnl.o

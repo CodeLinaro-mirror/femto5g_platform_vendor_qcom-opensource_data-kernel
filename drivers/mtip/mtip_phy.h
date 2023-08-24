@@ -51,4 +51,8 @@ struct mtip_process_lane_down
     u32 lane_index;
 };
 
+trx_link_length_range mtip_phy_get_trx_link_length_range(struct mtip_port_device_info* port_device);
+
+void mtip_phy_notify_eth_event_to_trx(u32 link_index, bool enable);
+
 #endif // _MTIP_PHY_H

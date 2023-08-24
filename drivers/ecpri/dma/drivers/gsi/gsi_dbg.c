@@ -50,11 +50,9 @@ static ssize_t gsi_dump_evt_read(struct file *file,
 	loff_t pos = 0;
 
 	if (gsi_read_finished) {
+		gsi_read_finished = false;
 		return 0;
 	}
-
-	nbytes += scnprintf(dbg_buff + nbytes, GSI_MAX_MSG_LEN - nbytes,
-	"arg1=%u arg2=%u arg3=%u arg4=%u\n", arg1, arg2, arg3, arg4);
 
 	if (arg1 >= gsi_ctx->max_ev) {
 		nbytes += scnprintf(dbg_buff + nbytes, GSI_MAX_MSG_LEN - nbytes,
@@ -196,8 +194,6 @@ static ssize_t gsi_dump_evt_write(struct file *file,
 	if (kstrtou32(token, 0, &arg4))
 		return -EINVAL;
 
-	TDBG("arg1=%u arg2=%u arg3=%u arg4=%u\n", arg1, arg2, arg3, arg4);
-
 	if (arg1 >= gsi_ctx->max_ev) {
 		TERR("invalid evt ring id %u\n", arg1);
 		return -EINVAL;
@@ -220,19 +216,15 @@ static ssize_t gsi_ch_dump_read(struct file *file,
 	loff_t pos = 0;
 
 	if (gsi_read_finished) {
+		gsi_read_finished = false;
 		return 0;
 	}
 
 	ctx = &gsi_ctx->chan[arg3][arg2][arg1];
 
 	/* Dump GSI info on first access*/
-	if (0 == gsi_ch_dump_last_index) {
-		nbytes += scnprintf(dbg_buff + nbytes, GSI_MAX_MSG_LEN - nbytes,
-		"arg1 %d, arg2 %d arg3 %d arg4 %d ring_base_vaddr %d ring_len %d\n",
-		arg1, arg2 ,arg3, arg4, ctx->props.ring_base_vaddr, ctx->props.ring_len);
-
+	if (0 == gsi_ch_dump_last_index)
 		nbytes += gsi_dump_ch_info_to_buffer(ctx->hdl, dbg_buff + nbytes, GSI_MAX_MSG_LEN);
-	}
 
 	gsi_read_finished = true;
 
@@ -240,7 +232,11 @@ static ssize_t gsi_ch_dump_read(struct file *file,
 		if (ctx->props.ring_base_vaddr) {
 
 			for (i = gsi_ch_dump_last_index; i < ctx->props.ring_len / 16; i++) {
-				nbytes += scnprintf(dbg_buff + nbytes, GSI_MAX_MSG_LEN - nbytes,"CH%2d (0x%08llx) %08x %08x %08x %08x\n",
+				nbytes += scnprintf(
+					dbg_buff + nbytes,
+					GSI_MAX_MSG_LEN - nbytes,
+					"CH%2d (0x%08llx) %08x %08x %08x %08x\n",
+
 				arg1, ctx->props.ring_base_addr + i * 16,
 				*(u32 *)((u8 *)ctx->props.ring_base_vaddr +
 					i * 16 + 0),
@@ -259,7 +255,8 @@ static ssize_t gsi_ch_dump_read(struct file *file,
 			gsi_ch_dump_last_index = i + 1;
 
 		} else {
-			nbytes += scnprintf(dbg_buff + nbytes, GSI_MAX_MSG_LEN - nbytes,"No VA supplied for chan id %u\n", arg1);
+			nbytes += scnprintf(dbg_buff + nbytes, GSI_MAX_MSG_LEN - nbytes,
+			"No VA supplied for chan id %u\n", arg1);
 		}
 	}
 
@@ -317,8 +314,6 @@ static ssize_t gsi_ch_dump_write(struct file *file,
 	if (kstrtou32(token, 0, &arg4))
 		return -EINVAL;
 
-	TERR("arg1=%u arg2=%u arg3=%u arg4=%u\n", arg1, arg2, arg3, arg4);
-
 	if (arg1 >= gsi_ctx->max_ch) {
 		TERR("invalid chan id %u\n", arg1);
 		return -EINVAL;
@@ -371,6 +366,7 @@ static ssize_t gsi_dump_stats_read(struct file *file,
 	loff_t pos = 0;
 
 	if (gsi_read_finished) {
+		gsi_read_finished = false;
 		return 0;
 	}
 
@@ -563,7 +559,7 @@ static ssize_t gsi_enable_dp_stats(struct file *file,
 
 	return count;
 error:
-	TERR("Usage: echo [+-]ch_id > enable_dp_stats\n");
+	TERR("Usage: echo [+-] ch_id > enable_dp_stats\n");
 	return -EINVAL;
 }
 
@@ -929,6 +925,11 @@ static ssize_t gsi_read_gsi_hw_profiling_stats(struct file *file,
 	int ret;
 	loff_t pos = 0;
 
+	if(gsi_read_finished == true) {
+		gsi_read_finished = false;
+		return 0;
+	}
+
 	for (gsi_id = 0; gsi_id < gsi_ctx->num_of_gsi; gsi_id++)
 	{
 		if (!gsi_get_hw_profiling_stats(&stats)) {
@@ -965,7 +966,9 @@ static ssize_t gsi_read_gsi_hw_profiling_stats(struct file *file,
 		}
 	}
 	ret = simple_read_from_buffer(buf, nbytes + 1, &pos, dbg_buff, count);
-	return 0;
+
+	gsi_read_finished = true;
+	return ret;
 }
 
 static ssize_t gsi_read_gsi_fw_version(struct file *file,
@@ -976,6 +979,11 @@ static ssize_t gsi_read_gsi_fw_version(struct file *file,
 	int cnt = 0;
 	loff_t pos = 0;
 	int ret;
+
+	if(gsi_read_finished == true) {
+		gsi_read_finished = false;
+		return 0;
+	}
 
 	if (!gsi_get_fw_version(&ver)) {
 		nbytes += scnprintf(dbg_buff, GSI_MAX_MSG_LEN,
@@ -991,7 +999,9 @@ static ssize_t gsi_read_gsi_fw_version(struct file *file,
 	}
 
 	ret = simple_read_from_buffer(buf, nbytes, &pos, dbg_buff, count);
-	return 0;
+
+	gsi_read_finished = true;
+	return ret;
 }
 
 static const struct file_operations gsi_ev_dump_ops = {

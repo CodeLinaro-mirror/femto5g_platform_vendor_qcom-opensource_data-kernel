@@ -56,6 +56,7 @@
 #include "mtip_platform.h"
 #include "eth_phy_iface.h"
 
+#include "mtip_notifr.h"
 int macsec_eth_set_macsec_ops(const struct macsec_ops* rb_macsec_ops)
 {
     int i;
@@ -1189,6 +1190,11 @@ int mtip_device_open_completion(u32 link_index)
     // get the sfp port type
     sfp_port_type = platform_driver_priv->mtip_ports[port_type]->sfp_port_type;
 
+    // Notify TRX driver to enable TX
+    rtnl_lock();
+    mtip_phy_notify_eth_event_to_trx(link_index, IFCFG_ENABLE);
+    rtnl_unlock();
+
     // bring up the phy
     mtip_phy_bringup_phy(link_index, sfp_port_type);
 
@@ -1225,7 +1231,6 @@ static int mtip_open(struct net_device *netdev)
    priv = netdev_priv(netdev);
 
    link_index = priv->link_index;
-
    if(link_index >= MTIP_MAX_LINKS)
    {
      CSMLOGERR("invalid link_index %d", link_index);
@@ -1294,12 +1299,17 @@ static int mtip_open(struct net_device *netdev)
    }
    else
    {
+      // Change the state for PCS loopback
+      if (mtip_loopback_mode == MTIP_MODE_LOOPBACK)
+         platform_driver_priv->mtip_links[link_index]->state = MTIP_LINK_STATE_OPEN_WAITING_FOR_LANES;
+
+      // For PCS/PHY loopback mode, configure port based on the speed modes set
+      if (mtip_loopback_mode != MTIP_MODE_DEFAULT)
+         mtip_device_configure_port(port_type);
+
       // PCS looback mode
       if (mtip_loopback_mode == MTIP_MODE_LOOPBACK)
       {
-         // set the link in UP state
-         platform_driver_priv->mtip_links[link_index]->state = MTIP_LINK_STATE_UP;
-
          // Process MAC link up state
          mtip_mac_link_up(link_index);
       }
@@ -1325,6 +1335,10 @@ static int mtip_open(struct net_device *netdev)
 
             // get the sfp port type
             sfp_port_type = platform_driver_priv->mtip_ports[port_type]->sfp_port_type;
+
+            // rtnl_lock not needed here as it will be already acquired by the NW stack
+            // Notify TRX driver to enable TX
+            mtip_phy_notify_eth_event_to_trx(link_index, IFCFG_ENABLE);
 
             // bring up the phy
             mtip_phy_bringup_phy(link_index, sfp_port_type);
@@ -1355,7 +1369,7 @@ static int mtip_open(struct net_device *netdev)
 
    /* Send update to clients */
    post_mtip_client_send_event(ETH_ECPRISS_EVENT_UP, link_index);
-
+   mtip_snd_event_notification(link_index, IF_UP);
    return 0;
 }
 
@@ -1369,6 +1383,9 @@ static int mtip_close(struct net_device *netdev)
    bool all_closed = true;
    int i;
    u32 tmp_link_index;
+   u32 real_lane = 0;
+   u32 lane_index;
+   u32 sfp_phandle[MAX_ETH_LANES] = {0};
 
    priv = netdev_priv(netdev);
 
@@ -1377,6 +1394,8 @@ static int mtip_close(struct net_device *netdev)
    hdl = platform_driver_priv->mtip_links[link_index]->dma_hdl;
 
    CSMLOGDBG("mtip_close called with link_index: %d with hdl: %d\n", link_index, hdl);
+
+   mtip_lookup_port_type_by_link_index(link_index, &port_type);
 
    // do this only for RUMI E2E
    if (mtip_rumi_platform != MTIP_PLATFORM_SOC)
@@ -1397,6 +1416,29 @@ static int mtip_close(struct net_device *netdev)
          mtip_phy_teardown_phy(link_index);
 
          CSMLOGDBG("phy teardown done for link: %d\n", link_index);
+
+         // rtnl_lock not needed here as it will be already acquired by the NW stack
+         // Notify TRX driver to disable TX
+         mtip_phy_notify_eth_event_to_trx(link_index, IFCFG_DISABLE);
+
+         // Notify TRX driver to disable TX on primary lane if AN was in progress
+         if(platform_driver_priv->mtip_ports[port_type]->port_state == MTIP_PORT_STATE_CONNECTED_NEGOTIATION_IN_PROGRESS)
+         {
+            if(port_type == MTIP_PORT_TYPE_DEBUG)
+            {
+               real_lane = 2;
+            }
+
+            mtip_lookup_lane_index_by_port_type_and_real_lane(&lane_index, port_type, real_lane);
+            sfp_phandle[real_lane] = platform_driver_priv->devices.lane_devices[lane_index].sfp_phandle;
+            qsfp_trx_ifconfig_notifier(IFCFG_DISABLE, sfp_phandle);
+         }
+      }
+      // PCS looback mode
+      else
+      {
+         // Process MAC link down state
+         mtip_mac_link_down(link_index);
       }
    }
 
@@ -1418,56 +1460,52 @@ static int mtip_close(struct net_device *netdev)
    CSMLOGDBG("Stopping netdev queue\n");
 
    // set the link state to CLOSE
-   if (mtip_loopback_mode == MTIP_MODE_DEFAULT)
+   mutex_lock(&platform_driver_priv->mtip_links[link_index]->dev_lock);
+
+   platform_driver_priv->mtip_links[link_index]->state = MTIP_LINK_STATE_CLOSE;
+
+   mutex_unlock(&platform_driver_priv->mtip_links[link_index]->dev_lock);
+
+   all_closed = true;
+
+   for (i = 0; i < platform_driver_priv->devices.port_devices[port_type].num_link_phandles; ++i) 
    {
-      mutex_lock(&platform_driver_priv->mtip_links[link_index]->dev_lock);
+       tmp_link_index = platform_driver_priv->devices.port_devices[port_type].link_devices[i]->link_index;
+       mutex_lock(&platform_driver_priv->mtip_links[link_index]->dev_lock);
+       if ((platform_driver_priv->mtip_links[tmp_link_index]) && (platform_driver_priv->mtip_links[tmp_link_index]->state != MTIP_LINK_STATE_INIT) &&
+           (platform_driver_priv->mtip_links[tmp_link_index]->state != MTIP_LINK_STATE_CLOSE))
+       {
+           all_closed = false;
+           mutex_unlock(&platform_driver_priv->mtip_links[link_index]->dev_lock);
+           break;
+       }
+       mutex_unlock(&platform_driver_priv->mtip_links[link_index]->dev_lock);
+   }
 
-      platform_driver_priv->mtip_links[link_index]->state = MTIP_LINK_STATE_CLOSE;
-
-      mutex_unlock(&platform_driver_priv->mtip_links[link_index]->dev_lock);
-
-      mtip_lookup_port_type_by_link_index(link_index, &port_type);
-
-      all_closed = true;
-
-      for (i = 0; i < platform_driver_priv->devices.port_devices[port_type].num_link_phandles; ++i) 
-      {
-          tmp_link_index = platform_driver_priv->devices.port_devices[port_type].link_devices[i]->link_index;
-          mutex_lock(&platform_driver_priv->mtip_links[link_index]->dev_lock);
-          if ((platform_driver_priv->mtip_links[tmp_link_index]) && (platform_driver_priv->mtip_links[tmp_link_index]->state != MTIP_LINK_STATE_INIT) &&
-              (platform_driver_priv->mtip_links[tmp_link_index]->state != MTIP_LINK_STATE_CLOSE))
-          {
-              all_closed = false;
-              mutex_unlock(&platform_driver_priv->mtip_links[link_index]->dev_lock);
-              break;
-          }
-          mutex_unlock(&platform_driver_priv->mtip_links[link_index]->dev_lock);
+   if (all_closed) 
+   {
+       // reset the port state to INIT
+      if(platform_driver_priv->mtip_ports[port_type]) {
+         platform_driver_priv->mtip_ports[port_type]->port_state = MTIP_PORT_STATE_INIT;
       }
 
-       if (all_closed) 
-       {
-           // reset the port state to INIT
-	   if(platform_driver_priv->mtip_ports[port_type]) {
-              platform_driver_priv->mtip_ports[port_type]->port_state = MTIP_PORT_STATE_INIT;
-	   }
+      // reset all the lane assignments
+      for (i = 0; i < platform_driver_priv->devices.port_devices[port_type].num_link_phandles; ++i) 
+      {
+         tmp_link_index = platform_driver_priv->devices.port_devices[port_type].link_devices[i]->link_index;
 
-           // reset all the lane assignments
-           for (i = 0; i < platform_driver_priv->devices.port_devices[port_type].num_link_phandles; ++i) 
-           {
-               tmp_link_index = platform_driver_priv->devices.port_devices[port_type].link_devices[i]->link_index;
+         if(platform_driver_priv->mtip_links[tmp_link_index]) {
+            mutex_lock(&platform_driver_priv->mtip_links[tmp_link_index]->dev_lock);
 
-               if(platform_driver_priv->mtip_links[tmp_link_index]) {
-                   mutex_lock(&platform_driver_priv->mtip_links[tmp_link_index]->dev_lock);
-
-                   platform_driver_priv->mtip_links[tmp_link_index]->lanes_assignment_complete = false;
-                   mutex_unlock(&platform_driver_priv->mtip_links[tmp_link_index]->dev_lock);
-               }
-           }
-       }
+            platform_driver_priv->mtip_links[tmp_link_index]->lanes_assignment_complete = false;
+            mutex_unlock(&platform_driver_priv->mtip_links[tmp_link_index]->dev_lock);
+         }
+      }
    }
 
    /* Send update to clients */
    post_mtip_client_send_event(ETH_ECPRISS_EVENT_DOWN, link_index);
+   mtip_snd_event_notification(link_index, IF_DOWN);
    return 0;
 }
 
@@ -2464,7 +2502,7 @@ static int mtip_device_lookup_lane_cfg(u32 port_type, trx_lane_cfg* lane_cfg, tr
 
 // filter the priv flags based on the current lane speed
 // and SFP module attached
-static u32 mtip_device_filter_priv_flags(u32 port_type)
+u32 mtip_device_filter_priv_flags(u32 port_type)
 {
     u32 filtered;
     int i;
@@ -2557,6 +2595,15 @@ static u32 mtip_device_resolve_port_configuration(u32 port_type)
     bool found = false;
     u32 pattern = 0x1;
     u32 pflags = mtip_device_filter_priv_flags(port_type);
+    u32 link_index;
+    u32 real_link = 0;
+
+    if(port_type == MTIP_PORT_TYPE_DEBUG)
+      real_link = 1;
+
+    // Get the link index of the first link for this port
+    if(mtip_lookup_link_index_by_port_type_and_real_link(&link_index, port_type, real_link) < 0)
+        return MTIP_PORT_CONFIG_MAX;
 
     // find the first port config bit that is set
     for (i = 0; i < MTIP_PORT_CONFIG_MAX; ++i) 
@@ -2576,6 +2623,40 @@ static u32 mtip_device_resolve_port_configuration(u32 port_type)
         return MTIP_PORT_CONFIG_MAX;
     }
 
+    switch (port_config) 
+    {
+    case MTIP_PORT_CONFIG_4x25GBASE_R:
+        {
+            if(platform_driver_priv->mtip_links[link_index]->config_fec == ETHTOOL_FEC_RS){
+                port_config = MTIP_PORT_CONFIG_4x25GBASE_R_RSFEC;
+            }
+        }
+        break;
+    case MTIP_PORT_CONFIG_1x25GBASE_R:
+        {
+            if(platform_driver_priv->mtip_links[link_index]->config_fec == ETHTOOL_FEC_RS){
+                port_config = MTIP_PORT_CONFIG_1x25GBASE_R_RSFEC;
+            }
+        }
+        break;
+
+    case MTIP_PORT_CONFIG_1x100GBASE_R4:
+        {
+            /* For 100G_R4, default mode to be used is with RSFEC enabled
+               unless set as OFF by ethtool set-priv-flags, or if
+               DR module is used */
+            if(((platform_driver_priv->mtip_links[link_index]->config_fec == ETHTOOL_FEC_NONE) &&
+                (mtip_phy_get_trx_link_length_range(&platform_driver_priv->devices.port_devices[port_type]) != TRX_DR)) ||
+                (platform_driver_priv->mtip_links[link_index]->config_fec == ETHTOOL_FEC_RS)){
+                port_config = MTIP_PORT_CONFIG_1x100GBASE_R4_RSFEC;
+            }
+        }
+        break;
+
+    default:
+        break;
+    }
+
     return port_config;
 }
 
@@ -2585,6 +2666,11 @@ static int mtip_device_resolve_port_configuration_optical(u32 port_type)
     struct mtip_port_info *port_info = platform_driver_priv->mtip_ports[port_type];
     int bc = 0;
     int rv = 0;
+    u32 link_index;
+    u32 real_link = 0;
+
+    if(port_type == MTIP_PORT_TYPE_DEBUG)
+      real_link = 1;
 
     // check if sfp is optical
     if (port_info->sfp_port_type != PORT_FIBRE) 
@@ -2602,6 +2688,10 @@ static int mtip_device_resolve_port_configuration_optical(u32 port_type)
         return -1; 
     }
 
+    // Get the link index of the first link for this port
+    if(mtip_lookup_link_index_by_port_type_and_real_link(&link_index, port_type, real_link) < 0)
+        return -1;
+
     // set the resolve port config
     port_info->port_config = mtip_device_resolve_port_configuration(port_type);
 
@@ -2610,12 +2700,18 @@ static int mtip_device_resolve_port_configuration_optical(u32 port_type)
     {
     case MTIP_PORT_CONFIG_4x25GBASE_R:
         {
-            port_info->port_config = MTIP_PORT_CONFIG_4x25GBASE_R_RSFEC;
+            if(platform_driver_priv->mtip_links[link_index]->config_fec == ETHTOOL_FEC_RS ||
+               platform_driver_priv->mtip_links[link_index]->config_fec == ETHTOOL_FEC_NONE){
+                port_info->port_config = MTIP_PORT_CONFIG_4x25GBASE_R_RSFEC;
+            }
         }
         break;
     case MTIP_PORT_CONFIG_1x25GBASE_R:
         {
-            port_info->port_config = MTIP_PORT_CONFIG_1x25GBASE_R_RSFEC;
+            if(platform_driver_priv->mtip_links[link_index]->config_fec == ETHTOOL_FEC_RS ||
+               platform_driver_priv->mtip_links[link_index]->config_fec == ETHTOOL_FEC_NONE){
+                port_info->port_config = MTIP_PORT_CONFIG_1x25GBASE_R_RSFEC;
+            }
         }
         break;
     default:
@@ -2735,7 +2831,7 @@ static int mtip_device_calculate_num_an_lanes(u32 port_type)
 
 // There has been some change in the configuration of a port
 // this is the common function to handle all such (re)configurations
-static void mtip_device_configure_port(u32 port_type)
+void mtip_device_configure_port(u32 port_type)
 {
    u32 tmp_lane_index;
    bool all_lanes_connected = true;
@@ -2751,6 +2847,10 @@ static void mtip_device_configure_port(u32 port_type)
    u32 filtered_priv_flags = 0;
    trx_lane_cfg lane_cfg;
    trx_breakout_cfg breakout_cfg;
+   u32 real_link = 0;
+   u32 real_lane = 0;
+   u32 lane_index;
+   u32 sfp_phandle[MAX_ETH_LANES] = {0};
 
    port_info = platform_driver_priv->mtip_ports[port_type];
 
@@ -2882,6 +2982,11 @@ static void mtip_device_configure_port(u32 port_type)
                      {
                         if (mtip_get_link_state_by_link_index(link_index) == MTIP_LINK_STATE_DOWN)
                         {
+                           // Notify TRX driver to enable TX
+                           rtnl_lock();
+                           mtip_phy_notify_eth_event_to_trx(link_index, IFCFG_ENABLE);
+                           rtnl_unlock();
+
                            // bring up the phy
                            mtip_phy_bringup_phy(link_index, platform_driver_priv->mtip_ports[port_type]->sfp_port_type);
                         }
@@ -2960,6 +3065,32 @@ static void mtip_device_configure_port(u32 port_type)
                        platform_driver_priv->mtip_ports[port_type]->port_priv_flags);
 
             filtered_priv_flags = mtip_device_filter_priv_flags(port_type);
+
+            if(port_type == MTIP_PORT_TYPE_DEBUG)
+            {
+               real_link = 1;
+               real_lane = 2;
+            }
+
+            // Get the link index of the first link for this port
+            if(mtip_lookup_link_index_by_port_type_and_real_link(&link_index, port_type, real_link) == 0)
+            {
+               /* For 100G_R4, default mode to be used is with RSFEC enabled
+                  unless set as OFF by ethtool set-priv-flags */
+               if((filtered_priv_flags & (1<<MTIP_PORT_CONFIG_1x100GBASE_R4)) &&
+                  ((platform_driver_priv->mtip_links[link_index]->config_fec == ETHTOOL_FEC_NONE) ||
+                   (platform_driver_priv->mtip_links[link_index]->config_fec == ETHTOOL_FEC_RS))){
+                  filtered_priv_flags &= ~(1<<MTIP_PORT_CONFIG_1x100GBASE_R4);
+                  filtered_priv_flags |= (1<<MTIP_PORT_CONFIG_1x100GBASE_R4_RSFEC);
+               }
+            }
+
+            // Notify TRX driver to enable TX, for the primary lane used for AN
+            rtnl_lock();
+            mtip_lookup_lane_index_by_port_type_and_real_lane(&lane_index, port_type, real_lane);
+            sfp_phandle[real_lane] = platform_driver_priv->devices.lane_devices[lane_index].sfp_phandle;
+            qsfp_trx_ifconfig_notifier(IFCFG_ENABLE, sfp_phandle);
+            rtnl_unlock();
 
             // initiate AN with the PHY
             mtip_phy_initiate_an(port_type, num_an_lanes, filtered_priv_flags);

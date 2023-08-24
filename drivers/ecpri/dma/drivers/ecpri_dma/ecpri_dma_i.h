@@ -284,12 +284,12 @@ struct ecpri_dma_gsi_ep_mem_info {
 /**
  * struct ecpri_dma_exception_stats - DMA exception statistics
  *
- * @num_of_pkts_recieved: Number of packets which were routed to exception ENDP
- * @num_of_bytes_recieved: Total number of bytes of these packets
+ * @num_of_pkts_received: Number of packets which were routed to exception ENDP
+ * @num_of_bytes_received: Total number of bytes of these packets
  */
 struct ecpri_dma_exception_stats {
-	u32 num_of_pkts_recieved;
-	u32 num_of_bytes_recieved;
+	u32 num_of_pkts_received;
+	u32 num_of_bytes_received;
 	u32 exception_status_statistics[ECPRI_DMA_STATUS_CODE_MAX];
 };
 
@@ -365,7 +365,7 @@ struct ecpri_dma_exception_context {
  * @dynamic_vf_enabled: Indicating this is a memcpy ENDP with dynamic VF
  * @tx_pre_header_enabled: Indicating whether tx pre header was enabled
  * (tx endp only)
- * @total_bytes_recv: EP statistics regarding number of bytes recieved
+ * @total_bytes_recv: EP statistics regarding number of bytes received
  *
  */
 struct ecpri_dma_endp_context {

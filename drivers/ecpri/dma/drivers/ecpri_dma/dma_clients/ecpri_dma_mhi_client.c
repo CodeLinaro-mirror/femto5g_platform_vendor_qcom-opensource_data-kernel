@@ -6,7 +6,7 @@
 #include "ecpri_dma_mhi_client.h"
 #include "gsihal.h"
 
-#define ECPRI_DMA_MHI_CLIENT_MEMCPY_ASYNC_BUDGET (5)
+#define ECPRI_DMA_MHI_CLIENT_MEMCPY_ASYNC_BUDGET (15)
 
 struct ecpri_dma_mhi_client_context*
 	ecpri_dma_mhi_client_ctx[ECPRI_DMA_MHI_CLIENT_FUNCTION_NUM] = { NULL };
@@ -523,7 +523,8 @@ static void ecpri_dma_mhi_memcpy_async_wq_cb_ready(struct work_struct* work)
 	async_work->xfer_desc->user_cb(async_work->xfer_desc->user_data);
 
 	kmem_cache_free(memcpy_ctx->xfer_wrapper_cache, async_work->xfer_desc);
-	kfree(async_work);
+	memcpy_ctx->async_work_rp++;
+	memcpy_ctx->async_work_rp %= ECPRI_DMA_MHI_MEMCPY_RLEN;
 }
 
 /**
@@ -566,7 +567,8 @@ static void ecpri_dma_mhi_memcpy_async_wq_cb_ready_vms(struct work_struct* work)
 	async_work->xfer_desc->user_cb(async_work->xfer_desc->user_data);
 
 	kmem_cache_free(memcpy_ctx->xfer_wrapper_cache, async_work->xfer_desc);
-	kfree(async_work);
+	memcpy_ctx->async_work_rp++;
+	memcpy_ctx->async_work_rp %= ECPRI_DMA_MHI_MEMCPY_RLEN;
 }
 
 /**
@@ -597,7 +599,7 @@ static void ecpri_dma_mhi_memcpy_async_notify_comp(
 	int hw_ver = ecpri_dma_get_ctx_hw_ver();
 
 	if (ECPRI_HW_MAX == hw_ver) {
- 		DMAERR("Invalid HW version\n");
+		DMAERR("Invalid HW version\n");
 		return;
 	}
 
@@ -653,24 +655,26 @@ static void ecpri_dma_mhi_memcpy_async_notify_comp(
 
 	for (i = 0; i < actual_num; i++)
 	{
-		/* Create notifier for ASYNC COMP */
-		work = kzalloc(sizeof(*work), GFP_NOWAIT);
-
-		if (work) {
-			INIT_WORK(&work->work,
-				  ecpri_dma_mhi_memcpy_async_wq_cb_ready);
-
-			queue_work(memcpy_ctx->async_wq, &work->work);
-		} else {
-			DMAERR("Allocation error in workqueue\n");
+		if (memcpy_ctx->async_work_wp == memcpy_ctx->async_work_rp) {
+			DMAERR("memcpy async_work array out of resources\n");
 			ecpri_dma_assert();
 		}
+
+		/* Create notifier for ASYNC COMP */
+		work = &memcpy_ctx->async_work[memcpy_ctx->async_work_wp];
+		memcpy_ctx->async_work_wp++;
+		memcpy_ctx->async_work_wp %= ECPRI_DMA_MHI_MEMCPY_RLEN;
+
+		INIT_WORK(&work->work,
+			ecpri_dma_mhi_memcpy_async_wq_cb_ready);
+
+		queue_work(memcpy_ctx->async_wq, &work->work);
 
 		ecpri_dma_mhi_dma_free_pkt(&async_pkts[i]->pkt);
 	}
 
 	/* There might be more packet to poll, rescheduale tasklet */
-	tasklet_schedule(&endp->tasklet);
+	tasklet_hi_schedule(&endp->tasklet);
 }
 
 /**
@@ -1222,7 +1226,8 @@ static int ecpri_dma_mhi_memcpy_init(struct mhi_dma_function_params function)
 	spin_lock_init(&memcpy_ctx->lock);
 	spin_lock_init(&memcpy_ctx->sync_lock);
 	spin_lock_init(&memcpy_ctx->async_lock);
-	memcpy_ctx->async_wq = create_singlethread_workqueue(
+	memcpy_ctx->async_wq = alloc_ordered_workqueue("%s",
+		__WQ_LEGACY | WQ_MEM_RECLAIM | WQ_HIGHPRI,
 		"ECPRI_DMA_MHI_MEMCPY_ASYNC_WQ");
 	init_completion(&memcpy_ctx->done);
 	memcpy_ctx->destroy_pending = false;
@@ -1231,6 +1236,8 @@ static int ecpri_dma_mhi_memcpy_init(struct mhi_dma_function_params function)
 	atomic_set(&memcpy_ctx->sync_pending, 0);
 	atomic_set(&memcpy_ctx->sync_total, 0);
 	atomic_set(&memcpy_ctx->async_total, 0);
+	/* Init async_wp to 1 to identify empty array */
+	memcpy_ctx->async_work_wp = 1;
 
 	INIT_LIST_HEAD(&memcpy_ctx->cbs_list);
 
@@ -1599,12 +1606,14 @@ static int ecpri_dma_mhi_dma_async_memcpy_vm_handling(
 	xfer_descr->function = function;
 
 	/* Create notifier for ASYNC COMP */
-	work = kzalloc(sizeof(*work), GFP_KERNEL);
-
-	if (!work) {
-		DMAERR("Allocation error\n");
-		return -ENOMEM;
+	if (memcpy_ctx->async_work_wp == memcpy_ctx->async_work_rp) {
+		DMAERR("memcpy %d async_work array out of resources\n", idx);
+		ecpri_dma_assert();
 	}
+
+	work = &memcpy_ctx->async_work[memcpy_ctx->async_work_wp];
+	memcpy_ctx->async_work_wp++;
+	memcpy_ctx->async_work_wp %= ECPRI_DMA_MHI_MEMCPY_RLEN;
 
 	ret = ecpri_dma_mhi_dma_sync_memcpy(dest, src, len, function);
 	if (ret)
