@@ -446,6 +446,17 @@ static void gsi_handle_ev_ctrl(int gsi_id, int ee)
 	}
 }
 
+
+static void gsi_print_malformed_tre(u32 gsi_id)
+{
+	GSIERR("Malformed TRE[0]: 0x%x\n",
+		gsihal_read_reg_pn(GSI_EE_n_CNTXT_SCRATCH_1, gsi_id, 0));
+	GSIERR("Malformed TRE[2]: 0x%x\n",
+		gsihal_read_reg_pn(GSI_EE_n_CNTXT_SCRATCH_1, gsi_id, 1));
+	GSIERR("Malformed TRE[3]: 0x%x\n",
+		gsihal_read_reg_pn(GSI_EE_n_CNTXT_SCRATCH_1, gsi_id, 2));
+}
+
 static void gsi_handle_glob_err(u32 gsi_id, u32 err)
 {
 	struct gsi_log_err *log;
@@ -486,6 +497,7 @@ static void gsi_handle_glob_err(u32 gsi_id, u32 err)
 		chan_notify.chan_user_data = ch->props.chan_user_data;
 		chan_notify.err_desc = err & 0xFFFF;
 		if (log->code == GSI_INVALID_TRE_ERR) {
+			gsi_print_malformed_tre(gsi_id);
 			gsihal_read_reg_pnk_fields(GSI_EE_n_GSI_CH_k_CNTXT_0,
 				gsi_id, log->ee, log->virt_idx, &ch_k_cntxt_0);
 			ch->state = ch_k_cntxt_0.chstate;
