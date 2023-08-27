@@ -524,6 +524,14 @@ static int DWC_ETH_QOS_ipa_offload_resume(struct DWC_ETH_QOS_prv_data *pdata, bo
 		EMACERR("Offload channel Init Failed \n");
 		return ret;
 	}
+
+	if (!pdata->prv_ipa.ipa_debugfs_exists) {
+		if (!DWC_ETH_QOS_ipa_create_debugfs(pdata)) {
+			EMACDBG("eMAC Debugfs created  \n");
+			pdata->prv_ipa.ipa_debugfs_exists = true;
+		} else EMACERR("eMAC Debugfs failed \n");
+	}
+
 	if (pdata->current_loopback > 0) {
 		MTL_RQDCM0R_RGRD(reg_val);
 		reg_val |= IPA_RX_TO_DMA_CH_MAP_NUM;
