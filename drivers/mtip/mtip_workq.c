@@ -32,6 +32,8 @@ static struct mtip_workq_list* mtip_workq_head = NULL;
 
 struct workqueue_struct *delayed_wq;
 
+extern struct mtip_delayed_work_q_params *delayed_wq_notifr_param;
+
 static void mtip_workq_handler(struct work_struct *w)
 {
    int i;
@@ -200,6 +202,10 @@ int mtip_destroy_workq(void)
          kfree(mtip_workq_head);
          mtip_workq_head = NULL;
       }
+
+      //flush and cancel delayed work
+      cancel_delayed_work(&delayed_wq_notifr_param->wq_item);
+      flush_delayed_work(&delayed_wq_notifr_param->wq_item);
 
       destroy_workqueue(delayed_wq);
    }
