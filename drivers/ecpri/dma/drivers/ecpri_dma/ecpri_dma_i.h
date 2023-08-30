@@ -504,8 +504,6 @@ struct ecpri_dma_icc_paths {
   * @ecpri_dma_num_endps: Number of endps
   * @endp_map: ENDP configuration mapping matching to current flavor & version
   * @endp_ctx: ENDP context array
-  * @driver_ver: current driver SW version, used to sync with Q6
-  *
   */
 struct ecpri_dma_context {
 	struct mutex lock;
@@ -546,7 +544,6 @@ struct ecpri_dma_context {
 	struct ecpri_dma_clks clks;
 	struct ecpri_dma_icc_paths icc_paths;
 	u32 num_of_gsi;
-	u32 driver_ver;
 	struct mutex mhi_memcpy_setup_lock;
 };
 

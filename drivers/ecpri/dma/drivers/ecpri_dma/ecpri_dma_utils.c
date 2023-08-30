@@ -9695,11 +9695,6 @@ int ecpri_dma_gsi_start_channel(struct ecpri_dma_endp_context *ep)
 	return ret;
 }
 
-u32 ecpri_dma_get_sw_ver()
-{
-	return ecpri_dma_ctx->driver_ver;
-}
-
 u32 ecpri_dma_get_ctx_hw_ver()
 {
 	return ecpri_dma_ctx->ecpri_hw_ver;
@@ -9738,4 +9733,63 @@ struct device* ecpri_dma_get_pdev(void)
 		return NULL;
 
 	return ecpri_dma_ctx->pdev;
+}
+
+int ecpri_dma_filter_endps(
+	struct ecpri_dma_endp_filter *filter,
+	struct ecpri_dma_endp_gsi_tuple  *endpoint_list,
+	size_t max_size
+	)
+{
+	int list_index = 0;
+	const struct dma_gsi_ep_config *cur_endp;
+	int gsi_id_start, gsi_id_end;
+	int gsi_id, endp_id;
+
+	if(NULL == endpoint_list)
+		return -EINVAL;
+
+	if (NULL == filter)
+		return -EINVAL;
+
+	if (!ecpri_dma_ctx || !(ecpri_dma_ctx->endp_map)) {
+		DMAERR("ecpri_dma_ctx or ecpri_dma_ctx->endp_map are NULL\n");
+		return -EFAULT;
+	}
+
+	if (filter->gsi_id_enable) {
+		gsi_id_start = filter->gsi_id;
+		gsi_id_end = filter->gsi_id + 1;
+	} else {
+		gsi_id_start = 0;
+		gsi_id_end = ECPRI_DMA_GSI_NUM_MAX;
+	}
+
+	for (gsi_id = gsi_id_start; gsi_id < gsi_id_end; gsi_id++)
+		for (endp_id = 0; endp_id < ECPRI_DMA_ENDP_NUM_MAX; endp_id++) {
+
+			cur_endp = &(*ecpri_dma_ctx->endp_map)[gsi_id][endp_id];
+
+			if (filter->valid_enable && filter->valid != cur_endp->valid)
+				continue;
+
+			if (filter->ee_enable && filter->ee != cur_endp->ee)
+				continue;
+
+			if (filter->dir_enable && filter->dir != cur_endp->dir)
+				continue;
+
+			if (filter->dest_enable && filter->dest != cur_endp->dest)
+				continue;
+
+			endpoint_list[list_index].endp_id = endp_id;
+			endpoint_list[list_index].gsi_id = gsi_id;
+
+			list_index++;
+
+			if (list_index == max_size)
+				return list_index;
+	}
+
+	return list_index;
 }

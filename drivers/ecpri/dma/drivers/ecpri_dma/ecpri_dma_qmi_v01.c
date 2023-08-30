@@ -184,3 +184,156 @@ struct qmi_elem_info ecpri_init_modem_driver_cmplt_ind_msg_v01_ei[] = {
 	},
 };
 
+static struct qmi_elem_info ecpri_ch_cmd_txn_id_type_v01_ei[] = {
+	{
+		.data_type      = QMI_UNSIGNED_4_BYTE,
+		.elem_len       = 1,
+		.elem_size      = sizeof(u32),
+		.array_type     = NO_ARRAY,
+		.tlv_type       = 0,
+		.offset         = offsetof(struct ecpri_ch_cmd_txn_id_type_v01,
+					   q6_endp_id),
+	},
+	{
+		.data_type      = QMI_UNSIGNED_4_BYTE,
+		.elem_len       = 1,
+		.elem_size      = sizeof(u32),
+		.array_type     = NO_ARRAY,
+		.tlv_type       = 0,
+		.offset         = offsetof(struct ecpri_ch_cmd_txn_id_type_v01,
+					   a55_endp_id),
+	},
+	{
+		.data_type      = QMI_UNSIGNED_4_BYTE,
+		.elem_len       = 1,
+		.elem_size      = sizeof(u32),
+		.array_type     = NO_ARRAY,
+		.tlv_type       = 0,
+		.offset         = offsetof(struct ecpri_ch_cmd_txn_id_type_v01,
+					   gsi_id),
+	},
+	{
+		.data_type      = QMI_EOTI,
+		.array_type     = NO_ARRAY,
+		.tlv_type       = QMI_COMMON_TLV_TYPE,
+	},
+};
+
+struct qmi_elem_info ecpri_modem_ch_cmd_req_msg_v01_ei[] = {
+	{
+		.data_type      = QMI_STRUCT,
+		.elem_len       = 1,
+		.elem_size      = sizeof(struct ecpri_ch_cmd_txn_id_type_v01),
+		.array_type     = NO_ARRAY,
+		.tlv_type       = 0x01,
+		.offset         = offsetof(struct ecpri_modem_ch_cmd_req_msg_v01,
+					   txn_id),
+		.ei_array      = ecpri_ch_cmd_txn_id_type_v01_ei,
+	},
+	{
+		.data_type      = QMI_UNSIGNED_4_BYTE,
+		.elem_len       = 1,
+		.elem_size      = sizeof(u32),
+		.array_type     = NO_ARRAY,
+		.tlv_type       = 0x02,
+		.offset         = offsetof(struct ecpri_modem_ch_cmd_req_msg_v01,
+					   vf_id),
+	},
+	{
+		.data_type      = QMI_SIGNED_4_BYTE_ENUM,
+		.elem_len       = 1,
+		.elem_size      = sizeof(enum ecpri_ch_cmd_type_enum_v01),
+		.array_type     = NO_ARRAY,
+		.tlv_type       = 0x03,
+		.offset         = offsetof(struct ecpri_modem_ch_cmd_req_msg_v01,
+					   ch_cmd),
+	},
+	{
+		.data_type      = QMI_EOTI,
+		.array_type     = NO_ARRAY,
+		.tlv_type       = QMI_COMMON_TLV_TYPE,
+	},
+};
+
+struct qmi_elem_info ecpri_modem_ch_cmd_resp_msg_v01_ei[] = {
+	{
+		.data_type      = QMI_STRUCT,
+		.elem_len       = 1,
+		.elem_size      = sizeof(struct qmi_response_type_v01),
+		.array_type     = NO_ARRAY,
+		.tlv_type       = 0x02,
+		.offset         = offsetof(struct ecpri_modem_ch_cmd_resp_msg_v01,
+					   resp),
+		.ei_array      = qmi_response_type_v01_ei,
+	},
+	{
+		.data_type      = QMI_OPT_FLAG,
+		.elem_len       = 1,
+		.elem_size      = sizeof(u8),
+		.array_type     = NO_ARRAY,
+		.tlv_type       = 0x10,
+		.offset         = offsetof(struct ecpri_modem_ch_cmd_resp_msg_v01,
+					   txn_id_valid),
+	},
+	{
+		.data_type      = QMI_STRUCT,
+		.elem_len       = 1,
+		.elem_size      = sizeof(struct ecpri_ch_cmd_txn_id_type_v01),
+		.array_type     = NO_ARRAY,
+		.tlv_type       = 0x10,
+		.offset         = offsetof(struct ecpri_modem_ch_cmd_resp_msg_v01,
+					   txn_id),
+		.ei_array      = ecpri_ch_cmd_txn_id_type_v01_ei,
+	},
+	{
+		.data_type      = QMI_OPT_FLAG,
+		.elem_len       = 1,
+		.elem_size      = sizeof(u8),
+		.array_type     = NO_ARRAY,
+		.tlv_type       = 0x11,
+		.offset         = offsetof(struct ecpri_modem_ch_cmd_resp_msg_v01,
+					   ch_cmd_valid),
+	},
+	{
+		.data_type      = QMI_SIGNED_4_BYTE_ENUM,
+		.elem_len       = 1,
+		.elem_size      = sizeof(enum ecpri_ch_cmd_type_enum_v01),
+		.array_type     = NO_ARRAY,
+		.tlv_type       = 0x11,
+		.offset         = offsetof(struct ecpri_modem_ch_cmd_resp_msg_v01,
+					   ch_cmd),
+	},
+	{
+		.data_type      = QMI_EOTI,
+		.array_type     = NO_ARRAY,
+		.tlv_type       = QMI_COMMON_TLV_TYPE,
+	},
+};
+
+struct qmi_elem_info ecpri_modem_ch_cmd_cmplt_ind_msg_v01_ei[] = {
+	{
+		.data_type      = QMI_STRUCT,
+		.elem_len       = 1,
+		.elem_size      = sizeof(struct ecpri_ch_cmd_txn_id_type_v01),
+		.array_type     = NO_ARRAY,
+		.tlv_type       = 0x01,
+		.offset         = offsetof(struct ecpri_modem_ch_cmd_cmplt_ind_msg_v01,
+					   txn_id),
+		.ei_array      = ecpri_ch_cmd_txn_id_type_v01_ei,
+	},
+	{
+		.data_type      = QMI_SIGNED_4_BYTE_ENUM,
+		.elem_len       = 1,
+		.elem_size      = sizeof(enum ecpri_ch_cmd_type_enum_v01),
+		.array_type     = NO_ARRAY,
+		.tlv_type       = 0x02,
+		.offset         = offsetof(struct ecpri_modem_ch_cmd_cmplt_ind_msg_v01,
+					   ch_cmd),
+	},
+	{
+		.data_type      = QMI_EOTI,
+		.array_type     = NO_ARRAY,
+		.tlv_type       = QMI_COMMON_TLV_TYPE,
+	},
+};
+
