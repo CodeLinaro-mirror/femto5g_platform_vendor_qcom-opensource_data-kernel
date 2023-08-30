@@ -157,9 +157,14 @@ enum ecpri_dma_hw_mhi_channel_states {
  * @channel_context_addr: Channel context address
  * @ev_context_addr: Event context address
  * @endp_ctx: DMA end point context
- * @is_over_pcie: indicates channel should transact over PCIe Configurable by SW.
- * @disable_overflow_event: when set overflow events are not generated on this ch.
+ * @is_over_pcie: indicates channel should transact over PCIe – Configurable by
+ *					SW.
+ * @disable_overflow_event: when set overflow events are not generated on this
+ *							ch.
  * @msi_config: MSI (Message Signaled Interrupts) parameters
+ *
+ * @clnt_hdl: ENDP handle
+ *
  */
 struct ecpri_dma_mhi_channel_ctx {
 	u8 channel_id;
@@ -179,6 +184,7 @@ struct ecpri_dma_mhi_channel_ctx {
 	bool is_over_pcie;
 	bool disable_overflow_event;
 	struct mhi_dma_msi_info* msi_config;
+	u32 clnt_hdl;
 };
 
 
