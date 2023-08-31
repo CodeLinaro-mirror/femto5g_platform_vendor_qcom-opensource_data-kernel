@@ -551,7 +551,8 @@ fail_gen:
 int ecpri_dma_alloc_endp(u32 gsi_id, int endp_id, u32 ring_length,
 					struct ecpri_dma_moderation_config *mod_cfg,
 					bool is_over_pcie,
-					client_notify_comp notify_comp)
+					client_notify_comp notify_comp,
+					bool enable_tx_poll)
 {
 	const struct dma_gsi_ep_config *gsi_ep_cfg;
 	struct ecpri_dma_endp_context *ep;
@@ -584,8 +585,14 @@ int ecpri_dma_alloc_endp(u32 gsi_id, int endp_id, u32 ring_length,
 	spin_lock_init(&ep->spinlock);
 
 	if (gsi_ep_cfg->dir == ECPRI_DMA_ENDP_DIR_SRC) {
-		tasklet_init(&ep->tasklet, ecpri_dma_tasklet_transmit_done,
-			(unsigned long)ep);
+		if (enable_tx_poll) {
+			tasklet_init(&ep->tasklet, ecpri_dma_tasklet_tx_poll_irq,
+				(unsigned long)ep);
+		}
+		else {
+			tasklet_init(&ep->tasklet, ecpri_dma_tasklet_transmit_done,
+				(unsigned long)ep);
+		}
 	} else {
 		tasklet_init(&ep->tasklet, ecpri_dma_tasklet_rx_done,
 			(unsigned long)ep);
@@ -601,6 +608,7 @@ int ecpri_dma_alloc_endp(u32 gsi_id, int endp_id, u32 ring_length,
 	ep->is_over_pcie = is_over_pcie;
 
 	ep->notify_comp = notify_comp;
+	ep->enable_tx_poll = enable_tx_poll;
 
 	ret = ecpri_dma_gsi_setup_channel(ep);
 	if (ret) {

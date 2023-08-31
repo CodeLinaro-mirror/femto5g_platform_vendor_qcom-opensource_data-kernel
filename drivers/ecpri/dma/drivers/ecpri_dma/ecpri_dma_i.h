@@ -366,6 +366,7 @@ struct ecpri_dma_exception_context {
  * @tx_pre_header_enabled: Indicating whether tx pre header was enabled
  * (tx endp only)
  * @total_bytes_recv: EP statistics regarding number of bytes received
+ * @enable_tx_poll: Determines if client is expected to poll Tx completions
  *
  */
 struct ecpri_dma_endp_context {
@@ -412,6 +413,7 @@ struct ecpri_dma_endp_context {
 	bool dynamic_vf_enabled;
 	bool tx_pre_header_enabled;
 	u32 total_bytes_recv;
+	bool enable_tx_poll;
 };
 
 /**
@@ -681,7 +683,7 @@ void *ecpri_dma_get_ipc_logbuf_low(void);
 int ecpri_dma_alloc_endp(u32 gsi_id, int endp_id, u32 ring_length,
 	struct ecpri_dma_moderation_config *mod_cfg,
 	bool is_over_pcie,
-	client_notify_comp notify_comp);
+	client_notify_comp notify_comp, bool enable_tx_poll);
 int ecpri_dma_start_endp(struct ecpri_dma_endp_context *endp_cfg);
 int ecpri_dma_stop_endp(struct ecpri_dma_endp_context *endp_cfg);
 int ecpri_dma_reset_endp(struct ecpri_dma_endp_context *endp_cfg);

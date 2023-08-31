@@ -9474,10 +9474,17 @@ int ecpri_dma_gsi_setup_transfer_ring(struct ecpri_dma_endp_context *ep,
 	gsi_channel_props.empty_lvl_threshold = gsi_ep_info->prefetch_threshold;
 	gsi_channel_props.ee = gsi_ep_info->ee;
 	gsi_channel_props.gsi_id = ep->gsi_id;
+	gsi_channel_props.tx_poll = ep->enable_tx_poll;
 
 	gsi_channel_props.err_cb = ecpri_dma_gsi_chan_err_cb;
-	if (gsi_ep_info->dir == ECPRI_DMA_ENDP_DIR_SRC)
-		gsi_channel_props.xfer_cb = ecpri_dma_dp_tx_comp_hdlr;
+	if (gsi_ep_info->dir == ECPRI_DMA_ENDP_DIR_SRC) {
+		if (ep->enable_tx_poll) {
+			gsi_channel_props.xfer_cb = ecpri_dma_dp_tx_comp_poll_irq_hdlr;
+		}
+		else {
+			gsi_channel_props.xfer_cb = ecpri_dma_dp_tx_comp_hdlr;
+		}
+	}
 	else {
 		gsi_channel_props.xfer_cb = ecpri_dma_dp_rx_comp_hdlr;
 		//TODO: Ucomment whem impelemnting cleanup_cb

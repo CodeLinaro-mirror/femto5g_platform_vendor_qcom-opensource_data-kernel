@@ -164,7 +164,7 @@ void ecpri_dma_dp_tasklet_exception_notify(unsigned long data)
 	spin_lock_irqsave(&ecpri_dma_ctx->exception_ctx.exception_spinlock, flags);
 	/* Poll Exceptions & Increase exception statistics
 		actual_num is in packets, need to check for jumbo packets */
-	ret = ecpri_dma_dp_rx_poll(endp, ECPRI_DMA_DP_EXCEPTION_BUDGET,
+	ret = ecpri_dma_dp_poll(endp, ECPRI_DMA_DP_EXCEPTION_BUDGET,
 				   exception_pkts, &actual_num);
 	if (ret) {
 		DMAERR("Exception endp polling failed\n");
@@ -313,6 +313,44 @@ void ecpri_dma_tasklet_rx_done(unsigned long data)
 
 	DMADBG("Notify Rx ENDP %d on completion\n", endp->endp_id);
 	/* Notify client on Rx completion */
+	if (endp->notify_comp != NULL) {
+		endp->notify_comp(endp, NULL, 0);
+	}
+	else {
+		DMADBG("ENDP %d doesn't have notify function\n",
+			endp->endp_id);
+	}
+}
+
+/**
+ * ecpri_dma_tasklet_tx_poll_irq() - this function will be (eventually)
+ * called when a Tx operation is complete
+ * @data: user pointer point to the ecpri_dma_endp_context
+ *
+ * Will be called in deferred context.
+ * - call client callback to notify on tx completion
+ */
+void ecpri_dma_tasklet_tx_poll_irq(unsigned long data)
+{
+	struct ecpri_dma_endp_context *endp =
+		(struct ecpri_dma_endp_context*)data;
+
+	if (unlikely(!endp)) {
+		DMAERR("NULL ENDP ptr in tasklet\n");
+		ecpri_dma_assert();
+	}
+
+	if (unlikely(atomic_read(&endp->disconnect_in_progress))) {
+		DMAERR("ENDP disconnect in progress\n");
+		return;
+	}
+
+	if (unlikely(!endp->valid)) {
+		DMAERR("ENDP in non-valid state\n");
+		return;
+	}
+
+	/* Notify client on Tx completion */
 	if (endp->notify_comp != NULL) {
 		endp->notify_comp(endp, NULL, 0);
 	}
@@ -533,6 +571,35 @@ void ecpri_dma_dp_rx_comp_hdlr(struct gsi_chan_xfer_notify *notify)
 	}
 }
 
+void ecpri_dma_dp_tx_comp_poll_irq_hdlr(struct gsi_chan_xfer_notify *notify)
+{
+	struct ecpri_dma_outstanding_pkt_wrapper *comp_pkt;
+	struct ecpri_dma_endp_context *endp;
+	int ret = 0;
+
+	DMADBG_LOW("event code %d received for CH %d\n", notify->evt_id,
+		   notify->chid);
+
+	switch (notify->evt_id) {
+	case GSI_CHAN_EVT_EOT:
+	case GSI_CHAN_EVT_EOB:
+		comp_pkt = notify->xfer_user_data;
+		endp = comp_pkt->endp;
+
+		ret = ecpri_dma_set_endp_mode(endp, ECPRI_DMA_NOTIFY_MODE_POLL);
+		if (ret) {
+			DMAERR("Setting ENDP %d endp to POLL mode failed\n", endp->endp_id);
+			ecpri_dma_assert();
+		}
+
+		tasklet_schedule(&endp->tasklet);
+		break;
+	default:
+		DMAERR("received unexpected event code %d on CH %d\n", notify->evt_id,
+			notify->chid);
+	}
+}
+
 void ecpri_dma_dp_tx_comp_hdlr(struct gsi_chan_xfer_notify *notify)
 {
 	struct ecpri_dma_outstanding_pkt_wrapper *comp_pkt;
@@ -545,10 +612,11 @@ void ecpri_dma_dp_tx_comp_hdlr(struct gsi_chan_xfer_notify *notify)
 	case GSI_CHAN_EVT_EOT:
 	case GSI_CHAN_EVT_EOB:
 		comp_pkt = notify->xfer_user_data;
-		comp_pkt->xfer_done = true;
 		endp = comp_pkt->endp;
 
+		comp_pkt->xfer_done = true;
 		atomic_inc(&endp->xmit_eot_cnt);
+
 		tasklet_schedule(&endp->tasklet);
 		break;
 	default:
@@ -557,10 +625,10 @@ void ecpri_dma_dp_tx_comp_hdlr(struct gsi_chan_xfer_notify *notify)
 	}
 }
 
-int ecpri_dma_dp_rx_poll(struct ecpri_dma_endp_context *endp, u32 budget,
+int ecpri_dma_dp_poll(struct ecpri_dma_endp_context *endp, u32 budget,
 	struct ecpri_dma_pkt_completion_wrapper **pkts, u32 *actual_num)
 {
-	int ret = 0, i = 0;
+	int ret = 0, i = 0, j = 0;
 	u32 rem_budget = budget, num_of_buff = 0;
 	u32 curr_iter_num_of_pkts = 0;
 	bool is_poll_empty = false;
@@ -568,11 +636,17 @@ int ecpri_dma_dp_rx_poll(struct ecpri_dma_endp_context *endp, u32 budget,
 	struct list_head *pos, *n;
 	struct gsi_chan_xfer_notify notify[ECPRI_DMA_DP_MAX_DESC];
 	unsigned long flags;
+	int dma_dir;
 
 	if (!endp || !endp->valid || !budget || !pkts || !actual_num) {
 		DMAERR("Invalid parameters\n");
 		return -EINVAL;
 	}
+
+	if (endp->gsi_ep_cfg->dir == ECPRI_DMA_ENDP_DIR_SRC)
+		dma_dir = DMA_TO_DEVICE;
+	else
+		dma_dir = DMA_FROM_DEVICE;
 
 	spin_lock_irqsave(&endp->spinlock, flags);
 	/* Begin polling the GSI event */
@@ -600,8 +674,18 @@ int ecpri_dma_dp_rx_poll(struct ecpri_dma_endp_context *endp, u32 budget,
 			curr_pkt_wrapper->comp_pkt.status_code = notify[i].status;
 			curr_pkt_wrapper->comp_pkt.phys_port = notify[i].phys_port;
 
-			curr_pkt_wrapper->bytes_xfered = notify[i].bytes_xfered;
-			endp->total_bytes_recv += notify[i].bytes_xfered;
+			if (endp->gsi_ep_cfg->dir == ECPRI_DMA_ENDP_DIR_DEST) {
+				curr_pkt_wrapper->bytes_xfered = notify[i].bytes_xfered;
+				endp->total_bytes_recv += notify[i].bytes_xfered;
+			}
+			else {
+				for (j = 0;
+					j < curr_pkt_wrapper->comp_pkt.pkt->num_of_buffers;
+					j++) {
+					curr_pkt_wrapper->bytes_xfered +=
+						curr_pkt_wrapper->comp_pkt.pkt->buffs[j]->size;
+				}
+			}
 
 			switch (notify[i].evt_id) {
 			case GSI_CHAN_EVT_EOT:
@@ -643,19 +727,23 @@ int ecpri_dma_dp_rx_poll(struct ecpri_dma_endp_context *endp, u32 budget,
 		pkts[i]->status_code = curr_pkt_wrapper->comp_pkt.status_code;
 		pkts[i]->comp_code = curr_pkt_wrapper->comp_pkt.comp_code;
 		pkts[i]->pkt = curr_pkt_wrapper->comp_pkt.pkt;
-		pkts[i]->pkt->buffs[0]->size = curr_pkt_wrapper->bytes_xfered;
-		/*	Unmapping is only required for ETH S2M ENDPs
-			which are not exception ENDP */
-		if (endp->gsi_ep_cfg->stream_mode != ECPRI_DMA_ENDP_STREAM_MODE_M2M &&
-			!(endp->gsi_id == ecpri_dma_ctx->exception_ctx.
-				exception_endp.gsi_id &&
-				endp->endp_id == ecpri_dma_ctx->exception_ctx.
-				exception_endp.endp_id))
-		{
-			dma_unmap_single(ecpri_dma_ctx->pdev,
-				pkts[i]->pkt->buffs[0]->phys_base,
-				pkts[i]->pkt->buffs[0]->size, DMA_FROM_DEVICE);
-			pkts[i]->pkt->buffs[0]->phys_base = 0;
+		for (j = 0; j < pkts[i]->pkt->num_of_buffers; j++) {
+			/*	Unmapping is only required for ETH S2M ENDPs
+				which are not exception ENDP */
+			if (endp->gsi_ep_cfg->stream_mode != ECPRI_DMA_ENDP_STREAM_MODE_M2M &&
+				!(endp->gsi_id == ecpri_dma_ctx->exception_ctx.
+					exception_endp.gsi_id &&
+					endp->endp_id == ecpri_dma_ctx->exception_ctx.
+					exception_endp.endp_id)) {
+				dma_unmap_single(ecpri_dma_ctx->pdev,
+					pkts[i]->pkt->buffs[j]->phys_base,
+					pkts[i]->pkt->buffs[j]->size, dma_dir);
+				pkts[i]->pkt->buffs[j]->phys_base = 0;
+			}
+
+			if (endp->gsi_ep_cfg->dir == ECPRI_DMA_ENDP_DIR_DEST) {
+				pkts[i]->pkt->buffs[j]->size = curr_pkt_wrapper->bytes_xfered;
+			}
 		}
 		i++;
 

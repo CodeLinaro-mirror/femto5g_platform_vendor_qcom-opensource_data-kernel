@@ -38,6 +38,10 @@
  * @tx_mod_cfg : Moderation configurations of the Tx ENDP
  * @received_irq_during_poll: Number of IRQ received whilst driver
  * in the POLL mode
+ * @enable_tx_poll: Determines if ETH is expected to poll Tx completions
+ * @tx_notify_mode: Currnet Tx ENDP notify mode (IRQ \ POLL)
+   @received_tx_irq_during_poll: Number of IRQ received whilst driver
+ * in the POLL mode
  */
 struct ecpri_dma_eth_client_connection {
     bool valid;
@@ -49,6 +53,9 @@ struct ecpri_dma_eth_client_connection {
     enum ecpri_dma_endp_stream_dest p_type;
     struct ecpri_dma_moderation_config tx_mod_cfg;
     u32 received_irq_during_poll;
+    bool enable_tx_poll;
+    enum ecpri_dma_notify_mode tx_notify_mode;
+    u32 received_tx_irq_during_poll;
 };
 
 /*
@@ -82,6 +89,9 @@ struct ecpri_dma_eth_client_endp_mapping {
   * @rx_comp_cb: ETH driver CB to invoke upon receiving Rx completion
                  notification from DMA
   * @rx_comp_cb_user_data: User data to use when invoking rx_comp_cb
+  * @tx_irq_comp_cb: ETH driver CB to invoke upon receiving Tx completion
+                 notification from DMA
+  * @tx_irq_comp_cb_user_data: User data to use when invoking tx_comp_cb
   * @link_to_endp_mapping: mapping of link_index to endps per hw ver & flavor
   */
 struct ecpri_dma_eth_client_context {
@@ -100,8 +110,11 @@ struct ecpri_dma_eth_client_context {
     ecpri_dma_eth_tx_comp_cb tx_comp_cb;
     void *tx_comp_cb_user_data;
 
-    ecpri_dma_eth_rx_comp_cb rx_comp_cb;
+    ecpri_dma_eth_irq_comp_cb rx_comp_cb;
     void *rx_comp_cb_user_data;
+
+    ecpri_dma_eth_irq_comp_cb tx_irq_comp_cb;
+    void *tx_irq_comp_cb_user_data;
 };
 
 /* Functions */
