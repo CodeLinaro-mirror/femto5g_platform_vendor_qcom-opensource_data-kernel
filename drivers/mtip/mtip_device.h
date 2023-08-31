@@ -45,6 +45,7 @@ struct mtip_netdev_priv {
    struct phy_device      *phydev;
    struct phylink         *phylink;
    struct phylink_config   phylink_config;
+   struct ecpri_dma_pkt_completion_wrapper **tx_comp_pkts;
 };
 
 /*
@@ -107,6 +108,7 @@ struct mtip_process_an_result_task
  * Immediate tasks
  */
 void mtip_set_rx_mode_immediate(ecpri_dma_eth_conn_hdl_t hdl, enum ecpri_dma_notify_mode setmode);
+void mtip_set_tx_mode_immediate(ecpri_dma_eth_conn_hdl_t hdl, enum ecpri_dma_notify_mode setmode);
 
 /*
  * Functions exposed by mtip_device
@@ -132,4 +134,5 @@ u8 mtip_netdev_get_next_ptp_ts_seq_num(u32 link_index);
 
 u32 mtip_device_filter_priv_flags(u32 port_type);
 
+void mtip_process_tx_comp_cb(ecpri_dma_eth_conn_hdl_t hdl, struct mtip_dma_tx_comp_params *tx_comp_params);
 #endif // _MTIP_DEVICE_H
