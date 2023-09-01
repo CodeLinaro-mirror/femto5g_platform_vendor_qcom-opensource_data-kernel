@@ -100,6 +100,7 @@ static int ecpriss_core_remove(struct platform_device *pdev)
 		clear_debugfs_directory();
 #endif
 		atomic_notifier_chain_unregister(&panic_notifier_list, &ecpriss_panic);
+		netlink_kernel_release(ecpriss_pdata_v2->netlink_socket);
 		dma_ecpri_ss_driver_ops.ecpri_dma_ecpri_ss_deregister();
 		ecpriss_qudp_irq_destroy_v2();
 		ecpriss_xbar_destroy_interrupts_v2();
@@ -107,7 +108,6 @@ static int ecpriss_core_remove(struct platform_device *pdev)
 		ecpriss_destroy_workq();
 		ecpriss_destroy_ipc_log_v2();
 		ecpriss_unmap_xbar_qudp_v2();
-		netlink_kernel_release(ecpriss_pdata_v2->netlink_socket);
 	}
 	return 0;
 }
