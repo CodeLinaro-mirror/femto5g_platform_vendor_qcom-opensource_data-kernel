@@ -3413,6 +3413,9 @@ static int DWC_ETH_QOS_configure_netdevice(struct platform_device *pdev)
 	if(!dwc_eth_qos_res_data.mac2mac_en && !dwc_eth_qos_res_data.ext_phy)
 		pdata->en_wol = of_property_read_bool(pdev->dev.of_node,
 						      "enable-wol");
+	/*Skip ipa autoresume if needed by adding dt entry*/
+	pdata->skip_ipa_autoresume = of_property_read_bool(pdev->dev.of_node,
+							   "skip-ipa-autoresume");
 
 	ret = of_property_read_u32(pdev->dev.of_node, "ipa-dma-rx-desc-cnt",
 		&pdata->prv_ipa.ipa_dma_rx_desc_cnt);
@@ -4311,7 +4314,7 @@ static INT DWC_ETH_QOS_resume(struct platform_device *pdev)
 
 	ret = DWC_ETH_QOS_powerup(dev, DWC_ETH_QOS_DRIVER_CONTEXT);
 
-	if (pdata->ipa_enabled)
+	if (pdata->ipa_enabled && !pdata->skip_ipa_autoresume)
 		DWC_ETH_QOS_ipa_offload_event_handler(pdata, EV_DPM_RESUME);
 
 	if(dwc_eth_qos_res_data.mac2mac_en) {
