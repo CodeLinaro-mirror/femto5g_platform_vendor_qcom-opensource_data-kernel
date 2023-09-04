@@ -2282,73 +2282,6 @@ fail_ready_state:
 }
 
 /**
- * ecpri_dma_mhi_destroy() - Destroy MHI DMA
- *
- * This function is called by MHI client driver on MHI reset to destroy all DMA
- * MHI resources.
- *
- */
-static void ecpri_dma_mhi_destroy(
-	struct mhi_dma_function_params function)
-{
-	int idx;
-	int ret;
-
-	ret = ecpri_dma_mhi_get_function_context_index(
-		function, &idx, ECPRI_DMA_MHI_DMA_CLIENT_CTX);
-	if (ret != 0) {
-		DMAERR("Function params are invalid,"
-			"function type: %d, vf_id: %d\n",
-			function.function_type, function.vf_id);
-		return;
-	}
-
-	if (!ecpri_dma_mhi_client_ctx[idx]) {
-		DMAERR("Context is not initialized\n");
-		return;
-	}
-
-	ret = ecpri_dma_mhi_dma_memcpy_disable(function);
-	if (ret != 0) {
-		DMAERR("Failed to disable memcpy\n");
-		ecpri_dma_assert();
-	}
-
-	ecpri_dma_mhi_memcpy_destroy(function);
-
-	idr_destroy(&ecpri_dma_mhi_client_ctx[idx]->idr);
-
-	// TODO: Destroy debugfs
-
-	destroy_workqueue(ecpri_dma_mhi_client_ctx[idx]->wq);
-
-	ecpri_dma_mhi_client_ctx[idx]->notify_cb = NULL;
-	ecpri_dma_mhi_client_ctx[idx]->user_data = NULL;
-	ecpri_dma_mhi_client_ctx[idx]->msi_config.addr_low = 0;
-	ecpri_dma_mhi_client_ctx[idx]->msi_config.addr_hi = 0;
-	ecpri_dma_mhi_client_ctx[idx]->msi_config.data = 0;
-	ecpri_dma_mhi_client_ctx[idx]->msi_config.mask = 0;
-	ecpri_dma_mhi_client_ctx[idx]->mmio_addr = 0;
-	ecpri_dma_mhi_client_ctx[idx]->first_ch = 0;
-	ecpri_dma_mhi_client_ctx[idx]->first_ev = 0;
-	ecpri_dma_mhi_client_ctx[idx]->is_over_pcie = false;
-	ecpri_dma_mhi_client_ctx[idx]->mhi_mstate =
-		MHI_DMA_STATE_M_MAX;
-	ecpri_dma_mhi_client_ctx[idx]->state =
-		ECPRI_DMA_MHI_STATE_INVALID;
-	ecpri_dma_mhi_client_ctx[idx]->dev_scratch
-		.mhi_base_chan_idx_valid = false;
-	ecpri_dma_mhi_client_ctx[idx]->dev_scratch
-		.mhi_base_chan_idx = 0;
-
-	kfree(ecpri_dma_mhi_client_ctx[idx]);
-	ecpri_dma_mhi_client_ctx[idx] = NULL;
-	DMADBG("DMA MHI was reset, ready for re-init\n");
-
-	return;
-}
-
-/**
  * ecpri_dma_mhi_client_dma_start() - Start DMA MHI engine
  * @function: function parameters
  * @params: pcie addresses for MHI
@@ -2815,6 +2748,7 @@ static int ecpri_dma_mhi_dma_connect_endp(
 	idr_preload_end();
 
 	channel->valid = true;
+	channel->clnt_hdl = *(clnt_hdl);
 
 	if (function.function_type == MHI_DMA_FUNCTION_TYPE_PHYSICAL)
 		DMADBG("Done Physical \n");
@@ -2842,9 +2776,10 @@ static int ecpri_dma_mhi_dma_disconnect_endp(
 	struct mhi_dma_function_params function,
 	struct mhi_dma_disconnect_params* in)
 {
-	int idx;
+	int idx = 0, memcpy_idx = 0;
 	int ret = 0;
 	struct ecpri_dma_mhi_channel_ctx* channel = NULL;
+	struct ecpri_dma_mhi_memcpy_context* memcpy_ctx = NULL;
 
 	if (function.function_type == MHI_DMA_FUNCTION_TYPE_PHYSICAL)
 		DMADBG("Physical \n");
@@ -2866,18 +2801,31 @@ static int ecpri_dma_mhi_dma_disconnect_endp(
 
 	channel->state = ECPRI_DMA_HW_MHI_CHANNEL_STATE_DISABLE;
 	channel->valid = false;
+	channel->clnt_hdl = ECPRI_DMA_MHI_MIN_VALID_HDL;
 
-	/* Write new state */
-	ret = ecpri_dma_mhi_client_read_write_host(
-		ecpri_dma_mhi_client_ctx[idx],
-		ECPRI_DMA_MHI_DMA_TO_HOST, &channel->ch_ctx_host,
-		channel->channel_context_addr +
-		offsetof(struct ecpri_dma_mhi_host_ch_ctx, chstate),
-		sizeof(channel->ch_ctx_host.chstate),
-		function);
+	/* Write new state only if memcpy context is still available */
+	ret = ecpri_dma_mhi_get_function_context_index(
+		function, &memcpy_idx, ECPRI_DMA_MHI_DMA_MEMCPY_CTX);
 	if (ret != 0) {
-		DMAERR("Unable to read write host\n");
-		return -EPERM;
+		DMAERR("Function params are invalid,"
+			"function type: %d, vf_id: %d\n",
+			function.function_type, function.vf_id);
+		return -EINVAL;
+	}
+
+	memcpy_ctx = ecpri_dma_mhi_memcpy_ctx[memcpy_idx];
+	if (memcpy_ctx) {
+		ret = ecpri_dma_mhi_client_read_write_host(
+			ecpri_dma_mhi_client_ctx[idx],
+			ECPRI_DMA_MHI_DMA_TO_HOST, &channel->ch_ctx_host,
+			channel->channel_context_addr +
+			offsetof(struct ecpri_dma_mhi_host_ch_ctx, chstate),
+			sizeof(channel->ch_ctx_host.chstate),
+			function);
+		if (ret != 0) {
+			DMAERR("Unable to read write host\n");
+			return -EPERM;
+		}
 	}
 
 	/* Stop */
@@ -3012,6 +2960,92 @@ static int ecpri_dma_mhi_client_suspend(
 		DMADBG("Virtual ID %d \n", function.vf_id);
 
 	return -EPERM;
+}
+
+/**
+ * ecpri_dma_mhi_destroy() - Destroy MHI DMA
+ *
+ * This function is called by MHI client driver on MHI reset to destroy all DMA
+ * MHI resources.
+ *
+ */
+static void ecpri_dma_mhi_destroy(
+	struct mhi_dma_function_params function)
+{
+	int idx, i;
+	int ret;
+	struct mhi_dma_disconnect_params disconnect_params = { 0 };
+
+	DMADBG("Function type: %d, vf_id: %d\n",
+		function.function_type, function.vf_id);
+
+	ret = ecpri_dma_mhi_get_function_context_index(
+		function, &idx, ECPRI_DMA_MHI_DMA_CLIENT_CTX);
+	if (ret != 0) {
+		DMAERR("Function params are invalid,"
+			"function type: %d, vf_id: %d\n",
+			function.function_type, function.vf_id);
+		return;
+	}
+
+	if (!ecpri_dma_mhi_client_ctx[idx]) {
+		DMAERR("Context is not initialized\n");
+		return;
+	}
+
+	/* Disconnect all HW CHs */
+	for (i = 0; i < ECPRI_DMA_MHI_MAX_HW_CHANNELS; i++) {
+		if (ecpri_dma_mhi_client_ctx[idx]->channels[i].valid) {
+			disconnect_params.clnt_hdl = ecpri_dma_mhi_client_ctx[idx]->
+				channels[i].clnt_hdl;
+			ret = ecpri_dma_mhi_dma_disconnect_endp(function,
+				&disconnect_params);
+			if (ret != 0) {
+				DMAERR("Failed to disconnect MHI HW CH %d vf_id %d\n", i,
+					function.vf_id);
+				ecpri_dma_assert();
+			}
+		}
+	}
+
+	ret = ecpri_dma_mhi_dma_memcpy_disable(function);
+	if (ret != 0) {
+		DMAERR("Failed to disable memcpy\n");
+		ecpri_dma_assert();
+	}
+
+	ecpri_dma_mhi_memcpy_destroy(function);
+
+	idr_destroy(&ecpri_dma_mhi_client_ctx[idx]->idr);
+
+	// TODO: Destroy debugfs
+
+	destroy_workqueue(ecpri_dma_mhi_client_ctx[idx]->wq);
+
+	ecpri_dma_mhi_client_ctx[idx]->notify_cb = NULL;
+	ecpri_dma_mhi_client_ctx[idx]->user_data = NULL;
+	ecpri_dma_mhi_client_ctx[idx]->msi_config.addr_low = 0;
+	ecpri_dma_mhi_client_ctx[idx]->msi_config.addr_hi = 0;
+	ecpri_dma_mhi_client_ctx[idx]->msi_config.data = 0;
+	ecpri_dma_mhi_client_ctx[idx]->msi_config.mask = 0;
+	ecpri_dma_mhi_client_ctx[idx]->mmio_addr = 0;
+	ecpri_dma_mhi_client_ctx[idx]->first_ch = 0;
+	ecpri_dma_mhi_client_ctx[idx]->first_ev = 0;
+	ecpri_dma_mhi_client_ctx[idx]->is_over_pcie = false;
+	ecpri_dma_mhi_client_ctx[idx]->mhi_mstate =
+		MHI_DMA_STATE_M_MAX;
+	ecpri_dma_mhi_client_ctx[idx]->state =
+		ECPRI_DMA_MHI_STATE_INVALID;
+	ecpri_dma_mhi_client_ctx[idx]->dev_scratch
+		.mhi_base_chan_idx_valid = false;
+	ecpri_dma_mhi_client_ctx[idx]->dev_scratch
+		.mhi_base_chan_idx = 0;
+
+	kfree(ecpri_dma_mhi_client_ctx[idx]);
+	ecpri_dma_mhi_client_ctx[idx] = NULL;
+	DMADBG("DMA MHI was reset, ready for re-init\n");
+
+	return;
 }
 
 /* API exposed structure */
