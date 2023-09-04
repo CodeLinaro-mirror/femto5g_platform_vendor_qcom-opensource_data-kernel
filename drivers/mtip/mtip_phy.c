@@ -265,6 +265,11 @@ void mtip_phy_retry_phy_bringup(struct work_struct *work)
       goto func_exit;
     }
 
+    if(!platform_driver_priv){
+        CSMLOGERR("platform_driver_priv NULL \n");
+        goto func_exit;
+    }
+
     if(platform_driver_priv->mtip_links[link_index]->state == MTIP_LINK_STATE_CLOSE)
     {
         goto func_exit;
@@ -321,8 +326,15 @@ void mtip_fault_notifr_status(struct work_struct *work)
     u32 port_link_id = 0;
     u32 read_val;
 
+    if(!platform_driver_priv){
+        CSMLOGERR("platform_driver_priv NULL \n");
+        return;
+    }
     for(port_type = MTIP_PORT_TYPE_FH_0;  port_type <= MTIP_PORT_TYPE_FH_2; port_type++){
 
+        if(!platform_driver_priv->mtip_links[port_link_id]){
+                continue;
+        }
         wrapper_base_addr = platform_driver_priv->devices.port_devices[port_type].wrapper_base_addr;
 
         read_val = (u32)ioread32(wrapper_base_addr + MTIP_MAC_WRAPPER_CORE_STATUS_REG_OFFSET);
