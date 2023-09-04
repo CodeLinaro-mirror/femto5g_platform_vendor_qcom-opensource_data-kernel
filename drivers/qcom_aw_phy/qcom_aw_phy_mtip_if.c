@@ -1101,12 +1101,16 @@ int qcom_aw_phy_bringup_manual_eq_mode(
 
   if ((config.rate == 2) || (config.rate == 3)) {
     aw_pmd_enable_pam4_mode(mss, 1);
+    aw_pmd_rx_pam4_precoder_enable_set(mss, 1, 0);
+    aw_pmd_tx_pam4_precoder_enable_set(mss, 1, 0);
+    aw_pmd_tx_pam4_precoder_override_set(mss, 1);
   }
 
   /* Configuration for Near End Parallel Loopback mode */
   if (qcom_aw_phy_get_loopback_mode() == QCOM_AW_PHY_NEAR_END_PARALLEL_LB) {
     QCOM_AW_PHY_LOG_INFO("Configuring PHY for near end parallel LB");
     aw_pmd_nep_loopback_set(mss, 1);
+    qcom_aw_phy_handle_cdr_lock_status(phy_inst_info, lane, CDR_LOCK_SUCCESS);
     return ret_val;
   }
 
@@ -2011,6 +2015,13 @@ void qcom_aw_phy_handle_rx_sig_detect(struct work_struct *work){
           }
 
           aw_pmd_txfir_config_set(&mss, &txfir_cfg, 1);
+
+          if ((config.rate == 2) || (config.rate == 3)) {
+             aw_pmd_enable_pam4_mode(&mss, 1);
+             aw_pmd_rx_pam4_precoder_enable_set(&mss, 1, 0);
+             aw_pmd_tx_pam4_precoder_enable_set(&mss, 1, 0);
+             aw_pmd_tx_pam4_precoder_override_set(&mss, 1);
+          }
 
           /* Delay before triggering RX equalization */
           mdelay(500);
