@@ -178,6 +178,15 @@ void DWC_ETH_QOS_ipa_offload_event_handler(
 					&& DWC_ETH_QOS_is_phy_link_up(pdata))
 						DWC_ETH_QOS_enable_ipa_offload(pdata);
 			}
+			if (!pdata->prv_ipa.ipa_debugfs_exists && pdata->prv_ipa.emac_dev_reset) {
+				if (!DWC_ETH_QOS_ipa_create_debugfs(pdata)) {
+					EMACDBG("eMAC Debugfs created  \n");
+					pdata->prv_ipa.ipa_debugfs_exists = true;
+				} else
+					EMACERR("eMAC Debugfs failed \n");
+			}
+			pdata->prv_ipa.emac_dev_reset =  false;
+
 		}
 		break;
 	case EV_IPA_READY:
@@ -216,6 +225,7 @@ void DWC_ETH_QOS_ipa_offload_event_handler(
 
 			/* reset link down on dev close */
 			pdata->prv_ipa.ipa_offload_link_down = 0;
+			pdata->prv_ipa.emac_dev_reset =  true;
 		}
 		break;
 	case EV_DPM_SUSPEND:
