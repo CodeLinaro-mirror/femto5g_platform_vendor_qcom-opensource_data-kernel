@@ -275,6 +275,60 @@ int mtip_dma_tx_comp_list_pop(u32 link_index, struct mtip_dma_tx_comp_params *tx
    return rv;
 }
 
+void mtip_dma_tx_irq_comp_cb(void *user_data, ecpri_dma_eth_conn_hdl_t hdl)
+{
+   u32 link_index;
+   struct mtip_link_info* link;
+   struct net_device *netdev;
+   struct mtip_netdev_priv* priv;
+   spinlock_t *lock;
+   unsigned long flags;
+   ecpri_dma_eth_conn_hdl_t used_handle = hdl;
+   enum ecpri_dma_notify_mode setmode;
+
+   CSMLOGDBG("mtip_dma_tx_irq_comp_cb orig: %d, used hdl: %d\n", hdl, used_handle);
+
+   // get the link index
+   if (mtip_lookup_link_index_by_handle(used_handle, &link_index) < 0)
+   {
+      CSMLOGERR("unable to find link_index for handle: %d ..ignoring\n", used_handle);
+   }
+   else
+   {
+      if (platform_driver_priv->mtip_links[link_index]->state == MTIP_LINK_STATE_OPEN_DONE ||
+          platform_driver_priv->mtip_links[link_index]->state == MTIP_LINK_STATE_UP)
+      {
+         link = platform_driver_priv->mtip_links[link_index];
+         netdev = link->dev;
+
+         CSMLOGDBG("napi schedule for hdl: %d, link_index: %d, link 0x%lx, netdev 0x%lx\n", used_handle, link_index, (unsigned long)link, (unsigned long)netdev);
+
+         priv = netdev_priv(netdev);
+         lock = &(priv->lock);
+
+         spin_lock_irqsave(lock, flags);
+
+         // schedule napi
+         if (napi_schedule_prep(&(link->napi_tx))) {
+            __napi_schedule(&(link->napi_tx));
+
+            // set to POLL mode
+            setmode = ECPRI_DMA_NOTIFY_MODE_POLL;
+
+            // set the tx mode to POLL
+            mtip_set_tx_mode_immediate(hdl, setmode);
+         }
+
+         spin_unlock_irqrestore(lock, flags);
+      }
+      else
+      {
+         CSMLOGERR("link not in open state for handle: %d ..ignoring\n", used_handle);
+      }
+   }
+}
+
+
 void mtip_dma_tx_comp_cb(void *user_data, ecpri_dma_eth_conn_hdl_t hdl, struct ecpri_dma_pkt_completion_wrapper **comp_pkts, u32 num_of_completed)
 {
     int i;
@@ -366,6 +420,8 @@ int mtip_connect_dma_pipe(u32 link_index, ecpri_dma_eth_conn_hdl_t* hdl)
        pipe_params.enable_tx_pre_header = true;
    }
 
+   // Enable TX completion napi poll 
+   pipe_params.enable_tx_poll = enable_tx_comp_poll;
    // connect the pipe
    rv = (ecpri_dma_eth_driver_ops.ecpri_dma_eth_connect_endpoints)(&pipe_params, hdl);
 
@@ -907,6 +963,60 @@ out:
     }
 }
  
+
+int mtip_dma_poll_tx_comp_packets(struct net_device *netdev, struct napi_struct *napi_ptr, ecpri_dma_eth_conn_hdl_t hdl,
+                             int budget, int* npackets, int *num_buffers)
+{
+   int rv;
+   struct ecpri_dma_pkt_completion_wrapper **pkts;
+   struct mtip_dma_tx_comp_params tx_comp_params={0};
+   struct mtip_netdev_priv* priv;
+   u32 link_index;
+   spinlock_t *lock;
+   unsigned long flags;
+   ecpri_dma_eth_conn_hdl_t actual_handle = hdl;
+
+   priv = netdev_priv(netdev);
+
+   link_index = priv->link_index;
+   lock = &(priv->lock);
+
+   spin_lock_irqsave(lock, flags);
+
+   pkts=priv->tx_comp_pkts;
+   if (pkts == NULL)
+   {
+       rv = -1;
+       spin_unlock_irqrestore(lock, flags);
+       goto out;
+   }
+   spin_unlock_irqrestore(lock, flags);
+
+   // set the number of packets to 0
+   *npackets = 0;
+
+   // read the packets
+   rv = (ecpri_dma_eth_driver_ops.ecpri_dma_eth_tx_poll)(actual_handle, budget,
+                                                         (struct ecpri_dma_pkt_completion_wrapper **)pkts,
+                                                          npackets);
+
+   if (rv < 0)
+   {
+      CSMLOGERR("dma_eth_tx_poll hdl: %d returned: %d\n", actual_handle, rv);
+   }
+   else
+   {
+      CSMLOGDBG("read from hdl %d: actual read tx comp packets: %d\n", actual_handle, *npackets);
+      tx_comp_params.local_comp_pkts = pkts;
+      tx_comp_params.num_of_completed = *npackets;
+      mtip_process_tx_comp_cb(hdl, &tx_comp_params);
+      goto out;
+   }
+
+out:
+   return rv;
+}
+
 
 int mtip_dma_poll_rx_packets(struct net_device *netdev, struct napi_struct *napi_ptr, ecpri_dma_eth_conn_hdl_t hdl, 
                              int budget, int* npackets, int *num_buffers)

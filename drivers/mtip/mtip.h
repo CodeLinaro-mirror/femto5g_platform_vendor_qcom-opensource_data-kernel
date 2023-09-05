@@ -1,6 +1,6 @@
 //SPDX-License-Identifier: GPL-2.0-only
 /*
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #ifndef _MTIP_H
@@ -69,6 +69,7 @@
 #define MTIP_DMA_RX_BUFF_SIZE 2500 /* use buffers of size 1600 */
 
 extern int mtip_dma_max_rx_buff_size;
+extern bool enable_tx_comp_poll;
 
 #define MTIP_RX_DMA_MAX_BUFFERS_PER_PACKET   4
 
