@@ -1806,8 +1806,8 @@ static int ecpriss_qudp_ingress_init_cfg_v2(void)
 				ingress_cfg->fh_ingress_config.fcs_err_action = ECPRISS_QUDP_ACTION_DISCARD;
 				ingress_cfg->fh_ingress_config.pkt_err_action = ECPRISS_QUDP_ACTION_DISCARD;
 				ingress_cfg->fh_ingress_config.ip_len_err_action = ECPRISS_QUDP_ACTION_DISCARD;
-				ingress_cfg->fh_ingress_config.vlan_filt_miss_action = ECPRISS_QUDP_ACTION_DISCARD;
-				ingress_cfg->fh_ingress_config.ip_filt_miss_action = ECPRISS_QUDP_ACTION_DISCARD;
+				ingress_cfg->fh_ingress_config.vlan_filt_miss_action = ECPRISS_QUDP_ACTION_PASS_TO_A55;
+				ingress_cfg->fh_ingress_config.ip_filt_miss_action = ECPRISS_QUDP_ACTION_PASS_TO_A55;
 				ingress_cfg->fh_ingress_config.non_local_dst_action = ECPRISS_QUDP_ACTION_DISCARD;
 
 				ecpriss_qudp_hal_write_reg_n_fields(ECPRISS_QUDP_FH,
