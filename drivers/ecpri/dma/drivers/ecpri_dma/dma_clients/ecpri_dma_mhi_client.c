@@ -2975,6 +2975,7 @@ static void ecpri_dma_mhi_destroy(
 	int idx, i;
 	int ret;
 	struct mhi_dma_disconnect_params disconnect_params = { 0 };
+	const struct ecpri_dma_mhi_ee_gsi_tuple* func_map;
 
 	DMADBG("Function type: %d, vf_id: %d\n",
 		function.function_type, function.vf_id);
@@ -3006,6 +3007,20 @@ static void ecpri_dma_mhi_destroy(
 				ecpri_dma_assert();
 			}
 		}
+	}
+
+	ret = ecpri_dma_mhi_get_function_mapping(function, &func_map);
+	if (ret) {
+		DMAERR("Unknown function");
+		return;
+	}
+
+	ret = gsi_dealloc_all_evt_rings(func_map->gsi_id, func_map->ee_id);
+	if (ret) {
+		DMAERR("Events deallocation failed"
+			"function type : % d, vf_id : % d\n",
+			function.function_type, function.vf_id);
+		return;
 	}
 
 	ret = ecpri_dma_mhi_dma_memcpy_disable(function);
