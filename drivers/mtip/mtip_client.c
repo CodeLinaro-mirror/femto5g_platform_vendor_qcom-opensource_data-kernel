@@ -535,6 +535,7 @@ eth_ecpriss_status_e mtip_eth_deregister_events_cb()
     // find the next open spot
     for (i = 0; i < MTIP_MAX_CLIENTS; ++i) {
             platform_driver_priv->clients[i].events_cb = NULL;
+            platform_driver_priv->clients[i].ready_cb = NULL;
     }
 
     spin_unlock_irqrestore(lock, flags);
@@ -575,6 +576,7 @@ eth_ecpriss_status_e mtip_eth_register_ready_cb(eth_ecpriss_topology_ready_cb re
 struct eth_ecpriss_ops mtip_ecpri_ops = {
     .eth_ecpriss_register_ready_cb = mtip_eth_register_ready_cb,
     .eth_ecpriss_register_events_cb = mtip_eth_register_events_cb,
+    .eth_ecpriss_deregister_events_cb = mtip_eth_deregister_events_cb,
     .eth_ecpriss_get_topology = mtip_eth_get_topology,
 };
 
