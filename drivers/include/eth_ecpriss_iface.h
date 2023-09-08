@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #ifndef ECPRI_ETH_H
@@ -202,6 +202,14 @@ eth_ecpriss_status_e eth_ecpriss_get_topology
  */
 eth_ecpriss_status_e eth_ecpriss_register_events_cb
 			(eth_ecpriss_interface_events_cb events_cb);
+/***
+ * eth_ecpriss_deregister_events_cb() - ECPRISS driver
+ * deregistration with ETH driver for events
+ *
+ * Returns:	0 on success, 1 on failure
+ */
+
+eth_ecpriss_status_e eth_ecpriss_deregister_events_cb(void);
 
 /**
  * struct eth_ecpriss_ops - Structure to hold ETH - eCPRI
@@ -212,6 +220,7 @@ struct eth_ecpriss_ops {
 		(eth_ecpriss_topology_ready_cb ready_cb, bool *is_ready);
 	eth_ecpriss_status_e (*eth_ecpriss_register_events_cb)
 		(eth_ecpriss_interface_events_cb events_cb);
+	eth_ecpriss_status_e (*eth_ecpriss_deregister_events_cb)(void);
 	eth_ecpriss_status_e (*eth_ecpriss_get_topology)
 		(eth_ecpriss_dev_mode_e *device_mode,
 		 eth_ecpriss_topology_root_s *topology_params);

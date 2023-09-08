@@ -99,7 +99,9 @@ static int ecpriss_core_remove(struct platform_device *pdev)
 #ifndef NO_DEBUGFS_PERF
 		clear_debugfs_directory();
 #endif
+		qcom_unregister_ssr_notifier(ecpriss_pdata_v2->ssr_info->notifier_handle,&ecpriss_pdata_v2->ssr_info->nb);
 		atomic_notifier_chain_unregister(&panic_notifier_list, &ecpriss_panic);
+		mtip_ecpri_ops.eth_ecpriss_deregister_events_cb();
 		netlink_kernel_release(ecpriss_pdata_v2->netlink_socket);
 		dma_ecpri_ss_driver_ops.ecpri_dma_ecpri_ss_deregister();
 		ecpriss_qudp_irq_destroy_v2();
