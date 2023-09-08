@@ -508,4 +508,10 @@ int mtip_lookup_lane_index_by_device(u32* lane_index, u32 port_type, u32 lane_de
  */
 int mtip_lookup_device_by_lane_index(u32 lane_index, u32* port_device_index, u32* lane_device_index);
 
+/*
+ * mtip_lookup_if_any_link_active_for_port 
+ *   checks whether there is any active link other than the given link for the given port type
+ */
+bool mtip_lookup_if_any_other_link_active_for_port(u32 port_type, u32 link_index);
+
 #endif // _MTIP_H

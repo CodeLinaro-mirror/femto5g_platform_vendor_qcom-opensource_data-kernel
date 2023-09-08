@@ -65,6 +65,8 @@ struct mtip_delayed_work_q_params *delayed_wq_params[MTIP_MAX_LINKS] = {NULL};
 
 u8 mtip_phy_retry_num[MTIP_MAX_LINKS] = {0};
 
+u8 mtip_phy_an_seq_num[MTIP_MAX_PORTS] = {0};
+
 /* 
  * qsfp_eth_get_link_type: returns sfp port type
  * based on values defined in ethtool.h
@@ -97,11 +99,17 @@ static void mtip_phy_ready_cb(void *user_data)
     return;
 }
 
-static void mtip_phy_an_result_cb(enum mtip_port_type_enum port_type, bool an_result, enum mtip_port_config_enum port_config)
+static void mtip_phy_an_result_cb(enum mtip_port_type_enum port_type, bool an_result, enum mtip_port_config_enum port_config, u8 seq_num)
 {
-    CSMLOGINFO("Got AN complete CB for port: %d result %d port_config %d %s\n", port_type, an_result, port_config, mtip_ethtool_get_priv_flags_str(port_config));
+    CSMLOGINFO("Got AN complete CB for port: %d seq %d result %d port_config %d %s\n", port_type, seq_num, an_result, port_config, mtip_ethtool_get_priv_flags_str(port_config));
 
-    post_mtip_process_an_result(port_type, an_result, port_config);
+    if(seq_num != mtip_phy_an_seq_num[port_type])
+    {
+        CSMLOGINFO("Ignore the older AN result");
+        return;
+    }
+
+    post_mtip_process_an_result(port_type, an_result, port_config, seq_num);
     return;
 }
 
@@ -117,14 +125,65 @@ void mtip_phy_lane_bring_up_progress_ind(u32 link_index, bool in_progress)
     return;
 }
 
-static void mtip_phy_cdr_lock_ind(u32 link_index, bool status)
+static void mtip_phy_cdr_lock_ind(u32 link_index, bool status, u8 an_seq_num)
 {
-    CSMLOGINFO("CDR lock indication for link_index %d, status %d\n",
-              link_index, status);
+    struct mtip_process_cdr_lock_ind* taskstruct;
+    u32 port_type;
+
+    if(mtip_lookup_port_type_by_link_index(link_index, &port_type) != 0)
+    {
+        CSMLOGINFO("Invalid link/port!");
+        return;
+    }
+
+    if(an_seq_num != 0 &&
+       an_seq_num != mtip_phy_an_seq_num[port_type])
+    {
+        CSMLOGINFO("Ignore the older CDR lock status");
+        return;
+    }
+
+    taskstruct = kmalloc(sizeof(struct mtip_process_cdr_lock_ind), GFP_ATOMIC);
+    if(taskstruct == NULL)
+    {
+      CSMLOGERR("memory alloc failed\n");
+      return;
+    }
+
+    taskstruct->link_index= link_index;
+    taskstruct->status = status;
+    taskstruct->an_seq_num = an_seq_num;
+    mtip_queue_work(MTIP_WORKQ_TASK_PROCESS_CDR_LOCK_IND, taskstruct);
+    return;
+}
+
+void run_mtip_process_cdr_lock_ind(void* workptr)
+{
+    struct mtip_process_cdr_lock_ind *taskstruct = (struct mtip_process_cdr_lock_ind *)workptr;
+    u32 link_index = taskstruct->link_index;
+    bool status = taskstruct->status;
+    u8 an_seq_num = taskstruct->an_seq_num;
+    u32 port_type;
+
+    CSMLOGINFO("CDR lock indication for link_index %d, status %d, an_seq_num %d\n",
+               link_index, status, an_seq_num);
+
+    if(mtip_lookup_port_type_by_link_index(link_index, &port_type) != 0)
+    {
+        CSMLOGINFO("Invalid link/port!");
+        goto out;
+    }
+
+    if(an_seq_num != 0 &&
+       an_seq_num != mtip_phy_an_seq_num[port_type])
+    {
+        CSMLOGINFO("Ignore the older CDR lock status");
+        goto out;
+    }
 
     if (mtip_mac_wrapper_get_link_status(link_index) == true) 
     {
-        post_mtip_process_link_state(link_index, true);
+        mtip_process_link_state(link_index, true);
         mtip_phy_lane_bring_up_progress_ind(link_index, false);
         mtip_phy_retry_num[link_index] = 0;
     }
@@ -144,6 +203,8 @@ static void mtip_phy_cdr_lock_ind(u32 link_index, bool status)
         }
     }
 
+out:
+    kfree(taskstruct);
     return;
 }
 
@@ -283,7 +344,7 @@ void mtip_phy_retry_phy_bringup(struct work_struct *work)
     if(mtip_mac_wrapper_get_link_status(link_index) == true)
     {
         mtip_phy_retry_num[link_index] = 0;
-        post_mtip_process_link_state(link_index, true);
+        mtip_process_link_state(link_index, true);
         mtip_phy_lane_bring_up_progress_ind(link_index, false);
         goto func_exit;
     }
@@ -422,7 +483,7 @@ int mtip_phy_teardown_phy(u32 link_index)
     // disable tx_rx on the link
     if (mtip_loopback_mode == MTIP_MODE_DEFAULT)
     {
-        post_mtip_process_link_state(link_index, false);
+        mtip_process_link_state(link_index, false);
     }
 
     // Clear the retry count if interface has been torn down
@@ -430,6 +491,9 @@ int mtip_phy_teardown_phy(u32 link_index)
     {
         mtip_phy_retry_num[link_index] = 0;
     }
+
+    // stop listening to link status interrupts
+    mtip_phy_lane_bring_up_progress_ind(link_index, true);
 
     return ret_val;
 }
@@ -461,8 +525,20 @@ int mtip_phy_notify_link_status(u32 link_index, bool status)
 
 int mtip_phy_initiate_an(u32 port_type, int num_lanes, u32 port_config_mask)
 {
-    CSMLOGDBG("initiating AN on port %d with num_lanes %d and mask %d", port_type, num_lanes, port_config_mask);
-    return (qcom_aw_phy_driver_iface_ops.eth_phy_iface_initiate_an)(port_type, num_lanes, port_config_mask);
+    mtip_phy_an_seq_num[port_type]++;
+    if(mtip_phy_an_seq_num[port_type] == 255)
+        mtip_phy_an_seq_num[port_type] = 1;
+
+    CSMLOGINFO("Initiating AN on port %d with seq %d, num_lanes %d and mask %d",
+               port_type, mtip_phy_an_seq_num[port_type], num_lanes, port_config_mask);
+    return (qcom_aw_phy_driver_iface_ops.eth_phy_iface_initiate_an)(
+              port_type, mtip_phy_an_seq_num[port_type], num_lanes, port_config_mask);
+}
+
+int mtip_phy_reset_phy_sm(u32 port_type)
+{
+    CSMLOGDBG("Resetting PHY state machine on port %d", port_type);
+    return (qcom_aw_phy_driver_iface_ops.eth_phy_iface_reset_phy_sm)(port_type);
 }
 
 static int mtip_phy_find_matching_lane(struct phylink_config *config, u32* lane_index)
@@ -1255,7 +1331,9 @@ void mtip_phy_notify_eth_event_to_trx(u32 link_index, bool enable)
     }
 
     // Indicate transceiver driver about interface bring up
+    rtnl_lock();
     qsfp_trx_ifconfig_notifier(enable, sfp_phandle);
+    rtnl_unlock();
 
     return;
 }

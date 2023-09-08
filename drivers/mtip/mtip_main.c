@@ -532,6 +532,29 @@ int mtip_lookup_device_by_lane_index(u32 lane_index, u32* port_type, u32* lane_d
     return -1;
 }
 
+bool mtip_lookup_if_any_other_link_active_for_port(u32 port_type, u32 link_index)
+{
+    u32 i = 0;
+    u32 temp_link_index = 0;
+
+    for (i = 0; i < platform_driver_priv->devices.port_devices[port_type].num_link_phandles; ++i)
+    {
+       temp_link_index = platform_driver_priv->devices.port_devices[port_type].link_devices[i]->link_index;
+
+       if (platform_driver_priv->mtip_links[temp_link_index] != NULL &&
+           temp_link_index != link_index)
+       {
+          if ((platform_driver_priv->mtip_links[temp_link_index]->state != MTIP_LINK_STATE_INIT) &&
+              (platform_driver_priv->mtip_links[temp_link_index]->state != MTIP_LINK_STATE_CLOSE))
+          {
+             return true;
+          }
+       }
+    }
+
+    return false;
+}
+
 static const struct of_device_id mtip_mac_link_match[] = {
     { .compatible = "mtip-mac-link", },
     { }
