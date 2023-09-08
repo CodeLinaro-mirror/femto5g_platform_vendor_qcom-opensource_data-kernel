@@ -1777,13 +1777,28 @@ static int ecpriss_qudp_ingress_init_cfg(void)
 	return ret;
 }
 
+static void ecpriss_qudp_strict_filter_cfg_v2(void)
+{
+	int strict_filter_config = 0;
+	int port_idx = 0;
+
+	for(port_idx = 0;port_idx < ecpriss_pdata_v2->qudp_ctx_v2->num_ports;port_idx++) {
+
+		strict_filter_config = ecpriss_pdata_v2->qudp_ctx_v2->fh_port_cfg_v2[port_idx].strict_filter_status;
+		if(strict_filter_config) {
+			ecpriss_qudp_set_strict_filter_config(strict_filter_config, port_idx);
+		}
+
+	}
+
+}
+
+
 static int ecpriss_qudp_ingress_init_cfg_v2(void)
 {
 	int ret = 0;
 	int port_type = 0;
 	int port_idx = 0;
-
-
 
 	for(port_type=0;port_type<ECPRISS_PORT_TYPE_MAX;port_type++)
 	{
@@ -3305,6 +3320,7 @@ int ecpriss_qudp_init_v2(struct device *dev)
 			break;
 		}
 
+
 		ret = ecpriss_qudp_egress_init_cfg_v2();
 
 		if(ret < 0)
@@ -3338,8 +3354,10 @@ int ecpriss_qudp_init_v2(struct device *dev)
 			}
 		}
 
+		ecpriss_qudp_strict_filter_cfg_v2();
 		ecpriss_qudp_configure_mtu_v2();
 		ecpriss_qudp_non_ecpri_dma_ring_info();
+
 		ecpriss_filtering_enabled = 1;
 
 		ecpriss_pdata_v2->qudp_ctx_v2->state = ECPRI_QUDP_READY ;
@@ -5488,6 +5506,42 @@ void ecpriss_qudp_set_ingress_action(int val)
 
 	if(ret != 0)
 		ECPRILOGINFO("ecpriss_qudp_ingress_init_action modify failed\n");
+
+	return;
+}
+
+
+int ecpriss_qudp_get_strict_filter_config(int fh_index)
+{
+	int strict_filter_config = 0;
+	ecpri_qudp_hwio_def_ecpri_udp_fh_filt_error_channel_cfg_p_s_v2 filt_error_channel_cfg;
+
+	ecpriss_qudp_hal_read_reg_n_fields(ECPRISS_QUDP_FH,
+		ECPRI_UDP_FH_FILT_ERROR_CHANNEL_CFG_p_V2,
+		fh_index,
+		&filt_error_channel_cfg);
+
+	if(filt_error_channel_cfg.send_vlan_filt_miss_to_error_channel &&
+			filt_error_channel_cfg.send_ip_filt_miss_to_error_channel) {
+		strict_filter_config = 1;
+	}
+
+	return strict_filter_config;
+}
+void ecpriss_qudp_set_strict_filter_config(int val,int fh_index)
+{
+	ecpri_qudp_hwio_def_ecpri_udp_fh_filt_error_channel_cfg_p_s_v2 strict_filter_config;
+
+	memset(&strict_filter_config,0,sizeof(strict_filter_config));
+  	strict_filter_config.send_vlan_filt_miss_to_error_channel = val;
+  	strict_filter_config.send_ip_filt_miss_to_error_channel = val;
+
+	ecpriss_qudp_hal_write_reg_n_fields(ECPRISS_QUDP_FH,
+		ECPRI_UDP_FH_FILT_ERROR_CHANNEL_CFG_p_V2,
+		fh_index,
+		&strict_filter_config);
+
+	ecpriss_pdata_v2->qudp_ctx_v2->fh_port_cfg_v2[fh_index].strict_filter_status = val;
 
 	return;
 }

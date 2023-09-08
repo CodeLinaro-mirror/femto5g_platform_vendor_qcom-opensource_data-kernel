@@ -260,14 +260,15 @@ typedef struct ecpriss_qudp_port_cfg
 typedef struct ecpriss_qudp_port_cfg_v2
 {
 	//ecpriss_port_type_e                   port_type;
-	ecpriss_port_idx_e                    port_index;
-	ecpriss_qudp_ingress_per_port_cfg_s_v2   ingress_port_cfg;
-	ecpriss_qudp_egress_per_port_cfg_s_v2    egress_cfg;
-	ecpriss_qudp_trap_cfg_s               trap_cfg;
-	ecpriss_qudp_interrupt_cfg_s_v2          interrupt_cfg_v2;
-	ecpriss_qudp_interrupt_stats_s_v2        interrupt_stats_v2;
-	ecpriss_qudp_stats_v2                    stats_v2;
-	eth_ecpriss_port_params_s             eth_cfg;
+	ecpriss_port_idx_e			port_index;
+	ecpriss_qudp_ingress_per_port_cfg_s_v2  ingress_port_cfg;
+	ecpriss_qudp_egress_per_port_cfg_s_v2   egress_cfg;
+	ecpriss_qudp_trap_cfg_s			trap_cfg;
+	ecpriss_qudp_interrupt_cfg_s_v2         interrupt_cfg_v2;
+	ecpriss_qudp_interrupt_stats_s_v2       interrupt_stats_v2;
+	ecpriss_qudp_stats_v2                   stats_v2;
+	eth_ecpriss_port_params_s		eth_cfg;
+	uint8_t					strict_filter_status;
 }ecpriss_qudp_port_cfg_s_v2;
 
 
@@ -381,4 +382,6 @@ int ecpriss_qudp_ingress_init_cfg_modify_v2(int action);
 int ecpriss_qudp_get_ingress_action(void);
 void ecpriss_qudp_set_ingress_action(int val);
 
+int ecpriss_qudp_get_strict_filter_config(int fh_index);
+void ecpriss_qudp_set_strict_filter_config(int val, int fh_index);
 #endif

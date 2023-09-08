@@ -278,6 +278,7 @@ static const char *ecpriss_qudp_hal_reg_name_to_str[ECPRISS_QUDP_REG_MAX+1] = {
 "	ECPRI_UDP_L2_FILT_MAC_ADDRESS_LSB_PORT_p_ENTRY_n_V2",
 "	ECPRI_UDP_L2_FILT_MAC_ADDRESS_MSB_PORT_p_ENTRY_n_V2",
 "	ECPRI_UDP_L2_FILT_MAC_ADDRESS_INFO_PORT_p_ENTRY_n_V2",
+"	ECPRI_UDP_FH_FILT_ERROR_CHANNEL_CFG_p_V2",
 "	ECPRISS_QUDP_REG_MAX"
 
 };
@@ -459,6 +460,46 @@ static const char *ecpriss_qudp_hal_reg_name_to_str[ECPRISS_QUDP_REG_MAX+1] = {
 
 	return;
 }
+
+	static void ecpriss_qudp_hal_reg_construct_udp_fh_filt_error_channel_cfg_p_v2
+(ecpriss_qudp_hal_reg_name_e reg, const void *fields, uint32_t* val)
+{
+	ecpri_qudp_hwio_def_ecpri_udp_fh_filt_error_channel_cfg_p_s_v2 *filt_error_channel_config_p
+		= (ecpri_qudp_hwio_def_ecpri_udp_fh_filt_error_channel_cfg_p_s_v2 *)fields;
+
+	ECPRISS_HAL_SETFIELD_IN_REG(*val,
+			filt_error_channel_config_p->send_ip_filt_miss_to_error_channel,
+			HWIO_ECPRI_UDP_FH_FILT_ERROR_CHANNEL_CFG_p_SEND_IP_FILT_MISS_TO_ERROR_CHANNEL_SHFT_V2,
+			HWIO_ECPRI_UDP_FH_FILT_ERROR_CHANNEL_CFG_p_SEND_IP_FILT_MISS_TO_ERROR_CHANNEL_BMSK_V2);
+
+	ECPRISS_HAL_SETFIELD_IN_REG(*val,
+			filt_error_channel_config_p->send_vlan_filt_miss_to_error_channel,
+			HWIO_ECPRI_UDP_FH_FILT_ERROR_CHANNEL_CFG_p_SEND_VLAN_FILT_MISS_TO_ERROR_CHANNEL_SHFT_V2,
+			HWIO_ECPRI_UDP_FH_FILT_ERROR_CHANNEL_CFG_p_SEND_VLAN_FILT_MISS_TO_ERROR_CHANNEL_BMSK_V2);
+
+
+	return;
+}
+
+
+
+	static void ecpriss_qudp_hal_reg_parse_udp_fh_filt_error_channel_cfg_p_v2
+(ecpriss_qudp_hal_reg_name_e reg, void *fields, uint32_t val)
+{
+	ecpri_qudp_hwio_def_ecpri_udp_fh_filt_error_channel_cfg_p_s_v2 *filt_error_channel_config_p
+		= (ecpri_qudp_hwio_def_ecpri_udp_fh_filt_error_channel_cfg_p_s_v2 *)fields;
+
+	filt_error_channel_config_p->send_ip_filt_miss_to_error_channel = ECPRISS_HAL_GETFIELD_FROM_REG(val,
+			HWIO_ECPRI_UDP_FH_FILT_ERROR_CHANNEL_CFG_p_SEND_IP_FILT_MISS_TO_ERROR_CHANNEL_SHFT_V2,
+			HWIO_ECPRI_UDP_FH_FILT_ERROR_CHANNEL_CFG_p_SEND_IP_FILT_MISS_TO_ERROR_CHANNEL_BMSK_V2);
+
+	filt_error_channel_config_p->send_vlan_filt_miss_to_error_channel = ECPRISS_HAL_GETFIELD_FROM_REG(val,
+			HWIO_ECPRI_UDP_FH_FILT_ERROR_CHANNEL_CFG_p_SEND_VLAN_FILT_MISS_TO_ERROR_CHANNEL_SHFT_V2,
+			HWIO_ECPRI_UDP_FH_FILT_ERROR_CHANNEL_CFG_p_SEND_VLAN_FILT_MISS_TO_ERROR_CHANNEL_BMSK_V2);
+
+	return;
+}
+
 
 
 	static void ecpriss_qudp_hal_reg_construct_udp_fh_ingress_config_p_v2
@@ -5278,6 +5319,11 @@ static struct ecpriss_qudp_hal_reg_obj ecpriss_qudp_hal_reg_objs[ECPRISS_HW_MAX]
 		ecpriss_qudp_hal_reg_construct_dummy_v2,
 		ecpriss_qudp_hal_reg_parse_dummy_v2,
 		0x93E2500 , 0x0, 0x4, 0, 0, 0, 0x10},
+	[ECPRISS_HW_v2_0][ECPRI_UDP_FH_FILT_ERROR_CHANNEL_CFG_p_V2] = {
+		ecpriss_qudp_hal_reg_construct_udp_fh_filt_error_channel_cfg_p_v2,
+		ecpriss_qudp_hal_reg_parse_udp_fh_filt_error_channel_cfg_p_v2,
+		0x9380000, 0x44, 0x4, 0, 0, 0, 0},
+
 
 
 

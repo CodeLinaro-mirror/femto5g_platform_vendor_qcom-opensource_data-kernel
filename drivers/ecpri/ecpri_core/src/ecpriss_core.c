@@ -25,6 +25,7 @@ module_param(disable_xbar_dma_fh_same_prio, int, S_IRUSR | S_IWUSR | S_IRGRP | S
 MODULE_PARM_DESC(disable_xbar_dma_fh_same_prio, "XBAR FH and DMA Priority Configuration");
 
 int stats_timeout_ms = 250;
+int ecpriss_qudp_strict_filt_cfg[MAX_PORTS] = {0,0,0};
 void ecpriss_eth_topology_cb(void);
 void ecpriss_eth_topology_cb_v2(void);
 void ecpriss_dma_events_cb(void *user_data, enum ecpri_dma_event_type);
@@ -42,6 +43,19 @@ void ecpriss_eth_events_cb_v2(eth_ecpriss_event_e event_type,
 		eth_ecpriss_link_event_params_s *link_event_params);
 void ecpriss_dma_ecpri_ss_log_msg_cb(void *user_data, const char *fmt, ...);
 void ecpriss_dma_ecpri_ss_log_msg_cb_v2(void *user_data, const char *fmt, ...);
+
+/***
+ *
+ * 'ecpriss_qudp_strict_filt_cfg' param takes an array as parameter
+ * user need to pass three comma separted values for corresponding action.
+ * values of each element can be either 0 or 1.
+ * 1-> enable
+ * 0-> disble
+ *
+***/
+
+module_param_array(ecpriss_qudp_strict_filt_cfg, int,NULL, S_IRUGO | S_IWUSR);
+MODULE_PARM_DESC(ecpriss_qudp_strict_filt_cfg, "configuration for qudp strict filtering for all ports");
 
 ecpri_clock sys_clock;
 ecpriss_core_private_s 	pdata;
@@ -1290,6 +1304,20 @@ static int ecpriss_core_data_init(void)
 	} while (0);
 	return ret;
 }
+
+
+static void ecpriss_update_strict_filter_cfg(ecpriss_core_private_s_v2 *ecpriss_pata_v2, int *strict_filter_cfg)
+{
+	int port_idx = 0;
+
+	for(port_idx = 0 ; port_idx < MAX_PORTS ; port_idx++) {
+		ecpriss_pdata_v2->qudp_ctx_v2->fh_port_cfg_v2[port_idx].strict_filter_status = strict_filter_cfg[port_idx];
+		ECPRILOGINFO("strict_filter_cfg: port %d, ecpri_strict_filter_cfg %d\n",port_idx,strict_filter_cfg[port_idx]);
+	}
+
+	return;
+
+}
 static int ecpriss_core_data_init_v2(void)
 {
 	/*1. Initialize all the tables and data strucutres
@@ -1318,6 +1346,8 @@ static int ecpriss_core_data_init_v2(void)
         ECPRILOGERR("failed to create log context for ECPRISS_SS driver\n");
 	mutex_init(&ecpriss_pdata_v2->ecpriss_mutex_lock);
 	ecpriss_pdata_v2->qudp_ctx_v2 = &qudp_ctx_g_v2;
+
+	ecpriss_update_strict_filter_cfg(ecpriss_pdata_v2, ecpriss_qudp_strict_filt_cfg);
 	ecpriss_pdata_v2->xbar_ctx_v2 = &xbar_ctx_g_v2;
 
 	ecpriss_pdata_v2->xbar_ctx_v2->disable_xbar_dma_fh_same_prio = disable_xbar_dma_fh_same_prio;
