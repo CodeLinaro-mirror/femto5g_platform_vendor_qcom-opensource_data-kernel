@@ -1021,7 +1021,7 @@ out:
 int mtip_dma_poll_rx_packets(struct net_device *netdev, struct napi_struct *napi_ptr, ecpri_dma_eth_conn_hdl_t hdl, 
                              int budget, int* npackets, int *num_buffers)
 {
-   int j, k, s_idx;
+   int j, k, s_idx, i;
    int rv;
    int num_pkt_allocs = budget*MTIP_RX_DMA_MAX_BUFFERS_PER_PACKET;
    struct ecpri_dma_pkt_completion_wrapper **pkts; 
@@ -1142,14 +1142,14 @@ int mtip_dma_poll_rx_packets(struct net_device *netdev, struct napi_struct *napi
           s_idx = *num_buffers;
       }
    }
-   
+   j = num_pkt_allocs; 
 
 out1:
    
-   for (j = 0; j < num_pkt_allocs; ++j) 
+   for (i = 0; i < j; ++i) 
    {
        // free the completion wrappers
-       mtip_dma_free_completion_wrapper(pkts[j]);
+       mtip_dma_free_completion_wrapper(pkts[i]);
    }
 
    // this is freed using kfree
