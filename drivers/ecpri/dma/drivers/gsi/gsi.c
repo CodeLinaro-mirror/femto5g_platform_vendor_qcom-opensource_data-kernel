@@ -1839,6 +1839,31 @@ int gsi_dealloc_evt_ring(unsigned long evt_ring_hdl)
 }
 EXPORT_SYMBOL(gsi_dealloc_evt_ring);
 
+int gsi_dealloc_all_evt_rings(int gsi_id, int ee)
+{
+	int res = 0;
+	int i = 0;
+
+	if (!gsi_ctx) {
+		pr_err("%s:%d gsi context not allocated\n", __func__, __LINE__);
+		return -GSI_STATUS_NODEV;
+	}
+
+	for (i = 0; i < GSI_EVT_RING_MAX; i++) {
+		if (gsi_ctx->evtr[gsi_id][ee][i].hdl >= GSI_MIN_HDL_ID) {
+			res = gsi_dealloc_evt_ring(gsi_ctx->evtr[gsi_id][ee][i].hdl);
+			if (res != GSI_STATUS_SUCCESS) {
+				GSIERR("Error deallocating event gsi id "
+					"%d ee %d ev id %d error: %d\n", gsi_id, ee, i, res);
+				return res;
+			}
+		}
+	}
+
+	return res;
+}
+EXPORT_SYMBOL(gsi_dealloc_all_evt_rings);
+
 int gsi_query_evt_ring_db_addr(unsigned long evt_ring_hdl,
 		u32 *db_addr_wp_lsb, u32 *db_addr_wp_msb)
 {
