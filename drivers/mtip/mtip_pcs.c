@@ -45,6 +45,7 @@
 
 #include "mtip_pcs.h"
 #include "eth_phy_iface.h"
+#include "mtip_debug_eth.h"
 
 void mtip_pcs_reset_pcs(struct mtip_link_device_info* link_device)
 {
@@ -683,8 +684,15 @@ int mtip_rsfec_initialize(struct mtip_port_device_info *port_device) {
 
     port_info = platform_driver_priv->mtip_ports[port_type];
 
+    if(port_type == MTIP_PORT_TYPE_DEBUG && !check_if_valid_port_config_for_debug_eth(port_config))
+    {
+        CSMLOGERR("config %d not supported on port_type %d", port_config, port_type);
+        return 0;
+    }
+
     for (i = 0; i < PHY_LANE_MAX; ++i) 
     {
+        rsfec_control_val = 0;
         if (port_info->lane_config[i].lane_enabled) 
         {
             // lane is enabled
@@ -695,7 +703,7 @@ int mtip_rsfec_initialize(struct mtip_port_device_info *port_device) {
             case MTIP_PORT_CONFIG_1x100GBASE_R2:
             case MTIP_PORT_CONFIG_1x100GBASE_R2_RSFEC:
                 {
-                    if (i == 0)
+                    if ((port_type != MTIP_PORT_TYPE_DEBUG && i == 0) || (port_type == MTIP_PORT_TYPE_DEBUG && i == 2))
                     {
                         rsfec_control_val = MTIP_RSFEC_CONTROL_AM16_COPY_DIS_BIT;
                     }
@@ -711,7 +719,7 @@ int mtip_rsfec_initialize(struct mtip_port_device_info *port_device) {
             case MTIP_PORT_CONFIG_1x50GBASE_R2:
             case MTIP_PORT_CONFIG_1x50GBASE_R2_RSFEC:
                 {
-                    if (i == 0)
+                    if ((port_type != MTIP_PORT_TYPE_DEBUG && i == 0) || (port_type == MTIP_PORT_TYPE_DEBUG && i == 2))
                     {
                         rsfec_control_val = MTIP_RSFEC_CONTROL_KP_ENABLE_BIT | MTIP_RSFEC_CONTROL_TC_PAD_VALUE_BIT;
                     }
@@ -748,7 +756,7 @@ int mtip_rsfec_initialize(struct mtip_port_device_info *port_device) {
             case MTIP_PORT_CONFIG_1x50GBASE_R2_LUAI:
             case MTIP_PORT_CONFIG_1x50GBASE_R2_LUAI_FEC:
                 {
-                    if (i == 0)
+                    if ((port_type != MTIP_PORT_TYPE_DEBUG && i == 0) || (port_type == MTIP_PORT_TYPE_DEBUG && i == 2))
                     {
                         rsfec_control_val = MTIP_RSFEC_CONTROL_KP_ENABLE_BIT | MTIP_RSFEC_CONTROL_TC_PAD_VALUE_BIT;
                     }

@@ -233,8 +233,7 @@ static int mtip_platform_setup_port(u32 port_type)
        }
        else
        {
-          // don't do autoneg on DEBUG ETH
-          platform_driver_priv->mtip_ports[port_type]->autoneg = false;
+          platform_driver_priv->mtip_ports[port_type]->autoneg = true;
 
           // set the default port config to 1x25GBASE_R
           platform_driver_priv->mtip_ports[port_type]->port_config = MTIP_PORT_CONFIG_1x25GBASE_R;
