@@ -2766,7 +2766,9 @@ static int mtip_device_complete_port_open(u32 port_type)
 
        if (platform_driver_priv->mtip_links[link_index] != NULL)
        {
-          if (platform_driver_priv->mtip_links[link_index]->state == MTIP_LINK_STATE_OPEN_WAITING_FOR_LANES)
+          if (mtip_loopback_mode != MTIP_MODE_LOOPBACK &&
+              (platform_driver_priv->mtip_links[link_index]->state == MTIP_LINK_STATE_OPEN_WAITING_FOR_LANES ||
+               platform_driver_priv->mtip_links[link_index]->state == MTIP_LINK_STATE_DOWN))
           {
              rv = mtip_device_open_completion(link_index);
           }
@@ -2869,7 +2871,6 @@ void mtip_device_configure_port(u32 port_type)
    struct mtip_port_info *port_info;
    bool set_port_config = false;
    u32 num_links_waiting_for_lanes = 0;
-   u32 num_links_down = 0;
    u32 link_index;
    bool loopflag = true;
    int bc = 0;
@@ -2949,7 +2950,6 @@ void mtip_device_configure_port(u32 port_type)
             // check if we can reconfigure the port
             set_port_config = true;
             num_links_waiting_for_lanes = 0;
-            num_links_down = 0;
 
             // port can be reconfigured only if there are no links already open
             // and there is atleast one link waiting for lane assignment
@@ -2969,13 +2969,10 @@ void mtip_device_configure_port(u32 port_type)
                      break;
                   }
 
-                  if (platform_driver_priv->mtip_links[link_index]->state == MTIP_LINK_STATE_OPEN_WAITING_FOR_LANES)
+                  if (platform_driver_priv->mtip_links[link_index]->state == MTIP_LINK_STATE_OPEN_WAITING_FOR_LANES ||
+                      platform_driver_priv->mtip_links[link_index]->state == MTIP_LINK_STATE_DOWN)
                   {
                      ++num_links_waiting_for_lanes;
-                  }
-                  if (platform_driver_priv->mtip_links[link_index]->state == MTIP_LINK_STATE_DOWN)
-                  {
-                     ++num_links_down;
                   }
                }
             }
@@ -2988,42 +2985,12 @@ void mtip_device_configure_port(u32 port_type)
                loopflag = false;
                goto out;
             }
-            if ((num_links_waiting_for_lanes == 0) && (num_links_down == 0))
+            if (num_links_waiting_for_lanes == 0)
             {
                // there are no links waiting to be assigned lanes
                CSMLOGINFO("no links waiting for lane assignment or to be brought up");
 
                // stay in connected and exit loop
-               loopflag = false;
-               goto out;
-            }
-            else if (num_links_down != 0)
-            {
-               // there are links that are down
-               // bring them back up
-               CSMLOGINFO("num_links_down for port_type %d is %d", port_type, num_links_down);
-
-               // go through all the links of the port that are in UP or DOWN state
-               for (i = 0; i < MTIP_MAX_LINKS_PER_PORT; ++i)
-               {
-                  if (mtip_lookup_link_index_by_port_type_and_real_link(&link_index, port_type, i) == 0)
-                  {
-                     if (platform_driver_priv->mtip_links[link_index] != NULL)
-                     {
-                        if (mtip_get_link_state_by_link_index(link_index) == MTIP_LINK_STATE_DOWN)
-                        {
-                           // Notify TRX driver to enable TX
-                           rtnl_lock();
-                           mtip_phy_notify_eth_event_to_trx(link_index, IFCFG_ENABLE);
-                           rtnl_unlock();
-
-                           // bring up the phy
-                           mtip_phy_bringup_phy(link_index, platform_driver_priv->mtip_ports[port_type]->sfp_port_type);
-                        }
-                     }
-                  }
-               }
-
                loopflag = false;
                goto out;
             }
