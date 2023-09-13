@@ -576,7 +576,7 @@ int mtip_napi_poll_tx(struct napi_struct *napi_ptr, int budget)
     struct net_device* dev;
     struct mtip_netdev_priv *priv;
     unsigned int tx_comp_list_size;
-    struct mtip_dma_tx_comp_params tx_comp_params;
+    struct mtip_dma_tx_comp_params tx_comp_params = {0};
     struct mtip_link_info* link = container_of(napi_ptr, struct mtip_link_info, napi_tx);
     ecpri_dma_eth_conn_hdl_t hdl = link->dma_hdl;
     enum ecpri_dma_notify_mode setmode = ECPRI_DMA_NOTIFY_MODE_IRQ;
@@ -604,9 +604,11 @@ int mtip_napi_poll_tx(struct napi_struct *napi_ptr, int budget)
         {
             for (list_counter = 0; list_counter < tx_comp_list_size; list_counter++ )
             {
-                mtip_dma_tx_comp_list_pop(link_index, &tx_comp_params);
-                mtip_process_tx_comp_cb(hdl, &tx_comp_params);
-                npackets += tx_comp_params.num_of_completed;
+                if(mtip_dma_tx_comp_list_pop(link_index, &tx_comp_params) > 0)
+		{
+                   mtip_process_tx_comp_cb(hdl, &tx_comp_params);
+                   npackets += tx_comp_params.num_of_completed; 
+		}
             }
         }
     }
