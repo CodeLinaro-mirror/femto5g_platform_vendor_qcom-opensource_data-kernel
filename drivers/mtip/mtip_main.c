@@ -671,8 +671,17 @@ static void mtip_save_eth_stats(void)
     u64 temp_val[DEBUG_ETHTOOL_STAT_STRINGS_LEN] = {0};
     ethtool_stat_strings = get_mtip_debug_ethtool_stat_strings();
 
+    if(!platform_driver_priv)
+      return;
+
     for(i = 0; i < MTIP_MAX_LINKS; i++)
     {
+	if(!platform_driver_priv->mtip_links[i])
+	    continue;
+
+	if(!platform_driver_priv->mtip_links[i]->dev)
+	    continue;
+
         //getting stats of fh ports
         if(i < 12)
         {  
@@ -687,6 +696,7 @@ static void mtip_save_eth_stats(void)
         {
             continue;
         }
+
         for(j = 0; j < DEBUG_ETHTOOL_STAT_STRINGS_LEN; j++)
         {
             //breaking the loop for fh ports when loop exceeds stats string length
@@ -694,8 +704,14 @@ static void mtip_save_eth_stats(void)
             {
                 break;
             }
+
             memcpy(platform_driver_priv->mtip_links[i]->stats[j].stats_name, ethtool_stat_strings[j], strlen(ethtool_stat_strings[j]));
             platform_driver_priv->mtip_links[i]->stats[j].stats_value = temp_val[j];
+	    if (platform_driver_priv->mtip_links[i]->state == MTIP_LINK_STATE_UP)
+	    {
+                CSMLOGERR("link : %s, %s : %lu \n",platform_driver_priv->devices.link_devices[i].link_name,platform_driver_priv->mtip_links[i]->stats[j].stats_name,platform_driver_priv->mtip_links[i]->stats[j].stats_value);
+	    }
+
         }
     }
 }
