@@ -1458,7 +1458,7 @@ static int ecpri_dma_eth_dp_test_util_init(
 		return -EFAULT;
 	}
 
-	if (ecpri_dma_get_ctx_hw_ver() != ECPRI_HW_V1_0) {
+	if (ECPRI_DMA_GET_CTX_HW_VER() != ECPRI_HW_V1_0) {
 		ret = ecpri_dma_eth_dp_test_util_rx_replenish(
 			ECPRI_DMA_ETH_CLIENT_UT_NUM_OF_BUFFS_IN_RING);
 		if (ret != 0) {
@@ -1493,7 +1493,7 @@ static int ecpri_dma_eth_dp_test_util_clean_up(ecpri_dma_eth_conn_hdl_t hdl,
 	ecpri_dma_eth_dp_test_util_destroy_test_data(num_of_pkts_to_send,
 		single_buffer, tx_pkts, rx_pkts);
 
-	if (ecpri_dma_get_ctx_hw_ver() != ECPRI_HW_V1_0) {
+	if (ECPRI_DMA_GET_CTX_HW_VER() != ECPRI_HW_V1_0) {
 		ret = ecpri_dma_eth_disconnect_endpoints(hdl);
 		if (ret != 0) {
 			DMA_UT_TEST_FAIL_REPORT("Failed on disconnect\n");
@@ -1576,7 +1576,7 @@ static int ecpri_dma_eth_dp_test_suite_teardown(void *priv)
 
 	if (eth_client_test_suite_ctx.allocated_pkts)
 	{
-		if (ecpri_dma_get_ctx_hw_ver() != ECPRI_HW_V1_0) {
+		if (ECPRI_DMA_GET_CTX_HW_VER() != ECPRI_HW_V1_0) {
 			for (i = 0; i < ECPRI_DMA_ETH_CLIENT_UT_NUM_OF_BUFFS_IN_RING; i++) {
 				kfree(eth_client_test_suite_ctx.rx_pkts[i]->buffs[0]->virt_base);
 				kfree(eth_client_test_suite_ctx.rx_pkts[i]->buffs[0]);
@@ -1779,7 +1779,7 @@ static int ecpri_dma_eth_dp_test_suite_connect(void *priv) {
 	}
 
 	/* Disconnect and check */
-	if (ecpri_dma_get_ctx_hw_ver() != ECPRI_HW_V1_0) {
+	if (ECPRI_DMA_GET_CTX_HW_VER() != ECPRI_HW_V1_0) {
 		ret = ecpri_dma_eth_disconnect_endpoints(
 			eth_client_test_suite_ctx.hdl);
 		if (ret != 0) {
@@ -1893,7 +1893,7 @@ static int ecpri_dma_eth_dp_test_suite_multiple_pkt_single_buffer_exception(void
 	}
 
 	/* Prepare exact amount of credits equal to amount of buffers sent */
-	if (ecpri_dma_get_ctx_hw_ver() == ECPRI_HW_V1_0) {
+	if (ECPRI_DMA_GET_CTX_HW_VER() == ECPRI_HW_V1_0) {
 		ret = ecpri_dma_eth_dp_test_suite_calculate_credits(0, tx_pkts,
 			num_of_pkts_to_send, &num_to_repelnish);
 		if (ret) {
@@ -1994,7 +1994,7 @@ static int ecpri_dma_eth_dp_test_suite_single_pkt_single_buffer_exception(void *
 	}
 
 	/* Prepare exact amount of credits equal to amount of buffers sent */
-	if (ecpri_dma_get_ctx_hw_ver() == ECPRI_HW_V1_0) {
+	if (ECPRI_DMA_GET_CTX_HW_VER() == ECPRI_HW_V1_0) {
 		ret = ecpri_dma_eth_dp_test_suite_calculate_credits(0, tx_pkts,
 			num_of_pkts_to_send, &num_to_repelnish);
 		if (ret) {
@@ -2082,7 +2082,7 @@ static int ecpri_dma_eth_dp_test_suite_single_pkt_single_buffer(void *priv) {
 	}
 
 	/* Prepare exact amount of credits equal to amount of buffers sent */
-	if (ecpri_dma_get_ctx_hw_ver() == ECPRI_HW_V1_0) {
+	if (ECPRI_DMA_GET_CTX_HW_VER() == ECPRI_HW_V1_0) {
 		ret = ecpri_dma_eth_dp_test_suite_calculate_credits(0, tx_pkts,
 			num_of_pkts_to_send, &num_to_repelnish);
 		if (ret) {
@@ -2121,7 +2121,7 @@ static int ecpri_dma_eth_dp_test_suite_single_pkt_single_buffer(void *priv) {
 		return -EFAULT;
 	}
 
-	if (ecpri_dma_get_ctx_hw_ver() != ECPRI_HW_V1_0) {
+	if (ECPRI_DMA_GET_CTX_HW_VER() != ECPRI_HW_V1_0) {
 		ret = ecpri_dma_eth_dp_test_util_rx_replenish(num_to_repelnish);
 		if (ret != 0) {
 			DMA_UT_LOG("Test failed due to replenish buffers failure\n");
@@ -2129,7 +2129,7 @@ static int ecpri_dma_eth_dp_test_suite_single_pkt_single_buffer(void *priv) {
 		}
 	}
 
-	if (ecpri_dma_get_ctx_hw_ver() == ECPRI_HW_V1_0) {
+	if (ECPRI_DMA_GET_CTX_HW_VER() == ECPRI_HW_V1_0) {
 		ret = ecpri_dma_test_eth_dp_test_suite_verify_read_write_ptr(
 			eth_client_test_suite_ctx.connection->rx_endp_ctx);
 		if (ret) {
@@ -2302,7 +2302,7 @@ static int ecpri_dma_eth_dp_test_suite_mult_pkt_single_buffer(void *priv) {
 	}
 
 	/* Prepare exact amount of credits equal to amount of buffers sent */
-	if (ecpri_dma_get_ctx_hw_ver() == ECPRI_HW_V1_0) {
+	if (ECPRI_DMA_GET_CTX_HW_VER() == ECPRI_HW_V1_0) {
 		ret = ecpri_dma_eth_dp_test_suite_calculate_credits(0, tx_pkts,
 			num_of_pkts_to_send, &num_to_repelnish);
 		if (ret) {
@@ -2340,7 +2340,7 @@ static int ecpri_dma_eth_dp_test_suite_mult_pkt_single_buffer(void *priv) {
 		return -EFAULT;
 	}
 
-	if (ecpri_dma_get_ctx_hw_ver() != ECPRI_HW_V1_0) {
+	if (ECPRI_DMA_GET_CTX_HW_VER() != ECPRI_HW_V1_0) {
 		ret = ecpri_dma_eth_dp_test_util_rx_replenish(num_of_pkts_to_send);
 		if (ret != 0) {
 			DMA_UT_LOG("Test failed due to replenish buffers failure\n");
@@ -2348,7 +2348,7 @@ static int ecpri_dma_eth_dp_test_suite_mult_pkt_single_buffer(void *priv) {
 		}
 	}
 
-	if (ecpri_dma_get_ctx_hw_ver() == ECPRI_HW_V1_0) {
+	if (ECPRI_DMA_GET_CTX_HW_VER() == ECPRI_HW_V1_0) {
 		ret = ecpri_dma_test_eth_dp_test_suite_verify_read_write_ptr(
 			eth_client_test_suite_ctx.connection->rx_endp_ctx);
 		if (ret) {
@@ -2392,7 +2392,7 @@ static int ecpri_dma_eth_dp_test_suite_mode_change(void *priv) {
 	}
 
 	/* Prepare exact amount of credits equal to amount of buffers sent */
-	if (ecpri_dma_get_ctx_hw_ver() == ECPRI_HW_V1_0) {
+	if (ECPRI_DMA_GET_CTX_HW_VER() == ECPRI_HW_V1_0) {
 		ret = ecpri_dma_eth_dp_test_suite_calculate_credits(0, tx_pkts,
 			num_of_pkts_to_send, &num_to_repelnish);
 		if (ret) {
@@ -2430,7 +2430,7 @@ static int ecpri_dma_eth_dp_test_suite_mode_change(void *priv) {
 		return -EFAULT;
 	}
 
-	if (ecpri_dma_get_ctx_hw_ver() != ECPRI_HW_V1_0) {
+	if (ECPRI_DMA_GET_CTX_HW_VER() != ECPRI_HW_V1_0) {
 		ret = ecpri_dma_eth_dp_test_util_rx_replenish(num_of_pkts_to_send);
 		if (ret != 0) {
 			DMA_UT_LOG("Test failed due to replenish buffers failure\n");
@@ -2446,7 +2446,7 @@ static int ecpri_dma_eth_dp_test_suite_mode_change(void *priv) {
 	}
 
 	/* Prepare exact amount of credits equal to amount of buffers sent */
-	if (ecpri_dma_get_ctx_hw_ver() == ECPRI_HW_V1_0) {
+	if (ECPRI_DMA_GET_CTX_HW_VER() == ECPRI_HW_V1_0) {
 		ret = ecpri_dma_eth_dp_test_suite_calculate_credits(0, tx_pkts,
 			num_of_pkts_to_send, &num_to_repelnish);
 		if (ret) {
@@ -2486,7 +2486,7 @@ static int ecpri_dma_eth_dp_test_suite_mode_change(void *priv) {
 		return -EFAULT;
 	}
 
-	if (ecpri_dma_get_ctx_hw_ver() != ECPRI_HW_V1_0) {
+	if (ECPRI_DMA_GET_CTX_HW_VER() != ECPRI_HW_V1_0) {
 		ret = ecpri_dma_eth_dp_test_util_rx_replenish(num_of_pkts_to_send);
 		if (ret != 0) {
 			DMA_UT_LOG("Test failed due to replenish buffers failure\n");
@@ -2494,7 +2494,7 @@ static int ecpri_dma_eth_dp_test_suite_mode_change(void *priv) {
 		}
 	}
 
-	if (ecpri_dma_get_ctx_hw_ver() == ECPRI_HW_V1_0) {
+	if (ECPRI_DMA_GET_CTX_HW_VER() == ECPRI_HW_V1_0) {
 		ret = ecpri_dma_test_eth_dp_test_suite_verify_read_write_ptr(
 			eth_client_test_suite_ctx.connection->rx_endp_ctx);
 		if (ret) {
@@ -2538,7 +2538,7 @@ static int ecpri_dma_eth_dp_test_suite_chains_large_payload(void *priv) {
 	}
 
 	/* Prepare exact amount of credits equal to amount of buffers sent */
-	if (ecpri_dma_get_ctx_hw_ver() == ECPRI_HW_V1_0) {
+	if (ECPRI_DMA_GET_CTX_HW_VER() == ECPRI_HW_V1_0) {
 		ret = ecpri_dma_eth_dp_test_suite_calculate_credits(0, tx_pkts,
 			num_of_pkts_to_send, &num_to_repelnish);
 		if (ret) {
@@ -2577,7 +2577,7 @@ static int ecpri_dma_eth_dp_test_suite_chains_large_payload(void *priv) {
 		return -EFAULT;
 	}
 
-	if (ecpri_dma_get_ctx_hw_ver() != ECPRI_HW_V1_0) {
+	if (ECPRI_DMA_GET_CTX_HW_VER() != ECPRI_HW_V1_0) {
 		ret = ecpri_dma_eth_dp_test_util_rx_replenish(
 			ECPRI_DMA_ETH_CLIENT_UT_TEST_LARGE_BUFFERS_AMOUNT);
 		if (ret != 0) {
@@ -2598,7 +2598,7 @@ static int ecpri_dma_eth_dp_test_suite_chains_large_payload(void *priv) {
 	/*Single packet sent but 2 rx pkts used so cleanup won't free the second */
 	kfree(rx_pkts[1]);
 
-	if (ecpri_dma_get_ctx_hw_ver() == ECPRI_HW_V1_0) {
+	if (ECPRI_DMA_GET_CTX_HW_VER() == ECPRI_HW_V1_0) {
 		ret = ecpri_dma_test_eth_dp_test_suite_verify_read_write_ptr(
 			eth_client_test_suite_ctx.connection->rx_endp_ctx);
 		if (ret) {
@@ -2642,7 +2642,7 @@ static int ecpri_dma_eth_dp_test_suite_commit(void *priv) {
 	}
 
 	/* Prepare exact amount of credits equal to amount of buffers sent */
-	if (ecpri_dma_get_ctx_hw_ver() == ECPRI_HW_V1_0) {
+	if (ECPRI_DMA_GET_CTX_HW_VER() == ECPRI_HW_V1_0) {
 		ret = ecpri_dma_eth_dp_test_suite_calculate_credits(0, tx_pkts,
 			num_of_pkts_to_send, &num_to_repelnish);
 		if (ret) {
@@ -2707,7 +2707,7 @@ static int ecpri_dma_eth_dp_test_suite_commit(void *priv) {
 		return -EFAULT;
 	}
 
-	if (ecpri_dma_get_ctx_hw_ver() != ECPRI_HW_V1_0) {
+	if (ECPRI_DMA_GET_CTX_HW_VER() != ECPRI_HW_V1_0) {
 		ret = ecpri_dma_eth_dp_test_util_rx_replenish(num_of_pkts_to_send);
 		if (ret != 0) {
 			DMA_UT_LOG("Test failed due to replenish buffers failure\n");
@@ -2724,7 +2724,7 @@ static int ecpri_dma_eth_dp_test_suite_commit(void *priv) {
 		return -EFAULT;
 	}
 
-	if (ecpri_dma_get_ctx_hw_ver() == ECPRI_HW_V1_0) {
+	if (ECPRI_DMA_GET_CTX_HW_VER() == ECPRI_HW_V1_0) {
 		ret = ecpri_dma_test_eth_dp_test_suite_verify_read_write_ptr(
 			eth_client_test_suite_ctx.connection->rx_endp_ctx);
 		if (ret) {

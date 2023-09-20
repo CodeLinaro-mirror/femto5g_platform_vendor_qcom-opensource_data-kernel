@@ -153,8 +153,8 @@ int ecpri_dma_ss_core_client_test_lte_config(void * priv)
 		(*test_endp_map_ptr)[ECPRI_DMA_GSI_NUM_MAX][ECPRI_DMA_ENDP_NUM_MAX] = {0};
 
 	/* Get current HW */
-	ver = ecpri_dma_get_ctx_hw_ver();
-	flv = ecpri_dma_get_ctx_hw_flavor();
+	ver = ECPRI_DMA_GET_CTX_HW_VER();
+	flv = ECPRI_DMA_GET_CTX_HW_FLAVOR();
 
 	port_topology = kzalloc(
 		sizeof(struct ecpri_dma_endp_mapping), GFP_KERNEL);
