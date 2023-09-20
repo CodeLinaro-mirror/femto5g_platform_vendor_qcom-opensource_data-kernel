@@ -83,6 +83,7 @@ enum qcom_aw_phy_debug_fs_cmd{
   SET_EQ_MODE,
   SET_PORT_CONFIG_MASK,
   INITIATE_AN,
+  RESET_PHY_SM,
 };
 
 int                                        qcom_aw_phy_attr_val;
@@ -199,14 +200,15 @@ void qcom_aw_phy_ready_cb(void *udata) {
 
 void qcom_aw_phy_an_result_cb(enum mtip_port_type_enum port_type,
                                       bool an_result,
-                                      enum mtip_port_config_enum port_config) {
+                                      enum mtip_port_config_enum port_config,
+                                      u8 seq_num) {
 
-  QCOM_AW_PHY_LOG_DBG("qcom_aw_phy_an_result_cb port %d, result %d, config %d",
-                      port_type, an_result, port_config);
+  QCOM_AW_PHY_LOG_DBG("qcom_aw_phy_an_result_cb port %d, seq %d, result %d, config %d",
+                      port_type, seq_num, an_result, port_config);
 }
 
-void qcom_aw_phy_cdr_lock_ind(u32 link_index, bool status) {
-  QCOM_AW_PHY_LOG_DBG("CDR lock for link_index %d, status %d", link_index, status);
+void qcom_aw_phy_cdr_lock_ind(u32 link_index, bool status, u8 an_seq_num) {
+  QCOM_AW_PHY_LOG_DBG("CDR lock for link_index %d, status %d, an_seq_num %d", link_index, status, an_seq_num);
 }
 
 void qcom_aw_phy_lane_bring_up_progress_ind(u32 link_index, bool in_progress) {
@@ -724,9 +726,14 @@ ssize_t qcom_aw_phy_set_attr(struct file *file, const char __user *buf,
 
     case INITIATE_AN:
       QCOM_AW_PHY_LOG_ERR("Initiate AN");
-      qcom_aw_phy_driver_iface_ops.eth_phy_iface_initiate_an(port_type,
+      qcom_aw_phy_driver_iface_ops.eth_phy_iface_initiate_an(port_type, 0,
                                                              num_lanes,
                                                              port_config_mask);
+      break;
+
+    case RESET_PHY_SM:
+      QCOM_AW_PHY_LOG_ERR("Reset PHY SM");
+      qcom_aw_phy_driver_iface_ops.eth_phy_iface_reset_phy_sm(port_type);
       break;
 
     default:

@@ -1,6 +1,6 @@
 //SPDX-License-Identifier: GPL-2.0-only
 /*
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  */ 
 
 #include <linux/module.h>
@@ -96,6 +96,11 @@ static void mtip_workq_handler(struct work_struct *w)
               run_mtip_process_lane_down(work_ptr);
           }
           break;
+      case MTIP_WORKQ_TASK_PROCESS_CDR_LOCK_IND:
+          {
+              run_mtip_process_cdr_lock_ind(work_ptr);
+          }
+          break;
       case MTIP_WORKQ_TASK_CREATE_PHYLINK:
           {
               run_mtip_process_create_phylink(work_ptr);
@@ -114,6 +119,16 @@ static void mtip_workq_handler(struct work_struct *w)
       case MTIP_WORKQ_TASK_PROCESS_AN_RESULT:
           {
               run_mtip_process_an_result(work_ptr);
+          }
+          break;
+      case MTIP_WORKQ_TASK_PROCESS_NETDEV_OPEN:
+          {
+              run_mtip_process_netdev_open(work_ptr);
+          }
+          break;
+      case MTIP_WORKQ_TASK_PROCESS_NETDEV_CLOSE:
+          {
+              run_mtip_process_netdev_close(work_ptr);
           }
           break;
       default:

@@ -266,6 +266,7 @@ struct qcom_aw_phy_an_params{
 	int                                   num_lanes;
 	enum eth_phy_iface_phy_lane_num_enum  current_lane;
 	uint32_t                              mac_port_config_mask;
+	u8                                    seq_num;
 };
 
 /* PHY Instance Config - Config info for a particular PHY instance */
