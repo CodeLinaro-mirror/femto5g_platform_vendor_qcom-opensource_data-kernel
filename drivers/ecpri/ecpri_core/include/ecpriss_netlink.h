@@ -29,7 +29,6 @@ typedef enum
 }ecpriss_packet_dir_e;
 
 
-
 typedef enum
 {
 	ECPRISS_MESSAGE_REGISTER_CLIENT,
@@ -48,13 +47,15 @@ typedef enum
 	ECPRISS_MESSAGE_FLOW_TRANSP_DECFG,
 	ECPRISS_MESSAGE_TRANSPORT_EGRESS_TABLE_RECFG,
 	ECPRISS_MESSAGE_TRANSPORT_INGESS_TABLE_CFG,
-	ECPRISS_MESSAGE_TRANSPORT_INGESS_TABLE_DECFG
+	ECPRISS_MESSAGE_TRANSPORT_INGESS_TABLE_DECFG,
+	ECPRISS_MESSAGE_LTE_MAC_CFG
 }ecpriss_message_id_e;
 
 typedef union ecpriss_netlink_flow
 {
 	ecpriss_flow_tx_cfg_s  flow_tx_cfg;
 	ecpriss_flow_rx_cfg_s  flow_rx_cfg;
+	ecpriss_lte_mac_addr_cfg_s mac_cfg;
 }ecpriss_packet_flow_u;
 
 

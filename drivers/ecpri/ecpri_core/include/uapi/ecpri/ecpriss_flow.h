@@ -10,6 +10,14 @@
 #define ECPRISS_MAX_PORTS           3
 	/*!40B - Max ipv6 and ipv4 string with no tunneling*/
 #define ECPRISS_IP_ADDR_LEN_MAX   16
+#define MAX_MAC_FILTER_ENTRIES    20
+/*
+ * We can support up to 16 Mac Addresses per port.
+ * For now it is limited to 12 mac only.
+ */
+#define ECPRISS_MAX_LTE_MAC_PER_PORT 12
+#define ECPRISS_MAX_NR_MAC_PER_PORT 4
+#define ECPRISS_MAX_LTE_VF 5
 
 	typedef enum
 	{
@@ -324,5 +332,15 @@
 		ecpriss_core_flow_route_id_e  flow_route;
 		ecpriss_flow_dir_e            flow_dir;
 	} ecpriss_flow_route_dir_s;
+
+typedef struct
+{
+	uint8_t mac[ECPRISS_MAC_ADDR_LEN];
+}ecpriss_mac_s;
+
+typedef struct
+{
+	ecpriss_mac_s lte_mac_addr[ECPRISS_MAX_PORTS][ECPRISS_MAX_LTE_MAC_PER_PORT];
+}ecpriss_lte_mac_addr_cfg_s;
 
 #endif /* ECPRI_FLOW_H */

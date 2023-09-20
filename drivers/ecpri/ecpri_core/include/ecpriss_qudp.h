@@ -51,6 +51,11 @@ typedef enum
 
 }epriss_qudp_state_e;
 
+typedef struct ecpriss_mac_filtr
+{
+	uint32_t lsb;
+	uint32_t msb;
+}ecpriss_mac_fltr;
 /**
  *
  */
@@ -73,6 +78,8 @@ typedef struct ecpriss_qudp_ingress_per_port_cfg_v2
 	uint32_t	num_ip_fltr_entries;
 	uint32_t	num_vlan_fltr_entries;
 	uint32_t	num_udp_fltr_entries;
+	uint32_t	num_mac_fltr_entries;
+	ecpriss_mac_fltr dmac[MAX_MAC_FILTER_ENTRIES];
 	uint32_t
 		ipdst_addr[MAX_WHITELIST_ENTRIES][ECPRISS_IP_ADDR_MAX_WORDS];
 	uint32_t	vlan_addr[MAX_WHITELIST_ENTRIES];
@@ -294,10 +301,18 @@ typedef struct ecpriss_qudp_ctx_v2
 	ecpriss_qudp_port_cfg_s_v2          fh_port_cfg_v2[ECPRISS_PORT_MAX];
 	ecpriss_qudp_port_cfg_s_v2          c2c_port_cfg_v2[ECPRISS_PORT_MAX];
 	ecpriss_qudp_port_cfg_s_v2          l2_port_cfg_v2[ECPRISS_PORT_MAX];
+	int                                 lte_fh_enabled;
 	//Todo:change to typedef
 	ecpriss_qudp_hal_context_s         *ecpriss_qudp_hal_ctx;
 }ecpriss_qudp_ctx_s_v2;
 
+enum {
+	ECPRISS_MAC_ACTION_PASS_TO_UC = 0,
+	ECPRISS_MAC_ACTION_PASS_TO_A55,
+	ECPRISS_MAC_ACTION_DISCARD,
+	ECPRISS_MAC_ACTION_PASS_TO_REMOTE_QUDP,
+	ECPRISS_MAC_ACTION_CONTINUE_NORMAL_PROCESSING
+};
 
 int ecpriss_qudp_init_v2(struct device *dev);
 int ecpriss_qudp_fh_tx_hdr_ins_cfg_v2(uint32_t               port_index,
@@ -378,6 +393,7 @@ void ecpriss_qudp_set_ecpriss_filt_enable_info(int val);
 int ecpriss_qudp_get_ecpriss_filt_enable_info(void);
 void ecpriss_qudp_non_ecpri_dma_ring_info(void) ;
 void ecpriss_qudp_irq_destroy_v2(void);
+
 int ecpriss_qudp_ingress_init_cfg_modify_v2(int action);
 
 int ecpriss_qudp_get_ingress_action(void);
@@ -389,4 +405,8 @@ void ecpriss_qudp_egress_table_reconfig(ecpriss_packet_payload_s *packet);
 void ecpriss_qudp_ingress_table_config(ecpriss_packet_payload_s *packet);
 void ecpriss_qudp_ingress_table_deconfig(ecpriss_packet_payload_s *packet);
 
+void ecpriss_qudp_set_lte_mac_filter(ecpriss_packet_payload_s *packet);
+void ecpriss_qudp_set_nr_mac_filter(void);
+void ecpriss_qudp_set_lte_mac_filter_info(void);
+void ecpriss_qudp_set_nr_mac_filter_info(void);
 #endif

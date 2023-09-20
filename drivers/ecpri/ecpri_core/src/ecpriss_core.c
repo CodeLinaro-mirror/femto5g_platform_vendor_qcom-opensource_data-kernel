@@ -24,6 +24,10 @@ int disable_xbar_dma_fh_same_prio = false;
 module_param(disable_xbar_dma_fh_same_prio, int, S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP);
 MODULE_PARM_DESC(disable_xbar_dma_fh_same_prio, "XBAR FH and DMA Priority Configuration");
 
+int lte_fh_enabled = 0;
+module_param(lte_fh_enabled, int, S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP);
+MODULE_PARM_DESC(lte_fh_enabled, "Enable LTE FH");
+
 int stats_timeout_ms = 250;
 int ecpriss_qudp_strict_filt_cfg[MAX_PORTS] = {0,0,0};
 void ecpriss_eth_topology_cb(void);
@@ -569,6 +573,11 @@ void ecpriss_eth_event_processing(void)
 		ecpriss_eth_topology_init();
 	}else {
 		ecpriss_eth_topology_init_v2();
+		if(ecpriss_pdata_v2->dev_mode != ECPRISS_DEV_MODE_RU && lte_fh_enabled) {
+
+			ecpriss_qudp_set_nr_mac_filter();
+		}
+
 	}
 	return;
 }
@@ -582,15 +591,21 @@ void ecpriss_eth_topology_init_wq(struct work_struct *work)
 	}else {
 		ecpriss_eth_topology_init_v2();
 
+		if(ecpriss_pdata_v2->dev_mode != ECPRISS_DEV_MODE_RU && lte_fh_enabled) {
+
+			ecpriss_qudp_set_nr_mac_filter();
+		}
+
+
 	}
 	return;
 }
 
-#if 1
 static int ecpriss_dma_endp_config(void)
 {
 	int ret = 0;
 	int i,j;
+
 
 	memset(&dma_endp_g , 0 , sizeof(dma_endp_g));
 
@@ -635,20 +650,21 @@ static int ecpriss_dma_endp_config(void)
 							&dma_endp_g.topology_params[i].dma_port_param[j],
 							sizeof(struct ecpri_dma_port_params));
 				}
+
+				}
 			}
-		}
 	}while (0);
 
 					/* Set the non ecpri LUT Cfg */
 					ecpriss_xbar_non_ecpri_lut_cfg();
 					return ret;
 }
-#endif
 
 static int ecpriss_dma_endp_config_v2(void)
 {
 	int ret = 0;
 	int i,j;
+	int lte_fh_index = 0;
 
 	memset(&dma_endp_g , 0 , sizeof(dma_endp_g));
 
@@ -685,6 +701,15 @@ static int ecpriss_dma_endp_config_v2(void)
 							&dma_endp_g.topology_params[i].dma_port_param[j],
 							sizeof(struct ecpri_dma_port_params));
 				}
+			}
+			else if(dma_endp_g.topology_params[i].port_type ==
+					ECPRI_DMA_ENDP_STREAM_DEST_FH_LTE) {
+				for(j=0;j<dma_endp_g.topology_params[i].num_of_ports;j++) {
+					memcpy(&ecpriss_pdata_v2->xbar_ctx_v2->fh_lte_port_cfg[lte_fh_index].dma_port_cfg[j],
+							&dma_endp_g.topology_params[i].dma_port_param[j],
+							sizeof(struct ecpri_dma_port_params));
+				}
+				lte_fh_index++;
 			}
 		}
 	}while (0);
@@ -1185,6 +1210,8 @@ static int ecpriss_core_data_init_v2(void)
 
 	ecpriss_pdata_v2->xbar_ctx_v2->disable_xbar_dma_fh_same_prio = disable_xbar_dma_fh_same_prio;
 
+	ecpriss_pdata_v2->qudp_ctx_v2->lte_fh_enabled = lte_fh_enabled;
+
 	for (port_index = 0;port_index < MAX_PORTS;port_index++)
 	{
 	memset(&ecpriss_pdata_v2->xbar_ctx_v2->flow_ctx_v2.fh_xbar_lut[port_index].configured_pcids
@@ -1209,13 +1236,6 @@ static int ecpriss_core_data_init_v2(void)
 			ECPRILOGERR("Work queue init failed\n");
 			break;
 		}
-		ret = ecpriss_netlink_socket_create_v2();
-		if(ret < 0) {
-			ECPRILOGERR("Netlink socket initialization failed\n");
-			break;
-		}
-		ECPRILOGINFO("eCPRI Netlink Socket(NETLINK_ECPRI family) Created\n");
-
 		ret = ecpriss_stats_timer_interrupt_create_v2();
 		if(ret < 0) {
 			ECPRILOGERR("eCPRI Timer Interrupt creation failed\n");
@@ -1321,7 +1341,14 @@ static int ecpriss_core_register_callbacks_v2(void)
 
 		if(*is_ready == true) {
 			ecpriss_eth_topology_init_v2();
+
+			if(ecpriss_pdata_v2->dev_mode != ECPRISS_DEV_MODE_RU && lte_fh_enabled) {
+
+				ecpriss_qudp_set_nr_mac_filter();
+			}
 		}
+
+
 
 		ready = 0;
 
@@ -1744,6 +1771,14 @@ static int ecpriss_core_init_v2(struct platform_device *pdev)
 			ECPRILOGERR("Stats Collection failed\n");
 			break;
 		}
+
+		ret = ecpriss_netlink_socket_create_v2();
+		if(ret < 0) {
+			ECPRILOGERR("Netlink socket initialization failed\n");
+			break;
+		}
+		ECPRILOGINFO("eCPRI Netlink Socket(NETLINK_ECPRI family) Created\n");
+
 
 		ecpriss_pdata_v2->ecpri_state = ECPRI_CORE_INIT;
 

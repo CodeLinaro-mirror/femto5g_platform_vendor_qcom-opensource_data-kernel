@@ -93,12 +93,14 @@ void ecpriss_netlink_process_packet(ecpriss_packet_s *packet)
 			case ECPRISS_MESSAGE_TRANSPORT_INGESS_TABLE_DECFG:
 				ecpriss_qudp_ingress_table_deconfig(&packet->payload);
 				break;
+			case ECPRISS_MESSAGE_LTE_MAC_CFG:
+				ecpriss_qudp_set_lte_mac_filter(&packet->payload);
+				break;
 			default:
 				ECPRILOGERR("Invalid message type: %s \n",packet->header.message_id);
 				break;
 		}
 	}
-	return;
 }
 
 
