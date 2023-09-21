@@ -1431,7 +1431,7 @@ static int mtip_platform_setup(void)
       }
 
       // allocate the mtip_lanes
-      for (j = 0; (j < platform_driver_priv->devices.port_devices[i].num_lane_phandles) && (j < MTIP_MAX_LINKS_PER_PORT); ++j)
+      for (j = 0; (j < platform_driver_priv->devices.port_devices[i].num_lane_phandles) && (j < MTIP_MAX_LANES_PER_PORT); ++j)
       {
          // check if this is a valid lane`
          if (platform_driver_priv->devices.port_devices[i].lane_devices[j]->lane_device_valid != 0)
@@ -1523,7 +1523,7 @@ static int mtip_platform_setup(void)
                 if (pkts[j] == NULL)
                 {
                     ret = -1;
-                    CSMLOGERR("PT:No memory,j=%d,ret=%d\n",j, ret);
+                    CSMLOGERR("memory alloc failed\n");
                     goto out;
                 }
             }

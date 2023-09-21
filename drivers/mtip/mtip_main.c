@@ -92,7 +92,7 @@ MODULE_PARM_DESC(mtip_loopback_enable_arp, "Enable ARP in loopback mode");
 
 int mtip_rumi_platform = MTIP_PLATFORM_SOC;
 module_param(mtip_rumi_platform, int, S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP);
-MODULE_PARM_DESC(mtip_rumi_platform, "Platform mode to RUMI");
+MODULE_PARM_DESC(mtip_rumi_platform, "Set Platform mode as SOC/RUMI");
 
 int mtip_dma_max_rx_buff_size = MTIP_DMA_RX_BUFF_SIZE;
 module_param(mtip_dma_max_rx_buff_size, int, S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP);
@@ -759,33 +759,36 @@ static int mtip_module_init(void)
 
    CSMLOGERR("mtip_module_init called\n");
 
+    if (mtip_rumi_platform != MTIP_PLATFORM_SOC) { 
    // process the module parameters
    // tx_delay parameter
-	for (i = 0; i < (sizeof mtip_tx_delay / sizeof (int)); i++)
-	{
-        if (mtip_tx_delay[i] != 0) 
+        for (i = 0; i < (sizeof mtip_tx_delay / sizeof (int)); i++)
         {
-            CSMLOGDBG("mtip_tx_delay[%d] = %d\n", i, mtip_tx_delay[i]);
+            if (mtip_tx_delay[i] != 0) 
+            {
+                CSMLOGDBG("mtip_tx_delay[%d] = %d\n", i, mtip_tx_delay[i]);
+            }
         }
-	}
-	CSMLOGDBG("mtip_tx_delay module params set for %d\n", mtip_tx_delay_argc);
 
-    for (i = mtip_tx_delay_argc; i < MTIP_MAX_LINKS; ++i) {
-        mtip_tx_delay[i] = TX_DELAY_DEFAULT_VAL;
-    }
+        CSMLOGDBG("mtip_tx_delay module params set for %d\n", mtip_tx_delay_argc);
 
-    // rx_delay parameter
-    for (i = 0; i < (sizeof mtip_rx_delay / sizeof (int)); i++)
-    {
-        if (mtip_rx_delay[i] != 0) 
+        for (i = mtip_tx_delay_argc; i < MTIP_MAX_LINKS; ++i) {
+            mtip_tx_delay[i] = TX_DELAY_DEFAULT_VAL;
+        }
+
+        // rx_delay parameter
+        for (i = 0; i < (sizeof mtip_rx_delay / sizeof (int)); i++)
         {
-            CSMLOGDBG("mtip_rx_delay[%d] = %d\n", i, mtip_rx_delay[i]);
+            if (mtip_rx_delay[i] != 0) 
+            {
+                CSMLOGDBG("mtip_rx_delay[%d] = %d\n", i, mtip_rx_delay[i]);
+            }
         }
-    }
-    CSMLOGDBG("mtip_rx_delay module params set for %d\n", mtip_rx_delay_argc);
+        CSMLOGDBG("mtip_rx_delay module params set for %d\n", mtip_rx_delay_argc);
 
-    for (i = mtip_rx_delay_argc; i < MTIP_MAX_LINKS; ++i) {
-        mtip_rx_delay[i] = RX_DELAY_DEFAULT_VAL;
+        for (i = mtip_rx_delay_argc; i < MTIP_MAX_LINKS; ++i) {
+            mtip_rx_delay[i] = RX_DELAY_DEFAULT_VAL;
+        }
     }
 
     CSMLOGDBG("Loopback mode is %d\n", mtip_loopback_mode);

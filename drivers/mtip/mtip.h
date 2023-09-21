@@ -66,7 +66,7 @@
 // the max size of MTU for M Plane
 #define MTIP_MAX_MPLANE_MTU_SIZE 9198
 
-#define MTIP_DMA_RX_BUFF_SIZE 2500 /* use buffers of size 1600 */
+#define MTIP_DMA_RX_BUFF_SIZE 2500 /* use buffers of size 2500 */
 
 extern int mtip_dma_max_rx_buff_size;
 extern bool enable_tx_comp_poll;
@@ -169,7 +169,7 @@ struct mtip_port_device_info
 
    // the references to lanes of the port
    u32 num_lane_phandles;
-   u32 lane_phandles[MTIP_MAX_LINKS_PER_PORT];
+   u32 lane_phandles[MTIP_MAX_LANES_PER_PORT];
 
    // the link devices
    struct mtip_link_device_info *link_devices[MTIP_MAX_LINKS_PER_PORT];
