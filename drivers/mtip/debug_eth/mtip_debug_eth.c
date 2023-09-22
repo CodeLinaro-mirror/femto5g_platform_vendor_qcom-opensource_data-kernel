@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: GPL-2.0-only
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 /**
@@ -78,6 +78,7 @@ const char * const mtip_debug_ethtool_stat_strings[] = {
 };
 
 #define MTIP_DEBUG_ETHTOOL_STATS_LEN ARRAY_SIZE(mtip_debug_ethtool_stat_strings)
+#define MTIP_ETHTOOL_PRIV_FLAGS_LEN 31
 
 #define MTIP_DEBUG_ETH_ETHTOOL_REG_OFFSET_ARRAY_SIZE 16
 int mtip_debug_eth_ethtool_reg_buffer_size;
@@ -522,6 +523,8 @@ static int mtip_debug_eth_get_sset_count(struct net_device *netdev, int sset)
   switch (sset) {
     case ETH_SS_STATS:
       return MTIP_DEBUG_ETHTOOL_STATS_LEN;
+    case ETH_SS_PRIV_FLAGS:
+      return MTIP_ETHTOOL_PRIV_FLAGS_LEN;
   default:
     return -EOPNOTSUPP;
   }
@@ -540,7 +543,14 @@ static void mtip_debug_eth_get_strings(struct net_device *netdev, u32 stringset,
       data += ETH_GSTRING_LEN;
     }
   }
-
+  else if (stringset == ETH_SS_PRIV_FLAGS)
+  {
+    for (i = 0; i < MTIP_ETHTOOL_PRIV_FLAGS_LEN; i++) {
+      strlcpy(data, mtip_ethtool_get_priv_flags_str(i),
+              ETH_GSTRING_LEN);
+	    data += ETH_GSTRING_LEN;	      
+	  }	    
+  }	
   return;
 }
 
@@ -557,6 +567,39 @@ static void mtip_debug_eth_ethtool_get_stats(struct net_device *netdev,
   return;
 }
 
+bool check_if_valid_port_config_for_debug_eth(enum mtip_port_config_enum port_config)
+{
+  switch (port_config)
+  {
+    /*
+    case MTIP_PORT_CONFIG_1x100GBASE_R:
+    case MTIP_PORT_CONFIG_1x100GBASE_R_RSFEC:
+    case MTIP_PORT_CONFIG_1x100GBASE_R_RSFEC_LL:
+    case MTIP_PORT_CONFIG_1x100GBASE_R2:
+    case MTIP_PORT_CONFIG_1x100GBASE_R2_RSFEC:
+    case MTIP_PORT_CONFIG_1x50GBASE_R:
+    case MTIP_PORT_CONFIG_1x50GBASE_R_RSFEC:
+    case MTIP_PORT_CONFIG_1x50GBASE_R2:
+    case MTIP_PORT_CONFIG_1x50GBASE_R2_RSFEC:
+    case MTIP_PORT_CONFIG_1x50GBASE_R2_LUAI:
+    case MTIP_PORT_CONFIG_1x50GBASE_R2_LUAI_FEC:
+    */
+    case MTIP_PORT_CONFIG_1x25GBASE_R:
+    case MTIP_PORT_CONFIG_1x25GBASE_R_FEC:
+    case MTIP_PORT_CONFIG_1x25GBASE_R_RSFEC:
+    case MTIP_PORT_CONFIG_1x10GBASE_R:
+    case MTIP_PORT_CONFIG_1x10GBASE_R_FEC:
+    {
+      return true;
+    }
+    default:
+    {
+      return false;
+    }
+  }
+  return false;
+}
+
 static const struct ethtool_ops mtip_debug_ethtool_ops = {
    .get_drvinfo = mtip_ethtool_getdrvinfo,
    .get_regs = mtip_debug_eth_ethtool_get_regs,
@@ -570,6 +613,8 @@ static const struct ethtool_ops mtip_debug_ethtool_ops = {
    .set_fecparam = mtip_ethtool_set_fecparam,
    .set_msglevel = mtip_ethtool_set_msglevel,
    .get_msglevel = mtip_ethtool_get_msglevel,
+   .get_priv_flags = mtip_ethtool_get_priv_flags,
+   .set_priv_flags = mtip_ethtool_set_priv_flags,
 };
 
 const struct ethtool_ops * mtip_debug_eth_get_ethtool_ops()

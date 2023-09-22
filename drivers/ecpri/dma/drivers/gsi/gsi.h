@@ -1012,6 +1012,20 @@ int gsi_alloc_evt_ring(struct gsi_evt_ring_props *props, unsigned long dev_hdl,
 int gsi_dealloc_evt_ring(unsigned long evt_ring_hdl);
 
 /**
+ * gsi_dealloc_all_evt_rings - Peripheral should call this function to
+ * de-allocate all event rings belonging to a specific ee.
+ * There should not exist any active channels using this event ring.
+ *
+ * @gsi_id:  GSI IDX for the specific EE
+ * @ee:  EE to dealloc all event
+ *
+ * This function can sleep
+ *
+ * @Return gsi_status
+ */
+int gsi_dealloc_all_evt_rings(int gsi_id, int ee);
+
+/**
  * gsi_alloc_channel - Peripheral should call this function to
  * allocate a channel
  *

@@ -38,5 +38,6 @@ typedef struct
 int ecpri_oxtor_rx_init(void);
 int ecpri_oxtor_rx_get_stats(u32 ring_id);
 int ecpri_oxtor_rx_ring_reset(u32 ring_id);
+uint32_t ecpri_oxtor_rx_get_latency(u32 ring_id);
 
 #endif /* ECPRI_OXTOR_RX_H_ */

@@ -167,6 +167,19 @@ void mtip_set_rx_mode_immediate(ecpri_dma_eth_conn_hdl_t hdl, enum ecpri_dma_not
     }
 }
 
+void mtip_set_tx_mode_immediate(ecpri_dma_eth_conn_hdl_t hdl, enum ecpri_dma_notify_mode setmode)
+{
+    int rv;
+
+    rv = (ecpri_dma_eth_driver_ops.ecpri_dma_eth_tx_mode_set)(hdl, setmode);
+
+    if (rv < 0)
+    {
+        CSMLOGDBG("Set Tx mode of hdl: %d to %d failed.. %d\n", hdl, setmode, rv);
+    }
+}
+
+
 // reset the number of pkts waiting for completion
 static int mtip_device_reset_pkt_completion_count(struct net_device *netdev)
 {
@@ -404,15 +417,6 @@ void mtip_process_tx_comp_cb(ecpri_dma_eth_conn_hdl_t hdl, struct mtip_dma_tx_co
    // decrement the pkt completion count
    mtip_device_update_pkt_completion_count(netdev, (-1*(int)num_of_completed));
 
-   // free the completion wrappers
-   for (i = 0; i < num_of_completed; ++i)
-   {
-      mtip_dma_free_completion_wrapper(comp_pkts[i]);
-   }
-
-   // free the container of comp_pkts using kfree
-   kfree(comp_pkts);
-
    pending_pkt_completion_count = mtip_device_get_pkt_completion_count(netdev);
 
    if (pending_pkt_completion_count < 0) 
@@ -467,6 +471,8 @@ void run_mtip_process_link_state(void* work_ptr)
         mtip_mac_link_up(link_index);
         // set the rx mode to IRQ
         mtip_set_rx_mode_immediate(dma_handle, setmode);
+        // set the tx mode to IRQ
+        mtip_set_tx_mode_immediate(dma_handle, setmode);
         // wake queues
         netif_tx_wake_all_queues(dev);
 
@@ -564,6 +570,7 @@ int mtip_napi_poll_tx(struct napi_struct *napi_ptr, int budget)
 {
     int rv = 0;
     int npackets = 0;
+    int num_buffers = 0;
     u32 link_index;
     u32 list_counter;
     struct net_device* dev;
@@ -572,6 +579,8 @@ int mtip_napi_poll_tx(struct napi_struct *napi_ptr, int budget)
     struct mtip_dma_tx_comp_params tx_comp_params;
     struct mtip_link_info* link = container_of(napi_ptr, struct mtip_link_info, napi_tx);
     ecpri_dma_eth_conn_hdl_t hdl = link->dma_hdl;
+    enum ecpri_dma_notify_mode setmode = ECPRI_DMA_NOTIFY_MODE_IRQ;
+    ecpri_dma_eth_conn_hdl_t actual_handle = hdl;
 
     rv = mtip_lookup_link_index_by_handle(hdl, &link_index);
 
@@ -589,13 +598,27 @@ int mtip_napi_poll_tx(struct napi_struct *napi_ptr, int budget)
 
     //CSMLOGDBG(" budget %d for link_index %d hdl %d list_size %d \n", budget, link_index, hdl, tx_comp_list_size);
 
-    if (tx_comp_list_size > 0)
+    if(!enable_tx_comp_poll)
     {
-        for (list_counter = 0; list_counter < tx_comp_list_size; list_counter++ )
+        if (tx_comp_list_size > 0)
         {
-            mtip_dma_tx_comp_list_pop(link_index, &tx_comp_params);
-            mtip_process_tx_comp_cb(hdl, &tx_comp_params);
-            npackets += tx_comp_params.num_of_completed;
+            for (list_counter = 0; list_counter < tx_comp_list_size; list_counter++ )
+            {
+                mtip_dma_tx_comp_list_pop(link_index, &tx_comp_params);
+                mtip_process_tx_comp_cb(hdl, &tx_comp_params);
+                npackets += tx_comp_params.num_of_completed;
+            }
+        }
+    }
+    else
+    {
+        // read the packets and process for tx completion 
+        rv = mtip_dma_poll_tx_comp_packets(dev, napi_ptr, hdl, budget, &npackets, &num_buffers);
+
+        // HANDLE THE ERROR
+        if (rv < 0)
+        {
+            CSMLOGERR("poll_tx_packets failed for hdl: %d\n", hdl);
         }
     }
 
@@ -605,6 +628,10 @@ int mtip_napi_poll_tx(struct napi_struct *napi_ptr, int budget)
     if (npackets < budget)
     {
         napi_complete(napi_ptr);
+        setmode = ECPRI_DMA_NOTIFY_MODE_IRQ;
+
+        // set the tx mode to IRQ
+        mtip_set_tx_mode_immediate(actual_handle, setmode);
     }
 
     return npackets;
@@ -1265,8 +1292,11 @@ static int mtip_open(struct net_device *netdev)
       // set to POLL mode
       setmode = ECPRI_DMA_NOTIFY_MODE_IRQ;
  
-      // set the rx mode to POLL
+      // set the rx mode to IRQ
       mtip_set_rx_mode_immediate(hdl, setmode);
+
+      // set the tx mode to IRQ
+      mtip_set_tx_mode_immediate(hdl, setmode);
 
       /*
        * enable napi
@@ -2736,7 +2766,9 @@ static int mtip_device_complete_port_open(u32 port_type)
 
        if (platform_driver_priv->mtip_links[link_index] != NULL)
        {
-          if (platform_driver_priv->mtip_links[link_index]->state == MTIP_LINK_STATE_OPEN_WAITING_FOR_LANES)
+          if (mtip_loopback_mode != MTIP_MODE_LOOPBACK &&
+              (platform_driver_priv->mtip_links[link_index]->state == MTIP_LINK_STATE_OPEN_WAITING_FOR_LANES ||
+               platform_driver_priv->mtip_links[link_index]->state == MTIP_LINK_STATE_DOWN))
           {
              rv = mtip_device_open_completion(link_index);
           }
@@ -2839,7 +2871,6 @@ void mtip_device_configure_port(u32 port_type)
    struct mtip_port_info *port_info;
    bool set_port_config = false;
    u32 num_links_waiting_for_lanes = 0;
-   u32 num_links_down = 0;
    u32 link_index;
    bool loopflag = true;
    int bc = 0;
@@ -2919,7 +2950,6 @@ void mtip_device_configure_port(u32 port_type)
             // check if we can reconfigure the port
             set_port_config = true;
             num_links_waiting_for_lanes = 0;
-            num_links_down = 0;
 
             // port can be reconfigured only if there are no links already open
             // and there is atleast one link waiting for lane assignment
@@ -2939,13 +2969,10 @@ void mtip_device_configure_port(u32 port_type)
                      break;
                   }
 
-                  if (platform_driver_priv->mtip_links[link_index]->state == MTIP_LINK_STATE_OPEN_WAITING_FOR_LANES)
+                  if (platform_driver_priv->mtip_links[link_index]->state == MTIP_LINK_STATE_OPEN_WAITING_FOR_LANES ||
+                      platform_driver_priv->mtip_links[link_index]->state == MTIP_LINK_STATE_DOWN)
                   {
                      ++num_links_waiting_for_lanes;
-                  }
-                  if (platform_driver_priv->mtip_links[link_index]->state == MTIP_LINK_STATE_DOWN)
-                  {
-                     ++num_links_down;
                   }
                }
             }
@@ -2958,42 +2985,12 @@ void mtip_device_configure_port(u32 port_type)
                loopflag = false;
                goto out;
             }
-            if ((num_links_waiting_for_lanes == 0) && (num_links_down == 0))
+            if (num_links_waiting_for_lanes == 0)
             {
                // there are no links waiting to be assigned lanes
                CSMLOGINFO("no links waiting for lane assignment or to be brought up");
 
                // stay in connected and exit loop
-               loopflag = false;
-               goto out;
-            }
-            else if (num_links_down != 0)
-            {
-               // there are links that are down
-               // bring them back up
-               CSMLOGINFO("num_links_down for port_type %d is %d", port_type, num_links_down);
-
-               // go through all the links of the port that are in UP or DOWN state
-               for (i = 0; i < MTIP_MAX_LINKS_PER_PORT; ++i)
-               {
-                  if (mtip_lookup_link_index_by_port_type_and_real_link(&link_index, port_type, i) == 0)
-                  {
-                     if (platform_driver_priv->mtip_links[link_index] != NULL)
-                     {
-                        if (mtip_get_link_state_by_link_index(link_index) == MTIP_LINK_STATE_DOWN)
-                        {
-                           // Notify TRX driver to enable TX
-                           rtnl_lock();
-                           mtip_phy_notify_eth_event_to_trx(link_index, IFCFG_ENABLE);
-                           rtnl_unlock();
-
-                           // bring up the phy
-                           mtip_phy_bringup_phy(link_index, platform_driver_priv->mtip_ports[port_type]->sfp_port_type);
-                        }
-                     }
-                  }
-               }
-
                loopflag = false;
                goto out;
             }

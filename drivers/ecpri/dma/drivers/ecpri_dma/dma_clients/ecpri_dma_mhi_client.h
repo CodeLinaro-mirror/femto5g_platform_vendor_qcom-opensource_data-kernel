@@ -163,6 +163,8 @@ enum ecpri_dma_hw_mhi_channel_states {
  *							ch.
  * @msi_config: MSI (Message Signaled Interrupts) parameters
  *
+ * @clnt_hdl: ENDP handle
+ *
  */
 struct ecpri_dma_mhi_channel_ctx {
 	u8 channel_id;
@@ -182,6 +184,7 @@ struct ecpri_dma_mhi_channel_ctx {
 	bool is_over_pcie;
 	bool disable_overflow_event;
 	struct mhi_dma_msi_info* msi_config;
+	u32 clnt_hdl;
 };
 
 
@@ -324,5 +327,13 @@ struct ecpri_dma_mhi_function_endp_data {
 };
 
 int ecpri_dma_mhi_provide_ops(void);
+
+/**
+ * ecpri_dma_mhi_get_vf_id() - find the vf id matching the provided tuple
+ * @ee_gsi_tuple: gsi_id, ee tuple to search for
+ *
+ * Return: vf_id matching the tupple of Linux error for error
+ */
+int ecpri_dma_mhi_get_vf_id(struct ecpri_dma_mhi_ee_gsi_tuple *ee_gsi_tuple);
 
 #endif /* _ECPRI_DMA_MHI_CLIENT_H_ */

@@ -147,6 +147,12 @@ typedef struct
 
 typedef struct
 {
+	uint32_t latency_val[4];
+
+}ecpri_oxtor_latency_val_s;
+
+typedef struct
+{
 	uint32_t  rx_kbyte[4];
 	uint64_t timer_val;
 }ecpri_oxtor_bw_rx_kbyte_val_s;
@@ -169,5 +175,6 @@ typedef struct
 #define ECPRI_OXTOR_IOCTL_BANDWIDTH_ENABLE _IOR(IOCTL_BASE, 'e',uint32_t *)
 #define ECPRI_OXTOR_IOCTL_BANDWIDTH_DISABLE _IOR(IOCTL_BASE, 'f', uint32_t *)
 #define ECPRI_OXTOR_IOCTL_GET_BANDWIDTH _IOR(IOCTL_BASE, 'g', ecpri_oxtor_bw_val_s *)
+#define ECPRI_OXTOR_IOCTL_GET_LATENCY _IOR(IOCTL_BASE, 'h', ecpri_oxtor_latency_val_s *)
 
 #endif /* ECPRI_OXTOR_IOCTL_H_ */

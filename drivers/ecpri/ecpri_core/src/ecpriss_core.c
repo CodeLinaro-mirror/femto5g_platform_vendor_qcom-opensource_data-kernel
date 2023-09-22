@@ -99,7 +99,10 @@ static int ecpriss_core_remove(struct platform_device *pdev)
 #ifndef NO_DEBUGFS_PERF
 		clear_debugfs_directory();
 #endif
+		qcom_unregister_ssr_notifier(ecpriss_pdata_v2->ssr_info->notifier_handle,&ecpriss_pdata_v2->ssr_info->nb);
 		atomic_notifier_chain_unregister(&panic_notifier_list, &ecpriss_panic);
+		mtip_ecpri_ops.eth_ecpriss_deregister_events_cb();
+		netlink_kernel_release(ecpriss_pdata_v2->netlink_socket);
 		dma_ecpri_ss_driver_ops.ecpri_dma_ecpri_ss_deregister();
 		ecpriss_qudp_irq_destroy_v2();
 		ecpriss_xbar_destroy_interrupts_v2();
@@ -107,7 +110,6 @@ static int ecpriss_core_remove(struct platform_device *pdev)
 		ecpriss_destroy_workq();
 		ecpriss_destroy_ipc_log_v2();
 		ecpriss_unmap_xbar_qudp_v2();
-		netlink_kernel_release(ecpriss_pdata_v2->netlink_socket);
 	}
 	return 0;
 }
@@ -1168,6 +1170,8 @@ void ecpriss_panic_notifr_handler(void)
 void ecpriss_panic_notifr_handler_v2(void)
 {
     int i;
+    int *flush_state = NULL;
+
 	ECPRILOGERR("ecpriss_hw_ver : %u",ecpriss_hw_ver);
 
 	ECPRILOGERR("ecpriss_pdata_v2->dev_mode : %u",ecpriss_pdata_v2->dev_mode);
@@ -1180,26 +1184,45 @@ void ecpriss_panic_notifr_handler_v2(void)
 	ECPRILOGERR("ecpriss_pdata_v2->qudp_ctx->state : %u",ecpriss_pdata_v2->qudp_ctx_v2->state);
 	ECPRILOGERR("ecpriss_pdata_v2->xbar_ctx->state : %u",ecpriss_pdata_v2->xbar_ctx_v2->state);
 	ECPRILOGERR("ecpriss_pdata_v2->state : %u",ecpriss_pdata_v2->ecpri_state);
+	ECPRILOGERR("ecpriss_pdata_v2->ssr_state : %u",ecpriss_pdata_v2->ssr_info->curr_ssr_state);
 
 	for(i=0;i<XBAR_LINKS;i++)
 	{
-		ECPRILOGERR("ecpriss_pdata_v2->xbar_ctx->stats.xbar_octx_pkt_cnt[%d]  : %u",i,ecpriss_pdata_v2->xbar_ctx_v2->stats_v2.xbar_octx_pkt_cnt[i]);
-        ECPRILOGERR(" ecpriss_pdata_v2->xbar_ctx->stats.xbar_ocrx_pkt_cnt[%d] : %u",i,ecpriss_pdata_v2->xbar_ctx_v2->stats_v2.xbar_ocrx_pkt_cnt[i]);
+		ECPRILOGERR("ecpriss_pdata_v2->xbar_ctx->stats.xbar_fhrx_pkt_cnt[%d]  : %llu",i,ecpriss_pdata_v2->xbar_ctx_v2->stats_v2.xbar_fhrx_pkt_cnt[i]);
+		ECPRILOGERR("ecpriss_pdata_v2->xbar_ctx->stats.xbar_fhtx_pkt_cnt[%d]  : %llu",i,ecpriss_pdata_v2->xbar_ctx_v2->stats_v2.xbar_fhtx_pkt_cnt[i]);
+		ECPRILOGERR("ecpriss_pdata_v2->xbar_ctx->stats.xbar_octx_pkt_cnt[%d]  : %llu",i,ecpriss_pdata_v2->xbar_ctx_v2->stats_v2.xbar_octx_pkt_cnt[i]);
+		ECPRILOGERR(" ecpriss_pdata_v2->xbar_ctx->stats.xbar_ocrx_pkt_cnt[%d] : %llu",i,ecpriss_pdata_v2->xbar_ctx_v2->stats_v2.xbar_ocrx_pkt_cnt[i]);
 	}
 
-	ECPRILOGERR("ecpriss_pdata_v2->xbar_ctx->stats.xbar_ocrx_fh_buff_watermark_fh0  : %u ",ecpriss_pdata_v2->xbar_ctx_v2->stats_v2.xbar_ocrx_fh_buff_watermark_fh0);
-	ECPRILOGERR("Vecpriss_pdata_v2->xbar_ctx->stats.xbar_ocrx_fh_buff_watermark_fh1 : %u ",ecpriss_pdata_v2->xbar_ctx_v2->stats_v2.xbar_ocrx_fh_buff_watermark_fh1);
-	ECPRILOGERR("ecpriss_pdata_v2->xbar_ctx->stats.xbar_ocrx_fh_buff_watermark_fh2  : %u ",ecpriss_pdata_v2->xbar_ctx_v2->stats_v2.xbar_ocrx_fh_buff_watermark_fh2);
+	ECPRILOGERR("ecpriss_pdata_v2->xbar_ctx->stats.xbar_fhrx_dma_pkt_cnt) %llu ",ecpriss_pdata_v2->xbar_ctx_v2->stats_v2.xbar_fhrx_dma_pkt_cnt);
+	ECPRILOGERR("ecpriss_pdata_v2->xbar_ctx->stats.xbar_fhtx_dma_pkt_cnt) %llu ",ecpriss_pdata_v2->xbar_ctx_v2->stats_v2.xbar_fhtx_dma_pkt_cnt);
 
-	ECPRILOGERR("ecpriss_pdata_v2->xbar_ctx->stats.octx_oc_0_1_buff_watermark_cc0 : %u ",ecpriss_pdata_v2->xbar_ctx_v2->stats_v2.octx_oc_0_1_buff_watermark_cc0);
-	ECPRILOGERR("ecpriss_pdata_v2->xbar_ctx->stats.octx_oc_0_1_buff_watermark_cc1 : %u ",ecpriss_pdata_v2->xbar_ctx_v2->stats_v2.octx_oc_0_1_buff_watermark_cc1);
-	ECPRILOGERR("ecpriss_pdata_v2->xbar_ctx->stats.octx_oc_2_3_buff_watermark_cc2 : %u ",ecpriss_pdata_v2->xbar_ctx_v2->stats_v2.octx_oc_2_3_buff_watermark_cc2);
-	ECPRILOGERR("ecpriss_pdata_v2->xbar_ctx->stats.octx_oc_2_3_buff_watermark_cc3 : %u ",ecpriss_pdata_v2->xbar_ctx_v2->stats_v2.octx_oc_2_3_buff_watermark_cc3);
+	ECPRILOGERR("ecpriss_pdata_v2->xbar_ctx->stats.xbar_ocrx_fh_buff_watermark_fh0  : %llu ",ecpriss_pdata_v2->xbar_ctx_v2->stats_v2.xbar_ocrx_fh_buff_watermark_fh0);
+	ECPRILOGERR("Vecpriss_pdata_v2->xbar_ctx->stats.xbar_ocrx_fh_buff_watermark_fh1 : %llu ",ecpriss_pdata_v2->xbar_ctx_v2->stats_v2.xbar_ocrx_fh_buff_watermark_fh1);
+	ECPRILOGERR("ecpriss_pdata_v2->xbar_ctx->stats.xbar_ocrx_fh_buff_watermark_fh2  : %llu ",ecpriss_pdata_v2->xbar_ctx_v2->stats_v2.xbar_ocrx_fh_buff_watermark_fh2);
 
-	ECPRILOGERR("ecpriss_pdata_v2->xbar_ctx->stats.xbar_dbg_ocrx_0_1_buff_watermark_cc0 : %u ",ecpriss_pdata_v2->xbar_ctx_v2->stats_v2.xbar_dbg_ocrx_0_1_buff_watermark_cc0);
-	ECPRILOGERR("ecpriss_pdata_v2->xbar_ctx->stats.xbar_dbg_ocrx_0_1_buff_watermark_cc1 : %u ",ecpriss_pdata_v2->xbar_ctx_v2->stats_v2.xbar_dbg_ocrx_0_1_buff_watermark_cc1);
-	ECPRILOGERR("ecpriss_pdata_v2->xbar_ctx->stats.xbar_dbg_ocrx_2_3_buff_watermark_cc2 : %u ",ecpriss_pdata_v2->xbar_ctx_v2->stats_v2.xbar_dbg_ocrx_2_3_buff_watermark_cc2);
-	ECPRILOGERR("ecpriss_pdata_v2->xbar_ctx->stats.xbar_dbg_ocrx_2_3_buff_watermark_cc3 : %u ",ecpriss_pdata_v2->xbar_ctx_v2->stats_v2.xbar_dbg_ocrx_2_3_buff_watermark_cc3);
+	ECPRILOGERR("ecpriss_pdata_v2->xbar_ctx->stats.octx_oc_0_1_buff_watermark_cc0 : %llu ",ecpriss_pdata_v2->xbar_ctx_v2->stats_v2.octx_oc_0_1_buff_watermark_cc0);
+	ECPRILOGERR("ecpriss_pdata_v2->xbar_ctx->stats.octx_oc_0_1_buff_watermark_cc1 : %llu ",ecpriss_pdata_v2->xbar_ctx_v2->stats_v2.octx_oc_0_1_buff_watermark_cc1);
+	ECPRILOGERR("ecpriss_pdata_v2->xbar_ctx->stats.octx_oc_2_3_buff_watermark_cc2 : %llu ",ecpriss_pdata_v2->xbar_ctx_v2->stats_v2.octx_oc_2_3_buff_watermark_cc2);
+	ECPRILOGERR("ecpriss_pdata_v2->xbar_ctx->stats.octx_oc_2_3_buff_watermark_cc3 : %llu ",ecpriss_pdata_v2->xbar_ctx_v2->stats_v2.octx_oc_2_3_buff_watermark_cc3);
+
+	ECPRILOGERR("ecpriss_pdata_v2->xbar_ctx->stats.xbar_dbg_ocrx_0_1_buff_watermark_cc0 : %llu ",ecpriss_pdata_v2->xbar_ctx_v2->stats_v2.xbar_dbg_ocrx_0_1_buff_watermark_cc0);
+	ECPRILOGERR("ecpriss_pdata_v2->xbar_ctx->stats.xbar_dbg_ocrx_0_1_buff_watermark_cc1 : %llu ",ecpriss_pdata_v2->xbar_ctx_v2->stats_v2.xbar_dbg_ocrx_0_1_buff_watermark_cc1);
+	ECPRILOGERR("ecpriss_pdata_v2->xbar_ctx->stats.xbar_dbg_ocrx_2_3_buff_watermark_cc2 : %llu ",ecpriss_pdata_v2->xbar_ctx_v2->stats_v2.xbar_dbg_ocrx_2_3_buff_watermark_cc2);
+	ECPRILOGERR("ecpriss_pdata_v2->xbar_ctx->stats.xbar_dbg_ocrx_2_3_buff_watermark_cc3 : %llu ",ecpriss_pdata_v2->xbar_ctx_v2->stats_v2.xbar_dbg_ocrx_2_3_buff_watermark_cc3);
+
+	ECPRILOGERR("ecpriss_pdata_v2->xbar_ctx->stats.xbar_dbg_fhrx_unknown_pcid_cnt_fhrx_0_cnt) %llu ",ecpriss_pdata_v2->xbar_ctx_v2->stats_v2.xbar_dbg_fhrx_unknown_pcid_cnt_fhrx_0_cnt);
+	ECPRILOGERR("ecpriss_pdata_v2->xbar_ctx->stats.xbar_dbg_fhrx_unknown_pcid_cnt_fhrx_1_cnt) %llu ",ecpriss_pdata_v2->xbar_ctx_v2->stats_v2.xbar_dbg_fhrx_unknown_pcid_cnt_fhrx_1_cnt);
+	ECPRILOGERR("ecpriss_pdata_v2->xbar_ctx->stats.xbar_dbg_fhrx_unknown_pcid_cnt_fhrx_2_cnt) %llu ",ecpriss_pdata_v2->xbar_ctx_v2->stats_v2.xbar_dbg_fhrx_unknown_pcid_cnt_fhrx_2_cnt);
+
+	ECPRILOGERR("ecpriss_pdata_v2->xbar_ctx->stats.xbar_dbg_ocrx_unknown_pcid_cnt_ocrx_fh_0_cnt) %llu ",ecpriss_pdata_v2->xbar_ctx_v2->stats_v2.xbar_dbg_ocrx_unknown_pcid_cnt_ocrx_fh_0_cnt);
+	ECPRILOGERR("ecpriss_pdata_v2->xbar_ctx->stats.xbar_dbg_ocrx_unknown_pcid_cnt_ocrx_fh_1_cnt) %llu ",ecpriss_pdata_v2->xbar_ctx_v2->stats_v2.xbar_dbg_ocrx_unknown_pcid_cnt_ocrx_fh_1_cnt);
+	ECPRILOGERR("ecpriss_pdata_v2->xbar_ctx->stats.xbar_dbg_ocrx_unknown_pcid_cnt_ocrx_fh_2_cnt) %llu ",ecpriss_pdata_v2->xbar_ctx_v2->stats_v2.xbar_dbg_ocrx_unknown_pcid_cnt_ocrx_fh_2_cnt);
+
+	flush_state = (int *)&ecpriss_pdata_v2->xbar_ctx_v2->xbar_flush_status;
+	if(flush_state) {
+		ECPRILOGERR("ecpriss_pdata_v2->xbar_ctx->flush_state) 0x%x ", *flush_state);
+	}
 }
 
 static int ecpriss_core_data_init(void)
@@ -1278,7 +1301,6 @@ static int ecpriss_core_data_init_v2(void)
 	ecpriss_pdata_v2->events_workqueue = &events_workqueue_g;
 	ecpriss_pdata_v2->interrupts_workqueue = &interrupts_workqueue_g;
 	spin_lock_init(&ecpriss_pdata_v2->irq_lock);
-	atomic_notifier_chain_register(&panic_notifier_list,&ecpriss_panic);
 	ecpriss_pdata_v2->ecpriss_core_logbuf =
         ipc_log_context_create(ECPRISS_CORE_IPC_LOG_PAGES,
                 "ecpriss_core", 0);
@@ -1307,10 +1329,11 @@ static int ecpriss_core_data_init_v2(void)
 		qudp_ctx_g.ecpriss_qudp_hal_ctx;
 	ecpriss_pdata_v2->xbar_ctx_v2->ecpriss_xbar_hal = xbar_ctx_g_v2.ecpriss_xbar_hal;
 	ecpriss_pdata_v2->ssr_info = &ssr_info_g;
-	/* ecpriss_pdata->stats = &stats_g; */
 
 	eth_topology_ready_cb = &ecpriss_eth_topology_cb_v2;
 	eth_interface_events_cb = &ecpriss_eth_events_cb_v2;
+
+	atomic_notifier_chain_register(&panic_notifier_list,&ecpriss_panic);
 	do {
 		ret = ecpriss_initialize_workq_v2();
 		if(ret < 0) {

@@ -904,12 +904,19 @@ int qcom_aw_phy_bringup_anlt_mode(mss_access_t *mss,
                                 bool lanes_enabled[PHY_LANE_MAX]){
   enum eth_phy_iface_phy_lane_num_enum i = PHY_LANE_0;
   enum eth_phy_iface_phy_lane_num_enum ref_lane;
+  enum eth_phy_iface_phy_lane_num_enum temp_lane = PHY_LANE_0;
   int ret_val = 0;
   uint32_t temp_adv_ability[PHY_SPEED_SPEC_MAX];
   uint32_t temp_fec_ability[PHY_FEC_SPEC_MAX];
 
   memset(temp_adv_ability, 0, PHY_SPEED_SPEC_MAX*sizeof(uint32_t));
   memset(temp_fec_ability, 0, PHY_FEC_SPEC_MAX*sizeof(uint32_t));
+
+  for (temp_lane = PHY_LANE_0; temp_lane < PHY_LANE_MAX; temp_lane++)
+  {
+    if (lanes_enabled[temp_lane] == true)
+      phy_inst_info->lane_params[temp_lane].lane_bring_up_status = true;
+  }
 
   /* For Debug port, hard code the master lane as lane 2 */
   if(phy_inst_info->phy_inst == QCOM_AW_PHY_INST_DEBUG)
@@ -927,11 +934,10 @@ int qcom_aw_phy_bringup_anlt_mode(mss_access_t *mss,
       continue;
     }
 
-    phy_inst_info->lane_params[i].lane_bring_up_status = true;
-
-    /* Skip AN for reference lane as it was already done with initiate
+    /* Skip AN for reference lane as it was already done with AN initiate
        procedure */
-    if(i == ref_lane){
+    if(i == ref_lane &&
+       phy_inst_info->bring_up_status == false){
       i += qcom_aw_phy_get_num_lanes_for_speed_mode(
                                  phy_inst_info->an_params.an_result[ref_lane]);
       continue;
@@ -947,6 +953,15 @@ int qcom_aw_phy_bringup_anlt_mode(mss_access_t *mss,
     temp_adv_ability[phy_inst_info->an_params.an_result[ref_lane]] = 1;
     temp_fec_ability[phy_inst_info->an_params.an_fec_result[ref_lane]] = 1;
     phy_inst_info->an_params.current_lane = i;
+
+    /* Just trigger CDR lock successful callback if reference lane was already
+       negotiated but was not brought up by MAC earlier post initiate AN */
+       if(i == ref_lane &&
+          phy_inst_info->an_params.an_state[ref_lane] == PHY_AN_STATE_DONE){
+         qcom_aw_phy_handle_cdr_lock_status(phy_inst_info, ref_lane,
+                                            CDR_LOCK_SUCCESS);
+         return ret_val;
+       }
 
     qcom_aw_phy_perform_an(phy_inst_info, temp_adv_ability, temp_fec_ability);
 
@@ -1101,12 +1116,16 @@ int qcom_aw_phy_bringup_manual_eq_mode(
 
   if ((config.rate == 2) || (config.rate == 3)) {
     aw_pmd_enable_pam4_mode(mss, 1);
+    aw_pmd_rx_pam4_precoder_enable_set(mss, 1, 0);
+    aw_pmd_tx_pam4_precoder_enable_set(mss, 1, 0);
+    aw_pmd_tx_pam4_precoder_override_set(mss, 1);
   }
 
   /* Configuration for Near End Parallel Loopback mode */
   if (qcom_aw_phy_get_loopback_mode() == QCOM_AW_PHY_NEAR_END_PARALLEL_LB) {
     QCOM_AW_PHY_LOG_INFO("Configuring PHY for near end parallel LB");
     aw_pmd_nep_loopback_set(mss, 1);
+    qcom_aw_phy_handle_cdr_lock_status(phy_inst_info, lane, CDR_LOCK_SUCCESS);
     return ret_val;
   }
 
@@ -1377,6 +1396,9 @@ int qcom_aw_phy_teardown(enum mtip_port_type_enum port_type,
 
    /* Get the lane specific info for the provided lane */
     phy_lane_params = &phy_inst_info->lane_params[lane];
+    if(phy_lane_params->lane_bring_up_status == false)
+      continue;
+
     if (phy_lane_params->lane_config.lane_enabled == false) {
       ret_val = EINVAL;
       local_err_val = LOCAL_ERROR_3;
@@ -1397,6 +1419,7 @@ int qcom_aw_phy_teardown(enum mtip_port_type_enum port_type,
 
     /* Reset AN and LT */
     qcom_aw_phy_reset_anlt(&mss);
+    phy_inst_info->an_params.an_state[lane] = PHY_AN_STATE_NONE;
 
     /* TX power down */
     aw_err_val = aw_pmd_iso_request_tx_state_change(
@@ -1467,6 +1490,7 @@ int qcom_aw_phy_teardown(enum mtip_port_type_enum port_type,
 
         /* Reset AN and LT */
         qcom_aw_phy_reset_anlt(&mss);
+        phy_inst_info->an_params.an_state[lane_temp] = PHY_AN_STATE_NONE;
 
         mutex_unlock(&phy_inst_info->lane_lock[lane_temp]);
       }
@@ -1785,6 +1809,7 @@ void qcom_aw_phy_handle_an_link_good(struct work_struct *work){
     for(i=wq_params->lane_num; i<PHY_LANE_MAX; i++){
       pmd_set_lane(&temp_mss, i);
       qcom_aw_phy_reset_anlt(&temp_mss);
+      phy_inst_info->an_params.an_state[i] = PHY_AN_STATE_NONE;
     }
 
     phy_inst_info->an_params.an_state[wq_params->lane_num] =
@@ -2011,6 +2036,13 @@ void qcom_aw_phy_handle_rx_sig_detect(struct work_struct *work){
           }
 
           aw_pmd_txfir_config_set(&mss, &txfir_cfg, 1);
+
+          if ((config.rate == 2) || (config.rate == 3)) {
+             aw_pmd_enable_pam4_mode(&mss, 1);
+             aw_pmd_rx_pam4_precoder_enable_set(&mss, 1, 0);
+             aw_pmd_tx_pam4_precoder_enable_set(&mss, 1, 0);
+             aw_pmd_tx_pam4_precoder_override_set(&mss, 1);
+          }
 
           /* Delay before triggering RX equalization */
           mdelay(500);

@@ -58,6 +58,15 @@ struct ecpri_dma_dynamic_vf_params {
 void ecpri_dma_dp_tx_comp_hdlr(struct gsi_chan_xfer_notify *notify);
 
 /**
+ * ecpri_dma_dp_tx_comp_poll_irq_hdlr() - Tx completion handler for Tx poll
+ * @notify:	[in] GSI completion notification
+ *
+ * Scheduale tasklet to complete Tx completion handling for Tx ENDPs supporting
+ * polling
+ */
+void ecpri_dma_dp_tx_comp_poll_irq_hdlr(struct gsi_chan_xfer_notify *notify);
+
+/**
  * ecpri_dma_dp_rx_comp_hdlr() - Rx completion handler
  * @notify:	[in] GSI completion notification
  *
@@ -103,6 +112,13 @@ void ecpri_dma_dp_tasklet_exception_notify(unsigned long data);
 void ecpri_dma_tasklet_transmit_done(unsigned long data);
 
 /**
+ * ecpri_dma_tasklet_tx_poll_irq() - Tx endp completion handler for poll cntxt
+ *
+ * @data:	[in] Tx endp context
+ */
+void ecpri_dma_tasklet_tx_poll_irq(unsigned long data);
+
+/**
  * ecpri_dma_tasklet_rx_done() - Rx endp completion handler
  *
  * @data:	[in] Rx endp context
@@ -131,7 +147,7 @@ int ecpri_dma_dp_transmit(struct ecpri_dma_endp_context *endp,
 			  bool commit);
 
 /**
- * ecpri_dma_dp_rx_poll() - Poll for completed Rx packets from DMA HW
+ * ecpri_dma_dp_poll() - Poll for completed Rx packets from DMA HW
  * @endp:	[in] Exception endp context
  * @budget: [in] Maximum number of packets to poll
  * @pkts: [out] Array of packets polled from HW
@@ -139,7 +155,7 @@ int ecpri_dma_dp_transmit(struct ecpri_dma_endp_context *endp,
  *
  * Returns:	0 on success, negative on failure
  */
-int ecpri_dma_dp_rx_poll(struct ecpri_dma_endp_context *endp, u32 budget,
+int ecpri_dma_dp_poll(struct ecpri_dma_endp_context *endp, u32 budget,
 			 struct ecpri_dma_pkt_completion_wrapper **pkts,
 			 u32 *actual_num);
 

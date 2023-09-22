@@ -1162,7 +1162,7 @@ static int ecpri_dma_dp_test_alloc_and_start_endp(
 
 	ret = ecpri_dma_alloc_endp(endp_ptr->gsi_id, endp_ptr->id,
 		ECPRI_DMA_DP_TEST_RING_LEN, &mod_cfg, false,
-		notify);
+		notify, false);
 
 	if (ret) {
 		DMA_UT_LOG("Failed to allocte test ENDP id: %d  gsi_id: %d\n",
@@ -1598,7 +1598,7 @@ static int ecpri_dma_dp_test_suite_verify_rx(
 		actual_num = 0;
 
 		/* actual_num is in packets, need to check for jumbo packets */
-		res = ecpri_dma_dp_rx_poll(rx_endp, ECPRI_DMA_DP_TEST_RX_BUDGET,
+		res = ecpri_dma_dp_poll(rx_endp, ECPRI_DMA_DP_TEST_RX_BUDGET,
 			rx_pkts, &actual_num);
 		if (res || !actual_num) {
 			DMA_UT_LOG("Test failed to perform rx poll, res = %d, actual = %d",
@@ -2055,7 +2055,7 @@ static int ecpri_dma_dp_test_suite_tx_header(void *priv) {
 	/* Get Rx packets */
 	/* Test is sending single buffer packets so actual_num == number
 			of buffers, no need to check for EOT */
-	ret = ecpri_dma_dp_rx_poll(
+	ret = ecpri_dma_dp_poll(
 			redirect_endp->endp_ctx,
 			ECPRI_DMA_DP_TEST_RX_BUDGET,
 			rx_pkts,
@@ -2308,7 +2308,7 @@ static int ecpri_dma_dp_test_suite_tx_broadcast(void *priv) {
 		/* Test is sending single buffer packets so actual_num == number
 			of buffers, no need to check for EOT */
 		ret =
-			ecpri_dma_dp_rx_poll(broadcast_endps_arr[i]->endp_ctx,
+			ecpri_dma_dp_poll(broadcast_endps_arr[i]->endp_ctx,
 								ECPRI_DMA_DP_TEST_RX_BUDGET,
 								rx_pkt_wrapper, &actual_number);
 		if (ret != 0) {

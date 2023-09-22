@@ -502,6 +502,9 @@ int aw_pmd_tx_pam4_precoder_enable_set(mss_access_t *mss, uint32_t gray_en,
 
 int aw_pmd_rx_pam4_precoder_override_set(mss_access_t *mss, uint32_t en);
 
+int aw_pmd_rx_pam4_precoder_enable_set(mss_access_t *mss, uint32_t gray_en,
+                                       uint32_t plusd_en);
+
 int aw_pmd_remote_loopback_set(mss_access_t *mss,
                                uint32_t remote_loopback_enable);
 

@@ -5063,42 +5063,42 @@ static const struct dma_gsi_ep_config ecpri_dma_endp_mapping
 		[14] = { true, 12, 32, 32, ECPRI_DMA_EE_VF1,
 			GSI_SMART_PRE_FETCH, ECPRI_DMA_TLV_TRSHLD,
 			ECPRI_DMA_ENDP_DIR_SRC,
-			ECPRI_DMA_ENDP_STREAM_MODE_M2S, {{0, 0}},
+			ECPRI_DMA_ENDP_STREAM_MODE_M2S, {{2, 1}},
 			false, ECPRI_DMA_ENDP_STREAM_DEST_FH,
 			false, ECPRI_DMA_VM_IDS_NONE, true},
 		[ECPRI_HW_V2_0][ECPRI_HW_FLAVOR_DU_PCIE_3_X_12][ECPRI_DMA_GSI_ID_1]
 		[15] = { true, 14, 32, 32, ECPRI_DMA_EE_VF1,
 			GSI_SMART_PRE_FETCH, ECPRI_DMA_TLV_TRSHLD,
 			ECPRI_DMA_ENDP_DIR_SRC,
-			ECPRI_DMA_ENDP_STREAM_MODE_M2S, {{1, 0}},
+			ECPRI_DMA_ENDP_STREAM_MODE_M2S, {{3, 1}},
 			false, ECPRI_DMA_ENDP_STREAM_DEST_FH,
 			false, ECPRI_DMA_VM_IDS_NONE, true},
 		[ECPRI_HW_V2_0][ECPRI_HW_FLAVOR_DU_PCIE_3_X_12][ECPRI_DMA_GSI_ID_1]
 		[16] = { true, 16, 32, 32, ECPRI_DMA_EE_VF1,
 			GSI_SMART_PRE_FETCH, ECPRI_DMA_TLV_TRSHLD,
 			ECPRI_DMA_ENDP_DIR_SRC,
-			ECPRI_DMA_ENDP_STREAM_MODE_M2S, {{2, 0}},
+			ECPRI_DMA_ENDP_STREAM_MODE_M2S, {{0, 2}},
 			false, ECPRI_DMA_ENDP_STREAM_DEST_FH,
 			false, ECPRI_DMA_VM_IDS_NONE, true},
 		[ECPRI_HW_V2_0][ECPRI_HW_FLAVOR_DU_PCIE_3_X_12][ECPRI_DMA_GSI_ID_1]
 		[17] = { true, 18, 32, 32, ECPRI_DMA_EE_VF1,
 			GSI_SMART_PRE_FETCH, ECPRI_DMA_TLV_TRSHLD,
 			ECPRI_DMA_ENDP_DIR_SRC,
-			ECPRI_DMA_ENDP_STREAM_MODE_M2S, {{3, 0}},
+			ECPRI_DMA_ENDP_STREAM_MODE_M2S, {{1, 2}},
 			false, ECPRI_DMA_ENDP_STREAM_DEST_FH,
 			false, ECPRI_DMA_VM_IDS_NONE, true},
 		[ECPRI_HW_V2_0][ECPRI_HW_FLAVOR_DU_PCIE_3_X_12][ECPRI_DMA_GSI_ID_1]
 		[18] = { true, 20, 32, 32, ECPRI_DMA_EE_VF1,
 			GSI_SMART_PRE_FETCH, ECPRI_DMA_TLV_TRSHLD,
 			ECPRI_DMA_ENDP_DIR_SRC,
-			ECPRI_DMA_ENDP_STREAM_MODE_M2S, {{0, 1}},
+			ECPRI_DMA_ENDP_STREAM_MODE_M2S, {{2, 2}},
 			false, ECPRI_DMA_ENDP_STREAM_DEST_FH,
 			false, ECPRI_DMA_VM_IDS_NONE, true},
 		[ECPRI_HW_V2_0][ECPRI_HW_FLAVOR_DU_PCIE_3_X_12][ECPRI_DMA_GSI_ID_1]
 		[19] = { true, 22, 32, 32, ECPRI_DMA_EE_VF1,
 			GSI_SMART_PRE_FETCH, ECPRI_DMA_TLV_TRSHLD,
 			ECPRI_DMA_ENDP_DIR_SRC,
-			ECPRI_DMA_ENDP_STREAM_MODE_M2S, {{1, 1}},
+			ECPRI_DMA_ENDP_STREAM_MODE_M2S, {{3, 2}},
 			false, ECPRI_DMA_ENDP_STREAM_DEST_FH,
 			false, ECPRI_DMA_VM_IDS_NONE, true},
 		[ECPRI_HW_V2_0][ECPRI_HW_FLAVOR_DU_PCIE_3_X_12][ECPRI_DMA_GSI_ID_1]
@@ -9474,10 +9474,17 @@ int ecpri_dma_gsi_setup_transfer_ring(struct ecpri_dma_endp_context *ep,
 	gsi_channel_props.empty_lvl_threshold = gsi_ep_info->prefetch_threshold;
 	gsi_channel_props.ee = gsi_ep_info->ee;
 	gsi_channel_props.gsi_id = ep->gsi_id;
+	gsi_channel_props.tx_poll = ep->enable_tx_poll;
 
 	gsi_channel_props.err_cb = ecpri_dma_gsi_chan_err_cb;
-	if (gsi_ep_info->dir == ECPRI_DMA_ENDP_DIR_SRC)
-		gsi_channel_props.xfer_cb = ecpri_dma_dp_tx_comp_hdlr;
+	if (gsi_ep_info->dir == ECPRI_DMA_ENDP_DIR_SRC) {
+		if (ep->enable_tx_poll) {
+			gsi_channel_props.xfer_cb = ecpri_dma_dp_tx_comp_poll_irq_hdlr;
+		}
+		else {
+			gsi_channel_props.xfer_cb = ecpri_dma_dp_tx_comp_hdlr;
+		}
+	}
 	else {
 		gsi_channel_props.xfer_cb = ecpri_dma_dp_rx_comp_hdlr;
 		//TODO: Ucomment whem impelemnting cleanup_cb
@@ -9695,11 +9702,6 @@ int ecpri_dma_gsi_start_channel(struct ecpri_dma_endp_context *ep)
 	return ret;
 }
 
-u32 ecpri_dma_get_sw_ver()
-{
-	return ecpri_dma_ctx->driver_ver;
-}
-
 u32 ecpri_dma_get_ctx_hw_ver()
 {
 	return ecpri_dma_ctx->ecpri_hw_ver;
@@ -9738,4 +9740,63 @@ struct device* ecpri_dma_get_pdev(void)
 		return NULL;
 
 	return ecpri_dma_ctx->pdev;
+}
+
+int ecpri_dma_filter_endps(
+	struct ecpri_dma_endp_filter *filter,
+	struct ecpri_dma_endp_gsi_tuple  *endpoint_list,
+	size_t max_size
+	)
+{
+	int list_index = 0;
+	const struct dma_gsi_ep_config *cur_endp;
+	int gsi_id_start, gsi_id_end;
+	int gsi_id, endp_id;
+
+	if(NULL == endpoint_list)
+		return -EINVAL;
+
+	if (NULL == filter)
+		return -EINVAL;
+
+	if (!ecpri_dma_ctx || !(ecpri_dma_ctx->endp_map)) {
+		DMAERR("ecpri_dma_ctx or ecpri_dma_ctx->endp_map are NULL\n");
+		return -EFAULT;
+	}
+
+	if (filter->gsi_id_enable) {
+		gsi_id_start = filter->gsi_id;
+		gsi_id_end = filter->gsi_id + 1;
+	} else {
+		gsi_id_start = 0;
+		gsi_id_end = ECPRI_DMA_GSI_NUM_MAX;
+	}
+
+	for (gsi_id = gsi_id_start; gsi_id < gsi_id_end; gsi_id++)
+		for (endp_id = 0; endp_id < ECPRI_DMA_ENDP_NUM_MAX; endp_id++) {
+
+			cur_endp = &(*ecpri_dma_ctx->endp_map)[gsi_id][endp_id];
+
+			if (filter->valid_enable && filter->valid != cur_endp->valid)
+				continue;
+
+			if (filter->ee_enable && filter->ee != cur_endp->ee)
+				continue;
+
+			if (filter->dir_enable && filter->dir != cur_endp->dir)
+				continue;
+
+			if (filter->dest_enable && filter->dest != cur_endp->dest)
+				continue;
+
+			endpoint_list[list_index].endp_id = endp_id;
+			endpoint_list[list_index].gsi_id = gsi_id;
+
+			list_index++;
+
+			if (list_index == max_size)
+				return list_index;
+	}
+
+	return list_index;
 }

@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: GPL-2.0-only
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 /**
@@ -36,14 +36,17 @@
 
 #define RX_SIGNAL_DETECT_RETRY_DELAY_TIMER 10
 
-/* Module parameters */
-static enum qcom_aw_phy_loopback_mode_enum qcom_aw_phy_loopback_mode;
-
 /* Global to store the device level PHY information */
 static struct qcom_aw_phy_config qcom_aw_phy_config_info;
 
 /* Global to cache CXO clock reference */
 struct clk *cxo_clk = NULL;
+
+/* Module parameters */
+int qcom_aw_phy_loopback_mode = QCOM_AW_PHY_NO_LB;
+module_param(qcom_aw_phy_loopback_mode, int,
+                  S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP);
+MODULE_PARM_DESC(qcom_aw_phy_loopback_mode, "PHY loopback mode");
 
 int qcom_aw_phy_ref_clk_mode = 0;
 module_param(qcom_aw_phy_ref_clk_mode, int,
@@ -888,6 +891,11 @@ static void qcom_aw_phy_hw_init() {
       qcom_aw_phy_load_hexfile(
           &mss, "/lib/firmware/qcom_aw_phy/eth_custom_rates_1.hex");
 
+      if(phy_inst_type == QCOM_AW_PHY_INST_DEBUG){
+        iowrite32(0x4, phy_inst_info->wrapper_base_addr +
+                             QCOM_AW_PHY_WRAPPER_PHY_ICTL_AN_MASTER_CFG_OFFSET);
+      }
+
 #ifndef FEATURE_QCOM_AW_RUMI_SW
       /* Register for PHY status IRQ */
       ret_val = devm_request_irq(
@@ -1159,7 +1167,6 @@ static int __init qcom_aw_phy_init(void) {
   int ret_val;
 
   memset(&qcom_aw_phy_config_info, 0, sizeof(struct qcom_aw_phy_config));
-  qcom_aw_phy_loopback_mode = QCOM_AW_PHY_NO_LB;
 
   qcom_aw_phy_config_info.phy_ipc_log_buf =
                                ipc_log_context_create(PHY_IPC_LOG_PAGES,

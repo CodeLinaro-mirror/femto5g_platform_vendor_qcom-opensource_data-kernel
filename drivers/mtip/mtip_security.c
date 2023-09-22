@@ -63,11 +63,11 @@ static int __register_security_device(struct mtip_security_device *sdev, u32 lin
 	if (!link || port_type != sdev->port_id)
 		return __register_security_device(sdev, link_index + 1);
 
-	tx_link_id = link->link_index;
+	rx_link_id = tx_link_id = link->link_index;
+
 #ifdef MTIP_LOOPBACK_SWAP_HANDLE
-	rx_link_id = tx_link_id ^ 0x1;
-#else
-	rx_link_id = tx_link_id;
+	if (mtip_loopback_mode != MTIP_MODE_DEFAULT)
+		rx_link_id ^= 0x1;
 #endif
 
 	netdev = link->dev;

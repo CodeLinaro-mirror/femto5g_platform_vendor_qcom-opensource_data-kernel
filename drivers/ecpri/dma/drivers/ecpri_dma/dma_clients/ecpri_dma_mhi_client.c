@@ -634,7 +634,7 @@ static void ecpri_dma_mhi_memcpy_async_notify_comp(
 
 	/* memcpy uses single buffer packet so actual_num == num of buffers
 		no need to check for EOT */
-	ret = ecpri_dma_dp_rx_poll(endp,
+	ret = ecpri_dma_dp_poll(endp,
 				   ECPRI_DMA_MHI_CLIENT_MEMCPY_ASYNC_BUDGET,
 				   async_pkts, &actual_num);
 	if (ret) {
@@ -708,7 +708,7 @@ static int ecpri_dma_mhi_alloc_sync_async_endps(
 		endp_ctx[gsi_id][sync_src_endp_id].eventless_endp = true;
 
 	ret = ecpri_dma_alloc_endp(gsi_id, sync_src_endp_id,
-		ECPRI_DMA_MHI_MEMCPY_RLEN, mod_cfg, false, NULL);
+		ECPRI_DMA_MHI_MEMCPY_RLEN, mod_cfg, false, NULL, false);
 	if (ret != 0) {
 		DMAERR("Unable to allocate SYNC_SRC ENDP, endp_id: %d\n",
 			sync_src_endp_id);
@@ -717,7 +717,7 @@ static int ecpri_dma_mhi_alloc_sync_async_endps(
 
 	ret = ecpri_dma_alloc_endp(gsi_id,
 		sync_dest_endp_id, ECPRI_DMA_MHI_MEMCPY_RLEN,
-		mod_cfg, false, NULL);
+		mod_cfg, false, NULL, false);
 	if (ret != 0) {
 		DMAERR("Unable to allocate SYNC_DEST ENDP, endp_id: %d\n",
 			sync_dest_endp_id);
@@ -741,7 +741,7 @@ static int ecpri_dma_mhi_alloc_sync_async_endps(
 		endp_ctx[gsi_id][async_src_endp_id].eventless_endp = true;
 	ret = ecpri_dma_alloc_endp(gsi_id,
 		async_src_endp_id, ECPRI_DMA_MHI_MEMCPY_RLEN,
-		mod_cfg, false, NULL);
+		mod_cfg, false, NULL, false);
 	if (ret != 0) {
 		DMAERR("Unable to allocate ASYNC_SRC ENDP, endp_id: %d\n",
 			async_src_endp_id);
@@ -751,7 +751,7 @@ static int ecpri_dma_mhi_alloc_sync_async_endps(
 	ret = ecpri_dma_alloc_endp(gsi_id,
 		async_dest_endp_id, ECPRI_DMA_MHI_MEMCPY_RLEN,
 		mod_cfg, false,
-		ecpri_dma_mhi_memcpy_async_notify_comp);
+		ecpri_dma_mhi_memcpy_async_notify_comp, false);
 	if (ret != 0) {
 		DMAERR("Unable to allocate ASYNC_DEST ENDP, endp_id: %d\n",
 			async_dest_endp_id);
@@ -1524,7 +1524,7 @@ static int ecpri_dma_mhi_dma_sync_memcpy(
 
 		/* memcpy uses single buffer packet so actual_num == num of buffers
 		no need to check for EOT */
-		ret = ecpri_dma_dp_rx_poll(memcpy_ctx->sync_dest_endp, 1,
+		ret = ecpri_dma_dp_poll(memcpy_ctx->sync_dest_endp, 1,
 			&pkt_wrapper, &actual_num);
 		if (ret != 0) {
 			DMAERR("Unable to poll\n");
@@ -2282,73 +2282,6 @@ fail_ready_state:
 }
 
 /**
- * ecpri_dma_mhi_destroy() - Destroy MHI DMA
- *
- * This function is called by MHI client driver on MHI reset to destroy all DMA
- * MHI resources.
- *
- */
-static void ecpri_dma_mhi_destroy(
-	struct mhi_dma_function_params function)
-{
-	int idx;
-	int ret;
-
-	ret = ecpri_dma_mhi_get_function_context_index(
-		function, &idx, ECPRI_DMA_MHI_DMA_CLIENT_CTX);
-	if (ret != 0) {
-		DMAERR("Function params are invalid,"
-			"function type: %d, vf_id: %d\n",
-			function.function_type, function.vf_id);
-		return;
-	}
-
-	if (!ecpri_dma_mhi_client_ctx[idx]) {
-		DMAERR("Context is not initialized\n");
-		return;
-	}
-
-	ret = ecpri_dma_mhi_dma_memcpy_disable(function);
-	if (ret != 0) {
-		DMAERR("Failed to disable memcpy\n");
-		ecpri_dma_assert();
-	}
-
-	ecpri_dma_mhi_memcpy_destroy(function);
-
-	idr_destroy(&ecpri_dma_mhi_client_ctx[idx]->idr);
-
-	// TODO: Destroy debugfs
-
-	destroy_workqueue(ecpri_dma_mhi_client_ctx[idx]->wq);
-
-	ecpri_dma_mhi_client_ctx[idx]->notify_cb = NULL;
-	ecpri_dma_mhi_client_ctx[idx]->user_data = NULL;
-	ecpri_dma_mhi_client_ctx[idx]->msi_config.addr_low = 0;
-	ecpri_dma_mhi_client_ctx[idx]->msi_config.addr_hi = 0;
-	ecpri_dma_mhi_client_ctx[idx]->msi_config.data = 0;
-	ecpri_dma_mhi_client_ctx[idx]->msi_config.mask = 0;
-	ecpri_dma_mhi_client_ctx[idx]->mmio_addr = 0;
-	ecpri_dma_mhi_client_ctx[idx]->first_ch = 0;
-	ecpri_dma_mhi_client_ctx[idx]->first_ev = 0;
-	ecpri_dma_mhi_client_ctx[idx]->is_over_pcie = false;
-	ecpri_dma_mhi_client_ctx[idx]->mhi_mstate =
-		MHI_DMA_STATE_M_MAX;
-	ecpri_dma_mhi_client_ctx[idx]->state =
-		ECPRI_DMA_MHI_STATE_INVALID;
-	ecpri_dma_mhi_client_ctx[idx]->dev_scratch
-		.mhi_base_chan_idx_valid = false;
-	ecpri_dma_mhi_client_ctx[idx]->dev_scratch
-		.mhi_base_chan_idx = 0;
-
-	kfree(ecpri_dma_mhi_client_ctx[idx]);
-	ecpri_dma_mhi_client_ctx[idx] = NULL;
-	DMADBG("DMA MHI was reset, ready for re-init\n");
-
-	return;
-}
-
-/**
  * ecpri_dma_mhi_client_dma_start() - Start DMA MHI engine
  * @function: function parameters
  * @params: pcie addresses for MHI
@@ -2602,7 +2535,7 @@ static int ecpri_dma_mhi_client_connect_internal(
 
 	ret = ecpri_dma_alloc_endp(channel->endp_ctx->gsi_id,
 		channel->endp_ctx->endp_id, channel->rlen,
-		&mod_cfg, channel->is_over_pcie, NULL);
+		&mod_cfg, channel->is_over_pcie, NULL, false);
 	if (ret != 0) {
 		DMAERR("Failed to allocate endp %d\n", channel->endp_ctx->endp_id);
 		goto fail_al_endp;
@@ -2815,6 +2748,7 @@ static int ecpri_dma_mhi_dma_connect_endp(
 	idr_preload_end();
 
 	channel->valid = true;
+	channel->clnt_hdl = *(clnt_hdl);
 
 	if (function.function_type == MHI_DMA_FUNCTION_TYPE_PHYSICAL)
 		DMADBG("Done Physical \n");
@@ -2842,9 +2776,10 @@ static int ecpri_dma_mhi_dma_disconnect_endp(
 	struct mhi_dma_function_params function,
 	struct mhi_dma_disconnect_params* in)
 {
-	int idx;
+	int idx = 0, memcpy_idx = 0;
 	int ret = 0;
 	struct ecpri_dma_mhi_channel_ctx* channel = NULL;
+	struct ecpri_dma_mhi_memcpy_context* memcpy_ctx = NULL;
 
 	if (function.function_type == MHI_DMA_FUNCTION_TYPE_PHYSICAL)
 		DMADBG("Physical \n");
@@ -2866,18 +2801,31 @@ static int ecpri_dma_mhi_dma_disconnect_endp(
 
 	channel->state = ECPRI_DMA_HW_MHI_CHANNEL_STATE_DISABLE;
 	channel->valid = false;
+	channel->clnt_hdl = ECPRI_DMA_MHI_MIN_VALID_HDL;
 
-	/* Write new state */
-	ret = ecpri_dma_mhi_client_read_write_host(
-		ecpri_dma_mhi_client_ctx[idx],
-		ECPRI_DMA_MHI_DMA_TO_HOST, &channel->ch_ctx_host,
-		channel->channel_context_addr +
-		offsetof(struct ecpri_dma_mhi_host_ch_ctx, chstate),
-		sizeof(channel->ch_ctx_host.chstate),
-		function);
+	/* Write new state only if memcpy context is still available */
+	ret = ecpri_dma_mhi_get_function_context_index(
+		function, &memcpy_idx, ECPRI_DMA_MHI_DMA_MEMCPY_CTX);
 	if (ret != 0) {
-		DMAERR("Unable to read write host\n");
-		return -EPERM;
+		DMAERR("Function params are invalid,"
+			"function type: %d, vf_id: %d\n",
+			function.function_type, function.vf_id);
+		return -EINVAL;
+	}
+
+	memcpy_ctx = ecpri_dma_mhi_memcpy_ctx[memcpy_idx];
+	if (memcpy_ctx) {
+		ret = ecpri_dma_mhi_client_read_write_host(
+			ecpri_dma_mhi_client_ctx[idx],
+			ECPRI_DMA_MHI_DMA_TO_HOST, &channel->ch_ctx_host,
+			channel->channel_context_addr +
+			offsetof(struct ecpri_dma_mhi_host_ch_ctx, chstate),
+			sizeof(channel->ch_ctx_host.chstate),
+			function);
+		if (ret != 0) {
+			DMAERR("Unable to read write host\n");
+			return -EPERM;
+		}
 	}
 
 	/* Stop */
@@ -3014,6 +2962,107 @@ static int ecpri_dma_mhi_client_suspend(
 	return -EPERM;
 }
 
+/**
+ * ecpri_dma_mhi_destroy() - Destroy MHI DMA
+ *
+ * This function is called by MHI client driver on MHI reset to destroy all DMA
+ * MHI resources.
+ *
+ */
+static void ecpri_dma_mhi_destroy(
+	struct mhi_dma_function_params function)
+{
+	int idx, i;
+	int ret;
+	struct mhi_dma_disconnect_params disconnect_params = { 0 };
+	const struct ecpri_dma_mhi_ee_gsi_tuple* func_map;
+
+	DMADBG("Function type: %d, vf_id: %d\n",
+		function.function_type, function.vf_id);
+
+	ret = ecpri_dma_mhi_get_function_context_index(
+		function, &idx, ECPRI_DMA_MHI_DMA_CLIENT_CTX);
+	if (ret != 0) {
+		DMAERR("Function params are invalid,"
+			"function type: %d, vf_id: %d\n",
+			function.function_type, function.vf_id);
+		return;
+	}
+
+	if (!ecpri_dma_mhi_client_ctx[idx]) {
+		DMAERR("Context is not initialized\n");
+		return;
+	}
+
+	/* Disconnect all HW CHs */
+	for (i = 0; i < ECPRI_DMA_MHI_MAX_HW_CHANNELS; i++) {
+		if (ecpri_dma_mhi_client_ctx[idx]->channels[i].valid) {
+			disconnect_params.clnt_hdl = ecpri_dma_mhi_client_ctx[idx]->
+				channels[i].clnt_hdl;
+			ret = ecpri_dma_mhi_dma_disconnect_endp(function,
+				&disconnect_params);
+			if (ret != 0) {
+				DMAERR("Failed to disconnect MHI HW CH %d vf_id %d\n", i,
+					function.vf_id);
+				ecpri_dma_assert();
+			}
+		}
+	}
+
+	ret = ecpri_dma_mhi_get_function_mapping(function, &func_map);
+	if (ret) {
+		DMAERR("Unknown function");
+		return;
+	}
+
+	ret = gsi_dealloc_all_evt_rings(func_map->gsi_id, func_map->ee_id);
+	if (ret) {
+		DMAERR("Events deallocation failed"
+			"function type : % d, vf_id : % d\n",
+			function.function_type, function.vf_id);
+		return;
+	}
+
+	ret = ecpri_dma_mhi_dma_memcpy_disable(function);
+	if (ret != 0) {
+		DMAERR("Failed to disable memcpy\n");
+		ecpri_dma_assert();
+	}
+
+	ecpri_dma_mhi_memcpy_destroy(function);
+
+	idr_destroy(&ecpri_dma_mhi_client_ctx[idx]->idr);
+
+	// TODO: Destroy debugfs
+
+	destroy_workqueue(ecpri_dma_mhi_client_ctx[idx]->wq);
+
+	ecpri_dma_mhi_client_ctx[idx]->notify_cb = NULL;
+	ecpri_dma_mhi_client_ctx[idx]->user_data = NULL;
+	ecpri_dma_mhi_client_ctx[idx]->msi_config.addr_low = 0;
+	ecpri_dma_mhi_client_ctx[idx]->msi_config.addr_hi = 0;
+	ecpri_dma_mhi_client_ctx[idx]->msi_config.data = 0;
+	ecpri_dma_mhi_client_ctx[idx]->msi_config.mask = 0;
+	ecpri_dma_mhi_client_ctx[idx]->mmio_addr = 0;
+	ecpri_dma_mhi_client_ctx[idx]->first_ch = 0;
+	ecpri_dma_mhi_client_ctx[idx]->first_ev = 0;
+	ecpri_dma_mhi_client_ctx[idx]->is_over_pcie = false;
+	ecpri_dma_mhi_client_ctx[idx]->mhi_mstate =
+		MHI_DMA_STATE_M_MAX;
+	ecpri_dma_mhi_client_ctx[idx]->state =
+		ECPRI_DMA_MHI_STATE_INVALID;
+	ecpri_dma_mhi_client_ctx[idx]->dev_scratch
+		.mhi_base_chan_idx_valid = false;
+	ecpri_dma_mhi_client_ctx[idx]->dev_scratch
+		.mhi_base_chan_idx = 0;
+
+	kfree(ecpri_dma_mhi_client_ctx[idx]);
+	ecpri_dma_mhi_client_ctx[idx] = NULL;
+	DMADBG("DMA MHI was reset, ready for re-init\n");
+
+	return;
+}
+
 /* API exposed structure */
 const struct mhi_dma_ops ecpri_dma_mhi_driver_ops = {
 	.mhi_dma_register_ready_cb = ecpri_dma_mhi_client_ready_cb,
@@ -3040,4 +3089,32 @@ const struct mhi_dma_ops ecpri_dma_mhi_driver_ops = {
 int ecpri_dma_mhi_provide_ops()
 {
 	return mhi_dma_provide_ops(&ecpri_dma_mhi_driver_ops);
+}
+
+int ecpri_dma_mhi_get_vf_id(struct ecpri_dma_mhi_ee_gsi_tuple *ee_gsi_tuple)
+{
+	int hw_ver = ecpri_dma_get_ctx_hw_ver();
+	enum ecpri_dma_vm_ids vf_id;
+	int max_vf_id;
+
+	/* Validate input*/
+	if (NULL == ee_gsi_tuple)
+		return -EINVAL;
+
+	/* Get max vf_id by HW version version */
+	if (hw_ver == ECPRI_HW_V1_0)
+		max_vf_id = ECPRI_DMA_VM_IDS_MAX_V1;
+	else
+		max_vf_id = ECPRI_DMA_VM_IDS_MAX;
+
+	/* Find VF id*/
+	for (vf_id = ECPRI_DMA_VM_IDS_VM0; vf_id < max_vf_id; vf_id++)
+		if ((ecpri_dma_mhi_function_map[vf_id].ee_id == ee_gsi_tuple->ee_id) &&
+			(ecpri_dma_mhi_function_map[vf_id].gsi_id == ee_gsi_tuple->gsi_id))
+				break;
+
+	if (max_vf_id == vf_id)
+		return ECPRI_DMA_VM_IDS_NONE;
+	else
+		return vf_id;
 }

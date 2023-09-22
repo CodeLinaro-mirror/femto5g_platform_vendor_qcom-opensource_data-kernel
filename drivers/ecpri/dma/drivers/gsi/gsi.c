@@ -446,6 +446,17 @@ static void gsi_handle_ev_ctrl(int gsi_id, int ee)
 	}
 }
 
+
+static void gsi_print_malformed_tre(u32 gsi_id)
+{
+	GSIERR("Malformed TRE[0]: 0x%x\n",
+		gsihal_read_reg_pn(GSI_EE_n_CNTXT_SCRATCH_1, gsi_id, 0));
+	GSIERR("Malformed TRE[2]: 0x%x\n",
+		gsihal_read_reg_pn(GSI_EE_n_CNTXT_SCRATCH_1, gsi_id, 1));
+	GSIERR("Malformed TRE[3]: 0x%x\n",
+		gsihal_read_reg_pn(GSI_EE_n_CNTXT_SCRATCH_1, gsi_id, 2));
+}
+
 static void gsi_handle_glob_err(u32 gsi_id, u32 err)
 {
 	struct gsi_log_err *log;
@@ -486,6 +497,7 @@ static void gsi_handle_glob_err(u32 gsi_id, u32 err)
 		chan_notify.chan_user_data = ch->props.chan_user_data;
 		chan_notify.err_desc = err & 0xFFFF;
 		if (log->code == GSI_INVALID_TRE_ERR) {
+			gsi_print_malformed_tre(gsi_id);
 			gsihal_read_reg_pnk_fields(GSI_EE_n_GSI_CH_k_CNTXT_0,
 				gsi_id, log->ee, log->virt_idx, &ch_k_cntxt_0);
 			ch->state = ch_k_cntxt_0.chstate;
@@ -1826,6 +1838,31 @@ int gsi_dealloc_evt_ring(unsigned long evt_ring_hdl)
 	return GSI_STATUS_SUCCESS;
 }
 EXPORT_SYMBOL(gsi_dealloc_evt_ring);
+
+int gsi_dealloc_all_evt_rings(int gsi_id, int ee)
+{
+	int res = 0;
+	int i = 0;
+
+	if (!gsi_ctx) {
+		pr_err("%s:%d gsi context not allocated\n", __func__, __LINE__);
+		return -GSI_STATUS_NODEV;
+	}
+
+	for (i = 0; i < GSI_EVT_RING_MAX; i++) {
+		if (gsi_ctx->evtr[gsi_id][ee][i].hdl >= GSI_MIN_HDL_ID) {
+			res = gsi_dealloc_evt_ring(gsi_ctx->evtr[gsi_id][ee][i].hdl);
+			if (res != GSI_STATUS_SUCCESS) {
+				GSIERR("Error deallocating event gsi id "
+					"%d ee %d ev id %d error: %d\n", gsi_id, ee, i, res);
+				return res;
+			}
+		}
+	}
+
+	return res;
+}
+EXPORT_SYMBOL(gsi_dealloc_all_evt_rings);
 
 int gsi_query_evt_ring_db_addr(unsigned long evt_ring_hdl,
 		u32 *db_addr_wp_lsb, u32 *db_addr_wp_msb)

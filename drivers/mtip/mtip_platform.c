@@ -233,8 +233,7 @@ static int mtip_platform_setup_port(u32 port_type)
        }
        else
        {
-          // don't do autoneg on DEBUG ETH
-          platform_driver_priv->mtip_ports[port_type]->autoneg = false;
+          platform_driver_priv->mtip_ports[port_type]->autoneg = true;
 
           // set the default port config to 1x25GBASE_R
           platform_driver_priv->mtip_ports[port_type]->port_config = MTIP_PORT_CONFIG_1x25GBASE_R;
@@ -1375,6 +1374,8 @@ static int mtip_platform_setup(void)
    struct mtip_netdev_priv *priv;
    u32 total_num_links = 0;
    u32 port_type;
+   struct ecpri_dma_pkt_completion_wrapper **pkts;
+   int num_pkt_allocs = MTIP_NAPI_WEIGHT*MTIP_RX_DMA_MAX_BUFFERS_PER_PACKET;
 
    // enable all the necessary clocks
    mtip_clocks_setup_clocks();
@@ -1506,6 +1507,27 @@ static int mtip_platform_setup(void)
             SET_NETDEV_DEV(platform_driver_priv->mtip_links[i]->dev, &platform_driver_priv->devices.link_devices[i].link_pdev->dev);
 
             priv->mac_ioaddr = platform_driver_priv->devices.link_devices[i].mac_ioaddr;
+
+            pkts = (struct ecpri_dma_pkt_completion_wrapper **)kmalloc(num_pkt_allocs * sizeof(struct ecpri_dma_pkt_completion_wrapper*), GFP_ATOMIC);
+
+            if (pkts == NULL)
+            {
+                ret = -1;
+                goto out;
+            }
+
+            for (j = 0; j < num_pkt_allocs; ++j)
+            {
+                pkts[j] = mtip_dma_alloc_completion_wrapper(GFP_ATOMIC);
+
+                if (pkts[j] == NULL)
+                {
+                    ret = -1;
+                    CSMLOGERR("PT:No memory,j=%d,ret=%d\n",j, ret);
+                    goto out;
+                }
+            }
+            priv->tx_comp_pkts=pkts;
 
           // add the mtip_napi_rx
           // this needs to be done before register netdev
@@ -1693,6 +1715,7 @@ void run_mtip_process_create_phylink(void *work_ptr)
 int mtip_link_remove(struct platform_device *pdev)
 {
    int i;
+   struct mtip_netdev_priv *priv;
    CSMLOGINFO("mtip_link_remove called\n");
 
    // free the net devices
@@ -1702,6 +1725,10 @@ int mtip_link_remove(struct platform_device *pdev)
       {
          if (platform_driver_priv->mtip_links[i]->dev != NULL)
          {
+            priv = netdev_priv(platform_driver_priv->mtip_links[i]->dev);
+            kfree(priv->tx_comp_pkts);
+            priv->tx_comp_pkts=NULL;
+
             // unregister the netdevs
             unregister_netdev(platform_driver_priv->mtip_links[i]->dev);
 

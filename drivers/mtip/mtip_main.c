@@ -1,6 +1,6 @@
 //SPDX-License-Identifier: GPL-2.0-only
 /*
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  */ 
 
 #include <linux/init.h>
@@ -97,6 +97,15 @@ MODULE_PARM_DESC(mtip_rumi_platform, "Platform mode to RUMI");
 int mtip_dma_max_rx_buff_size = MTIP_DMA_RX_BUFF_SIZE;
 module_param(mtip_dma_max_rx_buff_size, int, S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP);
 MODULE_PARM_DESC(mtip_dma_max_rx_buff_size, "SET mtip_dma_rx buff size");
+
+/* Module parameter for enabling Tx napi poll feature for
+ * Tx completion packets received from DMA.
+ * If this value is false, then polling of Tx of completion
+ * packets from DMA will work in regular IRQ mode.
+ */
+bool enable_tx_comp_poll = true;
+module_param(enable_tx_comp_poll, bool, S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP);
+MODULE_PARM_DESC(enable_tx_comp_poll, "Enable TX Completion Poll");
 
 int mtip_lookup_link_index_by_name(char *name, u32 *link_index) {
    int i;
@@ -662,8 +671,17 @@ static void mtip_save_eth_stats(void)
     u64 temp_val[DEBUG_ETHTOOL_STAT_STRINGS_LEN] = {0};
     ethtool_stat_strings = get_mtip_debug_ethtool_stat_strings();
 
+    if(!platform_driver_priv)
+      return;
+
     for(i = 0; i < MTIP_MAX_LINKS; i++)
     {
+	if(!platform_driver_priv->mtip_links[i])
+	    continue;
+
+	if(!platform_driver_priv->mtip_links[i]->dev)
+	    continue;
+
         //getting stats of fh ports
         if(i < 12)
         {  
@@ -678,6 +696,7 @@ static void mtip_save_eth_stats(void)
         {
             continue;
         }
+
         for(j = 0; j < DEBUG_ETHTOOL_STAT_STRINGS_LEN; j++)
         {
             //breaking the loop for fh ports when loop exceeds stats string length
@@ -685,8 +704,14 @@ static void mtip_save_eth_stats(void)
             {
                 break;
             }
+
             memcpy(platform_driver_priv->mtip_links[i]->stats[j].stats_name, ethtool_stat_strings[j], strlen(ethtool_stat_strings[j]));
             platform_driver_priv->mtip_links[i]->stats[j].stats_value = temp_val[j];
+	    if (platform_driver_priv->mtip_links[i]->state == MTIP_LINK_STATE_UP)
+	    {
+                CSMLOGERR("link : %s, %s : %lu \n",platform_driver_priv->devices.link_devices[i].link_name,platform_driver_priv->mtip_links[i]->stats[j].stats_name,platform_driver_priv->mtip_links[i]->stats[j].stats_value);
+	    }
+
         }
     }
 }
@@ -865,6 +890,8 @@ static int mtip_module_init(void)
    mtip_dma_register_params.userdata_rx = NULL;
    mtip_dma_register_params.notify_tx_comp = mtip_dma_tx_comp_cb;
    mtip_dma_register_params.userdata_tx = NULL;
+   mtip_dma_register_params.notify_tx_comp_irq = mtip_dma_tx_irq_comp_cb;
+   mtip_dma_register_params.userdata_tx_irq = NULL;
 
    // initialize the spinlock
    spin_lock_init(&platform_driver_priv->driver_lock);

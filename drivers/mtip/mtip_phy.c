@@ -1,6 +1,6 @@
 //SPDX-License-Identifier: GPL-2.0-only
 /*
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  */ 
 
 #include <linux/init.h>
@@ -265,6 +265,11 @@ void mtip_phy_retry_phy_bringup(struct work_struct *work)
       goto func_exit;
     }
 
+    if(!platform_driver_priv){
+        CSMLOGERR("platform_driver_priv NULL \n");
+        goto func_exit;
+    }
+
     if(platform_driver_priv->mtip_links[link_index]->state == MTIP_LINK_STATE_CLOSE)
     {
         goto func_exit;
@@ -321,8 +326,15 @@ void mtip_fault_notifr_status(struct work_struct *work)
     u32 port_link_id = 0;
     u32 read_val;
 
+    if(!platform_driver_priv){
+        CSMLOGERR("platform_driver_priv NULL \n");
+        return;
+    }
     for(port_type = MTIP_PORT_TYPE_FH_0;  port_type <= MTIP_PORT_TYPE_FH_2; port_type++){
 
+        if(!platform_driver_priv->mtip_links[port_link_id]){
+                continue;
+        }
         wrapper_base_addr = platform_driver_priv->devices.port_devices[port_type].wrapper_base_addr;
 
         read_val = (u32)ioread32(wrapper_base_addr + MTIP_MAC_WRAPPER_CORE_STATUS_REG_OFFSET);
@@ -574,13 +586,16 @@ static void mtip_phy_handle_lane_up(u32 lane_index, u8 sfp_port_type, enum eth_p
 
 static void mtip_phy_handle_lane_down(u32 lane_index)
 {
-   enum mtip_lane_state_enum current_state;
    int i;
    u32 link_index;
    enum mtip_link_state_enum link_state;
    u32 port_type;
+   enum mtip_lane_state_enum current_state = MTIP_LANE_STATE_INIT;
 
-   current_state = platform_driver_priv->mtip_lanes[lane_index]->lane_state;
+   if(platform_driver_priv->mtip_lanes[lane_index])
+   {
+      current_state = platform_driver_priv->mtip_lanes[lane_index]->lane_state;
+   }
 
    switch (current_state)
    {
@@ -588,7 +603,10 @@ static void mtip_phy_handle_lane_down(u32 lane_index)
    case MTIP_LANE_STATE_INIT:
       {
          CSMLOGINFO("Handling transition from lane state %d to DISCONNECTED for lane: %d", current_state, lane_index);
-         platform_driver_priv->mtip_lanes[lane_index]->lane_state = MTIP_LANE_STATE_DISCONNECTED;
+	 if(platform_driver_priv->mtip_lanes[lane_index])
+         {
+           platform_driver_priv->mtip_lanes[lane_index]->lane_state = MTIP_LANE_STATE_DISCONNECTED; 
+         }
       }
       break;
 
@@ -597,7 +615,10 @@ static void mtip_phy_handle_lane_down(u32 lane_index)
          CSMLOGINFO("Handling transition from CONNECTED to DISCONNECTED for lane: %d", lane_index);
 
          // set the lane state as DISCONNECTED
-         platform_driver_priv->mtip_lanes[lane_index]->lane_state = MTIP_LANE_STATE_DISCONNECTED;
+         if(platform_driver_priv->mtip_lanes[lane_index])
+         {
+           platform_driver_priv->mtip_lanes[lane_index]->lane_state = MTIP_LANE_STATE_DISCONNECTED;
+         }
 
          // determine the port using lane
          mtip_lookup_port_type_by_lane_index(lane_index, &port_type);
@@ -635,8 +656,11 @@ static void mtip_phy_handle_lane_down(u32 lane_index)
 
    default:
       {
-         CSMLOGINFO("Handling transition from unknown to CONNECTED for lane: %d", lane_index);
-         platform_driver_priv->mtip_lanes[lane_index]->lane_state = MTIP_LANE_STATE_DISCONNECTED;
+       CSMLOGINFO("Handling transition from unknown to CONNECTED for lane: %d", lane_index);
+       if(platform_driver_priv->mtip_lanes[lane_index])  
+       { 
+         platform_driver_priv->mtip_lanes[lane_index]->lane_state = MTIP_LANE_STATE_DISCONNECTED; 
+       }
       }
       break;
    }
