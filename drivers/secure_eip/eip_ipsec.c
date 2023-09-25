@@ -244,7 +244,7 @@ static void eip_ipsec_destroy_tr(u32 *tr, unsigned int wc)
 }
 
 static u32 *eip_ipsec_build_tr(bool inbound, u8 *key, unsigned int key_len,
-			       u8 *salt, u32 spi, bool insert_satag,
+			       u8 *salt, u32 spi, bool insert_satag, bool esn,
 			       unsigned int *wc)
 {
 	u32 *tr = NULL;
@@ -276,6 +276,9 @@ static u32 *eip_ipsec_build_tr(bool inbound, u8 *key, unsigned int key_len,
 	sab_params.Salt_p = salt;
 	sab_params.SPI = spi;
 
+	if (esn)
+		sab_params.flags |= SAB_MACSEC_FLAG_LONGSEQ;
+
 	rc = SABuilder_GetSize(&sab_params, &word_count);
 	if (rc != SAB_STATUS_OK) {
 		eip_logerr("EIP IPSEC: SAB GetSize Failed %d", rc);
@@ -300,7 +303,8 @@ static u32 *eip_ipsec_build_tr(bool inbound, u8 *key, unsigned int key_len,
 
 static int eip_ipsec_add_sa(unsigned int devid, unsigned int vport,
 			    bool inbound, const struct xfrm_state *xs,
-			    SecY_SAHandle_t *sa_h, unsigned int *sa_index)
+			    SecY_SAHandle_t *sa_h, unsigned int *sa_index,
+			    bool enable_esn)
 {
 	SecY_Status_t rc = 0;
 	SecY_SA_t sa_params;
@@ -338,7 +342,7 @@ static int eip_ipsec_add_sa(unsigned int devid, unsigned int vport,
 	 */
 
 	tr = eip_ipsec_build_tr(inbound, key, key_len, salt, spi, true,
-				&word_count);
+				enable_esn, &word_count);
 	if (tr == NULL) {
 		eip_logerr("EIP IPSEC: Failed to create transformation record");
 		return -EFAULT;
@@ -488,7 +492,8 @@ static int __eip_xdo_dev_state_add(struct eip_xfrm_state *eip_xs)
 	}
 
 	rc = eip_ipsec_add_sa(devid, eip_xs->vport, eip_xs->inbound, eip_xs->xs,
-			      &eip_xs->sa_h, &eip_xs->sa_index);
+			      &eip_xs->sa_h, &eip_xs->sa_index,
+			      eip_xs->enable_esn);
 	if (rc) {
 		eip_logerr("EIP IPSEC: Failed to install SA");
 		return -EFAULT;
@@ -568,6 +573,7 @@ static int eip_xdo_dev_state_add(struct xfrm_state *xs)
 
 	eip_xs->xs = xs;
 	eip_xs->inbound = (xs->xso.dir == XFRM_DEV_OFFLOAD_IN);
+	eip_xs->enable_esn = !!(xs->props.flags & XFRM_STATE_ESN);
 	eip_xs->sa_tag.etype = cpu_to_be16(eip_satag_etype);
 	eip_xs->channel = eip_xs->inbound ? &ilink->link->rx : &ilink->link->tx;
 
