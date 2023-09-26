@@ -56,6 +56,7 @@ struct eip_xfrm_state {
 	struct eip_ipsec_link *ilink;
 
 	bool inbound;
+	bool enable_esn;
 	struct xfrm_state *xs;
 	struct eip_sa_tag sa_tag; /* prepared for fast egress processing */
 
