@@ -612,7 +612,7 @@ void mtip_mac_set_hashtable_entry(struct mtip_netdev_priv *priv, u8 entry_addres
 void mtip_mac_link_up(u32 link_index)
 {
     // Don't enable TX/RX if the link has been closed
-    if (platform_driver_priv->mtip_links[link_index]->state == MTIP_LINK_STATE_CLOSE) 
+    if (platform_driver_priv->mtip_links[link_index]->state == MTIP_LINK_STATE_CLOSE || platform_driver_priv->mtip_links[link_index]->state == MTIP_LINK_STATE_UP)
     {
         return;
     }
@@ -628,6 +628,9 @@ void mtip_mac_link_up(u32 link_index)
 
 void mtip_mac_link_down(u32 link_index)
 {
+    if(platform_driver_priv->mtip_links[link_index]->state == MTIP_LINK_STATE_DOWN)
+        return;
+
     CSMLOGINFO("MAC/PCS link down on link_index: %d\n", link_index);
 
     // set the link state to DOWN if not closed

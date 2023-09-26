@@ -130,6 +130,9 @@ static void mtip_phy_cdr_lock_ind(u32 link_index, bool status, u8 an_seq_num)
     struct mtip_process_cdr_lock_ind* taskstruct;
     u32 port_type;
 
+    if(status == false)
+        return;
+
     if(mtip_lookup_port_type_by_link_index(link_index, &port_type) != 0)
     {
         CSMLOGINFO("Invalid link/port!");
@@ -167,6 +170,7 @@ void run_mtip_process_cdr_lock_ind(void* workptr)
 
     CSMLOGINFO("CDR lock indication for link_index %d, status %d, an_seq_num %d\n",
                link_index, status, an_seq_num);
+
 
     if(mtip_lookup_port_type_by_link_index(link_index, &port_type) != 0)
     {
@@ -468,6 +472,9 @@ int mtip_phy_teardown_phy(u32 link_index)
         return -1;
     }
 
+    // stop listening to link status interrupts
+    mtip_phy_lane_bring_up_progress_ind(link_index, true);
+
     mtip_phy_get_lanes_of_link(link_index, lanes_enabled);
 
     for (i = 0; i < PHY_LANE_MAX; ++i) 
@@ -491,9 +498,6 @@ int mtip_phy_teardown_phy(u32 link_index)
     {
         mtip_phy_retry_num[link_index] = 0;
     }
-
-    // stop listening to link status interrupts
-    mtip_phy_lane_bring_up_progress_ind(link_index, true);
 
     return ret_val;
 }

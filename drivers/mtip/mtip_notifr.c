@@ -17,6 +17,7 @@ EXPORT_SYMBOL_GPL(lassen_mtip_fault_notifr);
 void mtip_snd_event_notification(uint32_t interface, uint32_t event)
 {
 	static uint32_t ber_status[MAX_NOTIF_INTERFACE];
+	static uint32_t pcs_link_status[MAX_NOTIF_INTERFACE];
 
 	if(interface < 0 || interface > MAX_NOTIF_INTERFACE -1 ){
 		CSMLOGERR("Invalid interface id %u\n",interface);
@@ -50,9 +51,25 @@ void mtip_snd_event_notification(uint32_t interface, uint32_t event)
 			break;
 
 		case PCS_IF_UP:
+			/*
+			 * check if it is already set
+			 */
+			if(pcs_link_status[interface] == STATUS_SET){
+				CSMLOGDBG("Interface[%u] PCS Link is already Up\n",interface);
+				return;
+			}
+			pcs_link_status[interface] = STATUS_SET;
 			CSMLOGDBG("Interface[%u] PCS_IF_UP\n",interface);
 			break;
 		case PCS_IF_DOWN:
+			/*
+			 * check if it is already set
+			 */
+			if(pcs_link_status[interface] == STATUS_CLEAR){
+				CSMLOGDBG("Interface[%u] PCS Link is already Down\n",interface);
+				return;
+			}
+			pcs_link_status[interface] = STATUS_CLEAR;
 			CSMLOGDBG("Interface[%u] PCS_IF_DOWN\n",interface);
 			break;
 		case IF_UP:
