@@ -167,6 +167,7 @@ static const char *ecpriss_xbar_hal_reg_name_to_str[ECPRI_XBAR_MAX+1] = {
         "ECPRI_XBAR_DBG_OCRX_FH_BUFF_WATERMARK",
         "ECPRI_XBAR_DBG_OCTX_OC_0_1_BUFF_WATERMARK",
         "ECPRI_XBAR_DBG_OCTX_OC_2_3_BUFF_WATERMARK",
+	"ECPRI_XBAR_FH_CFG",
 
 	"ECPRI_XBAR_MAX"
 
@@ -1726,6 +1727,64 @@ static void ecpriss_xbar_hal_reg_parse_xbar_dbg_octx_oc_2_3_buff_watermark_2
 			HWIO_ECPRI_XBAR_DBG_OCTX_OC_2_3_BUFF_WATERMARK_CC3_BMSK);
 	return;
 }
+
+	static void ecpriss_xbar_hal_reg_construct_fh_cfg
+(enum ecpriss_xbar_hal_reg_name reg, const void *fields, uint32_t* val)
+{
+
+	ecpri_xbar_hwio_def_ecpri_xbar_fh_cfg_s *fh_cfg =
+		(ecpri_xbar_hwio_def_ecpri_xbar_fh_cfg_s *) fields;
+
+	ECPRISS_HAL_SETFIELD_IN_REG(*val,
+			fh_cfg->dma_prio,
+			HWIO_ECPRI_XBAR_FH_CFG_DMA_PRIO_SHFT,
+			HWIO_ECPRI_XBAR_FH_CFG_DMA_PRIO_BMSK);
+
+	ECPRISS_HAL_SETFIELD_IN_REG(*val,
+			fh_cfg->c2c_prio,
+			HWIO_ECPRI_XBAR_FH_CFG_C2C_PRIO_SHFT,
+			HWIO_ECPRI_XBAR_FH_CFG_C2C_PRIO_BMSK);
+
+	ECPRISS_HAL_SETFIELD_IN_REG(*val,
+			fh_cfg->oran_prio,
+			HWIO_ECPRI_XBAR_FH_CFG_ORAN_PRIO_SHFT,
+			HWIO_ECPRI_XBAR_FH_CFG_ORAN_PRIO_BMSK);
+
+	ECPRISS_HAL_SETFIELD_IN_REG(*val,
+			fh_cfg->uc_prio,
+			HWIO_ECPRI_XBAR_FH_CFG_UC_PRIO_SHFT,
+			HWIO_ECPRI_XBAR_FH_CFG_UC_PRIO_BMSK);
+
+
+	return;
+}
+
+static void ecpriss_xbar_hal_reg_parse_fh_cfg
+	    (enum ecpriss_xbar_hal_reg_name reg, void *fields, uint32_t val)
+{
+	ecpri_xbar_hwio_def_ecpri_xbar_fh_cfg_s *fh_cfg =
+		(ecpri_xbar_hwio_def_ecpri_xbar_fh_cfg_s *) fields;
+
+	fh_cfg->dma_prio = ECPRISS_HAL_GETFIELD_FROM_REG(val,
+			HWIO_ECPRI_XBAR_FH_CFG_DMA_PRIO_SHFT,
+			HWIO_ECPRI_XBAR_FH_CFG_DMA_PRIO_BMSK);
+
+	fh_cfg->c2c_prio= ECPRISS_HAL_GETFIELD_FROM_REG(val,
+			HWIO_ECPRI_XBAR_FH_CFG_C2C_PRIO_SHFT,
+			HWIO_ECPRI_XBAR_FH_CFG_C2C_PRIO_BMSK);
+
+	fh_cfg->oran_prio= ECPRISS_HAL_GETFIELD_FROM_REG(val,
+			HWIO_ECPRI_XBAR_FH_CFG_ORAN_PRIO_SHFT,
+			HWIO_ECPRI_XBAR_FH_CFG_ORAN_PRIO_BMSK);
+
+	fh_cfg->uc_prio= ECPRISS_HAL_GETFIELD_FROM_REG(val,
+			HWIO_ECPRI_XBAR_FH_CFG_UC_PRIO_SHFT,
+			HWIO_ECPRI_XBAR_FH_CFG_UC_PRIO_BMSK);
+
+	return;
+}
+
+
 static void ecpriss_xbar_hal_reg_parse_dummy(enum ecpriss_xbar_hal_reg_name reg, void *fields,
 		u32 val)
 {
@@ -2346,6 +2405,12 @@ static struct ecpriss_xbar_hal_reg_obj ecpriss_xbar_hal_reg_objs[ECPRISS_XBAR_HW
 		ecpriss_xbar_hal_reg_construct_dummy,
 		ecpriss_xbar_hal_reg_parse_xbar_dbg_octx_oc_2_3_buff_watermark_2,
 		0x09420000, 0x2454, 0x0, 0, 0, 0, 0},
+	[ECPRISS_XBAR_HW_v2_0][ECPRI_XBAR_FH_CFG] = {
+		ecpriss_xbar_hal_reg_construct_fh_cfg,
+		ecpriss_xbar_hal_reg_parse_fh_cfg,
+		0x09420000, 0x10, 0x0, 0, 0, 0, 0},
+
+
 
 };
 /*

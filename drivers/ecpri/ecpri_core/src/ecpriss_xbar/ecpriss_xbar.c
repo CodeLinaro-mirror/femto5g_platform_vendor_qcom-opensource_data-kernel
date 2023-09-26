@@ -622,6 +622,29 @@ static void ecpriss_xbar_flush_init_v2()
 	return;
 }
 
+static void ecpriss_xbar_fh_cfg_enable_v2()
+{
+	ecpri_xbar_hwio_def_ecpri_xbar_fh_cfg_s fh_cfg;
+
+	memset(&fh_cfg, 0x0, sizeof(fh_cfg));
+/*
+ * C2C is the highest Priority 0
+ * DMA and FH at same priority 1
+ * uC is the lowest Priority 2
+ * */
+	fh_cfg.dma_prio = 1;
+	fh_cfg.oran_prio = 1;
+	fh_cfg.c2c_prio = 0;
+	fh_cfg.uc_prio = 2;
+
+	ecpriss_xbar_hal_write_reg_n_fields(ECPRISS_XBAR_GLOBAL,ECPRI_XBAR_FH_CFG,
+			0,
+			&fh_cfg);
+
+	ECPRILOGINFO("XBAR FH Priority DMA:%d Oran:%d \n", fh_cfg.dma_prio, fh_cfg.oran_prio);
+	return;
+}
+
 static void ecpriss_xbar_flush_init()
 {
 	ecpri_xbar_hwio_def_ecpri_xbar_xbar_flush_s xbar_flush;
@@ -1487,6 +1510,7 @@ int ecpriss_xbar_cold_init(struct device *dev)
 
 		ecpriss_xbar_enable_stats();
 		ecpriss_xbar_flush_init();
+
 		if(ecpriss_pdata)
 		{
 			if(ecpriss_pdata->xbar_ctx)
@@ -1542,11 +1566,18 @@ int ecpriss_xbar_cold_init_v2(struct device *dev)
 
 		ecpriss_xbar_enable_stats_v2();
 		ecpriss_xbar_flush_init_v2();
-		if(ecpriss_pdata)
+
+		if(ecpriss_pdata_v2)
 		{
 			if(ecpriss_pdata_v2->xbar_ctx_v2)
 			{
 				ecpriss_pdata_v2->xbar_ctx_v2->state = ECPRI_XBAR_COLD_INIT ;
+
+				if(ecpriss_pdata_v2->xbar_ctx_v2->disable_xbar_dma_fh_same_prio == false) {
+					ecpriss_xbar_fh_cfg_enable_v2();
+				}else{
+					ECPRILOGINFO("ECPRI_XBAR_DMA_FH_SAME_PRIO Disabled\n");
+				}
 			}
 			else
 			{
