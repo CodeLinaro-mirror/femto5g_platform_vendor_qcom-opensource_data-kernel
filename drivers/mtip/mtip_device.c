@@ -2252,7 +2252,7 @@ int mtip_netdev_set_port_priv_flags(struct net_device *netdev)
         temp_link_index = platform_driver_priv->devices.port_devices[port_type].link_devices[i]->link_index;
         state = platform_driver_priv->mtip_links[temp_link_index]->state;
 
-        CSMLOGINFO("port_type %d link_index %d state %d", port_type, temp_link_index, state);
+        CSMLOGDBG("port_type %d link_index %d state %d", port_type, temp_link_index, state);
 
         // check if state is not INIT or CLOSE
         if ((state == MTIP_LINK_STATE_INIT) || (state == MTIP_LINK_STATE_CLOSE))
@@ -2287,12 +2287,12 @@ int mtip_netdev_set_port_priv_flags(struct net_device *netdev)
         CSMLOGDBG("clearing link lanes for link_index %d", temp_link_index);
     }
 
-    CSMLOGINFO("Setting the port %d priv flags to %d", port_type, port_priv_flags);
+    CSMLOGDBG("Setting the port %d priv flags to %d", port_type, port_priv_flags);
 
     return 0;
 }
 
-static int mtip_device_lookup_lane_cfg(u32 port_type, trx_lane_cfg* lane_cfg, trx_breakout_cfg* breakout_cfg)
+int mtip_device_lookup_lane_qsfp_cfg(u32 port_type, struct qsfp_info *lane_qsfp_info)
 {
     int i;
     u32 lane_index;
@@ -2320,8 +2320,7 @@ static int mtip_device_lookup_lane_cfg(u32 port_type, trx_lane_cfg* lane_cfg, tr
     lane_info = platform_driver_priv->mtip_lanes[lane_index];
 
     // set the lane_cfg
-    *lane_cfg = lane_info->lane_qsfp_info.trx_laneinfo;
-    *breakout_cfg = lane_info->lane_qsfp_info.trx_bout_cfg;
+    *lane_qsfp_info = lane_info->lane_qsfp_info;
     return 0;
 }
 
@@ -2329,13 +2328,19 @@ static int mtip_device_lookup_lane_cfg(u32 port_type, trx_lane_cfg* lane_cfg, tr
 // and SFP module attached
 u32 mtip_device_filter_priv_flags(u32 port_type)
 {
-    u32 filtered;
+    u32 filtered = 0;
     int i;
     struct mtip_port_info* port_info = platform_driver_priv->mtip_ports[port_type];
     u32 port_priv_flags = port_info->port_priv_flags;
     u32 lane_index;
     bool connected_lane_found = false;
     enum eth_phy_iface_phy_lane_speed_enum  max_lane_speed;
+    struct qsfp_info lane_qsfp_info;
+    u32 num_lanes;
+    u32 filtered_mask = 0;
+    u32 real_link = 0;
+    u32 link_index;
+    u32 config_fec;
 
     // find a lane that is connected
     for (i = 0; i < platform_driver_priv->devices.port_devices[port_type].num_lane_phandles; ++i) 
@@ -2358,29 +2363,158 @@ u32 mtip_device_filter_priv_flags(u32 port_type)
     // use the lane speed of the found lane
     max_lane_speed = platform_driver_priv->mtip_lanes[lane_index]->lane_speed;
 
+    if (mtip_device_lookup_lane_qsfp_cfg(port_type, &lane_qsfp_info) < 0)
+    {
+        CSMLOGERR("unable to lookup lane cfg of port_type %d", port_type);
+        return 0;
+    }
+
+    // use the number of lanes to decide the supported port configurations
+    if(port_type == MTIP_PORT_TYPE_DEBUG)
+    {
+        if(lane_qsfp_info.trx_module_type == TRX_QSFPDD)
+        {
+            // for QSFPDD on DU, bits at index 6 and 7 map to Debug port lanes
+            if((lane_qsfp_info.trx_laneinfo & 0xC0) == 0xC0)
+                num_lanes = 2;
+            else if((lane_qsfp_info.trx_laneinfo & 0x40) == 0x40)
+                num_lanes = 1;
+            else
+                return 0;
+        }
+        else
+        {
+            // for other modules, bits at index 2 and 3 map to Debug port lanes
+            if((lane_qsfp_info.trx_laneinfo & 0xC) == 0xC)
+                num_lanes = 2;
+            else if((lane_qsfp_info.trx_laneinfo & 0x4) == 0x4)
+                num_lanes = 1;
+            else
+                return 0;
+        }
+    }
+    else
+    {
+        // For FH ports, bits 0 to 3 will map to the 4 lanes of the port
+        if((lane_qsfp_info.trx_laneinfo & 0xF) == 0xF)
+            num_lanes = 4;
+        else if((lane_qsfp_info.trx_laneinfo & 0x3) == 0x3)
+            num_lanes = 2;
+        else if((lane_qsfp_info.trx_laneinfo & 0x1) == 0x1)
+            num_lanes = 1;
+        else
+        {
+            CSMLOGERR("Invalid trx_laneinfo 0x%x", lane_qsfp_info.trx_laneinfo);
+            return 0;
+        }
+    }
+
+    // TBD, need to use FEC setting as well to filter out supported speed modes
+    if(port_type == MTIP_PORT_TYPE_DEBUG)
+    {
+        real_link = 1;
+    }
+
+    // Get the link index of the first link for this port
+    if(mtip_lookup_link_index_by_port_type_and_real_link(&link_index, port_type, real_link) != 0)
+    {
+        return 0;
+    }
+
+    config_fec = platform_driver_priv->mtip_links[link_index]->config_fec;
+
     switch (max_lane_speed)
     {
-    case PHY_LANE_SPEED_10G:
-       {
-          filtered = port_priv_flags & MTIP_DEVICE_PRIV_FLAGS_BIT_MASK_10G;
-       }
-       break;
-
-    case PHY_LANE_SPEED_25G:
-       {
-          filtered = port_priv_flags & MTIP_DEVICE_PRIV_FLAGS_BIT_MASK_25G;
-       }
-       break;
-
-    case PHY_LANE_SPEED_50G:
-       {
-          filtered = port_priv_flags & MTIP_DEVICE_PRIV_FLAGS_BIT_MASK_50G;
-       }
-       break;
 
     case PHY_LANE_SPEED_100G:
        {
-          filtered = port_priv_flags & MTIP_DEVICE_PRIV_FLAGS_BIT_MASK_100G;
+          filtered_mask |= (1 << MTIP_PORT_CONFIG_1x100GBASE_R);
+       }
+       // fall through for lower speed modes
+
+    case PHY_LANE_SPEED_50G:
+       {
+           if(num_lanes == 1)
+           {
+              filtered_mask |= (1 << MTIP_PORT_CONFIG_1x50GBASE_R);
+           }
+           else if(num_lanes == 2 || num_lanes == 4)
+           {
+              // TBD - need to enhance breakout handling
+              filtered_mask |= ((1 << MTIP_PORT_CONFIG_1x100GBASE_R2)|
+                                (1 << MTIP_PORT_CONFIG_2x50GBASE_R) |
+                                (1 << MTIP_PORT_CONFIG_1x50GBASE_R));
+           }
+       }
+       // fall through for lower speed modes
+
+    case PHY_LANE_SPEED_25G:
+    {
+       if(num_lanes == 1)
+       {
+          filtered_mask |= (1 << MTIP_PORT_CONFIG_1x25GBASE_R);
+          if(config_fec == ETHTOOL_FEC_RS)
+             filtered_mask |= (1 << MTIP_PORT_CONFIG_1x25GBASE_R_RSFEC);
+          else if(config_fec == ETHTOOL_FEC_BASER)
+             filtered_mask |= (1 << MTIP_PORT_CONFIG_1x25GBASE_R_FEC);
+       }
+       else if(num_lanes == 2)
+       {
+          // TBD - need to enhance breakout handling
+          filtered_mask |= ((1 << MTIP_PORT_CONFIG_1x50GBASE_R2)|
+                            (1 << MTIP_PORT_CONFIG_1x25GBASE_R));
+          if(config_fec == ETHTOOL_FEC_RS)
+          {
+             filtered_mask |= ((1 << MTIP_PORT_CONFIG_1x50GBASE_R2_RSFEC) |
+                               (1 << MTIP_PORT_CONFIG_1x25GBASE_R_RSFEC));
+          }
+          else if(config_fec == ETHTOOL_FEC_BASER)
+             filtered_mask |= (1 << MTIP_PORT_CONFIG_1x25GBASE_R_FEC);
+       }
+       else if(num_lanes == 4)
+       {
+          // TBD - need to enhance breakout handling
+          filtered_mask |= ((1 << MTIP_PORT_CONFIG_1x100GBASE_R4) |
+                            (1 << MTIP_PORT_CONFIG_1x50GBASE_R2)|
+                            (1 << MTIP_PORT_CONFIG_4x25GBASE_R) |
+                            (1 << MTIP_PORT_CONFIG_1x25GBASE_R));
+          if(config_fec == ETHTOOL_FEC_RS)
+          {
+             filtered_mask |= ((1 << MTIP_PORT_CONFIG_1x100GBASE_R4_RSFEC) |
+                               (1 << MTIP_PORT_CONFIG_1x50GBASE_R2_RSFEC) |
+                               (1 << MTIP_PORT_CONFIG_4x25GBASE_R_RSFEC) |
+                               (1 << MTIP_PORT_CONFIG_1x25GBASE_R_RSFEC));
+          }
+          else if(config_fec == ETHTOOL_FEC_BASER)
+          {
+             filtered_mask |= ((1 << MTIP_PORT_CONFIG_4x25GBASE_R_FEC) |
+                               (1 << MTIP_PORT_CONFIG_1x25GBASE_R_FEC));
+          }
+       }
+    }
+    // fall through for lower speed modes
+
+    case PHY_LANE_SPEED_10G:
+       {
+          if(num_lanes == 1 || num_lanes == 2)
+          {
+             filtered_mask |= (1 << MTIP_PORT_CONFIG_1x10GBASE_R);
+             if(config_fec == ETHTOOL_FEC_BASER)
+                 filtered_mask |= (1 << MTIP_PORT_CONFIG_1x10GBASE_R_FEC);
+          }
+          else if(num_lanes == 4)
+          {
+             // TBD - need to enhance breakout handling, where we need to exclude 1x40_R4
+             filtered_mask |= ((1 << MTIP_PORT_CONFIG_1x10GBASE_R) |
+                               (1 << MTIP_PORT_CONFIG_4x10GBASE_R) |
+                               (1 << MTIP_PORT_CONFIG_1x40GBASE_R4));
+             if(config_fec == ETHTOOL_FEC_BASER)
+             {
+                 filtered_mask |= ((1 << MTIP_PORT_CONFIG_1x10GBASE_R_FEC) |
+                                   (1 << MTIP_PORT_CONFIG_4x10GBASE_R_FEC) |
+                                   (1 << MTIP_PORT_CONFIG_1x40GBASE_R4_FEC));
+             }
+          }
        }
        break;
 
@@ -2391,6 +2525,12 @@ u32 mtip_device_filter_priv_flags(u32 port_type)
        }
        break;
     }
+
+    filtered = port_priv_flags & filtered_mask;
+
+    CSMLOGINFO("mtip_device_filter_priv_flags: Port_type %d, lane %d, max_lane_speed %d, port_priv_flags 0x%x, filtered_mask 0x%x, filtered 0x%x",
+               port_type, lane_index, max_lane_speed, port_priv_flags, filtered_mask, filtered);
+
     return filtered;
 }
 
@@ -2505,13 +2645,6 @@ static int mtip_device_resolve_port_configuration_optical(u32 port_type)
     }
 
     bc = mtip_device_count_priv_flag_bits(port_type);
-
-    // check that there is only one bit set in priv-flags
-    if (bc != 1) 
-    {
-        CSMLOGERR("Only one mode can be supported for optical port_type %d bc: %d priv_flags %d", port_type, bc, port_info->port_priv_flags);
-        return -1; 
-    }
 
     // Get the link index of the first link for this port
     if(mtip_lookup_link_index_by_port_type_and_real_link(&link_index, port_type, real_link) < 0)
@@ -2662,6 +2795,7 @@ void mtip_device_configure_port(u32 port_type)
 {
    u32 tmp_lane_index;
    bool all_lanes_connected = true;
+   bool breakout_lane_connected = false;
    int i;
    struct mtip_port_info *port_info;
    bool set_port_config = false;
@@ -2671,12 +2805,11 @@ void mtip_device_configure_port(u32 port_type)
    int bc = 0;
    int num_an_lanes = 0;
    u32 filtered_priv_flags = 0;
-   trx_lane_cfg lane_cfg;
-   trx_breakout_cfg breakout_cfg;
    u32 real_link = 0;
    u32 real_lane = 0;
    u32 lane_index;
    u32 sfp_phandle[MAX_ETH_LANES] = {0};
+   struct qsfp_info lane_qsfp_info;
 
    port_info = platform_driver_priv->mtip_ports[port_type];
 
@@ -2690,30 +2823,53 @@ void mtip_device_configure_port(u32 port_type)
       {
       case MTIP_PORT_STATE_INIT:
          {
-             // lookup the lane cfg
-            if (mtip_device_lookup_lane_cfg(port_type, &lane_cfg, &breakout_cfg) < 0)
-            {
-               CSMLOGERR("unable to lookup lane cfg of port_type %d", port_type);
-               loopflag = false;
-               goto out;
-            }
-
             // check if this is a breakout cable case
-            if (lane_cfg != 0x0F)
+            if (mtip_phy_is_breakout_config(port_type))
             {
-                // this is a breakout cable
-                CSMLOGDBG("Breakout cable case: port_type %d lane_cfg: %d breakout_cfg %d", port_type, lane_cfg, breakout_cfg);
+                // this is a breakout cable, check that if any one lane of the port is in connected state
+               for (i = 0; i < platform_driver_priv->devices.port_devices[port_type].num_lane_phandles; ++i)
+               {
+                  tmp_lane_index = platform_driver_priv->devices.port_devices[port_type].lane_devices[i]->lane_index;
+
+                  if (platform_driver_priv->mtip_lanes[tmp_lane_index]->lane_state == MTIP_LANE_STATE_CONNECTED)
+                  {
+                     breakout_lane_connected = true;
+                     break;
+                  }
+               }
+
+               if(breakout_lane_connected == false)
+               {
+                   CSMLOGINFO("Waiting for at least one breakout lane for port: %d to be connected", port_type);
+
+                   // stay in INIT state
+                   loopflag = false;
+                   goto out;
+               }
+               else
+                   CSMLOGINFO("At least one breakout lane for port: %d is connected", port_type);
             }
             else
             {
                // this is not a breakout cable
                CSMLOGDBG("Not breakout cable case");
 
+               if (mtip_device_lookup_lane_qsfp_cfg(port_type, &lane_qsfp_info) < 0)
+               {
+                  // stay in INIT state
+                  loopflag = false;
+                  goto out;
+               }
+
                // check that all the lanes of the port are in connected state
                all_lanes_connected = true;
                for (i = 0; i < platform_driver_priv->devices.port_devices[port_type].num_lane_phandles; ++i)
                {
                   tmp_lane_index = platform_driver_priv->devices.port_devices[port_type].lane_devices[i]->lane_index;
+
+                  // Don't check for the lanes which are not valid
+                  if(((1 << i) & lane_qsfp_info.trx_laneinfo) == 0)
+                     continue;
 
                   if (platform_driver_priv->mtip_lanes[tmp_lane_index]->lane_state != MTIP_LANE_STATE_CONNECTED)
                   {
@@ -2780,6 +2936,7 @@ void mtip_device_configure_port(u32 port_type)
                loopflag = false;
                goto out;
             }
+
             if (num_links_waiting_for_lanes == 0)
             {
                // there are no links waiting to be assigned lanes
@@ -3389,6 +3546,12 @@ void run_mtip_process_netdev_close(void* workptr)
        // reset the port state to INIT
       if(platform_driver_priv->mtip_ports[port_type]) {
          platform_driver_priv->mtip_ports[port_type]->port_state = MTIP_PORT_STATE_INIT;
+
+         // reset the port speed to 0, across lanes
+         for (i = 0; i < PHY_LANE_MAX; ++i) 
+         {
+            platform_driver_priv->mtip_ports[port_type]->lane_config[i].lane_speed = 0;
+         }
       }
 
       // reset all the lane assignments

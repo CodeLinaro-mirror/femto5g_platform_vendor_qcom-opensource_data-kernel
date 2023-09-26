@@ -226,20 +226,20 @@ static int mtip_platform_setup_port(u32 port_type)
           // set the default port configs
           // THIS IS TBD
           // final port configuration will be known after AN completion
-          platform_driver_priv->mtip_ports[port_type]->port_config = MTIP_PORT_CONFIG_4x25GBASE_R;
+          //platform_driver_priv->mtip_ports[port_type]->port_config = MTIP_PORT_CONFIG_4x25GBASE_R;
 
           // set the default port priv flags
-          platform_driver_priv->mtip_ports[port_type]->port_priv_flags = (1 << MTIP_PORT_CONFIG_4x25GBASE_R);
+          platform_driver_priv->mtip_ports[port_type]->port_priv_flags = MTIP_DEVICE_PRIV_FLAGS_BIT_MASK_NON_FEC;
        }
        else
        {
           platform_driver_priv->mtip_ports[port_type]->autoneg = true;
 
           // set the default port config to 1x25GBASE_R
-          platform_driver_priv->mtip_ports[port_type]->port_config = MTIP_PORT_CONFIG_1x25GBASE_R;
+          //platform_driver_priv->mtip_ports[port_type]->port_config = MTIP_PORT_CONFIG_1x25GBASE_R;
 
           // set the default port priv flags
-          platform_driver_priv->mtip_ports[port_type]->port_priv_flags = (1 << MTIP_PORT_CONFIG_1x25GBASE_R);
+          platform_driver_priv->mtip_ports[port_type]->port_priv_flags = MTIP_DEVICE_PRIV_FLAGS_BIT_MASK_DBG_PORT_NON_FEC_NON_50G;
        }
     }
     else
@@ -602,6 +602,9 @@ int mtip_lane_probe(struct platform_device *pdev)
 
     // set this as a valid lane device
     lane_device.lane_device_valid = 1;
+
+    // set default lane down reason code
+    lane_device.reason_code = TRX_ERROR;
 
     // the DT entries have been processed
     spin_lock_irqsave(lock, flags);

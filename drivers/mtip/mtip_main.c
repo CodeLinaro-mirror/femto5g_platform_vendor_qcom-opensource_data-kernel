@@ -555,6 +555,29 @@ bool mtip_lookup_if_any_other_link_active_for_port(u32 port_type, u32 link_index
     return false;
 }
 
+int mtip_lookup_link_index_by_lane_index(u32 *link_index, u32 lane_index)
+{
+    int i;
+    int j;
+
+    for (i = 0; i < MTIP_MAX_LINKS; ++i) 
+    {
+        if (platform_driver_priv->mtip_links[i] != NULL)
+        {
+            for(j = 0; j < platform_driver_priv->mtip_links[i]->num_assigned_lanes; j++)
+            {
+                if(platform_driver_priv->mtip_links[i]->assigned_lane_indices[j] == lane_index)
+                {
+                    *link_index = i;
+                    return 0;
+                }
+            }
+        }
+    }
+
+    return -1;
+}
+
 static const struct of_device_id mtip_mac_link_match[] = {
     { .compatible = "mtip-mac-link", },
     { }

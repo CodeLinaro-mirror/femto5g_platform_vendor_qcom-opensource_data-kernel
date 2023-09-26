@@ -638,7 +638,8 @@ int mtip_ethtool_get_link_ksettings(struct net_device *dev, struct ethtool_link_
         for (i = 0; i < PHY_LANE_MAX; ++i) 
         {
             if ((port_info->lane_config[i].link_index == link_index) &&
-                (port_info->lane_config[i].lane_enabled))
+                (port_info->lane_config[i].lane_enabled) &&
+                (link_info->state == MTIP_LINK_STATE_UP))
             {
                 lane_speed += mtip_platform_convert_lane_speed_to_gbps(port_info->lane_config[i].lane_speed);
             }
@@ -657,6 +658,11 @@ int mtip_ethtool_set_link_ksettings(struct net_device *netdev, const struct etht
     struct mtip_link_info* link_info;
     u32 port_type;
     struct mtip_port_info* port_info;
+    bool autoneg = false;
+    u32 speed = 0;
+    u32 priv_flags = 0;
+    u32 temp_flag = 0;
+    u32 temp_flag_mask = 0;
 
     priv = netdev_priv(netdev);
     link_index = priv->link_index;
@@ -677,13 +683,66 @@ int mtip_ethtool_set_link_ksettings(struct net_device *netdev, const struct etht
     if (cmd->base.autoneg == AUTONEG_DISABLE) 
     {
         CSMLOGDBG("setting autoneg OFF on port_type %d", port_type);
-        port_info->autoneg = false;
+        autoneg = false;
     }
     else
     {
         CSMLOGDBG("setting autoneg ON on port_type %d", port_type);
-        port_info->autoneg = true;
+        autoneg = true;
     }
+
+    // Set the autoneg config
+    port_info->autoneg = autoneg;
+
+    speed = cmd->base.speed;
+    CSMLOGERR("Speed for link_index %d set to %d", link_index, speed);
+
+    if(speed != 0)
+    {
+        if(speed == 10000)
+        {
+            if(link_index == MTIP_DEBUG_ETH_LINK_INDEX)
+                priv_flags = MTIP_DEVICE_PRIV_FLAGS_BIT_MASK_10G_ONLY_DBG_PORT;
+            else
+                priv_flags = MTIP_DEVICE_PRIV_FLAGS_BIT_MASK_10G_ONLY;
+        }
+        else if(speed == 25000)
+        {
+            if(link_index == MTIP_DEBUG_ETH_LINK_INDEX)
+                priv_flags = MTIP_DEVICE_PRIV_FLAGS_BIT_MASK_25G_ONLY_DBG_PORT;
+            else
+                priv_flags = MTIP_DEVICE_PRIV_FLAGS_BIT_MASK_25G_ONLY;
+        }
+        else if(speed == 40000)
+            priv_flags = MTIP_DEVICE_PRIV_FLAGS_BIT_MASK_40G_ONLY;
+        else if(speed == 50000)
+        {
+            if(link_index == MTIP_DEBUG_ETH_LINK_INDEX)
+                priv_flags = MTIP_DEVICE_PRIV_FLAGS_BIT_MASK_50G_ONLY_DBG_PORT;
+            else
+                priv_flags = MTIP_DEVICE_PRIV_FLAGS_BIT_MASK_50G_ONLY;
+        }
+        else if(speed == 100000)
+        {
+            if(link_index == MTIP_DEBUG_ETH_LINK_INDEX)
+                priv_flags = MTIP_DEVICE_PRIV_FLAGS_BIT_MASK_100G_ONLY_DBG_PORT;
+            else
+                priv_flags = MTIP_DEVICE_PRIV_FLAGS_BIT_MASK_100G_ONLY;
+        }
+
+        // Set the priv flags for the speed config
+        while(priv_flags)
+        {
+            if(priv_flags & 0x1)
+            {
+                temp_flag_mask |= (1<<temp_flag);
+                mtip_ethtool_set_priv_flags(netdev, temp_flag_mask);
+            }
+            priv_flags >>= 1;
+            temp_flag++;
+        }
+    }
+
     return 0;
 }
 
@@ -917,6 +976,7 @@ void mtip_ethtool_set_msglevel(struct net_device *netdev, u32 level)
                     lane_index = platform_driver_priv->devices.port_devices[port_type].lane_devices[i]->lane_index;
 
                     memcpy(&platform_driver_priv->mtip_lanes[lane_index]->lane_qsfp_info, &trx_info, sizeof(struct qsfp_info));
+                    platform_driver_priv->devices.lane_devices[lane_index].reason_code = TRX_LOCAL_PLUGOUT;
                     post_mtip_phy_handle_lane_down(lane_index);
                 }
                 else

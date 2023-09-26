@@ -131,6 +131,10 @@ struct mtip_lane_device_info
 
     // sfp phandle
     int sfp_phandle;
+
+    // lane down reason
+    trx_lane_down_reason_code_type reason_code;
+
 };
 
 // the information stored for each port device
@@ -513,5 +517,11 @@ int mtip_lookup_device_by_lane_index(u32 lane_index, u32* port_device_index, u32
  *   checks whether there is any active link other than the given link for the given port type
  */
 bool mtip_lookup_if_any_other_link_active_for_port(u32 port_type, u32 link_index);
+
+/*
+ * mtip_lookup_link_index_by_lane_index 
+ *  find the link on which the given lane is mapped to 
+ */
+int mtip_lookup_link_index_by_lane_index(u32 *link_index, u32 lane_index);
 
 #endif // _MTIP_H

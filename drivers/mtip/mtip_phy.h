@@ -66,5 +66,6 @@ struct mtip_process_lane_down
 trx_link_length_range mtip_phy_get_trx_link_length_range(struct mtip_port_device_info* port_device);
 
 void mtip_phy_notify_eth_event_to_trx(u32 link_index, bool enable);
+bool mtip_phy_is_breakout_config(u32 port_type);
 
 #endif // _MTIP_PHY_H
