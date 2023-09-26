@@ -46,6 +46,7 @@
 #define DRV_NAME "ecpri-dma"
 #define DMA_INT_MAX ((int)(~0U >> 1))
 #define DMA_INT_MIN (-DMA_INT_MAX - 1)
+#define DMA_UINT32_MAX ((u32)~0U)
 
 extern struct ecpri_dma_context *ecpri_dma_ctx;
 
@@ -688,6 +689,8 @@ int ecpri_dma_start_endp(struct ecpri_dma_endp_context *endp_cfg);
 int ecpri_dma_stop_endp(struct ecpri_dma_endp_context *endp_cfg);
 int ecpri_dma_reset_endp(struct ecpri_dma_endp_context *endp_cfg);
 int ecpri_dma_dealloc_endp(struct ecpri_dma_endp_context *endp_cfg);
+int ecpri_dma_get_endp_stats(struct ecpri_dma_endp_context* ep,
+	struct ecpri_dma_endp_statistics* stats);
 
 
 #endif /* _ECPRI_DMA_I_H_ */
