@@ -237,6 +237,7 @@ static int eip_ipsec_alloc_vport(unsigned int devid, bool inbound,
 
 #define EIP_CRYPTO_AES_GCM_128 0x5
 #define EIP_CRYPTO_AES_GCM_256 0x7
+#define EIP_REPLAY_WINDOW_SIZE 128
 
 static void eip_ipsec_destroy_tr(u32 *tr, unsigned int wc)
 {
@@ -245,7 +246,7 @@ static void eip_ipsec_destroy_tr(u32 *tr, unsigned int wc)
 
 static u32 *eip_ipsec_build_tr(bool inbound, u8 *key, unsigned int key_len,
 			       u8 *salt, u32 spi, bool insert_satag, bool esn,
-			       unsigned int *wc)
+			       bool replay, unsigned int *wc)
 {
 	u32 *tr = NULL;
 	unsigned int word_count;
@@ -264,8 +265,11 @@ static u32 *eip_ipsec_build_tr(bool inbound, u8 *key, unsigned int key_len,
 	}
 
 	if (inbound) {
-		sab_params.WindowSize = 128;
+		sab_params.WindowSize = EIP_REPLAY_WINDOW_SIZE;
 		sab_params.flags = SAB_IPSEC_FLAG_PAD_CHECK;
+
+		if (!replay)
+			sab_params.flags |= SAB_IPSEC_DISABLE_REPLAY_CHECK;
 
 		if (!insert_satag)
 			sab_params.flags |= SAB_IPSEC_DISABLE_SA_TAG_INSERT;
@@ -315,6 +319,7 @@ static int eip_ipsec_add_sa(unsigned int devid, unsigned int vport,
 		(xs->aead->alg_key_len - EIP_IPSEC_SALT_SIZE) / BITS_PER_BYTE;
 	u8 *salt = &xs->aead->alg_key[key_len];
 	u32 spi = be32_to_cpu(xs->id.spi);
+	bool replay = false;
 
 	ZEROINIT(sa_params);
 
@@ -341,8 +346,13 @@ static int eip_ipsec_add_sa(unsigned int devid, unsigned int vport,
 	 * bits in the TR (transform record).
 	 */
 
+	if (xs->replay_esn) {
+		replay = !!(xs->replay_esn->replay_window ==
+			    EIP_REPLAY_WINDOW_SIZE);
+	}
+
 	tr = eip_ipsec_build_tr(inbound, key, key_len, salt, spi, true,
-				enable_esn, &word_count);
+				enable_esn, replay, &word_count);
 	if (tr == NULL) {
 		eip_logerr("EIP IPSEC: Failed to create transformation record");
 		return -EFAULT;
@@ -545,6 +555,15 @@ static int eip_ipsec_validate_sa(const struct xfrm_state *xs)
 
 	if (xs->tfcpad) {
 		eip_logerr("EIP IPSEC: EIP does not support TFC padding");
+		return -EINVAL;
+	}
+
+	if (xs->xso.dir == XFRM_DEV_OFFLOAD_IN &&
+	    ((xs->replay_esn &&
+	      xs->replay_esn->replay_window != EIP_REPLAY_WINDOW_SIZE) ||
+	     (!xs->replay_esn && xs->props.replay_window))) {
+		eip_logerr("EIP IPSEC: HW only support replay_window size %u",
+			   EIP_REPLAY_WINDOW_SIZE);
 		return -EINVAL;
 	}
 
