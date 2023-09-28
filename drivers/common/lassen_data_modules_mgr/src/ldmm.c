@@ -38,17 +38,19 @@ static int __init lassen_data_modules_mgr_init(void)
 out2:
 	exit_genlldmm();
 out1:
-	if(ldmm_core_context_g.ldmm_logbuf)
+	if(ldmm_core_context_g.ldmm_logbuf){
 		ipc_log_context_destroy(ldmm_core_context_g.ldmm_logbuf);
-
-
+		ldmm_core_context_g.ldmm_logbuf = NULL;
+        }
 	return -1;
 }
 static void __exit lassen_data_modules_mgr_exit(void){
 	LDMM_LOG_INFO("exiting LDMM\n");
 
-	if(ldmm_core_context_g.ldmm_logbuf)
+	if(ldmm_core_context_g.ldmm_logbuf){
 		ipc_log_context_destroy(ldmm_core_context_g.ldmm_logbuf);
+		ldmm_core_context_g.ldmm_logbuf = NULL;
+	}
 	exit_genlldmm();
 	ldmm_fault_notifr_exit();
 
