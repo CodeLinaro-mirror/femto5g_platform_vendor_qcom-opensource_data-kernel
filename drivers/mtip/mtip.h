@@ -26,6 +26,10 @@
 #include "mtip_clocks.h"
 #include "mtip_dma.h"
 
+#ifndef NO_DEBUGFS_PERF
+#define FEATURE_MTIP_TEST_DEBUG_FS
+#endif
+
 // the driver name
 #define MTIP_MAC_DRIVER                 "MTIP_MAC"
 #define MTIP_MAC_DRIVER_VERSION         "1.0.0"

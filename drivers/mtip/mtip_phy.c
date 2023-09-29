@@ -387,7 +387,7 @@ func_exit:
     kfree(wq_params);
     return;
 }
-
+extern uint32_t ber_sim_status[12];
 void mtip_fault_notifr_status(struct work_struct *work)
 {
     u32 link_index = 0;
@@ -417,7 +417,7 @@ void mtip_fault_notifr_status(struct work_struct *work)
                 continue;
             }
 
-            if (((read_val & GENMASK(5,2)) >> 2) & (1 << link_index)){
+            if ( (((read_val & GENMASK(5,2)) >> 2) & (1 << link_index)) || ber_sim_status[port_link_id]){
 
                 mtip_snd_event_notification(port_link_id, HIGH_BER_SET);
             }else{

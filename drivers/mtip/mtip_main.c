@@ -25,6 +25,7 @@
 #include <linux/bitrev.h>
 #include <linux/slab.h>
 #include <linux/panic_notifier.h>
+#include <linux/debugfs.h>
 
 MODULE_LICENSE("GPL v2");
 
@@ -61,6 +62,7 @@ MODULE_LICENSE("GPL v2");
 #include "mtip_macstats.h"
 #include "mtip_ethtool.h"
 #include "mtip_notifr.h"
+#include "mtip_sysfs.h"
 
 /* Global variables of the driver */
 struct mtip_platform_driver_priv* platform_driver_priv = NULL;
@@ -106,6 +108,117 @@ MODULE_PARM_DESC(mtip_dma_max_rx_buff_size, "SET mtip_dma_rx buff size");
 bool enable_tx_comp_poll = true;
 module_param(enable_tx_comp_poll, bool, S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP);
 MODULE_PARM_DESC(enable_tx_comp_poll, "Enable TX Completion Poll");
+
+uint32_t ber_sim_status[12]={0};
+
+#ifdef FEATURE_MTIP_TEST_DEBUG_FS
+
+struct dentry *mtip_dobj;
+int mtip_attr_val;
+
+#define MIN(a,b) ((a < b) ? a : b)
+
+char help_menu[] = {
+"Help Menu:\n\
+           Interface index (0-11), Enable(1)/Disable(0) BER Simulation\n\
+           For enable/disable BER Simulation on link index n, use following command:\n\
+           echo n,1 > /sys/kernel/debug/mtip_test/mtip_sim_ber\n\
+           echo n,0 > /sys/kernel/debug/mtip_test/mtip_sim_ber\n"
+};
+
+ssize_t mtip_set_attr(struct file *file, const char __user *buf,
+                             size_t count, loff_t *ppos) {
+ 
+  char *token;
+  char token_string[100];
+  int ber_sim = 0;
+  
+  memset(token_string, 0, sizeof(token_string));
+
+  if (copy_from_user(&token_string, buf, MIN(sizeof(token_string), count)))
+  {
+    CSMLOGERR("Copy from user failed\n");
+    return -EFAULT;
+  }
+
+  token = mtip_sysfs_strtok(token_string, ",");
+  if(token!=NULL)
+    sscanf(token, "%d", &mtip_attr_val);
+  else
+  {
+    CSMLOGERR("Invalid Input\n");
+    return -EFAULT;
+  }
+
+  if((mtip_attr_val < 0) || (mtip_attr_val > 11))
+  {
+    CSMLOGERR("Invalid interface index\n");
+    return -EFAULT;
+  }
+  else
+  {
+    token = mtip_sysfs_strtok(NULL, ",");
+    if(token!=NULL)
+      sscanf(token, "%d", &ber_sim);
+    else
+    {
+      CSMLOGERR("Invalid Input\n");
+      return -EFAULT;
+    }
+
+    if((ber_sim != 0) && (ber_sim != 1))
+    {
+      CSMLOGERR("Invalid ber_sim value\n");
+      return -EFAULT;
+    }
+    ber_sim_status[mtip_attr_val] = ber_sim;
+
+   }
+
+  return count;
+
+}
+
+ssize_t mtip_get_attr(struct file *file, char __user *buf,
+                             size_t count, loff_t *ppos) {
+  char ber_sim_str[700]={0};
+  uint32_t ret_val = 0, i = 0;
+
+  scnprintf(ber_sim_str + strlen(ber_sim_str), sizeof(help_menu), help_menu);
+  scnprintf(ber_sim_str + strlen(ber_sim_str), 40, "\nBer Simulation Status:\n");
+
+  for(i=0;i<12;i++)
+  {
+    scnprintf(ber_sim_str + strlen(ber_sim_str), 30, "    ber_status[%d] = %d\n",i,ber_sim_status[i]);
+  }
+
+  ret_val=simple_read_from_buffer(buf, count, ppos, ber_sim_str, 700);
+  return ret_val;
+}
+
+static const struct file_operations mtip_debug_fs_ops = {
+  .write = mtip_set_attr,
+  .read = mtip_get_attr,
+};
+
+void mtip_setup_debugfs(void) {
+
+  /* creating the directory structure in /sys/kernel/debug */
+  mtip_dobj = debugfs_create_dir("mtip_test", NULL);
+
+  debugfs_create_file("mtip_sim_ber", 0644, mtip_dobj, 0, &mtip_debug_fs_ops);
+
+  return;
+}
+
+void mtip_del_debugfs(void) {
+
+  /* deleting the directory structure in /sys/kernel/debug */
+  debugfs_remove_recursive(mtip_dobj);
+  return;
+}
+
+#endif /* FEATURE_MTIP_TEST_DEBUG_FS */
 
 int mtip_lookup_link_index_by_name(char *name, u32 *link_index) {
    int i;
@@ -578,6 +691,8 @@ int mtip_lookup_link_index_by_lane_index(u32 *link_index, u32 lane_index)
     return -1;
 }
 
+
+
 static const struct of_device_id mtip_mac_link_match[] = {
     { .compatible = "mtip-mac-link", },
     { }
@@ -843,6 +958,10 @@ static int mtip_module_init(void)
         }
     }
 
+#ifdef FEATURE_MTIP_TEST_DEBUG_FS
+   mtip_setup_debugfs();
+#endif /* FEATURE_MTIP_TEST_DEBUG_FS */
+
    // initialize the workq
    ret = mtip_initialize_workq();
 
@@ -981,6 +1100,7 @@ static int mtip_module_init(void)
    goto out;
 
 cleanup:
+
    if (platform_driver_priv->ipc_log_buf)
 		ipc_log_context_destroy(platform_driver_priv->ipc_log_buf);
    if (platform_driver_priv->ipc_log_buf_low)
@@ -989,6 +1109,9 @@ cleanup:
    platform_driver_priv = NULL;
 
 out:
+#ifdef FEATURE_MTIP_TEST_DEBUG_FS
+   mtip_del_debugfs();
+#endif /* FEATURE_MTIP_TEST_DEBUG_FS */
    return ret;
 }
 
@@ -1001,6 +1124,9 @@ static void mtip_module_exit(void)
    mtip_hashmap_destroy();
    mtip_eth_deregister_events_cb();
 
+#ifdef FEATURE_MTIP_TEST_DEBUG_FS
+   mtip_del_debugfs();
+#endif /* FEATURE_MTIP_TEST_DEBUG_FS */
    // deregister panic notifier
    atomic_notifier_chain_unregister(&panic_notifier_list, &mtip_panic_blk);
 
