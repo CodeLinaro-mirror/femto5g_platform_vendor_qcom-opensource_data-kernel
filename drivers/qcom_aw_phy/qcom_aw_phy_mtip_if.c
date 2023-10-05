@@ -1781,7 +1781,6 @@ void qcom_aw_phy_handle_an_link_good(struct work_struct *work){
   mss_access_t mss = {.phy_offset = 0, .lane_offset = 0};
   mss_access_t temp_mss = {.phy_offset = 0, .lane_offset = 0};
   uint32_t an_complete;
-  uint32_t lp_ability;
   enum mtip_port_config_enum port_config_result = MTIP_PORT_CONFIG_MAX;
   bool an_result = false;
   int i = 0;
@@ -1832,18 +1831,9 @@ void qcom_aw_phy_handle_an_link_good(struct work_struct *work){
                       &phy_inst_info->an_params.an_result[wq_params->lane_num]);
 
   /* Read the link partner ability */
-  pmd_read_field(&mss, ETH_AN_LP_ADV_ABILITY_REG3_ADDR,
-                 ETH_AN_LP_ADV_ABILITY_REG3_AN_MR_LP_ADV_ABILITY_3_MASK,
-                 ETH_AN_LP_ADV_ABILITY_REG3_AN_MR_LP_ADV_ABILITY_3_OFFSET,
-                 &lp_ability);
-
-  QCOM_AW_PHY_LOG_DBG("Link partner ability = 0x%x", lp_ability);
-
-  /* Fetch the FEC capability from LP ability */
-  for(i=11;i<=15;i++){
-    if((1<<i) & lp_ability)
-      phy_inst_info->an_params.lp_fec_ability[wq_params->lane_num][i-11] = 1;
-  }
+  aw_pmd_anlt_lp_auto_neg_adv_ability_get(&mss,
+                  phy_inst_info->an_params.lp_adv_ability[wq_params->lane_num],
+                  phy_inst_info->an_params.lp_fec_ability[wq_params->lane_num]);
 
   /* AN failure handling */
   if(phy_inst_info->an_params.an_result[wq_params->lane_num] == -1){

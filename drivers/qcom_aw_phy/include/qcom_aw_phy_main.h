@@ -262,6 +262,7 @@ struct qcom_aw_phy_an_params{
 	enum qcom_aw_phy_an_state_enum        an_state[PHY_LANE_MAX];
 	int                                   an_result[PHY_LANE_MAX];
 	int                                   an_fec_result[PHY_LANE_MAX];
+	uint32_t                              lp_adv_ability[PHY_LANE_MAX][PHY_SPEED_SPEC_MAX];
 	uint32_t                              lp_fec_ability[PHY_LANE_MAX][PHY_FEC_SPEC_MAX];
 	int                                   num_lanes;
 	enum eth_phy_iface_phy_lane_num_enum  current_lane;
