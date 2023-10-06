@@ -1621,6 +1621,12 @@ static int mtip_platform_setup(void)
 
                // set the lane speed as 25GBASE
                platform_driver_priv->mtip_lanes[i]->lane_speed = PHY_LANE_SPEED_100G;
+
+               // set the lane properties for TRX
+               platform_driver_priv->mtip_lanes[i]->lane_qsfp_info.trx_module_type = TRX_QSFP_PLS_QSFP28_QSFP56;
+               platform_driver_priv->mtip_lanes[i]->lane_qsfp_info.trx_speed = TRX_LANE_SPEED_100G;
+               platform_driver_priv->mtip_lanes[i]->lane_qsfp_info.trx_laneinfo = 0xF;
+               platform_driver_priv->mtip_lanes[i]->lane_qsfp_info.trx_bout_cfg = 0;
            }
        }
 

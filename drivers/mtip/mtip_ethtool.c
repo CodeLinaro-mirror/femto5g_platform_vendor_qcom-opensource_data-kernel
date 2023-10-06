@@ -960,8 +960,8 @@ void mtip_ethtool_set_msglevel(struct net_device *netdev, u32 level)
     }
 
     trx_info.trx_module_type = TRX_QSFP_PLS_QSFP28_QSFP56;
-    trx_info.trx_speed = TRX_LANE_SPEED_25G;
-    trx_info.trx_laneinfo = 0;
+    trx_info.trx_speed = TRX_LANE_SPEED_100G;
+    trx_info.trx_laneinfo = 0xF;
     trx_info.trx_bout_cfg = 0;
 
     switch (level)
