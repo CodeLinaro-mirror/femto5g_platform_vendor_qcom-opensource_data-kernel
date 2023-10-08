@@ -664,6 +664,10 @@ int ecpri_dma_dp_poll(struct ecpri_dma_endp_context *endp, u32 budget,
 			break;
 		}
 
+		if (endp->gsi_ep_cfg->dir == ECPRI_DMA_ENDP_DIR_SRC) {
+			gsi_ring_evt_doorbell_polling_mode(endp->gsi_chan_hdl);
+		}
+
 		endp->total_pkts_recv += num_of_buff;
 
 		/*	Transfer completion data from GSI event to completion pkts list */
@@ -926,7 +930,7 @@ int ecpri_dma_dp_transmit(struct ecpri_dma_endp_context *endp,
 		gsi_xfer_index += pkts[i]->num_of_buffers;
 	}
 
-	if (endp->curr_outstanding_num > endp->ring_length) {
+	if (endp->curr_outstanding_num >= endp->ring_length) {
 		DMAERR("This transfer will exceed ring length, dropping all\n");
 		goto fail_handling;
 	}

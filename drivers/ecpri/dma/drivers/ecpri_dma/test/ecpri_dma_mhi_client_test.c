@@ -2144,7 +2144,7 @@ static void ecpri_dma_mhi_client_test_utils_create_conn_params(
 	params->int_modt = 0;
 	params->int_modc = 1;
 	params->buff_size = buff_size;
-	params->desc_fifo_sz = ECPRI_DMA_MHI_MEMCPY_RLEN;
+	params->desc_fifo_sz = ECPRI_DMA_MHI_ASYNC_MEMCPY_RLEN;
 }
 
 static inline void ecpri_dma_mhi_test_create_func_params(
