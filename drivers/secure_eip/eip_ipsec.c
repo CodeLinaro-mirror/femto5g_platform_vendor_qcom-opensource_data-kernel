@@ -436,22 +436,19 @@ static int eip_install_cfye_rule(struct eip_xfrm_state *eip_xs)
 	rule_params.Mask.NumTags = CFYE_RULE_NUMTAGS_MASK;
 	rule_params.Mask.ChannelID = CFYE_RULE_CHANNEL_ID_MASK;
 
-	/* Let's not match against ethernet DA in order to accept broadcast/multicast
-	 * ethernet frames.
-	 */
+	/* Do not match Ethernet DA since we are already matching channel ID */
 	rule_params.Data[0] = *(u32 *)eip_xs->ndev->dev_addr;
 	rule_params.Data[1] = *(u16 *)(eip_xs->ndev->dev_addr + 4);
-	rule_params.DataMask[0] = 0x0;
-	rule_params.DataMask[1] = 0x0;
+	rule_params.DataMask[0] = 0;
+	rule_params.DataMask[1] = 0;
 
+	/* Match SPI */
 	rule_params.Data[2] = be32_to_cpu(xs->id.spi);
 	rule_params.DataMask[2] = 0xffffffff;
 
-	/* Disable MTT match as we do not need to support virtualization, and therefore
-	 * not expect more than one SPI namespace.
-	 */
-	rule_params.Data[3] = 0;
-	rule_params.DataMask[3] = 0x0;
+	/* Match MTT */
+	rule_params.Data[3] = eip_xs->ilink->mtt_index;
+	rule_params.DataMask[3] = 0xf;
 
 	rc = CfyE_Rule_Add(devid, eip_xs->vport_h, &eip_xs->rule_h,
 			   &rule_params);
@@ -680,9 +677,92 @@ const struct xfrmdev_ops eip_xfrm_ops = {
 	.xdo_dev_state_advance_esn = eip_xdo_dev_state_advance_esn,
 };
 
+static void eip_set_bit(unsigned int nr, u32 *words, u32 num_words)
+{
+	unsigned int word = nr / EIP_BITS_PER_WORD;
+
+	if (word < num_words)
+		words[word] |= 1 << (nr % EIP_BITS_PER_WORD);
+}
+
+static void eip_set_bits(unsigned int num_bits, u32 *words, u32 num_words)
+{
+	unsigned int i, full_words, last_bits;
+
+	if (num_bits > (num_words * EIP_BITS_PER_WORD))
+		num_bits = num_words * EIP_BITS_PER_WORD;
+
+	full_words = num_bits / EIP_BITS_PER_WORD;
+	last_bits = num_bits % EIP_BITS_PER_WORD;
+
+	for (i = 0; i < full_words; i++)
+		words[i] = (u32)~0;
+
+	if (last_bits)
+		words[full_words] =
+			((u32)(~0)) >> (EIP_BITS_PER_WORD - last_bits);
+}
+
+static int eip_ipsec_enable_mtt(struct eip_ipsec_link *ilink)
+{
+	CfyE_Status_t rc;
+	CfyE_MTT_t mtt_params;
+	struct eip_link *link = ilink->link;
+	unsigned int devid = eip_devid(&link->rx);
+	unsigned int channel = eip_chid(&link->rx);
+	unsigned int num_channels;
+
+	/* For sake of simplicity, use one-to-one mapping from channel to mtt index */
+	ilink->mtt_index = channel;
+
+	rc = CfyE_Device_Limits(devid, &num_channels, NULL, NULL);
+	if (rc != CFYE_STATUS_OK) {
+		eip_logerr("EIP IPSEC: CfyE_Device_Limits returned error %d",
+			   rc);
+		return -EFAULT;
+	}
+
+	ZEROINIT(mtt_params);
+
+	eip_set_bit(channel, mtt_params.Key.ChannelMask.ch_bitmask,
+		    ARRAY_SIZE(mtt_params.Key.ChannelMask.ch_bitmask));
+	eip_set_bits(num_channels, mtt_params.Mask.ChannelMask.ch_bitmask,
+		     ARRAY_SIZE(mtt_params.Mask.ChannelMask.ch_bitmask));
+
+	rc = CfyE_MTT_Update(devid, ilink->mtt_index, &mtt_params);
+	if (rc != CFYE_STATUS_OK) {
+		eip_logerr("EIP IPSEC: Failed, CfyE_MTT_Update()=%d", rc);
+		return -EFAULT;
+	}
+
+	rc = CfyE_MTT_Enable(devid, ilink->mtt_index, true);
+	if (rc != CFYE_STATUS_OK) {
+		eip_logerr("EIP IPSEC: Failed, CfyE_MTT_Enable()=%d", rc);
+		return -EFAULT;
+	}
+
+	return 0;
+}
+
+static int eip_ipsec_disable_mtt(struct eip_ipsec_link *ilink)
+{
+	int rc;
+	struct eip_link *link = ilink->link;
+	unsigned int devid = eip_devid(&link->rx);
+
+	rc = CfyE_MTT_Disable(devid, ilink->mtt_index, true);
+	if (rc != CFYE_STATUS_OK) {
+		eip_logerr("EIP IPSEC: Failed, CfyE_MTT_Disable()=%d", rc);
+		return -EFAULT;
+	}
+
+	return 0;
+}
+
 /* Initialized IPsec private data for a single link */
 int eip_ipsec_init_link(struct eip_link *link)
 {
+	int rc;
 	struct net_device *net_dev = link->ndev;
 	unsigned int rx_devid = eip_devid(&link->rx);
 	unsigned int tx_devid = eip_devid(&link->tx);
@@ -704,6 +784,13 @@ int eip_ipsec_init_link(struct eip_link *link)
 
 	link->ipsec_priv = ilink;
 
+	rc = eip_ipsec_enable_mtt(ilink);
+	if (rc) {
+		link->ipsec_priv = NULL;
+		ilink->link = NULL;
+		kfree(ilink);
+	}
+
 	net_dev->xfrmdev_ops = &eip_xfrm_ops;
 	net_dev->features |= NETIF_F_HW_ESP;
 	net_dev->hw_enc_features |= NETIF_F_HW_ESP;
@@ -714,6 +801,9 @@ int eip_ipsec_init_link(struct eip_link *link)
 void eip_ipsec_deinit_link(struct eip_link *link)
 {
 	struct net_device *net_dev = link->ndev;
+	struct eip_ipsec_link *ilink = link->ipsec_priv;
+
+	(void)eip_ipsec_disable_mtt(ilink);
 
 	net_dev->xfrmdev_ops = NULL;
 	net_dev->features &= ~NETIF_F_HW_ESP;
