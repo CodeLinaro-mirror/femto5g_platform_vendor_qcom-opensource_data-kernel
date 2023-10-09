@@ -133,6 +133,12 @@ static void mtip_phy_cdr_lock_ind(u32 link_index, bool status, u8 an_seq_num)
     if(status == false)
         return;
 
+    if(link_index >= MTIP_MAX_LINKS)
+    {
+        CSMLOGINFO("Invalid link index %d", link_index);
+        return;
+    }
+
     if(mtip_lookup_port_type_by_link_index(link_index, &port_type) != 0)
     {
         CSMLOGINFO("Invalid link/port!");
