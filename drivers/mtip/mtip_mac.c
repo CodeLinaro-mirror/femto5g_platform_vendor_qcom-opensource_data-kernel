@@ -624,6 +624,10 @@ void mtip_mac_link_up(u32 link_index)
 
     //send a notification to ldmm.ko
     mtip_snd_event_notification(link_index, PCS_IF_UP);
+
+    // Notify TRX driver to disable TX
+    mtip_phy_notify_eth_event_to_trx(link_index, TRX_ETH_LINK_UP);
+
 }
 
 void mtip_mac_link_down(u32 link_index)
@@ -639,8 +643,12 @@ void mtip_mac_link_down(u32 link_index)
         // set link state as down
         platform_driver_priv->mtip_links[link_index]->state = MTIP_LINK_STATE_DOWN;
     }
+
     //send a notification to ldmm.ko
     mtip_snd_event_notification(link_index, PCS_IF_DOWN);
+
+    // Notify TRX driver to disable TX
+    mtip_phy_notify_eth_event_to_trx(link_index, TRX_ETH_LINK_DOWN);
 }
 
 static void mtip_mac_set_xif_mode(struct mtip_netdev_priv *priv) {
