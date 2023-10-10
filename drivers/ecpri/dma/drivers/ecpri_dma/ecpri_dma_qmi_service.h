@@ -23,7 +23,7 @@
 #define ECPRI_DMA_Q6_SERVICE_SVC_ID 0x434
 #define ECPRI_DMA_Q6_SERVICE_INS_ID 2
 
-#define ECPRI_DMA_CUR_DMA_QMI_SW_VER (ECPRI_DMA_QMI_SW_V2)
+#define ECPRI_DMA_CUR_DMA_QMI_SW_VER (ECPRI_DMA_QMI_SW_V3)
 
  /* This is the largest MAX_MSG_LEN we have for all the messages
   * we expect to receive. This argument will be used in
@@ -45,11 +45,14 @@ enum ecpri_dma_qmi_msg_type{
  /**
   * Q6 QMI message versioning
   * ver 1: supports only init handshake
-  * ver 2: adds support for ch cmd
+  * ver 2: adds support for ch cmd with stop endp
+  * ver 3: adds support for ch cmd for start endp
   */
 enum ecpri_dma_qmi_q6_sw_vsersion {
+	ECPRI_DMA_QMI_Q6_SW_INVALID = 0,
 	ECPRI_DMA_QMI_Q6_SW_VER_1 = 1,
 	ECPRI_DMA_QMI_Q6_SW_VER_2 = 2,
+	ECPRI_DMA_QMI_Q6_SW_VER_3 = 3,
 };
 
  /**
@@ -59,6 +62,7 @@ enum ecpri_dma_qmi_q6_sw_vsersion {
   * ver 3: adds support for ch cmd for start endp
   */
 enum ecpri_dma_qmi_dma_sw_versions {
+	ECPRI_DMA_QMI_SW_INVALID = 0,
 	ECPRI_DMA_QMI_SW_V1 = 1,
 	ECPRI_DMA_QMI_SW_V2 = 2,
 	ECPRI_DMA_QMI_SW_V3 = 3,
@@ -76,11 +80,11 @@ struct ecpri_dma_qmi_context {
 	bool send_q6_init;
 	bool q6_init_sent;
 	bool q6_indication_recv;
-	bool q6_init_cmplt;
-	bool q6_response_recv;
+	atomic_t q6_init_cmplt;
+	atomic_t q6_response_recv;
 	bool q6_registered;
 	bool wq_stop;
-	bool q6_disconnected;
+	atomic_t q6_disconnected;
 	struct completion qmi_q6_int_cmplt_completion;
 	struct completion qmi_ch_cmd_sync_completion;
 	u32 q6_hw_version;
@@ -88,7 +92,9 @@ struct ecpri_dma_qmi_context {
 	enum ecpri_dma_qmi_dma_sw_versions  dma_sw_version;
 	struct mutex sync_ch_cmd_lock;
 	struct list_head pending_ch_cmd_indiciation_list;
+	struct list_head ecpri_dma_pending_q6_msg;
 	struct mutex cmd_list_lock;
+	struct mutex deferred_cmd_list_lock;
 };
 
 int ecpri_dma_qmi_service_init(void);
@@ -132,8 +138,15 @@ int ecpri_dma_qmi_service_send_ch_cmd_q6(
 /**
  * ecpri_dma_qmi_get_sw_ver() - get the QMI dma software version
  *
- * Return: qmi software version value
+ * Return: supported qmi software version value
  */
 enum ecpri_dma_qmi_dma_sw_versions ecpri_dma_qmi_get_sw_ver(void);
+
+/**
+ * ecpri_dma_qmi_get_q6_sw_ver() - get the reported QMI dma software version
+ *
+ * Return: Q6 reported software version value
+ */
+enum ecpri_dma_qmi_q6_sw_vsersion ecpri_dma_qmi_get_q6_sw_ver(void);
 
 #endif /* _ECPRI_DMA_QMI_SERVICE_H_ */

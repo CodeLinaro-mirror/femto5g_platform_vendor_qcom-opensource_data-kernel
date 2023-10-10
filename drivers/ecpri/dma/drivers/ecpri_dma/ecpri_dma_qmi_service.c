@@ -70,9 +70,28 @@ static struct qmi_msg_handler client_handlers[] = {
 static void ecpri_dma_qmi_service_q6_send_init_msg(struct work_struct* work);
 static DECLARE_DELAYED_WORK(ecpri_dma_work_send_q6_init_msg,
 	ecpri_dma_qmi_service_q6_send_init_msg);
+
 static void ecpri_dma_q6_clnt_svc_exit(struct work_struct* work);
 static DECLARE_DELAYED_WORK(ecpri_dma_work_svc_exit,
 	ecpri_dma_q6_clnt_svc_exit);
+
+
+static void ecpri_dma_send_q6_start_msg(struct work_struct* work);
+static DECLARE_DELAYED_WORK(ecpri_dma_work_send_q6_start_msg,
+	ecpri_dma_send_q6_start_msg);
+
+
+struct ecpri_dma_q6_msg_wrapper {
+	struct list_head link;
+	struct ecpri_dma_endp_context *endp_ctx;
+	enum ecpri_ch_cmd_type_enum_v01 op;
+	enum ecpri_dma_qmi_msg_type flag;
+};
+
+static bool ecpri_dma_is_handshake_complete() {
+	return atomic_read(&ecpri_dma_qmi_ctx->q6_init_cmplt) &&
+		atomic_read(&ecpri_dma_qmi_ctx->q6_response_recv);
+}
 
 static void ecpri_dma_a55_svc_disconnect_cb(struct qmi_handle* qmi, unsigned int node,
 	unsigned int port)
@@ -83,7 +102,7 @@ static void ecpri_dma_a55_svc_disconnect_cb(struct qmi_handle* qmi, unsigned int
 static void ecpri_dma_q6_clnt_svc_event_notify_net_reset(struct qmi_handle* qmi)
 {
 	if (!ecpri_dma_qmi_ctx->wq_stop)
-		queue_delayed_work(ecpri_dma_qmi_ctx->clnt_req_wq,
+        	queue_delayed_work(ecpri_dma_qmi_ctx->clnt_req_wq,
 			&ecpri_dma_work_svc_exit,
 			0);
 }
@@ -103,7 +122,7 @@ static void ecpri_dma_q6_clnt_svc_event_notify_svc_exit(struct qmi_handle* qmi,
 static void ecpri_dma_q6_clnt_svc_exit(struct work_struct* work)
 {
 	if (ecpri_dma_qmi_ctx != NULL) {
-		ecpri_dma_qmi_ctx->q6_disconnected = true;
+		atomic_set(&ecpri_dma_qmi_ctx->q6_disconnected,true);
 		DMADBG("Q6 disconnected\n");
 	}
 }
@@ -111,6 +130,11 @@ static void ecpri_dma_q6_clnt_svc_exit(struct work_struct* work)
 enum ecpri_dma_qmi_dma_sw_versions ecpri_dma_qmi_get_sw_ver()
 {
 	return ECPRI_DMA_CUR_DMA_QMI_SW_VER;
+}
+
+enum ecpri_dma_qmi_q6_sw_vsersion ecpri_dma_qmi_get_q6_sw_ver()
+{
+	return ecpri_dma_qmi_ctx->q6_sw_version;
 }
 
 int ecpri_dma_qmi_service_init(void)
@@ -131,10 +155,10 @@ int ecpri_dma_qmi_service_init(void)
 	ecpri_dma_qmi_ctx->send_q6_init = true;
 	ecpri_dma_qmi_ctx->q6_init_sent = false;
 	ecpri_dma_qmi_ctx->q6_indication_recv = false;
-	ecpri_dma_qmi_ctx->q6_init_cmplt = false;
-	ecpri_dma_qmi_ctx->q6_response_recv = false;
+	atomic_set(&ecpri_dma_qmi_ctx->q6_init_cmplt,false);
+	atomic_set(&ecpri_dma_qmi_ctx->q6_response_recv,false);
 	ecpri_dma_qmi_ctx->q6_registered = false;
-	ecpri_dma_qmi_ctx->q6_disconnected = false;
+	atomic_set(&ecpri_dma_qmi_ctx->q6_disconnected,false);
 	ecpri_dma_qmi_ctx->wq_stop = false;
 	ecpri_dma_qmi_ctx->sending_retries = 0;
 	ecpri_dma_qmi_ctx->dma_sw_version = ecpri_dma_qmi_get_sw_ver();
@@ -142,12 +166,14 @@ int ecpri_dma_qmi_service_init(void)
 	init_completion(&ecpri_dma_qmi_ctx->qmi_q6_int_cmplt_completion);
 	init_completion(&ecpri_dma_qmi_ctx->qmi_ch_cmd_sync_completion);
 
-	/* Init indication list */
+	/* Init lists */
 	INIT_LIST_HEAD(&ecpri_dma_qmi_ctx->pending_ch_cmd_indiciation_list);
+	INIT_LIST_HEAD(&ecpri_dma_qmi_ctx->ecpri_dma_pending_q6_msg);
 
 	/* Initialize mutexes */
 	mutex_init(&ecpri_dma_qmi_ctx->lock);
 	mutex_init(&ecpri_dma_qmi_ctx->cmd_list_lock);
+	mutex_init(&ecpri_dma_qmi_ctx->deferred_cmd_list_lock);
 	mutex_init(&ecpri_dma_qmi_ctx->sync_ch_cmd_lock);
 
 	ecpri_dma_qmi_ctx->svc_handle =
@@ -406,16 +432,22 @@ static int ecpri_dma_qmi_service_init_q6_send_msg(void)
 		msecs_to_jiffies(ECPRI_DMA_QMI_RESPONSE_TIMEOUT));
 
 	if (ret >= 0) {
-		ecpri_dma_qmi_ctx->q6_response_recv = true;
+		atomic_set(&ecpri_dma_qmi_ctx->q6_response_recv, true);
 		DMADBG("q6_response_recv: %d\n",
-		ecpri_dma_qmi_ctx->q6_response_recv);
+		atomic_read(&ecpri_dma_qmi_ctx->q6_response_recv));
 
 		DMADBG("q6 response: sw_version - %d sw_version_valid - %d\n",
 		resp.sw_version,
 		resp.sw_version_valid);
 
-		if (resp.sw_version_valid)
+		if (resp.sw_version_valid) {
+
 			ecpri_dma_qmi_ctx->q6_sw_version = resp.sw_version;
+
+			/* Send init complete*/
+			complete(&ecpri_dma_qmi_ctx->qmi_q6_int_cmplt_completion);
+		}
+
 		else
 			DMAERR("Error: Q6 QMI sw version is not valid\n");
 
@@ -424,6 +456,45 @@ static int ecpri_dma_qmi_service_init_q6_send_msg(void)
 	}
 
 	return ret;
+}
+
+static void ecpri_dma_send_q6_start_msg(struct work_struct* work) {
+
+	struct ecpri_dma_q6_msg_wrapper *entry;
+	struct ecpri_dma_q6_msg_wrapper *next;
+
+	DMADBG_LOW("Entered ecpri_dma_send_q6_start_msg");
+
+
+	if (!ecpri_dma_qmi_ctx || !ecpri_dma_qmi_ctx->q6_clnt) {
+		DMAERR("Invalid ctx or q6 clnt. don't send q6 msg.\n");
+		return;
+	}
+
+	if (!ecpri_dma_is_handshake_complete()) {
+		queue_delayed_work(ecpri_dma_qmi_ctx->clnt_req_wq,
+			&ecpri_dma_work_send_q6_start_msg,
+			ECPRI_DMA_QMI_COMPLETION_TIMEOUT);
+
+		return;
+	}
+
+	list_for_each_entry_safe(entry, next,
+		&ecpri_dma_qmi_ctx->ecpri_dma_pending_q6_msg, link)
+	{
+		DMADBG("Handeling deferred endpoint %d\n", entry->endp_ctx->endp_id);
+		ecpri_dma_qmi_service_send_ch_cmd_q6(
+			entry->endp_ctx,
+			entry->op,
+			entry->flag);
+
+		/* remove from list once done */
+		mutex_lock(&ecpri_dma_qmi_ctx->deferred_cmd_list_lock);
+		list_del(&entry->link);
+		mutex_unlock(&ecpri_dma_qmi_ctx->deferred_cmd_list_lock);
+
+		kfree(entry);
+	}
 }
 
 static void ecpri_dma_qmi_service_q6_send_init_msg(struct work_struct* work)
@@ -502,15 +573,13 @@ static void ecpri_dma_handle_init_indication(struct qmi_handle* qmi_handle,
 	cmplt_indication->modem_driver_mode,
 	cmplt_indication->modem_driver_mode_valid);
 
-	ecpri_dma_qmi_ctx->q6_init_cmplt = true;
+	atomic_set(&ecpri_dma_qmi_ctx->q6_init_cmplt,true);
+
 	DMADBG("q6_init_cmplt: %d\n",
-	ecpri_dma_qmi_ctx->q6_init_cmplt);
+	atomic_read(&ecpri_dma_qmi_ctx->q6_init_cmplt));
 
 	/* Cache the client sq */
 	memcpy(&ecpri_dma_qmi_ctx->client_sq, sq, sizeof(*sq));
-
-	/* Send init complete*/
-	complete(&ecpri_dma_qmi_ctx->qmi_q6_int_cmplt_completion);
 }
 
 static void ecpri_dma_handle_ch_cmd_indication(struct qmi_handle* qmi_handle,
@@ -533,7 +602,10 @@ static void ecpri_dma_handle_ch_cmd_indication(struct qmi_handle* qmi_handle,
 
 		if(ch_cmd_indication->txn_id.a55_endp_id == entry->item.req.txn_id.a55_endp_id) {
 
-			DMADBG("QMI CH cmd indication %d\n", ch_cmd_indication->txn_id.a55_endp_id);
+			DMADBG("Indication Q6 endp cmd %d %d %d\n",
+				entry->item.req.txn_id.a55_endp_id,
+				entry->item.req.txn_id.q6_endp_id,
+				entry->item.req.ch_cmd);
 
 			/* Complete sync command*/
 			if (ECPRI_DMA_QMI_MSG_SYNC == entry->item.flag)
@@ -546,7 +618,6 @@ static void ecpri_dma_handle_ch_cmd_indication(struct qmi_handle* qmi_handle,
 	}
 
 	mutex_unlock(&ecpri_dma_qmi_ctx->cmd_list_lock);
-
 }
 
 static int ecpri_dma_qmi_service_q6_send_ch_msg(struct ecpri_dma_pending_qmi_cmd* command)
@@ -557,6 +628,14 @@ static int ecpri_dma_qmi_service_q6_send_ch_msg(struct ecpri_dma_pending_qmi_cmd
 
 	if (!ecpri_dma_qmi_ctx->q6_clnt)
 		return -EINVAL;
+
+	if (!command)
+		return -EINVAL;
+
+	DMADBG("Handeling Q6 endp cmd %d %d %d\n",
+		command->req.txn_id.a55_endp_id,
+		command->req.txn_id.q6_endp_id,
+		command->req.ch_cmd);
 
 	/* Create request */
 	ret = qmi_txn_init(
@@ -615,7 +694,7 @@ int ecpri_dma_qmi_service_send_ch_cmd_q6(
 	int q6_gsi_id;
 	int a55_endp_id;
 	int a55_gsi_id;
-
+	struct ecpri_dma_q6_msg_wrapper *q6_msg_wrapper;
 	int result = 0;
 
 	/* Validate endpoint  */
@@ -637,17 +716,15 @@ int ecpri_dma_qmi_service_send_ch_cmd_q6(
 	a55_gsi_id = endp_ctx->gsi_id;
 
 	/* Check for disconnect after init */
-	if (ecpri_dma_qmi_ctx->q6_init_cmplt &&
-		ecpri_dma_qmi_ctx->q6_disconnected)
+	if (ecpri_dma_is_handshake_complete() &&
+		atomic_read(&ecpri_dma_qmi_ctx->q6_disconnected))
 			return 0;
 
-	if (ECPRI_DMA_ENDP_DIR_SRC == endp_ctx->gsi_ep_cfg->dir) {
-		if (endp_ctx->gsi_ep_cfg->stream_mode !=
-			ECPRI_DMA_ENDP_STREAM_MODE_M2M ) {
-				DMAERR("A55 enpdpoint is not M2M\n");
-				return 0;
-		}
+	/* Check only for M2M ENDPs */
+	if (endp_ctx->gsi_ep_cfg->stream_mode != ECPRI_DMA_ENDP_STREAM_MODE_M2M)
+		return 0;
 
+	if (ECPRI_DMA_ENDP_DIR_SRC == endp_ctx->gsi_ep_cfg->dir) {
 		/* Get the destination endpoint  */
 		dest_endp_id = endp_ctx->gsi_ep_cfg->dest;
 
@@ -661,7 +738,7 @@ int ecpri_dma_qmi_service_send_ch_cmd_q6(
 			(dest_endp->stream_mode != ECPRI_DMA_ENDP_STREAM_MODE_M2M) ||
 			(dest_endp->ee != ECPRI_DMA_EE_Q6)) {
 
-			DMAERR("ECPRI_DMA_ENDP_DIR_SRC "
+			DMADBG("ECPRI_DMA_ENDP_DIR_SRC "
 			"deset_endp gsi_id:[%d] endp_id[%d] is not a valid Q6 endp\n",
 			dest_gsi_id,
 			dest_endp_id);
@@ -693,7 +770,7 @@ int ecpri_dma_qmi_service_send_ch_cmd_q6(
 			DMAERR("Filtering of endpoint failed\n");
 			return result;
 		} else if (result == 0) {
-			DMAERR("Q6 endpoint not found");
+			DMADBG("Q6 endpoint not found");
 			return 0;
 		} else {
 			q6_endp_id = q6_endp.endp_id;
@@ -701,22 +778,63 @@ int ecpri_dma_qmi_service_send_ch_cmd_q6(
 		}
 	}
 
-
 	/* Wait for init completion*/
-	if (!ecpri_dma_qmi_ctx->q6_init_cmplt) {
+	if (!ecpri_dma_is_handshake_complete()) {
+
 		result = wait_for_completion_timeout(
 		&ecpri_dma_qmi_ctx->qmi_q6_int_cmplt_completion,
 		msecs_to_jiffies(ECPRI_DMA_QMI_INIT_COMPLETE_TIMEOUT));
 
 		if (0 == result) {
 			DMADBG("Timeout while waiting for Q6 init completion\n");
+
+			if (ECPRI_DMA_QMI_MSG_SYNC == flag) {
+				DMAERR("Unable to handle Q6 init TO during sync OP");
+				ecpri_dma_assert();
+			}
+
+			/* Defer command send after init is complete */
+			q6_msg_wrapper =
+				kmalloc(sizeof(struct ecpri_dma_q6_msg_wrapper), GFP_KERNEL);
+
+			if (!q6_msg_wrapper) {
+				DMAERR("Failed to create wrapper %d\n", q6_endp_id);
+				return -ENOMEM;
+			}
+
+			/* Assign values */
+			q6_msg_wrapper->endp_ctx = endp_ctx;
+			q6_msg_wrapper->op = op;
+			q6_msg_wrapper->flag = flag;
+
+			mutex_lock(&ecpri_dma_qmi_ctx->deferred_cmd_list_lock);
+
+			/* Add to list of pending messages*/
+			list_add_tail(&q6_msg_wrapper->link,
+			 &ecpri_dma_qmi_ctx->ecpri_dma_pending_q6_msg);
+
+			mutex_unlock(&ecpri_dma_qmi_ctx->deferred_cmd_list_lock);
+
+			/* Start delayed work */
+			queue_delayed_work(ecpri_dma_qmi_ctx->clnt_req_wq,
+				&ecpri_dma_work_send_q6_start_msg,
+				ECPRI_DMA_QMI_COMPLETION_TIMEOUT);
+
 			return 0;
 		}
 	}
 
 	/* Check version */
-	if (ecpri_dma_qmi_ctx->q6_sw_version < ECPRI_DMA_QMI_Q6_SW_VER_2)
+	if (ecpri_dma_qmi_ctx->q6_sw_version < ECPRI_DMA_QMI_Q6_SW_VER_2) {
+		DMADBG("Exit reason version 2 endp %d\n", endp_ctx->endp_id);
 		return 0;
+	}
+
+	if ((ecpri_dma_qmi_ctx->q6_sw_version < ECPRI_DMA_QMI_Q6_SW_VER_3) &&
+		(op == QMI_ECPRI_CH_CMD_TYPE_START_V01)) {
+		DMADBG("Exit reason version 3 %d\n", endp_ctx->endp_id);
+		return 0;
+	}
 
 	qmi_cmd =
 		kmalloc(sizeof(struct ecpri_dma_pending_qmi_cmd_wrapper), GFP_KERNEL);
@@ -784,7 +902,8 @@ int ecpri_dma_qmi_service_send_ch_cmd_q6(
 
 		/* Timeout */
 		if (0 == result) {
-			if (!ecpri_dma_qmi_ctx->q6_disconnected) {
+
+			if (!atomic_read(&ecpri_dma_qmi_ctx->q6_disconnected)) {
 				DMAERR("Commmand message timeout\n");
 				ecpri_dma_assert();
 			}
