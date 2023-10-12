@@ -26,6 +26,8 @@
 #define GET_CHANNEL_ID_FROM_LINK_IDX(link_index) link_index % 4
 #define GET_PORT_ID_FROM_DEVICE_ID(device_id) device_id / 2;
 
+#define EIP_BITS_PER_WORD 32
+
 struct eip_port;
 
 struct eip_datapath {

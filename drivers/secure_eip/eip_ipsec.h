@@ -75,6 +75,8 @@ struct eip_ipsec_link {
 
 	rwlock_t lock;
 	struct eip_link *link;
+
+	unsigned int mtt_index;
 };
 
 extern u16 eip_satag_etype;
