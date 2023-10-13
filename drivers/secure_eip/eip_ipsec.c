@@ -516,6 +516,11 @@ static int __eip_xdo_dev_state_add(struct eip_xfrm_state *eip_xs)
 
 static int eip_ipsec_validate_sa(const struct xfrm_state *xs)
 {
+	if (xs->xso.type != XFRM_DEV_OFFLOAD_CRYPTO) {
+		eip_logerr("EIP IPSEC: only crypto offload is supported");
+		return -EINVAL;
+	}
+
 	if (xs->props.mode != XFRM_MODE_TUNNEL) {
 		eip_logerr("EIP IPSEC: EIP supports only tunnel mode");
 		return -EINVAL;
@@ -561,6 +566,18 @@ static int eip_ipsec_validate_sa(const struct xfrm_state *xs)
 	     (!xs->replay_esn && xs->props.replay_window))) {
 		eip_logerr("EIP IPSEC: HW only support replay_window size %u",
 			   EIP_REPLAY_WINDOW_SIZE);
+		return -EINVAL;
+	}
+
+	if (xs->props.family != AF_INET && xs->props.family != AF_INET6) {
+		eip_logerr(
+			"EIP IPSEC: only ipv4/ipv6 xfrm states are supported for offload");
+		return -EINVAL;
+	}
+
+	if (xs->encap) {
+		eip_logerr(
+			"EIP IPSEC: Encapsulated xfrm state offload is not supported");
 		return -EINVAL;
 	}
 
