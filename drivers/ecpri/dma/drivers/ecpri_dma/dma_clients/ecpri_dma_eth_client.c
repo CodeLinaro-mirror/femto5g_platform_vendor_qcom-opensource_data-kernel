@@ -969,7 +969,7 @@ int ecpri_dma_eth_tx_ring_state(ecpri_dma_eth_conn_hdl_t hdl,
 	}
 
 	*(available) = connection->tx_endp_ctx->ring_length -
-		connection->tx_endp_ctx->curr_outstanding_num;
+		connection->tx_endp_ctx->curr_outstanding_num - 1;
 
 	DMADBG_LOW("Exit\n");
 
@@ -1009,7 +1009,7 @@ int ecpri_dma_eth_rx_ring_state(ecpri_dma_eth_conn_hdl_t hdl,
 	}
 
 	*(available) = connection->rx_endp_ctx->ring_length -
-		connection->rx_endp_ctx->curr_outstanding_num;
+		connection->rx_endp_ctx->curr_outstanding_num - 1;
 
 	DMADBG_LOW("Exit\n");
 
