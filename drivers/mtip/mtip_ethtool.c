@@ -730,17 +730,19 @@ int mtip_ethtool_set_link_ksettings(struct net_device *netdev, const struct etht
                 priv_flags = MTIP_DEVICE_PRIV_FLAGS_BIT_MASK_100G_ONLY;
         }
 
+    }
+    else
+        priv_flags = MTIP_DEVICE_PRIV_FLAGS_BIT_MASK_NON_FEC;
         // Set the priv flags for the speed config
-        while(priv_flags)
+    while(priv_flags)
+    {
+        if(priv_flags & 0x1)
         {
-            if(priv_flags & 0x1)
-            {
-                temp_flag_mask |= (1<<temp_flag);
-                mtip_ethtool_set_priv_flags(netdev, temp_flag_mask);
-            }
-            priv_flags >>= 1;
-            temp_flag++;
+            temp_flag_mask |= (1<<temp_flag);
+            mtip_ethtool_set_priv_flags(netdev, temp_flag_mask);
         }
+        priv_flags >>= 1;
+        temp_flag++;
     }
 
     return 0;
