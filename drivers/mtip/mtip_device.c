@@ -2429,8 +2429,12 @@ u32 mtip_device_filter_priv_flags(u32 port_type)
     case PHY_LANE_SPEED_100G:
        {
           filtered_mask |= (1 << MTIP_PORT_CONFIG_1x100GBASE_R);
+
+          /* For optics, don't select lower speed modes and for DAC fall
+             through to select lower speed modes */
+          if(port_info->sfp_port_type == PORT_FIBRE)
+             break;
        }
-       // fall through for lower speed modes
 
     case PHY_LANE_SPEED_50G:
        {
@@ -2445,54 +2449,62 @@ u32 mtip_device_filter_priv_flags(u32 port_type)
                                 (1 << MTIP_PORT_CONFIG_2x50GBASE_R) |
                                 (1 << MTIP_PORT_CONFIG_1x50GBASE_R));
            }
+
+           /* For optics, don't select lower speed modes and for DAC fall
+              through to select lower speed modes */
+           if(port_info->sfp_port_type == PORT_FIBRE)
+              break;
        }
-       // fall through for lower speed modes
 
     case PHY_LANE_SPEED_25G:
-    {
-       if(num_lanes == 1)
        {
-          filtered_mask |= (1 << MTIP_PORT_CONFIG_1x25GBASE_R);
-          if(config_fec == ETHTOOL_FEC_RS)
-             filtered_mask |= (1 << MTIP_PORT_CONFIG_1x25GBASE_R_RSFEC);
-          else if(config_fec == ETHTOOL_FEC_BASER)
-             filtered_mask |= (1 << MTIP_PORT_CONFIG_1x25GBASE_R_FEC);
-       }
-       else if(num_lanes == 2)
-       {
-          // TBD - need to enhance breakout handling
-          filtered_mask |= ((1 << MTIP_PORT_CONFIG_1x50GBASE_R2)|
-                            (1 << MTIP_PORT_CONFIG_1x25GBASE_R));
-          if(config_fec == ETHTOOL_FEC_RS)
+          if(num_lanes == 1)
           {
-             filtered_mask |= ((1 << MTIP_PORT_CONFIG_1x50GBASE_R2_RSFEC) |
-                               (1 << MTIP_PORT_CONFIG_1x25GBASE_R_RSFEC));
+             filtered_mask |= (1 << MTIP_PORT_CONFIG_1x25GBASE_R);
+             if(config_fec == ETHTOOL_FEC_RS)
+                filtered_mask |= (1 << MTIP_PORT_CONFIG_1x25GBASE_R_RSFEC);
+             else if(config_fec == ETHTOOL_FEC_BASER)
+                filtered_mask |= (1 << MTIP_PORT_CONFIG_1x25GBASE_R_FEC);
           }
-          else if(config_fec == ETHTOOL_FEC_BASER)
-             filtered_mask |= (1 << MTIP_PORT_CONFIG_1x25GBASE_R_FEC);
-       }
-       else if(num_lanes == 4)
-       {
-          // TBD - need to enhance breakout handling
-          filtered_mask |= ((1 << MTIP_PORT_CONFIG_1x100GBASE_R4) |
-                            (1 << MTIP_PORT_CONFIG_1x50GBASE_R2)|
-                            (1 << MTIP_PORT_CONFIG_4x25GBASE_R) |
-                            (1 << MTIP_PORT_CONFIG_1x25GBASE_R));
-          if(config_fec == ETHTOOL_FEC_RS)
+          else if(num_lanes == 2)
           {
-             filtered_mask |= ((1 << MTIP_PORT_CONFIG_1x100GBASE_R4_RSFEC) |
-                               (1 << MTIP_PORT_CONFIG_1x50GBASE_R2_RSFEC) |
-                               (1 << MTIP_PORT_CONFIG_4x25GBASE_R_RSFEC) |
-                               (1 << MTIP_PORT_CONFIG_1x25GBASE_R_RSFEC));
+             // TBD - need to enhance breakout handling
+             filtered_mask |= ((1 << MTIP_PORT_CONFIG_1x50GBASE_R2)|
+                               (1 << MTIP_PORT_CONFIG_1x25GBASE_R));
+             if(config_fec == ETHTOOL_FEC_RS)
+             {
+                filtered_mask |= ((1 << MTIP_PORT_CONFIG_1x50GBASE_R2_RSFEC) |
+                                  (1 << MTIP_PORT_CONFIG_1x25GBASE_R_RSFEC));
+             }
+             else if(config_fec == ETHTOOL_FEC_BASER)
+                filtered_mask |= (1 << MTIP_PORT_CONFIG_1x25GBASE_R_FEC);
           }
-          else if(config_fec == ETHTOOL_FEC_BASER)
+          else if(num_lanes == 4)
           {
-             filtered_mask |= ((1 << MTIP_PORT_CONFIG_4x25GBASE_R_FEC) |
-                               (1 << MTIP_PORT_CONFIG_1x25GBASE_R_FEC));
+             // TBD - need to enhance breakout handling
+             filtered_mask |= ((1 << MTIP_PORT_CONFIG_1x100GBASE_R4) |
+                               (1 << MTIP_PORT_CONFIG_1x50GBASE_R2)|
+                               (1 << MTIP_PORT_CONFIG_4x25GBASE_R) |
+                               (1 << MTIP_PORT_CONFIG_1x25GBASE_R));
+             if(config_fec == ETHTOOL_FEC_RS)
+             {
+                filtered_mask |= ((1 << MTIP_PORT_CONFIG_1x100GBASE_R4_RSFEC) |
+                                  (1 << MTIP_PORT_CONFIG_1x50GBASE_R2_RSFEC) |
+                                  (1 << MTIP_PORT_CONFIG_4x25GBASE_R_RSFEC) |
+                                  (1 << MTIP_PORT_CONFIG_1x25GBASE_R_RSFEC));
+             }
+             else if(config_fec == ETHTOOL_FEC_BASER)
+             {
+                filtered_mask |= ((1 << MTIP_PORT_CONFIG_4x25GBASE_R_FEC) |
+                                  (1 << MTIP_PORT_CONFIG_1x25GBASE_R_FEC));
+             }
           }
+
+          /* For optics, don't select lower speed modes and for DAC fall
+             through to select lower speed modes */
+          if(port_info->sfp_port_type == PORT_FIBRE)
+             break;
        }
-    }
-    // fall through for lower speed modes
 
     case PHY_LANE_SPEED_10G:
        {
@@ -2527,6 +2539,11 @@ u32 mtip_device_filter_priv_flags(u32 port_type)
     }
 
     filtered = port_priv_flags & filtered_mask;
+
+    /* For DR, we currently support only QSFP28 100G DR1, so only 100G_R4 will
+       be supported, and other modes will be masked out */
+    if(lane_qsfp_info.trx_link_length_range == TRX_DR)
+       filtered &= (1 << MTIP_PORT_CONFIG_1x100GBASE_R4);
 
     CSMLOGINFO("mtip_device_filter_priv_flags: Port_type %d, lane %d, max_lane_speed %d, port_priv_flags 0x%x, filtered_mask 0x%x, filtered 0x%x",
                port_type, lane_index, max_lane_speed, port_priv_flags, filtered_mask, filtered);
