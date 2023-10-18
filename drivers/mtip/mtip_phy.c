@@ -281,7 +281,7 @@ int mtip_phy_setup_phy(struct mtip_port_device_info* port_device)
     return rv;
 }
 
-static void mtip_phy_get_lanes_of_link(u32 link_index, bool lanes_enabled[PHY_LANE_MAX])
+void mtip_phy_get_lanes_of_link(u32 link_index, bool lanes_enabled[PHY_LANE_MAX])
 {
     u32 num_lanes;
     int i;

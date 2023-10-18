@@ -90,6 +90,7 @@ extern bool enable_tx_comp_poll;
 #define ETHTOOL_STAT_STRINGS_LEN 15
 #define DEBUG_ETHTOOL_STAT_STRINGS_LEN 23
 #define STATS_NAME_LEN 20
+#define QXDM_LOGGING_VAR_NA 255
 /*
  * Information related to the devices in the device tree
  */

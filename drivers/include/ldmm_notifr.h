@@ -9,6 +9,8 @@
 #ifndef _LDMM_NOTIFR_H
 #define _LDMM_NOTIFR_H
 
+#include "ldmm_genl.h"
+
 enum{
 	HIGH_BER_SET,
 	HIGH_BER_CLR,
@@ -16,6 +18,13 @@ enum{
 	IF_DOWN,
 	PCS_IF_UP,
 	PCS_IF_DOWN
+};
+
+/*Structure between LDMM and ETH to share information*/
+struct ldmm_eth_iface_ops {
+	stats_info (*ldmm_eth_iface_get_stats_info)(int link_index);
+	config_packet_info (*ldmm_eth_iface_get_config_info)(void);
+	bool (*ldmm_eth_iface_get_if_link_up)(int link_index);
 };
 
 #endif /* _LDMM_NOTIFR_H */

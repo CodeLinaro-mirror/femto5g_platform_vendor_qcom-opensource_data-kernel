@@ -39,6 +39,7 @@ void mtip_phy_set_tx_compliance(bool flag);
 
 void post_mtip_phy_handle_lane_up(u32 lane_index, u8 sfp_port_type, enum eth_phy_iface_phy_lane_speed_enum lane_speed);
 void run_mtip_process_lane_up(void* workptr);
+void mtip_phy_get_lanes_of_link(u32 link_index, bool lanes_enabled[]);
 
 struct mtip_process_lane_up
 {
