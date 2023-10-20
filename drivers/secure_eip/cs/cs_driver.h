@@ -99,7 +99,7 @@
 
 /** Timeout in milliseconds between two consecutive status polls for the
     Driver during the device initialization. */
-#define DRIVER_INIT_RETRY_TIMEOUT_MS    10
+#define DRIVER_INIT_RETRY_TIMEOUT_MS    1
 
 /** Maximum number of attempts for the Driver during the device
     uninitialization to get the device status initialized. */
