@@ -131,6 +131,11 @@ static void mtip_workq_handler(struct work_struct *w)
               run_mtip_process_netdev_close(work_ptr);
           }
           break;
+      case MTIP_WORKQ_TASK_PROCESS_RECONFIGURE_PORT:
+          {
+              run_mtip_process_reconfigure_port(work_ptr);
+          }
+          break;
       default:
          {
             CSMLOGERR("Unknown task type: %d\n", work_type);
