@@ -20,7 +20,12 @@
 #define ECPRI_DMA_MHI_MAX_HW_CHANNELS		      (24)
 #define ECPRI_DMA_MHI_INVALID_CH_ID			      (-1)
 #define ECPRI_DMA_MHI_INVALID_ENDP_ID			  (-1)
-#define ECPRI_DMA_MHI_MEMCPY_RLEN			      (256)
+/*	ASYNC ring needs to support all MHI SW CHs in parallel
+	MHI SW CHs for PF has 512 entries and VFs have 256.
+	512 + 256 * 16 VFs =  4608 max entries.
+	Closest power of two is 8192 */
+#define ECPRI_DMA_MHI_ASYNC_MEMCPY_RLEN			      (8192)
+#define ECPRI_DMA_MHI_SYNC_MEMCPY_RLEN			      (128)
 #define ECPRI_DMA_MHI_POLLING_MIN_SLEEP_RX	      (1010)
 #define ECPRI_DMA_MHI_POLLING_MAX_SLEEP_RX	      (1050)
 
@@ -301,7 +306,7 @@ struct ecpri_dma_mhi_memcpy_context {
 	struct list_head cbs_list;
 	u32 loop_counter;
 	struct kmem_cache* xfer_wrapper_cache;
-	struct ecpri_dma_mhi_async_wq_work_type async_work[ECPRI_DMA_MHI_MEMCPY_RLEN];
+	struct ecpri_dma_mhi_async_wq_work_type async_work[ECPRI_DMA_MHI_ASYNC_MEMCPY_RLEN];
 	u32 async_work_wp;
 	u32 async_work_rp;
 };

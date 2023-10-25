@@ -26,6 +26,10 @@
 #include "mtip_clocks.h"
 #include "mtip_dma.h"
 
+#ifndef NO_DEBUGFS_PERF
+#define FEATURE_MTIP_TEST_DEBUG_FS
+#endif
+
 // the driver name
 #define MTIP_MAC_DRIVER                 "MTIP_MAC"
 #define MTIP_MAC_DRIVER_VERSION         "1.0.0"
@@ -66,7 +70,7 @@
 // the max size of MTU for M Plane
 #define MTIP_MAX_MPLANE_MTU_SIZE 9198
 
-#define MTIP_DMA_RX_BUFF_SIZE 2500 /* use buffers of size 1600 */
+#define MTIP_DMA_RX_BUFF_SIZE 2500 /* use buffers of size 2500 */
 
 extern int mtip_dma_max_rx_buff_size;
 extern bool enable_tx_comp_poll;
@@ -131,6 +135,10 @@ struct mtip_lane_device_info
 
     // sfp phandle
     int sfp_phandle;
+
+    // lane down reason
+    trx_lane_down_reason_code_type reason_code;
+
 };
 
 // the information stored for each port device
@@ -169,7 +177,7 @@ struct mtip_port_device_info
 
    // the references to lanes of the port
    u32 num_lane_phandles;
-   u32 lane_phandles[MTIP_MAX_LINKS_PER_PORT];
+   u32 lane_phandles[MTIP_MAX_LANES_PER_PORT];
 
    // the link devices
    struct mtip_link_device_info *link_devices[MTIP_MAX_LINKS_PER_PORT];
@@ -507,5 +515,17 @@ int mtip_lookup_lane_index_by_device(u32* lane_index, u32 port_type, u32 lane_de
  *   find the device within a port by matching the phandle 
  */
 int mtip_lookup_device_by_lane_index(u32 lane_index, u32* port_device_index, u32* lane_device_index);
+
+/*
+ * mtip_lookup_if_any_link_active_for_port 
+ *   checks whether there is any active link other than the given link for the given port type
+ */
+bool mtip_lookup_if_any_other_link_active_for_port(u32 port_type, u32 link_index);
+
+/*
+ * mtip_lookup_link_index_by_lane_index 
+ *  find the link on which the given lane is mapped to 
+ */
+int mtip_lookup_link_index_by_lane_index(u32 *link_index, u32 lane_index);
 
 #endif // _MTIP_H

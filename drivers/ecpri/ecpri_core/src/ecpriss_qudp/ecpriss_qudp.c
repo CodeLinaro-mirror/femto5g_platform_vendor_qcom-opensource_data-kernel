@@ -7,7 +7,7 @@
 #include "ecpriss_log.h"
 
 volatile int ecpriss_filtering_enabled = 0;
-volatile int ecpriss_qudp_ingress_action = ECPRISS_QUDP_ACTION_DISCARD;
+volatile int ecpriss_qudp_ingress_action = ECPRISS_QUDP_ACTION_PASS_TO_A55;
 
 
 #define ECPRISS_ETH_QUDP_MTU_SIZE_V4   9000 

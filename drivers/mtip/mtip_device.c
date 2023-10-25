@@ -524,6 +524,73 @@ void run_mtip_process_link_state(void* work_ptr)
     kfree(taskstruct);
 }
 
+void mtip_process_link_state(u32 link_index, bool link_up)
+{
+    struct net_device *dev = platform_driver_priv->mtip_links[link_index]->dev;
+    ecpri_dma_eth_conn_hdl_t dma_handle = 0;
+    enum ecpri_dma_notify_mode setmode = ECPRI_DMA_NOTIFY_MODE_IRQ;
+
+    dma_handle = platform_driver_priv->mtip_links[link_index]->dma_hdl;
+    if (link_up)
+    {
+        CSMLOGDBG("Processing LINK_UP for link_index: %d\n", link_index);
+
+        // Process MAC link up state
+        mtip_mac_link_up(link_index);
+        // set the rx mode to IRQ
+        mtip_set_rx_mode_immediate(dma_handle, setmode);
+        // set the tx mode to IRQ
+        mtip_set_tx_mode_immediate(dma_handle, setmode);
+        // wake queues
+        netif_tx_wake_all_queues(dev);
+
+        if(link_index == MTIP_DEBUG_ETH_LINK_INDEX)
+        {
+           mtip_sysfs_mac_link_status(true);
+        }
+
+        // carrier is on
+        if (!netif_carrier_ok(dev)) {
+            netif_carrier_on(dev);
+            netdev_info(dev, "Link is Up\n");
+        }
+
+        // tell all the clients of the link status update
+        post_mtip_client_send_event(ETH_ECPRISS_EVENT_UP, link_index);
+    }
+    else
+    {
+        CSMLOGDBG("Processing LINK_DOWN for link_index: %d\n", link_index);
+
+        // stop the queues
+        netif_tx_stop_all_queues(platform_driver_priv->mtip_links[link_index]->dev);
+
+        // Process MAC link down state
+        mtip_mac_link_down(link_index);
+
+        if(link_index == MTIP_DEBUG_ETH_LINK_INDEX)
+        {
+            mtip_sysfs_mac_link_status(false);
+        }
+
+        if (netif_carrier_ok(dev)) {
+            netif_carrier_off(dev);
+            netdev_info(dev, "Link is Down\n");
+        }
+
+        // tell all the clients of the link status update
+        post_mtip_client_send_event(ETH_ECPRISS_EVENT_DOWN, link_index);
+    }
+
+    if (mtip_loopback_mode != MTIP_MODE_LOOPBACK) 
+    {
+        // notify phy of the link status
+        mtip_phy_notify_link_status(link_index, link_up);
+    }
+
+    return;
+}
+
 static int mtip_set_mac_address(struct net_device *dev, void *addr)
 {
    unsigned long flags;
@@ -576,7 +643,7 @@ int mtip_napi_poll_tx(struct napi_struct *napi_ptr, int budget)
     struct net_device* dev;
     struct mtip_netdev_priv *priv;
     unsigned int tx_comp_list_size;
-    struct mtip_dma_tx_comp_params tx_comp_params;
+    struct mtip_dma_tx_comp_params tx_comp_params = {0};
     struct mtip_link_info* link = container_of(napi_ptr, struct mtip_link_info, napi_tx);
     ecpri_dma_eth_conn_hdl_t hdl = link->dma_hdl;
     enum ecpri_dma_notify_mode setmode = ECPRI_DMA_NOTIFY_MODE_IRQ;
@@ -604,9 +671,11 @@ int mtip_napi_poll_tx(struct napi_struct *napi_ptr, int budget)
         {
             for (list_counter = 0; list_counter < tx_comp_list_size; list_counter++ )
             {
-                mtip_dma_tx_comp_list_pop(link_index, &tx_comp_params);
-                mtip_process_tx_comp_cb(hdl, &tx_comp_params);
-                npackets += tx_comp_params.num_of_completed;
+                if(mtip_dma_tx_comp_list_pop(link_index, &tx_comp_params) > 0)
+		{
+                   mtip_process_tx_comp_cb(hdl, &tx_comp_params);
+                   npackets += tx_comp_params.num_of_completed; 
+		}
             }
         }
     }
@@ -1214,13 +1283,19 @@ int mtip_device_open_completion(u32 link_index)
         mutex_unlock(&platform_driver_priv->mtip_links[link_index]->dev_lock);
     }
 
+    mutex_lock(&platform_driver_priv->mtip_links[link_index]->dev_lock);
+    if(platform_driver_priv->mtip_links[link_index]->state == MTIP_LINK_STATE_CLOSE)
+    {
+      mutex_unlock(&platform_driver_priv->mtip_links[link_index]->dev_lock);
+      return -1;
+    }
+    mutex_unlock(&platform_driver_priv->mtip_links[link_index]->dev_lock);
+
     // get the sfp port type
     sfp_port_type = platform_driver_priv->mtip_ports[port_type]->sfp_port_type;
 
     // Notify TRX driver to enable TX
-    rtnl_lock();
     mtip_phy_notify_eth_event_to_trx(link_index, IFCFG_ENABLE);
-    rtnl_unlock();
 
     // bring up the phy
     mtip_phy_bringup_phy(link_index, sfp_port_type);
@@ -1248,294 +1323,14 @@ int mtip_device_open_completion(u32 link_index)
 /* Called when the network interface is made active */
 static int mtip_open(struct net_device *netdev)
 {
-   struct mtip_netdev_priv *priv;
-   u32 link_index;
-   ecpri_dma_eth_conn_hdl_t hdl;
-   int sfp_port_type;
-   enum ecpri_dma_notify_mode setmode = ECPRI_DMA_NOTIFY_MODE_IRQ;
-   u32 port_type;
-
-   priv = netdev_priv(netdev);
-
-   link_index = priv->link_index;
-   if(link_index >= MTIP_MAX_LINKS)
-   {
-     CSMLOGERR("invalid link_index %d", link_index);
-     return -ENODEV;
-   }
-
-   hdl = platform_driver_priv->mtip_links[link_index]->dma_hdl;
-
-   CSMLOGINFO("mtip_open called for link_index: %d with hdl: %d\n", link_index, hdl);
-
-   if (mtip_lookup_port_type_by_link_index(link_index, &port_type) < 0)
-   {
-      CSMLOGERR("invalid port_type for link_index %d", link_index);
-      return -ENODEV;
-   }
-
-   // Initialize the carrier state as off
-   if (mtip_loopback_mode == MTIP_MODE_DEFAULT)
-   {
-      netif_carrier_off(netdev);
-   }
-
-   // first get the interface going
-   if (hdl)
-   {
-      // start the pipe
-      mtip_start_dma_pipe(netdev, hdl);
-
-      // set the netdev MAC address from the HW
-      mtip_set_netdev_hw_mac_addr(netdev, link_index);
-
-      // set to POLL mode
-      setmode = ECPRI_DMA_NOTIFY_MODE_IRQ;
- 
-      // set the rx mode to IRQ
-      mtip_set_rx_mode_immediate(hdl, setmode);
-
-      // set the tx mode to IRQ
-      mtip_set_tx_mode_immediate(hdl, setmode);
-
-      /*
-       * enable napi
-       */
-      napi_enable(&(platform_driver_priv->mtip_links[link_index]->napi));
-      napi_enable(&(platform_driver_priv->mtip_links[link_index]->napi_tx));
-
-      /* 
-       * Start the interface's transmit queue 
-       * (allowing it to accept packets for transmission) 
-       * once it is ready to start sending data. 
-       */
-      netif_start_queue(netdev);
-   }
-
-   // this is done only for the RUMI E2E
-   if (mtip_rumi_platform != MTIP_PLATFORM_SOC)
-   {
-      if (mtip_loopback_mode == MTIP_MODE_DEFAULT)
-      {
-         // Configure phylib in poll mode
-         priv->phydev->irq = PHY_POLL;
-
-         // PHYLINK-PHY binding and PHY bringup
-         phylink_connect_phy(priv->phylink, priv->phydev);
-
-         // Start the PHYLINK
-         phylink_start(priv->phylink);
-      }
-   }
-   else
-   {
-      // Change the state for PCS loopback
-      if (mtip_loopback_mode == MTIP_MODE_LOOPBACK)
-         platform_driver_priv->mtip_links[link_index]->state = MTIP_LINK_STATE_OPEN_WAITING_FOR_LANES;
-
-      // For PCS/PHY loopback mode, configure port based on the speed modes set
-      if (mtip_loopback_mode != MTIP_MODE_DEFAULT)
-         mtip_device_configure_port(port_type);
-
-      // PCS looback mode
-      if (mtip_loopback_mode == MTIP_MODE_LOOPBACK)
-      {
-         // Process MAC link up state
-         mtip_mac_link_up(link_index);
-      }
-      else
-      {
-         // the default E2E mode
-         // check if lane assignment is complete
-         if (platform_driver_priv->mtip_links[link_index]->lanes_assignment_complete == true)
-         {
-            // lane assignment is already done for the port
-            // this means the port HW has been configured already
-
-            mutex_lock(&platform_driver_priv->mtip_links[link_index]->dev_lock);
-
-            if ((platform_driver_priv->mtip_links[link_index]->state == MTIP_LINK_STATE_INIT) ||
-                (platform_driver_priv->mtip_links[link_index]->state == MTIP_LINK_STATE_CLOSE))
-            {
-               // set the state to OPEN_DONE
-               platform_driver_priv->mtip_links[link_index]->state = MTIP_LINK_STATE_OPEN_DONE;
-            }
-
-            mutex_unlock(&platform_driver_priv->mtip_links[link_index]->dev_lock);
-
-            // get the sfp port type
-            sfp_port_type = platform_driver_priv->mtip_ports[port_type]->sfp_port_type;
-
-            // rtnl_lock not needed here as it will be already acquired by the NW stack
-            // Notify TRX driver to enable TX
-            mtip_phy_notify_eth_event_to_trx(link_index, IFCFG_ENABLE);
-
-            // bring up the phy
-            mtip_phy_bringup_phy(link_index, sfp_port_type);
-
-            CSMLOGINFO("phy bringup done for link: %d\n", link_index);
-         }
-         else
-         {
-            // lane assignment has not been done for this port
-            mutex_lock(&platform_driver_priv->mtip_links[link_index]->dev_lock);
-
-            if ((platform_driver_priv->mtip_links[link_index]->state == MTIP_LINK_STATE_INIT) ||
-                (platform_driver_priv->mtip_links[link_index]->state == MTIP_LINK_STATE_CLOSE))
-            {
-               // lane assignment is not complete yet
-               // set the state to OPEN_WAITING_FOR_LANES
-               platform_driver_priv->mtip_links[link_index]->state = MTIP_LINK_STATE_OPEN_WAITING_FOR_LANES;
-            }
-
-            mutex_unlock(&platform_driver_priv->mtip_links[link_index]->dev_lock);
-
-            CSMLOGINFO("link_index %d set to WAITING_FOR_LANES state", link_index);
-
-            post_mtip_process_configure_port_using_link(port_type, link_index);
-         }
-      }
-   }
-
-   /* Send update to clients */
-   post_mtip_client_send_event(ETH_ECPRISS_EVENT_UP, link_index);
-   mtip_snd_event_notification(link_index, IF_UP);
+   post_mtip_process_netdev_open(netdev);
    return 0;
 }
 
 /* Called when the network interface is disabled */
 static int mtip_close(struct net_device *netdev)
 {
-   struct mtip_netdev_priv *priv;
-   ecpri_dma_eth_conn_hdl_t hdl;
-   u32 link_index;
-   u32 port_type;
-   bool all_closed = true;
-   int i;
-   u32 tmp_link_index;
-   u32 real_lane = 0;
-   u32 lane_index;
-   u32 sfp_phandle[MAX_ETH_LANES] = {0};
-
-   priv = netdev_priv(netdev);
-
-   link_index = priv->link_index;
-
-   hdl = platform_driver_priv->mtip_links[link_index]->dma_hdl;
-
-   CSMLOGDBG("mtip_close called with link_index: %d with hdl: %d\n", link_index, hdl);
-
-   mtip_lookup_port_type_by_link_index(link_index, &port_type);
-
-   // do this only for RUMI E2E
-   if (mtip_rumi_platform != MTIP_PLATFORM_SOC)
-   {
-      if (mtip_loopback_mode == MTIP_MODE_DEFAULT)
-      {
-         /* Stop and disconnect the PHY */
-         phylink_stop(priv->phylink);
-         phylink_disconnect_phy(priv->phylink);
-      }
-   }
-   else
-   {
-      if (mtip_loopback_mode == MTIP_MODE_DEFAULT ||
-          mtip_loopback_mode == MTIP_MODE_PHY_LOOPBACK)
-      {
-         // teardown the phy
-         mtip_phy_teardown_phy(link_index);
-
-         CSMLOGDBG("phy teardown done for link: %d\n", link_index);
-
-         // rtnl_lock not needed here as it will be already acquired by the NW stack
-         // Notify TRX driver to disable TX
-         mtip_phy_notify_eth_event_to_trx(link_index, IFCFG_DISABLE);
-
-         // Notify TRX driver to disable TX on primary lane if AN was in progress
-         if(platform_driver_priv->mtip_ports[port_type]->port_state == MTIP_PORT_STATE_CONNECTED_NEGOTIATION_IN_PROGRESS)
-         {
-            if(port_type == MTIP_PORT_TYPE_DEBUG)
-            {
-               real_lane = 2;
-            }
-
-            mtip_lookup_lane_index_by_port_type_and_real_lane(&lane_index, port_type, real_lane);
-            sfp_phandle[real_lane] = platform_driver_priv->devices.lane_devices[lane_index].sfp_phandle;
-            qsfp_trx_ifconfig_notifier(IFCFG_DISABLE, sfp_phandle);
-         }
-      }
-      // PCS looback mode
-      else
-      {
-         // Process MAC link down state
-         mtip_mac_link_down(link_index);
-      }
-   }
-
-   if (hdl)
-   {
-      // stop the pipe
-      mtip_stop_dma_pipe(hdl);
-
-      /*
-       * disable napi
-       */
-      napi_disable(&(platform_driver_priv->mtip_links[link_index]->napi));
-      napi_disable(&(platform_driver_priv->mtip_links[link_index]->napi_tx));
-
-      /* release ports, irq and such -- like fops->close */
-      netif_stop_queue(netdev);
-   }
-
-   CSMLOGDBG("Stopping netdev queue\n");
-
-   // set the link state to CLOSE
-   mutex_lock(&platform_driver_priv->mtip_links[link_index]->dev_lock);
-
-   platform_driver_priv->mtip_links[link_index]->state = MTIP_LINK_STATE_CLOSE;
-
-   mutex_unlock(&platform_driver_priv->mtip_links[link_index]->dev_lock);
-
-   all_closed = true;
-
-   for (i = 0; i < platform_driver_priv->devices.port_devices[port_type].num_link_phandles; ++i) 
-   {
-       tmp_link_index = platform_driver_priv->devices.port_devices[port_type].link_devices[i]->link_index;
-       mutex_lock(&platform_driver_priv->mtip_links[link_index]->dev_lock);
-       if ((platform_driver_priv->mtip_links[tmp_link_index]) && (platform_driver_priv->mtip_links[tmp_link_index]->state != MTIP_LINK_STATE_INIT) &&
-           (platform_driver_priv->mtip_links[tmp_link_index]->state != MTIP_LINK_STATE_CLOSE))
-       {
-           all_closed = false;
-           mutex_unlock(&platform_driver_priv->mtip_links[link_index]->dev_lock);
-           break;
-       }
-       mutex_unlock(&platform_driver_priv->mtip_links[link_index]->dev_lock);
-   }
-
-   if (all_closed) 
-   {
-       // reset the port state to INIT
-      if(platform_driver_priv->mtip_ports[port_type]) {
-         platform_driver_priv->mtip_ports[port_type]->port_state = MTIP_PORT_STATE_INIT;
-      }
-
-      // reset all the lane assignments
-      for (i = 0; i < platform_driver_priv->devices.port_devices[port_type].num_link_phandles; ++i) 
-      {
-         tmp_link_index = platform_driver_priv->devices.port_devices[port_type].link_devices[i]->link_index;
-
-         if(platform_driver_priv->mtip_links[tmp_link_index]) {
-            mutex_lock(&platform_driver_priv->mtip_links[tmp_link_index]->dev_lock);
-
-            platform_driver_priv->mtip_links[tmp_link_index]->lanes_assignment_complete = false;
-            mutex_unlock(&platform_driver_priv->mtip_links[tmp_link_index]->dev_lock);
-         }
-      }
-   }
-
-   /* Send update to clients */
-   post_mtip_client_send_event(ETH_ECPRISS_EVENT_DOWN, link_index);
-   mtip_snd_event_notification(link_index, IF_DOWN);
+   post_mtip_process_netdev_close(netdev);
    return 0;
 }
 
@@ -2457,7 +2252,7 @@ int mtip_netdev_set_port_priv_flags(struct net_device *netdev)
         temp_link_index = platform_driver_priv->devices.port_devices[port_type].link_devices[i]->link_index;
         state = platform_driver_priv->mtip_links[temp_link_index]->state;
 
-        CSMLOGINFO("port_type %d link_index %d state %d", port_type, temp_link_index, state);
+        CSMLOGDBG("port_type %d link_index %d state %d", port_type, temp_link_index, state);
 
         // check if state is not INIT or CLOSE
         if ((state == MTIP_LINK_STATE_INIT) || (state == MTIP_LINK_STATE_CLOSE))
@@ -2492,12 +2287,12 @@ int mtip_netdev_set_port_priv_flags(struct net_device *netdev)
         CSMLOGDBG("clearing link lanes for link_index %d", temp_link_index);
     }
 
-    CSMLOGINFO("Setting the port %d priv flags to %d", port_type, port_priv_flags);
+    CSMLOGDBG("Setting the port %d priv flags to %d", port_type, port_priv_flags);
 
     return 0;
 }
 
-static int mtip_device_lookup_lane_cfg(u32 port_type, trx_lane_cfg* lane_cfg, trx_breakout_cfg* breakout_cfg)
+int mtip_device_lookup_lane_qsfp_cfg(u32 port_type, struct qsfp_info *lane_qsfp_info)
 {
     int i;
     u32 lane_index;
@@ -2525,8 +2320,7 @@ static int mtip_device_lookup_lane_cfg(u32 port_type, trx_lane_cfg* lane_cfg, tr
     lane_info = platform_driver_priv->mtip_lanes[lane_index];
 
     // set the lane_cfg
-    *lane_cfg = lane_info->lane_qsfp_info.trx_laneinfo;
-    *breakout_cfg = lane_info->lane_qsfp_info.trx_bout_cfg;
+    *lane_qsfp_info = lane_info->lane_qsfp_info;
     return 0;
 }
 
@@ -2534,13 +2328,19 @@ static int mtip_device_lookup_lane_cfg(u32 port_type, trx_lane_cfg* lane_cfg, tr
 // and SFP module attached
 u32 mtip_device_filter_priv_flags(u32 port_type)
 {
-    u32 filtered;
+    u32 filtered = 0;
     int i;
     struct mtip_port_info* port_info = platform_driver_priv->mtip_ports[port_type];
     u32 port_priv_flags = port_info->port_priv_flags;
     u32 lane_index;
     bool connected_lane_found = false;
     enum eth_phy_iface_phy_lane_speed_enum  max_lane_speed;
+    struct qsfp_info lane_qsfp_info;
+    u32 num_lanes;
+    u32 filtered_mask = 0;
+    u32 real_link = 0;
+    u32 link_index;
+    u32 config_fec;
 
     // find a lane that is connected
     for (i = 0; i < platform_driver_priv->devices.port_devices[port_type].num_lane_phandles; ++i) 
@@ -2563,29 +2363,170 @@ u32 mtip_device_filter_priv_flags(u32 port_type)
     // use the lane speed of the found lane
     max_lane_speed = platform_driver_priv->mtip_lanes[lane_index]->lane_speed;
 
+    if (mtip_device_lookup_lane_qsfp_cfg(port_type, &lane_qsfp_info) < 0)
+    {
+        CSMLOGERR("unable to lookup lane cfg of port_type %d", port_type);
+        return 0;
+    }
+
+    // use the number of lanes to decide the supported port configurations
+    if(port_type == MTIP_PORT_TYPE_DEBUG)
+    {
+        if(lane_qsfp_info.trx_module_type == TRX_QSFPDD)
+        {
+            // for QSFPDD on DU, bits at index 6 and 7 map to Debug port lanes
+            if((lane_qsfp_info.trx_laneinfo & 0xC0) == 0xC0)
+                num_lanes = 2;
+            else if((lane_qsfp_info.trx_laneinfo & 0x40) == 0x40)
+                num_lanes = 1;
+            else
+                return 0;
+        }
+        else
+        {
+            // for other modules, bits at index 2 and 3 map to Debug port lanes
+            if((lane_qsfp_info.trx_laneinfo & 0xC) == 0xC)
+                num_lanes = 2;
+            else if((lane_qsfp_info.trx_laneinfo & 0x4) == 0x4)
+                num_lanes = 1;
+            else
+                return 0;
+        }
+    }
+    else
+    {
+        // For FH ports, bits 0 to 3 will map to the 4 lanes of the port
+        if((lane_qsfp_info.trx_laneinfo & 0xF) == 0xF)
+            num_lanes = 4;
+        else if((lane_qsfp_info.trx_laneinfo & 0x3) == 0x3)
+            num_lanes = 2;
+        else if((lane_qsfp_info.trx_laneinfo & 0x1) == 0x1)
+            num_lanes = 1;
+        else
+        {
+            CSMLOGERR("Invalid trx_laneinfo 0x%x", lane_qsfp_info.trx_laneinfo);
+            return 0;
+        }
+    }
+
+    // TBD, need to use FEC setting as well to filter out supported speed modes
+    if(port_type == MTIP_PORT_TYPE_DEBUG)
+    {
+        real_link = 1;
+    }
+
+    // Get the link index of the first link for this port
+    if(mtip_lookup_link_index_by_port_type_and_real_link(&link_index, port_type, real_link) != 0)
+    {
+        return 0;
+    }
+
+    config_fec = platform_driver_priv->mtip_links[link_index]->config_fec;
+
     switch (max_lane_speed)
     {
-    case PHY_LANE_SPEED_10G:
-       {
-          filtered = port_priv_flags & MTIP_DEVICE_PRIV_FLAGS_BIT_MASK_10G;
-       }
-       break;
-
-    case PHY_LANE_SPEED_25G:
-       {
-          filtered = port_priv_flags & MTIP_DEVICE_PRIV_FLAGS_BIT_MASK_25G;
-       }
-       break;
-
-    case PHY_LANE_SPEED_50G:
-       {
-          filtered = port_priv_flags & MTIP_DEVICE_PRIV_FLAGS_BIT_MASK_50G;
-       }
-       break;
 
     case PHY_LANE_SPEED_100G:
        {
-          filtered = port_priv_flags & MTIP_DEVICE_PRIV_FLAGS_BIT_MASK_100G;
+          filtered_mask |= (1 << MTIP_PORT_CONFIG_1x100GBASE_R);
+
+          /* For optics, don't select lower speed modes and for DAC fall
+             through to select lower speed modes */
+          if(port_info->sfp_port_type == PORT_FIBRE)
+             break;
+       }
+
+    case PHY_LANE_SPEED_50G:
+       {
+           if(num_lanes == 1)
+           {
+              filtered_mask |= (1 << MTIP_PORT_CONFIG_1x50GBASE_R);
+           }
+           else if(num_lanes == 2 || num_lanes == 4)
+           {
+              // TBD - need to enhance breakout handling
+              filtered_mask |= ((1 << MTIP_PORT_CONFIG_1x100GBASE_R2)|
+                                (1 << MTIP_PORT_CONFIG_2x50GBASE_R) |
+                                (1 << MTIP_PORT_CONFIG_1x50GBASE_R));
+           }
+
+           /* For optics, don't select lower speed modes and for DAC fall
+              through to select lower speed modes */
+           if(port_info->sfp_port_type == PORT_FIBRE)
+              break;
+       }
+
+    case PHY_LANE_SPEED_25G:
+       {
+          if(num_lanes == 1)
+          {
+             filtered_mask |= (1 << MTIP_PORT_CONFIG_1x25GBASE_R);
+             if(config_fec == ETHTOOL_FEC_RS)
+                filtered_mask |= (1 << MTIP_PORT_CONFIG_1x25GBASE_R_RSFEC);
+             else if(config_fec == ETHTOOL_FEC_BASER)
+                filtered_mask |= (1 << MTIP_PORT_CONFIG_1x25GBASE_R_FEC);
+          }
+          else if(num_lanes == 2)
+          {
+             // TBD - need to enhance breakout handling
+             filtered_mask |= ((1 << MTIP_PORT_CONFIG_1x50GBASE_R2)|
+                               (1 << MTIP_PORT_CONFIG_1x25GBASE_R));
+             if(config_fec == ETHTOOL_FEC_RS)
+             {
+                filtered_mask |= ((1 << MTIP_PORT_CONFIG_1x50GBASE_R2_RSFEC) |
+                                  (1 << MTIP_PORT_CONFIG_1x25GBASE_R_RSFEC));
+             }
+             else if(config_fec == ETHTOOL_FEC_BASER)
+                filtered_mask |= (1 << MTIP_PORT_CONFIG_1x25GBASE_R_FEC);
+          }
+          else if(num_lanes == 4)
+          {
+             // TBD - need to enhance breakout handling
+             filtered_mask |= ((1 << MTIP_PORT_CONFIG_1x100GBASE_R4) |
+                               (1 << MTIP_PORT_CONFIG_1x50GBASE_R2)|
+                               (1 << MTIP_PORT_CONFIG_4x25GBASE_R) |
+                               (1 << MTIP_PORT_CONFIG_1x25GBASE_R));
+             if(config_fec == ETHTOOL_FEC_RS)
+             {
+                filtered_mask |= ((1 << MTIP_PORT_CONFIG_1x100GBASE_R4_RSFEC) |
+                                  (1 << MTIP_PORT_CONFIG_1x50GBASE_R2_RSFEC) |
+                                  (1 << MTIP_PORT_CONFIG_4x25GBASE_R_RSFEC) |
+                                  (1 << MTIP_PORT_CONFIG_1x25GBASE_R_RSFEC));
+             }
+             else if(config_fec == ETHTOOL_FEC_BASER)
+             {
+                filtered_mask |= ((1 << MTIP_PORT_CONFIG_4x25GBASE_R_FEC) |
+                                  (1 << MTIP_PORT_CONFIG_1x25GBASE_R_FEC));
+             }
+          }
+
+          /* For optics, don't select lower speed modes and for DAC fall
+             through to select lower speed modes */
+          if(port_info->sfp_port_type == PORT_FIBRE)
+             break;
+       }
+
+    case PHY_LANE_SPEED_10G:
+       {
+          if(num_lanes == 1 || num_lanes == 2)
+          {
+             filtered_mask |= (1 << MTIP_PORT_CONFIG_1x10GBASE_R);
+             if(config_fec == ETHTOOL_FEC_BASER)
+                 filtered_mask |= (1 << MTIP_PORT_CONFIG_1x10GBASE_R_FEC);
+          }
+          else if(num_lanes == 4)
+          {
+             // TBD - need to enhance breakout handling, where we need to exclude 1x40_R4
+             filtered_mask |= ((1 << MTIP_PORT_CONFIG_1x10GBASE_R) |
+                               (1 << MTIP_PORT_CONFIG_4x10GBASE_R) |
+                               (1 << MTIP_PORT_CONFIG_1x40GBASE_R4));
+             if(config_fec == ETHTOOL_FEC_BASER)
+             {
+                 filtered_mask |= ((1 << MTIP_PORT_CONFIG_1x10GBASE_R_FEC) |
+                                   (1 << MTIP_PORT_CONFIG_4x10GBASE_R_FEC) |
+                                   (1 << MTIP_PORT_CONFIG_1x40GBASE_R4_FEC));
+             }
+          }
        }
        break;
 
@@ -2596,6 +2537,17 @@ u32 mtip_device_filter_priv_flags(u32 port_type)
        }
        break;
     }
+
+    filtered = port_priv_flags & filtered_mask;
+
+    /* For DR, we currently support only QSFP28 100G DR1, so only 100G_R4 will
+       be supported, and other modes will be masked out */
+    if(lane_qsfp_info.trx_link_length_range == TRX_DR)
+       filtered &= (1 << MTIP_PORT_CONFIG_1x100GBASE_R4);
+
+    CSMLOGINFO("mtip_device_filter_priv_flags: Port_type %d, lane %d, max_lane_speed %d, port_priv_flags 0x%x, filtered_mask 0x%x, filtered 0x%x",
+               port_type, lane_index, max_lane_speed, port_priv_flags, filtered_mask, filtered);
+
     return filtered;
 }
 
@@ -2710,13 +2662,6 @@ static int mtip_device_resolve_port_configuration_optical(u32 port_type)
     }
 
     bc = mtip_device_count_priv_flag_bits(port_type);
-
-    // check that there is only one bit set in priv-flags
-    if (bc != 1) 
-    {
-        CSMLOGERR("Only one mode can be supported for optical port_type %d bc: %d priv_flags %d", port_type, bc, port_info->port_priv_flags);
-        return -1; 
-    }
 
     // Get the link index of the first link for this port
     if(mtip_lookup_link_index_by_port_type_and_real_link(&link_index, port_type, real_link) < 0)
@@ -2867,6 +2812,7 @@ void mtip_device_configure_port(u32 port_type)
 {
    u32 tmp_lane_index;
    bool all_lanes_connected = true;
+   bool breakout_lane_connected = false;
    int i;
    struct mtip_port_info *port_info;
    bool set_port_config = false;
@@ -2876,12 +2822,11 @@ void mtip_device_configure_port(u32 port_type)
    int bc = 0;
    int num_an_lanes = 0;
    u32 filtered_priv_flags = 0;
-   trx_lane_cfg lane_cfg;
-   trx_breakout_cfg breakout_cfg;
    u32 real_link = 0;
    u32 real_lane = 0;
    u32 lane_index;
    u32 sfp_phandle[MAX_ETH_LANES] = {0};
+   struct qsfp_info lane_qsfp_info;
 
    port_info = platform_driver_priv->mtip_ports[port_type];
 
@@ -2895,30 +2840,53 @@ void mtip_device_configure_port(u32 port_type)
       {
       case MTIP_PORT_STATE_INIT:
          {
-             // lookup the lane cfg
-            if (mtip_device_lookup_lane_cfg(port_type, &lane_cfg, &breakout_cfg) < 0)
-            {
-               CSMLOGERR("unable to lookup lane cfg of port_type %d", port_type);
-               loopflag = false;
-               goto out;
-            }
-
             // check if this is a breakout cable case
-            if (lane_cfg != 0x0F)
+            if (mtip_phy_is_breakout_config(port_type))
             {
-                // this is a breakout cable
-                CSMLOGDBG("Breakout cable case: port_type %d lane_cfg: %d breakout_cfg %d", port_type, lane_cfg, breakout_cfg);
+                // this is a breakout cable, check that if any one lane of the port is in connected state
+               for (i = 0; i < platform_driver_priv->devices.port_devices[port_type].num_lane_phandles; ++i)
+               {
+                  tmp_lane_index = platform_driver_priv->devices.port_devices[port_type].lane_devices[i]->lane_index;
+
+                  if (platform_driver_priv->mtip_lanes[tmp_lane_index]->lane_state == MTIP_LANE_STATE_CONNECTED)
+                  {
+                     breakout_lane_connected = true;
+                     break;
+                  }
+               }
+
+               if(breakout_lane_connected == false)
+               {
+                   CSMLOGINFO("Waiting for at least one breakout lane for port: %d to be connected", port_type);
+
+                   // stay in INIT state
+                   loopflag = false;
+                   goto out;
+               }
+               else
+                   CSMLOGINFO("At least one breakout lane for port: %d is connected", port_type);
             }
             else
             {
                // this is not a breakout cable
                CSMLOGDBG("Not breakout cable case");
 
+               if (mtip_device_lookup_lane_qsfp_cfg(port_type, &lane_qsfp_info) < 0)
+               {
+                  // stay in INIT state
+                  loopflag = false;
+                  goto out;
+               }
+
                // check that all the lanes of the port are in connected state
                all_lanes_connected = true;
                for (i = 0; i < platform_driver_priv->devices.port_devices[port_type].num_lane_phandles; ++i)
                {
                   tmp_lane_index = platform_driver_priv->devices.port_devices[port_type].lane_devices[i]->lane_index;
+
+                  // Don't check for the lanes which are not valid
+                  if(((1 << i) & lane_qsfp_info.trx_laneinfo) == 0)
+                     continue;
 
                   if (platform_driver_priv->mtip_lanes[tmp_lane_index]->lane_state != MTIP_LANE_STATE_CONNECTED)
                   {
@@ -2985,6 +2953,7 @@ void mtip_device_configure_port(u32 port_type)
                loopflag = false;
                goto out;
             }
+
             if (num_links_waiting_for_lanes == 0)
             {
                // there are no links waiting to be assigned lanes
@@ -3227,7 +3196,7 @@ void run_mtip_process_configure_port_using_link(void *work_ptr)
    kfree(taskstruct);
 }
 
-void post_mtip_process_an_result(enum mtip_port_type_enum port_type, bool an_result, enum mtip_port_config_enum port_config)
+void post_mtip_process_an_result(enum mtip_port_type_enum port_type, bool an_result, enum mtip_port_config_enum port_config, u8 seq_num)
 {
    struct mtip_process_an_result_task* taskstruct = kmalloc(sizeof(struct mtip_process_an_result_task), GFP_ATOMIC);
    if(taskstruct == NULL)
@@ -3238,6 +3207,7 @@ void post_mtip_process_an_result(enum mtip_port_type_enum port_type, bool an_res
    taskstruct->port_type = port_type;
    taskstruct->an_result = an_result;
    taskstruct->port_config = port_config;
+   taskstruct->seq_num = seq_num;
    mtip_queue_work(MTIP_WORKQ_TASK_PROCESS_AN_RESULT, taskstruct);
 }
 
@@ -3247,23 +3217,29 @@ void run_mtip_process_an_result(void *work_ptr)
     struct mtip_process_an_result_task *taskstruct = (struct mtip_process_an_result_task *)work_ptr;
     u32 port_type = taskstruct->port_type;
     bool an_result = taskstruct->an_result;
+    u8 seq_num = taskstruct->seq_num;
     enum mtip_port_config_enum port_config = taskstruct->port_config;
 
-    CSMLOGINFO("processing AN result for port_type %d with result %d config %d %s", port_type, an_result, port_config, mtip_ethtool_get_priv_flags_str(port_config));
+    CSMLOGINFO("Processing AN result for port_type %d seq %d with result %d config %d %s",
+               port_type, an_result, seq_num, port_config, mtip_ethtool_get_priv_flags_str(port_config));
 
     if(an_result == false)
     {
         CSMLOGERR("AN failed for port_type %d", port_type);
-
         // need to figure out what to do with AN failures
-
         goto out;
+    }
+
+    if(seq_num != mtip_phy_an_seq_num[port_type])
+    {
+        CSMLOGINFO("Ignore the older AN result");
+        return;
     }
 
     // check that the port is waiting for AN result
     if (platform_driver_priv->mtip_ports[port_type]->port_state != MTIP_PORT_STATE_CONNECTED_NEGOTIATION_IN_PROGRESS) 
     {
-        CSMLOGERR("Got a spurious AN result callback in state %d for port_type %d", platform_driver_priv->mtip_ports[port_type]->port_state, port_type);
+        CSMLOGDBG("Got a spurious AN result callback in state %d for port_type %d", platform_driver_priv->mtip_ports[port_type]->port_state, port_type);
         goto out;
     }
 
@@ -3278,4 +3254,346 @@ out:
     // free the taskstruct
     kfree(taskstruct);
 }
-   
+
+void post_mtip_process_netdev_open(struct net_device *netdev)
+{
+   struct mtip_process_process_netdev_events* taskstruct = kmalloc(sizeof(struct mtip_process_process_netdev_events), GFP_ATOMIC);
+   if(taskstruct == NULL)
+   {
+       CSMLOGERR("memory alloc failed\n");
+       return;
+   }
+   taskstruct->netdev = netdev;
+   mtip_queue_work(MTIP_WORKQ_TASK_PROCESS_NETDEV_OPEN, taskstruct);
+}
+
+void run_mtip_process_netdev_open(void* workptr)
+{
+   struct mtip_process_process_netdev_events *taskstruct = (struct mtip_process_process_netdev_events *)workptr;
+   struct net_device *netdev = taskstruct->netdev;
+   struct mtip_netdev_priv *priv;
+   u32 link_index;
+   ecpri_dma_eth_conn_hdl_t hdl;
+   int sfp_port_type;
+   enum ecpri_dma_notify_mode setmode = ECPRI_DMA_NOTIFY_MODE_IRQ;
+   u32 port_type;
+
+   priv = netdev_priv(netdev);
+
+   link_index = priv->link_index;
+   if(link_index >= MTIP_MAX_LINKS)
+   {
+     CSMLOGERR("invalid link_index %d", link_index);
+     goto out;
+   }
+
+   hdl = platform_driver_priv->mtip_links[link_index]->dma_hdl;
+
+   CSMLOGINFO("mtip_open called for link_index: %d with hdl: %d\n", link_index, hdl);
+
+   if (mtip_lookup_port_type_by_link_index(link_index, &port_type) < 0)
+   {
+      CSMLOGERR("invalid port_type for link_index %d", link_index);
+      goto out;
+   }
+
+   // Initialize the carrier state as off
+   if (mtip_loopback_mode == MTIP_MODE_DEFAULT)
+   {
+      netif_carrier_off(netdev);
+   }
+
+   // first get the interface going
+   if (hdl)
+   {
+      // start the pipe
+      mtip_start_dma_pipe(netdev, hdl);
+
+      // set the netdev MAC address from the HW
+      mtip_set_netdev_hw_mac_addr(netdev, link_index);
+
+      // set to POLL mode
+      setmode = ECPRI_DMA_NOTIFY_MODE_IRQ;
+
+      // set the rx mode to IRQ
+      mtip_set_rx_mode_immediate(hdl, setmode);
+
+      // set the tx mode to IRQ
+      mtip_set_tx_mode_immediate(hdl, setmode);
+
+      /*
+       * enable napi
+       */
+      napi_enable(&(platform_driver_priv->mtip_links[link_index]->napi));
+      napi_enable(&(platform_driver_priv->mtip_links[link_index]->napi_tx));
+
+      /* 
+       * Start the interface's transmit queue 
+       * (allowing it to accept packets for transmission) 
+       * once it is ready to start sending data. 
+       */
+      netif_start_queue(netdev);
+   }
+
+   // this is done only for the RUMI E2E
+   if (mtip_rumi_platform != MTIP_PLATFORM_SOC)
+   {
+      if (mtip_loopback_mode == MTIP_MODE_DEFAULT)
+      {
+         // Configure phylib in poll mode
+         priv->phydev->irq = PHY_POLL;
+
+         // PHYLINK-PHY binding and PHY bringup
+         phylink_connect_phy(priv->phylink, priv->phydev);
+
+         // Start the PHYLINK
+         phylink_start(priv->phylink);
+      }
+   }
+   else
+   {
+      // Change the state for PCS loopback
+      if (mtip_loopback_mode == MTIP_MODE_LOOPBACK)
+         platform_driver_priv->mtip_links[link_index]->state = MTIP_LINK_STATE_OPEN_WAITING_FOR_LANES;
+
+      // For PCS/PHY loopback mode, configure port based on the speed modes set
+      if (mtip_loopback_mode != MTIP_MODE_DEFAULT)
+         mtip_device_configure_port(port_type);
+
+      // PCS looback mode
+      if (mtip_loopback_mode == MTIP_MODE_LOOPBACK)
+      {
+         // Process MAC link up state
+         mtip_mac_link_up(link_index);
+      }
+      else
+      {
+         // the default E2E mode
+         // check if lane assignment is complete
+         if (platform_driver_priv->mtip_links[link_index]->lanes_assignment_complete == true)
+         {
+            // lane assignment is already done for the port
+            // this means the port HW has been configured already
+
+            mutex_lock(&platform_driver_priv->mtip_links[link_index]->dev_lock);
+
+            if ((platform_driver_priv->mtip_links[link_index]->state == MTIP_LINK_STATE_INIT) ||
+                (platform_driver_priv->mtip_links[link_index]->state == MTIP_LINK_STATE_CLOSE))
+            {
+               // set the state to OPEN_DONE
+               platform_driver_priv->mtip_links[link_index]->state = MTIP_LINK_STATE_OPEN_DONE;
+            }
+
+            mutex_unlock(&platform_driver_priv->mtip_links[link_index]->dev_lock);
+
+            // get the sfp port type
+            sfp_port_type = platform_driver_priv->mtip_ports[port_type]->sfp_port_type;
+
+            // Notify TRX driver to enable TX
+            mtip_phy_notify_eth_event_to_trx(link_index, IFCFG_ENABLE);
+
+            // bring up the phy
+            mtip_phy_bringup_phy(link_index, sfp_port_type);
+
+            CSMLOGINFO("phy bringup done for link: %d\n", link_index);
+         }
+         else
+         {
+            // lane assignment has not been done for this port
+            mutex_lock(&platform_driver_priv->mtip_links[link_index]->dev_lock);
+
+            if ((platform_driver_priv->mtip_links[link_index]->state == MTIP_LINK_STATE_INIT) ||
+                (platform_driver_priv->mtip_links[link_index]->state == MTIP_LINK_STATE_CLOSE))
+            {
+               // lane assignment is not complete yet
+               // set the state to OPEN_WAITING_FOR_LANES
+               platform_driver_priv->mtip_links[link_index]->state = MTIP_LINK_STATE_OPEN_WAITING_FOR_LANES;
+            }
+
+            mutex_unlock(&platform_driver_priv->mtip_links[link_index]->dev_lock);
+
+            CSMLOGINFO("link_index %d set to WAITING_FOR_LANES state", link_index);
+
+            post_mtip_process_configure_port_using_link(port_type, link_index);
+         }
+      }
+   }
+
+   /* Send update to clients */
+   post_mtip_client_send_event(ETH_ECPRISS_EVENT_UP, link_index);
+   mtip_snd_event_notification(link_index, IF_UP);
+
+out:
+   // free the taskstruct
+   kfree(taskstruct);
+
+   return;
+}
+
+void post_mtip_process_netdev_close(struct net_device *netdev)
+{
+   struct mtip_process_process_netdev_events* taskstruct = kmalloc(sizeof(struct mtip_process_process_netdev_events), GFP_ATOMIC);
+   if(taskstruct == NULL)
+   {
+       CSMLOGERR("memory alloc failed\n");
+       return;
+   }
+   taskstruct->netdev = netdev;
+   mtip_queue_work(MTIP_WORKQ_TASK_PROCESS_NETDEV_CLOSE, taskstruct);
+}
+
+void run_mtip_process_netdev_close(void* workptr)
+{
+   struct mtip_process_process_netdev_events *taskstruct = (struct mtip_process_process_netdev_events *)workptr;
+   struct net_device *netdev = taskstruct->netdev;
+   struct mtip_netdev_priv *priv;
+   ecpri_dma_eth_conn_hdl_t hdl;
+   u32 link_index;
+   u32 port_type;
+   bool all_closed = true;
+   int i;
+   u32 tmp_link_index;
+   u32 real_lane = 0;
+   u32 lane_index;
+   u32 sfp_phandle[MAX_ETH_LANES] = {0};
+
+   priv = netdev_priv(netdev);
+
+   link_index = priv->link_index;
+
+   hdl = platform_driver_priv->mtip_links[link_index]->dma_hdl;
+
+   CSMLOGINFO("mtip_close called with link_index: %d with hdl: %d\n", link_index, hdl);
+
+   mtip_lookup_port_type_by_link_index(link_index, &port_type);
+
+   // set the link state to CLOSE
+   mutex_lock(&platform_driver_priv->mtip_links[link_index]->dev_lock);
+
+   platform_driver_priv->mtip_links[link_index]->state = MTIP_LINK_STATE_CLOSE;
+
+   mutex_unlock(&platform_driver_priv->mtip_links[link_index]->dev_lock);
+
+   // do this only for RUMI E2E
+   if (mtip_rumi_platform != MTIP_PLATFORM_SOC)
+   {
+      if (mtip_loopback_mode == MTIP_MODE_DEFAULT)
+      {
+         /* Stop and disconnect the PHY */
+         phylink_stop(priv->phylink);
+         phylink_disconnect_phy(priv->phylink);
+      }
+   }
+   else
+   {
+      if (mtip_loopback_mode == MTIP_MODE_DEFAULT ||
+          mtip_loopback_mode == MTIP_MODE_PHY_LOOPBACK)
+      {
+         /* teardown the phy if
+            1. AN is not in progress OR
+            2. If there is no other active link while AN is in progress
+         */
+         if(platform_driver_priv->mtip_ports[port_type]->port_state != MTIP_PORT_STATE_CONNECTED_NEGOTIATION_IN_PROGRESS ||
+            mtip_lookup_if_any_other_link_active_for_port(port_type, link_index) == false)
+         {
+            mtip_phy_teardown_phy(link_index);
+            CSMLOGDBG("phy teardown done for link: %d\n", link_index);
+         }
+
+         // Notify TRX driver to disable TX
+         mtip_phy_notify_eth_event_to_trx(link_index, IFCFG_DISABLE);
+
+         // Notify TRX driver to disable TX on primary lane if AN was in progress and not other links are active
+         if(platform_driver_priv->mtip_ports[port_type]->port_state == MTIP_PORT_STATE_CONNECTED_NEGOTIATION_IN_PROGRESS &&
+            mtip_lookup_if_any_other_link_active_for_port(port_type, link_index) == false)
+         {
+            if(port_type == MTIP_PORT_TYPE_DEBUG)
+            {
+               real_lane = 2;
+            }
+
+            rtnl_lock();
+            mtip_lookup_lane_index_by_port_type_and_real_lane(&lane_index, port_type, real_lane);
+            sfp_phandle[real_lane] = platform_driver_priv->devices.lane_devices[lane_index].sfp_phandle;
+            qsfp_trx_ifconfig_notifier(IFCFG_DISABLE, sfp_phandle);
+            rtnl_unlock();
+         }
+      }
+      // PCS looback mode
+      else
+      {
+         // Process MAC link down state
+         mtip_mac_link_down(link_index);
+      }
+   }
+
+   if (hdl)
+   {
+      // stop the pipe
+      mtip_stop_dma_pipe(hdl);
+
+      /*
+       * disable napi
+       */
+      napi_disable(&(platform_driver_priv->mtip_links[link_index]->napi));
+      napi_disable(&(platform_driver_priv->mtip_links[link_index]->napi_tx));
+
+      /* release ports, irq and such -- like fops->close */
+      netif_stop_queue(netdev);
+   }
+
+   all_closed = true;
+
+   for (i = 0; i < platform_driver_priv->devices.port_devices[port_type].num_link_phandles; ++i) 
+   {
+       tmp_link_index = platform_driver_priv->devices.port_devices[port_type].link_devices[i]->link_index;
+       mutex_lock(&platform_driver_priv->mtip_links[link_index]->dev_lock);
+       if ((platform_driver_priv->mtip_links[tmp_link_index]) && (platform_driver_priv->mtip_links[tmp_link_index]->state != MTIP_LINK_STATE_INIT) &&
+           (platform_driver_priv->mtip_links[tmp_link_index]->state != MTIP_LINK_STATE_CLOSE))
+       {
+           all_closed = false;
+           mutex_unlock(&platform_driver_priv->mtip_links[link_index]->dev_lock);
+           break;
+       }
+       mutex_unlock(&platform_driver_priv->mtip_links[link_index]->dev_lock);
+   }
+
+   if (all_closed) 
+   {
+       // reset the port state to INIT
+      if(platform_driver_priv->mtip_ports[port_type]) {
+         platform_driver_priv->mtip_ports[port_type]->port_state = MTIP_PORT_STATE_INIT;
+
+         // reset the port speed to 0, across lanes
+         for (i = 0; i < PHY_LANE_MAX; ++i) 
+         {
+            platform_driver_priv->mtip_ports[port_type]->lane_config[i].lane_speed = 0;
+         }
+      }
+
+      // reset all the lane assignments
+      for (i = 0; i < platform_driver_priv->devices.port_devices[port_type].num_link_phandles; ++i) 
+      {
+         tmp_link_index = platform_driver_priv->devices.port_devices[port_type].link_devices[i]->link_index;
+
+         if(platform_driver_priv->mtip_links[tmp_link_index]) {
+            mutex_lock(&platform_driver_priv->mtip_links[tmp_link_index]->dev_lock);
+
+            platform_driver_priv->mtip_links[tmp_link_index]->lanes_assignment_complete = false;
+            mutex_unlock(&platform_driver_priv->mtip_links[tmp_link_index]->dev_lock);
+         }
+      }
+
+      mtip_phy_reset_phy_sm(port_type);
+   }
+
+   /* Send update to clients */
+   post_mtip_client_send_event(ETH_ECPRISS_EVENT_DOWN, link_index);
+   mtip_snd_event_notification(link_index, IF_DOWN);
+
+   // free the taskstruct
+   kfree(taskstruct);
+
+   return;
+}
+

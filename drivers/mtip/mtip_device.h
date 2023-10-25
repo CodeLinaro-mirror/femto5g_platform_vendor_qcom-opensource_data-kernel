@@ -16,17 +16,46 @@
 
 #include "ecpri_dma_eth.h"
 
+/*----------------------Default FH supported speed mask-----------------------*/
 // For 100G lane speed all speed modes are allowed
-#define MTIP_DEVICE_PRIV_FLAGS_BIT_MASK_100G          0xFFFFFFFF
+#define MTIP_DEVICE_PRIV_FLAGS_BIT_MASK_100G               0xFFFFFFFF
+#define MTIP_DEVICE_PRIV_FLAGS_BIT_MASK_NON_FEC            0x2928A2A9
 
-// for 50G lane speed 50G, 25G and 10G lane speed modes are valid
-#define MTIP_DEVICE_PRIV_FLAGS_BIT_MASK_50G           0xFFFFFFF8
+/*------------------Default Debug ETH supported speed mask--------------------*/
+// For Debug port, port configurations with max 1 link and 2 lanes are valid
+#define MTIP_DEVICE_PRIV_FLAGS_BIT_MASK_DBG_PORT           0x6707E01F
+// Mask for all lane speeds supported by Debug ETH except FEC modes
+#define MTIP_DEVICE_PRIV_FLAGS_BIT_MASK_DBG_PORT_NON_FEC   0x2100A009
+// Mask for all lane speeds supported by Debug ETH except FEC modes and 50G lane speeds.
+#define MTIP_DEVICE_PRIV_FLAGS_BIT_MASK_DBG_PORT_NON_FEC_NON_50G   0x21000000
 
-// for 25G lane speed 25G and 10G lane speed modes are valid
-#define MTIP_DEVICE_PRIV_FLAGS_BIT_MASK_25G           0xFFFF9E60
+/*-----------------------Ethtool speed setting mask --------------------------*/
+// 100G link speed configuration mask
+#define MTIP_DEVICE_PRIV_FLAGS_BIT_MASK_100G_ONLY          0x0000007F
 
-// for 10G lane speed, only 10G lane speed modes are valid
-#define MTIP_DEVICE_PRIV_FLAGS_BIT_MASK_10G           0xF8180000
+// 50G link speed configuration mask
+#define MTIP_DEVICE_PRIV_FLAGS_BIT_MASK_50G_ONLY           0x0007FF80
+
+// 40G link speed configuration mask
+#define MTIP_DEVICE_PRIV_FLAGS_BIT_MASK_40G_ONLY           0x00180000
+
+// 25G link speed configuration mask
+#define MTIP_DEVICE_PRIV_FLAGS_BIT_MASK_25G_ONLY           0x07E00000
+
+// 10G link speed configuration mask
+#define MTIP_DEVICE_PRIV_FLAGS_BIT_MASK_10G_ONLY           0x78000000
+
+// 100G link speed configuration mask
+#define MTIP_DEVICE_PRIV_FLAGS_BIT_MASK_100G_ONLY_DBG_PORT 0x0000001F
+
+// 50G link speed configuration mask
+#define MTIP_DEVICE_PRIV_FLAGS_BIT_MASK_50G_ONLY_DBG_PORT  0x0007E000
+
+// 25G link speed configuration mask
+#define MTIP_DEVICE_PRIV_FLAGS_BIT_MASK_25G_ONLY_DBG_PORT  0x07000000
+
+// 10G link speed configuration mask
+#define MTIP_DEVICE_PRIV_FLAGS_BIT_MASK_10G_ONLY_DBG_PORT  0x60000000
 
 // the net device structure
 struct mtip_netdev_priv {
@@ -75,6 +104,7 @@ struct mtip_process_link_state_task
 
 void post_mtip_process_link_state(u32 link_index, bool link_up);
 void run_mtip_process_link_state(void* work_ptr);
+void mtip_process_link_state(u32 link_index, bool link_up);
 void mtip_device_configure_port(u32 port_type);
 void post_mtip_process_configure_port_using_lane(u32 port_type, u32 lane_index);
 void run_mtip_process_configure_port_using_lane(void* workptr);
@@ -94,7 +124,7 @@ struct mtip_process_configure_port_using_link_task
     u32 link_index;
 };
 
-void post_mtip_process_an_result(enum mtip_port_type_enum port_type, bool an_result, enum mtip_port_config_enum port_config);
+void post_mtip_process_an_result(enum mtip_port_type_enum port_type, bool an_result, enum mtip_port_config_enum port_config, u8 seq_num);
 void run_mtip_process_an_result(void* workptr);
 
 struct mtip_process_an_result_task
@@ -102,6 +132,17 @@ struct mtip_process_an_result_task
     u32 port_type;
     bool an_result;
     enum mtip_port_config_enum port_config;
+    u8 seq_num;
+};
+
+void post_mtip_process_netdev_open(struct net_device *netdev);
+void run_mtip_process_netdev_open(void* workptr);
+void post_mtip_process_netdev_close(struct net_device *netdev);
+void run_mtip_process_netdev_close(void* workptr);
+
+struct mtip_process_process_netdev_events
+{
+    struct net_device *netdev;
 };
 
 /*
@@ -133,6 +174,7 @@ int mtip_device_update_security_config(struct net_device *netdev, enum mtip_port
 u8 mtip_netdev_get_next_ptp_ts_seq_num(u32 link_index);
 
 u32 mtip_device_filter_priv_flags(u32 port_type);
+int mtip_device_lookup_lane_qsfp_cfg(u32 port_type, struct qsfp_info *lane_qsfp_info);
 
 void mtip_process_tx_comp_cb(ecpri_dma_eth_conn_hdl_t hdl, struct mtip_dma_tx_comp_params *tx_comp_params);
 #endif // _MTIP_DEVICE_H

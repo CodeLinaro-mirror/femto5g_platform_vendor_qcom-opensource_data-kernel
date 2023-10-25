@@ -226,20 +226,20 @@ static int mtip_platform_setup_port(u32 port_type)
           // set the default port configs
           // THIS IS TBD
           // final port configuration will be known after AN completion
-          platform_driver_priv->mtip_ports[port_type]->port_config = MTIP_PORT_CONFIG_4x25GBASE_R;
+          //platform_driver_priv->mtip_ports[port_type]->port_config = MTIP_PORT_CONFIG_4x25GBASE_R;
 
           // set the default port priv flags
-          platform_driver_priv->mtip_ports[port_type]->port_priv_flags = (1 << MTIP_PORT_CONFIG_4x25GBASE_R);
+          platform_driver_priv->mtip_ports[port_type]->port_priv_flags = MTIP_DEVICE_PRIV_FLAGS_BIT_MASK_NON_FEC;
        }
        else
        {
           platform_driver_priv->mtip_ports[port_type]->autoneg = true;
 
           // set the default port config to 1x25GBASE_R
-          platform_driver_priv->mtip_ports[port_type]->port_config = MTIP_PORT_CONFIG_1x25GBASE_R;
+          //platform_driver_priv->mtip_ports[port_type]->port_config = MTIP_PORT_CONFIG_1x25GBASE_R;
 
           // set the default port priv flags
-          platform_driver_priv->mtip_ports[port_type]->port_priv_flags = (1 << MTIP_PORT_CONFIG_1x25GBASE_R);
+          platform_driver_priv->mtip_ports[port_type]->port_priv_flags = MTIP_DEVICE_PRIV_FLAGS_BIT_MASK_DBG_PORT_NON_FEC_NON_50G;
        }
     }
     else
@@ -602,6 +602,9 @@ int mtip_lane_probe(struct platform_device *pdev)
 
     // set this as a valid lane device
     lane_device.lane_device_valid = 1;
+
+    // set default lane down reason code
+    lane_device.reason_code = TRX_ERROR;
 
     // the DT entries have been processed
     spin_lock_irqsave(lock, flags);
@@ -1431,7 +1434,7 @@ static int mtip_platform_setup(void)
       }
 
       // allocate the mtip_lanes
-      for (j = 0; (j < platform_driver_priv->devices.port_devices[i].num_lane_phandles) && (j < MTIP_MAX_LINKS_PER_PORT); ++j)
+      for (j = 0; (j < platform_driver_priv->devices.port_devices[i].num_lane_phandles) && (j < MTIP_MAX_LANES_PER_PORT); ++j)
       {
          // check if this is a valid lane`
          if (platform_driver_priv->devices.port_devices[i].lane_devices[j]->lane_device_valid != 0)
@@ -1523,7 +1526,7 @@ static int mtip_platform_setup(void)
                 if (pkts[j] == NULL)
                 {
                     ret = -1;
-                    CSMLOGERR("PT:No memory,j=%d,ret=%d\n",j, ret);
+                    CSMLOGERR("memory alloc failed\n");
                     goto out;
                 }
             }
@@ -1618,6 +1621,12 @@ static int mtip_platform_setup(void)
 
                // set the lane speed as 25GBASE
                platform_driver_priv->mtip_lanes[i]->lane_speed = PHY_LANE_SPEED_100G;
+
+               // set the lane properties for TRX
+               platform_driver_priv->mtip_lanes[i]->lane_qsfp_info.trx_module_type = TRX_QSFP_PLS_QSFP28_QSFP56;
+               platform_driver_priv->mtip_lanes[i]->lane_qsfp_info.trx_speed = TRX_LANE_SPEED_100G;
+               platform_driver_priv->mtip_lanes[i]->lane_qsfp_info.trx_laneinfo = 0xF;
+               platform_driver_priv->mtip_lanes[i]->lane_qsfp_info.trx_bout_cfg = 0;
            }
        }
 

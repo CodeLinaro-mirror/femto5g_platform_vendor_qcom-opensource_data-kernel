@@ -237,6 +237,7 @@ static int eip_ipsec_alloc_vport(unsigned int devid, bool inbound,
 
 #define EIP_CRYPTO_AES_GCM_128 0x5
 #define EIP_CRYPTO_AES_GCM_256 0x7
+#define EIP_REPLAY_WINDOW_SIZE 128
 
 static void eip_ipsec_destroy_tr(u32 *tr, unsigned int wc)
 {
@@ -244,8 +245,8 @@ static void eip_ipsec_destroy_tr(u32 *tr, unsigned int wc)
 }
 
 static u32 *eip_ipsec_build_tr(bool inbound, u8 *key, unsigned int key_len,
-			       u8 *salt, u32 spi, bool insert_satag,
-			       unsigned int *wc)
+			       u8 *salt, u32 spi, bool insert_satag, bool esn,
+			       bool replay, unsigned int *wc)
 {
 	u32 *tr = NULL;
 	unsigned int word_count;
@@ -264,8 +265,11 @@ static u32 *eip_ipsec_build_tr(bool inbound, u8 *key, unsigned int key_len,
 	}
 
 	if (inbound) {
-		sab_params.WindowSize = 128;
+		sab_params.WindowSize = EIP_REPLAY_WINDOW_SIZE;
 		sab_params.flags = SAB_IPSEC_FLAG_PAD_CHECK;
+
+		if (!replay)
+			sab_params.flags |= SAB_IPSEC_DISABLE_REPLAY_CHECK;
 
 		if (!insert_satag)
 			sab_params.flags |= SAB_IPSEC_DISABLE_SA_TAG_INSERT;
@@ -275,6 +279,9 @@ static u32 *eip_ipsec_build_tr(bool inbound, u8 *key, unsigned int key_len,
 	sab_params.KeyByteCount = key_len;
 	sab_params.Salt_p = salt;
 	sab_params.SPI = spi;
+
+	if (esn)
+		sab_params.flags |= SAB_MACSEC_FLAG_LONGSEQ;
 
 	rc = SABuilder_GetSize(&sab_params, &word_count);
 	if (rc != SAB_STATUS_OK) {
@@ -300,7 +307,8 @@ static u32 *eip_ipsec_build_tr(bool inbound, u8 *key, unsigned int key_len,
 
 static int eip_ipsec_add_sa(unsigned int devid, unsigned int vport,
 			    bool inbound, const struct xfrm_state *xs,
-			    SecY_SAHandle_t *sa_h, unsigned int *sa_index)
+			    SecY_SAHandle_t *sa_h, unsigned int *sa_index,
+			    bool enable_esn)
 {
 	SecY_Status_t rc = 0;
 	SecY_SA_t sa_params;
@@ -311,6 +319,7 @@ static int eip_ipsec_add_sa(unsigned int devid, unsigned int vport,
 		(xs->aead->alg_key_len - EIP_IPSEC_SALT_SIZE) / BITS_PER_BYTE;
 	u8 *salt = &xs->aead->alg_key[key_len];
 	u32 spi = be32_to_cpu(xs->id.spi);
+	bool replay = false;
 
 	ZEROINIT(sa_params);
 
@@ -337,8 +346,13 @@ static int eip_ipsec_add_sa(unsigned int devid, unsigned int vport,
 	 * bits in the TR (transform record).
 	 */
 
+	if (xs->replay_esn) {
+		replay = !!(xs->replay_esn->replay_window ==
+			    EIP_REPLAY_WINDOW_SIZE);
+	}
+
 	tr = eip_ipsec_build_tr(inbound, key, key_len, salt, spi, true,
-				&word_count);
+				enable_esn, replay, &word_count);
 	if (tr == NULL) {
 		eip_logerr("EIP IPSEC: Failed to create transformation record");
 		return -EFAULT;
@@ -422,22 +436,19 @@ static int eip_install_cfye_rule(struct eip_xfrm_state *eip_xs)
 	rule_params.Mask.NumTags = CFYE_RULE_NUMTAGS_MASK;
 	rule_params.Mask.ChannelID = CFYE_RULE_CHANNEL_ID_MASK;
 
-	/* Let's not match against ethernet DA in order to accept broadcast/multicast
-	 * ethernet frames.
-	 */
+	/* Do not match Ethernet DA since we are already matching channel ID */
 	rule_params.Data[0] = *(u32 *)eip_xs->ndev->dev_addr;
 	rule_params.Data[1] = *(u16 *)(eip_xs->ndev->dev_addr + 4);
-	rule_params.DataMask[0] = 0x0;
-	rule_params.DataMask[1] = 0x0;
+	rule_params.DataMask[0] = 0;
+	rule_params.DataMask[1] = 0;
 
+	/* Match SPI */
 	rule_params.Data[2] = be32_to_cpu(xs->id.spi);
 	rule_params.DataMask[2] = 0xffffffff;
 
-	/* Disable MTT match as we do not need to support virtualization, and therefore
-	 * not expect more than one SPI namespace.
-	 */
-	rule_params.Data[3] = 0;
-	rule_params.DataMask[3] = 0x0;
+	/* Match MTT */
+	rule_params.Data[3] = eip_xs->ilink->mtt_index;
+	rule_params.DataMask[3] = 0xf;
 
 	rc = CfyE_Rule_Add(devid, eip_xs->vport_h, &eip_xs->rule_h,
 			   &rule_params);
@@ -488,7 +499,8 @@ static int __eip_xdo_dev_state_add(struct eip_xfrm_state *eip_xs)
 	}
 
 	rc = eip_ipsec_add_sa(devid, eip_xs->vport, eip_xs->inbound, eip_xs->xs,
-			      &eip_xs->sa_h, &eip_xs->sa_index);
+			      &eip_xs->sa_h, &eip_xs->sa_index,
+			      eip_xs->enable_esn);
 	if (rc) {
 		eip_logerr("EIP IPSEC: Failed to install SA");
 		return -EFAULT;
@@ -504,6 +516,11 @@ static int __eip_xdo_dev_state_add(struct eip_xfrm_state *eip_xs)
 
 static int eip_ipsec_validate_sa(const struct xfrm_state *xs)
 {
+	if (xs->xso.type != XFRM_DEV_OFFLOAD_CRYPTO) {
+		eip_logerr("EIP IPSEC: only crypto offload is supported");
+		return -EINVAL;
+	}
+
 	if (xs->props.mode != XFRM_MODE_TUNNEL) {
 		eip_logerr("EIP IPSEC: EIP supports only tunnel mode");
 		return -EINVAL;
@@ -543,6 +560,27 @@ static int eip_ipsec_validate_sa(const struct xfrm_state *xs)
 		return -EINVAL;
 	}
 
+	if (xs->xso.dir == XFRM_DEV_OFFLOAD_IN &&
+	    ((xs->replay_esn &&
+	      xs->replay_esn->replay_window != EIP_REPLAY_WINDOW_SIZE) ||
+	     (!xs->replay_esn && xs->props.replay_window))) {
+		eip_logerr("EIP IPSEC: HW only support replay_window size %u",
+			   EIP_REPLAY_WINDOW_SIZE);
+		return -EINVAL;
+	}
+
+	if (xs->props.family != AF_INET && xs->props.family != AF_INET6) {
+		eip_logerr(
+			"EIP IPSEC: only ipv4/ipv6 xfrm states are supported for offload");
+		return -EINVAL;
+	}
+
+	if (xs->encap) {
+		eip_logerr(
+			"EIP IPSEC: Encapsulated xfrm state offload is not supported");
+		return -EINVAL;
+	}
+
 	return 0;
 }
 
@@ -568,6 +606,7 @@ static int eip_xdo_dev_state_add(struct xfrm_state *xs)
 
 	eip_xs->xs = xs;
 	eip_xs->inbound = (xs->xso.dir == XFRM_DEV_OFFLOAD_IN);
+	eip_xs->enable_esn = !!(xs->props.flags & XFRM_STATE_ESN);
 	eip_xs->sa_tag.etype = cpu_to_be16(eip_satag_etype);
 	eip_xs->channel = eip_xs->inbound ? &ilink->link->rx : &ilink->link->tx;
 
@@ -655,9 +694,92 @@ const struct xfrmdev_ops eip_xfrm_ops = {
 	.xdo_dev_state_advance_esn = eip_xdo_dev_state_advance_esn,
 };
 
+static void eip_set_bit(unsigned int nr, u32 *words, u32 num_words)
+{
+	unsigned int word = nr / EIP_BITS_PER_WORD;
+
+	if (word < num_words)
+		words[word] |= 1 << (nr % EIP_BITS_PER_WORD);
+}
+
+static void eip_set_bits(unsigned int num_bits, u32 *words, u32 num_words)
+{
+	unsigned int i, full_words, last_bits;
+
+	if (num_bits > (num_words * EIP_BITS_PER_WORD))
+		num_bits = num_words * EIP_BITS_PER_WORD;
+
+	full_words = num_bits / EIP_BITS_PER_WORD;
+	last_bits = num_bits % EIP_BITS_PER_WORD;
+
+	for (i = 0; i < full_words; i++)
+		words[i] = (u32)~0;
+
+	if (last_bits)
+		words[full_words] =
+			((u32)(~0)) >> (EIP_BITS_PER_WORD - last_bits);
+}
+
+static int eip_ipsec_enable_mtt(struct eip_ipsec_link *ilink)
+{
+	CfyE_Status_t rc;
+	CfyE_MTT_t mtt_params;
+	struct eip_link *link = ilink->link;
+	unsigned int devid = eip_devid(&link->rx);
+	unsigned int channel = eip_chid(&link->rx);
+	unsigned int num_channels;
+
+	/* For sake of simplicity, use one-to-one mapping from channel to mtt index */
+	ilink->mtt_index = channel;
+
+	rc = CfyE_Device_Limits(devid, &num_channels, NULL, NULL);
+	if (rc != CFYE_STATUS_OK) {
+		eip_logerr("EIP IPSEC: CfyE_Device_Limits returned error %d",
+			   rc);
+		return -EFAULT;
+	}
+
+	ZEROINIT(mtt_params);
+
+	eip_set_bit(channel, mtt_params.Key.ChannelMask.ch_bitmask,
+		    ARRAY_SIZE(mtt_params.Key.ChannelMask.ch_bitmask));
+	eip_set_bits(num_channels, mtt_params.Mask.ChannelMask.ch_bitmask,
+		     ARRAY_SIZE(mtt_params.Mask.ChannelMask.ch_bitmask));
+
+	rc = CfyE_MTT_Update(devid, ilink->mtt_index, &mtt_params);
+	if (rc != CFYE_STATUS_OK) {
+		eip_logerr("EIP IPSEC: Failed, CfyE_MTT_Update()=%d", rc);
+		return -EFAULT;
+	}
+
+	rc = CfyE_MTT_Enable(devid, ilink->mtt_index, true);
+	if (rc != CFYE_STATUS_OK) {
+		eip_logerr("EIP IPSEC: Failed, CfyE_MTT_Enable()=%d", rc);
+		return -EFAULT;
+	}
+
+	return 0;
+}
+
+static int eip_ipsec_disable_mtt(struct eip_ipsec_link *ilink)
+{
+	int rc;
+	struct eip_link *link = ilink->link;
+	unsigned int devid = eip_devid(&link->rx);
+
+	rc = CfyE_MTT_Disable(devid, ilink->mtt_index, true);
+	if (rc != CFYE_STATUS_OK) {
+		eip_logerr("EIP IPSEC: Failed, CfyE_MTT_Disable()=%d", rc);
+		return -EFAULT;
+	}
+
+	return 0;
+}
+
 /* Initialized IPsec private data for a single link */
 int eip_ipsec_init_link(struct eip_link *link)
 {
+	int rc;
 	struct net_device *net_dev = link->ndev;
 	unsigned int rx_devid = eip_devid(&link->rx);
 	unsigned int tx_devid = eip_devid(&link->tx);
@@ -679,6 +801,13 @@ int eip_ipsec_init_link(struct eip_link *link)
 
 	link->ipsec_priv = ilink;
 
+	rc = eip_ipsec_enable_mtt(ilink);
+	if (rc) {
+		link->ipsec_priv = NULL;
+		ilink->link = NULL;
+		kfree(ilink);
+	}
+
 	net_dev->xfrmdev_ops = &eip_xfrm_ops;
 	net_dev->features |= NETIF_F_HW_ESP;
 	net_dev->hw_enc_features |= NETIF_F_HW_ESP;
@@ -689,6 +818,9 @@ int eip_ipsec_init_link(struct eip_link *link)
 void eip_ipsec_deinit_link(struct eip_link *link)
 {
 	struct net_device *net_dev = link->ndev;
+	struct eip_ipsec_link *ilink = link->ipsec_priv;
+
+	(void)eip_ipsec_disable_mtt(ilink);
 
 	net_dev->xfrmdev_ops = NULL;
 	net_dev->features &= ~NETIF_F_HW_ESP;

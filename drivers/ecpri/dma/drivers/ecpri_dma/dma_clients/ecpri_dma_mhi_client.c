@@ -524,7 +524,7 @@ static void ecpri_dma_mhi_memcpy_async_wq_cb_ready(struct work_struct* work)
 
 	kmem_cache_free(memcpy_ctx->xfer_wrapper_cache, async_work->xfer_desc);
 	memcpy_ctx->async_work_rp++;
-	memcpy_ctx->async_work_rp %= ECPRI_DMA_MHI_MEMCPY_RLEN;
+	memcpy_ctx->async_work_rp %= ECPRI_DMA_MHI_ASYNC_MEMCPY_RLEN;
 }
 
 /**
@@ -568,7 +568,7 @@ static void ecpri_dma_mhi_memcpy_async_wq_cb_ready_vms(struct work_struct* work)
 
 	kmem_cache_free(memcpy_ctx->xfer_wrapper_cache, async_work->xfer_desc);
 	memcpy_ctx->async_work_rp++;
-	memcpy_ctx->async_work_rp %= ECPRI_DMA_MHI_MEMCPY_RLEN;
+	memcpy_ctx->async_work_rp %= ECPRI_DMA_MHI_ASYNC_MEMCPY_RLEN;
 }
 
 /**
@@ -663,7 +663,7 @@ static void ecpri_dma_mhi_memcpy_async_notify_comp(
 		/* Create notifier for ASYNC COMP */
 		work = &memcpy_ctx->async_work[memcpy_ctx->async_work_wp];
 		memcpy_ctx->async_work_wp++;
-		memcpy_ctx->async_work_wp %= ECPRI_DMA_MHI_MEMCPY_RLEN;
+		memcpy_ctx->async_work_wp %= ECPRI_DMA_MHI_ASYNC_MEMCPY_RLEN;
 
 		INIT_WORK(&work->work,
 			ecpri_dma_mhi_memcpy_async_wq_cb_ready);
@@ -708,7 +708,7 @@ static int ecpri_dma_mhi_alloc_sync_async_endps(
 		endp_ctx[gsi_id][sync_src_endp_id].eventless_endp = true;
 
 	ret = ecpri_dma_alloc_endp(gsi_id, sync_src_endp_id,
-		ECPRI_DMA_MHI_MEMCPY_RLEN, mod_cfg, false, NULL, false);
+		ECPRI_DMA_MHI_SYNC_MEMCPY_RLEN, mod_cfg, false, NULL, false);
 	if (ret != 0) {
 		DMAERR("Unable to allocate SYNC_SRC ENDP, endp_id: %d\n",
 			sync_src_endp_id);
@@ -716,7 +716,7 @@ static int ecpri_dma_mhi_alloc_sync_async_endps(
 	}
 
 	ret = ecpri_dma_alloc_endp(gsi_id,
-		sync_dest_endp_id, ECPRI_DMA_MHI_MEMCPY_RLEN,
+		sync_dest_endp_id, ECPRI_DMA_MHI_SYNC_MEMCPY_RLEN,
 		mod_cfg, false, NULL, false);
 	if (ret != 0) {
 		DMAERR("Unable to allocate SYNC_DEST ENDP, endp_id: %d\n",
@@ -740,7 +740,7 @@ static int ecpri_dma_mhi_alloc_sync_async_endps(
 	ecpri_dma_ctx->
 		endp_ctx[gsi_id][async_src_endp_id].eventless_endp = true;
 	ret = ecpri_dma_alloc_endp(gsi_id,
-		async_src_endp_id, ECPRI_DMA_MHI_MEMCPY_RLEN,
+		async_src_endp_id, ECPRI_DMA_MHI_ASYNC_MEMCPY_RLEN,
 		mod_cfg, false, NULL, false);
 	if (ret != 0) {
 		DMAERR("Unable to allocate ASYNC_SRC ENDP, endp_id: %d\n",
@@ -749,7 +749,7 @@ static int ecpri_dma_mhi_alloc_sync_async_endps(
 	}
 
 	ret = ecpri_dma_alloc_endp(gsi_id,
-		async_dest_endp_id, ECPRI_DMA_MHI_MEMCPY_RLEN,
+		async_dest_endp_id, ECPRI_DMA_MHI_ASYNC_MEMCPY_RLEN,
 		mod_cfg, false,
 		ecpri_dma_mhi_memcpy_async_notify_comp, false);
 	if (ret != 0) {
@@ -1613,7 +1613,7 @@ static int ecpri_dma_mhi_dma_async_memcpy_vm_handling(
 
 	work = &memcpy_ctx->async_work[memcpy_ctx->async_work_wp];
 	memcpy_ctx->async_work_wp++;
-	memcpy_ctx->async_work_wp %= ECPRI_DMA_MHI_MEMCPY_RLEN;
+	memcpy_ctx->async_work_wp %= ECPRI_DMA_MHI_ASYNC_MEMCPY_RLEN;
 
 	ret = ecpri_dma_mhi_dma_sync_memcpy(dest, src, len, function);
 	if (ret)

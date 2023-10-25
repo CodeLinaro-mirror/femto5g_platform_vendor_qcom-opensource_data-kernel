@@ -641,13 +641,11 @@ int ecpri_dma_qmi_service_send_ch_cmd_q6(
 		ecpri_dma_qmi_ctx->q6_disconnected)
 			return 0;
 
-	if (ECPRI_DMA_ENDP_DIR_SRC == endp_ctx->gsi_ep_cfg->dir) {
-		if (endp_ctx->gsi_ep_cfg->stream_mode !=
-			ECPRI_DMA_ENDP_STREAM_MODE_M2M ) {
-				DMAERR("A55 enpdpoint is not M2M\n");
-				return 0;
-		}
+	/* Check only for M2M ENDPs */
+	if (endp_ctx->gsi_ep_cfg->stream_mode != ECPRI_DMA_ENDP_STREAM_MODE_M2M)
+		return 0;
 
+	if (ECPRI_DMA_ENDP_DIR_SRC == endp_ctx->gsi_ep_cfg->dir) {
 		/* Get the destination endpoint  */
 		dest_endp_id = endp_ctx->gsi_ep_cfg->dest;
 

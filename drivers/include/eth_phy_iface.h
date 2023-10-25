@@ -106,9 +106,10 @@ typedef void (*eth_phy_iface_phy_ready_cb)(void *user_data);
 typedef void (*eth_phy_iface_an_result_cb)(
 	                            enum mtip_port_type_enum port_type,
 	                            bool an_result,
-	                            enum mtip_port_config_enum port_config);
+	                            enum mtip_port_config_enum port_config,
+	                            u8 seq_num);
 
-typedef void (*eth_phy_iface_cdr_lock_ind)(u32 link_index, bool status);
+typedef void (*eth_phy_iface_cdr_lock_ind)(u32 link_index, bool status, u8 an_seq_num);
 
 typedef void (*eth_phy_iface_lane_bring_up_progress_ind)(
                                               u32 link_index, bool in_progress);
@@ -144,6 +145,9 @@ struct eth_phy_iface_eth_register_params {
  * @eth_phy_iface_initiate_an: Initiate AN at port level with the speed modes
                                to be advertised for the number of lanes
                                passed as argument.
+ * @eth_phy_iface_reset_phy_sm: Resets PHY state machine at port level.
+ * @eth_phy_iface_set_tx_compliance: Indicates PHY to operate in TX only
+                                     compliance mode.
  */
 struct eth_phy_iface_ops {
 	int (*eth_phy_iface_eth_register)(
@@ -162,8 +166,11 @@ struct eth_phy_iface_ops {
 	                                     bool lanes_enabled[PHY_LANE_MAX],
 	                                     bool status);
 	int (*eth_phy_iface_initiate_an)(enum mtip_port_type_enum port_type,
+	                                 u8 seq_num,
 	                                 int num_lanes,
 	                                 uint32_t port_config_mask);
+	int (*eth_phy_iface_reset_phy_sm)(enum mtip_port_type_enum port_type);
+	void (*eth_phy_iface_set_tx_compliance)(bool flag);
 };
 
 #endif // _ETH_PHY_IFACE_H

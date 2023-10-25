@@ -103,10 +103,11 @@ static int ecpri_oxtor_core_latency_cfg_en(int ring_id)
 	ECPRISS_OXTOR_LOG_ERR("RX: max_latency[%d] %d \n",rx_n_max_latency_expected_s.max_latency,ring_id);
 
 	/*
-	 * Setting Value for max_latency field to 255
+	 * Setting Value for max_latency field to 1
+	 *
 	 */
 
-	rx_n_max_latency_expected_s.max_latency=255;
+	rx_n_max_latency_expected_s.max_latency=1;
 	ecpriss_oxtor_hal_write_reg_n_fields(ECPRI_OXTOR_REG_TYPE_BASE,
 			ECPRI_ORAN_XTOR_RX_n_MAX_LATENCY_EXPECTED, ring_id ,(void*) &rx_n_max_latency_expected_s);
 	ECPRISS_OXTOR_LOG_ERR("RX: max_latency[%d] %d \n",rx_n_max_latency_expected_s.max_latency

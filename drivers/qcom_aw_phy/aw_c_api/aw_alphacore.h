@@ -30,6 +30,8 @@
 #define AW_MAX(a, b) (((a) > (b)) ? (a) : (b))
 #define AW_MIN(a, b) (((a) < (b)) ? (a) : (b))
 #define PI 3.14159265
+#define AW_ADV_ABILITIES 20
+#define AW_FEC_ABILITIES 5
 
 #ifndef __aw_err_code_enum
 #define __aw_err_code_enum
@@ -99,8 +101,8 @@ typedef struct tx_hbridge_s {
   uint32_t lsb;
   uint32_t bias_adj;
   uint32_t rlm_ovr;
-  uint8_t bias_adj_en;
-  uint8_t rlm_ovr_en;
+  uint32_t bias_adj_en;
+  uint32_t rlm_ovr_en;
 } tx_hbridge_t;
 
 typedef struct aw_an_spec_s {
@@ -108,6 +110,7 @@ typedef struct aw_an_spec_s {
   uint32_t an_def_spec_rate[28];
 
   uint32_t an_def_an_rate;
+
   aw_an_newdef_t newdef1;
   aw_an_newdef_t newdef2;
   aw_an_newdef_t newdef3;
@@ -425,6 +428,10 @@ int aw_pmd_anlt_auto_neg_adv_ability_set(mss_access_t *mss,
                                          uint32_t *adv_ability,
                                          uint32_t *fec_ability, uint32_t nonce);
 
+int aw_pmd_anlt_lp_auto_neg_adv_ability_get(mss_access_t *mss,
+                                            uint32_t *adv_ability,
+                                            uint32_t *fec_ability);
+
 int aw_pmd_anlt_ms_per_ck_set(mss_access_t *mss, uint32_t ms_per_ck);
 
 int aw_pmd_anlt_auto_neg_config_set(mss_access_t *mss,
@@ -435,8 +442,14 @@ int aw_pmd_anlt_auto_neg_config_set(mss_access_t *mss,
 int aw_pmd_anlt_auto_neg_start_set(mss_access_t *mss, uint32_t start);
 
 int aw_pmd_anlt_auto_neg_status_get (mss_access_t *mss, uint32_t * link_good);
+
 int aw_pmd_anlt_auto_neg_status_complete_get(mss_access_t *mss,
                                              uint32_t *an_complete);
+
+int aw_pmd_anlt_auto_neg_result_get(mss_access_t *mss, uint32_t no_consortium,
+                                    uint32_t *an_result);
+
+int aw_pmd_anlt_auto_neg_next_page_set(mss_access_t *mss, uint64_t an_tx_np);
 
 int aw_pmd_anlt_auto_neg_next_page_oui_compare_set(mss_access_t *mss,
                                                    uint32_t np_expected_oui);
@@ -515,7 +528,7 @@ int aw_pmd_fep_data_set(mss_access_t *mss, uint32_t datapath_en);
 int aw_pmd_analog_loopback_set(mss_access_t *mss,
                                uint32_t analog_loopback_enable);
 
-int aw_pmd_fep_clock_set(mss_access_t *mss, uint8_t clock_en);
+int aw_pmd_fep_clock_set(mss_access_t *mss, uint32_t clock_en);
 
 int aw_pmd_tx_polarity_set(mss_access_t *mss, uint32_t tx_pol_flip);
 
@@ -697,9 +710,5 @@ int aw_pmd_snr_mon_enable_set(mss_access_t *mss, uint32_t nrz_mode,
 int aw_pmd_snr_vld_enable_set(mss_access_t *mss, uint32_t vld_enable);
 
 int aw_tc_sm_conv(uint32_t v, uint32_t i);
-
-int aw_pmd_anlt_auto_neg_result_get (mss_access_t *mss, uint8_t no_consortium, uint32_t * an_result);
-
-int aw_pmd_anlt_auto_neg_next_page_set(mss_access_t *mss, uint64_t an_tx_np);
 
 #endif

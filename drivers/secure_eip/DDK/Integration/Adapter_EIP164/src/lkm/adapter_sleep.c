@@ -38,7 +38,7 @@ void
 Adapter_SleepMS(
         const unsigned int Duration_ms)
 {
-    msleep(Duration_ms);
+    udelay(1000*Duration_ms);
 }
 
 

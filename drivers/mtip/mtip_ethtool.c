@@ -384,7 +384,6 @@ void mtip_ethtool_get_supported_speed_modes(struct mtip_port_info* port_info, st
             {
                 linkmode_set_bit(ETHTOOL_LINK_MODE_100000baseCR2_Full_BIT, supported);
                 linkmode_set_bit(ETHTOOL_LINK_MODE_100000baseSR2_Full_BIT, supported);
-                linkmode_set_bit(ETHTOOL_LINK_MODE_100000baseDR2_Full_BIT, supported);
                 linkmode_set_bit(ETHTOOL_LINK_MODE_100000baseLR2_ER2_FR2_Full_BIT, supported);
             }
             break;
@@ -394,6 +393,7 @@ void mtip_ethtool_get_supported_speed_modes(struct mtip_port_info* port_info, st
             {
                 linkmode_set_bit(ETHTOOL_LINK_MODE_100000baseCR4_Full_BIT, supported);
                 linkmode_set_bit(ETHTOOL_LINK_MODE_100000baseSR4_Full_BIT, supported);
+                linkmode_set_bit(ETHTOOL_LINK_MODE_100000baseDR_Full_BIT, supported);
                 linkmode_set_bit(ETHTOOL_LINK_MODE_100000baseLR4_ER4_Full_BIT, supported);
             }
             break;
@@ -405,7 +405,6 @@ void mtip_ethtool_get_supported_speed_modes(struct mtip_port_info* port_info, st
             {
                 linkmode_set_bit(ETHTOOL_LINK_MODE_50000baseCR_Full_BIT, supported);
                 linkmode_set_bit(ETHTOOL_LINK_MODE_50000baseSR_Full_BIT, supported);
-                linkmode_set_bit(ETHTOOL_LINK_MODE_50000baseDR_Full_BIT, supported);
                 linkmode_set_bit(ETHTOOL_LINK_MODE_50000baseLR_ER_FR_Full_BIT, supported);
             }
             break;
@@ -468,6 +467,13 @@ void mtip_ethtool_get_advertised_speed_modes(struct mtip_port_info* port_info, s
     int i;
     u32 port_priv_flags = mtip_device_filter_priv_flags(port_info->port_type);
     __ETHTOOL_DECLARE_LINK_MODE_MASK(advertised) = { 0, };
+    struct qsfp_info lane_qsfp_info = {0};
+    bool lane_qsfp_info_valid = false;
+
+    if (mtip_device_lookup_lane_qsfp_cfg(port_info->port_type, &lane_qsfp_info) == 0)
+    {
+       lane_qsfp_info_valid = true;
+    }
 
     for (i = 0; i < MTIP_PORT_CONFIG_MAX; ++i)
     {
@@ -479,29 +485,91 @@ void mtip_ethtool_get_advertised_speed_modes(struct mtip_port_info* port_info, s
                 case MTIP_PORT_CONFIG_1x100GBASE_R_RSFEC:
                 case MTIP_PORT_CONFIG_1x100GBASE_R_RSFEC_LL:
                 {
-                    linkmode_set_bit(ETHTOOL_LINK_MODE_100000baseCR_Full_BIT, advertised);
-                    linkmode_set_bit(ETHTOOL_LINK_MODE_100000baseSR_Full_BIT, advertised);
-                    linkmode_set_bit(ETHTOOL_LINK_MODE_100000baseDR_Full_BIT, advertised);
-                    linkmode_set_bit(ETHTOOL_LINK_MODE_100000baseLR_ER_FR_Full_BIT, advertised);
+                    if(lane_qsfp_info_valid)
+                    {
+                       if(lane_qsfp_info.trx_link_length_range == TRX_CR)
+                          linkmode_set_bit(ETHTOOL_LINK_MODE_100000baseCR_Full_BIT, advertised);
+                       else if(lane_qsfp_info.trx_link_length_range == TRX_SR)
+                          linkmode_set_bit(ETHTOOL_LINK_MODE_100000baseSR_Full_BIT, advertised);
+                       else if(lane_qsfp_info.trx_link_length_range == TRX_LR ||
+                               lane_qsfp_info.trx_link_length_range == TRX_ER ||
+                               lane_qsfp_info.trx_link_length_range == TRX_FR)
+                          linkmode_set_bit(ETHTOOL_LINK_MODE_100000baseLR_ER_FR_Full_BIT, advertised);
+                       else
+                       {
+                          linkmode_set_bit(ETHTOOL_LINK_MODE_100000baseCR_Full_BIT, advertised);
+                          linkmode_set_bit(ETHTOOL_LINK_MODE_100000baseSR_Full_BIT, advertised);
+                          linkmode_set_bit(ETHTOOL_LINK_MODE_100000baseLR_ER_FR_Full_BIT, advertised);
+                       }
+                    }
+                    else
+                    {
+                       linkmode_set_bit(ETHTOOL_LINK_MODE_100000baseCR_Full_BIT, advertised);
+                       linkmode_set_bit(ETHTOOL_LINK_MODE_100000baseSR_Full_BIT, advertised);
+                       linkmode_set_bit(ETHTOOL_LINK_MODE_100000baseLR_ER_FR_Full_BIT, advertised);
+                    }
                 }
                 break;
 
                 case MTIP_PORT_CONFIG_1x100GBASE_R2:
                 case MTIP_PORT_CONFIG_1x100GBASE_R2_RSFEC:
                 {
-                    linkmode_set_bit(ETHTOOL_LINK_MODE_100000baseCR2_Full_BIT, advertised);
-                    linkmode_set_bit(ETHTOOL_LINK_MODE_100000baseSR2_Full_BIT, advertised);
-                    linkmode_set_bit(ETHTOOL_LINK_MODE_100000baseDR2_Full_BIT, advertised);
-                    linkmode_set_bit(ETHTOOL_LINK_MODE_100000baseLR2_ER2_FR2_Full_BIT, advertised);
+                    if(lane_qsfp_info_valid)
+                    {
+                       if(lane_qsfp_info.trx_link_length_range == TRX_CR)
+                          linkmode_set_bit(ETHTOOL_LINK_MODE_100000baseCR2_Full_BIT, advertised);
+                       else if(lane_qsfp_info.trx_link_length_range == TRX_SR)
+                          linkmode_set_bit(ETHTOOL_LINK_MODE_100000baseSR2_Full_BIT, advertised);
+                       else if(lane_qsfp_info.trx_link_length_range == TRX_LR ||
+                               lane_qsfp_info.trx_link_length_range == TRX_ER ||
+                               lane_qsfp_info.trx_link_length_range == TRX_FR)
+                          linkmode_set_bit(ETHTOOL_LINK_MODE_100000baseLR2_ER2_FR2_Full_BIT, advertised);
+                       else
+                       {
+                          linkmode_set_bit(ETHTOOL_LINK_MODE_100000baseCR2_Full_BIT, advertised);
+                          linkmode_set_bit(ETHTOOL_LINK_MODE_100000baseSR2_Full_BIT, advertised);
+                          linkmode_set_bit(ETHTOOL_LINK_MODE_100000baseLR2_ER2_FR2_Full_BIT, advertised);
+                       }
+                    }
+                    else
+                    {
+                       linkmode_set_bit(ETHTOOL_LINK_MODE_100000baseCR2_Full_BIT, advertised);
+                       linkmode_set_bit(ETHTOOL_LINK_MODE_100000baseSR2_Full_BIT, advertised);
+                       linkmode_set_bit(ETHTOOL_LINK_MODE_100000baseLR2_ER2_FR2_Full_BIT, advertised);
+                    }
                 }
                 break;
 
                 case MTIP_PORT_CONFIG_1x100GBASE_R4:
                 case MTIP_PORT_CONFIG_1x100GBASE_R4_RSFEC:
                 {
-                    linkmode_set_bit(ETHTOOL_LINK_MODE_100000baseCR4_Full_BIT, advertised);
-                    linkmode_set_bit(ETHTOOL_LINK_MODE_100000baseSR4_Full_BIT, advertised);
-                    linkmode_set_bit(ETHTOOL_LINK_MODE_100000baseLR4_ER4_Full_BIT, advertised);
+                    if(lane_qsfp_info_valid)
+                    {
+                       if(lane_qsfp_info.trx_link_length_range == TRX_CR)
+                          linkmode_set_bit(ETHTOOL_LINK_MODE_100000baseCR4_Full_BIT, advertised);
+                       else if(lane_qsfp_info.trx_link_length_range == TRX_SR)
+                          linkmode_set_bit(ETHTOOL_LINK_MODE_100000baseSR4_Full_BIT, advertised);
+                       else if(lane_qsfp_info.trx_link_length_range == TRX_DR)
+                          linkmode_set_bit(ETHTOOL_LINK_MODE_100000baseDR_Full_BIT, advertised);
+                       else if(lane_qsfp_info.trx_link_length_range == TRX_LR ||
+                               lane_qsfp_info.trx_link_length_range == TRX_ER ||
+                               lane_qsfp_info.trx_link_length_range == TRX_FR)
+                          linkmode_set_bit(ETHTOOL_LINK_MODE_100000baseLR4_ER4_Full_BIT, advertised);
+                       else
+                       {
+                          linkmode_set_bit(ETHTOOL_LINK_MODE_100000baseCR4_Full_BIT, advertised);
+                          linkmode_set_bit(ETHTOOL_LINK_MODE_100000baseSR4_Full_BIT, advertised);
+                          linkmode_set_bit(ETHTOOL_LINK_MODE_100000baseDR_Full_BIT, advertised);
+                          linkmode_set_bit(ETHTOOL_LINK_MODE_100000baseLR4_ER4_Full_BIT, advertised);
+                       }
+                    }
+                    else
+                    {
+                       linkmode_set_bit(ETHTOOL_LINK_MODE_100000baseCR4_Full_BIT, advertised);
+                       linkmode_set_bit(ETHTOOL_LINK_MODE_100000baseSR4_Full_BIT, advertised);
+                       linkmode_set_bit(ETHTOOL_LINK_MODE_100000baseDR_Full_BIT, advertised);
+                       linkmode_set_bit(ETHTOOL_LINK_MODE_100000baseLR4_ER4_Full_BIT, advertised);
+                    }
                 }
                 break;
 
@@ -510,10 +578,29 @@ void mtip_ethtool_get_advertised_speed_modes(struct mtip_port_info* port_info, s
                 case MTIP_PORT_CONFIG_1x50GBASE_R:
                 case MTIP_PORT_CONFIG_1x50GBASE_R_RSFEC:
                 {
-                    linkmode_set_bit(ETHTOOL_LINK_MODE_50000baseCR_Full_BIT, advertised);
-                    linkmode_set_bit(ETHTOOL_LINK_MODE_50000baseSR_Full_BIT, advertised);
-                    linkmode_set_bit(ETHTOOL_LINK_MODE_50000baseDR_Full_BIT, advertised);
-                    linkmode_set_bit(ETHTOOL_LINK_MODE_50000baseLR_ER_FR_Full_BIT, advertised);
+                    if(lane_qsfp_info_valid)
+                    {
+                       if(lane_qsfp_info.trx_link_length_range == TRX_CR)
+                          linkmode_set_bit(ETHTOOL_LINK_MODE_50000baseCR_Full_BIT, advertised);
+                       else if(lane_qsfp_info.trx_link_length_range == TRX_SR)
+                          linkmode_set_bit(ETHTOOL_LINK_MODE_50000baseSR_Full_BIT, advertised);
+                       else if(lane_qsfp_info.trx_link_length_range == TRX_LR ||
+                               lane_qsfp_info.trx_link_length_range == TRX_ER ||
+                               lane_qsfp_info.trx_link_length_range == TRX_FR)
+                          linkmode_set_bit(ETHTOOL_LINK_MODE_50000baseLR_ER_FR_Full_BIT, advertised);
+                       else
+                       {
+                          linkmode_set_bit(ETHTOOL_LINK_MODE_50000baseCR_Full_BIT, advertised);
+                          linkmode_set_bit(ETHTOOL_LINK_MODE_50000baseSR_Full_BIT, advertised);
+                          linkmode_set_bit(ETHTOOL_LINK_MODE_50000baseLR_ER_FR_Full_BIT, advertised);
+                       }
+                    }
+                    else
+                    {
+                       linkmode_set_bit(ETHTOOL_LINK_MODE_50000baseCR_Full_BIT, advertised);
+                       linkmode_set_bit(ETHTOOL_LINK_MODE_50000baseSR_Full_BIT, advertised);
+                       linkmode_set_bit(ETHTOOL_LINK_MODE_50000baseLR_ER_FR_Full_BIT, advertised);
+                    }
                 }
                 break;
 
@@ -533,8 +620,23 @@ void mtip_ethtool_get_advertised_speed_modes(struct mtip_port_info* port_info, s
                 case MTIP_PORT_CONFIG_1x40GBASE_R4:
                 case MTIP_PORT_CONFIG_1x40GBASE_R4_FEC:
                 {
-                    linkmode_set_bit(ETHTOOL_LINK_MODE_40000baseCR4_Full_BIT, advertised);
-                    linkmode_set_bit(ETHTOOL_LINK_MODE_40000baseSR4_Full_BIT, advertised);
+                    if(lane_qsfp_info_valid)
+                    {
+                       if(lane_qsfp_info.trx_link_length_range == TRX_CR)
+                          linkmode_set_bit(ETHTOOL_LINK_MODE_40000baseCR4_Full_BIT, advertised);
+                       else if(lane_qsfp_info.trx_link_length_range == TRX_SR)
+                          linkmode_set_bit(ETHTOOL_LINK_MODE_40000baseSR4_Full_BIT, advertised);
+                       else
+                       {
+                          linkmode_set_bit(ETHTOOL_LINK_MODE_40000baseCR4_Full_BIT, advertised);
+                          linkmode_set_bit(ETHTOOL_LINK_MODE_40000baseSR4_Full_BIT, advertised);
+                       }
+                    }
+                    else
+                    {
+                       linkmode_set_bit(ETHTOOL_LINK_MODE_40000baseCR4_Full_BIT, advertised);
+                       linkmode_set_bit(ETHTOOL_LINK_MODE_40000baseSR4_Full_BIT, advertised);
+                    }
                 }
                 break;
 
@@ -545,8 +647,23 @@ void mtip_ethtool_get_advertised_speed_modes(struct mtip_port_info* port_info, s
                 case MTIP_PORT_CONFIG_1x25GBASE_R_FEC:
                 case MTIP_PORT_CONFIG_1x25GBASE_R_RSFEC:
                 {
-                    linkmode_set_bit(ETHTOOL_LINK_MODE_25000baseCR_Full_BIT, advertised);
-                    linkmode_set_bit(ETHTOOL_LINK_MODE_25000baseSR_Full_BIT, advertised);
+                    if(lane_qsfp_info_valid)
+                    {
+                       if(lane_qsfp_info.trx_link_length_range == TRX_CR)
+                          linkmode_set_bit(ETHTOOL_LINK_MODE_25000baseCR_Full_BIT, advertised);
+                       else if(lane_qsfp_info.trx_link_length_range == TRX_SR)
+                          linkmode_set_bit(ETHTOOL_LINK_MODE_25000baseSR_Full_BIT, advertised);
+                       else
+                       {
+                          linkmode_set_bit(ETHTOOL_LINK_MODE_25000baseCR_Full_BIT, advertised);
+                          linkmode_set_bit(ETHTOOL_LINK_MODE_25000baseSR_Full_BIT, advertised);
+                       }
+                    }
+                    else
+                    {
+                       linkmode_set_bit(ETHTOOL_LINK_MODE_25000baseCR_Full_BIT, advertised);
+                       linkmode_set_bit(ETHTOOL_LINK_MODE_25000baseSR_Full_BIT, advertised);
+                    }
                 }
                 break;
 
@@ -555,8 +672,23 @@ void mtip_ethtool_get_advertised_speed_modes(struct mtip_port_info* port_info, s
                 case MTIP_PORT_CONFIG_1x10GBASE_R:
                 case MTIP_PORT_CONFIG_1x10GBASE_R_FEC:
                 {
-                    linkmode_set_bit(ETHTOOL_LINK_MODE_10000baseCR_Full_BIT, advertised);
-                    linkmode_set_bit(ETHTOOL_LINK_MODE_10000baseSR_Full_BIT, advertised);
+                    if(lane_qsfp_info_valid)
+                    {
+                       if(lane_qsfp_info.trx_link_length_range == TRX_CR)
+                          linkmode_set_bit(ETHTOOL_LINK_MODE_10000baseCR_Full_BIT, advertised);
+                       else if(lane_qsfp_info.trx_link_length_range == TRX_SR)
+                          linkmode_set_bit(ETHTOOL_LINK_MODE_10000baseSR_Full_BIT, advertised);
+                       else
+                       {
+                          linkmode_set_bit(ETHTOOL_LINK_MODE_10000baseCR_Full_BIT, advertised);
+                          linkmode_set_bit(ETHTOOL_LINK_MODE_10000baseSR_Full_BIT, advertised);
+                       }
+                    }
+                    else
+                    {
+                       linkmode_set_bit(ETHTOOL_LINK_MODE_10000baseCR_Full_BIT, advertised);
+                       linkmode_set_bit(ETHTOOL_LINK_MODE_10000baseSR_Full_BIT, advertised);
+                    }
                 }
                 break;
 
@@ -638,7 +770,8 @@ int mtip_ethtool_get_link_ksettings(struct net_device *dev, struct ethtool_link_
         for (i = 0; i < PHY_LANE_MAX; ++i) 
         {
             if ((port_info->lane_config[i].link_index == link_index) &&
-                (port_info->lane_config[i].lane_enabled))
+                (port_info->lane_config[i].lane_enabled) &&
+                (link_info->state == MTIP_LINK_STATE_UP))
             {
                 lane_speed += mtip_platform_convert_lane_speed_to_gbps(port_info->lane_config[i].lane_speed);
             }
@@ -657,6 +790,11 @@ int mtip_ethtool_set_link_ksettings(struct net_device *netdev, const struct etht
     struct mtip_link_info* link_info;
     u32 port_type;
     struct mtip_port_info* port_info;
+    bool autoneg = false;
+    u32 speed = 0;
+    u32 priv_flags = 0;
+    u32 temp_flag = 0;
+    u32 temp_flag_mask = 0;
 
     priv = netdev_priv(netdev);
     link_index = priv->link_index;
@@ -677,13 +815,68 @@ int mtip_ethtool_set_link_ksettings(struct net_device *netdev, const struct etht
     if (cmd->base.autoneg == AUTONEG_DISABLE) 
     {
         CSMLOGDBG("setting autoneg OFF on port_type %d", port_type);
-        port_info->autoneg = false;
+        autoneg = false;
     }
     else
     {
         CSMLOGDBG("setting autoneg ON on port_type %d", port_type);
-        port_info->autoneg = true;
+        autoneg = true;
     }
+
+    // Set the autoneg config
+    port_info->autoneg = autoneg;
+
+    speed = cmd->base.speed;
+    CSMLOGERR("Speed for link_index %d set to %d", link_index, speed);
+
+    if(speed != 0)
+    {
+        if(speed == 10000)
+        {
+            if(link_index == MTIP_DEBUG_ETH_LINK_INDEX)
+                priv_flags = MTIP_DEVICE_PRIV_FLAGS_BIT_MASK_10G_ONLY_DBG_PORT;
+            else
+                priv_flags = MTIP_DEVICE_PRIV_FLAGS_BIT_MASK_10G_ONLY;
+        }
+        else if(speed == 25000)
+        {
+            if(link_index == MTIP_DEBUG_ETH_LINK_INDEX)
+                priv_flags = MTIP_DEVICE_PRIV_FLAGS_BIT_MASK_25G_ONLY_DBG_PORT;
+            else
+                priv_flags = MTIP_DEVICE_PRIV_FLAGS_BIT_MASK_25G_ONLY;
+        }
+        else if(speed == 40000)
+            priv_flags = MTIP_DEVICE_PRIV_FLAGS_BIT_MASK_40G_ONLY;
+        else if(speed == 50000)
+        {
+            if(link_index == MTIP_DEBUG_ETH_LINK_INDEX)
+                priv_flags = MTIP_DEVICE_PRIV_FLAGS_BIT_MASK_50G_ONLY_DBG_PORT;
+            else
+                priv_flags = MTIP_DEVICE_PRIV_FLAGS_BIT_MASK_50G_ONLY;
+        }
+        else if(speed == 100000)
+        {
+            if(link_index == MTIP_DEBUG_ETH_LINK_INDEX)
+                priv_flags = MTIP_DEVICE_PRIV_FLAGS_BIT_MASK_100G_ONLY_DBG_PORT;
+            else
+                priv_flags = MTIP_DEVICE_PRIV_FLAGS_BIT_MASK_100G_ONLY;
+        }
+
+    }
+    else
+        priv_flags = MTIP_DEVICE_PRIV_FLAGS_BIT_MASK_NON_FEC;
+        // Set the priv flags for the speed config
+    while(priv_flags)
+    {
+        if(priv_flags & 0x1)
+        {
+            temp_flag_mask |= (1<<temp_flag);
+            mtip_ethtool_set_priv_flags(netdev, temp_flag_mask);
+        }
+        priv_flags >>= 1;
+        temp_flag++;
+    }
+
     return 0;
 }
 
@@ -901,8 +1094,8 @@ void mtip_ethtool_set_msglevel(struct net_device *netdev, u32 level)
     }
 
     trx_info.trx_module_type = TRX_QSFP_PLS_QSFP28_QSFP56;
-    trx_info.trx_speed = TRX_LANE_SPEED_25G;
-    trx_info.trx_laneinfo = 0;
+    trx_info.trx_speed = TRX_LANE_SPEED_100G;
+    trx_info.trx_laneinfo = 0xF;
     trx_info.trx_bout_cfg = 0;
 
     switch (level)
@@ -917,6 +1110,7 @@ void mtip_ethtool_set_msglevel(struct net_device *netdev, u32 level)
                     lane_index = platform_driver_priv->devices.port_devices[port_type].lane_devices[i]->lane_index;
 
                     memcpy(&platform_driver_priv->mtip_lanes[lane_index]->lane_qsfp_info, &trx_info, sizeof(struct qsfp_info));
+                    platform_driver_priv->devices.lane_devices[lane_index].reason_code = TRX_LOCAL_PLUGOUT;
                     post_mtip_phy_handle_lane_down(lane_index);
                 }
                 else
@@ -1012,6 +1206,20 @@ void mtip_ethtool_set_msglevel(struct net_device *netdev, u32 level)
         {
             // print the information about the lanes
             mtip_platform_print_lanes();
+        }
+        break;
+
+    case 11:
+        {
+            // Set TX compliance to disable retry attempts for PHY lane bring up
+            mtip_phy_set_tx_compliance(true);
+        }
+        break;
+
+    case 12:
+        {
+            // Unset TX compliance to enable retry attempts for PHY lane bring up
+            mtip_phy_set_tx_compliance(false);
         }
         break;
 
