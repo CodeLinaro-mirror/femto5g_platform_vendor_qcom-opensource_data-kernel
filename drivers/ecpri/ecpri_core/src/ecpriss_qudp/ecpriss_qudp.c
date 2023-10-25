@@ -5,6 +5,7 @@
 #include "ecpriss_core.h"
 //#include "ecpriss_qudp_hal.h"
 #include "ecpriss_log.h"
+#include "ecpriss_xbar_hwio_v2.h"
 
 volatile int ecpriss_filtering_enabled = 0;
 volatile int ecpriss_qudp_ingress_action = ECPRISS_QUDP_ACTION_PASS_TO_A55;
@@ -18,6 +19,7 @@ volatile int ecpriss_qudp_ingress_action = ECPRISS_QUDP_ACTION_PASS_TO_A55;
 #define MSB_SHIFT                      32
 #define CONFIGURE		       1
 #define DE_CONFIGURE		       0
+#define ECPRISS_RESERVED_OVERRIDE_INDEX 255
 
 int qudp_irq_mapping[QUDP_IRQ_MAX];
 
@@ -5828,3 +5830,201 @@ void ecpriss_qudp_print_c2c_ingress_stats(uint32_t port_index, uint32_t link_ind
 	return;
 }
 #endif
+void ecpriss_qudp_ingress_table_config(ecpriss_packet_payload_s *packet)
+{
+	ecpriss_flow_rx_cfg_s *flow_rx = NULL;
+	int ret = 0;
+
+	if(packet == NULL) {
+		return;
+	}
+	if(ecpriss_hw_ver == ECPRISS_HW_v2_0) {
+		flow_rx = &packet->flow_cfg.flow_rx_cfg;
+		ret = ecpriss_qudp_fh_rx_filter_cfg_v2(
+				flow_rx->port_index,
+				&flow_rx->qudp_rx_cfg);
+		if(ret < 0) {
+			ECPRILOGERR("%s: QUDP filter configuration failed Port: %d\n",__func__,flow_rx->port_index);
+		}
+	}
+	return;
+}
+void ecpriss_qudp_ingress_table_deconfig(ecpriss_packet_payload_s *packet)
+{
+	ecpriss_flow_rx_cfg_s *flow_rx = NULL;
+	int ret = 0;
+
+	if(packet == NULL) {
+		return;
+	}
+	if(ecpriss_hw_ver == ECPRISS_HW_v2_0) {
+		flow_rx = &packet->flow_cfg.flow_rx_cfg;
+		ret = ecpriss_qudp_fh_rx_filter_decfg_v2(
+				flow_rx->port_index,
+				&flow_rx->qudp_rx_cfg);
+
+		if(ret < 0) {
+			ECPRILOGERR("%s: QUDP filter de-configuration failed Port: %d\n",__func__,flow_rx->port_index);
+		}
+	}
+	return;
+}
+void ecpriss_qudp_egress_table_reconfig(ecpriss_packet_payload_s *packet)
+{
+	ecpri_qudp_hwio_def_ecpri_udp_fh_egress_l2_encap_index_override_p_s_v2 l2_cfg;
+	ecpri_qudp_hwio_def_ecpri_udp_fh_egress_l3_encap_index_override_p_s_v2 l3_cfg;
+	ecpri_qudp_hwio_def_ecpri_udp_fh_egress_config_p_s_v2 egress_config;
+	ecpriss_flow_tx_cfg_s *flow_tx = NULL;
+	int port_idx = 0;
+	int ret = 0;
+
+	if(packet == NULL) {
+		return;
+	}
+
+	if(ecpriss_hw_ver != ECPRISS_HW_v2_0) {
+		ECPRILOGERR("Not a V2 Hw %s\n",__func__);
+		return;
+	}
+
+	flow_tx = &packet->flow_cfg.flow_tx_cfg;
+	port_idx = flow_tx->port_index;
+
+	memset(&l2_cfg,0, sizeof(l2_cfg));
+	memset(&l3_cfg,0, sizeof(l2_cfg));
+	memset(&egress_config,0,sizeof(egress_config));
+
+	/*
+	 * Below methode of reconfiguration is required when
+	 * User want to reconfigure flows while traffic is flowing in the background.
+	 */
+
+	l2_cfg.redirect_from = flow_tx->qudp_tx_cfg.l2_hdr_tbl_idx;
+	l2_cfg.redirect_to = ECPRISS_RESERVED_OVERRIDE_INDEX;
+
+	if(flow_tx->qudp_tx_cfg.eth_hdr.orig_ethertype != ECPRISS_ETHERTYPE_ECPRI){
+
+		l3_cfg.redirect_from =  flow_tx->qudp_tx_cfg.l3_hdr_tbl_idx;
+		l3_cfg.redirect_to = ECPRISS_RESERVED_OVERRIDE_INDEX;
+	}
+	ECPRILOGINFO("L2 %u, L3 %u\n",l2_cfg.redirect_from,l3_cfg.redirect_from);
+
+	/*
+	 * We need to write this config at L2/L3 index ECPRISS_RESERVED_OVERRIDE_INDEX first
+	 * save the original index and updat the config with ECPRISS_RESERVED_OVERRIDE_INDEX
+	 */
+	flow_tx->qudp_tx_cfg.l2_hdr_tbl_idx = ECPRISS_RESERVED_OVERRIDE_INDEX;
+
+	if(flow_tx->qudp_tx_cfg.eth_hdr.orig_ethertype != ECPRISS_ETHERTYPE_ECPRI){
+
+		flow_tx->qudp_tx_cfg.l3_hdr_tbl_idx = ECPRISS_RESERVED_OVERRIDE_INDEX;
+	}
+
+	/*
+	 * Update the new config at index ECPRISS_RESERVED_OVERRIDE_INDEX
+	 */
+	ECPRILOGINFO("Reconfig L2 L3 idx %u %u \n",flow_tx->qudp_tx_cfg.l2_hdr_tbl_idx,flow_tx->qudp_tx_cfg.l2_hdr_tbl_idx);
+
+	ret = ecpriss_qudp_fh_tx_hdr_ins_cfg_v2(
+			flow_tx->port_index,
+			&flow_tx->qudp_tx_cfg);
+
+	/*
+	 * Read rigister before any configuration change
+	 */
+	ecpriss_qudp_hal_read_reg_n_fields(ECPRISS_QUDP_FH,
+			ECPRI_UDP_FH_EGRESS_CONFIG_P_V2,
+			port_idx,
+			&egress_config);
+	/*
+	 * Only change override enable bit config
+	 */
+	egress_config.l2_encap_index_override_en = 1;
+
+	if(flow_tx->qudp_tx_cfg.eth_hdr.orig_ethertype != ECPRISS_ETHERTYPE_ECPRI){
+
+		egress_config.l3_encap_index_override_en = 1;
+	}
+
+	/*
+	 * Update the HW registers with over from and override to index
+	 * l2 index X to ECPRISS_RESERVED_OVERRIDE_INDEX, l3 index Y to ECPRISS_RESERVED_OVERRIDE_INDEX
+	 */
+	ecpriss_qudp_hal_write_reg_n_fields(ECPRISS_QUDP_FH,
+			ECPRI_UDP_FH_EGRESS_L2_ENCAP_INDEX_OVERRIDE_P_V2,
+			port_idx,
+			&l2_cfg);
+
+	if(flow_tx->qudp_tx_cfg.eth_hdr.orig_ethertype != ECPRISS_ETHERTYPE_ECPRI){
+
+		ecpriss_qudp_hal_write_reg_n_fields(ECPRISS_QUDP_FH,
+				ECPRI_UDP_FH_EGRESS_L3_ENCAP_INDEX_OVERRIDE_P_V2,
+				port_idx,
+				&l3_cfg);
+	}
+
+	/*
+	 * Redirect the current L2 -> X connfig to ECPRISS_RESERVED_OVERRIDE_INDEX
+	 * Redirect the current L3-> Y config to ECPRISS_RESERVED_OVERRIDE_INDEX
+	 */
+	ecpriss_qudp_hal_write_reg_n_fields(ECPRISS_QUDP_FH,
+			ECPRI_UDP_FH_EGRESS_CONFIG_P_V2,
+			port_idx,
+			&egress_config);
+
+
+	/*
+	 * Restor the original l2/l3 table indexes
+	 */
+	flow_tx->qudp_tx_cfg.l2_hdr_tbl_idx = l2_cfg.redirect_from;
+
+	if(flow_tx->qudp_tx_cfg.eth_hdr.orig_ethertype != ECPRISS_ETHERTYPE_ECPRI){
+
+		flow_tx->qudp_tx_cfg.l3_hdr_tbl_idx = l3_cfg.redirect_from;
+	}
+	/*
+	 * Now we need to update l2/l3 config at real index
+	 */
+	ret = ecpriss_qudp_fh_tx_hdr_ins_cfg_v2(
+			flow_tx->port_index,
+			&flow_tx->qudp_tx_cfg);
+
+	ecpriss_qudp_hal_read_reg_n_fields(ECPRISS_QUDP_FH,
+			ECPRI_UDP_FH_EGRESS_CONFIG_P_V2,
+			port_idx,
+			&egress_config);
+
+	if(flow_tx->qudp_tx_cfg.eth_hdr.orig_ethertype != ECPRISS_ETHERTYPE_ECPRI){
+
+		egress_config.l3_encap_index_override_en = 0;
+	}
+	egress_config.l2_encap_index_override_en = 0;
+
+	ecpriss_qudp_hal_write_reg_n_fields(ECPRISS_QUDP_FH,
+			ECPRI_UDP_FH_EGRESS_CONFIG_P_V2,
+			port_idx,
+			&egress_config);
+
+	/*
+	 * Reset the ECPRISS_RESERVED_OVERRIDE_INDEX indexes with zero
+	 */
+	memset(&flow_tx->qudp_tx_cfg, 0,sizeof(ecpriss_qudp_tx_cfg_s));
+
+	flow_tx->qudp_tx_cfg.l2_hdr_tbl_idx = ECPRISS_RESERVED_OVERRIDE_INDEX;
+
+	if(flow_tx->qudp_tx_cfg.eth_hdr.orig_ethertype != ECPRISS_ETHERTYPE_ECPRI){
+
+		flow_tx->qudp_tx_cfg.l3_hdr_tbl_idx = ECPRISS_RESERVED_OVERRIDE_INDEX;
+	}
+
+	/*
+	 * Update the new config at index ECPRISS_RESERVED_OVERRIDE_INDEX
+	 */
+	ret = ecpriss_qudp_fh_tx_hdr_ins_cfg_v2(
+			flow_tx->port_index,
+			&flow_tx->qudp_tx_cfg);
+
+
+	return;
+}
+

@@ -8,6 +8,7 @@
 #include "ecpriss_qudp_hal.h"
 #include "ecpriss_flow.h"
 #include "ecpriss_core.h"
+#include "ecpriss_netlink.h"
 
 #define MAX_WHITELIST_ENTRIES       16
 #define QUDP_IRQ_MAX                6
@@ -384,4 +385,8 @@ void ecpriss_qudp_set_ingress_action(int val);
 
 int ecpriss_qudp_get_strict_filter_config(int fh_index);
 void ecpriss_qudp_set_strict_filter_config(int val, int fh_index);
+void ecpriss_qudp_egress_table_reconfig(ecpriss_packet_payload_s *packet);
+void ecpriss_qudp_ingress_table_config(ecpriss_packet_payload_s *packet);
+void ecpriss_qudp_ingress_table_deconfig(ecpriss_packet_payload_s *packet);
+
 #endif
