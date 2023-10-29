@@ -692,7 +692,7 @@ int ecpri_dma_start_endp(struct ecpri_dma_endp_context *endp_cfg)
 	int ret = 0;
 
 	if (!endp_cfg->valid) {
-		DMADBG("ENDP %d for GSI ID %d isn't valid and cannot be started\n",
+		DMAERR("ENDP %d for GSI ID %d isn't valid and cannot be started\n",
 			endp_cfg->endp_id, endp_cfg->gsi_id);
 		return -EINVAL;
 	}
@@ -702,16 +702,15 @@ int ecpri_dma_start_endp(struct ecpri_dma_endp_context *endp_cfg)
 
 	ret = ecpri_dma_gsi_start_channel(endp_cfg);
 	if (ret) {
-		DMADBG("Start ENDP %d for GSI ID %d failed with code %d\n",
+		DMAERR("Start ENDP %d for GSI ID %d failed with code %d\n",
 			endp_cfg->endp_id, endp_cfg->gsi_id, ret);
 		return ret;
 	}
 
-	if(ecpri_dma_qmi_get_sw_ver() >= ECPRI_DMA_QMI_SW_V3)
-		ecpri_dma_qmi_service_send_ch_cmd_q6(
-			endp_cfg,
-			QMI_ECPRI_CH_CMD_TYPE_START_V01,
-			ECPRI_DMA_QMI_MSG_SYNC);
+	ecpri_dma_qmi_service_send_ch_cmd_q6(
+		endp_cfg,
+		QMI_ECPRI_CH_CMD_TYPE_START_V01,
+		ECPRI_DMA_QMI_MSG_ASYNC);
 
 	return ret;
 }
