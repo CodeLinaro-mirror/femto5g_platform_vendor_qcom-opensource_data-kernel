@@ -1097,7 +1097,7 @@ static int mtip_module_init(void)
    // register panic notifier
    atomic_notifier_chain_register(&panic_notifier_list, &mtip_panic_blk);
 
-   goto out;
+   goto ret;
 
 cleanup:
 
@@ -1112,6 +1112,7 @@ out:
 #ifdef FEATURE_MTIP_TEST_DEBUG_FS
    mtip_del_debugfs();
 #endif /* FEATURE_MTIP_TEST_DEBUG_FS */
+ret:   
    return ret;
 }
 
