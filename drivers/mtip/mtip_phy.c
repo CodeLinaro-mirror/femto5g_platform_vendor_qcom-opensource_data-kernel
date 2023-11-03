@@ -685,7 +685,6 @@ static void mtip_phy_handle_lane_down(u32 lane_index)
    enum mtip_lane_state_enum current_state = MTIP_LANE_STATE_INIT;
    u32 tmp_lane_index;
    bool any_lane_connected = false;
-   bool link_teardown_needed = true;
 
    if(platform_driver_priv->mtip_lanes[lane_index])
    {
@@ -701,46 +700,6 @@ static void mtip_phy_handle_lane_down(u32 lane_index)
          if(platform_driver_priv->mtip_lanes[lane_index])
          {
            platform_driver_priv->mtip_lanes[lane_index]->lane_state = MTIP_LANE_STATE_DISCONNECTED; 
-         }
-
-         /* For fibre, lane down could have happened because of RX LOS earlier,
-            but links were not torn down to avoid RX LOS from the local end.
-            So if local fault happens on the device later, tear down the links
-            so that port can be reconfigured based on subsequent lane up, as
-            the cable/module could have changed */
-         if(platform_driver_priv->mtip_lanes[lane_index]->sfp_port_type == PORT_FIBRE &&
-            platform_driver_priv->devices.lane_devices[lane_index].reason_code == TRX_LOCAL_PLUGOUT)
-         {
-            if(mtip_lookup_link_index_by_lane_index(&link_index, lane_index) == 0)
-            {
-               if (platform_driver_priv->mtip_links[link_index] != NULL)
-               {
-                  link_state = mtip_get_link_state_by_link_index(link_index);
-                  if ((link_state == MTIP_LINK_STATE_OPEN_DONE) ||
-                      (link_state == MTIP_LINK_STATE_UP) ||
-                      (link_state == MTIP_LINK_STATE_DOWN))
-                  {
-                     mtip_phy_teardown_phy(link_index);
-                  }
-               }
-            }
-
-            // Determine the port using lane
-            mtip_lookup_port_type_by_lane_index(lane_index, &port_type);
-
-            // Need to do PHY reset is all lanes were disconnected
-            for (i = 0; i < platform_driver_priv->devices.port_devices[port_type].num_lane_phandles; ++i)
-            {
-               tmp_lane_index = platform_driver_priv->devices.port_devices[port_type].lane_devices[i]->lane_index;
-               if (platform_driver_priv->mtip_lanes[tmp_lane_index]->lane_state == MTIP_LANE_STATE_CONNECTED)
-               {
-                  any_lane_connected = true;
-                  break;
-               }
-            }
-
-            if(any_lane_connected == false)
-               mtip_phy_reset_phy_sm(port_type);
          }
       }
       break;
@@ -758,31 +717,19 @@ static void mtip_phy_handle_lane_down(u32 lane_index)
          // determine the port using lane
          mtip_lookup_port_type_by_lane_index(lane_index, &port_type);
 
-         if((platform_driver_priv->mtip_lanes[lane_index]->sfp_port_type == PORT_FIBRE) &&
-            (platform_driver_priv->devices.lane_devices[lane_index].reason_code == TRX_TX_FAULT ||
-             platform_driver_priv->devices.lane_devices[lane_index].reason_code == TRX_RX_LOS))
-         {
-            /* No link tear down for optics, in case of remote faults, as we 
-               need to keep the lanes powered up to avoid RX LOS */
-            link_teardown_needed = false;
-         }
-
          // Bring down only the link which is mapped to this lane
-         if(link_teardown_needed)
+         if(mtip_lookup_link_index_by_lane_index(&link_index, lane_index) == 0)
          {
-            if(mtip_lookup_link_index_by_lane_index(&link_index, lane_index) == 0)
+            if (platform_driver_priv->mtip_links[link_index] != NULL)
             {
-               if (platform_driver_priv->mtip_links[link_index] != NULL)
+               link_state = mtip_get_link_state_by_link_index(link_index);
+               if ((link_state == MTIP_LINK_STATE_OPEN_DONE) ||
+                   (link_state == MTIP_LINK_STATE_UP) ||
+                   (link_state == MTIP_LINK_STATE_DOWN))
                {
-                  link_state = mtip_get_link_state_by_link_index(link_index);
-                  if ((link_state == MTIP_LINK_STATE_OPEN_DONE) ||
-                      (link_state == MTIP_LINK_STATE_UP) ||
-                      (link_state == MTIP_LINK_STATE_DOWN))
-                  {
-                     CSMLOGDBG("Port: %d with link_index: %d in %d state\n", port_type, link_index, link_state);
-                     // teardown the phy
-                     mtip_phy_teardown_phy(link_index);
-                  }
+                  CSMLOGDBG("Port: %d with link_index: %d in %d state\n", port_type, link_index, link_state);
+                  // teardown the phy
+                  mtip_phy_teardown_phy(link_index);
                }
             }
          }
@@ -801,8 +748,7 @@ static void mtip_phy_handle_lane_down(u32 lane_index)
          if(any_lane_connected == false)
          {
             // Reset PHY state machine if links were torn down
-            if(link_teardown_needed)
-               mtip_phy_reset_phy_sm(port_type);
+            mtip_phy_reset_phy_sm(port_type);
 
             // set the port state back to INIT
             platform_driver_priv->mtip_ports[port_type]->port_state = MTIP_PORT_STATE_INIT;
@@ -1121,11 +1067,16 @@ static void mtip_phy_phylink_lane_down(struct phylink_config *config, unsigned i
     switch (reason_code) 
     {
     case TRX_LOCAL_PLUGOUT:
-    case TRX_TX_FAULT:
-    case TRX_RX_LOS:
         {
             // handle this local cable plugout
             post_mtip_phy_handle_lane_down(lane_index);
+        }
+        break;
+
+    case TRX_TX_FAULT:
+    case TRX_RX_LOS:
+        {
+            CSMLOGINFO("Ignore lane down for lane_index %d", lane_index);
         }
         break;
 
