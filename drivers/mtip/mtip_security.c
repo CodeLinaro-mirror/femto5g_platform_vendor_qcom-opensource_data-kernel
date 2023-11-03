@@ -7,6 +7,7 @@
 #include "mtip_device.h"
 
 #include "mtip_security.h"
+#include <linux/errno.h>
 
 /* update port config on all links. */
 static void __update_security_port_config()
@@ -162,3 +163,37 @@ void *mtip_security_get_priv(struct net_device *netdev)
 	return ((struct mtip_netdev_priv *)netdev_priv(netdev))->sec_priv;
 }
 EXPORT_SYMBOL(mtip_security_get_priv);
+
+int mtip_security_get_sset_count(struct net_device *netdev)
+{
+	struct mtip_netdev_priv *priv = netdev_priv(netdev);
+	struct mtip_security_device *sec_dev = priv->sec_dev;
+
+	if (sec_dev && sec_dev->ops && sec_dev->ops->get_sset_count)
+		return sec_dev->ops->get_sset_count(netdev);
+
+	return 0;
+}
+
+int mtip_security_get_strings(struct net_device *netdev,
+				     u8 *stats_strings)
+{
+	struct mtip_netdev_priv *priv = netdev_priv(netdev);
+	struct mtip_security_device *sec_dev = priv->sec_dev;
+
+	if (sec_dev && sec_dev->ops && sec_dev->ops->get_sset_strings)
+		return sec_dev->ops->get_sset_strings(netdev, stats_strings);
+
+	return -EINVAL;
+}
+
+int mtip_security_get_stats(struct net_device *netdev, u64 *data)
+{
+	struct mtip_netdev_priv *priv = netdev_priv(netdev);
+	struct mtip_security_device *sec_dev = priv->sec_dev;
+
+	if (sec_dev && sec_dev->ops && sec_dev->ops->get_stats)
+		return sec_dev->ops->get_stats(netdev, data);
+
+	return -EINVAL;
+}
