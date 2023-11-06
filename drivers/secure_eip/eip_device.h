@@ -33,6 +33,7 @@ struct eip_port;
 struct eip_datapath {
 	int devid;
 	struct eip_port *port;
+	struct dentry *dbgfs_dp_dent;
 };
 
 struct eip_port {
@@ -50,7 +51,10 @@ struct eip_port {
 
 struct eip_channel {
 	struct eip_datapath *dp;
+	struct net_device *ndev;
 	int ch;
+	struct dentry *dbgfs_ch_dent;
+	bool inbound;
 };
 
 #define eip_chid(eip_ch) ((eip_ch)->ch)
@@ -63,6 +67,8 @@ struct eip_link {
 	struct eip_channel tx;
 
 	void *ipsec_priv;
+
+	struct dentry *dbgfs_dent;
 };
 
 #endif /* _EIP_DEVICE_H_ */
