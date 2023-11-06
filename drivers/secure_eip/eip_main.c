@@ -30,6 +30,7 @@
 #include "eip_log.h"
 #include "eip_debugfs.h"
 #include "eip_reg.h"
+#include "eip_ethtool.h"
 
 /* ETHSS_FHx_MACSEC_WRAPPER_CSR Init sequence offsets and recommended values*/
 #define MACSEC_WRAPPER_CFG_REG_OFFSET 0x000A8000
@@ -497,6 +498,9 @@ static struct mtip_security_ops mtip_sec_ops = {
 	.update_config = eip_mtip_link_config,
 	.fixup_rx_skb = eip_mtip_fixup_rx_skb,
 	.fixup_tx_skb = eip_mtip_fixup_tx_skb,
+	.get_sset_count = eip_ethtool_get_sset_count,
+	.get_sset_strings = eip_ethtool_get_sset_strings,
+	.get_stats = eip_ethtool_get_stats,
 };
 
 static int eip_probe(struct platform_device *pdev)

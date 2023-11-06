@@ -62,6 +62,7 @@ struct eip_link {
 	struct eip_channel rx;
 	struct eip_channel tx;
 
+	unsigned int sset;
 	void *ipsec_priv;
 };
 
