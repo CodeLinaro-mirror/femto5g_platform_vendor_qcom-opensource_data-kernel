@@ -26,7 +26,7 @@ struct mtip_lanedev_priv
 };
 
 int mtip_phy_create_phylink(struct mtip_lane_device_info* lane_device);
-int mtip_phy_destroy_phylink(u32 port_index);
+int mtip_phy_destroy_phylink(struct phylink *phylink,struct net_device* lane_dummy_ndev);
 
 int mtip_phy_setup_phy(struct mtip_port_device_info* port_device);
 int mtip_phy_bringup_phy(u32 link_index, int sfp_port_type);

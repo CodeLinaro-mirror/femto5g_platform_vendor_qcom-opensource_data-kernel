@@ -1224,20 +1224,19 @@ int mtip_phy_create_phylink(struct mtip_lane_device_info* lane_device)
     return 0;
 }
 
-int mtip_phy_destroy_phylink(u32 lane_index)
+int mtip_phy_destroy_phylink(struct phylink *phylink,struct net_device* lane_dummy_ndev)
 {
-    if (platform_driver_priv->devices.lane_devices[lane_index].sfp_phandle != -1)
-    {
-       // stop the phylink
-       phylink_stop(platform_driver_priv->mtip_lanes[lane_index]->phylink);
+    if(phylink) 
+	{
+	  // stop the phylink
+       phylink_stop(phylink);
 
        // destory the phylink
-       phylink_destroy(platform_driver_priv->mtip_lanes[lane_index]->phylink);
-
+       phylink_destroy(phylink);
+	}
        // free the netdev
-       if(platform_driver_priv->mtip_lanes[lane_index]->lane_dummy_ndev)
-          free_netdev(platform_driver_priv->mtip_lanes[lane_index]->lane_dummy_ndev);
-    }
+    if(lane_dummy_ndev)
+       free_netdev(lane_dummy_ndev);
 
     return 0;
 }
