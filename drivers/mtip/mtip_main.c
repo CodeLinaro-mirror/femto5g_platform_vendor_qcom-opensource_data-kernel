@@ -63,6 +63,9 @@ MODULE_LICENSE("GPL v2");
 #include "mtip_ethtool.h"
 #include "mtip_notifr.h"
 #include "mtip_sysfs.h"
+#include "ldmm_genl.h"
+#include "eth_phy_iface.h"
+#include "ldmm_notifr.h"
 
 /* Global variables of the driver */
 struct mtip_platform_driver_priv* platform_driver_priv = NULL;
@@ -108,6 +111,8 @@ MODULE_PARM_DESC(mtip_dma_max_rx_buff_size, "SET mtip_dma_rx buff size");
 bool enable_tx_comp_poll = true;
 module_param(enable_tx_comp_poll, bool, S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP);
 MODULE_PARM_DESC(enable_tx_comp_poll, "Enable TX Completion Poll");
+
+extern struct eth_phy_iface_ops qcom_aw_phy_driver_iface_ops;
 
 uint32_t ber_sim_status[12]={0};
 
@@ -888,6 +893,268 @@ static int mtip_panic_notifier(struct notifier_block *this, unsigned long event,
 static struct notifier_block mtip_panic_blk = {
 	.notifier_call = mtip_panic_notifier,
 };
+
+
+
+//mapping 4 bits of number corresponding to the 4 lanes
+int map_lanes_to_link(bool lanes_enabled[])
+{
+  int lane_index, mapped_value = 0;
+  for(lane_index = 0; lane_index < PHY_LANE_MAX; lane_index++)
+  {
+    if(lanes_enabled[lane_index] == true)
+    {
+      mapped_value |= (1<<lane_index);
+    }
+  }
+  return mapped_value;
+}
+
+
+link_info get_link_info(int port_type, int real_link_number, int port_config)
+{
+
+  link_info links = {0};
+  bool lanes_enabled[PHY_LANE_MAX];
+  int link_index;
+
+  if(mtip_lookup_link_index_by_port_type_and_real_link(&link_index, port_type, real_link_number) == -1)
+    goto out;
+
+  links.link_name = link_index;
+
+  if(platform_driver_priv == NULL || platform_driver_priv->mtip_links[link_index] == NULL)
+    goto out;
+
+  if(platform_driver_priv->mtip_links[link_index]->state != MTIP_LINK_STATE_UP)
+    goto out;
+
+  links.link_status = platform_driver_priv->mtip_links[link_index]->state;
+
+  mtip_phy_get_lanes_of_link(link_index, lanes_enabled);
+  links.lanes_mapped = map_lanes_to_link(lanes_enabled);
+
+  switch (port_config)
+  {
+    case MTIP_PORT_CONFIG_1x100GBASE_R:
+    case MTIP_PORT_CONFIG_1x100GBASE_R_RSFEC_LL:
+    case MTIP_PORT_CONFIG_1x100GBASE_R_RSFEC:
+    {
+      links.link_speed = MTIP_LINK_SPEED_100G;
+      links.lanes_speed = PHY_LANE_SPEED_100G;
+    }
+    break;
+    case MTIP_PORT_CONFIG_1x100GBASE_R2:
+    case MTIP_PORT_CONFIG_1x100GBASE_R2_RSFEC:
+    {
+      links.link_speed = MTIP_LINK_SPEED_100G;
+      links.lanes_speed = PHY_LANE_SPEED_50G;
+    }
+    break;
+    case MTIP_PORT_CONFIG_1x100GBASE_R4:
+    case MTIP_PORT_CONFIG_1x100GBASE_R4_RSFEC:
+    {
+      links.link_speed = MTIP_LINK_SPEED_100G;
+      links.lanes_speed = PHY_LANE_SPEED_25G;
+    }
+    break;
+    case MTIP_PORT_CONFIG_1x50GBASE_R:
+    case MTIP_PORT_CONFIG_1x50GBASE_R_RSFEC:
+    case MTIP_PORT_CONFIG_2x50GBASE_R:
+    case MTIP_PORT_CONFIG_2x50GBASE_R_RSFEC:
+    {
+      links.link_speed = MTIP_LINK_SPEED_50G;
+      links.lanes_speed = PHY_LANE_SPEED_50G;
+    }
+    break;
+    case MTIP_PORT_CONFIG_1x50GBASE_R2:
+    case MTIP_PORT_CONFIG_1x50GBASE_R2_RSFEC:
+    case MTIP_PORT_CONFIG_1x50GBASE_R2_LUAI:
+    case MTIP_PORT_CONFIG_1x50GBASE_R2_LUAI_FEC:
+    case MTIP_PORT_CONFIG_2x50GBASE_R2:
+    case MTIP_PORT_CONFIG_2x50GBASE_R2_FEC:
+    case MTIP_PORT_CONFIG_2x50GBASE_R2_LUAI:
+    case MTIP_PORT_CONFIG_2x50GBASE_R2_LUAI_FEC:
+    {
+      links.link_speed = MTIP_LINK_SPEED_50G;
+      links.lanes_speed = PHY_LANE_SPEED_25G;
+    }
+    break;
+    case MTIP_PORT_CONFIG_1x40GBASE_R4:
+    case MTIP_PORT_CONFIG_1x40GBASE_R4_FEC:
+    {
+      links.link_speed = MTIP_LINK_SPEED_40G;
+      links.lanes_speed = PHY_LANE_SPEED_10G;
+    }
+    break;
+    case MTIP_PORT_CONFIG_1x25GBASE_R:
+    case MTIP_PORT_CONFIG_1x25GBASE_R_FEC:
+    case MTIP_PORT_CONFIG_1x25GBASE_R_RSFEC:
+    case MTIP_PORT_CONFIG_4x25GBASE_R:
+    case MTIP_PORT_CONFIG_4x25GBASE_R_FEC:
+    case MTIP_PORT_CONFIG_4x25GBASE_R_RSFEC:
+    {
+      links.link_speed = MTIP_LINK_SPEED_25G;
+      links.lanes_speed = PHY_LANE_SPEED_25G;
+    }
+    break;
+    case MTIP_PORT_CONFIG_1x10GBASE_R:
+    case MTIP_PORT_CONFIG_1x10GBASE_R_FEC:
+    case MTIP_PORT_CONFIG_4x10GBASE_R:
+    case MTIP_PORT_CONFIG_4x10GBASE_R_FEC:
+    {
+      links.link_speed = MTIP_LINK_SPEED_10G;
+      links.lanes_speed = PHY_LANE_SPEED_10G;
+    }
+    break;
+    default:
+    {
+      CSMLOGERR("Unknown port config %d", port_config);
+    }
+    break;
+  }
+
+  out:
+    return links;
+}
+
+config_packet_info mtip_get_config_info(void)
+{
+  int port_type, real_link_number;
+  config_packet_info config = {0};
+  int master_link = 0, master_lane = 0, link_index, lane_index;
+
+  for(port_type = 0; port_type < MAX_PORTS; port_type++)
+  {
+    config.ports[port_type].port_type = port_type;
+    
+    if(platform_driver_priv == NULL || platform_driver_priv->mtip_ports[port_type] == NULL)
+    {
+        config.ports[port_type].port_enabled = 0;
+        config.ports[port_type].sfp_port_type = QXDM_LOGGING_VAR_NA;
+        config.ports[port_type].port_config = QXDM_LOGGING_VAR_NA;
+        config.ports[port_type].active_fec = QXDM_LOGGING_VAR_NA;
+        config.ports[port_type].link_length_range = QXDM_LOGGING_VAR_NA;
+        config.ports[port_type].phy_eq_mode = QXDM_LOGGING_VAR_NA;
+        config.ports[port_type].active_links = 0;
+        continue;
+    }
+      
+    config.ports[port_type].port_enabled = (int)platform_driver_priv->devices.port_devices[port_type].port_device_valid;
+    config.ports[port_type].sfp_port_type = platform_driver_priv->mtip_ports[port_type]->sfp_port_type;
+    config.ports[port_type].port_config = platform_driver_priv->mtip_ports[port_type]->port_config;
+    
+    if(port_type == MTIP_PORT_TYPE_DEBUG)
+    {
+      master_link = 1;
+      master_lane = 2;
+    }
+    mtip_lookup_link_index_by_port_type_and_real_link(&link_index, port_type, master_link);
+    mtip_lookup_lane_index_by_port_type_and_real_lane(&lane_index, port_type, master_lane);
+
+    if(platform_driver_priv->mtip_links[link_index] == NULL || platform_driver_priv->mtip_lanes[lane_index] == NULL)
+      goto out;
+
+    //setting master link/lane info to port
+    config.ports[port_type].active_fec = platform_driver_priv->mtip_links[link_index]->active_fec;
+    config.ports[port_type].link_length_range = platform_driver_priv->mtip_lanes[lane_index]->lane_qsfp_info.trx_link_length_range;
+
+    config.ports[port_type].phy_eq_mode = qcom_aw_phy_driver_iface_ops.eth_phy_iface_get_phy_phy_eq_mode(port_type);
+
+    for(real_link_number = 0; real_link_number < MAX_LINKS_PER_PORT; real_link_number++)
+    {
+      config.ports[port_type].links[real_link_number] = get_link_info(port_type, real_link_number, config.ports[port_type].port_config);
+      if(config.ports[port_type].links[real_link_number].link_status == MTIP_LINK_STATE_UP)
+        config.ports[port_type].active_links++;
+    }
+  }
+  out:
+    return config;
+}
+
+stats_info mtip_get_stats_info(int link_index)
+{
+  int j = 0;
+  u64 data[DEBUG_ETHTOOL_STAT_STRINGS_LEN] = {0};
+  stats_info stats = {0};
+
+  memset(data, 0, DEBUG_ETHTOOL_STAT_STRINGS_LEN*sizeof(u64));
+
+  if(link_index < 12)
+  {
+    mtip_macstats_get_stats(platform_driver_priv->mtip_links[link_index]->dev, data);
+  }
+  else if(link_index == MTIP_DEBUG_ETH_LINK_INDEX)
+  {
+    mtip_debug_eth_macstats_get_stats(platform_driver_priv->mtip_links[link_index]->dev, data);
+  }
+  else
+  {
+    //TBD
+    return stats;
+  }
+  stats.link_name = link_index;
+  stats.EtherStatsOctets = data[j++];
+  stats.OctetsReceivedOK = data[j++];
+  stats.VLANReceivedOK = data[j++];
+  stats.InErrors = data[j++];
+  stats.InUCastPkts = data[j++];
+  stats.InMCastPkts = data[j++];
+  stats.InBCastPkts = data[j++];
+  stats.EtherStatsDrops = data[j++];
+  stats.EtherStatsPkts = data[j++];
+  stats.OctetsTransmittedOK = data[j++];
+  stats.VLANTransmittedOK = data[j++];
+  stats.OutErrors = data[j++];
+  stats.OutUCastPkts = data[j++];
+  stats.OutMCastPkts = data[j++];
+  stats.OutBCastPkts = data[j++];
+  if(link_index == MTIP_DEBUG_ETH_LINK_INDEX)
+  {
+    stats.FIFO_0_TX_Count = data[j++];
+    stats.FIFO_1_TX_Count = data[j++];
+    stats.FIFO_2_TX_Count = data[j++];
+    stats.FIFO_3_TX_Count = data[j++];
+    stats.FIFO_4_TX_Count = data[j++];
+    stats.FIFO_5_TX_Count = data[j++];
+    stats.FIFO_6_TX_Count = data[j++];
+    stats.FIFO_7_TX_Count = data[j++];
+  }
+  stats.Software_TX_Errors = platform_driver_priv->mtip_links[link_index]->net_stats.tx_errors;
+  stats.Software_RX_Errors = platform_driver_priv->mtip_links[link_index]->net_stats.rx_errors;
+  stats.Software_TX_Packets = platform_driver_priv->mtip_links[link_index]->net_stats.tx_packets;
+  stats.Software_RX_Packets = platform_driver_priv->mtip_links[link_index]->net_stats.rx_packets;
+  return stats;
+}
+
+int mtip_get_total_active_links(void)
+{
+  int link_index, total_active_links = 0;
+  for(link_index = 0; link_index < MTIP_MAX_LINKS; link_index++)
+  {
+    if(platform_driver_priv != NULL && platform_driver_priv->mtip_links[link_index] != NULL && 
+                  platform_driver_priv->mtip_links[link_index]->state == MTIP_LINK_STATE_UP){
+      total_active_links++;
+    }
+  }
+  return total_active_links;
+}
+
+bool mtip_if_link_up(int link_index)
+{
+  if(platform_driver_priv != NULL && platform_driver_priv->mtip_links[link_index] != NULL && platform_driver_priv->mtip_links[link_index]->state == MTIP_LINK_STATE_UP)
+    return true;
+  return false;
+}
+
+/* API exposed structure */
+const struct ldmm_eth_iface_ops mtip_driver_iface_ops = {
+    .ldmm_eth_iface_get_stats_info = mtip_get_stats_info,
+    .ldmm_eth_iface_get_config_info = mtip_get_config_info,
+    .ldmm_eth_iface_get_if_link_up = mtip_if_link_up,
+};
+
+EXPORT_SYMBOL(mtip_driver_iface_ops);
 
 static int mtip_module_init(void)
 {

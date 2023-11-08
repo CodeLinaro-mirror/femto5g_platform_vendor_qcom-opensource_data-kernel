@@ -6,6 +6,11 @@
 #define _LDMM_NOTIFIER_H
 
 #include "ldmm_notifr.h"
+
+void ldmm_enable_notification(void);
+void ldmm_disable_notification(void);
+int ldmm_qxdm_logger_link_change_notification(void);
+
 int ldmm_fault_notifr_init(void);
 int ldmm_fault_notifr_exit(void);
 

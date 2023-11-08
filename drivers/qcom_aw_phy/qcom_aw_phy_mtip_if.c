@@ -2164,6 +2164,21 @@ void qcom_aw_phy_notify_lane_bring_up_progress_to_mac(
   return;
 }
 
+int qcom_aw_phy_get_phy_eq_mode(enum mtip_port_type_enum port_type) {
+  struct qcom_aw_phy_inst_config *phy_inst_info = NULL;
+  enum qcom_aw_phy_instance_enum phy_inst_type = QCOM_AW_PHY_INST_MAX;
+  
+  /* Get the PHY instance type for the provided port */
+  phy_inst_type = qcom_aw_phy_mac_port_to_phy_inst(port_type);
+
+  phy_inst_info = qcom_aw_phy_get_inst_config(phy_inst_type);
+  if(phy_inst_info == NULL)
+  {
+    return -1;
+  }
+  return phy_inst_info->phy_eq_mode;
+}
+
 /* API exposed structure */
 const struct eth_phy_iface_ops qcom_aw_phy_driver_iface_ops = {
     .eth_phy_iface_eth_register = qcom_aw_phy_mtip_register,
@@ -2175,6 +2190,7 @@ const struct eth_phy_iface_ops qcom_aw_phy_driver_iface_ops = {
     .eth_phy_iface_initiate_an = qcom_aw_phy_initiate_an,
     .eth_phy_iface_reset_phy_sm = qcom_aw_phy_reset_phy_sm,
     .eth_phy_iface_set_tx_compliance = qcom_aw_phy_set_tx_compliance,
+    .eth_phy_iface_get_phy_phy_eq_mode = qcom_aw_phy_get_phy_eq_mode,
 };
 
 EXPORT_SYMBOL(qcom_aw_phy_driver_iface_ops);
