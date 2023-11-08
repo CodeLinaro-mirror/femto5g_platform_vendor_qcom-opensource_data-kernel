@@ -78,10 +78,6 @@ static bool running_emulation;
 
 struct gsi_ctx *gsi_ctx;
 
-static union __packed gsi_channel_scratch __gsi_update_mhi_channel_scratch(
-	unsigned long ch_id, int ee, int gsi_id,
-	struct __packed gsi_mhi_channel_scratch mscr);
-
 static struct gsi_chan_ctx* __gsi_get_ch_ctx_from_hdl(u32 hdl) {
 	struct gsi_chan_ctx* ch_ctx;
 	unsigned long flags;
@@ -1734,9 +1730,9 @@ static void __gsi_write_evt_ring_scratch(unsigned long evt_ring_hdl,
 	}
 
 	gsihal_write_reg_pnk(GSI_EE_n_EV_CH_k_SCRATCH_0,
-		ctx->props.gsi_id, ctx->props.ee, ctx->id, val.data.word1);
+		ctx->props.gsi_id, ctx->props.ee, ctx->id, val.data.scratch0);
 	gsihal_write_reg_pnk(GSI_EE_n_EV_CH_k_SCRATCH_1,
-		ctx->props.gsi_id, ctx->props.ee, ctx->id, val.data.word2);
+		ctx->props.gsi_id, ctx->props.ee, ctx->id, val.data.scratch1);
 }
 
 int gsi_write_evt_ring_scratch(unsigned long evt_ring_hdl,
@@ -2367,25 +2363,39 @@ static void __gsi_write_channel_scratch(unsigned long ch_id, int ee, int gsi_id,
 		union __packed gsi_channel_scratch val)
 {
 	gsihal_write_reg_pnk(GSI_EE_n_GSI_CH_k_SCRATCH_0,
-		gsi_id, ee, ch_id, val.data.word1);
+		gsi_id, ee, ch_id, val.data.scratch0);
 	gsihal_write_reg_pnk(GSI_EE_n_GSI_CH_k_SCRATCH_1,
-		gsi_id, ee, ch_id, val.data.word2);
+		gsi_id, ee, ch_id, val.data.scratch1);
 	gsihal_write_reg_pnk(GSI_EE_n_GSI_CH_k_SCRATCH_2,
-		gsi_id, ee, ch_id, val.data.word3);
+		gsi_id, ee, ch_id, val.data.scratch2);
 	gsihal_write_reg_pnk(GSI_EE_n_GSI_CH_k_SCRATCH_3,
-		gsi_id, ee, ch_id, val.data.word4);
+		gsi_id, ee, ch_id, val.data.scratch3);
+
+	/* Scratchs 4 - 9 are read only and sholdn't be written to */
 }
 
 static void __gsi_read_channel_scratch(unsigned long ch_id, int ee, int gsi_id,
 		union __packed gsi_channel_scratch * val)
 {
-	val->data.word1 = gsihal_read_reg_pnk(GSI_EE_n_GSI_CH_k_SCRATCH_0,
+	val->data.scratch0 = gsihal_read_reg_pnk(GSI_EE_n_GSI_CH_k_SCRATCH_0,
 		gsi_id, ee, ch_id);
-	val->data.word2 = gsihal_read_reg_pnk(GSI_EE_n_GSI_CH_k_SCRATCH_1,
+	val->data.scratch1 = gsihal_read_reg_pnk(GSI_EE_n_GSI_CH_k_SCRATCH_1,
 		gsi_id, ee, ch_id);
-	val->data.word3 = gsihal_read_reg_pnk(GSI_EE_n_GSI_CH_k_SCRATCH_2,
+	val->data.scratch2 = gsihal_read_reg_pnk(GSI_EE_n_GSI_CH_k_SCRATCH_2,
 		gsi_id, ee, ch_id);
-	val->data.word4 = gsihal_read_reg_pnk(GSI_EE_n_GSI_CH_k_SCRATCH_3,
+	val->data.scratch3 = gsihal_read_reg_pnk(GSI_EE_n_GSI_CH_k_SCRATCH_3,
+		gsi_id, ee, ch_id);
+	val->data.scratch4 = gsihal_read_reg_pnk(GSI_EE_n_GSI_CH_k_SCRATCH_4,
+		gsi_id, ee, ch_id);
+	val->data.scratch5 = gsihal_read_reg_pnk(GSI_EE_n_GSI_CH_k_SCRATCH_5,
+		gsi_id, ee, ch_id);
+	val->data.scratch6 = gsihal_read_reg_pnk(GSI_EE_n_GSI_CH_k_SCRATCH_6,
+		gsi_id, ee, ch_id);
+	val->data.scratch7 = gsihal_read_reg_pnk(GSI_EE_n_GSI_CH_k_SCRATCH_7,
+		gsi_id, ee, ch_id);
+	val->data.scratch8 = gsihal_read_reg_pnk(GSI_EE_n_GSI_CH_k_SCRATCH_8,
+		gsi_id, ee, ch_id);
+	val->data.scratch9 = gsihal_read_reg_pnk(GSI_EE_n_GSI_CH_k_SCRATCH_9,
 		gsi_id, ee, ch_id);
 }
 
@@ -2454,38 +2464,6 @@ int gsi_read_channel_scratch(unsigned long chan_hdl,
 	return GSI_STATUS_SUCCESS;
 }
 EXPORT_SYMBOL(gsi_read_channel_scratch);
-
-int gsi_update_mhi_channel_scratch(unsigned long chan_hdl,
-		struct __packed gsi_mhi_channel_scratch mscr)
-{
-	struct gsi_chan_ctx *ctx;
-
-	if (!gsi_ctx) {
-		pr_err("%s:%d gsi context not allocated\n", __func__, __LINE__);
-		return -GSI_STATUS_NODEV;
-	}
-
-	ctx = __gsi_get_ch_ctx_from_hdl(chan_hdl);
-	if (!ctx) {
-		GSIERR("bad params chan_hdl=%lu\n", chan_hdl);
-		return -GSI_STATUS_INVALID_PARAMS;
-	}
-
-	if (ctx->state != GSI_CHAN_STATE_ALLOCATED &&
-		ctx->state != GSI_CHAN_STATE_STOPPED) {
-		GSIERR("bad state %d\n",
-				ctx->state);
-		return -GSI_STATUS_UNSUPPORTED_OP;
-	}
-
-	mutex_lock(&ctx->mlock);
-	ctx->scratch = __gsi_update_mhi_channel_scratch(ctx->props.ch_id,
-		ctx->props.ee, ctx->props.gsi_id, mscr);
-	mutex_unlock(&ctx->mlock);
-
-	return GSI_STATUS_SUCCESS;
-}
-EXPORT_SYMBOL(gsi_update_mhi_channel_scratch);
 
 int gsi_query_channel_db_addr(unsigned long chan_hdl,
 		u32 *db_addr_wp_lsb, u32 *db_addr_wp_msb)
@@ -3711,6 +3689,7 @@ int gsi_get_channel_cfg(unsigned long chan_hdl, struct gsi_chan_props *props,
 		union gsi_channel_scratch *scr)
 {
 	struct gsi_chan_ctx *ctx;
+	int res = 0;
 
 	if (!gsi_ctx) {
 		pr_err("%s:%d gsi context not allocated\n", __func__, __LINE__);
@@ -3731,6 +3710,13 @@ int gsi_get_channel_cfg(unsigned long chan_hdl, struct gsi_chan_props *props,
 	if (ctx->state == GSI_CHAN_STATE_NOT_ALLOCATED) {
 		GSIERR("bad state %d\n", ctx->state);
 		return -GSI_STATUS_UNSUPPORTED_OP;
+	}
+
+	res = gsi_read_channel_scratch(chan_hdl, &ctx->scratch);
+	if (res != GSI_STATUS_SUCCESS)
+	{
+		GSIERR("Failed to read CH scratch chan_hdl=%lu\n", chan_hdl);
+		return res;
 	}
 
 	mutex_lock(&ctx->mlock);
@@ -4299,38 +4285,6 @@ u32 gsi_get_evt_ring_len(int evt_hdl)
 }
 EXPORT_SYMBOL(gsi_get_evt_ring_len);
 
-static union __packed gsi_channel_scratch __gsi_update_mhi_channel_scratch(
-	unsigned long ch_id, int ee, int gsi_id,
-	struct __packed gsi_mhi_channel_scratch mscr)
-{
-	union __packed gsi_channel_scratch scr;
-
-	/* below sequence is not atomic. assumption is sequencer specific fields
-	 * will remain unchanged across this sequence
-	 */
-
-	/* READ */
-	scr.data.word1 = gsihal_read_reg_pnk(GSI_EE_n_GSI_CH_k_SCRATCH_0,
-		gsi_id, ee, ch_id);
-	scr.data.word2 = gsihal_read_reg_pnk(GSI_EE_n_GSI_CH_k_SCRATCH_1,
-		gsi_id, ee, ch_id);
-	scr.data.word3 = gsihal_read_reg_pnk(GSI_EE_n_GSI_CH_k_SCRATCH_2,
-		gsi_id, ee, ch_id);
-	scr.data.word4 = gsihal_read_reg_pnk(GSI_EE_n_GSI_CH_k_SCRATCH_3,
-		gsi_id, ee, ch_id);
-
-	/* WRITE */
-	gsihal_write_reg_pnk(GSI_EE_n_GSI_CH_k_SCRATCH_0,
-		gsi_id, ee, ch_id, scr.data.word1);
-	gsihal_write_reg_pnk(GSI_EE_n_GSI_CH_k_SCRATCH_1,
-		gsi_id, ee, ch_id, scr.data.word2);
-	gsihal_write_reg_pnk(GSI_EE_n_GSI_CH_k_SCRATCH_2,
-		gsi_id, ee, ch_id, scr.data.word3);
-	gsihal_write_reg_pnk(GSI_EE_n_GSI_CH_k_SCRATCH_3,
-		gsi_id, ee, ch_id, scr.data.word4);
-
-	return scr;
-}
 /**
  * gsi_get_hw_profiling_stats() - Query GSI HW profiling stats
  * @stats:	[out] stats blob from client populated by driver
