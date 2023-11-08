@@ -361,6 +361,9 @@ struct mtip_port_info
     // autoneg flag to see if autoneg is enabled
     bool autoneg;
 
+    // flag to see if autoneg setting was modified
+    bool autoneg_changed;
+
     // the negotiated port configuration
     enum mtip_port_config_enum port_config;
 

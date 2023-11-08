@@ -2232,10 +2232,7 @@ int mtip_netdev_set_port_priv_flags(struct net_device *netdev)
     u32 link_index;
     u32 port_priv_flags = 0;
     u32 port_type;
-    int i;
-    enum mtip_link_state_enum state;
     u32 port_link0_index;
-    u32 temp_link_index;
 
     priv = netdev_priv(netdev);
     link_index = priv->link_index;
@@ -2246,48 +2243,30 @@ int mtip_netdev_set_port_priv_flags(struct net_device *netdev)
         return -1;
     }
 
-    // check if any of the links of the port is open
-    for (i = 0; i < platform_driver_priv->devices.port_devices[port_type].num_link_phandles; ++i) 
-    {
-        temp_link_index = platform_driver_priv->devices.port_devices[port_type].link_devices[i]->link_index;
-        state = platform_driver_priv->mtip_links[temp_link_index]->state;
-
-        CSMLOGDBG("port_type %d link_index %d state %d", port_type, temp_link_index, state);
-
-        // check if state is not INIT or CLOSE
-        if ((state == MTIP_LINK_STATE_INIT) || (state == MTIP_LINK_STATE_CLOSE))
-        {
-            // we are ok with this link
-        }
-        else
-        {
-            CSMLOGERR("port_type %d link_index %d is open. port config not updated in state %d", port_type, temp_link_index, state);
-            return -1;
-        }
-    }
-
     // Process only for link 0 of the port
     port_link0_index = platform_driver_priv->devices.port_devices[port_type].link_devices[0]->link_index;
     priv = netdev_priv(platform_driver_priv->mtip_links[port_link0_index]->dev);
     port_priv_flags = priv->priv_flags;
     if (link_index != port_link0_index) 
     {
-        CSMLOGDBG("ignoring the default priv flags of link_index %d", link_index);
+        CSMLOGERR("ignoring the default priv flags of link_index %d", link_index);
+        return -1;
     }
 
-    platform_driver_priv->mtip_ports[port_type]->port_priv_flags = port_priv_flags;
-
-    // clear the lane assignment of all the links
-    for (i = 0; i < platform_driver_priv->devices.port_devices[port_type].num_link_phandles; ++i) 
+    if(platform_driver_priv->mtip_ports[port_type]->port_priv_flags == port_priv_flags &&
+       platform_driver_priv->mtip_ports[port_type]->autoneg_changed == false)
     {
-        temp_link_index = platform_driver_priv->devices.port_devices[port_type].link_devices[i]->link_index;
-        platform_driver_priv->mtip_links[temp_link_index]->lanes_assignment_complete = false;
-        platform_driver_priv->mtip_links[temp_link_index]->num_assigned_lanes = 0;
-
-        CSMLOGDBG("clearing link lanes for link_index %d", temp_link_index);
+        CSMLOGERR("No change in speed/autoneg for port %d", port_type);
+        return -1;
     }
+
+    // Reset the AN changed flag
+    platform_driver_priv->mtip_ports[port_type]->autoneg_changed = false;
 
     CSMLOGDBG("Setting the port %d priv flags to %d", port_type, port_priv_flags);
+    platform_driver_priv->mtip_ports[port_type]->port_priv_flags = port_priv_flags;
+
+    post_mtip_process_reconfigure_port(port_type);
 
     return 0;
 }
@@ -3590,6 +3569,66 @@ void run_mtip_process_netdev_close(void* workptr)
    /* Send update to clients */
    post_mtip_client_send_event(ETH_ECPRISS_EVENT_DOWN, link_index);
    mtip_snd_event_notification(link_index, IF_DOWN);
+
+   // free the taskstruct
+   kfree(taskstruct);
+
+   return;
+}
+
+void post_mtip_process_reconfigure_port(u32 port_type)
+{
+   struct mtip_process_reconfigure_port* taskstruct = kmalloc(sizeof(struct mtip_process_reconfigure_port), GFP_ATOMIC);
+   if(taskstruct == NULL)
+   {
+       CSMLOGERR("memory alloc failed\n");
+       return;
+   }
+
+   CSMLOGINFO("Reconfiguration queued for port %d\n", port_type);
+
+   taskstruct->port_type = port_type;
+   mtip_queue_work(MTIP_WORKQ_TASK_PROCESS_RECONFIGURE_PORT, taskstruct);
+}
+
+void run_mtip_process_reconfigure_port(void* workptr)
+{
+   struct mtip_process_reconfigure_port *taskstruct = (struct mtip_process_reconfigure_port *)workptr;
+   u32 port_type = taskstruct->port_type;
+   u32 tmp_link_index;
+   int i;
+   enum mtip_link_state_enum link_state;
+
+   // Set the port to DISCONNECTED
+   platform_driver_priv->mtip_ports[port_type]->port_state = MTIP_PORT_STATE_DISCONNECTED;
+
+   // Go through all the links of the port that are in UP or DOWN state
+   for (i = 0; i < MTIP_MAX_LINKS_PER_PORT; ++i)
+   {
+      if (mtip_lookup_link_index_by_port_type_and_real_link(&tmp_link_index, port_type, i) == 0)
+      {
+         if (platform_driver_priv->mtip_links[tmp_link_index] != NULL)
+         {
+            link_state = mtip_get_link_state_by_link_index(tmp_link_index);
+            if ((link_state == MTIP_LINK_STATE_OPEN_DONE) ||
+                (link_state == MTIP_LINK_STATE_UP) ||
+                (link_state == MTIP_LINK_STATE_DOWN))
+            {
+               // teardown the phy
+               mtip_phy_teardown_phy(tmp_link_index);
+            }
+         }
+      }
+   }
+
+   // rest PHY SM
+   mtip_phy_reset_phy_sm(port_type);
+
+   // Move the port state back to INIT
+   platform_driver_priv->mtip_ports[port_type]->port_state = MTIP_PORT_STATE_INIT;
+
+   // Issue port configuration with the new configuration
+   mtip_device_configure_port(port_type);
 
    // free the taskstruct
    kfree(taskstruct);

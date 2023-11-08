@@ -145,6 +145,15 @@ struct mtip_process_process_netdev_events
     struct net_device *netdev;
 };
 
+void post_mtip_process_reconfigure_port(u32 port_type);
+void run_mtip_process_reconfigure_port(void* workptr);
+
+struct mtip_process_reconfigure_port
+{
+    u32 port_type;
+};
+
+
 /*
  * Immediate tasks
  */

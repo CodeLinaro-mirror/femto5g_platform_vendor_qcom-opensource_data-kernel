@@ -198,18 +198,6 @@ static void mtip_ethtool_get_stats(struct net_device *netdev, struct ethtool_sta
     mtip_macstats_get_stats(netdev, data);
 }
 
-bool mtip_check_if_running(struct net_device *dev)
-{
-    bool rv = false;
-    CSMLOGDBG("ethtool: check_if_running\n");
-
-	if (netif_running(dev))
-    {
-        rv = true;
-    }
-    return rv;
-}
-
 void mtip_ethtool_get_dev_regs
 (
     struct platform_device* port_pdev,
@@ -356,10 +344,32 @@ void mtip_ethtool_getdrvinfo(struct net_device *dev, struct ethtool_drvinfo *inf
 	strlcpy(info->version, MTIP_MAC_DRIVER_VERSION, sizeof(info->version));
 }
 
-void mtip_ethtool_get_supported_speed_modes(struct mtip_port_info* port_info, struct ethtool_link_ksettings *cmd)
+void mtip_ethtool_get_supported_speed_modes(struct mtip_port_info* port_info, u32 real_link_number, struct ethtool_link_ksettings *cmd)
 {
     int i;
     __ETHTOOL_DECLARE_LINK_MODE_MASK(supported) = { 0, };
+    bool supports_100_g = false;
+    bool supports_50_g = false;
+    bool supports_40_g = false;
+
+    // Only link 0 for FH ports, and link 1 of Debug port will support 100G MAC configs
+    if(((port_info->port_type != MTIP_PORT_TYPE_DEBUG) && (real_link_number == 0)) ||
+       ((port_info->port_type == MTIP_PORT_TYPE_DEBUG) && (real_link_number == 1)))
+    {
+        supports_100_g = true;
+        supports_50_g = true;
+    }
+    // Only link 1 for FH and Debug ports will support 50G MAC configs
+    else if(real_link_number == 1)
+    {
+        supports_50_g = true;
+    }
+
+    // Only link 0 of FH port will support 40G MAC configuration
+    if((port_info->port_type != MTIP_PORT_TYPE_DEBUG) && (real_link_number == 0))
+    {
+        supports_40_g = true;
+    }
 
     for (i = 0; i < MTIP_PORT_CONFIG_MAX; ++i)
     {
@@ -382,19 +392,26 @@ void mtip_ethtool_get_supported_speed_modes(struct mtip_port_info* port_info, st
             case MTIP_PORT_CONFIG_1x100GBASE_R2:
             case MTIP_PORT_CONFIG_1x100GBASE_R2_RSFEC:
             {
-                linkmode_set_bit(ETHTOOL_LINK_MODE_100000baseCR2_Full_BIT, supported);
-                linkmode_set_bit(ETHTOOL_LINK_MODE_100000baseSR2_Full_BIT, supported);
-                linkmode_set_bit(ETHTOOL_LINK_MODE_100000baseLR2_ER2_FR2_Full_BIT, supported);
+                if(supports_100_g)
+                {
+                    linkmode_set_bit(ETHTOOL_LINK_MODE_100000baseCR2_Full_BIT, supported);
+                    linkmode_set_bit(ETHTOOL_LINK_MODE_100000baseSR2_Full_BIT, supported);
+                    linkmode_set_bit(ETHTOOL_LINK_MODE_100000baseLR2_ER2_FR2_Full_BIT, supported);
+                }
             }
             break;
 
             case MTIP_PORT_CONFIG_1x100GBASE_R4:
             case MTIP_PORT_CONFIG_1x100GBASE_R4_RSFEC:
             {
-                linkmode_set_bit(ETHTOOL_LINK_MODE_100000baseCR4_Full_BIT, supported);
-                linkmode_set_bit(ETHTOOL_LINK_MODE_100000baseSR4_Full_BIT, supported);
-                linkmode_set_bit(ETHTOOL_LINK_MODE_100000baseDR_Full_BIT, supported);
-                linkmode_set_bit(ETHTOOL_LINK_MODE_100000baseLR4_ER4_Full_BIT, supported);
+                // For R4, only link 0 can be mapped to 4 lanes
+                if(supports_100_g && (real_link_number == 0))
+                {
+                    linkmode_set_bit(ETHTOOL_LINK_MODE_100000baseCR4_Full_BIT, supported);
+                    linkmode_set_bit(ETHTOOL_LINK_MODE_100000baseSR4_Full_BIT, supported);
+                    //linkmode_set_bit(ETHTOOL_LINK_MODE_100000baseDR_Full_BIT, supported);
+                    linkmode_set_bit(ETHTOOL_LINK_MODE_100000baseLR4_ER4_Full_BIT, supported);
+                }
             }
             break;
 
@@ -403,9 +420,12 @@ void mtip_ethtool_get_supported_speed_modes(struct mtip_port_info* port_info, st
             case MTIP_PORT_CONFIG_1x50GBASE_R:
             case MTIP_PORT_CONFIG_1x50GBASE_R_RSFEC:
             {
-                linkmode_set_bit(ETHTOOL_LINK_MODE_50000baseCR_Full_BIT, supported);
-                linkmode_set_bit(ETHTOOL_LINK_MODE_50000baseSR_Full_BIT, supported);
-                linkmode_set_bit(ETHTOOL_LINK_MODE_50000baseLR_ER_FR_Full_BIT, supported);
+                if(supports_50_g)
+                {
+                    linkmode_set_bit(ETHTOOL_LINK_MODE_50000baseCR_Full_BIT, supported);
+                    linkmode_set_bit(ETHTOOL_LINK_MODE_50000baseSR_Full_BIT, supported);
+                    linkmode_set_bit(ETHTOOL_LINK_MODE_50000baseLR_ER_FR_Full_BIT, supported);
+                }
             }
             break;
 
@@ -418,15 +438,21 @@ void mtip_ethtool_get_supported_speed_modes(struct mtip_port_info* port_info, st
             case MTIP_PORT_CONFIG_1x50GBASE_R2_LUAI:
             case MTIP_PORT_CONFIG_1x50GBASE_R2_LUAI_FEC:
             {
-                linkmode_set_bit(ETHTOOL_LINK_MODE_50000baseCR2_Full_BIT, supported);
+                if(supports_50_g)
+                {
+                    linkmode_set_bit(ETHTOOL_LINK_MODE_50000baseCR2_Full_BIT, supported);
+                }
             }
             break;
 
             case MTIP_PORT_CONFIG_1x40GBASE_R4:
             case MTIP_PORT_CONFIG_1x40GBASE_R4_FEC:
             {
-                linkmode_set_bit(ETHTOOL_LINK_MODE_40000baseCR4_Full_BIT, supported);
-                linkmode_set_bit(ETHTOOL_LINK_MODE_40000baseSR4_Full_BIT, supported);
+                if(supports_40_g)
+                {
+                    linkmode_set_bit(ETHTOOL_LINK_MODE_40000baseCR4_Full_BIT, supported);
+                    linkmode_set_bit(ETHTOOL_LINK_MODE_40000baseSR4_Full_BIT, supported);
+                }
             }
             break;
 
@@ -462,13 +488,35 @@ void mtip_ethtool_get_supported_speed_modes(struct mtip_port_info* port_info, st
     return;
 }
 
-void mtip_ethtool_get_advertised_speed_modes(struct mtip_port_info* port_info, struct ethtool_link_ksettings *cmd)
+void mtip_ethtool_get_advertised_speed_modes(struct mtip_port_info* port_info, u32 real_link_number, struct ethtool_link_ksettings *cmd)
 {
     int i;
     u32 port_priv_flags = mtip_device_filter_priv_flags(port_info->port_type);
     __ETHTOOL_DECLARE_LINK_MODE_MASK(advertised) = { 0, };
     struct qsfp_info lane_qsfp_info = {0};
     bool lane_qsfp_info_valid = false;
+    bool supports_100_g = false;
+    bool supports_50_g = false;
+    bool supports_40_g = false;
+
+    // Only link 0 for FH ports, and link 1 of Debug port will support 100G MAC configs
+    if(((port_info->port_type != MTIP_PORT_TYPE_DEBUG) && (real_link_number == 0)) ||
+       ((port_info->port_type == MTIP_PORT_TYPE_DEBUG) && (real_link_number == 1)))
+    {
+        supports_100_g = true;
+        supports_50_g = true;
+    }
+    // Only link 1 for FH and Debug ports will support 50G MAC configs
+    else if(real_link_number == 1)
+    {
+        supports_50_g = true;
+    }
+
+    // Only link 0 of FH port will support 40G MAC configuration
+    if((port_info->port_type != MTIP_PORT_TYPE_DEBUG) && (real_link_number == 0))
+    {
+        supports_40_g = true;
+    }
 
     if (mtip_device_lookup_lane_qsfp_cfg(port_info->port_type, &lane_qsfp_info) == 0)
     {
@@ -485,28 +533,31 @@ void mtip_ethtool_get_advertised_speed_modes(struct mtip_port_info* port_info, s
                 case MTIP_PORT_CONFIG_1x100GBASE_R_RSFEC:
                 case MTIP_PORT_CONFIG_1x100GBASE_R_RSFEC_LL:
                 {
-                    if(lane_qsfp_info_valid)
+                    if(supports_100_g)
                     {
-                       if(lane_qsfp_info.trx_link_length_range == TRX_CR)
-                          linkmode_set_bit(ETHTOOL_LINK_MODE_100000baseCR_Full_BIT, advertised);
-                       else if(lane_qsfp_info.trx_link_length_range == TRX_SR)
-                          linkmode_set_bit(ETHTOOL_LINK_MODE_100000baseSR_Full_BIT, advertised);
-                       else if(lane_qsfp_info.trx_link_length_range == TRX_LR ||
-                               lane_qsfp_info.trx_link_length_range == TRX_ER ||
-                               lane_qsfp_info.trx_link_length_range == TRX_FR)
-                          linkmode_set_bit(ETHTOOL_LINK_MODE_100000baseLR_ER_FR_Full_BIT, advertised);
-                       else
-                       {
-                          linkmode_set_bit(ETHTOOL_LINK_MODE_100000baseCR_Full_BIT, advertised);
-                          linkmode_set_bit(ETHTOOL_LINK_MODE_100000baseSR_Full_BIT, advertised);
-                          linkmode_set_bit(ETHTOOL_LINK_MODE_100000baseLR_ER_FR_Full_BIT, advertised);
-                       }
-                    }
-                    else
-                    {
-                       linkmode_set_bit(ETHTOOL_LINK_MODE_100000baseCR_Full_BIT, advertised);
-                       linkmode_set_bit(ETHTOOL_LINK_MODE_100000baseSR_Full_BIT, advertised);
-                       linkmode_set_bit(ETHTOOL_LINK_MODE_100000baseLR_ER_FR_Full_BIT, advertised);
+                        if(lane_qsfp_info_valid)
+                        {
+                           if(lane_qsfp_info.trx_link_length_range == TRX_CR)
+                              linkmode_set_bit(ETHTOOL_LINK_MODE_100000baseCR_Full_BIT, advertised);
+                           else if(lane_qsfp_info.trx_link_length_range == TRX_SR)
+                              linkmode_set_bit(ETHTOOL_LINK_MODE_100000baseSR_Full_BIT, advertised);
+                           else if(lane_qsfp_info.trx_link_length_range == TRX_LR ||
+                                   lane_qsfp_info.trx_link_length_range == TRX_ER ||
+                                   lane_qsfp_info.trx_link_length_range == TRX_FR)
+                              linkmode_set_bit(ETHTOOL_LINK_MODE_100000baseLR_ER_FR_Full_BIT, advertised);
+                           else
+                           {
+                              linkmode_set_bit(ETHTOOL_LINK_MODE_100000baseCR_Full_BIT, advertised);
+                              linkmode_set_bit(ETHTOOL_LINK_MODE_100000baseSR_Full_BIT, advertised);
+                              linkmode_set_bit(ETHTOOL_LINK_MODE_100000baseLR_ER_FR_Full_BIT, advertised);
+                           }
+                        }
+                        else
+                        {
+                           linkmode_set_bit(ETHTOOL_LINK_MODE_100000baseCR_Full_BIT, advertised);
+                           linkmode_set_bit(ETHTOOL_LINK_MODE_100000baseSR_Full_BIT, advertised);
+                           linkmode_set_bit(ETHTOOL_LINK_MODE_100000baseLR_ER_FR_Full_BIT, advertised);
+                        }
                     }
                 }
                 break;
@@ -514,28 +565,31 @@ void mtip_ethtool_get_advertised_speed_modes(struct mtip_port_info* port_info, s
                 case MTIP_PORT_CONFIG_1x100GBASE_R2:
                 case MTIP_PORT_CONFIG_1x100GBASE_R2_RSFEC:
                 {
-                    if(lane_qsfp_info_valid)
+                    if(supports_100_g)
                     {
-                       if(lane_qsfp_info.trx_link_length_range == TRX_CR)
-                          linkmode_set_bit(ETHTOOL_LINK_MODE_100000baseCR2_Full_BIT, advertised);
-                       else if(lane_qsfp_info.trx_link_length_range == TRX_SR)
-                          linkmode_set_bit(ETHTOOL_LINK_MODE_100000baseSR2_Full_BIT, advertised);
-                       else if(lane_qsfp_info.trx_link_length_range == TRX_LR ||
-                               lane_qsfp_info.trx_link_length_range == TRX_ER ||
-                               lane_qsfp_info.trx_link_length_range == TRX_FR)
-                          linkmode_set_bit(ETHTOOL_LINK_MODE_100000baseLR2_ER2_FR2_Full_BIT, advertised);
-                       else
-                       {
-                          linkmode_set_bit(ETHTOOL_LINK_MODE_100000baseCR2_Full_BIT, advertised);
-                          linkmode_set_bit(ETHTOOL_LINK_MODE_100000baseSR2_Full_BIT, advertised);
-                          linkmode_set_bit(ETHTOOL_LINK_MODE_100000baseLR2_ER2_FR2_Full_BIT, advertised);
-                       }
-                    }
-                    else
-                    {
-                       linkmode_set_bit(ETHTOOL_LINK_MODE_100000baseCR2_Full_BIT, advertised);
-                       linkmode_set_bit(ETHTOOL_LINK_MODE_100000baseSR2_Full_BIT, advertised);
-                       linkmode_set_bit(ETHTOOL_LINK_MODE_100000baseLR2_ER2_FR2_Full_BIT, advertised);
+                        if(lane_qsfp_info_valid)
+                        {
+                           if(lane_qsfp_info.trx_link_length_range == TRX_CR)
+                              linkmode_set_bit(ETHTOOL_LINK_MODE_100000baseCR2_Full_BIT, advertised);
+                           else if(lane_qsfp_info.trx_link_length_range == TRX_SR)
+                              linkmode_set_bit(ETHTOOL_LINK_MODE_100000baseSR2_Full_BIT, advertised);
+                           else if(lane_qsfp_info.trx_link_length_range == TRX_LR ||
+                                   lane_qsfp_info.trx_link_length_range == TRX_ER ||
+                                   lane_qsfp_info.trx_link_length_range == TRX_FR)
+                              linkmode_set_bit(ETHTOOL_LINK_MODE_100000baseLR2_ER2_FR2_Full_BIT, advertised);
+                           else
+                           {
+                              linkmode_set_bit(ETHTOOL_LINK_MODE_100000baseCR2_Full_BIT, advertised);
+                              linkmode_set_bit(ETHTOOL_LINK_MODE_100000baseSR2_Full_BIT, advertised);
+                              linkmode_set_bit(ETHTOOL_LINK_MODE_100000baseLR2_ER2_FR2_Full_BIT, advertised);
+                           }
+                        }
+                        else
+                        {
+                           linkmode_set_bit(ETHTOOL_LINK_MODE_100000baseCR2_Full_BIT, advertised);
+                           linkmode_set_bit(ETHTOOL_LINK_MODE_100000baseSR2_Full_BIT, advertised);
+                           linkmode_set_bit(ETHTOOL_LINK_MODE_100000baseLR2_ER2_FR2_Full_BIT, advertised);
+                        }
                     }
                 }
                 break;
@@ -543,32 +597,40 @@ void mtip_ethtool_get_advertised_speed_modes(struct mtip_port_info* port_info, s
                 case MTIP_PORT_CONFIG_1x100GBASE_R4:
                 case MTIP_PORT_CONFIG_1x100GBASE_R4_RSFEC:
                 {
-                    if(lane_qsfp_info_valid)
+                    if(supports_100_g && (real_link_number == 0))
                     {
-                       if(lane_qsfp_info.trx_link_length_range == TRX_CR)
-                          linkmode_set_bit(ETHTOOL_LINK_MODE_100000baseCR4_Full_BIT, advertised);
-                       else if(lane_qsfp_info.trx_link_length_range == TRX_SR)
-                          linkmode_set_bit(ETHTOOL_LINK_MODE_100000baseSR4_Full_BIT, advertised);
-                       else if(lane_qsfp_info.trx_link_length_range == TRX_DR)
-                          linkmode_set_bit(ETHTOOL_LINK_MODE_100000baseDR_Full_BIT, advertised);
-                       else if(lane_qsfp_info.trx_link_length_range == TRX_LR ||
-                               lane_qsfp_info.trx_link_length_range == TRX_ER ||
-                               lane_qsfp_info.trx_link_length_range == TRX_FR)
-                          linkmode_set_bit(ETHTOOL_LINK_MODE_100000baseLR4_ER4_Full_BIT, advertised);
-                       else
-                       {
-                          linkmode_set_bit(ETHTOOL_LINK_MODE_100000baseCR4_Full_BIT, advertised);
-                          linkmode_set_bit(ETHTOOL_LINK_MODE_100000baseSR4_Full_BIT, advertised);
-                          linkmode_set_bit(ETHTOOL_LINK_MODE_100000baseDR_Full_BIT, advertised);
-                          linkmode_set_bit(ETHTOOL_LINK_MODE_100000baseLR4_ER4_Full_BIT, advertised);
-                       }
-                    }
-                    else
-                    {
-                       linkmode_set_bit(ETHTOOL_LINK_MODE_100000baseCR4_Full_BIT, advertised);
-                       linkmode_set_bit(ETHTOOL_LINK_MODE_100000baseSR4_Full_BIT, advertised);
-                       linkmode_set_bit(ETHTOOL_LINK_MODE_100000baseDR_Full_BIT, advertised);
-                       linkmode_set_bit(ETHTOOL_LINK_MODE_100000baseLR4_ER4_Full_BIT, advertised);
+                        if(lane_qsfp_info_valid)
+                        {
+                           if(lane_qsfp_info.trx_link_length_range == TRX_CR)
+                              linkmode_set_bit(ETHTOOL_LINK_MODE_100000baseCR4_Full_BIT, advertised);
+                           else if(lane_qsfp_info.trx_link_length_range == TRX_SR)
+                              linkmode_set_bit(ETHTOOL_LINK_MODE_100000baseSR4_Full_BIT, advertised);
+                           else if(lane_qsfp_info.trx_link_length_range == TRX_DR)
+                           {
+                              //linkmode_set_bit(ETHTOOL_LINK_MODE_100000baseDR_Full_BIT, advertised);
+
+                              // Adding temporarily as current ethtool userspace is not displaying DR mode
+                              linkmode_set_bit(ETHTOOL_LINK_MODE_100000baseLR4_ER4_Full_BIT, advertised);
+                           }
+                           else if(lane_qsfp_info.trx_link_length_range == TRX_LR ||
+                                   lane_qsfp_info.trx_link_length_range == TRX_ER ||
+                                   lane_qsfp_info.trx_link_length_range == TRX_FR)
+                              linkmode_set_bit(ETHTOOL_LINK_MODE_100000baseLR4_ER4_Full_BIT, advertised);
+                           else
+                           {
+                              linkmode_set_bit(ETHTOOL_LINK_MODE_100000baseCR4_Full_BIT, advertised);
+                              linkmode_set_bit(ETHTOOL_LINK_MODE_100000baseSR4_Full_BIT, advertised);
+                              linkmode_set_bit(ETHTOOL_LINK_MODE_100000baseDR_Full_BIT, advertised);
+                              linkmode_set_bit(ETHTOOL_LINK_MODE_100000baseLR4_ER4_Full_BIT, advertised);
+                           }
+                        }
+                        else
+                        {
+                           linkmode_set_bit(ETHTOOL_LINK_MODE_100000baseCR4_Full_BIT, advertised);
+                           linkmode_set_bit(ETHTOOL_LINK_MODE_100000baseSR4_Full_BIT, advertised);
+                           linkmode_set_bit(ETHTOOL_LINK_MODE_100000baseDR_Full_BIT, advertised);
+                           linkmode_set_bit(ETHTOOL_LINK_MODE_100000baseLR4_ER4_Full_BIT, advertised);
+                        }
                     }
                 }
                 break;
@@ -578,28 +640,31 @@ void mtip_ethtool_get_advertised_speed_modes(struct mtip_port_info* port_info, s
                 case MTIP_PORT_CONFIG_1x50GBASE_R:
                 case MTIP_PORT_CONFIG_1x50GBASE_R_RSFEC:
                 {
-                    if(lane_qsfp_info_valid)
+                    if(supports_50_g)
                     {
-                       if(lane_qsfp_info.trx_link_length_range == TRX_CR)
-                          linkmode_set_bit(ETHTOOL_LINK_MODE_50000baseCR_Full_BIT, advertised);
-                       else if(lane_qsfp_info.trx_link_length_range == TRX_SR)
-                          linkmode_set_bit(ETHTOOL_LINK_MODE_50000baseSR_Full_BIT, advertised);
-                       else if(lane_qsfp_info.trx_link_length_range == TRX_LR ||
-                               lane_qsfp_info.trx_link_length_range == TRX_ER ||
-                               lane_qsfp_info.trx_link_length_range == TRX_FR)
-                          linkmode_set_bit(ETHTOOL_LINK_MODE_50000baseLR_ER_FR_Full_BIT, advertised);
-                       else
-                       {
-                          linkmode_set_bit(ETHTOOL_LINK_MODE_50000baseCR_Full_BIT, advertised);
-                          linkmode_set_bit(ETHTOOL_LINK_MODE_50000baseSR_Full_BIT, advertised);
-                          linkmode_set_bit(ETHTOOL_LINK_MODE_50000baseLR_ER_FR_Full_BIT, advertised);
-                       }
-                    }
-                    else
-                    {
-                       linkmode_set_bit(ETHTOOL_LINK_MODE_50000baseCR_Full_BIT, advertised);
-                       linkmode_set_bit(ETHTOOL_LINK_MODE_50000baseSR_Full_BIT, advertised);
-                       linkmode_set_bit(ETHTOOL_LINK_MODE_50000baseLR_ER_FR_Full_BIT, advertised);
+                        if(lane_qsfp_info_valid)
+                        {
+                           if(lane_qsfp_info.trx_link_length_range == TRX_CR)
+                              linkmode_set_bit(ETHTOOL_LINK_MODE_50000baseCR_Full_BIT, advertised);
+                           else if(lane_qsfp_info.trx_link_length_range == TRX_SR)
+                              linkmode_set_bit(ETHTOOL_LINK_MODE_50000baseSR_Full_BIT, advertised);
+                           else if(lane_qsfp_info.trx_link_length_range == TRX_LR ||
+                                   lane_qsfp_info.trx_link_length_range == TRX_ER ||
+                                   lane_qsfp_info.trx_link_length_range == TRX_FR)
+                              linkmode_set_bit(ETHTOOL_LINK_MODE_50000baseLR_ER_FR_Full_BIT, advertised);
+                           else
+                           {
+                              linkmode_set_bit(ETHTOOL_LINK_MODE_50000baseCR_Full_BIT, advertised);
+                              linkmode_set_bit(ETHTOOL_LINK_MODE_50000baseSR_Full_BIT, advertised);
+                              linkmode_set_bit(ETHTOOL_LINK_MODE_50000baseLR_ER_FR_Full_BIT, advertised);
+                           }
+                        }
+                        else
+                        {
+                           linkmode_set_bit(ETHTOOL_LINK_MODE_50000baseCR_Full_BIT, advertised);
+                           linkmode_set_bit(ETHTOOL_LINK_MODE_50000baseSR_Full_BIT, advertised);
+                           linkmode_set_bit(ETHTOOL_LINK_MODE_50000baseLR_ER_FR_Full_BIT, advertised);
+                        }
                     }
                 }
                 break;
@@ -613,29 +678,35 @@ void mtip_ethtool_get_advertised_speed_modes(struct mtip_port_info* port_info, s
                 case MTIP_PORT_CONFIG_1x50GBASE_R2_LUAI:
                 case MTIP_PORT_CONFIG_1x50GBASE_R2_LUAI_FEC:
                 {
-                    linkmode_set_bit(ETHTOOL_LINK_MODE_50000baseCR2_Full_BIT, advertised);
+                    if(supports_50_g)
+                    {
+                        linkmode_set_bit(ETHTOOL_LINK_MODE_50000baseCR2_Full_BIT, advertised);
+                    }
                 }
                 break;
 
                 case MTIP_PORT_CONFIG_1x40GBASE_R4:
                 case MTIP_PORT_CONFIG_1x40GBASE_R4_FEC:
                 {
-                    if(lane_qsfp_info_valid)
+                    if(supports_40_g)
                     {
-                       if(lane_qsfp_info.trx_link_length_range == TRX_CR)
-                          linkmode_set_bit(ETHTOOL_LINK_MODE_40000baseCR4_Full_BIT, advertised);
-                       else if(lane_qsfp_info.trx_link_length_range == TRX_SR)
-                          linkmode_set_bit(ETHTOOL_LINK_MODE_40000baseSR4_Full_BIT, advertised);
-                       else
-                       {
-                          linkmode_set_bit(ETHTOOL_LINK_MODE_40000baseCR4_Full_BIT, advertised);
-                          linkmode_set_bit(ETHTOOL_LINK_MODE_40000baseSR4_Full_BIT, advertised);
-                       }
-                    }
-                    else
-                    {
-                       linkmode_set_bit(ETHTOOL_LINK_MODE_40000baseCR4_Full_BIT, advertised);
-                       linkmode_set_bit(ETHTOOL_LINK_MODE_40000baseSR4_Full_BIT, advertised);
+                        if(lane_qsfp_info_valid)
+                        {
+                           if(lane_qsfp_info.trx_link_length_range == TRX_CR)
+                              linkmode_set_bit(ETHTOOL_LINK_MODE_40000baseCR4_Full_BIT, advertised);
+                           else if(lane_qsfp_info.trx_link_length_range == TRX_SR)
+                              linkmode_set_bit(ETHTOOL_LINK_MODE_40000baseSR4_Full_BIT, advertised);
+                           else
+                           {
+                              linkmode_set_bit(ETHTOOL_LINK_MODE_40000baseCR4_Full_BIT, advertised);
+                              linkmode_set_bit(ETHTOOL_LINK_MODE_40000baseSR4_Full_BIT, advertised);
+                           }
+                        }
+                        else
+                        {
+                           linkmode_set_bit(ETHTOOL_LINK_MODE_40000baseCR4_Full_BIT, advertised);
+                           linkmode_set_bit(ETHTOOL_LINK_MODE_40000baseSR4_Full_BIT, advertised);
+                        }
                     }
                 }
                 break;
@@ -707,6 +778,7 @@ int mtip_ethtool_get_link_ksettings(struct net_device *dev, struct ethtool_link_
 {
     struct mtip_netdev_priv *priv;
     u32 link_index;
+    u32 real_link_number;
     struct mtip_link_info* link_info;
     u32 port_type;
     struct mtip_port_info* port_info;
@@ -726,11 +798,17 @@ int mtip_ethtool_get_link_ksettings(struct net_device *dev, struct ethtool_link_
         return -EINVAL;
     }
 
+    if (mtip_lookup_real_link_number_by_link_index(link_index, &real_link_number) < 0)
+    {
+        CSMLOGERR("invalid link_index %d", link_index);
+        return -EINVAL;
+    }
+
     port_info = platform_driver_priv->mtip_ports[port_type];
 
     // Set the supported and advertised speed modes
-    mtip_ethtool_get_supported_speed_modes(port_info, cmd);
-    mtip_ethtool_get_advertised_speed_modes(port_info, cmd);
+    mtip_ethtool_get_supported_speed_modes(port_info, real_link_number, cmd);
+    mtip_ethtool_get_advertised_speed_modes(port_info, real_link_number, cmd);
 
     // Set the supported port type
     linkmode_set_bit(ETHTOOL_LINK_MODE_TP_BIT, cmd->link_modes.supported);
@@ -787,14 +865,13 @@ int mtip_ethtool_set_link_ksettings(struct net_device *netdev, const struct etht
 {
     struct mtip_netdev_priv *priv;
     u32 link_index;
+    u32 real_link_number;
     struct mtip_link_info* link_info;
     u32 port_type;
     struct mtip_port_info* port_info;
     bool autoneg = false;
     u32 speed = 0;
     u32 priv_flags = 0;
-    u32 temp_flag = 0;
-    u32 temp_flag_mask = 0;
 
     priv = netdev_priv(netdev);
     link_index = priv->link_index;
@@ -806,6 +883,21 @@ int mtip_ethtool_set_link_ksettings(struct net_device *netdev, const struct etht
     if (mtip_lookup_port_type_by_link_index(link_index, &port_type) < 0)
     {
         CSMLOGERR("invalid port_type for link_index %d", link_index);
+        return -EINVAL;
+    }
+
+    if (mtip_lookup_real_link_number_by_link_index(link_index, &real_link_number) < 0)
+    {
+        CSMLOGERR("invalid link_index %d", link_index);
+        return -EINVAL;
+    }
+
+    // Honor only for primary link of the port
+    if((port_type != MTIP_PORT_TYPE_DEBUG && real_link_number != 0) ||
+       (port_type == MTIP_PORT_TYPE_DEBUG && real_link_number != 1))
+    {
+        CSMLOGERR("Ignore for non primary link %d of the port %d",
+                  real_link_number, port_type);
         return -EINVAL;
     }
 
@@ -824,7 +916,11 @@ int mtip_ethtool_set_link_ksettings(struct net_device *netdev, const struct etht
     }
 
     // Set the autoneg config
-    port_info->autoneg = autoneg;
+    if(port_info->autoneg != autoneg)
+    {
+        port_info->autoneg = autoneg;
+        port_info->autoneg_changed = true;
+    }
 
     speed = cmd->base.speed;
     CSMLOGERR("Speed for link_index %d set to %d", link_index, speed);
@@ -865,17 +961,9 @@ int mtip_ethtool_set_link_ksettings(struct net_device *netdev, const struct etht
     }
     else
         priv_flags = MTIP_DEVICE_PRIV_FLAGS_BIT_MASK_NON_FEC;
-        // Set the priv flags for the speed config
-    while(priv_flags)
-    {
-        if(priv_flags & 0x1)
-        {
-            temp_flag_mask |= (1<<temp_flag);
-            mtip_ethtool_set_priv_flags(netdev, temp_flag_mask);
-        }
-        priv_flags >>= 1;
-        temp_flag++;
-    }
+
+    // Set the priv flags for the speed config
+    mtip_ethtool_set_priv_flags(netdev, priv_flags);
 
     return 0;
 }
@@ -1001,11 +1089,28 @@ u32 mtip_ethtool_get_priv_flags(struct net_device *netdev)
 {
     struct mtip_netdev_priv *priv;
     u32 link_index;
+    u32 port_type;
+    u32 port_link0_index;
 
     priv = netdev_priv(netdev);
     link_index = priv->link_index;
 
     CSMLOGDBG("Get priv called for link index: %d", link_index);
+
+    if (mtip_lookup_port_type_by_link_index(link_index, &port_type) < 0)
+    {
+        CSMLOGERR("invalid port_type for link_index %d", link_index);
+        return -1;
+    }
+
+    // Process only for link 0 of the port
+    port_link0_index = platform_driver_priv->devices.port_devices[port_type].link_devices[0]->link_index;
+    if (link_index != port_link0_index) 
+    {
+        CSMLOGDBG("ignoring the default priv flags of link_index %d", link_index);
+    }
+
+    priv = netdev_priv(platform_driver_priv->mtip_links[port_link0_index]->dev);
 
     // return flags currently enabled
     return priv->priv_flags;
@@ -1032,30 +1137,53 @@ int mtip_ethtool_set_priv_flags(struct net_device *netdev, u32 flags)
     u32 link_index;
     u32 pflag;
     int err;
-    int port_config_index = 0, temp_flag = flags;
+    int temp_flag = flags;
+    enum mtip_port_config_enum port_config = MTIP_PORT_CONFIG_1x100GBASE_R;
+    u32 real_link_number;
+    u32 port_type;
 
     priv = netdev_priv(netdev);
     link_index = priv->link_index;
 
-    //extracting which bit of flag is set
-    while (temp_flag >>= 1)
+    if (mtip_lookup_port_type_by_link_index(link_index, &port_type) < 0)
     {
-        ++port_config_index;
+        CSMLOGERR("invalid port_type for link_index %d", link_index);
+        return -EINVAL;
+    }
+
+    if (mtip_lookup_real_link_number_by_link_index(link_index, &real_link_number) < 0)
+    {
+        CSMLOGERR("invalid link_index %d", link_index);
+        return -EINVAL;
+    }
+
+    // Honor only for primary link of the port
+    if((port_type != MTIP_PORT_TYPE_DEBUG && real_link_number != 0) ||
+       (port_type == MTIP_PORT_TYPE_DEBUG && real_link_number != 1))
+    {
+        CSMLOGERR("Ignore for non primary link %d of the port %d",
+                  real_link_number, port_type);
+        return -EINVAL;
     }
 
     CSMLOGDBG("Set priv called for link index: %d with flags: 0x%x", link_index, flags);
 
-    if (mtip_check_if_running(netdev) == true) 
-    {
-        CSMLOGERR("Set priv called when running for link_index: %d", link_index);
-        return -EINVAL;
-    }
-
     //checking for valid port config for debugeth
-    if(link_index == MTIP_DEBUG_ETH_LINK_INDEX && !check_if_valid_port_config_for_debug_eth(port_config_index))
+    if(link_index == MTIP_DEBUG_ETH_LINK_INDEX)
     {
-        CSMLOGERR("config not supported on debug port");
-        return 0;
+        //extracting which bits of flag are set
+        while (temp_flag)
+        {
+            if((temp_flag & 0x1) &&
+               check_if_valid_port_config_for_debug_eth(port_config) == false)
+            {
+                CSMLOGERR("Invalid port config %d for Debug ETH", port_config);
+                return -EINVAL;
+            }
+
+            temp_flag >>= 1;
+            port_config++;
+        }
     }
 
     // mark that priv flags have been set using ethtool
