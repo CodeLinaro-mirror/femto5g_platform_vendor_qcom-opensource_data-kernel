@@ -249,4 +249,7 @@ void ecpriss_unmap_xbar_qudp_v2(void);
 void ecpriss_xbar_oc_flush_enable(uint32_t code);
 void ecpriss_panic_notifr_handler_v2(void);
 void ecpriss_panic_notifr_handler(void);
+
+void ecpriss_debug_flow_info(ecpriss_packet_payload_s *packet, uint8_t msg_id);
+
 #endif

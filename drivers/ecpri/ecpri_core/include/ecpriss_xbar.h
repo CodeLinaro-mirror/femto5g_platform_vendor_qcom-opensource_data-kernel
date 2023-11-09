@@ -10,7 +10,7 @@
 #define LUT_INDEX 65535
 #define NUM_OF_FHP 3
 #define NUM_OF_FLTR 16
-#define NUM_EGRESS_ENTRY 255
+#define NUM_EGRESS_ENTRY 256
 #define MAX_XBAR_WM_ENTRY 10
 
 #include "ecpriss_xbar_hal.h"

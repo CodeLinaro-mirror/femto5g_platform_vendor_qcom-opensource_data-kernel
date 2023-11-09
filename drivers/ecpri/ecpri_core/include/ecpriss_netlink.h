@@ -45,7 +45,10 @@ typedef enum
 	ECPRISS_MESSAGE_STAT,
 	ECPRISS_MESSAGE_DEREGISTER_CLIENT,
 	ECPRISS_MESSAGE_TRANSPORT_ELEMENT_TO_TRANSPORT_HDLR_MAP,
-	ECPRISS_MESSAGE_FLOW_TRANSP_DECFG
+	ECPRISS_MESSAGE_FLOW_TRANSP_DECFG,
+	ECPRISS_MESSAGE_TRANSPORT_EGRESS_TABLE_RECFG,
+	ECPRISS_MESSAGE_TRANSPORT_INGESS_TABLE_CFG,
+	ECPRISS_MESSAGE_TRANSPORT_INGESS_TABLE_DECFG
 }ecpriss_message_id_e;
 
 typedef union ecpriss_netlink_flow
@@ -85,5 +88,4 @@ int ecpriss_netlink_socket_create(void);
 int ecpriss_netlink_socket_create_v2(void);
 void ecpriss_process_packet(ecpriss_packet_payload_s *packet);
 void ecpriss_process_packet_decfg(ecpriss_packet_payload_s *packet, ecpriss_message_id_e config_parameter);
-
 #endif

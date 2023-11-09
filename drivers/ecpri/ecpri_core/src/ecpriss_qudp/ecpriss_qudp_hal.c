@@ -181,6 +181,8 @@ static const char *ecpriss_qudp_hal_reg_name_to_str[ECPRISS_QUDP_REG_MAX+1] = {
 "	ECPRI_UDP_FH_EGRESS_IPV6_FIELDS_P_V2",
 "	ECPRI_UDP_FH_EGRESS_ETH_MTU_P_V2",
 "	ECPRI_UDP_FH_EGRESS_SA_TAG_ETHERTYPE_P_V2",
+"	ECPRI_UDP_FH_EGRESS_L2_ENCAP_INDEX_OVERRIDE_P_V2",
+"	ECPRI_UDP_FH_EGRESS_L3_ENCAP_INDEX_OVERRIDE_P_V2",
 "	ECPRI_UDP_FH_EGRESS_CONFIG_P_V2",
 "	ECPRI_UDP_FH_UDP_SW_IRQ_STATUS_0_PORT_P_V2",
 "	ECPRI_UDP_FH_UDP_SW_IRQ_STATUS_1_PORT_P_V2",
@@ -1006,8 +1008,75 @@ static const char *ecpriss_qudp_hal_reg_name_to_str[ECPRISS_QUDP_REG_MAX+1] = {
 	return;
 }
 
+	static void ecpriss_qudp_hal_reg_construct_udp_fh_egress_l2_encap_index_override_p_v2
+(ecpriss_qudp_hal_reg_name_e reg, const void *fields, uint32_t* val)
+{
+	ecpri_qudp_hwio_def_ecpri_udp_fh_egress_l2_encap_index_override_p_s_v2 
+		*egress_l2_encap_index_override_p =
+		(ecpri_qudp_hwio_def_ecpri_udp_fh_egress_l2_encap_index_override_p_s_v2 *)fields;
 
+	ECPRISS_HAL_SETFIELD_IN_REG(*val,
+			egress_l2_encap_index_override_p->redirect_from,
+			HWIO_ECPRI_UDP_FH_EGRESS_L2_ENCAP_INDEX_OVERRIDE_p_REDIRECT_FROM_SHFT_V2,
+			HWIO_ECPRI_UDP_FH_EGRESS_L2_ENCAP_INDEX_OVERRIDE_p_REDIRECT_FROM_BMSK_V2);
 
+	ECPRISS_HAL_SETFIELD_IN_REG(*val,
+			egress_l2_encap_index_override_p->redirect_to,
+			HWIO_ECPRI_UDP_FH_EGRESS_L2_ENCAP_INDEX_OVERRIDE_p_REDIRECT_TO_SHFT_V2,
+			HWIO_ECPRI_UDP_FH_EGRESS_L2_ENCAP_INDEX_OVERRIDE_p_REDIRECT_TO_BMSK_V2);
+	return;
+}
+	static void ecpriss_qudp_hal_reg_parse_udp_fh_egress_l2_encap_index_override_p_v2
+(ecpriss_qudp_hal_reg_name_e reg, void *fields, uint32_t val)
+{
+	ecpri_qudp_hwio_def_ecpri_udp_fh_egress_l2_encap_index_override_p_s_v2 
+		*egress_l2_encap_index_override_p =
+		(ecpri_qudp_hwio_def_ecpri_udp_fh_egress_l2_encap_index_override_p_s_v2 *)fields;
+
+	egress_l2_encap_index_override_p->redirect_from	= ECPRISS_HAL_GETFIELD_FROM_REG(val,
+			HWIO_ECPRI_UDP_FH_EGRESS_L2_ENCAP_INDEX_OVERRIDE_p_REDIRECT_FROM_SHFT_V2,
+			HWIO_ECPRI_UDP_FH_EGRESS_L2_ENCAP_INDEX_OVERRIDE_p_REDIRECT_FROM_BMSK_V2);
+
+	egress_l2_encap_index_override_p->redirect_to = ECPRISS_HAL_GETFIELD_FROM_REG(val,
+			HWIO_ECPRI_UDP_FH_EGRESS_L2_ENCAP_INDEX_OVERRIDE_p_REDIRECT_TO_SHFT_V2,
+			HWIO_ECPRI_UDP_FH_EGRESS_L2_ENCAP_INDEX_OVERRIDE_p_REDIRECT_TO_BMSK_V2);
+	return;
+}
+
+	static void ecpriss_qudp_hal_reg_construct_udp_fh_egress_l3_encap_index_override_p_v2
+(ecpriss_qudp_hal_reg_name_e reg, const void *fields, uint32_t* val)
+{
+	ecpri_qudp_hwio_def_ecpri_udp_fh_egress_l3_encap_index_override_p_s_v2 
+		*egress_l3_encap_index_override_p =
+		(ecpri_qudp_hwio_def_ecpri_udp_fh_egress_l3_encap_index_override_p_s_v2 *)fields;
+
+	ECPRISS_HAL_SETFIELD_IN_REG(*val,
+			egress_l3_encap_index_override_p->redirect_from,
+			HWIO_ECPRI_UDP_FH_EGRESS_L3_ENCAP_INDEX_OVERRIDE_p_REDIRECT_FROM_SHFT_V2,
+			HWIO_ECPRI_UDP_FH_EGRESS_L3_ENCAP_INDEX_OVERRIDE_p_REDIRECT_FROM_BMSK_V2);
+
+	ECPRISS_HAL_SETFIELD_IN_REG(*val,
+			egress_l3_encap_index_override_p->redirect_to,
+			HWIO_ECPRI_UDP_FH_EGRESS_L3_ENCAP_INDEX_OVERRIDE_p_REDIRECT_TO_SHFT_V2,
+			HWIO_ECPRI_UDP_FH_EGRESS_L3_ENCAP_INDEX_OVERRIDE_p_REDIRECT_TO_BMSK_V2);
+	return;
+}
+	static void ecpriss_qudp_hal_reg_parse_udp_fh_egress_l3_encap_index_override_p_v2
+(ecpriss_qudp_hal_reg_name_e reg, void *fields, uint32_t val)
+{
+	ecpri_qudp_hwio_def_ecpri_udp_fh_egress_l3_encap_index_override_p_s_v2 
+		*egress_l3_encap_index_override_p =
+		(ecpri_qudp_hwio_def_ecpri_udp_fh_egress_l3_encap_index_override_p_s_v2 *)fields;
+
+	egress_l3_encap_index_override_p->redirect_from	= ECPRISS_HAL_GETFIELD_FROM_REG(val,
+			HWIO_ECPRI_UDP_FH_EGRESS_L3_ENCAP_INDEX_OVERRIDE_p_REDIRECT_FROM_SHFT_V2,
+			HWIO_ECPRI_UDP_FH_EGRESS_L3_ENCAP_INDEX_OVERRIDE_p_REDIRECT_FROM_BMSK_V2);
+
+	egress_l3_encap_index_override_p->redirect_to = ECPRISS_HAL_GETFIELD_FROM_REG(val,
+			HWIO_ECPRI_UDP_FH_EGRESS_L3_ENCAP_INDEX_OVERRIDE_p_REDIRECT_TO_SHFT_V2,
+			HWIO_ECPRI_UDP_FH_EGRESS_L3_ENCAP_INDEX_OVERRIDE_p_REDIRECT_TO_BMSK_V2);
+	return;
+}
 	static void ecpriss_qudp_hal_reg_construct_udp_fh_egress_config_p
 (ecpriss_qudp_hal_reg_name_e reg, const void *fields, uint32_t* val)
 {
@@ -1029,7 +1098,43 @@ static const char *ecpriss_qudp_hal_reg_name_to_str[ECPRISS_QUDP_REG_MAX+1] = {
 
 	return;
 }
+	static void ecpriss_qudp_hal_reg_parse_udp_fh_egress_config_p_v2
+(ecpriss_qudp_hal_reg_name_e reg, void *fields, uint32_t val)
+{
+	ecpri_qudp_hwio_def_ecpri_udp_fh_egress_config_p_s_v2 *egress_config
+		= (ecpri_qudp_hwio_def_ecpri_udp_fh_egress_config_p_s_v2 *)fields;
 
+	egress_config->calc_ip_udp_len_from_byte_count = ECPRISS_HAL_GETFIELD_FROM_REG(val,
+			HWIO_ECPRI_UDP_FH_EGRESS_CONFIG_p_CALC_IP_UDP_LEN_FROM_BYTE_COUNT_SHFT_V2,
+			HWIO_ECPRI_UDP_FH_EGRESS_CONFIG_p_CALC_IP_UDP_LEN_FROM_BYTE_COUNT_BMSK_V2);
+
+	egress_config->bypassed_packets_vport_action = ECPRISS_HAL_GETFIELD_FROM_REG(val,
+			HWIO_ECPRI_UDP_FH_EGRESS_CONFIG_p_BYPASSED_PACKETS_VPORT_ACTION_SHFT_V2,
+			HWIO_ECPRI_UDP_FH_EGRESS_CONFIG_p_BYPASSED_PACKETS_VPORT_ACTION_BMSK_V2);
+
+	egress_config->bypassed_packets_vport = ECPRISS_HAL_GETFIELD_FROM_REG(val,
+			HWIO_ECPRI_UDP_FH_EGRESS_CONFIG_p_BYPASSED_PACKETS_VPORT_SHFT_V2,
+			HWIO_ECPRI_UDP_FH_EGRESS_CONFIG_p_BYPASSED_PACKETS_VPORT_BMSK_V2);
+
+	egress_config->disable_ptp_detection = ECPRISS_HAL_GETFIELD_FROM_REG(val,
+			HWIO_ECPRI_UDP_FH_EGRESS_CONFIG_p_DISABLE_PTP_DETECTION_SHFT_V2,
+			HWIO_ECPRI_UDP_FH_EGRESS_CONFIG_p_DISABLE_PTP_DETECTION_BMSK_V2);
+
+	egress_config->l3_encap_index_override_en = ECPRISS_HAL_GETFIELD_FROM_REG(val,
+			HWIO_ECPRI_UDP_FH_EGRESS_CONFIG_p_L3_ENCAP_INDEX_OVERRIDE_EN_SHFT_V2,
+			HWIO_ECPRI_UDP_FH_EGRESS_CONFIG_p_L3_ENCAP_INDEX_OVERRIDE_EN_BMSK_V2);
+
+	egress_config->l2_encap_index_override_en = ECPRISS_HAL_GETFIELD_FROM_REG(val,
+			HWIO_ECPRI_UDP_FH_EGRESS_CONFIG_p_L2_ENCAP_INDEX_OVERRIDE_EN_SHFT_V2,
+			HWIO_ECPRI_UDP_FH_EGRESS_CONFIG_p_L2_ENCAP_INDEX_OVERRIDE_EN_BMSK_V2);
+
+	egress_config->disable_padding_removal = ECPRISS_HAL_GETFIELD_FROM_REG(val,
+			HWIO_ECPRI_UDP_FH_EGRESS_CONFIG_p_DISABLE_PADDING_REMOVAL_SHFT_V2,
+			HWIO_ECPRI_UDP_FH_EGRESS_CONFIG_p_DISABLE_PADDING_REMOVAL_BMSK_V2);
+
+
+	return;
+}
 	static void ecpriss_qudp_hal_reg_construct_udp_fh_egress_config_p_v2
 (ecpriss_qudp_hal_reg_name_e reg, const void *fields, uint32_t* val)
 {
@@ -4906,9 +5011,17 @@ static struct ecpriss_qudp_hal_reg_obj ecpriss_qudp_hal_reg_objs[ECPRISS_HW_MAX]
 		ecpriss_qudp_hal_reg_construct_udp_fh_egress_sa_tag_ethertype_p_v2,
 		ecpriss_qudp_hal_reg_parse_dummy_v2,
 		0x09380000, 0x818, 0, 0, 0, 0, 0},
+	[ECPRISS_HW_v2_0][ECPRI_UDP_FH_EGRESS_L2_ENCAP_INDEX_OVERRIDE_P_V2] = {
+		ecpriss_qudp_hal_reg_construct_udp_fh_egress_l2_encap_index_override_p_v2,
+		ecpriss_qudp_hal_reg_parse_udp_fh_egress_l2_encap_index_override_p_v2,
+		0x09380000, 0x824, 0x4, 0, 0, 0, 0},
+	[ECPRISS_HW_v2_0][ECPRI_UDP_FH_EGRESS_L3_ENCAP_INDEX_OVERRIDE_P_V2] = {
+		ecpriss_qudp_hal_reg_construct_udp_fh_egress_l3_encap_index_override_p_v2,
+		ecpriss_qudp_hal_reg_parse_udp_fh_egress_l3_encap_index_override_p_v2,
+		0x09380000, 0x830, 0x4, 0, 0, 0, 0},
 	[ECPRISS_HW_v2_0][ECPRI_UDP_FH_EGRESS_CONFIG_P_V2] = {
 		ecpriss_qudp_hal_reg_construct_udp_fh_egress_config_p_v2,
-		ecpriss_qudp_hal_reg_parse_dummy_v2,
+		ecpriss_qudp_hal_reg_parse_udp_fh_egress_config_p_v2,
 		0x09380000, 0x860, 0x4, 0, 0, 0, 0},
 	[ECPRISS_HW_v2_0][ECPRI_UDP_FH_UDP_SW_IRQ_STATUS_0_PORT_P_V2] = {
 		ecpriss_qudp_hal_reg_construct_dummy_v2,
