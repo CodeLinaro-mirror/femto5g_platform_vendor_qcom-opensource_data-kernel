@@ -49,6 +49,7 @@
 #include "mtip_pcs.h"
 #include "mtip_debug_eth.h"
 #include "mtip_client.h"
+#include "mtip_security.h"
 
 int mtip_ethtool_debug_logging_enable = 0;
 
@@ -153,11 +154,13 @@ const char* mtip_ethtool_get_priv_flags_str(u32 index)
 
 static int mtip_ethtool_get_sset_count(struct net_device *netdev, int sset)
 {
-    CSMLOGDBG("ethtool: get_sset_count %d, %d\n", sset, MTIP_ETHTOOL_STATS_LEN);
+	int eip_ethtool_sset = mtip_security_get_sset_count(netdev);
+	CSMLOGDBG("ethtool: get_sset_count %d, %d\n", sset,
+		  MTIP_ETHTOOL_STATS_LEN + eip_ethtool_sset);
 
 	switch (sset) {
 	case ETH_SS_STATS:
-		return MTIP_ETHTOOL_STATS_LEN;
+		return (MTIP_ETHTOOL_STATS_LEN + eip_ethtool_sset);
     case ETH_SS_PRIV_FLAGS:
         return MTIP_ETHTOOL_PRIV_FLAGS_LEN;
 	default:
@@ -168,6 +171,7 @@ static int mtip_ethtool_get_sset_count(struct net_device *netdev, int sset)
 static void mtip_ethtool_get_strings(struct net_device *netdev, u32 stringset, u8 *data)
 {
     int i;
+
     CSMLOGDBG("ethtool: get_strings stringset %d, %d\n", stringset, MTIP_ETHTOOL_STATS_LEN);
 
     if (stringset == ETH_SS_STATS) 
@@ -177,6 +181,7 @@ static void mtip_ethtool_get_strings(struct net_device *netdev, u32 stringset, u
 				ETH_GSTRING_LEN);
 			data += ETH_GSTRING_LEN;
 		}
+        mtip_security_get_strings(netdev, data);
     }
     else if (stringset == ETH_SS_PRIV_FLAGS) 
     {
@@ -196,6 +201,9 @@ static void mtip_ethtool_get_stats(struct net_device *netdev, struct ethtool_sta
 
     // read the stats from the HW
     mtip_macstats_get_stats(netdev, data);
+
+    // Get stats
+    mtip_security_get_stats(netdev, &data[MTIP_ETHTOOL_STATS_LEN]);
 }
 
 void mtip_ethtool_get_dev_regs
