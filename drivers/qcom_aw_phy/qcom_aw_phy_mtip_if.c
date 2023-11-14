@@ -22,6 +22,7 @@
 struct qcom_aw_phy_mtip_if_info qcom_aw_phy_mtip_if_info_s = {0};
 
 extern int qcom_aw_phy_tx_compliance_flag;
+extern int qcom_aw_phy_an_restart_delay_timer;
 
 /*-------------------------------------------------------------------
 * Function Definitions
@@ -748,7 +749,7 @@ int qcom_aw_phy_perform_an(
   mss_access_t mss = {.phy_offset = 0, .lane_offset = 0};
   enum eth_phy_iface_phy_lane_num_enum lane = PHY_LANE_0;
   uint32_t an_no_attached = 1;
-  uint32_t status_check_disable = 0;
+  uint32_t status_check_disable = 2;
   uint32_t next_page_en = 0;
   mss_access_t temp_mss = {0};
   int i=0, start_lane=PHY_LANE_0, end_lane=PHY_LANE_MAX;
@@ -1017,11 +1018,13 @@ int qcom_aw_phy_bringup_anlt_mode(mss_access_t *mss,
                                 struct qcom_aw_phy_inst_config *phy_inst_info,
                                 bool lanes_enabled[PHY_LANE_MAX]){
   enum eth_phy_iface_phy_lane_num_enum i = PHY_LANE_0;
+  enum eth_phy_iface_phy_lane_num_enum j = PHY_LANE_0;
   enum eth_phy_iface_phy_lane_num_enum ref_lane;
   enum eth_phy_iface_phy_lane_num_enum temp_lane = PHY_LANE_0;
   int ret_val = 0;
   uint32_t temp_adv_ability[PHY_SPEED_SPEC_MAX];
   uint32_t temp_fec_ability[PHY_FEC_SPEC_MAX];
+  int num_an_lanes = 0;
 
   memset(temp_adv_ability, 0, PHY_SPEED_SPEC_MAX*sizeof(uint32_t));
   memset(temp_fec_ability, 0, PHY_FEC_SPEC_MAX*sizeof(uint32_t));
@@ -1048,13 +1051,18 @@ int qcom_aw_phy_bringup_anlt_mode(mss_access_t *mss,
       continue;
     }
 
-    /* Skip AN for reference lane as it was already done with AN initiate
-       procedure */
+    num_an_lanes = qcom_aw_phy_get_num_lanes_for_speed_mode(
+                                  phy_inst_info->an_params.an_result[ref_lane]);
+
+    /* Just trigger CDR lock successful callback if reference lane was already
+       negotiated but was not brought up by MAC earlier post initiate AN */
     if(i == ref_lane &&
-       phy_inst_info->bring_up_status == false){
-      i += qcom_aw_phy_get_num_lanes_for_speed_mode(
-                                 phy_inst_info->an_params.an_result[ref_lane]);
-      continue;
+       phy_inst_info->an_params.an_state[ref_lane] == PHY_AN_STATE_DONE){
+
+      for(j=ref_lane; (j < ref_lane+num_an_lanes) && (j < PHY_LANE_MAX); j++){
+        qcom_aw_phy_handle_cdr_lock_status(phy_inst_info, j, CDR_LOCK_SUCCESS);
+      }
+      return ret_val;
     }
 
     QCOM_AW_PHY_LOG_DBG("ANLT for PHY %d lane %d with speed mode %d FEC %d",
@@ -1068,22 +1076,12 @@ int qcom_aw_phy_bringup_anlt_mode(mss_access_t *mss,
     temp_fec_ability[phy_inst_info->an_params.an_fec_result[ref_lane]] = 1;
     phy_inst_info->an_params.current_lane = i;
 
-    /* Just trigger CDR lock successful callback if reference lane was already
-       negotiated but was not brought up by MAC earlier post initiate AN */
-    if(i == ref_lane &&
-       phy_inst_info->an_params.an_state[ref_lane] == PHY_AN_STATE_DONE){
-      qcom_aw_phy_handle_cdr_lock_status(phy_inst_info, ref_lane,
-                                         CDR_LOCK_SUCCESS);
-      return ret_val;
-    }
-
     qcom_aw_phy_perform_an(phy_inst_info, temp_adv_ability, temp_fec_ability);
 
     /* If multi lane is enabled, multiple lanes will be brought up as part of
        the previous AN. So, based on the negotiated speed mode, need to jump to
        the next master lane of this config. */
-    i += qcom_aw_phy_get_num_lanes_for_speed_mode(
-                                  phy_inst_info->an_params.an_result[ref_lane]);
+    i += num_an_lanes;
   }
 
   return ret_val;
@@ -1598,6 +1596,7 @@ int qcom_aw_phy_mac_link_status(enum mtip_port_type_enum port_type,
   bool notify_flag = false;
   enum local_error_enum local_err_val = LOCAL_ERROR_INVALID;
   int ret_val = 0;
+  struct qcom_aw_phy_work_q_params *wq_params = NULL;
 
   /* Get the PHY instance type for the provided port */
   phy_inst_type = qcom_aw_phy_mac_port_to_phy_inst(port_type);
@@ -1639,6 +1638,22 @@ int qcom_aw_phy_mac_link_status(enum mtip_port_type_enum port_type,
         phy_inst_info->cdr_lock_status_flag[lane_num] = CDR_LOCK_NONE;
       else
         phy_inst_info->cdr_lock_status_flag[lane_num] = CDR_LOCK_SUCCESS;
+
+      if (status == false &&
+          phy_inst_info->phy_eq_mode == QCOM_AW_PHY_ANLT_MODE) {
+
+        wq_params = kmalloc(sizeof(struct qcom_aw_phy_work_q_params),
+                            GFP_ATOMIC);
+        if(!wq_params)
+          QCOM_AW_PHY_LOG_ERR("Malloc failed!");
+        else{
+          INIT_DELAYED_WORK(&wq_params->wq_item, qcom_aw_phy_handle_an_restart);
+          wq_params->phy_inst = phy_inst_info->phy_inst;
+          wq_params->lane_num = lane_num;
+          queue_delayed_work(phy_config_info->wq, &wq_params->wq_item,
+                          msecs_to_jiffies(qcom_aw_phy_an_restart_delay_timer));
+        }
+      }
 
       mutex_unlock(&phy_inst_info->lane_lock[lane_num]);
     }
@@ -1979,8 +1994,7 @@ void qcom_aw_phy_handle_rx_sig_detect(struct work_struct *work){
 
       mutex_lock(&phy_inst_info->lane_lock[lane]);
 
-      if(phy_inst_info->lane_params[lane].lane_bring_up_status == false ||
-         phy_inst_info->phy_eq_mode != QCOM_AW_PHY_MANUAL_EQ_MODE) {
+      if(phy_inst_info->lane_params[lane].lane_bring_up_status == false) {
         mutex_unlock(&phy_inst_info->lane_lock[lane]);
         continue;
       }
@@ -2177,6 +2191,87 @@ int qcom_aw_phy_get_phy_eq_mode(enum mtip_port_type_enum port_type) {
     return -1;
   }
   return phy_inst_info->phy_eq_mode;
+}
+
+/*-------------------------------------------------------------------
+* qcom_aw_phy_handle_an_restart
+
+* Description: Restarts AN state machine after induced delay timer.
+------------------------------------------------------------------- */
+void qcom_aw_phy_handle_an_restart(struct work_struct *work){
+  struct delayed_work *delayed_work_item = to_delayed_work(work);
+  struct qcom_aw_phy_work_q_params *wq_params =
+     container_of(delayed_work_item, struct qcom_aw_phy_work_q_params, wq_item);
+  enum qcom_aw_phy_instance_enum phy_inst;
+  enum eth_phy_iface_phy_lane_num_enum lane_num;
+  struct qcom_aw_phy_config *phy_config_info = NULL;
+  struct qcom_aw_phy_inst_config *phy_inst_info = NULL;
+  mss_access_t mss = {.phy_offset = 0, .lane_offset = 0};
+
+  if(!wq_params){
+    QCOM_AW_PHY_LOG_ERR("Invalid work queue structure!");
+    return;
+  }
+
+  QCOM_AW_PHY_LOG_DBG("AN restart for PHY %d lane %d",
+                      wq_params->phy_inst, wq_params->lane_num);
+
+  phy_inst = wq_params->phy_inst;
+  lane_num = wq_params->lane_num;
+
+  if (!QCOM_AW_PHY_INST_VALID(phy_inst) || !QCOM_AW_PHY_LANE_VALID(lane_num)){
+    QCOM_AW_PHY_LOG_ERR("Invalid PHY instance/lane. AN restart failed.");
+    goto func_exit;
+  }
+
+  phy_config_info = qcom_aw_phy_get_config_info();
+  if (!phy_config_info) {
+    goto func_exit;
+  }
+
+  /* Get the PHY instance info for the passed instance type */
+  phy_inst_info = &phy_config_info->phy_inst_config_info[phy_inst];
+  if (phy_inst_info->valid == false) {
+    goto func_exit;
+  }
+
+  mutex_lock(&phy_inst_info->phy_inst_lock);
+
+  /* Setup PHY offset */
+  mss.phy_offset = phy_inst_info->base_addr;
+
+  mutex_lock(&phy_inst_info->lane_lock[lane_num]);
+
+  // Skip AN restart if PHY lane was brought down before this processing
+  if(phy_inst_info->lane_params[lane_num].lane_bring_up_status == false){
+    mutex_unlock(&phy_inst_info->lane_lock[lane_num]);
+    mutex_unlock(&phy_inst_info->phy_inst_lock);
+    goto func_exit;
+  }
+
+  // Skip AN restart if PCS link is already up
+  if(phy_inst_info->lane_params[lane_num].link_status == true){
+    mutex_unlock(&phy_inst_info->lane_lock[lane_num]);
+    mutex_unlock(&phy_inst_info->phy_inst_lock);
+    goto func_exit;
+  }
+
+  /* Set the lane offset */
+  pmd_set_lane(&mss, lane_num);
+
+  pmd_write_field(&mss, ETH_AN_CTRL_REG1_ADDR,
+                  ETH_AN_CTRL_REG1_AN_MR_RESTART_NEGOTIATION_MASK,
+                  ETH_AN_CTRL_REG1_AN_MR_RESTART_NEGOTIATION_OFFSET, 1);
+  pmd_write_field(&mss, ETH_AN_CTRL_REG1_ADDR,
+                  ETH_AN_CTRL_REG1_AN_MR_RESTART_NEGOTIATION_MASK,
+                  ETH_AN_CTRL_REG1_AN_MR_RESTART_NEGOTIATION_OFFSET, 0);
+
+  mutex_unlock(&phy_inst_info->lane_lock[lane_num]);
+  mutex_unlock(&phy_inst_info->phy_inst_lock);
+
+func_exit:
+  kfree(wq_params);
+  return;
 }
 
 /* API exposed structure */

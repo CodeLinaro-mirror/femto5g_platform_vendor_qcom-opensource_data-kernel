@@ -489,6 +489,12 @@ int mtip_phy_teardown_phy(u32 link_index)
     // stop listening to link status interrupts
     mtip_phy_lane_bring_up_progress_ind(link_index, true);
 
+    // Process link down
+    if (mtip_loopback_mode == MTIP_MODE_DEFAULT)
+    {
+        mtip_process_link_state(link_index, false);
+    }
+
     mtip_phy_get_lanes_of_link(link_index, lanes_enabled);
 
     for (i = 0; i < PHY_LANE_MAX; ++i) 
@@ -500,12 +506,6 @@ int mtip_phy_teardown_phy(u32 link_index)
     ret_val = (qcom_aw_phy_driver_iface_ops.eth_phy_iface_phy_teardown)(port_type, lanes_enabled);
 
     CSMLOGINFO("phy teardown done for link_index %d rv %d", link_index, ret_val);
-
-    // disable tx_rx on the link
-    if (mtip_loopback_mode == MTIP_MODE_DEFAULT)
-    {
-        mtip_process_link_state(link_index, false);
-    }
 
     // Clear the retry count if interface has been torn down
     if(platform_driver_priv->mtip_links[link_index]->state == MTIP_LINK_STATE_CLOSE)

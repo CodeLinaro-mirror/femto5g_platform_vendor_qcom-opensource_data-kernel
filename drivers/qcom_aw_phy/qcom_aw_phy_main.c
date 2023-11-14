@@ -63,6 +63,18 @@ MODULE_PARM_DESC(qcom_aw_phy_toggle_polarity,
    retry procedure for TX compliance tests */
 bool qcom_aw_phy_tx_compliance_flag = false;
 
+/* Root object for sysfs directory */
+struct kobject *qcom_aw_phy_kobj_root;
+
+/* File attribute for AN restart delay timer value sysfs node */
+struct kobj_attribute qcom_aw_phy_an_restart_delay_timer_attr =
+                         __ATTR(an_restart_delay_timer_msec, 0660,
+                                qcom_aw_phy_sysfs_show_an_restart_delay_timer,
+                                qcom_aw_phy_sysfs_store_an_restart_delay_timer);
+int qcom_aw_phy_an_restart_delay_timer = 1000;
+
+#define MAX_INT_CHAR_SIZE 15
+
 /*-------------------------------------------------------------------
 * Function Definitions
 ------------------------------------------------------------------- */
@@ -1149,6 +1161,46 @@ static int qcom_aw_phy_inst_remove(struct platform_device *pdev) {
 
 }
 
+ssize_t qcom_aw_phy_sysfs_show_an_restart_delay_timer(
+                struct kobject *kobj, struct kobj_attribute *attr, char *buf) {
+  return snprintf(buf, MAX_INT_CHAR_SIZE, "%d\n",
+                  qcom_aw_phy_an_restart_delay_timer);
+}
+
+ssize_t qcom_aw_phy_sysfs_store_an_restart_delay_timer(
+                              struct kobject *kobj, struct kobj_attribute *attr,
+                              const char *buf, size_t count) {
+  sscanf(buf, "%d", &qcom_aw_phy_an_restart_delay_timer);
+  return count;
+}
+
+void qcom_aw_phy_setup_sysfs(void) {
+
+  /* Creating the root directory structure in /sys/kernel */
+  qcom_aw_phy_kobj_root = kobject_create_and_add("qcom_aw_phy", kernel_kobj);
+
+  /* Creating file for AN restart delay timer value */
+  if(sysfs_create_file(qcom_aw_phy_kobj_root,
+                       &qcom_aw_phy_an_restart_delay_timer_attr.attr))
+  {
+    kobject_put(qcom_aw_phy_kobj_root);
+    sysfs_remove_file(kernel_kobj,
+                      &qcom_aw_phy_an_restart_delay_timer_attr.attr);
+  }
+
+  return;
+}
+
+void qcom_aw_phy_del_sysfs(void) {
+
+  sysfs_remove_file(qcom_aw_phy_kobj_root,
+                    &qcom_aw_phy_an_restart_delay_timer_attr.attr);
+  kobject_del(qcom_aw_phy_kobj_root);
+  qcom_aw_phy_kobj_root=NULL;
+
+  return;
+}
+
 /* PHY Driver Instance Compatible string */
 static const struct of_device_id qcom_aw_phy_inst_match[] = {
     {.compatible = "qcom-aw-phy-inst"}, {}};
@@ -1190,8 +1242,10 @@ static int __init qcom_aw_phy_init(void) {
   qcom_aw_phy_prbs_gnl_init();
 
 #ifdef FEATURE_QCOM_AW_TEST_SYS_FS
-  qcom_aw_phy_setup_sysfs();
+  qcom_aw_phy_setup_debugfs();
 #endif
+
+  qcom_aw_phy_setup_sysfs();
 
   ret_val = platform_driver_register(&qcom_aw_phy_inst_driver);
   if (ret_val < 0) {
@@ -1224,8 +1278,10 @@ static void __exit qcom_aw_phy_exit(void) {
   qcom_aw_phy_prbs_gnl_exit();
 
 #ifdef FEATURE_QCOM_AW_TEST_SYS_FS
-  qcom_aw_phy_del_sysfs();
+  qcom_aw_phy_del_debugfs();
 #endif
+
+  qcom_aw_phy_del_sysfs();
 
   if(qcom_aw_phy_config_info.phy_ipc_log_buf){
     ipc_log_context_destroy(qcom_aw_phy_config_info.phy_ipc_log_buf);
