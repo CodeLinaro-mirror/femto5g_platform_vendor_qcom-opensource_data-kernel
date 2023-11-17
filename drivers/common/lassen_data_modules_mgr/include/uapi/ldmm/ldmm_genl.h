@@ -64,6 +64,7 @@ typedef enum ldmm_fault{
 #define MAX_LINKS_PER_PORT 4
 #define TOTAL_LINKS 16
 #define MAX_PORTS 5
+#define EVENT_PACKET_SIZE 3
 
 typedef struct {
     int link_name;
