@@ -879,29 +879,11 @@ void ecpriss_eth_events_cb(eth_ecpriss_event_e event_type,
 void ecpriss_eth_events_cb_v2(eth_ecpriss_event_e event_type,
 		eth_ecpriss_link_event_params_s *link_event_params)
 {
-	int ret = 0;
-	struct workqueue_struct *ecpriss_wq;
-	struct work_struct *ecpriss_work;
 
 	ECPRILOGDBG("ecpriss_eth_events_cb_v2 event received %d", event_type);
 
+	ecpriss_eth_event_processing();
 
-	do{
-		if(link_event_params == NULL) {
-
-		}
-		ecpriss_wq =
-		ecpriss_pdata_v2->events_workqueue->kernel_events_workqueue;
-		ecpriss_work =
-		ecpriss_pdata_v2->events_workqueue->ecpriss_eth_events_rdy_work;
-		ret = ecpriss_queue_work(ecpriss_wq,
-				ecpriss_work);
-		if(ret < 0) {
-			ECPRILOGERR("Queue work failed\n");
-			break;
-		}
-
-	} while (0);
 	return;
 }
 
