@@ -317,6 +317,16 @@ struct ecpri_dma_tx_header
 	u32 reserved_2 : 6;
 };
 
+/**
+ * struct ecpri_dma_endp_statistics - DMA ENDP stastistics
+ * @total_pkts: Total number of packets transfered to \ from the ENDP
+ * @total_bytes: Total number of bytes transfered to \ from the ENDP
+ */
+struct ecpri_dma_endp_statistics {
+	u64 total_pkts;
+	u64 total_bytes;
+};
+
 typedef void (*ecpri_dma_ready_cb)(void *user_data);
 
 /** ecpri_dma_status_code_to_str() - return the string represnetaion os the status code

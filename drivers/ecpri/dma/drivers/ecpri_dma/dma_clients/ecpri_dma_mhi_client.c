@@ -331,9 +331,9 @@ static void ecpri_dma_mhi_get_l2_ch_bitmap(
 	enum ecpri_hw_ver hw_ver = ecpri_dma_get_ctx_hw_ver();
 
 	if (function.function_type == MHI_DMA_FUNCTION_TYPE_PHYSICAL)
-		DMADBG("Physical \n");
+		DMADBG_LOW("Physical \n");
 	else
-		DMADBG("Virtual ID %d \n", function.vf_id);
+		DMADBG_LOW("Virtual ID %d \n", function.vf_id);
 
 	*bitmap = 0;
 
@@ -486,7 +486,7 @@ static void ecpri_dma_mhi_memcpy_async_wq_cb_ready(struct work_struct* work)
 	struct ecpri_dma_mhi_async_wq_work_type *async_work = container_of(
 		work, struct ecpri_dma_mhi_async_wq_work_type, work);
 
-	DMADBG("Begin\n");
+	DMADBG_LOW("Begin\n");
 
 	memcpy_ctx = ecpri_dma_mhi_memcpy_ctx[ECPRI_DMA_MHI_PF_ID];
 	if (!memcpy_ctx) {
@@ -540,7 +540,7 @@ static void ecpri_dma_mhi_memcpy_async_wq_cb_ready_vms(struct work_struct* work)
 	struct ecpri_dma_mhi_async_wq_work_type* async_work = container_of(
 		work, struct ecpri_dma_mhi_async_wq_work_type, work);
 
-	DMADBG("Begin\n");
+	DMADBG_LOW("Begin\n");
 
 	/* Get the index of VM/PF */
 	ret = ecpri_dma_mhi_get_function_context_index(
@@ -1175,9 +1175,9 @@ static int ecpri_dma_mhi_memcpy_init(struct mhi_dma_function_params function)
 	struct ecpri_dma_mhi_memcpy_context* memcpy_ctx = NULL;
 
 	if (function.function_type == MHI_DMA_FUNCTION_TYPE_PHYSICAL)
-		DMADBG("Physical \n");
+		DMADBG_LOW("Physical \n");
 	else
-		DMADBG("Virtual ID %d \n", function.vf_id);
+		DMADBG_LOW("Virtual ID %d \n", function.vf_id);
 
 	if (function.function_type != MHI_DMA_FUNCTION_TYPE_PHYSICAL &&
 		function.vf_id > ECPRI_DMA_MHI_MAX_VIRTUAL_FUNCTIONS_ID) {
@@ -1289,9 +1289,9 @@ success:
 fail_xwrapper:
 fail_alloc_ctx:
 	if (function.function_type == MHI_DMA_FUNCTION_TYPE_PHYSICAL)
-		DMADBG("Done Physical \n");
+		DMADBG_LOW("Done Physical \n");
 	else
-		DMADBG("Done Virtual ID %d \n", function.vf_id);
+		DMADBG_LOW("Done Virtual ID %d \n", function.vf_id);
 	mutex_unlock(&ecpri_dma_ctx->mhi_memcpy_setup_lock);
 
 	return ret;
@@ -1310,9 +1310,9 @@ static void ecpri_dma_mhi_memcpy_destroy(
 	const struct ecpri_dma_mhi_ee_gsi_tuple* func_map;
 
 	if (function.function_type == MHI_DMA_FUNCTION_TYPE_PHYSICAL)
-		DMADBG("Physical \n");
+		DMADBG_LOW("Physical \n");
 	else
-		DMADBG("Virtual ID %d \n", function.vf_id);
+		DMADBG_LOW("Virtual ID %d \n", function.vf_id);
 
 	ret = ecpri_dma_mhi_get_function_mapping(function, &func_map);
 	if (ret)
@@ -1388,9 +1388,9 @@ static void ecpri_dma_mhi_memcpy_destroy(
 	ecpri_dma_mhi_memcpy_ctx[idx] = NULL;
 
 	if (function.function_type == MHI_DMA_FUNCTION_TYPE_PHYSICAL)
-		DMADBG("Done Physical \n");
+		DMADBG_LOW("Done Physical \n");
 	else
-		DMADBG("Done Virtual ID %d \n", function.vf_id);
+		DMADBG_LOW("Done Virtual ID %d \n", function.vf_id);
 	mutex_unlock(&ecpri_dma_ctx->mhi_memcpy_setup_lock);
 }
 
@@ -1425,9 +1425,9 @@ static int ecpri_dma_mhi_dma_sync_memcpy(
 	struct ecpri_dma_pkt_completion_wrapper* pkt_wrapper = NULL;
 
 	if (function.function_type == MHI_DMA_FUNCTION_TYPE_PHYSICAL)
-		DMADBG("Physical \n");
+		DMADBG_LOW("Physical \n");
 	else
-		DMADBG("Virtual ID %d \n", function.vf_id);
+		DMADBG_LOW("Virtual ID %d \n", function.vf_id);
 
 	if ((max(src, dest) - min(src, dest)) < len) {
 		DMAERR("Invalid addresses - overlapping buffers\n");
@@ -1554,9 +1554,9 @@ fail_src_alloc:
 fail_dest_alloc:
 
 	if (function.function_type == MHI_DMA_FUNCTION_TYPE_PHYSICAL)
-		DMADBG("Done Physical \n");
+		DMADBG_LOW("Done Physical \n");
 	else
-		DMADBG("Done Virtual ID %d \n", function.vf_id);
+		DMADBG_LOW("Done Virtual ID %d \n", function.vf_id);
 
 	return ret;
 }
@@ -1666,9 +1666,9 @@ static int ecpri_dma_mhi_dma_async_memcpy(
 	int hw_ver = ecpri_dma_get_ctx_hw_ver();
 
 	if (function.function_type == MHI_DMA_FUNCTION_TYPE_PHYSICAL)
-		DMADBG("Physical \n");
+		DMADBG_LOW("Physical \n");
 	else
-		DMADBG("Virtual ID %d \n", function.vf_id);
+		DMADBG_LOW("Virtual ID %d \n", function.vf_id);
 
 	if ((max(src, dest) - min(src, dest)) < len) {
 		DMAERR("Invalid addresses - overlapping buffers\n");
@@ -1766,9 +1766,9 @@ static int ecpri_dma_mhi_dma_async_memcpy(
 	ecpri_dma_mhi_dma_free_pkt(&pkt_src);
 
 	if (function.function_type == MHI_DMA_FUNCTION_TYPE_PHYSICAL)
-		DMADBG("Done Physical \n");
+		DMADBG_LOW("Done Physical \n");
 	else
-		DMADBG("Done Virtual ID %d \n", function.vf_id);
+		DMADBG_LOW("Done Virtual ID %d \n", function.vf_id);
 
 	return 0;
 
@@ -1814,9 +1814,9 @@ static int ecpri_dma_mhi_dma_memcpy_disable(
 	struct ecpri_dma_mhi_memcpy_context* memcpy_ctx;
 
 	if (function.function_type == MHI_DMA_FUNCTION_TYPE_PHYSICAL)
-		DMADBG("Physical \n");
+		DMADBG_LOW("Physical \n");
 	else
-		DMADBG("Virtual ID %d \n", function.vf_id);
+		DMADBG_LOW("Virtual ID %d \n", function.vf_id);
 
 	/* Get the index of VM/PF */
 	ret = ecpri_dma_mhi_get_function_context_index(
@@ -1851,9 +1851,9 @@ static int ecpri_dma_mhi_dma_memcpy_disable(
 			flags);
 
 		if (function.function_type == MHI_DMA_FUNCTION_TYPE_PHYSICAL)
-			DMADBG("Done Physical \n");
+			DMADBG_LOW("Done Physical \n");
 		else
-			DMADBG("Done Virtual ID %d \n", function.vf_id);
+			DMADBG_LOW("Done Virtual ID %d \n", function.vf_id);
 
 		return 0;
 	}
@@ -1864,9 +1864,9 @@ static int ecpri_dma_mhi_dma_memcpy_disable(
 			flags);
 
 		if (function.function_type == MHI_DMA_FUNCTION_TYPE_PHYSICAL)
-			DMADBG("Done Physical \n");
+			DMADBG_LOW("Done Physical \n");
 		else
-			DMADBG("Done Virtual ID %d \n", function.vf_id);
+			DMADBG_LOW("Done Virtual ID %d \n", function.vf_id);
 
 		return 0;
 	}
@@ -1917,9 +1917,9 @@ static int ecpri_dma_mhi_dma_memcpy_disable(
 	}
 
 	if (function.function_type == MHI_DMA_FUNCTION_TYPE_PHYSICAL)
-		DMADBG("Done Physical \n");
+		DMADBG_LOW("Done Physical \n");
 	else
-		DMADBG("Done Virtual ID %d \n", function.vf_id);
+		DMADBG_LOW("Done Virtual ID %d \n", function.vf_id);
 
 	return ret;
 }
@@ -1983,9 +1983,9 @@ static int ecpri_dma_mhi_dma_memcpy_enable(
 	const struct ecpri_dma_mhi_ee_gsi_tuple* func_map;
 
 	if (function.function_type == MHI_DMA_FUNCTION_TYPE_PHYSICAL)
-		DMADBG("Physical \n");
+		DMADBG_LOW("Physical \n");
 	else
-		DMADBG("Virtual ID %d \n", function.vf_id);
+		DMADBG_LOW("Virtual ID %d \n", function.vf_id);
 
 	/* Check function params are valid */
 	ret = ecpri_dma_mhi_get_function_mapping(function, &func_map);
@@ -2023,9 +2023,9 @@ static int ecpri_dma_mhi_dma_memcpy_enable(
 	if (atomic_read(&memcpy_ctx->ref_count)) {
 		atomic_inc(&memcpy_ctx->ref_count);
 		if (function.function_type == MHI_DMA_FUNCTION_TYPE_PHYSICAL)
-			DMADBG("Done Physical \n");
+			DMADBG_LOW("Done Physical \n");
 		else
-			DMADBG("Done Virtual ID %d \n", function.vf_id);
+			DMADBG_LOW("Done Virtual ID %d \n", function.vf_id);
 		mutex_unlock(&ecpri_dma_ctx->mhi_memcpy_setup_lock);
 		return 0;
 	}
@@ -2069,9 +2069,9 @@ fail_set_mode:
 fail_start_endp:
 success:
 	if (function.function_type == MHI_DMA_FUNCTION_TYPE_PHYSICAL)
-		DMADBG("Done Physical \n");
+		DMADBG_LOW("Done Physical \n");
 	else
-		DMADBG("Done Virtual ID %d \n", function.vf_id);
+		DMADBG_LOW("Done Virtual ID %d \n", function.vf_id);
 	mutex_unlock(&ecpri_dma_ctx->mhi_memcpy_setup_lock);
 
 	return ret;
@@ -2105,9 +2105,9 @@ static int ecpri_dma_mhi_client_init(
 	const struct ecpri_dma_mhi_ee_gsi_tuple* func_map;
 
 	if (function.function_type == MHI_DMA_FUNCTION_TYPE_PHYSICAL)
-		DMADBG("Physical \n");
+		DMADBG_LOW("Physical \n");
 	else
-		DMADBG("Virtual ID %d \n", function.vf_id);
+		DMADBG_LOW("Virtual ID %d \n", function.vf_id);
 
 
 	if (!params) {
@@ -2260,9 +2260,9 @@ static int ecpri_dma_mhi_client_init(
 
 
 	if (function.function_type == MHI_DMA_FUNCTION_TYPE_PHYSICAL)
-		DMADBG("Done Physical \n");
+		DMADBG_LOW("Done Physical \n");
 	else
-		DMADBG("Done Virtual ID %d \n", function.vf_id);
+		DMADBG_LOW("Done Virtual ID %d \n", function.vf_id);
 
 	return 0;
 
@@ -2307,9 +2307,9 @@ static int ecpri_dma_mhi_client_dma_start(
 	const struct ecpri_dma_mhi_ee_gsi_tuple* func_map;
 
 	if (function.function_type == MHI_DMA_FUNCTION_TYPE_PHYSICAL)
-		DMADBG("Physical \n");
+		DMADBG_LOW("Physical \n");
 	else
-		DMADBG("Virtual ID %d \n", function.vf_id);
+		DMADBG_LOW("Virtual ID %d \n", function.vf_id);
 
 	if (!params) {
 		DMAERR("Null params args\n");
@@ -2385,9 +2385,9 @@ static int ecpri_dma_mhi_client_dma_start(
 	}
 
 	if (function.function_type == MHI_DMA_FUNCTION_TYPE_PHYSICAL)
-		DMADBG("Done Physical \n");
+		DMADBG_LOW("Done Physical \n");
 	else
-		DMADBG("Done Virtual ID %d \n", function.vf_id);
+		DMADBG_LOW("Done Virtual ID %d \n", function.vf_id);
 	return ret;
 }
 
@@ -2630,9 +2630,9 @@ static int ecpri_dma_mhi_dma_connect_endp(
 	const struct ecpri_dma_mhi_ee_gsi_tuple* func_map;
 
 	if (function.function_type == MHI_DMA_FUNCTION_TYPE_PHYSICAL)
-		DMADBG("Physical \n");
+		DMADBG_LOW("Physical \n");
 	else
-		DMADBG("Virtual ID %d \n", function.vf_id);
+		DMADBG_LOW("Virtual ID %d \n", function.vf_id);
 
 	if (!in) {
 		DMAERR("Null params args\n");
@@ -2751,9 +2751,9 @@ static int ecpri_dma_mhi_dma_connect_endp(
 	channel->clnt_hdl = *(clnt_hdl);
 
 	if (function.function_type == MHI_DMA_FUNCTION_TYPE_PHYSICAL)
-		DMADBG("Done Physical \n");
+		DMADBG_LOW("Done Physical \n");
 	else
-		DMADBG("Done Virtual ID %d \n", function.vf_id);
+		DMADBG_LOW("Done Virtual ID %d \n", function.vf_id);
 
 	return ret;
 }
@@ -2782,9 +2782,9 @@ static int ecpri_dma_mhi_dma_disconnect_endp(
 	struct ecpri_dma_mhi_memcpy_context* memcpy_ctx = NULL;
 
 	if (function.function_type == MHI_DMA_FUNCTION_TYPE_PHYSICAL)
-		DMADBG("Physical \n");
+		DMADBG_LOW("Physical \n");
 	else
-		DMADBG("Virtual ID %d \n", function.vf_id);
+		DMADBG_LOW("Virtual ID %d \n", function.vf_id);
 
 	ret = ecpri_dma_mhi_get_function_context_index(function, &idx,
 		ECPRI_DMA_MHI_DMA_CLIENT_CTX);
@@ -2872,9 +2872,9 @@ int ecpri_dma_mhi_client_update_mstate(struct mhi_dma_function_params function,
 	unsigned long flags;
 
 	if (function.function_type == MHI_DMA_FUNCTION_TYPE_PHYSICAL)
-		DMADBG("Physical \n");
+		DMADBG_LOW("Physical \n");
 	else
-		DMADBG("Virtual ID %d \n", function.vf_id);
+		DMADBG_LOW("Virtual ID %d \n", function.vf_id);
 
 	/* Function params validity check */
 	ret = ecpri_dma_mhi_get_function_context_index(function, &idx,
@@ -2897,9 +2897,9 @@ int ecpri_dma_mhi_client_update_mstate(struct mhi_dma_function_params function,
 	spin_unlock_irqrestore(&ecpri_dma_mhi_client_ctx[idx]->lock, flags);
 
 	if (function.function_type == MHI_DMA_FUNCTION_TYPE_PHYSICAL)
-		DMADBG("Done Physical \n");
+		DMADBG_LOW("Done Physical \n");
 	else
-		DMADBG("Done Virtual ID %d \n", function.vf_id);
+		DMADBG_LOW("Done Virtual ID %d \n", function.vf_id);
 
 	return 0;
 }
@@ -2908,7 +2908,7 @@ static dma_addr_t ecpri_dma_mhi_client_map_buffer(void* virt, size_t size,
 	enum dma_data_direction dir)
 {
 	dma_addr_t phys;
-	DMADBG("Begin\n");
+	DMADBG_LOW("Begin\n");
 
 	phys = dma_map_single(ecpri_dma_ctx->pdev, virt, size, dir);
 	if (dma_mapping_error(ecpri_dma_ctx->pdev, phys)) {
@@ -2922,21 +2922,21 @@ static dma_addr_t ecpri_dma_mhi_client_map_buffer(void* virt, size_t size,
 static void ecpri_dma_mhi_client_unmap_buffer(dma_addr_t phys, size_t size,
 	enum dma_data_direction dir)
 {
-	DMADBG("Begin\n");
+	DMADBG_LOW("Begin\n");
 	dma_unmap_single(ecpri_dma_ctx->pdev, phys, size, dir);
 }
 
 static void *ecpri_dma_mhi_client_alloc_buffer(size_t size,
 	dma_addr_t* phys, gfp_t gfp)
 {
-	DMADBG("Begin\n");
+	DMADBG_LOW("Begin\n");
 	return  dma_alloc_coherent(ecpri_dma_ctx->pdev, size, phys, gfp);
 }
 
 static void ecpri_dma_mhi_client_free_buffer(size_t size, void* virt,
 	dma_addr_t phys)
 {
-	DMADBG("Begin\n");
+	DMADBG_LOW("Begin\n");
 
 	dma_free_coherent(ecpri_dma_ctx->pdev, size, virt, phys);
 }
@@ -2944,9 +2944,9 @@ static void ecpri_dma_mhi_client_free_buffer(size_t size, void* virt,
 static int ecpri_dma_mhi_client_resume(struct mhi_dma_function_params function)
 {
 	if (function.function_type == MHI_DMA_FUNCTION_TYPE_PHYSICAL)
-		DMADBG("Physical \n");
+		DMADBG_LOW("Physical \n");
 	else
-		DMADBG("Virtual ID %d \n", function.vf_id);
+		DMADBG_LOW("Virtual ID %d \n", function.vf_id);
 
 	return -EPERM;
 }
@@ -2955,9 +2955,9 @@ static int ecpri_dma_mhi_client_suspend(
 	struct mhi_dma_function_params function, bool force)
 {
 	if (function.function_type == MHI_DMA_FUNCTION_TYPE_PHYSICAL)
-		DMADBG("Physical \n");
+		DMADBG_LOW("Physical \n");
 	else
-		DMADBG("Virtual ID %d \n", function.vf_id);
+		DMADBG_LOW("Virtual ID %d \n", function.vf_id);
 
 	return -EPERM;
 }

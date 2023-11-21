@@ -291,7 +291,13 @@ ssize_t qcom_aw_phy_set_attr(struct file *file, const char __user *buf,
   }
 
   token = qcom_aw_phy_strtok(token_string, ',', &save_ptr);
-  sscanf(token, "%d", &qcom_aw_phy_attr_val);
+  if(token!=NULL)
+    sscanf(token, "%d", &qcom_aw_phy_attr_val);
+  else
+  {
+    QCOM_AW_PHY_LOG_ERR("Invalid input, \"cat /sys/kernel/debug/qcom_aw_phy_test/qcom_aw_phy\" for help menu");
+    return -EFAULT;
+  }
 
   QCOM_AW_PHY_LOG_ERR("qcom_aw_phy_set_attr val %d", qcom_aw_phy_attr_val);
 
@@ -398,7 +404,13 @@ ssize_t qcom_aw_phy_set_attr(struct file *file, const char __user *buf,
 
     case SET_PORT:
       token = qcom_aw_phy_strtok(NULL, ',', &save_ptr);
-      sscanf(token, "%d", &port_type);
+      if(token!=NULL)
+        sscanf(token, "%d", &port_type);
+      else
+      {
+        error = true;
+        break;
+      }
 
       if(port_type < MTIP_PORT_TYPE_FH_0 || port_type >= MTIP_PORT_TYPE_MAX){
         port_type = MTIP_PORT_TYPE_FH_0;
@@ -410,7 +422,13 @@ ssize_t qcom_aw_phy_set_attr(struct file *file, const char __user *buf,
 
     case SET_NUM_LANES:
       token = qcom_aw_phy_strtok(NULL, ',', &save_ptr);
-      sscanf(token, "%d", &num_lanes);
+      if(token!=NULL)
+        sscanf(token, "%d", &num_lanes);
+      else
+      {
+        error = true;
+        break;
+      }
 
       if(num_lanes < 1 || num_lanes > PHY_LANE_MAX){
         num_lanes = 1;
@@ -422,7 +440,13 @@ ssize_t qcom_aw_phy_set_attr(struct file *file, const char __user *buf,
 
     case SET_LANE_SPEED:
       token = qcom_aw_phy_strtok(NULL, ',', &save_ptr);
-      sscanf(token, "%d", &lane_speed);
+      if(token!=NULL)
+        sscanf(token, "%d", &lane_speed);
+      else
+      {
+        error = true;
+        break;
+      }
 
       if(lane_speed < PHY_LANE_SPEED_10G || lane_speed >= PHY_LANE_SPEED_MAX){
         lane_speed = PHY_LANE_SPEED_25G;
@@ -434,7 +458,13 @@ ssize_t qcom_aw_phy_set_attr(struct file *file, const char __user *buf,
 
     case TX_BIST_PHY_NUM:
       token = qcom_aw_phy_strtok(NULL, ',', &save_ptr);
-      sscanf(token, "%d", &tx_bist_phy_inst);
+      if(token!=NULL)
+        sscanf(token, "%d", &tx_bist_phy_inst);
+      else
+      {
+        error = true;
+        break;
+      }
 
       if(!QCOM_AW_PHY_INST_VALID(tx_bist_phy_inst)){
         tx_bist_phy_inst = QCOM_AW_PHY_INST_FH0;
@@ -447,7 +477,13 @@ ssize_t qcom_aw_phy_set_attr(struct file *file, const char __user *buf,
 
     case TX_BIST_LANE_NUM:
       token = qcom_aw_phy_strtok(NULL, ',', &save_ptr);
-      sscanf(token, "%d", &tx_bist_lane_num);
+      if(token!=NULL)
+        sscanf(token, "%d", &tx_bist_lane_num);
+      else
+      {
+        error = true;
+        break;
+      }
 
       if(tx_bist_lane_num > PHY_LANE_MAX){
         tx_bist_lane_num = PHY_LANE_0;
@@ -460,7 +496,13 @@ ssize_t qcom_aw_phy_set_attr(struct file *file, const char __user *buf,
 
     case RX_BIST_PHY_NUM:
       token = qcom_aw_phy_strtok(NULL, ',', &save_ptr);
-      sscanf(token, "%d", &rx_bist_phy_inst);
+      if(token!=NULL)
+        sscanf(token, "%d", &rx_bist_phy_inst);
+      else
+      {
+        error = true;
+        break;
+      }
 
       if(!QCOM_AW_PHY_INST_VALID(rx_bist_phy_inst)){
         rx_bist_phy_inst = QCOM_AW_PHY_INST_FH0;
@@ -473,7 +515,13 @@ ssize_t qcom_aw_phy_set_attr(struct file *file, const char __user *buf,
 
     case RX_BIST_LANE_NUM:
       token = qcom_aw_phy_strtok(NULL, ',', &save_ptr);
-      sscanf(token, "%d", &rx_bist_lane_num);
+      if(token!=NULL)
+        sscanf(token, "%d", &rx_bist_lane_num);
+      else
+      {
+        error = true;
+        break;
+      }
 
       if(rx_bist_lane_num > PHY_LANE_MAX){
         rx_bist_lane_num = PHY_LANE_0;
@@ -486,7 +534,13 @@ ssize_t qcom_aw_phy_set_attr(struct file *file, const char __user *buf,
 
     case PRBS_PATTERN:
       token = qcom_aw_phy_strtok(NULL, ',', &save_ptr);
-      sscanf(token, "%d", &bist_pattern);
+      if(token!=NULL)
+        sscanf(token, "%d", &bist_pattern);
+      else
+      {
+        error = true;
+        break;
+      } 
 
       if(bist_pattern >= AW_BIST_PATTERN_MAX){
         bist_pattern = AW_PRBS31;
@@ -498,26 +552,54 @@ ssize_t qcom_aw_phy_set_attr(struct file *file, const char __user *buf,
 
     case UDP_DATA:
       token = qcom_aw_phy_strtok(NULL, ',', &save_ptr);
-      sscanf(token, "%llx", &user_data);
+      if(token!=NULL)
+        sscanf(token, "%llx", &user_data);
+      else
+      {
+        error = true;
+        break;
+      }
+
       QCOM_AW_PHY_LOG_ERR("Configuring user data %llx", user_data);
       break;
 
     case BIST_DURATION:
       token = qcom_aw_phy_strtok(NULL, ',', &save_ptr);
-      sscanf(token, "%d", &measure_time);
+      if(token!=NULL)
+        sscanf(token, "%d", &measure_time);
+      else
+      {
+        error = true;
+        break;
+      }
+
       QCOM_AW_PHY_LOG_ERR("Configuring measurement time %d", measure_time);
       break;
 
     case BIST_ERROR_COUNT:
       token = qcom_aw_phy_strtok(NULL, ',', &save_ptr);
-      sscanf(token, "%d", &inject_error_count);
+      if(token!=NULL)
+        sscanf(token, "%d", &inject_error_count);
+      else
+      {
+        error = true;
+        break;
+      }
+
       QCOM_AW_PHY_LOG_ERR("Configuring inject error count %d",
                           inject_error_count);
       break;
 
     case ENABLE_TX_BIST:
       token = qcom_aw_phy_strtok(NULL, ',', &save_ptr);
-      sscanf(token, "%d", &enable_flag);
+      if(token!=NULL)
+        sscanf(token, "%d", &enable_flag);
+      else
+      {
+        error = true;
+        break;
+      }
+
       QCOM_AW_PHY_LOG_ERR("Configuring TX BIST, enabled = %d", enable_flag);
 
       phy_config_info = qcom_aw_phy_get_config_info();
@@ -572,7 +654,14 @@ ssize_t qcom_aw_phy_set_attr(struct file *file, const char __user *buf,
 
     case ENABLE_RX_BIST:
       token = qcom_aw_phy_strtok(NULL, ',', &save_ptr);
-      sscanf(token, "%d", &enable_flag);
+      if(token!=NULL)
+        sscanf(token, "%d", &enable_flag);
+      else
+      {
+        error = true;
+        break;
+      }
+
       QCOM_AW_PHY_LOG_ERR("Configuring RX BIST, enabled = %d", enable_flag);
 
       phy_config_info = qcom_aw_phy_get_config_info();
@@ -700,14 +789,28 @@ ssize_t qcom_aw_phy_set_attr(struct file *file, const char __user *buf,
 
     case CHECK_PRBS_ALL_LANES:
       token = qcom_aw_phy_strtok(NULL, ',', &save_ptr);
-      sscanf(token, "%d", &enable_flag);
+      if(token!=NULL)
+        sscanf(token, "%d", &enable_flag);
+      else
+      {
+        error = true;
+        break;
+      }
+
       QCOM_AW_PHY_LOG_ERR("Checking PRBS for all lanes = %d", enable_flag);
       check_prbs_all_lanes = enable_flag;
       break;
 
     case SET_EQ_MODE:
       token = qcom_aw_phy_strtok(NULL, ',', &save_ptr);
-      sscanf(token, "%d", &eq_mode);
+      if(token!=NULL)
+        sscanf(token, "%d", &eq_mode);
+      else
+      {
+        error = true;
+        break;
+      }
+
       QCOM_AW_PHY_LOG_ERR("Equalization mode set to %d", eq_mode);
 
       phy_config_info = qcom_aw_phy_get_config_info();
@@ -719,7 +822,14 @@ ssize_t qcom_aw_phy_set_attr(struct file *file, const char __user *buf,
 
     case SET_PORT_CONFIG_MASK:
       token = qcom_aw_phy_strtok(NULL, ',', &save_ptr);
-      sscanf(token, "%d", &port_config_mask);
+      if(token!=NULL)
+        sscanf(token, "%d", &port_config_mask);
+      else
+      {
+        error = true;
+        break;
+      }
+
       QCOM_AW_PHY_LOG_ERR("Port config mask set to 0x%x", port_config_mask);
       break;
 
@@ -742,8 +852,10 @@ ssize_t qcom_aw_phy_set_attr(struct file *file, const char __user *buf,
   }
 
   if(error)
+  {
     QCOM_AW_PHY_LOG_ERR("Invalid input, \"cat /sys/kernel/debug/qcom_aw_phy_test/qcom_aw_phy\" for help menu");
-
+	return -EFAULT;
+  }
   return count;
 }
 
@@ -764,21 +876,77 @@ ssize_t qcom_aw_phy_set_tx_eq_val(struct file *file, const char __user *buf,
   }
 
   token = qcom_aw_phy_strtok(token_string, ',', &save_ptr);
-  sscanf(token, "%d", &txfir_cfg.CM3);
+  if(token!=NULL)
+    sscanf(token, "%d", &txfir_cfg.CM3);
+  else
+  {
+    QCOM_AW_PHY_LOG_ERR("Invalid Input\n");
+    return -EFAULT;
+  }
+
   token = qcom_aw_phy_strtok(NULL, ',', &save_ptr);
-  sscanf(token, "%d", &txfir_cfg.CM2);
+  if(token!=NULL)
+    sscanf(token, "%d", &txfir_cfg.CM2);
+  else
+  {
+    QCOM_AW_PHY_LOG_ERR("Invalid Input\n");
+    return -EFAULT;
+  }
+
   token = qcom_aw_phy_strtok(NULL, ',', &save_ptr);
-  sscanf(token, "%d", &txfir_cfg.CM1);
+  if(token!=NULL)
+    sscanf(token, "%d", &txfir_cfg.CM1);
+  else
+  {
+    QCOM_AW_PHY_LOG_ERR("Invalid Input\n");
+    return -EFAULT;
+  }
+
   token = qcom_aw_phy_strtok(NULL, ',', &save_ptr);
-  sscanf(token, "%d", &txfir_cfg.C0);
+  if(token!=NULL)
+    sscanf(token, "%d", &txfir_cfg.C0);
+  else
+  {
+    QCOM_AW_PHY_LOG_ERR("Invalid Input\n");
+    return -EFAULT;
+  }
+
   token = qcom_aw_phy_strtok(NULL, ',', &save_ptr);
-  sscanf(token, "%d", &txfir_cfg.C1);
+  if(token!=NULL)
+    sscanf(token, "%d", &txfir_cfg.C1);
+  else
+  {
+    QCOM_AW_PHY_LOG_ERR("Invalid Input\n");
+    return -EFAULT;
+  }
+
   token = qcom_aw_phy_strtok(NULL, ',', &save_ptr);
-  sscanf(token, "%d", &txfir_cfg.C2);
+  if(token!=NULL)
+    sscanf(token, "%d", &txfir_cfg.C2);
+  else
+  {
+    QCOM_AW_PHY_LOG_ERR("Invalid Input\n");
+    return -EFAULT;
+  }
+
   token = qcom_aw_phy_strtok(NULL, ',', &save_ptr);
-  sscanf(token, "%d", &txfir_cfg.C3);
+  if(token!=NULL)
+    sscanf(token, "%d", &txfir_cfg.C3);
+  else
+  {
+    QCOM_AW_PHY_LOG_ERR("Invalid Input\n");
+    return -EFAULT;
+  }
+
   token = qcom_aw_phy_strtok(NULL, ',', &save_ptr);
-  sscanf(token, "%d", &txfir_cfg.main_or_max);
+  if(token!=NULL)
+    sscanf(token, "%d", &txfir_cfg.main_or_max);
+  else
+  {
+    QCOM_AW_PHY_LOG_ERR("Invalid Input\n");
+    return -EFAULT;
+  }
+
 
   QCOM_AW_PHY_LOG_ERR("TX EQ values for PHY instance %d, lane %d, "
                       "CM3=%d, CM2=%d, CM1=%d, C0=%d, C1=%d, C2=%d, C3=%d, "

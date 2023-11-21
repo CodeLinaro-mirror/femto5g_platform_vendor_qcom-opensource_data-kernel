@@ -9800,3 +9800,29 @@ int ecpri_dma_filter_endps(
 
 	return list_index;
 }
+
+int ecpri_dma_get_endp_stats(struct ecpri_dma_endp_context* ep,
+	struct ecpri_dma_endp_statistics* stats)
+{
+	int ret = 0;
+	struct gsi_chan_props props;
+
+
+	if (!ep || !stats || !ep->valid) {
+		DMAERR("EP context is empty or stats pointer is null \n");
+		return -EINVAL;
+	}
+
+	ret = gsi_get_channel_cfg(ep->gsi_chan_hdl, &props, &ep->chan_scratch);
+	if (ret != GSI_STATUS_SUCCESS){
+		DMAERR("Failed to get stats from HW for ENDP: %d\n", ep->endp_id);
+		return ret;
+	}
+
+	stats->total_pkts = (u64)ep->chan_scratch.mhi.total_pkts +
+		(ep->chan_scratch.mhi.total_pkts_wa * ((u64)DMA_UINT32_MAX + 1));
+	stats->total_bytes = (u64)ep->chan_scratch.mhi.total_bytes +
+		(ep->chan_scratch.mhi.total_bytes_wa * ((u64)DMA_UINT32_MAX + 1));
+
+	return ret;
+}

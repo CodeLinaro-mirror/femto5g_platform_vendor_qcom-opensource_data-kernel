@@ -209,6 +209,8 @@ static int mtip_platform_setup_port(u32 port_type)
         goto out;
     }
 
+    memset(platform_driver_priv->mtip_ports[port_type], 0, sizeof(struct mtip_port_info));
+
     // set the port_type
     platform_driver_priv->mtip_ports[port_type]->port_type = port_type;
 

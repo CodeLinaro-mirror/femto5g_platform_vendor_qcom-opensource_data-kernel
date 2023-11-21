@@ -521,10 +521,23 @@ enum gsi_xfer_elem_type {
 struct __packed gsi_mhi_channel_scratch {
 	uint32_t is_over_pcie : 1;
 	uint32_t skip_overflow_ev : 1;
-	uint32_t rsvd1;
-	uint32_t rsvd2;
-	uint32_t rsvd3;
-	uint32_t rsvd4;
+	uint32_t scratch0_res : 29;
+	uint32_t scratch1;
+	uint32_t scratch2;
+	uint32_t scratch3_res : 16;
+	uint32_t outstanding_tlvs_counter : 16;
+	uint32_t scratch4_res0 : 16;
+	uint32_t ch_halt_cmd_pending_reply : 1;
+	uint32_t ch_stop_cmd_pending_reply : 1;
+	uint32_t originator_ee_gen_cmd : 4;
+	uint32_t scratch4_res1 : 6;
+	uint32_t stop_in_progress_stm : 4;
+	uint32_t total_pkts;
+	uint32_t total_bytes;
+	uint32_t total_pkts_wa : 16;
+	uint32_t total_bytes_wa : 16;
+	uint32_t scratch8;
+	uint32_t scratch9;
 };
 
 /**
@@ -534,10 +547,16 @@ struct __packed gsi_mhi_channel_scratch {
 union __packed gsi_channel_scratch {
 	struct __packed gsi_mhi_channel_scratch mhi;
 	struct __packed {
-		uint32_t word1;
-		uint32_t word2;
-		uint32_t word3;
-		uint32_t word4;
+		uint32_t scratch0;
+		uint32_t scratch1;
+		uint32_t scratch2;
+		uint32_t scratch3;
+		uint32_t scratch4;
+		uint32_t scratch5;
+		uint32_t scratch6;
+		uint32_t scratch7;
+		uint32_t scratch8;
+		uint32_t scratch9;
 	} data;
 };
 
@@ -557,8 +576,8 @@ struct __packed gsi_mhi_evt_scratch {
 union __packed gsi_evt_scratch {
 	struct __packed gsi_mhi_evt_scratch mhi;
 	struct __packed {
-		uint32_t word1;
-		uint32_t word2;
+		uint32_t scratch0;
+		uint32_t scratch1;
 	} data;
 };
 
@@ -1299,21 +1318,6 @@ int gsi_write_channel_scratch(unsigned long chan_hdl,
  */
 int gsi_read_channel_scratch(unsigned long chan_hdl,
 		union __packed gsi_channel_scratch *val);
-
-/**
- * gsi_update_mhi_channel_scratch - MHI Peripheral should call this
- * function to update the scratch area of the channel context. Updating
- * will be by read-modify-write method, so non SWI fields will not be
- * affected
- *
- * @chan_hdl:  Client handle previously obtained from
- *             gsi_alloc_channel
- * @mscr:      MHI Channel Scratch value
- *
- * @Return gsi_status
- */
-int gsi_update_mhi_channel_scratch(unsigned long chan_hdl,
-		struct __packed gsi_mhi_channel_scratch mscr);
 
 /**
  * gsi_stop_channel - Peripheral should call this function to

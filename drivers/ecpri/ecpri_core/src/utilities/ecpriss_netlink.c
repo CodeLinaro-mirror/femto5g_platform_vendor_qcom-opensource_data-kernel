@@ -5,6 +5,7 @@
 #include "ecpriss_core.h"
 #include "ecpriss_netlink.h"
 #include "ecpriss_log.h"
+#include "ecpriss_qudp.h"
 
 uint32_t global_pid = 0;
 
@@ -49,6 +50,8 @@ void ecpriss_netlink_send_netlink_message(int client_id,
 //Wrapper for  ecpriss_process_packet() in ecpriss_core.c
 void ecpriss_netlink_process_packet(ecpriss_packet_s *packet)
 {
+	ecpriss_debug_flow_info(&packet->payload, packet->header.message_id);
+
 	if(packet) {
 		switch(packet->header.message_id){
 			case ECPRISS_MESSAGE_FLOW_CFG:
@@ -80,6 +83,15 @@ void ecpriss_netlink_process_packet(ecpriss_packet_s *packet)
 				break;
 			case ECPRISS_MESSAGE_FLOW_TRANSP_DECFG:
 				ecpriss_process_packet_decfg(&packet->payload,ECPRISS_MESSAGE_FLOW_TRANSP_DECFG);
+				break;
+			case ECPRISS_MESSAGE_TRANSPORT_EGRESS_TABLE_RECFG:
+				ecpriss_qudp_egress_table_reconfig(&packet->payload);
+				break;
+			case ECPRISS_MESSAGE_TRANSPORT_INGESS_TABLE_CFG:
+				ecpriss_qudp_ingress_table_config(&packet->payload);
+				break;
+			case ECPRISS_MESSAGE_TRANSPORT_INGESS_TABLE_DECFG:
+				ecpriss_qudp_ingress_table_deconfig(&packet->payload);
 				break;
 			default:
 				ECPRILOGERR("Invalid message type: %s \n",packet->header.message_id);

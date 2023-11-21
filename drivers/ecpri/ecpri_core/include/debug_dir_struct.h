@@ -298,6 +298,12 @@
 			} \
 			gcfg \
 			{ \
+				 ecpriss_strict_filt_config \
+				{\
+					,fh0:qudp_strict_filt_cfg_fh0 \
+					,fh1:qudp_strict_filt_cfg_fh1 \
+					,fh2:qudp_strict_filt_cfg_fh2 \
+				} \
 				,ecpriss_filt \
 				,ecpriss_stats_timeout \
 				,ecpriss_clear_stats \

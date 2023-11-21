@@ -145,14 +145,6 @@ enum qcom_aw_phy_instance_enum{
 	QCOM_AW_PHY_INST_MAX
 };
 
-enum qcom_aw_phy_eq_mode_enum {
-	QCOM_AW_PHY_EQ_MODE_MIN = 0,
-	QCOM_AW_PHY_MANUAL_EQ_MODE,
-	QCOM_AW_PHY_ANLT_MODE,
-	QCOM_AW_PHY_LT_MODE,
-	QCOM_AW_PHY_EQ_MODE_MAX
-};
-
 enum qcom_aw_phy_mod_tech_enum {
 	QCOM_AW_PHY_MOD_TECH_MIN = 0,
 	QCOM_AW_PHY_MOD_TECH_NRZ,

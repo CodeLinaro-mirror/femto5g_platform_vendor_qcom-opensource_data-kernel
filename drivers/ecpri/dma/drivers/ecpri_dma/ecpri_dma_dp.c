@@ -311,7 +311,7 @@ void ecpri_dma_tasklet_rx_done(unsigned long data)
 		return;
 	}
 
-	DMADBG("Notify Rx ENDP %d on completion\n", endp->endp_id);
+	DMADBG_LOW("Notify Rx ENDP %d on completion\n", endp->endp_id);
 	/* Notify client on Rx completion */
 	if (endp->notify_comp != NULL) {
 		endp->notify_comp(endp, NULL, 0);
@@ -819,7 +819,7 @@ int ecpri_dma_dp_transmit(struct ecpri_dma_endp_context *endp,
 		return -EINVAL;
 	}
 
-	DMADBG("Transmit start for ENDP %d GSI ID %d, num_of_pkts: %d\n",
+	DMADBG_LOW("Transmit start for ENDP %d GSI ID %d, num_of_pkts: %d\n",
 		endp->endp_id, endp->gsi_id, num_of_pkts);
 
 	if (endp->gsi_ep_cfg->dir == ECPRI_DMA_ENDP_DIR_SRC)
@@ -953,7 +953,7 @@ int ecpri_dma_dp_transmit(struct ecpri_dma_endp_context *endp,
 	/* Release spinlock before returning from transmit function */
 	spin_unlock_irqrestore(&endp->spinlock, flags);
 
-	DMADBG("Transmit finished\n");
+	DMADBG_LOW("Transmit finished\n");
 
 	return 0;
 

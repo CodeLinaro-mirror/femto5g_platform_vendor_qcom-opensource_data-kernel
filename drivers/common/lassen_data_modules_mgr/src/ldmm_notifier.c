@@ -12,6 +12,18 @@
 
 extern struct blocking_notifier_head lassen_mtip_fault_notifr;
 
+bool QXDM_NOTIFICATION_ENABLED = false;
+
+void ldmm_enable_notification()
+{
+	QXDM_NOTIFICATION_ENABLED = true;
+}
+
+void ldmm_disable_notification()
+{
+	QXDM_NOTIFICATION_ENABLED = false;
+}
+
 int ldmm_mtip_fault_hndlr(struct notifier_block *nb, unsigned long event, void *arg)
 {
 	int ret = NOTIFY_DONE;
@@ -60,11 +72,15 @@ int ldmm_mtip_fault_hndlr(struct notifier_block *nb, unsigned long event, void *
 		case PCS_IF_UP:
 			LDMM_LOG_ERR("PCS_IF_UP\n");
 			LDMM_SETFIELD_IN_REG(val, LDMM_PCS_IF_UP, FAULT_NUM_SHIFT, FAULT_NUM_MASK);
+			if(QXDM_NOTIFICATION_ENABLED)
+				ldmm_qxdm_logger_link_change_notification();
 			break;
 
 		case PCS_IF_DOWN:
 			LDMM_LOG_ERR("PCS_IF_DOWN\n");
 			LDMM_SETFIELD_IN_REG(val, LDMM_PCS_IF_DOWN, FAULT_NUM_SHIFT, FAULT_NUM_MASK);
+			if(QXDM_NOTIFICATION_ENABLED)
+				ldmm_qxdm_logger_link_change_notification();
 			break;
 
 		default:

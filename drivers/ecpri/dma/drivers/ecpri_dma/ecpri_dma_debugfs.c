@@ -13,6 +13,7 @@
 #include "ecpri_dma_reg_dump.h"
 #include "ecpri_dma_qmi_service.h"
 #include "ecpri_dma_eth_client.h"
+#include "ecpri_dma_mhi_client.h"
 #include "dmahal_reg.h"
 
 #define DMA_MAX_ENTRY_STRING_LEN 500
@@ -588,6 +589,62 @@ static ssize_t ecpri_dma_read_dma_stat(struct file *file, char __user *ubuf,
 	is_read_in_progress = false;
 	return cnt;
 }
+static ssize_t ecpri_dma_read_lte_stat(struct file *file, char __user *ubuf,
+		size_t count, loff_t *ppos)
+{
+	int nbytes = 0;
+	int cnt = 0;
+	int gsi_id, endp_id, vf_id;
+	struct ecpri_dma_endp_statistics stats = { 0 };
+	int ret = 0;
+	struct ecpri_dma_endp_context* ep;
+	struct ecpri_dma_mhi_ee_gsi_tuple ee_gsi_tuple = { 0 };
+
+	if (!is_read_in_progress) {
+		is_read_in_progress = true;
+		return 0;
+	}
+
+	for (gsi_id = 0; gsi_id < ECPRI_DMA_GSI_NUM_MAX; gsi_id++) {
+		for (endp_id = 0; endp_id < ECPRI_DMA_ENDP_NUM_MAX; endp_id++) {
+			ep = &ecpri_dma_ctx->endp_ctx[gsi_id][endp_id];
+			if (ep->valid && ep->gsi_ep_cfg->lte_enable) {
+				ret = ecpri_dma_get_endp_stats(ep, &stats);
+				if (ret) {
+					DMAERR("Failed to get stats for GSI ID %d ENDP ID %d",
+						ep->gsi_id, ep->endp_id);
+					return ret;
+				}
+
+				ee_gsi_tuple.ee_id = ep->gsi_ep_cfg->ee;
+				ee_gsi_tuple.gsi_id = ep->gsi_id;
+
+				vf_id = ecpri_dma_mhi_get_vf_id(&ee_gsi_tuple);
+				if(ep->gsi_ep_cfg->dir == ECPRI_DMA_ENDP_DIR_SRC)
+					nbytes += scnprintf(dbg_buff + nbytes, count - nbytes,
+						"Tx ");
+				else
+					nbytes += scnprintf(dbg_buff + nbytes, count - nbytes,
+						"Rx ");
+
+				nbytes += scnprintf(dbg_buff + nbytes, count - nbytes,
+					"Stats for GSI ID %d ENDP ID %d VF ID %d MHI CH ID %d: ",
+					ep->gsi_id, ep->endp_id, vf_id,
+					((struct ecpri_dma_mhi_channel_ctx*)ep->
+						l2_mhi_channel_ptr)->channel_id);
+				nbytes += scnprintf(dbg_buff + nbytes, count - nbytes,
+					"Total packets %lu Total bytes %lu\n",
+					stats.total_pkts, stats.total_bytes);
+			}
+		}
+	}
+
+	/* Copy data to user buffer */
+	cnt = simple_read_from_buffer(ubuf, nbytes + 1, ppos, dbg_buff, count);
+
+	is_read_in_progress = false;
+	return cnt;
+}
 
 static const struct ecpri_dma_debugfs_file debugfs_files[] = {
 	{
@@ -611,6 +668,10 @@ static const struct ecpri_dma_debugfs_file debugfs_files[] = {
 	},{
 		"dma_stat", DMA_READ_ONLY_MODE, NULL, {
 			.read = ecpri_dma_read_dma_stat,
+		},
+	},{
+		"lte_stat", DMA_READ_ONLY_MODE, NULL, {
+			.read = ecpri_dma_read_lte_stat,
 		},
 	},
 };

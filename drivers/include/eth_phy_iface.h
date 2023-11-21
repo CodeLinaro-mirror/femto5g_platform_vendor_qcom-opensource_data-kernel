@@ -93,6 +93,26 @@ enum eth_phy_iface_phy_lane_speed_enum
 	PHY_LANE_SPEED_MAX
 };
 
+/* Enum to identify the link speed */
+enum eth_phy_iface_mtip_link_speed_enum
+{
+	MTIP_LINK_SPEED_10G = 0,
+	MTIP_LINK_SPEED_25G,
+	MTIP_LINK_SPEED_40G,
+	MTIP_LINK_SPEED_50G,
+	MTIP_LINK_SPEED_100G,
+	MTIP_LINK_SPEED_MAX
+};
+
+/* Enum to identify the PHY eq mode */
+enum qcom_aw_phy_eq_mode_enum {
+	QCOM_AW_PHY_EQ_MODE_MIN = 0,
+	QCOM_AW_PHY_MANUAL_EQ_MODE,
+	QCOM_AW_PHY_ANLT_MODE,
+	QCOM_AW_PHY_LT_MODE,
+	QCOM_AW_PHY_EQ_MODE_MAX
+};
+
 /* Lane Config - Enabled flag and speed info */
 struct eth_phy_iface_phy_lane_config
 {
@@ -171,6 +191,8 @@ struct eth_phy_iface_ops {
 	                                 uint32_t port_config_mask);
 	int (*eth_phy_iface_reset_phy_sm)(enum mtip_port_type_enum port_type);
 	void (*eth_phy_iface_set_tx_compliance)(bool flag);
+	int (*eth_phy_iface_get_phy_phy_eq_mode)(
+                                    enum mtip_port_type_enum port_type);
 };
 
 #endif // _ETH_PHY_IFACE_H
