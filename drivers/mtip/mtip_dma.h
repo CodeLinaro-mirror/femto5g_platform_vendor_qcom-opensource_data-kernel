@@ -59,6 +59,7 @@ int mtip_start_dma_pipe(struct net_device *netdev, ecpri_dma_eth_conn_hdl_t hdl)
 int mtip_stop_dma_pipe(ecpri_dma_eth_conn_hdl_t hdl);
 
 int mtip_replenish_dma_rx_buffers(struct net_device *netdev, ecpri_dma_eth_conn_hdl_t hdl, u32 num_of_buffs);
+int mtip_replenish_dma_rx_buffers_reuse(struct net_device *netdev, ecpri_dma_eth_conn_hdl_t hdl, u32 num_of_buffs);
 int mtip_dma_send_packet(struct net_device *netdev, ecpri_dma_eth_conn_hdl_t hdl, struct sk_buff *skb, bool send_tx_pre_header, bool send_tx_seq_num, u8 ts_seq_num);
 void mtip_dma_tx_commit(ecpri_dma_eth_conn_hdl_t hdl);
 
@@ -111,4 +112,5 @@ void mtip_dma_free_mem_buffer(struct ecpri_dma_mem_buffer* ptr);
 struct ecpri_dma_tx_header* mtip_dma_alloc_tx_header(gfp_t flags);
 void mtip_dma_free_tx_header(struct ecpri_dma_tx_header* ptr);
 
+void mtip_dma_free_pkt(struct ecpri_dma_pkt* pkt);
 #endif // _MTIP_DMA_H

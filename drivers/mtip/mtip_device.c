@@ -99,62 +99,6 @@ struct net_device* macsec_eth_get_netdev_from_link(u32 link_index)
 }
 
 EXPORT_SYMBOL(macsec_eth_get_netdev_from_link);
-
-static void post_mtip_replenish_dma_rx_buffers(struct net_device *netdev, ecpri_dma_eth_conn_hdl_t hdl, u32 num_of_buffs)
-{
-   struct mtip_replenish_dma_rx_buffers_task* taskstruct = kmalloc(sizeof(struct mtip_replenish_dma_rx_buffers_task), GFP_ATOMIC);
-
-   if(taskstruct == NULL)
-   {
-	CSMLOGERR("memory alloc failed\n");
-	return;
-   }
-   taskstruct->netdev = netdev;
-   taskstruct->hdl = hdl;
-   taskstruct->num_of_buffs = num_of_buffs;
-   mtip_queue_work(MTIP_WORKQ_TASK_REPLENISH_RX_BUFFERS, taskstruct);
-}
-
-void run_mtip_replenish_dma_rx_buffers(void* work_ptr)
-{
-   int rv;
-   u32 tx_available;
-   u32 rx_available;
-   struct mtip_replenish_dma_rx_buffers_task* taskstruct = (struct mtip_replenish_dma_rx_buffers_task*)work_ptr;
-   struct mtip_netdev_priv* priv;
-   u32 link_index;
-   ecpri_dma_eth_conn_hdl_t hdl;
-
-   priv = netdev_priv(taskstruct->netdev);
-
-   link_index = priv->link_index;
-
-   hdl = platform_driver_priv->mtip_links[link_index]->dma_hdl;
-
-   if (hdl == -1) 
-   {
-       CSMLOGERR("invalid dma_hdl %d", hdl);
-       goto out;
-   }
-
-   rv = mtip_dma_get_ring_state(taskstruct->hdl, &tx_available, &rx_available);
-
-   if (platform_driver_priv->mtip_links[link_index]->peak_rx_available < rx_available) 
-   {
-       CSMLOGDBG("peak rx_available: %d/%d\n", rx_available, MTIP_RX_RING_SIZE);
-       platform_driver_priv->mtip_links[link_index]->peak_rx_available = rx_available;
-   }
-
-   if (rx_available > 1) 
-   {
-       rv = mtip_replenish_dma_rx_buffers(taskstruct->netdev, taskstruct->hdl, rx_available - 1);
-   }
-
-out:
-   // free the taskstruct
-   kfree(taskstruct);
-}
-
 void mtip_set_rx_mode_immediate(ecpri_dma_eth_conn_hdl_t hdl, enum ecpri_dma_notify_mode setmode)
 {
     int rv;
@@ -246,6 +190,7 @@ void mtip_process_tx_comp_cb(ecpri_dma_eth_conn_hdl_t hdl, struct mtip_dma_tx_co
    struct ecpri_dma_pkt_completion_wrapper *comp;
    struct ecpri_dma_pkt* pkt = NULL;
    struct sk_buff *skb;
+   struct mtip_pkt_priv *pkt_priv = NULL;
    struct ecpri_dma_mem_buffer **buffs;
    unsigned int num_of_buffers;
    struct net_device *netdev = NULL;
@@ -278,8 +223,14 @@ void mtip_process_tx_comp_cb(ecpri_dma_eth_conn_hdl_t hdl, struct mtip_dma_tx_co
           continue;
       }
 
-      skb = (struct sk_buff*)pkt->user_data;
+      pkt_priv = (struct mtip_pkt_priv *)pkt->user_data;
+      if (pkt_priv == NULL)
+      {
+          CSMLOGERR("Got a NULL userdata\n");
+          continue;
+      }
 
+      skb = pkt_priv->skb;
       if (skb == NULL)
       {
           CSMLOGERR("Got a NULL skb\n");
@@ -327,7 +278,7 @@ void mtip_process_tx_comp_cb(ecpri_dma_eth_conn_hdl_t hdl, struct mtip_dma_tx_co
           // this packet needs to be timestamped
           // acquire the ptp lock
           mtip_ptp_tx_ts_lock_acquire(link_index);
-	  tmp=(char*)(skb->data);
+          tmp=(char*)(skb->data);
           CSMLOGPTP("pkt_type=%x,seq_id=%x%x,skb=%lx,pkt_ts_seq_num=%d,ts_list_size=%d,\
             skb_list_size=%d [%s]\n",tmp[46],tmp[44],tmp[45],(unsigned long)skb->data, \
             pkt_ts_seq_num,mtip_ptp_tx_ts_list_size(link_index), \
@@ -405,8 +356,24 @@ void mtip_process_tx_comp_cb(ecpri_dma_eth_conn_hdl_t hdl, struct mtip_dma_tx_co
           CSMLOGERR("invalid number of buffers %d", num_of_buffers);
       }
 
+      // Check if this packet is present in TX array 
+      if(priv->tx_pkts[pkt_priv->tx_index] == pkt)
+      {
+         priv->tx_pkts[pkt_priv->tx_index] = NULL;
+         mtip_dma_free_dma_pkt(pkt);
+         pkt = NULL;
+      }
+      else
+      {
+         CSMLOGERR("TX Comp not matched with TX array,link_index=%d,tx_index=%d,pkt=0x%x,priv->tx_pkts[%d]=0x%x\n",
+          link_index,pkt_priv->tx_index,pkt,pkt_priv->tx_index,priv->tx_pkts[pkt_priv->tx_index]);
+      }
+
+      kfree(pkt_priv);
+
       // free the dma pkt
-      mtip_dma_free_dma_pkt(pkt);
+      if(pkt)
+         mtip_dma_free_dma_pkt(pkt);
    }
 
    if(netdev == NULL)
@@ -720,6 +687,9 @@ int mtip_napi_poll(struct napi_struct *napi_ptr, int budget)
    struct mtip_netdev_priv *priv;
    ecpri_dma_eth_conn_hdl_t actual_handle = hdl;
 
+   u32 tx_available = 0;
+   u32 rx_available = 0;
+
    if (mtip_loopback_mode != MTIP_MODE_DEFAULT) 
    {
 #ifdef MTIP_LOOPBACK_SWAP_HANDLE
@@ -772,13 +742,29 @@ int mtip_napi_poll(struct napi_struct *napi_ptr, int budget)
 
    // read the packets and push into the stack
    rv = mtip_dma_poll_rx_packets(dev, napi_ptr, hdl, budget, &npackets, &num_buffers);
-
+   priv->rx_polled_count += npackets;
    // HANDLE THE ERROR
    if (rv < 0)
    {
       CSMLOGERR("poll_rx_packets failed for hdl: %d\n", hdl);
    }
 
+   // Check if RX ring is 75% empty or not,
+   // if yes then replenish buffers to DMA
+   if(priv->rx_polled_count >= ((MTIP_RX_RING_SIZE*3)/4))
+   {
+      rv = mtip_dma_get_ring_state(actual_handle, &tx_available, &rx_available);
+      if (rv < 0)
+      {
+         CSMLOGERR("get ring state from DMA failed for hdl: %d\n", hdl);
+      }
+      else
+      {
+         rv = mtip_replenish_dma_rx_buffers_reuse(dev, actual_handle, rx_available -1);
+         if(rv == 0)
+            priv->rx_polled_count = 0;
+      }
+   }
    /* If we processed all packets, we're done; tell the kernel and re-enable ints */
    if (npackets < budget) {
       napi_complete(napi_ptr);
@@ -793,8 +779,6 @@ int mtip_napi_poll(struct napi_struct *napi_ptr, int budget)
       CSMLOGDBG("Remaining in POLL mode\n");
    }
 
-   // replenish the rx buffers for the packets processed
-   post_mtip_replenish_dma_rx_buffers(dev, actual_handle, num_buffers);
    return npackets;
 }
 
@@ -3285,6 +3269,7 @@ void run_mtip_process_netdev_open(void* workptr)
    // first get the interface going
    if (hdl)
    {
+
       // start the pipe
       mtip_start_dma_pipe(netdev, hdl);
 

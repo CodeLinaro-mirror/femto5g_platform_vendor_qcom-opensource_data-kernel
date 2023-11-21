@@ -44,6 +44,7 @@ void run_mtip_client_send_ready(void* work_ptr);
 void mtip_client_send_event(eth_ecpriss_event_e event, u32 link_index);
 
 int mtip_setup_topology(void);
+void mtip_free_topology(void);
 eth_ecpriss_status_e mtip_eth_get_topology(eth_ecpriss_dev_mode_e *device_mode, eth_ecpriss_topology_root_s *topology_params);
 eth_ecpriss_status_e mtip_eth_register_events_cb(eth_ecpriss_interface_events_cb events_cb);
 eth_ecpriss_status_e mtip_eth_deregister_events_cb(void);

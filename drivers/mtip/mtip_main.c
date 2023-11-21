@@ -1438,7 +1438,7 @@ ret:
 
 static void mtip_module_exit(void)
 {
-   //int i;
+   int i;
    CSMLOGERR("mtip_module_exit called\n");
 
    // destroy the hashmap
@@ -1469,11 +1469,11 @@ static void mtip_module_exit(void)
    }
    /* memory leak needs to be fixed later */
    // finalize the dma array of allocs
-   /*for (i = 0; i < MTIP_DMA_ALLOC_LIST_MAX; ++i) 
+   for (i = 0; i < MTIP_DMA_ALLOC_LIST_MAX; ++i)
    {
        mtip_dma_alloc_finalize(i);
    }
-*/
+
    // finalize the workq
    mtip_destroy_workq();
    
@@ -1482,6 +1482,8 @@ static void mtip_module_exit(void)
    if (platform_driver_priv->ipc_log_buf_low)
         ipc_log_context_destroy(platform_driver_priv->ipc_log_buf_low);
 
+   // free topology
+   mtip_free_topology();
    // free the platform driver priv
    kfree(platform_driver_priv);
    platform_driver_priv = NULL;

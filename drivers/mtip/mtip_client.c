@@ -450,6 +450,25 @@ int mtip_setup_topology(void)
     return 0;
 }
 
+void mtip_free_topology(void)
+{
+    eth_ecpriss_topology_root_s* topology = NULL;
+    unsigned long flags;
+    spinlock_t *lock = &platform_driver_priv->driver_lock;
+
+    CSMLOGDBG("Free topology\n");
+
+    spin_lock_irqsave(lock, flags);
+
+    // get the topology pointer
+    topology = platform_driver_priv->topology;
+    platform_driver_priv->topology = NULL;
+
+    spin_unlock_irqrestore(lock, flags);
+
+    if (topology)
+        kfree(topology);
+}
 /*
     The exported function to get the current topology
  */

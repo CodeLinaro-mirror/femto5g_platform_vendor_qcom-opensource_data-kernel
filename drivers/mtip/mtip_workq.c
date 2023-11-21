@@ -61,11 +61,6 @@ static void mtip_workq_handler(struct work_struct *w)
               run_mtip_client_send_ready(work_ptr);
           }
           break;
-      case MTIP_WORKQ_TASK_REPLENISH_RX_BUFFERS:
-         {
-            run_mtip_replenish_dma_rx_buffers(work_ptr);
-         }
-         break;
       case MTIP_WORKQ_TASK_TX_COMP_CB:
           {
               //run_mtip_tx_comp_cb(work_ptr);

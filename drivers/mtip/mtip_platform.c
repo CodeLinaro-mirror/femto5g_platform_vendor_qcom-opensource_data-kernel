@@ -62,7 +62,6 @@
 #include "mtip_debug_eth.h"
 
 static int mtip_platform_setup(void);
-
 /*
  * mtip_platform_setup_link: allocate memory for the link and connect to the dma
  */
@@ -132,10 +131,6 @@ static int mtip_platform_setup_link(unsigned int port_device_index, unsigned int
       mtip_hashmap_insert(hdl, link_index);
 
       CSMLOGDBG("connect_dma_pipe is complete with hdl: %d for link_index: %d\n", hdl, link_index);
-   }
-   else
-   {
-       platform_driver_priv->mtip_links[link_index]->dma_hdl = -1;
    }
 
    goto out;
@@ -272,6 +267,17 @@ static int mtip_platform_cleanup_link(unsigned int link_index)
    {
       if(platform_driver_priv->mtip_links[link_index]->dma_hdl != 0)
       {
+         mutex_lock(&platform_driver_priv->mtip_links[link_index]->dev_lock);
+         if (platform_driver_priv->mtip_links[link_index]->state != MTIP_LINK_STATE_INIT && platform_driver_priv->mtip_links[link_index]->state != MTIP_LINK_STATE_CLOSE)
+         {
+            mutex_unlock(&platform_driver_priv->mtip_links[link_index]->dev_lock);
+            // stop the pipe
+            mtip_stop_dma_pipe(platform_driver_priv->mtip_links[link_index]->dma_hdl);
+         }
+         else
+         {
+            mutex_unlock(&platform_driver_priv->mtip_links[link_index]->dev_lock);
+         }
          // disconnect the pipes
          mtip_disconnect_dma_pipe(platform_driver_priv->mtip_links[link_index]->dma_hdl);
 
@@ -280,13 +286,6 @@ static int mtip_platform_cleanup_link(unsigned int link_index)
 
          // reset the hdl of the link
          platform_driver_priv->mtip_links[link_index]->dma_hdl = 0;
-      }
-
-      if(platform_driver_priv->mtip_links[link_index] != NULL)
-      {
-        mutex_destroy(&platform_driver_priv->mtip_links[link_index]->dev_lock);
-        kfree(platform_driver_priv->mtip_links[link_index]);
-        platform_driver_priv->mtip_links[link_index] = NULL;
       }
    }
    return 0;
@@ -1385,8 +1384,6 @@ static int mtip_platform_setup(void)
    struct mtip_netdev_priv *priv;
    u32 total_num_links = 0;
    u32 port_type;
-   struct ecpri_dma_pkt_completion_wrapper **pkts;
-   int num_pkt_allocs = MTIP_NAPI_WEIGHT*MTIP_RX_DMA_MAX_BUFFERS_PER_PACKET;
 
    // enable all the necessary clocks
    mtip_clocks_setup_clocks();
@@ -1514,31 +1511,13 @@ static int mtip_platform_setup(void)
             // mark the priv flags as the default
             priv->priv_flags_set = false;
 
+            priv->rx_polled_count = 0;
+            priv->head = NULL;
+            priv->rx_curr_index = 0;
             // Set up link between ndev and pdev
             SET_NETDEV_DEV(platform_driver_priv->mtip_links[i]->dev, &platform_driver_priv->devices.link_devices[i].link_pdev->dev);
 
             priv->mac_ioaddr = platform_driver_priv->devices.link_devices[i].mac_ioaddr;
-
-            pkts = (struct ecpri_dma_pkt_completion_wrapper **)kmalloc(num_pkt_allocs * sizeof(struct ecpri_dma_pkt_completion_wrapper*), GFP_ATOMIC);
-
-            if (pkts == NULL)
-            {
-                ret = -1;
-                goto out;
-            }
-
-            for (j = 0; j < num_pkt_allocs; ++j)
-            {
-                pkts[j] = mtip_dma_alloc_completion_wrapper(GFP_ATOMIC);
-
-                if (pkts[j] == NULL)
-                {
-                    ret = -1;
-                    CSMLOGERR("memory alloc failed\n");
-                    goto out;
-                }
-            }
-            priv->tx_comp_pkts=pkts;
 
           // add the mtip_napi_rx
           // this needs to be done before register netdev
@@ -1731,8 +1710,14 @@ void run_mtip_process_create_phylink(void *work_ptr)
 
 int mtip_link_remove(struct platform_device *pdev)
 {
-   int i;
+   int i,j;
    struct mtip_netdev_priv *priv;
+   struct ecpri_dma_pkt **rx_pkts = NULL;
+   struct ecpri_dma_pkt_completion_wrapper **tx_comp_pkts = NULL;
+   int num_pkt_allocs = MTIP_NAPI_WEIGHT*MTIP_RX_DMA_MAX_BUFFERS_PER_PACKET;
+   struct ecpri_dma_pkt **tx_pkts = NULL;
+   struct ecpri_dma_pkt_completion_wrapper **rx_comp_pkts = NULL;
+
    CSMLOGINFO("mtip_link_remove called\n");
 
    // free the net devices
@@ -1740,21 +1725,84 @@ int mtip_link_remove(struct platform_device *pdev)
    {
       if (platform_driver_priv->mtip_links[i] != NULL)
       {
+         // cleanup the link
+         mtip_platform_cleanup_link(i);
+
          if (platform_driver_priv->mtip_links[i]->dev != NULL)
          {
             priv = netdev_priv(platform_driver_priv->mtip_links[i]->dev);
-            kfree(priv->tx_comp_pkts);
-            priv->tx_comp_pkts=NULL;
-
+            rx_pkts = priv->head;
+            tx_comp_pkts = priv->tx_comp_pkts;
+            tx_pkts = priv->tx_pkts;
+            rx_comp_pkts = priv->rx_comp_pkts;
+            priv->head = NULL;
+            // free ptp lists
+            mtip_ptp_finalize(i);
             // unregister the netdevs
             unregister_netdev(platform_driver_priv->mtip_links[i]->dev);
-
             // free the netdevs
             free_netdev(platform_driver_priv->mtip_links[i]->dev);
             platform_driver_priv->mtip_links[i]->dev = NULL;
          }
-         // cleanup the link
-         mtip_platform_cleanup_link(i);
+
+         mutex_destroy(&platform_driver_priv->mtip_links[i]->dev_lock);
+         kfree(platform_driver_priv->mtip_links[i]);
+         platform_driver_priv->mtip_links[i] = NULL;
+
+         CSMLOGINFO("Deallocate TX completion wrappers\n");
+
+         if(tx_comp_pkts != NULL)
+         {
+            for (j = 0; j < num_pkt_allocs; ++j)
+            {
+            // free the completion wrappers
+            if(tx_comp_pkts[j])
+               mtip_dma_free_completion_wrapper(tx_comp_pkts[j]);
+            }
+            kfree(tx_comp_pkts);
+         }
+
+         CSMLOGINFO("Deallocate RX completion wrappers\n");
+
+         if(rx_comp_pkts != NULL)
+         {
+            for (j = 0; j < num_pkt_allocs; ++j)
+            {
+               // free the completion wrappers
+               if(rx_comp_pkts[j])
+                  mtip_dma_free_completion_wrapper(rx_comp_pkts[j]);
+            }
+            kfree(rx_comp_pkts);
+         }
+
+         CSMLOGINFO("Deallocate TX buffers\n");
+
+         if(tx_pkts != NULL)
+         {
+            for (j = 0; j < MTIP_TX_RING_SIZE; ++j)
+            {
+               if(tx_pkts[j] == NULL)
+                  continue;
+
+               mtip_dma_free_pkt(tx_pkts[j]);
+               tx_pkts[j] = NULL;
+            }
+         }
+
+         CSMLOGINFO("Deallocate RX Buffers replenished to DMA\n");
+
+         if(rx_pkts != NULL)
+         {
+            for (j = 0; j < MTIP_RX_RING_SIZE-1; j++)
+            {
+               if(rx_pkts[j] == NULL)
+                  continue;
+
+               mtip_dma_free_pkt(rx_pkts[j]);
+               rx_pkts[j] = NULL;
+            }
+            kfree(rx_pkts);
+         }
       }
    }
 

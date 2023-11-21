@@ -75,6 +75,12 @@ struct mtip_netdev_priv {
    struct phylink         *phylink;
    struct phylink_config   phylink_config;
    struct ecpri_dma_pkt_completion_wrapper **tx_comp_pkts;
+   struct ecpri_dma_pkt_completion_wrapper **rx_comp_pkts;
+   struct ecpri_dma_pkt **head;
+   uint16_t rx_curr_index;
+   uint16_t rx_polled_count;
+   struct ecpri_dma_pkt *tx_pkts[MTIP_TX_RING_SIZE];
+   uint16_t tx_curr_index;
 };
 
 /*
@@ -86,7 +92,6 @@ struct mtip_replenish_dma_rx_buffers_task
    ecpri_dma_eth_conn_hdl_t  hdl;
    u32                 num_of_buffs;
 };
-void run_mtip_replenish_dma_rx_buffers(void* work_ptr);
 
 struct mtip_tx_comp_cb_task
 {
