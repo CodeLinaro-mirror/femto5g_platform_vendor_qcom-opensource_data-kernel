@@ -462,7 +462,18 @@ static ssize_t config_val_from_registers_qudp_ingress_mac_addr_v2(char __user *b
 				RESET_STR(temp_stat_val_str);
 				scnprintf(temp_stat_val_str, TEMP_STAT_VAL_STR_MAX_SIZE, "0x%x",
 						ecpriss_pdata_v2->cfg_stats_v2.qudp_cfg_v2.ingress.cfg.mac_addr[fh_index][fltr_table_index].mac_msb.value);
+				/*
+				 * First four mac addresses are reserved for NR
+				 * mac addr
+				 */
 
+				if(fltr_table_index < ECPRISS_MAX_NR_MAC_PER_PORT){
+					strlcat(max_str, "NR:",
+						max_str_size);
+				}else{
+					strlcat(max_str, "LTE:",
+						max_str_size);
+				}
 				strlcat(max_str, "mac_msb:lsb_fh_",
 						max_str_size);
 				strlcat(max_str, fh_str,

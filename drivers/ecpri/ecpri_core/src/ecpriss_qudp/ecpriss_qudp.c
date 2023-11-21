@@ -9,10 +9,12 @@
 
 volatile int ecpriss_filtering_enabled = 0;
 volatile int ecpriss_qudp_ingress_action = ECPRISS_QUDP_ACTION_PASS_TO_A55;
+extern struct ecpri_dma_endp_mapping dma_endp_g;
+extern struct eth_ecpriss_ops mtip_ecpri_ops;
+extern eth_ecpriss_topology_root_s        eth_link_params_g;
 
-
-#define ECPRISS_ETH_QUDP_MTU_SIZE_V4   9000 
-#define ECPRISS_ETH_QUDP_MTU_SIZE_V6   9000 
+#define ECPRISS_ETH_QUDP_MTU_SIZE_V4   9000
+#define ECPRISS_ETH_QUDP_MTU_SIZE_V6   9000
 #define ECPRISS_QUDP_REG_FIELD_ENABLE  1
 #define ENABLE_FILTER                  1
 #define BYTE_SHIFT                     8
@@ -604,6 +606,7 @@ void ecpriss_qudp_ingress_config_stats_update_v2(int32_t fh_index)
 				fh_index,
 				&ecpriss_pdata_v2->cfg_stats_v2.qudp_cfg_v2.ingress.vbits.mac_addr[fh_index]);
 	}
+
 	for(fltr_index = 0; fltr_index < NUM_OF_FLTR ; fltr_index ++){
 
 		flag = flag << fltr_index;
@@ -1568,6 +1571,7 @@ static int ecpriss_qudp_ingress_modify_cfg_v2(uint32_t port_index,
 	ecpri_qudp_hwio_def_ecpri_udp_fh_filt_ip_dst_addr_port_p_entries_valid_bits_s_v2 ip_dst_valid_bit;
 	ecpri_qudp_hwio_def_ecpri_udp_fh_udp_classification_list_port_p_entries_valid_bits_s_v2 udp_port;
 	ecpri_qudp_hwio_def_ecpri_udp_fh_filt_vlan_addr_port_p_entries_valid_bits_s_v2 vlan_id;
+	ecpri_qudp_hwio_def_ecpri_udp_fh_filt_mac_address_port_p_entries_valid_bits_s_v2 mac_valid_bit;
 
 	ecpriss_qudp_ingress_per_port_cfg_s_v2 *qudp_ingress_port =
 		&ecpriss_pdata_v2->qudp_ctx_v2->fh_port_cfg_v2[port_index].ingress_port_cfg;
@@ -1667,6 +1671,33 @@ static int ecpriss_qudp_ingress_modify_cfg_v2(uint32_t port_index,
 
 
 	}
+
+	if(field & ECPRISS_QUDP_RX_CFG_FLTR_MASK_LOCAL_MAC_ADDR)
+	{
+		ingress_cfg.enable_mac_dst_check = 1;
+		ingress_cfg.enable_broadcast_check = 1;
+		ingress_cfg.non_local_dst_action = ECPRISS_MAC_ACTION_DISCARD;
+
+		memset(&mac_valid_bit,0, sizeof(mac_valid_bit));
+
+
+		ecpriss_qudp_hal_read_reg_n_fields(ECPRISS_QUDP_FH,
+				ECPRI_UDP_FH_FILT_MAC_ADDRESS_PORT_p_ENTRIES_VALID_BITS_V2,
+				port_index, &mac_valid_bit);
+
+
+		if(cfg_action == CONFIGURE)
+			mac_valid_bit.valid_bits |= 1UL << filtnum;
+		else
+			mac_valid_bit.valid_bits &= ~(1UL << filtnum);
+
+		ecpriss_qudp_hal_write_reg_n_fields(ECPRISS_QUDP_FH,
+				ECPRI_UDP_FH_FILT_MAC_ADDRESS_PORT_p_ENTRIES_VALID_BITS_V2,
+				port_index, &mac_valid_bit);
+
+
+	}
+
 
 	ecpriss_qudp_hal_write_reg_n_fields(ECPRISS_QUDP_FH,
 			ECPRI_UDP_FH_INGRESS_CONFIG_P_V2,
@@ -3362,6 +3393,10 @@ int ecpriss_qudp_init_v2(struct device *dev)
 
 		ecpriss_filtering_enabled = 1;
 
+		if(ecpriss_pdata_v2->dev_mode != ECPRISS_DEV_MODE_RU && ecpriss_pdata_v2->qudp_ctx_v2->lte_fh_enabled) {
+			ecpriss_qudp_set_lte_mac_filter_info();
+			ecpriss_qudp_set_nr_mac_filter_info();
+		}
 		ecpriss_pdata_v2->qudp_ctx_v2->state = ECPRI_QUDP_READY ;
 
 	}while (0);
@@ -5112,7 +5147,6 @@ void ecpriss_qudp_non_ecpri_dma_ring_info(void)
 	}
 }
 
-
 int ecpriss_qudp_fh_tx_hdr_decfg_v2(uint32_t               port_index,
 		ecpriss_qudp_tx_cfg_s *tx_cfg)
 {
@@ -5271,6 +5305,280 @@ int ecpriss_qudp_fh_tx_hdr_decfg_v2(uint32_t               port_index,
 }
 
 
+void ecpriss_qudp_set_lte_mac_filter_info(void)
+{
+	int32_t fh_index = 0;
+	int j =0;
+	int i =0;
+	int lte_fh_index = 0;
+
+	int port_mac_index[NUM_OF_FHP] = {ECPRISS_MAX_NR_MAC_PER_PORT,
+		ECPRISS_MAX_NR_MAC_PER_PORT,
+		ECPRISS_MAX_NR_MAC_PER_PORT};
+
+	ecpri_qudp_hwio_def_ecpri_udp_fh_filt_mac_address_info_port_p_entry_n_s_v2 lte_fh_mac_info;
+
+	for(i=0;i<dma_endp_g.num_of_port_types;i++) {
+		if(dma_endp_g.topology_params[i].port_type ==
+				ECPRI_DMA_ENDP_STREAM_DEST_FH_LTE) {
+
+			for(fh_index = 0; fh_index < NUM_OF_FHP; fh_index++){
+
+				struct ecpri_dma_port_params *dma_port_cfg= &ecpriss_pdata_v2->xbar_ctx_v2->fh_lte_port_cfg[lte_fh_index].dma_port_cfg[fh_index];
+
+				for(j=0;j<dma_port_cfg->num_of_rings;j++)
+				{
+					memset(&lte_fh_mac_info, 0, sizeof(lte_fh_mac_info));
+
+					if(dma_port_cfg->dma_rings_param[j].dma_ring_type == ECPRI_DMA_RING_TYPE_LTE_DEFAULT)
+					{
+						switch(j)
+						{
+							case ECPRISS_CORE_LINK_ID_0:
+								lte_fh_mac_info.ring_id = dma_port_cfg->dma_rings_param[0].dest_dma_ring_id;
+								lte_fh_mac_info.gsi_id= dma_port_cfg->dma_rings_param[0].dest_dma_ring_gsi_id;
+								break;
+							case ECPRISS_CORE_LINK_ID_1:
+								lte_fh_mac_info.ring_id = dma_port_cfg->dma_rings_param[1].dest_dma_ring_id;
+								lte_fh_mac_info.gsi_id = dma_port_cfg->dma_rings_param[1].dest_dma_ring_gsi_id;
+								break;
+							case ECPRISS_CORE_LINK_ID_2:
+								lte_fh_mac_info.ring_id = dma_port_cfg->dma_rings_param[2].dest_dma_ring_id;
+								lte_fh_mac_info.gsi_id = dma_port_cfg->dma_rings_param[2].dest_dma_ring_gsi_id;
+								break;
+							case ECPRISS_CORE_LINK_ID_3:
+								lte_fh_mac_info.ring_id = dma_port_cfg->dma_rings_param[3].dest_dma_ring_id;
+								lte_fh_mac_info.gsi_id = dma_port_cfg->dma_rings_param[3].dest_dma_ring_gsi_id;
+								break;
+							default:
+								ECPRILOGERR("Wrong default value %d\n",j);
+								break;
+						}
+
+						lte_fh_mac_info.action = ECPRISS_MAC_ACTION_PASS_TO_A55;
+
+						ECPRILOGDBG("LTE FH DMA Endp Params: Port:%d Index:%d RingID:%d action:%d\n",fh_index, port_mac_index[fh_index], lte_fh_mac_info.ring_id,lte_fh_mac_info.action);
+
+						ecpriss_qudp_hal_write_reg_mn_fields(ECPRISS_QUDP_FH_FILTER,
+								ECPRI_UDP_FH_FILT_MAC_ADDRESS_INFO_PORT_p_ENTRY_n_V2,
+								fh_index,port_mac_index[fh_index]++,
+								&lte_fh_mac_info);
+
+
+					}
+				}
+			}
+			lte_fh_index++;
+		}
+	}
+}
+
+void ecpriss_qudp_set_nr_mac_filter_info(void)
+{
+	int32_t fh_index = 0;
+	int j =0;
+	int i =0;
+
+	ecpri_qudp_hwio_def_ecpri_udp_fh_filt_mac_address_info_port_p_entry_n_s_v2 nr_fh_mac_info;
+
+	for(i=0;i<dma_endp_g.num_of_port_types;i++) {
+		if(dma_endp_g.topology_params[i].port_type ==
+				ECPRI_DMA_ENDP_STREAM_DEST_FH) {
+
+			for(fh_index = 0; fh_index < NUM_OF_FHP; fh_index++){
+
+				struct ecpri_dma_port_params *dma_port_cfg= &ecpriss_pdata_v2->xbar_ctx_v2->fh_port_cfg.dma_port_cfg[fh_index];
+
+				for(j=0;j<dma_port_cfg->num_of_rings;j++)
+				{
+					memset(&nr_fh_mac_info, 0, sizeof(nr_fh_mac_info));
+					if(dma_port_cfg->dma_rings_param[j].dma_ring_type == ECPRI_DMA_RING_TYPE_FH_DEFAULT)
+					{
+						nr_fh_mac_info.action = ECPRISS_MAC_ACTION_CONTINUE_NORMAL_PROCESSING;
+
+						ECPRILOGDBG("NR FH DMA Endp Params: Port:%d Index:%d RingID:%d action:%d\n",fh_index, j, nr_fh_mac_info.ring_id, nr_fh_mac_info.action);
+
+						ecpriss_qudp_hal_write_reg_mn_fields(ECPRISS_QUDP_FH_FILTER,
+								ECPRI_UDP_FH_FILT_MAC_ADDRESS_INFO_PORT_p_ENTRY_n_V2,
+								fh_index,j,
+								&nr_fh_mac_info);
+
+
+					}
+				}
+			}
+		}
+	}
+}
+
+void ecpriss_qudp_set_lte_mac_filter(ecpriss_packet_payload_s *packet)
+{
+	int index = -1;
+	int fh_index = -1;
+
+	ecpri_qudp_hwio_def_ecpri_udp_fh_filt_mac_address_lsb_port_p_entry_n_u_v2 mac_lsb;
+	ecpri_qudp_hwio_def_ecpri_udp_fh_filt_mac_address_msb_port_p_entry_n_u_v2 mac_msb;
+	ecpriss_qudp_ingress_per_port_cfg_s_v2 *qudp_ingress_port = NULL;
+	ecpriss_lte_mac_addr_cfg_s *mac_info = NULL;
+
+	mac_info = &packet->flow_cfg.mac_cfg;
+
+	if(mac_info == NULL)
+		return;
+
+	if(ecpriss_pdata_v2->qudp_ctx_v2->lte_fh_enabled == 0)
+		return;
+
+
+	for(fh_index = 0; fh_index < NUM_OF_FHP; fh_index++){
+
+		qudp_ingress_port = &ecpriss_pdata_v2->qudp_ctx_v2->fh_port_cfg_v2[fh_index].ingress_port_cfg;
+
+		for(index = 0 ; index < ECPRISS_MAX_LTE_MAC_PER_PORT ; index++) {
+
+			memset(&mac_lsb, 0, sizeof(mac_lsb));
+			memset(&mac_msb, 0, sizeof(mac_msb));
+
+			mac_lsb.value = ((mac_info->lte_mac_addr[fh_index][index].mac[5]) | (mac_info->lte_mac_addr[fh_index][index].mac[4] << 8)
+					| (mac_info->lte_mac_addr[fh_index][index].mac[3] << 16) | (mac_info->lte_mac_addr[fh_index][index].mac[2] << 24));
+
+
+			mac_msb.value = ((mac_info->lte_mac_addr[fh_index][index].mac[1]) | (mac_info->lte_mac_addr[fh_index][index].mac[0] << 8));
+
+			if(0 == mac_lsb.value && 0 == mac_msb.value){
+				ECPRILOGINFO("Empty Mac Config for FH %u Index %u\n",fh_index, index);
+				continue;
+			}
+			ecpriss_qudp_hal_write_reg_mn_fields(ECPRISS_QUDP_FH_FILTER,
+					ECPRI_UDP_FH_FILT_MAC_ADDRESS_LSB_PORT_p_ENTRY_n_V2,
+					fh_index,
+					index + ECPRISS_MAX_NR_MAC_PER_PORT,
+					&mac_lsb);
+
+
+
+			ecpriss_qudp_hal_write_reg_mn_fields(ECPRISS_QUDP_FH_FILTER,
+					ECPRI_UDP_FH_FILT_MAC_ADDRESS_MSB_PORT_p_ENTRY_n_V2,
+					fh_index,
+					index + ECPRISS_MAX_NR_MAC_PER_PORT,
+					&mac_msb);
+
+			ecpriss_qudp_ingress_modify_cfg_v2(fh_index,
+					ENABLE_FILTER,
+					ECPRISS_QUDP_RX_CFG_FLTR_MASK_LOCAL_MAC_ADDR,
+					index + ECPRISS_MAX_NR_MAC_PER_PORT,
+					CONFIGURE);
+
+			qudp_ingress_port->dmac[index + ECPRISS_MAX_NR_MAC_PER_PORT].lsb = mac_lsb.value;
+			qudp_ingress_port->dmac[index + ECPRISS_MAX_NR_MAC_PER_PORT].msb = mac_msb.value;
+			qudp_ingress_port->num_mac_fltr_entries++;
+		}
+
+	}
+
+}
+
+void ecpriss_qudp_set_nr_mac_filter(void)
+{
+	int ret = 0;
+	int i,j,k;
+	uint8_t port_index;
+	uint8_t num_links;
+	eth_ecpriss_dev_mode_e device_mode;
+	int action = CONFIGURE;
+	ecpriss_qudp_port_cfg_s_v2      *port_cfg_local;
+	eth_ecpriss_port_params_s *port_params = NULL;
+	ecpriss_qudp_ingress_per_port_cfg_s_v2 *qudp_ingress_port = NULL;
+
+	ecpri_qudp_hwio_def_ecpri_udp_fh_filt_mac_address_lsb_port_p_entry_n_u_v2 mac_lsb;
+	ecpri_qudp_hwio_def_ecpri_udp_fh_filt_mac_address_msb_port_p_entry_n_u_v2 mac_msb;
+
+	do {
+		ret = (mtip_ecpri_ops.eth_ecpriss_get_topology)(&device_mode,
+				&eth_link_params_g);
+		if(ret < 0) {
+			break;
+		}
+
+		for(i=0;i<eth_link_params_g.num_unique_port_types;i++) {
+
+
+			if(eth_link_params_g.topology_params[i].port_type ==
+					ETH_ECPRISS_PORT_TYPE_FH) {
+
+				ecpriss_pdata_v2->qudp_ctx_v2->num_ports =
+					eth_link_params_g.topology_params[i].num_ports;
+
+				for(j=0;j<ecpriss_pdata_v2->qudp_ctx_v2->num_ports;j++){
+
+					port_index =
+						eth_link_params_g.topology_params[i].port_params[j].port_index;
+
+					port_cfg_local =
+						&ecpriss_pdata_v2->qudp_ctx_v2->fh_port_cfg_v2[port_index];
+
+					num_links =
+						eth_link_params_g.topology_params[i].port_params[j].num_links;
+					port_params = &eth_link_params_g.topology_params[i].port_params[port_index];
+
+					qudp_ingress_port =
+						&ecpriss_pdata_v2->qudp_ctx_v2->fh_port_cfg_v2[port_index].ingress_port_cfg;
+					for(k=0;k<num_links;k++){
+
+						memset(&mac_lsb, 0, sizeof(mac_lsb));
+						memset(&mac_msb, 0, sizeof(mac_msb));
+
+
+						if(port_params->link_params[k].link_state == ETH_ECPRISS_LINK_STATE_OPEN ||
+								port_params->link_params[k].link_state == ETH_ECPRISS_LINK_STATE_UP){
+							action = CONFIGURE;
+
+							mac_lsb.value = ((port_params->link_params[k].eth_mac_addr[5]) | (port_params->link_params[k].eth_mac_addr[4] << 8)
+									| (port_params->link_params[k].eth_mac_addr[3] << 16) | (port_params->link_params[k].eth_mac_addr[2] << 24));
+
+							mac_msb.value = ((port_params->link_params[k].eth_mac_addr[1]) | (port_params->link_params[k].eth_mac_addr[0] << 8));
+
+							ECPRILOGDBG("ecpriss_qudp: Configure NR MAC Filter MSB:%d LSB:%d for Port:%d Link:%d\n ", mac_msb.value, mac_lsb.value, port_index, k);
+
+						}
+						else if (port_params->link_params[k].link_state == ETH_ECPRISS_LINK_STATE_CLOSE){
+
+							action = DE_CONFIGURE;
+
+							ECPRILOGDBG("ecpriss_qudp: Deconfigure NR MAC Filter Port:%d Link:%d\n ", port_index, k);
+						}else{
+							continue;
+						}
+
+						ecpriss_qudp_hal_write_reg_mn_fields(ECPRISS_QUDP_FH_FILTER,
+								ECPRI_UDP_FH_FILT_MAC_ADDRESS_LSB_PORT_p_ENTRY_n_V2,
+								port_index,
+								k,
+								&mac_lsb);
+
+
+						ecpriss_qudp_hal_write_reg_mn_fields(ECPRISS_QUDP_FH_FILTER,
+								ECPRI_UDP_FH_FILT_MAC_ADDRESS_MSB_PORT_p_ENTRY_n_V2,
+								port_index,
+								k,
+								&mac_msb);
+
+						ecpriss_qudp_ingress_modify_cfg_v2(port_index,
+								ENABLE_FILTER,
+								ECPRISS_QUDP_RX_CFG_FLTR_MASK_LOCAL_MAC_ADDR,
+								k,
+								action);
+						qudp_ingress_port->dmac[k].lsb = mac_lsb.value;
+						qudp_ingress_port->dmac[k].msb = mac_msb.value;
+						qudp_ingress_port->num_mac_fltr_entries++;
+
+					}
+				}
+			}
+		}
+
+	}while (0);
+}
 
 int ecpriss_qudp_fh_tx_hdr_ins_cfg_v2(uint32_t               port_index,
 		ecpriss_qudp_tx_cfg_s *tx_cfg)

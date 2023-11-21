@@ -238,6 +238,7 @@ static const char *ecpriss_qudp_hal_reg_name_to_str[ECPRISS_QUDP_REG_MAX+1] = {
 "	ECPRI_UDP_FH_EGRESS_NUM_ETH_ONLY_PACKETS_PORT_p_LINK_n_V2",
 "	ECPRI_UDP_FH_EGRESS_NUM_BYPASSED_PACKETS_PORT_p_LINK_n_V2",
 "	ECPRI_UDP_FH_EGRESS_MTU_ERR_PACKETS_PORT_p_LINK_n_V2",
+"       ECPRI_UDP_FH_FILT_MAC_ADDRESS_INFO_PORT_p_ENTRY_n_V2",
 "	ECPRI_UDP_L2_INGRESS_NUM_ETH_UDP_PACKETS_PORT_p_LINK_n_V2",
 "	ECPRI_UDP_L2_INGRESS_FCS_ERR_PACKETS_PORT_p_LINK_n_V2",
 "	ECPRI_UDP_L2_INGRESS_IPV4_CS_ERROR_PACKETS_PORT_p_LINK_n_V2",
@@ -2691,7 +2692,49 @@ static const char *ecpriss_qudp_hal_reg_name_to_str[ECPRISS_QUDP_REG_MAX+1] = {
 	return;
 }
 
+	static void ecpriss_qudp_hal_reg_construct_udp_fh_mac_addr_info_v2
+(ecpriss_qudp_hal_reg_name_e reg, const void *fields, uint32_t* val)
+{
+	ecpri_qudp_hwio_def_ecpri_udp_fh_filt_mac_address_info_port_p_entry_n_s_v2 *udp_fh_mac_info
+		= (ecpri_qudp_hwio_def_ecpri_udp_fh_filt_mac_address_info_port_p_entry_n_s_v2 *)fields;
 
+	ECPRISS_HAL_SETFIELD_IN_REG(*val,
+			udp_fh_mac_info->action,
+			HWIO_ECPRI_UDP_FH_FILT_MAC_ADDRESS_INFO_PORT_p_ENTRY_n_ACTION_SHFT_V2,
+			HWIO_ECPRI_UDP_FH_FILT_MAC_ADDRESS_INFO_PORT_p_ENTRY_n_ACTION_BMSK_V2);
+
+	ECPRISS_HAL_SETFIELD_IN_REG(*val,
+			udp_fh_mac_info->gsi_id,
+			HWIO_ECPRI_UDP_FH_FILT_MAC_ADDRESS_INFO_PORT_p_ENTRY_n_GSI_ID_SHFT_V2,
+			HWIO_ECPRI_UDP_FH_FILT_MAC_ADDRESS_INFO_PORT_p_ENTRY_n_GSI_ID_BMSK_V2);
+
+	ECPRISS_HAL_SETFIELD_IN_REG(*val,
+			udp_fh_mac_info->ring_id,
+			HWIO_ECPRI_UDP_FH_FILT_MAC_ADDRESS_INFO_PORT_p_ENTRY_n_RING_ID_SHFT_V2,
+			HWIO_ECPRI_UDP_FH_FILT_MAC_ADDRESS_INFO_PORT_p_ENTRY_n_RING_ID_BMSK_V2);
+	return;
+
+}
+	static void ecpriss_qudp_hal_reg_parse_udp_fh_mac_addr_info_v2
+(ecpriss_qudp_hal_reg_name_e reg, void *fields, uint32_t val)
+{
+	ecpri_qudp_hwio_def_ecpri_udp_fh_filt_mac_address_info_port_p_entry_n_s_v2 *udp_fh_mac_info
+		= (ecpri_qudp_hwio_def_ecpri_udp_fh_filt_mac_address_info_port_p_entry_n_s_v2 *)fields;
+
+	udp_fh_mac_info->action = ECPRISS_HAL_GETFIELD_FROM_REG(val,
+			HWIO_ECPRI_UDP_FH_FILT_MAC_ADDRESS_INFO_PORT_p_ENTRY_n_ACTION_SHFT_V2,
+			HWIO_ECPRI_UDP_FH_FILT_MAC_ADDRESS_INFO_PORT_p_ENTRY_n_ACTION_BMSK_V2);
+
+	udp_fh_mac_info->gsi_id = ECPRISS_HAL_GETFIELD_FROM_REG(val,
+			HWIO_ECPRI_UDP_FH_FILT_MAC_ADDRESS_INFO_PORT_p_ENTRY_n_GSI_ID_SHFT_V2,
+			HWIO_ECPRI_UDP_FH_FILT_MAC_ADDRESS_INFO_PORT_p_ENTRY_n_GSI_ID_BMSK_V2);
+
+	udp_fh_mac_info->ring_id = ECPRISS_HAL_GETFIELD_FROM_REG(val,
+			HWIO_ECPRI_UDP_FH_FILT_MAC_ADDRESS_INFO_PORT_p_ENTRY_n_RING_ID_SHFT_V2,
+			HWIO_ECPRI_UDP_FH_FILT_MAC_ADDRESS_INFO_PORT_p_ENTRY_n_RING_ID_BMSK_V2);
+	return;
+
+}
 static void ecpriss_qudp_hal_reg_construct_dummy(ecpriss_qudp_hal_reg_name_e reg,
 		const void *fields,
 		uint32_t *val)
@@ -5077,11 +5120,11 @@ static struct ecpriss_qudp_hal_reg_obj ecpriss_qudp_hal_reg_objs[ECPRISS_HW_MAX]
 	[ECPRISS_HW_v2_0][ECPRI_UDP_FH_FILT_MAC_ADDRESS_LSB_PORT_p_ENTRY_n_V2] = {
 		ecpriss_qudp_hal_reg_construct_filt_mac_addr_lsb_port_p_entry_n_v2,
 		ecpriss_qudp_hal_reg_parse_filt_mac_addr_lsb_port_p_entry_n_v2,
-		0x09381000,0x1300, 0x4, 0, 0, 0, 0x10},
+		0x09381000,0x1300, 0x4, 0, 0, 0, 0x50},
 	[ECPRISS_HW_v2_0][ECPRI_UDP_FH_FILT_MAC_ADDRESS_MSB_PORT_p_ENTRY_n_V2] = {
 		ecpriss_qudp_hal_reg_construct_filt_mac_addr_msb_port_p_entry_n_v2,
 		ecpriss_qudp_hal_reg_parse_filt_mac_addr_msb_port_p_entry_n_v2,
-		0x09381000,0x1340, 0x4, 0, 0, 0, 0x10},
+		0x09381000,0x1400, 0x4, 0, 0, 0, 0x50},
 	[ECPRISS_HW_v2_0][ECPRI_UDP_FH_FILT_VLAN_ADDR_PORT_p_ENTRY_n_V2] = {
 		ecpriss_qudp_hal_reg_construct_filt_vlan_addr_port_port_p_entry_n_v2,
 		ecpriss_qudp_hal_reg_parse_filt_vlan_addr_port_port_p_entry_n_v2,
@@ -5247,6 +5290,13 @@ static struct ecpriss_qudp_hal_reg_obj ecpriss_qudp_hal_reg_objs[ECPRISS_HW_MAX]
 		ecpriss_qudp_hal_reg_construct_dummy_v2,
 		ecpriss_qudp_hal_reg_parse_dummy_v2,
 		0x09384000, 0x44, 0x48, 0, 0, 0, 0x120},
+
+	// LTE FH
+	[ECPRISS_HW_v2_0][ECPRI_UDP_FH_FILT_MAC_ADDRESS_INFO_PORT_p_ENTRY_n_V2] = {
+		ecpriss_qudp_hal_reg_construct_udp_fh_mac_addr_info_v2,
+		ecpriss_qudp_hal_reg_parse_udp_fh_mac_addr_info_v2,
+		0x09381000,0x1500, 0x4, 0, 0, 0, 0x50},
+
 	//L2 Rams
 
 	[ECPRISS_HW_v2_0][ECPRI_UDP_L2_INGRESS_NUM_ETH_UDP_PACKETS_PORT_p_LINK_n_V2] = {

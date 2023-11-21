@@ -57,11 +57,18 @@ typedef enum
 /**
  * enum dev mode
  */
+
 typedef enum {
-	ECPRISS_DEV_MODE_DU = 0,
-	ECPRISS_DEV_MODE_RU,
+	ECPRISS_DEV_MODE_NONE = 0,
+	ECPRISS_DEV_MODE_RU = 1,
+	ECPRISS_DEV_MODE_DU_PCIE = 2,
+	ECPRISS_DEV_MODE_DU_PCIE_3_X_12 = ECPRI_HW_FLAVOR_DU_PCIE,
+	ECPRISS_DEV_MODE_DU_L2 = 3,
+	ECPRISS_DEV_MODE_DU_PCIE_4_X_9 = 4,
+	ECPRISS_DEV_DEV_DU_PCIE_5_X_6 = 5,
 	ECPRISS_DEV_MODE_MAX
 }ecpriss_dev_mode_e;
+
 
 typedef struct ecpriss_core_callback_flags
 {

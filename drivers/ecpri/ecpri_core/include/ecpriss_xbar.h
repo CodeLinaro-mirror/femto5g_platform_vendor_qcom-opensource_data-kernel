@@ -314,6 +314,7 @@ typedef struct ecpriss_xbar_ctx_v2
 	ecpriss_xbar_port_cfg_s		c2c_port_cfg;
 	ecpriss_xbar_port_cfg_s		l2_port_cfg;
 	ecpriss_xbar_port_cfg_s		fh_exception_port_cfg;
+	ecpriss_xbar_port_cfg_s         fh_lte_port_cfg[ECPRISS_MAX_LTE_VF];
 	ecpriss_xbar_interrupt_cfg_s_v2	interrupt_cfg_v2;
 	ecpriss_xbar_stats_s_v2		stats_v2;
 	ecpriss_xbar_interrupt_stats_s_v2 interrupt_stats_v2;
