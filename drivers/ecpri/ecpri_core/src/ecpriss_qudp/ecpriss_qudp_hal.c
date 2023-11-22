@@ -461,6 +461,11 @@ static const char *ecpriss_qudp_hal_reg_name_to_str[ECPRISS_QUDP_REG_MAX+1] = {
 			HWIO_ECPRI_UDP_FH_INGRESS_CONFIG_p_ENABLE_ETH_PADDING_REMOVAL_SHFT,
 			HWIO_ECPRI_UDP_FH_INGRESS_CONFIG_p_ENABLE_ETH_PADDING_REMOVAL_BMSK);
 
+	ECPRISS_HAL_SETFIELD_IN_REG(*val,
+			ingress_config_p->enable_mac_dst_check,
+			HWIO_ECPRI_UDP_FH_INGRESS_CONFIG_p_ENABLE_MAC_DST_CHECK_SHFT,
+			HWIO_ECPRI_UDP_FH_INGRESS_CONFIG_p_ENABLE_MAC_DST_CHECK_BMSK);
+
 	return;
 }
 
@@ -615,6 +620,11 @@ static const char *ecpriss_qudp_hal_reg_name_to_str[ECPRISS_QUDP_REG_MAX+1] = {
 			ingress_config_p->enable_eth_padding_removal,
 			HWIO_ECPRI_UDP_FH_INGRESS_CONFIG_p_ENABLE_ETH_PADDING_REMOVAL_SHFT_V2,
 			HWIO_ECPRI_UDP_FH_INGRESS_CONFIG_p_ENABLE_ETH_PADDING_REMOVAL_BMSK_V2);
+
+	ECPRISS_HAL_SETFIELD_IN_REG(*val,
+			ingress_config_p->enable_mac_dst_check,
+			HWIO_ECPRI_UDP_FH_INGRESS_CONFIG_p_ENABLE_MAC_DST_CHECK_SHFT_V2,
+			HWIO_ECPRI_UDP_FH_INGRESS_CONFIG_p_ENABLE_MAC_DST_CHECK_BMSK_V2);
 
 	return;
 }
@@ -1701,8 +1711,8 @@ static const char *ecpriss_qudp_hal_reg_name_to_str[ECPRISS_QUDP_REG_MAX+1] = {
 
 	ECPRISS_HAL_SETFIELD_IN_REG(*val,
 			mac_addr->valid_bits,
-			HWIO_ECPRI_UDP_FH_UDP_CLASSIFICATION_LIST_PORT_p_ENTRIES_VALID_BITS_VALID_BITS_SHFT_V2,
-			HWIO_ECPRI_UDP_FH_UDP_CLASSIFICATION_LIST_PORT_p_ENTRIES_VALID_BITS_VALID_BITS_BMSK_V2);
+			HWIO_ECPRI_UDP_FH_FILT_MAC_ADDRESS_PORT_p_ENTRIES_VALID_BITS_VALID_BITS_SHFT_V2,
+			HWIO_ECPRI_UDP_FH_FILT_MAC_ADDRESS_PORT_p_ENTRIES_VALID_BITS_VALID_BITS_BMSK_V2);
 	return;
 }
 	static void ecpriss_qudp_hal_reg_construct_udp_fh_filt_vlan_addr_port_p_entries_valid_bits
@@ -1750,8 +1760,8 @@ static const char *ecpriss_qudp_hal_reg_name_to_str[ECPRISS_QUDP_REG_MAX+1] = {
 		= (ecpri_qudp_hwio_def_ecpri_udp_fh_filt_mac_address_port_p_entries_valid_bits_s_v2 *)fields;
 
 	mac_addr->valid_bits = ECPRISS_HAL_GETFIELD_FROM_REG(val,
-			HWIO_ECPRI_UDP_FH_UDP_CLASSIFICATION_LIST_PORT_p_ENTRIES_VALID_BITS_VALID_BITS_SHFT_V2,
-			HWIO_ECPRI_UDP_FH_UDP_CLASSIFICATION_LIST_PORT_p_ENTRIES_VALID_BITS_VALID_BITS_BMSK_V2);
+			HWIO_ECPRI_UDP_FH_FILT_MAC_ADDRESS_PORT_p_ENTRIES_VALID_BITS_VALID_BITS_SHFT_V2,
+			HWIO_ECPRI_UDP_FH_FILT_MAC_ADDRESS_PORT_p_ENTRIES_VALID_BITS_VALID_BITS_BMSK_V2);
 	return;
 }
 	static void ecpriss_qudp_hal_reg_parse_udp_fh_filt_vlan_addr_port_p_entries_valid_bits

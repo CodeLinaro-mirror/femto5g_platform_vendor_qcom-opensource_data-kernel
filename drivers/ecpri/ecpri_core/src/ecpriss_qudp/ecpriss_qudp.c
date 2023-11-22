@@ -661,9 +661,16 @@ void ecpriss_qudp_ingress_config_stats_update_v2(int32_t fh_index)
 						&ecpriss_pdata_v2->cfg_stats_v2.qudp_cfg_v2.ingress.cfg.udp_clss[fh_index][fltr_index]);
 			}
 		}
-		ecpriss_pdata_v2->cfg_stats_v2.qudp_cfg_v2.ingress.cfg.mac_addr[fh_index][fltr_index].mac_lsb.value = 0;
-		ecpriss_pdata_v2->cfg_stats_v2.qudp_cfg_v2.ingress.cfg.mac_addr[fh_index][fltr_index].mac_msb.value = 0;
-		if(ecpriss_pdata_v2->cfg_stats_v2.qudp_cfg_v2.ingress.cfg.global_cfg[fh_index].enable_mac_dst_check && fltr_index <= 4){
+		flag = 1;
+	}
+
+	flag = 1;
+	if(ecpriss_pdata_v2->cfg_stats_v2.qudp_cfg_v2.ingress.cfg.global_cfg[fh_index].enable_mac_dst_check){
+		for(fltr_index = 0; fltr_index < MAX_MAC_FILTER_ENTRIES ; fltr_index++){
+
+			flag = flag << fltr_index;
+			ecpriss_pdata_v2->cfg_stats_v2.qudp_cfg_v2.ingress.cfg.mac_addr[fh_index][fltr_index].mac_lsb.value = 0;
+			ecpriss_pdata_v2->cfg_stats_v2.qudp_cfg_v2.ingress.cfg.mac_addr[fh_index][fltr_index].mac_msb.value = 0;
 			if(ecpriss_pdata_v2->cfg_stats_v2.qudp_cfg_v2.ingress.vbits.mac_addr[fh_index].valid_bits & flag){
 				ecpriss_qudp_hal_read_reg_mn_fields(ECPRISS_QUDP_FH_FILTER,
 						ECPRI_UDP_FH_FILT_MAC_ADDRESS_LSB_PORT_p_ENTRY_n_V2,
@@ -676,9 +683,9 @@ void ecpriss_qudp_ingress_config_stats_update_v2(int32_t fh_index)
 						fltr_index,
 						&ecpriss_pdata_v2->cfg_stats_v2.qudp_cfg_v2.ingress.cfg.mac_addr[fh_index][fltr_index].mac_msb);
 			}
-		}
 
-		flag = 1;
+			flag = 1;
+		}
 	}
 	return;
 }

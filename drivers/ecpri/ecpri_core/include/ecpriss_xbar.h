@@ -435,7 +435,7 @@ typedef struct ecpriss_qudp_ingress_cfg_value_v2{
 	ecpri_qudp_hwio_def_ecpri_udp_fh_filt_vlan_addr_port_p_entry_n_s_v2 vlan[NUM_OF_FHP][NUM_OF_FLTR];
 	ecpri_qudp_hwio_def_ecpri_udp_fh_udp_classification_list_port_p_entry_n_s_v2 udp_clss[NUM_OF_FHP][NUM_OF_FLTR];
 	ecpriss_ip_addr_fltr_cfg_s_v2 ip_addr[NUM_OF_FHP][NUM_OF_FLTR];
-	ecpriss_mac_addr_fltr_cfg_s_v2 mac_addr[NUM_OF_FHP][NUM_OF_FLTR];
+	ecpriss_mac_addr_fltr_cfg_s_v2 mac_addr[NUM_OF_FHP][MAX_MAC_FILTER_ENTRIES];
 }ecpriss_qudp_ingress_cfg_value_s_v2;
 
 
