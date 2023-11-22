@@ -62,6 +62,8 @@ struct eth_phy_iface_eth_register_params mtip_phy_eth_params;
 extern struct eth_phy_iface_ops qcom_aw_phy_driver_iface_ops;
 
 struct mtip_delayed_work_q_params *delayed_wq_params[MTIP_MAX_LINKS] = {NULL};
+extern struct mutex delayed_wq_mutex_lock;
+extern struct workqueue_struct *delayed_wq;
 
 u8 mtip_phy_retry_num[MTIP_MAX_LINKS] = {0};
 
@@ -198,6 +200,12 @@ void run_mtip_process_cdr_lock_ind(void* workptr)
     }
     else if(status == true)
     {
+        mutex_lock(&delayed_wq_mutex_lock);
+        if(!delayed_wq)
+	{
+           mutex_unlock(&delayed_wq_mutex_lock);
+           goto out;
+	}
         delayed_wq_params[link_index] =
                               kmalloc(sizeof(struct mtip_delayed_work_q_params),
                                       GFP_ATOMIC);
@@ -210,6 +218,7 @@ void run_mtip_process_cdr_lock_ind(void* workptr)
             mtip_workq_queue_delayed_work(delayed_wq_params[link_index],
                                           MTIP_PHY_RETRY_TIMER);
         }
+        mutex_unlock(&delayed_wq_mutex_lock);
     }
 
 out:

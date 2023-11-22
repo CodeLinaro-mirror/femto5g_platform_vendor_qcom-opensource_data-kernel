@@ -30,8 +30,8 @@ static DECLARE_WORK(mtip_workq, mtip_workq_handler);
 
 static struct mtip_workq_list* mtip_workq_head = NULL;
 
-struct workqueue_struct *delayed_wq;
-
+struct workqueue_struct *delayed_wq = NULL;
+struct mutex delayed_wq_mutex_lock;
 extern struct mtip_delayed_work_q_params *delayed_wq_notifr_param;
 
 static void mtip_workq_handler(struct work_struct *w)
@@ -195,6 +195,7 @@ int mtip_initialize_workq(void)
          goto cleanup;
       }
 
+      mutex_init(&delayed_wq_mutex_lock);
       delayed_wq = create_singlethread_workqueue("mtip_delayed_workq");
    }
    goto out;
@@ -226,8 +227,15 @@ int mtip_destroy_workq(void)
       //flush and cancel delayed work
       cancel_delayed_work(&delayed_wq_notifr_param->wq_item);
       flush_delayed_work(&delayed_wq_notifr_param->wq_item);
+ 
+      mutex_lock(&delayed_wq_mutex_lock);
 
+      flush_workqueue(delayed_wq);
       destroy_workqueue(delayed_wq);
+      delayed_wq = NULL;
+
+      mutex_unlock(&delayed_wq_mutex_lock);
+      mutex_destroy(&delayed_wq_mutex_lock);
    }
    return 0;
 }
