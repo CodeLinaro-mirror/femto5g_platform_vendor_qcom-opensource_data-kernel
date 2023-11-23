@@ -14,4 +14,7 @@ int ldmm_qxdm_logger_link_change_notification(void);
 int ldmm_fault_notifr_init(void);
 int ldmm_fault_notifr_exit(void);
 
+int ldmm_qxdm_timer_update_notifr_init(void);
+int ldmm_qxdm_timer_update_notifr_exit(void);
+
 #endif /* _LDMM_NOTIFIER_H */

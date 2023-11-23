@@ -114,11 +114,17 @@ MODULE_PARM_DESC(enable_tx_comp_poll, "Enable TX Completion Poll");
 
 extern struct eth_phy_iface_ops qcom_aw_phy_driver_iface_ops;
 
+struct blocking_notifier_head lassen_qxdm_timer_update_notifr;
+
+EXPORT_SYMBOL_GPL(lassen_qxdm_timer_update_notifr);
+
 uint32_t ber_sim_status[12]={0};
+int logging_timer_value = 10;
 
 #ifdef FEATURE_MTIP_TEST_DEBUG_FS
 
 struct dentry *mtip_dobj;
+
 int mtip_attr_val;
 
 #define MIN(a,b) ((a < b) ? a : b)
@@ -201,10 +207,52 @@ ssize_t mtip_get_attr(struct file *file, char __user *buf,
   return ret_val;
 }
 
+
+ssize_t qxdm_logger_set_interval(struct file *file, const char __user *buf,
+                             size_t count, loff_t *ppos) {
+  char temp_string[3];
+  int temp_val;
+
+  if (copy_from_user(&temp_string, buf, MIN(sizeof(temp_string), count)))
+  {
+    CSMLOGERR("Copy from user failed\n");
+    return -EFAULT;
+  }
+  sscanf(temp_string, "%d", &temp_val);
+  
+  //timer value could only be set for range 1 to 100
+  if(temp_val < 1 || temp_val > 100)
+    return -EFAULT;
+  logging_timer_value = temp_val;
+
+  blocking_notifier_call_chain(&lassen_qxdm_timer_update_notifr, logging_timer_value, NULL);
+
+  return count;
+}
+
+ssize_t qxdm_logger_get_interval(struct file *file, char __user *buf,
+                             size_t count, loff_t *ppos) {
+  char temp_string[3];
+  ssize_t ret_val;
+
+  scnprintf(temp_string, sizeof(temp_string), "%d", logging_timer_value);
+  ret_val = simple_read_from_buffer(buf, count, ppos, temp_string, sizeof(temp_string));
+
+  return ret_val;
+}
+
+
 static const struct file_operations mtip_debug_fs_ops = {
   .write = mtip_set_attr,
   .read = mtip_get_attr,
 };
+
+
+static const struct file_operations qxdm_logging_fs_ops = {
+  .write = qxdm_logger_set_interval,
+  .read = qxdm_logger_get_interval,
+};
+
 
 void mtip_setup_debugfs(void) {
 
@@ -212,6 +260,8 @@ void mtip_setup_debugfs(void) {
   mtip_dobj = debugfs_create_dir("mtip_test", NULL);
 
   debugfs_create_file("mtip_sim_ber", 0644, mtip_dobj, 0, &mtip_debug_fs_ops);
+
+  debugfs_create_file("eth_qxdm_logging_interval", 0644, mtip_dobj, 0, &qxdm_logging_fs_ops);
 
   return;
 }
@@ -1140,6 +1190,7 @@ int mtip_get_total_active_links(void)
   return total_active_links;
 }
 
+
 bool mtip_if_link_up(int link_index)
 {
   if(platform_driver_priv != NULL && platform_driver_priv->mtip_links[link_index] != NULL && platform_driver_priv->mtip_links[link_index]->state == MTIP_LINK_STATE_UP)
@@ -1363,6 +1414,8 @@ static int mtip_module_init(void)
 
    // register panic notifier
    atomic_notifier_chain_register(&panic_notifier_list, &mtip_panic_blk);
+
+   BLOCKING_INIT_NOTIFIER_HEAD(&lassen_qxdm_timer_update_notifr);
 
    goto ret;
 

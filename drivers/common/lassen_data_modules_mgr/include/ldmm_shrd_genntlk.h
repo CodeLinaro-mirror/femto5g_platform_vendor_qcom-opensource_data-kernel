@@ -21,5 +21,6 @@ int fult_mgmt_snd(uint32_t buf, int mode);
 int ldmm_qxdm_logger_get_stats_info(struct sk_buff *sender_skb, struct genl_info *info);
 int ldmm_qxdm_logger_get_config_info(struct sk_buff *sender_skb, struct genl_info *info);
 int ldmm_qxdm_logger_no_action(struct sk_buff *sender_skb, struct genl_info *info);
+int ldmm_qxdm_logger_update_timer_value(int timer_value);
 
 #endif /* _LDMM_SHRD_GENL_H */
