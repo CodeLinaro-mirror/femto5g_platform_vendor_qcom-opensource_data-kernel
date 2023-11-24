@@ -417,10 +417,14 @@ static int eip_mtip_add_link(struct net_device *ndev,
 
 	link->ndev = ndev;
 	link->rx.dp = &rx_port->rx;
+	link->rx.ndev = ndev;
+	link->rx.inbound = true;
 	link->rx.ch = GET_CHANNEL_ID_FROM_LINK_IDX(rx_link);
 
 	link->tx.dp = &tx_port->tx;
 	link->tx.ch = GET_CHANNEL_ID_FROM_LINK_IDX(tx_link);
+	link->tx.ndev = ndev;
+	link->tx.inbound = false;
 
 	eip_logcrit("Seure_EIP: %s %s rx = (%u, %u, %u), tx = (%u, %u, %u)\n",
 		    __func__, ndev->name, rx_sec->port_id, link->rx.dp->devid,
@@ -429,7 +433,7 @@ static int eip_mtip_add_link(struct net_device *ndev,
 
 	eip_ipsec_init_link(link);
 	eip_macsec_init_link(link);
-
+	eip_debugfs_add_link(link);
 	mtip_security_set_priv(ndev, link);
 
 	return 0;
@@ -441,6 +445,7 @@ static void eip_mtip_del_link(struct net_device *ndev)
 
 	eip_ipsec_deinit_link(link);
 	eip_macsec_deinit_link(link);
+	eip_debugfs_remove_link(link);
 	kfree(link);
 }
 
