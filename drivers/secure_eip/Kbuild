@@ -97,5 +97,6 @@ lassen_secure_eip-y += eip_main.o
 lassen_secure_eip-y += eip_macsec.o
 lassen_secure_eip-$(CONFIG_XFRM_OFFLOAD) += eip_ipsec.o
 lassen_secure_eip-$(CONFIG_XFRM_OFFLOAD) += eip_ipsec_fixup.o
+lassen_secure_eip-y += eip_ethtool.o
 lassen_secure_eip-y += eip_log.o
 lassen_secure_eip-$(CONFIG_DEBUG_FS) += eip_debugfs.o
