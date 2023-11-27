@@ -1205,6 +1205,11 @@ static int __init qcom_aw_phy_init(void) {
 /* Module Exit Function */
 static void __exit qcom_aw_phy_exit(void) {
 
+  enum qcom_aw_phy_instance_enum phy_inst_type = QCOM_AW_PHY_INST_MAX;
+  struct qcom_aw_phy_inst_config *phy_inst_info = NULL;
+  enum eth_phy_iface_phy_lane_num_enum lane = PHY_LANE_0;
+  extern struct qcom_aw_phy_mtip_if_info qcom_aw_phy_mtip_if_info_s;
+
   QCOM_AW_PHY_LOG_INFO("qcom_aw_phy_exit");
 
   if(qcom_aw_phy_config_info.ldo16_supply){
@@ -1219,6 +1224,20 @@ static void __exit qcom_aw_phy_exit(void) {
                       &qcom_aw_phy_config_info.rx_sig_detect_wq_item.wq_item);
     destroy_workqueue(qcom_aw_phy_config_info.rx_sig_detect_wq);
   }
+
+  for(phy_inst_type = QCOM_AW_PHY_INST_FH0; phy_inst_type < QCOM_AW_PHY_INST_MAX;phy_inst_type ++)  {
+
+    phy_inst_info = &qcom_aw_phy_config_info.phy_inst_config_info[phy_inst_type];
+
+    if(phy_inst_info) {
+      for (lane = PHY_LANE_0; lane < PHY_LANE_MAX; lane++) {
+        mutex_destroy(&phy_inst_info->lane_lock[lane]);
+      }
+    }
+    mutex_destroy(&phy_inst_info->phy_inst_lock);
+  }
+
+  mutex_destroy(&qcom_aw_phy_mtip_if_info_s.lock);
 
   qcom_aw_phy_gnl_exit();
   qcom_aw_phy_prbs_gnl_exit();
