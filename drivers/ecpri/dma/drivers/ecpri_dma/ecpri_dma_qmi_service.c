@@ -365,10 +365,10 @@ static int ecpri_dma_qmi_service_init_q6_send_msg(void)
 {
 	/* Define request message */
 	struct ecpri_init_modem_driver_req_msg_v01 req = {
-		.platform_type = ecpri_dma_get_ctx_hw_flavor(),
+		.platform_type = ECPRI_DMA_GET_HW_FLAVOR(),
 		.ep_desc_list_len = ECPRI_NUM_MODEM_EP_V01,
 		.hw_version_valid = true,
-		.hw_version = ecpri_dma_get_ctx_hw_ver(),
+		.hw_version = ECPRI_DMA_GET_CTX_HW_VER(),
 		.sw_version_valid = true,
 		.sw_version = ecpri_dma_qmi_get_sw_ver(),
 	};

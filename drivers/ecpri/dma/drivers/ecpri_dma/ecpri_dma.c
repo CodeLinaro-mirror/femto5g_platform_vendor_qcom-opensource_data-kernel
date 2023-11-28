@@ -275,7 +275,7 @@ static void ecpri_dma_notify_dma_ready(void)
 	}
 
 	/* Trigger Q6 init without QMI */
-	spare_reg.value = ecpri_dma_get_ctx_hw_flavor();
+	spare_reg.value = ECPRI_DMA_GET_HW_FLAVOR();
 	ecpri_dma_hal_write_reg(
 		ECPRI_SPARE_REG, spare_reg.value);
 
@@ -1591,7 +1591,7 @@ static void ecpri_dma_dealloc_exception(void)
 
 static void __exit ecpri_dma_module_exit(void)
 {
-	enum ecpri_hw_flavor hw_flavor = ecpri_dma_get_ctx_hw_flavor();
+	enum ecpri_hw_flavor hw_flavor = ECPRI_DMA_GET_HW_FLAVOR();
 	int endp_id = 0, gsi_id = 0;
 	struct ecpri_dma_endp_context* curr_endp = NULL;
 	int ret = 0;

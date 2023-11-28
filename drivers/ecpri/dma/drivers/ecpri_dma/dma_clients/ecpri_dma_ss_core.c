@@ -83,9 +83,9 @@ int ecpri_dma_ecpri_ss_register(
 		ready_info->userdata_log_msg;
 
 	ecpri_dma_ss_core_ctx->ecpri_hw_ver =
-		ecpri_dma_get_ctx_hw_ver();
+		ECPRI_DMA_GET_CTX_HW_VER();
 	ecpri_dma_ss_core_ctx->hw_flavor =
-		ecpri_dma_get_ctx_hw_flavor();
+		ECPRI_DMA_GET_HW_FLAVOR();
 
 	spin_unlock_irqrestore(&ecpri_dma_ss_core_ctx->lock, flags);
 

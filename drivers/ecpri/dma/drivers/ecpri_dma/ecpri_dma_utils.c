@@ -8906,7 +8906,7 @@ int ecpri_dma_hw_init(void)
 	ECPRI_DMA_PREPARE_AND_ENABLE_CLK(dma_fast_div2_noc_clk);
 	ECPRI_DMA_PREPARE_AND_ENABLE_CLK(dma_nfapi_axi_clk);
 
-	if(ecpri_dma_get_ctx_hw_ver() > ECPRI_HW_V1_0)
+	if(ECPRI_DMA_GET_CTX_HW_VER() > ECPRI_HW_V1_0)
 		ECPRI_DMA_PREPARE_AND_ENABLE_CLK(gcc_ddrss_ecpri_gsi);
 
 	clk_set_rate(ecpri_dma_ctx->clks.gcc_aggre_noc_ecpri_dma,
@@ -9149,7 +9149,7 @@ int ecpri_dma_setup_dma_endps(
 					case ECPRI_DMA_ENDP_STREAM_MODE_M2M:
 						break;
 					case ECPRI_DMA_ENDP_STREAM_MODE_S2M:
-						if (ecpri_dma_get_ctx_hw_ver() != ECPRI_HW_V1_0) {
+						if (ECPRI_DMA_GET_CTX_HW_VER() != ECPRI_HW_V1_0) {
 							lte_cfg.def.is_lte =
 									(*endp_map)[gsi_id][endp_id].lte_enable;
 
@@ -9700,16 +9700,6 @@ int ecpri_dma_gsi_start_channel(struct ecpri_dma_endp_context *ep)
 	}
 
 	return ret;
-}
-
-u32 ecpri_dma_get_ctx_hw_ver()
-{
-	return ecpri_dma_ctx->ecpri_hw_ver;
-}
-
-u32 ecpri_dma_get_ctx_hw_flavor()
-{
-	return ecpri_dma_ctx->hw_flavor;
 }
 
 int ecpri_dma_get_gsi_dev_hdl(unsigned long* dev_hdl)
