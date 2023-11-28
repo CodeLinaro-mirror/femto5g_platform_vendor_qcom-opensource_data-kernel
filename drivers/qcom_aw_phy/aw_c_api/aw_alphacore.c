@@ -1068,7 +1068,7 @@ int aw_pmd_rx_background_adapt_enable_set(mss_access_t *mss,
                         RXIFFSM_CTRL_RXIFFSM_GENERAL_REQ_A_OFFSET, 1));
   poll_result = pmd_poll_field(
       mss, RXIFFSM_STAT_ADDR, RXIFFSM_STAT_RXIFFSM_GENERAL_ACK_MASK,
-      RXIFFSM_STAT_RXIFFSM_GENERAL_ACK_OFFSET, 1, 1000000);
+      RXIFFSM_STAT_RXIFFSM_GENERAL_ACK_OFFSET, 1, 500000);
   CHECK(pmd_write_field(mss, RXIFFSM_CTRL_ADDR,
                         RXIFFSM_CTRL_RXIFFSM_GENERAL_REQ_A_MASK,
                         RXIFFSM_CTRL_RXIFFSM_GENERAL_REQ_A_OFFSET, 0));

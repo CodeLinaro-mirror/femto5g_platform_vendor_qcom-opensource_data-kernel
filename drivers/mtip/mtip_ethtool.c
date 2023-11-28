@@ -839,6 +839,8 @@ int mtip_ethtool_get_link_ksettings(struct net_device *dev, struct ethtool_link_
     CSMLOGDBG("ethtool: get_link_ksettings for link_index: %d\n", link_index);
 
     link_info = platform_driver_priv->mtip_links[link_index];
+    if(!link_info)
+        return -EINVAL;
 
     if (mtip_lookup_port_type_by_link_index(link_index, &port_type) < 0)
     {
@@ -853,6 +855,8 @@ int mtip_ethtool_get_link_ksettings(struct net_device *dev, struct ethtool_link_
     }
 
     port_info = platform_driver_priv->mtip_ports[port_type];
+    if(!port_info)
+        return -EINVAL;
 
     // Set the supported and advertised speed modes
     mtip_ethtool_get_supported_speed_modes(port_info, real_link_number, cmd);
@@ -866,7 +870,8 @@ int mtip_ethtool_get_link_ksettings(struct net_device *dev, struct ethtool_link_
     for (i = 0; i < platform_driver_priv->devices.port_devices[port_type].num_lane_phandles; ++i)
     {
         lane_index = platform_driver_priv->devices.port_devices[port_type].lane_devices[i]->lane_index;
-        if(platform_driver_priv->mtip_lanes[lane_index]->lane_state == MTIP_LANE_STATE_CONNECTED)
+        if(platform_driver_priv->mtip_lanes[lane_index] != NULL &&
+           platform_driver_priv->mtip_lanes[lane_index]->lane_state == MTIP_LANE_STATE_CONNECTED)
         {
             lane_connected = true;
             break;
@@ -933,6 +938,7 @@ int mtip_ethtool_set_link_ksettings(struct net_device *netdev, const struct etht
     bool autoneg = false;
     u32 speed = 0;
     u32 priv_flags = 0;
+    int i;
 
     priv = netdev_priv(netdev);
     link_index = priv->link_index;
@@ -994,8 +1000,38 @@ int mtip_ethtool_set_link_ksettings(struct net_device *netdev, const struct etht
         port_info->autoneg_changed = true;
     }
 
-    if(speed != 0)
+    speed = cmd->base.speed;
+    CSMLOGDBG("Speed for link_index %d set to %d", link_index, speed);
+    if(port_type == MTIP_PORT_TYPE_DEBUG)
     {
+        if(!check_if_valid_speed_for_debug_eth(speed))
+        {
+            CSMLOGERR("invalid speed for link_index %d", link_index);
+            return -EINVAL;
+        }
+    }
+
+    speed = 0;
+    for (i = 0; i < PHY_LANE_MAX; ++i) 
+    {
+        if ((port_info->lane_config[i].link_index == link_index) &&
+            (port_info->lane_config[i].lane_enabled) &&
+            (link_info->state == MTIP_LINK_STATE_UP))
+        {
+            speed += mtip_platform_convert_lane_speed_to_gbps(port_info->lane_config[i].lane_speed);
+        }
+    }
+
+    /* If the link is up, ethtool_link_ksettings will be fetched with get API
+       and cmd->base.speed will be filled based on the current link speed. If it
+       matches, then no need to modify the private flags and hence speed will be
+       reset to 0. If it is a new value, then the private flags will be set
+       based on the newer speed value specified in ethtool command. */
+    if(speed != cmd->base.speed)
+    {
+        speed = cmd->base.speed;
+        CSMLOGERR("Speed for link_index %d set to %d", link_index, speed);
+
         if(speed == 10000)
         {
             if(link_index == MTIP_DEBUG_ETH_LINK_INDEX)
@@ -1348,6 +1384,8 @@ void mtip_ethtool_set_msglevel(struct net_device *netdev, u32 level)
     u32 port_type;
     struct mtip_netdev_priv *priv;
     struct qsfp_info trx_info = {0};
+    struct mtip_process_lane_up lane_up_info = {0};
+    struct mtip_process_lane_down lane_down_info = {0};
 
     priv = netdev_priv(netdev);
     link_index = priv->link_index;
@@ -1363,7 +1401,7 @@ void mtip_ethtool_set_msglevel(struct net_device *netdev, u32 level)
     }
 
     trx_info.trx_module_type = TRX_QSFP_PLS_QSFP28_QSFP56;
-    trx_info.trx_speed = TRX_LANE_SPEED_100G;
+    trx_info.speed_mask = TRX_LANE_SPEED_10G | TRX_LANE_SPEED_25G | TRX_LANE_SPEED_50G | TRX_LANE_SPEED_100G;
     trx_info.trx_laneinfo = 0xF;
     trx_info.trx_bout_cfg = 0;
 
@@ -1380,7 +1418,10 @@ void mtip_ethtool_set_msglevel(struct net_device *netdev, u32 level)
 
                     memcpy(&platform_driver_priv->mtip_lanes[lane_index]->lane_qsfp_info, &trx_info, sizeof(struct qsfp_info));
                     platform_driver_priv->devices.lane_devices[lane_index].reason_code = TRX_LOCAL_PLUGOUT;
-                    post_mtip_phy_handle_lane_down(lane_index);
+
+                    lane_down_info.lane_index = lane_index;
+                    lane_down_info.reason_code = TRX_LOCAL_PLUGOUT;
+                    post_mtip_phy_handle_lane_down(lane_down_info);
                 }
                 else
                 {
@@ -1400,7 +1441,12 @@ void mtip_ethtool_set_msglevel(struct net_device *netdev, u32 level)
                     lane_index = platform_driver_priv->devices.port_devices[port_type].lane_devices[i]->lane_index;
 
                     memcpy(&platform_driver_priv->mtip_lanes[lane_index]->lane_qsfp_info, &trx_info, sizeof(struct qsfp_info));
-                    post_mtip_phy_handle_lane_up(lane_index, PORT_DA, PHY_LANE_SPEED_100G);
+
+                    lane_up_info.lane_index = lane_index;
+                    lane_up_info.sfp_port_type = PORT_DA;
+                    lane_up_info.speed_mask = TRX_LANE_SPEED_10G | TRX_LANE_SPEED_25G | TRX_LANE_SPEED_50G | TRX_LANE_SPEED_100G;
+                    lane_up_info.lane_connected = true;
+                    post_mtip_phy_handle_lane_up(lane_up_info);
                 }
                 else
                 {
@@ -1420,7 +1466,12 @@ void mtip_ethtool_set_msglevel(struct net_device *netdev, u32 level)
                     lane_index = platform_driver_priv->devices.port_devices[port_type].lane_devices[i]->lane_index;
 
                     memcpy(&platform_driver_priv->mtip_lanes[lane_index]->lane_qsfp_info, &trx_info, sizeof(struct qsfp_info));
-                    post_mtip_phy_handle_lane_up(lane_index, PORT_FIBRE, PHY_LANE_SPEED_100G);
+
+                    lane_up_info.lane_index = lane_index;
+                    lane_up_info.sfp_port_type = PORT_FIBRE;
+                    lane_up_info.speed_mask = TRX_LANE_SPEED_10G | TRX_LANE_SPEED_25G | TRX_LANE_SPEED_50G | TRX_LANE_SPEED_100G;
+                    lane_up_info.lane_connected = true;
+                    post_mtip_phy_handle_lane_up(lane_up_info);
                 }
                 else
                 {

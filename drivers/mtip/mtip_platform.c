@@ -1,6 +1,6 @@
 //SPDX-License-Identifier: GPL-2.0-only
 /*
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  */ 
 
 #include <linux/init.h>
@@ -112,6 +112,12 @@ static int mtip_platform_setup_link(unsigned int port_device_index, unsigned int
 
    platform_driver_priv->mtip_links[link_index]->config_fec = ETHTOOL_FEC_NONE;
    platform_driver_priv->mtip_links[link_index]->active_fec = ETHTOOL_FEC_OFF;
+
+   platform_driver_priv->mtip_links[link_index]->link_down_received_post_link_up = false;
+
+   timer_setup(&platform_driver_priv->mtip_links[link_index]->phy_retry_timer,
+               &mtip_phy_retry_timer_cb, link_index);
+   platform_driver_priv->mtip_links[link_index]->phy_retry_timer_valid = true;
 
    if(link_index != MTIP_DEBUG_ETH_LINK_INDEX){
       // connect to the dma pipe
@@ -287,6 +293,9 @@ static int mtip_platform_cleanup_link(unsigned int link_index)
          // reset the hdl of the link
          platform_driver_priv->mtip_links[link_index]->dma_hdl = 0;
       }
+
+      platform_driver_priv->mtip_links[link_index]->phy_retry_timer_valid = false;
+      del_timer_sync(&platform_driver_priv->mtip_links[link_index]->phy_retry_timer);
    }
    return 0;
 }
@@ -1606,12 +1615,12 @@ static int mtip_platform_setup(void)
                // set the lane sfp as DAC
                platform_driver_priv->mtip_lanes[i]->sfp_port_type = PORT_DA;
 
-               // set the lane speed as 25GBASE
-               platform_driver_priv->mtip_lanes[i]->lane_speed = PHY_LANE_SPEED_100G;
+               // set the lane speed mask
+               platform_driver_priv->mtip_lanes[i]->speed_mask = TRX_LANE_SPEED_10G | TRX_LANE_SPEED_25G | TRX_LANE_SPEED_50G | TRX_LANE_SPEED_100G;
 
                // set the lane properties for TRX
                platform_driver_priv->mtip_lanes[i]->lane_qsfp_info.trx_module_type = TRX_QSFP_PLS_QSFP28_QSFP56;
-               platform_driver_priv->mtip_lanes[i]->lane_qsfp_info.trx_speed = TRX_LANE_SPEED_100G;
+               platform_driver_priv->mtip_lanes[i]->lane_qsfp_info.speed_mask = TRX_LANE_SPEED_10G | TRX_LANE_SPEED_25G | TRX_LANE_SPEED_50G | TRX_LANE_SPEED_100G;
                platform_driver_priv->mtip_lanes[i]->lane_qsfp_info.trx_laneinfo = 0xF;
                platform_driver_priv->mtip_lanes[i]->lane_qsfp_info.trx_bout_cfg = 0;
            }
@@ -2018,12 +2027,12 @@ void mtip_platform_print_lanes(void)
         {
             lane = platform_driver_priv->mtip_lanes[i];
 
-            CSMLOGINFO("mtip_lane[%d] lane_index: %d state: %d sfp %d speed %d", 
+            CSMLOGINFO("mtip_lane[%d] lane_index: %d state: %d sfp %d speed mask 0x%x",
                        i,
                        lane->lane_index,
                        lane->lane_state,
                        lane->sfp_port_type,
-                       lane->lane_speed);
+                       lane->speed_mask);
 
             CSMLOGINFO("trx_module_type %d, trx_laneinfo: %d, breakout cfg: %d",
                        lane->lane_qsfp_info.trx_module_type, lane->lane_qsfp_info.trx_laneinfo, lane->lane_qsfp_info.trx_bout_cfg);

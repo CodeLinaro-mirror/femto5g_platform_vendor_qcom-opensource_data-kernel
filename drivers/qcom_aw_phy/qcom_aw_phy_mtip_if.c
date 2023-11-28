@@ -1704,10 +1704,13 @@ int qcom_aw_phy_mac_link_status(enum mtip_port_type_enum port_type,
         notify_flag = true;
       }
 
-      if(!status)
+      if(!status){
         phy_inst_info->cdr_lock_status_flag[lane_num] = CDR_LOCK_NONE;
-      else
+        phy_inst_info->lane_params[lane_num].rx_sig_detect_status = false;
+      }
+      else{
         phy_inst_info->cdr_lock_status_flag[lane_num] = CDR_LOCK_SUCCESS;
+      }
 
       if (status == false &&
           phy_inst_info->phy_eq_mode == QCOM_AW_PHY_ANLT_MODE) {

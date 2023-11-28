@@ -61,13 +61,16 @@ struct eth_phy_iface_eth_register_params mtip_phy_eth_params;
 
 extern struct eth_phy_iface_ops qcom_aw_phy_driver_iface_ops;
 
-struct mtip_delayed_work_q_params *delayed_wq_params[MTIP_MAX_LINKS] = {NULL};
 extern struct mutex delayed_wq_mutex_lock;
 extern struct workqueue_struct *delayed_wq;
 
 u8 mtip_phy_retry_num[MTIP_MAX_LINKS] = {0};
 
 u8 mtip_phy_an_seq_num[MTIP_MAX_PORTS] = {0};
+
+/* Timer to define the polling time for link to come up, before retrying or
+before attempting new speed mode */
+int mtip_link_polling_timer = 3000;
 
 /* 
  * qsfp_eth_get_link_type: returns sfp port type
@@ -84,8 +87,7 @@ u8 mtip_phy_an_seq_num[MTIP_MAX_PORTS] = {0};
 extern int qsfp_eth_get_link_type(u32 qsfp_phandle, u8* link_info);
 
 // PCS level retry delay to bring up PHY lane
-#define MTIP_PHY_RETRY_TIMER       2000
-#define MTIP_PHY_RETRIES_MAX_NUM   5
+#define MTIP_PHY_RETRY_TIMER_INTERVAL       1000
 
 static void mtip_phy_ready_cb(void *user_data)
 {
@@ -132,9 +134,6 @@ static void mtip_phy_cdr_lock_ind(u32 link_index, bool status, u8 an_seq_num)
     struct mtip_process_cdr_lock_ind* taskstruct;
     u32 port_type;
 
-    if(status == false)
-        return;
-
     if(link_index >= MTIP_MAX_LINKS)
     {
         CSMLOGINFO("Invalid link index %d", link_index);
@@ -168,6 +167,23 @@ static void mtip_phy_cdr_lock_ind(u32 link_index, bool status, u8 an_seq_num)
     return;
 }
 
+u32 mtip_phy_get_max_retry_num(void)
+{
+    u32 max_retries_num = 0;
+    u16 random_timer;
+
+    // Get a random number
+    get_random_bytes(&random_timer, sizeof(random_timer));
+
+    // Make sure that random value is less than 0.5 of the defined timer
+    random_timer %= (mtip_link_polling_timer/2);
+
+    // Max number of retries will be the final timer/retry interval
+    max_retries_num = ((mtip_link_polling_timer+random_timer)/MTIP_PHY_RETRY_TIMER_INTERVAL);
+
+    return max_retries_num;
+}
+
 void run_mtip_process_cdr_lock_ind(void* workptr)
 {
     struct mtip_process_cdr_lock_ind *taskstruct = (struct mtip_process_cdr_lock_ind *)workptr;
@@ -175,11 +191,19 @@ void run_mtip_process_cdr_lock_ind(void* workptr)
     bool status = taskstruct->status;
     u8 an_seq_num = taskstruct->an_seq_num;
     u32 port_type;
+    u32 lane_index;
 
     if(link_index >= MTIP_MAX_LINKS)
     {
         CSMLOGINFO("Invalid link index %d", link_index);
-        return;
+        goto out;
+    }
+
+    if((status == false) &&
+       (mtip_phy_retry_num[link_index] >= mtip_phy_get_max_retry_num()))
+    {
+        CSMLOGDBG("Max retries already done for link index %d", link_index);
+        goto out;
     }
 
     CSMLOGINFO("CDR lock indication for link_index %d, status %d, an_seq_num %d\n",
@@ -191,6 +215,11 @@ void run_mtip_process_cdr_lock_ind(void* workptr)
         goto out;
     }
 
+    if(platform_driver_priv->mtip_links[link_index]->state == MTIP_LINK_STATE_CLOSE)
+    {
+        goto out;
+    }
+
     if(an_seq_num != 0 &&
        an_seq_num != mtip_phy_an_seq_num[port_type])
     {
@@ -198,33 +227,28 @@ void run_mtip_process_cdr_lock_ind(void* workptr)
         goto out;
     }
 
+    // Fetch the first lane index
+    lane_index = platform_driver_priv->mtip_links[link_index]->assigned_lane_indices[0];
+
+    // Process link up if MAC wrapper core status register indicates so
     if (mtip_mac_wrapper_get_link_status(link_index) == true) 
     {
         mtip_process_link_state(link_index, true);
         mtip_phy_lane_bring_up_progress_ind(link_index, false);
         mtip_phy_retry_num[link_index] = 0;
     }
-    else if(status == true)
+    // Retry logic will apply only for FIBRE, or with DAC if AN is disabled
+    else if(platform_driver_priv->mtip_ports[port_type]->sfp_port_type == PORT_FIBRE ||
+            platform_driver_priv->mtip_ports[port_type]->autoneg == false)
     {
-        mutex_lock(&delayed_wq_mutex_lock);
-        if(!delayed_wq)
-	{
-           mutex_unlock(&delayed_wq_mutex_lock);
-           goto out;
-	}
-        delayed_wq_params[link_index] =
-                              kmalloc(sizeof(struct mtip_delayed_work_q_params),
-                                      GFP_ATOMIC);
-        if(!delayed_wq_params[link_index])
-            CSMLOGERR("Malloc failed!");
-        else{
-            INIT_DELAYED_WORK(&delayed_wq_params[link_index]->wq_item,
-                              mtip_phy_retry_phy_bringup);
-            delayed_wq_params[link_index]->link_index = link_index;
-            mtip_workq_queue_delayed_work(delayed_wq_params[link_index],
-                                          MTIP_PHY_RETRY_TIMER);
+        /* If the PCS link didn't come up, then retry after the configured
+           interval. Skip restarting the timer if it was already running */
+        if(platform_driver_priv->mtip_links[link_index]->phy_retry_timer_valid == true &&
+           !timer_pending(&platform_driver_priv->mtip_links[link_index]->phy_retry_timer))
+        {
+            mod_timer(&platform_driver_priv->mtip_links[link_index]->phy_retry_timer,
+                      jiffies + msecs_to_jiffies(MTIP_PHY_RETRY_TIMER_INTERVAL));
         }
-        mutex_unlock(&delayed_wq_mutex_lock);
     }
 
 out:
@@ -336,13 +360,37 @@ void mtip_phy_get_lanes_of_link(u32 link_index, bool lanes_enabled[PHY_LANE_MAX]
     return;
 }
 
-void mtip_phy_retry_phy_bringup(struct work_struct *work)
+void mtip_phy_retry_timer_cb(struct timer_list *list)
 {
-    struct delayed_work *delayed_work_item = to_delayed_work(work);
-    struct mtip_delayed_work_q_params *wq_params =
-        container_of(delayed_work_item, struct mtip_delayed_work_q_params, wq_item);
+    struct mtip_process_phy_retry_bringup* taskstruct;
+    struct mtip_link_info *link_info;
+
+    if(!platform_driver_priv)
+        return;
+
+    taskstruct = kmalloc(sizeof(struct mtip_process_phy_retry_bringup), GFP_ATOMIC);
+    if(taskstruct == NULL)
+    {
+      CSMLOGERR("memory alloc failed\n");
+      return;
+    }
+
+    link_info = from_timer(link_info, list, phy_retry_timer);
+    if(!link_info)
+        return;
+
+    taskstruct->link_index = link_info->link_index;
+    mtip_queue_work(MTIP_WORKQ_TASK_PROCESS_RETRY_PHY_BRINGUP, taskstruct);
+
+    return;
+}
+
+void run_mtip_phy_retry_bringup(void* workptr)
+{
+    struct mtip_process_phy_retry_bringup *taskstruct = (struct mtip_process_phy_retry_bringup *)workptr;
     u32 port_type;
-    u32 link_index = wq_params->link_index;
+    u32 link_index = taskstruct->link_index;
+    struct mtip_process_next_speed_mode info = {0};
 
     if(link_index >= MTIP_MAX_LINKS)
     {
@@ -360,11 +408,7 @@ void mtip_phy_retry_phy_bringup(struct work_struct *work)
         goto func_exit;
     }
 
-    if(delayed_wq_params[link_index] != wq_params){
-        CSMLOGINFO("Work mismatch, dropping");
-        goto func_exit;
-    }
-
+    // If PCS link is up, set the state and return back, else continue
     if(mtip_mac_wrapper_get_link_status(link_index) == true)
     {
         mtip_phy_retry_num[link_index] = 0;
@@ -380,26 +424,50 @@ void mtip_phy_retry_phy_bringup(struct work_struct *work)
     }
 
     mtip_phy_retry_num[link_index]++;
-    if(mtip_phy_retry_num[link_index] >= MTIP_PHY_RETRIES_MAX_NUM){
 
+    // If max attempts for PHY lane bring up retry by PCS are completed,
+    if(mtip_phy_retry_num[link_index] >= mtip_phy_get_max_retry_num())
+    {
         CSMLOGINFO("Max retries done for link_index %d", link_index);
-        mtip_phy_retry_num[link_index] = 0;
 
-        // notify phy that PCS link is down after max retries
-        mtip_phy_notify_link_status(link_index, false);
+        /* Switch and process next speed mode if,
+           1. Optical module that supports dual rate
+           2. Ethtool setting is such that more than one speed mode is advertised
+           3. Max attempts to switch the speed mode is not yet reached
+        */
+        if(platform_driver_priv->mtip_ports[port_type]->sfp_port_type == PORT_FIBRE &&
+           platform_driver_priv->mtip_ports[port_type]->multi_rate_supported == true &&
+           mtip_device_count_priv_flag_bits(port_type) > 1 &&
+           platform_driver_priv->mtip_ports[port_type]->next_speed_retry_count < MTIP_NEXT_SPEED_MODE_RETRY_MAX_COUNT)
+        {
+            mtip_phy_retry_num[link_index] = 0;
+
+            // check if retry for other speed modes need to be attempted
+            info.port_type = port_type;
+            info.link_index = link_index;
+            post_mtip_process_next_speed_mode(info);
+        }
+        else
+        {
+            // Enable PCS link interrupts as link status wont be polled after max retries are done
+            mtip_phy_lane_bring_up_progress_ind(link_index, false);
+        }
 
         goto func_exit;
     }
 
-    CSMLOGDBG("mtip_phy_retry_phy_bringup with link: %d, port: %d\n",
+    CSMLOGDBG("run_mtip_phy_retry_bringup with link: %d, port: %d\n",
                link_index, port_type);
 
     mtip_phy_teardown_phy(link_index);
+    mdelay(1000);
     mtip_phy_bringup_phy(link_index,
                     platform_driver_priv->mtip_ports[port_type]->sfp_port_type);
 
 func_exit:
-    kfree(wq_params);
+    // free the taskstruct
+    kfree(taskstruct);
+
     return;
 }
 extern uint32_t ber_sim_status[12];
@@ -636,62 +704,120 @@ static void mtip_phy_config(struct phylink_config *config,
    return;
 }
 
-static void mtip_phy_handle_lane_up(u32 lane_index, u8 sfp_port_type, enum eth_phy_iface_phy_lane_speed_enum lane_speed)
+static void mtip_phy_handle_lane_up(struct mtip_process_lane_up lane_up_info)
 {
     u32 port_type;
     enum mtip_lane_state_enum current_state;
+    u8 lane_speed_count = 0;
+    u32 link_index;
 
-    current_state = platform_driver_priv->mtip_lanes[lane_index]->lane_state;
+    current_state = platform_driver_priv->mtip_lanes[lane_up_info.lane_index]->lane_state;
 
     switch (current_state)
     {
     case MTIP_LANE_STATE_DISCONNECTED:
     case MTIP_LANE_STATE_INIT:
        {
-          CSMLOGINFO("Handling transition from lane state %d to CONNECTED for lane: %d", current_state, lane_index);
+          CSMLOGINFO("Handling transition from lane state %d to CONNECTED for lane: %d", current_state, lane_up_info.lane_index);
 
-          // trigger an update for the port
-          if (mtip_lookup_port_type_by_lane_index(lane_index, &port_type) < 0)
+          if (mtip_lookup_port_type_by_lane_index(lane_up_info.lane_index, &port_type) < 0)
           {
-              CSMLOGERR("invalid port_type for lane_index %d", lane_index);
+              CSMLOGERR("invalid port_type for lane_index %d", lane_up_info.lane_index);
               return;
           }
 
-          CSMLOGINFO("Updating state of Port: %d with lane_index: %d in state %d\n", port_type, lane_index, MTIP_LANE_STATE_CONNECTED);
+          CSMLOGINFO("Updating state of Port: %d with lane_index: %d in state %d\n", port_type, lane_up_info.lane_index, MTIP_LANE_STATE_CONNECTED);
 
           // set the lane state of the lane to CONNECTED
-          platform_driver_priv->mtip_lanes[lane_index]->lane_state = MTIP_LANE_STATE_CONNECTED;
+          platform_driver_priv->mtip_lanes[lane_up_info.lane_index]->lane_state = MTIP_LANE_STATE_CONNECTED;
+          platform_driver_priv->mtip_ports[port_type]->needs_rx_los_processing = false;
 
           // set the sfp_port_type
-          platform_driver_priv->mtip_lanes[lane_index]->sfp_port_type = sfp_port_type;
+          platform_driver_priv->mtip_lanes[lane_up_info.lane_index]->sfp_port_type = lane_up_info.sfp_port_type;
 
           // set the lane speed
-          platform_driver_priv->mtip_lanes[lane_index]->lane_speed = lane_speed;
+          platform_driver_priv->mtip_lanes[lane_up_info.lane_index]->speed_mask = lane_up_info.speed_mask;
 
           // set the sfp port type of the port
-          platform_driver_priv->mtip_ports[port_type]->sfp_port_type = sfp_port_type;
+          platform_driver_priv->mtip_ports[port_type]->sfp_port_type = lane_up_info.sfp_port_type;
+
+          if(lane_up_info.sfp_port_type == PORT_FIBRE)
+          {
+              if(lane_up_info.speed_mask & TRX_LANE_SPEED_10G)
+                  lane_speed_count++;
+
+              if(lane_up_info.speed_mask & TRX_LANE_SPEED_25G)
+                  lane_speed_count++;
+
+              if(lane_up_info.speed_mask & TRX_LANE_SPEED_50G)
+                  lane_speed_count++;
+
+              if(lane_up_info.speed_mask & TRX_LANE_SPEED_100G)
+                  lane_speed_count++;
+
+              if(lane_speed_count > 1)
+                  platform_driver_priv->mtip_ports[port_type]->multi_rate_supported = true;
+              else
+                  platform_driver_priv->mtip_ports[port_type]->multi_rate_supported = false;
+          }
 
           // update the port configuration
-          post_mtip_process_configure_port_using_lane(port_type, lane_index);
+          post_mtip_process_configure_port_using_lane(port_type, lane_up_info.lane_index);
        }
        break;
 
     case MTIP_LANE_STATE_CONNECTED:
        {
-          CSMLOGINFO("Handling transition from CONNECTED to CONNECTED for lane: %d ignoring", lane_index);
+          if (mtip_lookup_port_type_by_lane_index(lane_up_info.lane_index, &port_type) < 0)
+          {
+              CSMLOGERR("invalid port_type for lane_index %d", lane_up_info.lane_index);
+              return;
+          }
+
+          // Trigger port reconfig with all the supported speed modes if RX LOS is cleared
+          if(platform_driver_priv->mtip_ports[port_type] !=  NULL &&
+             platform_driver_priv->mtip_ports[port_type]->needs_rx_los_processing == true &&
+             mtip_lookup_link_index_by_lane_index(&link_index, lane_up_info.lane_index) == 0 &&
+             platform_driver_priv->mtip_links[link_index] != NULL)
+          {
+             /* Port reconfiguration post RX LOS clear will be triggered in following cases
+                1. If the PCS link was up and it went down due to RX LOS, or
+                2. If multi rate is not supported and max PHY lane bring up retries are done, or
+                3. If multi rate is supported but just one speed configured via ethtool
+                   and max PHY lane bring up retries are done, or
+                4. If multi rate is supported with more than one speed configured via ethtool
+                   and max speed mode toggle attempts are done */
+             if((platform_driver_priv->mtip_links[link_index]->link_down_received_post_link_up) ||
+                (platform_driver_priv->mtip_ports[port_type]->multi_rate_supported == false &&
+                 mtip_phy_retry_num[link_index] >= mtip_phy_get_max_retry_num()) ||
+                (platform_driver_priv->mtip_ports[port_type]->multi_rate_supported == true &&
+                 mtip_device_count_priv_flag_bits(port_type) == 1 &&
+                 mtip_phy_retry_num[link_index] >= mtip_phy_get_max_retry_num()) ||
+                (platform_driver_priv->mtip_ports[port_type]->multi_rate_supported == true &&
+                 mtip_device_count_priv_flag_bits(port_type) > 1 &&
+                 platform_driver_priv->mtip_ports[port_type]->next_speed_retry_count >= MTIP_NEXT_SPEED_MODE_RETRY_MAX_COUNT))
+             {
+                platform_driver_priv->mtip_ports[port_type]->port_priv_flags_optical = 0;
+                platform_driver_priv->mtip_ports[port_type]->next_speed_retry_count = 0;
+                platform_driver_priv->mtip_links[link_index]->link_down_received_post_link_up = false;
+                post_mtip_process_reconfigure_port(port_type);
+             }
+
+             platform_driver_priv->mtip_ports[port_type]->needs_rx_los_processing = false;
+          }
        }
        break;
 
     default:
        {
-          CSMLOGINFO("Handling transition from unknown to CONNECTED for lane: %d", lane_index);
+          CSMLOGINFO("Handling transition from unknown to CONNECTED for lane: %d", lane_up_info.lane_index);
        }
        break;
     }
     return;
 }
 
-static void mtip_phy_handle_lane_down(u32 lane_index)
+static void mtip_phy_handle_lane_down(struct mtip_process_lane_down lane_down_info)
 {
    int i;
    u32 link_index;
@@ -701,39 +827,49 @@ static void mtip_phy_handle_lane_down(u32 lane_index)
    u32 tmp_lane_index;
    bool any_lane_connected = false;
 
-   if(platform_driver_priv->mtip_lanes[lane_index])
+   // determine the port using lane
+   mtip_lookup_port_type_by_lane_index(lane_down_info.lane_index, &port_type);
+
+   if(platform_driver_priv == NULL ||
+      platform_driver_priv->mtip_ports[port_type] == NULL ||
+      platform_driver_priv->mtip_lanes[lane_down_info.lane_index] == NULL)
    {
-      current_state = platform_driver_priv->mtip_lanes[lane_index]->lane_state;
+      return;
    }
+
+   // Lane down received due to RX LOS
+   if(platform_driver_priv->mtip_lanes[lane_down_info.lane_index]->sfp_port_type == PORT_FIBRE &&
+      lane_down_info.reason_code == TRX_RX_LOS)
+   {
+      /* Set needs_rx_los_processing flag which will be used to trigger port
+         reconfiguration once RX LOS gets cleared */
+      platform_driver_priv->mtip_ports[port_type]->needs_rx_los_processing = true;
+      return;
+   }
+
+   current_state = platform_driver_priv->mtip_lanes[lane_down_info.lane_index]->lane_state;
 
    switch (current_state)
    {
    case MTIP_LANE_STATE_DISCONNECTED:
    case MTIP_LANE_STATE_INIT:
       {
-         CSMLOGINFO("Handling transition from lane state %d to DISCONNECTED for lane: %d", current_state, lane_index);
-         if(platform_driver_priv->mtip_lanes[lane_index])
-         {
-           platform_driver_priv->mtip_lanes[lane_index]->lane_state = MTIP_LANE_STATE_DISCONNECTED; 
-         }
+         CSMLOGINFO("Handling transition from lane state %d to DISCONNECTED for lane: %d", current_state, lane_down_info.lane_index);
+         platform_driver_priv->mtip_lanes[lane_down_info.lane_index]->lane_state = MTIP_LANE_STATE_DISCONNECTED;
+         platform_driver_priv->mtip_ports[port_type]->needs_rx_los_processing = false;
       }
       break;
 
    case MTIP_LANE_STATE_CONNECTED:
       {
-         CSMLOGINFO("Handling transition from CONNECTED to DISCONNECTED for lane: %d", lane_index);
+         CSMLOGINFO("Handling transition from CONNECTED to DISCONNECTED for lane: %d", lane_down_info.lane_index);
 
          // set the lane state as DISCONNECTED
-         if(platform_driver_priv->mtip_lanes[lane_index])
-         {
-           platform_driver_priv->mtip_lanes[lane_index]->lane_state = MTIP_LANE_STATE_DISCONNECTED;
-         }
-
-         // determine the port using lane
-         mtip_lookup_port_type_by_lane_index(lane_index, &port_type);
+         platform_driver_priv->mtip_lanes[lane_down_info.lane_index]->lane_state = MTIP_LANE_STATE_DISCONNECTED;
+         platform_driver_priv->mtip_ports[port_type]->needs_rx_los_processing = false;
 
          // Bring down only the link which is mapped to this lane
-         if(mtip_lookup_link_index_by_lane_index(&link_index, lane_index) == 0)
+         if(mtip_lookup_link_index_by_lane_index(&link_index, lane_down_info.lane_index) == 0)
          {
             if (platform_driver_priv->mtip_links[link_index] != NULL)
             {
@@ -773,11 +909,9 @@ static void mtip_phy_handle_lane_down(u32 lane_index)
 
    default:
       {
-       CSMLOGINFO("Handling transition from unknown to CONNECTED for lane: %d", lane_index);
-       if(platform_driver_priv->mtip_lanes[lane_index])  
-       { 
-         platform_driver_priv->mtip_lanes[lane_index]->lane_state = MTIP_LANE_STATE_DISCONNECTED; 
-       }
+         CSMLOGINFO("Handling transition from unknown to CONNECTED for lane: %d", lane_down_info.lane_index);
+         platform_driver_priv->mtip_lanes[lane_down_info.lane_index]->lane_state = MTIP_LANE_STATE_DISCONNECTED; 
+         platform_driver_priv->mtip_ports[port_type]->needs_rx_los_processing = false;
       }
       break;
    }
@@ -785,7 +919,7 @@ static void mtip_phy_handle_lane_down(u32 lane_index)
    return;
 }
 
-void post_mtip_phy_handle_lane_up(u32 lane_index, u8 sfp_port_type, enum eth_phy_iface_phy_lane_speed_enum lane_speed)
+void post_mtip_phy_handle_lane_up(struct mtip_process_lane_up lane_up_info)
 {
     struct mtip_process_lane_up* taskstruct = kmalloc(sizeof(struct mtip_process_lane_up), GFP_ATOMIC);
     if(taskstruct == NULL)
@@ -793,26 +927,22 @@ void post_mtip_phy_handle_lane_up(u32 lane_index, u8 sfp_port_type, enum eth_phy
       CSMLOGERR("memory alloc failed\n");
       return;
     }
-    taskstruct->lane_index = lane_index;
-    taskstruct->sfp_port_type = sfp_port_type;
-    taskstruct->lane_speed = lane_speed;
+
+    memcpy(taskstruct, &lane_up_info, sizeof(struct mtip_process_lane_up));
     mtip_queue_work(MTIP_WORKQ_TASK_PROCESS_LANE_UP, taskstruct);
 }
 
 void run_mtip_process_lane_up(void* workptr)
 {
     struct mtip_process_lane_up *taskstruct = (struct mtip_process_lane_up *)workptr;
-    u32 lane_index = taskstruct->lane_index;
-    u8 sfp_port_type = taskstruct->sfp_port_type;
-    enum eth_phy_iface_phy_lane_speed_enum lane_speed = taskstruct->lane_speed;
 
-    mtip_phy_handle_lane_up(lane_index,sfp_port_type,lane_speed);
+    mtip_phy_handle_lane_up(*taskstruct);
 
     // free the taskstruct
     kfree(taskstruct);
 }
 
-void post_mtip_phy_handle_lane_down(u32 lane_index)
+void post_mtip_phy_handle_lane_down(struct mtip_process_lane_down lane_down_info)
 {
     struct mtip_process_lane_down* taskstruct = kmalloc(sizeof(struct mtip_process_lane_down), GFP_ATOMIC);
     if(taskstruct == NULL)
@@ -820,16 +950,16 @@ void post_mtip_phy_handle_lane_down(u32 lane_index)
       CSMLOGERR("memory alloc failed\n");
       return;
    }
-    taskstruct->lane_index = lane_index;
+
+    memcpy(taskstruct, &lane_down_info, sizeof(struct mtip_process_lane_down));
     mtip_queue_work(MTIP_WORKQ_TASK_PROCESS_LANE_DOWN, taskstruct);
 }
 
 void run_mtip_process_lane_down(void* workptr)
 {
     struct mtip_process_lane_down *taskstruct = (struct mtip_process_lane_down *)workptr;
-    u32 lane_index = taskstruct->lane_index;
 
-    mtip_phy_handle_lane_down(lane_index);
+    mtip_phy_handle_lane_down(*taskstruct);
 
     // free the taskstruct
     kfree(taskstruct);
@@ -844,9 +974,7 @@ static void mtip_phy_phy_validate(struct phylink_config *config,
     u8  sfp_port_type = PORT_DA;
     int sfp_phandle;
     struct qsfp_info trx_info;
-
-    // set the lane speed for now to 25G
-    enum eth_phy_iface_phy_lane_speed_enum lane_speed = PHY_LANE_SPEED_25G;
+    struct mtip_process_lane_up lane_up_info = {0};
 
     ret = mtip_phy_find_matching_lane(config, &lane_index);
     if (ret < 0) 
@@ -896,39 +1024,28 @@ static void mtip_phy_phy_validate(struct phylink_config *config,
         // copy the trx info to the lane
         memcpy(&platform_driver_priv->mtip_lanes[lane_index]->lane_qsfp_info, &trx_info, sizeof(struct qsfp_info));
 
-        // convert the trx_speed to eth_phy format
-        switch (trx_info.trx_speed)
+        CSMLOGINFO("mod_type %d , trx_speed_mask 0x%x, lane_info 0x%x, breakout_cfg 0x%x, link length range %d, associated with lane_index %d",
+                   trx_info.trx_module_type, trx_info.speed_mask, trx_info.trx_laneinfo, trx_info.trx_bout_cfg , trx_info.trx_link_length_range, lane_index);
+
+        if((trx_info.speed_mask & (TRX_LANE_SPEED_10G | TRX_LANE_SPEED_25G | TRX_LANE_SPEED_50G | TRX_LANE_SPEED_100G)) == 0)
+            return;
+
+        // For DAC, backward compatibility is supported for lower speed modes
+        if(sfp_port_type == PORT_DA)
         {
-        case TRX_LANE_SPEED_10G:
-           lane_speed = PHY_LANE_SPEED_10G;
-           break;
-
-        case TRX_LANE_SPEED_25G:
-           lane_speed = PHY_LANE_SPEED_25G;
-           break;
-
-        case TRX_LANE_SPEED_50G:
-           lane_speed = PHY_LANE_SPEED_50G;
-           break;
-
-        case TRX_LANE_SPEED_100G:
-           lane_speed = PHY_LANE_SPEED_100G;
-           break;
-
-        case TRX_LANE_SPEED_UNKNOWN:
-        case TRX_LANE_SPEED_2_5G:
-        default:
-           lane_speed = PHY_LANE_SPEED_MAX;
-           break;
+            if(trx_info.speed_mask & TRX_LANE_SPEED_100G)
+                trx_info.speed_mask |= TRX_LANE_SPEED_10G | TRX_LANE_SPEED_25G | TRX_LANE_SPEED_50G;
+            else if(trx_info.speed_mask & TRX_LANE_SPEED_50G)
+                trx_info.speed_mask |= TRX_LANE_SPEED_10G | TRX_LANE_SPEED_25G;
+            else if(trx_info.speed_mask & TRX_LANE_SPEED_25G)
+                trx_info.speed_mask |= TRX_LANE_SPEED_10G;
         }
 
-        CSMLOGINFO("mod_type %d , trx_speed %d, lane_info 0x%x, breakout_cfg 0x%x, link length range %d, associated with lane_index %d",
-                   trx_info.trx_module_type, trx_info.trx_speed, trx_info.trx_laneinfo, trx_info.trx_bout_cfg , trx_info.trx_link_length_range, lane_index);
-
-        if(lane_speed == PHY_LANE_SPEED_MAX)
-           return;
-
-        post_mtip_phy_handle_lane_up(lane_index, sfp_port_type, lane_speed);
+        lane_up_info.lane_index = lane_index;
+        lane_up_info.sfp_port_type = sfp_port_type;
+        lane_up_info.speed_mask = trx_info.speed_mask;
+        lane_up_info.lane_connected = false;
+        post_mtip_phy_handle_lane_up(lane_up_info);
     }
 
     return;
@@ -944,8 +1061,7 @@ static void mtip_phy_phylink_lane_up(struct phylink_config *config,
     u8  sfp_port_type = PORT_DA;
     int sfp_phandle;
     struct qsfp_info trx_info;
-    // set the lane speed for now to 25G
-    enum eth_phy_iface_phy_lane_speed_enum lane_speed = PHY_LANE_SPEED_25G;
+    struct mtip_process_lane_up lane_up_info = {0};
 
     ret = mtip_phy_find_matching_lane(config, &lane_index);
 
@@ -999,39 +1115,28 @@ static void mtip_phy_phylink_lane_up(struct phylink_config *config,
         // copy the trx info to the lane
         memcpy(&platform_driver_priv->mtip_lanes[lane_index]->lane_qsfp_info, &trx_info, sizeof(struct qsfp_info));
 
-        // convert the trx_speed to eth_phy format
-        switch (trx_info.trx_speed)
-        {
-        case TRX_LANE_SPEED_10G:
-           lane_speed = PHY_LANE_SPEED_10G;
-           break;
+        CSMLOGINFO("mod_type %d , trx_speed_mask 0x%x, lane_info 0x%x, breakout_cfg 0x%x, link length range %d, associated with lane_index %d",
+                   trx_info.trx_module_type, trx_info.speed_mask, trx_info.trx_laneinfo, trx_info.trx_bout_cfg , trx_info.trx_link_length_range, lane_index);
 
-        case TRX_LANE_SPEED_25G:
-           lane_speed = PHY_LANE_SPEED_25G;
-           break;
-
-        case TRX_LANE_SPEED_50G:
-           lane_speed = PHY_LANE_SPEED_50G;
-           break;
-
-        case TRX_LANE_SPEED_100G:
-           lane_speed = PHY_LANE_SPEED_100G;
-           break;
-
-        case TRX_LANE_SPEED_UNKNOWN:
-        case TRX_LANE_SPEED_2_5G:
-        default:
-           lane_speed = PHY_LANE_SPEED_MAX;
-           break;
-        }
-
-        CSMLOGINFO("mod_type %d , trx_speed %d, lane_info 0x%x, breakout_cfg 0x%x, link length range %d, associated with lane_index %d",
-                   trx_info.trx_module_type, trx_info.trx_speed, trx_info.trx_laneinfo, trx_info.trx_bout_cfg , trx_info.trx_link_length_range, lane_index);
-
-        if(lane_speed == PHY_LANE_SPEED_MAX)
+        if((trx_info.speed_mask & (TRX_LANE_SPEED_10G | TRX_LANE_SPEED_25G | TRX_LANE_SPEED_50G | TRX_LANE_SPEED_100G)) == 0)
            return;
 
-        post_mtip_phy_handle_lane_up(lane_index, sfp_port_type, lane_speed);
+        // For DAC, backward compatibility is supported for lower speed modes
+        if(sfp_port_type == PORT_DA)
+        {
+            if(trx_info.speed_mask & TRX_LANE_SPEED_100G)
+                trx_info.speed_mask |= TRX_LANE_SPEED_10G | TRX_LANE_SPEED_25G | TRX_LANE_SPEED_50G;
+            else if(trx_info.speed_mask & TRX_LANE_SPEED_50G)
+                trx_info.speed_mask |= TRX_LANE_SPEED_10G | TRX_LANE_SPEED_25G;
+            else if(trx_info.speed_mask & TRX_LANE_SPEED_25G)
+                trx_info.speed_mask |= TRX_LANE_SPEED_10G;
+        }
+
+        lane_up_info.lane_index = lane_index;
+        lane_up_info.sfp_port_type = sfp_port_type;
+        lane_up_info.speed_mask = trx_info.speed_mask;
+        lane_up_info.lane_connected = true;
+        post_mtip_phy_handle_lane_up(lane_up_info);
     }   
 
    return;
@@ -1044,6 +1149,7 @@ static void mtip_phy_phylink_lane_down(struct phylink_config *config, unsigned i
     int ret;
     int sfp_phandle;
     trx_lane_down_reason_code_type reason_code;
+    struct mtip_process_lane_down lane_down_info = {0};
 
     ret = mtip_phy_find_matching_lane(config, &lane_index);
 
@@ -1081,21 +1187,22 @@ static void mtip_phy_phylink_lane_down(struct phylink_config *config, unsigned i
 
     switch (reason_code) 
     {
-    case TRX_LOCAL_PLUGOUT:
+        case TRX_LOCAL_PLUGOUT:
+        case TRX_RX_LOS:
         {
-            // handle this local cable plugout
-            post_mtip_phy_handle_lane_down(lane_index);
+            lane_down_info.lane_index = lane_index;
+            lane_down_info.reason_code = reason_code;
+            post_mtip_phy_handle_lane_down(lane_down_info);
         }
         break;
 
-    case TRX_TX_FAULT:
-    case TRX_RX_LOS:
+        case TRX_TX_FAULT:
         {
-            CSMLOGINFO("Ignore lane down for lane_index %d", lane_index);
+            CSMLOGDBG("Ignore lane down for lane_index %d", lane_index);
         }
         break;
 
-    default:
+        default:
         {
             CSMLOGERR("unknown reason code received for lane_index %d", lane_index);
         }
@@ -1237,6 +1344,7 @@ void mtip_phy_notify_eth_event_to_trx(u32 link_index, trx_phy_event event)
     u32 lane_index;
     u32 sfp_phandle[MTIP_MAX_LANES_PER_PORT] = {0};
     u8 sfp_lane_count = 0;
+    struct trx_eth_event_t trx_event_info = {0};
 
     if (mtip_lookup_port_type_by_link_index(link_index, &port_type) < 0)
     {
@@ -1258,7 +1366,19 @@ void mtip_phy_notify_eth_event_to_trx(u32 link_index, trx_phy_event event)
 
     // Indicate transceiver driver about interface bring up
     rtnl_lock();
-    qsfp_trx_eth_event_notifier(event, sfp_phandle, sfp_lane_count);
+
+    trx_event_info.event = event;
+    trx_event_info.lane_phandle = sfp_phandle;
+    trx_event_info.num_lanes = sfp_lane_count;
+
+    // During link bring up, inform TRX about the lane speed used for port configuration
+    if(event == TRX_IFCONFIG_UP)
+    {
+        trx_event_info.eth_cfg_speed =
+               mtip_phy_port_config_to_trx_lane_speed(platform_driver_priv->mtip_ports[port_type]->port_config);
+    }
+
+    qsfp_trx_eth_event_notifier(&trx_event_info);
     rtnl_unlock();
 
     return;
@@ -1298,5 +1418,56 @@ bool mtip_phy_is_breakout_config(u32 port_type)
     }
 
     return false;
+}
+
+trx_lane_speed mtip_phy_port_config_to_trx_lane_speed(enum mtip_port_config_enum port_config)
+{
+    switch(port_config)
+    {
+        case MTIP_PORT_CONFIG_1x100GBASE_R:
+        case MTIP_PORT_CONFIG_1x100GBASE_R_RSFEC_LL:
+        case MTIP_PORT_CONFIG_1x100GBASE_R_RSFEC:
+            return TRX_LANE_SPEED_100G;
+
+        case MTIP_PORT_CONFIG_1x100GBASE_R2:
+        case MTIP_PORT_CONFIG_1x100GBASE_R2_RSFEC:
+        case MTIP_PORT_CONFIG_2x50GBASE_R:
+        case MTIP_PORT_CONFIG_2x50GBASE_R_RSFEC:
+        case MTIP_PORT_CONFIG_1x50GBASE_R:
+        case MTIP_PORT_CONFIG_1x50GBASE_R_RSFEC:
+            return TRX_LANE_SPEED_50G;
+
+        case MTIP_PORT_CONFIG_1x100GBASE_R4:
+        case MTIP_PORT_CONFIG_1x100GBASE_R4_RSFEC:
+        case MTIP_PORT_CONFIG_2x50GBASE_R2:
+        case MTIP_PORT_CONFIG_2x50GBASE_R2_FEC:
+        case MTIP_PORT_CONFIG_2x50GBASE_R2_LUAI:
+        case MTIP_PORT_CONFIG_2x50GBASE_R2_LUAI_FEC:
+        case MTIP_PORT_CONFIG_1x50GBASE_R2:
+        case MTIP_PORT_CONFIG_1x50GBASE_R2_RSFEC:
+        case MTIP_PORT_CONFIG_1x50GBASE_R2_LUAI:
+        case MTIP_PORT_CONFIG_1x50GBASE_R2_LUAI_FEC:
+        case MTIP_PORT_CONFIG_4x25GBASE_R:
+        case MTIP_PORT_CONFIG_4x25GBASE_R_FEC:
+        case MTIP_PORT_CONFIG_4x25GBASE_R_RSFEC:
+        case MTIP_PORT_CONFIG_1x25GBASE_R:
+        case MTIP_PORT_CONFIG_1x25GBASE_R_FEC:
+        case MTIP_PORT_CONFIG_1x25GBASE_R_RSFEC:
+            return TRX_LANE_SPEED_25G;
+
+        case MTIP_PORT_CONFIG_1x40GBASE_R4:
+        case MTIP_PORT_CONFIG_1x40GBASE_R4_FEC:
+        case MTIP_PORT_CONFIG_4x10GBASE_R:
+        case MTIP_PORT_CONFIG_4x10GBASE_R_FEC:
+        case MTIP_PORT_CONFIG_1x10GBASE_R:
+        case MTIP_PORT_CONFIG_1x10GBASE_R_FEC:
+            return TRX_LANE_SPEED_10G;
+
+        case MTIP_PORT_CONFIG_MAX:
+        default:
+            return TRX_LANE_SPEED_UNKNOWN;
+    }
+
+    return TRX_LANE_SPEED_UNKNOWN;
 }
 
