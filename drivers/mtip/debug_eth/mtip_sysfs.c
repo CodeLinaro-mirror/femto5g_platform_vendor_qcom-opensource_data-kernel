@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: GPL-2.0-only
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 /**
@@ -60,8 +60,6 @@
 #include <linux/sysfs.h> /* sysfs addition*/
 
 #define MIN(a,b) ((a < b) ? a : b)
-
-#define MAX_INT_CHAR_SIZE 15
 
 void __iomem *debug_port_base_address;
 

@@ -1,6 +1,6 @@
 //SPDX-License-Identifier: GPL-2.0-only
 /*
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  */ 
 
 #ifndef _MTIP_WORKQ_H
@@ -30,6 +30,8 @@ typedef enum {
    MTIP_WORKQ_TASK_PROCESS_NETDEV_OPEN,
    MTIP_WORKQ_TASK_PROCESS_NETDEV_CLOSE,
    MTIP_WORKQ_TASK_PROCESS_RECONFIGURE_PORT,
+   MTIP_WORKQ_TASK_PROCESS_NEXT_SPEED_MODE,
+   MTIP_WORKQ_TASK_PROCESS_RETRY_PHY_BRINGUP,
    MTIP_WORKQ_TASK_MAX
 } mtip_workq_task_e;
 

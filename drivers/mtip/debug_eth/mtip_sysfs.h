@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: GPL-2.0-only
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 /**
@@ -124,6 +124,8 @@
 #define Kobj_Name_FIFO_Size 7
 #define L2_size 5
 #define L3_size 3
+
+#define MAX_INT_CHAR_SIZE 15
 
 struct RootDirectory {
   unsigned int enabled;

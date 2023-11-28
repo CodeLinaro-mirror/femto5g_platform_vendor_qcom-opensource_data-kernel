@@ -2247,6 +2247,8 @@ int mtip_netdev_set_port_priv_flags(struct net_device *netdev)
 
     CSMLOGDBG("Setting the port %d priv flags to %d", port_type, port_priv_flags);
     platform_driver_priv->mtip_ports[port_type]->port_priv_flags = port_priv_flags;
+    platform_driver_priv->mtip_ports[port_type]->port_priv_flags_optical = 0;
+    platform_driver_priv->mtip_ports[port_type]->next_speed_retry_count = 0;
 
     post_mtip_process_reconfigure_port(port_type);
 
@@ -2260,12 +2262,16 @@ int mtip_device_lookup_lane_qsfp_cfg(u32 port_type, struct qsfp_info *lane_qsfp_
     bool connected_lane_found = false;
     struct mtip_lane_info* lane_info = NULL;
 
+    if(!platform_driver_priv)
+        return -1;
+
     // find a lane that is connected
     for (i = 0; i < platform_driver_priv->devices.port_devices[port_type].num_lane_phandles; ++i) 
     {
         lane_index = platform_driver_priv->devices.port_devices[port_type].lane_devices[i]->lane_index;
 
-        if (platform_driver_priv->mtip_lanes[lane_index]->lane_state == MTIP_LANE_STATE_CONNECTED) 
+        if (platform_driver_priv->mtip_lanes[lane_index] != NULL &&
+            platform_driver_priv->mtip_lanes[lane_index]->lane_state == MTIP_LANE_STATE_CONNECTED) 
         {
             connected_lane_found = true;
             break;
@@ -2292,22 +2298,28 @@ u32 mtip_device_filter_priv_flags(u32 port_type)
     u32 filtered = 0;
     int i;
     struct mtip_port_info* port_info = platform_driver_priv->mtip_ports[port_type];
-    u32 port_priv_flags = port_info->port_priv_flags;
+    u32 port_priv_flags;
     u32 lane_index;
     bool connected_lane_found = false;
-    enum eth_phy_iface_phy_lane_speed_enum  max_lane_speed;
+    u8  lane_speed_mask;
     struct qsfp_info lane_qsfp_info;
     u32 num_lanes;
     u32 filtered_mask = 0;
     u32 real_link = 0;
     u32 link_index;
 
+    if(!port_info)
+        return 0;
+    else
+        port_priv_flags = port_info->port_priv_flags;
+
     // find a lane that is connected
     for (i = 0; i < platform_driver_priv->devices.port_devices[port_type].num_lane_phandles; ++i) 
     {
         lane_index = platform_driver_priv->devices.port_devices[port_type].lane_devices[i]->lane_index;
 
-        if (platform_driver_priv->mtip_lanes[lane_index]->lane_state == MTIP_LANE_STATE_CONNECTED) 
+        if (platform_driver_priv->mtip_lanes[lane_index] != NULL &&
+            platform_driver_priv->mtip_lanes[lane_index]->lane_state == MTIP_LANE_STATE_CONNECTED) 
         {
             connected_lane_found = true;
             break;
@@ -2320,8 +2332,8 @@ u32 mtip_device_filter_priv_flags(u32 port_type)
         return 0;
     }
 
-    // use the lane speed of the found lane
-    max_lane_speed = platform_driver_priv->mtip_lanes[lane_index]->lane_speed;
+    // This is mask of all the supported speed modes by the TRX module
+    lane_speed_mask = platform_driver_priv->mtip_lanes[lane_index]->speed_mask;
 
     if (mtip_device_lookup_lane_qsfp_cfg(port_type, &lane_qsfp_info) < 0)
     {
@@ -2381,88 +2393,58 @@ u32 mtip_device_filter_priv_flags(u32 port_type)
         return 0;
     }
 
-    switch (max_lane_speed)
+    if(lane_speed_mask & TRX_LANE_SPEED_100G)
     {
+       filtered_mask |= (1 << MTIP_PORT_CONFIG_1x100GBASE_R);
+    }
 
-    case PHY_LANE_SPEED_100G:
+    if(lane_speed_mask & TRX_LANE_SPEED_50G)
+    {
+        if(num_lanes == 1)
+        {
+           filtered_mask |= (1 << MTIP_PORT_CONFIG_1x50GBASE_R);
+        }
+        else if(num_lanes == 2 || num_lanes == 4)
+        {
+           // TBD - need to enhance breakout handling
+           filtered_mask |= ((1 << MTIP_PORT_CONFIG_1x100GBASE_R2)|
+                             (1 << MTIP_PORT_CONFIG_2x50GBASE_R));
+        }
+    }
+
+    if(lane_speed_mask & TRX_LANE_SPEED_25G)
+    {
+       if(num_lanes == 1)
        {
-          filtered_mask |= (1 << MTIP_PORT_CONFIG_1x100GBASE_R);
-
-          /* For optics, don't select lower speed modes and for DAC fall
-             through to select lower speed modes */
-          if(port_info->sfp_port_type == PORT_FIBRE)
-             break;
+          filtered_mask |= (1 << MTIP_PORT_CONFIG_1x25GBASE_R);
        }
-
-    case PHY_LANE_SPEED_50G:
+       else if(num_lanes == 2)
        {
-           if(num_lanes == 1)
-           {
-              filtered_mask |= (1 << MTIP_PORT_CONFIG_1x50GBASE_R);
-           }
-           else if(num_lanes == 2 || num_lanes == 4)
-           {
-              // TBD - need to enhance breakout handling
-              filtered_mask |= ((1 << MTIP_PORT_CONFIG_1x100GBASE_R2)|
-                                (1 << MTIP_PORT_CONFIG_2x50GBASE_R) |
-                                (1 << MTIP_PORT_CONFIG_1x50GBASE_R));
-           }
-
-           /* For optics, don't select lower speed modes and for DAC fall
-              through to select lower speed modes */
-           if(port_info->sfp_port_type == PORT_FIBRE)
-              break;
+          // TBD - need to enhance breakout handling
+          filtered_mask |= ((1 << MTIP_PORT_CONFIG_1x50GBASE_R2)|
+                            (1 << MTIP_PORT_CONFIG_1x25GBASE_R));
        }
-
-    case PHY_LANE_SPEED_25G:
+       else if(num_lanes == 4)
        {
-          if(num_lanes == 1)
-          {
-             filtered_mask |= (1 << MTIP_PORT_CONFIG_1x25GBASE_R);
-          }
-          else if(num_lanes == 2)
-          {
-             // TBD - need to enhance breakout handling
-             filtered_mask |= ((1 << MTIP_PORT_CONFIG_1x50GBASE_R2)|
-                               (1 << MTIP_PORT_CONFIG_1x25GBASE_R));
-          }
-          else if(num_lanes == 4)
-          {
-             // TBD - need to enhance breakout handling
-             filtered_mask |= ((1 << MTIP_PORT_CONFIG_1x100GBASE_R4) |
-                               (1 << MTIP_PORT_CONFIG_1x50GBASE_R2)|
-                               (1 << MTIP_PORT_CONFIG_4x25GBASE_R) |
-                               (1 << MTIP_PORT_CONFIG_1x25GBASE_R));
-          }
-
-          /* For optics, don't select lower speed modes and for DAC fall
-             through to select lower speed modes */
-          if(port_info->sfp_port_type == PORT_FIBRE)
-             break;
+          // TBD - need to enhance breakout handling
+          filtered_mask |= ((1 << MTIP_PORT_CONFIG_1x100GBASE_R4) |
+                            (1 << MTIP_PORT_CONFIG_1x50GBASE_R2)|
+                            (1 << MTIP_PORT_CONFIG_4x25GBASE_R));
        }
+    }
 
-    case PHY_LANE_SPEED_10G:
+    if(lane_speed_mask & TRX_LANE_SPEED_10G)
+    {
+       if(num_lanes == 1 || num_lanes == 2)
        {
-          if(num_lanes == 1 || num_lanes == 2)
-          {
-             filtered_mask |= (1 << MTIP_PORT_CONFIG_1x10GBASE_R);
-          }
-          else if(num_lanes == 4)
-          {
-             // TBD - need to enhance breakout handling, where we need to exclude 1x40_R4
-             filtered_mask |= ((1 << MTIP_PORT_CONFIG_1x10GBASE_R) |
-                               (1 << MTIP_PORT_CONFIG_4x10GBASE_R) |
-                               (1 << MTIP_PORT_CONFIG_1x40GBASE_R4));
-          }
+          filtered_mask |= (1 << MTIP_PORT_CONFIG_1x10GBASE_R);
        }
-       break;
-
-    default:
+       else if(num_lanes == 4)
        {
-          CSMLOGERR("unknown lane speed %d for port_type %d", max_lane_speed, port_type);
-          return 0;
+          // TBD - need to enhance breakout handling, where we need to exclude 1x40_R4
+          filtered_mask |= ((1 << MTIP_PORT_CONFIG_4x10GBASE_R) |
+                            (1 << MTIP_PORT_CONFIG_1x40GBASE_R4));
        }
-       break;
     }
 
     filtered = port_priv_flags & filtered_mask;
@@ -2472,13 +2454,13 @@ u32 mtip_device_filter_priv_flags(u32 port_type)
     if(lane_qsfp_info.trx_link_length_range == TRX_DR)
        filtered &= (1 << MTIP_PORT_CONFIG_1x100GBASE_R4);
 
-    CSMLOGINFO("mtip_device_filter_priv_flags: Port_type %d, lane %d, max_lane_speed %d, port_priv_flags 0x%x, filtered_mask 0x%x, filtered 0x%x",
-               port_type, lane_index, max_lane_speed, port_priv_flags, filtered_mask, filtered);
+    CSMLOGINFO("mtip_device_filter_priv_flags: Port_type %d, lane %d, lane_speed_mask 0x%x, port_priv_flags 0x%x, filtered_mask 0x%x, filtered 0x%x",
+               port_type, lane_index, lane_speed_mask, port_priv_flags, filtered_mask, filtered);
 
     return filtered;
 }
 
-static int mtip_device_count_priv_flag_bits(u32 port_type)
+int mtip_device_count_priv_flag_bits(u32 port_type)
 {
     int i;
     int ret = 0;
@@ -2516,6 +2498,14 @@ static u32 mtip_device_resolve_port_configuration(u32 port_type)
     if(mtip_lookup_link_index_by_port_type_and_real_link(&link_index, port_type, real_link) < 0)
         return MTIP_PORT_CONFIG_MAX;
 
+    /* port_priv_flags_optical will be configured with the truncated set of
+       speed modes on which attempt needs to be made for dual rate modules */
+    if(platform_driver_priv->mtip_ports[port_type]->sfp_port_type == PORT_FIBRE &&
+       platform_driver_priv->mtip_ports[port_type]->port_priv_flags_optical != 0)
+    {
+        pflags &= platform_driver_priv->mtip_ports[port_type]->port_priv_flags_optical;
+    }
+
     if (port_info->autoneg == false || platform_driver_priv->mtip_ports[port_type]->sfp_port_type == PORT_FIBRE)
     {
         // find the first port config bit that is set
@@ -2536,9 +2526,7 @@ static u32 mtip_device_resolve_port_configuration(u32 port_type)
         }
     }
     else
-    {
         port_config_mask = pflags;
-    }
 
     config_fec = platform_driver_priv->mtip_links[link_index]->config_fec;
     pattern = 0x1;
@@ -2780,6 +2768,7 @@ void mtip_device_configure_port(u32 port_type)
    struct qsfp_info lane_qsfp_info;
    u32 pattern = 0x1;
    enum mtip_port_config_enum port_config;
+   struct trx_eth_event_t trx_event_info = {0};
 
    port_info = platform_driver_priv->mtip_ports[port_type];
 
@@ -3005,7 +2994,11 @@ void mtip_device_configure_port(u32 port_type)
             rtnl_lock();
             mtip_lookup_lane_index_by_port_type_and_real_lane(&lane_index, port_type, real_lane);
             sfp_phandle[real_lane] = platform_driver_priv->devices.lane_devices[lane_index].sfp_phandle;
-            qsfp_trx_eth_event_notifier(TRX_IFCONFIG_UP, sfp_phandle, 1);
+            trx_event_info.event = TRX_IFCONFIG_UP;
+            trx_event_info.lane_phandle = sfp_phandle;
+            trx_event_info.num_lanes = 1;
+            trx_event_info.eth_cfg_speed = TRX_LANE_SPEED_UNKNOWN;
+            qsfp_trx_eth_event_notifier(&trx_event_info);
             rtnl_unlock();
 
             // initiate AN with the PHY
@@ -3071,6 +3064,10 @@ void mtip_device_configure_port(u32 port_type)
 resolved:
    CSMLOGINFO("Negotiated port configuration is %d %s", port_info->port_config,
               mtip_ethtool_get_port_config_str(port_info->port_config));
+
+   // Reset PHY SM for optical if any old configuration was active earlier
+   if (port_info->sfp_port_type == PORT_FIBRE || port_info->autoneg == false)
+      mtip_phy_reset_phy_sm(port_type);
 
    // for now only one port configuration will apply
    // assign lanes to links based on chosen port configuration
@@ -3418,6 +3415,7 @@ void run_mtip_process_netdev_close(void* workptr)
    u32 real_lane = 0;
    u32 lane_index;
    u32 sfp_phandle[MTIP_MAX_LANES_PER_PORT] = {0};
+   struct trx_eth_event_t trx_event_info = {0};
 
    priv = netdev_priv(netdev);
 
@@ -3477,7 +3475,10 @@ void run_mtip_process_netdev_close(void* workptr)
             rtnl_lock();
             mtip_lookup_lane_index_by_port_type_and_real_lane(&lane_index, port_type, real_lane);
             sfp_phandle[real_lane] = platform_driver_priv->devices.lane_devices[lane_index].sfp_phandle;
-            qsfp_trx_eth_event_notifier(TRX_IFCONFIG_DOWN, sfp_phandle, 1);
+            trx_event_info.event = TRX_IFCONFIG_DOWN;
+            trx_event_info.lane_phandle = sfp_phandle;
+            trx_event_info.num_lanes = 1;
+            qsfp_trx_eth_event_notifier(&trx_event_info);
             rtnl_unlock();
          }
       }
@@ -3531,6 +3532,10 @@ void run_mtip_process_netdev_close(void* workptr)
          {
             platform_driver_priv->mtip_ports[port_type]->lane_config[i].lane_speed = 0;
          }
+
+         // Reset the speed mode switch counters and flags
+         platform_driver_priv->mtip_ports[port_type]->port_priv_flags_optical = 0;
+         platform_driver_priv->mtip_ports[port_type]->next_speed_retry_count = 0;
       }
 
       // reset all the lane assignments
@@ -3604,7 +3609,7 @@ void run_mtip_process_reconfigure_port(void* workptr)
       }
    }
 
-   // rest PHY SM
+   // reset PHY SM
    mtip_phy_reset_phy_sm(port_type);
 
    // Move the port state back to INIT
@@ -3612,6 +3617,72 @@ void run_mtip_process_reconfigure_port(void* workptr)
 
    // Issue port configuration with the new configuration
    mtip_device_configure_port(port_type);
+
+   // free the taskstruct
+   kfree(taskstruct);
+
+   return;
+}
+
+void post_mtip_process_next_speed_mode(struct mtip_process_next_speed_mode info)
+{
+   struct mtip_process_next_speed_mode* taskstruct;
+
+   taskstruct = kmalloc(sizeof(struct mtip_process_next_speed_mode), GFP_ATOMIC);
+   if(taskstruct == NULL)
+   {
+       CSMLOGERR("memory alloc failed\n");
+       return;
+   }
+
+   memcpy(taskstruct, &info, sizeof(struct mtip_process_next_speed_mode));
+   mtip_queue_work(MTIP_WORKQ_TASK_PROCESS_NEXT_SPEED_MODE, taskstruct);
+}
+
+void run_mtip_process_next_speed_mode(void* workptr)
+{
+   struct mtip_process_next_speed_mode *taskstruct = (struct mtip_process_next_speed_mode *)workptr;
+   u32 port_type = taskstruct->port_type;
+   u32 link_index = taskstruct->link_index;
+   u32 lane_index;
+   u32 pflags = platform_driver_priv->mtip_ports[port_type]->port_priv_flags_optical;
+   int i;
+
+   // Fetch the first lane index
+   lane_index = platform_driver_priv->mtip_links[link_index]->assigned_lane_indices[0];
+
+   CSMLOGINFO("Checking if attempt needed for next speed mode for port %d", port_type);
+
+   // Init port_priv_flags_optical with the supported modes
+   if(pflags == 0)
+      pflags = platform_driver_priv->mtip_ports[port_type]->port_priv_flags_optical = mtip_device_filter_priv_flags(port_type);
+
+   for (i = 0; i < MTIP_PORT_CONFIG_MAX; ++i) 
+   {
+      // Clear the highest configured speed mode, and attempt for the pending ones
+      if (pflags & 0x1) 
+      {
+         platform_driver_priv->mtip_ports[port_type]->port_priv_flags_optical &= (~(1<<i));
+         break;
+      }
+
+      pflags >>= 1;
+   }
+
+   CSMLOGDBG("port_priv_flags_optical 0x%x, next_speed_retry_count %d", platform_driver_priv->mtip_ports[port_type]->port_priv_flags_optical, platform_driver_priv->mtip_ports[port_type]->next_speed_retry_count);
+
+   /* If all supported speed modes have been tried already, begin from the start
+      and increment the retry count */
+   if(platform_driver_priv->mtip_ports[port_type]->port_priv_flags_optical == 0)
+   {
+      platform_driver_priv->mtip_ports[port_type]->port_priv_flags_optical = mtip_device_filter_priv_flags(port_type);
+      platform_driver_priv->mtip_ports[port_type]->next_speed_retry_count++;
+   }
+
+   CSMLOGINFO("Attempting for next speed mode with port config 0x%x", platform_driver_priv->mtip_ports[port_type]->port_priv_flags_optical);
+
+   // Issue port configuration with the new set of speed mode flags
+   post_mtip_process_reconfigure_port(port_type);
 
    // free the taskstruct
    kfree(taskstruct);

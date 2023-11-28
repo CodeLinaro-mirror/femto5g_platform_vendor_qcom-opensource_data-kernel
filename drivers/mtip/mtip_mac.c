@@ -1,6 +1,6 @@
 //SPDX-License-Identifier: GPL-2.0-only
 /*
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  */ 
 
 #include <linux/init.h>
@@ -626,6 +626,10 @@ void mtip_mac_link_up(u32 link_index)
         return;
     }
 
+    // Reset the flags and counters for dual rate module speed switch
+    platform_driver_priv->mtip_links[link_index]->link_down_received_post_link_up = false;
+    platform_driver_priv->mtip_ports[port_type]->next_speed_retry_count = 0;
+
     CSMLOGINFO("MAC/PCS link up on link_index: %d\n", link_index);
     // set the link state as up
     platform_driver_priv->mtip_links[link_index]->state = MTIP_LINK_STATE_UP;
@@ -643,6 +647,12 @@ void mtip_mac_link_down(u32 link_index)
     platform_driver_priv->mtip_links[link_index]->active_fec = ETHTOOL_FEC_NONE;
     if(platform_driver_priv->mtip_links[link_index]->state == MTIP_LINK_STATE_DOWN)
         return;
+
+    // Set the flag to track if this link down was received post a successful link up
+    if(platform_driver_priv->mtip_links[link_index]->state == MTIP_LINK_STATE_UP)
+        platform_driver_priv->mtip_links[link_index]->link_down_received_post_link_up = true;
+    else
+        platform_driver_priv->mtip_links[link_index]->link_down_received_post_link_up = false;
 
     CSMLOGINFO("MAC/PCS link down on link_index: %d\n", link_index);
     // set the link state to DOWN if not closed

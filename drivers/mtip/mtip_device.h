@@ -158,6 +158,14 @@ struct mtip_process_reconfigure_port
     u32 port_type;
 };
 
+struct mtip_process_next_speed_mode
+{
+    u32 port_type;
+    u32 link_index;
+};
+void post_mtip_process_next_speed_mode(struct mtip_process_next_speed_mode info);
+void run_mtip_process_next_speed_mode(void* workptr);
+
 
 /*
  * Immediate tasks
@@ -187,6 +195,7 @@ int mtip_device_update_security_config(struct net_device *netdev, enum mtip_port
 // get the next ptp ts seq num to use
 u8 mtip_netdev_get_next_ptp_ts_seq_num(u32 link_index);
 
+int mtip_device_count_priv_flag_bits(u32 port_type);
 u32 mtip_device_filter_priv_flags(u32 port_type);
 int mtip_device_lookup_lane_qsfp_cfg(u32 port_type, struct qsfp_info *lane_qsfp_info);
 

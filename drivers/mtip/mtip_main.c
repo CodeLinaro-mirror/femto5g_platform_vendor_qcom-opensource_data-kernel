@@ -1,6 +1,6 @@
 //SPDX-License-Identifier: GPL-2.0-only
 /*
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  */ 
 
 #include <linux/init.h>
@@ -120,6 +120,16 @@ EXPORT_SYMBOL_GPL(lassen_qxdm_timer_update_notifr);
 
 uint32_t ber_sim_status[12]={0};
 int logging_timer_value = 10;
+
+/* Root object for sysfs directory */
+struct kobject *mtip_kobj_root;
+
+/* File attribute for link polling timer sysfs node */
+struct kobj_attribute mtip_link_polling_timer_attr =
+                         __ATTR(mtip_link_poll_timer_msec, 0660,
+                                mtip_show_link_polling_timer,
+                                mtip_store_link_polling_timer);
+extern int mtip_link_polling_timer;
 
 #ifdef FEATURE_MTIP_TEST_DEBUG_FS
 
@@ -274,6 +284,42 @@ void mtip_del_debugfs(void) {
 }
 
 #endif /* FEATURE_MTIP_TEST_DEBUG_FS */
+
+ssize_t mtip_show_link_polling_timer(
+                struct kobject *kobj, struct kobj_attribute *attr, char *buf) {
+  return snprintf(buf, MAX_INT_CHAR_SIZE, "%d\n", mtip_link_polling_timer);
+}
+
+ssize_t mtip_store_link_polling_timer(
+                              struct kobject *kobj, struct kobj_attribute *attr,
+                              const char *buf, size_t count) {
+  sscanf(buf, "%d", &mtip_link_polling_timer);
+  return count;
+}
+
+void mtip_setup_sysfs(void) {
+
+  /* Creating the root directory structure in /sys/kernel */
+  mtip_kobj_root = kobject_create_and_add("mtip", kernel_kobj);
+
+  /* Creating file for link polling timer */
+  if(sysfs_create_file(mtip_kobj_root, &mtip_link_polling_timer_attr.attr))
+  {
+    kobject_put(mtip_kobj_root);
+    sysfs_remove_file(kernel_kobj, &mtip_link_polling_timer_attr.attr);
+  }
+
+  return;
+}
+
+void mtip_del_sysfs(void) {
+
+  sysfs_remove_file(mtip_kobj_root, &mtip_link_polling_timer_attr.attr);
+  kobject_del(mtip_kobj_root);
+  mtip_kobj_root=NULL;
+
+  return;
+}
 
 int mtip_lookup_link_index_by_name(char *name, u32 *link_index) {
    int i;
@@ -1280,6 +1326,8 @@ static int mtip_module_init(void)
    mtip_setup_debugfs();
 #endif /* FEATURE_MTIP_TEST_DEBUG_FS */
 
+   mtip_setup_sysfs();
+
    // initialize the workq
    ret = mtip_initialize_workq();
 
@@ -1444,6 +1492,8 @@ static void mtip_module_exit(void)
    // destroy the hashmap
    mtip_hashmap_destroy();
    mtip_eth_deregister_events_cb();
+
+   mtip_del_sysfs();
 
 #ifdef FEATURE_MTIP_TEST_DEBUG_FS
    mtip_del_debugfs();
