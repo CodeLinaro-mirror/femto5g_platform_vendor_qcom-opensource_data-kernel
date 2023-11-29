@@ -33,9 +33,4 @@ int eip_device_deinit(bool fIngress, unsigned int device_id);
 void eip_macsec_init_link(struct eip_link *link);
 void eip_macsec_deinit_link(struct eip_link *link);
 
-int eip_macsec_get_vport_index(struct net_device *netdev,
-			       unsigned int *vport_index, bool ingress);
-int eip_macsec_get_sa_handle(struct net_device *netdev, SecY_SAHandle_t *sa_h,
-			     bool ingress);
-
 #endif /* MACSEC_DEVICE_H_ */
