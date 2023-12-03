@@ -1578,6 +1578,7 @@ static int ecpri_dma_mhi_dma_sync_memcpy(
 	}
 
 	atomic_inc(&memcpy_ctx->sync_pending);
+	spin_unlock_irqrestore(&memcpy_ctx->sync_lock, flags);
 
 	dst_params.buff_addr = dest;
 	dst_params.len = len;
@@ -1604,7 +1605,6 @@ static int ecpri_dma_mhi_dma_sync_memcpy(
 		ret = -EPERM;
 		goto fail_src_alloc;
 	}
-	spin_unlock_irqrestore(&memcpy_ctx->sync_lock, flags);
 
 	/* Transmit packets */
 	ret = ecpri_dma_dp_transmit(memcpy_ctx->sync_dest_endp,
