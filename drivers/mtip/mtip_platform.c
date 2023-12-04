@@ -284,6 +284,7 @@ static int mtip_platform_cleanup_link(unsigned int link_index)
 
       if(platform_driver_priv->mtip_links[link_index] != NULL)
       {
+        mutex_destroy(&platform_driver_priv->mtip_links[link_index]->dev_lock);
         kfree(platform_driver_priv->mtip_links[link_index]);
         platform_driver_priv->mtip_links[link_index] = NULL;
       }
