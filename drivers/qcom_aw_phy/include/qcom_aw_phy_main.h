@@ -328,8 +328,8 @@ void qcom_aw_phy_disable_snr_interrupt(
                                   enum eth_phy_iface_phy_lane_num_enum lane);
 
 #ifdef FEATURE_QCOM_AW_TEST_SYS_FS
-void qcom_aw_phy_setup_sysfs(void);
-void qcom_aw_phy_del_sysfs(void);
+void qcom_aw_phy_setup_debugfs(void);
+void qcom_aw_phy_del_debugfs(void);
 ssize_t qcom_aw_phy_set_attr(struct file *file, const char __user *buf,
                                       size_t count, loff_t *ppos) ;
 ssize_t qcom_aw_phy_get_attr(struct file *file, char __user *buf,
@@ -344,5 +344,12 @@ bool qcom_aw_phy_get_tx_fir_val(enum qcom_aw_phy_instance_enum tx_bist_phy_inst,
                                 void* txfir_cfg);
 int32_t setup_phy_status_debugfs_directory(void);
 #endif /* FEATURE_QCOM_AW_TEST_SYS_FS */
+
+ssize_t qcom_aw_phy_sysfs_show_an_restart_delay_timer(
+                  struct kobject *kobj, struct kobj_attribute *attr, char *buf);
+
+ssize_t qcom_aw_phy_sysfs_store_an_restart_delay_timer(
+                              struct kobject *kobj, struct kobj_attribute *attr,
+                              const char *buf, size_t count);
 
 #endif /* QCOM_AW_PHY_MAIN_H */

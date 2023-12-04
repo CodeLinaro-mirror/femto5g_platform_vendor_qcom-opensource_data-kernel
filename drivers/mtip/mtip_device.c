@@ -488,7 +488,7 @@ void run_mtip_process_link_state(void* work_ptr)
         }
 
         // tell all the clients of the link status update
-        post_mtip_client_send_event(ETH_ECPRISS_EVENT_UP, link_index);
+        mtip_client_send_event(ETH_ECPRISS_EVENT_UP, link_index);
     }
     else
     {
@@ -511,7 +511,7 @@ void run_mtip_process_link_state(void* work_ptr)
         }
 
         // tell all the clients of the link status update
-        post_mtip_client_send_event(ETH_ECPRISS_EVENT_DOWN, link_index);
+        mtip_client_send_event(ETH_ECPRISS_EVENT_DOWN, link_index);
     }
 
     if (mtip_loopback_mode != MTIP_MODE_LOOPBACK) 
@@ -556,7 +556,7 @@ void mtip_process_link_state(u32 link_index, bool link_up)
         }
 
         // tell all the clients of the link status update
-        post_mtip_client_send_event(ETH_ECPRISS_EVENT_UP, link_index);
+        mtip_client_send_event(ETH_ECPRISS_EVENT_UP, link_index);
     }
     else
     {
@@ -579,7 +579,7 @@ void mtip_process_link_state(u32 link_index, bool link_up)
         }
 
         // tell all the clients of the link status update
-        post_mtip_client_send_event(ETH_ECPRISS_EVENT_DOWN, link_index);
+        mtip_client_send_event(ETH_ECPRISS_EVENT_DOWN, link_index);
     }
 
     if (mtip_loopback_mode != MTIP_MODE_LOOPBACK) 
@@ -615,7 +615,7 @@ static int mtip_set_mac_address(struct net_device *dev, void *addr)
    spin_unlock_irqrestore(lock, flags);
 
    /* Send update to clients */
-   post_mtip_client_send_event(ETH_ECPRISS_EVENT_UP, link_index);
+   mtip_client_send_event(ETH_ECPRISS_EVENT_UP, link_index);
 
    return 0;
 }
@@ -1193,7 +1193,7 @@ static void mtip_rx_mode_set(struct net_device *netdev)
     if (ret == 0)
     {
         /* Send update to clients */
-        post_mtip_client_send_event(ETH_ECPRISS_EVENT_UP, link_index);
+        mtip_client_send_event(ETH_ECPRISS_EVENT_UP, link_index);
     }
 
    return; 
@@ -1237,7 +1237,7 @@ static int mtip_change_mtu(struct net_device *netdev, int new_mtu)
    mtip_mac_set_frame_length(priv, new_mtu + mtu_overhead);
 
    /* Send update to clients */
-   post_mtip_client_send_event(ETH_ECPRISS_EVENT_UP, link_index);
+   mtip_client_send_event(ETH_ECPRISS_EVENT_UP, link_index);
 
    return 0;
 }
@@ -1315,7 +1315,7 @@ int mtip_device_open_completion(u32 link_index)
     mtip_device_update_security_config(netdev, port_config);
 
     /* Send update to clients */
-    post_mtip_client_send_event(ETH_ECPRISS_EVENT_UP, link_index);
+    mtip_client_send_event(ETH_ECPRISS_EVENT_UP, link_index);
 
     return 0;
 }
@@ -3399,7 +3399,7 @@ void run_mtip_process_netdev_open(void* workptr)
    }
 
    /* Send update to clients */
-   post_mtip_client_send_event(ETH_ECPRISS_EVENT_UP, link_index);
+   mtip_client_send_event(ETH_ECPRISS_EVENT_UP, link_index);
    mtip_snd_event_notification(link_index, IF_UP);
 
 out:
@@ -3567,7 +3567,7 @@ void run_mtip_process_netdev_close(void* workptr)
    }
 
    /* Send update to clients */
-   post_mtip_client_send_event(ETH_ECPRISS_EVENT_DOWN, link_index);
+   mtip_client_send_event(ETH_ECPRISS_EVENT_DOWN, link_index);
    mtip_snd_event_notification(link_index, IF_DOWN);
 
    // free the taskstruct

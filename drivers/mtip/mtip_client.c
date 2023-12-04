@@ -1,6 +1,6 @@
 //SPDX-License-Identifier: GPL-2.0-only
 /*
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  */ 
 
 #include <linux/init.h>
@@ -352,24 +352,9 @@ void run_mtip_client_send_ready(void* work_ptr)
    kfree(taskstruct);
 }
 
-void post_mtip_client_send_event(eth_ecpriss_event_e event, u32 link_index)
-{
-   struct mtip_send_event_task* taskstruct = kmalloc(sizeof(struct mtip_send_event_task), GFP_ATOMIC);
-   if(taskstruct == NULL)
-   {
-	CSMLOGERR("memory alloc failed\n");
-	return;
-   }
-   taskstruct->event = event;
-   taskstruct->link_index = link_index;
-
-   mtip_queue_work(MTIP_WORKQ_TASK_INDICATE_EVENT, taskstruct);
-}
-
-void run_mtip_client_send_event(void* work_ptr)
+void mtip_client_send_event(eth_ecpriss_event_e event, u32 link_index)
 {
    int i;
-   struct mtip_send_event_task* taskstruct = (struct mtip_send_event_task*)work_ptr;
    unsigned long flags;
    spinlock_t *lock = &platform_driver_priv->driver_lock;
    eth_ecpriss_interface_events_cb events_cb = NULL;
@@ -390,12 +375,9 @@ void run_mtip_client_send_event(void* work_ptr)
        if (events_cb != NULL)
        {
            // invoke the client cb
-           (*events_cb)(taskstruct->event, NULL);
+           (*events_cb)(event, NULL);
        }
    }
-
-   // free the taskstruct
-   kfree(taskstruct);
 }
 
 void mtip_print_topology(eth_ecpriss_topology_root_s *topology)
