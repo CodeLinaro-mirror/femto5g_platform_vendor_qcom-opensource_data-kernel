@@ -18,6 +18,7 @@ void mtip_snd_event_notification(uint32_t interface, uint32_t event)
 {
 	static uint32_t ber_status[MAX_NOTIF_INTERFACE];
 	static uint32_t pcs_link_status[MAX_NOTIF_INTERFACE];
+	event_info_struct event_info;
 
 	if(interface < 0 || interface > MAX_NOTIF_INTERFACE -1 ){
 		CSMLOGERR("Invalid interface id %u\n",interface);
@@ -83,7 +84,9 @@ void mtip_snd_event_notification(uint32_t interface, uint32_t event)
 			return;
 
 	}
-	blocking_notifier_call_chain(&lassen_mtip_fault_notifr, event, (void*)&interface);
+	mtip_lookup_port_type_by_link_index(interface, &event_info.port_type);
+	event_info.interface = interface;
+	blocking_notifier_call_chain(&lassen_mtip_fault_notifr, event, (void*)(&event_info));
 	return ;
 }
 

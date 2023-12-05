@@ -341,7 +341,7 @@ int ldmm_qxdm_logger_get_config_info(struct sk_buff *sender_skb, struct genl_inf
 	return 0;
 }
 
-int ldmm_qxdm_logger_link_change_notification(void)
+int ldmm_qxdm_logger_link_change_notification(event_info_struct *event_info, int link_up)
 {
 	struct sk_buff *reply_skb;
 	void *msg_head;
@@ -351,7 +351,11 @@ int ldmm_qxdm_logger_link_change_notification(void)
 
 	config = mtip_driver_iface_ops.ldmm_eth_iface_get_config_info();
 
-	parse_config_packet(&config, parsed_msg);
+	parsed_msg[0] = link_up;
+	parsed_msg[1] = event_info->port_type;
+	parsed_msg[2] = event_info->interface;
+
+	parse_config_packet(&config, &parsed_msg[EVENT_PACKET_SIZE]);
 
 	reply_skb = genlmsg_new(NLMSG_GOODSIZE, GFP_KERNEL);
 	if (reply_skb == NULL) {

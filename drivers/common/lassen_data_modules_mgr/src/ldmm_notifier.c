@@ -7,6 +7,7 @@
 #include "ldmm_shrd_notifr.h"
 #include "ldmm_shrd_genntlk.h"
 #include "ldmm_ipc_log.h"
+#include "ldmm_notifr.h"
 
 //#define IS_MULTICAST_EN
 
@@ -31,18 +32,17 @@ void ldmm_disable_notification()
 int ldmm_mtip_fault_hndlr(struct notifier_block *nb, unsigned long event, void *arg)
 {
 	int ret = NOTIFY_DONE;
-	uint32_t interface = 0;
 	uint32_t val = 0;
+	event_info_struct event_info = *(event_info_struct*)arg;
 
 	if(!arg){
 		LDMM_LOG_ERR("%s:Invalid Param NULL\n", __func__);
 		return NOTIFY_BAD;
 	}
-	interface = (uint32_t)*((uint32_t*) arg);
 
-	LDMM_SETFIELD_IN_REG(val, interface, LINK_ID_SHIFT, LINK_ID_MASK);
+	LDMM_SETFIELD_IN_REG(val, event_info.interface, LINK_ID_SHIFT, LINK_ID_MASK);
 
-	LDMM_LOG_INFO("ldmm_mtip_fault_hndlr interface = %u\n",interface);
+	LDMM_LOG_INFO("ldmm_mtip_fault_hndlr interface = %u\n",event_info.interface);
 
 	switch(event){
 		case HIGH_BER_SET:
@@ -77,14 +77,14 @@ int ldmm_mtip_fault_hndlr(struct notifier_block *nb, unsigned long event, void *
 			LDMM_LOG_ERR("PCS_IF_UP\n");
 			LDMM_SETFIELD_IN_REG(val, LDMM_PCS_IF_UP, FAULT_NUM_SHIFT, FAULT_NUM_MASK);
 			if(QXDM_NOTIFICATION_ENABLED)
-				ldmm_qxdm_logger_link_change_notification();
+				ldmm_qxdm_logger_link_change_notification(&event_info, 1);
 			break;
 
 		case PCS_IF_DOWN:
 			LDMM_LOG_ERR("PCS_IF_DOWN\n");
 			LDMM_SETFIELD_IN_REG(val, LDMM_PCS_IF_DOWN, FAULT_NUM_SHIFT, FAULT_NUM_MASK);
 			if(QXDM_NOTIFICATION_ENABLED)
-				ldmm_qxdm_logger_link_change_notification();
+				ldmm_qxdm_logger_link_change_notification(&event_info, 0);
 			break;
 
 		default:

@@ -9,7 +9,7 @@
 
 void ldmm_enable_notification(void);
 void ldmm_disable_notification(void);
-int ldmm_qxdm_logger_link_change_notification(void);
+int ldmm_qxdm_logger_link_change_notification(event_info_struct *event_info, int link_up);
 
 int ldmm_fault_notifr_init(void);
 int ldmm_fault_notifr_exit(void);
