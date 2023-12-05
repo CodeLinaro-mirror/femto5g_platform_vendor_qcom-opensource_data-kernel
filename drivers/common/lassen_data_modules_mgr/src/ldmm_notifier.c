@@ -11,6 +11,10 @@
 //#define IS_MULTICAST_EN
 
 extern struct blocking_notifier_head lassen_mtip_fault_notifr;
+extern struct blocking_notifier_head lassen_qxdm_timer_update_notifr;
+
+//default logging timer value 
+int qxdm_logging_timer_value = 10;
 
 bool QXDM_NOTIFICATION_ENABLED = false;
 
@@ -96,8 +100,18 @@ int ldmm_mtip_fault_hndlr(struct notifier_block *nb, unsigned long event, void *
 	return ret;
 }
 
+int ldmm_qxdm_timer_update_hndlr(struct notifier_block *nb, unsigned long timer_value, void *arg)
+{
+	ldmm_qxdm_logger_update_timer_value((int)timer_value);
+	return 0;
+}
+
 static struct notifier_block ldmm_mtip_fault_event = {
 	.notifier_call = ldmm_mtip_fault_hndlr,
+};
+
+static struct notifier_block ldmm_qxdm_timer_update_event = {
+	.notifier_call = ldmm_qxdm_timer_update_hndlr,
 };
 
 int ldmm_fault_notifr_init(void)
@@ -109,6 +123,21 @@ int ldmm_fault_notifr_exit(void)
 {
 	return blocking_notifier_chain_unregister(&lassen_mtip_fault_notifr ,&ldmm_mtip_fault_event);
 
+}
+
+int ldmm_qxdm_timer_update_notifr_init(void)
+{
+	int ret = blocking_notifier_chain_register(&lassen_qxdm_timer_update_notifr ,&ldmm_qxdm_timer_update_event);
+	if(!ret)
+	{
+		//calling notifier to set initial timer value
+   		blocking_notifier_call_chain(&lassen_qxdm_timer_update_notifr, qxdm_logging_timer_value, NULL);
+	}
+	return ret;  
+}
+int ldmm_qxdm_timer_update_notifr_exit(void)
+{
+	return blocking_notifier_chain_unregister(&lassen_qxdm_timer_update_notifr ,&ldmm_qxdm_timer_update_event);
 }
 
 
