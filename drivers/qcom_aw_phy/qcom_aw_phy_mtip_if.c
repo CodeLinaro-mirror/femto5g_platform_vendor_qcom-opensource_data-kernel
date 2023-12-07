@@ -1056,13 +1056,18 @@ int qcom_aw_phy_bringup_anlt_mode(mss_access_t *mss,
 
     /* Just trigger CDR lock successful callback if reference lane was already
        negotiated but was not brought up by MAC earlier post initiate AN */
-    if(i == ref_lane &&
-       phy_inst_info->an_params.an_state[ref_lane] == PHY_AN_STATE_DONE){
+    if(i == ref_lane){
 
-      for(j=ref_lane; (j < ref_lane+num_an_lanes) && (j < PHY_LANE_MAX); j++){
-        qcom_aw_phy_handle_cdr_lock_status(phy_inst_info, j, CDR_LOCK_SUCCESS);
+      if(phy_inst_info->an_params.an_state[ref_lane] == PHY_AN_STATE_DONE){
+        for(j=ref_lane; (j < ref_lane+num_an_lanes) && (j < PHY_LANE_MAX); j++){
+          qcom_aw_phy_handle_cdr_lock_status(phy_inst_info, j, CDR_LOCK_SUCCESS);
+        }
       }
-      return ret_val;
+
+      /* No need to perform AN again if initiate AN was already done for the
+         reference lane, and bring up was triggered for the same */
+      if(phy_inst_info->bring_up_status == false)
+        return ret_val;
     }
 
     QCOM_AW_PHY_LOG_DBG("ANLT for PHY %d lane %d with speed mode %d FEC %d",
