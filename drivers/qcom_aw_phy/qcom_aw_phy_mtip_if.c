@@ -24,6 +24,8 @@ struct qcom_aw_phy_mtip_if_info qcom_aw_phy_mtip_if_info_s = {0};
 extern int qcom_aw_phy_tx_compliance_flag;
 extern int qcom_aw_phy_an_restart_delay_timer;
 
+#define MAX_PHY_LANE_STR_LEN 12
+
 /*-------------------------------------------------------------------
 * Function Definitions
 ------------------------------------------------------------------- */
@@ -130,10 +132,13 @@ int qcom_aw_phy_setup(
   struct qcom_aw_phy_inst_config *phy_inst_info = NULL;
   struct qcom_aw_lane_params *phy_lane_params = NULL;
   uint8_t i = 0;
+  char temp_buf[MAX_PHY_LANE_STR_LEN] = {0};
+  char buf[MAX_PHY_LANE_STR_LEN] = {0};
+  enum eth_phy_iface_phy_lane_speed_enum lane_speed;
   enum local_error_enum local_err_val = LOCAL_ERROR_INVALID;
   int ret_val = 0;
 
-  QCOM_AW_PHY_LOG_INFO("qcom_aw_phy_setup !");
+  QCOM_AW_PHY_LOG_DBG("qcom_aw_phy_setup !");
 
   phy_inst_type = qcom_aw_phy_mac_port_to_phy_inst(port_type);
   if (phy_inst_type == QCOM_AW_PHY_INST_MAX) {
@@ -166,6 +171,18 @@ int qcom_aw_phy_setup(
     goto func_exit;
   }
 
+  for (i = 0; i < PHY_LANE_MAX; i++) {
+    phy_lane_params = &phy_inst_info->lane_params[i];
+    if (lane_config[i].lane_enabled) {
+        snprintf(temp_buf, sizeof(temp_buf), "%d ", i);
+        strlcat(buf, temp_buf, sizeof(buf));
+        lane_speed = lane_config[i].lane_speed;
+    }
+  }
+
+  QCOM_AW_PHY_LOG_INFO("Setting up PHY %d for lanes %s with speed %d",
+                       port_type, buf, lane_speed);
+
   // Reset the number of lanes to 0
   phy_inst_info->num_lanes = 0;
 
@@ -184,9 +201,6 @@ int qcom_aw_phy_setup(
       phy_lane_params->lane_config = lane_config[i];
 
       phy_inst_info->cdr_lock_status_flag[i] = CDR_LOCK_NONE;
-
-      QCOM_AW_PHY_LOG_INFO("Port %d has lane %d enabled with speed %d",
-                           port_type, i, lane_config[i].lane_speed);
     }
     else{
       /* Clear the old lane configuration */
@@ -228,8 +242,10 @@ void qcom_aw_phy_handle_cdr_lock_status(
   bool eth_level_status = false;
   u32 i;
 
-  QCOM_AW_PHY_LOG_INFO("CDR lock status %d for PHY %d, lane %d",
-                       lane_level_status, phy_inst_info->phy_inst, lane);
+  if(lane_level_status == CDR_LOCK_FAILURE){
+    QCOM_AW_PHY_LOG_ERR("CDR lock status %d for PHY %d, lane %d",
+                        lane_level_status, phy_inst_info->phy_inst, lane);
+  }
 
   if(lane >= PHY_LANE_MAX)
   {
@@ -1171,13 +1187,6 @@ int qcom_aw_phy_bringup_lt_mode(mss_access_t *mss,
   }
   else {
     QCOM_AW_PHY_LOG_INFO("LT successful");
-    mdelay(500);
-    if(AW_ERR_CODE_NONE == aw_pmd_rx_check_cdr_lock(mss, RX_CDR_TIMEOUT_US)){
-      qcom_aw_phy_handle_cdr_lock_status(phy_inst_info, lane, CDR_LOCK_SUCCESS);
-    }
-    else{
-      qcom_aw_phy_handle_cdr_lock_status(phy_inst_info, lane, CDR_LOCK_FAILURE);
-    }
   }
 
 func_exit:
@@ -1267,29 +1276,10 @@ int qcom_aw_phy_bringup_manual_eq_mode(
     aw_pmd_analog_loopback_set(mss, 1);
   }
 
-  /* Delay before triggering RX equalization */
-  mdelay(500);
-
   // RX Equalization - Check aw_eq_type_e enum
   aw_pmd_rx_equalize(mss, AW_EQ_FULL_DIR, RX_LINKEVAL_FULL_TIMEOUT_US);
 
   aw_pmd_rx_background_adapt_enable_set(mss, 1);
-
-  /* Delay before checking RX CDR lock post equalization */
-  mdelay(500);
-
-  /* RX CDR lock check not needed if lane bring up is disabled for
-     TX compliance test */
-  if(qcom_aw_phy_tx_compliance_flag)
-    return ret_val;
-
-  // Check CDR Lock
-  if(AW_ERR_CODE_NONE == aw_pmd_rx_check_cdr_lock(mss, RX_CDR_TIMEOUT_US)){
-    qcom_aw_phy_handle_cdr_lock_status(phy_inst_info, lane, CDR_LOCK_SUCCESS);
-  }
-  else{
-    qcom_aw_phy_handle_cdr_lock_status(phy_inst_info, lane, CDR_LOCK_FAILURE);
-  }
 
 func_exit:
   if(local_err_val != LOCAL_ERROR_INVALID){
@@ -1319,6 +1309,8 @@ int qcom_aw_phy_bringup(enum mtip_port_type_enum port_type,
   enum eth_phy_iface_phy_lane_num_enum lane = PHY_LANE_0;
   mss_access_t mss = {.phy_offset = 0, .lane_offset = 0};
   struct qcom_aw_phy_lane_speed_config config;
+  char temp_buf[MAX_PHY_LANE_STR_LEN] = {0};
+  char buf[MAX_PHY_LANE_STR_LEN] = {0};
   enum local_error_enum local_err_val = LOCAL_ERROR_INVALID;
   aw_err_code_t aw_err_val = AW_ERR_CODE_NONE;
   int ret_val = 0;
@@ -1348,7 +1340,7 @@ int qcom_aw_phy_bringup(enum mtip_port_type_enum port_type,
 
   mutex_lock(&phy_inst_info->phy_inst_lock);
 
-  QCOM_AW_PHY_LOG_INFO("MAC Port %d has sfp port %d", port_type, sfp_port_type);
+  QCOM_AW_PHY_LOG_DBG("MAC Port %d has sfp port %d", port_type, sfp_port_type);
   phy_inst_info->sfp_port_type = sfp_port_type;
 
   /* Setup PHY offset */
@@ -1381,6 +1373,15 @@ int qcom_aw_phy_bringup(enum mtip_port_type_enum port_type,
     return ret_val;
   }
 
+  for (lane = 0; lane < PHY_LANE_MAX; lane++) {
+    if (lanes_enabled[lane]) {
+        snprintf(temp_buf, sizeof(temp_buf), "%d ", lane);
+        strlcat(buf, temp_buf, sizeof(buf));
+    }
+  }
+
+  QCOM_AW_PHY_LOG_INFO("Bringing up PHY %d for lanes %s", port_type, buf);
+
   for (lane = PHY_LANE_0; lane < PHY_LANE_MAX; lane++) {
     /* Check if lane is valid for this MAC instance */
     if (lanes_enabled[lane] == false)
@@ -1394,8 +1395,6 @@ int qcom_aw_phy_bringup(enum mtip_port_type_enum port_type,
       mutex_unlock(&phy_inst_info->phy_inst_lock);
       goto func_exit;
     }
-
-    QCOM_AW_PHY_LOG_INFO("Bringing up lane %d on port %d!", lane, port_type);
 
     mutex_lock(&phy_inst_info->lane_lock[lane]);
 
@@ -1446,6 +1445,33 @@ int qcom_aw_phy_bringup(enum mtip_port_type_enum port_type,
     phy_inst_info->bring_up_status = true;
   }
 
+  for (lane = PHY_LANE_0; lane < PHY_LANE_MAX; lane++) {
+    /* Check if lane is valid for this MAC instance */
+    if (lanes_enabled[lane] == false)
+      continue;
+
+    mutex_lock(&phy_inst_info->lane_lock[lane]);
+
+    /* RX CDR lock check not needed if lane bring up is disabled for
+       TX compliance test */
+    if(qcom_aw_phy_tx_compliance_flag){
+      mutex_unlock(&phy_inst_info->lane_lock[lane]);
+      break;
+    }
+
+    // Check CDR Lock
+    if(AW_ERR_CODE_NONE == aw_pmd_rx_check_cdr_lock(&mss, RX_CDR_TIMEOUT_US)){
+      qcom_aw_phy_handle_cdr_lock_status(phy_inst_info, lane, CDR_LOCK_SUCCESS);
+    }
+    else{
+      qcom_aw_phy_handle_cdr_lock_status(phy_inst_info, lane, CDR_LOCK_FAILURE);
+      mutex_unlock(&phy_inst_info->lane_lock[lane]);
+      break;
+    }
+
+    mutex_unlock(&phy_inst_info->lane_lock[lane]);
+  }
+
   mutex_unlock(&phy_inst_info->phy_inst_lock);
 
 func_exit:
@@ -1477,6 +1503,8 @@ int qcom_aw_phy_teardown(enum mtip_port_type_enum port_type,
   mss_access_t mss = {.phy_offset = 0, .lane_offset = 0};
   struct qcom_aw_phy_lane_speed_config config;
   int poll_result;
+  char temp_buf[MAX_PHY_LANE_STR_LEN] = {0};
+  char buf[MAX_PHY_LANE_STR_LEN] = {0};
   enum local_error_enum local_err_val = LOCAL_ERROR_INVALID;
   aw_err_code_t aw_err_val = AW_ERR_CODE_NONE;
   int ret_val = 0;
@@ -1509,6 +1537,15 @@ int qcom_aw_phy_teardown(enum mtip_port_type_enum port_type,
   /* Setup PHY offset */
   mss.phy_offset = phy_inst_info->base_addr;
 
+  for (lane = 0; lane < PHY_LANE_MAX; lane++) {
+    if (lanes_enabled[lane]) {
+        snprintf(temp_buf, sizeof(temp_buf), "%d ", lane);
+        strlcat(buf, temp_buf, sizeof(buf));
+    }
+  }
+
+  QCOM_AW_PHY_LOG_INFO("Tearing down PHY %d for lanes %s", port_type, buf);
+
   for (lane = PHY_LANE_0; lane < PHY_LANE_MAX; lane++) {
     /* Check if lane is valid for this MAC instance */
     if (lanes_enabled[lane] == false)
@@ -1525,8 +1562,6 @@ int qcom_aw_phy_teardown(enum mtip_port_type_enum port_type,
       mutex_unlock(&phy_inst_info->phy_inst_lock);
       goto func_exit;
     }
-
-    QCOM_AW_PHY_LOG_INFO("Tearing down lane %d on port %d!", lane, port_type);
 
     mutex_lock(&phy_inst_info->lane_lock[lane]);
 
@@ -1602,6 +1637,9 @@ int qcom_aw_phy_mac_link_status(enum mtip_port_type_enum port_type,
   enum local_error_enum local_err_val = LOCAL_ERROR_INVALID;
   int ret_val = 0;
   struct qcom_aw_phy_work_q_params *wq_params = NULL;
+  char temp_buf[MAX_PHY_LANE_STR_LEN] = {0};
+  char buf[MAX_PHY_LANE_STR_LEN] = {0};
+  bool needs_logging = false;
 
   /* Get the PHY instance type for the provided port */
   phy_inst_type = qcom_aw_phy_mac_port_to_phy_inst(port_type);
@@ -1628,14 +1666,29 @@ int qcom_aw_phy_mac_link_status(enum mtip_port_type_enum port_type,
 
   mutex_lock(&phy_inst_info->phy_inst_lock);
 
+  for (lane_num = 0; lane_num < PHY_LANE_MAX; lane_num++) {
+    if (lanes_enabled[lane_num]) {
+      mutex_lock(&phy_inst_info->lane_lock[lane_num]);
+      if(phy_inst_info->lane_params[lane_num].link_status != status){
+        snprintf(temp_buf, sizeof(temp_buf), "%d ", lane_num);
+        strlcat(buf, temp_buf, sizeof(buf));
+        needs_logging = true;
+      }
+      mutex_unlock(&phy_inst_info->lane_lock[lane_num]);
+    }
+  }
+
+  if(needs_logging){
+    QCOM_AW_PHY_LOG_INFO("MAC link status %d for PHY %d lanes %s",
+                         status, port_type, buf);
+  }
+
   for (lane_num = PHY_LANE_0; lane_num < PHY_LANE_MAX; lane_num++) {
     if(lanes_enabled[lane_num]){
 
       mutex_lock(&phy_inst_info->lane_lock[lane_num]);
       if(phy_inst_info->lane_params[lane_num].link_status != status){
         phy_inst_info->lane_params[lane_num].link_status = status;
-        QCOM_AW_PHY_LOG_ERR("PHY instance %d, lane %d, status %d, ",
-                            phy_inst_type, lane_num, status);
         notify_flag = true;
       }
 
@@ -2117,16 +2170,10 @@ void qcom_aw_phy_handle_rx_sig_detect(struct work_struct *work){
              aw_pmd_tx_pam4_precoder_override_set(&mss, 1);
           }
 
-          /* Delay before triggering RX equalization */
-          mdelay(500);
-
           // RX Equalization - Check aw_eq_type_e enum
           aw_pmd_rx_equalize(&mss, AW_EQ_FULL_DIR, RX_LINKEVAL_FULL_TIMEOUT_US);
 
           aw_pmd_rx_background_adapt_enable_set(&mss, 1);
-
-          /* Delay before checking RX CDR lock post equalization */
-          mdelay(500);
         }
 
         cdr_lock_status = aw_pmd_rx_check_cdr_lock(&mss, RX_CDR_TIMEOUT_US);
