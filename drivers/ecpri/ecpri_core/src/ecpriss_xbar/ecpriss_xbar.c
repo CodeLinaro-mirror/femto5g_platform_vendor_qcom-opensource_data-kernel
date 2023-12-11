@@ -1758,14 +1758,14 @@ int ecpriss_xbar_fh_rx_lut_v2(uint32_t  port_index,
 				0,
 				sizeof(xbar_fhrx_m_lut_n));
 
+		current_pcid_index = xbar_rx_cfg->xbar_rx_cfg.flow_id;
+
 		ecpriss_xbar_hal_read_reg_mn_fields(ECPRISS_XBAR_LUT,
 				ECPRI_XBAR_LUT_XBAR_FHRX_m_LUT_n_V2,
 				port_index,
 				current_pcid_index,
 				&xbar_fhrx_m_lut_n);
 
-
-		current_pcid_index = xbar_rx_cfg->xbar_rx_cfg.flow_id;
 		xbar_port_lut = &ecpriss_pdata_v2->xbar_ctx_v2->flow_ctx_v2.fh_xbar_lut[port_index];
 		xbar_port_lut->configured_pcids[xbar_port_lut->num_pcid_entries++] = current_pcid_index;
 
@@ -1774,9 +1774,9 @@ int ecpriss_xbar_fh_rx_lut_v2(uint32_t  port_index,
 
 		if(xbar_rx_cfg->xbar_rx_cfg.flow_dir == ECPRISS_FLOW_DIR_UL){
 
-			xbar_fhrx_m_lut_n.ul_oc_link_id |=
+			xbar_fhrx_m_lut_n.ul_oc_link_id =
 				xbar_rx_cfg->xbar_rx_cfg.oc_link_id;
-			xbar_fhrx_m_lut_n.ul_route_to_oran |= 1;
+			xbar_fhrx_m_lut_n.ul_route_to_oran = 1;
 
 			xbar_port_lut->lut_table[current_pcid_index].ul_oc_link_id =
 				xbar_rx_cfg->xbar_rx_cfg.oc_link_id;
@@ -1787,9 +1787,9 @@ int ecpriss_xbar_fh_rx_lut_v2(uint32_t  port_index,
 					current_pcid_index, xbar_fhrx_m_lut_n.ul_oc_link_id , xbar_fhrx_m_lut_n.ul_route_to_oran);
 
 		}else {
-			xbar_fhrx_m_lut_n.dl_oc_link_id |=
+			xbar_fhrx_m_lut_n.dl_oc_link_id =
 				xbar_rx_cfg->xbar_rx_cfg.oc_link_id;
-			xbar_fhrx_m_lut_n.dl_route_to_oran |= 1;
+			xbar_fhrx_m_lut_n.dl_route_to_oran = 1;
 
 			xbar_port_lut->lut_table[current_pcid_index].dl_oc_link_id =
 				xbar_rx_cfg->xbar_rx_cfg.oc_link_id;
