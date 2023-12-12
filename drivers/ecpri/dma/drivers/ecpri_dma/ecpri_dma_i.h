@@ -175,9 +175,16 @@ do {\
 /* Define for DMA max nominal clock */
 #define ECPRI_DMA_CLK_NOM_MAX (ECPRI_CLK_FREQ(466.50))
 
+/* Define for DMA max turbo clock */
+#define ECPRI_DMA_CLK_TUR_MAX (ECPRI_CLK_FREQ(500))
+
 /* Define for GSI max nominal clock */
 #define ECPRI_GSI_FAST_CLK_NOM_MAX (ECPRI_CLK_FREQ(500))
 #define ECPRI_GSI_FAST_DIV2_CLK_NOM_MAX (ECPRI_CLK_FREQ(250))
+
+/* Define for GSI max turbo clock */
+#define ECPRI_GSI_FAST_CLK_TUR_MAX (ECPRI_CLK_FREQ(600))
+#define ECPRI_GSI_FAST_DIV2_CLK_TUR_MAX (ECPRI_CLK_FREQ(300))
 
 /* Define for GCC max nominal clock */
 #define GCC_AHB_CLK_NOM_MAX (ECPRI_CLK_FREQ(100))

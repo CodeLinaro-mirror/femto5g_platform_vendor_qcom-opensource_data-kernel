@@ -8913,12 +8913,12 @@ int ecpri_dma_hw_init(void)
 		ECPRI_DMA_PREPARE_AND_ENABLE_CLK(gcc_ddrss_ecpri_gsi);
 
 	clk_set_rate(ecpri_dma_ctx->clks.gcc_aggre_noc_ecpri_dma,
-		ECPRI_DMA_CLK_NOM_MAX);
+		ECPRI_DMA_CLK_TUR_MAX);
 	clk_set_rate(ecpri_dma_ctx->clks.gcc_aggre_noc_ecpri_gsi,
-		ECPRI_GSI_FAST_DIV2_CLK_NOM_MAX);
+		ECPRI_GSI_FAST_DIV2_CLK_TUR_MAX);
 	clk_set_rate(ecpri_dma_ctx->clks.ecpri_cg_clk, ECPRI_DMA_CLK_NOM_MAX);
-	clk_set_rate(ecpri_dma_ctx->clks.dma_clk, ECPRI_DMA_CLK_NOM_MAX);
-	clk_set_rate(ecpri_dma_ctx->clks.dma_fast_clk, ECPRI_GSI_FAST_CLK_NOM_MAX);
+	clk_set_rate(ecpri_dma_ctx->clks.dma_clk, ECPRI_DMA_CLK_TUR_MAX);
+	clk_set_rate(ecpri_dma_ctx->clks.dma_fast_clk, ECPRI_GSI_FAST_CLK_TUR_MAX);
 
 	/* get ICC */
 
