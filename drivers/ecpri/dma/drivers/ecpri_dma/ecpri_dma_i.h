@@ -183,10 +183,14 @@ do {\
 #define ECPRI_DMA_EXCEPTION_RING_SIZE			(256)
 #define ECPRI_DMA_DP_EXCEPTION_BUDGET			(16)
 #define ECPRI_DMA_DP_EXCEPTION_FH_RX_MAX_CHAIN	(4)
+
 /* ETH supports up to 9K jumbo packet, due to HW limitation
 	DMA can overflow to up to 4 buffers, to support 9K on 4 buffers
 	each buffer should be at least 2500 */
 #define ECPRI_DMA_DP_EXCEPTION_BUFF_SIZE		(2500)
+
+/* DMA Tx Pre-Fetch buffer size change for LTE FH jumbo packets */
+#define ECPRI_DMA_PRE_FETCH_CHANGE_SIZE			(0x10)
 
 enum ecpri_dma_smmu_cb_type {
 	ECPRI_DMA_SMMU_CB_AP,
