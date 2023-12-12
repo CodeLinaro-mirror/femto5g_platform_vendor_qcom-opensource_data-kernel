@@ -26,7 +26,6 @@
 #define DMA_READ_WRITE_MODE 0664
 #define DMA_WRITE_ONLY_MODE 0220
 #define DMA_MIN_READ_BUFFER_REMINING_SIZE (500)
-#define ECPRI_DMA_MIN_DEST_ENDP (37)
 
 struct ecpri_dma_debugfs_file {
 	const char *name;
@@ -346,6 +345,36 @@ static ssize_t ecpri_dma_link_stat_write(struct file *file, const char __user *b
 
 	/* Reset file read */
 	is_read_in_progress = true;
+
+	return count;
+}
+
+static ssize_t ecpri_dma_write_lte_lb(struct file *file, const char __user *buf,
+		size_t count, loff_t *ppos)
+{
+	s8 val;
+	unsigned long missing;
+
+	/* Veriy debug buffer has enough space*/
+	if (count >= sizeof(dbg_buff))
+		return -EINVAL;
+
+	/* Copy user data to debug buffer */
+	missing = copy_from_user(dbg_buff, buf, count);
+	if (missing) {
+		DMAERR("Failed to read user input\n");
+		return count;
+	}
+
+	/* Terminate debug buffer */
+	dbg_buff[count] = '\0';
+
+	if (kstrtos8(dbg_buff, 0, &val)) {
+		DMAERR("Failed to convert val to number\n");
+		return count;
+	}
+
+	ecpri_dma_lte_set_loopback(val);
 
 	return count;
 }
@@ -672,6 +701,10 @@ static const struct ecpri_dma_debugfs_file debugfs_files[] = {
 	},{
 		"lte_stat", DMA_READ_ONLY_MODE, NULL, {
 			.read = ecpri_dma_read_lte_stat,
+		},
+	},{
+		"lte_lb_enable", DMA_WRITE_ONLY_MODE, NULL, {
+			.write = ecpri_dma_write_lte_lb,
 		},
 	},
 };
