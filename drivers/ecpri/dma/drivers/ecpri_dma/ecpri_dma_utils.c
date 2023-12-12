@@ -9816,3 +9816,49 @@ int ecpri_dma_get_endp_stats(struct ecpri_dma_endp_context* ep,
 
 	return ret;
 }
+
+void ecpri_dma_lte_set_loopback(int val)
+{
+	int endp_id = 0;
+	int gsi_id = 0;
+	ecpri_hwio_def_ecpri_endp_cfg_dest_gsi_m_ch_n_u endp_cfg_dest = { 0 };
+	ecpri_hwio_def_ecpri_endp_cfg_xbar_u endp_cfg_xbar = { 0 };
+
+	if (!ecpri_dma_ctx->endp_map)
+		return;
+
+	for (gsi_id = 0; gsi_id < ECPRI_DMA_GSI_NUM_MAX; gsi_id++) {
+		for (endp_id = 0; endp_id < ECPRI_DMA_ENDP_NUM_MAX; endp_id++) {
+			if ((*ecpri_dma_ctx->endp_map)[gsi_id][endp_id].valid &&
+				((*ecpri_dma_ctx->endp_map)[gsi_id][endp_id].dir ==
+					ECPRI_DMA_ENDP_DIR_SRC) &&
+				(*ecpri_dma_ctx->endp_map)[gsi_id][endp_id].lte_enable) {
+
+				endp_cfg_xbar.value =
+					ecpri_dma_hal_read_reg_mn(ECPRI_ENDP_CFG_XBAR, gsi_id,
+						endp_id);
+				endp_cfg_dest.value =
+					ecpri_dma_hal_read_reg_mn(ECPRI_ENDP_CFG_DEST, gsi_id,
+						endp_id);
+
+				if (val) {
+					endp_cfg_xbar.def_v2.loopback_en = 1;
+					endp_cfg_dest.def.dest_mem_channel = endp_id +
+						ECPRI_DMA_MIN_DEST_ENDP;
+					endp_cfg_dest.def.loopback_gid =
+						gsi_id;
+				}
+				else {
+					endp_cfg_xbar.def_v2.loopback_en = 0;
+					endp_cfg_dest.def.dest_mem_channel = 0;
+					endp_cfg_dest.def.loopback_gid = 0;
+				}
+
+				ecpri_dma_hal_write_reg_mn(
+					ECPRI_ENDP_CFG_XBAR, gsi_id, endp_id, endp_cfg_xbar.value);
+				ecpri_dma_hal_write_reg_mn(
+					ECPRI_ENDP_CFG_DEST, gsi_id, endp_id, endp_cfg_dest.value);
+			}
+		}
+	}
+}

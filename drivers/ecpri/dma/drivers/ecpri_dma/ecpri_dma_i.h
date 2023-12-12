@@ -139,6 +139,9 @@ do {\
 /* Max ENDP ID for eCPRI DMA */
 #define ECPRI_DMA_ENDP_NUM_MAX 74
 
+/* Min Dest ENDP ID for eCPRI DMA */
+#define ECPRI_DMA_MIN_DEST_ENDP (37)
+
 /* Num of GSIs in HW VER 1 */
 #define ECPRI_DMA_NUM_OF_GSI_HW_VER_1_0 1
 

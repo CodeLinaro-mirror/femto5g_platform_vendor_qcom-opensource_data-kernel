@@ -89,6 +89,7 @@ int ecpri_dma_gsi_reset_channel(struct ecpri_dma_endp_context *ep);
 int ecpri_dma_hw_init(void);
 int ecpri_dma_get_gsi_dev_hdl(unsigned long* dev_hdl);
 struct device* ecpri_dma_get_pdev(void);
+void ecpri_dma_lte_set_loopback(int val);
 
 /**
  * ecpri_dma_filter_endps() - filter endpoint map endpoits by filter criteria
