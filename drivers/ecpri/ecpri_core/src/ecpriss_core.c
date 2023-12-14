@@ -295,7 +295,8 @@ void ecpriss_process_packet(ecpriss_packet_payload_s *packet)
 
 					ret = ecpriss_qudp_fh_tx_hdr_ins_cfg_v2(
 							flow_tx->port_index,
-							&flow_tx->qudp_tx_cfg);
+							&flow_tx->qudp_tx_cfg,
+							ECPRISS_L2_L3_TRANSP);
 					if(ret < 0) {
 						break;
 					}
@@ -2249,7 +2250,9 @@ void ecpriss_debug_flow_info(ecpriss_packet_payload_s *packet, uint8_t msg_id)
 		offset += scnprintf(cmd_buf + offset ,max_str_size - offset ,"%s","DeCFG ");
 		offset = offset % max_str_size;
 
-	}else if(msg_id == ECPRISS_MESSAGE_TRANSPORT_EGRESS_TABLE_RECFG ||
+	}else if(msg_id == ECPRISS_MESSAGE_TRANSPORT_EGRESS_L2_TABLE_RECFG ||
+			msg_id == ECPRISS_MESSAGE_TRANSPORT_EGRESS_L3_TABLE_RECFG ||
+			msg_id == ECPRISS_MESSAGE_TRANSPORT_EGRESS_L2_L3_TABLE_RECFG ||
 			msg_id == ECPRISS_MESSAGE_TRANSPORT_INGESS_TABLE_CFG ||
 			msg_id == ECPRISS_MESSAGE_TRANSPORT_INGESS_TABLE_DECFG){
 		offset += scnprintf(cmd_buf + offset ,max_str_size - offset ,"%s","ReCFG");
@@ -2269,7 +2272,9 @@ void ecpriss_debug_flow_info(ecpriss_packet_payload_s *packet, uint8_t msg_id)
 		case ECPRISS_MESSAGE_FLOW_DECFG:
 			ecpriss_debug_stringify_flow_cfg(packet, cmd_buf, &offset, max_str_size);
 			break;
-		case ECPRISS_MESSAGE_TRANSPORT_EGRESS_TABLE_RECFG:
+		case ECPRISS_MESSAGE_TRANSPORT_EGRESS_L2_TABLE_RECFG:
+		case ECPRISS_MESSAGE_TRANSPORT_EGRESS_L3_TABLE_RECFG:
+		case ECPRISS_MESSAGE_TRANSPORT_EGRESS_L2_L3_TABLE_RECFG:
 			ecpriss_debug_stringify_egress_tp_cfg(packet, cmd_buf, &offset, max_str_size);
 			break;
 		case ECPRISS_MESSAGE_TRANSPORT_INGESS_TABLE_CFG :

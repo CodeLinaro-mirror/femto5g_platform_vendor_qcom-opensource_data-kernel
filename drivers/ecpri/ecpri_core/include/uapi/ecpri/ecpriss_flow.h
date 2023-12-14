@@ -343,4 +343,11 @@ typedef struct
 	ecpriss_mac_s lte_mac_addr[ECPRISS_MAX_PORTS][ECPRISS_MAX_LTE_MAC_PER_PORT];
 }ecpriss_lte_mac_addr_cfg_s;
 
+typedef enum ecpriss_transp_type_e{
+	ECPRISS_L2_TRANSP,
+	ECPRISS_L3_TRANSP,
+	ECPRISS_L2_L3_TRANSP,
+	ECPRISS_INVALID_TRANSP
+}ecpriss_transp_type;
+
 #endif /* ECPRI_FLOW_H */

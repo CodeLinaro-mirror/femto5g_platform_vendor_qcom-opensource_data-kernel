@@ -84,8 +84,14 @@ void ecpriss_netlink_process_packet(ecpriss_packet_s *packet)
 			case ECPRISS_MESSAGE_FLOW_TRANSP_DECFG:
 				ecpriss_process_packet_decfg(&packet->payload,ECPRISS_MESSAGE_FLOW_TRANSP_DECFG);
 				break;
-			case ECPRISS_MESSAGE_TRANSPORT_EGRESS_TABLE_RECFG:
-				ecpriss_qudp_egress_table_reconfig(&packet->payload);
+			case ECPRISS_MESSAGE_TRANSPORT_EGRESS_L2_TABLE_RECFG:
+				ecpriss_qudp_egress_l2_table_reconfig(&packet->payload);
+				break;
+			case ECPRISS_MESSAGE_TRANSPORT_EGRESS_L3_TABLE_RECFG:
+				ecpriss_qudp_egress_l3_table_reconfig(&packet->payload);
+				break;
+			case ECPRISS_MESSAGE_TRANSPORT_EGRESS_L2_L3_TABLE_RECFG:
+				ecpriss_qudp_egress_l2_l3_table_reconfig(&packet->payload);
 				break;
 			case ECPRISS_MESSAGE_TRANSPORT_INGESS_TABLE_CFG:
 				ecpriss_qudp_ingress_table_config(&packet->payload);

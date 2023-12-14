@@ -316,7 +316,8 @@ enum {
 
 int ecpriss_qudp_init_v2(struct device *dev);
 int ecpriss_qudp_fh_tx_hdr_ins_cfg_v2(uint32_t               port_index,
-		ecpriss_qudp_tx_cfg_s *tx_cfg);
+		ecpriss_qudp_tx_cfg_s *tx_cfg,
+		ecpriss_transp_type tp_type);
 int ecpriss_qudp_fh_rx_filter_cfg_v2(uint32_t               port_index,
 		ecpriss_qudp_rx_cfg_s *rx_cfg);
 
@@ -401,7 +402,9 @@ void ecpriss_qudp_set_ingress_action(int val);
 
 int ecpriss_qudp_get_strict_filter_config(int fh_index);
 void ecpriss_qudp_set_strict_filter_config(int val, int fh_index);
-void ecpriss_qudp_egress_table_reconfig(ecpriss_packet_payload_s *packet);
+void ecpriss_qudp_egress_l2_table_reconfig(ecpriss_packet_payload_s *packet);
+void ecpriss_qudp_egress_l3_table_reconfig(ecpriss_packet_payload_s *packet);
+void ecpriss_qudp_egress_l2_l3_table_reconfig(ecpriss_packet_payload_s *packet);
 void ecpriss_qudp_ingress_table_config(ecpriss_packet_payload_s *packet);
 void ecpriss_qudp_ingress_table_deconfig(ecpriss_packet_payload_s *packet);
 
