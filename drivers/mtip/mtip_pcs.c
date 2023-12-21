@@ -74,6 +74,8 @@ static void mtip_pcs_set_vendor_pcs_mode(enum mtip_port_config_enum port_config,
     {
     case MTIP_PORT_CONFIG_1x25GBASE_R:
     case MTIP_PORT_CONFIG_4x25GBASE_R:
+    case MTIP_PORT_CONFIG_1x25GBASE_R_FEC:
+    case MTIP_PORT_CONFIG_4x25GBASE_R_FEC:
         {
             vendor_pcs_mode = MTIP_PCS_VENDOR_PCS_ENA_CLAUSE49_BIT | MTIP_PCS_VENDOR_PCS_DISABLE_MLD_BIT | MTIP_PCS_VENDOR_PCS_HI_BER25_BIT;
         }
@@ -87,8 +89,8 @@ static void mtip_pcs_set_vendor_pcs_mode(enum mtip_port_config_enum port_config,
         break;
 
     case MTIP_PORT_CONFIG_1x10GBASE_R:
-    case MTIP_PORT_CONFIG_1x10GBASE_R_FEC:
     case MTIP_PORT_CONFIG_4x10GBASE_R:
+    case MTIP_PORT_CONFIG_1x10GBASE_R_FEC:
     case MTIP_PORT_CONFIG_4x10GBASE_R_FEC:
         {
             vendor_pcs_mode = MTIP_PCS_VENDOR_PCS_ENA_CLAUSE49_BIT | MTIP_PCS_VENDOR_PCS_DISABLE_MLD_BIT; // HI_BER25 is not set
@@ -604,6 +606,50 @@ void mtip_pcs_reset_all_vl_registers(struct mtip_link_device_info* link_device)
     return;
 }
 
+static void mtip_set_fec_control_registers(enum mtip_port_config_enum port_config, struct mtip_port_device_info *port_device)
+{
+    void __iomem *rsfec_base_addr = port_device->rsfec_base_addr;
+    u32 fec_control_val = 0;
+    u32 fec_control_val1 = 0;
+    u32 fec_control_val2 = 0;
+    u32 fec_control_val3 = 0;
+    CSMLOGDBG("Setting all FEC control registers\n");
+
+    switch (port_config)
+    {
+        case MTIP_PORT_CONFIG_1x10GBASE_R_FEC:
+        case MTIP_PORT_CONFIG_1x25GBASE_R_FEC:
+        case MTIP_PORT_CONFIG_1x40GBASE_R4_FEC:
+        {
+             fec_control_val = 0x3;
+        }
+        break;
+
+        case MTIP_PORT_CONFIG_4x10GBASE_R_FEC:
+        case MTIP_PORT_CONFIG_4x25GBASE_R_FEC:
+        {
+             fec_control_val = 0x3;
+             fec_control_val1 = 0x3;
+             fec_control_val2 = 0x3;
+             fec_control_val3 = 0x3;
+        }
+        break;
+
+        default:
+        break;
+    }
+
+    iowrite32(fec_control_val,
+              rsfec_base_addr + MTIP_FEC_CONTROL_OFFSET);
+    iowrite32(fec_control_val1,
+              rsfec_base_addr + MTIP_FEC_CONTROL1_OFFSET);
+    iowrite32(fec_control_val2,
+              rsfec_base_addr + MTIP_FEC_CONTROL2_OFFSET);
+    iowrite32(fec_control_val3,
+              rsfec_base_addr + MTIP_FEC_CONTROL3_OFFSET);
+    return;
+}
+
 int mtip_pcs_config_pcs(u32 link_index)
 {
     enum mtip_port_config_enum port_config;
@@ -624,9 +670,6 @@ int mtip_pcs_config_pcs(u32 link_index)
     // this is the port configuration
     port_config = platform_driver_priv->mtip_ports[port_type]->port_config;
 
-    mtip_pcs_update_active_fec(link_index, port_config,
-                               platform_driver_priv->mtip_ports[port_type]->sfp_port_type);
-
     // program the vendor pcs mode register
     mtip_pcs_set_vendor_pcs_mode(port_config, &platform_driver_priv->devices.link_devices[link_index]);
 
@@ -635,6 +678,8 @@ int mtip_pcs_config_pcs(u32 link_index)
 
     // program the vendor vl registers
     mtip_pcs_set_vl_registers(port_config, &platform_driver_priv->devices.link_devices[link_index]);
+
+    mtip_set_fec_control_registers(port_config, &platform_driver_priv->devices.port_devices[port_type]);
 
     return 0;
 }
@@ -785,11 +830,6 @@ int mtip_rsfec_initialize(struct mtip_port_device_info *port_device) {
 
             case MTIP_PORT_CONFIG_1x25GBASE_R_FEC:
             case MTIP_PORT_CONFIG_4x25GBASE_R_FEC:
-                {
-                    rsfec_control_val = MTIP_RSFEC_CONTROL_KP_ENABLE_BIT | MTIP_RSFEC_CONTROL_TC_PAD_VALUE_BIT;
-                }
-                break;
-
             case MTIP_PORT_CONFIG_1x100GBASE_R4:
             case MTIP_PORT_CONFIG_1x100GBASE_R4_RSFEC:
             case MTIP_PORT_CONFIG_1x40GBASE_R4:
@@ -903,16 +943,9 @@ void mtip_pcs_update_active_fec(u32 link_index,
     case MTIP_PORT_CONFIG_1x100GBASE_R4_RSFEC:
     case MTIP_PORT_CONFIG_2x50GBASE_R:
     case MTIP_PORT_CONFIG_2x50GBASE_R_RSFEC:
-    case MTIP_PORT_CONFIG_2x50GBASE_R2:
-    case MTIP_PORT_CONFIG_2x50GBASE_R2_FEC:
-    case MTIP_PORT_CONFIG_2x50GBASE_R2_LUAI:
-    case MTIP_PORT_CONFIG_2x50GBASE_R2_LUAI_FEC:
     case MTIP_PORT_CONFIG_1x50GBASE_R:
     case MTIP_PORT_CONFIG_1x50GBASE_R_RSFEC:
-    case MTIP_PORT_CONFIG_1x50GBASE_R2:
     case MTIP_PORT_CONFIG_1x50GBASE_R2_RSFEC:
-    case MTIP_PORT_CONFIG_1x50GBASE_R2_LUAI:
-    case MTIP_PORT_CONFIG_1x50GBASE_R2_LUAI_FEC:
     case MTIP_PORT_CONFIG_1x25GBASE_R_RSFEC:
     case MTIP_PORT_CONFIG_4x25GBASE_R_RSFEC:
         {
@@ -921,24 +954,31 @@ void mtip_pcs_update_active_fec(u32 link_index,
         break;
 
     case MTIP_PORT_CONFIG_1x100GBASE_R4:
+    case MTIP_PORT_CONFIG_1x50GBASE_R2:
+    case MTIP_PORT_CONFIG_1x50GBASE_R2_LUAI:
+    case MTIP_PORT_CONFIG_1x50GBASE_R2_LUAI_FEC:
+    case MTIP_PORT_CONFIG_2x50GBASE_R2:
+    case MTIP_PORT_CONFIG_2x50GBASE_R2_FEC:
+    case MTIP_PORT_CONFIG_2x50GBASE_R2_LUAI:
+    case MTIP_PORT_CONFIG_2x50GBASE_R2_LUAI_FEC:
     case MTIP_PORT_CONFIG_1x25GBASE_R:
     case MTIP_PORT_CONFIG_4x25GBASE_R:
+    case MTIP_PORT_CONFIG_1x40GBASE_R4:
+    case MTIP_PORT_CONFIG_4x10GBASE_R:
+    case MTIP_PORT_CONFIG_1x10GBASE_R:
         {
             active_fec = ETHTOOL_FEC_OFF;
         }
         break;
 
-    case MTIP_PORT_CONFIG_1x40GBASE_R4:
     case MTIP_PORT_CONFIG_1x40GBASE_R4_FEC:
     case MTIP_PORT_CONFIG_4x25GBASE_R_FEC:
     case MTIP_PORT_CONFIG_1x25GBASE_R_FEC:
-    case MTIP_PORT_CONFIG_4x10GBASE_R:
     case MTIP_PORT_CONFIG_4x10GBASE_R_FEC:
-    case MTIP_PORT_CONFIG_1x10GBASE_R:
     case MTIP_PORT_CONFIG_1x10GBASE_R_FEC:
     default:
         {
-            active_fec = ETHTOOL_FEC_OFF;
+            active_fec = ETHTOOL_FEC_BASER;
         }
         break;
     }

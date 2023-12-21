@@ -2183,7 +2183,7 @@ int mtip_netdev_setup_port_hw(u32 port_type)
     struct mtip_port_info* port_info = platform_driver_priv->mtip_ports[port_type];
     enum mtip_port_config_enum port_config = port_info->port_config;
 
-    CSMLOGINFO("Setting up the port HW of port_type %d to %d str %s", port_type, port_config, mtip_ethtool_get_priv_flags_str(port_config));
+    CSMLOGINFO("Setting up the port HW of port_type %d to %d str %s", port_type, port_config, mtip_ethtool_get_port_config_str(port_config));
 
     // setup ethernet based on the updated port config
     mtip_platform_setup_ethernet(port_type);
@@ -2303,7 +2303,6 @@ u32 mtip_device_filter_priv_flags(u32 port_type)
     u32 filtered_mask = 0;
     u32 real_link = 0;
     u32 link_index;
-    u32 config_fec;
 
     // find a lane that is connected
     for (i = 0; i < platform_driver_priv->devices.port_devices[port_type].num_lane_phandles; ++i) 
@@ -2384,8 +2383,6 @@ u32 mtip_device_filter_priv_flags(u32 port_type)
         return 0;
     }
 
-    config_fec = platform_driver_priv->mtip_links[link_index]->config_fec;
-
     switch (max_lane_speed)
     {
 
@@ -2424,23 +2421,12 @@ u32 mtip_device_filter_priv_flags(u32 port_type)
           if(num_lanes == 1)
           {
              filtered_mask |= (1 << MTIP_PORT_CONFIG_1x25GBASE_R);
-             if(config_fec == ETHTOOL_FEC_RS)
-                filtered_mask |= (1 << MTIP_PORT_CONFIG_1x25GBASE_R_RSFEC);
-             else if(config_fec == ETHTOOL_FEC_BASER)
-                filtered_mask |= (1 << MTIP_PORT_CONFIG_1x25GBASE_R_FEC);
           }
           else if(num_lanes == 2)
           {
              // TBD - need to enhance breakout handling
              filtered_mask |= ((1 << MTIP_PORT_CONFIG_1x50GBASE_R2)|
                                (1 << MTIP_PORT_CONFIG_1x25GBASE_R));
-             if(config_fec == ETHTOOL_FEC_RS)
-             {
-                filtered_mask |= ((1 << MTIP_PORT_CONFIG_1x50GBASE_R2_RSFEC) |
-                                  (1 << MTIP_PORT_CONFIG_1x25GBASE_R_RSFEC));
-             }
-             else if(config_fec == ETHTOOL_FEC_BASER)
-                filtered_mask |= (1 << MTIP_PORT_CONFIG_1x25GBASE_R_FEC);
           }
           else if(num_lanes == 4)
           {
@@ -2449,18 +2435,6 @@ u32 mtip_device_filter_priv_flags(u32 port_type)
                                (1 << MTIP_PORT_CONFIG_1x50GBASE_R2)|
                                (1 << MTIP_PORT_CONFIG_4x25GBASE_R) |
                                (1 << MTIP_PORT_CONFIG_1x25GBASE_R));
-             if(config_fec == ETHTOOL_FEC_RS)
-             {
-                filtered_mask |= ((1 << MTIP_PORT_CONFIG_1x100GBASE_R4_RSFEC) |
-                                  (1 << MTIP_PORT_CONFIG_1x50GBASE_R2_RSFEC) |
-                                  (1 << MTIP_PORT_CONFIG_4x25GBASE_R_RSFEC) |
-                                  (1 << MTIP_PORT_CONFIG_1x25GBASE_R_RSFEC));
-             }
-             else if(config_fec == ETHTOOL_FEC_BASER)
-             {
-                filtered_mask |= ((1 << MTIP_PORT_CONFIG_4x25GBASE_R_FEC) |
-                                  (1 << MTIP_PORT_CONFIG_1x25GBASE_R_FEC));
-             }
           }
 
           /* For optics, don't select lower speed modes and for DAC fall
@@ -2474,8 +2448,6 @@ u32 mtip_device_filter_priv_flags(u32 port_type)
           if(num_lanes == 1 || num_lanes == 2)
           {
              filtered_mask |= (1 << MTIP_PORT_CONFIG_1x10GBASE_R);
-             if(config_fec == ETHTOOL_FEC_BASER)
-                 filtered_mask |= (1 << MTIP_PORT_CONFIG_1x10GBASE_R_FEC);
           }
           else if(num_lanes == 4)
           {
@@ -2483,12 +2455,6 @@ u32 mtip_device_filter_priv_flags(u32 port_type)
              filtered_mask |= ((1 << MTIP_PORT_CONFIG_1x10GBASE_R) |
                                (1 << MTIP_PORT_CONFIG_4x10GBASE_R) |
                                (1 << MTIP_PORT_CONFIG_1x40GBASE_R4));
-             if(config_fec == ETHTOOL_FEC_BASER)
-             {
-                 filtered_mask |= ((1 << MTIP_PORT_CONFIG_1x10GBASE_R_FEC) |
-                                   (1 << MTIP_PORT_CONFIG_4x10GBASE_R_FEC) |
-                                   (1 << MTIP_PORT_CONFIG_1x40GBASE_R4_FEC));
-             }
           }
        }
        break;
@@ -2536,129 +2502,153 @@ static int mtip_device_count_priv_flag_bits(u32 port_type)
 static u32 mtip_device_resolve_port_configuration(u32 port_type)
 {
     int i;
-    enum mtip_port_config_enum port_config;
+    u32 port_config_mask = 0, final_port_config_mask = 0;
     bool found = false;
     u32 pattern = 0x1;
     u32 pflags = mtip_device_filter_priv_flags(port_type);
     u32 link_index;
     u32 real_link = 0;
-
-    if(port_type == MTIP_PORT_TYPE_DEBUG)
-      real_link = 1;
-
-    // Get the link index of the first link for this port
-    if(mtip_lookup_link_index_by_port_type_and_real_link(&link_index, port_type, real_link) < 0)
-        return MTIP_PORT_CONFIG_MAX;
-
-    // find the first port config bit that is set
-    for (i = 0; i < MTIP_PORT_CONFIG_MAX; ++i) 
-    {
-        if ((pflags & pattern) != 0) 
-        {
-            found = true;
-            port_config = i;
-            break;
-        }
-        pattern = pattern << 1;
-    }
-
-    if (found == false) 
-    {
-        CSMLOGERR("No priv flags %d ON. Ignoring", pflags);
-        return MTIP_PORT_CONFIG_MAX;
-    }
-
-    switch (port_config) 
-    {
-    case MTIP_PORT_CONFIG_4x25GBASE_R:
-        {
-            if(platform_driver_priv->mtip_links[link_index]->config_fec == ETHTOOL_FEC_RS){
-                port_config = MTIP_PORT_CONFIG_4x25GBASE_R_RSFEC;
-            }
-        }
-        break;
-    case MTIP_PORT_CONFIG_1x25GBASE_R:
-        {
-            if(platform_driver_priv->mtip_links[link_index]->config_fec == ETHTOOL_FEC_RS){
-                port_config = MTIP_PORT_CONFIG_1x25GBASE_R_RSFEC;
-            }
-        }
-        break;
-
-    case MTIP_PORT_CONFIG_1x100GBASE_R4:
-        {
-            /* For 100G_R4, default mode to be used is with RSFEC enabled
-               unless set as OFF by ethtool set-priv-flags, or if
-               DR module is used */
-            if(((platform_driver_priv->mtip_links[link_index]->config_fec == ETHTOOL_FEC_NONE) &&
-                (mtip_phy_get_trx_link_length_range(&platform_driver_priv->devices.port_devices[port_type]) != TRX_DR)) ||
-                (platform_driver_priv->mtip_links[link_index]->config_fec == ETHTOOL_FEC_RS)){
-                port_config = MTIP_PORT_CONFIG_1x100GBASE_R4_RSFEC;
-            }
-        }
-        break;
-
-    default:
-        break;
-    }
-
-    return port_config;
-}
-
-// use the port priv flags to find the best port configuration to use for optical
-static int mtip_device_resolve_port_configuration_optical(u32 port_type)
-{
+    u32 config_fec = 0;
+    enum mtip_port_config_enum port_config;
     struct mtip_port_info *port_info = platform_driver_priv->mtip_ports[port_type];
-    int bc = 0;
-    int rv = 0;
-    u32 link_index;
-    u32 real_link = 0;
-
     if(port_type == MTIP_PORT_TYPE_DEBUG)
       real_link = 1;
 
-    // check if sfp is optical
-    if (port_info->sfp_port_type != PORT_FIBRE) 
-    {
-        CSMLOGERR("port %d is not FIBRE [%d]", port_type, port_info->sfp_port_type);
-        return -1;
-    }
-
-    bc = mtip_device_count_priv_flag_bits(port_type);
-
     // Get the link index of the first link for this port
     if(mtip_lookup_link_index_by_port_type_and_real_link(&link_index, port_type, real_link) < 0)
-        return -1;
+        return MTIP_PORT_CONFIG_MAX;
 
-    // set the resolve port config
-    port_info->port_config = mtip_device_resolve_port_configuration(port_type);
-
-    // optical 4x25GBASE_R must have RSFEC
-    switch (port_info->port_config) 
+    if (port_info->autoneg == false || platform_driver_priv->mtip_ports[port_type]->sfp_port_type == PORT_FIBRE)
     {
-    case MTIP_PORT_CONFIG_4x25GBASE_R:
+        // find the first port config bit that is set
+        for (i = 0; i < MTIP_PORT_CONFIG_MAX; ++i)
         {
-            if(platform_driver_priv->mtip_links[link_index]->config_fec == ETHTOOL_FEC_RS ||
-               platform_driver_priv->mtip_links[link_index]->config_fec == ETHTOOL_FEC_NONE){
-                port_info->port_config = MTIP_PORT_CONFIG_4x25GBASE_R_RSFEC;
+            if ((pflags & pattern) != 0)
+            {
+                found = true;
+                port_config_mask = 1 << i;
+                break;
             }
+            pattern = pattern << 1;
         }
-        break;
-    case MTIP_PORT_CONFIG_1x25GBASE_R:
+        if (found == false)
         {
-            if(platform_driver_priv->mtip_links[link_index]->config_fec == ETHTOOL_FEC_RS ||
-               platform_driver_priv->mtip_links[link_index]->config_fec == ETHTOOL_FEC_NONE){
-                port_info->port_config = MTIP_PORT_CONFIG_1x25GBASE_R_RSFEC;
-            }
+            CSMLOGERR("No priv flags %d ON. Ignoring", pflags);
+            return MTIP_PORT_CONFIG_MAX;
         }
-        break;
-    default:
-        break;
+    }
+    else
+    {
+        port_config_mask = pflags;
     }
 
-    CSMLOGINFO("setting configuration of port_type %d to %d, %s", port_type, port_info->port_config, mtip_ethtool_get_priv_flags_str(port_info->port_config));
+    config_fec = platform_driver_priv->mtip_links[link_index]->config_fec;
+    pattern = 0x1;
+    port_config = MTIP_PORT_CONFIG_1x100GBASE_R;
+    while(port_config_mask)
+    {
+        if(port_config_mask & pattern)
+        {
+            switch (port_config)
+            {
+                case MTIP_PORT_CONFIG_1x25GBASE_R:
+                    {
+                        if( (port_info->sfp_port_type == PORT_FIBRE) && ((config_fec == ETHTOOL_FEC_RS)
+                        || (config_fec == ETHTOOL_FEC_NONE)) )
+                            final_port_config_mask |= 1 << MTIP_PORT_CONFIG_1x25GBASE_R_RSFEC;
+                        else if(config_fec == ETHTOOL_FEC_RS)
+                            final_port_config_mask |= 1 << MTIP_PORT_CONFIG_1x25GBASE_R_RSFEC;
+                        else if (config_fec == ETHTOOL_FEC_BASER)
+                            final_port_config_mask |= 1 << MTIP_PORT_CONFIG_1x25GBASE_R_FEC;
+                        else
+                            final_port_config_mask |= 1 << MTIP_PORT_CONFIG_1x25GBASE_R;
+                    }
+                    break;
+                case MTIP_PORT_CONFIG_4x25GBASE_R:
+                    {
+                        if( (port_info->sfp_port_type == PORT_FIBRE) && ((config_fec == ETHTOOL_FEC_RS)
+                        || (config_fec == ETHTOOL_FEC_NONE)) )
+                            final_port_config_mask |= 1 << MTIP_PORT_CONFIG_4x25GBASE_R_RSFEC;
+                        else if(config_fec == ETHTOOL_FEC_RS)
+                            final_port_config_mask |= 1 << MTIP_PORT_CONFIG_4x25GBASE_R_RSFEC;
+                        else if (config_fec == ETHTOOL_FEC_BASER)
+                            final_port_config_mask |= 1 << MTIP_PORT_CONFIG_4x25GBASE_R_FEC;
+                        else
+                            final_port_config_mask |= 1 << MTIP_PORT_CONFIG_4x25GBASE_R;
+                    }
+                    break;
+                case MTIP_PORT_CONFIG_4x10GBASE_R:
+                    {
+                        if (config_fec == ETHTOOL_FEC_BASER)
+                            final_port_config_mask |= 1 << MTIP_PORT_CONFIG_4x10GBASE_R_FEC;
+                        else
+                            final_port_config_mask |= 1 << MTIP_PORT_CONFIG_4x10GBASE_R;
+                    }
+                    break;
+                case MTIP_PORT_CONFIG_1x10GBASE_R:
+                    {
+                        if (config_fec == ETHTOOL_FEC_BASER)
+                            final_port_config_mask |= 1 << MTIP_PORT_CONFIG_1x10GBASE_R_FEC;
+                        else
+                            final_port_config_mask |= 1 << MTIP_PORT_CONFIG_1x10GBASE_R;
+                    }
+                    break;
+                case MTIP_PORT_CONFIG_1x40GBASE_R4:
+                    {
+                        if (config_fec == ETHTOOL_FEC_BASER)
+                            final_port_config_mask |= 1 << MTIP_PORT_CONFIG_1x40GBASE_R4_FEC;
+                        else
+                            final_port_config_mask |= 1 << MTIP_PORT_CONFIG_1x40GBASE_R4;
+                    }
+                    break;
+                case MTIP_PORT_CONFIG_1x100GBASE_R4:
+                    {
+                        /* For 100G_R4, default mode to be used is with RSFEC enabled
+                       unless set as OFF by ethtool set-priv-flags, or if
+                       DR module is used */
+                        if( (mtip_phy_get_trx_link_length_range(&platform_driver_priv->devices.port_devices[port_type]) != TRX_DR)
+                        && (config_fec == ETHTOOL_FEC_RS || config_fec == ETHTOOL_FEC_BASER || config_fec == ETHTOOL_FEC_NONE) )
+                            final_port_config_mask |= 1 << MTIP_PORT_CONFIG_1x100GBASE_R4_RSFEC;
+                        else if( (mtip_phy_get_trx_link_length_range(&platform_driver_priv->devices.port_devices[port_type]) == TRX_DR) && (config_fec == ETHTOOL_FEC_RS) )
+                            final_port_config_mask |= 1 << MTIP_PORT_CONFIG_1x100GBASE_R4_RSFEC;
+                        else
+                            final_port_config_mask |= 1 << MTIP_PORT_CONFIG_1x100GBASE_R4;
+                    }
+                    break;
+                case MTIP_PORT_CONFIG_2x50GBASE_R:
+                    {
+                        final_port_config_mask |= 1 << MTIP_PORT_CONFIG_2x50GBASE_R;
+                    }
+                    break;
+                case MTIP_PORT_CONFIG_1x50GBASE_R:
+                    {
+                        final_port_config_mask |= 1 << MTIP_PORT_CONFIG_1x50GBASE_R;
+                    }
+                    break;
+                case MTIP_PORT_CONFIG_1x100GBASE_R2:
+                    {
+                        final_port_config_mask |= 1 << MTIP_PORT_CONFIG_1x100GBASE_R2;
+                    }
+                    break;
+                case MTIP_PORT_CONFIG_1x50GBASE_R2:
+                    {
+                        if(config_fec == ETHTOOL_FEC_RS)
+                            final_port_config_mask |= 1 << MTIP_PORT_CONFIG_1x50GBASE_R2_RSFEC;
+                        else
+                            final_port_config_mask |= 1 << MTIP_PORT_CONFIG_1x50GBASE_R2;
+                    }
+                    break;
+                default:
+                    CSMLOGERR("default:final_port_config_mask: 0x%x,config_fec=%d\n", final_port_config_mask,config_fec);
+                    break;
+            }
+        }
+        port_config_mask = port_config_mask >> 1;
+        port_config++;
+    }
 
-    return rv;
+    CSMLOGINFO("selected port_config: 0x%x, link_index: %d\n", final_port_config_mask,link_index);
+    return final_port_config_mask;
 }
 
 static int mtip_device_complete_port_open(u32 port_type)
@@ -2784,12 +2774,14 @@ void mtip_device_configure_port(u32 port_type)
    bool loopflag = true;
    int bc = 0;
    int num_an_lanes = 0;
-   u32 filtered_priv_flags = 0;
+   u32 filtered_priv_flags = 0, port_config_mask = 0;
    u32 real_link = 0;
    u32 real_lane = 0;
    u32 lane_index;
    u32 sfp_phandle[MTIP_MAX_LANES_PER_PORT] = {0};
    struct qsfp_info lane_qsfp_info;
+   u32 pattern = 0x1;
+   enum mtip_port_config_enum port_config;
 
    port_info = platform_driver_priv->mtip_ports[port_type];
 
@@ -2920,7 +2912,7 @@ void mtip_device_configure_port(u32 port_type)
             if (num_links_waiting_for_lanes == 0)
             {
                // there are no links waiting to be assigned lanes
-               CSMLOGINFO("no links waiting for lane assignment or to be brought up");
+               CSMLOGINFO("no links waiting for lane assignment or to be brought up,link_index=%d,link_state=%d\n",link_index,platform_driver_priv->mtip_links[link_index]->state);
 
                // stay in connected and exit loop
                loopflag = false;
@@ -2930,13 +2922,17 @@ void mtip_device_configure_port(u32 port_type)
             {
                // we can reconfigure the port and we have links waiting for lane assignment
                // check if an optical is connected
-               if (platform_driver_priv->mtip_ports[port_type]->sfp_port_type == PORT_FIBRE)
+               if (platform_driver_priv->mtip_ports[port_type]->sfp_port_type == PORT_FIBRE || port_info->autoneg == false)
                {
                   // we cannot do auto-negotiation
-                  // how do we resolve the port configuration to use?
-                  if (mtip_device_resolve_port_configuration_optical(port_type) < 0)
+                  // resolve port configuration manually
+                  port_config_mask =  mtip_device_resolve_port_configuration(port_type);
+                  if (port_config_mask == MTIP_PORT_CONFIG_MAX)
                   {
-                     CSMLOGERR("Unable to resolve optical port configuration for port: %d", port_type);
+                     if (platform_driver_priv->mtip_ports[port_type]->sfp_port_type == PORT_FIBRE)
+                        CSMLOGERR("Unable to resolve optical port configuration for port: %d", port_type);
+                     else
+                        CSMLOGERR("Unable to resolve copper port configuration for port: %d", port_type);
                      loopflag = false;
                      goto out;
                   }
@@ -2944,6 +2940,16 @@ void mtip_device_configure_port(u32 port_type)
                   {
                      // we have a resolved port configuration
                      // we can go ahead with the configuration
+                     pattern = 0x1;
+                     port_config = MTIP_PORT_CONFIG_1x100GBASE_R;
+                     while(port_config_mask)
+                     {
+                        if(port_config_mask & pattern)
+                           break;
+                        pattern = pattern << 1;
+                        port_config++;
+                     }
+                     port_info->port_config = port_config;
                      loopflag = false;
                      goto resolved;
                   }
@@ -2969,15 +2975,6 @@ void mtip_device_configure_port(u32 port_type)
                         // set the port state to AN in progress and continue loop
                         port_info->port_state = MTIP_PORT_STATE_CONNECTED_INITIATE_AN;
                      }
-                     else
-                     {
-                        // set the resolve port config
-                        port_info->port_config = mtip_device_resolve_port_configuration(port_type);
-
-                        // we can go ahead with the configuration
-                        loopflag = false;
-                        goto resolved;
-                     }
                   }
                }
             }
@@ -2993,25 +2990,17 @@ void mtip_device_configure_port(u32 port_type)
             CSMLOGINFO("initiating AN on port_type %d with num lanes %d and priv_flags %d", port_type, num_an_lanes,
                        platform_driver_priv->mtip_ports[port_type]->port_priv_flags);
 
-            filtered_priv_flags = mtip_device_filter_priv_flags(port_type);
-
+            filtered_priv_flags = mtip_device_resolve_port_configuration(port_type);
+            if (filtered_priv_flags == 0)
+            {
+               CSMLOGERR("No priv flags %d ON for AN mode\n");
+               loopflag = false;
+               goto out;
+            }
             if(port_type == MTIP_PORT_TYPE_DEBUG)
             {
                real_link = 1;
                real_lane = 2;
-            }
-
-            // Get the link index of the first link for this port
-            if(mtip_lookup_link_index_by_port_type_and_real_link(&link_index, port_type, real_link) == 0)
-            {
-               /* For 100G_R4, default mode to be used is with RSFEC enabled
-                  unless set as OFF by ethtool set-priv-flags */
-               if((filtered_priv_flags & (1<<MTIP_PORT_CONFIG_1x100GBASE_R4)) &&
-                  ((platform_driver_priv->mtip_links[link_index]->config_fec == ETHTOOL_FEC_NONE) ||
-                   (platform_driver_priv->mtip_links[link_index]->config_fec == ETHTOOL_FEC_RS))){
-                  filtered_priv_flags &= ~(1<<MTIP_PORT_CONFIG_1x100GBASE_R4);
-                  filtered_priv_flags |= (1<<MTIP_PORT_CONFIG_1x100GBASE_R4_RSFEC);
-               }
             }
 
             // Notify TRX driver to enable TX, for the primary lane used for AN
@@ -3083,7 +3072,7 @@ void mtip_device_configure_port(u32 port_type)
 
 resolved:
    CSMLOGINFO("Negotiated port configuration is %d %s", port_info->port_config,
-              mtip_ethtool_get_priv_flags_str(port_info->port_config));
+              mtip_ethtool_get_port_config_str(port_info->port_config));
 
    // for now only one port configuration will apply
    // assign lanes to links based on chosen port configuration
@@ -3184,7 +3173,7 @@ void run_mtip_process_an_result(void *work_ptr)
     enum mtip_port_config_enum port_config = taskstruct->port_config;
 
     CSMLOGINFO("Processing AN result for port_type %d seq %d with result %d config %d %s",
-               port_type, an_result, seq_num, port_config, mtip_ethtool_get_priv_flags_str(port_config));
+               port_type, an_result, seq_num, port_config, mtip_ethtool_get_port_config_str(port_config));
 
     if(an_result == false)
     {
@@ -3200,10 +3189,21 @@ void run_mtip_process_an_result(void *work_ptr)
     }
 
     // check that the port is waiting for AN result
-    if (platform_driver_priv->mtip_ports[port_type]->port_state != MTIP_PORT_STATE_CONNECTED_NEGOTIATION_IN_PROGRESS) 
+    if(platform_driver_priv->mtip_ports[port_type]->port_state != MTIP_PORT_STATE_CONNECTED_NEGOTIATION_IN_PROGRESS)
     {
-        CSMLOGDBG("Got a spurious AN result callback in state %d for port_type %d", platform_driver_priv->mtip_ports[port_type]->port_state, port_type);
-        goto out;
+        // Process this AN result if the result port_config has changed
+        if(platform_driver_priv->mtip_ports[port_type]->port_config != port_config)
+        {
+            CSMLOGINFO("AN result has changed, apply reconfiguration");
+            post_mtip_process_reconfigure_port(port_type);
+            goto out;
+        }
+        // Ignore if same port config is received
+        else
+        {
+            CSMLOGDBG("Got a spurious AN result callback in state %d for port_type %d", platform_driver_priv->mtip_ports[port_type]->port_state, port_type);
+            goto out;
+        }
     }
 
     // set the port config

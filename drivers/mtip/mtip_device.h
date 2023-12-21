@@ -19,7 +19,7 @@
 /*----------------------Default FH supported speed mask-----------------------*/
 // For 100G lane speed all speed modes are allowed
 #define MTIP_DEVICE_PRIV_FLAGS_BIT_MASK_100G               0xFFFFFFFF
-#define MTIP_DEVICE_PRIV_FLAGS_BIT_MASK_NON_FEC            0x2928A2A9
+#define MTIP_DEVICE_PRIV_FLAGS_BIT_MASK_NON_FEC            0x2928A0A8
 
 /*------------------Default Debug ETH supported speed mask--------------------*/
 // For Debug port, port configurations with max 1 link and 2 lanes are valid
@@ -31,31 +31,31 @@
 
 /*-----------------------Ethtool speed setting mask --------------------------*/
 // 100G link speed configuration mask
-#define MTIP_DEVICE_PRIV_FLAGS_BIT_MASK_100G_ONLY          0x0000007F
+#define MTIP_DEVICE_PRIV_FLAGS_BIT_MASK_100G_ONLY          0x00000028
 
 // 50G link speed configuration mask
-#define MTIP_DEVICE_PRIV_FLAGS_BIT_MASK_50G_ONLY           0x0007FF80
+#define MTIP_DEVICE_PRIV_FLAGS_BIT_MASK_50G_ONLY           0x0000A080
 
 // 40G link speed configuration mask
-#define MTIP_DEVICE_PRIV_FLAGS_BIT_MASK_40G_ONLY           0x00180000
+#define MTIP_DEVICE_PRIV_FLAGS_BIT_MASK_40G_ONLY           0x00080000
 
 // 25G link speed configuration mask
-#define MTIP_DEVICE_PRIV_FLAGS_BIT_MASK_25G_ONLY           0x07E00000
+#define MTIP_DEVICE_PRIV_FLAGS_BIT_MASK_25G_ONLY           0x01200000
 
 // 10G link speed configuration mask
-#define MTIP_DEVICE_PRIV_FLAGS_BIT_MASK_10G_ONLY           0x78000000
+#define MTIP_DEVICE_PRIV_FLAGS_BIT_MASK_10G_ONLY           0x28000000
 
 // 100G link speed configuration mask
-#define MTIP_DEVICE_PRIV_FLAGS_BIT_MASK_100G_ONLY_DBG_PORT 0x0000001F
+#define MTIP_DEVICE_PRIV_FLAGS_BIT_MASK_100G_ONLY_DBG_PORT 0x00000009
 
 // 50G link speed configuration mask
-#define MTIP_DEVICE_PRIV_FLAGS_BIT_MASK_50G_ONLY_DBG_PORT  0x0007E000
+#define MTIP_DEVICE_PRIV_FLAGS_BIT_MASK_50G_ONLY_DBG_PORT  0x0000A000
 
 // 25G link speed configuration mask
-#define MTIP_DEVICE_PRIV_FLAGS_BIT_MASK_25G_ONLY_DBG_PORT  0x07000000
+#define MTIP_DEVICE_PRIV_FLAGS_BIT_MASK_25G_ONLY_DBG_PORT  0x01000000
 
 // 10G link speed configuration mask
-#define MTIP_DEVICE_PRIV_FLAGS_BIT_MASK_10G_ONLY_DBG_PORT  0x60000000
+#define MTIP_DEVICE_PRIV_FLAGS_BIT_MASK_10G_ONLY_DBG_PORT  0x20000000
 
 // the net device structure
 struct mtip_netdev_priv {
