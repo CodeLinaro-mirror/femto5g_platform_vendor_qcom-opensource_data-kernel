@@ -1909,7 +1909,7 @@ void mtip_platform_print_port_device(struct mtip_port_device_info* port_device)
 
     port_info = platform_driver_priv->mtip_ports[port_type];
 
-    CSMLOGINFO("port config: %d str %s", port_info->port_config, mtip_ethtool_get_priv_flags_str(port_info->port_config));
+    CSMLOGINFO("port config: %d str %s", port_info->port_config, mtip_ethtool_get_port_config_str(port_info->port_config));
 
     for (i = 0; i < PHY_LANE_MAX; ++i) 
     {

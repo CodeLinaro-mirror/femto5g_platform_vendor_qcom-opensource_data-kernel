@@ -103,7 +103,7 @@ static void mtip_phy_ready_cb(void *user_data)
 
 static void mtip_phy_an_result_cb(enum mtip_port_type_enum port_type, bool an_result, enum mtip_port_config_enum port_config, u8 seq_num)
 {
-    CSMLOGINFO("Got AN complete CB for port: %d seq %d result %d port_config %d %s\n", port_type, seq_num, an_result, port_config, mtip_ethtool_get_priv_flags_str(port_config));
+    CSMLOGINFO("Got AN complete CB for port: %d seq %d result %d port_config %d %s\n", port_type, seq_num, an_result, port_config, mtip_ethtool_get_port_config_str(port_config));
 
     if(seq_num != mtip_phy_an_seq_num[port_type])
     {
@@ -457,7 +457,7 @@ int mtip_phy_bringup_phy(u32 link_index, int sfp_port_type)
 
     port_config = platform_driver_priv->mtip_ports[port_type]->port_config;
 
-    CSMLOGINFO("phy bringup of port_type %d with config %d, %s", port_type, port_config, mtip_ethtool_get_priv_flags_str(port_config));
+    CSMLOGINFO("phy bringup of port_type %d with config %d, %s", port_type, port_config, mtip_ethtool_get_port_config_str(port_config));
 
     mtip_phy_get_lanes_of_link(link_index, lanes_enabled);
 

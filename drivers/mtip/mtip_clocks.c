@@ -1292,7 +1292,7 @@ static void mtip_clocks_set_dbg_clock_rates(enum mtip_port_config_enum port_conf
  */
 void mtip_clocks_set_clock_rates(enum mtip_port_type_enum port_type, enum mtip_port_config_enum port_config)
 {
-    CSMLOGDBG("Setting clock rates for port %d with port config %d str %s", port_type, port_config, mtip_ethtool_get_priv_flags_str(port_config));
+    CSMLOGDBG("Setting clock rates for port %d with port config %d str %s", port_type, port_config, mtip_ethtool_get_port_config_str(port_config));
 
     switch (port_type) 
     {

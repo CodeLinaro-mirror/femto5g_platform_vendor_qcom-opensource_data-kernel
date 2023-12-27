@@ -26,6 +26,10 @@
 #define MTIP_PCS_VL0_1_OFFSET                   0x00020104
 #define MTIP_PCS_VLn_OFFSET                     0x00000008
 
+#define MTIP_FEC_CONTROL_OFFSET                 0x00000304
+#define MTIP_FEC_CONTROL1_OFFSET                0x00000324
+#define MTIP_FEC_CONTROL2_OFFSET                0x00000344
+#define MTIP_FEC_CONTROL3_OFFSET                0x00000364
 
 // PCS register values
 #define MTIP_PCS_LOOPBACK_CONTROL_BIT           0x00004000
