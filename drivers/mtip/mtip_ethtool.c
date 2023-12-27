@@ -831,6 +831,8 @@ int mtip_ethtool_get_link_ksettings(struct net_device *dev, struct ethtool_link_
     struct mtip_port_info* port_info;
     int lane_speed = 0;
     int i;
+    u32 lane_index;
+    bool lane_connected=false;
 
     priv = netdev_priv(dev);
     link_index = priv->link_index;
@@ -861,10 +863,23 @@ int mtip_ethtool_get_link_ksettings(struct net_device *dev, struct ethtool_link_
     linkmode_set_bit(ETHTOOL_LINK_MODE_TP_BIT, cmd->link_modes.supported);
     linkmode_set_bit(ETHTOOL_LINK_MODE_FIBRE_BIT, cmd->link_modes.supported);
 
-    if(port_info->sfp_port_type == PORT_FIBRE)
+    // check if lane is connected
+    for (i = 0; i < platform_driver_priv->devices.port_devices[port_type].num_lane_phandles; ++i)
+    {
+        lane_index = platform_driver_priv->devices.port_devices[port_type].lane_devices[i]->lane_index;
+        if(platform_driver_priv->mtip_lanes[lane_index]->lane_state == MTIP_LANE_STATE_CONNECTED)
+        {
+            lane_connected = true;
+            break;
+        }
+    }
+
+    if(port_info->sfp_port_type == PORT_FIBRE && lane_connected == true)
         cmd->base.port = PORT_FIBRE;
-    else
+    else if(port_info->sfp_port_type == PORT_DA && lane_connected == true)
         cmd->base.port = PORT_DA;
+    else
+        cmd->base.port = PORT_NONE;
 
     // Duplex is always set to TRUE
     cmd->base.duplex = true;
