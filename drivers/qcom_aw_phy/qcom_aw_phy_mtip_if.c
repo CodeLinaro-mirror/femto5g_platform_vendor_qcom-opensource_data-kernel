@@ -1968,8 +1968,7 @@ void qcom_aw_phy_handle_an_link_good(struct work_struct *work){
                        phy_inst_info->an_params.mac_port_config_mask);
 
   /* AN result callback if calculated port config is valid and is configured */
-  if(port_config_result != MTIP_PORT_CONFIG_MAX &&
-     (phy_inst_info->an_params.mac_port_config_mask & (1<<port_config_result))){
+  if(port_config_result != MTIP_PORT_CONFIG_MAX ){
     an_result = true;
     /* Notify AN result to MAC */
     qcom_aw_phy_mtip_if_info_s.notify_an_result(
