@@ -9353,9 +9353,9 @@ int ecpri_dma_gsi_setup_event_ring(struct ecpri_dma_endp_context *ep,
 		channel = ep->l2_mhi_channel_ptr;
 
 		gsi_evt_ring_props.msi_irq = GSI_INTR_MSI;
-		gsi_evt_ring_props.int_modt = channel->ev_ctx_host.intmodt *
+		gsi_evt_ring_props.int_modt = channel->int_modt *
 			ECPRI_DMA_MHI_SLEEP_CLK_RATE_KHZ;
-		gsi_evt_ring_props.int_modc = channel->ev_ctx_host.intmodc;
+		gsi_evt_ring_props.int_modc = channel->int_modc;
 		gsi_evt_ring_props.intvec = ((channel->msi_config->data
 			& ~channel->msi_config->mask) |
 			(channel->ev_ctx_host.msivec & channel->msi_config->mask));

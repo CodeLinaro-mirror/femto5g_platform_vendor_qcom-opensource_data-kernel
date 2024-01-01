@@ -47,6 +47,12 @@
 #define ECPRI_DMA_MHI_HOST_ADDR_COND(addr, ctx) \
 	((ctx->is_over_pcie)?(ECPRI_DMA_MHI_HOST_ADDR(addr)):(addr))
 
+/* LTE DEST MOD RP Counter */
+#define ECPRI_DMA_MHI_LTE_DEST_MOD_RP_COUNTER 32
+
+/* LTE DEST MOD RP Timer in msec */
+#define ECPRI_DMA_MHI_LTE_DEST_MOD_RP_TIMER 1
+
 #define ECPRI_DMA_VIRTUL_VFID_CFG(vf_num) (0x4 | vf_num)
 
 struct ecpri_dma_mhi_ee_gsi_tuple {
@@ -170,8 +176,9 @@ enum ecpri_dma_hw_mhi_channel_states {
  * @is_over_pcie: indicates channel should transact over PCIe - Configurable by SW.
  * @disable_overflow_event: when set overflow events are not generated on this ch.
  * @msi_config: MSI (Message Signaled Interrupts) parameters
- *
  * @clnt_hdl: ENDP handle
+ * @is_mod_rp_only_enabled: For LTE DEST ENDP, moderate RP only is used.
+ *							Original intmod values are overwritten.
  *
  */
 struct ecpri_dma_mhi_channel_ctx {
@@ -193,6 +200,7 @@ struct ecpri_dma_mhi_channel_ctx {
 	bool disable_overflow_event;
 	struct mhi_dma_msi_info* msi_config;
 	u32 clnt_hdl;
+	bool is_mod_rp_only_enabled;
 };
 
 /**

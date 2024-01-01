@@ -2639,6 +2639,19 @@ static int ecpri_dma_mhi_client_connect_internal(
 	int ret;
 	union __packed gsi_channel_scratch ch_scratch;
 	struct ecpri_dma_moderation_config mod_cfg;
+	union __packed gsi_evt_scratch ev_scratch;
+	const struct dma_gsi_ep_config *gsi_ep_cfg =
+		&((*ecpri_dma_ctx->endp_map)[channel->endp_ctx->gsi_id]
+		[channel->endp_ctx->endp_id]);
+
+	/* For LTE DEST CHs configure RP moderation values */
+	if (gsi_ep_cfg->lte_enable && gsi_ep_cfg->dir == ECPRI_DMA_ENDP_DIR_DEST &&
+		channel->int_modc == 0 && channel->int_modt == 0)
+	{
+		channel->int_modc = ECPRI_DMA_MHI_LTE_DEST_MOD_RP_COUNTER;
+		channel->int_modt = ECPRI_DMA_MHI_LTE_DEST_MOD_RP_TIMER;
+		channel->is_mod_rp_only_enabled = true;
+	}
 
 	mod_cfg.moderation_counter_threshold = channel->int_modc;
 	mod_cfg.moderation_timer_threshold = channel->int_modt;
@@ -2649,6 +2662,24 @@ static int ecpri_dma_mhi_client_connect_internal(
 	if (ret != 0) {
 		DMAERR("Failed to allocate endp %d\n", channel->endp_ctx->endp_id);
 		goto fail_al_endp;
+	}
+
+	/*	Enable NotifyMCS for LTE DEST CHs, also set MOD_RP_ONLY incase original
+		modc & modt are 0 */
+	if (channel->endp_ctx->gsi_ep_cfg->lte_enable &&
+		channel->endp_ctx->gsi_ep_cfg->dir == ECPRI_DMA_ENDP_DIR_DEST)
+	{
+		ev_scratch.mhi.enable_notify_mcs = 1;
+		ev_scratch.mhi.moderate_update_rp_only =
+			channel->is_mod_rp_only_enabled ? 1 : 0;
+		ret = gsi_write_evt_ring_scratch(channel->endp_ctx->gsi_evt_ring_hdl,
+			ev_scratch);
+		if (ret != 0) {
+			DMAERR("Unable to write event scratch,"
+				"gsi event handle: %lu\n",
+				channel->endp_ctx->gsi_evt_ring_hdl);
+			goto fail_write_scratch;
+		}
 	}
 
 	ch_scratch.mhi.is_over_pcie = channel->is_over_pcie;
