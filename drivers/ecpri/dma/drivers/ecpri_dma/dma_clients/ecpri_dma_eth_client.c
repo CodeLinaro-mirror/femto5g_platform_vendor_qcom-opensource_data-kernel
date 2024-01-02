@@ -1260,7 +1260,8 @@ int ecpri_dma_eth_tx_poll(ecpri_dma_eth_conn_hdl_t hdl, u32 budget,
 }
 
 int ecpri_dma_eth_replenish_buffers(ecpri_dma_eth_conn_hdl_t hdl,
-	struct ecpri_dma_pkt **pkts, u32 num_of_pkts, bool commit)
+	struct ecpri_dma_pkt **pkts, u32 num_of_pkts, bool commit,
+	u32 *successful_pkts)
 {
 	int ret;
 	struct ecpri_dma_eth_client_connection *connection;
@@ -1268,6 +1269,7 @@ int ecpri_dma_eth_replenish_buffers(ecpri_dma_eth_conn_hdl_t hdl,
 	u32 num_of_pkts_to_send = num_of_pkts;
 
 	DMADBG_LOW("Begin\n");
+	*successful_pkts = 0;
 
 	if (!pkts || num_of_pkts == 0) {
 		DMAERR("Invalid parameters\n");
@@ -1301,6 +1303,7 @@ int ecpri_dma_eth_replenish_buffers(ecpri_dma_eth_conn_hdl_t hdl,
 		}
 		pkts += num_of_pkts_to_send;
 		num_of_pkts_remain -= num_of_pkts_to_send;
+		*successful_pkts += num_of_pkts_to_send;
 	}
 
 	DMADBG_LOW("Exit\n");
