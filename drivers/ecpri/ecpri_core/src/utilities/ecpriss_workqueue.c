@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: GPL-2.0-only
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include "ecpriss_core.h"
@@ -149,20 +149,28 @@ int ecpriss_destroy_workq(void)
 {
 	do {
 		if (events_workqueue) {
+
 			flush_workqueue(events_workqueue);
 			destroy_workqueue(events_workqueue);
-			//events_workqueue  = NULL;
+
+			if(ecpriss_pdata_v2->events_workqueue->kernel_events_workqueue) {
+				ecpriss_pdata_v2->events_workqueue->kernel_events_workqueue = NULL;
+			}
 		}
+
 
 		if (interrupt_events_workqueue) {
 			flush_workqueue(interrupt_events_workqueue);
 			destroy_workqueue(interrupt_events_workqueue);
-			//interrupt_events_workqueue = NULL;
+
+			if(ecpriss_pdata_v2->interrupts_workqueue->ecpriss_interrupts_workq) {
+
+				ecpriss_pdata_v2->interrupts_workqueue->ecpriss_interrupts_workq = NULL;
+			}
 		}
+
 	} while(0);
 	return 0;
 }
-
-
 
 

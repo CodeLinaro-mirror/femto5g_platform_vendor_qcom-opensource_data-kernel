@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: GPL-2.0-only
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include "ecpriss_core.h"
@@ -128,8 +128,8 @@ static int ecpriss_core_remove(struct platform_device *pdev)
 		dma_ecpri_ss_driver_ops.ecpri_dma_ecpri_ss_deregister();
 		ecpriss_qudp_irq_destroy_v2();
 		ecpriss_xbar_destroy_interrupts_v2();
-		ecpriss_destroy_timers_v2();
 		ecpriss_destroy_workq();
+		ecpriss_destroy_timers_v2();
 		ecpriss_destroy_ipc_log_v2();
 		ecpriss_unmap_xbar_qudp_v2();
 	}
@@ -796,6 +796,11 @@ int ecpriss_ssr_events_cb(struct notifier_block *this,unsigned long code, void *
 		ecpriss_work =
 			ecpriss_pdata_v2->events_workqueue->ecpriss_ssr_events_rdy_work;
 
+		if(ecpriss_wq == NULL || ecpriss_wq == NULL) {
+			ECPRILOGERR("ecpriss_ssr_events_cb: NULL Wq or Work");
+			break;
+		}
+
 		ret = ecpriss_queue_work(ecpriss_wq,ecpriss_work);
 
 		if(ret < 0) {
@@ -840,6 +845,11 @@ void ecpriss_eth_topology_cb_v2(void)
 		ecpriss_pdata_v2->events_workqueue->kernel_events_workqueue;
 		ecpriss_work =
 	ecpriss_pdata_v2->events_workqueue->ecpriss_eth_topology_events_rdy_work;
+
+		if(ecpriss_wq == NULL || ecpriss_wq == NULL) {
+			ECPRILOGERR("ecpriss_eth_topology_cb_v2:NULL Wq or Work");
+			break;
+		}
 		ret = ecpriss_queue_work(ecpriss_wq,
 				ecpriss_work);
 		if(ret < 0) {
@@ -942,6 +952,12 @@ void ecpriss_stats_timer_cb_v2(struct timer_list *data)
 		ecpriss_pdata_v2->interrupts_workqueue->ecpriss_interrupts_workq;
 		ecpriss_work =
 		ecpriss_pdata_v2->interrupts_workqueue->ecpriss_interrupt_events_rdy_work;
+
+		if(ecpriss_wq == NULL || ecpriss_wq == NULL) {
+			ECPRILOGERR("ecpriss_stats_timer_cb_v2: NULL Wq or Work");
+			break;
+		}
+
 		ret = ecpriss_queue_work(ecpriss_wq,
 				ecpriss_work);
 		if(ret < 0) {
@@ -954,7 +970,7 @@ void ecpriss_stats_timer_cb_v2(struct timer_list *data)
 }
 void ecpriss_dma_endp_cb_v2(void * userdata)
 {
-	int ret =0;
+	int ret = 0;
 	struct workqueue_struct    *ecpriss_wq;
 	struct work_struct         *ecpriss_work;
 	ECPRILOGERR("ecpriss dma endp cb 2\n");
@@ -964,6 +980,11 @@ void ecpriss_dma_endp_cb_v2(void * userdata)
 		ecpriss_pdata_v2->events_workqueue->kernel_events_workqueue;
 		ecpriss_work =
 		ecpriss_pdata_v2->events_workqueue->ecpriss_dma_events_rdy_work;
+
+		if(ecpriss_wq == NULL || ecpriss_wq == NULL) {
+			ECPRILOGERR("ecpriss_dma_endp_cb_v2: NULL Wq or Work");
+			break;
+		}
 		ret = ecpriss_queue_work(ecpriss_wq,
 				ecpriss_work);
 		if(ret < 0) {
