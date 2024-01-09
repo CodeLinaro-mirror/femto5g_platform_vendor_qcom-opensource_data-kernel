@@ -8885,6 +8885,9 @@ static void  ecpri_dma_gsi_ev_err_cb(struct gsi_evt_err_notify* notify)
 int ecpri_dma_hw_init(void)
 {
 	ecpri_hwio_def_ecpri_hw_params_0_u hw_params_0 = { 0 };
+	ecpri_hwio_def_ecpri_stream_ctrl_u dma_stream_control = { 0 };
+	u32 hw_ver = ECPRI_DMA_GET_CTX_HW_VER();
+	u32 hw_flavor = ECPRI_DMA_GET_HW_FLAVOR();
 
 	/* Get Clocks */
 	DMADBG("Started getting clocks\n");
@@ -8906,7 +8909,7 @@ int ecpri_dma_hw_init(void)
 	ECPRI_DMA_PREPARE_AND_ENABLE_CLK(dma_fast_div2_noc_clk);
 	ECPRI_DMA_PREPARE_AND_ENABLE_CLK(dma_nfapi_axi_clk);
 
-	if(ECPRI_DMA_GET_CTX_HW_VER() > ECPRI_HW_V1_0)
+	if(hw_ver > ECPRI_HW_V1_0)
 		ECPRI_DMA_PREPARE_AND_ENABLE_CLK(gcc_ddrss_ecpri_gsi);
 
 	clk_set_rate(ecpri_dma_ctx->clks.gcc_aggre_noc_ecpri_dma,
@@ -8951,6 +8954,20 @@ int ecpri_dma_hw_init(void)
 	       hw_params_0.def.total_channels_n);
 	if (hw_params_0.def.total_channels_n == 0)
 		return -EFAULT;
+
+
+	/* Set DMA Pre-Fetch buffer size to support jumbo packets on LTE FH perf */
+	if ((hw_ver > ECPRI_HW_V1_0) &&
+		(hw_flavor == ECPRI_HW_FLAVOR_DU_PCIE_3_X_12 ||
+			hw_flavor == ECPRI_HW_FLAVOR_DU_PCIE_4_X_9 ||
+			hw_flavor == ECPRI_HW_FLAVOR_DU_PCIE_5_X_6)) {
+		dma_stream_control.value =
+			ecpri_dma_hal_read_reg(ECPRI_DMA_STREAM_CTRL);
+		dma_stream_control.def.fh_limit += ECPRI_DMA_PRE_FETCH_CHANGE_SIZE;
+		dma_stream_control.def.l2_limit -= ECPRI_DMA_PRE_FETCH_CHANGE_SIZE;
+		ecpri_dma_hal_write_reg(ECPRI_DMA_STREAM_CTRL,
+			dma_stream_control.value);
+	}
 
 	return 0;
 }
