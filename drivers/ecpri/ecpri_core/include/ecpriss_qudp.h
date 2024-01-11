@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: GPL-2.0-only
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #ifndef ECPRISS_QUDP_H_
@@ -9,10 +9,12 @@
 #include "ecpriss_flow.h"
 #include "ecpriss_core.h"
 #include "ecpriss_netlink.h"
+#include "csm_lte_eth_dev.h" 
 
 #define MAX_WHITELIST_ENTRIES       16
 #define QUDP_IRQ_MAX                6
 #define ECPRISS_MAX_LINKS           4
+#define ECPRISS_MAX_PORT_TYPE       2
 #define MAX_QUDP_WM_ENTRY    10
 
 #define ECPRISS_QUDP_ACTION_PASS_TO_UC 0
@@ -409,4 +411,10 @@ void ecpriss_qudp_set_lte_mac_filter(ecpriss_packet_payload_s *packet);
 void ecpriss_qudp_set_nr_mac_filter(void);
 void ecpriss_qudp_set_lte_mac_filter_info(void);
 void ecpriss_qudp_set_nr_mac_filter_info(void);
+
+int ecpriss_qudp_set_lte_mac_addr(int port, int index, csm_lte_ethdev_mac_s *mac_info);
+int ecpriss_qudp_get_lte_mac_addr(int port, int index, csm_lte_ethdev_mac_s *mac_info);
+
+
+
 #endif

@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: GPL-2.0-only
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include "ecpriss_core.h"
@@ -7,6 +7,7 @@
 #include "ecpriss_workqueue.h"
 #include "ecpriss_debugfs.h"
 #include "ecpriss_log.h"
+#include "ecpriss_mhi.h"
 #include <linux/notifier.h>
 #include <linux/panic_notifier.h>
 extern struct ecpri_dma_ecpri_ss_ops dma_ecpri_ss_driver_ops;
@@ -515,6 +516,7 @@ void ecpriss_eth_topology_init_v2(void)
 	ecpriss_qudp_port_cfg_s_v2      *port_cfg_local;
         eth_ecpriss_port_params_s *port_params = NULL;
         bool link_state_flag = false;
+
 	do {
 		ret = (mtip_ecpri_ops.eth_ecpriss_get_topology)(&device_mode,
 				&eth_link_params_g);
@@ -538,10 +540,14 @@ void ecpriss_eth_topology_init_v2(void)
 					port_params = &eth_link_params_g.topology_params[i].port_params[port_index];
                                         for(k=0;k<num_links;k++){
 						//pr_err("port_index: %d link_index: %d link state: %d\n",port_index,k,port_params->link_params[k].link_state);
+						if(lte_fh_enabled) {
+							ecpriss_mhi_process_async_link_state(port_index, k, port_params->link_params[k].link_state);
+						}
                                                 if(port_params->link_params[k].link_state == ETH_ECPRISS_LINK_STATE_UP){
                                                         link_state_flag = true;
 	                                        }
                                         }
+
                                         if(link_state_flag == true){
                                                 ecpriss_configure_xbar_flush_v2(ECPRISS_PORT_TYPE_FH,port_index,ETH_ECPRISS_EVENT_UP);
                                         }
@@ -716,6 +722,59 @@ static int ecpriss_dma_endp_config_v2(void)
 
 					return ret;
 }
+
+
+int ecpriss_get_link_state(eth_ecpriss_port_type_e port_type,
+		int port, int link)
+{
+	eth_ecpriss_link_state_e state;
+
+	if(port < 0 || port >= ECPRISS_MAX_PORTS)
+		return -1;
+
+	if(link < 0 || link >= ECPRISS_MAX_LINKS)
+		return -1;
+
+	if(port_type < 0 || port_type >= ECPRISS_MAX_PORT_TYPE)
+		return -1;
+
+	if(!ecpriss_pdata_v2)
+		return -1;
+
+	state = ecpriss_pdata_v2->qudp_ctx_v2->fh_port_cfg_v2[port].eth_cfg.link_params[link].link_state;
+
+
+	ECPRILOGINFO("ecpriss_get_link_state: Ptype:%d Port:%d Link:%d state:%d",
+			port_type, port, link, state);
+
+	return state;
+
+}
+
+int ecpriss_get_link_rate(eth_ecpriss_port_type_e port_type,
+		int port, int link)
+{
+	eth_ecpriss_link_rate_e link_rate;
+
+	if(port < 0 || port >= ECPRISS_MAX_PORTS)
+		return -1;
+
+	if(link < 0 || link >= ECPRISS_MAX_LINKS)
+		return -1;
+
+	if(port_type < 0 || port_type >= ECPRISS_MAX_PORT_TYPE)
+		return -1;
+
+	link_rate = ecpriss_pdata_v2->qudp_ctx_v2->fh_port_cfg_v2[port].eth_cfg.link_params[link].link_rate;
+
+
+	ECPRILOGINFO("ecpriss_get_link_state: Ptype:%d Port:%d Link:%d rate:%d",
+			port_type, port, link, link_rate);
+
+	return link_rate;
+
+}
+
 
 void ecpriss_dma_event_processing_wq(struct work_struct *work)
 {
@@ -950,6 +1009,7 @@ void ecpriss_stats_timer_cb_v2(struct timer_list *data)
 
 	}while (0);
 	return;
+
 }
 void ecpriss_dma_endp_cb_v2(void * userdata)
 {
@@ -1733,6 +1793,16 @@ static int ecpriss_core_init_v2(struct platform_device *pdev)
 			break;
 		}
 
+		if(lte_fh_enabled) {
+
+			ret = ecpriss_mhi_ctx_init(&ecpriss_pdata_v2->mhi_ctx);
+
+			if(ret < 0) {
+				ECPRILOGERR("LTE_FH:MHI Ctx Init Failed\n");
+			}
+
+		}
+
 		ret = ecpriss_core_register_callbacks_v2();
 		if(ret < 0) {
 			ECPRILOGERR("Callback registrations failed\n");
@@ -1760,7 +1830,6 @@ static int ecpriss_core_init_v2(struct platform_device *pdev)
 			break;
 		}
 		ECPRILOGINFO("eCPRI Netlink Socket(NETLINK_ECPRI family) Created\n");
-
 
 		ecpriss_pdata_v2->ecpri_state = ECPRI_CORE_INIT;
 
