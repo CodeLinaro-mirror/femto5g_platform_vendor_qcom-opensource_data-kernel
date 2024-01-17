@@ -665,7 +665,8 @@ int ecpri_dma_stop_endp(struct ecpri_dma_endp_context *endp_cfg)
 		ecpri_dma_qmi_service_send_ch_cmd_q6(
 		endp_cfg,
 		QMI_ECPRI_CH_CMD_TYPE_STOP_V01,
-		ECPRI_DMA_QMI_MSG_SYNC);
+		ECPRI_DMA_QMI_MSG_SYNC,
+		false);
 
 	ret = ecpri_dma_gsi_stop_channel(endp_cfg);
 	if (ret) {
@@ -678,7 +679,8 @@ int ecpri_dma_stop_endp(struct ecpri_dma_endp_context *endp_cfg)
 		ecpri_dma_qmi_service_send_ch_cmd_q6(
 		endp_cfg,
 		QMI_ECPRI_CH_CMD_TYPE_STOP_V01,
-		ECPRI_DMA_QMI_MSG_ASYNC);
+		ECPRI_DMA_QMI_MSG_ASYNC,
+		false);
 
 	/* sleep for short period to flush DMA */
 	usleep_range(ECPRI_DMA_GSI_CHANNEL_STOP_SLEEP_MIN_USEC,
@@ -710,7 +712,8 @@ int ecpri_dma_start_endp(struct ecpri_dma_endp_context *endp_cfg)
 	ecpri_dma_qmi_service_send_ch_cmd_q6(
 		endp_cfg,
 		QMI_ECPRI_CH_CMD_TYPE_START_V01,
-		ECPRI_DMA_QMI_MSG_ASYNC);
+		ECPRI_DMA_QMI_MSG_ASYNC,
+		false);
 
 	return ret;
 }

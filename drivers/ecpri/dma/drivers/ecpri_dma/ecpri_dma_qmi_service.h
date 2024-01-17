@@ -127,13 +127,16 @@ struct ecpri_dma_pending_qmi_cmd_wrapper {
  * @endp_cfg: A55 endpoint's context
  * @op: the operation to execute
  * @flag: sync/non sync command specifer
+ * @enforce_order: When true - send this cmd, when false, check if this endp
+ * has an earlier command to send
  *
  * Return: 0 on success Linux error on failure
  */
 int ecpri_dma_qmi_service_send_ch_cmd_q6(
 	struct ecpri_dma_endp_context *endp_cfg,
 	enum ecpri_ch_cmd_type_enum_v01 op,
-	enum ecpri_dma_qmi_msg_type flag);
+	enum ecpri_dma_qmi_msg_type flag,
+	bool enforce_order);
 
 /**
  * ecpri_dma_qmi_get_sw_ver() - get the QMI dma software version

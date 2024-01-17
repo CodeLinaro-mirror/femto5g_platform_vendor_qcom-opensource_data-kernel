@@ -459,7 +459,6 @@ static int ecpri_dma_qmi_service_init_q6_send_msg(void)
 }
 
 static void ecpri_dma_send_q6_start_msg(struct work_struct* work) {
-
 	struct ecpri_dma_q6_msg_wrapper *entry;
 	struct ecpri_dma_q6_msg_wrapper *next;
 
@@ -486,7 +485,8 @@ static void ecpri_dma_send_q6_start_msg(struct work_struct* work) {
 		ecpri_dma_qmi_service_send_ch_cmd_q6(
 			entry->endp_ctx,
 			entry->op,
-			entry->flag);
+			entry->flag,
+			true);
 
 		/* remove from list once done */
 		mutex_lock(&ecpri_dma_qmi_ctx->deferred_cmd_list_lock);
@@ -681,21 +681,19 @@ static int ecpri_dma_qmi_service_q6_send_ch_msg(struct ecpri_dma_pending_qmi_cmd
 int ecpri_dma_qmi_service_send_ch_cmd_q6(
 	struct ecpri_dma_endp_context *endp_ctx,
 	enum ecpri_ch_cmd_type_enum_v01 op,
-	enum ecpri_dma_qmi_msg_type flag)
+	enum ecpri_dma_qmi_msg_type flag,
+	bool enforce_order)
 {
 	struct ecpri_dma_mhi_ee_gsi_tuple ee_gsi_tuple = {0};
 	struct ecpri_dma_endp_gsi_tuple q6_endp;
 	struct ecpri_dma_endp_filter filter = {0};
 	struct ecpri_dma_pending_qmi_cmd_wrapper *qmi_cmd = NULL;
 	const struct dma_gsi_ep_config *dest_endp;
-	int dest_endp_id;
-	int dest_gsi_id;
-	int q6_endp_id;
-	int q6_gsi_id;
-	int a55_endp_id;
-	int a55_gsi_id;
+	int dest_endp_id, dest_gsi_id, q6_endp_id, q6_gsi_id, a55_endp_id,
+		a55_gsi_id;
 	struct ecpri_dma_q6_msg_wrapper *q6_msg_wrapper;
 	int result = 0;
+	struct ecpri_dma_q6_msg_wrapper* entry, *next;
 
 	/* Validate endpoint  */
 	if (NULL == endp_ctx) {
@@ -834,6 +832,49 @@ int ecpri_dma_qmi_service_send_ch_cmd_q6(
 		(op == QMI_ECPRI_CH_CMD_TYPE_START_V01)) {
 		DMADBG("Exit reason version 3 %d\n", endp_ctx->endp_id);
 		return 0;
+	}
+
+	if (!enforce_order) {
+		/*	Check if there's a deferred work queued for this ENDP to enforce
+			order */
+		mutex_lock(&ecpri_dma_qmi_ctx->deferred_cmd_list_lock);
+
+		list_for_each_entry_safe(entry, next,
+			&ecpri_dma_qmi_ctx->ecpri_dma_pending_q6_msg, link)
+		{
+			if (entry->endp_ctx->endp_id == endp_ctx->endp_id) {
+				/* Found a qeueued deferred work for this ENDP, enforce order*/
+				q6_msg_wrapper =
+					kmalloc(sizeof(struct ecpri_dma_q6_msg_wrapper),
+						GFP_ATOMIC);
+
+				if (!q6_msg_wrapper) {
+					DMAERR("Failed to create wrapper %d\n", q6_endp_id);
+					mutex_unlock(&ecpri_dma_qmi_ctx->deferred_cmd_list_lock);
+					return -ENOMEM;
+				}
+
+				/* Assign values */
+				q6_msg_wrapper->endp_ctx = endp_ctx;
+				q6_msg_wrapper->op = op;
+				q6_msg_wrapper->flag = flag;
+
+				/* Add to list of pending messages*/
+				list_add_tail(&q6_msg_wrapper->link,
+					&ecpri_dma_qmi_ctx->ecpri_dma_pending_q6_msg);
+
+				mutex_unlock(&ecpri_dma_qmi_ctx->deferred_cmd_list_lock);
+
+				/* Start delayed work */
+				queue_delayed_work(ecpri_dma_qmi_ctx->clnt_req_wq,
+					&ecpri_dma_work_send_q6_start_msg,
+					ECPRI_DMA_QMI_COMPLETION_TIMEOUT);
+
+				return 0;
+			}
+		}
+
+		mutex_unlock(&ecpri_dma_qmi_ctx->deferred_cmd_list_lock);
 	}
 
 	qmi_cmd =
