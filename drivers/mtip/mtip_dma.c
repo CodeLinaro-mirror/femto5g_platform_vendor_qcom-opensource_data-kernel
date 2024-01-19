@@ -565,7 +565,7 @@ int mtip_stop_dma_pipe(ecpri_dma_eth_conn_hdl_t hdl)
 int mtip_replenish_dma_rx_buffers_reuse(struct net_device *netdev, ecpri_dma_eth_conn_hdl_t hdl, u32 num_of_buffs)
 {
    int rv = 0;
-   int j,i;
+   int j,i,start_index = 0;
    uint16_t curr_index = 0;
    int buff_size = mtip_dma_max_rx_buff_size;
    struct ecpri_dma_pkt **pkts = NULL;
@@ -578,7 +578,7 @@ int mtip_replenish_dma_rx_buffers_reuse(struct net_device *netdev, ecpri_dma_eth
    u32 link_index;
    u32 num_of_pkts_to_send = num_of_buffs;
    u32 num_of_pkts_remain = num_of_buffs;
-
+   u32 successful_pkts = 0;
    priv = netdev_priv(netdev);
 
    link_index = priv->link_index;
@@ -632,11 +632,13 @@ int mtip_replenish_dma_rx_buffers_reuse(struct net_device *netdev, ecpri_dma_eth
 
       pkts = &(head_pkt[priv->rx_curr_index]);
       // replenish the buffers
-      rv = (ecpri_dma_eth_driver_ops.ecpri_dma_eth_replenish_buffers)(hdl, pkts,num_of_pkts_to_send, commit);
+      rv = (ecpri_dma_eth_driver_ops.ecpri_dma_eth_replenish_buffers)(hdl, pkts,num_of_pkts_to_send, commit, &successful_pkts);
       if (rv < 0)
       {
          CSMLOGERR("Failed to replenish packets for hdl:%d,curr_index:%d,num_of_pkts_to_send:%d,num_of_pkts_remain:%d\n", hdl,priv->rx_curr_index,num_of_pkts_to_send,num_of_pkts_remain);
-         return -1;
+         //return -1;
+         start_index = successful_pkts;
+         goto skb_free;
       }
 
       num_of_pkts_remain -= num_of_pkts_to_send;
@@ -647,7 +649,7 @@ int mtip_replenish_dma_rx_buffers_reuse(struct net_device *netdev, ecpri_dma_eth
 
 skb_free:
    pkts = priv->head;
-   for (i = 0; i < j ; ++i)
+   for (i = start_index; i < j ; ++i)
    {
       curr_index = (priv->rx_curr_index + i)%(MTIP_RX_RING_SIZE - 1);
       // free the skb
@@ -667,7 +669,7 @@ ret:
 int mtip_replenish_dma_rx_buffers(struct net_device *netdev, ecpri_dma_eth_conn_hdl_t hdl, u32 num_of_buffs)
 {
    int rv = 0;
-   int j,i;
+   int j,i, start_index = 0;
    int buff_size = mtip_dma_max_rx_buff_size;
    struct ecpri_dma_pkt **pkts = NULL;
    struct ecpri_dma_mem_buffer **pbuffs = NULL;
@@ -676,6 +678,7 @@ int mtip_replenish_dma_rx_buffers(struct net_device *netdev, ecpri_dma_eth_conn_
    struct mtip_netdev_priv* priv;
    u32 link_index;
    struct mtip_pkt_priv *pkt_priv = NULL;
+   u32 successful_pkts = 0;
 
    priv = netdev_priv(netdev);
 
@@ -754,17 +757,18 @@ int mtip_replenish_dma_rx_buffers(struct net_device *netdev, ecpri_dma_eth_conn_
    }
 
    // replenish the buffers
-   rv = (ecpri_dma_eth_driver_ops.ecpri_dma_eth_replenish_buffers)(hdl, pkts, num_of_buffs, commit);
+   rv = (ecpri_dma_eth_driver_ops.ecpri_dma_eth_replenish_buffers)(hdl, pkts, num_of_buffs, commit, &successful_pkts);
 
    if (rv < 0)
    {
       CSMLOGERR("Failed to replenish packets for hdl: %d\n", hdl);
+      start_index = successful_pkts;
       goto cleanup;
    }
    goto ret;
 
 cleanup:
-   for (i = 0; i < j; i++)
+   for (i = start_index ; i < j; i++)
    {
       if(pkts[i] == NULL)
          continue;
