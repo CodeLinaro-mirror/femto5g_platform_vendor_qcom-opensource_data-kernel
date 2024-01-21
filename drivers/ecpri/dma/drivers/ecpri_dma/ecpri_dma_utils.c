@@ -9674,6 +9674,8 @@ int ecpri_dma_gsi_stop_channel(struct ecpri_dma_endp_context *ep)
 {
 	int res = 0;
 	int i;
+	ecpri_hwio_def_ecpri_endp_gsi_cfg_gsi_m_ch_n_u dest_endp_gsi_cfg;
+	bool dest_endp_flushed = false;
 
 	if (!ep || !ep->valid) {
 		DMAERR("EP context is empty\n");
@@ -9692,9 +9694,33 @@ int ecpri_dma_gsi_stop_channel(struct ecpri_dma_endp_context *ep)
 		if (res != -GSI_STATUS_AGAIN)
 			return res;
 
+		/*	For M2M ENDPs, if second retry still gives STOP_IN_PROG perform
+			Flush on DEST ENDP */
+		if (i == 1 &&
+			ep->gsi_ep_cfg->stream_mode == ECPRI_DMA_ENDP_STREAM_MODE_M2M) {
+			dest_endp_gsi_cfg.value = ecpri_dma_hal_read_reg_mn(
+				ECPRI_ENDP_GSI_CFG, ep->gsi_id, ep->gsi_ep_cfg->dest);
+
+			dest_endp_gsi_cfg.def.endp_flush = 1;
+
+			ecpri_dma_hal_write_reg_mn(
+				ECPRI_ENDP_GSI_CFG, ep->gsi_id, ep->gsi_ep_cfg->dest,
+				dest_endp_gsi_cfg.value);
+
+			dest_endp_flushed = true;
+		}
+
 		/* sleep for short period to flush DMA */
 		usleep_range(ECPRI_DMA_GSI_CHANNEL_STOP_SLEEP_MIN_USEC,
 			ECPRI_DMA_GSI_CHANNEL_STOP_SLEEP_MAX_USEC);
+	}
+
+	if (dest_endp_flushed) {
+		dest_endp_gsi_cfg.def.endp_flush = 0;
+
+		ecpri_dma_hal_write_reg_mn(
+			ECPRI_ENDP_GSI_CFG, ep->gsi_id, ep->gsi_ep_cfg->dest,
+			dest_endp_gsi_cfg.value);
 	}
 
 	DMAERR("Failed  to stop GSI channel with retries\n");
