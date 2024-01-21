@@ -1215,13 +1215,13 @@ trx_link_length_range mtip_phy_get_trx_link_length_range(struct mtip_port_device
     return TRX_LINK_UNKNOWN;
 }
 
-void mtip_phy_notify_eth_event_to_trx(u32 link_index, trx_phy_event event)
+void mtip_phy_notify_eth_event_to_trx(u32 link_index, bool enable)
 {
     enum mtip_port_type_enum port_type;
     bool lanes_enabled[PHY_LANE_MAX];
     int i;
     u32 lane_index;
-    u32 sfp_phandle[MTIP_MAX_LANES_PER_PORT] = {0};
+    u32 sfp_phandle[MAX_ETH_LANES] = {0};
     u8 sfp_lane_count = 0;
 
     if (mtip_lookup_port_type_by_link_index(link_index, &port_type) < 0)
@@ -1238,13 +1238,13 @@ void mtip_phy_notify_eth_event_to_trx(u32 link_index, trx_phy_event event)
             mtip_lookup_lane_index_by_port_type_and_real_lane(&lane_index, port_type, i);
             sfp_phandle[sfp_lane_count++] = platform_driver_priv->devices.lane_devices[lane_index].sfp_phandle;
             CSMLOGINFO("eth_event %d for link_index %d = lane %d = sfp_phandle=%d",
-                       event, link_index, lane_index, sfp_phandle[sfp_lane_count-1]);
+                       enable, link_index, lane_index, sfp_phandle[sfp_lane_count-1]);
         }
     }
 
     // Indicate transceiver driver about interface bring up
     rtnl_lock();
-    qsfp_trx_eth_event_notifier(event, sfp_phandle, sfp_lane_count);
+    qsfp_trx_ifconfig_notifier(enable, sfp_phandle);
     rtnl_unlock();
 
     return;

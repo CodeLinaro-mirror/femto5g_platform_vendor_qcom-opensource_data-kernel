@@ -1295,7 +1295,7 @@ int mtip_device_open_completion(u32 link_index)
     sfp_port_type = platform_driver_priv->mtip_ports[port_type]->sfp_port_type;
 
     // Notify TRX driver to enable TX
-    mtip_phy_notify_eth_event_to_trx(link_index, TRX_IFCONFIG_UP);
+    mtip_phy_notify_eth_event_to_trx(link_index, IFCFG_ENABLE);
 
     // bring up the phy
     mtip_phy_bringup_phy(link_index, sfp_port_type);
@@ -2804,7 +2804,7 @@ void mtip_device_configure_port(u32 port_type)
    u32 real_link = 0;
    u32 real_lane = 0;
    u32 lane_index;
-   u32 sfp_phandle[MTIP_MAX_LANES_PER_PORT] = {0};
+   u32 sfp_phandle[MAX_ETH_LANES] = {0};
    struct qsfp_info lane_qsfp_info;
 
    port_info = platform_driver_priv->mtip_ports[port_type];
@@ -3034,7 +3034,7 @@ void mtip_device_configure_port(u32 port_type)
             rtnl_lock();
             mtip_lookup_lane_index_by_port_type_and_real_lane(&lane_index, port_type, real_lane);
             sfp_phandle[real_lane] = platform_driver_priv->devices.lane_devices[lane_index].sfp_phandle;
-            qsfp_trx_eth_event_notifier(TRX_IFCONFIG_UP, sfp_phandle, 1);
+            qsfp_trx_ifconfig_notifier(IFCFG_ENABLE, sfp_phandle);
             rtnl_unlock();
 
             // initiate AN with the PHY
@@ -3369,7 +3369,7 @@ void run_mtip_process_netdev_open(void* workptr)
             sfp_port_type = platform_driver_priv->mtip_ports[port_type]->sfp_port_type;
 
             // Notify TRX driver to enable TX
-            mtip_phy_notify_eth_event_to_trx(link_index, TRX_IFCONFIG_UP);
+            mtip_phy_notify_eth_event_to_trx(link_index, IFCFG_ENABLE);
 
             // bring up the phy
             mtip_phy_bringup_phy(link_index, sfp_port_type);
@@ -3434,7 +3434,7 @@ void run_mtip_process_netdev_close(void* workptr)
    u32 tmp_link_index;
    u32 real_lane = 0;
    u32 lane_index;
-   u32 sfp_phandle[MTIP_MAX_LANES_PER_PORT] = {0};
+   u32 sfp_phandle[MAX_ETH_LANES] = {0};
 
    priv = netdev_priv(netdev);
 
@@ -3480,7 +3480,7 @@ void run_mtip_process_netdev_close(void* workptr)
          }
 
          // Notify TRX driver to disable TX
-         mtip_phy_notify_eth_event_to_trx(link_index, TRX_IFCONFIG_DOWN);
+         mtip_phy_notify_eth_event_to_trx(link_index, IFCFG_DISABLE);
 
          // Notify TRX driver to disable TX on primary lane if AN was in progress and not other links are active
          if(platform_driver_priv->mtip_ports[port_type]->port_state == MTIP_PORT_STATE_CONNECTED_NEGOTIATION_IN_PROGRESS &&
@@ -3494,7 +3494,7 @@ void run_mtip_process_netdev_close(void* workptr)
             rtnl_lock();
             mtip_lookup_lane_index_by_port_type_and_real_lane(&lane_index, port_type, real_lane);
             sfp_phandle[real_lane] = platform_driver_priv->devices.lane_devices[lane_index].sfp_phandle;
-            qsfp_trx_eth_event_notifier(TRX_IFCONFIG_DOWN, sfp_phandle, 1);
+            qsfp_trx_ifconfig_notifier(IFCFG_DISABLE, sfp_phandle);
             rtnl_unlock();
          }
       }
