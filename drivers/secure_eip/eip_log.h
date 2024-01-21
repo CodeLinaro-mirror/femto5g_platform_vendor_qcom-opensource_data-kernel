@@ -1,6 +1,6 @@
 //SPDX-License-Identifier: GPL-2.0-only
 /*
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #ifndef _EIP_LOG_H
@@ -52,7 +52,6 @@ extern void *secure_eip_ipc_log_prio;
 
 #define eip_loginfo(fmt, args...)                                              \
 	do {                                                                   \
-		pr_info(DRV_NAME " %s:%d " fmt, __func__, __LINE__, ##args);   \
 		__eip_debugfs_eip_log_msg(secure_eip_ipc_log_norm,             \
 					  "INFO:" fmt, ##args);                \
 	} while (0)

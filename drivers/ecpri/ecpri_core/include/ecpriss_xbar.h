@@ -314,6 +314,7 @@ typedef struct ecpriss_xbar_ctx_v2
 	ecpriss_xbar_port_cfg_s		c2c_port_cfg;
 	ecpriss_xbar_port_cfg_s		l2_port_cfg;
 	ecpriss_xbar_port_cfg_s		fh_exception_port_cfg;
+	ecpriss_xbar_port_cfg_s         fh_lte_port_cfg[ECPRISS_MAX_LTE_VF];
 	ecpriss_xbar_interrupt_cfg_s_v2	interrupt_cfg_v2;
 	ecpriss_xbar_stats_s_v2		stats_v2;
 	ecpriss_xbar_interrupt_stats_s_v2 interrupt_stats_v2;
@@ -434,7 +435,7 @@ typedef struct ecpriss_qudp_ingress_cfg_value_v2{
 	ecpri_qudp_hwio_def_ecpri_udp_fh_filt_vlan_addr_port_p_entry_n_s_v2 vlan[NUM_OF_FHP][NUM_OF_FLTR];
 	ecpri_qudp_hwio_def_ecpri_udp_fh_udp_classification_list_port_p_entry_n_s_v2 udp_clss[NUM_OF_FHP][NUM_OF_FLTR];
 	ecpriss_ip_addr_fltr_cfg_s_v2 ip_addr[NUM_OF_FHP][NUM_OF_FLTR];
-	ecpriss_mac_addr_fltr_cfg_s_v2 mac_addr[NUM_OF_FHP][NUM_OF_FLTR];
+	ecpriss_mac_addr_fltr_cfg_s_v2 mac_addr[NUM_OF_FHP][MAX_MAC_FILTER_ENTRIES];
 }ecpriss_qudp_ingress_cfg_value_s_v2;
 
 

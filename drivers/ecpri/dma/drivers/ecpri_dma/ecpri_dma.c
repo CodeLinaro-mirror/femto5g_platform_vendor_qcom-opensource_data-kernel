@@ -275,7 +275,7 @@ static void ecpri_dma_notify_dma_ready(void)
 	}
 
 	/* Trigger Q6 init without QMI */
-	spare_reg.value = ecpri_dma_get_ctx_hw_flavor();
+	spare_reg.value = ECPRI_DMA_GET_HW_FLAVOR();
 	ecpri_dma_hal_write_reg(
 		ECPRI_SPARE_REG, spare_reg.value);
 
@@ -665,7 +665,8 @@ int ecpri_dma_stop_endp(struct ecpri_dma_endp_context *endp_cfg)
 		ecpri_dma_qmi_service_send_ch_cmd_q6(
 		endp_cfg,
 		QMI_ECPRI_CH_CMD_TYPE_STOP_V01,
-		ECPRI_DMA_QMI_MSG_SYNC);
+		ECPRI_DMA_QMI_MSG_SYNC,
+		false);
 
 	ret = ecpri_dma_gsi_stop_channel(endp_cfg);
 	if (ret) {
@@ -678,7 +679,8 @@ int ecpri_dma_stop_endp(struct ecpri_dma_endp_context *endp_cfg)
 		ecpri_dma_qmi_service_send_ch_cmd_q6(
 		endp_cfg,
 		QMI_ECPRI_CH_CMD_TYPE_STOP_V01,
-		ECPRI_DMA_QMI_MSG_ASYNC);
+		ECPRI_DMA_QMI_MSG_ASYNC,
+		false);
 
 	/* sleep for short period to flush DMA */
 	usleep_range(ECPRI_DMA_GSI_CHANNEL_STOP_SLEEP_MIN_USEC,
@@ -710,7 +712,8 @@ int ecpri_dma_start_endp(struct ecpri_dma_endp_context *endp_cfg)
 	ecpri_dma_qmi_service_send_ch_cmd_q6(
 		endp_cfg,
 		QMI_ECPRI_CH_CMD_TYPE_START_V01,
-		ECPRI_DMA_QMI_MSG_ASYNC);
+		ECPRI_DMA_QMI_MSG_ASYNC,
+		false);
 
 	return ret;
 }
@@ -1591,7 +1594,7 @@ static void ecpri_dma_dealloc_exception(void)
 
 static void __exit ecpri_dma_module_exit(void)
 {
-	enum ecpri_hw_flavor hw_flavor = ecpri_dma_get_ctx_hw_flavor();
+	enum ecpri_hw_flavor hw_flavor = ECPRI_DMA_GET_HW_FLAVOR();
 	int endp_id = 0, gsi_id = 0;
 	struct ecpri_dma_endp_context* curr_endp = NULL;
 	int ret = 0;

@@ -74,37 +74,65 @@ static const char * const mtip_ethtool_stat_strings[] = {
 #define MTIP_ETHTOOL_STATS_LEN	ARRAY_SIZE(mtip_ethtool_stat_strings)
 
 static const char* const mtip_ethtool_priv_flags_str_arr[] = {
-    "1x100GBASE_R",
-    "1x100GBASE_R_RSFEC_LL",
-    "1x100GBASE_R_RSFEC",
     "1x100GBASE_R2",
-    "1x100GBASE_R2_RSFEC",
     "1x100GBASE_R4",
-    "1x100GBASE_R4_RSFEC",
     "2x50GBASE_R",
-    "2x50GBASE_R_RSFEC",
-    "2x50GBASE_R2",
-    "2x50GBASE_R2_FEC",
-    "2x50GBASE_R2_LUAI",
-    "2x50GBASE_R2_LUAI_FEC",
     "1x50GBASE_R",
-    "1x50GBASE_R_RSFEC",
     "1x50GBASE_R2",
-    "1x50GBASE_R2_RSFEC",
-    "1x50GBASE_R2_LUAI",
-    "1x50GBASE_R2_LUAI_FEC",
     "1x40GBASE_R4",
-    "1x40GBASE_R4_FEC",
     "4x25GBASE_R",
-    "4x25GBASE_R_FEC",
-    "4x25GBASE_R_RSFEC",
     "1x25GBASE_R",
-    "1x25GBASE_R_FEC",
-    "1x25GBASE_R_RSFEC",
     "4x10GBASE_R",
-    "4x10GBASE_R_FEC",
     "1x10GBASE_R",
-    "1x10GBASE_R_FEC",
+};
+
+static const char* const mtip_ethtool_port_config_str_arr[] = {
+   "1x100GBASE_R",
+   "1x100GBASE_R_RSFEC_LL",
+   "1x100GBASE_R_RSFEC",
+   "1x100GBASE_R2",
+   "1x100GBASE_R2_RSFEC",
+   "1x100GBASE_R4",
+   "1x100GBASE_R4_RSFEC",
+   "2x50GBASE_R",
+   "2x50GBASE_R_RSFEC",
+   "2x50GBASE_R2",
+   "2x50GBASE_R2_FEC",
+   "2x50GBASE_R2_LUAI",
+   "2x50GBASE_R2_LUAI_FEC",
+   "1x50GBASE_R",
+   "1x50GBASE_R_RSFEC",
+   "1x50GBASE_R2",
+   "1x50GBASE_R2_RSFEC",
+   "1x50GBASE_R2_LUAI",
+   "1x50GBASE_R2_LUAI_FEC",
+   "1x40GBASE_R4",
+   "1x40GBASE_R4_FEC",
+   "4x25GBASE_R",
+   "4x25GBASE_R_FEC",
+   "4x25GBASE_R_RSFEC",
+   "1x25GBASE_R",
+   "1x25GBASE_R_FEC",
+   "1x25GBASE_R_RSFEC",
+   "4x10GBASE_R",
+   "4x10GBASE_R_FEC",
+   "1x10GBASE_R",
+   "1x10GBASE_R_FEC",
+};
+
+enum mtip_priv_flag_enum
+{
+	MTIP_PRIV_FLAG_1x100GBASE_R2,
+	MTIP_PRIV_FLAG_1x100GBASE_R4,
+	MTIP_PRIV_FLAG_2x50GBASE_R,
+	MTIP_PRIV_FLAG_1x50GBASE_R,
+	MTIP_PRIV_FLAG_1x50GBASE_R2,
+	MTIP_PRIV_FLAG_1x40GBASE_R4,
+	MTIP_PRIV_FLAG_4x25GBASE_R,
+	MTIP_PRIV_FLAG_1x25GBASE_R,
+	MTIP_PRIV_FLAG_4x10GBASE_R,
+	MTIP_PRIV_FLAG_1x10GBASE_R,
+	MTIP_PRIV_FLAG_MAX
 };
 
 #define MTIP_ETHTOOL_REG_OFFSET_ARRAY_SIZE 14
@@ -150,6 +178,13 @@ struct mtip_ethtool_reg_offset mtip_ethtool_reg_offset_val[MTIP_ETHTOOL_REG_OFFS
 const char* mtip_ethtool_get_priv_flags_str(u32 index)
 {
     return mtip_ethtool_priv_flags_str_arr[index];
+}
+
+#define MTIP_ETHTOOL_PORT_CONFIG_LEN ARRAY_SIZE(mtip_ethtool_port_config_str_arr)
+
+const char* mtip_ethtool_get_port_config_str(u32 index)
+{
+    return mtip_ethtool_port_config_str_arr[index];
 }
 
 static int mtip_ethtool_get_sset_count(struct net_device *netdev, int sset)
@@ -378,7 +413,9 @@ void mtip_ethtool_get_supported_speed_modes(struct mtip_port_info* port_info, u3
     {
         supports_40_g = true;
     }
-
+    linkmode_set_bit(ETHTOOL_LINK_MODE_FEC_NONE_BIT, supported);
+    linkmode_set_bit(ETHTOOL_LINK_MODE_FEC_RS_BIT, supported);
+    linkmode_set_bit(ETHTOOL_LINK_MODE_FEC_BASER_BIT, supported);
     for (i = 0; i < MTIP_PORT_CONFIG_MAX; ++i)
     {
         switch (i)
@@ -530,7 +567,9 @@ void mtip_ethtool_get_advertised_speed_modes(struct mtip_port_info* port_info, u
     {
        lane_qsfp_info_valid = true;
     }
-
+    linkmode_set_bit(ETHTOOL_LINK_MODE_FEC_NONE_BIT, advertised);
+    linkmode_set_bit(ETHTOOL_LINK_MODE_FEC_RS_BIT, advertised);
+    linkmode_set_bit(ETHTOOL_LINK_MODE_FEC_BASER_BIT, advertised);
     for (i = 0; i < MTIP_PORT_CONFIG_MAX; ++i)
     {
         if (port_priv_flags & (1<<i))
@@ -792,6 +831,8 @@ int mtip_ethtool_get_link_ksettings(struct net_device *dev, struct ethtool_link_
     struct mtip_port_info* port_info;
     int lane_speed = 0;
     int i;
+    u32 lane_index;
+    bool lane_connected=false;
 
     priv = netdev_priv(dev);
     link_index = priv->link_index;
@@ -822,10 +863,23 @@ int mtip_ethtool_get_link_ksettings(struct net_device *dev, struct ethtool_link_
     linkmode_set_bit(ETHTOOL_LINK_MODE_TP_BIT, cmd->link_modes.supported);
     linkmode_set_bit(ETHTOOL_LINK_MODE_FIBRE_BIT, cmd->link_modes.supported);
 
-    if(port_info->sfp_port_type == PORT_FIBRE)
+    // check if lane is connected
+    for (i = 0; i < platform_driver_priv->devices.port_devices[port_type].num_lane_phandles; ++i)
+    {
+        lane_index = platform_driver_priv->devices.port_devices[port_type].lane_devices[i]->lane_index;
+        if(platform_driver_priv->mtip_lanes[lane_index]->lane_state == MTIP_LANE_STATE_CONNECTED)
+        {
+            lane_connected = true;
+            break;
+        }
+    }
+
+    if(port_info->sfp_port_type == PORT_FIBRE && lane_connected == true)
         cmd->base.port = PORT_FIBRE;
-    else
+    else if(port_info->sfp_port_type == PORT_DA && lane_connected == true)
         cmd->base.port = PORT_DA;
+    else
+        cmd->base.port = PORT_NONE;
 
     // Duplex is always set to TRUE
     cmd->base.duplex = true;
@@ -911,6 +965,17 @@ int mtip_ethtool_set_link_ksettings(struct net_device *netdev, const struct etht
 
     port_info = platform_driver_priv->mtip_ports[port_type];
 
+    speed = cmd->base.speed;
+    CSMLOGDBG("Speed for link_index %d set to %d", link_index, speed);
+    if(port_type == MTIP_PORT_TYPE_DEBUG)
+    {
+        if(!check_if_valid_speed_for_debug_eth(speed))
+        {
+            CSMLOGERR("invalid speed for link_index %d", link_index);
+            return -EINVAL;
+        }
+    }
+
     // set link settings can be used to change autoneg to off/on
     if (cmd->base.autoneg == AUTONEG_DISABLE) 
     {
@@ -929,9 +994,6 @@ int mtip_ethtool_set_link_ksettings(struct net_device *netdev, const struct etht
         port_info->autoneg = autoneg;
         port_info->autoneg_changed = true;
     }
-
-    speed = cmd->base.speed;
-    CSMLOGERR("Speed for link_index %d set to %d", link_index, speed);
 
     if(speed != 0)
     {
@@ -965,13 +1027,21 @@ int mtip_ethtool_set_link_ksettings(struct net_device *netdev, const struct etht
             else
                 priv_flags = MTIP_DEVICE_PRIV_FLAGS_BIT_MASK_100G_ONLY;
         }
-
     }
     else
-        priv_flags = MTIP_DEVICE_PRIV_FLAGS_BIT_MASK_NON_FEC;
+    {
+        if(link_index == MTIP_DEBUG_ETH_LINK_INDEX)
+            priv_flags = MTIP_DEVICE_PRIV_FLAGS_BIT_MASK_DBG_PORT_NON_FEC_NON_50G;
+        else
+            priv_flags = MTIP_DEVICE_PRIV_FLAGS_BIT_MASK_NON_FEC;
+    }
 
     // Set the priv flags for the speed config
-    mtip_ethtool_set_priv_flags(netdev, priv_flags);
+
+    priv->priv_flags_set = true;
+    priv->priv_flags = priv_flags;
+
+    mtip_netdev_set_port_priv_flags(netdev);
 
     return 0;
 }
@@ -1001,7 +1071,7 @@ static int mtip_ethtool_get_ts_info(struct net_device *ndev, struct ethtool_ts_i
 	return 0;
 }
 
-int	mtip_ethtool_get_fecparam(struct net_device* netdev, struct ethtool_fecparam* pfec)
+int mtip_ethtool_get_fecparam(struct net_device* netdev, struct ethtool_fecparam* pfec)
 {
     u32 cmd = pfec->cmd;
     struct mtip_netdev_priv *priv;
@@ -1010,9 +1080,8 @@ int	mtip_ethtool_get_fecparam(struct net_device* netdev, struct ethtool_fecparam
     priv = netdev_priv(netdev);
     link_index = priv->link_index;
 
-    // set the capable set of FECs
-    pfec->fec = ETHTOOL_FEC_OFF | ETHTOOL_FEC_RS;
-
+    // set the config fec
+    pfec->fec = platform_driver_priv->mtip_links[link_index]->config_fec;
     // set the active fec
     pfec->active_fec = platform_driver_priv->mtip_links[link_index]->active_fec;
 
@@ -1021,7 +1090,7 @@ int	mtip_ethtool_get_fecparam(struct net_device* netdev, struct ethtool_fecparam
     return 0;
 }
 
-int	mtip_ethtool_set_fecparam(struct net_device* netdev, struct ethtool_fecparam* pfec)
+int mtip_ethtool_set_fecparam(struct net_device* netdev, struct ethtool_fecparam* pfec)
 {
     u32 cmd = pfec->cmd;
     u32 active_fec = pfec->active_fec;
@@ -1029,14 +1098,10 @@ int	mtip_ethtool_set_fecparam(struct net_device* netdev, struct ethtool_fecparam
     struct mtip_netdev_priv *priv;
     u32 link_index;
     u32 port_type;
-    struct mtip_port_device_info* port_device = NULL;
-    struct mtip_link_device_info* link_device = NULL;
-    int i;
+    u32 real_link_number;
 
     priv = netdev_priv(netdev);
     link_index = priv->link_index;
-
-    CSMLOGDBG("Setting FEC parameter for link index: %d, cmd: %d, active: %d, fec: %d", link_index, cmd, active_fec, fec);
 
     if (mtip_lookup_port_type_by_link_index(link_index, &port_type) < 0)
     {
@@ -1044,53 +1109,82 @@ int	mtip_ethtool_set_fecparam(struct net_device* netdev, struct ethtool_fecparam
         return -1;
     }
 
-    // set the port_device
-    port_device = &platform_driver_priv->devices.port_devices[port_type];
-
-    // check the value of the active_fec
-    if (fec == ETHTOOL_FEC_OFF) 
+    if (mtip_lookup_real_link_number_by_link_index(link_index, &real_link_number) < 0)
     {
-        // find the port corresponding to the link
-        CSMLOGDBG("Going to set FEC OFF for link_index: %d", link_index);
-
-        // set the configured fec
-        platform_driver_priv->mtip_links[link_index]->config_fec = ETHTOOL_FEC_OFF;
-
-        // turn FEC to OFF
-        mtip_mac_wrapper_disable_rsfec_for_25g_mode(port_device);
-
-        // disable rsfec in pcs
-        for (i = 0; i < port_device->num_link_phandles; ++i)
-        {
-            link_device = port_device->link_devices[i];
-            mtip_pcs_disable_rsfec_for_25g_mode(link_device);
-        }
-    }
-    else if (fec == ETHTOOL_FEC_RS) 
-    {
-        // find the port corresponding to the link
-        CSMLOGDBG("Going to set FEC RS for link_index: %d", link_index);
-
-        // set the configured fec
-        platform_driver_priv->mtip_links[link_index]->config_fec = ETHTOOL_FEC_RS;
-
-        // turn on RS FEC
-        mtip_mac_wrapper_enable_rsfec_for_25g_mode(port_device);
-
-        // enable rsfec in the pcs
-        for (i = 0; i < port_device->num_link_phandles; ++i)
-        {
-            link_device = port_device->link_devices[i];
-            mtip_pcs_enable_rsfec_for_25g_mode(link_device);
-        }
-    }
-    else
-    {
-        CSMLOGERR("Unsupported FEC %d parameter for link index: %d", active_fec, link_index);
+        CSMLOGERR("invalid link_index %d", link_index);
         return -EINVAL;
     }
 
+    // Honor only for primary link of the port
+    if((port_type != MTIP_PORT_TYPE_DEBUG && real_link_number != 0) ||
+       (port_type == MTIP_PORT_TYPE_DEBUG && real_link_number != 1))
+    {
+        CSMLOGERR("Ignore for non primary link %d of the port %d",
+                  real_link_number, port_type);
+        return -EINVAL;
+    }
+
+    CSMLOGINFO("Setting FEC parameter for link index: %d, cmd: %d, active: %d, fec: %d", link_index, cmd, active_fec, fec);
+    // set the configured fec
+    platform_driver_priv->mtip_links[link_index]->config_fec = fec;
+
+    post_mtip_process_reconfigure_port(port_type);
+
     return 0;
+}
+
+
+u32 port_config_to_priv_flags_mapping(u32 flags)
+{
+    u32 pattern = 0x1;
+    u32 filtered_flags = 0;
+    enum mtip_port_config_enum port_config = MTIP_PORT_CONFIG_1x100GBASE_R;
+    u32 tmp_flags = flags;
+    while(flags)
+    {
+        if(flags & pattern)
+        {
+            switch(port_config)
+            {
+                case MTIP_PORT_CONFIG_1x100GBASE_R2 :
+                    filtered_flags |= pattern << MTIP_PRIV_FLAG_1x100GBASE_R2;
+                    break;
+                case MTIP_PORT_CONFIG_1x100GBASE_R4 :
+                    filtered_flags |= pattern << MTIP_PRIV_FLAG_1x100GBASE_R4;
+                    break;
+                case MTIP_PORT_CONFIG_2x50GBASE_R :
+                    filtered_flags |= pattern << MTIP_PRIV_FLAG_2x50GBASE_R;
+                    break;
+                case MTIP_PORT_CONFIG_1x50GBASE_R :
+                    filtered_flags |= pattern << MTIP_PRIV_FLAG_1x50GBASE_R;
+                    break;
+                case MTIP_PORT_CONFIG_1x50GBASE_R2:
+                    filtered_flags |= pattern << MTIP_PRIV_FLAG_1x50GBASE_R2;
+                    break;
+                case MTIP_PORT_CONFIG_1x40GBASE_R4:
+                    filtered_flags |= pattern << MTIP_PRIV_FLAG_1x40GBASE_R4;
+                    break;
+                case MTIP_PORT_CONFIG_4x25GBASE_R:
+                    filtered_flags |= pattern << MTIP_PRIV_FLAG_4x25GBASE_R;
+                    break;
+                case MTIP_PORT_CONFIG_1x25GBASE_R:
+                    filtered_flags |= pattern << MTIP_PRIV_FLAG_1x25GBASE_R;
+                    break;
+                case MTIP_PORT_CONFIG_4x10GBASE_R:
+                    filtered_flags |= pattern << MTIP_PRIV_FLAG_4x10GBASE_R;
+                    break;
+                case MTIP_PORT_CONFIG_1x10GBASE_R:
+                    filtered_flags |= pattern << MTIP_PRIV_FLAG_1x10GBASE_R;
+                    break;
+                default:
+                    CSMLOGERR("Invalid private flag was set: %x\n", tmp_flags);
+            }
+        }
+        flags = flags >> 1;
+        port_config++;
+    }
+    CSMLOGDBG("final filtered_flags: %x\n", filtered_flags);
+    return filtered_flags;
 }
 
 u32 mtip_ethtool_get_priv_flags(struct net_device *netdev)
@@ -1099,11 +1193,12 @@ u32 mtip_ethtool_get_priv_flags(struct net_device *netdev)
     u32 link_index;
     u32 port_type;
     u32 port_link0_index;
+    u32 filtered_flags=0;
 
     priv = netdev_priv(netdev);
     link_index = priv->link_index;
 
-    CSMLOGDBG("Get priv called for link index: %d", link_index);
+    CSMLOGDBG("Get priv called for link index: %d, priv->priv_flags: 0x%x\n", link_index, priv->priv_flags);
 
     if (mtip_lookup_port_type_by_link_index(link_index, &port_type) < 0)
     {
@@ -1121,35 +1216,73 @@ u32 mtip_ethtool_get_priv_flags(struct net_device *netdev)
     priv = netdev_priv(platform_driver_priv->mtip_links[port_link0_index]->dev);
 
     // return flags currently enabled
-    return priv->priv_flags;
+    filtered_flags = port_config_to_priv_flags_mapping(priv->priv_flags);
+
+    return filtered_flags;
 }
 
-int mtip_ethtool_handle_pflag(struct net_device *netdev,
-			      u32 wanted_flags,
-			      u32 flag)
+u32 priv_flags_to_port_config_mapping(u32 flags)
 {
-    struct mtip_netdev_priv *priv = netdev_priv(netdev);
-	bool enable = !!(wanted_flags & BIT(flag));
-    u32 changes = wanted_flags ^ priv->priv_flags;
-
-	if (!(changes & BIT(flag)))
-		return 0;
-
-	MTIP_ETHTOOL_SET_PFLAG(priv, flag, enable);
-	return 0;
+    u32 pattern = 0x1;
+    u32 filtered_flags = 0;
+    enum mtip_port_config_enum port_config = MTIP_PORT_CONFIG_1x100GBASE_R;
+    u32 pflags = flags;
+    while(pflags)
+    {
+        if(pflags&pattern)
+        {
+            switch(port_config)
+            {
+                case MTIP_PRIV_FLAG_1x100GBASE_R2 :
+                    filtered_flags |= pattern << MTIP_PORT_CONFIG_1x100GBASE_R2;
+                    break;
+                case MTIP_PRIV_FLAG_1x100GBASE_R4 :
+                    filtered_flags |= pattern << MTIP_PORT_CONFIG_1x100GBASE_R4;
+                    break;
+                case MTIP_PRIV_FLAG_2x50GBASE_R :
+                    filtered_flags |= pattern << MTIP_PORT_CONFIG_2x50GBASE_R;
+                    break;
+                case MTIP_PRIV_FLAG_1x50GBASE_R :
+                    filtered_flags |= pattern << MTIP_PORT_CONFIG_1x50GBASE_R;
+                    break;
+                case MTIP_PRIV_FLAG_1x50GBASE_R2:
+                    filtered_flags |= pattern << MTIP_PORT_CONFIG_1x50GBASE_R2;
+                    break;
+                case MTIP_PRIV_FLAG_1x40GBASE_R4:
+                    filtered_flags |= pattern << MTIP_PORT_CONFIG_1x40GBASE_R4;
+                    break;
+                case MTIP_PRIV_FLAG_4x25GBASE_R:
+                    filtered_flags |= pattern << MTIP_PORT_CONFIG_4x25GBASE_R;
+                    break;
+                case MTIP_PRIV_FLAG_1x25GBASE_R:
+                    filtered_flags |= pattern << MTIP_PORT_CONFIG_1x25GBASE_R;
+                    break;
+                case MTIP_PRIV_FLAG_4x10GBASE_R:
+                    filtered_flags |= pattern << MTIP_PORT_CONFIG_4x10GBASE_R;
+                    break;
+                case MTIP_PRIV_FLAG_1x10GBASE_R:
+                    filtered_flags |= pattern << MTIP_PORT_CONFIG_1x10GBASE_R;
+                    break;
+                default:
+                    CSMLOGERR("Invalid private flag set: %x\n", flags);
+            }
+        }
+        pflags = pflags >> 1;
+        port_config++;
+    }
+    CSMLOGINFO("final filtered_flags: %x\n", filtered_flags);
+    return filtered_flags;
 }
 
 int mtip_ethtool_set_priv_flags(struct net_device *netdev, u32 flags)
 {
     struct mtip_netdev_priv *priv;
     u32 link_index;
-    u32 pflag;
-    int err;
     int temp_flag = flags;
     enum mtip_port_config_enum port_config = MTIP_PORT_CONFIG_1x100GBASE_R;
     u32 real_link_number;
     u32 port_type;
-
+    int filtered_flags=0;
     priv = netdev_priv(netdev);
     link_index = priv->link_index;
 
@@ -1193,18 +1326,13 @@ int mtip_ethtool_set_priv_flags(struct net_device *netdev, u32 flags)
             port_config++;
         }
     }
-
+    filtered_flags = priv_flags_to_port_config_mapping(flags);
     // mark that priv flags have been set using ethtool
     priv->priv_flags_set = true;
-
-    for (pflag = 0; pflag < MTIP_ETHTOOL_PRIV_FLAGS_LEN; pflag++) {
-        err = mtip_ethtool_handle_pflag(netdev, flags, pflag);
-        if (err)
-            break;
-    }
+    priv->priv_flags = filtered_flags;
 
     mtip_netdev_set_port_priv_flags(netdev);
-    return err;
+    return 0;
 }
 
 void mtip_ethtool_set_msglevel(struct net_device *netdev, u32 level)

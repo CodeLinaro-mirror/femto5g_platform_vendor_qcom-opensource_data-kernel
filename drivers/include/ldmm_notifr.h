@@ -20,6 +20,11 @@ enum{
 	PCS_IF_DOWN
 };
 
+typedef struct {
+  	int port_type;
+  	int interface;
+} event_info_struct;
+
 /*Structure between LDMM and ETH to share information*/
 struct ldmm_eth_iface_ops {
 	stats_info (*ldmm_eth_iface_get_stats_info)(int link_index);

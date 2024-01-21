@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: GPL-2.0-only
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 /**
@@ -77,5 +77,7 @@ void qcom_aw_phy_notify_lane_bring_up_progress_to_mac(
                                   struct qcom_aw_phy_inst_config *phy_inst_info,
                                   enum eth_phy_iface_phy_lane_num_enum lane,
                                   bool in_progress);
+
+void qcom_aw_phy_handle_an_restart(struct work_struct *work);
 
 #endif /* QCOM_AW_PHY_MTIP_IF_H */

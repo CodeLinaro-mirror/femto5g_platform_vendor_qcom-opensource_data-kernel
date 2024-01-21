@@ -1073,7 +1073,7 @@ int aw_pmd_rx_background_adapt_enable_set(mss_access_t *mss,
                         RXIFFSM_CTRL_RXIFFSM_GENERAL_REQ_A_MASK,
                         RXIFFSM_CTRL_RXIFFSM_GENERAL_REQ_A_OFFSET, 0));
   if (poll_result == -1) {
-    USR_PRINTF("ERROR: Timed out waiting for asserting RXIFFSM_GENERAL_ACK\n");
+    USR_PRINTF_DBG("ERROR: Timed out waiting for asserting RXIFFSM_GENERAL_ACK\n");
     return AW_ERR_CODE_POLL_TIMEOUT;
   }
 

@@ -41,6 +41,7 @@ const struct ethtool_ops * mtip_debug_eth_get_ethtool_ops(void);
 int mtip_debug_eth_set_ethtool_ops(void);
 char ** get_mtip_debug_ethtool_stat_strings(void);
 void mtip_debug_eth_macstats_get_stats(struct net_device *netdev, u64 *data);
+bool check_if_valid_speed_for_debug_eth(u32 speed);
 bool check_if_valid_port_config_for_debug_eth(enum mtip_port_config_enum port_config);
 
 #endif /* MTIP_DEBUG_ETH_H */

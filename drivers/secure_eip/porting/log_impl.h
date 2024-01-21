@@ -1,6 +1,6 @@
 //SPDX-License-Identifier: GPL-2.0-only
 /*
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #ifndef LOG_IMPL_H
@@ -10,9 +10,9 @@
 
 #ifdef LOG_SEVERITY_MAX
 #undef LOG_SEVERITY_MAX
-#define LOG_SEVERITY_MAX LOG_SEVERITY_INFO
+#define LOG_SEVERITY_MAX LOG_SEVERITY_CRIT
 #else
-#define LOG_SEVERITY_MAX LOG_SEVERITY_INFO
+#define LOG_SEVERITY_MAX LOG_SEVERITY_CRIT
 #endif
 
 #define Log_Message eip_logdbg

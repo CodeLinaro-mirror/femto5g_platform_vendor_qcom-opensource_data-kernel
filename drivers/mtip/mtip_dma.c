@@ -48,6 +48,8 @@
 #include "mtip_device.h"
 #include "mtip_ptp.h"
 
+#define DMA_HANDLE_MAX 13
+
 void mtip_dma_ready_cb(void *user_data)
 {
    CSMLOGDBG("mtip_dma_ready_cb\n");
@@ -451,7 +453,11 @@ int mtip_disconnect_dma_pipe(ecpri_dma_eth_conn_hdl_t hdl)
 int mtip_start_dma_pipe(struct net_device *netdev, ecpri_dma_eth_conn_hdl_t hdl)
 {
    int rv = 0;
-
+   static bool hdl_repl[DMA_HANDLE_MAX] = {0};
+   struct mtip_netdev_priv *priv = NULL;
+   int rx_index = 0, tx_index = 0, i = 0;
+   struct ecpri_dma_pkt_completion_wrapper **pkts;
+   int num_pkt_allocs = MTIP_NAPI_WEIGHT * MTIP_RX_DMA_MAX_BUFFERS_PER_PACKET;
    // start the pipes
    rv = (ecpri_dma_eth_driver_ops.ecpri_dma_eth_start_endpoints)(hdl);
 
@@ -462,8 +468,82 @@ int mtip_start_dma_pipe(struct net_device *netdev, ecpri_dma_eth_conn_hdl_t hdl)
 
    // set the initial set of rx buffers
    // the number of buffers to replenish has to be at most MTIP_RX_RING_SIZE - 1
-   mtip_replenish_dma_rx_buffers(netdev, hdl, MTIP_RX_RING_SIZE - 1);
+   if(hdl_repl[hdl] == false)
+   {
+      priv = netdev_priv(netdev);
 
+      pkts = (struct ecpri_dma_pkt_completion_wrapper **)kmalloc(num_pkt_allocs * sizeof(struct ecpri_dma_pkt_completion_wrapper*), GFP_KERNEL);
+
+      if (pkts == NULL)
+      {
+         rv = -1;
+         CSMLOGERR("Memory alloc for tx completion wrapper failed\n");
+         goto ret;
+      }
+
+      priv->tx_comp_pkts = pkts;
+
+      for (tx_index = 0; tx_index < num_pkt_allocs; ++tx_index)
+      {
+         pkts[tx_index] = mtip_dma_alloc_completion_wrapper(GFP_KERNEL);
+
+         if (pkts[tx_index] == NULL)
+         {
+            rv = -1;
+            CSMLOGERR("Memory alloc for tx completion wrapper failed\n");
+            goto free_tx_buf;
+         }
+      }
+
+      pkts = NULL;
+      pkts = (struct ecpri_dma_pkt_completion_wrapper **)kmalloc(num_pkt_allocs * sizeof(struct ecpri_dma_pkt_completion_wrapper*), GFP_KERNEL);
+      if (pkts == NULL)
+      {
+         rv = -1;
+         CSMLOGERR("Memory alloc for rx completion wrapper failed\n");
+         goto free_tx_buf;
+      }
+
+      priv->rx_comp_pkts = pkts;
+
+      for (rx_index = 0; rx_index < num_pkt_allocs; ++rx_index)
+      {
+         pkts[rx_index] = mtip_dma_alloc_completion_wrapper(GFP_KERNEL);
+
+         if (pkts[rx_index] == NULL)
+         {
+            rv = -1;
+            CSMLOGERR("Memory alloc for rx completion wrapper failed\n");
+            goto free_rx_buf;
+         }
+      }
+
+      mtip_replenish_dma_rx_buffers(netdev, hdl, MTIP_RX_RING_SIZE - 1);
+      hdl_repl[hdl] = true;
+   }
+   goto ret;
+
+free_rx_buf:
+   pkts = priv->rx_comp_pkts;
+   for (i = 0; i < rx_index; ++i)
+   {
+      if(pkts[i])
+         mtip_dma_free_completion_wrapper(pkts[i]);
+   }
+   kfree(pkts);
+   priv->rx_comp_pkts = NULL;
+
+free_tx_buf:
+   pkts = priv->tx_comp_pkts;
+   for (i = 0; i < tx_index; ++i)
+   {
+      if(pkts[i])
+         mtip_dma_free_completion_wrapper(pkts[i]);
+   }
+   kfree(pkts);
+   priv->tx_comp_pkts = NULL;
+
+ret:
    return rv;
 }
 
@@ -482,52 +562,172 @@ int mtip_stop_dma_pipe(ecpri_dma_eth_conn_hdl_t hdl)
    return rv;
 }
 
-// replenish dma buffers
-int mtip_replenish_dma_rx_buffers(struct net_device *netdev, ecpri_dma_eth_conn_hdl_t hdl, u32 num_of_buffs)
+int mtip_replenish_dma_rx_buffers_reuse(struct net_device *netdev, ecpri_dma_eth_conn_hdl_t hdl, u32 num_of_buffs)
 {
    int rv = 0;
-   int j;
+   int j,i;
+   uint16_t curr_index = 0;
    int buff_size = mtip_dma_max_rx_buff_size;
    struct ecpri_dma_pkt **pkts = NULL;
+   struct ecpri_dma_pkt **head_pkt = NULL;
    struct ecpri_dma_mem_buffer **pbuffs = NULL;
+   struct mtip_pkt_priv *pkt_priv = NULL;
    bool commit = true;
-   struct sk_buff *skb;
+   struct sk_buff *skb = NULL;
    struct mtip_netdev_priv* priv;
    u32 link_index;
+   u32 num_of_pkts_to_send = num_of_buffs;
+   u32 num_of_pkts_remain = num_of_buffs;
 
    priv = netdev_priv(netdev);
 
    link_index = priv->link_index;
 
-   CSMLOGDBG("replenishing %d buffs for hdl %d\n", num_of_buffs, hdl);
+   CSMLOGDBG("Replenishing reused %d buffs for hdl %d\n", num_of_buffs, hdl);
+
+   pkts = priv->head;
+   if(pkts == NULL)
+   {
+      CSMLOGERR("HEAD is NULL, No buffers allocated and replenished to DMA\n");
+      return -1;
+   }
+
+   curr_index = priv->rx_curr_index;
+
+   for (j = 0; j < num_of_buffs ; ++j)
+   {
+      curr_index = (priv->rx_curr_index + j)%(MTIP_RX_RING_SIZE - 1);
+
+      skb = netdev_alloc_skb_ip_align(netdev, buff_size);
+      if(skb == NULL)
+      {
+         CSMLOGERR("Skb alloc with netdev_alloc_skb_ip_align failed\n");
+         goto skb_free;
+      }
+
+      // set the netdev of the skb
+      skb->dev = netdev;
+
+      pbuffs = pkts[curr_index]->buffs;
+
+      memset(pbuffs[0], 0, sizeof(struct ecpri_dma_mem_buffer));
+      pbuffs[0]->virt_base = skb->data;
+      pbuffs[0]->size = buff_size;
+      pbuffs[0]->phys_base = 0;
+
+      pkt_priv = (struct mtip_pkt_priv *)(pkts[curr_index]->user_data);
+      pkt_priv->skb = skb;
+      pkts[curr_index]->buffs = pbuffs;
+
+   }
+
+   head_pkt = priv->head;
+
+   while(num_of_pkts_remain)
+   {
+      if( (num_of_pkts_to_send + priv->rx_curr_index) > (MTIP_RX_RING_SIZE - 1))
+         num_of_pkts_to_send = (MTIP_RX_RING_SIZE - 1) - priv->rx_curr_index;
+      else
+         num_of_pkts_to_send = num_of_pkts_remain;
+
+      pkts = &(head_pkt[priv->rx_curr_index]);
+      // replenish the buffers
+      rv = (ecpri_dma_eth_driver_ops.ecpri_dma_eth_replenish_buffers)(hdl, pkts,num_of_pkts_to_send, commit);
+      if (rv < 0)
+      {
+         CSMLOGERR("Failed to replenish packets for hdl:%d,curr_index:%d,num_of_pkts_to_send:%d,num_of_pkts_remain:%d\n", hdl,priv->rx_curr_index,num_of_pkts_to_send,num_of_pkts_remain);
+         return -1;
+      }
+
+      num_of_pkts_remain -= num_of_pkts_to_send;
+      priv->rx_curr_index = ( (priv->rx_curr_index) + num_of_pkts_to_send )%(MTIP_RX_RING_SIZE - 1);
+   }
+
+   goto ret;
+
+skb_free:
+   pkts = priv->head;
+   for (i = 0; i < j ; ++i)
+   {
+      curr_index = (priv->rx_curr_index + i)%(MTIP_RX_RING_SIZE - 1);
+      // free the skb
+      pkt_priv = (struct mtip_pkt_priv *)(pkts[curr_index]->user_data);
+      if(pkt_priv)
+      {
+         if(pkt_priv->skb)
+            dev_kfree_skb(pkt_priv->skb);
+      }
+   }
+   return -1;
+ret:
+   return 0;
+}
+
+
+int mtip_replenish_dma_rx_buffers(struct net_device *netdev, ecpri_dma_eth_conn_hdl_t hdl, u32 num_of_buffs)
+{
+   int rv = 0;
+   int j,i;
+   int buff_size = mtip_dma_max_rx_buff_size;
+   struct ecpri_dma_pkt **pkts = NULL;
+   struct ecpri_dma_mem_buffer **pbuffs = NULL;
+   bool commit = true;
+   struct sk_buff *skb = NULL;
+   struct mtip_netdev_priv* priv;
+   u32 link_index;
+   struct mtip_pkt_priv *pkt_priv = NULL;
+
+   priv = netdev_priv(netdev);
+
+   link_index = priv->link_index;
+
+   CSMLOGDBG("Replenishing %d buffs for hdl %d\n", num_of_buffs, hdl);
 
    // replenish the rx buffers
    // allocate space to hold pkt pointers
    pkts = (struct ecpri_dma_pkt **)kmalloc(num_of_buffs * sizeof(struct ecpri_dma_pkt *), GFP_KERNEL);
    if(pkts == NULL)
    {
-	CSMLOGERR("memory alloc failed\n");
-	return -1;
+      CSMLOGERR("Memory alloc with kmalloc for ecpri_dma_pkt failed\n");
+      return -1;
    }
+   priv->head = pkts;
+   priv->rx_curr_index = 0;
 
    for (j = 0; j < num_of_buffs; ++j)
    {
       // the dma pkt struct
       pkts[j] = mtip_dma_alloc_dma_pkt(GFP_KERNEL);
+      if(pkts[j] == NULL)
+      {
+         CSMLOGERR("Memory alloc with mtip_dma_alloc_dma_pkt failed\n");
+         goto cleanup;
+      }
 
       // the dma mem buffer struct
       pbuffs = mtip_dma_alloc_mem_buffer_single_ptr(GFP_KERNEL);
+      if(pbuffs == NULL)
+      {
+         CSMLOGERR("Single pointer alloc with mtip_dma_alloc_mem_buffer_single_ptr failed\n");
+         goto cleanup;
+      }
 
       pbuffs[0] = mtip_dma_alloc_mem_buffer(GFP_KERNEL);
-
-      // HANDLE THE ERROR
+      if(pbuffs[0] == NULL)
+      {
+         CSMLOGERR("Mem buffer alloc with mtip_dma_alloc_mem_buffer failed\n");
+         goto cleanup;
+      }
 
       pkts[j]->num_of_buffers = 1;
 
       // allocate an skb where IP is aligned to 4 byte boundaries
       skb = __netdev_alloc_skb_ip_align(netdev, buff_size, GFP_KERNEL);
-
-      // HANDLE THE ERROR
+      if(skb == NULL)
+      {
+         CSMLOGERR("Skb alloc with __netdev_alloc_skb_ip_align failed\n");
+         goto cleanup;
+      }
 
       // set the netdev of the skb
       skb->dev = netdev;
@@ -539,7 +739,18 @@ int mtip_replenish_dma_rx_buffers(struct net_device *netdev, ecpri_dma_eth_conn_
 
       // allocate space for one mem_buffer
       pkts[j]->buffs = pbuffs;
-      pkts[j]->user_data = (void*)skb;
+
+      // allocate mtip packet priv structure
+      pkt_priv = (struct mtip_pkt_priv *)kmalloc(sizeof(struct mtip_pkt_priv), GFP_KERNEL);
+      if(pkt_priv == NULL)
+      {
+         CSMLOGERR("Pkt priv alloc failed\n");
+         goto cleanup;
+      }
+      pkt_priv->skb = skb;
+      pkt_priv->tx_index = 0;
+
+      pkts[j]->user_data = (void*)pkt_priv;
    }
 
    // replenish the buffers
@@ -547,13 +758,24 @@ int mtip_replenish_dma_rx_buffers(struct net_device *netdev, ecpri_dma_eth_conn_
 
    if (rv < 0)
    {
-      CSMLOGERR("failed to replenish packets for hdl: %d\n", hdl);
-
-      // free all the allocated memory
+      CSMLOGERR("Failed to replenish packets for hdl: %d\n", hdl);
+      goto cleanup;
    }
+   goto ret;
 
-   // we can now free the pkts using kfree
+cleanup:
+   for (i = 0; i < j; i++)
+   {
+      if(pkts[i] == NULL)
+         continue;
+
+      mtip_dma_free_pkt(pkts[i]);
+      pkts[i] = NULL;
+   }
    kfree(pkts);
+   return -1;
+
+ret:
    return 0;
 }
 
@@ -612,6 +834,9 @@ int mtip_dma_send_packet(struct net_device *netdev, ecpri_dma_eth_conn_hdl_t hdl
    unsigned long flags;
    u32 num_buffers = 1;
    struct ecpri_dma_tx_header *pre_header_buff;
+   struct ecpri_dma_pkt *tx_pkt;
+   uint16_t tx_curr_index;
+   struct mtip_pkt_priv *pkt_priv = NULL;
 
    priv = netdev_priv(netdev);
 
@@ -673,7 +898,13 @@ int mtip_dma_send_packet(struct net_device *netdev, ecpri_dma_eth_conn_hdl_t hdl
 
    pkts[0]->num_of_buffers = num_buffers;
    pkts[0]->buffs = buffs;
-   pkts[0]->user_data = (void*)skb;
+   
+   // allocate mtip packet priv structure
+   pkt_priv = (struct mtip_pkt_priv *)kmalloc(sizeof(struct mtip_pkt_priv), GFP_ATOMIC);
+   pkt_priv->skb = skb;
+   pkt_priv->tx_index = priv->tx_curr_index;
+
+   pkts[0]->user_data = (void*)pkt_priv;
 
    spin_lock_irqsave(lock, flags);
 
@@ -690,16 +921,35 @@ int mtip_dma_send_packet(struct net_device *netdev, ecpri_dma_eth_conn_hdl_t hdl
    mtip_dma_dump_packet(skb->data, skb->len);
 #endif
 
+   tx_curr_index = priv->tx_curr_index;
+   tx_pkt = priv->tx_pkts[tx_curr_index];
+
+   if(tx_pkt)
+   {
+      CSMLOGINFO("PT:TX COMP MISSED FOR THIS PACKET-FREE THIS PACKET:link_index=%d,tx_curr_index=%d,pkt=0x%x\n",link_index,tx_curr_index,tx_pkt);
+      mtip_dma_free_pkt(tx_pkt);
+   }
+   priv->tx_pkts[tx_curr_index] = pkts[0];
+
    res = (ecpri_dma_eth_driver_ops.ecpri_dma_eth_transmit)(hdl, pkts, 1, commit);
 
    if (res < 0)
    {
       CSMLOGERR("transmit failed for handle %d with res = %d\n", hdl, res);
+      if(pkts[0])
+      {
+         pkt_priv = (struct mtip_pkt_priv *)(pkts[0]->user_data);
+         if(pkt_priv)
+            pkt_priv->skb = NULL;
+         mtip_dma_free_pkt(pkts[0]);
+         priv->tx_pkts[tx_curr_index] = NULL;
 
-      // cleanup here
+      }
+      goto ret;
    }
+   priv->tx_curr_index = (tx_curr_index + 1)% MTIP_TX_RING_SIZE;
 
-   // free the container
+ret:
    mtip_dma_free_dma_pkt_ptr(pkts);
    return res;
 }
@@ -859,8 +1109,13 @@ static void mtip_dma_process_packet(
     struct iphdr* iphdr_ptr;
     struct mtip_security_device *sec_dev;
     int k = 0;
-    int p, i; 
+    struct mtip_pkt_priv *pkt_priv = NULL;
 
+    if(pkts == NULL)
+    {
+      CSMLOGERR("pkts is NULL\n");
+      return;
+    }
     priv = netdev_priv(netdev);
     link_index = priv->link_index;
     lock = &(priv->lock);
@@ -868,13 +1123,30 @@ static void mtip_dma_process_packet(
 
     status_code = pkts[s_idx]->status_code;
     pkt = pkts[s_idx]->pkt;
+    if(pkt == NULL)
+    {
+      CSMLOGERR("pkt is NULL\n");
+      return;
+    }
     num_of_buffers = pkt->num_of_buffers;
     buffs = (struct ecpri_dma_mem_buffer **)pkt->buffs;
+    if(buffs == NULL || buffs[0] == NULL)
+    {
+      CSMLOGERR("buffs is NULL\n");
+      return;
+    }
 
     size = buffs[0]->size;
     head_base = buffs[0]->virt_base;
-    head_skb = (struct sk_buff *)pkt->user_data;
+    pkt_priv = (struct mtip_pkt_priv *)(pkt->user_data);
+    head_skb = pkt_priv->skb;
+    pkt_priv->skb = NULL;
     curr_skb = head_skb;
+    if(head_skb == NULL)
+    {
+      CSMLOGERR("head_skb is NULL\n");
+      return;
+    }
 
     skb_put(head_skb, size);    
 
@@ -886,7 +1158,9 @@ static void mtip_dma_process_packet(
         pkt = pkts[k]->pkt;
         buffs = (struct ecpri_dma_mem_buffer **)pkt->buffs;
         size = buffs[0]->size;
-        nskb = (struct sk_buff *)pkt->user_data;
+        pkt_priv = (struct mtip_pkt_priv *)(pkt->user_data);
+        nskb = pkt_priv->skb;
+        pkt_priv->skb = NULL;
         num_of_buffers = pkt->num_of_buffers;
         
         if (curr_skb == head_skb)
@@ -938,29 +1212,12 @@ static void mtip_dma_process_packet(
         {
             ++(platform_driver_priv->mtip_links[link_index]->net_stats.rx_errors);
             dev_kfree_skb_any(head_skb);
-            goto out;
+            return;
         }
     }
     
     napi_gro_receive(napi_ptr, head_skb);
 
-out:
-    // free the container
-    for (p = s_idx; p <= e_idx; p++)
-    {
-        pkt = pkts[p]->pkt;
-        buffs = (struct ecpri_dma_mem_buffer **)pkt->buffs;
-        num_of_buffers = pkt->num_of_buffers;
-        
-        for (i = 0; i < num_of_buffers; ++i)
-        {
-            mtip_dma_free_mem_buffer(buffs[i]);
-        }
-
-        //CSMLOGINFO(" Pkt free p %d \n", p);
-        mtip_dma_free_mem_buffer_single_ptr(buffs);
-        mtip_dma_free_dma_pkt(pkt);
-    }
 }
  
 
@@ -1021,10 +1278,9 @@ out:
 int mtip_dma_poll_rx_packets(struct net_device *netdev, struct napi_struct *napi_ptr, ecpri_dma_eth_conn_hdl_t hdl, 
                              int budget, int* npackets, int *num_buffers)
 {
-   int j, k, s_idx, i;
-   int rv;
-   int num_pkt_allocs = budget*MTIP_RX_DMA_MAX_BUFFERS_PER_PACKET;
-   struct ecpri_dma_pkt_completion_wrapper **pkts; 
+   int j, k, s_idx;
+   int rv = 0;
+   struct ecpri_dma_pkt_completion_wrapper **pkts = NULL; 
    struct mtip_netdev_priv* priv;
    u32 link_index;
    spinlock_t *lock;
@@ -1083,25 +1339,12 @@ int mtip_dma_poll_rx_packets(struct net_device *netdev, struct napi_struct *napi
 
    spin_lock_irqsave(lock, flags);
 
-   pkts = (struct ecpri_dma_pkt_completion_wrapper **)kmalloc(num_pkt_allocs * sizeof(struct ecpri_dma_pkt_completion_wrapper*), GFP_ATOMIC);
-
+   pkts = priv->rx_comp_pkts;
    if (pkts == NULL)
    {
        rv = -1;
        spin_unlock_irqrestore(lock, flags);
        goto out;
-   }
-
-   for (j = 0; j < num_pkt_allocs; ++j) 
-   {
-      pkts[j] = mtip_dma_alloc_completion_wrapper(GFP_ATOMIC);
-
-       if (pkts[j] == NULL)
-       {
-           rv = -1;
-           spin_unlock_irqrestore(lock, flags);
-           goto out1;
-       }
    }
 
    spin_unlock_irqrestore(lock, flags);
@@ -1116,6 +1359,7 @@ int mtip_dma_poll_rx_packets(struct net_device *netdev, struct napi_struct *napi
 
    if (rv < 0)
    {
+      *npackets = 0;
       CSMLOGERR("dma_eth_rx_poll hdl: %d returned: %d\n", actual_handle, rv);
    }
    else
@@ -1123,6 +1367,7 @@ int mtip_dma_poll_rx_packets(struct net_device *netdev, struct napi_struct *napi
       CSMLOGDBG("read from hdl %d: actual read packets: %d\n", actual_handle, *npackets);
 
       s_idx = 0;
+
       for (j = 0; j < *npackets; j++)   // loop over all packets
       {
           for(k = s_idx; k < (s_idx + MTIP_RX_DMA_MAX_BUFFERS_PER_PACKET); k++)  // Loop over all buffers from start idx (s_idx) to s_idx+4
@@ -1142,18 +1387,6 @@ int mtip_dma_poll_rx_packets(struct net_device *netdev, struct napi_struct *napi
           s_idx = *num_buffers;
       }
    }
-   j = num_pkt_allocs; 
-
-out1:
-   
-   for (i = 0; i < j; ++i) 
-   {
-       // free the completion wrappers
-       mtip_dma_free_completion_wrapper(pkts[i]);
-   }
-
-   // this is freed using kfree
-   kfree(pkts);
 
 out:
    return rv;
@@ -1447,6 +1680,52 @@ void mtip_dma_free_tx_header(struct ecpri_dma_tx_header* ptr)
     kmem_cache_free(platform_driver_priv->mtip_dma_alloc_array[index].cachep, (void *)ptr);
 }
 /* TX HEADER */
+
+// FREE Complete DMA Packet along with Buffers, Preheader and Skb
+
+void mtip_dma_free_pkt(struct ecpri_dma_pkt* pkt)
+{
+   struct ecpri_dma_tx_header *pre_header_buff;
+   struct ecpri_dma_mem_buffer **buffs;
+   struct mtip_pkt_priv *pkt_priv = NULL;
+   int j,num_buffers;
+
+   if(!pkt)
+      return;
+
+   if(pkt->buffs)
+   {
+      buffs = (struct ecpri_dma_mem_buffer **)pkt->buffs;
+      num_buffers = pkt->num_of_buffers;
+
+      for (j = 0; j < num_buffers; ++j)
+      {
+         if(num_buffers == 2 && j == 0)
+         {
+            pre_header_buff = (struct ecpri_dma_tx_header *)buffs[j]->virt_base;
+            // free the pre header buff
+            if(pre_header_buff)
+               mtip_dma_free_tx_header(pre_header_buff);
+         }
+         mtip_dma_free_mem_buffer(buffs[j]);
+      }
+      if(num_buffers == 2)
+         mtip_dma_free_mem_buffer_dual_ptr(buffs);
+      else
+         mtip_dma_free_mem_buffer_single_ptr(buffs);
+   }
+
+   // free the skb
+   pkt_priv = (struct mtip_pkt_priv *)(pkt->user_data);
+   if(pkt_priv)
+   {
+      if(pkt_priv->skb)
+         dev_kfree_skb(pkt_priv->skb);
+      kfree(pkt_priv);
+   }
+
+   mtip_dma_free_dma_pkt(pkt);
+}
 
 int mtip_dma_alloc_initialize(u32 index)
 {

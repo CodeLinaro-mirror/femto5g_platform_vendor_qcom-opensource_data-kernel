@@ -207,9 +207,22 @@ int mtip_ptp_tx_ts_list_initialize(u32 link_index)
 
 int mtip_ptp_tx_ts_list_finalize(u32 link_index)
 {
-   // go through all the packets and pop them
+   u8 tmp_ts_seq_num = 0;
+   u32 timestamp_secs;
+   u32 timestamp_nsecs;
 
-   // free the memory allocations
+   CSMLOGINFO("Flushing pending tx_ts_list\n");
+   // Aquire the ptp lock
+   mtip_ptp_tx_ts_lock_acquire(link_index);
+
+   while(mtip_ptp_tx_ts_list_size(link_index)!=0)
+   {
+      // pop the timestamp
+      mtip_ptp_tx_ts_list_pop(link_index, &timestamp_secs, &timestamp_nsecs, &tmp_ts_seq_num);
+   }
+
+   // release the ptp lock
+   mtip_ptp_tx_ts_lock_release(link_index);
    return 0;
 }
 
@@ -338,9 +351,21 @@ int mtip_ptp_tx_ts_skb_list_initialize(u32 link_index)
 
 int mtip_ptp_tx_ts_skb_list_finalize(u32 link_index)
 {
-   // go through all the packets and pop them
+   struct sk_buff* tmp_skb = NULL;
+   u8 skb_ts_seq_num = 0;
 
-   // free the memory allocations
+   CSMLOGINFO("Flushing pending tx_ts_skb_list\n");
+   // Aquire the ptp lock
+   mtip_ptp_tx_ts_lock_acquire(link_index);
+
+   while(mtip_ptp_tx_ts_skb_list_size(link_index) != 0)
+   {
+      // pop the skbs
+      mtip_ptp_tx_ts_skb_list_pop(link_index, &tmp_skb, &skb_ts_seq_num);
+   }
+
+   // release the ptp lock
+   mtip_ptp_tx_ts_lock_release(link_index);
    return 0;
 }
 

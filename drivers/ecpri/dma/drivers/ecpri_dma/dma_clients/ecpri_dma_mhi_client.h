@@ -54,6 +54,11 @@ struct ecpri_dma_mhi_ee_gsi_tuple {
 	enum ecpri_dma_gsi_id gsi_id;
 };
 
+enum ecpri_dma_mhi_pkt_type {
+	ECPRI_DMA_MHI_SYNC_PACKET = 0,
+	ECPRI_DMA_MHI_ASYNC_PACKET = 1,
+};
+
 enum ecpri_dma_mhi_dma_dir {
 	ECPRI_DMA_MHI_DMA_TO_HOST,
 	ECPRI_DMA_MHI_DMA_FROM_HOST,
@@ -162,10 +167,8 @@ enum ecpri_dma_hw_mhi_channel_states {
  * @channel_context_addr: Channel context address
  * @ev_context_addr: Event context address
  * @endp_ctx: DMA end point context
- * @is_over_pcie: indicates channel should transact over PCIe – Configurable by
- *					SW.
- * @disable_overflow_event: when set overflow events are not generated on this
- *							ch.
+ * @is_over_pcie: indicates channel should transact over PCIe - Configurable by SW.
+ * @disable_overflow_event: when set overflow events are not generated on this ch.
  * @msi_config: MSI (Message Signaled Interrupts) parameters
  *
  * @clnt_hdl: ENDP handle
@@ -191,7 +194,6 @@ struct ecpri_dma_mhi_channel_ctx {
 	struct mhi_dma_msi_info* msi_config;
 	u32 clnt_hdl;
 };
-
 
 /**
  * struct ecpri_dma_mhi_client_context - MHI Client context
@@ -242,14 +244,12 @@ struct ecpri_dma_mhi_client_context {
 * @user_cb: ECPRI DMA client provided completion callback
 * @user1: cookie1 for above callback
 * @user_data: userdata for DMA cb
-* @link: linked to the wrappers list on the proper(sync/async) cons pipe
-*
+
 * This struct can wrap both sync and async memcpy transfers descriptors.
 */
 struct ecpri_dma_mhi_xfer_wrapper {
 	void (*user_cb)(void *user1);
 	void *user_data;
-	struct list_head link;
 	struct mhi_dma_function_params function;
 };
 
@@ -283,9 +283,6 @@ struct ecpri_dma_mhi_wq_work_type {
  * @destroy_pending: destroy ecpri_dma after handling all pending memcpy
  * @cbs_list: list of user callbacks and data
  * @loop_counter: Loop counter for sync_memcopy (statistics)
- * @xfer_wrapper_cache: cache of ecpri_dma_mhi_xfer_wrapper structs
- * @async_work_wp: index of free async_work to write work into
- * @async_work_rp: index of next async_work to handle
  */
 struct ecpri_dma_mhi_memcpy_context {
 	spinlock_t lock;
@@ -303,14 +300,49 @@ struct ecpri_dma_mhi_memcpy_context {
 	struct workqueue_struct *async_wq;
 	struct completion done;
 	bool destroy_pending;
-	struct list_head cbs_list;
 	u32 loop_counter;
-	struct kmem_cache* xfer_wrapper_cache;
-	struct ecpri_dma_mhi_async_wq_work_type async_work[ECPRI_DMA_MHI_ASYNC_MEMCPY_RLEN];
-	u32 async_work_wp;
-	u32 async_work_rp;
-};
 
+	ECPRI_DMA_MEMRING_CREATE(
+		async_work_ring,
+		struct ecpri_dma_mhi_async_wq_work_type,
+		ECPRI_DMA_MHI_ASYNC_MEMCPY_RLEN);
+	ECPRI_DMA_MEMRING_CREATE(
+		xfer_descr_ring,
+		struct ecpri_dma_mhi_xfer_wrapper,
+		ECPRI_DMA_MHI_ASYNC_MEMCPY_RLEN);
+	ECPRI_DMA_MEMRING_CREATE(
+		src_func_ring,
+		struct mhi_dma_function_params,
+		ECPRI_DMA_MHI_ASYNC_MEMCPY_RLEN);
+	ECPRI_DMA_MEMRING_CREATE(
+		dst_func_ring,
+		struct mhi_dma_function_params,
+		ECPRI_DMA_MHI_ASYNC_MEMCPY_RLEN);
+	ECPRI_DMA_MEMRING_CREATE(
+		src_pkt_ring,
+		struct ecpri_dma_pkt,
+		ECPRI_DMA_MHI_ASYNC_MEMCPY_RLEN);
+	ECPRI_DMA_MEMRING_CREATE(
+		dst_pkt_ring,
+		struct ecpri_dma_pkt,
+		ECPRI_DMA_MHI_ASYNC_MEMCPY_RLEN);
+	ECPRI_DMA_MEMRING_CREATE(
+		src_bufs_ptr_ring,
+		struct ecpri_dma_mem_buffer *,
+		ECPRI_DMA_MHI_ASYNC_MEMCPY_RLEN);
+	ECPRI_DMA_MEMRING_CREATE(
+		dst_bufs_ptr_ring,
+		struct ecpri_dma_mem_buffer *,
+		ECPRI_DMA_MHI_ASYNC_MEMCPY_RLEN);
+	ECPRI_DMA_MEMRING_CREATE(
+		src_bufs_ring,
+		struct ecpri_dma_mem_buffer,
+		ECPRI_DMA_MHI_ASYNC_MEMCPY_RLEN);
+	ECPRI_DMA_MEMRING_CREATE(
+		dst_bufs_ring,
+		struct ecpri_dma_mem_buffer,
+		ECPRI_DMA_MHI_ASYNC_MEMCPY_RLEN);
+};
 
 /**
  * struct ecpri_dma_mhi_function_endp_data - Holds ENDPOINT IDs per VM/PF
@@ -329,6 +361,27 @@ struct ecpri_dma_mhi_function_endp_data {
 	int sync_dest_id;
 	int async_src_id;
 	int async_dest_id;
+};
+
+/**
+ * ecpri_dma_mhi_dma_alloc_pkt() - Allocates
+ * the memory for packet's buffer
+ *
+ * @buff_addr:  [IN] Buffer address
+ * @len:        [IN] Buffer length
+ * @function:   [IN] VF \ PF info
+ * @pkt_type:   [IN] sync/async packet
+ * @ecpri_dma_endp_dir:  [IN] packet direction, used only for async packet
+ * @memcpy_ctx: [IN] memcpy operation context,  used only for async packet
+ *
+ */
+struct ecpri_dma_mhi_alloc_pkt_params {
+	u64 buff_addr;
+	int len;
+	struct mhi_dma_function_params* function;
+	enum ecpri_dma_mhi_pkt_type pkt_type;
+	enum ecpri_dma_endp_dir dir;
+	struct ecpri_dma_mhi_memcpy_context* memcpy_ctx;
 };
 
 int ecpri_dma_mhi_provide_ops(void);

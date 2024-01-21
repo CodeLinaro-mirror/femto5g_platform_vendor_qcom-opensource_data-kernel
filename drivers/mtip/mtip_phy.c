@@ -62,6 +62,8 @@ struct eth_phy_iface_eth_register_params mtip_phy_eth_params;
 extern struct eth_phy_iface_ops qcom_aw_phy_driver_iface_ops;
 
 struct mtip_delayed_work_q_params *delayed_wq_params[MTIP_MAX_LINKS] = {NULL};
+extern struct mutex delayed_wq_mutex_lock;
+extern struct workqueue_struct *delayed_wq;
 
 u8 mtip_phy_retry_num[MTIP_MAX_LINKS] = {0};
 
@@ -101,7 +103,7 @@ static void mtip_phy_ready_cb(void *user_data)
 
 static void mtip_phy_an_result_cb(enum mtip_port_type_enum port_type, bool an_result, enum mtip_port_config_enum port_config, u8 seq_num)
 {
-    CSMLOGINFO("Got AN complete CB for port: %d seq %d result %d port_config %d %s\n", port_type, seq_num, an_result, port_config, mtip_ethtool_get_priv_flags_str(port_config));
+    CSMLOGINFO("Got AN complete CB for port: %d seq %d result %d port_config %d %s\n", port_type, seq_num, an_result, port_config, mtip_ethtool_get_port_config_str(port_config));
 
     if(seq_num != mtip_phy_an_seq_num[port_type])
     {
@@ -198,6 +200,12 @@ void run_mtip_process_cdr_lock_ind(void* workptr)
     }
     else if(status == true)
     {
+        mutex_lock(&delayed_wq_mutex_lock);
+        if(!delayed_wq)
+	{
+           mutex_unlock(&delayed_wq_mutex_lock);
+           goto out;
+	}
         delayed_wq_params[link_index] =
                               kmalloc(sizeof(struct mtip_delayed_work_q_params),
                                       GFP_ATOMIC);
@@ -210,6 +218,7 @@ void run_mtip_process_cdr_lock_ind(void* workptr)
             mtip_workq_queue_delayed_work(delayed_wq_params[link_index],
                                           MTIP_PHY_RETRY_TIMER);
         }
+        mutex_unlock(&delayed_wq_mutex_lock);
     }
 
 out:
@@ -448,7 +457,7 @@ int mtip_phy_bringup_phy(u32 link_index, int sfp_port_type)
 
     port_config = platform_driver_priv->mtip_ports[port_type]->port_config;
 
-    CSMLOGINFO("phy bringup of port_type %d with config %d, %s", port_type, port_config, mtip_ethtool_get_priv_flags_str(port_config));
+    CSMLOGINFO("phy bringup of port_type %d with config %d, %s", port_type, port_config, mtip_ethtool_get_port_config_str(port_config));
 
     mtip_phy_get_lanes_of_link(link_index, lanes_enabled);
 
@@ -480,6 +489,12 @@ int mtip_phy_teardown_phy(u32 link_index)
     // stop listening to link status interrupts
     mtip_phy_lane_bring_up_progress_ind(link_index, true);
 
+    // Process link down
+    if (mtip_loopback_mode == MTIP_MODE_DEFAULT)
+    {
+        mtip_process_link_state(link_index, false);
+    }
+
     mtip_phy_get_lanes_of_link(link_index, lanes_enabled);
 
     for (i = 0; i < PHY_LANE_MAX; ++i) 
@@ -491,12 +506,6 @@ int mtip_phy_teardown_phy(u32 link_index)
     ret_val = (qcom_aw_phy_driver_iface_ops.eth_phy_iface_phy_teardown)(port_type, lanes_enabled);
 
     CSMLOGINFO("phy teardown done for link_index %d rv %d", link_index, ret_val);
-
-    // disable tx_rx on the link
-    if (mtip_loopback_mode == MTIP_MODE_DEFAULT)
-    {
-        mtip_process_link_state(link_index, false);
-    }
 
     // Clear the retry count if interface has been torn down
     if(platform_driver_priv->mtip_links[link_index]->state == MTIP_LINK_STATE_CLOSE)
@@ -1175,20 +1184,19 @@ int mtip_phy_create_phylink(struct mtip_lane_device_info* lane_device)
     return 0;
 }
 
-int mtip_phy_destroy_phylink(u32 lane_index)
+int mtip_phy_destroy_phylink(struct phylink *phylink,struct net_device* lane_dummy_ndev)
 {
-    if (platform_driver_priv->devices.lane_devices[lane_index].sfp_phandle != -1)
-    {
-       // stop the phylink
-       phylink_stop(platform_driver_priv->mtip_lanes[lane_index]->phylink);
+    if(phylink) 
+	{
+	  // stop the phylink
+       phylink_stop(phylink);
 
        // destory the phylink
-       phylink_destroy(platform_driver_priv->mtip_lanes[lane_index]->phylink);
-
+       phylink_destroy(phylink);
+	}
        // free the netdev
-       if(platform_driver_priv->mtip_lanes[lane_index]->lane_dummy_ndev)
-          free_netdev(platform_driver_priv->mtip_lanes[lane_index]->lane_dummy_ndev);
-    }
+    if(lane_dummy_ndev)
+       free_netdev(lane_dummy_ndev);
 
     return 0;
 }
@@ -1215,13 +1223,13 @@ trx_link_length_range mtip_phy_get_trx_link_length_range(struct mtip_port_device
     return TRX_LINK_UNKNOWN;
 }
 
-void mtip_phy_notify_eth_event_to_trx(u32 link_index, bool enable)
+void mtip_phy_notify_eth_event_to_trx(u32 link_index, trx_phy_event event)
 {
     enum mtip_port_type_enum port_type;
     bool lanes_enabled[PHY_LANE_MAX];
     int i;
     u32 lane_index;
-    u32 sfp_phandle[MAX_ETH_LANES] = {0};
+    u32 sfp_phandle[MTIP_MAX_LANES_PER_PORT] = {0};
     u8 sfp_lane_count = 0;
 
     if (mtip_lookup_port_type_by_link_index(link_index, &port_type) < 0)
@@ -1238,13 +1246,13 @@ void mtip_phy_notify_eth_event_to_trx(u32 link_index, bool enable)
             mtip_lookup_lane_index_by_port_type_and_real_lane(&lane_index, port_type, i);
             sfp_phandle[sfp_lane_count++] = platform_driver_priv->devices.lane_devices[lane_index].sfp_phandle;
             CSMLOGINFO("eth_event %d for link_index %d = lane %d = sfp_phandle=%d",
-                       enable, link_index, lane_index, sfp_phandle[sfp_lane_count-1]);
+                       event, link_index, lane_index, sfp_phandle[sfp_lane_count-1]);
         }
     }
 
     // Indicate transceiver driver about interface bring up
     rtnl_lock();
-    qsfp_trx_ifconfig_notifier(enable, sfp_phandle);
+    qsfp_trx_eth_event_notifier(event, sfp_phandle, sfp_lane_count);
     rtnl_unlock();
 
     return;

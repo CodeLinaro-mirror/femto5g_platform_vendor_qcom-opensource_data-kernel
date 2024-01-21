@@ -170,7 +170,7 @@ char help_menu[] = {
 27,x	Flag to configure if PRBS needs to be validated for all lanes\n\
 28,x	Set equalization mode 'x' (1-Manual, 2-ANLT. 3-LT)\n"};
 
-void qcom_aw_phy_setup_sysfs() {
+void qcom_aw_phy_setup_debugfs() {
 
   /* creating the directory structure in /sys/kernel/debug */
   dobj = debugfs_create_dir("qcom_aw_phy_test", NULL);
@@ -187,7 +187,7 @@ void qcom_aw_phy_setup_sysfs() {
   return;
 }
 
-void qcom_aw_phy_del_sysfs() {
+void qcom_aw_phy_del_debugfs() {
 
   /* deleting the directory structure in /sys/kernel/debug */
   debugfs_remove_recursive(dobj);

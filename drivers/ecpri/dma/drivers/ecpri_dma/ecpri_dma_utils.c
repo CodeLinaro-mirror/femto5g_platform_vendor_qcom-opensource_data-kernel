@@ -8885,6 +8885,9 @@ static void  ecpri_dma_gsi_ev_err_cb(struct gsi_evt_err_notify* notify)
 int ecpri_dma_hw_init(void)
 {
 	ecpri_hwio_def_ecpri_hw_params_0_u hw_params_0 = { 0 };
+	ecpri_hwio_def_ecpri_stream_ctrl_u dma_stream_control = { 0 };
+	u32 hw_ver = ECPRI_DMA_GET_CTX_HW_VER();
+	u32 hw_flavor = ECPRI_DMA_GET_HW_FLAVOR();
 
 	/* Get Clocks */
 	DMADBG("Started getting clocks\n");
@@ -8906,7 +8909,7 @@ int ecpri_dma_hw_init(void)
 	ECPRI_DMA_PREPARE_AND_ENABLE_CLK(dma_fast_div2_noc_clk);
 	ECPRI_DMA_PREPARE_AND_ENABLE_CLK(dma_nfapi_axi_clk);
 
-	if(ecpri_dma_get_ctx_hw_ver() > ECPRI_HW_V1_0)
+	if(hw_ver > ECPRI_HW_V1_0)
 		ECPRI_DMA_PREPARE_AND_ENABLE_CLK(gcc_ddrss_ecpri_gsi);
 
 	clk_set_rate(ecpri_dma_ctx->clks.gcc_aggre_noc_ecpri_dma,
@@ -8951,6 +8954,20 @@ int ecpri_dma_hw_init(void)
 	       hw_params_0.def.total_channels_n);
 	if (hw_params_0.def.total_channels_n == 0)
 		return -EFAULT;
+
+
+	/* Set DMA Pre-Fetch buffer size to support jumbo packets on LTE FH perf */
+	if ((hw_ver > ECPRI_HW_V1_0) &&
+		(hw_flavor == ECPRI_HW_FLAVOR_DU_PCIE_3_X_12 ||
+			hw_flavor == ECPRI_HW_FLAVOR_DU_PCIE_4_X_9 ||
+			hw_flavor == ECPRI_HW_FLAVOR_DU_PCIE_5_X_6)) {
+		dma_stream_control.value =
+			ecpri_dma_hal_read_reg(ECPRI_DMA_STREAM_CTRL);
+		dma_stream_control.def.fh_limit += ECPRI_DMA_PRE_FETCH_CHANGE_SIZE;
+		dma_stream_control.def.l2_limit -= ECPRI_DMA_PRE_FETCH_CHANGE_SIZE;
+		ecpri_dma_hal_write_reg(ECPRI_DMA_STREAM_CTRL,
+			dma_stream_control.value);
+	}
 
 	return 0;
 }
@@ -9149,7 +9166,7 @@ int ecpri_dma_setup_dma_endps(
 					case ECPRI_DMA_ENDP_STREAM_MODE_M2M:
 						break;
 					case ECPRI_DMA_ENDP_STREAM_MODE_S2M:
-						if (ecpri_dma_get_ctx_hw_ver() != ECPRI_HW_V1_0) {
+						if (ECPRI_DMA_GET_CTX_HW_VER() != ECPRI_HW_V1_0) {
 							lte_cfg.def.is_lte =
 									(*endp_map)[gsi_id][endp_id].lte_enable;
 
@@ -9702,16 +9719,6 @@ int ecpri_dma_gsi_start_channel(struct ecpri_dma_endp_context *ep)
 	return ret;
 }
 
-u32 ecpri_dma_get_ctx_hw_ver()
-{
-	return ecpri_dma_ctx->ecpri_hw_ver;
-}
-
-u32 ecpri_dma_get_ctx_hw_flavor()
-{
-	return ecpri_dma_ctx->hw_flavor;
-}
-
 int ecpri_dma_get_gsi_dev_hdl(unsigned long* dev_hdl)
 {
 	bool ready = false;
@@ -9825,4 +9832,50 @@ int ecpri_dma_get_endp_stats(struct ecpri_dma_endp_context* ep,
 		(ep->chan_scratch.mhi.total_bytes_wa * ((u64)DMA_UINT32_MAX + 1));
 
 	return ret;
+}
+
+void ecpri_dma_lte_set_loopback(int val)
+{
+	int endp_id = 0;
+	int gsi_id = 0;
+	ecpri_hwio_def_ecpri_endp_cfg_dest_gsi_m_ch_n_u endp_cfg_dest = { 0 };
+	ecpri_hwio_def_ecpri_endp_cfg_xbar_u endp_cfg_xbar = { 0 };
+
+	if (!ecpri_dma_ctx->endp_map)
+		return;
+
+	for (gsi_id = 0; gsi_id < ECPRI_DMA_GSI_NUM_MAX; gsi_id++) {
+		for (endp_id = 0; endp_id < ECPRI_DMA_ENDP_NUM_MAX; endp_id++) {
+			if ((*ecpri_dma_ctx->endp_map)[gsi_id][endp_id].valid &&
+				((*ecpri_dma_ctx->endp_map)[gsi_id][endp_id].dir ==
+					ECPRI_DMA_ENDP_DIR_SRC) &&
+				(*ecpri_dma_ctx->endp_map)[gsi_id][endp_id].lte_enable) {
+
+				endp_cfg_xbar.value =
+					ecpri_dma_hal_read_reg_mn(ECPRI_ENDP_CFG_XBAR, gsi_id,
+						endp_id);
+				endp_cfg_dest.value =
+					ecpri_dma_hal_read_reg_mn(ECPRI_ENDP_CFG_DEST, gsi_id,
+						endp_id);
+
+				if (val) {
+					endp_cfg_xbar.def_v2.loopback_en = 1;
+					endp_cfg_dest.def.dest_mem_channel = endp_id +
+						ECPRI_DMA_MIN_DEST_ENDP;
+					endp_cfg_dest.def.loopback_gid =
+						gsi_id;
+				}
+				else {
+					endp_cfg_xbar.def_v2.loopback_en = 0;
+					endp_cfg_dest.def.dest_mem_channel = 0;
+					endp_cfg_dest.def.loopback_gid = 0;
+				}
+
+				ecpri_dma_hal_write_reg_mn(
+					ECPRI_ENDP_CFG_XBAR, gsi_id, endp_id, endp_cfg_xbar.value);
+				ecpri_dma_hal_write_reg_mn(
+					ECPRI_ENDP_CFG_DEST, gsi_id, endp_id, endp_cfg_dest.value);
+			}
+		}
+	}
 }

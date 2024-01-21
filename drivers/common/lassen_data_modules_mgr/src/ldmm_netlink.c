@@ -53,6 +53,7 @@ static struct nla_policy fult_mgmt_rcv_pol[LDMM_A_MAX + 1] = {
   	[LDMM_QXDM_LOGGER_ATTR_GET_STATS_INFO] = { .type = NLA_U32 },
   	[LDMM_QXDM_LOGGER_ATTR_GET_CONFIG_INFO] = { .type = NLA_U32},
   	[LDMM_QXDM_LOGGER_ATTR_LINK_CHANGE_NOTIFICATION] = { .type = NLA_U32},
+	[LDMM_QXDM_LOGGER_ATTR_UPDATE_TIMER_VALUE] = { .type = NLA_U32},
 };
 
 /* Operations for our Generic Netlink family */
@@ -74,6 +75,11 @@ static struct genl_ops genl_ops[] = {
       	},
       	{
         	.cmd = LDMM_QXDM_LOGGER_CMD_LINK_CHANGE_NOTIFICATION,
+        	.policy = fult_mgmt_rcv_pol,
+        	.doit = ldmm_qxdm_logger_no_action,
+      	},
+	{
+        	.cmd = LDMM_QXDM_LOGGER_CMD_UPDATE_TIMER_VALUE,
         	.policy = fult_mgmt_rcv_pol,
         	.doit = ldmm_qxdm_logger_no_action,
       	},
@@ -218,6 +224,42 @@ int ldmm_qxdm_logger_get_stats_info(struct sk_buff *sender_skb, struct genl_info
     	return 0;
 }
 
+int ldmm_qxdm_logger_update_timer_value(int timer_value)
+{
+	struct sk_buff *reply_skb;
+	void *msg_head;
+	int ret_val = 0;
+
+	reply_skb = genlmsg_new(NLMSG_GOODSIZE, GFP_KERNEL);
+	if (reply_skb == NULL) {
+        	pr_err("Out of Memory \n");
+        	return -1;
+    	}
+
+	msg_head = genlmsg_put(reply_skb, 0, 0, &genl_fam, 0, LDMM_QXDM_LOGGER_CMD_UPDATE_TIMER_VALUE);
+
+	if (msg_head == NULL) {
+		pr_err("genlmsg_put failed \n");
+		return -1;
+	}
+
+	ret_val = nla_put(reply_skb, LDMM_QXDM_LOGGER_ATTR_UPDATE_TIMER_VALUE, sizeof(int), &timer_value);
+
+	if (ret_val != 0) {
+		pr_err("nla_put API failed \n");
+		return -1;
+	}
+
+	genlmsg_end(reply_skb, msg_head);
+
+	ret_val = genlmsg_unicast(&init_net, reply_skb, dst_portid);
+	if (ret_val != 0) {
+		pr_err("genlmsg_unicast failed \n");
+		return -1;
+	}
+	return 0;
+}
+
 void parse_config_packet(config_packet_info* config_packet, int parsed_msg[])
 {
 	int port_index, link_index, i = 0;
@@ -299,7 +341,7 @@ int ldmm_qxdm_logger_get_config_info(struct sk_buff *sender_skb, struct genl_inf
 	return 0;
 }
 
-int ldmm_qxdm_logger_link_change_notification(void)
+int ldmm_qxdm_logger_link_change_notification(event_info_struct *event_info, int link_up)
 {
 	struct sk_buff *reply_skb;
 	void *msg_head;
@@ -309,7 +351,11 @@ int ldmm_qxdm_logger_link_change_notification(void)
 
 	config = mtip_driver_iface_ops.ldmm_eth_iface_get_config_info();
 
-	parse_config_packet(&config, parsed_msg);
+	parsed_msg[0] = link_up;
+	parsed_msg[1] = event_info->port_type;
+	parsed_msg[2] = event_info->interface;
+
+	parse_config_packet(&config, &parsed_msg[EVENT_PACKET_SIZE]);
 
 	reply_skb = genlmsg_new(NLMSG_GOODSIZE, GFP_KERNEL);
 	if (reply_skb == NULL) {

@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: GPL-2.0-only
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include "ecpriss_core.h"
@@ -23,6 +23,10 @@ extern struct eth_ecpriss_ops mtip_ecpri_ops;
 int disable_xbar_dma_fh_same_prio = false;
 module_param(disable_xbar_dma_fh_same_prio, int, S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP);
 MODULE_PARM_DESC(disable_xbar_dma_fh_same_prio, "XBAR FH and DMA Priority Configuration");
+
+int lte_fh_enabled = 0;
+module_param(lte_fh_enabled, int, S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP);
+MODULE_PARM_DESC(lte_fh_enabled, "Enable LTE FH");
 
 int stats_timeout_ms = 250;
 int ecpriss_qudp_strict_filt_cfg[MAX_PORTS] = {0,0,0};
@@ -124,8 +128,8 @@ static int ecpriss_core_remove(struct platform_device *pdev)
 		dma_ecpri_ss_driver_ops.ecpri_dma_ecpri_ss_deregister();
 		ecpriss_qudp_irq_destroy_v2();
 		ecpriss_xbar_destroy_interrupts_v2();
-		ecpriss_destroy_timers_v2();
 		ecpriss_destroy_workq();
+		ecpriss_destroy_timers_v2();
 		ecpriss_destroy_ipc_log_v2();
 		ecpriss_unmap_xbar_qudp_v2();
 	}
@@ -291,7 +295,8 @@ void ecpriss_process_packet(ecpriss_packet_payload_s *packet)
 
 					ret = ecpriss_qudp_fh_tx_hdr_ins_cfg_v2(
 							flow_tx->port_index,
-							&flow_tx->qudp_tx_cfg);
+							&flow_tx->qudp_tx_cfg,
+							ECPRISS_L2_L3_TRANSP);
 					if(ret < 0) {
 						break;
 					}
@@ -569,6 +574,11 @@ void ecpriss_eth_event_processing(void)
 		ecpriss_eth_topology_init();
 	}else {
 		ecpriss_eth_topology_init_v2();
+		if(ecpriss_pdata_v2->dev_mode != ECPRISS_DEV_MODE_RU && lte_fh_enabled) {
+
+			ecpriss_qudp_set_nr_mac_filter();
+		}
+
 	}
 	return;
 }
@@ -582,15 +592,21 @@ void ecpriss_eth_topology_init_wq(struct work_struct *work)
 	}else {
 		ecpriss_eth_topology_init_v2();
 
+		if(ecpriss_pdata_v2->dev_mode != ECPRISS_DEV_MODE_RU && lte_fh_enabled) {
+
+			ecpriss_qudp_set_nr_mac_filter();
+		}
+
+
 	}
 	return;
 }
 
-#if 1
 static int ecpriss_dma_endp_config(void)
 {
 	int ret = 0;
 	int i,j;
+
 
 	memset(&dma_endp_g , 0 , sizeof(dma_endp_g));
 
@@ -635,20 +651,21 @@ static int ecpriss_dma_endp_config(void)
 							&dma_endp_g.topology_params[i].dma_port_param[j],
 							sizeof(struct ecpri_dma_port_params));
 				}
+
+				}
 			}
-		}
 	}while (0);
 
 					/* Set the non ecpri LUT Cfg */
 					ecpriss_xbar_non_ecpri_lut_cfg();
 					return ret;
 }
-#endif
 
 static int ecpriss_dma_endp_config_v2(void)
 {
 	int ret = 0;
 	int i,j;
+	int lte_fh_index = 0;
 
 	memset(&dma_endp_g , 0 , sizeof(dma_endp_g));
 
@@ -685,6 +702,15 @@ static int ecpriss_dma_endp_config_v2(void)
 							&dma_endp_g.topology_params[i].dma_port_param[j],
 							sizeof(struct ecpri_dma_port_params));
 				}
+			}
+			else if(dma_endp_g.topology_params[i].port_type ==
+					ECPRI_DMA_ENDP_STREAM_DEST_FH_LTE) {
+				for(j=0;j<dma_endp_g.topology_params[i].num_of_ports;j++) {
+					memcpy(&ecpriss_pdata_v2->xbar_ctx_v2->fh_lte_port_cfg[lte_fh_index].dma_port_cfg[j],
+							&dma_endp_g.topology_params[i].dma_port_param[j],
+							sizeof(struct ecpri_dma_port_params));
+				}
+				lte_fh_index++;
 			}
 		}
 	}while (0);
@@ -770,6 +796,11 @@ int ecpriss_ssr_events_cb(struct notifier_block *this,unsigned long code, void *
 		ecpriss_work =
 			ecpriss_pdata_v2->events_workqueue->ecpriss_ssr_events_rdy_work;
 
+		if(ecpriss_wq == NULL || ecpriss_wq == NULL) {
+			ECPRILOGERR("ecpriss_ssr_events_cb: NULL Wq or Work");
+			break;
+		}
+
 		ret = ecpriss_queue_work(ecpriss_wq,ecpriss_work);
 
 		if(ret < 0) {
@@ -814,6 +845,11 @@ void ecpriss_eth_topology_cb_v2(void)
 		ecpriss_pdata_v2->events_workqueue->kernel_events_workqueue;
 		ecpriss_work =
 	ecpriss_pdata_v2->events_workqueue->ecpriss_eth_topology_events_rdy_work;
+
+		if(ecpriss_wq == NULL || ecpriss_wq == NULL) {
+			ECPRILOGERR("ecpriss_eth_topology_cb_v2:NULL Wq or Work");
+			break;
+		}
 		ret = ecpriss_queue_work(ecpriss_wq,
 				ecpriss_work);
 		if(ret < 0) {
@@ -854,29 +890,11 @@ void ecpriss_eth_events_cb(eth_ecpriss_event_e event_type,
 void ecpriss_eth_events_cb_v2(eth_ecpriss_event_e event_type,
 		eth_ecpriss_link_event_params_s *link_event_params)
 {
-	int ret = 0;
-	struct workqueue_struct *ecpriss_wq;
-	struct work_struct *ecpriss_work;
 
 	ECPRILOGDBG("ecpriss_eth_events_cb_v2 event received %d", event_type);
 
+	ecpriss_eth_event_processing();
 
-	do{
-		if(link_event_params == NULL) {
-
-		}
-		ecpriss_wq =
-		ecpriss_pdata_v2->events_workqueue->kernel_events_workqueue;
-		ecpriss_work =
-		ecpriss_pdata_v2->events_workqueue->ecpriss_eth_events_rdy_work;
-		ret = ecpriss_queue_work(ecpriss_wq,
-				ecpriss_work);
-		if(ret < 0) {
-			ECPRILOGERR("Queue work failed\n");
-			break;
-		}
-
-	} while (0);
 	return;
 }
 
@@ -934,6 +952,12 @@ void ecpriss_stats_timer_cb_v2(struct timer_list *data)
 		ecpriss_pdata_v2->interrupts_workqueue->ecpriss_interrupts_workq;
 		ecpriss_work =
 		ecpriss_pdata_v2->interrupts_workqueue->ecpriss_interrupt_events_rdy_work;
+
+		if(ecpriss_wq == NULL || ecpriss_wq == NULL) {
+			ECPRILOGERR("ecpriss_stats_timer_cb_v2: NULL Wq or Work");
+			break;
+		}
+
 		ret = ecpriss_queue_work(ecpriss_wq,
 				ecpriss_work);
 		if(ret < 0) {
@@ -946,7 +970,7 @@ void ecpriss_stats_timer_cb_v2(struct timer_list *data)
 }
 void ecpriss_dma_endp_cb_v2(void * userdata)
 {
-	int ret =0;
+	int ret = 0;
 	struct workqueue_struct    *ecpriss_wq;
 	struct work_struct         *ecpriss_work;
 	ECPRILOGERR("ecpriss dma endp cb 2\n");
@@ -956,6 +980,11 @@ void ecpriss_dma_endp_cb_v2(void * userdata)
 		ecpriss_pdata_v2->events_workqueue->kernel_events_workqueue;
 		ecpriss_work =
 		ecpriss_pdata_v2->events_workqueue->ecpriss_dma_events_rdy_work;
+
+		if(ecpriss_wq == NULL || ecpriss_wq == NULL) {
+			ECPRILOGERR("ecpriss_dma_endp_cb_v2: NULL Wq or Work");
+			break;
+		}
 		ret = ecpriss_queue_work(ecpriss_wq,
 				ecpriss_work);
 		if(ret < 0) {
@@ -1185,6 +1214,8 @@ static int ecpriss_core_data_init_v2(void)
 
 	ecpriss_pdata_v2->xbar_ctx_v2->disable_xbar_dma_fh_same_prio = disable_xbar_dma_fh_same_prio;
 
+	ecpriss_pdata_v2->qudp_ctx_v2->lte_fh_enabled = lte_fh_enabled;
+
 	for (port_index = 0;port_index < MAX_PORTS;port_index++)
 	{
 	memset(&ecpriss_pdata_v2->xbar_ctx_v2->flow_ctx_v2.fh_xbar_lut[port_index].configured_pcids
@@ -1209,13 +1240,6 @@ static int ecpriss_core_data_init_v2(void)
 			ECPRILOGERR("Work queue init failed\n");
 			break;
 		}
-		ret = ecpriss_netlink_socket_create_v2();
-		if(ret < 0) {
-			ECPRILOGERR("Netlink socket initialization failed\n");
-			break;
-		}
-		ECPRILOGINFO("eCPRI Netlink Socket(NETLINK_ECPRI family) Created\n");
-
 		ret = ecpriss_stats_timer_interrupt_create_v2();
 		if(ret < 0) {
 			ECPRILOGERR("eCPRI Timer Interrupt creation failed\n");
@@ -1321,7 +1345,14 @@ static int ecpriss_core_register_callbacks_v2(void)
 
 		if(*is_ready == true) {
 			ecpriss_eth_topology_init_v2();
+
+			if(ecpriss_pdata_v2->dev_mode != ECPRISS_DEV_MODE_RU && lte_fh_enabled) {
+
+				ecpriss_qudp_set_nr_mac_filter();
+			}
 		}
+
+
 
 		ready = 0;
 
@@ -1744,6 +1775,14 @@ static int ecpriss_core_init_v2(struct platform_device *pdev)
 			ECPRILOGERR("Stats Collection failed\n");
 			break;
 		}
+
+		ret = ecpriss_netlink_socket_create_v2();
+		if(ret < 0) {
+			ECPRILOGERR("Netlink socket initialization failed\n");
+			break;
+		}
+		ECPRILOGINFO("eCPRI Netlink Socket(NETLINK_ECPRI family) Created\n");
+
 
 		ecpriss_pdata_v2->ecpri_state = ECPRI_CORE_INIT;
 
@@ -2232,7 +2271,9 @@ void ecpriss_debug_flow_info(ecpriss_packet_payload_s *packet, uint8_t msg_id)
 		offset += scnprintf(cmd_buf + offset ,max_str_size - offset ,"%s","DeCFG ");
 		offset = offset % max_str_size;
 
-	}else if(msg_id == ECPRISS_MESSAGE_TRANSPORT_EGRESS_TABLE_RECFG ||
+	}else if(msg_id == ECPRISS_MESSAGE_TRANSPORT_EGRESS_L2_TABLE_RECFG ||
+			msg_id == ECPRISS_MESSAGE_TRANSPORT_EGRESS_L3_TABLE_RECFG ||
+			msg_id == ECPRISS_MESSAGE_TRANSPORT_EGRESS_L2_L3_TABLE_RECFG ||
 			msg_id == ECPRISS_MESSAGE_TRANSPORT_INGESS_TABLE_CFG ||
 			msg_id == ECPRISS_MESSAGE_TRANSPORT_INGESS_TABLE_DECFG){
 		offset += scnprintf(cmd_buf + offset ,max_str_size - offset ,"%s","ReCFG");
@@ -2252,7 +2293,9 @@ void ecpriss_debug_flow_info(ecpriss_packet_payload_s *packet, uint8_t msg_id)
 		case ECPRISS_MESSAGE_FLOW_DECFG:
 			ecpriss_debug_stringify_flow_cfg(packet, cmd_buf, &offset, max_str_size);
 			break;
-		case ECPRISS_MESSAGE_TRANSPORT_EGRESS_TABLE_RECFG:
+		case ECPRISS_MESSAGE_TRANSPORT_EGRESS_L2_TABLE_RECFG:
+		case ECPRISS_MESSAGE_TRANSPORT_EGRESS_L3_TABLE_RECFG:
+		case ECPRISS_MESSAGE_TRANSPORT_EGRESS_L2_L3_TABLE_RECFG:
 			ecpriss_debug_stringify_egress_tp_cfg(packet, cmd_buf, &offset, max_str_size);
 			break;
 		case ECPRISS_MESSAGE_TRANSPORT_INGESS_TABLE_CFG :

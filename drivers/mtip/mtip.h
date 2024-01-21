@@ -224,6 +224,12 @@ struct mtip_devices_info
     struct mtip_lane_device_info lane_devices[MTIP_MAX_LANES];
 };
 
+struct mtip_pkt_priv
+{
+	struct sk_buff *skb;
+	uint16_t tx_index;
+};
+
 /*
  * information stored for each active link including netdev struct etc
  */

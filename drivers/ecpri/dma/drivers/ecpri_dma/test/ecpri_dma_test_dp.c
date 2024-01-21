@@ -1180,7 +1180,7 @@ static int ecpri_dma_dp_test_alloc_and_start_endp(
 		goto fail_start;
 	}
 
-	if (ecpri_dma_get_ctx_hw_ver() != ECPRI_HW_V1_0) {
+	if (ECPRI_DMA_GET_CTX_HW_VER() != ECPRI_HW_V1_0) {
 		/* Fill ring with credtis */
 		if (ECPRI_DMA_ENDP_DIR_DEST == endp_ptr->dir) {
 			ret = ecpri_dma_dp_test_rx_replenish(endp_ptr->endp_ctx,
@@ -1267,7 +1267,7 @@ static int ecpri_dma_dp_test_destroy_endp(
 				   endp_id, gsi_id, ret);
 	}
 
-	if (ecpri_dma_get_ctx_hw_ver() != ECPRI_HW_V1_0)
+	if (ECPRI_DMA_GET_CTX_HW_VER() != ECPRI_HW_V1_0)
 	{
 		for (i = 0; i < ECPRI_DMA_DP_TEST_NUM_OF_BUFFS_IN_RING; i++)
 		{
@@ -1855,7 +1855,7 @@ static int ecpri_dma_dp_test_suite_single_pkt_single_buffer(void *priv)
 	}
 
 	/* Prepare exact amount of credits equal to amount of buffers sent */
-	if (ecpri_dma_get_ctx_hw_ver() == ECPRI_HW_V1_0) {
+	if (ECPRI_DMA_GET_CTX_HW_VER() == ECPRI_HW_V1_0) {
 		res = ecpri_dma_dp_test_suite_calculate_credits(0, tx_pkts, num_of_pkts,
 			&buffs_to_replenish);
 		if (res) {
@@ -1894,7 +1894,7 @@ static int ecpri_dma_dp_test_suite_single_pkt_single_buffer(void *priv)
 	}
 
 	/* Replenish all buffers */
-	if (ecpri_dma_get_ctx_hw_ver() != ECPRI_HW_V1_0) {
+	if (ECPRI_DMA_GET_CTX_HW_VER() != ECPRI_HW_V1_0) {
 		res = ecpri_dma_dp_test_rx_replenish(rx_endp, buffs_to_replenish);
 		if (res) {
 			DMA_UT_TEST_FAIL_REPORT("Test failed to perform rx replenish");
@@ -1910,7 +1910,7 @@ static int ecpri_dma_dp_test_suite_single_pkt_single_buffer(void *priv)
 		DMA_UT_LOG("Failed to change Rx test ENDP mode to IRQ\n");
 	}
 
-	if (ecpri_dma_get_ctx_hw_ver() == ECPRI_HW_V1_0) {
+	if (ECPRI_DMA_GET_CTX_HW_VER() == ECPRI_HW_V1_0) {
 		res = ecpri_dma_dp_test_suite_verify_read_write_ptr(rx_endp, &ch_info);
 		if (res) {
 			DMA_UT_LOG("RP/WP mismatch\n");
@@ -1938,7 +1938,7 @@ static int ecpri_dma_dp_test_suite_tx_header(void *priv) {
 	struct ecpri_dma_tx_header *packet_header_ptr;
 
 	u8 *p_packet_body;
-	enum ecpri_hw_flavor hw_flavor = ecpri_dma_get_ctx_hw_flavor();
+	enum ecpri_hw_flavor hw_flavor = ECPRI_DMA_GET_CTX_HW_FLAVOR();
 
 	DMA_UT_LOG("Start Tx pre-header test\n");
 	if (hw_flavor == ECPRI_HW_FLAVOR_RU || hw_flavor == ECPRI_HW_FLAVOR_DU_L2)
@@ -2159,7 +2159,7 @@ static int ecpri_dma_dp_test_suite_tx_broadcast(void *priv) {
 	int ret = 0;
 	int i;
 	int j;
-	enum ecpri_hw_flavor hw_flavor = ecpri_dma_get_ctx_hw_flavor();
+	enum ecpri_hw_flavor hw_flavor = ECPRI_DMA_GET_CTX_HW_FLAVOR();
 
 	/* End: variable declaraion */
 
@@ -2464,7 +2464,7 @@ static int ecpri_dma_dp_test_suite_single_pkt_mult_buffer(void *priv)
 	}
 
 	/* Prepare exact amount of credits equal to amount of buffers sent */
-	if (ecpri_dma_get_ctx_hw_ver() == ECPRI_HW_V1_0) {
+	if (ECPRI_DMA_GET_CTX_HW_VER() == ECPRI_HW_V1_0) {
 		res = ecpri_dma_dp_test_suite_calculate_credits(0, tx_pkts, num_of_pkts,
 			&buffs_to_replenish);
 		if (res) {
@@ -2500,7 +2500,7 @@ static int ecpri_dma_dp_test_suite_single_pkt_mult_buffer(void *priv)
 		return -EFAULT;
 	}
 
-	if (ecpri_dma_get_ctx_hw_ver() != ECPRI_HW_V1_0) {
+	if (ECPRI_DMA_GET_CTX_HW_VER() != ECPRI_HW_V1_0) {
 		res = ecpri_dma_dp_test_rx_replenish(rx_endp, buffs_to_replenish);
 		if (res) {
 			DMA_UT_TEST_FAIL_REPORT("Test failed to perform rx replenish");
@@ -2516,7 +2516,7 @@ static int ecpri_dma_dp_test_suite_single_pkt_mult_buffer(void *priv)
 		DMA_UT_LOG("Failed to change Rx test ENDP mode to IRQ\n");
 	}
 
-	if (ecpri_dma_get_ctx_hw_ver() == ECPRI_HW_V1_0) {
+	if (ECPRI_DMA_GET_CTX_HW_VER() == ECPRI_HW_V1_0) {
 		res = ecpri_dma_dp_test_suite_verify_read_write_ptr(rx_endp, &ch_info);
 		if (res) {
 			DMA_UT_LOG("RP/WP mismatch\n");
@@ -2553,7 +2553,7 @@ static int ecpri_dma_dp_test_suite_mult_pkt_single_buffer(void *priv)
 	}
 
 	/* Prepare exact amount of credits equal to amount of buffers sent */
-	if (ecpri_dma_get_ctx_hw_ver() == ECPRI_HW_V1_0) {
+	if (ECPRI_DMA_GET_CTX_HW_VER() == ECPRI_HW_V1_0) {
 		res = ecpri_dma_dp_test_suite_calculate_credits(0, tx_pkts,
 			num_of_pkts_to_send, &buffs_to_replenish);
 		if (res) {
@@ -2589,7 +2589,7 @@ static int ecpri_dma_dp_test_suite_mult_pkt_single_buffer(void *priv)
 		return -EFAULT;
 	}
 
-	if (ecpri_dma_get_ctx_hw_ver() != ECPRI_HW_V1_0) {
+	if (ECPRI_DMA_GET_CTX_HW_VER() != ECPRI_HW_V1_0) {
 		res = ecpri_dma_dp_test_rx_replenish(rx_endp, buffs_to_replenish);
 		if (res) {
 			DMA_UT_TEST_FAIL_REPORT("Test failed to perform rx replenish");
@@ -2605,7 +2605,7 @@ static int ecpri_dma_dp_test_suite_mult_pkt_single_buffer(void *priv)
 		DMA_UT_LOG("Failed to change Rx test ENDP mode to IRQ\n");
 	}
 
-	if (ecpri_dma_get_ctx_hw_ver() == ECPRI_HW_V1_0) {
+	if (ECPRI_DMA_GET_CTX_HW_VER() == ECPRI_HW_V1_0) {
 		res = ecpri_dma_dp_test_suite_verify_read_write_ptr(rx_endp, &ch_info);
 		if (res) {
 			DMA_UT_LOG("RP/WP mismatch\n");
@@ -2644,7 +2644,7 @@ static int ecpri_dma_dp_test_suite_mult_pkt_mult_buffer(void *priv)
 	}
 
 	/* Prepare exact amount of credits equal to amount of buffers sent */
-	if (ecpri_dma_get_ctx_hw_ver() == ECPRI_HW_V1_0) {
+	if (ECPRI_DMA_GET_CTX_HW_VER() == ECPRI_HW_V1_0) {
 		res = ecpri_dma_dp_test_suite_calculate_credits(0, tx_pkts,
 			num_of_pkts_to_send, &buffs_to_replenish);
 		if (res) {
@@ -2680,7 +2680,7 @@ static int ecpri_dma_dp_test_suite_mult_pkt_mult_buffer(void *priv)
 		return -EFAULT;
 	}
 
-	if (ecpri_dma_get_ctx_hw_ver() != ECPRI_HW_V1_0) {
+	if (ECPRI_DMA_GET_CTX_HW_VER() != ECPRI_HW_V1_0) {
 		res = ecpri_dma_dp_test_rx_replenish(
 			rx_endp, buffs_to_replenish);
 		if (res) {
@@ -2697,7 +2697,7 @@ static int ecpri_dma_dp_test_suite_mult_pkt_mult_buffer(void *priv)
 		DMA_UT_LOG("Failed to change Rx test ENDP mode to IRQ\n");
 	}
 
-	if (ecpri_dma_get_ctx_hw_ver() == ECPRI_HW_V1_0) {
+	if (ECPRI_DMA_GET_CTX_HW_VER() == ECPRI_HW_V1_0) {
 		res = ecpri_dma_dp_test_suite_verify_read_write_ptr(rx_endp, &ch_info);
 		if (res) {
 			DMA_UT_LOG("RP/WP mismatch\n");
@@ -2738,7 +2738,7 @@ static int ecpri_dma_dp_test_suite_wrap_around_single_buffer(void *priv)
 
 	for (i = 0; i < num_of_iter; i++) {
 		/* Prepare exact amount of credits equal to amount of buffers sent */
-		if (ecpri_dma_get_ctx_hw_ver() == ECPRI_HW_V1_0) {
+		if (ECPRI_DMA_GET_CTX_HW_VER() == ECPRI_HW_V1_0) {
 			res = ecpri_dma_dp_test_suite_calculate_credits(
 				i * num_of_pkts_to_send, tx_pkts,
 				num_of_pkts_to_send,
@@ -2786,7 +2786,7 @@ static int ecpri_dma_dp_test_suite_wrap_around_single_buffer(void *priv)
 
 		expecting_irq = false;
 
-		if (ecpri_dma_get_ctx_hw_ver() != ECPRI_HW_V1_0) {
+		if (ECPRI_DMA_GET_CTX_HW_VER() != ECPRI_HW_V1_0) {
 			res = ecpri_dma_dp_test_rx_replenish(rx_endp, buffs_to_replenish);
 			if (res) {
 				DMA_UT_TEST_FAIL_REPORT("Test failed to perform rx replenish");
@@ -2804,7 +2804,7 @@ static int ecpri_dma_dp_test_suite_wrap_around_single_buffer(void *priv)
 		DMA_UT_LOG("Failed to change Rx test ENDP mode to IRQ\n");
 	}
 
-	if (ecpri_dma_get_ctx_hw_ver() == ECPRI_HW_V1_0) {
+	if (ECPRI_DMA_GET_CTX_HW_VER() == ECPRI_HW_V1_0) {
 		res = ecpri_dma_dp_test_suite_verify_read_write_ptr(rx_endp, &ch_info);
 		if (res) {
 			DMA_UT_LOG("RP/WP mismatch\n");
@@ -2847,7 +2847,7 @@ static int ecpri_dma_dp_test_suite_wrap_around_mult_buffer(void *priv)
 
 	for (i = 0; i < num_of_iter; i++) {
 		/* Prepare exact amount of credits equal to amount of buffers sent */
-		if (ecpri_dma_get_ctx_hw_ver() == ECPRI_HW_V1_0) {
+		if (ECPRI_DMA_GET_CTX_HW_VER() == ECPRI_HW_V1_0) {
 			res = ecpri_dma_dp_test_suite_calculate_credits(
 				i * num_of_pkts_to_send, tx_pkts,
 				num_of_pkts_to_send,
@@ -2893,7 +2893,7 @@ static int ecpri_dma_dp_test_suite_wrap_around_mult_buffer(void *priv)
 
 		expecting_irq = false;
 
-		if (ecpri_dma_get_ctx_hw_ver() != ECPRI_HW_V1_0) {
+		if (ECPRI_DMA_GET_CTX_HW_VER() != ECPRI_HW_V1_0) {
 			res = ecpri_dma_dp_test_rx_replenish(
 				rx_endp, buffs_to_replenish);
 			if (res) {
@@ -2912,7 +2912,7 @@ static int ecpri_dma_dp_test_suite_wrap_around_mult_buffer(void *priv)
 		DMA_UT_LOG("Failed to change Rx test ENDP mode to IRQ\n");
 	}
 
-	if (ecpri_dma_get_ctx_hw_ver() == ECPRI_HW_V1_0) {
+	if (ECPRI_DMA_GET_CTX_HW_VER() == ECPRI_HW_V1_0) {
 		res = ecpri_dma_dp_test_suite_verify_read_write_ptr(rx_endp, &ch_info);
 		if (res) {
 			DMA_UT_LOG("RP/WP mismatch\n");

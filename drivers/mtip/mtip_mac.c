@@ -56,6 +56,7 @@
 #include "mtip_notifr.h"
 #include "mtip_debug_eth.h"
 #include "eth_phy_iface.h"
+#include "mtip_pcs.h"
 
 static u32 mtip_mac_get_interrupt_summary(struct mtip_port_device_info* port_device)
 {
@@ -611,6 +612,14 @@ void mtip_mac_set_hashtable_entry(struct mtip_netdev_priv *priv, u8 entry_addres
 
 void mtip_mac_link_up(u32 link_index)
 {
+    u32 port_type;
+
+    if (mtip_lookup_port_type_by_link_index(link_index, &port_type) < 0)
+    {
+        CSMLOGERR("invalid port_type for link_index %d", link_index);
+        return;
+    }
+    mtip_pcs_update_active_fec(link_index, platform_driver_priv->mtip_ports[port_type]->port_config, platform_driver_priv->mtip_ports[port_type]->sfp_port_type);
     // Don't enable TX/RX if the link has been closed
     if (platform_driver_priv->mtip_links[link_index]->state == MTIP_LINK_STATE_CLOSE || platform_driver_priv->mtip_links[link_index]->state == MTIP_LINK_STATE_UP)
     {
@@ -618,29 +627,36 @@ void mtip_mac_link_up(u32 link_index)
     }
 
     CSMLOGINFO("MAC/PCS link up on link_index: %d\n", link_index);
-
     // set the link state as up
     platform_driver_priv->mtip_links[link_index]->state = MTIP_LINK_STATE_UP;
 
     //send a notification to ldmm.ko
     mtip_snd_event_notification(link_index, PCS_IF_UP);
+
+    // Notify TRX driver to disable TX
+    mtip_phy_notify_eth_event_to_trx(link_index, TRX_ETH_LINK_UP);
+
 }
 
 void mtip_mac_link_down(u32 link_index)
 {
+    platform_driver_priv->mtip_links[link_index]->active_fec = ETHTOOL_FEC_NONE;
     if(platform_driver_priv->mtip_links[link_index]->state == MTIP_LINK_STATE_DOWN)
         return;
 
     CSMLOGINFO("MAC/PCS link down on link_index: %d\n", link_index);
-
     // set the link state to DOWN if not closed
     if (platform_driver_priv->mtip_links[link_index]->state != MTIP_LINK_STATE_CLOSE) 
     {
         // set link state as down
         platform_driver_priv->mtip_links[link_index]->state = MTIP_LINK_STATE_DOWN;
     }
+
     //send a notification to ldmm.ko
     mtip_snd_event_notification(link_index, PCS_IF_DOWN);
+
+    // Notify TRX driver to disable TX
+    mtip_phy_notify_eth_event_to_trx(link_index, TRX_ETH_LINK_DOWN);
 }
 
 static void mtip_mac_set_xif_mode(struct mtip_netdev_priv *priv) {
@@ -821,7 +837,7 @@ static u32 mtip_mac_wrapper_calendar_cfg_val(struct mtip_port_device_info* port_
                port_device->port_type, 
                cfg_val, 
                port_config, 
-               mtip_ethtool_get_priv_flags_str(port_config));
+               mtip_ethtool_get_port_config_str(port_config));
 
     return cfg_val;
 }
@@ -918,7 +934,7 @@ static void mtip_mac_wrapper_set_csr_cfg(struct mtip_port_device_info* port_devi
         break;
     case MTIP_PORT_CONFIG_1x10GBASE_R_FEC:
         {
-            csr_cfg |= 0xc000;
+            csr_cfg |= 0x0;
         }
         break;
     case MTIP_PORT_CONFIG_1x100GBASE_R4:
@@ -1058,7 +1074,7 @@ static void mtip_mac_wrapper_set_pcs_mode(struct mtip_port_device_info* port_dev
         break;
     case MTIP_PORT_CONFIG_1x40GBASE_R4_FEC:
         {
-            pcs_mode_set =  0x1f00000;
+            pcs_mode_set =  0x100000;
         }
         break;
     case MTIP_PORT_CONFIG_1x50GBASE_R:
@@ -1088,32 +1104,24 @@ static void mtip_mac_wrapper_set_pcs_mode(struct mtip_port_device_info* port_dev
         break;
     case MTIP_PORT_CONFIG_1x50GBASE_R2_LUAI_FEC:
         {
-            pcs_mode_set =  0x210000;
-        }
-        break;
-    case MTIP_PORT_CONFIG_1x25GBASE_R:
-        {
             pcs_mode_set =  0;
         }
         break;
+    case MTIP_PORT_CONFIG_1x25GBASE_R:
     case MTIP_PORT_CONFIG_1x25GBASE_R_FEC:
+    case MTIP_PORT_CONFIG_1x10GBASE_R:
+    case MTIP_PORT_CONFIG_1x10GBASE_R_FEC:
+    case MTIP_PORT_CONFIG_4x25GBASE_R:
+    case MTIP_PORT_CONFIG_4x25GBASE_R_FEC:
+    case MTIP_PORT_CONFIG_4x10GBASE_R:
+    case MTIP_PORT_CONFIG_4x10GBASE_R_FEC:
         {
-            pcs_mode_set =  0x600000;
+            pcs_mode_set =  0;
         }
         break;
     case MTIP_PORT_CONFIG_1x25GBASE_R_RSFEC:
         {
             pcs_mode_set =  0x0031;
-        }
-        break;
-    case MTIP_PORT_CONFIG_1x10GBASE_R:
-        {
-            pcs_mode_set =  0;
-        }
-        break;
-    case MTIP_PORT_CONFIG_1x10GBASE_R_FEC:
-        {
-            pcs_mode_set =  0x600000;
         }
         break;
     case MTIP_PORT_CONFIG_2x50GBASE_R:
@@ -1146,29 +1154,9 @@ static void mtip_mac_wrapper_set_pcs_mode(struct mtip_port_device_info* port_dev
             pcs_mode_set =  0;
         }
         break;
-    case MTIP_PORT_CONFIG_4x25GBASE_R:
-        {
-            pcs_mode_set =  0;
-        }
-        break;
-    case MTIP_PORT_CONFIG_4x25GBASE_R_FEC:
-        {
-            pcs_mode_set =  0x1e00000;
-        }
-        break;
     case MTIP_PORT_CONFIG_4x25GBASE_R_RSFEC:
         {
             pcs_mode_set =  0x3f;
-        }
-        break;
-    case MTIP_PORT_CONFIG_4x10GBASE_R:
-        {
-            pcs_mode_set =  0;
-        }
-        break;
-    case MTIP_PORT_CONFIG_4x10GBASE_R_FEC:
-        {
-            pcs_mode_set =  0x1e00000;
         }
         break;
     default:

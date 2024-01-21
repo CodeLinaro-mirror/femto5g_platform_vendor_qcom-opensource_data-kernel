@@ -26,7 +26,7 @@ struct mtip_lanedev_priv
 };
 
 int mtip_phy_create_phylink(struct mtip_lane_device_info* lane_device);
-int mtip_phy_destroy_phylink(u32 port_index);
+int mtip_phy_destroy_phylink(struct phylink *phylink,struct net_device* lane_dummy_ndev);
 
 int mtip_phy_setup_phy(struct mtip_port_device_info* port_device);
 int mtip_phy_bringup_phy(u32 link_index, int sfp_port_type);
@@ -67,7 +67,7 @@ struct mtip_process_lane_down
 
 trx_link_length_range mtip_phy_get_trx_link_length_range(struct mtip_port_device_info* port_device);
 
-void mtip_phy_notify_eth_event_to_trx(u32 link_index, bool enable);
+void mtip_phy_notify_eth_event_to_trx(u32 link_index, trx_phy_event event);
 bool mtip_phy_is_breakout_config(u32 port_type);
 
 #endif // _MTIP_PHY_H

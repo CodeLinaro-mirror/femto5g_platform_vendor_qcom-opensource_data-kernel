@@ -17,6 +17,10 @@
 #define ECPRI_DMA_GSI_CHANNEL_STOP_SLEEP_MIN_USEC (3000)
 #define ECPRI_DMA_GSI_CHANNEL_STOP_SLEEP_MAX_USEC (5000)
 
+#define ECPRI_DMA_GET_CTX_HW_VER() (ecpri_dma_ctx->ecpri_hw_ver)
+#define ECPRI_DMA_GET_SW_VER() (ecpri_dma_ctx->driver_ver)
+#define ECPRI_DMA_GET_HW_FLAVOR() (ecpri_dma_ctx->hw_flavor)
+
 /**
  * Endpoint map's filter structure.
  * Contins pairs of filter field and its enable value.
@@ -83,11 +87,9 @@ int ecpri_dma_gsi_start_channel(struct ecpri_dma_endp_context *ep);
 int ecpri_dma_gsi_stop_channel(struct ecpri_dma_endp_context *ep);
 int ecpri_dma_gsi_reset_channel(struct ecpri_dma_endp_context *ep);
 int ecpri_dma_hw_init(void);
-
-u32 ecpri_dma_get_ctx_hw_ver(void);
-u32 ecpri_dma_get_ctx_hw_flavor(void);
 int ecpri_dma_get_gsi_dev_hdl(unsigned long* dev_hdl);
 struct device* ecpri_dma_get_pdev(void);
+void ecpri_dma_lte_set_loopback(int val);
 
 /**
  * ecpri_dma_filter_endps() - filter endpoint map endpoits by filter criteria
@@ -101,5 +103,105 @@ int ecpri_dma_filter_endps(
 	struct ecpri_dma_endp_filter *filter,
 	struct ecpri_dma_endp_gsi_tuple  *endpoint_list,
 	size_t max_size);
+
+/*------------------------------------------*/
+/*            === MEMRING API ===           */
+/*------------------------------------------*/
+
+/**
+ * ECPRI_DMA_MEMRING_CREATE() - Define a new cyclic buffer memory,
+ * @name: unique name for the ring
+ * @type: ring item type, can be any leagal c type
+ * @ring_size: the size of the ring, must be an integer literal
+ */
+#define ECPRI_DMA_MEMRING_CREATE(name, type, ring_size)                        \
+	u32 name##_wp;                                                             \
+	u32 name##_rp;                                                             \
+	u32 name##_size;                                                           \
+	type name##_memory[ring_size];
+
+ /**
+  * ECPRI_DMA_MEMRING_CREATE() - Initiazlie the new cyclic buffer memory,
+  * Should be called before first usage
+  * @name: name of the ring
+  * @ring_size: ring size
+  */
+#define ECPRI_DMA_MEMRING_INIT(name, ring_size)                                \
+	name##_wp = 0;                                                             \
+	name##_rp = 0;                                                             \
+	name##_size = ring_size;                                                   \
+	memset(name##_memory, 0, sizeof(name##_memory))
+
+/**
+ * ECPRI_DMA_MEMRING_ALLOC_ITEM() - get an item handler from the ring
+ * @name: ring's name
+ */
+#define ECPRI_DMA_MEMRING_ALLOC_ITEM(name)                                     \
+	if (ECPRI_DMA_MEMRING_IS_FULL(name)) {                                     \
+		DMAERR("failed to alloc memring items in %s\n", __stringify(name));    \
+		ecpri_dma_assert();                                                    \
+	}                                                                          \
+	name##_wp = (name##_wp + 1) % name##_size
+
+ /**
+ * ECPRI_DMA_MEMRING_ACCESS_INDEX() - access ring item for read/write
+ * @name: name of ring
+ * @item_handle:	memring handle previously recieved via 
+ *					ECPRI_DMA_MEMRING_GET_ITEM
+ */
+#define ECPRI_DMA_MEMRING_ACCESS_INDEX(name, index) name##_memory[index]
+
+/**
+ * ECPRI_DMA_MEMRING_ACCESS_WP() - access Newest taken ring item for read/write
+ * @name: ring's name
+ * 
+ * WP points to the next free index
+ * This macro will access the last added item - (WP - 1) % size
+ */
+#define ECPRI_DMA_MEMRING_ACCESS_WP(name)                                      \
+	ECPRI_DMA_MEMRING_ACCESS_INDEX(name, (name##_wp + name##_size - 1) % name##_size)
+
+/**
+ * ECPRI_DMA_MEMRING_ACCESS_RP() - access Oldest taken ring item for read/write
+ * @name: ring's name
+ */
+#define ECPRI_DMA_MEMRING_ACCESS_RP(name) name##_memory[name##_rp]
+
+/**
+ * ECPRI_DMA_MEMRING_IS_EMPTY() - check if no item has been allocated from
+ * the ring
+ * @name: ring's name
+ */
+#define ECPRI_DMA_MEMRING_IS_EMPTY(name)                                       \
+	(name##_wp == name##_rp)
+
+/**
+ * ECPRI_DMA_MEMRING_IS_FULL() - check if the memrting is full
+ * the ring
+ * @name: ring's name
+ */
+#define ECPRI_DMA_MEMRING_IS_FULL(name)                                        \
+	(((name##_wp + 1) % (name##_size)) == name##_rp)
+
+/**
+ * ECPRI_DMA_MEMRING_INC_RP() - Frees the oldeset assigned handle
+ * @name: ring's name
+ */
+#define ECPRI_DMA_MEMRING_INC_RP(name)                                         \
+	if (!ECPRI_DMA_MEMRING_IS_EMPTY(name)) {                                   \
+		name##_rp = (name##_rp + 1) % name##_size;                             \
+	}
+
+/**
+ * _ECPRI_DMA_MEMRING_GET_VAR() - Debug macro, get the value of an internal
+ * variable
+ * @name: ring's name
+ * @var: one of _wp, _rp, _size
+ */
+#define _ECPRI_DMA_MEMRING_GET_VAR(name, var) name##var
+
+/*------------------------------------------*/
+/*          === MEMRING API End ===         */
+/*------------------------------------------*/
 
 #endif /* _ECPRI_DMA_UTILS_H_ */

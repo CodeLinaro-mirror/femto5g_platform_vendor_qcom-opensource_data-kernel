@@ -34,6 +34,11 @@ static int __init lassen_data_modules_mgr_init(void)
 		pr_err("ldmm: Kernel Notifier chain registration failed\n");
 		goto out2;
 	}
+
+	if(ldmm_qxdm_timer_update_notifr_init()){
+		pr_err("ldmm: Kernel Notifier chain registration failed\n");
+		goto out2;
+	}
 	return 0;
 out2:
 	exit_genlldmm();
@@ -53,6 +58,7 @@ static void __exit lassen_data_modules_mgr_exit(void){
 	}
 	exit_genlldmm();
 	ldmm_fault_notifr_exit();
+	ldmm_qxdm_timer_update_notifr_exit();
 
 	pr_info("ldmm exit complete\n");
 	return;

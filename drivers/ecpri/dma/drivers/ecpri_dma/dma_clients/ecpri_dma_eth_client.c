@@ -172,8 +172,8 @@ ecpri_dma_eth_client_get_conn_from_hdl (ecpri_dma_eth_conn_hdl_t hdl) {
 
 static void ecpri_dma_eth_client_register_ready(void *user_data)
 {
-	u32 hw_ver = ecpri_dma_get_ctx_hw_ver();
-	u32 hw_flavor = ecpri_dma_get_ctx_hw_flavor();
+	u32 hw_ver = ECPRI_DMA_GET_CTX_HW_VER();
+	u32 hw_flavor = ECPRI_DMA_GET_HW_FLAVOR();
 
 	struct ecpri_dma_eth_client_endp_mapping *current_map;
 
@@ -488,8 +488,8 @@ int ecpri_dma_eth_register(struct ecpri_dma_eth_register_params *ready_info,
 	}
 
 	if (ready) {
-		hw_ver = ecpri_dma_get_ctx_hw_ver();
-		hw_flavor = ecpri_dma_get_ctx_hw_flavor();
+		hw_ver = ECPRI_DMA_GET_CTX_HW_VER();
+		hw_flavor = ECPRI_DMA_GET_HW_FLAVOR();
 
         if ((hw_ver < ECPRI_HW_MAX) && (hw_flavor < ECPRI_HW_FLAVOR_MAX)) {
             current_map = &eth_client_endp_map[hw_ver][hw_flavor][0];
@@ -686,7 +686,7 @@ int ecpri_dma_eth_disconnect_endpoints(ecpri_dma_eth_conn_hdl_t hdl)
 
 	DMADBG_LOW("Begin\n");
 
-	if (ecpri_dma_get_ctx_hw_ver() == ECPRI_HW_V1_0) {
+	if (ECPRI_DMA_GET_CTX_HW_VER() == ECPRI_HW_V1_0) {
 		DMAERR("Disconnect not supported for v1\n");
 		return -EPERM;
 	}

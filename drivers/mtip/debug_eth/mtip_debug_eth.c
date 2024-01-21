@@ -567,6 +567,14 @@ static void mtip_debug_eth_ethtool_get_stats(struct net_device *netdev,
   return;
 }
 
+bool check_if_valid_speed_for_debug_eth(u32 speed)
+{
+   if(speed == 10000 || speed == 25000)
+      return true;
+   else
+      return false;
+}
+
 bool check_if_valid_port_config_for_debug_eth(enum mtip_port_config_enum port_config)
 {
   switch (port_config)

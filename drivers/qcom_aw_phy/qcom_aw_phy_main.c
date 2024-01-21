@@ -63,6 +63,18 @@ MODULE_PARM_DESC(qcom_aw_phy_toggle_polarity,
    retry procedure for TX compliance tests */
 bool qcom_aw_phy_tx_compliance_flag = false;
 
+/* Root object for sysfs directory */
+struct kobject *qcom_aw_phy_kobj_root;
+
+/* File attribute for AN restart delay timer value sysfs node */
+struct kobj_attribute qcom_aw_phy_an_restart_delay_timer_attr =
+                         __ATTR(an_restart_delay_timer_msec, 0660,
+                                qcom_aw_phy_sysfs_show_an_restart_delay_timer,
+                                qcom_aw_phy_sysfs_store_an_restart_delay_timer);
+int qcom_aw_phy_an_restart_delay_timer = 1000;
+
+#define MAX_INT_CHAR_SIZE 15
+
 /*-------------------------------------------------------------------
 * Function Definitions
 ------------------------------------------------------------------- */
@@ -1149,6 +1161,46 @@ static int qcom_aw_phy_inst_remove(struct platform_device *pdev) {
 
 }
 
+ssize_t qcom_aw_phy_sysfs_show_an_restart_delay_timer(
+                struct kobject *kobj, struct kobj_attribute *attr, char *buf) {
+  return snprintf(buf, MAX_INT_CHAR_SIZE, "%d\n",
+                  qcom_aw_phy_an_restart_delay_timer);
+}
+
+ssize_t qcom_aw_phy_sysfs_store_an_restart_delay_timer(
+                              struct kobject *kobj, struct kobj_attribute *attr,
+                              const char *buf, size_t count) {
+  sscanf(buf, "%d", &qcom_aw_phy_an_restart_delay_timer);
+  return count;
+}
+
+void qcom_aw_phy_setup_sysfs(void) {
+
+  /* Creating the root directory structure in /sys/kernel */
+  qcom_aw_phy_kobj_root = kobject_create_and_add("qcom_aw_phy", kernel_kobj);
+
+  /* Creating file for AN restart delay timer value */
+  if(sysfs_create_file(qcom_aw_phy_kobj_root,
+                       &qcom_aw_phy_an_restart_delay_timer_attr.attr))
+  {
+    kobject_put(qcom_aw_phy_kobj_root);
+    sysfs_remove_file(kernel_kobj,
+                      &qcom_aw_phy_an_restart_delay_timer_attr.attr);
+  }
+
+  return;
+}
+
+void qcom_aw_phy_del_sysfs(void) {
+
+  sysfs_remove_file(qcom_aw_phy_kobj_root,
+                    &qcom_aw_phy_an_restart_delay_timer_attr.attr);
+  kobject_del(qcom_aw_phy_kobj_root);
+  qcom_aw_phy_kobj_root=NULL;
+
+  return;
+}
+
 /* PHY Driver Instance Compatible string */
 static const struct of_device_id qcom_aw_phy_inst_match[] = {
     {.compatible = "qcom-aw-phy-inst"}, {}};
@@ -1190,8 +1242,10 @@ static int __init qcom_aw_phy_init(void) {
   qcom_aw_phy_prbs_gnl_init();
 
 #ifdef FEATURE_QCOM_AW_TEST_SYS_FS
-  qcom_aw_phy_setup_sysfs();
+  qcom_aw_phy_setup_debugfs();
 #endif
+
+  qcom_aw_phy_setup_sysfs();
 
   ret_val = platform_driver_register(&qcom_aw_phy_inst_driver);
   if (ret_val < 0) {
@@ -1204,6 +1258,11 @@ static int __init qcom_aw_phy_init(void) {
 
 /* Module Exit Function */
 static void __exit qcom_aw_phy_exit(void) {
+
+  enum qcom_aw_phy_instance_enum phy_inst_type = QCOM_AW_PHY_INST_MAX;
+  struct qcom_aw_phy_inst_config *phy_inst_info = NULL;
+  enum eth_phy_iface_phy_lane_num_enum lane = PHY_LANE_0;
+  extern struct qcom_aw_phy_mtip_if_info qcom_aw_phy_mtip_if_info_s;
 
   QCOM_AW_PHY_LOG_INFO("qcom_aw_phy_exit");
 
@@ -1220,12 +1279,28 @@ static void __exit qcom_aw_phy_exit(void) {
     destroy_workqueue(qcom_aw_phy_config_info.rx_sig_detect_wq);
   }
 
+  for(phy_inst_type = QCOM_AW_PHY_INST_FH0; phy_inst_type < QCOM_AW_PHY_INST_MAX;phy_inst_type ++)  {
+
+    phy_inst_info = &qcom_aw_phy_config_info.phy_inst_config_info[phy_inst_type];
+
+    if(phy_inst_info) {
+      for (lane = PHY_LANE_0; lane < PHY_LANE_MAX; lane++) {
+        mutex_destroy(&phy_inst_info->lane_lock[lane]);
+      }
+    }
+    mutex_destroy(&phy_inst_info->phy_inst_lock);
+  }
+
+  mutex_destroy(&qcom_aw_phy_mtip_if_info_s.lock);
+
   qcom_aw_phy_gnl_exit();
   qcom_aw_phy_prbs_gnl_exit();
 
 #ifdef FEATURE_QCOM_AW_TEST_SYS_FS
-  qcom_aw_phy_del_sysfs();
+  qcom_aw_phy_del_debugfs();
 #endif
+
+  qcom_aw_phy_del_sysfs();
 
   if(qcom_aw_phy_config_info.phy_ipc_log_buf){
     ipc_log_context_destroy(qcom_aw_phy_config_info.phy_ipc_log_buf);

@@ -47,6 +47,7 @@ struct mtip_tx_ts_skb_list
 };
 
 int mtip_ptp_initialize(u32 link_index);
+void mtip_ptp_finalize(u32 link_index);
 int mtip_ptp_handle_hwtstamp_ioctl(struct ifreq *ifr, u32 link_index);
 
 void mtip_ptp_set_rx_timestamp(struct sk_buff* skb, u32 timestamp_secs, u32 timestamp_nsecs);

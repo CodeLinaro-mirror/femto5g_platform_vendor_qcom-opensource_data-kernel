@@ -6,13 +6,16 @@
 //#include "ecpriss_qudp_hal.h"
 #include "ecpriss_log.h"
 #include "ecpriss_xbar_hwio_v2.h"
+#include "ecpriss_qudp.h"
 
 volatile int ecpriss_filtering_enabled = 0;
 volatile int ecpriss_qudp_ingress_action = ECPRISS_QUDP_ACTION_PASS_TO_A55;
+extern struct ecpri_dma_endp_mapping dma_endp_g;
+extern struct eth_ecpriss_ops mtip_ecpri_ops;
+extern eth_ecpriss_topology_root_s        eth_link_params_g;
 
-
-#define ECPRISS_ETH_QUDP_MTU_SIZE_V4   9000 
-#define ECPRISS_ETH_QUDP_MTU_SIZE_V6   9000 
+#define ECPRISS_ETH_QUDP_MTU_SIZE_V4   9000
+#define ECPRISS_ETH_QUDP_MTU_SIZE_V6   9000
 #define ECPRISS_QUDP_REG_FIELD_ENABLE  1
 #define ENABLE_FILTER                  1
 #define BYTE_SHIFT                     8
@@ -604,6 +607,7 @@ void ecpriss_qudp_ingress_config_stats_update_v2(int32_t fh_index)
 				fh_index,
 				&ecpriss_pdata_v2->cfg_stats_v2.qudp_cfg_v2.ingress.vbits.mac_addr[fh_index]);
 	}
+
 	for(fltr_index = 0; fltr_index < NUM_OF_FLTR ; fltr_index ++){
 
 		flag = flag << fltr_index;
@@ -658,9 +662,16 @@ void ecpriss_qudp_ingress_config_stats_update_v2(int32_t fh_index)
 						&ecpriss_pdata_v2->cfg_stats_v2.qudp_cfg_v2.ingress.cfg.udp_clss[fh_index][fltr_index]);
 			}
 		}
-		ecpriss_pdata_v2->cfg_stats_v2.qudp_cfg_v2.ingress.cfg.mac_addr[fh_index][fltr_index].mac_lsb.value = 0;
-		ecpriss_pdata_v2->cfg_stats_v2.qudp_cfg_v2.ingress.cfg.mac_addr[fh_index][fltr_index].mac_msb.value = 0;
-		if(ecpriss_pdata_v2->cfg_stats_v2.qudp_cfg_v2.ingress.cfg.global_cfg[fh_index].enable_mac_dst_check && fltr_index <= 4){
+		flag = 1;
+	}
+
+	flag = 1;
+	if(ecpriss_pdata_v2->cfg_stats_v2.qudp_cfg_v2.ingress.cfg.global_cfg[fh_index].enable_mac_dst_check){
+		for(fltr_index = 0; fltr_index < MAX_MAC_FILTER_ENTRIES ; fltr_index++){
+
+			flag = flag << fltr_index;
+			ecpriss_pdata_v2->cfg_stats_v2.qudp_cfg_v2.ingress.cfg.mac_addr[fh_index][fltr_index].mac_lsb.value = 0;
+			ecpriss_pdata_v2->cfg_stats_v2.qudp_cfg_v2.ingress.cfg.mac_addr[fh_index][fltr_index].mac_msb.value = 0;
 			if(ecpriss_pdata_v2->cfg_stats_v2.qudp_cfg_v2.ingress.vbits.mac_addr[fh_index].valid_bits & flag){
 				ecpriss_qudp_hal_read_reg_mn_fields(ECPRISS_QUDP_FH_FILTER,
 						ECPRI_UDP_FH_FILT_MAC_ADDRESS_LSB_PORT_p_ENTRY_n_V2,
@@ -673,9 +684,9 @@ void ecpriss_qudp_ingress_config_stats_update_v2(int32_t fh_index)
 						fltr_index,
 						&ecpriss_pdata_v2->cfg_stats_v2.qudp_cfg_v2.ingress.cfg.mac_addr[fh_index][fltr_index].mac_msb);
 			}
-		}
 
-		flag = 1;
+			flag = 1;
+		}
 	}
 	return;
 }
@@ -1568,6 +1579,7 @@ static int ecpriss_qudp_ingress_modify_cfg_v2(uint32_t port_index,
 	ecpri_qudp_hwio_def_ecpri_udp_fh_filt_ip_dst_addr_port_p_entries_valid_bits_s_v2 ip_dst_valid_bit;
 	ecpri_qudp_hwio_def_ecpri_udp_fh_udp_classification_list_port_p_entries_valid_bits_s_v2 udp_port;
 	ecpri_qudp_hwio_def_ecpri_udp_fh_filt_vlan_addr_port_p_entries_valid_bits_s_v2 vlan_id;
+	ecpri_qudp_hwio_def_ecpri_udp_fh_filt_mac_address_port_p_entries_valid_bits_s_v2 mac_valid_bit;
 
 	ecpriss_qudp_ingress_per_port_cfg_s_v2 *qudp_ingress_port =
 		&ecpriss_pdata_v2->qudp_ctx_v2->fh_port_cfg_v2[port_index].ingress_port_cfg;
@@ -1667,6 +1679,33 @@ static int ecpriss_qudp_ingress_modify_cfg_v2(uint32_t port_index,
 
 
 	}
+
+	if(field & ECPRISS_QUDP_RX_CFG_FLTR_MASK_LOCAL_MAC_ADDR)
+	{
+		ingress_cfg.enable_mac_dst_check = 1;
+		ingress_cfg.enable_broadcast_check = 1;
+		ingress_cfg.non_local_dst_action = ECPRISS_MAC_ACTION_DISCARD;
+
+		memset(&mac_valid_bit,0, sizeof(mac_valid_bit));
+
+
+		ecpriss_qudp_hal_read_reg_n_fields(ECPRISS_QUDP_FH,
+				ECPRI_UDP_FH_FILT_MAC_ADDRESS_PORT_p_ENTRIES_VALID_BITS_V2,
+				port_index, &mac_valid_bit);
+
+
+		if(cfg_action == CONFIGURE)
+			mac_valid_bit.valid_bits |= 1UL << filtnum;
+		else
+			mac_valid_bit.valid_bits &= ~(1UL << filtnum);
+
+		ecpriss_qudp_hal_write_reg_n_fields(ECPRISS_QUDP_FH,
+				ECPRI_UDP_FH_FILT_MAC_ADDRESS_PORT_p_ENTRIES_VALID_BITS_V2,
+				port_index, &mac_valid_bit);
+
+
+	}
+
 
 	ecpriss_qudp_hal_write_reg_n_fields(ECPRISS_QUDP_FH,
 			ECPRI_UDP_FH_INGRESS_CONFIG_P_V2,
@@ -3362,6 +3401,10 @@ int ecpriss_qudp_init_v2(struct device *dev)
 
 		ecpriss_filtering_enabled = 1;
 
+		if(ecpriss_pdata_v2->dev_mode != ECPRISS_DEV_MODE_RU && ecpriss_pdata_v2->qudp_ctx_v2->lte_fh_enabled) {
+			ecpriss_qudp_set_lte_mac_filter_info();
+			ecpriss_qudp_set_nr_mac_filter_info();
+		}
 		ecpriss_pdata_v2->qudp_ctx_v2->state = ECPRI_QUDP_READY ;
 
 	}while (0);
@@ -5112,7 +5155,6 @@ void ecpriss_qudp_non_ecpri_dma_ring_info(void)
 	}
 }
 
-
 int ecpriss_qudp_fh_tx_hdr_decfg_v2(uint32_t               port_index,
 		ecpriss_qudp_tx_cfg_s *tx_cfg)
 {
@@ -5271,9 +5313,284 @@ int ecpriss_qudp_fh_tx_hdr_decfg_v2(uint32_t               port_index,
 }
 
 
+void ecpriss_qudp_set_lte_mac_filter_info(void)
+{
+	int32_t fh_index = 0;
+	int j =0;
+	int i =0;
+	int lte_fh_index = 0;
+
+	int port_mac_index[NUM_OF_FHP] = {ECPRISS_MAX_NR_MAC_PER_PORT,
+		ECPRISS_MAX_NR_MAC_PER_PORT,
+		ECPRISS_MAX_NR_MAC_PER_PORT};
+
+	ecpri_qudp_hwio_def_ecpri_udp_fh_filt_mac_address_info_port_p_entry_n_s_v2 lte_fh_mac_info;
+
+	for(i=0;i<dma_endp_g.num_of_port_types;i++) {
+		if(dma_endp_g.topology_params[i].port_type ==
+				ECPRI_DMA_ENDP_STREAM_DEST_FH_LTE) {
+
+			for(fh_index = 0; fh_index < NUM_OF_FHP; fh_index++){
+
+				struct ecpri_dma_port_params *dma_port_cfg= &ecpriss_pdata_v2->xbar_ctx_v2->fh_lte_port_cfg[lte_fh_index].dma_port_cfg[fh_index];
+
+				for(j=0;j<dma_port_cfg->num_of_rings;j++)
+				{
+					memset(&lte_fh_mac_info, 0, sizeof(lte_fh_mac_info));
+
+					if(dma_port_cfg->dma_rings_param[j].dma_ring_type == ECPRI_DMA_RING_TYPE_LTE_DEFAULT)
+					{
+						switch(j)
+						{
+							case ECPRISS_CORE_LINK_ID_0:
+								lte_fh_mac_info.ring_id = dma_port_cfg->dma_rings_param[0].dest_dma_ring_id;
+								lte_fh_mac_info.gsi_id= dma_port_cfg->dma_rings_param[0].dest_dma_ring_gsi_id;
+								break;
+							case ECPRISS_CORE_LINK_ID_1:
+								lte_fh_mac_info.ring_id = dma_port_cfg->dma_rings_param[1].dest_dma_ring_id;
+								lte_fh_mac_info.gsi_id = dma_port_cfg->dma_rings_param[1].dest_dma_ring_gsi_id;
+								break;
+							case ECPRISS_CORE_LINK_ID_2:
+								lte_fh_mac_info.ring_id = dma_port_cfg->dma_rings_param[2].dest_dma_ring_id;
+								lte_fh_mac_info.gsi_id = dma_port_cfg->dma_rings_param[2].dest_dma_ring_gsi_id;
+								break;
+							case ECPRISS_CORE_LINK_ID_3:
+								lte_fh_mac_info.ring_id = dma_port_cfg->dma_rings_param[3].dest_dma_ring_id;
+								lte_fh_mac_info.gsi_id = dma_port_cfg->dma_rings_param[3].dest_dma_ring_gsi_id;
+								break;
+							default:
+								ECPRILOGERR("Wrong default value %d\n",j);
+								break;
+						}
+
+						lte_fh_mac_info.action = ECPRISS_MAC_ACTION_PASS_TO_A55;
+
+						ECPRILOGDBG("LTE FH DMA Endp Params: Port:%d Index:%d RingID:%d action:%d\n",fh_index, port_mac_index[fh_index], lte_fh_mac_info.ring_id,lte_fh_mac_info.action);
+
+						ecpriss_qudp_hal_write_reg_mn_fields(ECPRISS_QUDP_FH_FILTER,
+								ECPRI_UDP_FH_FILT_MAC_ADDRESS_INFO_PORT_p_ENTRY_n_V2,
+								fh_index,port_mac_index[fh_index]++,
+								&lte_fh_mac_info);
+
+
+					}
+				}
+			}
+			lte_fh_index++;
+		}
+	}
+}
+
+void ecpriss_qudp_set_nr_mac_filter_info(void)
+{
+	int32_t fh_index = 0;
+	int j =0;
+	int i =0;
+
+	ecpri_qudp_hwio_def_ecpri_udp_fh_filt_mac_address_info_port_p_entry_n_s_v2 nr_fh_mac_info;
+
+	for(i=0;i<dma_endp_g.num_of_port_types;i++) {
+		if(dma_endp_g.topology_params[i].port_type ==
+				ECPRI_DMA_ENDP_STREAM_DEST_FH) {
+
+			for(fh_index = 0; fh_index < NUM_OF_FHP; fh_index++){
+
+				struct ecpri_dma_port_params *dma_port_cfg= &ecpriss_pdata_v2->xbar_ctx_v2->fh_port_cfg.dma_port_cfg[fh_index];
+
+				for(j=0;j<dma_port_cfg->num_of_rings;j++)
+				{
+					memset(&nr_fh_mac_info, 0, sizeof(nr_fh_mac_info));
+					if(dma_port_cfg->dma_rings_param[j].dma_ring_type == ECPRI_DMA_RING_TYPE_FH_DEFAULT)
+					{
+						nr_fh_mac_info.action = ECPRISS_MAC_ACTION_CONTINUE_NORMAL_PROCESSING;
+
+						ECPRILOGDBG("NR FH DMA Endp Params: Port:%d Index:%d RingID:%d action:%d\n",fh_index, j, nr_fh_mac_info.ring_id, nr_fh_mac_info.action);
+
+						ecpriss_qudp_hal_write_reg_mn_fields(ECPRISS_QUDP_FH_FILTER,
+								ECPRI_UDP_FH_FILT_MAC_ADDRESS_INFO_PORT_p_ENTRY_n_V2,
+								fh_index,j,
+								&nr_fh_mac_info);
+
+
+					}
+				}
+			}
+		}
+	}
+}
+
+void ecpriss_qudp_set_lte_mac_filter(ecpriss_packet_payload_s *packet)
+{
+	int index = -1;
+	int fh_index = -1;
+
+	ecpri_qudp_hwio_def_ecpri_udp_fh_filt_mac_address_lsb_port_p_entry_n_u_v2 mac_lsb;
+	ecpri_qudp_hwio_def_ecpri_udp_fh_filt_mac_address_msb_port_p_entry_n_u_v2 mac_msb;
+	ecpriss_qudp_ingress_per_port_cfg_s_v2 *qudp_ingress_port = NULL;
+	ecpriss_lte_mac_addr_cfg_s *mac_info = NULL;
+
+	mac_info = &packet->flow_cfg.mac_cfg;
+
+	if(mac_info == NULL)
+		return;
+
+	if(ecpriss_pdata_v2->qudp_ctx_v2->lte_fh_enabled == 0)
+		return;
+
+
+	for(fh_index = 0; fh_index < NUM_OF_FHP; fh_index++){
+
+		qudp_ingress_port = &ecpriss_pdata_v2->qudp_ctx_v2->fh_port_cfg_v2[fh_index].ingress_port_cfg;
+
+		for(index = 0 ; index < ECPRISS_MAX_LTE_MAC_PER_PORT ; index++) {
+
+			memset(&mac_lsb, 0, sizeof(mac_lsb));
+			memset(&mac_msb, 0, sizeof(mac_msb));
+
+			mac_lsb.value = ((mac_info->lte_mac_addr[fh_index][index].mac[5]) | (mac_info->lte_mac_addr[fh_index][index].mac[4] << 8)
+					| (mac_info->lte_mac_addr[fh_index][index].mac[3] << 16) | (mac_info->lte_mac_addr[fh_index][index].mac[2] << 24));
+
+
+			mac_msb.value = ((mac_info->lte_mac_addr[fh_index][index].mac[1]) | (mac_info->lte_mac_addr[fh_index][index].mac[0] << 8));
+
+			if(0 == mac_lsb.value && 0 == mac_msb.value){
+				ECPRILOGINFO("Empty Mac Config for FH %u Index %u\n",fh_index, index);
+				continue;
+			}
+			ecpriss_qudp_hal_write_reg_mn_fields(ECPRISS_QUDP_FH_FILTER,
+					ECPRI_UDP_FH_FILT_MAC_ADDRESS_LSB_PORT_p_ENTRY_n_V2,
+					fh_index,
+					index + ECPRISS_MAX_NR_MAC_PER_PORT,
+					&mac_lsb);
+
+
+
+			ecpriss_qudp_hal_write_reg_mn_fields(ECPRISS_QUDP_FH_FILTER,
+					ECPRI_UDP_FH_FILT_MAC_ADDRESS_MSB_PORT_p_ENTRY_n_V2,
+					fh_index,
+					index + ECPRISS_MAX_NR_MAC_PER_PORT,
+					&mac_msb);
+
+			ecpriss_qudp_ingress_modify_cfg_v2(fh_index,
+					ENABLE_FILTER,
+					ECPRISS_QUDP_RX_CFG_FLTR_MASK_LOCAL_MAC_ADDR,
+					index + ECPRISS_MAX_NR_MAC_PER_PORT,
+					CONFIGURE);
+
+			qudp_ingress_port->dmac[index + ECPRISS_MAX_NR_MAC_PER_PORT].lsb = mac_lsb.value;
+			qudp_ingress_port->dmac[index + ECPRISS_MAX_NR_MAC_PER_PORT].msb = mac_msb.value;
+			qudp_ingress_port->num_mac_fltr_entries++;
+		}
+
+	}
+
+}
+
+void ecpriss_qudp_set_nr_mac_filter(void)
+{
+	int ret = 0;
+	int i,j,k;
+	uint8_t port_index;
+	uint8_t num_links;
+	eth_ecpriss_dev_mode_e device_mode;
+	int action = CONFIGURE;
+	ecpriss_qudp_port_cfg_s_v2      *port_cfg_local;
+	eth_ecpriss_port_params_s *port_params = NULL;
+	ecpriss_qudp_ingress_per_port_cfg_s_v2 *qudp_ingress_port = NULL;
+
+	ecpri_qudp_hwio_def_ecpri_udp_fh_filt_mac_address_lsb_port_p_entry_n_u_v2 mac_lsb;
+	ecpri_qudp_hwio_def_ecpri_udp_fh_filt_mac_address_msb_port_p_entry_n_u_v2 mac_msb;
+
+	do {
+		ret = (mtip_ecpri_ops.eth_ecpriss_get_topology)(&device_mode,
+				&eth_link_params_g);
+		if(ret < 0) {
+			break;
+		}
+
+		for(i=0;i<eth_link_params_g.num_unique_port_types;i++) {
+
+
+			if(eth_link_params_g.topology_params[i].port_type ==
+					ETH_ECPRISS_PORT_TYPE_FH) {
+
+				ecpriss_pdata_v2->qudp_ctx_v2->num_ports =
+					eth_link_params_g.topology_params[i].num_ports;
+
+				for(j=0;j<ecpriss_pdata_v2->qudp_ctx_v2->num_ports;j++){
+
+					port_index =
+						eth_link_params_g.topology_params[i].port_params[j].port_index;
+
+					port_cfg_local =
+						&ecpriss_pdata_v2->qudp_ctx_v2->fh_port_cfg_v2[port_index];
+
+					num_links =
+						eth_link_params_g.topology_params[i].port_params[j].num_links;
+					port_params = &eth_link_params_g.topology_params[i].port_params[port_index];
+
+					qudp_ingress_port =
+						&ecpriss_pdata_v2->qudp_ctx_v2->fh_port_cfg_v2[port_index].ingress_port_cfg;
+					for(k=0;k<num_links;k++){
+
+						memset(&mac_lsb, 0, sizeof(mac_lsb));
+						memset(&mac_msb, 0, sizeof(mac_msb));
+
+
+						if(port_params->link_params[k].link_state == ETH_ECPRISS_LINK_STATE_OPEN ||
+								port_params->link_params[k].link_state == ETH_ECPRISS_LINK_STATE_UP){
+							action = CONFIGURE;
+
+							mac_lsb.value = ((port_params->link_params[k].eth_mac_addr[5]) | (port_params->link_params[k].eth_mac_addr[4] << 8)
+									| (port_params->link_params[k].eth_mac_addr[3] << 16) | (port_params->link_params[k].eth_mac_addr[2] << 24));
+
+							mac_msb.value = ((port_params->link_params[k].eth_mac_addr[1]) | (port_params->link_params[k].eth_mac_addr[0] << 8));
+
+							ECPRILOGDBG("ecpriss_qudp: Configure NR MAC Filter MSB:%d LSB:%d for Port:%d Link:%d\n ", mac_msb.value, mac_lsb.value, port_index, k);
+
+						}
+						else if (port_params->link_params[k].link_state == ETH_ECPRISS_LINK_STATE_CLOSE){
+
+							action = DE_CONFIGURE;
+
+							ECPRILOGDBG("ecpriss_qudp: Deconfigure NR MAC Filter Port:%d Link:%d\n ", port_index, k);
+						}else{
+							continue;
+						}
+
+						ecpriss_qudp_hal_write_reg_mn_fields(ECPRISS_QUDP_FH_FILTER,
+								ECPRI_UDP_FH_FILT_MAC_ADDRESS_LSB_PORT_p_ENTRY_n_V2,
+								port_index,
+								k,
+								&mac_lsb);
+
+
+						ecpriss_qudp_hal_write_reg_mn_fields(ECPRISS_QUDP_FH_FILTER,
+								ECPRI_UDP_FH_FILT_MAC_ADDRESS_MSB_PORT_p_ENTRY_n_V2,
+								port_index,
+								k,
+								&mac_msb);
+
+						ecpriss_qudp_ingress_modify_cfg_v2(port_index,
+								ENABLE_FILTER,
+								ECPRISS_QUDP_RX_CFG_FLTR_MASK_LOCAL_MAC_ADDR,
+								k,
+								action);
+						qudp_ingress_port->dmac[k].lsb = mac_lsb.value;
+						qudp_ingress_port->dmac[k].msb = mac_msb.value;
+						qudp_ingress_port->num_mac_fltr_entries++;
+
+					}
+				}
+			}
+		}
+
+	}while (0);
+}
 
 int ecpriss_qudp_fh_tx_hdr_ins_cfg_v2(uint32_t               port_index,
-		ecpriss_qudp_tx_cfg_s *tx_cfg)
+		ecpriss_qudp_tx_cfg_s *tx_cfg,
+		ecpriss_transp_type tp_type)
 {
 	int ret = 0;
 
@@ -5304,187 +5621,192 @@ int ecpriss_qudp_fh_tx_hdr_ins_cfg_v2(uint32_t               port_index,
 		}
 
 		/* 4 LSB goes to this eth_dst0_port */
+		if(tp_type == ECPRISS_L2_TRANSP || tp_type == ECPRISS_L2_L3_TRANSP){
 
-		eth_dst0_port.value = ((tx_cfg->eth_hdr.dst_mac_addr[5]) | (tx_cfg->eth_hdr.dst_mac_addr[4] << 8)
-				| (tx_cfg->eth_hdr.dst_mac_addr[3] << 16) | (tx_cfg->eth_hdr.dst_mac_addr[2] << 24));
-
-
-
-		ecpriss_qudp_hal_write_reg_mn_fields(ECPRISS_QUDP_FH_RAMS,
-				ECPRI_UDP_FH_EGRESS_ETH_DST0_PORT_p_ENTRY_n_V2,
-				port_index,
-				tx_cfg->l2_hdr_tbl_idx,
-				&eth_dst0_port);
-
-		memcpy(&qudp_egress_port->eth_dst0_port[tx_cfg->l2_hdr_tbl_idx],&eth_dst0_port,sizeof(eth_dst0_port));
-
-		eth_src1_dst1_port.dst_msb = ((tx_cfg->eth_hdr.dst_mac_addr[1]) | (tx_cfg->eth_hdr.dst_mac_addr[0] << 8));
-		eth_src1_dst1_port.src_msb = ((tx_cfg->eth_hdr.src_mac_addr[1]) | (tx_cfg->eth_hdr.src_mac_addr[0] << 8));
+			eth_dst0_port.value = ((tx_cfg->eth_hdr.dst_mac_addr[5]) | (tx_cfg->eth_hdr.dst_mac_addr[4] << 8)
+					| (tx_cfg->eth_hdr.dst_mac_addr[3] << 16) | (tx_cfg->eth_hdr.dst_mac_addr[2] << 24));
 
 
-		ecpriss_qudp_hal_write_reg_mn_fields(ECPRISS_QUDP_FH_RAMS,
-				ECPRI_UDP_FH_EGRESS_ETH_SRC1_DST1_PORT_p_ENTRY_n_V2,
-				port_index,
-				tx_cfg->l2_hdr_tbl_idx,
-				&eth_src1_dst1_port);
-
-
-		memcpy(&qudp_egress_port->eth_src1_dst1_port[tx_cfg->l2_hdr_tbl_idx],&eth_src1_dst1_port,sizeof(eth_src1_dst1_port));
-
-		eth_src0_port.value = ((tx_cfg->eth_hdr.src_mac_addr[5]) | (tx_cfg->eth_hdr.src_mac_addr[4] << 8)
-				| (tx_cfg->eth_hdr.src_mac_addr[3] << 16) | (tx_cfg->eth_hdr.src_mac_addr[2]) << 24);
-
-
-
-		ecpriss_qudp_hal_write_reg_mn_fields(ECPRISS_QUDP_FH_RAMS,
-				ECPRI_UDP_FH_EGRESS_ETH_SRC0_PORT_p_ENTRY_n_V2,
-				port_index,
-				tx_cfg->l2_hdr_tbl_idx,
-				&eth_src0_port);
-		memcpy(&qudp_egress_port->eth_src0_port[tx_cfg->l2_hdr_tbl_idx],&eth_src0_port,sizeof(eth_src0_port));
-
-		vlan_ethertype_port.ethertype = tx_cfg->eth_hdr.orig_ethertype;
-
-		vlan_ethertype_port.vlan_data = tx_cfg->eth_hdr.vlan_data;
-
-		ecpriss_qudp_hal_write_reg_mn_fields(ECPRISS_QUDP_FH_RAMS,
-				ECPRI_UDP_FH_EGRESS_VLAN_ETHERTYPE_PORT_p_ENTRY_n_V2,
-				port_index,
-				tx_cfg->l2_hdr_tbl_idx,
-				&vlan_ethertype_port);
-
-		memcpy(&qudp_egress_port->vlan_ethertype[tx_cfg->l2_hdr_tbl_idx],&vlan_ethertype_port,sizeof(vlan_ethertype_port));
-		vport_misc_port.vport = tx_cfg->eth_hdr.vport;
-
-		vport_misc_port.has_vlan = tx_cfg->eth_hdr.is_vlan;
-
-		vport_misc_port.vport_action = tx_cfg->eth_hdr.vport_action;
-
-		ecpriss_qudp_hal_write_reg_mn_fields(ECPRISS_QUDP_FH_RAMS,
-				ECPRI_UDP_FH_EGRESS_VPORT_MISC_PORT_p_ENTRY_n_V2,
-				port_index,
-				tx_cfg->l2_hdr_tbl_idx,
-				&vport_misc_port);
-
-		if(tx_cfg->eth_hdr.orig_ethertype != ECPRISS_ETHERTYPE_ECPRI){
-
-			ip_src0.value |= ((tx_cfg->ip_hdr.src_ip_addr[3]) | (tx_cfg->ip_hdr.src_ip_addr[2] << 8) | (tx_cfg->ip_hdr.src_ip_addr[1] << 16)
-					| (tx_cfg->ip_hdr.src_ip_addr[0] << 24));
 
 			ecpriss_qudp_hal_write_reg_mn_fields(ECPRISS_QUDP_FH_RAMS,
-					ECPRI_UDP_FH_EGRESS_IP_SRC_ADDR0_PORT_p_ENTRY_n_V2,
+					ECPRI_UDP_FH_EGRESS_ETH_DST0_PORT_p_ENTRY_n_V2,
 					port_index,
-					tx_cfg->l3_hdr_tbl_idx,
-					&ip_src0);
+					tx_cfg->l2_hdr_tbl_idx,
+					&eth_dst0_port);
 
+			memcpy(&qudp_egress_port->eth_dst0_port[tx_cfg->l2_hdr_tbl_idx],&eth_dst0_port,sizeof(eth_dst0_port));
 
-			memcpy(&qudp_egress_port->src_ip_addr[tx_cfg->l3_hdr_tbl_idx].ip_src0,&ip_src0,sizeof(ip_src0));
+			eth_src1_dst1_port.dst_msb = ((tx_cfg->eth_hdr.dst_mac_addr[1]) | (tx_cfg->eth_hdr.dst_mac_addr[0] << 8));
+			eth_src1_dst1_port.src_msb = ((tx_cfg->eth_hdr.src_mac_addr[1]) | (tx_cfg->eth_hdr.src_mac_addr[0] << 8));
 
-			ip_dst0.value |= ((tx_cfg->ip_hdr.dst_ip_addr[3]) | (tx_cfg->ip_hdr.dst_ip_addr[2] << 8) | (tx_cfg->ip_hdr.dst_ip_addr[1] << 16)
-					| (tx_cfg->ip_hdr.dst_ip_addr[0] << 24));
 
 			ecpriss_qudp_hal_write_reg_mn_fields(ECPRISS_QUDP_FH_RAMS,
-					ECPRI_UDP_FH_EGRESS_IP_DST_ADDR0_PORT_p_ENTRY_n_V2,
+					ECPRI_UDP_FH_EGRESS_ETH_SRC1_DST1_PORT_p_ENTRY_n_V2,
 					port_index,
-					tx_cfg->l3_hdr_tbl_idx,
-					&ip_dst0);
-			memcpy(&qudp_egress_port->dst_ip_addr[tx_cfg->l3_hdr_tbl_idx].ip_dst0,&ip_dst0,sizeof(ip_dst0));
+					tx_cfg->l2_hdr_tbl_idx,
+					&eth_src1_dst1_port);
 
-			if(tx_cfg->ip_hdr.ip_type == ECPRISS_IPV6_TYPE)
-			{
 
-				ip_src1.value |= ((tx_cfg->ip_hdr.src_ip_addr[7]) | (tx_cfg->ip_hdr.src_ip_addr[6] << 8) | (tx_cfg->ip_hdr.src_ip_addr[5] << 16)
-						| (tx_cfg->ip_hdr.src_ip_addr[4] << 24));
+			memcpy(&qudp_egress_port->eth_src1_dst1_port[tx_cfg->l2_hdr_tbl_idx],&eth_src1_dst1_port,sizeof(eth_src1_dst1_port));
 
-				ecpriss_qudp_hal_write_reg_mn_fields(ECPRISS_QUDP_FH_RAMS,
-						ECPRI_UDP_FH_EGRESS_IP_SRC_ADDR1_PORT_p_ENTRY_n_V2,
-						port_index,
-						tx_cfg->l3_hdr_tbl_idx,
-						&ip_src1);
-			memcpy(&qudp_egress_port->src_ip_addr[tx_cfg->l3_hdr_tbl_idx].ip_src1,&ip_src1,sizeof(ip_src0));
+			eth_src0_port.value = ((tx_cfg->eth_hdr.src_mac_addr[5]) | (tx_cfg->eth_hdr.src_mac_addr[4] << 8)
+					| (tx_cfg->eth_hdr.src_mac_addr[3] << 16) | (tx_cfg->eth_hdr.src_mac_addr[2]) << 24);
 
-				ip_src2.value |= ((tx_cfg->ip_hdr.src_ip_addr[11]) | (tx_cfg->ip_hdr.src_ip_addr[10] << 8) | (tx_cfg->ip_hdr.src_ip_addr[9] << 16)
-						| (tx_cfg->ip_hdr.src_ip_addr[8] << 24));
 
-				ecpriss_qudp_hal_write_reg_mn_fields(ECPRISS_QUDP_FH_RAMS,
-						ECPRI_UDP_FH_EGRESS_IP_SRC_ADDR2_PORT_p_ENTRY_n_V2,
-						port_index,
-						tx_cfg->l3_hdr_tbl_idx,
-						&ip_src2);
-
-			memcpy(&qudp_egress_port->src_ip_addr[tx_cfg->l3_hdr_tbl_idx].ip_src2,&ip_src0,sizeof(ip_src2));
-				ip_src3.value |= ((tx_cfg->ip_hdr.src_ip_addr[15]) | (tx_cfg->ip_hdr.src_ip_addr[14] << 8) | (tx_cfg->ip_hdr.src_ip_addr[13] << 16)
-						| (tx_cfg->ip_hdr.src_ip_addr[12] << 24));
-
-				ecpriss_qudp_hal_write_reg_mn_fields(ECPRISS_QUDP_FH_RAMS,
-						ECPRI_UDP_FH_EGRESS_IP_SRC_ADDR3_PORT_p_ENTRY_n_V2,
-						port_index,
-						tx_cfg->l3_hdr_tbl_idx,
-						&ip_src3);
-
-			memcpy(&qudp_egress_port->src_ip_addr[tx_cfg->l3_hdr_tbl_idx].ip_src3,&ip_src0,sizeof(ip_src3));
-				ip_dst1.value |= ((tx_cfg->ip_hdr.dst_ip_addr[7]) | (tx_cfg->ip_hdr.dst_ip_addr[6] << 8) | (tx_cfg->ip_hdr.dst_ip_addr[5] << 16)
-						| (tx_cfg->ip_hdr.dst_ip_addr[4] << 24));
-
-				ecpriss_qudp_hal_write_reg_mn_fields(ECPRISS_QUDP_FH_RAMS,
-						ECPRI_UDP_FH_EGRESS_IP_DST_ADDR1_PORT_p_ENTRY_n_V2,
-						port_index,
-						tx_cfg->l3_hdr_tbl_idx,
-						&ip_dst1);
-			memcpy(&qudp_egress_port->dst_ip_addr[tx_cfg->l3_hdr_tbl_idx].ip_dst1,&ip_dst1,sizeof(ip_dst1));
-
-				ip_dst2.value |= ((tx_cfg->ip_hdr.dst_ip_addr[11]) | (tx_cfg->ip_hdr.dst_ip_addr[10] << 8) | (tx_cfg->ip_hdr.dst_ip_addr[9] << 16)
-						| (tx_cfg->ip_hdr.dst_ip_addr[8] << 24));
-
-				ecpriss_qudp_hal_write_reg_mn_fields(ECPRISS_QUDP_FH_RAMS,
-						ECPRI_UDP_FH_EGRESS_IP_DST_ADDR2_PORT_p_ENTRY_n_V2,
-						port_index,
-						tx_cfg->l3_hdr_tbl_idx,
-						&ip_dst2);
-
-			memcpy(&qudp_egress_port->dst_ip_addr[tx_cfg->l3_hdr_tbl_idx].ip_dst2,&ip_dst2,sizeof(ip_dst2));
-				ip_dst3.value |= ((tx_cfg->ip_hdr.dst_ip_addr[15]) | (tx_cfg->ip_hdr.dst_ip_addr[14] << 8) | (tx_cfg->ip_hdr.dst_ip_addr[13] << 16)
-						| (tx_cfg->ip_hdr.dst_ip_addr[12] << 24));
-
-				ecpriss_qudp_hal_write_reg_mn_fields(ECPRISS_QUDP_FH_RAMS,
-						ECPRI_UDP_FH_EGRESS_IP_DST_ADDR3_PORT_p_ENTRY_n_V2,
-						port_index,
-						tx_cfg->l3_hdr_tbl_idx,
-						&ip_dst3);
-
-			memcpy(&qudp_egress_port->dst_ip_addr[tx_cfg->l3_hdr_tbl_idx].ip_dst3,&ip_dst3,sizeof(ip_dst3));
-
-			}
-
-			udp_port.src = tx_cfg->ip_hdr.src_udp_port;
-			udp_port.dst = tx_cfg->ip_hdr.dst_udp_port;
 
 			ecpriss_qudp_hal_write_reg_mn_fields(ECPRISS_QUDP_FH_RAMS,
-					ECPRI_UDP_FH_EGRESS_UDP_PORTS_PORT_p_ENTRY_n_V2,
+					ECPRI_UDP_FH_EGRESS_ETH_SRC0_PORT_p_ENTRY_n_V2,
 					port_index,
-					tx_cfg->l3_hdr_tbl_idx,
-					&udp_port);
+					tx_cfg->l2_hdr_tbl_idx,
+					&eth_src0_port);
+			memcpy(&qudp_egress_port->eth_src0_port[tx_cfg->l2_hdr_tbl_idx],&eth_src0_port,sizeof(eth_src0_port));
 
-		memcpy(&qudp_egress_port->udp_ports[tx_cfg->l3_hdr_tbl_idx],&udp_port,sizeof(udp_port));
+			vlan_ethertype_port.ethertype = tx_cfg->eth_hdr.orig_ethertype;
 
-			ip_opts.sa_tag_data = tx_cfg->ip_hdr.sa_tag_data ;
-			ip_opts.tos = tx_cfg->ip_hdr.tos;
-			ip_opts.df_bit = tx_cfg->ip_hdr.df_en;
-			ip_opts.calc_udp_cs = tx_cfg->ip_hdr.udp_chksum_en;
-			ip_opts.is_ipsec = tx_cfg->ip_hdr.ipsec_en;
-			ip_opts.rsvd = tx_cfg->ip_hdr.rsvd;
-			ip_opts.ip_type = tx_cfg->ip_hdr.ip_type;
+			vlan_ethertype_port.vlan_data = tx_cfg->eth_hdr.vlan_data;
 
-		ecpriss_qudp_hal_write_reg_mn_fields(ECPRISS_QUDP_FH_RAMS,
-				ECPRI_UDP_FH_EGRESS_SA_TAG_IP_TOS_MISC_PORT_p_ENTRY_n_V2,
-				port_index,
-				tx_cfg->l3_hdr_tbl_idx,
-				&ip_opts);
+			ecpriss_qudp_hal_write_reg_mn_fields(ECPRISS_QUDP_FH_RAMS,
+					ECPRI_UDP_FH_EGRESS_VLAN_ETHERTYPE_PORT_p_ENTRY_n_V2,
+					port_index,
+					tx_cfg->l2_hdr_tbl_idx,
+					&vlan_ethertype_port);
 
-		if(!qudp_egress_port->l3_tbl_valid_entry[tx_cfg->l3_hdr_tbl_idx]){
-			qudp_egress_port->l3_tbl_valid_entry[tx_cfg->l3_hdr_tbl_idx] = true;
-			qudp_egress_port->num_l3_tbl_entries++;
+			memcpy(&qudp_egress_port->vlan_ethertype[tx_cfg->l2_hdr_tbl_idx],&vlan_ethertype_port,sizeof(vlan_ethertype_port));
+			vport_misc_port.vport = tx_cfg->eth_hdr.vport;
+
+			vport_misc_port.has_vlan = tx_cfg->eth_hdr.is_vlan;
+
+			vport_misc_port.vport_action = tx_cfg->eth_hdr.vport_action;
+
+			ecpriss_qudp_hal_write_reg_mn_fields(ECPRISS_QUDP_FH_RAMS,
+					ECPRI_UDP_FH_EGRESS_VPORT_MISC_PORT_p_ENTRY_n_V2,
+					port_index,
+					tx_cfg->l2_hdr_tbl_idx,
+					&vport_misc_port);
 		}
+
+		if(tp_type == ECPRISS_L3_TRANSP || tp_type == ECPRISS_L2_L3_TRANSP){
+
+			if(tx_cfg->eth_hdr.orig_ethertype != ECPRISS_ETHERTYPE_ECPRI){
+
+				ip_src0.value |= ((tx_cfg->ip_hdr.src_ip_addr[3]) | (tx_cfg->ip_hdr.src_ip_addr[2] << 8) | (tx_cfg->ip_hdr.src_ip_addr[1] << 16)
+						| (tx_cfg->ip_hdr.src_ip_addr[0] << 24));
+
+				ecpriss_qudp_hal_write_reg_mn_fields(ECPRISS_QUDP_FH_RAMS,
+						ECPRI_UDP_FH_EGRESS_IP_SRC_ADDR0_PORT_p_ENTRY_n_V2,
+						port_index,
+						tx_cfg->l3_hdr_tbl_idx,
+						&ip_src0);
+
+
+				memcpy(&qudp_egress_port->src_ip_addr[tx_cfg->l3_hdr_tbl_idx].ip_src0,&ip_src0,sizeof(ip_src0));
+
+				ip_dst0.value |= ((tx_cfg->ip_hdr.dst_ip_addr[3]) | (tx_cfg->ip_hdr.dst_ip_addr[2] << 8) | (tx_cfg->ip_hdr.dst_ip_addr[1] << 16)
+						| (tx_cfg->ip_hdr.dst_ip_addr[0] << 24));
+
+				ecpriss_qudp_hal_write_reg_mn_fields(ECPRISS_QUDP_FH_RAMS,
+						ECPRI_UDP_FH_EGRESS_IP_DST_ADDR0_PORT_p_ENTRY_n_V2,
+						port_index,
+						tx_cfg->l3_hdr_tbl_idx,
+						&ip_dst0);
+				memcpy(&qudp_egress_port->dst_ip_addr[tx_cfg->l3_hdr_tbl_idx].ip_dst0,&ip_dst0,sizeof(ip_dst0));
+
+				if(tx_cfg->ip_hdr.ip_type == ECPRISS_IPV6_TYPE)
+				{
+
+					ip_src1.value |= ((tx_cfg->ip_hdr.src_ip_addr[7]) | (tx_cfg->ip_hdr.src_ip_addr[6] << 8) | (tx_cfg->ip_hdr.src_ip_addr[5] << 16)
+							| (tx_cfg->ip_hdr.src_ip_addr[4] << 24));
+
+					ecpriss_qudp_hal_write_reg_mn_fields(ECPRISS_QUDP_FH_RAMS,
+							ECPRI_UDP_FH_EGRESS_IP_SRC_ADDR1_PORT_p_ENTRY_n_V2,
+							port_index,
+							tx_cfg->l3_hdr_tbl_idx,
+							&ip_src1);
+					memcpy(&qudp_egress_port->src_ip_addr[tx_cfg->l3_hdr_tbl_idx].ip_src1,&ip_src1,sizeof(ip_src0));
+
+					ip_src2.value |= ((tx_cfg->ip_hdr.src_ip_addr[11]) | (tx_cfg->ip_hdr.src_ip_addr[10] << 8) | (tx_cfg->ip_hdr.src_ip_addr[9] << 16)
+							| (tx_cfg->ip_hdr.src_ip_addr[8] << 24));
+
+					ecpriss_qudp_hal_write_reg_mn_fields(ECPRISS_QUDP_FH_RAMS,
+							ECPRI_UDP_FH_EGRESS_IP_SRC_ADDR2_PORT_p_ENTRY_n_V2,
+							port_index,
+							tx_cfg->l3_hdr_tbl_idx,
+							&ip_src2);
+
+					memcpy(&qudp_egress_port->src_ip_addr[tx_cfg->l3_hdr_tbl_idx].ip_src2,&ip_src0,sizeof(ip_src2));
+					ip_src3.value |= ((tx_cfg->ip_hdr.src_ip_addr[15]) | (tx_cfg->ip_hdr.src_ip_addr[14] << 8) | (tx_cfg->ip_hdr.src_ip_addr[13] << 16)
+							| (tx_cfg->ip_hdr.src_ip_addr[12] << 24));
+
+					ecpriss_qudp_hal_write_reg_mn_fields(ECPRISS_QUDP_FH_RAMS,
+							ECPRI_UDP_FH_EGRESS_IP_SRC_ADDR3_PORT_p_ENTRY_n_V2,
+							port_index,
+							tx_cfg->l3_hdr_tbl_idx,
+							&ip_src3);
+
+					memcpy(&qudp_egress_port->src_ip_addr[tx_cfg->l3_hdr_tbl_idx].ip_src3,&ip_src0,sizeof(ip_src3));
+					ip_dst1.value |= ((tx_cfg->ip_hdr.dst_ip_addr[7]) | (tx_cfg->ip_hdr.dst_ip_addr[6] << 8) | (tx_cfg->ip_hdr.dst_ip_addr[5] << 16)
+							| (tx_cfg->ip_hdr.dst_ip_addr[4] << 24));
+
+					ecpriss_qudp_hal_write_reg_mn_fields(ECPRISS_QUDP_FH_RAMS,
+							ECPRI_UDP_FH_EGRESS_IP_DST_ADDR1_PORT_p_ENTRY_n_V2,
+							port_index,
+							tx_cfg->l3_hdr_tbl_idx,
+							&ip_dst1);
+					memcpy(&qudp_egress_port->dst_ip_addr[tx_cfg->l3_hdr_tbl_idx].ip_dst1,&ip_dst1,sizeof(ip_dst1));
+
+					ip_dst2.value |= ((tx_cfg->ip_hdr.dst_ip_addr[11]) | (tx_cfg->ip_hdr.dst_ip_addr[10] << 8) | (tx_cfg->ip_hdr.dst_ip_addr[9] << 16)
+							| (tx_cfg->ip_hdr.dst_ip_addr[8] << 24));
+
+					ecpriss_qudp_hal_write_reg_mn_fields(ECPRISS_QUDP_FH_RAMS,
+							ECPRI_UDP_FH_EGRESS_IP_DST_ADDR2_PORT_p_ENTRY_n_V2,
+							port_index,
+							tx_cfg->l3_hdr_tbl_idx,
+							&ip_dst2);
+
+					memcpy(&qudp_egress_port->dst_ip_addr[tx_cfg->l3_hdr_tbl_idx].ip_dst2,&ip_dst2,sizeof(ip_dst2));
+					ip_dst3.value |= ((tx_cfg->ip_hdr.dst_ip_addr[15]) | (tx_cfg->ip_hdr.dst_ip_addr[14] << 8) | (tx_cfg->ip_hdr.dst_ip_addr[13] << 16)
+							| (tx_cfg->ip_hdr.dst_ip_addr[12] << 24));
+
+					ecpriss_qudp_hal_write_reg_mn_fields(ECPRISS_QUDP_FH_RAMS,
+							ECPRI_UDP_FH_EGRESS_IP_DST_ADDR3_PORT_p_ENTRY_n_V2,
+							port_index,
+							tx_cfg->l3_hdr_tbl_idx,
+							&ip_dst3);
+
+					memcpy(&qudp_egress_port->dst_ip_addr[tx_cfg->l3_hdr_tbl_idx].ip_dst3,&ip_dst3,sizeof(ip_dst3));
+
+				}
+
+				udp_port.src = tx_cfg->ip_hdr.src_udp_port;
+				udp_port.dst = tx_cfg->ip_hdr.dst_udp_port;
+
+				ecpriss_qudp_hal_write_reg_mn_fields(ECPRISS_QUDP_FH_RAMS,
+						ECPRI_UDP_FH_EGRESS_UDP_PORTS_PORT_p_ENTRY_n_V2,
+						port_index,
+						tx_cfg->l3_hdr_tbl_idx,
+						&udp_port);
+
+				memcpy(&qudp_egress_port->udp_ports[tx_cfg->l3_hdr_tbl_idx],&udp_port,sizeof(udp_port));
+
+				ip_opts.sa_tag_data = tx_cfg->ip_hdr.sa_tag_data ;
+				ip_opts.tos = tx_cfg->ip_hdr.tos;
+				ip_opts.df_bit = tx_cfg->ip_hdr.df_en;
+				ip_opts.calc_udp_cs = tx_cfg->ip_hdr.udp_chksum_en;
+				ip_opts.is_ipsec = tx_cfg->ip_hdr.ipsec_en;
+				ip_opts.rsvd = tx_cfg->ip_hdr.rsvd;
+				ip_opts.ip_type = tx_cfg->ip_hdr.ip_type;
+
+				ecpriss_qudp_hal_write_reg_mn_fields(ECPRISS_QUDP_FH_RAMS,
+						ECPRI_UDP_FH_EGRESS_SA_TAG_IP_TOS_MISC_PORT_p_ENTRY_n_V2,
+						port_index,
+						tx_cfg->l3_hdr_tbl_idx,
+						&ip_opts);
+
+				if(!qudp_egress_port->l3_tbl_valid_entry[tx_cfg->l3_hdr_tbl_idx]){
+					qudp_egress_port->l3_tbl_valid_entry[tx_cfg->l3_hdr_tbl_idx] = true;
+					qudp_egress_port->num_l3_tbl_entries++;
+				}
+			}
 		}
 		if(!qudp_egress_port->l2_tbl_valid_entry[tx_cfg->l2_hdr_tbl_idx]){
 			qudp_egress_port->l2_tbl_valid_entry[tx_cfg->l2_hdr_tbl_idx] = true;
@@ -5869,7 +6191,277 @@ void ecpriss_qudp_ingress_table_deconfig(ecpriss_packet_payload_s *packet)
 	}
 	return;
 }
-void ecpriss_qudp_egress_table_reconfig(ecpriss_packet_payload_s *packet)
+void ecpriss_qudp_egress_l2_table_reconfig(ecpriss_packet_payload_s *packet)
+{
+	ecpri_qudp_hwio_def_ecpri_udp_fh_egress_l2_encap_index_override_p_s_v2 l2_cfg;
+	ecpri_qudp_hwio_def_ecpri_udp_fh_egress_config_p_s_v2 egress_config;
+	ecpriss_flow_tx_cfg_s *flow_tx = NULL;
+	int port_idx = 0;
+	int ret = 0;
+
+	if(packet == NULL) {
+		return;
+	}
+
+	if(ecpriss_hw_ver != ECPRISS_HW_v2_0) {
+		ECPRILOGERR("Not a V2 Hw %s\n",__func__);
+		return;
+	}
+
+	flow_tx = &packet->flow_cfg.flow_tx_cfg;
+	port_idx = flow_tx->port_index;
+
+	memset(&l2_cfg,0, sizeof(l2_cfg));
+	memset(&egress_config,0,sizeof(egress_config));
+
+	/*
+	 * Below methode of reconfiguration is required when
+	 * User want to reconfigure flows while traffic is flowing in the background.
+	 */
+
+	l2_cfg.redirect_from = flow_tx->qudp_tx_cfg.l2_hdr_tbl_idx;
+	l2_cfg.redirect_to = ECPRISS_RESERVED_OVERRIDE_INDEX;
+
+	ECPRILOGINFO("L2 %u\n",l2_cfg.redirect_from);
+
+	/*
+	 * We need to write this config at L2/L3 index ECPRISS_RESERVED_OVERRIDE_INDEX first
+	 * save the original index and updat the config with ECPRISS_RESERVED_OVERRIDE_INDEX
+	 */
+	flow_tx->qudp_tx_cfg.l2_hdr_tbl_idx = ECPRISS_RESERVED_OVERRIDE_INDEX;
+
+	/*
+	 * Update the new config at index ECPRISS_RESERVED_OVERRIDE_INDEX
+	 */
+	ECPRILOGINFO("Reconfig L2 idx %u \n",flow_tx->qudp_tx_cfg.l2_hdr_tbl_idx);
+
+	ret = ecpriss_qudp_fh_tx_hdr_ins_cfg_v2(
+			flow_tx->port_index,
+			&flow_tx->qudp_tx_cfg,
+			ECPRISS_L2_TRANSP);
+
+	/*
+	 * Read rigister before any configuration change
+	 */
+	ecpriss_qudp_hal_read_reg_n_fields(ECPRISS_QUDP_FH,
+			ECPRI_UDP_FH_EGRESS_CONFIG_P_V2,
+			port_idx,
+			&egress_config);
+	/*
+	 * Only change override enable bit config
+	 */
+	egress_config.l2_encap_index_override_en = 1;
+
+	/*
+	 * Update the HW registers with over from and override to index
+	 * l2 index X to ECPRISS_RESERVED_OVERRIDE_INDEX, l3 index Y to ECPRISS_RESERVED_OVERRIDE_INDEX
+	 */
+	ecpriss_qudp_hal_write_reg_n_fields(ECPRISS_QUDP_FH,
+			ECPRI_UDP_FH_EGRESS_L2_ENCAP_INDEX_OVERRIDE_P_V2,
+			port_idx,
+			&l2_cfg);
+
+	/*
+	 * Redirect the current L2 -> X connfig to ECPRISS_RESERVED_OVERRIDE_INDEX
+	 * Redirect the current L3-> Y config to ECPRISS_RESERVED_OVERRIDE_INDEX
+	 * Set enable bit to start redirection
+	 */
+	ecpriss_qudp_hal_write_reg_n_fields(ECPRISS_QUDP_FH,
+			ECPRI_UDP_FH_EGRESS_CONFIG_P_V2,
+			port_idx,
+			&egress_config);
+
+
+	/*
+	 * Restor the original l2/l3 table indexes
+	 */
+	flow_tx->qudp_tx_cfg.l2_hdr_tbl_idx = l2_cfg.redirect_from;
+
+	/*
+	 * Now we need to update l2/l3 config at real index
+	 */
+	ret = ecpriss_qudp_fh_tx_hdr_ins_cfg_v2(
+			flow_tx->port_index,
+			&flow_tx->qudp_tx_cfg,
+			ECPRISS_L2_TRANSP);
+	/*
+	 * Clear enable bit to stop redirection of l2/l3 table
+	 */
+	ecpriss_qudp_hal_read_reg_n_fields(ECPRISS_QUDP_FH,
+			ECPRI_UDP_FH_EGRESS_CONFIG_P_V2,
+			port_idx,
+			&egress_config);
+
+	egress_config.l2_encap_index_override_en = 0;
+
+	ecpriss_qudp_hal_write_reg_n_fields(ECPRISS_QUDP_FH,
+			ECPRI_UDP_FH_EGRESS_CONFIG_P_V2,
+			port_idx,
+			&egress_config);
+
+	/*
+	 * Reset the ECPRISS_RESERVED_OVERRIDE_INDEX indexes with zero
+	 */
+	memset(&flow_tx->qudp_tx_cfg, 0,sizeof(ecpriss_qudp_tx_cfg_s));
+
+	flow_tx->qudp_tx_cfg.l2_hdr_tbl_idx = ECPRISS_RESERVED_OVERRIDE_INDEX;
+
+	/*
+	 * Update the new config at index ECPRISS_RESERVED_OVERRIDE_INDEX
+	 */
+	ret = ecpriss_qudp_fh_tx_hdr_ins_cfg_v2(
+			flow_tx->port_index,
+			&flow_tx->qudp_tx_cfg,
+			ECPRISS_L2_TRANSP);
+
+}
+
+void ecpriss_qudp_egress_l3_table_reconfig(ecpriss_packet_payload_s *packet)
+{
+	ecpri_qudp_hwio_def_ecpri_udp_fh_egress_l3_encap_index_override_p_s_v2 l3_cfg;
+	ecpri_qudp_hwio_def_ecpri_udp_fh_egress_config_p_s_v2 egress_config;
+	ecpriss_flow_tx_cfg_s *flow_tx = NULL;
+	int port_idx = 0;
+	int ret = 0;
+
+	if(packet == NULL) {
+		return;
+	}
+
+	if(ecpriss_hw_ver != ECPRISS_HW_v2_0) {
+		ECPRILOGERR("Not a V2 Hw %s\n",__func__);
+		return;
+	}
+
+	flow_tx = &packet->flow_cfg.flow_tx_cfg;
+	port_idx = flow_tx->port_index;
+
+	memset(&l3_cfg,0, sizeof(l3_cfg));
+	memset(&egress_config,0,sizeof(egress_config));
+
+	/*
+	 * Below methode of reconfiguration is required when
+	 * User want to reconfigure flows while traffic is flowing in the background.
+	 */
+
+	if(flow_tx->qudp_tx_cfg.eth_hdr.orig_ethertype != ECPRISS_ETHERTYPE_ECPRI){
+
+		l3_cfg.redirect_from =  flow_tx->qudp_tx_cfg.l3_hdr_tbl_idx;
+		l3_cfg.redirect_to = ECPRISS_RESERVED_OVERRIDE_INDEX;
+	}
+	ECPRILOGINFO("L3 %u\n",l3_cfg.redirect_from);
+
+	/*
+	 * We need to write this config at L2/L3 index ECPRISS_RESERVED_OVERRIDE_INDEX first
+	 * save the original index and updat the config with ECPRISS_RESERVED_OVERRIDE_INDEX
+	 */
+
+	if(flow_tx->qudp_tx_cfg.eth_hdr.orig_ethertype != ECPRISS_ETHERTYPE_ECPRI){
+
+		flow_tx->qudp_tx_cfg.l3_hdr_tbl_idx = ECPRISS_RESERVED_OVERRIDE_INDEX;
+	}
+
+	/*
+	 * Update the new config at index ECPRISS_RESERVED_OVERRIDE_INDEX
+	 */
+	ECPRILOGINFO("Reconfig L3 idx %u \n",flow_tx->qudp_tx_cfg.l3_hdr_tbl_idx);
+
+	ret = ecpriss_qudp_fh_tx_hdr_ins_cfg_v2(
+			flow_tx->port_index,
+			&flow_tx->qudp_tx_cfg,
+			ECPRISS_L3_TRANSP);
+
+	/*
+	 * Read rigister before any configuration change
+	 */
+	ecpriss_qudp_hal_read_reg_n_fields(ECPRISS_QUDP_FH,
+			ECPRI_UDP_FH_EGRESS_CONFIG_P_V2,
+			port_idx,
+			&egress_config);
+	/*
+	 * Only change override enable bit config
+	 */
+
+	if(flow_tx->qudp_tx_cfg.eth_hdr.orig_ethertype != ECPRISS_ETHERTYPE_ECPRI){
+
+		egress_config.l3_encap_index_override_en = 1;
+	}
+
+	/*
+	 * Update the HW registers with over from and override to index
+	 * l2 index X to ECPRISS_RESERVED_OVERRIDE_INDEX, l3 index Y to ECPRISS_RESERVED_OVERRIDE_INDEX
+	 */
+	if(flow_tx->qudp_tx_cfg.eth_hdr.orig_ethertype != ECPRISS_ETHERTYPE_ECPRI){
+
+		ecpriss_qudp_hal_write_reg_n_fields(ECPRISS_QUDP_FH,
+				ECPRI_UDP_FH_EGRESS_L3_ENCAP_INDEX_OVERRIDE_P_V2,
+				port_idx,
+				&l3_cfg);
+	}
+
+	/*
+	 * Redirect the current L2 -> X connfig to ECPRISS_RESERVED_OVERRIDE_INDEX
+	 * Redirect the current L3-> Y config to ECPRISS_RESERVED_OVERRIDE_INDEX
+	 */
+	ecpriss_qudp_hal_write_reg_n_fields(ECPRISS_QUDP_FH,
+			ECPRI_UDP_FH_EGRESS_CONFIG_P_V2,
+			port_idx,
+			&egress_config);
+
+
+	/*
+	 * Restor the original l2/l3 table indexes
+	 */
+
+	if(flow_tx->qudp_tx_cfg.eth_hdr.orig_ethertype != ECPRISS_ETHERTYPE_ECPRI){
+
+		flow_tx->qudp_tx_cfg.l3_hdr_tbl_idx = l3_cfg.redirect_from;
+	}
+	/*
+	 * Now we need to update l2/l3 config at real index
+	 */
+	ret = ecpriss_qudp_fh_tx_hdr_ins_cfg_v2(
+			flow_tx->port_index,
+			&flow_tx->qudp_tx_cfg,
+			ECPRISS_L3_TRANSP);
+
+	ecpriss_qudp_hal_read_reg_n_fields(ECPRISS_QUDP_FH,
+			ECPRI_UDP_FH_EGRESS_CONFIG_P_V2,
+			port_idx,
+			&egress_config);
+
+	if(flow_tx->qudp_tx_cfg.eth_hdr.orig_ethertype != ECPRISS_ETHERTYPE_ECPRI){
+
+		egress_config.l3_encap_index_override_en = 0;
+	}
+
+	ecpriss_qudp_hal_write_reg_n_fields(ECPRISS_QUDP_FH,
+			ECPRI_UDP_FH_EGRESS_CONFIG_P_V2,
+			port_idx,
+			&egress_config);
+
+	/*
+	 * Reset the ECPRISS_RESERVED_OVERRIDE_INDEX indexes with zero
+	 */
+	memset(&flow_tx->qudp_tx_cfg, 0,sizeof(ecpriss_qudp_tx_cfg_s));
+
+	if(flow_tx->qudp_tx_cfg.eth_hdr.orig_ethertype != ECPRISS_ETHERTYPE_ECPRI){
+
+		flow_tx->qudp_tx_cfg.l3_hdr_tbl_idx = ECPRISS_RESERVED_OVERRIDE_INDEX;
+	}
+
+	/*
+	 * Update the new config at index ECPRISS_RESERVED_OVERRIDE_INDEX
+	 */
+	ret = ecpriss_qudp_fh_tx_hdr_ins_cfg_v2(
+			flow_tx->port_index,
+			&flow_tx->qudp_tx_cfg,
+			ECPRISS_L3_TRANSP);
+
+
+}
+
+void ecpriss_qudp_egress_l2_l3_table_reconfig(ecpriss_packet_payload_s *packet)
 {
 	ecpri_qudp_hwio_def_ecpri_udp_fh_egress_l2_encap_index_override_p_s_v2 l2_cfg;
 	ecpri_qudp_hwio_def_ecpri_udp_fh_egress_l3_encap_index_override_p_s_v2 l3_cfg;
@@ -5891,7 +6483,7 @@ void ecpriss_qudp_egress_table_reconfig(ecpriss_packet_payload_s *packet)
 	port_idx = flow_tx->port_index;
 
 	memset(&l2_cfg,0, sizeof(l2_cfg));
-	memset(&l3_cfg,0, sizeof(l2_cfg));
+	memset(&l3_cfg,0, sizeof(l3_cfg));
 	memset(&egress_config,0,sizeof(egress_config));
 
 	/*
@@ -5927,7 +6519,8 @@ void ecpriss_qudp_egress_table_reconfig(ecpriss_packet_payload_s *packet)
 
 	ret = ecpriss_qudp_fh_tx_hdr_ins_cfg_v2(
 			flow_tx->port_index,
-			&flow_tx->qudp_tx_cfg);
+			&flow_tx->qudp_tx_cfg,
+			ECPRISS_L2_L3_TRANSP);
 
 	/*
 	 * Read rigister before any configuration change
@@ -5987,7 +6580,8 @@ void ecpriss_qudp_egress_table_reconfig(ecpriss_packet_payload_s *packet)
 	 */
 	ret = ecpriss_qudp_fh_tx_hdr_ins_cfg_v2(
 			flow_tx->port_index,
-			&flow_tx->qudp_tx_cfg);
+			&flow_tx->qudp_tx_cfg,
+			ECPRISS_L2_L3_TRANSP);
 
 	ecpriss_qudp_hal_read_reg_n_fields(ECPRISS_QUDP_FH,
 			ECPRI_UDP_FH_EGRESS_CONFIG_P_V2,
@@ -6022,9 +6616,9 @@ void ecpriss_qudp_egress_table_reconfig(ecpriss_packet_payload_s *packet)
 	 */
 	ret = ecpriss_qudp_fh_tx_hdr_ins_cfg_v2(
 			flow_tx->port_index,
-			&flow_tx->qudp_tx_cfg);
+			&flow_tx->qudp_tx_cfg,
+			ECPRISS_L2_L3_TRANSP);
 
 
-	return;
 }
 
