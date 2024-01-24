@@ -1,6 +1,6 @@
 //SPDX-License-Identifier: GPL-2.0-only
 /*
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  */ 
 
 #include <linux/init.h>
@@ -1127,6 +1127,12 @@ int mtip_ethtool_set_fecparam(struct net_device* netdev, struct ethtool_fecparam
     CSMLOGINFO("Setting FEC parameter for link index: %d, cmd: %d, active: %d, fec: %d", link_index, cmd, active_fec, fec);
     // set the configured fec
     platform_driver_priv->mtip_links[link_index]->config_fec = fec;
+
+    if(fec == platform_driver_priv->mtip_links[link_index]->active_fec)
+    {
+        CSMLOGERR("FEC is already active\n");
+        return 0;
+    }
 
     post_mtip_process_reconfigure_port(port_type);
 
