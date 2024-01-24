@@ -393,6 +393,9 @@ typedef struct ecpriss_qudp_egress_cfg_v2{
         ecpri_qudp_hwio_def_ecpri_udp_fh_egress_eth_src0_port_p_entry_n_s_v2 eth_src0_port[NUM_OF_FHP][NUM_EGRESS_ENTRY];
 	ecpriss_dst_ip_addr_cfg_s_v2 dst_ip_addr[NUM_OF_FHP][NUM_EGRESS_ENTRY];
 	ecpriss_src_ip_addr_cfg_s_v2 src_ip_addr[NUM_OF_FHP][NUM_EGRESS_ENTRY];
+	ecpri_qudp_hwio_def_ecpri_udp_fh_egress_sa_tag_ip_tos_misc_port_p_entry_n_s_v2 sa_ip_tos_misc_port[NUM_OF_FHP][NUM_EGRESS_ENTRY];
+	ecpri_qudp_hwio_def_ecpri_udp_l2_egress_ipv4_fields_p_s_v2 ipv4_cfg[NUM_OF_FHP];
+	ecpri_qudp_hwio_def_ecpri_udp_l2_egress_ipv6_fields_p_s_v2 ipv6_cfg[NUM_OF_FHP];
 }ecpriss_qudp_egress_cfg_s_v2;
 
 

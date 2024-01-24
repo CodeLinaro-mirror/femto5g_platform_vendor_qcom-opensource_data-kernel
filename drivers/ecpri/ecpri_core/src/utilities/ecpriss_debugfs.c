@@ -1678,7 +1678,119 @@ static ssize_t config_val_from_registers_qudp_ingress_global_cfg_v2(char __user 
 	return data_size;
 }
 
+static ssize_t config_val_from_registers_qudp_egress_ipv4_cfg_v2(char __user *buf, int fh_index, size_t *count, loff_t *ppos)
+{
+	char fh_str[TEMP_STR_MAX_SIZE];
+	char temp_stat_val_str[TEMP_STAT_VAL_STR_MAX_SIZE];
+	int max_str_size = MAX_STR_SIZE;
+	int ret_val = 0;
+	static int data_size = 0;
 
+	if(*ppos == 0 )
+	{
+		memset(max_str,0,sizeof(max_str));
+
+		RESET_STR(fh_str);
+		scnprintf(fh_str, TEMP_STR_MIN_SIZE, "%u", fh_index);
+
+		ecpriss_qudp_egress_config_stats_update_v2(fh_index);
+
+
+			scnprintf(temp_stat_val_str, TEMP_STAT_VAL_STR_MAX_SIZE, "%u",
+					ecpriss_pdata_v2->cfg_stats_v2.qudp_cfg_v2.egress.ipv4_cfg[fh_index].id);
+
+			strlcat(max_str, "ipv4_id_fh_",
+					max_str_size);
+			strlcat(max_str, fh_str,
+					max_str_size);
+			strlcat(max_str, ":", max_str_size);
+			strlcat(max_str, temp_stat_val_str,
+					max_str_size);
+			strlcat(max_str, "\n",
+					max_str_size);
+
+			scnprintf(temp_stat_val_str, TEMP_STAT_VAL_STR_MAX_SIZE, "%u",
+					ecpriss_pdata_v2->cfg_stats_v2.qudp_cfg_v2.egress.ipv4_cfg[fh_index].ttl);
+
+			strlcat(max_str, "ipv4_ttl_fh_",
+					max_str_size);
+			strlcat(max_str, fh_str,
+					max_str_size);
+			strlcat(max_str, ":", max_str_size);
+			strlcat(max_str, temp_stat_val_str,
+					max_str_size);
+			strlcat(max_str, "\n",
+					max_str_size);
+
+		data_size = strlen(max_str);
+		ECPRILOGDBG("strlen = %u \n",data_size);
+	}
+	if(*ppos  >= max_str_size)
+		return 0;
+
+	if( *ppos + *count > data_size)
+		*count =  data_size - *ppos;
+
+	ret_val = copy_to_user(buf,(max_str + *ppos), *count);
+	return data_size;
+}
+
+static ssize_t config_val_from_registers_qudp_egress_ipv6_cfg_v2(char __user *buf, int fh_index, size_t *count, loff_t *ppos)
+{
+	char fh_str[TEMP_STR_MAX_SIZE];
+	char temp_stat_val_str[TEMP_STAT_VAL_STR_MAX_SIZE];
+	int max_str_size = MAX_STR_SIZE;
+	int ret_val = 0;
+	static int data_size = 0;
+
+	if(*ppos == 0 )
+	{
+		memset(max_str,0,sizeof(max_str));
+
+		RESET_STR(fh_str);
+		scnprintf(fh_str, TEMP_STR_MIN_SIZE, "%u", fh_index);
+
+		ecpriss_qudp_egress_config_stats_update_v2(fh_index);
+
+
+			scnprintf(temp_stat_val_str, TEMP_STAT_VAL_STR_MAX_SIZE, "%u",
+					ecpriss_pdata_v2->cfg_stats_v2.qudp_cfg_v2.egress.ipv6_cfg[fh_index].hop_limit);
+
+			strlcat(max_str, "ipv6_hop_limit_fh_",
+					max_str_size);
+			strlcat(max_str, fh_str,
+					max_str_size);
+			strlcat(max_str, ":", max_str_size);
+			strlcat(max_str, temp_stat_val_str,
+					max_str_size);
+			strlcat(max_str, "\n",
+					max_str_size);
+
+			scnprintf(temp_stat_val_str, TEMP_STAT_VAL_STR_MAX_SIZE, "%u",
+					ecpriss_pdata_v2->cfg_stats_v2.qudp_cfg_v2.egress.ipv6_cfg[fh_index].flow_label);
+
+			strlcat(max_str, "ipv6_flow_label_fh_",
+					max_str_size);
+			strlcat(max_str, fh_str,
+					max_str_size);
+			strlcat(max_str, ":", max_str_size);
+			strlcat(max_str, temp_stat_val_str,
+					max_str_size);
+			strlcat(max_str, "\n",
+					max_str_size);
+
+		data_size = strlen(max_str);
+		ECPRILOGDBG("strlen = %u \n",data_size);
+	}
+	if(*ppos  >= max_str_size)
+		return 0;
+
+	if( *ppos + *count > data_size)
+		*count =  data_size - *ppos;
+
+	ret_val = copy_to_user(buf,(max_str + *ppos), *count);
+	return data_size;
+}
 static ssize_t config_val_from_registers_qudp_egress_src_ip_addr(char __user *buf, int fh_index, size_t *count, loff_t *ppos)
 {
 	char fh_str[TEMP_STR_MAX_SIZE];
@@ -2518,6 +2630,147 @@ static ssize_t config_val_from_registers_qudp_egress_vlan_ethertype(char __user 
 
 	ret_val = copy_to_user(buf,(max_str + *ppos), *count);
 	return data_size;
+}
+
+static ssize_t config_val_from_registers_qudp_egress_sa_tag_ip_tos_misc_port_v2(char __user *buf, int fh_index, size_t *count, loff_t *ppos)
+{
+	char fh_str[TEMP_STR_MAX_SIZE];
+	char index_str[TEMP_STR_MAX_SIZE];
+	char temp_stat_val_str[TEMP_STAT_VAL_STR_MAX_SIZE];
+	int max_str_size = MAX_STR_SIZE;
+	int egress_table_index = 0;
+	int ret_val = 0;
+	static int data_size = 0;
+
+	if(*ppos == 0 )
+	{
+		memset(max_str,0,sizeof(max_str));
+
+		RESET_STR(fh_str);
+		scnprintf(fh_str, TEMP_STR_MIN_SIZE, "%u", fh_index);
+
+		ecpriss_qudp_egress_config_stats_update_v2(fh_index);
+
+		for(egress_table_index = 0; egress_table_index < NUM_EGRESS_ENTRY; egress_table_index++){
+
+			if(ecpriss_pdata_v2->cfg_stats_v2.qudp_cfg_v2.egress.vlan_ethertype[fh_index][egress_table_index].ethertype){
+
+				RESET_STR(index_str);
+				scnprintf(index_str, TEMP_STR_MIN_SIZE, "%u", egress_table_index);
+				RESET_STR(temp_stat_val_str);
+				scnprintf(temp_stat_val_str, TEMP_STAT_VAL_STR_MAX_SIZE, "0x%x",
+						ecpriss_pdata_v2->cfg_stats_v2.qudp_cfg_v2.egress.sa_ip_tos_misc_port[fh_index][egress_table_index].sa_tag_data);
+
+				strlcat(max_str, "Sa_Tag_Data_fh_",
+						max_str_size);
+				strlcat(max_str, fh_str,
+						max_str_size);
+				strlcat(max_str, "_table_index_",
+						max_str_size);
+				strlcat(max_str, index_str,
+						max_str_size);
+				strlcat(max_str, ":", max_str_size);
+				strlcat(max_str, temp_stat_val_str,
+						max_str_size);
+				strlcat(max_str, "\n",
+						max_str_size);
+
+				scnprintf(temp_stat_val_str, TEMP_STAT_VAL_STR_MAX_SIZE, "0x%x",
+						ecpriss_pdata_v2->cfg_stats_v2.qudp_cfg_v2.egress.sa_ip_tos_misc_port[fh_index][egress_table_index].tos);
+				strlcat(max_str, "TOS_fh_",
+						max_str_size);
+				strlcat(max_str, fh_str,
+						max_str_size);
+				strlcat(max_str, "_table_index_",
+						max_str_size);
+				strlcat(max_str, index_str,
+						max_str_size);
+				strlcat(max_str, ":", max_str_size);
+				strlcat(max_str, temp_stat_val_str,
+						max_str_size);
+				strlcat(max_str, "\n",
+						max_str_size);
+
+				scnprintf(temp_stat_val_str, TEMP_STAT_VAL_STR_MAX_SIZE, "%s",
+						(ecpriss_pdata_v2->cfg_stats_v2.qudp_cfg_v2.egress.sa_ip_tos_misc_port[fh_index][egress_table_index].ip_type == 0)? "Ipv4":"Ipv6");
+				strlcat(max_str, "IP_Type_fh_",
+						max_str_size);
+				strlcat(max_str, fh_str,
+						max_str_size);
+				strlcat(max_str, "_table_index_",
+						max_str_size);
+				strlcat(max_str, index_str,
+						max_str_size);
+				strlcat(max_str, ":", max_str_size);
+				strlcat(max_str, temp_stat_val_str,
+						max_str_size);
+				strlcat(max_str, "\n",
+						max_str_size);
+
+				scnprintf(temp_stat_val_str, TEMP_STAT_VAL_STR_MAX_SIZE, "%s",
+						(ecpriss_pdata_v2->cfg_stats_v2.qudp_cfg_v2.egress.sa_ip_tos_misc_port[fh_index][egress_table_index].is_ipsec == 0)? "Disable":"Enable");
+				strlcat(max_str, "Is_Ipsec_fh_",
+						max_str_size);
+				strlcat(max_str, fh_str,
+						max_str_size);
+				strlcat(max_str, "_table_index_",
+						max_str_size);
+				strlcat(max_str, index_str,
+						max_str_size);
+				strlcat(max_str, ":", max_str_size);
+				strlcat(max_str, temp_stat_val_str,
+						max_str_size);
+				strlcat(max_str, "\n",
+						max_str_size);
+
+				scnprintf(temp_stat_val_str, TEMP_STAT_VAL_STR_MAX_SIZE, "%s",
+						(ecpriss_pdata_v2->cfg_stats_v2.qudp_cfg_v2.egress.sa_ip_tos_misc_port[fh_index][egress_table_index].df_bit == 0)? "Disable":"Enable");
+				strlcat(max_str, "Defragmentation_fh_",
+						max_str_size);
+				strlcat(max_str, fh_str,
+						max_str_size);
+				strlcat(max_str, "_table_index_",
+						max_str_size);
+				strlcat(max_str, index_str,
+						max_str_size);
+				strlcat(max_str, ":", max_str_size);
+				strlcat(max_str, temp_stat_val_str,
+						max_str_size);
+				strlcat(max_str, "\n",
+						max_str_size);
+
+
+				scnprintf(temp_stat_val_str, TEMP_STAT_VAL_STR_MAX_SIZE, "%s",
+						(ecpriss_pdata_v2->cfg_stats_v2.qudp_cfg_v2.egress.sa_ip_tos_misc_port[fh_index][egress_table_index].calc_udp_cs == 0)? "No":"Yes");
+				strlcat(max_str, "Calculate_Udp_Checksum_fh_",
+						max_str_size);
+				strlcat(max_str, fh_str,
+						max_str_size);
+				strlcat(max_str, "_table_index_",
+						max_str_size);
+				strlcat(max_str, index_str,
+						max_str_size);
+				strlcat(max_str, ":", max_str_size);
+				strlcat(max_str, temp_stat_val_str,
+						max_str_size);
+				strlcat(max_str, "\n\n",
+						max_str_size);
+
+			}
+
+		}
+		data_size = strlen(max_str);
+		ECPRILOGDBG("strlen = %u \n",data_size);
+	}
+	if(*ppos  >= max_str_size)
+		return 0;
+
+	if( *ppos + *count > data_size)
+		*count =  data_size - *ppos;
+
+	ret_val = copy_to_user(buf,(max_str + *ppos), *count);
+	return data_size;
+
 }
 
 static ssize_t config_val_from_registers_qudp_egress_vlan_ethertype_v2(char __user *buf, int fh_index, size_t *count, loff_t *ppos)
@@ -5536,7 +5789,60 @@ static ssize_t cfg_value_from_qudp_egress_udp_ports_fh2(struct file *file, char 
 	return count;
 
 }
+static ssize_t cfg_value_from_qudp_egress_misc_cfg_fh0(struct file *file, char __user *buf,
+			size_t count, loff_t *ppos)
+{
+	uint32_t len;
 
+	if(ecpriss_hw_ver == 2)
+		len = config_val_from_registers_qudp_egress_sa_tag_ip_tos_misc_port_v2(buf, 0 , &count , ppos);
+	else{
+		ECPRILOGERR("Debugfs, MISC port is not supported for V1 HW \n");
+		return -EINVAL;
+	}
+	if((*ppos + count) > len){
+		count = len - *ppos;
+	}
+	*ppos += count;
+	return count;
+
+}
+static ssize_t cfg_value_from_qudp_egress_misc_cfg_fh1(struct file *file, char __user *buf,
+			size_t count, loff_t *ppos)
+{
+	uint32_t len;
+
+	if(ecpriss_hw_ver == 2)
+		len = config_val_from_registers_qudp_egress_sa_tag_ip_tos_misc_port_v2(buf, 1 , &count , ppos);
+	else{
+		ECPRILOGERR("Debugfs, MISC port is not supported for V1 HW \n");
+		return -EINVAL;
+	}
+	if((*ppos + count) > len){
+		count = len - *ppos;
+	}
+	*ppos += count;
+	return count;
+
+}
+static ssize_t cfg_value_from_qudp_egress_misc_cfg_fh2(struct file *file, char __user *buf,
+			size_t count, loff_t *ppos)
+{
+	uint32_t len;
+
+	if(ecpriss_hw_ver == 2)
+		len = config_val_from_registers_qudp_egress_sa_tag_ip_tos_misc_port_v2(buf, 2 , &count , ppos);
+	else{
+		ECPRILOGERR("Debugfs, MISC port is not supported for V1 HW \n");
+		return -EINVAL;
+	}
+	if((*ppos + count) > len){
+		count = len - *ppos;
+	}
+	*ppos += count;
+	return count;
+
+}
 static ssize_t cfg_value_from_qudp_egress_vlan_ethertype_fh0(struct file *file, char __user *buf,
 			size_t count, loff_t *ppos)
 {
@@ -5888,6 +6194,114 @@ static ssize_t cfg_value_from_qudp_ingress_global_cfg_fh2(struct file *file, cha
 	*ppos += count;
 	return count;
 
+}
+
+static ssize_t cfg_value_from_qudp_egress_ipv4_cfg_fh0(struct file *file, char __user *buf,
+			size_t count, loff_t *ppos)
+{
+	uint32_t len;
+
+	if(ecpriss_hw_ver == 2)
+		len = config_val_from_registers_qudp_egress_ipv4_cfg_v2(buf, 0 , &count , ppos);
+	else{
+		ECPRILOGERR("Debugfs, IPV4 fields are not supported for V1 HW \n");
+		return -EINVAL;
+	}
+	if((*ppos + count) > len){
+		count = len - *ppos;
+	}
+	*ppos += count;
+	return count;
+
+}
+static ssize_t cfg_value_from_qudp_egress_ipv4_cfg_fh1(struct file *file, char __user *buf,
+			size_t count, loff_t *ppos)
+{
+	uint32_t len;
+
+	if(ecpriss_hw_ver == 2)
+		len = config_val_from_registers_qudp_egress_ipv4_cfg_v2(buf, 1 , &count , ppos);
+	else{
+		ECPRILOGERR("Debugfs, IPV4 fields are not supported for V1 HW \n");
+		return -EINVAL;
+	}
+	if((*ppos + count) > len){
+		count = len - *ppos;
+	}
+	*ppos += count;
+	return count;
+
+}
+static ssize_t cfg_value_from_qudp_egress_ipv4_cfg_fh2(struct file *file, char __user *buf,
+			size_t count, loff_t *ppos)
+{
+	uint32_t len;
+
+	if(ecpriss_hw_ver == 2)
+		len = config_val_from_registers_qudp_egress_ipv4_cfg_v2(buf, 2 , &count , ppos);
+	else{
+		ECPRILOGERR("Debugfs, IPV4 fields are not supported for V1 HW \n");
+		return -EINVAL;
+	}
+	if((*ppos + count) > len){
+		count = len - *ppos;
+	}
+	*ppos += count;
+	return count;
+}
+
+static ssize_t cfg_value_from_qudp_egress_ipv6_cfg_fh0(struct file *file, char __user *buf,
+			size_t count, loff_t *ppos)
+{
+	uint32_t len;
+
+	if(ecpriss_hw_ver == 2)
+		len = config_val_from_registers_qudp_egress_ipv6_cfg_v2(buf, 0 , &count , ppos);
+	else{
+		ECPRILOGERR("Debugfs, IPV6 fields are not supported for V1 HW \n");
+		return -EINVAL;
+	}
+	if((*ppos + count) > len){
+		count = len - *ppos;
+	}
+	*ppos += count;
+	return count;
+
+}
+static ssize_t cfg_value_from_qudp_egress_ipv6_cfg_fh1(struct file *file, char __user *buf,
+			size_t count, loff_t *ppos)
+{
+	uint32_t len;
+
+	if(ecpriss_hw_ver == 2)
+		len = config_val_from_registers_qudp_egress_ipv6_cfg_v2(buf, 1 , &count , ppos);
+	else{
+		ECPRILOGERR("Debugfs, IPV6 fields are not supported for V1 HW \n");
+		return -EINVAL;
+	}
+	if((*ppos + count) > len){
+		count = len - *ppos;
+	}
+	*ppos += count;
+	return count;
+
+}
+static ssize_t cfg_value_from_qudp_egress_ipv6_cfg_fh2(struct file *file, char __user *buf,
+			size_t count, loff_t *ppos)
+{
+	uint32_t len;
+
+	if(ecpriss_hw_ver == 2)
+		len = config_val_from_registers_qudp_egress_ipv6_cfg_v2(buf, 2 , &count , ppos);
+	else{
+		ECPRILOGERR("Debugfs, IPV6 fields are not supported for V1 HW \n");
+		return -EINVAL;
+	}
+	if((*ppos + count) > len){
+		count = len - *ppos;
+	}
+	*ppos += count;
+	return count;
 }
 
 static ssize_t cfg_value_from_qudp_ingress_vlan_fh0(struct file *file, char __user *buf,
@@ -6473,6 +6887,9 @@ static struct file_operations cfg_xbar_global_ops = {
 static struct file_operations qudp_egress_udp_ports_fh0_ops = {
 	.read = cfg_value_from_qudp_egress_udp_ports_fh0,
 };
+static struct file_operations qudp_egress_misc_cfg_fh0_ops = {
+	.read = cfg_value_from_qudp_egress_misc_cfg_fh0,
+};
 static struct file_operations qudp_egress_vlan_ethertype_fh0_ops = {
 	.read = cfg_value_from_qudp_egress_vlan_ethertype_fh0,
 };
@@ -6493,6 +6910,9 @@ static struct file_operations qudp_egress_src_ip_addr_fh0_ops = {
 };
 static struct file_operations qudp_egress_udp_ports_fh1_ops = {
 	.read = cfg_value_from_qudp_egress_udp_ports_fh1,
+};
+static struct file_operations qudp_egress_misc_cfg_fh1_ops = {
+	.read = cfg_value_from_qudp_egress_misc_cfg_fh1,
 };
 static struct file_operations qudp_egress_vlan_ethertype_fh1_ops = {
 	.read = cfg_value_from_qudp_egress_vlan_ethertype_fh1,
@@ -6516,6 +6936,9 @@ static struct file_operations qudp_egress_src_ip_addr_fh1_ops = {
 static struct file_operations qudp_egress_udp_ports_fh2_ops = {
 	.read = cfg_value_from_qudp_egress_udp_ports_fh2,
 };
+static struct file_operations qudp_egress_misc_cfg_fh2_ops = {
+	.read = cfg_value_from_qudp_egress_misc_cfg_fh2,
+};
 static struct file_operations qudp_egress_vlan_ethertype_fh2_ops = {
 	.read = cfg_value_from_qudp_egress_vlan_ethertype_fh2,
 };
@@ -6538,6 +6961,12 @@ static struct file_operations qudp_egress_src_ip_addr_fh2_ops = {
 static struct file_operations qudp_ingress_global_cfg_fh0 = {
 	.read = cfg_value_from_qudp_ingress_global_cfg_fh0,
 };
+static struct file_operations qudp_egress_global_cfg_ipv4_fh0 = {
+	.read = cfg_value_from_qudp_egress_ipv4_cfg_fh0,
+};
+static struct file_operations qudp_egress_global_cfg_ipv6_fh0 = {
+	.read = cfg_value_from_qudp_egress_ipv6_cfg_fh0,
+};
 static struct file_operations qudp_ingress_vlan_cfg_fh0 = {
 	.read = cfg_value_from_qudp_ingress_vlan_fh0,
 };
@@ -6557,6 +6986,12 @@ static struct file_operations qudp_ingress_fltr_valid_bits_fh0 = {
 static struct file_operations qudp_ingress_global_cfg_fh1 = {
 	.read = cfg_value_from_qudp_ingress_global_cfg_fh1,
 };
+static struct file_operations qudp_egress_global_cfg_ipv4_fh1 = {
+	.read = cfg_value_from_qudp_egress_ipv4_cfg_fh1,
+};
+static struct file_operations qudp_egress_global_cfg_ipv6_fh1 = {
+	.read = cfg_value_from_qudp_egress_ipv6_cfg_fh1,
+};
 static struct file_operations qudp_ingress_vlan_cfg_fh1 = {
 	.read = cfg_value_from_qudp_ingress_vlan_fh1,
 };
@@ -6575,6 +7010,12 @@ static struct file_operations qudp_ingress_fltr_valid_bits_fh1 = {
 
 static struct file_operations qudp_ingress_global_cfg_fh2 = {
 	.read = cfg_value_from_qudp_ingress_global_cfg_fh2,
+};
+static struct file_operations qudp_egress_global_cfg_ipv4_fh2 = {
+	.read = cfg_value_from_qudp_egress_ipv4_cfg_fh2,
+};
+static struct file_operations qudp_egress_global_cfg_ipv6_fh2 = {
+	.read = cfg_value_from_qudp_egress_ipv6_cfg_fh2,
 };
 static struct file_operations qudp_ingress_vlan_cfg_fh2 = {
 	.read = cfg_value_from_qudp_ingress_vlan_fh2,
@@ -6807,6 +7248,10 @@ static struct file_operations *file_name_to_wrapper(char *filename)
 	{
 		return &qudp_egress_dst_ip_addr_fh0_ops;
 	}
+	else if (!strncmp(filename, "fh0:misc", XBAR_WRAPPER_SIZE))
+	{
+		return &qudp_egress_misc_cfg_fh0_ops;
+	}
 	else if (!strncmp(filename, "fh0:vlan_ethertype", XBAR_WRAPPER_SIZE))
 	{
 		return &qudp_egress_vlan_ethertype_fh0_ops;
@@ -6835,6 +7280,10 @@ static struct file_operations *file_name_to_wrapper(char *filename)
 	else if (!strncmp(filename, "fh1:dst_ip_addr", XBAR_WRAPPER_SIZE))
 	{
 		return &qudp_egress_dst_ip_addr_fh1_ops;
+	}
+	else if (!strncmp(filename, "fh1:misc", XBAR_WRAPPER_SIZE))
+	{
+		return &qudp_egress_misc_cfg_fh1_ops;
 	}
 	else if (!strncmp(filename, "fh1:vlan_ethertype", XBAR_WRAPPER_SIZE))
 	{
@@ -6866,6 +7315,10 @@ static struct file_operations *file_name_to_wrapper(char *filename)
 	{
 		return &qudp_egress_dst_ip_addr_fh2_ops;
 	}
+	else if (!strncmp(filename, "fh2:misc", XBAR_WRAPPER_SIZE))
+	{
+		return &qudp_egress_misc_cfg_fh2_ops;
+	}
 	else if (!strncmp(filename, "fh2:vlan_ethertype", XBAR_WRAPPER_SIZE))
 	{
 		return &qudp_egress_vlan_ethertype_fh2_ops;
@@ -6884,9 +7337,17 @@ static struct file_operations *file_name_to_wrapper(char *filename)
 	}
 
 
-	else if (!strncmp(filename, "fh0:config", XBAR_WRAPPER_SIZE))
+	else if (!strncmp(filename, "fh0:ingress_config", XBAR_WRAPPER_SIZE))
 	{
 		return &qudp_ingress_global_cfg_fh0;
+	}
+	else if (!strncmp(filename, "fh0:egress_ipv4_cfg", XBAR_WRAPPER_SIZE))
+	{
+		return &qudp_egress_global_cfg_ipv4_fh0;
+	}
+	else if (!strncmp(filename, "fh0:egress_ipv6_cfg", XBAR_WRAPPER_SIZE))
+	{
+		return &qudp_egress_global_cfg_ipv6_fh0;
 	}
 	else if (!strncmp(filename, "fh0:vlan_fltr", XBAR_WRAPPER_SIZE))
 	{
@@ -6908,9 +7369,17 @@ static struct file_operations *file_name_to_wrapper(char *filename)
 	{
 		return &qudp_ingress_fltr_valid_bits_fh0;
 	}
-	else if (!strncmp(filename, "fh1:config", XBAR_WRAPPER_SIZE))
+	else if (!strncmp(filename, "fh1:ingress_config", XBAR_WRAPPER_SIZE))
 	{
 		return &qudp_ingress_global_cfg_fh1;
+	}
+	else if (!strncmp(filename, "fh1:egress_ipv4_cfg", XBAR_WRAPPER_SIZE))
+	{
+		return &qudp_egress_global_cfg_ipv4_fh1;
+	}
+	else if (!strncmp(filename, "fh1:egress_ipv6_cfg", XBAR_WRAPPER_SIZE))
+	{
+		return &qudp_egress_global_cfg_ipv6_fh1;
 	}
 	else if (!strncmp(filename, "fh1:vlan_fltr", XBAR_WRAPPER_SIZE))
 	{
@@ -6933,9 +7402,17 @@ static struct file_operations *file_name_to_wrapper(char *filename)
 		return &qudp_ingress_fltr_valid_bits_fh1;
 	}
 
-	else if (!strncmp(filename, "fh2:config", XBAR_WRAPPER_SIZE))
+	else if (!strncmp(filename, "fh2:ingress_config", XBAR_WRAPPER_SIZE))
 	{
 		return &qudp_ingress_global_cfg_fh2;
+	}
+	else if (!strncmp(filename, "fh2:egress_ipv4_cfg", XBAR_WRAPPER_SIZE))
+	{
+		return &qudp_egress_global_cfg_ipv4_fh2;
+	}
+	else if (!strncmp(filename, "fh2:egress_ipv6_cfg", XBAR_WRAPPER_SIZE))
+	{
+		return &qudp_egress_global_cfg_ipv6_fh2;
 	}
 	else if (!strncmp(filename, "fh2:vlan_fltr", XBAR_WRAPPER_SIZE))
 	{

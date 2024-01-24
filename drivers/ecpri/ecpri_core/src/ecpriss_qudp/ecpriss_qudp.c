@@ -340,9 +340,18 @@ void ecpriss_qudp_egress_config_stats_update_v2(int32_t fh_index)
 {
 	int32_t egress_table_index = 0;
 
+	ecpriss_qudp_hal_read_reg_n_fields(ECPRISS_QUDP_FH,
+			ECPRI_UDP_FH_EGRESS_IPV4_FIELDS_P_V2,
+			fh_index,
+			&ecpriss_pdata_v2->cfg_stats_v2.qudp_cfg_v2.egress.ipv4_cfg[fh_index]);
+
+	ecpriss_qudp_hal_read_reg_n_fields(ECPRISS_QUDP_FH,
+			ECPRI_UDP_FH_EGRESS_IPV6_FIELDS_P_V2,
+			fh_index,
+			&ecpriss_pdata_v2->cfg_stats_v2.qudp_cfg_v2.egress.ipv6_cfg[fh_index]);
+
 	for(egress_table_index = 0; egress_table_index < NUM_EGRESS_ENTRY ; egress_table_index++)
 	{
-
 		ecpriss_qudp_hal_read_reg_mn_fields(ECPRISS_QUDP_FH_RAMS,
 				ECPRI_UDP_FH_EGRESS_UDP_PORTS_PORT_p_ENTRY_n_V2,
 				fh_index,
@@ -414,6 +423,11 @@ void ecpriss_qudp_egress_config_stats_update_v2(int32_t fh_index)
 				fh_index,
 				egress_table_index,
 				&ecpriss_pdata_v2->cfg_stats_v2.qudp_cfg_v2.egress.src_ip_addr[fh_index][egress_table_index].ip_src3);
+		ecpriss_qudp_hal_read_reg_mn_fields(ECPRISS_QUDP_FH_RAMS,
+				ECPRI_UDP_FH_EGRESS_SA_TAG_IP_TOS_MISC_PORT_p_ENTRY_n_V2,
+				fh_index,
+				egress_table_index,
+				&ecpriss_pdata_v2->cfg_stats_v2.qudp_cfg_v2.egress.sa_ip_tos_misc_port[fh_index][egress_table_index]);
 	}
 	return;
 }
@@ -5175,6 +5189,8 @@ int ecpriss_qudp_fh_tx_hdr_decfg_v2(uint32_t               port_index,
 	ecpri_qudp_hwio_def_ecpri_udp_fh_egress_ip_dst_addr3_port_p_entry_n_s_v2    ip_dst3 = {0};
 	ecpri_qudp_hwio_def_ecpri_udp_fh_egress_udp_ports_port_p_entry_n_s_v2       udp_port = {0};
 	ecpri_qudp_hwio_def_ecpri_udp_fh_egress_sa_tag_ip_tos_misc_port_p_entry_n_s_v2   ip_opts = {0};
+	ecpri_qudp_hwio_def_ecpri_udp_l2_egress_ipv4_fields_p_s_v2 ipv4_fields = {0};
+	ecpri_qudp_hwio_def_ecpri_udp_l2_egress_ipv6_fields_p_s_v2 ipv6_fields = {0};
 
 
 	ecpriss_qudp_egress_per_port_cfg_s_v2 *qudp_egress_port =
@@ -5300,6 +5316,32 @@ int ecpriss_qudp_fh_tx_hdr_decfg_v2(uint32_t               port_index,
 					port_index,
 					tx_cfg->l3_hdr_tbl_idx,
 					&ip_opts);
+			if(tx_cfg->ip_hdr.ip_type == ECPRISS_IPV6_TYPE){
+				memset(&ipv6_fields, 0 ,sizeof(ipv6_fields));
+				ipv6_fields.flow_label = 0;
+				ipv6_fields.hop_limit = 255;
+
+				ecpriss_qudp_hal_write_reg_n_fields(ECPRISS_QUDP_FH,
+						ECPRI_UDP_FH_EGRESS_IPV6_FIELDS_P_V2,
+						port_index,
+						&ipv6_fields);
+				ecpriss_pdata_v2->cfg_stats_v2.qudp_cfg_v2.egress.ipv6_cfg[port_index].hop_limit = ipv6_fields.hop_limit; 
+				ecpriss_pdata_v2->cfg_stats_v2.qudp_cfg_v2.egress.ipv6_cfg[port_index].flow_label = ipv6_fields.flow_label;
+
+			}else{
+				memset(&ipv4_fields, 0 ,sizeof(ipv4_fields));
+				ipv4_fields.ttl = 255;
+				ipv4_fields.id = 0;
+
+				ecpriss_qudp_hal_write_reg_n_fields(ECPRISS_QUDP_FH,
+						ECPRI_UDP_FH_EGRESS_IPV4_FIELDS_P_V2,
+						port_index,
+						&ipv4_fields);
+
+				ecpriss_pdata_v2->cfg_stats_v2.qudp_cfg_v2.egress.ipv4_cfg[port_index].ttl = ipv4_fields.ttl;
+				ecpriss_pdata_v2->cfg_stats_v2.qudp_cfg_v2.egress.ipv4_cfg[port_index].id = ipv4_fields.id;
+
+			}
 
 			qudp_egress_port->l3_tbl_valid_entry[tx_cfg->l3_hdr_tbl_idx] = false;
 			qudp_egress_port->num_l3_tbl_entries--;
@@ -5609,6 +5651,8 @@ int ecpriss_qudp_fh_tx_hdr_ins_cfg_v2(uint32_t               port_index,
 	ecpri_qudp_hwio_def_ecpri_udp_fh_egress_ip_dst_addr3_port_p_entry_n_s_v2    ip_dst3 = {0};
 	ecpri_qudp_hwio_def_ecpri_udp_fh_egress_udp_ports_port_p_entry_n_s_v2       udp_port = {0};
 	ecpri_qudp_hwio_def_ecpri_udp_fh_egress_sa_tag_ip_tos_misc_port_p_entry_n_s_v2   ip_opts = {0};
+	ecpri_qudp_hwio_def_ecpri_udp_l2_egress_ipv4_fields_p_s_v2 ipv4_fields = {0};
+	ecpri_qudp_hwio_def_ecpri_udp_l2_egress_ipv6_fields_p_s_v2 ipv6_fields = {0};
 
 
 	ecpriss_qudp_egress_per_port_cfg_s_v2 *qudp_egress_port =
@@ -5793,7 +5837,7 @@ int ecpriss_qudp_fh_tx_hdr_ins_cfg_v2(uint32_t               port_index,
 				ip_opts.df_bit = tx_cfg->ip_hdr.df_en;
 				ip_opts.calc_udp_cs = tx_cfg->ip_hdr.udp_chksum_en;
 				ip_opts.is_ipsec = tx_cfg->ip_hdr.ipsec_en;
-				ip_opts.rsvd = tx_cfg->ip_hdr.rsvd;
+				//ip_opts.rsvd = tx_cfg->ip_hdr.rsvd;
 				ip_opts.ip_type = tx_cfg->ip_hdr.ip_type;
 
 				ecpriss_qudp_hal_write_reg_mn_fields(ECPRISS_QUDP_FH_RAMS,
@@ -5812,6 +5856,60 @@ int ecpriss_qudp_fh_tx_hdr_ins_cfg_v2(uint32_t               port_index,
 			qudp_egress_port->l2_tbl_valid_entry[tx_cfg->l2_hdr_tbl_idx] = true;
 			qudp_egress_port->num_l2_tbl_entries++;
 		}
+
+		if(tx_cfg->ip_hdr.ip_type == ECPRISS_IPV6_TYPE){
+
+			/*
+			 * Hop limit zero is an invalid value. if it is zero set it as 255 POR value
+			 */
+			if( 0 == ecpriss_pdata_v2->cfg_stats_v2.qudp_cfg_v2.egress.ipv6_cfg[port_index].hop_limit)
+				ecpriss_pdata_v2->cfg_stats_v2.qudp_cfg_v2.egress.ipv6_cfg[port_index].hop_limit = 255;
+			/*
+			 * If new configuration is same as previous configuration,
+			 * no need to do register write.
+			 */
+			if((tx_cfg->ip_hdr_p.flow_label != ecpriss_pdata_v2->cfg_stats_v2.qudp_cfg_v2.egress.ipv6_cfg[port_index].flow_label ||
+					tx_cfg->ip_hdr_p.hop_limit != ecpriss_pdata_v2->cfg_stats_v2.qudp_cfg_v2.egress.ipv6_cfg[port_index].hop_limit) &&
+					tx_cfg->ip_hdr_p.hop_limit != 0){
+				memset(&ipv6_fields, 0 ,sizeof(ipv6_fields));
+
+				ipv6_fields.flow_label = tx_cfg->ip_hdr_p.flow_label;
+				ipv6_fields.hop_limit = tx_cfg->ip_hdr_p.hop_limit;
+
+				ecpriss_qudp_hal_write_reg_n_fields(ECPRISS_QUDP_FH,
+						ECPRI_UDP_FH_EGRESS_IPV6_FIELDS_P_V2,
+						port_index,
+						&ipv6_fields);
+				ecpriss_pdata_v2->cfg_stats_v2.qudp_cfg_v2.egress.ipv6_cfg[port_index].hop_limit = ipv6_fields.hop_limit;
+				ecpriss_pdata_v2->cfg_stats_v2.qudp_cfg_v2.egress.ipv6_cfg[port_index].flow_label = ipv6_fields.flow_label;
+			}
+		}else{
+			/*
+			 * TTL zero is an invalid value. if it is zero set it as 255 POR value
+			 */
+			if(0 == ecpriss_pdata_v2->cfg_stats_v2.qudp_cfg_v2.egress.ipv4_cfg[port_index].ttl)
+				ecpriss_pdata_v2->cfg_stats_v2.qudp_cfg_v2.egress.ipv4_cfg[port_index].ttl  = 255;
+			/*
+			 * If new configuration is same as previous configuration,
+			 * no need to do register write.
+			 */
+			if((tx_cfg->ip_hdr_p.ttl != ecpriss_pdata_v2->cfg_stats_v2.qudp_cfg_v2.egress.ipv4_cfg[port_index].ttl ||
+					tx_cfg->ip_hdr_p.identification != ecpriss_pdata_v2->cfg_stats_v2.qudp_cfg_v2.egress.ipv4_cfg[port_index].id) &&
+					tx_cfg->ip_hdr_p.ttl != 0){
+				memset(&ipv4_fields, 0 ,sizeof(ipv4_fields));
+
+				ipv4_fields.ttl = tx_cfg->ip_hdr_p.ttl;
+				ipv4_fields.id = tx_cfg->ip_hdr_p.identification;
+			}
+
+			ecpriss_qudp_hal_write_reg_n_fields(ECPRISS_QUDP_FH,
+					ECPRI_UDP_FH_EGRESS_IPV4_FIELDS_P_V2,
+					port_index,
+					&ipv4_fields);
+			ecpriss_pdata_v2->cfg_stats_v2.qudp_cfg_v2.egress.ipv4_cfg[port_index].ttl = ipv4_fields.ttl;
+			ecpriss_pdata_v2->cfg_stats_v2.qudp_cfg_v2.egress.ipv4_cfg[port_index].id = ipv4_fields.id;
+		}
+
 	}while(0);
 	return 0;
 }

@@ -880,7 +880,6 @@ static const char *ecpriss_qudp_hal_reg_name_to_str[ECPRISS_QUDP_REG_MAX+1] = {
 {
 	ecpri_qudp_hwio_def_ecpri_udp_fh_egress_ipv4_fields_p_s_v2 *ipv4_fields
 		= (ecpri_qudp_hwio_def_ecpri_udp_fh_egress_ipv4_fields_p_s_v2 *)fields;
-
 	ECPRISS_HAL_SETFIELD_IN_REG(*val,
 			ipv4_fields->id,
 			HWIO_ECPRI_UDP_FH_EGRESS_IPV4_FIELDS_p_ID_SHFT_V2,
@@ -888,6 +887,22 @@ static const char *ecpriss_qudp_hal_reg_name_to_str[ECPRISS_QUDP_REG_MAX+1] = {
 
 	ECPRISS_HAL_SETFIELD_IN_REG(*val,
 			ipv4_fields->ttl,
+			HWIO_ECPRI_UDP_FH_EGRESS_IPV4_FIELDS_p_TTL_SHFT_V2,
+			HWIO_ECPRI_UDP_FH_EGRESS_IPV4_FIELDS_p_TTL_BMSK_V2);
+	return;
+}
+
+	static void ecpriss_qudp_hal_reg_parse_udp_fh_egress_ipv4_fields_p_v2
+(ecpriss_qudp_hal_reg_name_e reg, void *fields, uint32_t val)
+{
+	ecpri_qudp_hwio_def_ecpri_udp_fh_egress_ipv4_fields_p_s_v2 *ipv4_fields
+		= (ecpri_qudp_hwio_def_ecpri_udp_fh_egress_ipv4_fields_p_s_v2 *)fields;
+
+	ipv4_fields->id = ECPRISS_HAL_GETFIELD_FROM_REG(val,
+			HWIO_ECPRI_UDP_FH_EGRESS_IPV4_FIELDS_p_ID_SHFT_V2,
+			HWIO_ECPRI_UDP_FH_EGRESS_IPV4_FIELDS_p_ID_BMSK_V2);
+
+	ipv4_fields->ttl = ECPRISS_HAL_GETFIELD_FROM_REG(val,
 			HWIO_ECPRI_UDP_FH_EGRESS_IPV4_FIELDS_p_TTL_SHFT_V2,
 			HWIO_ECPRI_UDP_FH_EGRESS_IPV4_FIELDS_p_TTL_BMSK_V2);
 	return;
@@ -925,6 +940,22 @@ static const char *ecpriss_qudp_hal_reg_name_to_str[ECPRISS_QUDP_REG_MAX+1] = {
 
 	ECPRISS_HAL_SETFIELD_IN_REG(*val,
 			ipv6_fields->flow_label,
+			HWIO_ECPRI_UDP_FH_EGRESS_IPV6_FIELDS_p_FLOW_LABEL_SHFT_V2,
+			HWIO_ECPRI_UDP_FH_EGRESS_IPV6_FIELDS_p_FLOW_LABEL_BMSK_V2);
+	return;
+}
+
+	static void ecpriss_qudp_hal_reg_parse_udp_fh_egress_ipv6_fields_p_v2
+(ecpriss_qudp_hal_reg_name_e reg, void *fields, uint32_t val)
+{
+	ecpri_qudp_hwio_def_ecpri_udp_fh_egress_ipv6_fields_p_s_v2 *ipv6_fields
+		= (ecpri_qudp_hwio_def_ecpri_udp_fh_egress_ipv6_fields_p_s_v2 *)fields;
+
+	ipv6_fields->hop_limit = ECPRISS_HAL_GETFIELD_FROM_REG(val,
+			HWIO_ECPRI_UDP_FH_EGRESS_IPV6_FIELDS_p_HOP_LIMIT_SHFT_V2,
+			HWIO_ECPRI_UDP_FH_EGRESS_IPV6_FIELDS_p_HOP_LIMIT_BMSK_V2);
+
+	ipv6_fields->flow_label = ECPRISS_HAL_GETFIELD_FROM_REG(val,
 			HWIO_ECPRI_UDP_FH_EGRESS_IPV6_FIELDS_p_FLOW_LABEL_SHFT_V2,
 			HWIO_ECPRI_UDP_FH_EGRESS_IPV6_FIELDS_p_FLOW_LABEL_BMSK_V2);
 	return;
@@ -2701,7 +2732,38 @@ static const char *ecpriss_qudp_hal_reg_name_to_str[ECPRISS_QUDP_REG_MAX+1] = {
 			HWIO_ECPRI_UDP_FH_EGRESS_SA_TAG_IP_TOS_MISC_PORT_p_ENTRY_n_CALC_UDP_CS_BMSK_V2);
 	return;
 }
+	static void ecpriss_qudp_hal_reg_parse_fh_egress_sa_tag_ip_tos_misc_port_p_entry_n_v2
+(ecpriss_qudp_hal_reg_name_e reg, void *fields, uint32_t val)
+{
+	ecpri_qudp_hwio_def_ecpri_udp_fh_egress_sa_tag_ip_tos_misc_port_p_entry_n_s_v2 *sa_tag_ip_tos_misc_port_p_entry_n
+		= (ecpri_qudp_hwio_def_ecpri_udp_fh_egress_sa_tag_ip_tos_misc_port_p_entry_n_s_v2 *)fields;
 
+	sa_tag_ip_tos_misc_port_p_entry_n->sa_tag_data = ECPRISS_HAL_GETFIELD_FROM_REG(val,
+			HWIO_ECPRI_UDP_FH_EGRESS_SA_TAG_IP_TOS_MISC_PORT_p_ENTRY_n_SA_TAG_DATA_SHFT_V2,
+			HWIO_ECPRI_UDP_FH_EGRESS_SA_TAG_IP_TOS_MISC_PORT_p_ENTRY_n_SA_TAG_DATA_BMSK_V2);
+
+	sa_tag_ip_tos_misc_port_p_entry_n->tos = ECPRISS_HAL_GETFIELD_FROM_REG(val,
+			HWIO_ECPRI_UDP_FH_EGRESS_SA_TAG_IP_TOS_MISC_PORT_p_ENTRY_n_TOS_SHFT_V2,
+			HWIO_ECPRI_UDP_FH_EGRESS_SA_TAG_IP_TOS_MISC_PORT_p_ENTRY_n_TOS_BMSK_V2);
+
+	sa_tag_ip_tos_misc_port_p_entry_n->ip_type = ECPRISS_HAL_GETFIELD_FROM_REG(val,
+			HWIO_ECPRI_UDP_FH_EGRESS_SA_TAG_IP_TOS_MISC_PORT_p_ENTRY_n_IP_TYPE_SHFT_V2,
+			HWIO_ECPRI_UDP_FH_EGRESS_SA_TAG_IP_TOS_MISC_PORT_p_ENTRY_n_IP_TYPE_BMSK_V2);
+
+	sa_tag_ip_tos_misc_port_p_entry_n->is_ipsec = ECPRISS_HAL_GETFIELD_FROM_REG(val,
+			HWIO_ECPRI_UDP_FH_EGRESS_SA_TAG_IP_TOS_MISC_PORT_p_ENTRY_n_IS_IPSEC_SHFT_V2,
+			HWIO_ECPRI_UDP_FH_EGRESS_SA_TAG_IP_TOS_MISC_PORT_p_ENTRY_n_IS_IPSEC_BMSK_V2);
+
+	sa_tag_ip_tos_misc_port_p_entry_n->df_bit = ECPRISS_HAL_GETFIELD_FROM_REG(val,
+			HWIO_ECPRI_UDP_FH_EGRESS_SA_TAG_IP_TOS_MISC_PORT_p_ENTRY_n_DF_BIT_SHFT_V2,
+			HWIO_ECPRI_UDP_FH_EGRESS_SA_TAG_IP_TOS_MISC_PORT_p_ENTRY_n_DF_BIT_BMSK_V2);
+
+	sa_tag_ip_tos_misc_port_p_entry_n->calc_udp_cs = ECPRISS_HAL_GETFIELD_FROM_REG(val,
+			HWIO_ECPRI_UDP_FH_EGRESS_SA_TAG_IP_TOS_MISC_PORT_p_ENTRY_n_CALC_UDP_CS_SHFT_V2,
+			HWIO_ECPRI_UDP_FH_EGRESS_SA_TAG_IP_TOS_MISC_PORT_p_ENTRY_n_CALC_UDP_CS_BMSK_V2);
+	return;
+
+}
 	static void ecpriss_qudp_hal_reg_construct_udp_fh_mac_addr_info_v2
 (ecpriss_qudp_hal_reg_name_e reg, const void *fields, uint32_t* val)
 {
@@ -5050,12 +5112,12 @@ static struct ecpriss_qudp_hal_reg_obj ecpriss_qudp_hal_reg_objs[ECPRISS_HW_MAX]
 		0x09380000, 0x0, 0x4, 0, 0, 0, 0},
 	[ECPRISS_HW_v2_0][ECPRI_UDP_FH_EGRESS_IPV4_FIELDS_P_V2] = {
 		ecpriss_qudp_hal_reg_construct_udp_fh_egress_ipv4_fields_p_v2,
-		ecpriss_qudp_hal_reg_parse_dummy_v2,
-		0x09180000, 0x800, 0, 0, 0, 0, 0},
+		ecpriss_qudp_hal_reg_parse_udp_fh_egress_ipv4_fields_p_v2,
+		0x09380000, 0x800, 0x4, 0, 0, 0, 0},
 	[ECPRISS_HW_v2_0][ECPRI_UDP_FH_EGRESS_IPV6_FIELDS_P_V2] = {
 		ecpriss_qudp_hal_reg_construct_udp_fh_egress_ipv6_fields_p_v2,
-		ecpriss_qudp_hal_reg_parse_dummy_v2,
-		0x09180000, 0x80C, 0, 0, 0, 0, 0},
+		ecpriss_qudp_hal_reg_parse_udp_fh_egress_ipv6_fields_p_v2,
+		0x09380000, 0x80C, 0x4, 0, 0, 0, 0},
 	[ECPRISS_HW_v2_0][ECPRI_UDP_FH_EGRESS_ETH_MTU_P_V2] = {
 		ecpriss_qudp_hal_reg_construct_udp_fh_egress_eth_mtu_p_v2,
 		ecpriss_qudp_hal_reg_parse_udp_fh_egress_eth_mtu_p_v2,
@@ -5222,7 +5284,7 @@ static struct ecpriss_qudp_hal_reg_obj ecpriss_qudp_hal_reg_objs[ECPRISS_HW_MAX]
 		0x09384000, 0x10020, 0x40, 0, 0, 0, 0x4000},
 	[ECPRISS_HW_v2_0][ ECPRI_UDP_FH_EGRESS_SA_TAG_IP_TOS_MISC_PORT_p_ENTRY_n_V2] = {
 		ecpriss_qudp_hal_reg_construct_fh_egress_sa_tag_ip_tos_misc_port_p_entry_n_v2,
-		ecpriss_qudp_hal_reg_parse_dummy_v2,
+		ecpriss_qudp_hal_reg_parse_fh_egress_sa_tag_ip_tos_misc_port_p_entry_n_v2,
 		0x09384000, 0x10024, 0x40, 0, 0, 0, 0x4000},
 
 
