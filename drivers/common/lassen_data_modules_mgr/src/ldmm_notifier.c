@@ -9,7 +9,7 @@
 #include "ldmm_ipc_log.h"
 #include "ldmm_notifr.h"
 
-//#define IS_MULTICAST_EN
+#define IS_MULTICAST_EN
 
 extern struct blocking_notifier_head lassen_mtip_fault_notifr;
 extern struct blocking_notifier_head lassen_qxdm_timer_update_notifr;
@@ -94,10 +94,10 @@ int ldmm_mtip_fault_hndlr(struct notifier_block *nb, unsigned long event, void *
 			return NOTIFY_BAD;
 	}
 
-	fult_mgmt_snd(val ,UNICAST_MSG);
-
 #ifdef IS_MULTICAST_EN
 	fult_mgmt_snd(val ,MULTICAST_MSG);
+#else
+	fult_mgmt_snd(val ,UNICAST_MSG);
 #endif
 	return ret;
 }
@@ -135,7 +135,7 @@ int ldmm_qxdm_timer_update_notifr_init(void)
 		//calling notifier to set initial timer value
    		blocking_notifier_call_chain(&lassen_qxdm_timer_update_notifr, qxdm_logging_timer_value, NULL);
 	}
-	return ret;  
+	return ret;
 }
 int ldmm_qxdm_timer_update_notifr_exit(void)
 {
