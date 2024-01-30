@@ -1684,7 +1684,7 @@ static int ecpriss_qudp_ingress_modify_cfg_v2(uint32_t port_index,
 	{
 		ingress_cfg.enable_mac_dst_check = 1;
 		ingress_cfg.enable_broadcast_check = 1;
-		ingress_cfg.non_local_dst_action = ECPRISS_MAC_ACTION_DISCARD;
+		ingress_cfg.non_local_dst_action = ECPRISS_MAC_ACTION_PASS_TO_A55;
 
 		memset(&mac_valid_bit,0, sizeof(mac_valid_bit));
 
