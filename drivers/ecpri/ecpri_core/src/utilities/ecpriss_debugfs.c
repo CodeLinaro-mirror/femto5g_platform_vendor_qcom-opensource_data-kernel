@@ -46,6 +46,20 @@ typedef enum config_param{
 
 uint32_t min_lut_index = 0;
 uint32_t max_lut_index = 299;
+
+typedef union msb_mac{
+	uint16_t msb_mac;
+	uint8_t mac[2];
+}ecpriss_msb_mac;
+
+typedef union lsb_mac{
+	uint32_t lsb_mac;
+	uint8_t mac[4];
+}ecpriss_lsb_mac;
+typedef union ipv4_addrs{
+	uint32_t ipv4;
+	uint8_t ip[4];
+}ecpriss_ipv4_addr;
 /*
  * only white listed alphbates are allowed
  * { } , _  : and 0 to 9 a to z A to Z
@@ -599,7 +613,8 @@ static ssize_t config_val_from_registers_qudp_ingress_dst_ip_v2(char __user *buf
 	int fltr_table_index = 0;
 	int ret_val = 0;
 	static int data_size = 0;
-
+	bool is_ipv4 = false;
+	ecpriss_ipv4_addr ipv4_addrs;
 	if(*ppos == 0 )
 	{
 		memset(max_str,0,sizeof(max_str));
@@ -616,10 +631,23 @@ static ssize_t config_val_from_registers_qudp_ingress_dst_ip_v2(char __user *buf
 				RESET_STR(index_str);
 				scnprintf(index_str, TEMP_STR_MIN_SIZE, "%u", fltr_table_index);
 				RESET_STR(temp_stat_val_str);
-				scnprintf(temp_stat_val_str, TEMP_STAT_VAL_STR_MAX_SIZE, "0x%x",
-						ecpriss_pdata_v2->cfg_stats_v2.qudp_cfg_v2.ingress.cfg.ip_addr[fh_index][fltr_table_index].dst_ip0.value);
-
-				strlcat(max_str, "dst_ip_0:1:2:3_fh_",
+				/*
+				 * The assumption here is that if only ip0 is non zero and ip1,ip2 & ip3 are zero, most probably it is a ipv4 address
+				 * there are no official ways to validate the ip filter type.
+				 * this logic will not work in case of ipv6 addresses like 1::
+				 */
+				if(!ecpriss_pdata_v2->cfg_stats_v2.qudp_cfg_v2.ingress.cfg.ip_addr[fh_index][fltr_table_index].dst_ip1.value &&
+						!ecpriss_pdata_v2->cfg_stats_v2.qudp_cfg_v2.ingress.cfg.ip_addr[fh_index][fltr_table_index].dst_ip2.value &&
+						!ecpriss_pdata_v2->cfg_stats_v2.qudp_cfg_v2.ingress.cfg.ip_addr[fh_index][fltr_table_index].dst_ip3.value &&
+						ecpriss_pdata_v2->cfg_stats_v2.qudp_cfg_v2.ingress.cfg.ip_addr[fh_index][fltr_table_index].dst_ip0.value ){
+					is_ipv4 = true;
+					ipv4_addrs.ipv4 = ecpriss_pdata_v2->cfg_stats_v2.qudp_cfg_v2.ingress.cfg.ip_addr[fh_index][fltr_table_index].dst_ip0.value; 
+					scnprintf(temp_stat_val_str, TEMP_STAT_VAL_STR_MAX_SIZE, "%u.%u.%u.%u\n",ipv4_addrs.ip[3],ipv4_addrs.ip[2],ipv4_addrs.ip[1],ipv4_addrs.ip[0]);
+				}else{
+					scnprintf(temp_stat_val_str, TEMP_STAT_VAL_STR_MAX_SIZE, "0x%x",
+							ecpriss_pdata_v2->cfg_stats_v2.qudp_cfg_v2.ingress.cfg.ip_addr[fh_index][fltr_table_index].dst_ip0.value);
+				}
+				strlcat(max_str, "dst_ip_fh_",
 						max_str_size);
 				strlcat(max_str, fh_str,
 						max_str_size);
@@ -630,26 +658,25 @@ static ssize_t config_val_from_registers_qudp_ingress_dst_ip_v2(char __user *buf
 				strlcat(max_str, ":", max_str_size);
 				strlcat(max_str, temp_stat_val_str,
 						max_str_size);
-				strlcat(max_str, "\n",
-						max_str_size);
+				if(!is_ipv4){
+					scnprintf(temp_stat_val_str, TEMP_STAT_VAL_STR_MAX_SIZE, "0x%x",
+							ecpriss_pdata_v2->cfg_stats_v2.qudp_cfg_v2.ingress.cfg.ip_addr[fh_index][fltr_table_index].dst_ip1.value);
+					strlcat(max_str, ":", max_str_size);
+					strlcat(max_str, temp_stat_val_str,
+							max_str_size);
 
-				scnprintf(temp_stat_val_str, TEMP_STAT_VAL_STR_MAX_SIZE, "0x%x",
-						ecpriss_pdata_v2->cfg_stats_v2.qudp_cfg_v2.ingress.cfg.ip_addr[fh_index][fltr_table_index].dst_ip1.value);
-				strlcat(max_str, ":", max_str_size);
-				strlcat(max_str, temp_stat_val_str,
-						max_str_size);
+					scnprintf(temp_stat_val_str, TEMP_STAT_VAL_STR_MAX_SIZE, "0x%x",
+							ecpriss_pdata_v2->cfg_stats_v2.qudp_cfg_v2.ingress.cfg.ip_addr[fh_index][fltr_table_index].dst_ip2.value);
+					strlcat(max_str, ":", max_str_size);
+					strlcat(max_str, temp_stat_val_str,
+							max_str_size);
 
-				scnprintf(temp_stat_val_str, TEMP_STAT_VAL_STR_MAX_SIZE, "0x%x",
-						ecpriss_pdata_v2->cfg_stats_v2.qudp_cfg_v2.ingress.cfg.ip_addr[fh_index][fltr_table_index].dst_ip2.value);
-				strlcat(max_str, ":", max_str_size);
-				strlcat(max_str, temp_stat_val_str,
-						max_str_size);
-
-				scnprintf(temp_stat_val_str, TEMP_STAT_VAL_STR_MAX_SIZE, "0x%x",
-						ecpriss_pdata_v2->cfg_stats_v2.qudp_cfg_v2.ingress.cfg.ip_addr[fh_index][fltr_table_index].dst_ip3.value);
-				strlcat(max_str, ":", max_str_size);
-				strlcat(max_str, temp_stat_val_str,
-						max_str_size);
+					scnprintf(temp_stat_val_str, TEMP_STAT_VAL_STR_MAX_SIZE, "0x%x",
+							ecpriss_pdata_v2->cfg_stats_v2.qudp_cfg_v2.ingress.cfg.ip_addr[fh_index][fltr_table_index].dst_ip3.value);
+					strlcat(max_str, ":", max_str_size);
+					strlcat(max_str, temp_stat_val_str,
+							max_str_size);
+				}
 				strlcat(max_str, "\n",
 						max_str_size);
 
@@ -1893,6 +1920,7 @@ static ssize_t config_val_from_registers_qudp_egress_src_ip_addr_v2(char __user 
 	int egress_table_index = 0;
 	int ret_val = 0;
 	static int data_size = 0;
+	ecpriss_ipv4_addr ipv4_addrs;
 
 	if(*ppos == 0 )
 	{
@@ -1918,10 +1946,16 @@ static ssize_t config_val_from_registers_qudp_egress_src_ip_addr_v2(char __user 
 				RESET_STR(index_str);
 				scnprintf(index_str, TEMP_STR_MIN_SIZE, "%u", egress_table_index);
 				RESET_STR(temp_stat_val_str);
-				scnprintf(temp_stat_val_str, TEMP_STAT_VAL_STR_MAX_SIZE, "0x%x",
-						ecpriss_pdata_v2->cfg_stats_v2.qudp_cfg_v2.egress.src_ip_addr[fh_index][egress_table_index].ip_src0.value);
 
-				strlcat(max_str, "src_ip_addr_0:1:2:3_fh_",
+				if (ECPRISS_ETHERTYPE_IPV4 == ecpriss_pdata_v2->cfg_stats_v2.qudp_cfg_v2.egress.vlan_ethertype[fh_index][egress_table_index].ethertype){
+					ipv4_addrs.ipv4 = ecpriss_pdata_v2->cfg_stats_v2.qudp_cfg_v2.egress.src_ip_addr[fh_index][egress_table_index].ip_src0.value; 
+					scnprintf(temp_stat_val_str, TEMP_STAT_VAL_STR_MAX_SIZE, "%u.%u.%u.%u",ipv4_addrs.ip[3],ipv4_addrs.ip[2],ipv4_addrs.ip[1],ipv4_addrs.ip[0]);
+				}else{
+					scnprintf(temp_stat_val_str, TEMP_STAT_VAL_STR_MAX_SIZE, "0x%x",
+							ecpriss_pdata_v2->cfg_stats_v2.qudp_cfg_v2.egress.src_ip_addr[fh_index][egress_table_index].ip_src0.value);
+				}
+
+				strlcat(max_str, "src_ip_addr_fh_",
 						max_str_size);
 				strlcat(max_str, fh_str,
 						max_str_size);
@@ -1934,29 +1968,32 @@ static ssize_t config_val_from_registers_qudp_egress_src_ip_addr_v2(char __user 
 						max_str_size);
 
 
-				scnprintf(temp_stat_val_str, TEMP_STAT_VAL_STR_MAX_SIZE, "0x%x",
-						ecpriss_pdata_v2->cfg_stats_v2.qudp_cfg_v2.egress.src_ip_addr[fh_index][egress_table_index].ip_src1.value);
+				if (ECPRISS_ETHERTYPE_IPV6 == ecpriss_pdata_v2->cfg_stats_v2.qudp_cfg_v2.egress.vlan_ethertype[fh_index][egress_table_index].ethertype){
+					scnprintf(temp_stat_val_str, TEMP_STAT_VAL_STR_MAX_SIZE, "0x%x",
+							ecpriss_pdata_v2->cfg_stats_v2.qudp_cfg_v2.egress.src_ip_addr[fh_index][egress_table_index].ip_src1.value);
 
-				strlcat(max_str, ":", max_str_size);
-				strlcat(max_str, temp_stat_val_str,
-						max_str_size);
-
-
-				scnprintf(temp_stat_val_str, TEMP_STAT_VAL_STR_MAX_SIZE, "0x%x",
-						ecpriss_pdata_v2->cfg_stats_v2.qudp_cfg_v2.egress.src_ip_addr[fh_index][egress_table_index].ip_src2.value);
-
-				strlcat(max_str, ":", max_str_size);
-				strlcat(max_str, temp_stat_val_str,
-						max_str_size);
+					strlcat(max_str, ":", max_str_size);
+					strlcat(max_str, temp_stat_val_str,
+							max_str_size);
 
 
+					scnprintf(temp_stat_val_str, TEMP_STAT_VAL_STR_MAX_SIZE, "0x%x",
+							ecpriss_pdata_v2->cfg_stats_v2.qudp_cfg_v2.egress.src_ip_addr[fh_index][egress_table_index].ip_src2.value);
 
-				scnprintf(temp_stat_val_str, TEMP_STAT_VAL_STR_MAX_SIZE, "0x%x",
-						ecpriss_pdata_v2->cfg_stats_v2.qudp_cfg_v2.egress.src_ip_addr[fh_index][egress_table_index].ip_src3.value);
+					strlcat(max_str, ":", max_str_size);
+					strlcat(max_str, temp_stat_val_str,
+							max_str_size);
 
-				strlcat(max_str, ":", max_str_size);
-				strlcat(max_str, temp_stat_val_str,
-						max_str_size);
+
+
+					scnprintf(temp_stat_val_str, TEMP_STAT_VAL_STR_MAX_SIZE, "0x%x",
+							ecpriss_pdata_v2->cfg_stats_v2.qudp_cfg_v2.egress.src_ip_addr[fh_index][egress_table_index].ip_src3.value);
+
+					strlcat(max_str, ":", max_str_size);
+					strlcat(max_str, temp_stat_val_str,
+							max_str_size);
+
+				}
 				strlcat(max_str, "\n",
 						max_str_size);
 
@@ -2000,17 +2037,14 @@ static ssize_t config_val_from_registers_qudp_egress_dst_ip_addr(char __user *bu
 		for(egress_table_index = 0; egress_table_index < NUM_EGRESS_ENTRY; egress_table_index++){
 
 			if(ecpriss_pdata->cfg_stats.qudp_cfg.egress.dst_ip_addr[fh_index][egress_table_index].ip_dst0.value ||
-				ecpriss_pdata->cfg_stats.qudp_cfg.egress.dst_ip_addr[fh_index][egress_table_index].ip_dst1.value ||
-				ecpriss_pdata->cfg_stats.qudp_cfg.egress.dst_ip_addr[fh_index][egress_table_index].ip_dst2.value ||
-				ecpriss_pdata->cfg_stats.qudp_cfg.egress.dst_ip_addr[fh_index][egress_table_index].ip_dst3.value ){
+					ecpriss_pdata->cfg_stats.qudp_cfg.egress.dst_ip_addr[fh_index][egress_table_index].ip_dst1.value ||
+					ecpriss_pdata->cfg_stats.qudp_cfg.egress.dst_ip_addr[fh_index][egress_table_index].ip_dst2.value ||
+					ecpriss_pdata->cfg_stats.qudp_cfg.egress.dst_ip_addr[fh_index][egress_table_index].ip_dst3.value ){
 
 				RESET_STR(index_str);
 				scnprintf(index_str, TEMP_STR_MIN_SIZE, "%u", egress_table_index);
 				RESET_STR(temp_stat_val_str);
-				scnprintf(temp_stat_val_str, TEMP_STAT_VAL_STR_MAX_SIZE, "0x%x",
-						ecpriss_pdata->cfg_stats.qudp_cfg.egress.dst_ip_addr[fh_index][egress_table_index].ip_dst0.value);
-
-				strlcat(max_str, "dst_ip_addr_0:1:2:3_fh_",
+				strlcat(max_str, "dst_ip_addr_fh_",
 						max_str_size);
 				strlcat(max_str, fh_str,
 						max_str_size);
@@ -2071,7 +2105,7 @@ static ssize_t config_val_from_registers_qudp_egress_dst_ip_addr_v2(char __user 
 	int egress_table_index = 0;
 	int ret_val = 0;
 	static int data_size = 0;
-
+	ecpriss_ipv4_addr ipv4_addrs;
 	if(*ppos == 0 )
 	{
 		memset(max_str,0,sizeof(max_str));
@@ -2091,10 +2125,15 @@ static ssize_t config_val_from_registers_qudp_egress_dst_ip_addr_v2(char __user 
 				RESET_STR(index_str);
 				scnprintf(index_str, TEMP_STR_MIN_SIZE, "%u", egress_table_index);
 				RESET_STR(temp_stat_val_str);
-				scnprintf(temp_stat_val_str, TEMP_STAT_VAL_STR_MAX_SIZE, "0x%x",
-						ecpriss_pdata_v2->cfg_stats_v2.qudp_cfg_v2.egress.dst_ip_addr[fh_index][egress_table_index].ip_dst0.value);
 
-				strlcat(max_str, "dst_ip_addr_0:1:2:3_fh_",
+				if (ECPRISS_ETHERTYPE_IPV4 == ecpriss_pdata_v2->cfg_stats_v2.qudp_cfg_v2.egress.vlan_ethertype[fh_index][egress_table_index].ethertype){
+					ipv4_addrs.ipv4 = ecpriss_pdata_v2->cfg_stats_v2.qudp_cfg_v2.egress.dst_ip_addr[fh_index][egress_table_index].ip_dst0.value; 
+					scnprintf(temp_stat_val_str, TEMP_STAT_VAL_STR_MAX_SIZE, "%u.%u.%u.%u",ipv4_addrs.ip[3],ipv4_addrs.ip[2],ipv4_addrs.ip[1],ipv4_addrs.ip[0]);
+				}else{
+					scnprintf(temp_stat_val_str, TEMP_STAT_VAL_STR_MAX_SIZE, "0x%x",
+							ecpriss_pdata_v2->cfg_stats_v2.qudp_cfg_v2.egress.dst_ip_addr[fh_index][egress_table_index].ip_dst0.value);
+				}
+				strlcat(max_str, "dst_ip_addr_fh_",
 						max_str_size);
 				strlcat(max_str, fh_str,
 						max_str_size);
@@ -2102,31 +2141,33 @@ static ssize_t config_val_from_registers_qudp_egress_dst_ip_addr_v2(char __user 
 						max_str_size);
 				strlcat(max_str, index_str,
 						max_str_size);
-				strlcat(max_str, ":", max_str_size);
+				strlcat(max_str, ": ", max_str_size);
 				strlcat(max_str, temp_stat_val_str,
 						max_str_size);
 
+				if (ECPRISS_ETHERTYPE_IPV6 == ecpriss_pdata_v2->cfg_stats_v2.qudp_cfg_v2.egress.vlan_ethertype[fh_index][egress_table_index].ethertype){
 
-				scnprintf(temp_stat_val_str, TEMP_STAT_VAL_STR_MAX_SIZE, "0x%x",
-						ecpriss_pdata_v2->cfg_stats_v2.qudp_cfg_v2.egress.dst_ip_addr[fh_index][egress_table_index].ip_dst1.value);
+					scnprintf(temp_stat_val_str, TEMP_STAT_VAL_STR_MAX_SIZE, "0x%x",
+							ecpriss_pdata_v2->cfg_stats_v2.qudp_cfg_v2.egress.dst_ip_addr[fh_index][egress_table_index].ip_dst1.value);
 
-				strlcat(max_str, ":", max_str_size);
-				strlcat(max_str, temp_stat_val_str,
-						max_str_size);
+					strlcat(max_str, ":", max_str_size);
+					strlcat(max_str, temp_stat_val_str,
+							max_str_size);
 
-				scnprintf(temp_stat_val_str, TEMP_STAT_VAL_STR_MAX_SIZE, "0x%x",
-						ecpriss_pdata_v2->cfg_stats_v2.qudp_cfg_v2.egress.dst_ip_addr[fh_index][egress_table_index].ip_dst2.value);
+					scnprintf(temp_stat_val_str, TEMP_STAT_VAL_STR_MAX_SIZE, "0x%x",
+							ecpriss_pdata_v2->cfg_stats_v2.qudp_cfg_v2.egress.dst_ip_addr[fh_index][egress_table_index].ip_dst2.value);
 
-				strlcat(max_str, ":", max_str_size);
-				strlcat(max_str, temp_stat_val_str,
-						max_str_size);
+					strlcat(max_str, ":", max_str_size);
+					strlcat(max_str, temp_stat_val_str,
+							max_str_size);
 
-				scnprintf(temp_stat_val_str, TEMP_STAT_VAL_STR_MAX_SIZE, "0x%x",
-						ecpriss_pdata_v2->cfg_stats_v2.qudp_cfg_v2.egress.dst_ip_addr[fh_index][egress_table_index].ip_dst3.value);
+					scnprintf(temp_stat_val_str, TEMP_STAT_VAL_STR_MAX_SIZE, "0x%x",
+							ecpriss_pdata_v2->cfg_stats_v2.qudp_cfg_v2.egress.dst_ip_addr[fh_index][egress_table_index].ip_dst3.value);
 
-				strlcat(max_str, ":", max_str_size);
-				strlcat(max_str, temp_stat_val_str,
-						max_str_size);
+					strlcat(max_str, ":", max_str_size);
+					strlcat(max_str, temp_stat_val_str,
+							max_str_size);
+				}
 				strlcat(max_str, "\n",
 						max_str_size);
 
@@ -2147,8 +2188,7 @@ static ssize_t config_val_from_registers_qudp_egress_dst_ip_addr_v2(char __user 
 	return data_size;
 }
 
-
-static ssize_t config_val_from_registers_qudp_egress_eth_src0_port(char __user *buf, int fh_index, size_t *count, loff_t *ppos)
+static ssize_t config_val_from_registers_qudp_egress_fh_src_mac_v2(char __user *buf, int fh_index, size_t *count, loff_t *ppos)
 {
 	char fh_str[TEMP_STR_MAX_SIZE];
 	char index_str[TEMP_STR_MAX_SIZE];
@@ -2157,6 +2197,8 @@ static ssize_t config_val_from_registers_qudp_egress_eth_src0_port(char __user *
 	int egress_table_index = 0;
 	int ret_val = 0;
 	static int data_size = 0;
+	ecpriss_msb_mac mac0;
+	ecpriss_lsb_mac mac1;
 
 	if(*ppos == 0 )
 	{
@@ -2165,19 +2207,25 @@ static ssize_t config_val_from_registers_qudp_egress_eth_src0_port(char __user *
 		RESET_STR(fh_str);
 		scnprintf(fh_str, TEMP_STR_MIN_SIZE, "%u", fh_index);
 
-		ecpriss_qudp_egress_config_stats_update(fh_index);
+		ecpriss_qudp_egress_config_stats_update_v2(fh_index);
 
 		for(egress_table_index = 0; egress_table_index < NUM_EGRESS_ENTRY; egress_table_index++){
 
-			if(ecpriss_pdata->cfg_stats.qudp_cfg.egress.eth_src0_port[fh_index][egress_table_index].value){
+			if(ecpriss_pdata_v2->cfg_stats_v2.qudp_cfg_v2.egress.eth_src0_port[fh_index][egress_table_index].value ||
+					ecpriss_pdata_v2->cfg_stats_v2.qudp_cfg_v2.egress.eth_src1_dst1_port[fh_index][egress_table_index].src_msb){
 
 				RESET_STR(index_str);
 				scnprintf(index_str, TEMP_STR_MIN_SIZE, "%u", egress_table_index);
 				RESET_STR(temp_stat_val_str);
-				scnprintf(temp_stat_val_str, TEMP_STAT_VAL_STR_MAX_SIZE, "%x",
-						ecpriss_pdata->cfg_stats.qudp_cfg.egress.eth_src0_port[fh_index][egress_table_index].value);
 
-				strlcat(max_str, "eth_src0_port_fh_",
+				mac0.msb_mac = ecpriss_pdata_v2->cfg_stats_v2.qudp_cfg_v2.egress.eth_src1_dst1_port[fh_index][egress_table_index].src_msb;
+				mac1.lsb_mac = ecpriss_pdata_v2->cfg_stats_v2.qudp_cfg_v2.egress.eth_src0_port[fh_index][egress_table_index].value;
+
+				scnprintf(temp_stat_val_str, TEMP_STAT_VAL_STR_MAX_SIZE, "%x:%x:%x:%x:%x:%x",mac0.mac[1], mac0.mac[0]
+						,mac1.mac[3],mac1.mac[2],mac1.mac[1],mac1.mac[0]);
+
+
+				strlcat(max_str, "src_mac_fh_",
 						max_str_size);
 				strlcat(max_str, fh_str,
 						max_str_size);
@@ -2185,7 +2233,7 @@ static ssize_t config_val_from_registers_qudp_egress_eth_src0_port(char __user *
 						max_str_size);
 				strlcat(max_str, index_str,
 						max_str_size);
-				strlcat(max_str, ":", max_str_size);
+				strlcat(max_str, "- ", max_str_size);
 				strlcat(max_str, temp_stat_val_str,
 						max_str_size);
 				strlcat(max_str, "\n",
@@ -2204,9 +2252,10 @@ static ssize_t config_val_from_registers_qudp_egress_eth_src0_port(char __user *
 
 	ret_val = copy_to_user(buf,(max_str + *ppos), *count);
 	return data_size;
+
 }
 
-static ssize_t config_val_from_registers_qudp_egress_eth_src0_port_v2(char __user *buf, int fh_index, size_t *count, loff_t *ppos)
+static ssize_t config_val_from_registers_qudp_egress_fh_dst_mac_v2(char __user *buf, int fh_index, size_t *count, loff_t *ppos)
 {
 	char fh_str[TEMP_STR_MAX_SIZE];
 	char index_str[TEMP_STR_MAX_SIZE];
@@ -2215,6 +2264,8 @@ static ssize_t config_val_from_registers_qudp_egress_eth_src0_port_v2(char __use
 	int egress_table_index = 0;
 	int ret_val = 0;
 	static int data_size = 0;
+	ecpriss_msb_mac mac0;
+	ecpriss_lsb_mac mac1;
 
 	if(*ppos == 0 )
 	{
@@ -2232,10 +2283,15 @@ static ssize_t config_val_from_registers_qudp_egress_eth_src0_port_v2(char __use
 				RESET_STR(index_str);
 				scnprintf(index_str, TEMP_STR_MIN_SIZE, "%u", egress_table_index);
 				RESET_STR(temp_stat_val_str);
-				scnprintf(temp_stat_val_str, TEMP_STAT_VAL_STR_MAX_SIZE, "%u",
-						ecpriss_pdata_v2->cfg_stats_v2.qudp_cfg_v2.egress.eth_src0_port[fh_index][egress_table_index].value);
 
-				strlcat(max_str, "eth_src0_port_fh_",
+				mac0.msb_mac = ecpriss_pdata_v2->cfg_stats_v2.qudp_cfg_v2.egress.eth_src1_dst1_port[fh_index][egress_table_index].dst_msb;
+				mac1.lsb_mac = ecpriss_pdata_v2->cfg_stats_v2.qudp_cfg_v2.egress.eth_dst0_port[fh_index][egress_table_index].value;
+
+				scnprintf(temp_stat_val_str, TEMP_STAT_VAL_STR_MAX_SIZE, "%x:%x:%x:%x:%x:%x",mac0.mac[1], mac0.mac[0]
+						,mac1.mac[3],mac1.mac[2],mac1.mac[1],mac1.mac[0]);
+
+
+				strlcat(max_str, "dst_mac_fh_",
 						max_str_size);
 				strlcat(max_str, fh_str,
 						max_str_size);
@@ -2243,7 +2299,7 @@ static ssize_t config_val_from_registers_qudp_egress_eth_src0_port_v2(char __use
 						max_str_size);
 				strlcat(max_str, index_str,
 						max_str_size);
-				strlcat(max_str, ":", max_str_size);
+				strlcat(max_str, "- ", max_str_size);
 				strlcat(max_str, temp_stat_val_str,
 						max_str_size);
 				strlcat(max_str, "\n",
@@ -2262,293 +2318,8 @@ static ssize_t config_val_from_registers_qudp_egress_eth_src0_port_v2(char __use
 
 	ret_val = copy_to_user(buf,(max_str + *ppos), *count);
 	return data_size;
+
 }
-
-
-static ssize_t config_val_from_registers_qudp_egress_eth_src1_dst1_port(char __user *buf, int fh_index, size_t *count, loff_t *ppos)
-{
-	char fh_str[TEMP_STR_MAX_SIZE];
-	char index_str[TEMP_STR_MAX_SIZE];
-	char temp_stat_val_str[TEMP_STAT_VAL_STR_MAX_SIZE];
-	int max_str_size = MAX_STR_SIZE;
-	int egress_table_index = 0;
-	int ret_val = 0;
-	static int data_size = 0;
-
-	if(*ppos == 0 )
-	{
-		memset(max_str,0,sizeof(max_str));
-
-		RESET_STR(fh_str);
-		scnprintf(fh_str, TEMP_STR_MIN_SIZE, "%u", fh_index);
-
-		ecpriss_qudp_egress_config_stats_update(fh_index);
-
-		for(egress_table_index = 0; egress_table_index < NUM_EGRESS_ENTRY; egress_table_index++){
-
-			if(ecpriss_pdata->cfg_stats.qudp_cfg.egress.eth_src1_dst1_port[fh_index][egress_table_index].dst_msb){
-
-				RESET_STR(index_str);
-				scnprintf(index_str, TEMP_STR_MIN_SIZE, "%u", egress_table_index);
-				RESET_STR(temp_stat_val_str);
-				scnprintf(temp_stat_val_str, TEMP_STAT_VAL_STR_MAX_SIZE, "%x",
-						ecpriss_pdata->cfg_stats.qudp_cfg.egress.eth_src1_dst1_port[fh_index][egress_table_index].dst_msb);
-
-				strlcat(max_str, "eth_src1_dst1_port_dst_msb_fh_",
-						max_str_size);
-				strlcat(max_str, fh_str,
-						max_str_size);
-				strlcat(max_str, "_table_index_",
-						max_str_size);
-				strlcat(max_str, index_str,
-						max_str_size);
-				strlcat(max_str, ":", max_str_size);
-				strlcat(max_str, temp_stat_val_str,
-						max_str_size);
-				strlcat(max_str, "\n",
-						max_str_size);
-
-			}
-
-			if(ecpriss_pdata->cfg_stats.qudp_cfg.egress.eth_src1_dst1_port[fh_index][egress_table_index].src_msb){
-
-				RESET_STR(index_str);
-				scnprintf(index_str, TEMP_STR_MIN_SIZE, "%u", egress_table_index);
-				RESET_STR(temp_stat_val_str);
-				scnprintf(temp_stat_val_str, TEMP_STAT_VAL_STR_MAX_SIZE, "%x",
-						ecpriss_pdata->cfg_stats.qudp_cfg.egress.eth_src1_dst1_port[fh_index][egress_table_index].src_msb);
-
-				strlcat(max_str, "eth_src1_dst1_port_src_msb_fh_",
-						max_str_size);
-				strlcat(max_str, fh_str,
-						max_str_size);
-				strlcat(max_str, "_table_index_",
-						max_str_size);
-				strlcat(max_str, index_str,
-						max_str_size);
-				strlcat(max_str, ":", max_str_size);
-				strlcat(max_str, temp_stat_val_str,
-						max_str_size);
-				strlcat(max_str, "\n",
-						max_str_size);
-
-			}
-		}
-		data_size = strlen(max_str);
-		ECPRILOGDBG("strlen = %u \n",data_size);
-	}
-	if(*ppos  >= max_str_size)
-		return 0;
-
-	if( *ppos + *count > data_size)
-		*count =  data_size - *ppos;
-
-	ret_val = copy_to_user(buf,(max_str + *ppos), *count);
-	return data_size;
-}
-
-
-static ssize_t config_val_from_registers_qudp_egress_eth_src1_dst1_port_v2(char __user *buf, int fh_index, size_t *count, loff_t *ppos)
-{
-	char fh_str[TEMP_STR_MAX_SIZE];
-	char index_str[TEMP_STR_MAX_SIZE];
-	char temp_stat_val_str[TEMP_STAT_VAL_STR_MAX_SIZE];
-	int max_str_size = MAX_STR_SIZE;
-	int egress_table_index = 0;
-	int ret_val = 0;
-	static int data_size = 0;
-
-	if(*ppos == 0 )
-	{
-		memset(max_str,0,sizeof(max_str));
-
-		RESET_STR(fh_str);
-		scnprintf(fh_str, TEMP_STR_MIN_SIZE, "%u", fh_index);
-
-		ecpriss_qudp_egress_config_stats_update_v2(fh_index);
-
-		for(egress_table_index = 0; egress_table_index < NUM_EGRESS_ENTRY; egress_table_index++){
-
-			if(ecpriss_pdata_v2->cfg_stats_v2.qudp_cfg_v2.egress.eth_src1_dst1_port[fh_index][egress_table_index].dst_msb){
-
-				RESET_STR(index_str);
-				scnprintf(index_str, TEMP_STR_MIN_SIZE, "%u", egress_table_index);
-				RESET_STR(temp_stat_val_str);
-				scnprintf(temp_stat_val_str, TEMP_STAT_VAL_STR_MAX_SIZE, "%x",
-						ecpriss_pdata_v2->cfg_stats_v2.qudp_cfg_v2.egress.eth_src1_dst1_port[fh_index][egress_table_index].dst_msb);
-
-				strlcat(max_str, "eth_src1_dst1_port_dst_msb_fh_",
-						max_str_size);
-				strlcat(max_str, fh_str,
-						max_str_size);
-				strlcat(max_str, "_table_index_",
-						max_str_size);
-				strlcat(max_str, index_str,
-						max_str_size);
-				strlcat(max_str, ":", max_str_size);
-				strlcat(max_str, temp_stat_val_str,
-						max_str_size);
-				strlcat(max_str, "\n",
-						max_str_size);
-
-			}
-
-			if(ecpriss_pdata_v2->cfg_stats_v2.qudp_cfg_v2.egress.eth_src1_dst1_port[fh_index][egress_table_index].src_msb){
-
-				RESET_STR(index_str);
-				scnprintf(index_str, TEMP_STR_MIN_SIZE, "%u", egress_table_index);
-				RESET_STR(temp_stat_val_str);
-				scnprintf(temp_stat_val_str, TEMP_STAT_VAL_STR_MAX_SIZE, "%x",
-						ecpriss_pdata_v2->cfg_stats_v2.qudp_cfg_v2.egress.eth_src1_dst1_port[fh_index][egress_table_index].src_msb);
-
-				strlcat(max_str, "eth_src1_dst1_port_src_msb_fh_",
-						max_str_size);
-				strlcat(max_str, fh_str,
-						max_str_size);
-				strlcat(max_str, "_table_index_",
-						max_str_size);
-				strlcat(max_str, index_str,
-						max_str_size);
-				strlcat(max_str, ":", max_str_size);
-				strlcat(max_str, temp_stat_val_str,
-						max_str_size);
-				strlcat(max_str, "\n",
-						max_str_size);
-
-			}
-		}
-		data_size = strlen(max_str);
-		ECPRILOGDBG("strlen = %u \n",data_size);
-	}
-	if(*ppos  >= max_str_size)
-		return 0;
-
-	if( *ppos + *count > data_size)
-		*count =  data_size - *ppos;
-
-	ret_val = copy_to_user(buf,(max_str + *ppos), *count);
-	return data_size;
-}
-
-
-
-static ssize_t config_val_from_registers_qudp_egress_eth_dst0_port(char __user *buf, int fh_index, size_t *count, loff_t *ppos)
-{
-	char fh_str[TEMP_STR_MAX_SIZE];
-	char index_str[TEMP_STR_MAX_SIZE];
-	char temp_stat_val_str[TEMP_STAT_VAL_STR_MAX_SIZE];
-	int max_str_size = MAX_STR_SIZE;
-	int egress_table_index = 0;
-	int ret_val = 0;
-	static int data_size = 0;
-
-	if(*ppos == 0 )
-	{
-		memset(max_str,0,sizeof(max_str));
-
-		RESET_STR(fh_str);
-		scnprintf(fh_str, TEMP_STR_MIN_SIZE, "%u", fh_index);
-
-		ecpriss_qudp_egress_config_stats_update(fh_index);
-
-		for(egress_table_index = 0; egress_table_index < NUM_EGRESS_ENTRY; egress_table_index++){
-
-			if(ecpriss_pdata->cfg_stats.qudp_cfg.egress.eth_dst0_port[fh_index][egress_table_index].value){
-
-				RESET_STR(index_str);
-				scnprintf(index_str, TEMP_STR_MIN_SIZE, "%u", egress_table_index);
-				RESET_STR(temp_stat_val_str);
-				scnprintf(temp_stat_val_str, TEMP_STAT_VAL_STR_MAX_SIZE, "%u",
-						ecpriss_pdata->cfg_stats.qudp_cfg.egress.eth_dst0_port[fh_index][egress_table_index].value);
-
-				strlcat(max_str, "eth_dst0_port_fh_",
-						max_str_size);
-				strlcat(max_str, fh_str,
-						max_str_size);
-				strlcat(max_str, "_table_index_",
-						max_str_size);
-				strlcat(max_str, index_str,
-						max_str_size);
-				strlcat(max_str, ":", max_str_size);
-				strlcat(max_str, temp_stat_val_str,
-						max_str_size);
-				strlcat(max_str, "\n",
-						max_str_size);
-
-			}
-		}
-		data_size = strlen(max_str);
-		ECPRILOGDBG("strlen = %u \n",data_size);
-	}
-	if(*ppos  >= max_str_size)
-		return 0;
-
-	if( *ppos + *count > data_size)
-		*count =  data_size - *ppos;
-
-	ret_val = copy_to_user(buf,(max_str + *ppos), *count);
-	return data_size;
-}
-
-static ssize_t config_val_from_registers_qudp_egress_eth_dst0_port_v2(char __user *buf, int fh_index, size_t *count, loff_t *ppos)
-{
-	char fh_str[TEMP_STR_MAX_SIZE];
-	char index_str[TEMP_STR_MAX_SIZE];
-	char temp_stat_val_str[TEMP_STAT_VAL_STR_MAX_SIZE];
-	int max_str_size = MAX_STR_SIZE;
-	int egress_table_index = 0;
-	int ret_val = 0;
-	static int data_size = 0;
-
-	if(*ppos == 0 )
-	{
-		memset(max_str,0,sizeof(max_str));
-
-		RESET_STR(fh_str);
-		scnprintf(fh_str, TEMP_STR_MIN_SIZE, "%u", fh_index);
-
-		ecpriss_qudp_egress_config_stats_update_v2(fh_index);
-
-		for(egress_table_index = 0; egress_table_index < NUM_EGRESS_ENTRY; egress_table_index++){
-
-			if(ecpriss_pdata_v2->cfg_stats_v2.qudp_cfg_v2.egress.eth_dst0_port[fh_index][egress_table_index].value){
-
-				RESET_STR(index_str);
-				scnprintf(index_str, TEMP_STR_MIN_SIZE, "%u", egress_table_index);
-				RESET_STR(temp_stat_val_str);
-				scnprintf(temp_stat_val_str, TEMP_STAT_VAL_STR_MAX_SIZE, "%u",
-						ecpriss_pdata_v2->cfg_stats_v2.qudp_cfg_v2.egress.eth_dst0_port[fh_index][egress_table_index].value);
-
-				strlcat(max_str, "eth_dst0_port_fh_",
-						max_str_size);
-				strlcat(max_str, fh_str,
-						max_str_size);
-				strlcat(max_str, "_table_index_",
-						max_str_size);
-				strlcat(max_str, index_str,
-						max_str_size);
-				strlcat(max_str, ":", max_str_size);
-				strlcat(max_str, temp_stat_val_str,
-						max_str_size);
-				strlcat(max_str, "\n",
-						max_str_size);
-
-			}
-		}
-		data_size = strlen(max_str);
-		ECPRILOGDBG("strlen = %u \n",data_size);
-	}
-	if(*ppos  >= max_str_size)
-		return 0;
-
-	if( *ppos + *count > data_size)
-		*count =  data_size - *ppos;
-
-	ret_val = copy_to_user(buf,(max_str + *ppos), *count);
-	return data_size;
-}
-
-
 
 static ssize_t config_val_from_registers_qudp_egress_vlan_ethertype(char __user *buf, int fh_index, size_t *count, loff_t *ppos)
 {
@@ -2799,9 +2570,16 @@ static ssize_t config_val_from_registers_qudp_egress_vlan_ethertype_v2(char __us
 				RESET_STR(index_str);
 				scnprintf(index_str, TEMP_STR_MIN_SIZE, "%u", egress_table_index);
 				RESET_STR(temp_stat_val_str);
-				scnprintf(temp_stat_val_str, TEMP_STAT_VAL_STR_MAX_SIZE, "0x%x",
-						ecpriss_pdata_v2->cfg_stats_v2.qudp_cfg_v2.egress.vlan_ethertype[fh_index][egress_table_index].ethertype);
-
+				if(ECPRISS_ETHERTYPE_ECPRI == ecpriss_pdata_v2->cfg_stats_v2.qudp_cfg_v2.egress.vlan_ethertype[fh_index][egress_table_index].ethertype){
+					scnprintf(temp_stat_val_str, TEMP_STAT_VAL_STR_MAX_SIZE, "ECPRI");
+				}else if (ECPRISS_ETHERTYPE_IPV4 == ecpriss_pdata_v2->cfg_stats_v2.qudp_cfg_v2.egress.vlan_ethertype[fh_index][egress_table_index].ethertype){
+					scnprintf(temp_stat_val_str, TEMP_STAT_VAL_STR_MAX_SIZE, "IPV4");
+				}else if (ECPRISS_ETHERTYPE_IPV6 == ecpriss_pdata_v2->cfg_stats_v2.qudp_cfg_v2.egress.vlan_ethertype[fh_index][egress_table_index].ethertype){
+					scnprintf(temp_stat_val_str, TEMP_STAT_VAL_STR_MAX_SIZE, "IPV6");
+				}else{
+					scnprintf(temp_stat_val_str, TEMP_STAT_VAL_STR_MAX_SIZE, "0x%x",
+							ecpriss_pdata_v2->cfg_stats_v2.qudp_cfg_v2.egress.vlan_ethertype[fh_index][egress_table_index].ethertype);
+				}
 				strlcat(max_str, "ethertype_fh_",
 						max_str_size);
 				strlcat(max_str, fh_str,
@@ -5894,156 +5672,127 @@ static ssize_t cfg_value_from_qudp_egress_vlan_ethertype_fh2(struct file *file, 
 
 }
 
-static ssize_t cfg_value_from_qudp_egress_eth_dst0_port_fh0(struct file *file, char __user *buf,
+static ssize_t cfg_value_from_qudp_egress_fh0_src_mac(struct file *file, char __user *buf,
 			size_t count, loff_t *ppos)
 {
-	uint32_t len;
+	uint32_t len = 0;
 
 	if(ecpriss_hw_ver == 2)
-		len = config_val_from_registers_qudp_egress_eth_dst0_port_v2(buf, 0 , &count , ppos);
-	else
-		len = config_val_from_registers_qudp_egress_eth_dst0_port(buf, 0 , &count , ppos);
+		len = config_val_from_registers_qudp_egress_fh_src_mac_v2(buf, 0 , &count , ppos);
+	else{
+		ECPRILOGERR("V1 is not supported for src_mac read in debugfs\n");
+		return -EINVAL;
+	}
 	if((*ppos + count) > len){
 		count = len - *ppos;
 	}
 	*ppos += count;
 	return count;
+
+
 
 }
 
-static ssize_t cfg_value_from_qudp_egress_eth_dst0_port_fh1(struct file *file, char __user *buf,
+static ssize_t cfg_value_from_qudp_egress_fh0_dst_mac(struct file *file, char __user *buf,
 			size_t count, loff_t *ppos)
 {
-	uint32_t len;
+	uint32_t len = 0;
 
 	if(ecpriss_hw_ver == 2)
-		len = config_val_from_registers_qudp_egress_eth_dst0_port_v2(buf, 1, &count , ppos);
-	else
-		len = config_val_from_registers_qudp_egress_eth_dst0_port(buf, 1, &count , ppos);
+		len = config_val_from_registers_qudp_egress_fh_dst_mac_v2(buf, 0 , &count , ppos);
+	else{
+		ECPRILOGERR("V1 is not supported for dst_mac read in debugfs\n");
+		return -EINVAL;
+	}
 	if((*ppos + count) > len){
 		count = len - *ppos;
 	}
 	*ppos += count;
 	return count;
+
+
+
+}
+static ssize_t cfg_value_from_qudp_egress_fh1_src_mac(struct file *file, char __user *buf,
+			size_t count, loff_t *ppos)
+{
+	uint32_t len = 0;
+
+	if(ecpriss_hw_ver == 2)
+		len = config_val_from_registers_qudp_egress_fh_src_mac_v2(buf, 1 , &count , ppos);
+	else{
+		ECPRILOGERR("V1 is not supported for src_mac read in debugfs\n");
+		return -EINVAL;
+	}
+	if((*ppos + count) > len){
+		count = len - *ppos;
+	}
+	*ppos += count;
+	return count;
+
+
 
 }
 
-static ssize_t cfg_value_from_qudp_egress_eth_dst0_port_fh2(struct file *file, char __user *buf,
+static ssize_t cfg_value_from_qudp_egress_fh1_dst_mac(struct file *file, char __user *buf,
 			size_t count, loff_t *ppos)
 {
-	uint32_t len;
+	uint32_t len = 0;
 
 	if(ecpriss_hw_ver == 2)
-		len = config_val_from_registers_qudp_egress_eth_dst0_port_v2(buf, 2 , &count , ppos);
-	else
-		len = config_val_from_registers_qudp_egress_eth_dst0_port(buf, 2 , &count , ppos);
+		len = config_val_from_registers_qudp_egress_fh_dst_mac_v2(buf, 1 , &count , ppos);
+	else{
+		ECPRILOGERR("V1 is not supported for dst_mac read in debugfs\n");
+		return -EINVAL;
+	}
 	if((*ppos + count) > len){
 		count = len - *ppos;
 	}
 	*ppos += count;
 	return count;
+
+
+
+}
+static ssize_t cfg_value_from_qudp_egress_fh2_src_mac(struct file *file, char __user *buf,
+			size_t count, loff_t *ppos)
+{
+	uint32_t len = 0;
+
+	if(ecpriss_hw_ver == 2)
+		len = config_val_from_registers_qudp_egress_fh_src_mac_v2(buf, 2 , &count , ppos);
+	else{
+		ECPRILOGERR("V1 is not supported for src_mac read in debugfs\n");
+		return -EINVAL;
+	}
+	if((*ppos + count) > len){
+		count = len - *ppos;
+	}
+	*ppos += count;
+	return count;
+
+
 
 }
 
-static ssize_t cfg_value_from_qudp_egress_eth_src1_dst1_fh0(struct file *file, char __user *buf,
+static ssize_t cfg_value_from_qudp_egress_fh2_dst_mac(struct file *file, char __user *buf,
 			size_t count, loff_t *ppos)
 {
-	uint32_t len;
+	uint32_t len = 0;
 
 	if(ecpriss_hw_ver == 2)
-		len = config_val_from_registers_qudp_egress_eth_src1_dst1_port_v2(buf, 0 , &count , ppos);
-	else
-		len = config_val_from_registers_qudp_egress_eth_src1_dst1_port(buf, 0 , &count , ppos);
+		len = config_val_from_registers_qudp_egress_fh_dst_mac_v2(buf, 2 , &count , ppos);
+	else{
+		ECPRILOGERR("V1 is not supported for dst_mac read in debugfs\n");
+		return -EINVAL;
+	}
 	if((*ppos + count) > len){
 		count = len - *ppos;
 	}
 	*ppos += count;
 	return count;
 
-}
 
-static ssize_t cfg_value_from_qudp_egress_eth_src1_dst1_fh1(struct file *file, char __user *buf,
-			size_t count, loff_t *ppos)
-{
-	uint32_t len;
-
-	if(ecpriss_hw_ver == 2)
-		len = config_val_from_registers_qudp_egress_eth_src1_dst1_port_v2(buf, 1 , &count , ppos);
-	else
-		len = config_val_from_registers_qudp_egress_eth_src1_dst1_port(buf, 1 , &count , ppos);
-	if((*ppos + count) > len){
-		count = len - *ppos;
-	}
-	*ppos += count;
-	return count;
-
-}
-
-static ssize_t cfg_value_from_qudp_egress_eth_src1_dst1_fh2(struct file *file, char __user *buf,
-			size_t count, loff_t *ppos)
-{
-	uint32_t len;
-
-	if(ecpriss_hw_ver == 2)
-		len = config_val_from_registers_qudp_egress_eth_src1_dst1_port_v2(buf, 2 , &count , ppos);
-	else
-		len = config_val_from_registers_qudp_egress_eth_src1_dst1_port(buf, 2 , &count , ppos);
-	if((*ppos + count) > len){
-		count = len - *ppos;
-	}
-	*ppos += count;
-	return count;
-
-}
-
-static ssize_t cfg_value_from_qudp_egress_eth_src0_port_fh0(struct file *file, char __user *buf,
-			size_t count, loff_t *ppos)
-{
-	uint32_t len;
-
-	if(ecpriss_hw_ver == 2)
-		len = config_val_from_registers_qudp_egress_eth_src0_port_v2(buf, 0 , &count , ppos);
-	else
-		len = config_val_from_registers_qudp_egress_eth_src0_port(buf, 0 , &count , ppos);
-	if((*ppos + count) > len){
-		count = len - *ppos;
-	}
-	*ppos += count;
-	return count;
-
-}
-
-static ssize_t cfg_value_from_qudp_egress_eth_src0_port_fh1(struct file *file, char __user *buf,
-			size_t count, loff_t *ppos)
-{
-	uint32_t len;
-
-	if(ecpriss_hw_ver == 2)
-		len = config_val_from_registers_qudp_egress_eth_src0_port_v2(buf, 1 , &count , ppos);
-	else
-		len = config_val_from_registers_qudp_egress_eth_src0_port(buf, 1 , &count , ppos);
-	if((*ppos + count) > len){
-		count = len - *ppos;
-	}
-	*ppos += count;
-	return count;
-
-}
-
-static ssize_t cfg_value_from_qudp_egress_eth_src0_port_fh2(struct file *file, char __user *buf,
-			size_t count, loff_t *ppos)
-{
-	uint32_t len;
-
-	if(ecpriss_hw_ver == 2)
-		len = config_val_from_registers_qudp_egress_eth_src0_port_v2(buf, 2 , &count , ppos);
-	else
-		len = config_val_from_registers_qudp_egress_eth_src0_port(buf, 2 , &count , ppos);
-	if((*ppos + count) > len){
-		count = len - *ppos;
-	}
-	*ppos += count;
-	return count;
 
 }
 
@@ -6893,14 +6642,11 @@ static struct file_operations qudp_egress_misc_cfg_fh0_ops = {
 static struct file_operations qudp_egress_vlan_ethertype_fh0_ops = {
 	.read = cfg_value_from_qudp_egress_vlan_ethertype_fh0,
 };
-static struct file_operations qudp_egress_eth0_dst0_fh0_ops = {
-	.read = cfg_value_from_qudp_egress_eth_dst0_port_fh0,
+static struct file_operations qudp_egress_fh0_src_mac = {
+	.read = cfg_value_from_qudp_egress_fh0_src_mac,
 };
-static struct file_operations qudp_egress_eth_src1_dst1_fh0_ops = {
-	.read = cfg_value_from_qudp_egress_eth_src1_dst1_fh0,
-};
-static struct file_operations qudp_egress_eth_src0_fh0_ops = {
-	.read = cfg_value_from_qudp_egress_eth_src0_port_fh0,
+static struct file_operations qudp_egress_fh0_dst_mac = {
+	.read = cfg_value_from_qudp_egress_fh0_dst_mac,
 };
 static struct file_operations qudp_egress_dst_ip_addr_fh0_ops = {
 	.read = cfg_value_from_qudp_egress_dst_ip_addr_fh0,
@@ -6917,14 +6663,11 @@ static struct file_operations qudp_egress_misc_cfg_fh1_ops = {
 static struct file_operations qudp_egress_vlan_ethertype_fh1_ops = {
 	.read = cfg_value_from_qudp_egress_vlan_ethertype_fh1,
 };
-static struct file_operations qudp_egress_eth0_dst0_fh1_ops = {
-	.read = cfg_value_from_qudp_egress_eth_dst0_port_fh1,
+static struct file_operations qudp_egress_fh1_src_mac = {
+	.read = cfg_value_from_qudp_egress_fh1_src_mac,
 };
-static struct file_operations qudp_egress_eth_src1_dst1_fh1_ops = {
-	.read = cfg_value_from_qudp_egress_eth_src1_dst1_fh1,
-};
-static struct file_operations qudp_egress_eth_src0_fh1_ops = {
-	.read = cfg_value_from_qudp_egress_eth_src0_port_fh1,
+static struct file_operations qudp_egress_fh1_dst_mac = {
+	.read = cfg_value_from_qudp_egress_fh1_dst_mac,
 };
 static struct file_operations qudp_egress_dst_ip_addr_fh1_ops = {
 	.read = cfg_value_from_qudp_egress_dst_ip_addr_fh1,
@@ -6942,14 +6685,11 @@ static struct file_operations qudp_egress_misc_cfg_fh2_ops = {
 static struct file_operations qudp_egress_vlan_ethertype_fh2_ops = {
 	.read = cfg_value_from_qudp_egress_vlan_ethertype_fh2,
 };
-static struct file_operations qudp_egress_eth0_dst0_fh2_ops = {
-	.read = cfg_value_from_qudp_egress_eth_dst0_port_fh2,
+static struct file_operations qudp_egress_fh2_src_mac = {
+	.read = cfg_value_from_qudp_egress_fh2_src_mac,
 };
-static struct file_operations qudp_egress_eth_src1_dst1_fh2_ops = {
-	.read = cfg_value_from_qudp_egress_eth_src1_dst1_fh2,
-};
-static struct file_operations qudp_egress_eth_src0_fh2_ops = {
-	.read = cfg_value_from_qudp_egress_eth_src0_port_fh2,
+static struct file_operations qudp_egress_fh2_dst_mac = {
+	.read = cfg_value_from_qudp_egress_fh2_dst_mac,
 };
 static struct file_operations qudp_egress_dst_ip_addr_fh2_ops = {
 	.read = cfg_value_from_qudp_egress_dst_ip_addr_fh2,
@@ -7256,19 +6996,14 @@ static struct file_operations *file_name_to_wrapper(char *filename)
 	{
 		return &qudp_egress_vlan_ethertype_fh0_ops;
 	}
-	else if (!strncmp(filename, "fh0:eth_src0", XBAR_WRAPPER_SIZE))
+	else if (!strncmp(filename, "fh0:src_mac", XBAR_WRAPPER_SIZE))
 	{
-		return &qudp_egress_eth_src0_fh0_ops;
+		return &qudp_egress_fh0_src_mac;
 	}
-	else if (!strncmp(filename, "fh0:eth_src1", XBAR_WRAPPER_SIZE))
+	else if (!strncmp(filename, "fh0:dst_mac", XBAR_WRAPPER_SIZE))
 	{
-		return &qudp_egress_eth_src1_dst1_fh0_ops;
+		return &qudp_egress_fh0_dst_mac;
 	}
-	else if (!strncmp(filename, "fh0:eth_dst0", XBAR_WRAPPER_SIZE))
-	{
-		return &qudp_egress_eth0_dst0_fh0_ops;
-	}
-
 	else if (!strncmp(filename, "fh1:udp_ports", XBAR_WRAPPER_SIZE))
 	{
 		return &qudp_egress_udp_ports_fh1_ops;
@@ -7289,19 +7024,14 @@ static struct file_operations *file_name_to_wrapper(char *filename)
 	{
 		return &qudp_egress_vlan_ethertype_fh1_ops;
 	}
-	else if (!strncmp(filename, "fh1:eth_src0", XBAR_WRAPPER_SIZE))
+	else if (!strncmp(filename, "fh1:src_mac", XBAR_WRAPPER_SIZE))
 	{
-		return &qudp_egress_eth_src0_fh1_ops;
+		return &qudp_egress_fh1_src_mac;
 	}
-	else if (!strncmp(filename, "fh1:eth_src1", XBAR_WRAPPER_SIZE))
+	else if (!strncmp(filename, "fh1:dst_mac", XBAR_WRAPPER_SIZE))
 	{
-		return &qudp_egress_eth_src1_dst1_fh1_ops;
+		return &qudp_egress_fh1_dst_mac;
 	}
-	else if (!strncmp(filename, "fh1:eth_dst0", XBAR_WRAPPER_SIZE))
-	{
-		return &qudp_egress_eth0_dst0_fh1_ops;
-	}
-
 
 	else if (!strncmp(filename, "fh2:udp_ports", XBAR_WRAPPER_SIZE))
 	{
@@ -7323,20 +7053,14 @@ static struct file_operations *file_name_to_wrapper(char *filename)
 	{
 		return &qudp_egress_vlan_ethertype_fh2_ops;
 	}
-	else if (!strncmp(filename, "fh2:eth_src0", XBAR_WRAPPER_SIZE))
+	else if (!strncmp(filename, "fh2:src_mac", XBAR_WRAPPER_SIZE))
 	{
-		return &qudp_egress_eth_src0_fh2_ops;
+		return &qudp_egress_fh2_src_mac;
 	}
-	else if (!strncmp(filename, "fh2:eth_src1", XBAR_WRAPPER_SIZE))
+	else if (!strncmp(filename, "fh2:dst_mac", XBAR_WRAPPER_SIZE))
 	{
-		return &qudp_egress_eth_src1_dst1_fh2_ops;
+		return &qudp_egress_fh2_dst_mac;
 	}
-	else if (!strncmp(filename, "fh2:eth_dst0", XBAR_WRAPPER_SIZE))
-	{
-		return &qudp_egress_eth0_dst0_fh2_ops;
-	}
-
-
 	else if (!strncmp(filename, "fh0:ingress_config", XBAR_WRAPPER_SIZE))
 	{
 		return &qudp_ingress_global_cfg_fh0;

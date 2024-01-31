@@ -412,7 +412,7 @@ void ecpriss_qudp_egress_config_stats_update_v2(int32_t fh_index)
 				ECPRI_UDP_FH_EGRESS_IP_SRC_ADDR1_PORT_p_ENTRY_n_V2,
 				fh_index,
 				egress_table_index,
-				&ecpriss_pdata->cfg_stats.qudp_cfg.egress.src_ip_addr[fh_index][egress_table_index].ip_src1);
+				&ecpriss_pdata_v2->cfg_stats_v2.qudp_cfg_v2.egress.src_ip_addr[fh_index][egress_table_index].ip_src1);
 		ecpriss_qudp_hal_read_reg_mn_fields(ECPRISS_QUDP_FH_RAMS,
 				ECPRI_UDP_FH_EGRESS_IP_SRC_ADDR2_PORT_p_ENTRY_n_V2,
 				fh_index,

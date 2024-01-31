@@ -176,9 +176,8 @@
 							,fh0:src_ip_addr \
 							,fh0:dst_ip_addr \
 							,fh0:vlan_ethertype \
-							,fh0:eth_src0 \
-							,fh0:eth_src1 \
-							,fh0:eth_dst0 \
+							,fh0:src_mac \
+							,fh0:dst_mac \
 							,fh0:misc \
 						} \
 						ingress \
@@ -207,9 +206,8 @@
 							,fh1:src_ip_addr \
 							,fh1:dst_ip_addr \
 							,fh1:vlan_ethertype \
-							,fh1:eth_src0 \
-							,fh1:eth_src1 \
-							,fh1:eth_dst0 \
+							,fh1:src_mac \
+							,fh1:dst_mac \
 							,fh1:misc \
 						} \
 						ingress \
@@ -238,9 +236,8 @@
 							,fh2:src_ip_addr \
 							,fh2:dst_ip_addr \
 							,fh2:vlan_ethertype \
-							,fh2:eth_src0 \
-							,fh2:eth_src1 \
-							,fh2:eth_dst0 \
+							,fh2:src_mac \
+							,fh2:dst_mac \
 							,fh2:misc \
 						} \
 						ingress \
