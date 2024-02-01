@@ -521,7 +521,7 @@ enum gsi_xfer_elem_type {
 struct __packed gsi_mhi_channel_scratch {
 	uint32_t is_over_pcie : 1;
 	uint32_t skip_overflow_ev : 1;
-	uint32_t scratch0_res : 29;
+	uint32_t scratch0_res : 30;
 	uint32_t scratch1;
 	uint32_t scratch2;
 	uint32_t scratch3_res : 16;
@@ -566,7 +566,9 @@ union __packed gsi_channel_scratch {
  */
 struct __packed gsi_mhi_evt_scratch {
 	uint32_t resvd1;
-	uint32_t resvd2;
+	uint32_t enable_notify_mcs : 1;
+	uint32_t moderate_update_rp_only : 1;
+	uint32_t resvd2_res0 : 30;
 };
 
 /**
