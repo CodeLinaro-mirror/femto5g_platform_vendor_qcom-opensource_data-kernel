@@ -1755,12 +1755,6 @@ static int ecpriss_core_init_v2(struct platform_device *pdev)
 			break;
 		}
 
-		ret = ecpriss_core_register_callbacks_v2();
-		if(ret < 0) {
-			ECPRILOGERR("Callback registrations failed\n");
-			break;
-		}
-
 		ret = ecpriss_qudp_init_v2(&pdev->dev);
 		if(ret < 0) {
 			ECPRILOGERR("QUDP initialization failed\n");
@@ -1768,6 +1762,13 @@ static int ecpriss_core_init_v2(struct platform_device *pdev)
 		}
 
 		ECPRILOGERR("QUDP init complete\n");
+
+		ret = ecpriss_core_register_callbacks_v2();
+		if(ret < 0) {
+			ECPRILOGERR("Callback registrations failed\n");
+			break;
+		}
+
 
 		ret = ecpriss_stats_timer_enable_v2(stats_timeout_ms);
 
