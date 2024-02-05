@@ -432,7 +432,7 @@ void ecpri_dma_tasklet_transmit_done(unsigned long data)
 		if (endp->gsi_ep_cfg->stream_mode != ECPRI_DMA_ENDP_STREAM_MODE_M2M)
 		{
 			for (i = 0; i < pkt->num_of_buffers; i++) {
-				dma_unmap_single(ecpri_dma_ctx->pdev,
+				dma_unmap_single(endp->cb_ptr->dev,
 					pkt->buffs[i]->phys_base,
 					pkt->buffs[i]->size, DMA_TO_DEVICE);
 				pkt->buffs[i]->phys_base = 0;
@@ -739,9 +739,11 @@ int ecpri_dma_dp_poll(struct ecpri_dma_endp_context *endp, u32 budget,
 					exception_endp.gsi_id &&
 					endp->endp_id == ecpri_dma_ctx->exception_ctx.
 					exception_endp.endp_id)) {
-				dma_unmap_single(ecpri_dma_ctx->pdev,
+
+				dma_unmap_single(endp->cb_ptr->dev,
 					pkts[i]->pkt->buffs[j]->phys_base,
 					pkts[i]->pkt->buffs[j]->size, dma_dir);
+
 				pkts[i]->pkt->buffs[j]->phys_base = 0;
 			}
 
@@ -819,6 +821,11 @@ int ecpri_dma_dp_transmit(struct ecpri_dma_endp_context *endp,
 		return -EINVAL;
 	}
 
+	if (endp->cb_ptr == NULL) {
+		DMAERR("SMMU CB pointer is NULL\n");
+		ecpri_dma_assert();
+	}
+
 	DMADBG_LOW("Transmit start for ENDP %d GSI ID %d, num_of_pkts: %d\n",
 		endp->endp_id, endp->gsi_id, num_of_pkts);
 
@@ -832,9 +839,10 @@ int ecpri_dma_dp_transmit(struct ecpri_dma_endp_context *endp,
 			if (!pkts[i]->buffs[j]->phys_base) {
 				/* Perform mapping using SMMU */
 				pkts[i]->buffs[j]->phys_base =
-					dma_map_single(ecpri_dma_ctx->pdev,
+					dma_map_single(endp->cb_ptr->dev,
 						pkts[i]->buffs[j]->virt_base,
 						pkts[i]->buffs[j]->size, dma_dir);
+
 				if (dma_mapping_error(ecpri_dma_ctx->pdev,
 					pkts[i]->buffs[j]->phys_base)) {
 					DMAERR("failed to do dma map.\n");
@@ -963,9 +971,11 @@ fail_handling:
 	for (k = 0; k < i; k++) {
 		for (j = 0; j < pkts[k]->num_of_buffers; j++) {
 			/* Perform unmapping using SMMU */
-			dma_unmap_single(ecpri_dma_ctx->pdev,
+
+			dma_unmap_single(endp->cb_ptr->dev,
 				pkts[k]->buffs[j]->phys_base,
 				pkts[k]->buffs[j]->size, dma_dir);
+
 			pkts[k]->buffs[j]->phys_base = 0;
 		}
 

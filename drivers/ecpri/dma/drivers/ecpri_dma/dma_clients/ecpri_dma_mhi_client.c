@@ -777,6 +777,10 @@ static int ecpri_dma_mhi_alloc_sync_async_endps(
 	const struct ecpri_dma_mhi_ee_gsi_tuple* func_map;
 	enum ecpri_hw_ver hw_ver = ECPRI_DMA_GET_CTX_HW_VER();
 	struct ecpri_dma_moderation_config sync_mod_cfg, async_mod_cfg;
+	struct ecpri_dma_ecpri_endp_alloc_params sync_src_params = { 0 };
+	struct ecpri_dma_ecpri_endp_alloc_params sync_dst_params = { 0 };
+	struct ecpri_dma_ecpri_endp_alloc_params async_src_params = { 0 };
+	struct ecpri_dma_ecpri_endp_alloc_params async_dst_params = { 0 };
 
 	sync_mod_cfg.moderation_counter_threshold = 1;
 	sync_mod_cfg.moderation_timer_threshold = 0;
@@ -797,17 +801,34 @@ static int ecpri_dma_mhi_alloc_sync_async_endps(
 	ecpri_dma_ctx->
 		endp_ctx[gsi_id][sync_src_endp_id].eventless_endp = true;
 
-	ret = ecpri_dma_alloc_endp(gsi_id, sync_src_endp_id,
-		ECPRI_DMA_MHI_SYNC_MEMCPY_RLEN, &sync_mod_cfg, false, NULL, false);
+	sync_src_params.gsi_id = gsi_id;
+	sync_src_params.endp_id = sync_src_endp_id;
+	sync_src_params.ring_length = ECPRI_DMA_MHI_SYNC_MEMCPY_RLEN;
+	sync_src_params.mod_cfg = &sync_mod_cfg;
+	sync_src_params.is_over_pcie = false;
+	sync_src_params.notify_comp = NULL;
+	sync_src_params.enable_tx_poll = false;
+	sync_src_params.cb_to_use = ECPRI_DMA_SMMU_CB_MHI;
+
+	ret = ecpri_dma_alloc_endp(&sync_src_params);
+
 	if (ret != 0) {
 		DMAERR("Unable to allocate SYNC_SRC ENDP, endp_id: %d\n",
 			sync_src_endp_id);
 		goto fail_alloc_sync_src;
 	}
 
-	ret = ecpri_dma_alloc_endp(gsi_id,
-		sync_dest_endp_id, ECPRI_DMA_MHI_SYNC_MEMCPY_RLEN,
-		&sync_mod_cfg, false, NULL, false);
+	sync_dst_params.gsi_id = gsi_id;
+	sync_dst_params.endp_id = sync_dest_endp_id;
+	sync_dst_params.ring_length = ECPRI_DMA_MHI_SYNC_MEMCPY_RLEN;
+	sync_dst_params.mod_cfg = &sync_mod_cfg;
+	sync_dst_params.is_over_pcie = false;
+	sync_dst_params.notify_comp = NULL;
+	sync_dst_params.enable_tx_poll = false;
+	sync_dst_params.cb_to_use = ECPRI_DMA_SMMU_CB_MHI;
+
+	ret = ecpri_dma_alloc_endp(&sync_dst_params);
+
 	if (ret != 0) {
 		DMAERR("Unable to allocate SYNC_DEST ENDP, endp_id: %d\n",
 			sync_dest_endp_id);
@@ -829,19 +850,35 @@ static int ecpri_dma_mhi_alloc_sync_async_endps(
 
 	ecpri_dma_ctx->
 		endp_ctx[gsi_id][async_src_endp_id].eventless_endp = true;
-	ret = ecpri_dma_alloc_endp(gsi_id,
-		async_src_endp_id, ECPRI_DMA_MHI_ASYNC_MEMCPY_RLEN,
-		&async_mod_cfg, false, NULL, false);
+
+	async_src_params.gsi_id = gsi_id;
+	async_src_params.endp_id = async_src_endp_id;
+	async_src_params.ring_length = ECPRI_DMA_MHI_ASYNC_MEMCPY_RLEN;
+	async_src_params.mod_cfg = &async_mod_cfg;
+	async_src_params.is_over_pcie = false;
+	async_src_params.notify_comp = NULL;
+	async_src_params.enable_tx_poll = false;
+	async_src_params.cb_to_use = ECPRI_DMA_SMMU_CB_MHI;
+
+	ret = ecpri_dma_alloc_endp(&async_src_params);
+
 	if (ret != 0) {
 		DMAERR("Unable to allocate ASYNC_SRC ENDP, endp_id: %d\n",
 			async_src_endp_id);
 		goto fail_alloc_async_src;
 	}
 
-	ret = ecpri_dma_alloc_endp(gsi_id,
-		async_dest_endp_id, ECPRI_DMA_MHI_ASYNC_MEMCPY_RLEN,
-		&async_mod_cfg, false,
-		ecpri_dma_mhi_memcpy_async_notify_comp, false);
+	async_dst_params.gsi_id = gsi_id;
+	async_dst_params.endp_id = async_dest_endp_id;
+	async_dst_params.ring_length = ECPRI_DMA_MHI_ASYNC_MEMCPY_RLEN;
+	async_dst_params.mod_cfg = &async_mod_cfg;
+	async_dst_params.is_over_pcie = false;
+	async_dst_params.notify_comp = ecpri_dma_mhi_memcpy_async_notify_comp;
+	async_dst_params.enable_tx_poll = false;
+	async_dst_params.cb_to_use = ECPRI_DMA_SMMU_CB_MHI;
+
+	ret = ecpri_dma_alloc_endp(&async_dst_params);
+
 	if (ret != 0) {
 		DMAERR("Unable to allocate ASYNC_DEST ENDP, endp_id: %d\n",
 			async_dest_endp_id);
@@ -2524,13 +2561,13 @@ static int ecpri_dma_mhi_client_read_write_host(
 	struct mhi_dma_function_params function)
 {
 	int ret = 0;
-	struct device* pdev;
+	struct device *pdev;
 	struct ecpri_dma_mem_buffer mem;
 
-	pdev = ecpri_dma_get_pdev();
+	pdev = ecpri_dma_get_smmu_ctx(ECPRI_DMA_SMMU_CB_MHI)->dev;
 	host_addr = ECPRI_DMA_MHI_HOST_ADDR_COND(host_addr, ctx);
-
 	mem.size = size;
+
 	if (pdev) {
 		mem.virt_base = dma_alloc_coherent(pdev, mem.size,
 			&mem.phys_base, GFP_KERNEL);
@@ -2562,7 +2599,6 @@ static int ecpri_dma_mhi_client_read_write_host(
 			goto failed_memcopy;
 		}
 	}
-
 	dma_free_coherent(pdev, mem.size, mem.virt_base, mem.phys_base);
 	return 0;
 
@@ -2639,6 +2675,7 @@ static int ecpri_dma_mhi_client_connect_internal(
 	int ret;
 	union __packed gsi_channel_scratch ch_scratch;
 	struct ecpri_dma_moderation_config mod_cfg;
+	struct ecpri_dma_ecpri_endp_alloc_params params = {0};
 	union __packed gsi_evt_scratch ev_scratch;
 	const struct dma_gsi_ep_config *gsi_ep_cfg =
 		&((*ecpri_dma_ctx->endp_map)[channel->endp_ctx->gsi_id]
@@ -2656,9 +2693,17 @@ static int ecpri_dma_mhi_client_connect_internal(
 	mod_cfg.moderation_counter_threshold = channel->int_modc;
 	mod_cfg.moderation_timer_threshold = channel->int_modt;
 
-	ret = ecpri_dma_alloc_endp(channel->endp_ctx->gsi_id,
-		channel->endp_ctx->endp_id, channel->rlen,
-		&mod_cfg, channel->is_over_pcie, NULL, false);
+	params.gsi_id = channel->endp_ctx->gsi_id;
+	params.endp_id = channel->endp_ctx->endp_id;
+	params.ring_length = channel->rlen;
+	params.mod_cfg = &mod_cfg;
+	params.is_over_pcie = channel->is_over_pcie;
+	params.notify_comp = NULL;
+	params.enable_tx_poll = false;
+	params.cb_to_use = ECPRI_DMA_SMMU_CB_MHI;
+
+	ret = ecpri_dma_alloc_endp(&params);
+
 	if (ret != 0) {
 		DMAERR("Failed to allocate endp %d\n", channel->endp_ctx->endp_id);
 		goto fail_al_endp;
@@ -3049,14 +3094,19 @@ static dma_addr_t ecpri_dma_mhi_client_map_buffer(void* virt, size_t size,
 	enum dma_data_direction dir)
 {
 	dma_addr_t phys;
+	struct device *dev;
 	DMADBG_LOW("Begin\n");
 
-	phys = dma_map_single(ecpri_dma_ctx->pdev, virt, size, dir);
-	if (dma_mapping_error(ecpri_dma_ctx->pdev, phys)) {
+	dev = ecpri_dma_get_smmu_ctx(ECPRI_DMA_SMMU_CB_MHI)->dev;
+	phys =
+		dma_map_single(
+			dev,
+			virt, size, dir);
+	if (dma_mapping_error(
+		dev, phys)) {
 		DMAERR("failed to do dma map.\n");
 		ecpri_dma_assert();
 	}
-
 	return phys;
 }
 
@@ -3064,22 +3114,28 @@ static void ecpri_dma_mhi_client_unmap_buffer(dma_addr_t phys, size_t size,
 	enum dma_data_direction dir)
 {
 	DMADBG_LOW("Begin\n");
-	dma_unmap_single(ecpri_dma_ctx->pdev, phys, size, dir);
+
+	dma_unmap_single(
+		ecpri_dma_get_smmu_ctx(ECPRI_DMA_SMMU_CB_MHI)->dev,
+	phys, size, dir);
 }
 
 static void *ecpri_dma_mhi_client_alloc_buffer(size_t size,
 	dma_addr_t* phys, gfp_t gfp)
 {
 	DMADBG_LOW("Begin\n");
-	return  dma_alloc_coherent(ecpri_dma_ctx->pdev, size, phys, gfp);
+	return  dma_alloc_coherent(
+	ecpri_dma_get_smmu_ctx(ECPRI_DMA_SMMU_CB_MHI)->dev,
+	size, phys, gfp);
 }
 
 static void ecpri_dma_mhi_client_free_buffer(size_t size, void* virt,
 	dma_addr_t phys)
 {
 	DMADBG_LOW("Begin\n");
-
-	dma_free_coherent(ecpri_dma_ctx->pdev, size, virt, phys);
+	dma_free_coherent(
+	ecpri_dma_get_smmu_ctx(ECPRI_DMA_SMMU_CB_MHI)->dev,
+	size, virt, phys);
 }
 
 static int ecpri_dma_mhi_client_resume(struct mhi_dma_function_params function)

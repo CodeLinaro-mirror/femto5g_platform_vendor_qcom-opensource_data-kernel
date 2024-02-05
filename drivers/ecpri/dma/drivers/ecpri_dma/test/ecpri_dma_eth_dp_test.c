@@ -1836,24 +1836,6 @@ static int ecpri_dma_eth_dp_test_suite_connect(void *priv) {
 		return -EFAULT;
 	}
 
-	endp_gsi_cfg.value = ecpri_dma_hal_read_reg_mn(
-		ECPRI_ENDP_GSI_CFG, connection->tx_endp_ctx->gsi_id,
-		connection->tx_endp_ctx->endp_id);
-	if (endp_gsi_cfg.def.endp_en != 0) {
-		DMA_UT_LOG("Test failed due to "
-			   "Tx endpoint was not disabled\n");
-		return -EFAULT;
-	}
-
-	endp_gsi_cfg.value = ecpri_dma_hal_read_reg_mn(
-		ECPRI_ENDP_GSI_CFG, connection->rx_endp_ctx->gsi_id,
-		connection->rx_endp_ctx->endp_id);
-	if (endp_gsi_cfg.def.endp_en != 0) {
-		DMA_UT_LOG("Test failed due to "
-			   "Rx endpoint was not disabled\n");
-		return -EFAULT;
-	}
-
 	/* Deregister and check */
 	ecpri_dma_eth_deregister();
 

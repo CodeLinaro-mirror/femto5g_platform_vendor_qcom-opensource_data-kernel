@@ -22,6 +22,7 @@
 #include <linux/wait.h>
 #include <linux/delay.h>
 #include <linux/version.h>
+#include <linux/dma-mapping.h>
 
 #define GSI_CMD_TIMEOUT (5*HZ)
 #define GSI_FC_CMD_TIMEOUT (2*GSI_CMD_TIMEOUT)
@@ -4355,6 +4356,7 @@ int gsi_get_fw_version(struct gsi_fw_version *ver)
 static int msm_gsi_probe(struct platform_device *pdev)
 {
 	struct device *dev = &pdev->dev;
+	bool is_64_bit_addressing = false;
 
 	pr_debug("gsi_probe\n");
 	gsi_ctx = devm_kzalloc(dev, sizeof(*gsi_ctx), GFP_KERNEL);
@@ -4367,6 +4369,25 @@ static int msm_gsi_probe(struct platform_device *pdev)
 		"gsi", 0);
 	if (gsi_ctx->ipc_logbuf == NULL)
 		GSIERR("failed to create IPC log, continue...\n");
+	/* Check if 64 or 32 bit addressing is used */
+
+	is_64_bit_addressing = of_property_read_bool(dev->of_node,
+		"qcom,use-64-bit-dma-mask");
+
+	/* Configure memory access */
+	if (is_64_bit_addressing) {
+		if (dma_set_mask(dev, DMA_BIT_MASK(64)) ||
+			dma_set_coherent_mask(dev, DMA_BIT_MASK(64))) {
+			dev_err(dev, "DMA set 64bit mask failed\n");
+			return -EOPNOTSUPP;
+		}
+	} else {
+		if (dma_set_mask(dev, DMA_BIT_MASK(32)) ||
+			dma_set_coherent_mask(dev, DMA_BIT_MASK(32))) {
+			dev_err(dev, "DMA set 32bit mask failed\n");
+			return -EOPNOTSUPP;
+		}
+	}
 
 	gsi_ctx->dev = dev;
 	init_completion(&gsi_ctx->gen_ee_cmd_compl);

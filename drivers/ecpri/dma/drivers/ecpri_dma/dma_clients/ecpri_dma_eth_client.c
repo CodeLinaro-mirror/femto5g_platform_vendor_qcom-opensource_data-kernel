@@ -550,6 +550,8 @@ int ecpri_dma_eth_connect_endpoints(
 	struct ecpri_dma_moderation_config irq_mod_cfg = { 1, 0 };
 	struct ecpri_dma_moderation_config* curr_tx_mod_cfg;
 	client_notify_comp tx_notify_comp;
+	struct ecpri_dma_ecpri_endp_alloc_params tx_endp_params = {0};
+	struct ecpri_dma_ecpri_endp_alloc_params rx_endp_params = {0};
 
 	DMADBG_LOW("Begin\n");
 
@@ -593,13 +595,20 @@ int ecpri_dma_eth_connect_endpoints(
 		tx_notify_comp = &dma_eth_client_tx_comp_hdlr;
 	}
 
-	ret = ecpri_dma_alloc_endp(
-		ecpri_dma_eth_client_ctx->
-		link_to_endp_mapping[params->link_index].tx_endp.gsi_id,
-		ecpri_dma_eth_client_ctx->
-		link_to_endp_mapping[params->link_index].tx_endp.endp_id,
-		params->tx_ring_length, curr_tx_mod_cfg, false,
-		tx_notify_comp, connection->enable_tx_poll);
+	tx_endp_params.gsi_id = ecpri_dma_eth_client_ctx->
+	link_to_endp_mapping[params->link_index].tx_endp.gsi_id;
+
+	tx_endp_params.endp_id = ecpri_dma_eth_client_ctx->
+		link_to_endp_mapping[params->link_index].tx_endp.endp_id;
+
+	tx_endp_params.ring_length = params->tx_ring_length;
+	tx_endp_params.mod_cfg = curr_tx_mod_cfg;
+	tx_endp_params.is_over_pcie = false;
+	tx_endp_params.notify_comp = tx_notify_comp;
+	tx_endp_params.enable_tx_poll = connection->enable_tx_poll;
+	tx_endp_params.cb_to_use = ECPRI_DMA_SMMU_CB_ETH;
+
+	ret = ecpri_dma_alloc_endp(&tx_endp_params);
 
 	if (ret != 0) {
 		DMAERR("Unable to allocate Tx ENDP, ENDP ID:%d, GSI ID %d\n",
@@ -610,13 +619,20 @@ int ecpri_dma_eth_connect_endpoints(
 		return ret;
 	}
 
-	ret = ecpri_dma_alloc_endp(
-		ecpri_dma_eth_client_ctx->
-		link_to_endp_mapping[params->link_index].rx_endp.gsi_id,
-		ecpri_dma_eth_client_ctx->
-		link_to_endp_mapping[params->link_index].rx_endp.endp_id,
-		params->rx_ring_length, &irq_mod_cfg, false,
-		&dma_eth_client_rx_comp_hdlr, false);
+	rx_endp_params.gsi_id = ecpri_dma_eth_client_ctx->
+		link_to_endp_mapping[params->link_index].rx_endp.gsi_id;
+
+	rx_endp_params.endp_id = ecpri_dma_eth_client_ctx->
+		link_to_endp_mapping[params->link_index].rx_endp.endp_id;
+
+	rx_endp_params.ring_length = params->rx_ring_length;
+	rx_endp_params.mod_cfg = &irq_mod_cfg;
+	rx_endp_params.is_over_pcie = false;
+	rx_endp_params.notify_comp = &dma_eth_client_rx_comp_hdlr;
+	rx_endp_params.enable_tx_poll = false;
+	rx_endp_params.cb_to_use = ECPRI_DMA_SMMU_CB_ETH;
+
+	ret = ecpri_dma_alloc_endp(&rx_endp_params);
 
 	if (ret != 0) {
 		DMAERR("Unable to allocate Rx ENDP, ENDP ID:%d, GSI ID %d\n",

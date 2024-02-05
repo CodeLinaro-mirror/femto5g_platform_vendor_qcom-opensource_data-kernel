@@ -1136,6 +1136,8 @@ static int ecpri_dma_dp_test_alloc_and_start_endp(
 
 	struct ecpri_dma_dp_test_suite_endp *endp_ptr;
 	struct ecpri_dma_moderation_config mod_cfg = {0, 0};
+	struct ecpri_dma_ecpri_endp_alloc_params endp_params = {0};
+
 	int ret = 0;
 
 	client_notify_comp notify;
@@ -1160,9 +1162,17 @@ static int ecpri_dma_dp_test_alloc_and_start_endp(
 	mod_cfg.moderation_timer_threshold =
 		ECPRI_DMA_DP_TEST_ENDP_MODT;
 
-	ret = ecpri_dma_alloc_endp(endp_ptr->gsi_id, endp_ptr->id,
-		ECPRI_DMA_DP_TEST_RING_LEN, &mod_cfg, false,
-		notify, false);
+
+	endp_params.gsi_id = endp_ptr->gsi_id;
+	endp_params.endp_id =  endp_ptr->id;
+	endp_params.ring_length = ECPRI_DMA_DP_TEST_RING_LEN;
+	endp_params.mod_cfg = &mod_cfg;
+	endp_params.is_over_pcie = false;
+	endp_params.notify_comp = notify;
+	endp_params.enable_tx_poll = false;
+	endp_params.cb_to_use = ECPRI_DMA_SMMU_CB_ETH ;
+
+	ret = ecpri_dma_alloc_endp(&endp_params);
 
 	if (ret) {
 		DMA_UT_LOG("Failed to allocte test ENDP id: %d  gsi_id: %d\n",

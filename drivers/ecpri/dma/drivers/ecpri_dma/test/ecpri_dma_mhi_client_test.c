@@ -878,6 +878,7 @@ static int ecpri_dma_mhi_client_test_util_setup_dma_endps(
 
 void ecpri_dma_mhi_client_test_free_mmio_space(int idx)
 {
+	struct device *dev;
 
 	DMA_UT_DBG("Free MMIO Space enter\n");
 
@@ -887,12 +888,13 @@ void ecpri_dma_mhi_client_test_free_mmio_space(int idx)
 		return;
 	}
 
-	dma_free_coherent(ecpri_dma_ctx->pdev,
+	dev = ecpri_dma_get_smmu_ctx(ECPRI_DMA_SMMU_CB_MHI)->dev;
+	dma_free_coherent(dev,
 		mhi_client_test_suite_ctx[idx]->ev_ctx_array.size,
 		mhi_client_test_suite_ctx[idx]->ev_ctx_array.virt_base,
 		mhi_client_test_suite_ctx[idx]->ev_ctx_array.phys_base);
 
-	dma_free_coherent(ecpri_dma_ctx->pdev,
+	dma_free_coherent(dev,
 		mhi_client_test_suite_ctx[idx]->ch_ctx_array.size,
 		mhi_client_test_suite_ctx[idx]->ch_ctx_array.virt_base,
 		mhi_client_test_suite_ctx[idx]->ch_ctx_array.phys_base);
@@ -901,6 +903,7 @@ void ecpri_dma_mhi_client_test_free_mmio_space(int idx)
 		mhi_client_test_suite_ctx[idx]->msi.size,
 		mhi_client_test_suite_ctx[idx]->msi.virt_base,
 		mhi_client_test_suite_ctx[idx]->msi.phys_base);
+
 }
 
 static int ecpri_dma_mhi_client_test_alloc_mmio_space(int idx)
@@ -911,7 +914,7 @@ static int ecpri_dma_mhi_client_test_alloc_mmio_space(int idx)
 	struct ecpri_dma_mem_buffer* ev_ctx_array;
 	struct ecpri_dma_mem_buffer* mmio_buf;
 	struct ecpri_dma_mhi_mmio_register_set* p_mmio;
-
+	struct device *dev;
 	DMA_UT_DBG("Entry\n");
 
 	msi = &mhi_client_test_suite_ctx[idx]->msi;
@@ -936,8 +939,12 @@ static int ecpri_dma_mhi_client_test_alloc_mmio_space(int idx)
 	/* allocate buffer for channel context */
 	ch_ctx_array->size = sizeof(struct ecpri_dma_mhi_host_ch_ctx) *
 		(ECPRI_DMA_MHI_TEST_FIRST_HW_CH_ID + ECPRI_DMA_MHI_TEST_MAX_NUM_HW_CHS);
-	ch_ctx_array->virt_base = dma_alloc_coherent(ecpri_dma_ctx->pdev,
+
+	dev = ecpri_dma_get_smmu_ctx(ECPRI_DMA_SMMU_CB_MHI)->dev;
+	ch_ctx_array->virt_base = dma_alloc_coherent(
+		dev,
 		ch_ctx_array->size, &ch_ctx_array->phys_base, GFP_KERNEL);
+
 	if (!ch_ctx_array->virt_base) {
 		DMA_UT_ERR("no mem for ch ctx array\n");
 		ret = -ENOMEM;
@@ -951,8 +958,11 @@ static int ecpri_dma_mhi_client_test_alloc_mmio_space(int idx)
 	ev_ctx_array->size = sizeof(struct ecpri_dma_mhi_host_ev_ctx) *
 		(ECPRI_DMA_MHI_TEST_FIRST_EVENT_RING_ID +
 		ECPRI_DMA_MHI_TEST_MAX_NUM_EVENT_RINGS);
-	ev_ctx_array->virt_base = dma_alloc_coherent(ecpri_dma_ctx->pdev,
+
+	ev_ctx_array->virt_base = dma_alloc_coherent(
+		dev,
 		ev_ctx_array->size, &ev_ctx_array->phys_base, GFP_KERNEL);
+
 	if (!ev_ctx_array->virt_base) {
 		DMA_UT_ERR("no mem for ev ctx array\n");
 		ret = -ENOMEM;
@@ -964,9 +974,12 @@ static int ecpri_dma_mhi_client_test_alloc_mmio_space(int idx)
 
 	/* allocate buffer for mmio */
 	mmio_buf->size = sizeof(struct ecpri_dma_mhi_mmio_register_set);
-	mmio_buf->virt_base = dma_alloc_coherent(ecpri_dma_ctx->pdev,
+
+	mmio_buf->virt_base = dma_alloc_coherent(
+		dev,
 		mmio_buf->size,
 		&mmio_buf->phys_base, GFP_KERNEL);
+
 	if (!mmio_buf->virt_base) {
 		DMA_UT_ERR("no mem for mmio buf\n");
 		ret = -ENOMEM;
@@ -1017,17 +1030,31 @@ static int ecpri_dma_mhi_client_test_alloc_mmio_space(int idx)
 	return ret;
 
 fail_alloc_mmio_buf:
-	dma_free_coherent(ecpri_dma_ctx->pdev, ev_ctx_array->size,
+
+	dma_free_coherent(
+		dev,
+		ev_ctx_array->size,
 		ev_ctx_array->virt_base, ev_ctx_array->phys_base);
+
 	ev_ctx_array->virt_base = NULL;
+
 fail_alloc_ev_ctx_arr:
-	dma_free_coherent(ecpri_dma_ctx->pdev, ch_ctx_array->size,
+
+	dma_free_coherent(
+		dev,
+		ch_ctx_array->size,
 		ch_ctx_array->virt_base, ch_ctx_array->phys_base);
+
 	ch_ctx_array->virt_base = NULL;
 fail_alloc_ch_ctx_arr:
-	dma_free_coherent(ecpri_dma_ctx->pdev, msi->size, msi->virt_base,
+
+	dma_free_coherent(
+		dev,
+		msi->size,
+		msi->virt_base,
 		msi->phys_base);
 	msi->virt_base = NULL;
+
 fail_alloc_msi:
 	return ret;
 }
@@ -1037,6 +1064,7 @@ static int ecpri_dma_mhi_client_test_alloc_src_dest_buffers(int idx)
 	int ret = 0;
 	struct ecpri_dma_mem_buffer* src_buffer;
 	struct ecpri_dma_mem_buffer* dest_buffer;
+	struct device *dev;
 
 	DMA_UT_DBG("Allocating buffers \n");
 
@@ -1046,8 +1074,11 @@ static int ecpri_dma_mhi_client_test_alloc_src_dest_buffers(int idx)
 	/* allocate src buffer */
 	src_buffer->size = sizeof(u32);
 
-	src_buffer->virt_base = dma_alloc_coherent(ecpri_dma_ctx->pdev,
-		src_buffer->size, &src_buffer->phys_base, GFP_KERNEL);
+	dev = ecpri_dma_get_smmu_ctx(ECPRI_DMA_SMMU_CB_MHI)->dev;
+	src_buffer->virt_base = dma_alloc_coherent(
+	dev,
+	src_buffer->size, &src_buffer->phys_base, GFP_KERNEL);
+
 	if (!src_buffer->virt_base) {
 		DMA_UT_ERR("no mem for src_buffer\n");
 		ret = -ENOMEM;
@@ -1061,8 +1092,10 @@ static int ecpri_dma_mhi_client_test_alloc_src_dest_buffers(int idx)
 	/* allocate dest buffer */
 	dest_buffer->size = sizeof(u32);
 
-	dest_buffer->virt_base = dma_alloc_coherent(ecpri_dma_ctx->pdev,
+	dest_buffer->virt_base = dma_alloc_coherent(
+		dev,
 		dest_buffer->size, &dest_buffer->phys_base, GFP_KERNEL);
+
 	if (!dest_buffer->virt_base) {
 		DMA_UT_ERR("no mem for dest_buffer\n");
 		ret = -ENOMEM;
@@ -1076,9 +1109,12 @@ static int ecpri_dma_mhi_client_test_alloc_src_dest_buffers(int idx)
 	return ret;
 
 fail_alloc_dest_buffer:
-	dma_free_coherent(ecpri_dma_ctx->pdev, src_buffer->size,
+	dma_free_coherent(
+		dev,
+		src_buffer->size,
 		src_buffer->virt_base,
 		src_buffer->phys_base);
+
 	src_buffer->virt_base = NULL;
 fail_alloc_src_buffer:
 	return ret;
@@ -1088,23 +1124,32 @@ static void ecpri_dma_mhi_client_test_free_src_dest_buffers(int idx)
 {
 	struct ecpri_dma_mem_buffer* src_buffer;
 	struct ecpri_dma_mem_buffer* dest_buffer;
-
+	struct device *dev;
 	DMA_UT_DBG("deallocating buffers \n");
 
 	src_buffer = &mhi_client_test_suite_ctx[idx]->src_buffer;
 	dest_buffer = &mhi_client_test_suite_ctx[idx]->dest_buffer;
 
 	DMA_UT_DBG("dest buffers deallocation start \n");
-	dma_free_coherent(ecpri_dma_ctx->pdev, dest_buffer->size,
+
+	dev = ecpri_dma_get_smmu_ctx(ECPRI_DMA_SMMU_CB_MHI)->dev;
+	dma_free_coherent(
+		dev,
+		dest_buffer->size,
 		dest_buffer->virt_base,
 		dest_buffer->phys_base);
+
 	DMA_UT_DBG("dest buffers deallocated \n");
 	dest_buffer->virt_base = NULL;
 
 	DMA_UT_DBG("src buffers deallocation start \n");
-	dma_free_coherent(ecpri_dma_ctx->pdev, src_buffer->size,
+
+	dma_free_coherent(
+		dev,
+	 	src_buffer->size,
 		src_buffer->virt_base,
 		src_buffer->phys_base);
+
 	DMA_UT_DBG("src buffers deallocated \n");
 	src_buffer->virt_base = NULL;
 	DMA_UT_DBG("Finished\n");
@@ -1508,14 +1553,16 @@ void ecpri_dma_mhi_client_test_destroy_data_context(int idx)
 		[hw_ver][hw_flavor][idx].num_of_hw_chs_pairs;
 
 	/* Destroy DEST data buffer */
-	dma_free_coherent(ecpri_dma_ctx->pdev,
+	dma_free_coherent(
+		ecpri_dma_get_smmu_ctx(ECPRI_DMA_SMMU_CB_MHI)->dev,
 		mhi_client_test_suite_ctx[idx]->dest_buffer.size,
 		mhi_client_test_suite_ctx[idx]->dest_buffer.virt_base,
 		mhi_client_test_suite_ctx[idx]->dest_buffer.phys_base);
 	mhi_client_test_suite_ctx[idx]->dest_buffer.virt_base = NULL;
 
 	/* Destroy SRC data buffer */
-	dma_free_coherent(ecpri_dma_ctx->pdev,
+	dma_free_coherent(
+		ecpri_dma_get_smmu_ctx(ECPRI_DMA_SMMU_CB_MHI)->dev,
 		mhi_client_test_suite_ctx[idx]->src_buffer.size,
 		mhi_client_test_suite_ctx[idx]->src_buffer.virt_base,
 		mhi_client_test_suite_ctx[idx]->src_buffer.phys_base);
@@ -1598,9 +1645,12 @@ static int ecpri_dma_mhi_client_test_setup_channels(int idx)
 	/* allocate DEST data buffer */
 	mhi_client_test_suite_ctx[idx]->dest_buffer.size =
 		ECPRI_DMA_MHI_TEST_BUFF_SIZE;
+
 	mhi_client_test_suite_ctx[idx]->dest_buffer.virt_base = dma_alloc_coherent(
-		ecpri_dma_ctx->pdev, mhi_client_test_suite_ctx[idx]->dest_buffer.size,
+		ecpri_dma_get_smmu_ctx(ECPRI_DMA_SMMU_CB_MHI)->dev,
+		mhi_client_test_suite_ctx[idx]->dest_buffer.size,
 		&mhi_client_test_suite_ctx[idx]->dest_buffer.phys_base, GFP_KERNEL);
+
 	if (!mhi_client_test_suite_ctx[idx]->dest_buffer.virt_base) {
 		DMA_UT_ERR("no mem for dest data buffer\n");
 		ret = -ENOMEM;
@@ -1617,9 +1667,12 @@ static int ecpri_dma_mhi_client_test_setup_channels(int idx)
 	/* allocate SRC data buffer */
 	mhi_client_test_suite_ctx[idx]->src_buffer.size =
 		ECPRI_DMA_MHI_TEST_BUFF_SIZE;
+
 	mhi_client_test_suite_ctx[idx]->src_buffer.virt_base = dma_alloc_coherent(
-		ecpri_dma_ctx->pdev, mhi_client_test_suite_ctx[idx]->src_buffer.size,
+		ecpri_dma_get_smmu_ctx(ECPRI_DMA_SMMU_CB_MHI)->dev,
+		mhi_client_test_suite_ctx[idx]->src_buffer.size,
 		&mhi_client_test_suite_ctx[idx]->src_buffer.phys_base, GFP_KERNEL);
+
 	if (!mhi_client_test_suite_ctx[idx]->src_buffer.virt_base) {
 		DMA_UT_ERR("no mem for src data buffer\n");
 		ret = -EFAULT;
@@ -1635,10 +1688,13 @@ static int ecpri_dma_mhi_client_test_setup_channels(int idx)
 	return 0;
 
 fail_destroy_dest_data_buf:
-	dma_free_coherent(ecpri_dma_ctx->pdev,
+
+	dma_free_coherent(
+		ecpri_dma_get_smmu_ctx(ECPRI_DMA_SMMU_CB_MHI)->dev,
 		mhi_client_test_suite_ctx[idx]->dest_buffer.size,
 		mhi_client_test_suite_ctx[idx]->dest_buffer.virt_base,
 		mhi_client_test_suite_ctx[idx]->dest_buffer.phys_base);
+
 	mhi_client_test_suite_ctx[idx]->dest_buffer.virt_base = NULL;
 fail_destroy_ch_cntxt:
 	for (; endp_pair_id >= 0; endp_pair_id--) {
@@ -2492,9 +2548,12 @@ static int ecpri_dma_mhi_test_loopback_data_transfer_redirect(int idx,
 
 	/* Prepare packet and credits */
 	redirect_buffer.size = ECPRI_DMA_MHI_TEST_BUFF_SIZE;
+
 	redirect_buffer.virt_base = dma_alloc_coherent(
-		ecpri_dma_ctx->pdev, redirect_buffer.size,
+		ecpri_dma_get_smmu_ctx(ECPRI_DMA_SMMU_CB_MHI)->dev,
+		redirect_buffer.size,
 		&redirect_buffer.phys_base, GFP_KERNEL);
+
 	if (!redirect_buffer.virt_base) {
 		DMA_UT_ERR("no mem for redirect data buffer\n");
 		return -ENOMEM;
@@ -2644,11 +2703,12 @@ static int ecpri_dma_mhi_test_loopback_data_transfer_redirect(int idx,
 	}
 
 fail_redirect:
-	dma_free_coherent(ecpri_dma_ctx->pdev,
+
+	dma_free_coherent(
+		ecpri_dma_get_smmu_ctx(ECPRI_DMA_SMMU_CB_MHI)->dev,
 		redirect_buffer.size,
 		redirect_buffer.virt_base,
 		redirect_buffer.phys_base);
-
 	return ret;
 }
 
@@ -4321,7 +4381,185 @@ ecpri_dma_mhi_client_test_suite_hw_ch_redirect(void* priv)
 	return 0;
 }
 
+static int ecpri_dma_mhi_client_test_alloc_src_dest_buffers_eth(int idx)
+{
+	int ret = 0;
+	struct ecpri_dma_mem_buffer* src_buffer;
+	struct ecpri_dma_mem_buffer* dest_buffer;
+	struct ecpri_dma_smmu_cb_ctx *cb =
+			ecpri_dma_get_smmu_ctx(ECPRI_DMA_SMMU_CB_ETH);
 
+	DMA_UT_DBG("Allocating buffers \n");
+
+	if (NULL == cb) {
+		DMA_UT_ERR("MHI CB pointer is null\n");
+		return -EINVAL;
+	}
+
+	src_buffer = &mhi_client_test_suite_ctx[idx]->src_buffer;
+	dest_buffer = &mhi_client_test_suite_ctx[idx]->dest_buffer;
+
+	/* allocate src buffer */
+	src_buffer->size = sizeof(u32);
+
+	src_buffer->virt_base = dma_alloc_coherent(cb->dev,
+		src_buffer->size, &src_buffer->phys_base, GFP_KERNEL);
+	if (!src_buffer->virt_base) {
+		DMA_UT_ERR("no mem for src_buffer\n");
+		ret = -ENOMEM;
+		goto fail_alloc_src_buffer;
+	}
+
+	DMA_UT_DBG("src_buffer: virt_base 0x%px phys_addr %pad size %d\n",
+		src_buffer->virt_base, &src_buffer->phys_base,
+		src_buffer->size);
+
+	/* allocate dest buffer */
+	dest_buffer->size = sizeof(u32);
+
+	dest_buffer->virt_base = dma_alloc_coherent(cb->dev,
+		dest_buffer->size, &dest_buffer->phys_base, GFP_KERNEL);
+	if (!dest_buffer->virt_base) {
+		DMA_UT_ERR("no mem for dest_buffer\n");
+		ret = -ENOMEM;
+		goto fail_alloc_dest_buffer;
+	}
+
+	DMA_UT_DBG("dest_buffer: virt_base 0x%px phys_addr %pad size %d\n",
+		dest_buffer->virt_base, &dest_buffer->phys_base,
+		dest_buffer->size);
+
+	return ret;
+
+fail_alloc_dest_buffer:
+	dma_free_coherent(cb->dev, src_buffer->size,
+		src_buffer->virt_base,
+		src_buffer->phys_base);
+	src_buffer->virt_base = NULL;
+fail_alloc_src_buffer:
+	return ret;
+}
+/**
+ * This test is used to verify SMMU creates a fault when the wrong CB
+ * is being accessed
+ */
+static int ecpri_dma_mhi_client_test_suite_smmu_fault(void* priv)
+{
+	int ret = 0;
+	int idx;
+	struct mhi_dma_function_params function;
+	u32 pkt_content = ECPRI_DMA_MHI_TEST_PACKET_CONTENT;
+
+	DMA_UT_DBG("Start MHI MEMCPY ASYNC PF\n");
+
+	/* Create func params for PF */
+	ecpri_dma_mhi_test_create_func_params(&function,
+		MHI_DMA_FUNCTION_TYPE_PHYSICAL, ECPRI_DMA_MHI_PF_ID);
+
+	ret = ecpri_dma_mhi_test_get_func_idx(&function, &idx);
+	if (ret != 0) {
+		return ret;
+	}
+
+	ret = ecpri_dma_mhi_driver_ops.mhi_dma_memcpy_init(function);
+	if (ret != 0) {
+		DMA_UT_ERR("Memcopy_init failed for,"
+			"FUNCTION TYPE: %d, VF_ID: %d\n",
+			function.function_type,
+			function.vf_id);
+		DMA_UT_TEST_FAIL_REPORT("Memcopy_init failed\n");
+		goto fail_init;
+	}
+
+	/* Invoke mhi_dma_enable */
+	ret = ecpri_dma_mhi_driver_ops.mhi_dma_memcpy_enable(function);
+	if (ret != 0) {
+		DMA_UT_ERR("mhi_dma_enable failed, ret %d\n", ret);
+		DMA_UT_TEST_FAIL_REPORT("mhi_dma_enable failed\n");
+		ret = -EFAULT;
+		goto fail_enable;
+	}
+
+	/* Allocate packets and buffers */
+	ret = ecpri_dma_mhi_client_test_alloc_src_dest_buffers_eth(ECPRI_DMA_MHI_PF_ID);
+	if (ret != 0) {
+		DMA_UT_ERR("Failed to allocate buffers, ret %d\n", ret);
+		DMA_UT_TEST_FAIL_REPORT("Failed to allocate buffers\n");
+		ret = -EFAULT;
+		goto fail;
+	}
+
+	/* Assign packet to src */
+	*(u32*)mhi_client_test_suite_ctx[ECPRI_DMA_MHI_PF_ID]->
+		src_buffer.virt_base = pkt_content;
+
+	mhi_client_test_suite_ctx[ECPRI_DMA_MHI_PF_ID]->async_user_data =
+		pkt_content;
+
+	/* invoke memcpy_async */
+	ret = ecpri_dma_mhi_driver_ops.mhi_dma_async_memcpy(
+		(u64)mhi_client_test_suite_ctx[ECPRI_DMA_MHI_PF_ID]->
+		dest_buffer.phys_base,
+		(u64)mhi_client_test_suite_ctx[ECPRI_DMA_MHI_PF_ID]->
+		src_buffer.phys_base,
+		sizeof(u32),
+		function,
+		&ecpri_dma_mhi_client_test_async_comp_cb,
+		&mhi_client_test_suite_ctx[ECPRI_DMA_MHI_PF_ID]->async_user_data);
+	if (ret != 0) {
+		DMA_UT_ERR("Failed async_memcpy, ret %d\n", ret);
+		ret = -EFAULT;
+		goto fail;
+	}
+
+	/* Wait for completion */
+	DMA_UT_DBG("Wait for async completion event\n");
+	if (wait_for_completion_timeout(
+		&mhi_client_test_suite_ctx[ECPRI_DMA_MHI_PF_ID]->
+		ecpri_dma_mhi_test_async_comp,
+		msecs_to_jiffies(ECPRI_DMA_MHI_TEST_CMPLN_TIMEOUT)) == 0)
+	{
+		DMA_UT_DBG("timeout waiting for async completion event");
+		DMA_UT_TEST_FAIL_REPORT("failed waiting for state ready");
+		ret = -ETIME;
+		goto fail;
+	}
+	DMA_UT_DBG("Got DMA ready event\n");
+
+	/* Verify content of src and dest buffers */
+	if (memcmp(mhi_client_test_suite_ctx[ECPRI_DMA_MHI_PF_ID]->
+		src_buffer.virt_base,
+		mhi_client_test_suite_ctx[ECPRI_DMA_MHI_PF_ID]->
+		dest_buffer.virt_base,
+		mhi_client_test_suite_ctx[ECPRI_DMA_MHI_PF_ID]->
+		dest_buffer.size)) {
+		DMA_UT_ERR("Buffers don't match, ret %d\n", ret);
+		ret = -EFAULT;
+		goto fail;
+	}
+
+	/* Free buffers */
+	ecpri_dma_mhi_client_test_free_src_dest_buffers(idx);
+
+fail:
+	ret = ecpri_dma_mhi_driver_ops.mhi_dma_memcpy_disable(function);
+	if (ret != 0) {
+		DMA_UT_DBG("mhi_dma_memcpy_disable failed, ret %d\n", ret);
+		ret = -EFAULT;
+	}
+
+fail_enable:
+	ecpri_dma_mhi_driver_ops.mhi_dma_memcpy_destroy(function);
+
+fail_init:
+
+	return ret;
+}
+
+/* Note:
+	ecpri_dma_mhi_client_test_setup_channels in ecpri_dma_mhi_client_test_suite_setup must
+	be masked to prevent repeated HW channel allocation
+*/
 /* Suite definition block */
 DMA_UT_DEFINE_SUITE_START(mhi_client, "MHI Client suite",
 	ecpri_dma_mhi_client_test_suite_setup,
@@ -4421,4 +4659,10 @@ DMA_UT_DEFINE_SUITE_START(mhi_client, "MHI Client suite",
 			" Test will compare the content of the recevied packet.",
 			ecpri_dma_mhi_client_test_suite_hw_ch_redirect,
 			false, ECPRI_HW_V2_0, ECPRI_HW_MAX),
+
+		// DMA_UT_ADD_TEST(
+		// 	smmu_fault,
+		// 	"This test will verify SMMU access, we expect this test to cause a crash",
+		// 	ecpri_dma_mhi_client_test_suite_smmu_fault,
+		// 	false, ECPRI_HW_V1_0, ECPRI_HW_MAX),
 } DMA_UT_DEFINE_SUITE_END(mhi_client);
