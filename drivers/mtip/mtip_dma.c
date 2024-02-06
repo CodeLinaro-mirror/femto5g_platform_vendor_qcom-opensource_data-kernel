@@ -75,10 +75,8 @@ void mtip_dma_rx_comp_cb(void *user_data, ecpri_dma_eth_conn_hdl_t hdl)
    struct mtip_link_info* link;
    struct net_device *netdev;
    struct mtip_netdev_priv* priv;
-   spinlock_t *lock;
-   unsigned long flags;
    ecpri_dma_eth_conn_hdl_t used_handle = hdl;
-   enum ecpri_dma_notify_mode setmode;
+   enum ecpri_dma_notify_mode setmode = ECPRI_DMA_NOTIFY_MODE_POLL;
 
    if (mtip_loopback_mode != MTIP_MODE_DEFAULT) 
    {
@@ -143,22 +141,14 @@ void mtip_dma_rx_comp_cb(void *user_data, ecpri_dma_eth_conn_hdl_t hdl)
          CSMLOGDBG("napi schedule for hdl: %d, link_index: %d, link 0x%lx, netdev 0x%lx\n", used_handle, link_index, (unsigned long)link, (unsigned long)netdev);
 
          priv = netdev_priv(netdev);
-         lock = &(priv->lock);
-
-         spin_lock_irqsave(lock, flags);
 
          // schedule napi
          if (napi_schedule_prep(&(link->napi))) {
             __napi_schedule(&(link->napi));
 
-            // set to POLL mode
-            setmode = ECPRI_DMA_NOTIFY_MODE_POLL;
-
             // set the rx mode to POLL
             mtip_set_rx_mode_immediate(hdl, setmode);
          }
-
-         spin_unlock_irqrestore(lock, flags);
       }
       else
       {
@@ -283,10 +273,8 @@ void mtip_dma_tx_irq_comp_cb(void *user_data, ecpri_dma_eth_conn_hdl_t hdl)
    struct mtip_link_info* link;
    struct net_device *netdev;
    struct mtip_netdev_priv* priv;
-   spinlock_t *lock;
-   unsigned long flags;
    ecpri_dma_eth_conn_hdl_t used_handle = hdl;
-   enum ecpri_dma_notify_mode setmode;
+   enum ecpri_dma_notify_mode setmode = ECPRI_DMA_NOTIFY_MODE_POLL;
 
    CSMLOGDBG("mtip_dma_tx_irq_comp_cb orig: %d, used hdl: %d\n", hdl, used_handle);
 
@@ -306,22 +294,14 @@ void mtip_dma_tx_irq_comp_cb(void *user_data, ecpri_dma_eth_conn_hdl_t hdl)
          CSMLOGDBG("napi schedule for hdl: %d, link_index: %d, link 0x%lx, netdev 0x%lx\n", used_handle, link_index, (unsigned long)link, (unsigned long)netdev);
 
          priv = netdev_priv(netdev);
-         lock = &(priv->lock);
-
-         spin_lock_irqsave(lock, flags);
 
          // schedule napi
          if (napi_schedule_prep(&(link->napi_tx))) {
             __napi_schedule(&(link->napi_tx));
 
-            // set to POLL mode
-            setmode = ECPRI_DMA_NOTIFY_MODE_POLL;
-
             // set the tx mode to POLL
             mtip_set_tx_mode_immediate(hdl, setmode);
          }
-
-         spin_unlock_irqrestore(lock, flags);
       }
       else
       {
@@ -339,8 +319,6 @@ void mtip_dma_tx_comp_cb(void *user_data, ecpri_dma_eth_conn_hdl_t hdl, struct e
     struct mtip_link_info* link;
     struct net_device *netdev;
     struct mtip_netdev_priv* priv;
-    spinlock_t *lock;
-    unsigned long flags;
 
     //CSMLOGDBG(" hdl: %d, num_of_completed: %d\n", hdl, num_of_completed);
 
@@ -381,23 +359,14 @@ void mtip_dma_tx_comp_cb(void *user_data, ecpri_dma_eth_conn_hdl_t hdl, struct e
          //CSMLOGDBG("napi schedule for hdl: %d, link_index: %d \n", hdl, link_index);
 
          priv = netdev_priv(netdev);
-         lock = &(priv->lock);
-
-         spin_lock_irqsave(lock, flags);
 
          // schedule napi
          if (napi_schedule_prep(&(link->napi_tx)))
          {
             __napi_schedule(&(link->napi_tx));
 
-            // set to POLL mode
-            //setmode = ECPRI_DMA_NOTIFY_MODE_POLL;
-
-            // set the rx mode to POLL
-            //mtip_set_rx_mode_immediate(hdl, setmode);
          }
 
-         spin_unlock_irqrestore(lock, flags);
     }
 }
 
@@ -1131,7 +1100,7 @@ static void mtip_dma_process_packet(
     }
     priv = netdev_priv(netdev);
     link_index = priv->link_index;
-    lock = &(priv->lock);
+    lock = &(priv->rx_lock);
     sec_dev = priv->sec_dev;
 
     status_code = pkts[s_idx]->status_code;
@@ -1242,25 +1211,18 @@ int mtip_dma_poll_tx_comp_packets(struct net_device *netdev, struct napi_struct 
    struct mtip_dma_tx_comp_params tx_comp_params={0};
    struct mtip_netdev_priv* priv;
    u32 link_index;
-   spinlock_t *lock;
-   unsigned long flags;
    ecpri_dma_eth_conn_hdl_t actual_handle = hdl;
 
    priv = netdev_priv(netdev);
 
    link_index = priv->link_index;
-   lock = &(priv->lock);
-
-   spin_lock_irqsave(lock, flags);
 
    pkts=priv->tx_comp_pkts;
    if (pkts == NULL)
    {
        rv = -1;
-       spin_unlock_irqrestore(lock, flags);
        goto out;
    }
-   spin_unlock_irqrestore(lock, flags);
 
    // set the number of packets to 0
    *npackets = 0;
@@ -1296,8 +1258,6 @@ int mtip_dma_poll_rx_packets(struct net_device *netdev, struct napi_struct *napi
    struct ecpri_dma_pkt_completion_wrapper **pkts = NULL; 
    struct mtip_netdev_priv* priv;
    u32 link_index;
-   spinlock_t *lock;
-   unsigned long flags;
    ecpri_dma_eth_conn_hdl_t actual_handle = hdl;
 
    if (mtip_loopback_mode != MTIP_MODE_DEFAULT) 
@@ -1348,19 +1308,13 @@ int mtip_dma_poll_rx_packets(struct net_device *netdev, struct napi_struct *napi
    priv = netdev_priv(netdev);
 
    link_index = priv->link_index;
-   lock = &(priv->lock);
-
-   spin_lock_irqsave(lock, flags);
 
    pkts = priv->rx_comp_pkts;
    if (pkts == NULL)
    {
        rv = -1;
-       spin_unlock_irqrestore(lock, flags);
        goto out;
    }
-
-   spin_unlock_irqrestore(lock, flags);
 
    // set the number of packets to 0
    *npackets = 0;
@@ -1409,7 +1363,6 @@ int mtip_dma_get_ring_state(ecpri_dma_eth_conn_hdl_t hdl, u32* tx_available, u32
 {
     int rv;
 
-    rv = (ecpri_dma_eth_driver_ops.ecpri_dma_eth_tx_ring_state)(hdl, tx_available);
     rv = (ecpri_dma_eth_driver_ops.ecpri_dma_eth_rx_ring_state)(hdl, rx_available);
     return rv;
 }

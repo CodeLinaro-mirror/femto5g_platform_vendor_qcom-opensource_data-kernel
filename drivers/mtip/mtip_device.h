@@ -1,6 +1,6 @@
 //SPDX-License-Identifier: GPL-2.0-only
 /*
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  */ 
 
 #ifndef _MTIP_DEVICE_H
@@ -61,6 +61,7 @@
 struct mtip_netdev_priv {
    u32 link_index;
    spinlock_t lock;
+   spinlock_t rx_lock;
    void __iomem           *mac_ioaddr;
    u64 hashtablebits;
    u32 priv_flags;
