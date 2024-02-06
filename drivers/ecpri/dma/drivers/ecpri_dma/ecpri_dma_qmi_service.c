@@ -443,9 +443,6 @@ static int ecpri_dma_qmi_service_init_q6_send_msg(void)
 		if (resp.sw_version_valid) {
 
 			ecpri_dma_qmi_ctx->q6_sw_version = resp.sw_version;
-
-			/* Send init complete*/
-			complete(&ecpri_dma_qmi_ctx->qmi_q6_int_cmplt_completion);
 		}
 
 		else
@@ -573,13 +570,16 @@ static void ecpri_dma_handle_init_indication(struct qmi_handle* qmi_handle,
 	cmplt_indication->modem_driver_mode,
 	cmplt_indication->modem_driver_mode_valid);
 
-	atomic_set(&ecpri_dma_qmi_ctx->q6_init_cmplt,true);
-
-	DMADBG("q6_init_cmplt: %d\n",
-	atomic_read(&ecpri_dma_qmi_ctx->q6_init_cmplt));
-
 	/* Cache the client sq */
 	memcpy(&ecpri_dma_qmi_ctx->client_sq, sq, sizeof(*sq));
+
+	atomic_set(&ecpri_dma_qmi_ctx->q6_init_cmplt, true);
+
+	DMADBG("q6_init_cmplt: %d\n",
+		atomic_read(&ecpri_dma_qmi_ctx->q6_init_cmplt));
+
+	/* Send init complete*/
+	complete(&ecpri_dma_qmi_ctx->qmi_q6_int_cmplt_completion);
 }
 
 static void ecpri_dma_handle_ch_cmd_indication(struct qmi_handle* qmi_handle,
@@ -783,7 +783,7 @@ int ecpri_dma_qmi_service_send_ch_cmd_q6(
 		&ecpri_dma_qmi_ctx->qmi_q6_int_cmplt_completion,
 		msecs_to_jiffies(ECPRI_DMA_QMI_INIT_COMPLETE_TIMEOUT));
 
-		if (0 == result) {
+		if (0 == result || !ecpri_dma_is_handshake_complete()) {
 			DMADBG("Timeout while waiting for Q6 init completion\n");
 
 			if (ECPRI_DMA_QMI_MSG_SYNC == flag) {
