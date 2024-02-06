@@ -116,12 +116,18 @@ static int ecpri_dma_mhi_pkt_alloc_from_heap(
 	struct mhi_dma_function_params **function_ptr,
 	struct ecpri_dma_pkt **pkt_ptr)
 {
+	if(!function_ptr || !pkt_ptr)
+	{
+		DMAERR("Invalid pointers\n");
+		return -EINVAL;
+	}
+
 	*function_ptr =
 		(struct mhi_dma_function_params*)kzalloc(
 		sizeof(struct mhi_dma_function_params),
 		GFP_KERNEL);
 
-	if (!function_ptr) {
+	if (!*function_ptr) {
 		DMAERR("failed to alloc packets array \n");
 		return -ENOMEM;
 	}
@@ -517,6 +523,12 @@ static int ecpri_dma_mhi_alloc_pkt(
 	else
 		ret = ecpri_dma_mhi_pkt_alloc_from_heap(
 			&function_ptr, &pkt);
+
+	if (ret || !pkt)
+	{
+		DMAERR("Packet allocation failed with code: %d\n", ret);
+		ecpri_dma_assert();
+	}
 
 	pkt->buffs[0]->phys_base = (dma_addr_t)(params->buff_addr);
 	pkt->buffs[0]->size = params->len;
