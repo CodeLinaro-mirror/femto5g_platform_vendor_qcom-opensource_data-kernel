@@ -1016,9 +1016,6 @@ static int mtip_start_xmit(struct sk_buff *skb, struct net_device *netdev)
        pending_pkt_completion_count = 0;
    }
 
-   // commit the packet
-   mtip_dma_tx_commit(hdl);
-
    return NETDEV_TX_OK;
 }
 
@@ -1479,6 +1476,7 @@ void mtip_netdevice_init(struct net_device *dev)
 
    // initialize the lock
    spin_lock_init(&priv->lock);
+   spin_lock_init(&priv->rx_lock);
 
    /*
     * set the ethtool ops
