@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: GPL-2.0-only
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 /**
@@ -78,7 +78,6 @@ const char * const mtip_debug_ethtool_stat_strings[] = {
 };
 
 #define MTIP_DEBUG_ETHTOOL_STATS_LEN ARRAY_SIZE(mtip_debug_ethtool_stat_strings)
-#define MTIP_ETHTOOL_PRIV_FLAGS_LEN 31
 
 #define MTIP_DEBUG_ETH_ETHTOOL_REG_OFFSET_ARRAY_SIZE 16
 int mtip_debug_eth_ethtool_reg_buffer_size;

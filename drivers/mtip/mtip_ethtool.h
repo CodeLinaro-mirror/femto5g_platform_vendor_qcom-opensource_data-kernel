@@ -1,6 +1,6 @@
 //SPDX-License-Identifier: GPL-2.0-only
 /*
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  */ 
 
 #ifndef _MTIP_ETHTOOL_H
@@ -15,6 +15,8 @@
  		else						\
  			(params)->priv_flags &= ~(BIT(pflag));	\
 	} while (0)
+
+#define MTIP_ETHTOOL_PRIV_FLAGS_LEN 10
 
 void mtip_ethtool_set_ops(struct net_device *netdev);
 void mtip_ethtool_getdrvinfo(struct net_device *dev, struct ethtool_drvinfo *info);

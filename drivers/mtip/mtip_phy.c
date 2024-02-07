@@ -1,6 +1,6 @@
 //SPDX-License-Identifier: GPL-2.0-only
 /*
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  */ 
 
 #include <linux/init.h>
@@ -175,6 +175,12 @@ void run_mtip_process_cdr_lock_ind(void* workptr)
     bool status = taskstruct->status;
     u8 an_seq_num = taskstruct->an_seq_num;
     u32 port_type;
+
+    if(link_index >= MTIP_MAX_LINKS)
+    {
+        CSMLOGINFO("Invalid link index %d", link_index);
+        return;
+    }
 
     CSMLOGINFO("CDR lock indication for link_index %d, status %d, an_seq_num %d\n",
                link_index, status, an_seq_num);

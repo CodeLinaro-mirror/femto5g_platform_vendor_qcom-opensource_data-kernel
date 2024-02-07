@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: GPL-2.0-only
- * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2023-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/slab.h>
@@ -33,12 +33,14 @@ int ldmm_mtip_fault_hndlr(struct notifier_block *nb, unsigned long event, void *
 {
 	int ret = NOTIFY_DONE;
 	uint32_t val = 0;
-	event_info_struct event_info = *(event_info_struct*)arg;
+	event_info_struct event_info;
 
 	if(!arg){
 		LDMM_LOG_ERR("%s:Invalid Param NULL\n", __func__);
 		return NOTIFY_BAD;
 	}
+
+	event_info = *(event_info_struct*)arg;
 
 	LDMM_SETFIELD_IN_REG(val, event_info.interface, LINK_ID_SHIFT, LINK_ID_MASK);
 

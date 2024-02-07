@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: GPL-2.0-only
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 /**
@@ -134,7 +134,7 @@ int qcom_aw_phy_setup(
   uint8_t i = 0;
   char temp_buf[MAX_PHY_LANE_STR_LEN] = {0};
   char buf[MAX_PHY_LANE_STR_LEN] = {0};
-  enum eth_phy_iface_phy_lane_speed_enum lane_speed;
+  enum eth_phy_iface_phy_lane_speed_enum lane_speed = PHY_LANE_SPEED_10G;
   enum local_error_enum local_err_val = LOCAL_ERROR_INVALID;
   int ret_val = 0;
 
