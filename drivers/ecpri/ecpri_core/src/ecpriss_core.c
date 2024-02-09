@@ -574,7 +574,8 @@ void ecpriss_eth_event_processing(void)
 		ecpriss_eth_topology_init();
 	}else {
 		ecpriss_eth_topology_init_v2();
-		if(ecpriss_pdata_v2->dev_mode != ECPRISS_DEV_MODE_RU && lte_fh_enabled) {
+		if(ecpriss_pdata_v2->dev_mode != ECPRISS_DEV_MODE_RU && lte_fh_enabled
+				&& ecpriss_pdata_v2->ecpri_state == ECPRI_CORE_INIT) {
 
 			ecpriss_qudp_set_nr_mac_filter();
 		}
@@ -592,7 +593,8 @@ void ecpriss_eth_topology_init_wq(struct work_struct *work)
 	}else {
 		ecpriss_eth_topology_init_v2();
 
-		if(ecpriss_pdata_v2->dev_mode != ECPRISS_DEV_MODE_RU && lte_fh_enabled) {
+		if(ecpriss_pdata_v2->dev_mode != ECPRISS_DEV_MODE_RU && lte_fh_enabled
+				&& ecpriss_pdata_v2->ecpri_state == ECPRI_CORE_INIT) {
 
 			ecpriss_qudp_set_nr_mac_filter();
 		}
@@ -1346,7 +1348,8 @@ static int ecpriss_core_register_callbacks_v2(void)
 		if(*is_ready == true) {
 			ecpriss_eth_topology_init_v2();
 
-			if(ecpriss_pdata_v2->dev_mode != ECPRISS_DEV_MODE_RU && lte_fh_enabled) {
+			if(ecpriss_pdata_v2->dev_mode != ECPRISS_DEV_MODE_RU && lte_fh_enabled
+					&& ecpriss_pdata_v2->ecpri_state == ECPRI_CORE_INIT) {
 
 				ecpriss_qudp_set_nr_mac_filter();
 			}
@@ -1755,6 +1758,13 @@ static int ecpriss_core_init_v2(struct platform_device *pdev)
 			break;
 		}
 
+		ret = ecpriss_core_register_callbacks_v2();
+		if(ret < 0) {
+			ECPRILOGERR("Callback registrations failed\n");
+			break;
+		}
+
+
 		ret = ecpriss_qudp_init_v2(&pdev->dev);
 		if(ret < 0) {
 			ECPRILOGERR("QUDP initialization failed\n");
@@ -1762,13 +1772,6 @@ static int ecpriss_core_init_v2(struct platform_device *pdev)
 		}
 
 		ECPRILOGERR("QUDP init complete\n");
-
-		ret = ecpriss_core_register_callbacks_v2();
-		if(ret < 0) {
-			ECPRILOGERR("Callback registrations failed\n");
-			break;
-		}
-
 
 		ret = ecpriss_stats_timer_enable_v2(stats_timeout_ms);
 
