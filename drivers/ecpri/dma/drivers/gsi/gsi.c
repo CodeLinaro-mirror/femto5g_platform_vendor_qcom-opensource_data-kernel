@@ -568,6 +568,7 @@ static void gsi_handle_glob_ee(int gsi_id, int ee)
 
 	val = gsihal_read_reg_pn_fields(GSI_EE_n_CNTXT_GLOB_IRQ_STTS,
 		gsi_id, ee, &cntxt_glob_irq_stts);
+	gsihal_write_reg_pn(GSI_EE_n_CNTXT_GLOB_IRQ_CLR, gsi_id, ee, val);
 
 	notify.user_data = gsi_ctx->per.user_data;
 
@@ -591,7 +592,6 @@ static void gsi_handle_glob_ee(int gsi_id, int ee)
 		gsi_ctx->per.notify_cb(&notify);
 	}
 
-	gsihal_write_reg_pn(GSI_EE_n_CNTXT_GLOB_IRQ_CLR, gsi_id, ee, val);
 }
 
 static void gsi_incr_ring_wp(struct gsi_ring_ctx *ctx)
@@ -849,6 +849,7 @@ static void gsi_handle_general(int gsi_id, int ee)
 
 	val = gsihal_read_reg_pn_fields(GSI_EE_n_CNTXT_GSI_IRQ_STTS,
 		gsi_id, ee, &gsi_irq_stts);
+	gsihal_write_reg_pn(GSI_EE_n_CNTXT_GSI_IRQ_CLR, gsi_id, ee, val);
 
 	notify.user_data = gsi_ctx->per.user_data;
 
@@ -867,7 +868,6 @@ static void gsi_handle_general(int gsi_id, int ee)
 	if (gsi_ctx->per.notify_cb)
 		gsi_ctx->per.notify_cb(&notify);
 
-	gsihal_write_reg_pn(GSI_EE_n_CNTXT_GSI_IRQ_CLR, gsi_id, ee, val);
 }
 
 static void gsi_handle_irq(int gsi_id, int ee)
