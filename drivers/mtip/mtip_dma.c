@@ -945,7 +945,7 @@ int mtip_dma_send_packet(struct net_device *netdev, ecpri_dma_eth_conn_hdl_t hdl
 
    if (res < 0)
    {
-      CSMLOGERR("transmit failed for handle %d with res = %d\n", hdl, res);
+      CSMLOGERR("DMA transmit failed for handle %d with res = %d\n", hdl, res);
       if(pkts[0])
       {
          pkt_priv = (struct mtip_pkt_priv *)(pkts[0]->user_data);

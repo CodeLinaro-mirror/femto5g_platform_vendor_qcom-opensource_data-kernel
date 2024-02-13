@@ -911,6 +911,22 @@ static int mtip_start_xmit(struct sk_buff *skb, struct net_device *netdev)
        }
    }
 
+   pending_pkt_completion_count = mtip_device_get_pkt_completion_count(netdev);
+
+   // check if we need to flow control the interface
+   if ((mtip_dma_tx_available(hdl) == false) ||
+       (pending_pkt_completion_count >= (MTIP_TX_RING_SIZE - MTIP_TX_PACKET_AVAILABILITY_THRESHOLD)))
+   {
+       if (!netif_queue_stopped(netdev))
+       {
+           CSMLOGERR("stopping queue for link_index %d", link_index);
+
+           // wait for space to become available
+           netif_stop_queue(netdev);
+       }
+       return NETDEV_TX_BUSY;
+   }
+
    // check if we need to send pre-header
    if ((mode == MTIP_DEVICE_RUv2) || (mode == MTIP_DEVICE_DUv2)) 
    {
@@ -986,12 +1002,6 @@ static int mtip_start_xmit(struct sk_buff *skb, struct net_device *netdev)
 
    // HANDLE THE ERROR
    if (ret < 0) {
-      if (!netif_queue_stopped(netdev))
-      {
-         netif_stop_queue(netdev);
-
-         CSMLOGERR("Tx ring full when queue awake\n");
-      }
       return NETDEV_TX_BUSY;
    }
 
@@ -1009,18 +1019,6 @@ static int mtip_start_xmit(struct sk_buff *skb, struct net_device *netdev)
    // commit the packet
    mtip_dma_tx_commit(hdl);
 
-   // check if we need to flow control the interface
-   if ((mtip_dma_tx_available(hdl) == false) ||
-       (pending_pkt_completion_count >= (MTIP_TX_RING_SIZE - MTIP_TX_PACKET_AVAILABILITY_THRESHOLD)))
-   {
-       if (!netif_queue_stopped(netdev))
-       {
-           CSMLOGERR("stopping queue for link_index %d", link_index);
-
-           // wait for space to become available
-           netif_stop_queue(netdev);
-       }
-   }
    return NETDEV_TX_OK;
 }
 
