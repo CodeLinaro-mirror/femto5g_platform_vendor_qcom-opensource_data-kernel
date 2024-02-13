@@ -1,6 +1,6 @@
 //SPDX-License-Identifier: GPL-2.0-only
 /*
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  */ 
 
 #include <linux/init.h>
@@ -831,7 +831,7 @@ int mtip_dma_send_packet(struct net_device *netdev, ecpri_dma_eth_conn_hdl_t hdl
    struct ecpri_dma_pkt **pkts;
    struct ecpri_dma_mem_buffer ** buffs;
    bool commit = true;
-   int res;
+   int res = -1;
    struct mtip_netdev_priv* priv;
    u32 link_index;
    spinlock_t *lock;
@@ -851,6 +851,7 @@ int mtip_dma_send_packet(struct net_device *netdev, ecpri_dma_eth_conn_hdl_t hdl
    pkts = mtip_dma_alloc_dma_pkt_ptr(GFP_ATOMIC);
 
    pkts[0] = mtip_dma_alloc_dma_pkt(GFP_ATOMIC);
+   memset(pkts[0], 0, sizeof(struct ecpri_dma_pkt));
 
    if (send_tx_pre_header == true)
    {
@@ -905,6 +906,11 @@ int mtip_dma_send_packet(struct net_device *netdev, ecpri_dma_eth_conn_hdl_t hdl
    
    // allocate mtip packet priv structure
    pkt_priv = (struct mtip_pkt_priv *)kmalloc(sizeof(struct mtip_pkt_priv), GFP_ATOMIC);
+   if(pkt_priv == NULL)
+   {
+       CSMLOGERR("Pkt priv alloc failed\n");
+       goto cleanup;
+   }
    pkt_priv->skb = skb;
    pkt_priv->tx_index = priv->tx_curr_index;
 
@@ -952,7 +958,10 @@ int mtip_dma_send_packet(struct net_device *netdev, ecpri_dma_eth_conn_hdl_t hdl
       goto ret;
    }
    priv->tx_curr_index = (tx_curr_index + 1)% MTIP_TX_RING_SIZE;
+   goto ret;
 
+cleanup:
+   mtip_dma_free_pkt(pkts[0]);
 ret:
    mtip_dma_free_dma_pkt_ptr(pkts);
    return res;

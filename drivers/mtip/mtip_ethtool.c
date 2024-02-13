@@ -73,7 +73,7 @@ static const char * const mtip_ethtool_stat_strings[] = {
 
 #define MTIP_ETHTOOL_STATS_LEN	ARRAY_SIZE(mtip_ethtool_stat_strings)
 
-static const char* const mtip_ethtool_priv_flags_str_arr[] = {
+static const char* const mtip_ethtool_priv_flags_str_arr[MTIP_ETHTOOL_PRIV_FLAGS_LEN] = {
     "1x100GBASE_R2",
     "1x100GBASE_R4",
     "2x50GBASE_R",
@@ -173,7 +173,6 @@ struct mtip_ethtool_reg_offset mtip_ethtool_reg_offset_val[MTIP_ETHTOOL_REG_OFFS
     {0x000002C0,    0x000002D8,     MTIP_ETHTOOL_RSFEC}
 };
 
-#define MTIP_ETHTOOL_PRIV_FLAGS_LEN ARRAY_SIZE(mtip_ethtool_priv_flags_str_arr)
 
 const char* mtip_ethtool_get_priv_flags_str(u32 index)
 {
