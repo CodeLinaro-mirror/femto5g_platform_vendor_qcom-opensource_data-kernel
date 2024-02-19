@@ -1823,7 +1823,7 @@ static void ecpriss_qudp_strict_filter_cfg_v2(void)
 	int strict_filter_config = 0;
 	int port_idx = 0;
 
-	for(port_idx = 0;port_idx < ecpriss_pdata_v2->qudp_ctx_v2->num_ports;port_idx++) {
+	for(port_idx = 0;(port_idx < ecpriss_pdata_v2->qudp_ctx_v2->num_ports) && (port_idx < ECPRISS_PORT_MAX);port_idx++) {
 
 		strict_filter_config = ecpriss_pdata_v2->qudp_ctx_v2->fh_port_cfg_v2[port_idx].strict_filter_status;
 		if(strict_filter_config) {

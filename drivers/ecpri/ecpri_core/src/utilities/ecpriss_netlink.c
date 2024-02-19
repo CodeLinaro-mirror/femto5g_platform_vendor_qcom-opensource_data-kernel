@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: GPL-2.0-only
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include "ecpriss_core.h"
@@ -50,9 +50,10 @@ void ecpriss_netlink_send_netlink_message(int client_id,
 //Wrapper for  ecpriss_process_packet() in ecpriss_core.c
 void ecpriss_netlink_process_packet(ecpriss_packet_s *packet)
 {
-	ecpriss_debug_flow_info(&packet->payload, packet->header.message_id);
-
 	if(packet) {
+	
+	ecpriss_debug_flow_info(&packet->payload, packet->header.message_id);
+		
 		switch(packet->header.message_id){
 			case ECPRISS_MESSAGE_FLOW_CFG:
 				ecpriss_process_packet(&packet->payload);
