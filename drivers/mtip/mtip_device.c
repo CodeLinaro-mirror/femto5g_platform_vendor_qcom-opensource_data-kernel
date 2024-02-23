@@ -429,9 +429,21 @@ void run_mtip_process_link_state(void* work_ptr)
     ecpri_dma_eth_conn_hdl_t dma_handle = 0;
     enum ecpri_dma_notify_mode setmode = ECPRI_DMA_NOTIFY_MODE_IRQ;
 
+    if(link_index >= MTIP_MAX_LINKS)
+    {
+        CSMLOGERR("invalid link_index %d", link_index);
+        goto func_exit;
+    }
+
     dma_handle = platform_driver_priv->mtip_links[link_index]->dma_hdl;
     if (link_up)
     {
+        if(mtip_mac_wrapper_get_link_status(link_index) == false)
+        {
+            // Ignore the stale event
+            goto func_exit;
+        }
+
         CSMLOGDBG("Processing LINK_UP for link_index: %d\n", link_index);
 
         // Process MAC link up state
@@ -459,6 +471,12 @@ void run_mtip_process_link_state(void* work_ptr)
     }
     else
     {
+        if(mtip_mac_wrapper_get_link_status(link_index) == true)
+        {
+            // Ignore the stale event
+            goto func_exit;
+        }
+
         CSMLOGDBG("Processing LINK_DOWN for link_index: %d\n", link_index);
 
         // stop the queues
@@ -487,6 +505,7 @@ void run_mtip_process_link_state(void* work_ptr)
         mtip_phy_notify_link_status(link_index, link_up);
     }
 
+func_exit:
     // free the taskstruct
     kfree(taskstruct);
 }
