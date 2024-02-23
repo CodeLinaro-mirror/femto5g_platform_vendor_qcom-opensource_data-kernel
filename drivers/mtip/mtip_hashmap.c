@@ -1,6 +1,6 @@
 //SPDX-License-Identifier: GPL-2.0-only
 /*
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  */ 
 
 #include <linux/module.h>
@@ -42,7 +42,6 @@ static int mtip_hashmap_find_key(u32 key)
 int mtip_hashmap_initialize(void)
 {
     int i;
-    spin_lock_init(&mtip_hashmap.lock);
 
     for (i = 0; i < MTIP_HASHMAP_TABLE_SIZE; ++i) {
         mtip_hashmap.key[i] = MTIP_HASHMAP_EMPTY;
@@ -66,10 +65,6 @@ int mtip_hashmap_insert(u32 key, u32 value)
     int ret = 0;
     int index;
     u32 hashed_index;
-    unsigned long flags;
-    spinlock_t *lock = &(mtip_hashmap.lock);
-
-    spin_lock_irqsave(lock, flags);
 
     // first check if the key is already in the map
     index = mtip_hashmap_find_key(key);
@@ -98,7 +93,7 @@ int mtip_hashmap_insert(u32 key, u32 value)
     if (inserted == false) {
         ret = -1;
     }
-    spin_unlock_irqrestore(lock, flags);
+
     return ret;
 }
 
@@ -107,10 +102,6 @@ int mtip_hashmap_remove(u32 key)
 {
     int ret = 0;
     int index;
-    unsigned long flags;
-    spinlock_t *lock = &(mtip_hashmap.lock);
-
-    spin_lock_irqsave(lock, flags);
 
     // first check if the key is already in the map
     index = mtip_hashmap_find_key(key);
@@ -124,7 +115,6 @@ int mtip_hashmap_remove(u32 key)
         ret = -1;
     }
 
-    spin_unlock_irqrestore(lock, flags);
     return ret;
 }
 
@@ -133,10 +123,6 @@ int mtip_hashmap_find(u32 key, u32* value)
 {
     int ret = 0;
     int index;
-    unsigned long flags;
-    spinlock_t *lock = &(mtip_hashmap.lock);
-
-    spin_lock_irqsave(lock, flags);
 
     // first check if the key is already in the map
     index = mtip_hashmap_find_key(key);
@@ -150,7 +136,7 @@ int mtip_hashmap_find(u32 key, u32* value)
         *value = mtip_hashmap.value[index];
         ret = 0;
     }
-    spin_unlock_irqrestore(lock, flags);
+
     return ret;
 }
 
