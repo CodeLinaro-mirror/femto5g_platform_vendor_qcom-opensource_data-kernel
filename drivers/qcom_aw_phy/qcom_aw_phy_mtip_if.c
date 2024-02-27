@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: GPL-2.0-only
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 /**
@@ -134,7 +134,7 @@ int qcom_aw_phy_setup(
   uint8_t i = 0;
   char temp_buf[MAX_PHY_LANE_STR_LEN] = {0};
   char buf[MAX_PHY_LANE_STR_LEN] = {0};
-  enum eth_phy_iface_phy_lane_speed_enum lane_speed;
+  enum eth_phy_iface_phy_lane_speed_enum lane_speed = PHY_LANE_SPEED_10G;
   enum local_error_enum local_err_val = LOCAL_ERROR_INVALID;
   int ret_val = 0;
 
@@ -473,9 +473,14 @@ int qcom_aw_phy_configure_speed_mode(
           break;
 
         case MTIP_PORT_CONFIG_1x40GBASE_R4:
+          phy_inst_info->an_params.adv_ability[PHY_SPEED_SPEC_40G_BASE_KR4] = 1;
+          phy_inst_info->an_params.adv_ability[PHY_SPEED_SPEC_40G_BASE_CR4] = 1;
+          break;
+
         case MTIP_PORT_CONFIG_1x40GBASE_R4_FEC:
           phy_inst_info->an_params.adv_ability[PHY_SPEED_SPEC_40G_BASE_KR4] = 1;
           phy_inst_info->an_params.adv_ability[PHY_SPEED_SPEC_40G_BASE_CR4] = 1;
+          phy_inst_info->an_params.fec_ability[PHY_10G_BASE_R_FEC] = 1;
           break;
 
         case MTIP_PORT_CONFIG_1x25GBASE_R:
@@ -629,10 +634,17 @@ enum mtip_port_config_enum qcom_aw_phy_an_result_to_port_config(
 
     case PHY_SPEED_SPEC_40G_BASE_KR4:
     case PHY_SPEED_SPEC_40G_BASE_CR4:
-      if(phy_inst_info->an_params.mac_port_config_mask & (1<<MTIP_PORT_CONFIG_1x40GBASE_R4_FEC))
-        return MTIP_PORT_CONFIG_1x40GBASE_R4_FEC;
-      else
-        return MTIP_PORT_CONFIG_1x40GBASE_R4;
+      if((phy_inst_info->an_params.mac_port_config_mask & (1<<MTIP_PORT_CONFIG_1x40GBASE_R4)) ||
+         (phy_inst_info->an_params.mac_port_config_mask & (1<<MTIP_PORT_CONFIG_1x40GBASE_R4_FEC))){
+
+        if(phy_inst_info->an_params.fec_ability[PHY_10G_BASE_R_FEC] == 1 &&
+           phy_inst_info->an_params.lp_fec_ability[PHY_LANE_0][PHY_10G_BASE_R_FEC] == 1){
+          phy_inst_info->an_params.an_fec_result[PHY_LANE_0] = PHY_10G_BASE_R_FEC;
+          return MTIP_PORT_CONFIG_1x40GBASE_R4_FEC;
+	}
+        else
+          return MTIP_PORT_CONFIG_1x40GBASE_R4;
+        }
 
     case PHY_SPEED_SPEC_50G_BASE_K_CR:
       if(phy_inst_info->an_params.mac_port_config_mask & (1<<MTIP_PORT_CONFIG_2x50GBASE_R_RSFEC))

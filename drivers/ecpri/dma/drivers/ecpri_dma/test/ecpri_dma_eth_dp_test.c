@@ -1278,6 +1278,7 @@ int ecpri_dma_eth_dp_test_util_rx_replenish(u32 num_to_replenish)
 	int first_batch = 0;
 	u32 first_idx = eth_client_test_suite_ctx.rx_pkt_idx;
 	u32* i = &eth_client_test_suite_ctx.rx_pkt_idx;
+	u32 success = 0;
 	ecpri_dma_eth_conn_hdl_t hdl = eth_client_test_suite_ctx.hdl;
 
 	eth_client_test_suite_ctx.allocated_pkts = true;
@@ -1342,15 +1343,15 @@ int ecpri_dma_eth_dp_test_util_rx_replenish(u32 num_to_replenish)
 		rem_to_repelnish = num_to_replenish - first_batch;
 		ret = ecpri_dma_eth_replenish_buffers(hdl,
 			&eth_client_test_suite_ctx.rx_pkts[first_idx],
-			first_batch, true);
-		if (ret) {
+			first_batch, true, &success);
+		if (ret || success != first_batch) {
 			DMA_UT_LOG("failed to replenish Rx endp\n");
 			goto fail_alloc;
 		}
 		ret = ecpri_dma_eth_replenish_buffers(hdl,
 			&eth_client_test_suite_ctx.rx_pkts[0],
-			rem_to_repelnish, true);
-		if (ret) {
+			rem_to_repelnish, true, &success);
+		if (ret || success != rem_to_repelnish) {
 			DMA_UT_LOG("failed to replenish Rx endp\n");
 			goto fail_alloc;
 		}
@@ -1360,8 +1361,8 @@ int ecpri_dma_eth_dp_test_util_rx_replenish(u32 num_to_replenish)
 		/* No need to handle wrap around*/
 		ret = ecpri_dma_eth_replenish_buffers(hdl,
 			&eth_client_test_suite_ctx.rx_pkts[first_idx],
-			num_to_replenish, true);
-		if (ret) {
+			num_to_replenish, true, &success);
+		if (ret || success != num_to_replenish) {
 			DMA_UT_LOG("failed to replenish Rx endp\n");
 			goto fail_alloc;
 		}
@@ -1832,24 +1833,6 @@ static int ecpri_dma_eth_dp_test_suite_connect(void *priv) {
 		DMA_UT_LOG("Test failed due to "
 			   "Tx Mod Configuration - Timer Threshold "
 			   "was not cleared\n");
-		return -EFAULT;
-	}
-
-	endp_gsi_cfg.value = ecpri_dma_hal_read_reg_mn(
-		ECPRI_ENDP_GSI_CFG, connection->tx_endp_ctx->gsi_id,
-		connection->tx_endp_ctx->endp_id);
-	if (endp_gsi_cfg.def.endp_en != 0) {
-		DMA_UT_LOG("Test failed due to "
-			   "Tx endpoint was not disabled\n");
-		return -EFAULT;
-	}
-
-	endp_gsi_cfg.value = ecpri_dma_hal_read_reg_mn(
-		ECPRI_ENDP_GSI_CFG, connection->rx_endp_ctx->gsi_id,
-		connection->rx_endp_ctx->endp_id);
-	if (endp_gsi_cfg.def.endp_en != 0) {
-		DMA_UT_LOG("Test failed due to "
-			   "Rx endpoint was not disabled\n");
 		return -EFAULT;
 	}
 

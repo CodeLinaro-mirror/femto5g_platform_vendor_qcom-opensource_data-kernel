@@ -52,11 +52,33 @@
 
 #define ECPRI_DMA_GSI_CHANNEL_STOP_SLEEP_MIN_USEC (3000)
 #define ECPRI_DMA_GSI_CHANNEL_STOP_SLEEP_MAX_USEC (5000)
+#define ECPRI_DMA_DIRVER_ADDRESS_BYTES (4)
 
 int ecpri_dma_plat_drv_probe(struct platform_device *pdev_p);
+int ecpri_dma_smmu_plat_drv_probe(struct platform_device *pdev_p);
 
 static const struct of_device_id ecpri_dma_plat_drv_match[] = {
 	{.compatible = "qcom,ecpri-dma", },
+	{}
+};
+
+static const struct of_device_id ecpri_dma_smmu_plat_drv_match[] = {
+	{.compatible = "qcom,ecpri-dma-smmus", },
+	{}
+};
+
+static const struct of_device_id ecpri_dma_smmu_gen_plat_drv_match[] = {
+	{.compatible = "qcom,ecpri-dma-smmu-gen-cb", },
+	{}
+};
+
+static const struct of_device_id ecpri_dma_smmu_eth_plat_drv_match[] = {
+	{.compatible = "qcom,ecpri-dma-smmu-eth-cb", },
+	{}
+};
+
+static const struct of_device_id ecpri_dma_smmu_mhi_plat_drv_match[] = {
+	{.compatible = "qcom,ecpri-dma-smmu-mhi-cb", },
 	{}
 };
 
@@ -71,6 +93,38 @@ static struct platform_driver ecpri_dma_plat_drv = {
 		.name = DRV_NAME,
 		.pm = &ecpri_dma_pm_ops,
 		.of_match_table = ecpri_dma_plat_drv_match,
+	},
+};
+
+static struct platform_driver ecpri_dma_smmu_gen_plat_drv = {
+	.probe = ecpri_dma_smmu_plat_drv_probe,
+	.driver = {
+		.name = DRV_SMMU_GEN_NAME,
+		.of_match_table = ecpri_dma_smmu_gen_plat_drv_match,
+	},
+};
+
+static struct platform_driver ecpri_dma_smmu_eth_plat_drv = {
+	.probe = ecpri_dma_smmu_plat_drv_probe,
+	.driver = {
+		.name = DRV_SMMU_ETH_NAME,
+		.of_match_table = ecpri_dma_smmu_eth_plat_drv_match,
+	},
+};
+
+static struct platform_driver ecpri_dma_smmu_mhi_plat_drv = {
+	.probe = ecpri_dma_smmu_plat_drv_probe,
+	.driver = {
+		.name = DRV_SMMU_MHI_NAME,
+		.of_match_table = ecpri_dma_smmu_mhi_plat_drv_match,
+	},
+};
+
+static struct platform_driver ecpri_dma_smmu_plat_drv = {
+	.probe = ecpri_dma_smmu_plat_drv_probe,
+	.driver = {
+		.name = DRV_SMMU_NAME,
+		.of_match_table = ecpri_dma_smmu_plat_drv_match,
 	},
 };
 
@@ -138,16 +192,28 @@ struct ecpri_dma_smmu_cb_ctx *ecpri_dma_get_smmu_ctx(
 	return &smmu_cb[cb_type];
 }
 
-static int ecpri_dma_smmu_ap_cb_probe(struct device *dev)
+static int ecpri_dma_smmu_cb_probe(struct device *dev,
+  					enum ecpri_dma_smmu_cb_type cb_type)
 {
 	struct ecpri_dma_smmu_cb_ctx *cb =
-		ecpri_dma_get_smmu_ctx(ECPRI_DMA_SMMU_CB_AP);
+		ecpri_dma_get_smmu_ctx(cb_type);
+
 	int bypass = 0;
-	u32 iova_ap_mapping[2];
+	u32 iova_ap_mapping[ECPRI_DMA_DIRVER_ADDRESS_BYTES];
+	bool is_64_bit_addressing;
+
+	if (ECPRI_DMA_SMMU_CB_MAX == cb_type) {
+		DMAERR("Ileagal value passed to context bank type \n");
+		return -EINVAL;
+	}
 
 	DMADBG("AP CB PROBE dev=%px\n", dev);
 
-	if (smmu_info.use_64_bit_dma_mask) {
+	/* Check if 64 or 32 bit addressing is used */
+	is_64_bit_addressing = of_property_read_bool(dev->of_node,
+		"qcom,use-64-bit-dma-mask");
+
+	if (is_64_bit_addressing) {
 		if (dma_set_mask(dev, DMA_BIT_MASK(64)) ||
 			dma_set_coherent_mask(dev, DMA_BIT_MASK(64))) {
 			DMAERR("DMA set 64bit mask failed\n");
@@ -177,11 +243,16 @@ static int ecpri_dma_smmu_ap_cb_probe(struct device *dev)
 	cb->valid = true;
 
 	cb->va_start = cb->va_end = cb->va_size = 0;
-	if (of_property_read_u32_array(
-		dev->of_node, "qcom,iommu-dma-addr-pool",
-		iova_ap_mapping, 2) == 0) {
-		cb->va_start = iova_ap_mapping[0];
-		cb->va_size = iova_ap_mapping[1];
+	if (of_property_read_u32_array(dev->of_node,
+		 "qcom,iommu-dma-addr-pool",
+		 iova_ap_mapping, ECPRI_DMA_DIRVER_ADDRESS_BYTES) == 0) {
+
+		cb->va_start = iova_ap_mapping[1] +
+			 ((u64)iova_ap_mapping[0] << 32);
+
+		cb->va_size = iova_ap_mapping[3] +
+			 ((u64)iova_ap_mapping[2] << 32);
+
 		cb->va_end = cb->va_start + cb->va_size;
 	}
 
@@ -207,9 +278,9 @@ static int ecpri_dma_smmu_ap_cb_probe(struct device *dev)
 		dev, bypass, fast);
 	*/
 
-	ecpri_dma_ctx->s1_bypass_arr[ECPRI_DMA_SMMU_CB_AP] = (bypass != 0);
+	ecpri_dma_ctx->s1_bypass_arr[cb_type] = (bypass != 0);
 
-	smmu_info.present[ECPRI_DMA_SMMU_CB_AP] = true;
+	smmu_info.present[cb_type] = true;
 	ecpri_dma_ctx->num_smmu_cb_probed++;
 
 	return 0;
@@ -459,6 +530,14 @@ static int ecpri_dma_alloc_exception_endp(void)
 				ep->notify_comp =
 					ecpri_dma_dp_exception_endp_notify_completion;
 
+				ep->cb_ptr = ecpri_dma_get_smmu_ctx(ECPRI_DMA_SMMU_CB_ETH);
+
+				/* Verify context bank */
+				if (NULL == ep->cb_ptr) {
+					DMAERR("Context bank not assigned\n");
+					ecpri_dma_assert();
+				}
+
 				ret = ecpri_dma_gsi_setup_channel(ep);
 				if (ret) {
 					DMAERR("Failed to setup GSI channel\n");
@@ -509,7 +588,8 @@ static int ecpri_dma_alloc_exception_endp(void)
 						&ecpri_dma_ctx->exception_ctx.exception_buffs[i];
 					ecpri_dma_ctx->exception_ctx.
 						exception_buffs[i].virt_base =
-						dma_alloc_coherent(ecpri_dma_ctx->pdev,
+							dma_alloc_coherent(ep->cb_ptr->dev,
+
 							ECPRI_DMA_DP_EXCEPTION_BUFF_SIZE,
 							&(ecpri_dma_ctx->exception_ctx.
 								exception_buffs[i].phys_base),
@@ -548,15 +628,19 @@ fail_gen:
 	return ret;
 }
 
-int ecpri_dma_alloc_endp(u32 gsi_id, int endp_id, u32 ring_length,
-					struct ecpri_dma_moderation_config *mod_cfg,
-					bool is_over_pcie,
-					client_notify_comp notify_comp,
-					bool enable_tx_poll)
+int ecpri_dma_alloc_endp(struct ecpri_dma_ecpri_endp_alloc_params *params)
 {
 	const struct dma_gsi_ep_config *gsi_ep_cfg;
 	struct ecpri_dma_endp_context *ep;
 	int ret = 0;
+	u32 gsi_id = params->gsi_id;
+	int endp_id = params->endp_id;
+	u32 ring_length = params->ring_length;
+	struct ecpri_dma_moderation_config *mod_cfg = params->mod_cfg;
+	bool is_over_pcie = params->is_over_pcie;
+	client_notify_comp notify_comp = params->notify_comp;
+	enum ecpri_dma_smmu_cb_type cb_to_use = params->cb_to_use;
+	bool enable_tx_poll = params->enable_tx_poll;
 
 	if(endp_id < 0 || endp_id >= ECPRI_DMA_ENDP_NUM_MAX ||
 		gsi_id < 0 || gsi_id >= ECPRI_DMA_GSI_NUM_MAX || ring_length == 0 ||
@@ -576,6 +660,15 @@ int ecpri_dma_alloc_endp(u32 gsi_id, int endp_id, u32 ring_length,
 		return -EINVAL;
 	}
 
+	/* Assign context bank to endpoint */
+	ep->cb_ptr = ecpri_dma_get_smmu_ctx(cb_to_use);
+
+	/* Verify pointer */
+	if (NULL == ep->cb_ptr) {
+		DMAERR("CB pointer is NULL\n");
+		ecpri_dma_assert();
+	}
+
 	gsi_ep_cfg = &(*ecpri_dma_ctx->endp_map)[gsi_id][endp_id];
 	ep->gsi_ep_cfg = gsi_ep_cfg;
 
@@ -590,8 +683,8 @@ int ecpri_dma_alloc_endp(u32 gsi_id, int endp_id, u32 ring_length,
 				(unsigned long)ep);
 		}
 		else {
-			tasklet_init(&ep->tasklet, ecpri_dma_tasklet_transmit_done,
-				(unsigned long)ep);
+		tasklet_init(&ep->tasklet, ecpri_dma_tasklet_transmit_done,
+			(unsigned long)ep);
 		}
 	} else {
 		tasklet_init(&ep->tasklet, ecpri_dma_tasklet_rx_done,
@@ -634,14 +727,14 @@ int ecpri_dma_reset_endp(struct ecpri_dma_endp_context *endp_cfg)
 	int ret = 0;
 
 	if (!endp_cfg->valid) {
-		DMADBG("ENDP %d for GSI ID %d isn't valid and cannot be stopped\n",
+		DMAERR("ENDP %d for GSI ID %d isn't valid and cannot be stopped\n",
 			endp_cfg->endp_id, endp_cfg->gsi_id);
 		return -EINVAL;
 	}
 
 	ret = ecpri_dma_gsi_reset_channel(endp_cfg);
 	if (ret) {
-		DMADBG("Reset ENDP %d for GSI ID %d failed with code %d\n",
+		DMAERR("Reset ENDP %d for GSI ID %d failed with code %d\n",
 			endp_cfg->endp_id, endp_cfg->gsi_id, ret);
 		return ret;
 	}
@@ -654,7 +747,7 @@ int ecpri_dma_stop_endp(struct ecpri_dma_endp_context *endp_cfg)
 	int ret = 0;
 
 	if(!endp_cfg->valid) {
-		DMADBG("ENDP %d isn't valid and cannot be stopped\n", endp_cfg->endp_id);
+		DMAERR("ENDP %d isn't valid and cannot be stopped\n", endp_cfg->endp_id);
 		return -EINVAL;
 	}
 
@@ -1243,35 +1336,6 @@ static int ecpri_dma_get_dts_configuration(struct platform_device* pdev,
 	for (i = 0; i < ECPRI_DMA_SMMU_CB_MAX; i++)
 		ecpri_dma_ctx->s1_bypass_arr[i] = true;
 
-	if (of_property_read_bool(pdev->dev.of_node, "qcom,arm-smmu")) {
-		if (of_property_read_bool(pdev->dev.of_node,
-			"qcom,use-64-bit-dma-mask"))
-			smmu_info.use_64_bit_dma_mask = true;
-		smmu_info.arm_smmu = true;
-		result = ecpri_dma_smmu_ap_cb_probe(&pdev->dev);
-		if (result)
-			DMADBG(": Error parsing SMMU details\n");
-		else
-			DMADBG(": parsed SMMU details\n");
-	} else {
-		if (of_property_read_bool(pdev->dev.of_node,
-			"qcom,use-64-bit-dma-mask")) {
-			if (dma_set_mask(&pdev->dev, DMA_BIT_MASK(64)) ||
-				dma_set_coherent_mask(&pdev->dev,
-					DMA_BIT_MASK(64))) {
-				DMAERR(":DMA set 64bit mask failed\n");
-				return -EOPNOTSUPP;
-			}
-		} else {
-			if (dma_set_mask(&pdev->dev, DMA_BIT_MASK(32)) ||
-				dma_set_coherent_mask(&pdev->dev,
-					DMA_BIT_MASK(32))) {
-				DMAERR(":DMA set 32bit mask failed\n");
-				return -EOPNOTSUPP;
-			}
-		}
-	}
-
 	return 0;
 }
 
@@ -1430,60 +1494,123 @@ fail_mem_ctx:
 	return result;
 }
 
-int ecpri_dma_plat_drv_probe(struct platform_device *pdev_p)
+int ecpri_dma_smmu_plat_drv_probe(struct platform_device *pdev_p)
 {
 	int result;
 
-	/*
-	 * eCPRI DMA probe function can be called for multiple times as the
-	 * same probe function handles multiple compatibilities
-	 */
-	//pr_err
-	pr_info("ecpri_dma: DMA driver probing started for %s\n",
-		pdev_p->dev.of_node->name);
+	DMADBG("ecpri_dma_smmu_plat_drv_probe() - start\n");
 
+	/* Verify context is initialized */
 	if (ecpri_dma_ctx == NULL) {
 		DMAERR("ecpri_dma_ctx was not initialized\n");
 		return -EPROBE_DEFER;
 	}
 
-	if (ecpri_dma_ctx->ecpri_hw_ver == 0) {
+	/* Probe eCPRI DMA device */
+	if (of_device_is_compatible(pdev_p->dev.of_node,
+	 "qcom,ecpri-dma-smmus")) {
+		DMAERR("Probing: qcom,ecpri-dma-smmus\n");
 
-		/* Get eCPRI HW Version */
-		result = of_property_read_u32(pdev_p->dev.of_node,
-			"qcom,ecpri-hw-ver", &ecpri_dma_ctx->ecpri_hw_ver);
-		if ((result) || (ecpri_dma_ctx->ecpri_hw_ver == ECPRI_HW_NONE)) {
-			pr_err("ecpri_dma: get resource failed for ecpri-hw-ver!\n");
-			return -ENODEV;
+		result = of_platform_populate(pdev_p->dev.of_node,
+			ecpri_dma_plat_drv_match, NULL, &pdev_p->dev);
+
+		if (result) {
+			DMAERR("failed to populate platform\n");
+			return result;
 		}
-		pr_err("ecpri_dma: ecpri_hw_ver = %d\n", ecpri_dma_ctx->ecpri_hw_ver);
+
+		return 0;
+
+	} else if (of_device_is_compatible(pdev_p->dev.of_node,
+	 "qcom,ecpri-dma-smmu-gen-cb")) {
+		DMAERR("Probing: qcom,ecpri-dma-smmu-gen-cb\n");
+		result = ecpri_dma_smmu_cb_probe(&pdev_p->dev,
+			ECPRI_DMA_SMMU_CB_GEN);
+			result = 0;
+			if (result) {
+				DMAERR("Gen CB probing failed\n");
+				return result;
+			}
+
+		return 0;
+
+	} else if (of_device_is_compatible(pdev_p->dev.of_node,
+	 "qcom,ecpri-dma-smmu-eth-cb")) {
+		DMAERR("Probing: qcom,ecpri-dma-smmu-eth-cb\n");
+		result = ecpri_dma_smmu_cb_probe(&pdev_p->dev,
+			ECPRI_DMA_SMMU_CB_ETH);
+		result = 0;
+		if (result) {
+			DMAERR("Eth CB probing failed\n");
+			return result;
+		}
+
+		return 0;
+
+	} else if (of_device_is_compatible(pdev_p->dev.of_node,
+	 "qcom,ecpri-dma-smmu-mhi-cb")) {
+		DMAERR("Probing: qcom,ecpri-dma-smmu-mhi-cb\n");
+			result = ecpri_dma_smmu_cb_probe(&pdev_p->dev,
+			ECPRI_DMA_SMMU_CB_MHI);
+		result = 0;
+		if (result) {
+			DMAERR("MHI CB probing failed\n");
+			return result;
+		}
+
+		return 0;
 	}
 
-	if (ecpri_dma_ctx->ecpri_hw_ver >= ECPRI_HW_MAX) {
-		pr_err(":ECPRI version is greater than the MAX\n");
-		return -ENODEV;
+	DMADBG("ALL CBs probed\n");
+	/* Assign CB pointer to the context */
+
+	return 0;
+}
+
+int ecpri_dma_plat_drv_probe(struct platform_device *pdev_p)
+{
+	int result;
+
+	DMADBG("ecpri_dma_plat_drv_probe() - start\n");
+
+	/* Verify context is initialized */
+	if (ecpri_dma_ctx == NULL) {
+		DMAERR("ecpri_dma_ctx was not initialized\n");
+		return -EPROBE_DEFER;
 	}
 
-	DMADBG("eCPRI DMA driver probing started\n");
-	DMADBG("dev->of_node->name = %s\n", pdev_p->dev.of_node->name);
+	/* Probe eCPRI DMA device */
+	DMAERR("Probing: qcom,ecpri-dma\n");
+
+
+	if (ecpri_dma_ctx->num_smmu_cb_probed < 3)
+	{
+		DMAERR("Probing: waiting for all SMMU CBs\n");
+		return -EPROBE_DEFER;
+	}
 
 	result = ecpri_dma_get_dts_configuration(pdev_p, &ecpri_dma_res);
 	if (result) {
-		DMAERR("DMA dts parsing failed\n");
+		DMAERR("DMA device probing failed\n");
 		return result;
 	}
 
-	/* Proceed to real initialization */
-	result = ecpri_dma_pre_init(&ecpri_dma_res, pdev_p);
-	if (result) {
-		DMAERR("ecpri_dma_pre_init failed\n");
-		return result;
-	}
+	ecpri_dma_ctx->master_pdev = pdev_p;
+	ecpri_dma_ctx->pdev = &pdev_p->dev;
 
 	result = of_platform_populate(pdev_p->dev.of_node,
 		ecpri_dma_plat_drv_match, NULL, &pdev_p->dev);
+
 	if (result) {
 		DMAERR("failed to populate platform\n");
+		return result;
+	}
+
+	/* Proceed with initialization */
+	result = ecpri_dma_pre_init(&ecpri_dma_res,
+		ecpri_dma_ctx->master_pdev);
+	if (result) {
+		DMAERR("ecpri_dma_pre_init failed\n");
 		return result;
 	}
 
@@ -1534,6 +1661,8 @@ int ecpri_dma_register_ready_cb(void (*ecpri_dma_ready_cb)(void *user_data),
 
 static int __init ecpri_dma_module_init(void)
 {
+	int ret;
+
 	pr_info("eCPRI DMA module init\n");
 
 	ecpri_dma_ctx = kzalloc(sizeof(*ecpri_dma_ctx), GFP_KERNEL);
@@ -1547,7 +1676,52 @@ static int __init ecpri_dma_module_init(void)
 	INIT_LIST_HEAD(&ecpri_dma_ctx->ecpri_dma_ready_cb_list);
 
 	/* Register as a platform device driver */
-	return platform_driver_register(&ecpri_dma_plat_drv);
+	ret = platform_driver_register(&ecpri_dma_smmu_plat_drv);
+	if(ret)
+	{
+		DMAERR("SMMU Register failed %d\n", ret);
+		return ret;
+	}
+	
+	ret = platform_driver_register(&ecpri_dma_smmu_gen_plat_drv);
+	if(ret)
+	{
+		DMAERR("SMMU GEN Register failed %d\n", ret);
+		platform_driver_unregister(&ecpri_dma_smmu_plat_drv);
+		return ret;
+	}
+	
+	ret = platform_driver_register(&ecpri_dma_smmu_eth_plat_drv);
+	if(ret)
+	{
+		DMAERR("SMMU ETH Register failed %d\n", ret);
+		platform_driver_unregister(&ecpri_dma_smmu_gen_plat_drv);
+		platform_driver_unregister(&ecpri_dma_smmu_plat_drv);
+		return ret;
+	}
+	
+	ret = platform_driver_register(&ecpri_dma_smmu_mhi_plat_drv);
+	if(ret)
+	{
+		DMAERR("SMMU MHI Register failed %d\n", ret);
+		platform_driver_unregister(&ecpri_dma_smmu_eth_plat_drv);
+		platform_driver_unregister(&ecpri_dma_smmu_gen_plat_drv);
+		platform_driver_unregister(&ecpri_dma_smmu_plat_drv);
+		return ret;
+	}
+
+	ret = platform_driver_register(&ecpri_dma_plat_drv);
+	if (ret)
+	{
+		DMAERR("Driver Register failed %d\n", ret);
+
+		platform_driver_unregister(&ecpri_dma_smmu_mhi_plat_drv);
+		platform_driver_unregister(&ecpri_dma_smmu_eth_plat_drv);
+		platform_driver_unregister(&ecpri_dma_smmu_gen_plat_drv);
+		platform_driver_unregister(&ecpri_dma_smmu_plat_drv);
+	}
+	
+	return ret;
 }
 subsys_initcall(ecpri_dma_module_init);
 
@@ -1585,7 +1759,7 @@ static void ecpri_dma_dealloc_exception(void)
 
 	/* Free buffers */
 	for (i = 0; i < ECPRI_DMA_EXCEPTION_RING_SIZE; i++) {
-		dma_free_coherent(ecpri_dma_ctx->pdev,
+		dma_free_coherent(ecpri_dma_get_smmu_ctx(ECPRI_DMA_SMMU_CB_ETH)->dev,
 			ECPRI_DMA_DP_EXCEPTION_BUFF_SIZE,
 			ecpri_dma_ctx->exception_ctx.exception_buffs[i].virt_base,
 			ecpri_dma_ctx->exception_ctx.exception_buffs[i].phys_base);

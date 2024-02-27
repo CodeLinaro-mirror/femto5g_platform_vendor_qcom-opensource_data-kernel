@@ -134,7 +134,7 @@ enum ecpri_dma_qmi_dma_sw_versions ecpri_dma_qmi_get_sw_ver()
 
 enum ecpri_dma_qmi_q6_sw_vsersion ecpri_dma_qmi_get_q6_sw_ver()
 {
-	return ecpri_dma_qmi_ctx->q6_sw_version;
+	return atomic_read(&ecpri_dma_qmi_ctx->q6_sw_version);
 }
 
 int ecpri_dma_qmi_service_init(void)
@@ -432,24 +432,20 @@ static int ecpri_dma_qmi_service_init_q6_send_msg(void)
 		msecs_to_jiffies(ECPRI_DMA_QMI_RESPONSE_TIMEOUT));
 
 	if (ret >= 0) {
-		atomic_set(&ecpri_dma_qmi_ctx->q6_response_recv, true);
-		DMADBG("q6_response_recv: %d\n",
-		atomic_read(&ecpri_dma_qmi_ctx->q6_response_recv));
-
 		DMADBG("q6 response: sw_version - %d sw_version_valid - %d\n",
 		resp.sw_version,
 		resp.sw_version_valid);
 
 		if (resp.sw_version_valid) {
-
-			ecpri_dma_qmi_ctx->q6_sw_version = resp.sw_version;
-
-			/* Send init complete*/
-			complete(&ecpri_dma_qmi_ctx->qmi_q6_int_cmplt_completion);
+			atomic_set(&ecpri_dma_qmi_ctx->q6_sw_version, resp.sw_version);
+		}
+		else {
+			DMAERR("Error: Q6 QMI sw version is not valid\n");
 		}
 
-		else
-			DMAERR("Error: Q6 QMI sw version is not valid\n");
+		atomic_set(&ecpri_dma_qmi_ctx->q6_response_recv, true);
+		DMADBG("q6_response_recv: %d\n",
+			atomic_read(&ecpri_dma_qmi_ctx->q6_response_recv));
 
 	} else {
 		DMAERR("Error: response timeout\n");
@@ -573,13 +569,16 @@ static void ecpri_dma_handle_init_indication(struct qmi_handle* qmi_handle,
 	cmplt_indication->modem_driver_mode,
 	cmplt_indication->modem_driver_mode_valid);
 
-	atomic_set(&ecpri_dma_qmi_ctx->q6_init_cmplt,true);
-
-	DMADBG("q6_init_cmplt: %d\n",
-	atomic_read(&ecpri_dma_qmi_ctx->q6_init_cmplt));
-
 	/* Cache the client sq */
 	memcpy(&ecpri_dma_qmi_ctx->client_sq, sq, sizeof(*sq));
+
+	atomic_set(&ecpri_dma_qmi_ctx->q6_init_cmplt, true);
+
+	DMADBG("q6_init_cmplt: %d\n",
+		atomic_read(&ecpri_dma_qmi_ctx->q6_init_cmplt));
+
+	/* Send init complete*/
+	complete(&ecpri_dma_qmi_ctx->qmi_q6_int_cmplt_completion);
 }
 
 static void ecpri_dma_handle_ch_cmd_indication(struct qmi_handle* qmi_handle,
@@ -783,7 +782,7 @@ int ecpri_dma_qmi_service_send_ch_cmd_q6(
 		&ecpri_dma_qmi_ctx->qmi_q6_int_cmplt_completion,
 		msecs_to_jiffies(ECPRI_DMA_QMI_INIT_COMPLETE_TIMEOUT));
 
-		if (0 == result) {
+		if (0 == result || !ecpri_dma_is_handshake_complete()) {
 			DMADBG("Timeout while waiting for Q6 init completion\n");
 
 			if (ECPRI_DMA_QMI_MSG_SYNC == flag) {
@@ -823,12 +822,14 @@ int ecpri_dma_qmi_service_send_ch_cmd_q6(
 	}
 
 	/* Check version */
-	if (ecpri_dma_qmi_ctx->q6_sw_version < ECPRI_DMA_QMI_Q6_SW_VER_2) {
+	if (atomic_read(&ecpri_dma_qmi_ctx->q6_sw_version)
+		< ECPRI_DMA_QMI_Q6_SW_VER_2) {
 		DMADBG("Exit reason version 2 endp %d\n", endp_ctx->endp_id);
 		return 0;
 	}
 
-	if ((ecpri_dma_qmi_ctx->q6_sw_version < ECPRI_DMA_QMI_Q6_SW_VER_3) &&
+	if ((atomic_read(&ecpri_dma_qmi_ctx->q6_sw_version)
+		< ECPRI_DMA_QMI_Q6_SW_VER_3) &&
 		(op == QMI_ECPRI_CH_CMD_TYPE_START_V01)) {
 		DMADBG("Exit reason version 3 %d\n", endp_ctx->endp_id);
 		return 0;

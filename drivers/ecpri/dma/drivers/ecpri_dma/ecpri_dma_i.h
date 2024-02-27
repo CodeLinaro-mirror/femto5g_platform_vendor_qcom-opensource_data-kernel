@@ -44,6 +44,10 @@
 #endif //ECPRI_NO_PRINTS
 
 #define DRV_NAME "ecpri-dma"
+#define DRV_SMMU_NAME "ecpri-dma-smmu"
+#define DRV_SMMU_GEN_NAME "ecpri-dma-smmu-gen"
+#define DRV_SMMU_ETH_NAME "ecpri-dma-smmu-eth"
+#define DRV_SMMU_MHI_NAME "ecpri-dma-smmu-mhi"
 #define DMA_INT_MAX ((int)(~0U >> 1))
 #define DMA_INT_MIN (-DMA_INT_MAX - 1)
 #define DMA_UINT32_MAX ((u32)~0U)
@@ -193,7 +197,9 @@ do {\
 #define ECPRI_DMA_PRE_FETCH_CHANGE_SIZE			(0x10)
 
 enum ecpri_dma_smmu_cb_type {
-	ECPRI_DMA_SMMU_CB_AP,
+	ECPRI_DMA_SMMU_CB_GEN,
+	ECPRI_DMA_SMMU_CB_ETH,
+	ECPRI_DMA_SMMU_CB_MHI,
 	ECPRI_DMA_SMMU_CB_MAX
 };
 
@@ -375,6 +381,7 @@ struct ecpri_dma_exception_context {
  * (tx endp only)
  * @total_bytes_recv: EP statistics regarding number of bytes received
  * @enable_tx_poll: Determines if client is expected to poll Tx completions
+ * @cb_ptr: endpoint's memory context bank pointer
  *
  */
 struct ecpri_dma_endp_context {
@@ -422,6 +429,7 @@ struct ecpri_dma_endp_context {
 	bool tx_pre_header_enabled;
 	u32 total_bytes_recv;
 	bool enable_tx_poll;
+	struct ecpri_dma_smmu_cb_ctx *cb_ptr;
 };
 
 /**
@@ -439,9 +447,9 @@ struct ecpri_dma_smmu_cb_ctx {
 	bool valid;
 	struct device *dev;
 	struct iommu_domain *iommu_domain;
-	u32 va_start;
-	u32 va_size;
-	u32 va_end;
+	u64 va_start;
+	u64 va_size;
+	u64 va_end;
 	bool shared;
 	bool is_cache_coherent;
 };
@@ -514,6 +522,7 @@ struct ecpri_dma_icc_paths {
   * @ecpri_dma_num_endps: Number of endps
   * @endp_map: ENDP configuration mapping matching to current flavor & version
   * @endp_ctx: ENDP context array
+  * @smmu_cb: pointer to DMA's SMMU context banks
   */
 struct ecpri_dma_context {
 	struct mutex lock;
@@ -555,6 +564,7 @@ struct ecpri_dma_context {
 	struct ecpri_dma_icc_paths icc_paths;
 	u32 num_of_gsi;
 	struct mutex mhi_memcpy_setup_lock;
+	struct ecpri_dma_smmu_cb_ctx *smmu_cb;
 };
 
 /**
@@ -670,6 +680,17 @@ typedef void (*client_notify_comp)(
 	struct ecpri_dma_pkt_completion_wrapper **comp_pkt,
 	u32 num_of_completed);
 
+struct ecpri_dma_ecpri_endp_alloc_params {
+	u32 gsi_id;
+	int endp_id;
+	u32 ring_length;
+	struct ecpri_dma_moderation_config *mod_cfg;
+	bool is_over_pcie;
+	client_notify_comp notify_comp;
+	enum ecpri_dma_smmu_cb_type cb_to_use;
+	bool enable_tx_poll;
+};
+
 /**
  * ecpri_dma_register_ready_cb() - Register ready CBs with DMA driver
  * @ecpri_dma_ready_cb:	[in] CB function to be called once DMA driver is ready
@@ -688,10 +709,7 @@ int ecpri_dma_ap_resume(struct device *dev);
 void *ecpri_dma_get_ipc_logbuf(void);
 void *ecpri_dma_get_ipc_logbuf_low(void);
 
-int ecpri_dma_alloc_endp(u32 gsi_id, int endp_id, u32 ring_length,
-	struct ecpri_dma_moderation_config *mod_cfg,
-	bool is_over_pcie,
-	client_notify_comp notify_comp, bool enable_tx_poll);
+int ecpri_dma_alloc_endp(struct ecpri_dma_ecpri_endp_alloc_params *params);
 int ecpri_dma_start_endp(struct ecpri_dma_endp_context *endp_cfg);
 int ecpri_dma_stop_endp(struct ecpri_dma_endp_context *endp_cfg);
 int ecpri_dma_reset_endp(struct ecpri_dma_endp_context *endp_cfg);
@@ -699,5 +717,7 @@ int ecpri_dma_dealloc_endp(struct ecpri_dma_endp_context *endp_cfg);
 int ecpri_dma_get_endp_stats(struct ecpri_dma_endp_context* ep,
 	struct ecpri_dma_endp_statistics* stats);
 
+struct ecpri_dma_smmu_cb_ctx *ecpri_dma_get_smmu_ctx(
+	enum ecpri_dma_smmu_cb_type cb_type);
 
 #endif /* _ECPRI_DMA_I_H_ */

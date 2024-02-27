@@ -149,8 +149,8 @@ struct ecpri_dma_eth_ops {
 		struct ecpri_dma_pkt_completion_wrapper **pkts,
 		u32 *actual_num);
 	int (*ecpri_dma_eth_replenish_buffers)(ecpri_dma_eth_conn_hdl_t hdl,
-					       struct ecpri_dma_pkt **pkts,
-					       u32 num_of_pkts, bool commit);
+		struct ecpri_dma_pkt** pkts,
+		u32 num_of_pkts, bool commit, u32* successful_pkts);
 	int (*ecpri_dma_eth_query_stats)(
 		ecpri_dma_eth_conn_hdl_t hdl,
 		struct ecpri_dma_connection_stats *stats);
@@ -429,7 +429,7 @@ int ecpri_dma_eth_tx_poll(ecpri_dma_eth_conn_hdl_t hdl, u32 budget,
  */
 int ecpri_dma_eth_replenish_buffers(ecpri_dma_eth_conn_hdl_t hdl,
 				    struct ecpri_dma_pkt **pkts,
-				    u32 num_of_pkts, bool commit);
+				    u32 num_of_pkts, bool commit, u32* successful_pkts);
 
 /**
  * ecpri_dma_eth_query_stats() - ETH driver to query statistics on a specific

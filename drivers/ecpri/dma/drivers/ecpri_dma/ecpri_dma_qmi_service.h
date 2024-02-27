@@ -88,7 +88,7 @@ struct ecpri_dma_qmi_context {
 	struct completion qmi_q6_int_cmplt_completion;
 	struct completion qmi_ch_cmd_sync_completion;
 	u32 q6_hw_version;
-	enum ecpri_dma_qmi_q6_sw_vsersion q6_sw_version;
+	atomic_t q6_sw_version;
 	enum ecpri_dma_qmi_dma_sw_versions  dma_sw_version;
 	struct mutex sync_ch_cmd_lock;
 	struct list_head pending_ch_cmd_indiciation_list;

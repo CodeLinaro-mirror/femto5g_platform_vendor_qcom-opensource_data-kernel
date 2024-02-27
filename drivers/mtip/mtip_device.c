@@ -1,6 +1,6 @@
 //SPDX-License-Identifier: GPL-2.0-only
 /*
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  */ 
 
 #include <linux/init.h>
@@ -911,6 +911,22 @@ static int mtip_start_xmit(struct sk_buff *skb, struct net_device *netdev)
        }
    }
 
+   pending_pkt_completion_count = mtip_device_get_pkt_completion_count(netdev);
+
+   // check if we need to flow control the interface
+   if ((mtip_dma_tx_available(hdl) == false) ||
+       (pending_pkt_completion_count >= (MTIP_TX_RING_SIZE - MTIP_TX_PACKET_AVAILABILITY_THRESHOLD)))
+   {
+       if (!netif_queue_stopped(netdev))
+       {
+           CSMLOGERR("stopping queue for link_index %d", link_index);
+
+           // wait for space to become available
+           netif_stop_queue(netdev);
+       }
+       return NETDEV_TX_BUSY;
+   }
+
    // check if we need to send pre-header
    if ((mode == MTIP_DEVICE_RUv2) || (mode == MTIP_DEVICE_DUv2)) 
    {
@@ -986,12 +1002,6 @@ static int mtip_start_xmit(struct sk_buff *skb, struct net_device *netdev)
 
    // HANDLE THE ERROR
    if (ret < 0) {
-      if (!netif_queue_stopped(netdev))
-      {
-         netif_stop_queue(netdev);
-
-         CSMLOGERR("Tx ring full when queue awake\n");
-      }
       return NETDEV_TX_BUSY;
    }
 
@@ -1009,18 +1019,6 @@ static int mtip_start_xmit(struct sk_buff *skb, struct net_device *netdev)
    // commit the packet
    mtip_dma_tx_commit(hdl);
 
-   // check if we need to flow control the interface
-   if ((mtip_dma_tx_available(hdl) == false) ||
-       (pending_pkt_completion_count >= (MTIP_TX_RING_SIZE - MTIP_TX_PACKET_AVAILABILITY_THRESHOLD)))
-   {
-       if (!netif_queue_stopped(netdev))
-       {
-           CSMLOGERR("stopping queue for link_index %d", link_index);
-
-           // wait for space to become available
-           netif_stop_queue(netdev);
-       }
-   }
    return NETDEV_TX_OK;
 }
 
@@ -2770,7 +2768,7 @@ void mtip_device_configure_port(u32 port_type)
    struct mtip_port_info *port_info;
    bool set_port_config = false;
    u32 num_links_waiting_for_lanes = 0;
-   u32 link_index;
+   u32 link_index = 0;
    bool loopflag = true;
    int bc = 0;
    int num_an_lanes = 0;

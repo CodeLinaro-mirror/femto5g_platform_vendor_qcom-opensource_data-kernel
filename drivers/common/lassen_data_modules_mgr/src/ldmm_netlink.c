@@ -1,6 +1,6 @@
 /*
  * SPDX-License-Identifier: GPL-2.0-only
- * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2023-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/module.h>
@@ -15,7 +15,7 @@
 #define INIT_MSG 1234
 #define SIZEOF_CONFIG_PACKET sizeof(int)*240
 
-//#define IS_MULTICAST_EN
+#define IS_MULTICAST_EN
 
 static struct genl_family genl_fam;
 static uint32_t dst_portid;
@@ -41,7 +41,11 @@ static int fult_mgmt_rcv_doit(struct sk_buff *skb, struct genl_info *info)
 	/*
 	 * Dummy MSG to check connectivity
 	 */
+#ifdef IS_MULTICAST_EN
+	fult_mgmt_snd(INIT_MSG, MULTICAST_MSG);
+#else
 	fult_mgmt_snd(INIT_MSG, UNICAST_MSG);
+#endif
 
 	return ret;
 }
@@ -251,12 +255,22 @@ int ldmm_qxdm_logger_update_timer_value(int timer_value)
 	}
 
 	genlmsg_end(reply_skb, msg_head);
-
+#ifdef IS_MULTICAST_EN
+		ret_val = genlmsg_multicast(&genl_fam, reply_skb, 0, 0, GFP_KERNEL);
+		if (ret_val == -ESRCH) {
+			LDMM_LOG_ERR("multicast message sent, but nobody was listening...\n");
+		} else if (ret_val) {
+			LDMM_LOG_ERR("failed to send multicast genl message\n");
+		} else {
+			LDMM_LOG_INFO("multicast message sent\n");
+		}
+#else
 	ret_val = genlmsg_unicast(&init_net, reply_skb, dst_portid);
 	if (ret_val != 0) {
 		pr_err("genlmsg_unicast failed \n");
 		return -1;
 	}
+#endif
 	return 0;
 }
 
@@ -265,7 +279,7 @@ void parse_config_packet(config_packet_info* config_packet, int parsed_msg[])
 	int port_index, link_index, i = 0;
 	for(port_index = 0; port_index < MAX_PORTS; port_index++)
 	{
-		memcpy(&parsed_msg[i++], &config_packet->ports[port_index].port_type, sizeof(int));    
+		memcpy(&parsed_msg[i++], &config_packet->ports[port_index].port_type, sizeof(int));
 		memcpy(&parsed_msg[i++], &config_packet->ports[port_index].port_enabled, sizeof(int));
 		memcpy(&parsed_msg[i++], &config_packet->ports[port_index].phy_eq_mode, sizeof(int));
 		memcpy(&parsed_msg[i++], &config_packet->ports[port_index].sfp_port_type, sizeof(int));
@@ -379,11 +393,22 @@ int ldmm_qxdm_logger_link_change_notification(event_info_struct *event_info, int
 
 	genlmsg_end(reply_skb, msg_head);
 
+#ifdef IS_MULTICAST_EN
+		ret_val = genlmsg_multicast(&genl_fam, reply_skb, 0, 0, GFP_KERNEL);
+		if (ret_val == -ESRCH) {
+			LDMM_LOG_ERR("multicast message sent, but nobody was listening...\n");
+		} else if (ret_val) {
+			LDMM_LOG_ERR("failed to send multicast genl message\n");
+		} else {
+			LDMM_LOG_INFO("multicast message sent\n");
+		}
+#else
 	ret_val = genlmsg_unicast(&init_net, reply_skb, dst_portid);
 	if (ret_val != 0) {
 		pr_err("genlmsg_unicast failed \n");
 		return -1;
 	}
+#endif
 	return 0;
 }
 

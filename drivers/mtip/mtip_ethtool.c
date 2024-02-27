@@ -1,6 +1,6 @@
 //SPDX-License-Identifier: GPL-2.0-only
 /*
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  */ 
 
 #include <linux/init.h>
@@ -73,7 +73,7 @@ static const char * const mtip_ethtool_stat_strings[] = {
 
 #define MTIP_ETHTOOL_STATS_LEN	ARRAY_SIZE(mtip_ethtool_stat_strings)
 
-static const char* const mtip_ethtool_priv_flags_str_arr[] = {
+static const char* const mtip_ethtool_priv_flags_str_arr[MTIP_ETHTOOL_PRIV_FLAGS_LEN] = {
     "1x100GBASE_R2",
     "1x100GBASE_R4",
     "2x50GBASE_R",
@@ -173,7 +173,6 @@ struct mtip_ethtool_reg_offset mtip_ethtool_reg_offset_val[MTIP_ETHTOOL_REG_OFFS
     {0x000002C0,    0x000002D8,     MTIP_ETHTOOL_RSFEC}
 };
 
-#define MTIP_ETHTOOL_PRIV_FLAGS_LEN ARRAY_SIZE(mtip_ethtool_priv_flags_str_arr)
 
 const char* mtip_ethtool_get_priv_flags_str(u32 index)
 {
@@ -1127,6 +1126,12 @@ int mtip_ethtool_set_fecparam(struct net_device* netdev, struct ethtool_fecparam
     CSMLOGINFO("Setting FEC parameter for link index: %d, cmd: %d, active: %d, fec: %d", link_index, cmd, active_fec, fec);
     // set the configured fec
     platform_driver_priv->mtip_links[link_index]->config_fec = fec;
+
+    if(fec == platform_driver_priv->mtip_links[link_index]->active_fec)
+    {
+        CSMLOGERR("FEC is already active\n");
+        return 0;
+    }
 
     post_mtip_process_reconfigure_port(port_type);
 
