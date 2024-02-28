@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: GPL-2.0-only
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include "ecpriss_core.h"
@@ -5856,6 +5856,9 @@ void ecpriss_qudp_set_strict_filter_config(int val,int fh_index)
 {
 	ecpri_qudp_hwio_def_ecpri_udp_fh_filt_error_channel_cfg_p_s_v2 strict_filter_config;
 
+	if(fh_index < 0 || fh_index >= ECPRISS_MAX_PORTS)
+		return;
+
 	memset(&strict_filter_config,0,sizeof(strict_filter_config));
   	strict_filter_config.send_vlan_filt_miss_to_error_channel = val;
   	strict_filter_config.send_ip_filt_miss_to_error_channel = val;
@@ -5870,6 +5873,86 @@ void ecpriss_qudp_set_strict_filter_config(int val,int fh_index)
 	return;
 }
 
+int ecpriss_qudp_get_lte_mac_addr(int port, int index, csm_lte_ethdev_mac_s *mac_info)
+{
+
+	uint32_t mac_msb = 0;
+	uint32_t mac_lsb = 0;
+
+	ecpriss_qudp_ingress_per_port_cfg_s_v2 *qudp_ingress_port = NULL;
+	qudp_ingress_port = &ecpriss_pdata_v2->qudp_ctx_v2->fh_port_cfg_v2[port].ingress_port_cfg;
+
+	if(!qudp_ingress_port)
+		return -1;
+
+
+	mac_msb = qudp_ingress_port->dmac[index].msb;
+	mac_lsb = qudp_ingress_port->dmac[index].lsb;
+
+
+	mac_info->mac_addr[5] = (mac_lsb & 0x000000ff);
+	mac_info->mac_addr[4] = (mac_lsb & 0x0000ff00) >> 8;
+	mac_info->mac_addr[3] = (mac_lsb & 0x00ff0000) >> 16;
+	mac_info->mac_addr[2] = (mac_lsb & 0xff000000) >> 24;
+
+	mac_info->mac_addr[1] = (mac_msb & 0x000000ff);
+	mac_info->mac_addr[0] = (mac_msb & 0x0000ff00) >> 8;
+
+	ECPRILOGDBG("%x:%x:%x:%x\n", mac_info->mac_addr[2], mac_info->mac_addr[3],
+			mac_info->mac_addr[4],mac_info->mac_addr[5]);
+
+	return 0;
+
+}
+
+int ecpriss_qudp_set_lte_mac_addr(int port, int index, csm_lte_ethdev_mac_s *mac_info)
+{
+
+	ecpri_qudp_hwio_def_ecpri_udp_fh_filt_mac_address_lsb_port_p_entry_n_u_v2 mac_lsb;
+	ecpri_qudp_hwio_def_ecpri_udp_fh_filt_mac_address_msb_port_p_entry_n_u_v2 mac_msb;
+
+	ecpriss_qudp_ingress_per_port_cfg_s_v2 *qudp_ingress_port = NULL;
+	qudp_ingress_port = &ecpriss_pdata_v2->qudp_ctx_v2->fh_port_cfg_v2[port].ingress_port_cfg;
+
+	if(!qudp_ingress_port)
+		return -1;
+
+	memset(&mac_lsb, 0, sizeof(mac_lsb));
+	memset(&mac_msb, 0, sizeof(mac_msb));
+
+	mac_lsb.value = ((mac_info->mac_addr[5]) | (mac_info->mac_addr[4] << 8)
+				| (mac_info->mac_addr[3] << 16) | (mac_info->mac_addr[2] << 24));
+
+
+	mac_msb.value = ((mac_info->mac_addr[1]) | (mac_info->mac_addr[0] << 8));
+
+	ECPRILOGDBG("%x:%x:%x:%x:%x:%x\n",mac_info->mac_addr[0], mac_info->mac_addr[1], mac_info->mac_addr[2], mac_info->mac_addr[3],
+			mac_info->mac_addr[4],mac_info->mac_addr[5]);
+
+	if(0 == mac_lsb.value && 0 == mac_msb.value){
+		return -1;
+	}
+
+	ecpriss_qudp_hal_write_reg_mn_fields(ECPRISS_QUDP_FH_FILTER,
+				ECPRI_UDP_FH_FILT_MAC_ADDRESS_LSB_PORT_p_ENTRY_n_V2,
+				port,
+				index,
+				&mac_lsb);
+
+
+
+	ecpriss_qudp_hal_write_reg_mn_fields(ECPRISS_QUDP_FH_FILTER,
+				ECPRI_UDP_FH_FILT_MAC_ADDRESS_MSB_PORT_p_ENTRY_n_V2,
+				port,
+				index,
+				&mac_msb);
+
+	qudp_ingress_port->dmac[index].lsb = mac_lsb.value;
+	qudp_ingress_port->dmac[index].msb = mac_msb.value;
+
+	return 0;
+
+}
 
 #ifdef UNUSED
 
