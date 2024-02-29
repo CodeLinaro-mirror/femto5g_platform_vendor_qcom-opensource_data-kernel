@@ -1,6 +1,6 @@
 //SPDX-License-Identifier: GPL-2.0-only
 /*
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  */ 
 
 #include <linux/module.h>
@@ -124,6 +124,16 @@ static void mtip_workq_handler(struct work_struct *w)
       case MTIP_WORKQ_TASK_PROCESS_RECONFIGURE_PORT:
           {
               run_mtip_process_reconfigure_port(work_ptr);
+          }
+          break;
+      case MTIP_WORKQ_TASK_PROCESS_NEXT_SPEED_MODE:
+          {
+              run_mtip_process_next_speed_mode(work_ptr);
+          }
+          break;
+      case MTIP_WORKQ_TASK_PROCESS_RETRY_PHY_BRINGUP:
+          {
+              run_mtip_phy_retry_bringup(work_ptr);
           }
           break;
       default:

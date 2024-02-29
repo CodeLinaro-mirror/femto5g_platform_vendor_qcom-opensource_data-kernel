@@ -1,6 +1,6 @@
 //SPDX-License-Identifier: GPL-2.0-only
 /*
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #ifndef _MTIP_H
@@ -91,6 +91,10 @@ extern bool enable_tx_comp_poll;
 #define DEBUG_ETHTOOL_STAT_STRINGS_LEN 23
 #define STATS_NAME_LEN 20
 #define QXDM_LOGGING_VAR_NA 255
+
+// Maximum number of retries with speed mode change for dual rate optics module
+#define MTIP_NEXT_SPEED_MODE_RETRY_MAX_COUNT 2
+
 /*
  * Information related to the devices in the device tree
  */
@@ -296,6 +300,15 @@ struct mtip_link_info
 
    struct mutex dev_lock;
    struct eth_stats stats[DEBUG_ETHTOOL_STAT_STRINGS_LEN];
+
+   // Timer to retry lane bring up in case of failure
+   struct timer_list phy_retry_timer;
+   bool phy_retry_timer_valid;
+
+   /* Flag to track if link down came post link was up. This will help to decide
+      if RX LOS processing is needed or not for speed mode change of dual rate
+      optics modules */
+   bool link_down_received_post_link_up;
 };
 
 /*
@@ -324,8 +337,8 @@ struct mtip_lane_info
     // sfp port type
     u32                sfp_port_type;
 
-    // link lane speed
-    enum eth_phy_iface_phy_lane_speed_enum  lane_speed;
+    // Mask of lane speeds supported by the module
+    u8  speed_mask;
 
     // the phylink related to the lane
     struct phylink         *phylink;
@@ -364,6 +377,12 @@ struct mtip_port_info
     // the consolidate priv flags of all links of port
     u32 port_priv_flags;
 
+    // the port priv flags of FIBRE on which retries need to be made
+    u32 port_priv_flags_optical;
+
+    // Number of speed switch retries for dual rate modules
+    u8 next_speed_retry_count;
+
     // autoneg flag to see if autoneg is enabled
     bool autoneg;
 
@@ -380,6 +399,12 @@ struct mtip_port_info
     u32  sfp_port_type;
 
     spinlock_t lock;
+
+    // Flag to track if this a dual/multi rate optical module
+    bool multi_rate_supported;
+
+    // Flag to track if port reconfiguration is needed after RX LOS is cleared
+    bool needs_rx_los_processing;
 };
 
 // platform struct private
@@ -537,5 +562,12 @@ bool mtip_lookup_if_any_other_link_active_for_port(u32 port_type, u32 link_index
  *  find the link on which the given lane is mapped to 
  */
 int mtip_lookup_link_index_by_lane_index(u32 *link_index, u32 lane_index);
+
+ssize_t mtip_show_link_polling_timer(
+                struct kobject *kobj, struct kobj_attribute *attr, char *buf);
+
+ssize_t mtip_store_link_polling_timer(
+                              struct kobject *kobj, struct kobj_attribute *attr,
+                              const char *buf, size_t count);
 
 #endif // _MTIP_H
