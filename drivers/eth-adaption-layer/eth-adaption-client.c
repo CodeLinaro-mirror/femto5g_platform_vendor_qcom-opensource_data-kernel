@@ -64,8 +64,8 @@ extern struct eth_adapt_device eth_dev;
 extern struct eth_adapt_result eth_res;
 extern int qrtr_init;
 extern struct mutex eam_lock;
+extern struct mutex send_lock;
 
-int client_send_retry = 0;
 /**
 * eth_adaption_client_send() - this will be called from qrtr context.
 * @buf: Buffer to send
@@ -80,24 +80,38 @@ int eth_adaption_client_send(const char *buf, const size_t length)
 	mm_segment_t oldmm;
 	unsigned long flags = MSG_DONTWAIT;
 
+	if(!client_sk.conn_socket)
+		return written;
 	msg.msg_name    = 0;
 	msg.msg_namelen = 0;
 	msg.msg_control = NULL;
 	msg.msg_controllen = 0;
 	msg.msg_flags   = flags;
+	int client_send_retry = 0;
+	int eagain_send_retry = 0;
 
   oldmm = get_fs(); set_fs(KERNEL_DS);
 repeat_send:
+	if(!client_sk.conn_socket)
+		return written;
   vec.iov_len = left;
   vec.iov_base = (char *)buf + written;
 
 	len = kernel_sendmsg(client_sk.conn_socket, &msg, &vec, left, left);
+	if(len == -EAGAIN)
+	{
+		ETHADPTDBGIPC("%s Failure to client send kernel error EAGAIN %d, %d\n", __func__, len, eagain_send_retry);
+		eagain_send_retry++;
+		msleep(200);
+		goto repeat_send;
+	}
+
 	if(len <= 0)
 	{
+		ETHADPTDBGIPC("%s Failure to client send kernel error code %d, %d\n", __func__, len, client_send_retry);
 		if( client_send_retry >10)
 			return -1;
 		client_send_retry++;
-		ETHADPTDBGIPC("%s client send fail message len: %d\n", __func__,len);
 		goto repeat_send;
 	}
 	if(len > 0)
@@ -489,8 +503,8 @@ int eth_adaption_client_connect(unsigned char *destip, int iptype, int port,int 
 */
 void eth_adaption_client_cleanup(bool cleanup_lock)
 {
+	mutex_lock(&send_lock);
 	ETHADPTINFOIPC("client_cleanup entry\n");
-
 	if (cleanup_lock)
 	{
 		/* Critical section */
@@ -548,12 +562,13 @@ void eth_adaption_client_cleanup(bool cleanup_lock)
 	recevied_data = 0;
 
 	ETHADPTINFOIPC("client_cleanup exit\n");
-
+	mutex_unlock(&send_lock);
 }
 
 void eth_adaption_client_sock_cleanup(void) {
 
-	ETHADPTINFOIPC("eth_adaption_client_sock_cleanup entry\n");
+	mutex_lock(&send_lock);
+	ETHADPTINFO("eth_adaption_client_sock_cleanup entry\n");
 
 	/*reset packet stats*/
 	receive_allocfree_stat = 0;
@@ -591,5 +606,6 @@ void eth_adaption_client_sock_cleanup(void) {
 	send_data = 0;
 	recevied_data = 0;
 
-	ETHADPTINFOIPC("eth_adaption_client_sock_cleanup exit\n");
+	ETHADPTINFO("eth_adaption_client_sock_cleanup exit\n");
+	mutex_unlock(&send_lock);
 }

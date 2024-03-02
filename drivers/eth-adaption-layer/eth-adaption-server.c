@@ -52,8 +52,8 @@ extern struct eth_adapt_device eth_dev;
 extern struct eth_adapt_result eth_res;
 extern int qrtr_init;
 extern struct mutex eam_lock;
+extern struct mutex send_lock;
 
-int server_send_retry = 0;
 struct qrtr_ethernet_cb_info *cb_info_server;
 
 /**
@@ -81,20 +81,30 @@ int eth_adaption_server_send(const char *buf, const size_t length)
 	msg.msg_control = NULL;
 	msg.msg_controllen = 0;
 	msg.msg_flags = flags;
+	int server_send_retry = 0;
+	int eagain_send_retry = 0;
 
 	oldmm = get_fs(); set_fs(KERNEL_DS);
 
 repeat_send:
+	if(!serv_sk.newsocket)
+		return written;
 	vec.iov_len = left;
 	vec.iov_base = (char *)buf + written;
 
 	len = kernel_sendmsg(serv_sk.newsocket, &msg, &vec, left, left);
-
+	if(len == -EAGAIN)
+	{
+		ETHADPTDBGIPC("%s Failure to server send kernel error EAGAIN %d, %d\n", __func__, len, eagain_send_retry);
+		eagain_send_retry++;
+		msleep(200);
+		goto repeat_send;
+	}
 	if(len <= 0) {
+		ETHADPTDBGIPC("%s Failure to server send kernel error code %d, %d\n", __func__, len, server_send_retry);
 		if(server_send_retry >10)
 			return -1;
 		server_send_retry++;
-		ETHADPTDBGIPC("%s server send fail message len: %d\n", __func__,len);
 		goto repeat_send;
 	}
 
@@ -494,8 +504,8 @@ int eth_adaption_server_connect(int port,int iptype,int connect_retry_cnt,int is
 */
 void eth_adaption_server_cleanup(bool clean_up)
 {
+	mutex_lock(&send_lock);
 	ETHADPTINFOIPC("server_cleanup entry \n");
-
 	if (clean_up)
 	{
 		serv_sk.rmmod = true;
@@ -560,11 +570,13 @@ void eth_adaption_server_cleanup(bool clean_up)
 	send_data = 0;
 	recevied_data = 0;
 	ETHADPTINFOIPC("server_cleanup exit \n");
+	mutex_unlock(&send_lock);
 }
 
 
 void eth_adaption_server_sock_cleanup (void)
 {
+	mutex_lock(&send_lock);
 	ETHADPTINFOIPC("eth_adaption_server_sock_cleanup entry\n");
 
 	kthread_cancel_work_sync(&serv_sk.read_data);
@@ -591,6 +603,6 @@ void eth_adaption_server_sock_cleanup (void)
 	}
 
 	ETHADPTINFOIPC("eth_adaption_server_sock_cleanup exit\n");
-
+	mutex_unlock(&send_lock);
 }
 

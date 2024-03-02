@@ -82,10 +82,10 @@ struct mutex gpio_toggle_lock;
 /* Wakelock for holding state till connection resumes*/
 struct wakeup_source *eth_ws;
 atomic_t acquire_wakelock;
-
+/* send lock*/
+struct mutex send_lock;
 
 void *ipc_eth_adapt_log_ctxt;
-
 
 DECLARE_WAIT_QUEUE_HEAD(suspend_wait);
 
@@ -465,13 +465,15 @@ int eth_adaption_send(struct sk_buff *skb)
 	ETHADPTDBG("%s state running sending\n", __func__);
 	if (server)
 	{
+		mutex_lock(&send_lock);
 		ret = eth_adaption_server_send(skb->data,skb->len);
-		if(ret < 0)
-			eth_adaption_server_sock_cleanup();
+		mutex_unlock(&send_lock);
 	}
 	else
 	{
+		mutex_lock(&send_lock);
 		ret = eth_adaption_client_send(skb->data,skb->len);
+		mutex_unlock(&send_lock);
 		if(ret < 0) {
 			eth_adaption_client_sock_cleanup();
 			eth_adaption_client_start(dummy);
@@ -675,6 +677,7 @@ static int __init eth_adaption_init(void)
 
         mutex_init(&eam_lock);
         mutex_init(&gpio_toggle_lock);
+	mutex_init(&send_lock);
 	// register for eth netdev linkup linkdown events.
 	if(server)
 	{
@@ -750,6 +753,7 @@ static void __exit eth_adaption_exit(void)
 		eth_adaption_client_cleanup(true);
 	mutex_destroy(&gpio_toggle_lock);
 	mutex_destroy(&eam_lock);
+	mutex_destroy(&send_lock);
 	wakeup_source_unregister(eth_ws);
 	unregister_pm_notifier(&eth_adaption_pm_nb);
 
