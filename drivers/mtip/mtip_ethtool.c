@@ -942,7 +942,8 @@ int mtip_ethtool_set_link_ksettings(struct net_device *netdev, const struct etht
     priv = netdev_priv(netdev);
     link_index = priv->link_index;
 
-    CSMLOGDBG("ethtool: set_link_ksettings for link_index: %d\n", link_index);
+    CSMLOGINFO("ethtool: set_link_ksettings for link_index: %d, speed %d, autoneg %d, lanes %d\n",
+               link_index, cmd->base.speed, cmd->base.autoneg, cmd->lanes);
 
     link_info = platform_driver_priv->mtip_links[link_index];
 
@@ -976,6 +977,12 @@ int mtip_ethtool_set_link_ksettings(struct net_device *netdev, const struct etht
         if(!check_if_valid_speed_for_debug_eth(speed))
         {
             CSMLOGERR("invalid speed for link_index %d", link_index);
+            return -EINVAL;
+        }
+
+        if(cmd->lanes > 2)
+        {
+            CSMLOGERR("invalid lanes for link_index %d", link_index);
             return -EINVAL;
         }
     }
@@ -1044,8 +1051,15 @@ int mtip_ethtool_set_link_ksettings(struct net_device *netdev, const struct etht
             priv_flags = MTIP_DEVICE_PRIV_FLAGS_BIT_MASK_NON_FEC;
     }
 
-    // Set the priv flags for the speed config
+    /* Restrict the number of lanes as specified in ethtool command */
+    if(cmd->lanes == 1)
+        priv_flags &= MTIP_DEVICE_PRIV_FLAGS_SINGLE_LANE_MASK;
+    else if(cmd->lanes == 2)
+        priv_flags &= MTIP_DEVICE_PRIV_FLAGS_TWO_LANES_MASK;
+    else if(cmd->lanes == 4)
+        priv_flags &= MTIP_DEVICE_PRIV_FLAGS_FOUR_LANES_MASK;
 
+    // Set the priv flags for the speed config
     priv->priv_flags_set = true;
     priv->priv_flags = priv_flags;
 
