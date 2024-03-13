@@ -309,6 +309,9 @@ struct mtip_link_info
       if RX LOS processing is needed or not for speed mode change of dual rate
       optics modules */
    bool link_down_received_post_link_up;
+
+   // Timer to retry RX buffer replenish with NAPI poll in case of mem alloc failure
+   struct timer_list rx_replenish_retry_timer;
 };
 
 /*

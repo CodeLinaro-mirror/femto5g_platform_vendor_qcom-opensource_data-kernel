@@ -66,6 +66,8 @@
 // Four lanes link speed configuration mask
 #define MTIP_DEVICE_PRIV_FLAGS_FOUR_LANES_MASK             0x00180060
 
+// RX Replenish retry timer interval
+#define MTIP_RX_REPLENISH_RETRY_TIMER_INTERVAL             5000
 
 // the net device structure
 struct mtip_netdev_priv {
@@ -212,5 +214,6 @@ int mtip_device_lookup_lane_qsfp_cfg(u32 port_type, struct qsfp_info *lane_qsfp_
 
 void mtip_process_tx_comp_cb(ecpri_dma_eth_conn_hdl_t hdl, struct mtip_dma_tx_comp_params *tx_comp_params);
 void mtip_rx_mode_set(struct net_device *netdev);
+void mtip_rx_replenish_retry_timer_cb(struct timer_list *list);
 
 #endif // _MTIP_DEVICE_H
