@@ -26,9 +26,10 @@
 #include <linux/hashtable.h>
 #include <linux/jhash.h>
 #include <linux/pci.h>
-// TODO: Uncomment when SSR support is added
-//#include <soc/qcom/subsystem_restart.h>
+#include <soc/qcom/subsystem_restart.h>
+#include <soc/qcom/subsystem_notif.h>
 #include <linux/soc/qcom/smem.h>
+#include <linux/remoteproc/qcom_rproc.h>
 #include <linux/qcom_scm.h>
 #include <asm/cacheflush.h>
 #include <linux/soc/qcom/smem_state.h>
@@ -56,6 +57,8 @@
 
 int ecpri_dma_plat_drv_probe(struct platform_device *pdev_p);
 int ecpri_dma_smmu_plat_drv_probe(struct platform_device *pdev_p);
+static int ecpri_dma_lcl_mdm_ssr_notifier_cb(struct notifier_block* this,
+	unsigned long code, void* data);
 
 static const struct of_device_id ecpri_dma_plat_drv_match[] = {
 	{.compatible = "qcom,ecpri-dma", },
@@ -126,6 +129,10 @@ static struct platform_driver ecpri_dma_smmu_plat_drv = {
 		.name = DRV_SMMU_NAME,
 		.of_match_table = ecpri_dma_smmu_plat_drv_match,
 	},
+};
+
+static struct notifier_block ecpri_dma_lcl_mdm_ssr_notifier = {
+	.notifier_call = ecpri_dma_lcl_mdm_ssr_notifier_cb,
 };
 
 static struct {
@@ -782,6 +789,29 @@ int ecpri_dma_stop_endp(struct ecpri_dma_endp_context *endp_cfg)
 	return ret;
 }
 
+int ecpri_dma_halt_q6_endps(enum ecpri_dma_endp_dir dir) {
+	int res = 0, gsi_id, endp_id;
+	const struct dma_gsi_ep_config* ep;
+
+	for (gsi_id = 0; gsi_id < ecpri_dma_ctx->num_of_gsi; gsi_id++) {
+		for (endp_id = 0; endp_id < ECPRI_DMA_ENDP_NUM_MAX; endp_id++) {
+			ep = &(*ecpri_dma_ctx->endp_map)[gsi_id][endp_id];
+
+			if (ep->valid && ep->ee == ECPRI_DMA_EE_Q6 && ep->dir == dir)
+			{
+				res = ecpri_dma_gsi_halt_channel(endp_id, gsi_id);
+				if (res)
+				{
+					DMAERR("Generic EE HALT fail for ENDP:%d GSI:%d res:%d \n",
+						endp_id, gsi_id, res);
+				}
+			}
+		}
+	}
+
+	return 0;
+}
+
 int ecpri_dma_start_endp(struct ecpri_dma_endp_context *endp_cfg)
 {
 	int ret = 0;
@@ -904,8 +934,6 @@ static int ecpri_dma_post_init(void)
 		result = -EFAULT;
 		goto fail_dmahal;
 	}
-
-	//TODO: Implement REG SAVE & Reg save Init here
 
 	/* Configure DMA HW */
 	result = ecpri_dma_hw_init();
@@ -1384,6 +1412,7 @@ static int ecpri_dma_pre_init(const struct ecpri_dma_plat_drv_res *resource_p,
 {
 	int result = 0;
 	int ee = 0, gsi_id = 0;
+	void* ssr_hdl;
 
 	pr_info("DMA Driver initialization started\n");
 	if (!ecpri_dma_ctx) {
@@ -1480,6 +1509,22 @@ static int ecpri_dma_pre_init(const struct ecpri_dma_plat_drv_res *resource_p,
 		ecpri_dma_assert();
 	}
 
+	/* Register for Local Modem SSR */
+#if IS_ENABLED(CONFIG_QCOM_Q6V5_PAS)
+	ssr_hdl = qcom_register_ssr_notifier(SUBSYS_LOCAL_MODEM,
+		&ecpri_dma_lcl_mdm_ssr_notifier);
+#else
+	ssr_hdl = subsys_notif_register_notifier(SUBSYS_LOCAL_MODEM,
+		&ecpri_dma_lcl_mdm_ssr_notifier);
+#endif
+
+	if (!IS_ERR(ssr_hdl))
+		ecpri_dma_ctx->ssr_ctx.lcl_mdm_subsys_notify_handle = ssr_hdl;
+	else {
+		result = PTR_ERR(ssr_hdl);
+		DMAERR("local modem ssr register fail result=%d\n", result);
+		goto fail_remap;
+	}
 
 	DMADBG("pre_init complete\n");
 
@@ -1671,6 +1716,7 @@ static int __init ecpri_dma_module_init(void)
 	}
 	mutex_init(&ecpri_dma_ctx->lock);
 	mutex_init(&ecpri_dma_ctx->mhi_memcpy_setup_lock);
+	mutex_init(&ecpri_dma_ctx->ssr_ctx.lock);
 
 	/* Init ready CB list */
 	INIT_LIST_HEAD(&ecpri_dma_ctx->ecpri_dma_ready_cb_list);
@@ -1782,6 +1828,16 @@ static void __exit ecpri_dma_module_exit(void)
 			hw_flavor);
 		ecpri_dma_assert();
 	}
+
+#if IS_ENABLED(CONFIG_QCOM_Q6V5_PAS)
+	qcom_unregister_ssr_notifier(
+		ecpri_dma_ctx->ssr_ctx.lcl_mdm_subsys_notify_handle,
+		&ecpri_dma_lcl_mdm_ssr_notifier);
+#else
+	subsys_notif_unregister_notifier(
+		ecpri_dma_ctx->ssr_ctx.lcl_mdm_subsys_notify_handle,
+		&ecpri_dma_lcl_mdm_ssr_notifier);
+#endif
 
 	/* Stop, reset and dealloc exception */
 	ecpri_dma_dealloc_exception();
@@ -1944,8 +2000,125 @@ const char *ecpri_dma_status_code_to_str(enum ecpri_dma_status_code status_code)
 module_exit(ecpri_dma_module_exit);
 
 
-//TODO: define dependencies
-//MODULE_SOFTDEP("pre: subsys-pil-tz");
-//MODULE_SOFTDEP("pre: qcom-arm-smmu-mod");
+static int ecpri_dma_lcl_mdm_ssr_notifier_cb(struct notifier_block* this,
+	unsigned long code, void* data)
+{
+	int res = 0;
+	DMADBG("SSR: Entry\n");
+
+	if (!ecpri_dma_ctx)
+		return NOTIFY_DONE;
+
+	mutex_lock(&ecpri_dma_ctx->lock);
+	if (!ecpri_dma_is_ready()) {
+		DMAERR("SSR: SSR while driver is not ready\n");
+		mutex_unlock(&ecpri_dma_ctx->lock);
+		return NOTIFY_DONE;
+	}
+	mutex_unlock(&ecpri_dma_ctx->lock);
+
+	mutex_lock(&ecpri_dma_ctx->ssr_ctx.lock);
+
+	switch (code) {
+#if IS_ENABLED(CONFIG_QCOM_Q6V5_PAS)
+	case QCOM_SSR_BEFORE_SHUTDOWN:
+#else
+	case SUBSYS_BEFORE_SHUTDOWN:
+#endif
+		DMADBG("SSR: BEFORE_SHUTDOWN Entry\n");
+		if (atomic_read(&ecpri_dma_ctx->ssr_ctx.is_ssr) == 1) {
+			DMADBG("SSR: Received second BEFORE_SHUTDOWN\n");
+			atomic_inc(&ecpri_dma_ctx->ssr_ctx.shutdown_already_down);
+			mutex_unlock(&ecpri_dma_ctx->ssr_ctx.lock);
+			return NOTIFY_DONE;
+		}
+		atomic_set(&ecpri_dma_ctx->ssr_ctx.is_ssr, 1);
+		atomic_inc(&ecpri_dma_ctx->ssr_ctx.shutdown_ssr);
+
+		DMADBG("SSR: Reset QMI\n");
+		res = ecpri_dma_qmi_service_ssr_reset();
+		if (res)
+		{
+			DMAERR("SSR: QMI reset failed with err %d\n", res);
+			ecpri_dma_assert();
+		}
+
+		DMADBG("SSR: QMI reset complete, HALT Q6 SRC ENDPs\n");
+		res = ecpri_dma_halt_q6_endps(ECPRI_DMA_ENDP_DIR_SRC);
+		if (res)
+		{
+			DMAERR("SSR: HALT Q6 SRC ENDPs failed with err %d\n", res);
+			ecpri_dma_assert();
+		}
+
+		DMADBG("SSR: HALT Q6 SRC ENDPs complete, STOP VFs SRC ENDPs\n");
+		res = ecpri_dma_mhi_client_ssr_chs_stop(ECPRI_DMA_ENDP_DIR_SRC);
+		if (res)
+		{
+			DMAERR("SSR: Stop VFs SRC ENDPs failed with err %d\n", res);
+			ecpri_dma_assert();
+		}
+
+		DMADBG("SSR: VFs SRCs CHs Stopped, HALT Q6 DEST ENDPs\n");
+		res = ecpri_dma_halt_q6_endps(ECPRI_DMA_ENDP_DIR_DEST);
+		if (res)
+		{
+			DMAERR("SSR: HALT Q6 DEST ENDPs failed with err %d\n", res);
+			ecpri_dma_assert();
+		}
+
+		DMADBG("SSR: Q6 Dest CHs Halted, Stop VFs DEST ENDPs\n");
+		res = ecpri_dma_mhi_client_ssr_chs_stop(ECPRI_DMA_ENDP_DIR_DEST);
+		if (res)
+		{
+			DMAERR("SSR: Stop Vfs DEST ENDPs failed with err %d\n", res);
+			ecpri_dma_assert();
+		}
+
+		DMADBG("SSR: VFs Dest CHs Stopped, Notify HOST \n");
+		res = ecpri_dma_mhi_client_ssr_notify_host();
+		if (res)
+		{
+			DMAERR("SSR: Notify HOST failed with err %d\n", res);
+			ecpri_dma_assert();
+		}
+
+		DMADBG("SSR: BEFORE_SHUTDOWN Exit\n");
+		break;
+
+#if IS_ENABLED(CONFIG_QCOM_Q6V5_PAS)
+	case QCOM_SSR_BEFORE_POWERUP:
+#else
+	case SUBSYS_BEFORE_POWERUP:
+#endif
+		DMADBG("SSR: BEFORE_POWERUP Entry\n");
+		if (atomic_read(&ecpri_dma_ctx->ssr_ctx.is_ssr) == 0) {
+			DMADBG("SSR: Received BEFORE_POWERUP without powerdown\n");
+			atomic_inc(&ecpri_dma_ctx->ssr_ctx.powerup_already_up);
+			mutex_unlock(&ecpri_dma_ctx->ssr_ctx.lock);
+			return NOTIFY_DONE;
+		}
+		atomic_inc(&ecpri_dma_ctx->ssr_ctx.powerup_ssr);
+
+		DMADBG("SSR: Reset Q6 handshake procedure\n");
+		res = ecpri_dma_qmi_service_ssr_reset_q6_handshake();
+		if (res)
+		{
+			DMAERR("SSR: Reset Q6 handshake failed with err %d\n", res);
+			ecpri_dma_assert();
+		}
+
+		atomic_set(&ecpri_dma_ctx->ssr_ctx.is_ssr, 0);
+		DMADBG("SSR: Finished BEFORE_POWERUP\n");
+		break;
+	default:
+		DMADBG("SSR:Unknown SSR Code %d\n", code);
+	}
+
+	mutex_unlock(&ecpri_dma_ctx->ssr_ctx.lock);
+	DMADBG("SSR: Exit\n");
+	return NOTIFY_DONE;
+}
+
 MODULE_LICENSE("GPL v2");
 MODULE_DESCRIPTION("eCPRI DMA HW device driver");

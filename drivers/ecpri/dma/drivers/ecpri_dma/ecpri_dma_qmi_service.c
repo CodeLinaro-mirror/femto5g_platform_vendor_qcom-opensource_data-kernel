@@ -7,6 +7,7 @@
 #include "ecpri_dma_utils.h"
 #include "ecpri_dma_qmi_v01.h"
 #include "ecpri_dma_mhi_client.h"
+#include "dmahal.h"
 
 struct ecpri_dma_qmi_context* ecpri_dma_qmi_ctx;
 
@@ -96,12 +97,12 @@ static bool ecpri_dma_is_handshake_complete() {
 static void ecpri_dma_a55_svc_disconnect_cb(struct qmi_handle* qmi, unsigned int node,
 	unsigned int port)
 {
-	DMADBG("Received QMI client disconnect\n");
+	DMADBG_LOW("Received QMI client disconnect\n");
 }
 
 static void ecpri_dma_q6_clnt_svc_event_notify_net_reset(struct qmi_handle* qmi)
 {
-	if (!ecpri_dma_qmi_ctx->wq_stop)
+	if (!atomic_read(&ecpri_dma_qmi_ctx->wq_stop))
         	queue_delayed_work(ecpri_dma_qmi_ctx->clnt_req_wq,
 			&ecpri_dma_work_svc_exit,
 			0);
@@ -113,7 +114,7 @@ static void ecpri_dma_q6_clnt_svc_event_notify_svc_exit(struct qmi_handle* qmi,
 	DMADBG("QMI svc:%d vers:%d ins:%d node:%d port:%d\n", svc->service,
 		svc->version, svc->instance, svc->node, svc->port);
 
-	if (!ecpri_dma_qmi_ctx->wq_stop)
+	if (!atomic_read(&ecpri_dma_qmi_ctx->wq_stop))
 		queue_delayed_work(ecpri_dma_qmi_ctx->clnt_req_wq,
 			&ecpri_dma_work_svc_exit,
 			0);
@@ -159,11 +160,10 @@ int ecpri_dma_qmi_service_init(void)
 	atomic_set(&ecpri_dma_qmi_ctx->q6_response_recv,false);
 	ecpri_dma_qmi_ctx->q6_registered = false;
 	atomic_set(&ecpri_dma_qmi_ctx->q6_disconnected,false);
-	ecpri_dma_qmi_ctx->wq_stop = false;
+	atomic_set(&ecpri_dma_qmi_ctx->wq_stop, false);
 	ecpri_dma_qmi_ctx->sending_retries = 0;
 	ecpri_dma_qmi_ctx->dma_sw_version = ecpri_dma_qmi_get_sw_ver();
 
-	init_completion(&ecpri_dma_qmi_ctx->qmi_q6_int_cmplt_completion);
 	init_completion(&ecpri_dma_qmi_ctx->qmi_ch_cmd_sync_completion);
 
 	/* Init lists */
@@ -264,9 +264,9 @@ void ecpri_dma_qmi_service_exit(void)
 
 	mutex_lock(&ecpri_dma_qmi_ctx->lock);
 
-	ecpri_dma_qmi_ctx->wq_stop = true;
+	atomic_set(&ecpri_dma_qmi_ctx->wq_stop, true);
 	DMADBG("wq_stop: %d\n",
-	ecpri_dma_qmi_ctx->wq_stop);
+	atomic_read(&ecpri_dma_qmi_ctx->wq_stop));
 
 	/* qmi-service */
 	if (ecpri_dma_qmi_ctx->svc_handle != NULL) {
@@ -299,9 +299,9 @@ void ecpri_dma_qmi_stop_workqueues(void)
 	DMADBG("Stopping all QMI workqueues\n");
 
 	/* Stopping all workqueues so new work won't be scheduled */
-	ecpri_dma_qmi_ctx->wq_stop = true;
+	atomic_set(&ecpri_dma_qmi_ctx->wq_stop, true);
 	DMADBG("q_stop: %d\n",
-	ecpri_dma_qmi_ctx->wq_stop);
+	atomic_read(&ecpri_dma_qmi_ctx->wq_stop));
 
 }
 
@@ -353,7 +353,7 @@ ecpri_dma_qmi_service_q6_client_event_notify_new(struct qmi_handle* qmi,
 
 int ecpri_dma_qmi_send_q6_msg(void)
 {
-	if (!ecpri_dma_qmi_ctx->wq_stop) {
+	if (!atomic_read(&ecpri_dma_qmi_ctx->wq_stop)) {
 		queue_delayed_work(ecpri_dma_qmi_ctx->clnt_req_wq,
 			&ecpri_dma_work_send_q6_init_msg, 0);
 	}
@@ -576,9 +576,6 @@ static void ecpri_dma_handle_init_indication(struct qmi_handle* qmi_handle,
 
 	DMADBG("q6_init_cmplt: %d\n",
 		atomic_read(&ecpri_dma_qmi_ctx->q6_init_cmplt));
-
-	/* Send init complete*/
-	complete(&ecpri_dma_qmi_ctx->qmi_q6_int_cmplt_completion);
 }
 
 static void ecpri_dma_handle_ch_cmd_indication(struct qmi_handle* qmi_handle,
@@ -707,7 +704,7 @@ int ecpri_dma_qmi_service_send_ch_cmd_q6(
 	}
 
 	/* Set A55 endpoint id */
-	a55_endp_id =  endp_ctx->endp_id;
+	a55_endp_id = endp_ctx->endp_id;
 
 	/* Set A55 GSI id */
 	a55_gsi_id = endp_ctx->gsi_id;
@@ -748,18 +745,18 @@ int ecpri_dma_qmi_service_send_ch_cmd_q6(
 		q6_gsi_id = dest_gsi_id;
 
 	} else {
-		filter.valid = true,
-		filter.valid_enable = true,
-		filter.ee = ECPRI_DMA_EE_Q6,
-		filter.ee_enable = true,
-		filter.stream_mode = ECPRI_DMA_ENDP_STREAM_MODE_M2M,
-		filter.stream_mode_enable = true,
-		filter.dir = ECPRI_DMA_ENDP_DIR_SRC,
-		filter.dir_enable = true,
-		filter.gsi_id = endp_ctx->gsi_id,
-		filter.gsi_id_enable = true,
-		filter.dest = endp_ctx->endp_id,
-		filter.dest_enable = true,
+		filter.valid = true;
+		filter.valid_enable = true;
+		filter.ee = ECPRI_DMA_EE_Q6;
+		filter.ee_enable = true;
+		filter.stream_mode = ECPRI_DMA_ENDP_STREAM_MODE_M2M;
+		filter.stream_mode_enable = true;
+		filter.dir = ECPRI_DMA_ENDP_DIR_SRC;
+		filter.dir_enable = true;
+		filter.gsi_id = endp_ctx->gsi_id;
+		filter.gsi_id_enable = true;
+		filter.dest = endp_ctx->endp_id;
+		filter.dest_enable = true;
 
 		/* Try to find Q6 source endpoint */
 		result = ecpri_dma_filter_endps(&filter, &q6_endp, 1);
@@ -777,48 +774,41 @@ int ecpri_dma_qmi_service_send_ch_cmd_q6(
 
 	/* Wait for init completion*/
 	if (!ecpri_dma_is_handshake_complete()) {
+		DMADBG("Q6 handshke isn't completed, defer message\n");
 
-		result = wait_for_completion_timeout(
-		&ecpri_dma_qmi_ctx->qmi_q6_int_cmplt_completion,
-		msecs_to_jiffies(ECPRI_DMA_QMI_INIT_COMPLETE_TIMEOUT));
-
-		if (0 == result || !ecpri_dma_is_handshake_complete()) {
-			DMADBG("Timeout while waiting for Q6 init completion\n");
-
-			if (ECPRI_DMA_QMI_MSG_SYNC == flag) {
-				DMAERR("Unable to handle Q6 init TO during sync OP");
-				ecpri_dma_assert();
-			}
-
-			/* Defer command send after init is complete */
-			q6_msg_wrapper =
-				kmalloc(sizeof(struct ecpri_dma_q6_msg_wrapper), GFP_KERNEL);
-
-			if (!q6_msg_wrapper) {
-				DMAERR("Failed to create wrapper %d\n", q6_endp_id);
-				return -ENOMEM;
-			}
-
-			/* Assign values */
-			q6_msg_wrapper->endp_ctx = endp_ctx;
-			q6_msg_wrapper->op = op;
-			q6_msg_wrapper->flag = flag;
-
-			mutex_lock(&ecpri_dma_qmi_ctx->deferred_cmd_list_lock);
-
-			/* Add to list of pending messages*/
-			list_add_tail(&q6_msg_wrapper->link,
-			 &ecpri_dma_qmi_ctx->ecpri_dma_pending_q6_msg);
-
-			mutex_unlock(&ecpri_dma_qmi_ctx->deferred_cmd_list_lock);
-
-			/* Start delayed work */
-			queue_delayed_work(ecpri_dma_qmi_ctx->clnt_req_wq,
-				&ecpri_dma_work_send_q6_start_msg,
-				ECPRI_DMA_QMI_COMPLETION_TIMEOUT);
-
-			return 0;
+		if (ECPRI_DMA_QMI_MSG_SYNC == flag) {
+			DMAERR("Unable to send SYNC message as handshake isn't completed");
+			ecpri_dma_assert();
 		}
+
+		/* Defer command send after init is complete */
+		q6_msg_wrapper =
+			kmalloc(sizeof(struct ecpri_dma_q6_msg_wrapper), GFP_KERNEL);
+
+		if (!q6_msg_wrapper) {
+			DMAERR("Failed to create wrapper %d\n", q6_endp_id);
+			return -ENOMEM;
+		}
+
+		/* Assign values */
+		q6_msg_wrapper->endp_ctx = endp_ctx;
+		q6_msg_wrapper->op = op;
+		q6_msg_wrapper->flag = flag;
+
+		mutex_lock(&ecpri_dma_qmi_ctx->deferred_cmd_list_lock);
+
+		/* Add to list of pending messages*/
+		list_add_tail(&q6_msg_wrapper->link,
+			&ecpri_dma_qmi_ctx->ecpri_dma_pending_q6_msg);
+
+		mutex_unlock(&ecpri_dma_qmi_ctx->deferred_cmd_list_lock);
+
+		/* Start delayed work */
+		queue_delayed_work(ecpri_dma_qmi_ctx->clnt_req_wq,
+			&ecpri_dma_work_send_q6_start_msg,
+			ECPRI_DMA_QMI_COMPLETION_TIMEOUT);
+
+		return 0;
 	}
 
 	/* Check version */
@@ -954,5 +944,69 @@ int ecpri_dma_qmi_service_send_ch_cmd_q6(
 		/* Unlock QMI sync command */
 		mutex_unlock(&ecpri_dma_qmi_ctx->sync_ch_cmd_lock);
 	}
+	return 0;
+}
+
+int ecpri_dma_qmi_service_ssr_reset(void)
+{
+	ecpri_hwio_def_ecpri_spare_reg_u spare_reg;
+
+	if (!ecpri_dma_qmi_ctx) {
+		DMADBG("QMI is not allocated\n");
+		return EINVAL;
+	}
+
+	DMADBG("SSR: QMI: Entry QMI reset\n");
+
+	mutex_lock(&ecpri_dma_qmi_ctx->lock);
+	atomic_set(&ecpri_dma_qmi_ctx->wq_stop, true);
+
+	ecpri_dma_qmi_ctx->send_q6_init = true;
+	ecpri_dma_qmi_ctx->q6_init_sent = false;
+	ecpri_dma_qmi_ctx->q6_indication_recv = false;
+	atomic_set(&ecpri_dma_qmi_ctx->q6_init_cmplt, false);
+	atomic_set(&ecpri_dma_qmi_ctx->q6_response_recv, false);
+	ecpri_dma_qmi_ctx->q6_registered = false;
+	atomic_set(&ecpri_dma_qmi_ctx->q6_disconnected, false);
+
+	ecpri_dma_qmi_ctx->sending_retries = 0;
+	ecpri_dma_qmi_ctx->dma_sw_version = ecpri_dma_qmi_get_sw_ver();
+
+	init_completion(&ecpri_dma_qmi_ctx->qmi_ch_cmd_sync_completion);
+
+	/* Reset Spare reg legacy handshake */
+	spare_reg.value = 0;
+	ecpri_dma_hal_write_reg(ECPRI_SPARE_REG, spare_reg.value);
+
+	atomic_set(&ecpri_dma_qmi_ctx->wq_stop, false);
+	mutex_unlock(&ecpri_dma_qmi_ctx->lock);
+
+	DMADBG("SSR: QMI: Exit QMI reset\n");
+
+	return 0;
+}
+
+int ecpri_dma_qmi_service_ssr_reset_q6_handshake(void)
+{
+	ecpri_hwio_def_ecpri_spare_reg_u spare_reg;
+
+	if (!ecpri_dma_qmi_ctx) {
+		DMADBG("QMI is not allocated\n");
+		return EINVAL;
+	}
+
+	DMADBG("SSR: QMI: Entry QMI reset Q6 handshake\n");
+	/* Clear disconnected flag */
+	atomic_set(&ecpri_dma_qmi_ctx->q6_disconnected, false);
+
+	/* Trigger Q6 init without QMI */
+	spare_reg.value = ECPRI_DMA_GET_HW_FLAVOR();
+	ecpri_dma_hal_write_reg(
+		ECPRI_SPARE_REG, spare_reg.value);
+
+	/* Trigger QMI message */
+	ecpri_dma_qmi_send_q6_msg();
+	DMADBG("SSR: QMI: EXIT QMI reset Q6 handshake\n");
+
 	return 0;
 }
