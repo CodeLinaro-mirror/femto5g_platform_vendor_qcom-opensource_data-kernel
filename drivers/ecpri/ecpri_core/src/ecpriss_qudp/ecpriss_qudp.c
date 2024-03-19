@@ -4353,25 +4353,24 @@ static bool ecpriss_qudp_fh_rx_udp_filter_cfg_v2(uint32_t port_index, ecpriss_qu
 int ecpriss_qudp_fh_rx_filter_cfg_v2(uint32_t port_index, ecpriss_qudp_rx_cfg_s *rx_cfg)
 {
 	bool ret = false;
-	if(ecpriss_filtering_enabled){
+
+	if(rx_cfg->fltr_en_mask & ECPRISS_QUDP_RX_CFG_FLTR_MASK_IP_DADDR){
 		ret = ecpriss_qudp_fh_rx_ip_filter_cfg_v2(port_index, rx_cfg);
 		if(ret == false){
 			ECPRILOGERR("IP filter Config validation failed \n");
 		}
-	}else{
-		ECPRILOGERR("Global filter config is disabled, Can't config IP filter \n");
 	}
-	if(ecpriss_filtering_enabled){
+	if(rx_cfg->fltr_en_mask & ECPRISS_QUDP_RX_CFG_FLTR_MASK_VLAN){
 		ret = ecpriss_qudp_fh_rx_vlan_filter_cfg_v2(port_index, rx_cfg);
 		if(ret == false){
 			ECPRILOGERR("Vlan filter config validation failed \n");
 		}
-	}else{
-		ECPRILOGERR("Global filter config is disabled, Can't config VLAN filter \n");
 	}
-	ret = ecpriss_qudp_fh_rx_udp_filter_cfg_v2(port_index, rx_cfg);
-	if(ret == false){
-		ECPRILOGERR("UDP filter config validation failed \n");
+	if(rx_cfg->fltr_en_mask & ECPRISS_QUDP_RX_CFG_FLTR_MASK_UDP_DPORT){
+		ret = ecpriss_qudp_fh_rx_udp_filter_cfg_v2(port_index, rx_cfg);
+		if(ret == false){
+			ECPRILOGERR("UDP filter config validation failed \n");
+		}
 	}
 
 	return 0;

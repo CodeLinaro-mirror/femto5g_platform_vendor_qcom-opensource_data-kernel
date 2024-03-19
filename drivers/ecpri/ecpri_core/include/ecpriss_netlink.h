@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: GPL-2.0-only
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #ifndef ECPRISS_NETLINK_H_
@@ -83,7 +83,7 @@ typedef struct ecpriss_netlink_packet_hdr_s
 typedef struct ecpriss_packet
 {
 	ecpriss_packet_hdr_s     header;
-	ecpriss_packet_payload_s payload;
+	ecpriss_packet_payload_s payload[ECPRISS_MAX_KERNEL_NETLINK_FLOW];
 } ecpriss_packet_s;
 
 
