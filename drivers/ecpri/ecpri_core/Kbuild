@@ -45,6 +45,7 @@ endif
 obj-$(CONFIG_ECPRI_CORE) += ecpri_core.o
 ecpri_core-$(CONFIG_ECPRI_CORE) += \
 	    src/ecpriss_core.o \
+	    src/ecpriss_mhi.o \
         src/utilities/ecpriss_netlink.o \
 		src/utilities/ecpriss_debugfs.o \
 		src/ecpriss_qudp/ecpriss_qudp.o \

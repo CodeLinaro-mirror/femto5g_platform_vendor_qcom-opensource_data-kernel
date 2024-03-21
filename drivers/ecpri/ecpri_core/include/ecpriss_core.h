@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: GPL-2.0-only
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #ifndef ECPRISS_CORE_H_
@@ -32,6 +32,8 @@
 #include "ecpriss_qudp.h"
 #include "ecpriss_flow.h"
 #include "ecpriss_debugfs.h"
+#include "ecpriss_mhi.h"
+#include "csm_lte_eth_dev.h"
 
 #define ECPRI_DMA_RING_PER_PORT_MAX 4
 
@@ -225,6 +227,7 @@ typedef struct ecpriss_core_private_s_v2 {
 	struct ecpriss_ssr_nb		     *ssr_info;
 	struct platform_device		     *pdev;
 	struct mutex                          ecpriss_mutex_lock;
+	void                                 *mhi_ctx;
 	spinlock_t                            irq_lock;
 } ecpriss_core_private_s_v2;
 
@@ -256,6 +259,11 @@ void ecpriss_unmap_xbar_qudp_v2(void);
 void ecpriss_xbar_oc_flush_enable(uint32_t code);
 void ecpriss_panic_notifr_handler_v2(void);
 void ecpriss_panic_notifr_handler(void);
+int ecpriss_get_link_state(eth_ecpriss_port_type_e port_type,
+		                int port, int link);
+int ecpriss_get_link_rate(eth_ecpriss_port_type_e port_type,
+		                int port, int link);
+
 
 void ecpriss_debug_flow_info(ecpriss_packet_payload_s *packet, uint8_t msg_id);
 
