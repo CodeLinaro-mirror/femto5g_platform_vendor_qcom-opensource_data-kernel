@@ -8886,6 +8886,7 @@ int ecpri_dma_hw_init(void)
 {
 	ecpri_hwio_def_ecpri_hw_params_0_u hw_params_0 = { 0 };
 	ecpri_hwio_def_ecpri_stream_ctrl_u dma_stream_control = { 0 };
+	ecpri_hwio_def_ecpri_clkon_cfg_u ecpri_clkon_cfg = { 0 };
 	u32 hw_ver = ECPRI_DMA_GET_CTX_HW_VER();
 	u32 hw_flavor = ECPRI_DMA_GET_HW_FLAVOR();
 
@@ -8956,17 +8957,25 @@ int ecpri_dma_hw_init(void)
 		return -EFAULT;
 
 
-	/* Set DMA Pre-Fetch buffer size to support jumbo packets on LTE FH perf */
 	if ((hw_ver > ECPRI_HW_V1_0) &&
 		(hw_flavor == ECPRI_HW_FLAVOR_DU_PCIE_3_X_12 ||
 			hw_flavor == ECPRI_HW_FLAVOR_DU_PCIE_4_X_9 ||
-			hw_flavor == ECPRI_HW_FLAVOR_DU_PCIE_5_X_6)) {
+			hw_flavor == ECPRI_HW_FLAVOR_DU_PCIE_5_X_6 ||
+			hw_flavor == ECPRI_HW_FLAVOR_DU_L2)) {
+		/* Set DMA Pre-Fetch buffer size to support jumbo packets on LTE FH perf */
 		dma_stream_control.value =
 			ecpri_dma_hal_read_reg(ECPRI_DMA_STREAM_CTRL);
 		dma_stream_control.def.fh_limit += ECPRI_DMA_PRE_FETCH_CHANGE_SIZE;
 		dma_stream_control.def.l2_limit -= ECPRI_DMA_PRE_FETCH_CHANGE_SIZE;
 		ecpri_dma_hal_write_reg(ECPRI_DMA_STREAM_CTRL,
 			dma_stream_control.value);
+
+		/* To support mirroring we disable clock gating */
+		ecpri_clkon_cfg.value = ecpri_dma_hal_read_reg(ECPRI_CLKON_CFG);
+		ecpri_clkon_cfg.def.cgc_open_dma = 1;
+		ecpri_dma_hal_write_reg(ECPRI_CLKON_CFG,
+			ecpri_clkon_cfg.value);
+
 	}
 
 	return 0;
