@@ -1051,6 +1051,8 @@ int ecpriss_mhi_send_rsp(void *buf, int len,
 
 	struct mhi_req req;
 
+	int retry_count = ECPRISS_MAX_MHI_SEND_RETRY_CNT;
+
 	int err = -1;
 
 	if (!ch_info || atomic_read(&ch_info->ch_state) != ECPRISS_MHI_CH_STATE_OPEN) {
@@ -1071,9 +1073,21 @@ int ecpriss_mhi_send_rsp(void *buf, int len,
 	req.client = ch_info->handle;
 	req.vf_id = ch_info->vf_id;
 
-	bytes_written = mhi_dev_write_channel(&req);
+	/* These retries are needed if we don't have any
+	 * buffers available from host to write*/
+
+	do {
+
+		bytes_written = mhi_dev_write_channel(&req);
+
+		retry_count--;
+
+		msleep(ECPRISS_MAX_MHI_SEND_RETRY_DELAY);
+
+	} while (bytes_written == 0 && retry_count);
 
 	ECPRILOGDBG("MHI SND RESP: Bytes to send %d  and bytes Written %d\n", req.len, bytes_written);
+
 
 	if(bytes_written != len) {
 
