@@ -815,9 +815,10 @@ int ecpriss_mhi_ctx_init(void **mhi_ctx)
 	if(ctx == NULL) {
 
 		ECPRILOGERR("ecpriss_mhi_ctx_init: Ctx Mem Alloc failed\n");
-		goto error;
+		return -1;
 	}
 
+	memset(ctx, 0, sizeof(ecpriss_mhi_client_ctx_t));
 
 	spin_lock_init(&ctx->ctx_lock);
 
@@ -883,7 +884,7 @@ int ecpriss_mhi_ctx_deinit(void *mhi_ctx)
 {
 	int i = 0;
 
-	if(mhi_ctx == NULL) {
+	if(mhi_ctx == NULL || ctx == NULL) {
 
 		ECPRILOGERR("Invalid params\n");
 		return -EINVAL;
