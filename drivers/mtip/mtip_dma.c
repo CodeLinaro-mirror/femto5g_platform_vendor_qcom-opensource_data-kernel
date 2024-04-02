@@ -427,6 +427,9 @@ int mtip_start_dma_pipe(struct net_device *netdev, ecpri_dma_eth_conn_hdl_t hdl)
    int rx_index = 0, tx_index = 0, i = 0;
    struct ecpri_dma_pkt_completion_wrapper **pkts;
    int num_pkt_allocs = MTIP_NAPI_WEIGHT * MTIP_RX_DMA_MAX_BUFFERS_PER_PACKET;
+   u32 tx_available = 0;
+   u32 rx_available = 0;
+
    // start the pipes
    rv = (ecpri_dma_eth_driver_ops.ecpri_dma_eth_start_endpoints)(hdl);
 
@@ -435,12 +438,12 @@ int mtip_start_dma_pipe(struct net_device *netdev, ecpri_dma_eth_conn_hdl_t hdl)
       CSMLOGDBG("started pipe %d\n", hdl);
    }
 
+   priv = netdev_priv(netdev);
+
    // set the initial set of rx buffers
    // the number of buffers to replenish has to be at most MTIP_RX_RING_SIZE - 1
    if(hdl_repl[hdl] == false)
    {
-      priv = netdev_priv(netdev);
-
       pkts = (struct ecpri_dma_pkt_completion_wrapper **)kmalloc(num_pkt_allocs * sizeof(struct ecpri_dma_pkt_completion_wrapper*), GFP_KERNEL);
 
       if (pkts == NULL)
@@ -490,6 +493,22 @@ int mtip_start_dma_pipe(struct net_device *netdev, ecpri_dma_eth_conn_hdl_t hdl)
       mtip_replenish_dma_rx_buffers(netdev, hdl, MTIP_RX_RING_SIZE - 1);
       hdl_repl[hdl] = true;
    }
+   else
+   {
+      rv = mtip_dma_get_ring_state(hdl, &tx_available, &rx_available);
+      CSMLOGDBG("rx_available: %d, priv->rx_polled_count %d\n", rx_available, priv->rx_polled_count);
+      if (rv < 0)
+      {
+         CSMLOGERR("get ring state from DMA failed for hdl: %d\n", hdl);
+      }
+      else if(rx_available > 1)
+      {
+         rv = mtip_replenish_dma_rx_buffers_reuse(netdev, hdl, rx_available-1);
+         if(rv == 0)
+            priv->rx_polled_count = 0;
+      }
+   }
+
    goto ret;
 
 free_rx_buf:
