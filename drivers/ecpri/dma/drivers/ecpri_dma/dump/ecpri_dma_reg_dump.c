@@ -168,6 +168,8 @@ struct ecpri_dma_reg_save_dma_gen_s {
 		ecpri_dma_testbus[ECPRI_DMA_REG_SAVE_TEST_BUS_MAX];
 	ecpri_hwio_def_ecpri_dma_testbus_u
 		ecpri_dma_testbus_internal[ECPRI_DMA_REG_SAVE_TEST_BUS_MAX];
+	ecpri_hwio_def_ecpri_rate_limiter_u
+		ecpri_rate_limiter;
 	ecpri_hwio_def_ecpri_dma_gp_stat3_u
 		ecpri_dma_gp_stat3;
 	ecpri_hwio_def_ecpri_dma_idle_reg_u
@@ -871,6 +873,8 @@ void ecpri_dma_save_registers(void) {
 		dma.gen, ecpri_dma_aos_fifo_stat);
 	READ_DMA_REG(ECPRI_DMA_GP_STAT1,
 		dma.gen, ecpri_dma_gp_stat1);
+	READ_DMA_REG(ECPRI_DMA_RATE_LIMITER,
+		dma.gen, ecpri_rate_limiter);
 	READ_DMA_REG(ECPRI_DMA_GP_STAT3,
 		dma.gen, ecpri_dma_gp_stat3);
 	READ_DMA_REG(ECPRI_DMA_IDLE_REG,

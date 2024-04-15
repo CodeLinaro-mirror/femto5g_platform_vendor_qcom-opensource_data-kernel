@@ -8887,6 +8887,7 @@ int ecpri_dma_hw_init(void)
 	ecpri_hwio_def_ecpri_hw_params_0_u hw_params_0 = { 0 };
 	ecpri_hwio_def_ecpri_stream_ctrl_u dma_stream_control = { 0 };
 	ecpri_hwio_def_ecpri_clkon_cfg_u ecpri_clkon_cfg = { 0 };
+	ecpri_hwio_def_ecpri_rate_limiter_u ecpri_rate_limiter = { 0 };
 	u32 hw_ver = ECPRI_DMA_GET_CTX_HW_VER();
 	u32 hw_flavor = ECPRI_DMA_GET_HW_FLAVOR();
 
@@ -8976,6 +8977,12 @@ int ecpri_dma_hw_init(void)
 		ecpri_dma_hal_write_reg(ECPRI_CLKON_CFG,
 			ecpri_clkon_cfg.value);
 
+		/* Enable Rate Limiter for FH port */
+		ecpri_rate_limiter.value =
+			ecpri_dma_hal_read_reg(ECPRI_DMA_RATE_LIMITER);
+		ecpri_rate_limiter.def.fh = ECPRI_DMA_RATE_LIMITER_FH;
+		ecpri_dma_hal_write_reg(ECPRI_DMA_RATE_LIMITER,
+			ecpri_rate_limiter.value);
 	}
 
 	return 0;

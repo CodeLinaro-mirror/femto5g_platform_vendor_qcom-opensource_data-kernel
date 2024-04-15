@@ -209,6 +209,9 @@ do {\
 /* DMA Tx Pre-Fetch buffer size change for LTE FH jumbo packets */
 #define ECPRI_DMA_PRE_FETCH_CHANGE_SIZE			(0x10)
 
+/* DMA Rate Limiter config for FH perf */
+#define ECPRI_DMA_RATE_LIMITER_FH			(0x28)
+
 enum ecpri_dma_smmu_cb_type {
 	ECPRI_DMA_SMMU_CB_GEN,
 	ECPRI_DMA_SMMU_CB_ETH,
