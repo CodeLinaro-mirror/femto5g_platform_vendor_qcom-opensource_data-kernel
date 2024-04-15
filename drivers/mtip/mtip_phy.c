@@ -352,11 +352,11 @@ void mtip_phy_get_lanes_of_link(u32 link_index, bool lanes_enabled[PHY_LANE_MAX]
 
         lanes_enabled[lane] = true;
 
-        CSMLOGDBG("using lane %d for link_index: %d", lane, link_index);
+       // CSMLOGDBG("using lane %d for link_index: %d", lane, link_index);
         ++lane_count;
     }
 
-    CSMLOGDBG("lane count of link_index: %d is %d\n", link_index, lane_count);
+    //CSMLOGDBG("lane count of link_index: %d is %d\n", link_index, lane_count);
     return;
 }
 
