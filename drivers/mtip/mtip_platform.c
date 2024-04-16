@@ -1683,13 +1683,16 @@ out:
 void post_mtip_process_create_phylink(void)
 {
    struct mtip_process_create_phylink_task* taskstruct = kmalloc(sizeof(struct mtip_process_create_phylink_task), GFP_ATOMIC);
+
    if(taskstruct == NULL)
    {
        CSMLOGERR("memory alloc failed\n");
        return;
    }
+
    taskstruct->value = 0;
-   mtip_queue_work(MTIP_WORKQ_TASK_CREATE_PHYLINK, taskstruct);
+
+   mtip_queue_work(MTIP_WORKQ_TASK_CREATE_PHYLINK, taskstruct, MTIP_PORT_TYPE_FH_0);
 }
 
 void run_mtip_process_create_phylink(void *work_ptr)
