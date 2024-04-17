@@ -1051,9 +1051,26 @@ int aw_pmd_rx_dfe_adapt_set(mss_access_t *mss, uint32_t dfe_adapt_enable) {
   return AW_ERR_CODE_NONE;
 }
 
+int aw_pmd_rx_background_adapt_enable_get(mss_access_t *mss, uint32_t *rx_bkgrnd_adapt_enable){
+    uint32_t adapt_en;
+    CHECK(pmd_read_field(mss, RXMFSM_CTRL_ADDR, RXMFSM_CTRL_RXMFSM_EQBK_POWER_STATE_MASK, RXMFSM_CTRL_RXMFSM_EQBK_POWER_STATE_OFFSET, &adapt_en));
+    if (adapt_en == 0){
+        *rx_bkgrnd_adapt_enable = 1;
+    } else {
+        *rx_bkgrnd_adapt_enable = 0;
+    }
+    return AW_ERR_CODE_NONE;
+}
+
 int aw_pmd_rx_background_adapt_enable_set(mss_access_t *mss,
                                           uint32_t rx_background_adapt) {
   int32_t poll_result;
+  uint32_t rx_background_adapt_curr_val;
+
+  aw_pmd_rx_background_adapt_enable_get(mss, &rx_background_adapt_curr_val);
+  if(rx_background_adapt_curr_val == rx_background_adapt)
+    return AW_ERR_CODE_NONE;
+
   if (rx_background_adapt == 1) {
     CHECK(pmd_write_field(mss, RXMFSM_CTRL_ADDR,
                           RXMFSM_CTRL_RXMFSM_EQBK_POWER_STATE_MASK,
