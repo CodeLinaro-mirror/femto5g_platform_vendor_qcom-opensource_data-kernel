@@ -71,7 +71,7 @@ struct kobj_attribute qcom_aw_phy_an_restart_delay_timer_attr =
                          __ATTR(an_restart_delay_timer_msec, 0660,
                                 qcom_aw_phy_sysfs_show_an_restart_delay_timer,
                                 qcom_aw_phy_sysfs_store_an_restart_delay_timer);
-int qcom_aw_phy_an_restart_delay_timer = 1000;
+int qcom_aw_phy_an_restart_delay_timer_val = 1000;
 
 #define MAX_INT_CHAR_SIZE 15
 
@@ -997,6 +997,11 @@ static int qcom_aw_phy_inst_probe(struct platform_device *pdev) {
 
       for (i = 0; i < PHY_LANE_MAX; i++) {
         mutex_init(&phy_inst_info->lane_lock[i]);
+
+        phy_inst_info->lane_params[i].an_restart_wq_item.phy_inst = phy_inst_type;
+        phy_inst_info->lane_params[i].an_restart_wq_item.lane_num = i;
+        INIT_DELAYED_WORK(&phy_inst_info->lane_params[i].an_restart_wq_item.wq_item,
+                          qcom_aw_phy_handle_an_restart);
       }
     } else {
       local_err_val = LOCAL_ERROR_0;
@@ -1164,13 +1169,13 @@ static int qcom_aw_phy_inst_remove(struct platform_device *pdev) {
 ssize_t qcom_aw_phy_sysfs_show_an_restart_delay_timer(
                 struct kobject *kobj, struct kobj_attribute *attr, char *buf) {
   return snprintf(buf, MAX_INT_CHAR_SIZE, "%d\n",
-                  qcom_aw_phy_an_restart_delay_timer);
+                  qcom_aw_phy_an_restart_delay_timer_val);
 }
 
 ssize_t qcom_aw_phy_sysfs_store_an_restart_delay_timer(
                               struct kobject *kobj, struct kobj_attribute *attr,
                               const char *buf, size_t count) {
-  sscanf(buf, "%d", &qcom_aw_phy_an_restart_delay_timer);
+  sscanf(buf, "%d", &qcom_aw_phy_an_restart_delay_timer_val);
   return count;
 }
 
@@ -1269,6 +1274,16 @@ static void __exit qcom_aw_phy_exit(void) {
   if(qcom_aw_phy_config_info.ldo16_supply){
     regulator_disable(qcom_aw_phy_config_info.ldo16_supply);
     qcom_aw_phy_config_info.ldo16_supply = NULL;
+  }
+
+  for(phy_inst_type = QCOM_AW_PHY_INST_FH0; phy_inst_type < QCOM_AW_PHY_INST_MAX;phy_inst_type ++){
+    phy_inst_info = &qcom_aw_phy_config_info.phy_inst_config_info[phy_inst_type];
+    if(phy_inst_info) {
+      for (lane = PHY_LANE_0; lane < PHY_LANE_MAX; lane++) {
+        cancel_delayed_work_sync(
+                  &phy_inst_info->lane_params[lane].an_restart_wq_item.wq_item);
+      }
+    }
   }
 
   destroy_workqueue(qcom_aw_phy_config_info.wq);
