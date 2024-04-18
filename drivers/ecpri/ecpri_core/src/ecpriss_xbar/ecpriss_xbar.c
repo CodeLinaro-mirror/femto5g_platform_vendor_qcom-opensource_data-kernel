@@ -8,7 +8,6 @@
 #define ENABLE_BIT 1
 #define DISABLE_BIT 0
 #include "ecpriss_log.h"
-
 int xbar_irq_mapping = 0;
 
 void ecpriss_xbar_config_stats_update(void){
@@ -125,7 +124,7 @@ void ecpriss_xbar_config_stats_update_v2(void){
 
 void ecpriss_xbar_stats_update(void)
 {
-	uint64_t val=0;
+	uint32_t val=0;
 	int link_index;
 	uint64_t curr_wm_index = 0;
 
@@ -314,7 +313,7 @@ void ecpriss_xbar_stats_update(void)
 
 void ecpriss_xbar_stats_update_v2(void)
 {
-	uint64_t val=0;
+	uint32_t val=0;
 	int link_index;
 	uint64_t curr_wm_index = 0;
 

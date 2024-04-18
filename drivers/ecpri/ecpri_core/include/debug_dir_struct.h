@@ -79,82 +79,6 @@
 						} \
 					} \
 				} \
-				c2c  \
-				{ \
-					c2c_0  \
-					{ \
-						link_0  \
-						{ \
-							,c2c:stats:00  \
-							,c2c:interrupts:00  \
-						} \
-						link_1  \
-						{ \
-							,c2c:stats:01  \
-							,c2c:interrupts:01  \
-						} \
-						link_2  \
-						{ \
-							,c2c:stats:02  \
-							,c2c:interrupts:02  \
-						} \
-						link_3  \
-						{ \
-							,c2c:stats:03  \
-							,c2c:interrupts:03  \
-						} \
-					} \
-					c2c_1  \
-					{ \
-						link_0  \
-						{ \
-							,c2c:stats:10  \
-							,c2c:interrupts:10  \
-						} \
-						link_1  \
-						{ \
-							,c2c:stats:11  \
-							,c2c:interrupts:11  \
-						} \
-						link_2  \
-						{ \
-							,c2c:stats:12  \
-							,c2c:interrupts:12\
-						} \
-						link_3  \
-						{ \
-							,c2c:stats:13  \
-							,c2c:interrupts:13  \
-						} \
-					} \
-					c2c_2  \
-					{ \
-						link_0  \
-						{ \
-							,c2c:stats:20  \
-							,c2c:interrupts:20  \
-						} \
-						link_1  \
-						{ \
-							,c2c:stats:21  \
-							,c2c:interrupts:21  \
-						} \
-						link_2  \
-						{ \
-							,c2c:stats:22  \
-							,c2c:interrupts:22  \
-						} \
-						link_3  \
-						{ \
-							,c2c:stats:23  \
-							,c2c:interrupts:23  \
-						} \
-					} \
-				} \
-				l2 \
-				{ \
-					,dummy \
-				} \
 			} \
 			xbar \
 			{\
@@ -262,14 +186,6 @@
 						} \
 					} \
 				} \
-				c2c  \
-				{ \
-					,dummy \
-				} \
-				l2 \
-				{ \
-					,dummy \
-				} \
 			} \
 			xbar \
 			{ \
@@ -286,18 +202,6 @@
 						,fh0:fhrx_fh0\
 						,fh1:fhrx_fh1\
 						,fh2:fhrx_fh2\
-					} \
-					c2crxDL \
-					{\
-						,fh0:c2crxDL_fh0\
-						,fh1:c2crxDL_fh1\
-						,fh2:c2crxDL_fh2\
-					} \
-					c2crxUL \
-					{\
-						,fh0:c2crxUL_fh0\
-						,fh1:c2crxUL_fh1\
-						,fh2:c2crxUL_fh2\
 					} \
 				} \
 				global \
