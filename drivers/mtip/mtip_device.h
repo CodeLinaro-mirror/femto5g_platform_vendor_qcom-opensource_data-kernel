@@ -57,6 +57,16 @@
 // 10G link speed configuration mask
 #define MTIP_DEVICE_PRIV_FLAGS_BIT_MASK_10G_ONLY_DBG_PORT  0x20000000
 
+// Single lane link speed configuration mask
+#define MTIP_DEVICE_PRIV_FLAGS_SINGLE_LANE_MASK            0x7FE06187
+
+// Two lanes link speed configuration mask
+#define MTIP_DEVICE_PRIV_FLAGS_TWO_LANES_MASK              0x00079E18
+
+// Four lanes link speed configuration mask
+#define MTIP_DEVICE_PRIV_FLAGS_FOUR_LANES_MASK             0x00180060
+
+
 // the net device structure
 struct mtip_netdev_priv {
    u32 link_index;

@@ -601,7 +601,8 @@ static int mtip_set_mac_address(struct net_device *dev, void *addr)
    spin_unlock_irqrestore(lock, flags);
 
    /* Send update to clients */
-   mtip_client_send_event(ETH_ECPRISS_EVENT_UP, link_index);
+   /* TBD - Need to post this event in wq context if needed in future */
+   //mtip_client_send_event(ETH_ECPRISS_EVENT_UP, link_index);
 
    return 0;
 }
@@ -1191,7 +1192,8 @@ static void mtip_rx_mode_set(struct net_device *netdev)
     if (ret == 0)
     {
         /* Send update to clients */
-        mtip_client_send_event(ETH_ECPRISS_EVENT_UP, link_index);
+        /* TBD - Need to post this event in wq context if needed in future */
+        //mtip_client_send_event(ETH_ECPRISS_EVENT_UP, link_index);
     }
 
    return; 
@@ -1235,7 +1237,8 @@ static int mtip_change_mtu(struct net_device *netdev, int new_mtu)
    mtip_mac_set_frame_length(priv, new_mtu + mtu_overhead);
 
    /* Send update to clients */
-   mtip_client_send_event(ETH_ECPRISS_EVENT_UP, link_index);
+   /* TBD - Need to post this event in wq context if needed in future */
+   //mtip_client_send_event(ETH_ECPRISS_EVENT_UP, link_index);
 
    return 0;
 }

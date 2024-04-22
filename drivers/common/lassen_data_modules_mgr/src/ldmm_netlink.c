@@ -168,11 +168,12 @@ int fult_mgmt_snd(uint32_t buf, int mode)
 	return ret;
 }
 
+stats_packet_info stats = {0};
+
 int ldmm_qxdm_logger_get_stats_info(struct sk_buff *sender_skb, struct genl_info *info) {
 	struct nlattr *na;
 	struct sk_buff *reply_skb;
 	void *msg_head;
-	stats_packet_info stats = {0};
 	int ret_val = 0;
 	int link_index, i = 0;
 
@@ -186,6 +187,8 @@ int ldmm_qxdm_logger_get_stats_info(struct sk_buff *sender_skb, struct genl_info
 		ret_val = EINVAL;
 		return ret_val;
 	}
+
+	memset(&stats, 0,sizeof(stats_packet_info));
 
 	for(link_index = 0; link_index < TOTAL_LINKS; link_index++)
 	{

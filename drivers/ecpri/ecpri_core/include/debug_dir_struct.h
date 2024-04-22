@@ -179,6 +179,7 @@
 							,fh0:eth_src0 \
 							,fh0:eth_src1 \
 							,fh0:eth_dst0 \
+							,fh0:misc \
 						} \
 						ingress \
 						{\
@@ -193,7 +194,9 @@
 						} \
 						global \
 						{\
-							,fh0:config \
+							,fh0:ingress_config \
+							,fh0:egress_ipv4_cfg \
+							,fh0:egress_ipv6_cfg \
 						} \
 					} \
 					fh_1  \
@@ -207,6 +210,7 @@
 							,fh1:eth_src0 \
 							,fh1:eth_src1 \
 							,fh1:eth_dst0 \
+							,fh1:misc \
 						} \
 						ingress \
 						{\
@@ -221,7 +225,9 @@
 						} \
 						global \
 						{\
-							,fh1:config \
+							,fh1:ingress_config \
+							,fh1:egress_ipv4_cfg \
+							,fh1:egress_ipv6_cfg \
 						} \
 					} \
 					fh_2  \
@@ -235,6 +241,7 @@
 							,fh2:eth_src0 \
 							,fh2:eth_src1 \
 							,fh2:eth_dst0 \
+							,fh2:misc \
 						} \
 						ingress \
 						{\
@@ -249,7 +256,9 @@
 						} \
 						global \
 						{\
-							,fh2:config \
+							,fh2:ingress_config \
+							,fh2:egress_ipv4_cfg \
+							,fh2:egress_ipv6_cfg \
 						} \
 					} \
 				} \

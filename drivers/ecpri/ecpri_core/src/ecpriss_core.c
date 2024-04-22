@@ -2052,6 +2052,40 @@ static void ecpriss_debug_stringify_flow_tp_cfg(ecpriss_packet_payload_s *packet
 			offset += scnprintf(cmd_buf + offset ,max_str_size - offset ,":%u| ",flow_tx->qudp_tx_cfg.ip_hdr.dst_udp_port);
 			offset = offset % max_str_size;
 		}
+		if(flow_tx->qudp_tx_cfg.eth_hdr.vport)
+			offset += scnprintf(cmd_buf + offset ,max_str_size - offset ,"Vport|%u| ",flow_tx->qudp_tx_cfg.eth_hdr.vport);
+		offset = offset % max_str_size;
+
+		if(flow_tx->qudp_tx_cfg.eth_hdr.vport_action)
+			offset += scnprintf(cmd_buf + offset ,max_str_size - offset ,"Vport_action|%u| ",flow_tx->qudp_tx_cfg.eth_hdr.vport_action);
+		offset = offset % max_str_size;
+		if(flow_tx->qudp_tx_cfg.ip_hdr.sa_tag_data)
+			offset += scnprintf(cmd_buf + offset ,max_str_size - offset ,"Sa_data|%u| ",flow_tx->qudp_tx_cfg.ip_hdr.sa_tag_data);
+		offset = offset % max_str_size;
+		if(flow_tx->qudp_tx_cfg.ip_hdr.udp_chksum_en)
+			offset += scnprintf(cmd_buf + offset ,max_str_size - offset ,"Checksum_en|%u| ",flow_tx->qudp_tx_cfg.ip_hdr.udp_chksum_en);
+		offset = offset % max_str_size;
+		if(flow_tx->qudp_tx_cfg.ip_hdr.ipsec_en)
+			offset += scnprintf(cmd_buf + offset ,max_str_size - offset ,"IPsec_en|%u| ",flow_tx->qudp_tx_cfg.ip_hdr.ipsec_en);
+		offset = offset % max_str_size;
+		if(flow_tx->qudp_tx_cfg.ip_hdr.df_en)
+			offset += scnprintf(cmd_buf + offset ,max_str_size - offset ,"DE_Frag|%u| ",flow_tx->qudp_tx_cfg.ip_hdr.df_en);
+		offset = offset % max_str_size;
+		if(flow_tx->qudp_tx_cfg.ip_hdr_p.ttl)
+			offset += scnprintf(cmd_buf + offset ,max_str_size - offset ,"TTL|%u| ",flow_tx->qudp_tx_cfg.ip_hdr_p.ttl);
+		offset = offset % max_str_size;
+		if(flow_tx->qudp_tx_cfg.ip_hdr_p.identification)
+			offset += scnprintf(cmd_buf + offset ,max_str_size - offset ,"IPV4_ID|%u| ",flow_tx->qudp_tx_cfg.ip_hdr_p.identification);
+		offset = offset % max_str_size;
+		if(flow_tx->qudp_tx_cfg.ip_hdr_p.flow_label)
+			offset += scnprintf(cmd_buf + offset ,max_str_size - offset ,"Flow_label|%u| ",flow_tx->qudp_tx_cfg.ip_hdr_p.flow_label);
+		offset = offset % max_str_size;
+		if(flow_tx->qudp_tx_cfg.ip_hdr_p.hop_limit)
+			offset += scnprintf(cmd_buf + offset ,max_str_size - offset ,"Hop_limit|%u| ",flow_tx->qudp_tx_cfg.ip_hdr_p.hop_limit);
+		offset = offset % max_str_size;
+		if(flow_tx->qudp_tx_cfg.ip_hdr_p.hop_limit)
+			offset += scnprintf(cmd_buf + offset ,max_str_size - offset ,"PCP/TOS|%u| ",flow_tx->qudp_tx_cfg.ip_hdr.tos);
+		offset = offset % max_str_size;
 
 	}else if( (int)flow_tx->src == ECPRISS_ROUTE_SRC_FH){
 		flow_rx = &packet->flow_cfg.flow_rx_cfg;
@@ -2253,6 +2287,43 @@ static void ecpriss_debug_stringify_egress_tp_cfg(ecpriss_packet_payload_s *pack
 		offset += scnprintf(cmd_buf + offset ,max_str_size - offset ,":%u| ",flow_tx->qudp_tx_cfg.ip_hdr.dst_udp_port);
 		offset = offset % max_str_size;
 	}
+	if(flow_tx->qudp_tx_cfg.eth_hdr.vport)
+		offset += scnprintf(cmd_buf + offset ,max_str_size - offset ,"Vport|%u| ",flow_tx->qudp_tx_cfg.eth_hdr.vport);
+	offset = offset % max_str_size;
+	if(flow_tx->qudp_tx_cfg.eth_hdr.vport_action)
+		offset += scnprintf(cmd_buf + offset ,max_str_size - offset ,"Vport_action|%u| ",flow_tx->qudp_tx_cfg.eth_hdr.vport_action);
+	offset = offset % max_str_size;
+	if(flow_tx->qudp_tx_cfg.ip_hdr.tos)
+		offset += scnprintf(cmd_buf + offset ,max_str_size - offset ,"TOS|%u| ",flow_tx->qudp_tx_cfg.ip_hdr.tos);
+	offset = offset % max_str_size;
+	if(flow_tx->qudp_tx_cfg.ip_hdr.sa_tag_data)
+		offset += scnprintf(cmd_buf + offset ,max_str_size - offset ,"Sa_data|%u| ",flow_tx->qudp_tx_cfg.ip_hdr.sa_tag_data);
+	offset = offset % max_str_size;
+	if(flow_tx->qudp_tx_cfg.ip_hdr.udp_chksum_en)
+		offset += scnprintf(cmd_buf + offset ,max_str_size - offset ,"Checksum_en|%u| ",flow_tx->qudp_tx_cfg.ip_hdr.udp_chksum_en);
+	offset = offset % max_str_size;
+	if(flow_tx->qudp_tx_cfg.ip_hdr.ipsec_en)
+		offset += scnprintf(cmd_buf + offset ,max_str_size - offset ,"IPsec_en|%u| ",flow_tx->qudp_tx_cfg.ip_hdr.ipsec_en);
+	offset = offset % max_str_size;
+	if(flow_tx->qudp_tx_cfg.ip_hdr.df_en)
+		offset += scnprintf(cmd_buf + offset ,max_str_size - offset ,"DE_Frag|%u| ",flow_tx->qudp_tx_cfg.ip_hdr.df_en);
+	offset = offset % max_str_size;
+	if(flow_tx->qudp_tx_cfg.ip_hdr_p.ttl)
+		offset += scnprintf(cmd_buf + offset ,max_str_size - offset ,"TTL|%u| ",flow_tx->qudp_tx_cfg.ip_hdr_p.ttl);
+	offset = offset % max_str_size;
+	if(flow_tx->qudp_tx_cfg.ip_hdr_p.identification)
+		offset += scnprintf(cmd_buf + offset ,max_str_size - offset ,"IPV4_ID|%u| ",flow_tx->qudp_tx_cfg.ip_hdr_p.identification);
+	offset = offset % max_str_size;
+	if(flow_tx->qudp_tx_cfg.ip_hdr_p.flow_label)
+		offset += scnprintf(cmd_buf + offset ,max_str_size - offset ,"Flow_label|%u| ",flow_tx->qudp_tx_cfg.ip_hdr_p.flow_label);
+	offset = offset % max_str_size;
+	if(flow_tx->qudp_tx_cfg.ip_hdr_p.hop_limit)
+		offset += scnprintf(cmd_buf + offset ,max_str_size - offset ,"Hop_limit|%u| ",flow_tx->qudp_tx_cfg.ip_hdr_p.hop_limit);
+	offset = offset % max_str_size;
+	if(flow_tx->qudp_tx_cfg.ip_hdr_p.hop_limit)
+		offset += scnprintf(cmd_buf + offset ,max_str_size - offset ,"PCP/TOS|%u| ",flow_tx->qudp_tx_cfg.ip_hdr.tos);
+	offset = offset % max_str_size;
+
 
 
 	*offset_p = offset;

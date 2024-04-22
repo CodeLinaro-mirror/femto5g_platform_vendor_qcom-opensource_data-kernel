@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: GPL-2.0-only
- * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2023-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #ifndef _LDMM_GENL_H
@@ -92,34 +92,34 @@ typedef struct {
 } __attribute__ ((packed)) port_info;
 
 typedef struct {
-    int link_name;
-    int EtherStatsOctets;
-    int OctetsReceivedOK;
-    int VLANReceivedOK;
-    int InErrors;
-    int InUCastPkts;
-    int InMCastPkts;
-    int InBCastPkts;
-    int EtherStatsDrops;
-    int EtherStatsPkts;
-    int OctetsTransmittedOK;
-    int VLANTransmittedOK;
-    int OutErrors;
-    int OutUCastPkts;
-    int OutMCastPkts;
-    int OutBCastPkts;
-    int FIFO_0_TX_Count;
-    int FIFO_1_TX_Count;
-    int FIFO_2_TX_Count;
-    int FIFO_3_TX_Count;
-    int FIFO_4_TX_Count;
-    int FIFO_5_TX_Count;
-    int FIFO_6_TX_Count;
-    int FIFO_7_TX_Count;
-    int Software_TX_Errors;
-    int Software_RX_Errors;
-    int Software_TX_Packets;
-    int Software_RX_Packets;
+    uint64_t link_name;
+    uint64_t EtherStatsOctets;
+    uint64_t OctetsReceivedOK;
+    uint64_t VLANReceivedOK;
+    uint64_t InErrors;
+    uint64_t InUCastPkts;
+    uint64_t InMCastPkts;
+    uint64_t InBCastPkts;
+    uint64_t EtherStatsDrops;
+    uint64_t EtherStatsPkts;
+    uint64_t OctetsTransmittedOK;
+    uint64_t VLANTransmittedOK;
+    uint64_t OutErrors;
+    uint64_t OutUCastPkts;
+    uint64_t OutMCastPkts;
+    uint64_t OutBCastPkts;
+    uint64_t FIFO_0_TX_Count;
+    uint64_t FIFO_1_TX_Count;
+    uint64_t FIFO_2_TX_Count;
+    uint64_t FIFO_3_TX_Count;
+    uint64_t FIFO_4_TX_Count;
+    uint64_t FIFO_5_TX_Count;
+    uint64_t FIFO_6_TX_Count;
+    uint64_t FIFO_7_TX_Count;
+    uint64_t Software_TX_Errors;
+    uint64_t Software_RX_Errors;
+    uint64_t Software_TX_Packets;
+    uint64_t Software_RX_Packets;
 } __attribute__ ((packed)) stats_info;
 
 typedef struct {
@@ -131,5 +131,7 @@ typedef struct {
     stats_info stats[TOTAL_LINKS];
 } __attribute__ ((packed)) stats_packet_info;
 
+#define STATS_PACKET_SIZE sizeof(stats_packet_info)
+#define CONFIG_PACKET_SIZE sizeof(config_packet_info)
 
 #endif /* _LDMM_GENL_H */

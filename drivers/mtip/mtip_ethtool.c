@@ -938,12 +938,12 @@ int mtip_ethtool_set_link_ksettings(struct net_device *netdev, const struct etht
     bool autoneg = false;
     u32 speed = 0;
     u32 priv_flags = 0;
-    int i;
 
     priv = netdev_priv(netdev);
     link_index = priv->link_index;
 
-    CSMLOGDBG("ethtool: set_link_ksettings for link_index: %d\n", link_index);
+    CSMLOGINFO("ethtool: set_link_ksettings for link_index: %d, speed %d, autoneg %d, lanes %d\n",
+               link_index, cmd->base.speed, cmd->base.autoneg, cmd->lanes);
 
     link_info = platform_driver_priv->mtip_links[link_index];
 
@@ -979,6 +979,12 @@ int mtip_ethtool_set_link_ksettings(struct net_device *netdev, const struct etht
             CSMLOGERR("invalid speed for link_index %d", link_index);
             return -EINVAL;
         }
+
+        if(cmd->lanes > 2)
+        {
+            CSMLOGERR("invalid lanes for link_index %d", link_index);
+            return -EINVAL;
+        }
     }
 
     // set link settings can be used to change autoneg to off/on
@@ -1000,38 +1006,12 @@ int mtip_ethtool_set_link_ksettings(struct net_device *netdev, const struct etht
         port_info->autoneg_changed = true;
     }
 
-    speed = cmd->base.speed;
-    CSMLOGDBG("Speed for link_index %d set to %d", link_index, speed);
-    if(port_type == MTIP_PORT_TYPE_DEBUG)
+    /* Private flags will be set based on the new speed value specified in
+       ethtool command. If the link is up, ethtool_link_ksettings will be
+       fetched with get API and cmd->base.speed will be filled based on the
+       current link speed.  */
+    if(speed != 0)
     {
-        if(!check_if_valid_speed_for_debug_eth(speed))
-        {
-            CSMLOGERR("invalid speed for link_index %d", link_index);
-            return -EINVAL;
-        }
-    }
-
-    speed = 0;
-    for (i = 0; i < PHY_LANE_MAX; ++i) 
-    {
-        if ((port_info->lane_config[i].link_index == link_index) &&
-            (port_info->lane_config[i].lane_enabled) &&
-            (link_info->state == MTIP_LINK_STATE_UP))
-        {
-            speed += mtip_platform_convert_lane_speed_to_gbps(port_info->lane_config[i].lane_speed);
-        }
-    }
-
-    /* If the link is up, ethtool_link_ksettings will be fetched with get API
-       and cmd->base.speed will be filled based on the current link speed. If it
-       matches, then no need to modify the private flags and hence speed will be
-       reset to 0. If it is a new value, then the private flags will be set
-       based on the newer speed value specified in ethtool command. */
-    if(speed != cmd->base.speed)
-    {
-        speed = cmd->base.speed;
-        CSMLOGERR("Speed for link_index %d set to %d", link_index, speed);
-
         if(speed == 10000)
         {
             if(link_index == MTIP_DEBUG_ETH_LINK_INDEX)
@@ -1071,8 +1051,15 @@ int mtip_ethtool_set_link_ksettings(struct net_device *netdev, const struct etht
             priv_flags = MTIP_DEVICE_PRIV_FLAGS_BIT_MASK_NON_FEC;
     }
 
-    // Set the priv flags for the speed config
+    /* Restrict the number of lanes as specified in ethtool command */
+    if(cmd->lanes == 1)
+        priv_flags &= MTIP_DEVICE_PRIV_FLAGS_SINGLE_LANE_MASK;
+    else if(cmd->lanes == 2)
+        priv_flags &= MTIP_DEVICE_PRIV_FLAGS_TWO_LANES_MASK;
+    else if(cmd->lanes == 4)
+        priv_flags &= MTIP_DEVICE_PRIV_FLAGS_FOUR_LANES_MASK;
 
+    // Set the priv flags for the speed config
     priv->priv_flags_set = true;
     priv->priv_flags = priv_flags;
 

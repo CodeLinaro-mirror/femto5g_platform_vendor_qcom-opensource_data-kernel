@@ -1706,11 +1706,11 @@ static int ecpri_dma_mhi_dma_sync_memcpy(
 	goto success;
 
 fail_poll_rx:
-	kfree(pkt_wrapper);
 	atomic_dec(&memcpy_ctx->sync_pending);
+success:
+	kfree(pkt_wrapper);
 fail_alloc_wrapper:
 fail_transmit:
-success:
 	ecpri_dma_mhi_free_pkt_from_heap(&pkts_src);
 fail_src_alloc:
 	ecpri_dma_mhi_free_pkt_from_heap(&pkts_dest);
