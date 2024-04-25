@@ -352,11 +352,11 @@ void mtip_phy_get_lanes_of_link(u32 link_index, bool lanes_enabled[PHY_LANE_MAX]
 
         lanes_enabled[lane] = true;
 
-        CSMLOGDBG("using lane %d for link_index: %d", lane, link_index);
+       // CSMLOGDBG("using lane %d for link_index: %d", lane, link_index);
         ++lane_count;
     }
 
-    CSMLOGDBG("lane count of link_index: %d is %d\n", link_index, lane_count);
+    //CSMLOGDBG("lane count of link_index: %d is %d\n", link_index, lane_count);
     return;
 }
 
@@ -973,7 +973,7 @@ static void mtip_phy_phy_validate(struct phylink_config *config,
     int ret;
     u8  sfp_port_type = PORT_DA;
     int sfp_phandle;
-    struct qsfp_info trx_info;
+    struct qsfp_info trx_info = {0};
     struct mtip_process_lane_up lane_up_info = {0};
 
     ret = mtip_phy_find_matching_lane(config, &lane_index);
@@ -1060,7 +1060,7 @@ static void mtip_phy_phylink_lane_up(struct phylink_config *config,
     int ret;
     u8  sfp_port_type = PORT_DA;
     int sfp_phandle;
-    struct qsfp_info trx_info;
+    struct qsfp_info trx_info = {0};
     struct mtip_process_lane_up lane_up_info = {0};
 
     ret = mtip_phy_find_matching_lane(config, &lane_index);

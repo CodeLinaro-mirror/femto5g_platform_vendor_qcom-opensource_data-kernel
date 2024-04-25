@@ -24,6 +24,10 @@ do {\
     if (mtip_ethtool_debug_logging_enable) {\
             pr_err(DRV_NAME " %s:%d " fmt, __func__, __LINE__, ## args);\
         } \
+    if (platform_driver_priv) {\
+			CSM_IPC_Log(platform_driver_priv->ipc_log_buf_dbg , \
+				DRV_NAME " %s:%d " fmt, ## args); \
+        } \
 } while (0)
 
 #define CSMLOGERR(fmt, args...) \
