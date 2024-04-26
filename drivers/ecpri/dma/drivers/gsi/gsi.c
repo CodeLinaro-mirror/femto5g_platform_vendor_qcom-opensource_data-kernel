@@ -3166,6 +3166,47 @@ static void __gsi_query_channel_free_re(struct gsi_chan_ctx *ctx,
 	*num_free_re = ctx->ring.max_num_elem - used;
 }
 
+int gsi_query_channel_free_re(unsigned long chan_hdl,
+	uint32_t* num_free_re)
+{
+	struct gsi_chan_ctx* ctx;
+	spinlock_t* slock;
+	unsigned long flags;
+
+	if (!num_free_re) {
+		GSIERR("null params num_free_re");
+		return -GSI_STATUS_INVALID_PARAMS;
+	}
+	*num_free_re = 0;
+
+	if (!gsi_ctx) {
+		pr_err("%s:%d gsi context not allocated\n", __func__, __LINE__);
+		return -GSI_STATUS_NODEV;
+	}
+
+	ctx = __gsi_get_ch_ctx_from_hdl(chan_hdl);
+	if (!ctx) {
+		GSIERR("bad params chan_hdl=%lu\n", chan_hdl);
+		return -GSI_STATUS_INVALID_PARAMS;
+	}
+
+	if (ctx->evtr) {
+		slock = &ctx->evtr->ring.slock;
+	}
+	else {
+		slock = &ctx->ring.slock;
+	}
+
+	spin_lock_irqsave(slock, flags);
+
+	__gsi_query_channel_free_re(ctx, (uint16_t *)num_free_re);
+
+	spin_unlock_irqrestore(slock, flags);
+
+	return GSI_STATUS_SUCCESS;
+}
+EXPORT_SYMBOL(gsi_query_channel_free_re);
+
 int gsi_query_channel_info(unsigned long chan_hdl,
 		struct gsi_chan_info *info)
 {
