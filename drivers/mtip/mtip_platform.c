@@ -116,7 +116,7 @@ static int mtip_platform_setup_link(unsigned int port_device_index, unsigned int
    platform_driver_priv->mtip_links[link_index]->link_down_received_post_link_up = false;
 
    timer_setup(&platform_driver_priv->mtip_links[link_index]->phy_retry_timer,
-               &mtip_phy_retry_timer_cb, link_index);
+               &mtip_phy_retry_timer_cb, 0);
    platform_driver_priv->mtip_links[link_index]->phy_retry_timer_valid = true;
 
    if(link_index != MTIP_DEBUG_ETH_LINK_INDEX){
