@@ -7135,6 +7135,8 @@ INT DWC_ETH_QOS_powerdown(struct net_device *dev, UINT wakeup_type,
 	struct DWC_ETH_QOS_prv_data *pdata = netdev_priv(dev);
 	struct hw_if_struct *hw_if = &pdata->hw_if;
 	ULONG flags;
+	int i = 0;
+	ULONG data;
 
 	DBGPR(KERN_ALERT "-->DWC_ETH_QOS_powerdown\n");
 
@@ -7162,6 +7164,17 @@ INT DWC_ETH_QOS_powerdown(struct net_device *dev, UINT wakeup_type,
 
 	/* Disable MAC TX/RX */
 	hw_if->stop_mac_tx_rx();
+
+	for(i = 0; i < DWC_ETH_QOS_RX_QUEUE_CNT; i++) {
+		if(pdata->ipa_enabled && (i == IPA_DMA_RX_CH))
+			continue;
+		while (1) {
+			MTL_QRDR_RXQSTS_UDFRD(i, data);
+			if(!(data & MTL_QRDR_RXQSTS_MASK));
+				break;
+			usleep_range(1000, 1500);
+		}
+	}
 
 	/* Stop SW RX after DMA RX in HW */
 	DWC_ETH_QOS_stop_all_ch_rx_dma(pdata);
