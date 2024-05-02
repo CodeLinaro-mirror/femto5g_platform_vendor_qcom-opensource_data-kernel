@@ -484,7 +484,7 @@ int eth_adaption_send(struct sk_buff *skb)
 			__pm_relax(eth_ws);
 		}
 	}
-	return 0;
+	return ret;
 }
 EXPORT_SYMBOL(eth_adaption_send);
 
