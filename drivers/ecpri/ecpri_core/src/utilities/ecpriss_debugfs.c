@@ -3467,7 +3467,7 @@ static ssize_t stats_value_from_registers_xbar_v2(char __user *buf)
 
 	char *final_stats_str = NULL;
 	char temp_stat_val_str[TEMP_STAT_VAL_STR_MAX_SIZE];
-	uint32_t temp_stat_val = 0;
+	uint64_t temp_stat_val = 0;
 	uint32_t i = 0;
 	uint32_t ret_val = 0;
 
@@ -3498,7 +3498,7 @@ static ssize_t stats_value_from_registers_xbar_v2(char __user *buf)
 
 		temp_stat_val =
 			ecpriss_pdata_v2->xbar_ctx_v2->stats_v2.xbar_fhrx_pkt_cnt[i];
-		scnprintf(temp_stat_val_str, TEMP_STAT_VAL_STR_MAX_SIZE, "%lu",
+		scnprintf(temp_stat_val_str, TEMP_STAT_VAL_STR_MAX_SIZE, "%llu",
 				  temp_stat_val);
 
 		strlcat(final_stats_str, temp_stat_val_str_1,
@@ -3513,7 +3513,7 @@ static ssize_t stats_value_from_registers_xbar_v2(char __user *buf)
 
 		temp_stat_val =
 			ecpriss_pdata_v2->xbar_ctx_v2->stats_v2.xbar_fhtx_pkt_cnt[i];
-		scnprintf(temp_stat_val_str, TEMP_STAT_VAL_STR_MAX_SIZE, "%lu",
+		scnprintf(temp_stat_val_str, TEMP_STAT_VAL_STR_MAX_SIZE, "%llu",
 				  temp_stat_val);
 
 		strlcat(final_stats_str, temp_stat_val_str_2,
@@ -3529,7 +3529,7 @@ static ssize_t stats_value_from_registers_xbar_v2(char __user *buf)
 	}
 
 	temp_stat_val = ecpriss_pdata_v2->xbar_ctx_v2->stats_v2.xbar_fhrx_dma_pkt_cnt;
-	scnprintf(temp_stat_val_str, TEMP_STAT_VAL_STR_MAX_SIZE, "%lu",
+	scnprintf(temp_stat_val_str, TEMP_STAT_VAL_STR_MAX_SIZE, "%llu",
 			  temp_stat_val);
 	strlcat(final_stats_str,
 			"{xbar_fhrx_dma_pkt_cnt:", FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
@@ -3538,7 +3538,7 @@ static ssize_t stats_value_from_registers_xbar_v2(char __user *buf)
 	strlcat(final_stats_str, "}\n", FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
 
 	temp_stat_val = ecpriss_pdata_v2->xbar_ctx_v2->stats_v2.xbar_fhrx_uc_pkt_cnt;
-	scnprintf(temp_stat_val_str, TEMP_STAT_VAL_STR_MAX_SIZE, "%lu",
+	scnprintf(temp_stat_val_str, TEMP_STAT_VAL_STR_MAX_SIZE, "%llu",
 			  temp_stat_val);
 	strlcat(final_stats_str,
 			"{xbar_fhrx_uc_pkt_cnt:", FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
@@ -3547,7 +3547,7 @@ static ssize_t stats_value_from_registers_xbar_v2(char __user *buf)
 	strlcat(final_stats_str, "}\n", FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
 
 	temp_stat_val = ecpriss_pdata_v2->xbar_ctx_v2->stats_v2.xbar_fhrx_uc_err_pkt_cnt;
-	scnprintf(temp_stat_val_str, TEMP_STAT_VAL_STR_MAX_SIZE, "%lu",
+	scnprintf(temp_stat_val_str, TEMP_STAT_VAL_STR_MAX_SIZE, "%llu",
 			  temp_stat_val);
 	strlcat(final_stats_str,
 			"{xbar_fhrx_uc_err_pkt_cnt:", FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
@@ -3556,7 +3556,7 @@ static ssize_t stats_value_from_registers_xbar_v2(char __user *buf)
 	strlcat(final_stats_str, "}\n", FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
 
 	temp_stat_val = ecpriss_pdata_v2->xbar_ctx_v2->stats_v2.xbar_fhrx_err_pkt_cnt;
-	scnprintf(temp_stat_val_str, TEMP_STAT_VAL_STR_MAX_SIZE, "%lu",
+	scnprintf(temp_stat_val_str, TEMP_STAT_VAL_STR_MAX_SIZE, "%llu",
 			  temp_stat_val);
 	strlcat(final_stats_str,
 			"{xbar_fhrx_err_pkt_cnt:", FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
@@ -3566,7 +3566,7 @@ static ssize_t stats_value_from_registers_xbar_v2(char __user *buf)
 
 	temp_stat_val =
 		ecpriss_pdata_v2->xbar_ctx_v2->stats_v2.xbar_fhtx_c2c_pkt_ovf_cnt;
-	scnprintf(temp_stat_val_str, TEMP_STAT_VAL_STR_MAX_SIZE, "%lu",
+	scnprintf(temp_stat_val_str, TEMP_STAT_VAL_STR_MAX_SIZE, "%llu",
 			  temp_stat_val);
 	strlcat(final_stats_str, "{xbar_fhtx_c2c_pkt_ovf_cnt:",
 			FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
@@ -3575,7 +3575,7 @@ static ssize_t stats_value_from_registers_xbar_v2(char __user *buf)
 	strlcat(final_stats_str, "}\n", FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
 
 	temp_stat_val = ecpriss_pdata_v2->xbar_ctx_v2->stats_v2.xbar_fhtx_dma_pkt_cnt;
-	scnprintf(temp_stat_val_str, TEMP_STAT_VAL_STR_MAX_SIZE, "%lu",
+	scnprintf(temp_stat_val_str, TEMP_STAT_VAL_STR_MAX_SIZE, "%llu",
 			  temp_stat_val, FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
 	strlcat(final_stats_str,
 			"{xbar_fhtx_dma_pkt_cnt:", FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
@@ -3584,7 +3584,7 @@ static ssize_t stats_value_from_registers_xbar_v2(char __user *buf)
 	strlcat(final_stats_str, "}\n", FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
 
 	temp_stat_val = ecpriss_pdata_v2->xbar_ctx_v2->stats_v2.xbar_fhtx_uc_pkt_cnt;
-	scnprintf(temp_stat_val_str, TEMP_STAT_VAL_STR_MAX_SIZE, "%lu",
+	scnprintf(temp_stat_val_str, TEMP_STAT_VAL_STR_MAX_SIZE, "%llu",
 			  temp_stat_val);
 	strlcat(final_stats_str,
 			"{xbar_fhtx_uc_pkt_cnt:", FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
@@ -3600,7 +3600,7 @@ static ssize_t stats_value_from_registers_xbar_v2(char __user *buf)
 
 			temp_stat_val =
 				ecpriss_pdata_v2->xbar_ctx_v2->stats_v2.xbar_fhrx_c2c_pkt_cnt[i];
-			scnprintf(temp_stat_val_str, TEMP_STAT_VAL_STR_MAX_SIZE, "%lu",
+			scnprintf(temp_stat_val_str, TEMP_STAT_VAL_STR_MAX_SIZE, "%llu",
 					  temp_stat_val);
 
 			strlcat(final_stats_str, "{xbar_fhrx_c2c_pkt_cnt_fh",
@@ -3615,7 +3615,7 @@ static ssize_t stats_value_from_registers_xbar_v2(char __user *buf)
 
 			temp_stat_val =
 				ecpriss_pdata_v2->xbar_ctx_v2->stats_v2.xbar_fhrx_oc_pkt_cnt[i];
-			scnprintf(temp_stat_val_str, TEMP_STAT_VAL_STR_MAX_SIZE, "%lu",
+			scnprintf(temp_stat_val_str, TEMP_STAT_VAL_STR_MAX_SIZE, "%llu",
 					  temp_stat_val);
 
 			strlcat(final_stats_str, "{xbar_fhrx_oc_pkt_cnt_fh",
@@ -3630,7 +3630,7 @@ static ssize_t stats_value_from_registers_xbar_v2(char __user *buf)
 	}
 
 	temp_stat_val = ecpriss_pdata_v2->xbar_ctx_v2->stats_v2.xbar_octx_c2c_pkt_drop_cnt;
-	scnprintf(temp_stat_val_str, TEMP_STAT_VAL_STR_MAX_SIZE, "%lu",
+	scnprintf(temp_stat_val_str, TEMP_STAT_VAL_STR_MAX_SIZE, "%llu",
 			  temp_stat_val);
 	strlcat(final_stats_str,
 			"{xbar_octx_c2c_pkt_drop_cnt:", FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
@@ -3639,7 +3639,7 @@ static ssize_t stats_value_from_registers_xbar_v2(char __user *buf)
 	strlcat(final_stats_str, "}\n", FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
 
 	temp_stat_val = ecpriss_pdata_v2->xbar_ctx_v2->stats_v2.xbar_octx_fh_pkt_drop_cnt;
-	scnprintf(temp_stat_val_str, TEMP_STAT_VAL_STR_MAX_SIZE, "%lu",
+	scnprintf(temp_stat_val_str, TEMP_STAT_VAL_STR_MAX_SIZE, "%llu",
 			  temp_stat_val);
 	strlcat(final_stats_str,
 			"{xbar_octx_fh_pkt_drop_cnt:", FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
@@ -3648,7 +3648,7 @@ static ssize_t stats_value_from_registers_xbar_v2(char __user *buf)
 	strlcat(final_stats_str, "}\n", FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
 
 	temp_stat_val = ecpriss_pdata_v2->xbar_ctx_v2->stats_v2.xbar_octx_c2c_len_err_cnt;
-	scnprintf(temp_stat_val_str, TEMP_STAT_VAL_STR_MAX_SIZE, "%lu",
+	scnprintf(temp_stat_val_str, TEMP_STAT_VAL_STR_MAX_SIZE, "%llu",
 			  temp_stat_val);
 	strlcat(final_stats_str,
 			"{xbar_octx_c2c_len_err_cnt:", FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
@@ -3658,7 +3658,7 @@ static ssize_t stats_value_from_registers_xbar_v2(char __user *buf)
 
 
 	temp_stat_val = ecpriss_pdata_v2->xbar_ctx_v2->stats_v2.xbar_octx_fh_len_err_cnt;
-	scnprintf(temp_stat_val_str, TEMP_STAT_VAL_STR_MAX_SIZE, "%lu",
+	scnprintf(temp_stat_val_str, TEMP_STAT_VAL_STR_MAX_SIZE, "%llu",
 			  temp_stat_val);
 	strlcat(final_stats_str,
 			"{xbar_octx_fh_len_err_cnt:", FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
@@ -3677,7 +3677,7 @@ static ssize_t stats_value_from_registers_xbar_v2(char __user *buf)
 
 		temp_stat_val =
 			ecpriss_pdata_v2->xbar_ctx_v2->stats_v2.xbar_octx_pkt_cnt[i];
-		scnprintf(temp_stat_val_str, TEMP_STAT_VAL_STR_MAX_SIZE, "%lu",
+		scnprintf(temp_stat_val_str, TEMP_STAT_VAL_STR_MAX_SIZE, "%llu",
 				  temp_stat_val);
 
 		strlcat(final_stats_str, "{xbar_octx_pkt_cnt_link",
@@ -3692,7 +3692,7 @@ static ssize_t stats_value_from_registers_xbar_v2(char __user *buf)
 
 		temp_stat_val =
 			ecpriss_pdata_v2->xbar_ctx_v2->stats_v2.xbar_ocrx_pkt_cnt[i];
-		scnprintf(temp_stat_val_str, TEMP_STAT_VAL_STR_MAX_SIZE, "%lu",
+		scnprintf(temp_stat_val_str, TEMP_STAT_VAL_STR_MAX_SIZE, "%llu",
 				  temp_stat_val);
 
 		strlcat(final_stats_str, "{xbar_ocrx_pkt_cnt_link",
@@ -3713,7 +3713,7 @@ static ssize_t stats_value_from_registers_xbar_v2(char __user *buf)
 
 		temp_stat_val =
 			ecpriss_pdata_v2->xbar_ctx_v2->stats_v2.xbar_ocrx_fh_pkt_cnt[i];
-		scnprintf(temp_stat_val_str, TEMP_STAT_VAL_STR_MAX_SIZE, "%lu",
+		scnprintf(temp_stat_val_str, TEMP_STAT_VAL_STR_MAX_SIZE, "%llu",
 				  temp_stat_val);
 
 		strlcat(final_stats_str, "{xbar_ocrx_fh_pkt_cnt_link",
@@ -3734,7 +3734,7 @@ static ssize_t stats_value_from_registers_xbar_v2(char __user *buf)
 
 			temp_stat_val =
 				ecpriss_pdata_v2->xbar_ctx_v2->stats_v2.xbar_ocrx_c2c_pkt_cnt[i];
-			scnprintf(temp_stat_val_str, TEMP_STAT_VAL_STR_MAX_SIZE, "%lu",
+			scnprintf(temp_stat_val_str, TEMP_STAT_VAL_STR_MAX_SIZE, "%llu",
 					  temp_stat_val);
 
 			strlcat(final_stats_str, "{xbar_ocrx_c2c_pkt_cnt_fh",
@@ -3749,7 +3749,7 @@ static ssize_t stats_value_from_registers_xbar_v2(char __user *buf)
 	}
 
 	temp_stat_val = ecpriss_pdata_v2->xbar_ctx_v2->stats_v2.xbar_dbg_fhrx_unknown_pcid_cnt_fhrx_0_cnt;
-        scnprintf(temp_stat_val_str, TEMP_STAT_VAL_STR_MAX_SIZE, "%lu",
+        scnprintf(temp_stat_val_str, TEMP_STAT_VAL_STR_MAX_SIZE, "%llu",
                         temp_stat_val);
         strlcat(final_stats_str,
                         "{xbar_dbg_fhrx_unknown_pcid_cnt-->fhrx_0_cnt :", FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
@@ -3758,7 +3758,7 @@ static ssize_t stats_value_from_registers_xbar_v2(char __user *buf)
         strlcat(final_stats_str, "}\n", FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
 
         temp_stat_val = ecpriss_pdata_v2->xbar_ctx_v2->stats_v2.xbar_dbg_fhrx_unknown_pcid_cnt_fhrx_1_cnt;
-        scnprintf(temp_stat_val_str, TEMP_STAT_VAL_STR_MAX_SIZE, "%lu",
+        scnprintf(temp_stat_val_str, TEMP_STAT_VAL_STR_MAX_SIZE, "%llu",
                         temp_stat_val);
         strlcat(final_stats_str,
                         "{xbar_dbg_fhrx_unknown_pcid_cnt-->fhrx_1_cnt :", FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
@@ -3767,7 +3767,7 @@ static ssize_t stats_value_from_registers_xbar_v2(char __user *buf)
         strlcat(final_stats_str, "}\n", FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
 
         temp_stat_val = ecpriss_pdata_v2->xbar_ctx_v2->stats_v2.xbar_dbg_fhrx_unknown_pcid_cnt_fhrx_2_cnt;
-        scnprintf(temp_stat_val_str, TEMP_STAT_VAL_STR_MAX_SIZE, "%lu",
+        scnprintf(temp_stat_val_str, TEMP_STAT_VAL_STR_MAX_SIZE, "%llu",
                         temp_stat_val);
         strlcat(final_stats_str,
                         "{xbar_dbg_fhrx_unknown_pcid_cnt-->fhrx_2_cnt :", FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
@@ -3777,7 +3777,7 @@ static ssize_t stats_value_from_registers_xbar_v2(char __user *buf)
 
 
 	temp_stat_val = ecpriss_pdata_v2->xbar_ctx_v2->stats_v2.xbar_dbg_ocrx_unknown_pcid_cnt_ocrx_fh_0_cnt;
-        scnprintf(temp_stat_val_str, TEMP_STAT_VAL_STR_MAX_SIZE, "%lu",
+        scnprintf(temp_stat_val_str, TEMP_STAT_VAL_STR_MAX_SIZE, "%llu",
                         temp_stat_val);
         strlcat(final_stats_str,
                         "{xbar_dbg_ocrx_unknown_pcid_cnt-->ocrx_fh_0_cnt :", FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
@@ -3786,7 +3786,7 @@ static ssize_t stats_value_from_registers_xbar_v2(char __user *buf)
         strlcat(final_stats_str, "}\n", FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
 
         temp_stat_val = ecpriss_pdata_v2->xbar_ctx_v2->stats_v2.xbar_dbg_ocrx_unknown_pcid_cnt_ocrx_fh_1_cnt;
-        scnprintf(temp_stat_val_str, TEMP_STAT_VAL_STR_MAX_SIZE, "%lu",
+        scnprintf(temp_stat_val_str, TEMP_STAT_VAL_STR_MAX_SIZE, "%llu",
                         temp_stat_val);
         strlcat(final_stats_str,
                         "{xbar_dbg_ocrx_unknown_pcid_cnt-->ocrx_fh_1_cnt :", FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
@@ -3795,7 +3795,7 @@ static ssize_t stats_value_from_registers_xbar_v2(char __user *buf)
         strlcat(final_stats_str, "}\n", FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
 
         temp_stat_val = ecpriss_pdata_v2->xbar_ctx_v2->stats_v2.xbar_dbg_ocrx_unknown_pcid_cnt_ocrx_fh_2_cnt;
-        scnprintf(temp_stat_val_str, TEMP_STAT_VAL_STR_MAX_SIZE, "%lu",
+        scnprintf(temp_stat_val_str, TEMP_STAT_VAL_STR_MAX_SIZE, "%llu",
                         temp_stat_val);
         strlcat(final_stats_str,
                         "{xbar_dbg_ocrx_unknown_pcid_cnt-->ocrx_fh_2_cnt :", FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
@@ -4771,7 +4771,7 @@ static ssize_t stats_value_from_registers_fh_v2(char __user *buf, int port, int 
 
 	temp_stat_val = ecpriss_pdata_v2->qudp_ctx_v2->fh_port_cfg_v2[port]
 						.stats_v2.egress_num_udp_packets[link];
-	scnprintf(temp_stat_val_str, TEMP_STAT_VAL_STR_MAX_SIZE, "%lu",
+	scnprintf(temp_stat_val_str, TEMP_STAT_VAL_STR_MAX_SIZE, "%llu",
 			  temp_stat_val);
 	strlcat(final_stats_str,
 			"{egress_num_udp_packets:", FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
@@ -4781,7 +4781,7 @@ static ssize_t stats_value_from_registers_fh_v2(char __user *buf, int port, int 
 
 	temp_stat_val = ecpriss_pdata_v2->qudp_ctx_v2->fh_port_cfg_v2[port]
 						.stats_v2.egress_num_eth_packets[link];
-	scnprintf(temp_stat_val_str, TEMP_STAT_VAL_STR_MAX_SIZE, "%lu",
+	scnprintf(temp_stat_val_str, TEMP_STAT_VAL_STR_MAX_SIZE, "%llu",
 			  temp_stat_val);
 	strlcat(final_stats_str,
 			"{egress_num_eth_packets:", FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
@@ -4791,7 +4791,7 @@ static ssize_t stats_value_from_registers_fh_v2(char __user *buf, int port, int 
 
 	temp_stat_val = ecpriss_pdata_v2->qudp_ctx_v2->fh_port_cfg_v2[port]
 						.stats_v2.egress_num_bypassed_packets[link];
-	scnprintf(temp_stat_val_str, TEMP_STAT_VAL_STR_MAX_SIZE, "%lu",
+	scnprintf(temp_stat_val_str, TEMP_STAT_VAL_STR_MAX_SIZE, "%llu",
 			  temp_stat_val);
 	strlcat(final_stats_str, "{egress_num_bypassed_packets:",
 			FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
@@ -4801,7 +4801,7 @@ static ssize_t stats_value_from_registers_fh_v2(char __user *buf, int port, int 
 
 	temp_stat_val = ecpriss_pdata_v2->qudp_ctx_v2->fh_port_cfg_v2[port]
 						.stats_v2.egress_num_mtu_err_packets[link];
-	scnprintf(temp_stat_val_str, TEMP_STAT_VAL_STR_MAX_SIZE, "%lu",
+	scnprintf(temp_stat_val_str, TEMP_STAT_VAL_STR_MAX_SIZE, "%llu",
 			  temp_stat_val);
 	strlcat(final_stats_str, "{egress_num_mtu_err_packets:",
 			FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
@@ -4811,7 +4811,7 @@ static ssize_t stats_value_from_registers_fh_v2(char __user *buf, int port, int 
 
 	temp_stat_val = ecpriss_pdata_v2->qudp_ctx_v2->fh_port_cfg_v2[port]
 						.stats_v2.ingress_num_eth_udp_packets[link];
-	scnprintf(temp_stat_val_str, TEMP_STAT_VAL_STR_MAX_SIZE, "%lu",
+	scnprintf(temp_stat_val_str, TEMP_STAT_VAL_STR_MAX_SIZE, "%llu",
 			  temp_stat_val);
 	strlcat(final_stats_str,
 			"{ingress_num_eth_udp_packets:", FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
@@ -4821,7 +4821,7 @@ static ssize_t stats_value_from_registers_fh_v2(char __user *buf, int port, int 
 
 	temp_stat_val = ecpriss_pdata_v2->qudp_ctx_v2->fh_port_cfg_v2[port]
 						.stats_v2.ingress_num_fcs_err_packets[link];
-	scnprintf(temp_stat_val_str, TEMP_STAT_VAL_STR_MAX_SIZE, "%lu",
+	scnprintf(temp_stat_val_str, TEMP_STAT_VAL_STR_MAX_SIZE, "%llu",
 			  temp_stat_val);
 	strlcat(final_stats_str, "{ingress_num_fcs_err_packets:",
 			FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
@@ -4831,7 +4831,7 @@ static ssize_t stats_value_from_registers_fh_v2(char __user *buf, int port, int 
 
 	temp_stat_val = ecpriss_pdata_v2->qudp_ctx_v2->fh_port_cfg_v2[port]
 						.stats_v2.ingress_num_ipv4_cs_err_packets[link];
-	scnprintf(temp_stat_val_str, TEMP_STAT_VAL_STR_MAX_SIZE, "%lu",
+	scnprintf(temp_stat_val_str, TEMP_STAT_VAL_STR_MAX_SIZE, "%llu",
 			  temp_stat_val);
 	strlcat(final_stats_str, "{ingress_num_ipv4_cs_err_packets:",
 			FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
@@ -4841,7 +4841,7 @@ static ssize_t stats_value_from_registers_fh_v2(char __user *buf, int port, int 
 
 	temp_stat_val = ecpriss_pdata_v2->qudp_ctx_v2->fh_port_cfg_v2[port]
 						.stats_v2.ingress_num_udp_cs_err_packets[link];
-	scnprintf(temp_stat_val_str, TEMP_STAT_VAL_STR_MAX_SIZE, "%lu",
+	scnprintf(temp_stat_val_str, TEMP_STAT_VAL_STR_MAX_SIZE, "%llu",
 			  temp_stat_val);
 	strlcat(final_stats_str, "{ingress_num_udp_cs_err_packets:",
 			FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
@@ -4851,7 +4851,7 @@ static ssize_t stats_value_from_registers_fh_v2(char __user *buf, int port, int 
 
 	temp_stat_val = ecpriss_pdata_v2->qudp_ctx_v2->fh_port_cfg_v2[port]
 						.stats_v2.ingress_ip_filtered_packets[link];
-	scnprintf(temp_stat_val_str, TEMP_STAT_VAL_STR_MAX_SIZE, "%lu",
+	scnprintf(temp_stat_val_str, TEMP_STAT_VAL_STR_MAX_SIZE, "%llu",
 			  temp_stat_val);
 	strlcat(final_stats_str, "{ingress_ip_filtered_packets:",
 			FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
@@ -4862,7 +4862,7 @@ static ssize_t stats_value_from_registers_fh_v2(char __user *buf, int port, int 
 
 	temp_stat_val = ecpriss_pdata_v2->qudp_ctx_v2->fh_port_cfg_v2[port]
 						.stats_v2.ingress_num_vlan_filtered_packets[link];
-	scnprintf(temp_stat_val_str, TEMP_STAT_VAL_STR_MAX_SIZE, "%lu",
+	scnprintf(temp_stat_val_str, TEMP_STAT_VAL_STR_MAX_SIZE, "%llu",
 			  temp_stat_val);
 	strlcat(final_stats_str, "{ingress_num_vlan_filtered_packets:",
 			FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
@@ -4872,7 +4872,7 @@ static ssize_t stats_value_from_registers_fh_v2(char __user *buf, int port, int 
 
 	temp_stat_val = ecpriss_pdata_v2->qudp_ctx_v2->fh_port_cfg_v2[port]
 						.stats_v2.ingress_num_sec_err_packets[link];
-	scnprintf(temp_stat_val_str, TEMP_STAT_VAL_STR_MAX_SIZE, "%lu",
+	scnprintf(temp_stat_val_str, TEMP_STAT_VAL_STR_MAX_SIZE, "%llu",
 			  temp_stat_val);
 	strlcat(final_stats_str, "{ingress_num_sec_err_packets:",
 			FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
@@ -4882,7 +4882,7 @@ static ssize_t stats_value_from_registers_fh_v2(char __user *buf, int port, int 
 
 	temp_stat_val = ecpriss_pdata_v2->qudp_ctx_v2->fh_port_cfg_v2[port]
 						.stats_v2.ingress_ip_len_err_packets[link];
-	scnprintf(temp_stat_val_str, TEMP_STAT_VAL_STR_MAX_SIZE, "%lu",
+	scnprintf(temp_stat_val_str, TEMP_STAT_VAL_STR_MAX_SIZE, "%llu",
 			  temp_stat_val);
 	strlcat(final_stats_str, "{ingress_ip_len_err_packets:",
 			FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
@@ -4892,7 +4892,7 @@ static ssize_t stats_value_from_registers_fh_v2(char __user *buf, int port, int 
 
 	temp_stat_val = ecpriss_pdata_v2->qudp_ctx_v2->fh_port_cfg_v2[port]
 						.stats_v2.ingress_num_eth_ecpri_packets[link];
-	scnprintf(temp_stat_val_str, TEMP_STAT_VAL_STR_MAX_SIZE, "%lu",
+	scnprintf(temp_stat_val_str, TEMP_STAT_VAL_STR_MAX_SIZE, "%llu",
 			  temp_stat_val);
 	strlcat(final_stats_str, "{ingress_num_eth_ecpri_packets:",
 			FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
@@ -4902,7 +4902,7 @@ static ssize_t stats_value_from_registers_fh_v2(char __user *buf, int port, int 
 
 	temp_stat_val = ecpriss_pdata_v2->qudp_ctx_v2->fh_port_cfg_v2[port]
 						.stats_v2.ingress_num_eth_ptp_packets[link];
-	scnprintf(temp_stat_val_str, TEMP_STAT_VAL_STR_MAX_SIZE, "%lu",
+	scnprintf(temp_stat_val_str, TEMP_STAT_VAL_STR_MAX_SIZE, "%llu",
 			  temp_stat_val);
 	strlcat(final_stats_str, "{ingress_num_eth_ptp_packets:",
 			FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
@@ -4912,7 +4912,7 @@ static ssize_t stats_value_from_registers_fh_v2(char __user *buf, int port, int 
 
 	temp_stat_val = ecpriss_pdata_v2->qudp_ctx_v2->fh_port_cfg_v2[port]
 						.stats_v2.ingress_num_eth_other_packets[link];
-	scnprintf(temp_stat_val_str, TEMP_STAT_VAL_STR_MAX_SIZE, "%lu",
+	scnprintf(temp_stat_val_str, TEMP_STAT_VAL_STR_MAX_SIZE, "%llu",
 			  temp_stat_val);
 	strlcat(final_stats_str, "{ingress_num_eth_other_packets:",
 			FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
@@ -4922,7 +4922,7 @@ static ssize_t stats_value_from_registers_fh_v2(char __user *buf, int port, int 
 
 	temp_stat_val = ecpriss_pdata_v2->qudp_ctx_v2->fh_port_cfg_v2[port]
 						.stats_v2.ingress_num_udp_ecpri_or_nfapi_packets[link];
-	scnprintf(temp_stat_val_str, TEMP_STAT_VAL_STR_MAX_SIZE, "%lu",
+	scnprintf(temp_stat_val_str, TEMP_STAT_VAL_STR_MAX_SIZE, "%llu",
 			  temp_stat_val);
 	strlcat(final_stats_str, "{ingress_num_udp_ecpri_or_nfapi_packets:",
 			FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
@@ -4932,7 +4932,7 @@ static ssize_t stats_value_from_registers_fh_v2(char __user *buf, int port, int 
 
 	temp_stat_val = ecpriss_pdata_v2->qudp_ctx_v2->fh_port_cfg_v2[port]
 						.stats_v2.ingress_num_udp_ptp_packets[link];
-	scnprintf(temp_stat_val_str, TEMP_STAT_VAL_STR_MAX_SIZE, "%lu",
+	scnprintf(temp_stat_val_str, TEMP_STAT_VAL_STR_MAX_SIZE, "%llu",
 			  temp_stat_val);
 	strlcat(final_stats_str, "{ingress_num_udp_ptp_packets:",
 			FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
@@ -4942,7 +4942,7 @@ static ssize_t stats_value_from_registers_fh_v2(char __user *buf, int port, int 
 
 	temp_stat_val = ecpriss_pdata_v2->qudp_ctx_v2->fh_port_cfg_v2[port]
 						.stats_v2.ingress_num_udp_other_packets[link];
-	scnprintf(temp_stat_val_str, TEMP_STAT_VAL_STR_MAX_SIZE, "%lu",
+	scnprintf(temp_stat_val_str, TEMP_STAT_VAL_STR_MAX_SIZE, "%llu",
 			  temp_stat_val);
 	strlcat(final_stats_str, "{ingress_num_udp_other_packets:",
 			FINAL_STATS_DYNAMIC_STR_MAX_SIZE);
