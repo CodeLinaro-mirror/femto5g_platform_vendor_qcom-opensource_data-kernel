@@ -1,19 +1,10 @@
+// SPDX-License-Identifier: GPL-2.0-only
 /* Copyright (c) 2011-2016, The Linux Foundation. All rights reserved.
- * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License version 2 and
- * only version 2 as published by the Free Software Foundation.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * Copyright (c) 2023-2024, Qualcomm Innovation Center, Inc. All rights reserved.
  *
  */
 
-/*
- * RMNET BAM Module.
- */
+/* RMNET BAM Module.  */
 
 #include <linux/module.h>
 #include <linux/kernel.h>
@@ -36,25 +27,67 @@
 
 /* Debug message support */
 static int msm_rmnet_bam_debug_mask;
-module_param_named(debug_enable, msm_rmnet_bam_debug_mask,
-			int, S_IRUGO | S_IWUSR | S_IWGRP);
+static ssize_t debug_enable_show(struct device *dev, struct device_attribute
+					*attr, char *buf)
+{
+	return scnprintf(buf, PAGE_SIZE, "%d\n", msm_rmnet_bam_debug_mask);
+}
 
-static unsigned long int msm_rmnet_bam_headroom_check_failure;
-module_param(msm_rmnet_bam_headroom_check_failure, ulong, S_IRUGO);
-MODULE_PARM_DESC(msm_rmnet_bam_headroom_check_failure,
-		 "Number of packets with insufficient headroom");
+static ssize_t debug_enable_store(struct device *dev,
+				  struct device_attribute *attr,
+				  const char *buf, size_t count)
+{
+	int val;
+
+	if (kstrtos32(buf, 0, &val))
+		return -EINVAL;
+
+	msm_rmnet_bam_debug_mask = val;
+
+	return count;
+}
+static DEVICE_ATTR_RW(debug_enable);
+
+static unsigned long msm_rmnet_bam_headroom_check_failure;
+static ssize_t
+msm_rmnet_bam_headroom_check_failure_show(struct device *dev,
+					  struct device_attribute *attr,
+					  char *buf)
+{
+	return scnprintf(buf, PAGE_SIZE, "%d\n",
+			msm_rmnet_bam_headroom_check_failure);
+}
+static DEVICE_ATTR_RO(msm_rmnet_bam_headroom_check_failure);
 
 /* Packet threshold. */
 static unsigned int pkt_threshold = 1;
-module_param(pkt_threshold,
-	     uint, S_IRUGO | S_IWUSR | S_IWGRP);
+static ssize_t pkt_threshold_show(struct device *dev, struct device_attribute
+				*attr, char *buf)
+{
+	return scnprintf(buf, PAGE_SIZE, "%d\n", pkt_threshold);
+}
 
-#define DEBUG_MASK_LVL0 (1U << 0)
-#define DEBUG_MASK_LVL1 (1U << 1)
-#define DEBUG_MASK_LVL2 (1U << 2)
+static ssize_t pkt_threshold_store(struct device *dev,
+				   struct device_attribute *attr,
+				   const char *buf, size_t count)
+{
+	int val;
+
+	if (kstrtos32(buf, 0, &val))
+		return -EINVAL;
+
+	pkt_threshold = val;
+
+	return count;
+}
+static DEVICE_ATTR_RW(pkt_threshold);
+
+#define DEBUG_MASK_LVL0	BIT(0)
+#define DEBUG_MASK_LVL1	BIT(1)
+#define DEBUG_MASK_LVL2	BIT(2)
 
 #define DBG(m, x...) do {			   \
-		if (msm_rmnet_bam_debug_mask & m) \
+		if (msm_rmnet_bam_debug_mask & (m)) \
 			pr_info(x);		   \
 } while (0)
 #define DBG0(x...) DBG(DEBUG_MASK_LVL0, x)
@@ -78,7 +111,7 @@ module_param(pkt_threshold,
 
 struct rmnet_private {
 	struct net_device_stats stats;
-	uint32_t ch_id;
+	u32 ch_id;
 #ifdef CONFIG_MSM_RMNET_DEBUG
 	ktime_t last_packet;
 	unsigned long wakeups_xmit;
@@ -86,17 +119,23 @@ struct rmnet_private {
 	unsigned long timeout_us;
 #endif
 	struct sk_buff *waiting_for_ul_skb;
+
+	/* Lock to change operation mode */
 	spinlock_t lock;
+
+	/* Lock to check low water mark */
 	spinlock_t tx_queue_lock;
 	struct tasklet_struct tsklt;
-	u32 operation_mode; /* IOCTL specified mode (protocol, QoS header) */
-	uint8_t device_up;
-	uint8_t in_reset;
+
+	/* IOCTL specified mode (protocol, QoS header) */
+	u32 operation_mode;
+	u8 device_up;
+	u8 in_reset;
 };
 
 struct rmnet_free_bam_work {
 	struct work_struct work;
-	uint32_t ch_id;
+	u32 ch_id;
 };
 
 #ifdef CONFIG_MSM_RMNET_DEBUG
@@ -107,6 +146,7 @@ static int rmnet_cause_wakeup(struct rmnet_private *p)
 {
 	int ret = 0;
 	ktime_t now;
+
 	if (p->timeout_us == 0) /* Check if disabled */
 		return 0;
 
@@ -125,26 +165,34 @@ static ssize_t wakeups_xmit_show(struct device *d,
 				 char *buf)
 {
 	struct rmnet_private *p = netdev_priv(to_net_dev(d));
-	return snprintf(buf, PAGE_SIZE, "%lu\n", p->wakeups_xmit);
+
+	return scnprintf(buf, PAGE_SIZE, "%lu\n", p->wakeups_xmit);
 }
 
-DEVICE_ATTR(wakeups_xmit, 0444, wakeups_xmit_show, NULL);
+DEVICE_ATTR_RO(wakeups_xmit);
 
 static ssize_t wakeups_rcv_show(struct device *d, struct device_attribute *attr,
 				char *buf)
 {
 	struct rmnet_private *p = netdev_priv(to_net_dev(d));
-	return snprintf(buf, PAGE_SIZE, "%lu\n", p->wakeups_rcv);
+
+	return scnprintf(buf, PAGE_SIZE, "%lu\n", p->wakeups_rcv);
 }
 
-DEVICE_ATTR(wakeups_rcv, 0444, wakeups_rcv_show, NULL);
+DEVICE_ATTR_RO(wakeups_rcv);
 
 /* Set timeout in us. */
 static ssize_t timeout_store(struct device *d, struct device_attribute *attr,
 			     const char *buf, size_t n)
 {
 	struct rmnet_private *p = netdev_priv(to_net_dev(d));
-	p->timeout_us = timeout_us = strict_strtoul(buf, NULL, 10);
+	int ret;
+
+	ret = kstrtoul(buf, 10, &timeout_us);
+	if (!ret)
+		p->timeout_us = timeout_us;
+	else
+		n = 0;
 	return n;
 }
 
@@ -152,16 +200,17 @@ static ssize_t timeout_show(struct device *d, struct device_attribute *attr,
 			    char *buf)
 {
 	struct rmnet_private *p = netdev_priv(to_net_dev(d));
+
 	p = netdev_priv(to_net_dev(d));
-	return snprintf(buf, PAGE_SIZE, "%lu\n", timeout_us);
+	return scnprintf(buf, PAGE_SIZE, "%lu\n", timeout_us);
 }
 
-DEVICE_ATTR(timeout, 0664, timeout_show, timeout_store);
+DEVICE_ATTR_RW(timeout);
 #endif
 
-
 /* Forward declaration */
-static int rmnet_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd);
+static int rmnet_ioctl(struct net_device *dev, struct ifreq *ifr,
+		       void __user *data, int cmd);
 static struct platform_driver bam_rmnet_drivers[BAM_DMUX_NUM_CHANNELS];
 
 static struct net_device *netdevs[BAM_DMUX_NUM_CHANNELS];
@@ -226,22 +275,23 @@ static void bam_recv_notify(void *dev, struct sk_buff *skb)
 			p->stats.rx_bytes += skb->len;
 		}
 		DBG1("[%s] Rx packet #%lu len=%d\n",
-			((struct net_device *)dev)->name,
+		     ((struct net_device *)dev)->name,
 			p->stats.rx_packets, skb->len);
 
 		/* Deliver to network stack */
 		if (pkt_threshold == 1) {
-			netif_rx_ni(skb);
+			__netif_rx(skb);
 		} else {
 			/* For every nth packet, use netif_rx_ni(). */
 			if (p->stats.rx_packets % pkt_threshold == 0)
-				netif_rx_ni(skb);
+				__netif_rx(skb);
 			else
 				netif_rx(skb);
 		}
-	} else
-		pr_err("[%s] %s: No skb received",
-			((struct net_device *)dev)->name, __func__);
+	} else {
+		pr_err("[%s] %s: No skb received\n",
+		       ((struct net_device *)dev)->name, __func__);
+	}
 }
 
 static struct sk_buff *_rmnet_add_headroom(struct sk_buff **skb,
@@ -286,13 +336,12 @@ static int _rmnet_xmit(struct sk_buff *skb, struct net_device *dev)
 		qmih->flow_id = skb->mark;
 	}
 
-	netif_trans_update(dev);
 	/* if write() succeeds, skb access is unsafe in this process */
 	bam_ret = msm_bam_dmux_write(p->ch_id, skb);
 
 	if (bam_ret != 0 && bam_ret != -EAGAIN && bam_ret != -EFAULT) {
-		pr_err("[%s] %s: write returned error %d",
-			dev->name, __func__, bam_ret);
+		pr_err("[%s] %s: write returned error %d\n",
+		       dev->name, __func__, bam_ret);
 		if (RMNET_IS_MODE_QOS(opmode))
 			skb_pull(skb, sizeof(struct QMI_QOS_HDR_S));
 		return -EPERM;
@@ -309,7 +358,7 @@ static void bam_write_done(void *dev, struct sk_buff *skb)
 
 	DBG1("%s: write complete\n", __func__);
 	if (RMNET_IS_MODE_IP(opmode) ||
-				count_this_packet(skb->data, skb->len)) {
+	    count_this_packet(skb->data, skb->len)) {
 		p->stats.tx_packets++;
 		p->stats.tx_bytes += skb->len;
 #ifdef CONFIG_MSM_RMNET_DEBUG
@@ -317,7 +366,7 @@ static void bam_write_done(void *dev, struct sk_buff *skb)
 #endif
 	}
 	DBG1("[%s] Tx packet #%lu len=%d mark=0x%x\n",
-	    ((struct net_device *)(dev))->name, p->stats.tx_packets,
+	     ((struct net_device *)(dev))->name, p->stats.tx_packets,
 	    skb->len, skb->mark);
 	dev_kfree_skb_any(skb);
 
@@ -325,7 +374,7 @@ static void bam_write_done(void *dev, struct sk_buff *skb)
 	if (netif_queue_stopped(dev) &&
 	    msm_bam_dmux_is_ch_low(p->ch_id)) {
 		DBG0("%s: Low WM hit, waking queue=%p\n",
-		      __func__, skb);
+		     __func__, skb);
 		netif_wake_queue(dev);
 	}
 	spin_unlock_irqrestore(&p->tx_queue_lock, flags);
@@ -345,7 +394,7 @@ static void bam_notify(void *dev, int event, unsigned long data)
 		break;
 	case BAM_DMUX_UL_CONNECTED:
 		spin_lock_irqsave(&p->lock, flags);
-		if (p->waiting_for_ul_skb != NULL) {
+		if (p->waiting_for_ul_skb) {
 			struct sk_buff *skb;
 			int ret;
 
@@ -355,7 +404,7 @@ static void bam_notify(void *dev, int event, unsigned long data)
 			ret = _rmnet_xmit(skb, dev);
 			if (ret) {
 				pr_err("%s: error %d dropping delayed TX SKB %p\n",
-						__func__, ret, skb);
+				       __func__, ret, skb);
 				dev_kfree_skb_any(skb);
 			}
 			netif_wake_queue(dev);
@@ -373,17 +422,13 @@ static int __rmnet_open(struct net_device *dev)
 	int r;
 	struct rmnet_private *p = netdev_priv(dev);
 
-	DBG0("[%s] __rmnet_open()\n", dev->name);
-	pr_err("ld_debug: %s: %s\n", __func__, dev->name);
+	DBG0("[%s] %s\n", dev->name, __func__);
 
 	if (p->device_up == DEVICE_UNINITIALIZED) {
-		pr_err("ld_debug: %s: bam_dmux_open\n", __func__);
 		r = msm_bam_dmux_open(p->ch_id, dev, bam_notify);
 		if (r < 0) {
 			DBG0("%s: ch=%d failed with rc %d\n",
-					__func__, p->ch_id, r);
-			pr_err("ld_debug: %s: ch=%d failed with rc %d\n",
-					__func__, p->ch_id, r);
+			     __func__, p->ch_id, r);
 			return -ENODEV;
 		}
 	}
@@ -396,7 +441,7 @@ static int rmnet_open(struct net_device *dev)
 {
 	int rc = 0;
 
-	DBG0("[%s] rmnet_open()\n", dev->name);
+	DBG0("[%s] %s\n", dev->name, __func__);
 
 	rc = __rmnet_open(dev);
 
@@ -406,7 +451,6 @@ static int rmnet_open(struct net_device *dev)
 	return rc;
 }
 
-
 static int __rmnet_close(struct net_device *dev)
 {
 	struct rmnet_private *p = netdev_priv(dev);
@@ -414,17 +458,18 @@ static int __rmnet_close(struct net_device *dev)
 
 	if (p->device_up == DEVICE_ACTIVE) {
 		/* do not close rmnet port once up,  this causes
-		   remote side to hang if tried to open again */
+		 * remote side to hang if tried to open again
+		 */
 		p->device_up = DEVICE_INACTIVE;
 		return rc;
-	} else
+	} else {
 		return -EBADF;
+	}
 }
-
 
 static int rmnet_stop(struct net_device *dev)
 {
-	DBG0("[%s] rmnet_stop()\n", dev->name);
+	DBG0("[%s] %s\n", dev->name, __func__);
 
 	__rmnet_close(dev);
 	netif_stop_queue(dev);
@@ -438,7 +483,7 @@ static int rmnet_change_mtu(struct net_device *dev, int new_mtu)
 		return -EINVAL;
 
 	DBG0("[%s] MTU change: old=%d new=%d\n",
-		dev->name, dev->mtu, new_mtu);
+	     dev->name, dev->mtu, new_mtu);
 	dev->mtu = new_mtu;
 
 	return 0;
@@ -452,8 +497,8 @@ static int rmnet_xmit(struct sk_buff *skb, struct net_device *dev)
 	int ret = 0;
 
 	if (netif_queue_stopped(dev)) {
-		pr_err("[%s]fatal: rmnet_xmit called when "
-			"netif_queue is stopped", dev->name);
+		pr_err("[%s]fatal: %s called when netif_queue is stopped\n",
+		       dev->name, __func__);
 		return NETDEV_TX_BUSY;
 	}
 
@@ -475,10 +520,9 @@ static int rmnet_xmit(struct sk_buff *skb, struct net_device *dev)
 		goto exit;
 	}
 
-	/*
-	 * detected SSR a bit early.  shut some things down now, and leave
-	 * the rest to the main ssr handling code when that happens later
-	 */
+	 /* Detected SSR a bit early.  shut some things down now, and leave
+	  * the rest to the main ssr handling code when that happens later
+	  */
 	if (ret == -EFAULT) {
 		netif_carrier_off(dev);
 		dev_kfree_skb_any(skb);
@@ -487,14 +531,13 @@ static int rmnet_xmit(struct sk_buff *skb, struct net_device *dev)
 	}
 
 	if (ret == -EAGAIN) {
-		/*
-		 * This should not happen
-		 * EAGAIN means we attempted to overflow the high watermark
-		 * Clearly the queue is not stopped like it should be, so
-		 * stop it and return BUSY to the TCP/IP framework.  It will
-		 * retry this packet with the queue is restarted which happens
-		 * in the write_done callback when the low watermark is hit.
-		 */
+		 /* This should not happen
+		  * EAGAIN means we attempted to overflow the high watermark
+		  * Clearly the queue is not stopped like it should be, so
+		  * stop it and return BUSY to the TCP/IP framework.  It will
+		  * retry this packet with the queue is restarted which happens
+		  * in the write_done callback when the low watermark is hit.
+		  */
 		netif_stop_queue(dev);
 		ret = NETDEV_TX_BUSY;
 		goto exit;
@@ -515,12 +558,13 @@ exit:
 static struct net_device_stats *rmnet_get_stats(struct net_device *dev)
 {
 	struct rmnet_private *p = netdev_priv(dev);
+
 	return &p->stats;
 }
 
-static void rmnet_tx_timeout(struct net_device *dev)
+static void rmnet_tx_timeout(struct net_device *dev, unsigned int txqueue)
 {
-	pr_warning("[%s] rmnet_tx_timeout()\n", dev->name);
+	pr_warn("[%s] %s\n", dev->name, __func__);
 }
 
 static const struct net_device_ops rmnet_ops_ether = {
@@ -529,7 +573,7 @@ static const struct net_device_ops rmnet_ops_ether = {
 	.ndo_start_xmit = rmnet_xmit,
 	.ndo_get_stats = rmnet_get_stats,
 	.ndo_tx_timeout = rmnet_tx_timeout,
-	.ndo_do_ioctl = rmnet_ioctl,
+	.ndo_siocdevprivate = rmnet_ioctl,
 	.ndo_change_mtu = rmnet_change_mtu,
 	.ndo_set_mac_address = eth_mac_addr,
 	.ndo_validate_addr = eth_validate_addr,
@@ -541,7 +585,7 @@ static const struct net_device_ops rmnet_ops_ip = {
 	.ndo_start_xmit = rmnet_xmit,
 	.ndo_get_stats = rmnet_get_stats,
 	.ndo_tx_timeout = rmnet_tx_timeout,
-	.ndo_do_ioctl = rmnet_ioctl,
+	.ndo_siocdevprivate = rmnet_ioctl,
 	.ndo_change_mtu = rmnet_change_mtu,
 	.ndo_set_mac_address = 0,
 	.ndo_validate_addr = 0,
@@ -576,7 +620,7 @@ static int rmnet_ioctl_extended(struct net_device *dev, struct ifreq *ifr)
 			    sizeof(ext_cmd));
 
 	if (rc) {
-		pr_err("%s: copy_from_user failed ,error %d", __func__, rc);
+		pr_err("%s: copy_from_user failed ,error %d\n", __func__, rc);
 		return rc;
 	}
 
@@ -591,7 +635,7 @@ static int rmnet_ioctl_extended(struct net_device *dev, struct ifreq *ifr)
 		ext_cmd.u.data = 0;
 		break;
 	case RMNET_IOCTL_GET_DRIVER_NAME:
-		strlcpy(ext_cmd.u.if_name, RMNET_BAM_DRIVER_NAME,
+		strscpy(ext_cmd.u.if_name, RMNET_BAM_DRIVER_NAME,
 			sizeof(ext_cmd.u.if_name));
 		break;
 	case RMNET_IOCTL_DEREGISTER_DEV:
@@ -611,12 +655,13 @@ static int rmnet_ioctl_extended(struct net_device *dev, struct ifreq *ifr)
 	rc = copy_to_user(ifr->ifr_ifru.ifru_data, &ext_cmd, sizeof(ext_cmd));
 
 	if (rc)
-		pr_err("%s: copy_to_user failed, error %d", __func__, rc);
+		pr_err("%s: copy_to_user failed, error %d\n", __func__, rc);
 
 	return rc;
 }
 
-static int rmnet_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
+static int rmnet_ioctl(struct net_device *dev, struct ifreq *ifr,
+		       void __user *data, int cmd)
 {
 	struct rmnet_private *p = netdev_priv(dev);
 	u32 old_opmode = p->operation_mode;
@@ -631,7 +676,7 @@ static int rmnet_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 		/* Perform Ethernet config only if in IP mode currently*/
 		if (p->operation_mode & RMNET_MODE_LLP_IP) {
 			ether_setup(dev);
-			random_ether_addr(dev->dev_addr);
+			eth_random_addr((u8 *)dev->dev_addr);
 			dev->mtu = prev_mtu;
 
 			dev->netdev_ops = &rmnet_ops_ether;
@@ -639,23 +684,21 @@ static int rmnet_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 			p->operation_mode &= ~RMNET_MODE_LLP_IP;
 			p->operation_mode |= RMNET_MODE_LLP_ETH;
 			spin_unlock_irqrestore(&p->lock, flags);
-			DBG0("[%s] rmnet_ioctl(): "
-				"set Ethernet protocol mode\n",
-				dev->name);
+			DBG0("[%s] %s: set Ethernet protocol mode\n",
+			     dev->name, __func__);
 		}
 		break;
 
 	case RMNET_IOCTL_SET_LLP_IP:        /* Set RAWIP protocol      */
 		/* Perform IP config only if in Ethernet mode currently*/
 		if (p->operation_mode & RMNET_MODE_LLP_ETH) {
-
 			/* Undo config done in ether_setup() */
 			dev->header_ops         = 0;  /* No header */
 			dev->type               = ARPHRD_RAWIP;
 			dev->hard_header_len    = 0;
 			dev->mtu                = prev_mtu;
 			dev->addr_len           = 0;
-			dev->flags              &= ~(IFF_BROADCAST|
+			dev->flags              &= ~(IFF_BROADCAST |
 						     IFF_MULTICAST);
 
 			dev->needed_headroom = HEADROOM_FOR_BAM +
@@ -666,17 +709,16 @@ static int rmnet_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 			p->operation_mode &= ~RMNET_MODE_LLP_ETH;
 			p->operation_mode |= RMNET_MODE_LLP_IP;
 			spin_unlock_irqrestore(&p->lock, flags);
-			DBG0("[%s] rmnet_ioctl(): "
-				"set IP protocol mode\n",
-				dev->name);
+			DBG0("[%s] %s: set IP protocol mode\n",
+			     dev->name, __func__);
 		}
 		break;
 
 	case RMNET_IOCTL_GET_LLP:           /* Get link protocol state */
 		ioctl_data.u.operation_mode = (p->operation_mode &
-				 (RMNET_MODE_LLP_ETH|RMNET_MODE_LLP_IP));
+				 (RMNET_MODE_LLP_ETH | RMNET_MODE_LLP_IP));
 		if (copy_to_user(ifr->ifr_ifru.ifru_data, &ioctl_data,
-			sizeof(struct rmnet_ioctl_data_s)))
+				 sizeof(struct rmnet_ioctl_data_s)))
 			rc = -EFAULT;
 		break;
 
@@ -684,65 +726,63 @@ static int rmnet_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 		spin_lock_irqsave(&p->lock, flags);
 		p->operation_mode |= RMNET_MODE_QOS;
 		spin_unlock_irqrestore(&p->lock, flags);
-		DBG0("[%s] rmnet_ioctl(): set QMI QOS header enable\n",
-			dev->name);
+		DBG0("[%s] %s: set QMI QOS header enable\n",
+		     dev->name, __func__);
 		break;
 
 	case RMNET_IOCTL_SET_QOS_DISABLE:   /* Set QoS header disabled */
 		spin_lock_irqsave(&p->lock, flags);
 		p->operation_mode &= ~RMNET_MODE_QOS;
 		spin_unlock_irqrestore(&p->lock, flags);
-		DBG0("[%s] rmnet_ioctl(): set QMI QOS header disable\n",
-			dev->name);
+		DBG0("[%s] %s: set QMI QOS header disable\n",
+		     dev->name, __func__);
 		break;
 
 	case RMNET_IOCTL_FLOW_ENABLE:
 		if (copy_from_user(&ioctl_data, ifr->ifr_ifru.ifru_data,
-			sizeof(struct rmnet_ioctl_data_s))) {
+				   sizeof(struct rmnet_ioctl_data_s))) {
 			rc = -EFAULT;
 			break;
 		}
-		/*making it noop as FC not needed at rmnetbam
-		 * tc_qdisc_flow_control(dev, ioctl_data.u.tcm_handle, 1);*/
-		DBG0("[%s] rmnet_ioctl(): enabled flow: ignored", dev->name);
+		//tc_qdisc_flow_control(dev, ioctl_data.u.tcm_handle, 1);
+		DBG0("[%s] %s: enabled flow", dev->name, __func__);
 		break;
 
 	case RMNET_IOCTL_FLOW_DISABLE:
 		if (copy_from_user(&ioctl_data, ifr->ifr_ifru.ifru_data,
-			sizeof(struct rmnet_ioctl_data_s))) {
+				   sizeof(struct rmnet_ioctl_data_s))) {
 			rc = -EFAULT;
 			break;
 		}
-		/*making it noop as FC not needed at rmnetbam
-		 *tc_qdisc_flow_control(dev, ioctl_data.u.tcm_handle, 0);*/
-		DBG0("[%s] rmnet_ioctl(): disabled flow: ignored", dev->name);
+		//tc_qdisc_flow_control(dev, ioctl_data.u.tcm_handle, 0);
+		DBG0("[%s] %s: disabled flow", dev->name, __func__);
 		break;
 
 	case RMNET_IOCTL_GET_QOS:           /* Get QoS header state    */
 		ioctl_data.u.operation_mode = (p->operation_mode
 						& RMNET_MODE_QOS);
 		if (copy_to_user(ifr->ifr_ifru.ifru_data, &ioctl_data,
-			sizeof(struct rmnet_ioctl_data_s)))
+				 sizeof(struct rmnet_ioctl_data_s)))
 			rc = -EFAULT;
 		break;
 
 	case RMNET_IOCTL_GET_OPMODE:        /* Get operation mode      */
 		ioctl_data.u.operation_mode = p->operation_mode;
 		if (copy_to_user(ifr->ifr_ifru.ifru_data, &ioctl_data,
-			sizeof(struct rmnet_ioctl_data_s)))
+				 sizeof(struct rmnet_ioctl_data_s)))
 			rc = -EFAULT;
 		break;
 
 	case RMNET_IOCTL_OPEN:              /* Open transport port     */
 		rc = __rmnet_open(dev);
-		DBG0("[%s] rmnet_ioctl(): open transport port\n",
-			dev->name);
+		DBG0("[%s] %s: open transport port\n",
+		     dev->name, __func__);
 		break;
 
 	case RMNET_IOCTL_CLOSE:             /* Close transport port    */
 		rc = __rmnet_close(dev);
-		DBG0("[%s] rmnet_ioctl(): close transport port\n",
-			dev->name);
+		DBG0("[%s] %s: close transport port\n",
+		     dev->name, __func__);
 		break;
 
 	case RMNET_IOCTL_EXTENDED:          /* Extended IOCTL's        */
@@ -750,13 +790,13 @@ static int rmnet_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 		break;
 
 	default:
-		pr_err("[%s] error: rmnet_ioct called for unsupported cmd[%d]",
-			dev->name, cmd);
+		pr_err("[%s] error: %s called for unsupported cmd[%d]\n",
+		       dev->name, __func__, cmd);
 		return -EINVAL;
 	}
 
 	DBG2("[%s] %s: cmd=0x%x opmode old=0x%08x new=0x%08x\n",
-		dev->name, __func__, cmd, old_opmode, p->operation_mode);
+	     dev->name, __func__, cmd, old_opmode, p->operation_mode);
 	return rc;
 }
 
@@ -768,25 +808,25 @@ static void rmnet_setup(struct net_device *dev)
 
 	/* set this after calling ether_setup */
 	dev->mtu = RMNET_DATA_LEN;
-	dev->needed_headroom = HEADROOM_FOR_BAM + HEADROOM_FOR_QOS ;
+	dev->needed_headroom = HEADROOM_FOR_BAM + HEADROOM_FOR_QOS;
 	dev->needed_tailroom = TAILROOM;
-	random_ether_addr(dev->dev_addr);
+	eth_random_addr((u8 *)dev->dev_addr);
 
 	dev->watchdog_timeo = 1000; /* 10 seconds? */
 }
 
-
 #ifdef CONFIG_MSM_RMNET_DEBUG
 static int rmnet_debug_init(struct net_device *dev)
 {
-
 	struct device *d;
 	struct rmnet_private *p;
 	int err = 0;
-	d = &(dev->dev);
+
+	d = &dev->dev;
 	p = netdev_priv(dev);
 	p->timeout_us = 0;
-	p->wakeups_xmit = p->wakeups_rcv = 0;
+	p->wakeups_xmit = 0;
+	p->wakeups_rcv = 0;
 	err = device_create_file(d, &dev_attr_timeout);
 	if (err)
 		return err;
@@ -803,6 +843,28 @@ static int rmnet_debug_init(struct net_device *dev)
 }
 #endif
 
+static int rmnet_sysnode_init(struct device *dev)
+{
+	int ret = 0;
+
+	if (!dev)
+		return -EINVAL;
+
+	device_create_file(dev, &dev_attr_debug_enable);
+	device_create_file(dev,
+			   &dev_attr_msm_rmnet_bam_headroom_check_failure);
+	device_create_file(dev, &dev_attr_pkt_threshold);
+
+	return ret;
+}
+
+static void rmnet_remove_files(struct device *dev)
+{
+	device_remove_file(dev, &dev_attr_debug_enable);
+	device_remove_file(dev, &dev_attr_msm_rmnet_bam_headroom_check_failure);
+	device_remove_file(dev, &dev_attr_pkt_threshold);
+}
+
 static int bam_rmnet_probe(struct platform_device *pdev)
 {
 	int i, ret;
@@ -818,8 +880,8 @@ static int bam_rmnet_probe(struct platform_device *pdev)
 			break;
 	}
 
-	if (((i > BAM_DMUX_DATA_RMNET_7) && (i < BAM_DMUX_DATA_REV_RMNET_0)) ||
-	    (i >= BAM_DMUX_NUM_CHANNELS)) {
+	if ((i > BAM_DMUX_DATA_RMNET_7 && i < BAM_DMUX_DATA_REV_RMNET_0) ||
+	    i >= BAM_DMUX_NUM_CHANNELS) {
 		pr_err("%s: wrong netdev %s\n", __func__, pdev->name);
 		return -ENODEV;
 	}
@@ -836,7 +898,7 @@ static int bam_rmnet_probe(struct platform_device *pdev)
 	}
 
 	netdevs[i] = dev;
-	d = &(dev->dev);
+	d = &dev->dev;
 	p = netdev_priv(dev);
 	/* Initial config uses Ethernet */
 	p->operation_mode = RMNET_MODE_LLP_ETH;
@@ -849,13 +911,14 @@ static int bam_rmnet_probe(struct platform_device *pdev)
 	ret = register_netdev(dev);
 	if (ret) {
 		pr_err("%s: unable to register netdev %d rc=%d\n",
-			__func__, i, ret);
+		       __func__, i, ret);
 		netdevs[i] = NULL;
 		free_netdev(dev);
 		return ret;
 	}
 
 	rmnet_debug_init(dev);
+	rmnet_sysnode_init(d);
 
 	return 0;
 }
@@ -872,14 +935,14 @@ static int bam_rmnet_remove(struct platform_device *pdev)
 			break;
 	}
 
-	if (((i > BAM_DMUX_DATA_RMNET_7) && (i < BAM_DMUX_DATA_REV_RMNET_0)) ||
-	    (i >= BAM_DMUX_NUM_CHANNELS)) {
+	if ((i > BAM_DMUX_DATA_RMNET_7 && i < BAM_DMUX_DATA_REV_RMNET_0) ||
+	    i >= BAM_DMUX_NUM_CHANNELS) {
 		pr_err("%s: wrong netdev %s\n", __func__, pdev->name);
 		return -ENODEV;
 	}
 
 	p = netdev_priv(netdevs[i]);
-	if (p->waiting_for_ul_skb != NULL) {
+	if (p->waiting_for_ul_skb) {
 		dev_kfree_skb_any(p->waiting_for_ul_skb);
 		p->waiting_for_ul_skb = NULL;
 	}
@@ -889,6 +952,7 @@ static int bam_rmnet_remove(struct platform_device *pdev)
 
 	unregister_netdev(netdevs[i]);
 	free_netdev(netdevs[i]);
+	rmnet_remove_files(&pdev->dev);
 
 	return 0;
 }
@@ -901,28 +965,27 @@ static void rmnet_clear_timeout_us(void)
 #else
 static void rmnet_clear_timeout_us(void)
 {
-	return;
 }
 #endif /* CONFIG_MSM_RMNET_DEBUG */
 
 static int __init rmnet_init(void)
 {
-	unsigned n;
+	unsigned int n;
 	char *tempname;
 
 	rmnet_clear_timeout_us();
 
 	n = 0;
 	while (n <= BAM_DMUX_DATA_REV_RMNET_8) {
-		if ((n > BAM_DMUX_DATA_RMNET_7) &&
-		    (n < BAM_DMUX_DATA_REV_RMNET_0)) {
+		if (n > BAM_DMUX_DATA_RMNET_7 &&
+		    n < BAM_DMUX_DATA_REV_RMNET_0) {
 			n++;
 			continue;
 		}
 		bam_rmnet_drivers[n].probe = bam_rmnet_probe;
 		bam_rmnet_drivers[n].remove = bam_rmnet_remove;
 		tempname = kmalloc(BAM_DMUX_CH_NAME_MAX_LEN, GFP_KERNEL);
-		if (tempname == NULL) {
+		if (!tempname) {
 			netdevs[n] = NULL;
 			return -ENOMEM;
 		}
@@ -939,5 +1002,4 @@ static int __init rmnet_init(void)
 
 module_init(rmnet_init);
 MODULE_DESCRIPTION("MSM RMNET BAM TRANSPORT");
-MODULE_LICENSE("GPL v2");
-
+MODULE_LICENSE("GPL");
