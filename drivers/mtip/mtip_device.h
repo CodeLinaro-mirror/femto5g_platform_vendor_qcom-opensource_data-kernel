@@ -211,4 +211,6 @@ u32 mtip_device_filter_priv_flags(u32 port_type);
 int mtip_device_lookup_lane_qsfp_cfg(u32 port_type, struct qsfp_info *lane_qsfp_info);
 
 void mtip_process_tx_comp_cb(ecpri_dma_eth_conn_hdl_t hdl, struct mtip_dma_tx_comp_params *tx_comp_params);
+void mtip_rx_mode_set(struct net_device *netdev);
+
 #endif // _MTIP_DEVICE_H
