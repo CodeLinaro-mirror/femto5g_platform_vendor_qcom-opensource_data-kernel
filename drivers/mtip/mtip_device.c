@@ -1138,7 +1138,7 @@ static void mtip_generate_hashtablebits(struct net_device *netdev, u64* hashtabl
 }
 
 /* Configure Multicast and Promiscuous modes */
-static void mtip_rx_mode_set(struct net_device *netdev)
+void mtip_rx_mode_set(struct net_device *netdev)
 {
    bool is_multicast_enabled = !!(netdev->flags & IFF_MULTICAST);
    bool all_multi_needed = !!(netdev->flags & IFF_ALLMULTI);
