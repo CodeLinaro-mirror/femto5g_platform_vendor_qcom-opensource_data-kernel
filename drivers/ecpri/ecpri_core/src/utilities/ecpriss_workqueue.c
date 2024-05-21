@@ -113,7 +113,7 @@ int ecpriss_initialize_workq_v2(void)
 				break;
 			}
 		}
-
+		spin_lock_init(&ecpriss_pdata_v2->ecpriss_workq_spin_lock);
 		INIT_WORK(&ecpriss_dma_events_rdy,
 				ecpriss_dma_event_processing_wq);
 		ecpriss_pdata_v2->events_workqueue->ecpriss_dma_events_rdy_work=
@@ -150,12 +150,17 @@ int ecpriss_destroy_workq(void)
 	do {
 		if (events_workqueue) {
 
+			spin_lock(&ecpriss_pdata_v2->ecpriss_workq_spin_lock);
+
 			flush_workqueue(events_workqueue);
 			destroy_workqueue(events_workqueue);
 
 			if(ecpriss_pdata_v2->events_workqueue->kernel_events_workqueue) {
 				ecpriss_pdata_v2->events_workqueue->kernel_events_workqueue = NULL;
+				events_workqueue = NULL;
 			}
+
+			spin_unlock(&ecpriss_pdata_v2->ecpriss_workq_spin_lock);
 		}
 
 

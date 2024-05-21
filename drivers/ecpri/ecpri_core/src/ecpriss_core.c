@@ -129,7 +129,6 @@ static int ecpriss_core_remove(struct platform_device *pdev)
 		dma_ecpri_ss_driver_ops.ecpri_dma_ecpri_ss_deregister();
 		ecpriss_qudp_irq_destroy_v2();
 		ecpriss_xbar_destroy_interrupts_v2();
-		ecpriss_destroy_workq();
 		ecpriss_destroy_timers_v2();
 		ecpriss_destroy_ipc_log_v2();
 		ecpriss_unmap_xbar_qudp_v2();
@@ -861,8 +860,11 @@ int ecpriss_ssr_events_cb(struct notifier_block *this,unsigned long code, void *
 			ECPRILOGERR("ecpriss_ssr_events_cb: NULL Wq or Work");
 			break;
 		}
+		spin_lock(&ecpriss_pdata_v2->ecpriss_workq_spin_lock);
 
 		ret = ecpriss_queue_work(ecpriss_wq,ecpriss_work);
+
+		spin_unlock(&ecpriss_pdata_v2->ecpriss_workq_spin_lock);
 
 		if(ret < 0) {
 			ECPRILOGERR("Queue work failed\n");
@@ -911,8 +913,10 @@ void ecpriss_eth_topology_cb_v2(void)
 			ECPRILOGERR("ecpriss_eth_topology_cb_v2:NULL Wq or Work");
 			break;
 		}
+		spin_lock(&ecpriss_pdata_v2->ecpriss_workq_spin_lock);
 		ret = ecpriss_queue_work(ecpriss_wq,
 				ecpriss_work);
+        spin_unlock(&ecpriss_pdata_v2->ecpriss_workq_spin_lock);
 		if(ret < 0) {
 			ECPRILOGERR("Queue work failed\n");
 			break;
@@ -971,8 +975,10 @@ void ecpriss_dma_endp_cb(void * userdata)
 		ecpriss_pdata->events_workqueue->kernel_events_workqueue;
 		ecpriss_work =
 		ecpriss_pdata->events_workqueue->ecpriss_dma_events_rdy_work;
+
 		ret = ecpriss_queue_work(ecpriss_wq,
 				ecpriss_work);
+
 		if(ret < 0) {
 			ECPRILOGERR("Queue work failed\n");
 			break;
@@ -1007,6 +1013,7 @@ void ecpriss_stats_timer_cb_v2(struct timer_list *data)
 	int ret = 0;
 	struct workqueue_struct    *ecpriss_wq;
 	struct work_struct         *ecpriss_work;
+	unsigned long flags;
 
 	do{
 		ecpriss_wq =
@@ -1018,9 +1025,13 @@ void ecpriss_stats_timer_cb_v2(struct timer_list *data)
 			ECPRILOGERR("ecpriss_stats_timer_cb_v2: NULL Wq or Work");
 			break;
 		}
+		spin_lock_irqsave(&ecpriss_pdata_v2->ecpriss_workq_spin_lock,flags);
 
 		ret = ecpriss_queue_work(ecpriss_wq,
 				ecpriss_work);
+
+		spin_unlock_irqrestore(&ecpriss_pdata_v2->ecpriss_workq_spin_lock,flags);
+
 		if(ret < 0) {
 			ECPRILOGERR("Queue work failed\n");
 			break;
@@ -1047,8 +1058,13 @@ void ecpriss_dma_endp_cb_v2(void * userdata)
 			ECPRILOGERR("ecpriss_dma_endp_cb_v2: NULL Wq or Work");
 			break;
 		}
+
+		spin_lock(&ecpriss_pdata_v2->ecpriss_workq_spin_lock);
 		ret = ecpriss_queue_work(ecpriss_wq,
 				ecpriss_work);
+
+		spin_unlock(&ecpriss_pdata_v2->ecpriss_workq_spin_lock);
+
 		if(ret < 0) {
 			ECPRILOGERR("Queue work failed\n");
 			break;
@@ -1925,7 +1941,7 @@ static void __exit ecpriss_core_module_exit(void)
 {
 
 	pr_err("ecpriss_core_module_exit():Exit \n");
-
+	ecpriss_destroy_workq();
 	platform_driver_unregister(&ecpriss_core_driver);
 
 	return;
