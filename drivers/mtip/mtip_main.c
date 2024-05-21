@@ -1499,6 +1499,8 @@ static void mtip_module_exit(void)
    int i;
    CSMLOGERR("mtip_module_exit called\n");
 
+   // finalize the workq
+   mtip_destroy_workq();
    // destroy the hashmap
    mtip_hashmap_destroy();
    mtip_eth_deregister_events_cb();
@@ -1534,8 +1536,6 @@ static void mtip_module_exit(void)
        mtip_dma_alloc_finalize(i);
    }
 
-   // finalize the workq
-   mtip_destroy_workq();
    
    if (platform_driver_priv->ipc_log_buf)
 		ipc_log_context_destroy(platform_driver_priv->ipc_log_buf);
