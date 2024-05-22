@@ -797,6 +797,7 @@ static void mtip_phy_handle_lane_up(struct mtip_process_lane_up lane_up_info)
                 platform_driver_priv->mtip_ports[port_type]->port_priv_flags_optical = 0;
                 platform_driver_priv->mtip_ports[port_type]->next_speed_retry_count = 0;
                 platform_driver_priv->mtip_links[link_index]->link_down_received_post_link_up = false;
+                mtip_phy_retry_num[link_index] = 0;
                 post_mtip_process_reconfigure_port(port_type);
              }
              else if (mtip_mac_wrapper_get_link_status(link_index) == true) 
