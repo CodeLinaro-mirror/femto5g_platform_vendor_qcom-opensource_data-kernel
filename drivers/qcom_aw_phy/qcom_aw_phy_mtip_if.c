@@ -22,7 +22,7 @@
 struct qcom_aw_phy_mtip_if_info qcom_aw_phy_mtip_if_info_s = {0};
 
 extern int qcom_aw_phy_tx_compliance_flag;
-extern int qcom_aw_phy_an_restart_delay_timer_val;
+extern int qcom_aw_phy_an_restart_delay_timer;
 
 #define MAX_PHY_LANE_STR_LEN 12
 
@@ -1648,6 +1648,7 @@ int qcom_aw_phy_mac_link_status(enum mtip_port_type_enum port_type,
   bool notify_flag = false;
   enum local_error_enum local_err_val = LOCAL_ERROR_INVALID;
   int ret_val = 0;
+  struct qcom_aw_phy_work_q_params *wq_params = NULL;
   char temp_buf[MAX_PHY_LANE_STR_LEN] = {0};
   char buf[MAX_PHY_LANE_STR_LEN] = {0};
   bool needs_logging = false;
@@ -1713,11 +1714,18 @@ int qcom_aw_phy_mac_link_status(enum mtip_port_type_enum port_type,
 
       if (status == false &&
           phy_inst_info->phy_eq_mode == QCOM_AW_PHY_ANLT_MODE) {
-        /* If the link goes down in ANLT mode, queue a delayed work and restart
-           AN post this delay */
-        queue_delayed_work(phy_config_info->wq,
-               &phy_inst_info->lane_params[lane_num].an_restart_wq_item.wq_item,
-               msecs_to_jiffies(qcom_aw_phy_an_restart_delay_timer_val));
+
+        wq_params = kmalloc(sizeof(struct qcom_aw_phy_work_q_params),
+                            GFP_ATOMIC);
+        if(!wq_params)
+          QCOM_AW_PHY_LOG_ERR("Malloc failed!");
+        else{
+          INIT_DELAYED_WORK(&wq_params->wq_item, qcom_aw_phy_handle_an_restart);
+          wq_params->phy_inst = phy_inst_info->phy_inst;
+          wq_params->lane_num = lane_num;
+          queue_delayed_work(phy_config_info->wq, &wq_params->wq_item,
+                          msecs_to_jiffies(qcom_aw_phy_an_restart_delay_timer));
+        }
       }
 
       mutex_unlock(&phy_inst_info->lane_lock[lane_num]);
@@ -2328,6 +2336,7 @@ void qcom_aw_phy_handle_an_restart(struct work_struct *work){
   mutex_unlock(&phy_inst_info->phy_inst_lock);
 
 func_exit:
+  kfree(wq_params);
   return;
 }
 
