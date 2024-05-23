@@ -32,7 +32,7 @@ void mtip_snd_event_notification(uint32_t interface, uint32_t event)
 			 * check if it is already set
 			 */
 			if(ber_status[interface] == STATUS_SET){
-//				CSMLOGDBG("Interface[%u] Hig Ber is already set\n",interface);
+				CSMLOGDBG("Interface[%u] Hig Ber is already set\n",interface);
 				return;
 			}
 			ber_status[interface] = STATUS_SET;
@@ -44,7 +44,7 @@ void mtip_snd_event_notification(uint32_t interface, uint32_t event)
 			 * check if it is already clear
 			 */
 			if(ber_status[interface] == STATUS_CLEAR){
-//				CSMLOGDBG("Interface[%u] Hig Ber is already clear\n",interface);
+				CSMLOGDBG("Interface[%u] Hig Ber is already clear\n",interface);
 				return;
 			}
 			ber_status[interface] = STATUS_CLEAR;

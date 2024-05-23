@@ -454,9 +454,6 @@ struct mtip_platform_driver_priv
     // IPC log buffer low
     void* ipc_log_buf_low;
 
-    // IPC log buffer dbg
-    void* ipc_log_buf_dbg;
-
     // array of lists of dma allocations
     // static array of lists for allocations
     struct mtip_dma_alloc_struct mtip_dma_alloc_array[MTIP_DMA_ALLOC_LIST_MAX];
