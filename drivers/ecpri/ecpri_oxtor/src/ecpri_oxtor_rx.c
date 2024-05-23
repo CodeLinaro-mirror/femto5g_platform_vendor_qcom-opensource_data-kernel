@@ -25,7 +25,7 @@ int ecpri_oxtor_rx_init(void)
 	return 0;
 }
 
-uint32_t ecpri_oxtor_rx_get_stats(u32 ring_id)
+int ecpri_oxtor_rx_get_stats(u32 ring_id)
 {
 	ecpri_oran_xtor_hwio_def_ecpri_oran_xtor_rx_n_pkt_cnt_reg_s pkt_cnt;
 	ecpri_oxtor_rx_ring_s *ring_ptr = NULL;
