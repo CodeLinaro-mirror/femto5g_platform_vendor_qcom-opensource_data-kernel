@@ -2249,7 +2249,7 @@ static struct ecpriss_xbar_hal_reg_obj ecpriss_xbar_hal_reg_objs[ECPRISS_XBAR_HW
 	[ECPRISS_XBAR_HW_v2_0][ECPRI_XBAR_DBG_FHRX_OC_PKT_CNT] = {
 		ecpriss_xbar_hal_reg_construct_dummy_v2,
 		ecpriss_xbar_hal_reg_parse_dummy_v2,
-		0x09420000, 0x4088, 0, 0, 0, 0, 0},
+		0x09420000, 0x4088, 0x4, 0, 0, 0, 0},
 	[ECPRISS_XBAR_HW_v2_0][ECPRI_XBAR_DBG_FHRX_C2C_PKT_CNT] = {
 		ecpriss_xbar_hal_reg_construct_dummy_v2,
 		ecpriss_xbar_hal_reg_parse_dummy_v2,

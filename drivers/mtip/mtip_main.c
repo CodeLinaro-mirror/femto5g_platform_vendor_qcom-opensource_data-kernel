@@ -388,7 +388,7 @@ int mtip_lookup_link_index_by_port_type_and_real_link(u32* link_index, u32 port_
 	{
         if (real_link_number >= 2)
         {
-            CSMLOGDBG("invalid link number: %d for port %d:\n", real_link_number, port_type);
+//            CSMLOGDBG("invalid link number: %d for port %d:\n", real_link_number, port_type);
             ret = -1;
             goto out;
         }
@@ -456,7 +456,7 @@ int mtip_lookup_port_type_by_link_index(u32 link_index, u32* port_type)
     case 14:
     case 13:
     default:
-        CSMLOGDBG("invalid link_index: %d\n", link_index);
+//        CSMLOGDBG("invalid link_index: %d\n", link_index);
         ret = -1;
         break;
     }
@@ -1401,6 +1401,16 @@ static int mtip_module_init(void)
         CSMLOGDBG("mtip_init(): IPC log context LOW created successfully, continue...\n");
     }
 
+    platform_driver_priv->ipc_log_buf_dbg = ipc_log_context_create(CSM_IPC_LOG_PAGES,
+		"csm_mtip_dbg", 0);
+    if (platform_driver_priv->ipc_log_buf_dbg == NULL)
+    {
+		CSMLOGERR("mtip_init(): failed to create IPC log LOW context, continue...\n");
+    }
+    else
+    {
+        CSMLOGDBG("mtip_init(): IPC log context LOW created successfully, continue...\n");
+    }
     // initialize the dma array of allocs
     for (i = 0; i < MTIP_DMA_ALLOC_LIST_MAX; ++i) 
     {
@@ -1489,6 +1499,8 @@ static void mtip_module_exit(void)
    int i;
    CSMLOGERR("mtip_module_exit called\n");
 
+   // finalize the workq
+   mtip_destroy_workq();
    // destroy the hashmap
    mtip_hashmap_destroy();
    mtip_eth_deregister_events_cb();
@@ -1524,8 +1536,6 @@ static void mtip_module_exit(void)
        mtip_dma_alloc_finalize(i);
    }
 
-   // finalize the workq
-   mtip_destroy_workq();
    
    if (platform_driver_priv->ipc_log_buf)
 		ipc_log_context_destroy(platform_driver_priv->ipc_log_buf);

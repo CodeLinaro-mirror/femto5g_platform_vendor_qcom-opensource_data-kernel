@@ -412,7 +412,7 @@ void ecpriss_qudp_egress_config_stats_update_v2(int32_t fh_index)
 				ECPRI_UDP_FH_EGRESS_IP_SRC_ADDR1_PORT_p_ENTRY_n_V2,
 				fh_index,
 				egress_table_index,
-				&ecpriss_pdata->cfg_stats.qudp_cfg.egress.src_ip_addr[fh_index][egress_table_index].ip_src1);
+				&ecpriss_pdata_v2->cfg_stats_v2.qudp_cfg_v2.egress.src_ip_addr[fh_index][egress_table_index].ip_src1);
 		ecpriss_qudp_hal_read_reg_mn_fields(ECPRISS_QUDP_FH_RAMS,
 				ECPRI_UDP_FH_EGRESS_IP_SRC_ADDR2_PORT_p_ENTRY_n_V2,
 				fh_index,
@@ -4353,25 +4353,24 @@ static bool ecpriss_qudp_fh_rx_udp_filter_cfg_v2(uint32_t port_index, ecpriss_qu
 int ecpriss_qudp_fh_rx_filter_cfg_v2(uint32_t port_index, ecpriss_qudp_rx_cfg_s *rx_cfg)
 {
 	bool ret = false;
-	if(ecpriss_filtering_enabled){
+
+	if(rx_cfg->fltr_en_mask & ECPRISS_QUDP_RX_CFG_FLTR_MASK_IP_DADDR){
 		ret = ecpriss_qudp_fh_rx_ip_filter_cfg_v2(port_index, rx_cfg);
 		if(ret == false){
 			ECPRILOGERR("IP filter Config validation failed \n");
 		}
-	}else{
-		ECPRILOGERR("Global filter config is disabled, Can't config IP filter \n");
 	}
-	if(ecpriss_filtering_enabled){
+	if(rx_cfg->fltr_en_mask & ECPRISS_QUDP_RX_CFG_FLTR_MASK_VLAN){
 		ret = ecpriss_qudp_fh_rx_vlan_filter_cfg_v2(port_index, rx_cfg);
 		if(ret == false){
 			ECPRILOGERR("Vlan filter config validation failed \n");
 		}
-	}else{
-		ECPRILOGERR("Global filter config is disabled, Can't config VLAN filter \n");
 	}
-	ret = ecpriss_qudp_fh_rx_udp_filter_cfg_v2(port_index, rx_cfg);
-	if(ret == false){
-		ECPRILOGERR("UDP filter config validation failed \n");
+	if(rx_cfg->fltr_en_mask & ECPRISS_QUDP_RX_CFG_FLTR_MASK_UDP_DPORT){
+		ret = ecpriss_qudp_fh_rx_udp_filter_cfg_v2(port_index, rx_cfg);
+		if(ret == false){
+			ECPRILOGERR("UDP filter config validation failed \n");
+		}
 	}
 
 	return 0;

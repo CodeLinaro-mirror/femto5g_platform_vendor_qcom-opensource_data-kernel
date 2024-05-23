@@ -70,7 +70,7 @@ u8 mtip_phy_an_seq_num[MTIP_MAX_PORTS] = {0};
 
 /* Timer to define the polling time for link to come up, before retrying or
 before attempting new speed mode */
-int mtip_link_polling_timer = 3000;
+int mtip_link_polling_timer = 2000;
 
 /* 
  * qsfp_eth_get_link_type: returns sfp port type
@@ -352,11 +352,11 @@ void mtip_phy_get_lanes_of_link(u32 link_index, bool lanes_enabled[PHY_LANE_MAX]
 
         lanes_enabled[lane] = true;
 
-        CSMLOGDBG("using lane %d for link_index: %d", lane, link_index);
+       // CSMLOGDBG("using lane %d for link_index: %d", lane, link_index);
         ++lane_count;
     }
 
-    CSMLOGDBG("lane count of link_index: %d is %d\n", link_index, lane_count);
+    //CSMLOGDBG("lane count of link_index: %d is %d\n", link_index, lane_count);
     return;
 }
 
@@ -508,7 +508,12 @@ void mtip_fault_notifr_status(struct work_struct *work)
             }
         }
     }
-    mtip_workq_queue_delayed_work(delayed_wq_notifr_param , MTIP_NOTIFY_TIMER);
+    mutex_lock(&delayed_wq_mutex_lock);
+    if(delayed_wq)
+    { 
+      mtip_workq_queue_delayed_work(delayed_wq_notifr_param , MTIP_NOTIFY_TIMER);
+    }
+    mutex_unlock(&delayed_wq_mutex_lock);
 
     return;
 }
@@ -782,17 +787,9 @@ static void mtip_phy_handle_lane_up(struct mtip_process_lane_up lane_up_info)
           {
              /* Port reconfiguration post RX LOS clear will be triggered in following cases
                 1. If the PCS link was up and it went down due to RX LOS, or
-                2. If multi rate is not supported and max PHY lane bring up retries are done, or
-                3. If multi rate is supported but just one speed configured via ethtool
-                   and max PHY lane bring up retries are done, or
-                4. If multi rate is supported with more than one speed configured via ethtool
+                2. If multi rate is supported with more than one speed configured via ethtool
                    and max speed mode toggle attempts are done */
              if((platform_driver_priv->mtip_links[link_index]->link_down_received_post_link_up) ||
-                (platform_driver_priv->mtip_ports[port_type]->multi_rate_supported == false &&
-                 mtip_phy_retry_num[link_index] >= mtip_phy_get_max_retry_num()) ||
-                (platform_driver_priv->mtip_ports[port_type]->multi_rate_supported == true &&
-                 mtip_device_count_priv_flag_bits(port_type) == 1 &&
-                 mtip_phy_retry_num[link_index] >= mtip_phy_get_max_retry_num()) ||
                 (platform_driver_priv->mtip_ports[port_type]->multi_rate_supported == true &&
                  mtip_device_count_priv_flag_bits(port_type) > 1 &&
                  platform_driver_priv->mtip_ports[port_type]->next_speed_retry_count >= MTIP_NEXT_SPEED_MODE_RETRY_MAX_COUNT))
@@ -801,6 +798,12 @@ static void mtip_phy_handle_lane_up(struct mtip_process_lane_up lane_up_info)
                 platform_driver_priv->mtip_ports[port_type]->next_speed_retry_count = 0;
                 platform_driver_priv->mtip_links[link_index]->link_down_received_post_link_up = false;
                 post_mtip_process_reconfigure_port(port_type);
+             }
+             else if (mtip_mac_wrapper_get_link_status(link_index) == true) 
+             {
+                mtip_process_link_state(link_index, true);
+                mtip_phy_lane_bring_up_progress_ind(link_index, false);
+                mtip_phy_retry_num[link_index] = 0;
              }
 
              platform_driver_priv->mtip_ports[port_type]->needs_rx_los_processing = false;
@@ -973,7 +976,7 @@ static void mtip_phy_phy_validate(struct phylink_config *config,
     int ret;
     u8  sfp_port_type = PORT_DA;
     int sfp_phandle;
-    struct qsfp_info trx_info;
+    struct qsfp_info trx_info = {0};
     struct mtip_process_lane_up lane_up_info = {0};
 
     ret = mtip_phy_find_matching_lane(config, &lane_index);
@@ -1060,7 +1063,7 @@ static void mtip_phy_phylink_lane_up(struct phylink_config *config,
     int ret;
     u8  sfp_port_type = PORT_DA;
     int sfp_phandle;
-    struct qsfp_info trx_info;
+    struct qsfp_info trx_info = {0};
     struct mtip_process_lane_up lane_up_info = {0};
 
     ret = mtip_phy_find_matching_lane(config, &lane_index);

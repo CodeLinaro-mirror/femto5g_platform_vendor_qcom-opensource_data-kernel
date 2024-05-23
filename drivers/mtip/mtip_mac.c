@@ -744,6 +744,9 @@ void mtip_mac_initialize(struct mtip_netdev_priv *priv)
    // configure the mac for operation
    iowrite32(MTIP_MAC_INIT_COMMAND_CONFIG, priv->mac_ioaddr + MTIP_MAC_COMMAND_CONFIG);
 
+   // Configure MAC with the promiscuous mode if already set by QNCM before MAC init
+   mtip_rx_mode_set(platform_driver_priv->mtip_links[link_index]->dev);
+
    // Process link up only for PCS loopback mode
    if (mtip_loopback_mode == MTIP_MODE_LOOPBACK)
    {

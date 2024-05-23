@@ -245,6 +245,7 @@ struct qcom_aw_lane_params{
 	uint32_t                               an_link_good_intr;
 	uint32_t                               an_done_intr;
 	bool                                   rx_sig_detect_status;
+	struct qcom_aw_phy_work_q_params       an_restart_wq_item;
 };
 
 /* AN Params - AN specific information */

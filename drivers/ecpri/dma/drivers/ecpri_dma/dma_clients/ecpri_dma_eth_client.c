@@ -984,8 +984,11 @@ int ecpri_dma_eth_tx_ring_state(ecpri_dma_eth_conn_hdl_t hdl,
 		return -EINVAL;
 	}
 
-	*(available) = connection->tx_endp_ctx->ring_length -
-		connection->tx_endp_ctx->curr_outstanding_num - 1;
+	ret = gsi_query_channel_free_re(connection->tx_endp_ctx->gsi_chan_hdl,
+		available);
+	if (ret) {
+		DMAERR("GSI failed to get available\n");
+	}
 
 	DMADBG_LOW("Exit\n");
 
@@ -1024,8 +1027,11 @@ int ecpri_dma_eth_rx_ring_state(ecpri_dma_eth_conn_hdl_t hdl,
 		return -EINVAL;
 	}
 
-	*(available) = connection->rx_endp_ctx->ring_length -
-		connection->rx_endp_ctx->curr_outstanding_num - 1;
+	ret = gsi_query_channel_free_re(connection->rx_endp_ctx->gsi_chan_hdl,
+		available);
+	if (ret) {
+		DMAERR("GSI failed to get available\n");
+	}
 
 	DMADBG_LOW("Exit\n");
 

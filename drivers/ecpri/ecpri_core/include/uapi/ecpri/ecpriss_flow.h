@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: GPL-2.0-only
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #ifndef ECPRI_FLOW_H
@@ -18,7 +18,7 @@
 #define ECPRISS_MAX_LTE_MAC_PER_PORT 12
 #define ECPRISS_MAX_NR_MAC_PER_PORT 4
 #define ECPRISS_MAX_LTE_VF 5
-
+#define ECPRISS_MAX_KERNEL_NETLINK_FLOW 64
 	typedef enum
 	{
 		ECPRISS_QUDP_RX_CFG_FLTR_MASK_IP_DADDR		= 0x01,
