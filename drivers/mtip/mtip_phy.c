@@ -70,7 +70,7 @@ u8 mtip_phy_an_seq_num[MTIP_MAX_PORTS] = {0};
 
 /* Timer to define the polling time for link to come up, before retrying or
 before attempting new speed mode */
-int mtip_link_polling_timer = 2000;
+int mtip_link_polling_timer = 3000;
 
 /* 
  * qsfp_eth_get_link_type: returns sfp port type
@@ -787,9 +787,17 @@ static void mtip_phy_handle_lane_up(struct mtip_process_lane_up lane_up_info)
           {
              /* Port reconfiguration post RX LOS clear will be triggered in following cases
                 1. If the PCS link was up and it went down due to RX LOS, or
-                2. If multi rate is supported with more than one speed configured via ethtool
+                2. If multi rate is not supported and max PHY lane bring up retries are done, or
+                3. If multi rate is supported but just one speed configured via ethtool
+                   and max PHY lane bring up retries are done, or
+                4. If multi rate is supported with more than one speed configured via ethtool
                    and max speed mode toggle attempts are done */
              if((platform_driver_priv->mtip_links[link_index]->link_down_received_post_link_up) ||
+                (platform_driver_priv->mtip_ports[port_type]->multi_rate_supported == false &&
+                 mtip_phy_retry_num[link_index] >= mtip_phy_get_max_retry_num()) ||
+                (platform_driver_priv->mtip_ports[port_type]->multi_rate_supported == true &&
+                 mtip_device_count_priv_flag_bits(port_type) == 1 &&
+                 mtip_phy_retry_num[link_index] >= mtip_phy_get_max_retry_num()) ||
                 (platform_driver_priv->mtip_ports[port_type]->multi_rate_supported == true &&
                  mtip_device_count_priv_flag_bits(port_type) > 1 &&
                  platform_driver_priv->mtip_ports[port_type]->next_speed_retry_count >= MTIP_NEXT_SPEED_MODE_RETRY_MAX_COUNT))
@@ -798,12 +806,6 @@ static void mtip_phy_handle_lane_up(struct mtip_process_lane_up lane_up_info)
                 platform_driver_priv->mtip_ports[port_type]->next_speed_retry_count = 0;
                 platform_driver_priv->mtip_links[link_index]->link_down_received_post_link_up = false;
                 post_mtip_process_reconfigure_port(port_type);
-             }
-             else if (mtip_mac_wrapper_get_link_status(link_index) == true) 
-             {
-                mtip_process_link_state(link_index, true);
-                mtip_phy_lane_bring_up_progress_ind(link_index, false);
-                mtip_phy_retry_num[link_index] = 0;
              }
 
              platform_driver_priv->mtip_ports[port_type]->needs_rx_los_processing = false;
