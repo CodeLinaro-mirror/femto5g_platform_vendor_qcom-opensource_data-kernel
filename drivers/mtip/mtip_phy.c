@@ -508,12 +508,7 @@ void mtip_fault_notifr_status(struct work_struct *work)
             }
         }
     }
-    mutex_lock(&delayed_wq_mutex_lock);
-    if(!delayed_wq)
-    { 
-      mtip_workq_queue_delayed_work(delayed_wq_notifr_param , MTIP_NOTIFY_TIMER);
-    }
-    mutex_unlock(&delayed_wq_mutex_lock);
+    mtip_workq_queue_delayed_work(delayed_wq_notifr_param , MTIP_NOTIFY_TIMER);
 
     return;
 }
