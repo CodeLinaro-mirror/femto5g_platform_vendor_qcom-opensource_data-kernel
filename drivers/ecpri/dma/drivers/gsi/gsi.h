@@ -1660,6 +1660,4 @@ int gsi_get_peripheral_ee(void);
 
 uint32_t gsi_get_chan_stop_stm(int chan_id, int ee, int gsi_id);
 
-int gsi_query_channel_free_re(unsigned long chan_hdl, uint32_t* num_free_re);
-
 #endif
