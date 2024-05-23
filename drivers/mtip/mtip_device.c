@@ -1343,38 +1343,10 @@ static int mtip_close(struct net_device *netdev)
  */
 static void mtip_tx_timeout(struct net_device *netdev, unsigned int txqueue)
 {
-   struct mtip_netdev_priv* priv;
-   u32 link_index;
-   ecpri_dma_eth_conn_hdl_t hdl;
-   int pending_pkt_completion_count = 0;
    CSMLOGINFO("mtip_tx_timeout called\n");
 
-   priv = netdev_priv(netdev);
-   link_index = priv->link_index;
-   hdl = platform_driver_priv->mtip_links[link_index]->dma_hdl;
-
-   pending_pkt_completion_count = mtip_device_get_pkt_completion_count(netdev);
-
-   if (pending_pkt_completion_count < 0)
-   {
-       mtip_device_reset_pkt_completion_count(netdev);
-       pending_pkt_completion_count = 0;
-   }
-
-   // check if we need to flow control the interface
-   if ((mtip_dma_tx_available(hdl) == true) &&
-       (pending_pkt_completion_count < (MTIP_TX_RING_SIZE - MTIP_TX_PACKET_AVAILABILITY_THRESHOLD)))
-   {
-      if (netif_queue_stopped(netdev))
-      {
-         CSMLOGERR("waking queue for link_index %d", link_index);
-
-         // wake the queue
-         netif_trans_update(netdev); /* prevent tx timeout */
-         netif_wake_queue(netdev);
-      }
-   }
-
+   netif_trans_update(netdev); /* prevent tx timeout */
+   netif_wake_queue(netdev);
 }
 
 /* IOCTL support for the interface */
