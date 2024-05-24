@@ -1846,7 +1846,11 @@ static void __exit ecpri_dma_module_exit(void)
 	kfree(ecpri_dma_ctx);
 	ecpri_dma_ctx = NULL;
 
-	/* Unregister driver */
+	/* Unregister drivers */
+	platform_driver_unregister(&ecpri_dma_smmu_mhi_plat_drv);
+	platform_driver_unregister(&ecpri_dma_smmu_eth_plat_drv);
+	platform_driver_unregister(&ecpri_dma_smmu_gen_plat_drv);
+	platform_driver_unregister(&ecpri_dma_smmu_plat_drv);
 	platform_driver_unregister(&ecpri_dma_plat_drv);
 }
 
