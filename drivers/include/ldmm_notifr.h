@@ -17,7 +17,11 @@ enum{
 	IF_UP,
 	IF_DOWN,
 	PCS_IF_UP,
-	PCS_IF_DOWN
+	PCS_IF_DOWN,
+	RX_LOS_SET,
+	RX_LOS_CLR,
+	LOCAL_PLUG_OUT_SET,
+	LOCAL_PLUG_OUT_CLR
 };
 
 typedef struct {

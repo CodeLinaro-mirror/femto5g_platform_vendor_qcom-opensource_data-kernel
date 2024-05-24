@@ -733,6 +733,10 @@ static void mtip_phy_handle_lane_up(struct mtip_process_lane_up lane_up_info)
 
           CSMLOGINFO("Updating state of Port: %d with lane_index: %d in state %d\n", port_type, lane_up_info.lane_index, MTIP_LANE_STATE_CONNECTED);
 
+          /* Indicate connected even with local plug out clear to user space */
+          if(mtip_lookup_link_index_by_lane_index(&link_index, lane_up_info.lane_index) == 0)
+             mtip_snd_event_notification(link_index, LOCAL_PLUG_OUT_CLR);
+
           // set the lane state of the lane to CONNECTED
           platform_driver_priv->mtip_lanes[lane_up_info.lane_index]->lane_state = MTIP_LANE_STATE_CONNECTED;
           platform_driver_priv->mtip_ports[port_type]->needs_rx_los_processing = false;
@@ -785,6 +789,10 @@ static void mtip_phy_handle_lane_up(struct mtip_process_lane_up lane_up_info)
              mtip_lookup_link_index_by_lane_index(&link_index, lane_up_info.lane_index) == 0 &&
              platform_driver_priv->mtip_links[link_index] != NULL)
           {
+
+             /* Indicate RX LOS clear to user space */
+             mtip_snd_event_notification(link_index, RX_LOS_CLR);
+
              /* Port reconfiguration post RX LOS clear will be triggered in following cases
                 1. If the PCS link was up and it went down due to RX LOS, or
                 2. If multi rate is supported with more than one speed configured via ethtool
@@ -848,7 +856,19 @@ static void mtip_phy_handle_lane_down(struct mtip_process_lane_down lane_down_in
       /* Set needs_rx_los_processing flag which will be used to trigger port
          reconfiguration once RX LOS gets cleared */
       platform_driver_priv->mtip_ports[port_type]->needs_rx_los_processing = true;
+
+      /* Indicate RX LOS to user space */
+      if(mtip_lookup_link_index_by_lane_index(&link_index, lane_down_info.lane_index) == 0)
+         mtip_snd_event_notification(link_index, RX_LOS_SET);
+
       return;
+   }
+
+   /* Indicate local plug put to user space */
+   if(lane_down_info.reason_code == TRX_LOCAL_PLUGOUT &&
+      mtip_lookup_link_index_by_lane_index(&link_index, lane_down_info.lane_index) == 0)
+   {
+      mtip_snd_event_notification(link_index, LOCAL_PLUG_OUT_SET);
    }
 
    current_state = platform_driver_priv->mtip_lanes[lane_down_info.lane_index]->lane_state;
