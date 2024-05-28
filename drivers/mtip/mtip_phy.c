@@ -199,6 +199,18 @@ void run_mtip_process_cdr_lock_ind(void* workptr)
         goto out;
     }
 
+    if(mtip_lookup_port_type_by_link_index(link_index, &port_type) != 0)
+    {
+        CSMLOGINFO("Invalid link/port!");
+        goto out;
+    }
+
+    if(platform_driver_priv->mtip_ports[port_type]->needs_rx_los_processing)
+    {
+        CSMLOGDBG("Skip processing as Rx LOS is set for port %d", port_type);
+        goto out;
+    }
+
     if((status == false) &&
        (mtip_phy_retry_num[link_index] >= mtip_phy_get_max_retry_num()))
     {
@@ -208,12 +220,6 @@ void run_mtip_process_cdr_lock_ind(void* workptr)
 
     CSMLOGINFO("CDR lock indication for link_index %d, status %d, an_seq_num %d\n",
                link_index, status, an_seq_num);
-
-    if(mtip_lookup_port_type_by_link_index(link_index, &port_type) != 0)
-    {
-        CSMLOGINFO("Invalid link/port!");
-        goto out;
-    }
 
     if(platform_driver_priv->mtip_links[link_index]->state == MTIP_LINK_STATE_CLOSE)
     {
@@ -420,6 +426,12 @@ void run_mtip_phy_retry_bringup(void* workptr)
     if (mtip_lookup_port_type_by_link_index(link_index, &port_type) < 0)
     {
         CSMLOGERR("invalid port_type for link_index %d", link_index);
+        goto func_exit;
+    }
+
+    if(platform_driver_priv->mtip_ports[port_type]->needs_rx_los_processing)
+    {
+        CSMLOGDBG("Skip processing as Rx LOS is set for port %d", port_type);
         goto func_exit;
     }
 
