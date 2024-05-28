@@ -9695,17 +9695,28 @@ int ecpri_dma_gsi_stop_channel(struct ecpri_dma_endp_context *ep)
 	 * Apply the GSI stop retry logic if GSI returns err code to retry.
 	 */
 	for (i = 0; i < ECPRI_DMA_GSI_CHANNEL_STOP_MAX_RETRY; i++) {
-		DMADBG("Calling gsi_stop_channel ch:%lu\n",
-			ep->gsi_chan_hdl);
+		DMADBG("Calling gsi_stop_channel endp:%lu\n",
+			ep->endp_id);
 		res = gsi_stop_channel(ep->gsi_chan_hdl);
-		DMADBG("gsi_stop_channel ch: %lu returned %d\n",
-			ep->gsi_chan_hdl, res);
+		DMADBG("gsi_stop_channel endp: %lu returned %d\n",
+			ep->endp_id, res);
 		if (res != -GSI_STATUS_AGAIN)
-			return res;
+		{
+			if (dest_endp_flushed) {
+				dest_endp_gsi_cfg.def.endp_flush = 0;
 
-		/*	For M2M ENDPs, if second retry still gives STOP_IN_PROG perform
+				ecpri_dma_hal_write_reg_mn(
+					ECPRI_ENDP_GSI_CFG, ep->gsi_id, ep->gsi_ep_cfg->dest,
+					dest_endp_gsi_cfg.value);
+			}
+
+			return res;
+		}
+
+		/*	For M2M SRC ENDPs, if second retry still gives STOP_IN_PROG perform
 			Flush on DEST ENDP */
 		if (i == 1 &&
+			ep->gsi_ep_cfg->dir == ECPRI_DMA_ENDP_DIR_SRC &&
 			ep->gsi_ep_cfg->stream_mode == ECPRI_DMA_ENDP_STREAM_MODE_M2M) {
 			dest_endp_gsi_cfg.value = ecpri_dma_hal_read_reg_mn(
 				ECPRI_ENDP_GSI_CFG, ep->gsi_id, ep->gsi_ep_cfg->dest);
@@ -9724,15 +9735,71 @@ int ecpri_dma_gsi_stop_channel(struct ecpri_dma_endp_context *ep)
 			ECPRI_DMA_GSI_CHANNEL_STOP_SLEEP_MAX_USEC);
 	}
 
-	if (dest_endp_flushed) {
-		dest_endp_gsi_cfg.def.endp_flush = 0;
+	DMAERR("Failed  to stop GSI channel with retries\n");
+	return res;
+}
 
-		ecpri_dma_hal_write_reg_mn(
-			ECPRI_ENDP_GSI_CFG, ep->gsi_id, ep->gsi_ep_cfg->dest,
-			dest_endp_gsi_cfg.value);
+int ecpri_dma_gsi_halt_channel(int endp_id, int gsi_id)
+{
+	int res = 0;
+	int i, code = 0;
+	ecpri_hwio_def_ecpri_endp_gsi_cfg_gsi_m_ch_n_u dest_endp_gsi_cfg;
+	bool dest_endp_flushed = false;
+	const struct dma_gsi_ep_config* ep;
+
+	ep = &(*ecpri_dma_ctx->endp_map)[gsi_id][endp_id];
+
+	if (!ep || !ep->valid) {
+		DMAERR("EP mapping is empty endp: %d, GSI: %d\n",
+			endp_id, gsi_id);
+		return -EINVAL;
 	}
 
-	DMAERR("Failed  to stop GSI channel with retries\n");
+	/*
+	 * Apply the GSI HALT retry logic if GSI returns err code to retry.
+	 */
+	for (i = 0; i < ECPRI_DMA_GSI_CHANNEL_STOP_MAX_RETRY; i++) {
+		DMADBG("Calling gsi_halt_channel ch:%lu ee:%d gsi:%d\n",
+			ep->dma_gsi_chan_num, ep->ee, gsi_id);
+		res = gsi_halt_channel_ee(ep->dma_gsi_chan_num, ep->ee, gsi_id, &code);
+		DMADBG("gsi_halt_channel_ee ch:%lu ee:%d gsi:%d returned %d\n",
+			ep->dma_gsi_chan_num, ep->ee, gsi_id, code);
+		if (code != GSI_GEN_EE_CMD_RETURN_CODE_RETRY)
+		{
+			if (dest_endp_flushed) {
+				dest_endp_gsi_cfg.def.endp_flush = 0;
+
+				ecpri_dma_hal_write_reg_mn(
+					ECPRI_ENDP_GSI_CFG, gsi_id, ep->dest,
+					dest_endp_gsi_cfg.value);
+			}
+
+			return res;
+		}
+
+		/*	For M2M SRC ENDPs, if second retry still gives STOP_IN_PROG perform
+			Flush on DEST ENDP */
+		if (i == 1 &&
+			ep->dir == ECPRI_DMA_ENDP_DIR_SRC &&
+			ep->stream_mode == ECPRI_DMA_ENDP_STREAM_MODE_M2M) {
+			dest_endp_gsi_cfg.value = ecpri_dma_hal_read_reg_mn(
+				ECPRI_ENDP_GSI_CFG, gsi_id, ep->dest);
+
+			dest_endp_gsi_cfg.def.endp_flush = 1;
+
+			ecpri_dma_hal_write_reg_mn(
+				ECPRI_ENDP_GSI_CFG, gsi_id, ep->dest,
+				dest_endp_gsi_cfg.value);
+
+			dest_endp_flushed = true;
+		}
+
+		/* sleep for short period to flush DMA */
+		usleep_range(ECPRI_DMA_GSI_CHANNEL_STOP_SLEEP_MIN_USEC,
+			ECPRI_DMA_GSI_CHANNEL_STOP_SLEEP_MAX_USEC);
+	}
+
+	DMAERR("Failed  to HALT GSI channel with retries\n");
 	return res;
 }
 

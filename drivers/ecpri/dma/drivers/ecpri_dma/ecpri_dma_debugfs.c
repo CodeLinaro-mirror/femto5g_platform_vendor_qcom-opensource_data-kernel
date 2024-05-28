@@ -500,7 +500,7 @@ static ssize_t ecpri_dma_read_qmi_info(struct file *file, char __user *ubuf,
 
 	nbytes += scnprintf(dbg_buff + nbytes, count,
 		"wq_stop: %d\n",
-		ecpri_dma_qmi_ctx->wq_stop);
+		atomic_read(&ecpri_dma_qmi_ctx->wq_stop));
 
 	nbytes += scnprintf(dbg_buff + nbytes, count,
 		"q6_init_cmplt: %d\n",  ecpri_dma_qmi_ctx->q6_init_cmplt);

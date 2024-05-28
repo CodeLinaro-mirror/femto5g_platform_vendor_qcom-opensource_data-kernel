@@ -55,6 +55,23 @@ ecpri_dma_mhi_function_map[ECPRI_DMA_VM_IDS_MAX] = {
 	[ECPRI_DMA_VM_IDS_VF5] = {ECPRI_DMA_EE_VF5, ECPRI_DMA_GSI_ID_2},
 };
 
+static const bool ecpri_dma_mhi_q6_related_vf_map[ECPRI_DMA_VM_IDS_MAX] = {
+	[ECPRI_DMA_VM_IDS_VM0] = true,
+	[ECPRI_DMA_VM_IDS_VM1] = true,
+	[ECPRI_DMA_VM_IDS_VM2] = true,
+	[ECPRI_DMA_VM_IDS_VM3] = true,
+	[ECPRI_DMA_VM_IDS_VFA] = true,
+	[ECPRI_DMA_VM_IDS_VFB] = true,
+	[ECPRI_DMA_VM_IDS_VFC] = true,
+	[ECPRI_DMA_VM_IDS_VF1] = false,
+	[ECPRI_DMA_VM_IDS_VF2] = false,
+	[ECPRI_DMA_VM_IDS_VFD] = true,
+	[ECPRI_DMA_VM_IDS_VFE] = true,
+	[ECPRI_DMA_VM_IDS_VF3] = false,
+	[ECPRI_DMA_VM_IDS_VF4] = false,
+	[ECPRI_DMA_VM_IDS_VF5] = false,
+};
+
 static const struct ecpri_dma_mhi_ee_gsi_tuple
 	ecpri_dma_mhi_physical_function_tuple =
 		{ ECPRI_DMA_EE_PF, ECPRI_DMA_GSI_ID_0 };
@@ -2765,6 +2782,7 @@ static int ecpri_dma_mhi_client_connect_internal(
 	}
 
 	channel->state = ECPRI_DMA_HW_MHI_CHANNEL_STATE_RUN;
+	channel->ch_ctx_host.chstate = ECPRI_DMA_HW_MHI_CHANNEL_STATE_RUN;
 
 	ret = ecpri_dma_mhi_client_read_write_host(
 		ctx, ECPRI_DMA_MHI_DMA_TO_HOST, &channel->ch_ctx_host,
@@ -2998,6 +3016,7 @@ static int ecpri_dma_mhi_dma_disconnect_endp(
 	spin_unlock_bh(&ecpri_dma_mhi_client_ctx[idx]->idr_lock);
 
 	channel->state = ECPRI_DMA_HW_MHI_CHANNEL_STATE_DISABLE;
+	channel->ch_ctx_host.chstate = ECPRI_DMA_HW_MHI_CHANNEL_STATE_DISABLE;
 	channel->valid = false;
 	channel->clnt_hdl = ECPRI_DMA_MHI_MIN_VALID_HDL;
 
@@ -3027,11 +3046,16 @@ static int ecpri_dma_mhi_dma_disconnect_endp(
 	}
 
 	/* Stop */
-	ret = ecpri_dma_stop_endp(channel->endp_ctx);
-	if (ret != 0) {
-		DMAERR("Unable to stop the endp, ENDP ID: %d\n",
-			channel->endp_ctx->endp_id);
-		ecpri_dma_assert();
+	if (!channel->endp_ctx->ssr_in_progress) {
+		ret = ecpri_dma_stop_endp(channel->endp_ctx);
+		if (ret != 0) {
+			DMAERR("Unable to stop the endp, ENDP ID: %d\n",
+				channel->endp_ctx->endp_id);
+			ecpri_dma_assert();
+		}
+	} else {
+		/* ENDP was already stopped due to SSR */
+		channel->endp_ctx->ssr_in_progress = false;
 	}
 
 	/* Reset */
@@ -3326,4 +3350,149 @@ int ecpri_dma_mhi_get_vf_id(struct ecpri_dma_mhi_ee_gsi_tuple *ee_gsi_tuple)
 		return ECPRI_DMA_VM_IDS_NONE;
 	else
 		return vf_id;
+}
+
+
+int ecpri_dma_mhi_client_ssr_chs_stop(enum ecpri_dma_endp_dir dir) {
+	int hw_ver = ECPRI_DMA_GET_CTX_HW_VER();
+	enum ecpri_dma_vm_ids vf_id;
+	int max_vf_id, vf_idx, hw_ch_id;
+	int ret = -EINVAL;
+	int gsi_id;
+	struct mhi_dma_function_params function;
+	enum ecpri_dma_ees ee_idx;
+	const struct ecpri_dma_mhi_ee_gsi_tuple* func_map;
+	struct ecpri_dma_endp_context* endp_ctx;
+	struct ecpri_dma_mhi_channel_ctx* channel;
+
+	/* Get max vf_id by HW version version */
+	if (hw_ver == ECPRI_HW_V1_0)
+		max_vf_id = ECPRI_DMA_VM_IDS_MAX_V1;
+	else
+		max_vf_id = ECPRI_DMA_VM_IDS_MAX;
+
+	/* Iterate over all VFs*/
+	function.function_type = MHI_DMA_FUNCTION_TYPE_VIRTUAL;
+
+	for (vf_id = ECPRI_DMA_VM_IDS_VM0; vf_id < max_vf_id; vf_id++) {
+		function.vf_id = vf_id;
+
+		ret = ecpri_dma_mhi_get_function_context_index(
+			function, &vf_idx, ECPRI_DMA_MHI_DMA_CLIENT_CTX);
+		if (ret != 0) {
+			DMAERR("Function params are invalid,"
+				"function type: %d, vf_id: %d\n",
+				function.function_type, function.vf_id);
+		}
+
+		if (!ecpri_dma_mhi_client_ctx[vf_idx]) {
+			DMADBG("Function isn't initiated,"
+				"function type: %d, vf_id: %d\n",
+				function.function_type, function.vf_id);
+			/* VF not initialized, continue */
+			continue;
+		}
+
+		if (!ecpri_dma_mhi_q6_related_vf_map[vf_idx]) {
+			DMADBG("Function isn't Q6 related,"
+				"function type: %d, vf_id: %d\n",
+				function.function_type, function.vf_id);
+			/* VF not initialized, continue */
+			continue;
+		}
+
+		ret = ecpri_dma_mhi_get_function_mapping(function, &func_map);
+		if (ret) {
+			DMADBG("Unknown function %d\n", vf_id);
+			continue;
+		}
+
+		ee_idx = func_map->ee_id;
+		gsi_id = func_map->gsi_id;
+
+		for (hw_ch_id = 0; hw_ch_id < ECPRI_DMA_MHI_MAX_HW_CHANNELS; hw_ch_id++)
+		{
+			if (ecpri_dma_mhi_client_ctx[vf_idx]->channels[hw_ch_id].valid)
+			{
+				/* Found SSR impacted ENDP, mark endp context */
+				endp_ctx = ecpri_dma_mhi_client_ctx[vf_idx]->
+					channels[hw_ch_id].endp_ctx;
+				endp_ctx->ssr_in_progress = true;
+
+				/* Found SSR impacted ENDP, mark VF context */
+				ecpri_dma_mhi_client_ctx[vf_idx]->ssr_in_progress = true;
+
+				/* Update host CH context with new state */
+				channel = &ecpri_dma_mhi_client_ctx[vf_idx]->channels[hw_ch_id];
+				channel->state =
+					ECPRI_DMA_HW_MHI_CHANNEL_STATE_ERROR;
+				channel->ch_ctx_host.chstate =
+					ECPRI_DMA_HW_MHI_CHANNEL_STATE_ERROR;
+
+				ret = ecpri_dma_mhi_client_read_write_host(
+					ecpri_dma_mhi_client_ctx[vf_idx],
+					ECPRI_DMA_MHI_DMA_TO_HOST,
+					&channel->ch_ctx_host,
+					channel->channel_context_addr +
+					offsetof(struct ecpri_dma_mhi_host_ch_ctx, chstate),
+					sizeof(channel->ch_ctx_host.chstate),
+					function);
+				if (ret != 0) {
+					DMAERR("Unable to write host EDNP:%d GSI:%d, ret:%d\n",
+						endp_ctx->endp_id, gsi_id, ret);
+				}
+
+				/*	Stop ENDP,
+					use ecpri_dma_gsi API to avoid sending QMI */
+				ret = ecpri_dma_gsi_stop_channel(endp_ctx);
+				if (ret)
+				{
+					DMAERR("Stop failed for ENDP:%d GSI:%d res:%d\n",
+						endp_ctx->endp_id, gsi_id, ret);
+				}
+			}
+		}
+	}
+
+	return 0;
+}
+
+int ecpri_dma_mhi_client_ssr_notify_host() {
+	int hw_ver = ECPRI_DMA_GET_CTX_HW_VER();
+	enum ecpri_dma_vm_ids vf_id;
+	int max_vf_id, idx;
+	int ret = -EINVAL;
+	struct mhi_dma_function_params function;
+
+	/* Get max vf_id by HW version version */
+	if (hw_ver == ECPRI_HW_V1_0)
+		max_vf_id = ECPRI_DMA_VM_IDS_MAX_V1;
+	else
+		max_vf_id = ECPRI_DMA_VM_IDS_MAX;
+
+	/* Iterate over all VFs*/
+	function.function_type = MHI_DMA_FUNCTION_TYPE_VIRTUAL;
+
+	for (vf_id = ECPRI_DMA_VM_IDS_VM0; vf_id < max_vf_id; vf_id++) {
+		function.vf_id = vf_id;
+
+		ret = ecpri_dma_mhi_get_function_context_index(
+			function, &idx, ECPRI_DMA_MHI_DMA_CLIENT_CTX);
+		if (ret != 0) {
+			DMADBG("Function params are invalid,"
+				"function type: %d, vf_id: %d\n",
+				function.function_type, function.vf_id);
+		}
+		if (ecpri_dma_mhi_client_ctx[idx] &&
+			ecpri_dma_mhi_client_ctx[idx]->ssr_in_progress) {
+			DMADBG("SSR: Notified VF:%d\n", vf_id);
+			ecpri_dma_mhi_client_ctx[idx]->notify_cb(
+				ecpri_dma_mhi_client_ctx[idx]->user_data,
+				MHI_DMA_EVENT_SSR_RESET,
+				0);
+			ecpri_dma_mhi_client_ctx[idx]->ssr_in_progress = false;
+		}
+	}
+
+	return ret;
 }
