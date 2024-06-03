@@ -1401,7 +1401,6 @@ void mtip_phy_notify_eth_event_to_trx(u32 link_index, trx_phy_event event)
     }
 
     // Indicate transceiver driver about interface bring up
-    rtnl_lock();
 
     trx_event_info.event = event;
     trx_event_info.lane_phandle = sfp_phandle;
@@ -1415,7 +1414,6 @@ void mtip_phy_notify_eth_event_to_trx(u32 link_index, trx_phy_event event)
     }
 
     qsfp_trx_eth_event_notifier(&trx_event_info);
-    rtnl_unlock();
 
     return;
 }

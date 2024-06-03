@@ -3039,7 +3039,6 @@ void mtip_device_configure_port(u32 port_type)
             }
 
             // Notify TRX driver to enable TX, for the primary lane used for AN
-            rtnl_lock();
             mtip_lookup_lane_index_by_port_type_and_real_lane(&lane_index, port_type, real_lane);
             sfp_phandle[real_lane] = platform_driver_priv->devices.lane_devices[lane_index].sfp_phandle;
             trx_event_info.event = TRX_IFCONFIG_UP;
@@ -3047,7 +3046,6 @@ void mtip_device_configure_port(u32 port_type)
             trx_event_info.num_lanes = 1;
             trx_event_info.eth_cfg_speed = TRX_LANE_SPEED_UNKNOWN;
             qsfp_trx_eth_event_notifier(&trx_event_info);
-            rtnl_unlock();
 
             // initiate AN with the PHY
             mtip_phy_initiate_an(port_type, num_an_lanes, filtered_priv_flags);
@@ -3520,14 +3518,12 @@ void run_mtip_process_netdev_close(void* workptr)
                real_lane = 2;
             }
 
-            rtnl_lock();
             mtip_lookup_lane_index_by_port_type_and_real_lane(&lane_index, port_type, real_lane);
             sfp_phandle[real_lane] = platform_driver_priv->devices.lane_devices[lane_index].sfp_phandle;
             trx_event_info.event = TRX_IFCONFIG_DOWN;
             trx_event_info.lane_phandle = sfp_phandle;
             trx_event_info.num_lanes = 1;
             qsfp_trx_eth_event_notifier(&trx_event_info);
-            rtnl_unlock();
          }
       }
       // PCS looback mode
