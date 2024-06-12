@@ -1731,7 +1731,7 @@ int qcom_aw_phy_mac_link_status(enum mtip_port_type_enum port_type,
           phy_inst_info->phy_eq_mode == QCOM_AW_PHY_ANLT_MODE) {
         /* If the link goes down in ANLT mode, queue a delayed work and restart
            AN post this delay */
-        queue_delayed_work(phy_config_info->wq,
+        queue_delayed_work(phy_inst_info->wq,
                &phy_inst_info->lane_params[lane_num].an_restart_wq_item.wq_item,
                msecs_to_jiffies(qcom_aw_phy_an_restart_delay_timer_val));
       }
@@ -1763,9 +1763,8 @@ func_exit:
                finished along with link training.
 ------------------------------------------------------------------- */
 void qcom_aw_phy_handle_an_done(struct work_struct *work){
-  struct delayed_work *delayed_work_item = to_delayed_work(work);
   struct qcom_aw_phy_work_q_params *wq_params =
-     container_of(delayed_work_item, struct qcom_aw_phy_work_q_params, wq_item);
+                 container_of(work, struct qcom_aw_phy_work_q_params, wq_item);
   enum qcom_aw_phy_instance_enum phy_inst;
   enum eth_phy_iface_phy_lane_num_enum lane_num;
   struct qcom_aw_phy_config *phy_config_info = NULL;
@@ -1869,7 +1868,6 @@ void qcom_aw_phy_handle_an_done(struct work_struct *work){
   mutex_unlock(&phy_inst_info->phy_inst_lock);
 
 func_exit:
-  kfree(wq_params);
   return;
 }
 
@@ -1880,9 +1878,8 @@ func_exit:
 has been negotiated via AN.
 ------------------------------------------------------------------- */
 void qcom_aw_phy_handle_an_link_good(struct work_struct *work){
-  struct delayed_work *delayed_work_item = to_delayed_work(work);
   struct qcom_aw_phy_work_q_params *wq_params =
-     container_of(delayed_work_item, struct qcom_aw_phy_work_q_params, wq_item);
+                  container_of(work, struct qcom_aw_phy_work_q_params, wq_item);
   struct qcom_aw_phy_config *phy_config_info = NULL;
   struct qcom_aw_phy_inst_config *phy_inst_info = NULL;
   mss_access_t mss = {.phy_offset = 0, .lane_offset = 0};
@@ -2011,14 +2008,13 @@ func_exit:
   mutex_unlock(&phy_inst_info->lane_lock[wq_params->lane_num]);
   mutex_unlock(&phy_inst_info->phy_inst_lock);
 
-  kfree(wq_params);
   return;
 }
 
 void qcom_aw_phy_handle_rx_sig_detect(struct work_struct *work){
   struct delayed_work *delayed_work_item = to_delayed_work(work);
-  struct qcom_aw_phy_work_q_params *wq_params =
-     container_of(delayed_work_item, struct qcom_aw_phy_work_q_params, wq_item);
+  struct qcom_aw_phy_delayed_work_q_params *wq_params =
+     container_of(delayed_work_item, struct qcom_aw_phy_delayed_work_q_params, wq_item);
   struct qcom_aw_phy_config *phy_config_info = NULL;
   struct qcom_aw_phy_inst_config *phy_inst_info = NULL;
   enum qcom_aw_phy_instance_enum phy_inst_type = QCOM_AW_PHY_INST_FH0;
@@ -2281,8 +2277,8 @@ int qcom_aw_phy_get_phy_eq_mode(enum mtip_port_type_enum port_type) {
 ------------------------------------------------------------------- */
 void qcom_aw_phy_handle_an_restart(struct work_struct *work){
   struct delayed_work *delayed_work_item = to_delayed_work(work);
-  struct qcom_aw_phy_work_q_params *wq_params =
-     container_of(delayed_work_item, struct qcom_aw_phy_work_q_params, wq_item);
+  struct qcom_aw_phy_delayed_work_q_params *wq_params =
+     container_of(delayed_work_item, struct qcom_aw_phy_delayed_work_q_params, wq_item);
   enum qcom_aw_phy_instance_enum phy_inst;
   enum eth_phy_iface_phy_lane_num_enum lane_num;
   struct qcom_aw_phy_config *phy_config_info = NULL;

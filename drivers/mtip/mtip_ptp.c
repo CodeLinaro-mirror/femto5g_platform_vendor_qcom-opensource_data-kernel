@@ -480,17 +480,28 @@ int mtip_ptp_tx_ts_skb_list_peek(u32 link_index, struct sk_buff **skb, u8* ts_se
 
 void post_mtip_process_timestamp(u32 link_index, u32 timestamp_secs, u32 timestamp_nsecs, u8 ts_seq_num)
 {
-   struct mtip_process_timestamp_task* taskstruct = kmalloc(sizeof(struct mtip_process_timestamp_task), GFP_ATOMIC);
+   u32 port_type;
+   struct mtip_process_timestamp_task* taskstruct = NULL;
+
+   if(mtip_lookup_port_type_by_link_index(link_index, &port_type))
+   {
+      CSMLOGERR("invalid link index");
+      return;
+   }
+
+   taskstruct = kmalloc(sizeof(struct mtip_process_timestamp_task), GFP_ATOMIC);
    if(taskstruct == NULL)
    {
-	CSMLOGERR("memory alloc failed\n");
-	return;
+      CSMLOGERR("memory alloc failed\n");
+      return;
    }
+
    taskstruct->link_index = link_index;
    taskstruct->timestamp_secs = timestamp_secs;
    taskstruct->timestamp_nsecs = timestamp_nsecs;
    taskstruct->ts_seq_num = ts_seq_num;
-   mtip_queue_work(MTIP_WORKQ_TASK_PROCESS_TIMESTAMP, taskstruct);
+
+   mtip_queue_work(MTIP_WORKQ_TASK_PROCESS_TIMESTAMP, taskstruct, port_type);
 }
 
 void run_mtip_process_timestamp(void* work_ptr)
@@ -502,6 +513,9 @@ void run_mtip_process_timestamp(void* work_ptr)
     u8 read_ts_seq_num = taskstruct->ts_seq_num;
     u8 pkt_ts_seq_num = 0;
     struct sk_buff* skb = NULL;
+
+    if(link_index >= MTIP_MAX_LINKS || platform_driver_priv == NULL || platform_driver_priv->mtip_links[link_index] == NULL)
+         goto exit;
 
     CSMLOGDBG("process tx timestamp %d, %d, read_ts_seq_num: %d\n", timestamp_secs, timestamp_nsecs, read_ts_seq_num);
 
@@ -551,6 +565,7 @@ void run_mtip_process_timestamp(void* work_ptr)
     // release the lock
     mtip_ptp_tx_ts_lock_release(link_index);
 
+exit:
     // free the taskstruct
     kfree(taskstruct);
 }

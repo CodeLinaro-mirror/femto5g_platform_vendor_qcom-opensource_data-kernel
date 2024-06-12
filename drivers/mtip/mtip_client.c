@@ -317,7 +317,7 @@ static void mtip_update_topology()
 void post_mtip_client_send_ready(void)
 {
    struct mtip_send_ready_task* taskstruct = kmalloc(sizeof(struct mtip_send_ready_task), GFP_ATOMIC);
-   mtip_queue_work(MTIP_WORKQ_TASK_INDICATE_READY, taskstruct);
+   mtip_queue_work(MTIP_WORKQ_TASK_INDICATE_READY, taskstruct, MTIP_PORT_TYPE_FH_0);
 }
 
 void run_mtip_client_send_ready(void* work_ptr)

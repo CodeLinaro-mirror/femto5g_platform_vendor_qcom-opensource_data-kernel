@@ -168,17 +168,35 @@ static int mtip_device_get_pkt_completion_count(struct net_device *netdev)
 
 void post_mtip_tx_comp_cb(void *user_data, ecpri_dma_eth_conn_hdl_t hdl, struct ecpri_dma_pkt_completion_wrapper **comp_pkts, u32 num_of_completed)
 {
-   struct mtip_tx_comp_cb_task* taskstruct = kmalloc(sizeof(struct mtip_tx_comp_cb_task), GFP_ATOMIC);
+   struct mtip_tx_comp_cb_task* taskstruct = NULL;
+   u32 link_index;
+   u32 port_type;
+
+   if(mtip_lookup_link_index_by_handle(hdl, &link_index))
+   {
+      CSMLOGERR("Unable to find link_index of hdl: %d\n", hdl);
+      return;
+   }
+
+   if(mtip_lookup_port_type_by_link_index(link_index, &port_type))
+   {
+      CSMLOGERR("invalid link_index");
+      return;
+   }
+
+   taskstruct = kmalloc(sizeof(struct mtip_tx_comp_cb_task), GFP_ATOMIC);
    if(taskstruct == NULL)
    {
-	CSMLOGERR("memory alloc failed\n");
-	return;
+      CSMLOGERR("memory alloc failed\n");
+      return;
    }
+
    taskstruct->user_data = user_data;
    taskstruct->hdl = hdl;
    taskstruct->comp_pkts = comp_pkts;
    taskstruct->num_of_completed = num_of_completed;
-   mtip_queue_work(MTIP_WORKQ_TASK_TX_COMP_CB, taskstruct);
+
+   mtip_queue_work(MTIP_WORKQ_TASK_TX_COMP_CB, taskstruct, port_type);
 }
 
 void mtip_process_tx_comp_cb(ecpri_dma_eth_conn_hdl_t hdl, struct mtip_dma_tx_comp_params *tx_comp_params)
@@ -409,15 +427,26 @@ void mtip_process_tx_comp_cb(ecpri_dma_eth_conn_hdl_t hdl, struct mtip_dma_tx_co
 
 void post_mtip_process_link_state(u32 link_index, bool link_up)
 {
-   struct mtip_process_link_state_task* taskstruct = kmalloc(sizeof(struct mtip_process_link_state_task), GFP_ATOMIC);
+   u32 port_type;
+   struct mtip_process_link_state_task* taskstruct = NULL;
+
+   if(mtip_lookup_port_type_by_link_index(link_index, &port_type))
+   {
+      CSMLOGERR("invalid link index\n");
+      return;
+   }
+
+   taskstruct = kmalloc(sizeof(struct mtip_process_link_state_task), GFP_ATOMIC);
    if(taskstruct == NULL)
    {
-	CSMLOGERR("memory alloc failed\n");
-	return;
+      CSMLOGERR("memory alloc failed\n");
+      return;
    }
+
    taskstruct->link_index = link_index;
    taskstruct->link_up = link_up;
-   mtip_queue_work(MTIP_WORKQ_TASK_PROCESS_LINK_STATE, taskstruct);
+
+   mtip_queue_work(MTIP_WORKQ_TASK_PROCESS_LINK_STATE, taskstruct, port_type);
 }
 
 void run_mtip_process_link_state(void* work_ptr)
@@ -434,6 +463,9 @@ void run_mtip_process_link_state(void* work_ptr)
         CSMLOGERR("invalid link_index %d", link_index);
         goto func_exit;
     }
+
+    if(platform_driver_priv == NULL || platform_driver_priv->mtip_links[link_index] == NULL)
+         goto func_exit;
 
     dma_handle = platform_driver_priv->mtip_links[link_index]->dma_hdl;
     if (link_up)
@@ -2818,6 +2850,9 @@ void mtip_device_configure_port(u32 port_type)
    enum mtip_port_config_enum port_config;
    struct trx_eth_event_t trx_event_info = {0};
 
+   if(platform_driver_priv == NULL || platform_driver_priv->mtip_ports[port_type] == NULL)
+      goto out;
+
    port_info = platform_driver_priv->mtip_ports[port_type];
 
    loopflag = true;
@@ -3132,14 +3167,17 @@ out:
 void post_mtip_process_configure_port_using_lane(u32 port_type, u32 lane_index)
 {
    struct mtip_process_configure_port_using_lane_task* taskstruct = kmalloc(sizeof(struct mtip_process_configure_port_using_lane_task), GFP_ATOMIC);
+
    if(taskstruct == NULL)
    {
-	CSMLOGERR("memory alloc failed\n");
-	return;
+      CSMLOGERR("memory alloc failed\n");
+      return;
    }
+
    taskstruct->port_type = port_type;
    taskstruct->lane_index = lane_index;
-   mtip_queue_work(MTIP_WORKQ_TASK_PROCESS_PORT_CONFIGURATION_USING_LANE, taskstruct);
+
+   mtip_queue_work(MTIP_WORKQ_TASK_PROCESS_PORT_CONFIGURATION_USING_LANE, taskstruct, port_type);
 }
 
 // There has been some change in the configuration of a port
@@ -3163,14 +3201,17 @@ void run_mtip_process_configure_port_using_lane(void *work_ptr)
 void post_mtip_process_configure_port_using_link(u32 port_type, u32 link_index)
 {
    struct mtip_process_configure_port_using_link_task* taskstruct = kmalloc(sizeof(struct mtip_process_configure_port_using_link_task), GFP_ATOMIC);
-      if(taskstruct == NULL)
+
+   if(taskstruct == NULL)
    {
-	CSMLOGERR("memory alloc failed\n");
-	return;
+      CSMLOGERR("memory alloc failed\n");
+      return;
    }
+
    taskstruct->port_type = port_type;
    taskstruct->link_index = link_index;
-   mtip_queue_work(MTIP_WORKQ_TASK_PROCESS_PORT_CONFIGURATION_USING_LINK, taskstruct);
+
+   mtip_queue_work(MTIP_WORKQ_TASK_PROCESS_PORT_CONFIGURATION_USING_LINK, taskstruct, port_type);
 }
 
 // There has been some change in the configuration of a port
@@ -3192,16 +3233,19 @@ void run_mtip_process_configure_port_using_link(void *work_ptr)
 void post_mtip_process_an_result(enum mtip_port_type_enum port_type, bool an_result, enum mtip_port_config_enum port_config, u8 seq_num)
 {
    struct mtip_process_an_result_task* taskstruct = kmalloc(sizeof(struct mtip_process_an_result_task), GFP_ATOMIC);
+
    if(taskstruct == NULL)
    {
-	CSMLOGERR("memory alloc failed\n");
-	return;
+      CSMLOGERR("memory alloc failed\n");
+      return;
    }
+
    taskstruct->port_type = port_type;
    taskstruct->an_result = an_result;
    taskstruct->port_config = port_config;
    taskstruct->seq_num = seq_num;
-   mtip_queue_work(MTIP_WORKQ_TASK_PROCESS_AN_RESULT, taskstruct);
+
+   mtip_queue_work(MTIP_WORKQ_TASK_PROCESS_AN_RESULT, taskstruct, port_type);
 }
 
 // we got the updated result of AN
@@ -3212,6 +3256,9 @@ void run_mtip_process_an_result(void *work_ptr)
     bool an_result = taskstruct->an_result;
     u8 seq_num = taskstruct->seq_num;
     enum mtip_port_config_enum port_config = taskstruct->port_config;
+
+    if(platform_driver_priv == NULL || platform_driver_priv->mtip_ports[port_type] == NULL)
+       goto out;
 
     CSMLOGINFO("Processing AN result for port_type %d seq %d with result %d config %d %s",
                port_type, an_result, seq_num, port_config, mtip_ethtool_get_port_config_str(port_config));
@@ -3261,14 +3308,26 @@ out:
 
 void post_mtip_process_netdev_open(struct net_device *netdev)
 {
-   struct mtip_process_process_netdev_events* taskstruct = kmalloc(sizeof(struct mtip_process_process_netdev_events), GFP_ATOMIC);
+   u32 port_type;
+   struct mtip_netdev_priv *priv = netdev_priv(netdev);
+   struct mtip_process_process_netdev_events* taskstruct = NULL;
+
+   if(mtip_lookup_port_type_by_link_index(priv->link_index, &port_type))
+   {
+      CSMLOGERR("invalid link index");
+      return;
+   }
+
+   taskstruct = kmalloc(sizeof(struct mtip_process_process_netdev_events), GFP_ATOMIC);
    if(taskstruct == NULL)
    {
-       CSMLOGERR("memory alloc failed\n");
-       return;
+      CSMLOGERR("memory alloc failed\n");
+      return;
    }
+
    taskstruct->netdev = netdev;
-   mtip_queue_work(MTIP_WORKQ_TASK_PROCESS_NETDEV_OPEN, taskstruct);
+
+   mtip_queue_work(MTIP_WORKQ_TASK_PROCESS_NETDEV_OPEN, taskstruct, port_type);
 }
 
 void run_mtip_process_netdev_open(void* workptr)
@@ -3283,6 +3342,8 @@ void run_mtip_process_netdev_open(void* workptr)
    u32 port_type;
 
    priv = netdev_priv(netdev);
+   if(!priv)
+      goto out;
 
    link_index = priv->link_index;
    if(link_index >= MTIP_MAX_LINKS)
@@ -3290,6 +3351,9 @@ void run_mtip_process_netdev_open(void* workptr)
      CSMLOGERR("invalid link_index %d", link_index);
      goto out;
    }
+
+   if(platform_driver_priv == NULL || platform_driver_priv->mtip_links[link_index] == NULL)
+      goto out;
 
    hdl = platform_driver_priv->mtip_links[link_index]->dma_hdl;
 
@@ -3437,14 +3501,25 @@ out:
 
 void post_mtip_process_netdev_close(struct net_device *netdev)
 {
-   struct mtip_process_process_netdev_events* taskstruct = kmalloc(sizeof(struct mtip_process_process_netdev_events), GFP_ATOMIC);
-   if(taskstruct == NULL)
+   u32 port_type;
+   struct mtip_netdev_priv *priv = netdev_priv(netdev);
+   struct mtip_process_process_netdev_events* taskstruct = NULL;
+
+   if(mtip_lookup_port_type_by_link_index(priv->link_index, &port_type))
    {
-       CSMLOGERR("memory alloc failed\n");
+       CSMLOGERR("invalid link index");
        return;
    }
+
+   taskstruct = kmalloc(sizeof(struct mtip_process_process_netdev_events), GFP_ATOMIC);
+   if(taskstruct == NULL)
+   {
+      CSMLOGERR("memory alloc failed\n");
+      return;
+   }
+
    taskstruct->netdev = netdev;
-   mtip_queue_work(MTIP_WORKQ_TASK_PROCESS_NETDEV_CLOSE, taskstruct);
+   mtip_queue_work(MTIP_WORKQ_TASK_PROCESS_NETDEV_CLOSE, taskstruct, port_type);
 }
 
 void run_mtip_process_netdev_close(void* workptr)
@@ -3464,8 +3539,18 @@ void run_mtip_process_netdev_close(void* workptr)
    struct trx_eth_event_t trx_event_info = {0};
 
    priv = netdev_priv(netdev);
+   if(!priv)
+      goto exit;
 
    link_index = priv->link_index;
+   if(link_index >= MTIP_MAX_LINKS)
+   {
+     CSMLOGERR("invalid link_index %d", link_index);
+     goto exit;
+   }
+
+   if(platform_driver_priv == NULL || platform_driver_priv->mtip_links[link_index] == NULL)
+      goto exit;
 
    hdl = platform_driver_priv->mtip_links[link_index]->dma_hdl;
 
@@ -3602,6 +3687,7 @@ void run_mtip_process_netdev_close(void* workptr)
    mtip_client_send_event(ETH_ECPRISS_EVENT_DOWN, link_index);
    mtip_snd_event_notification(link_index, IF_DOWN);
 
+exit:
    // free the taskstruct
    kfree(taskstruct);
 
@@ -3620,7 +3706,7 @@ void post_mtip_process_reconfigure_port(u32 port_type)
    CSMLOGINFO("Reconfiguration queued for port %d\n", port_type);
 
    taskstruct->port_type = port_type;
-   mtip_queue_work(MTIP_WORKQ_TASK_PROCESS_RECONFIGURE_PORT, taskstruct);
+   mtip_queue_work(MTIP_WORKQ_TASK_PROCESS_RECONFIGURE_PORT, taskstruct, port_type);
 }
 
 void run_mtip_process_reconfigure_port(void* workptr)
@@ -3630,6 +3716,9 @@ void run_mtip_process_reconfigure_port(void* workptr)
    u32 tmp_link_index;
    int i;
    enum mtip_link_state_enum link_state;
+
+   if(platform_driver_priv == NULL || platform_driver_priv->mtip_ports[port_type] == NULL)
+      goto exit;
 
    // Set the port to DISCONNECTED
    platform_driver_priv->mtip_ports[port_type]->port_state = MTIP_PORT_STATE_DISCONNECTED;
@@ -3662,6 +3751,7 @@ void run_mtip_process_reconfigure_port(void* workptr)
    // Issue port configuration with the new configuration
    mtip_device_configure_port(port_type);
 
+exit:
    // free the taskstruct
    kfree(taskstruct);
 
@@ -3680,7 +3770,7 @@ void post_mtip_process_next_speed_mode(struct mtip_process_next_speed_mode info)
    }
 
    memcpy(taskstruct, &info, sizeof(struct mtip_process_next_speed_mode));
-   mtip_queue_work(MTIP_WORKQ_TASK_PROCESS_NEXT_SPEED_MODE, taskstruct);
+   mtip_queue_work(MTIP_WORKQ_TASK_PROCESS_NEXT_SPEED_MODE, taskstruct, info.port_type);
 }
 
 void run_mtip_process_next_speed_mode(void* workptr)
@@ -3689,8 +3779,13 @@ void run_mtip_process_next_speed_mode(void* workptr)
    u32 port_type = taskstruct->port_type;
    u32 link_index = taskstruct->link_index;
    u32 lane_index;
-   u32 pflags = platform_driver_priv->mtip_ports[port_type]->port_priv_flags_optical;
+   u32 pflags;
    int i;
+
+   if(platform_driver_priv == NULL || platform_driver_priv->mtip_links[link_index] == NULL || platform_driver_priv->mtip_ports[port_type] == NULL)
+      goto exit;
+
+   pflags = platform_driver_priv->mtip_ports[port_type]->port_priv_flags_optical;
 
    // Fetch the first lane index
    lane_index = platform_driver_priv->mtip_links[link_index]->assigned_lane_indices[0];
@@ -3728,6 +3823,7 @@ void run_mtip_process_next_speed_mode(void* workptr)
    // Issue port configuration with the new set of speed mode flags
    post_mtip_process_reconfigure_port(port_type);
 
+exit:
    // free the taskstruct
    kfree(taskstruct);
 
