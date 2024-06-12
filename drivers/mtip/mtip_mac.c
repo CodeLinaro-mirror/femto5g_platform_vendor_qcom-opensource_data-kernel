@@ -231,48 +231,23 @@ static irqreturn_t mtip_mac_interrupt_handler(int irq, void *devptr)
            // check for LINK DOWN
            if ((int_status & MTIP_MAC_INTERRUPT_LINK_DOWN_INTR) != 0)
            {
-               // check if the LINK_UP_INTR is also set
-               if ((int_status & MTIP_MAC_INTERRUPT_LINK_UP_INTR) != 0) 
-               {
-                   CSMLOGDBG("Got a link down/up interrupt link_index: %d: ignoring", link_index);
+               CSMLOGDBG("Got a link down interrupt link_index: %d", link_index);
 
-                   // LINK_UP also set
-                   // ignore both
-                   handled = true;
-               }
-               else
-               {
-                   CSMLOGDBG("Got a link down interrupt link_index: %d", link_index);
+               // got a link down interrupt for link index
+               post_mtip_process_link_state(link_index, false);
 
-                   // got a link down interrupt for link index
-                   post_mtip_process_link_state(link_index, false);
-
-                   handled = true;
-               }
+               handled = true;
            }
 
            // check for LINK UP
            if ((int_status & MTIP_MAC_INTERRUPT_LINK_UP_INTR) != 0) 
            {
-               // check if LINK_DOWN is set
-               if ((int_status & MTIP_MAC_INTERRUPT_LINK_DOWN_INTR) != 0)
-               {
-                   CSMLOGDBG("Got a link down/up interrupt link_index: %d: ignoring", link_index);
+               CSMLOGDBG("Got a link up interrupt link_index: %d", link_index);
 
-                   // LINK_DOWN also set
-                   // ignore both
+               // got a link up interrupt for link index
+               post_mtip_process_link_state(link_index, true);
 
-                   handled = true;
-               }
-               else
-               {
-                   CSMLOGDBG("Got a link up interrupt link_index: %d", link_index);
-
-                   // got a link up interrupt for link index
-                   post_mtip_process_link_state(link_index, true);
-
-                   handled = true;
-               }
+               handled = true;
            }
 
            // catchall
