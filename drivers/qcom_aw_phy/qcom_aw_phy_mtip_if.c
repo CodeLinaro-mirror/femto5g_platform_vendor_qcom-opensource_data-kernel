@@ -317,11 +317,11 @@ void qcom_aw_phy_handle_cdr_lock_status(
 }
 
 void qcom_aw_phy_reset_anlt(mss_access_t *mss) {
-  aw_pmd_anlt_link_training_reset(mss);
   aw_pmd_anlt_auto_neg_start_set(mss, 0);
   aw_pmd_iso_tx_reset_set(mss, 0);
-  aw_pmd_iso_tx_reset_set(mss, 1);
   aw_pmd_iso_rx_reset_set(mss, 0);
+  udelay(100);
+  aw_pmd_iso_tx_reset_set(mss, 1);
   aw_pmd_iso_rx_reset_set(mss, 1);
   return;
 }
@@ -844,6 +844,9 @@ int qcom_aw_phy_perform_an(
       qcom_aw_phy_disable_snr_interrupt(phy_inst_info, i);
 
       /* Reset TX and RX lanes */
+      aw_pmd_iso_tx_reset_set(&temp_mss, 0);
+      aw_pmd_iso_rx_reset_set(&temp_mss, 0);
+      udelay(100);
       aw_pmd_iso_tx_reset_set(&temp_mss, 1);
       aw_pmd_iso_rx_reset_set(&temp_mss, 1);
 
@@ -878,6 +881,9 @@ int qcom_aw_phy_perform_an(
     qcom_aw_phy_disable_snr_interrupt(phy_inst_info, lane);
 
     /* Reset TX and RX lanes */
+    aw_pmd_iso_tx_reset_set(&temp_mss, 0);
+    aw_pmd_iso_rx_reset_set(&temp_mss, 0);
+    udelay(100);
     aw_pmd_iso_tx_reset_set(&temp_mss, 1);
     aw_pmd_iso_rx_reset_set(&temp_mss, 1);
 
@@ -922,6 +928,11 @@ int qcom_aw_phy_perform_an(
   /* Enable LT and AN for master lane */
   aw_pmd_anlt_link_training_en_set(&mss, 1);
   aw_pmd_anlt_auto_neg_start_set(&mss, 1);
+
+  /* Queue delayed work to restart AN post this delay if link doesn't come up */
+  mod_delayed_work(phy_inst_info->wq,
+                   &phy_inst_info->lane_params[lane].an_restart_wq_item.wq_item,
+                   msecs_to_jiffies(10000));
 
   func_exit:
   if(local_err_val != LOCAL_ERROR_INVALID){
@@ -1110,7 +1121,8 @@ int qcom_aw_phy_bringup_anlt_mode(mss_access_t *mss,
 
       /* No need to perform AN again if initiate AN was already done for the
          reference lane, and bring up was triggered for the same */
-      if(phy_inst_info->bring_up_status == false)
+      if(phy_inst_info->an_params.an_state[ref_lane] != PHY_AN_STATE_START &&
+         phy_inst_info->an_params.an_state[ref_lane] != PHY_AN_STATE_NONE)
         return ret_val;
     }
 
@@ -1529,6 +1541,7 @@ int qcom_aw_phy_teardown(enum mtip_port_type_enum port_type,
   struct qcom_aw_lane_params *phy_lane_params = NULL;
   enum eth_phy_iface_phy_lane_num_enum lane = PHY_LANE_0;
   mss_access_t mss = {.phy_offset = 0, .lane_offset = 0};
+  mss_access_t temp_mss = {.phy_offset = 0, .lane_offset = 0};
   struct qcom_aw_phy_lane_speed_config config;
   int poll_result;
   char temp_buf[MAX_PHY_LANE_STR_LEN] = {0};
@@ -1536,6 +1549,7 @@ int qcom_aw_phy_teardown(enum mtip_port_type_enum port_type,
   enum local_error_enum local_err_val = LOCAL_ERROR_INVALID;
   aw_err_code_t aw_err_val = AW_ERR_CODE_NONE;
   int ret_val = 0;
+  int num_lanes=0, i=0;
 
   /* Get the PHY instance type for the provided port */
   phy_inst_type = qcom_aw_phy_mac_port_to_phy_inst(port_type);
@@ -1564,6 +1578,7 @@ int qcom_aw_phy_teardown(enum mtip_port_type_enum port_type,
 
   /* Setup PHY offset */
   mss.phy_offset = phy_inst_info->base_addr;
+  temp_mss.phy_offset = phy_inst_info->base_addr;
 
   for (lane = 0; lane < PHY_LANE_MAX; lane++) {
     if (lanes_enabled[lane]) {
@@ -1593,6 +1608,24 @@ int qcom_aw_phy_teardown(enum mtip_port_type_enum port_type,
 
     mutex_lock(&phy_inst_info->lane_lock[lane]);
 
+    /* Reset AN and LT for slave lanes if applicable */
+    if(phy_inst_info->phy_eq_mode == QCOM_AW_PHY_ANLT_MODE &&
+       phy_inst_info->an_params.an_result[lane] != -1){
+
+      num_lanes = qcom_aw_phy_get_num_lanes_for_speed_mode(
+                                      phy_inst_info->an_params.an_result[lane]);
+      if(num_lanes > 1){
+        for(i=lane+1; (i< lane+num_lanes) && (i < PHY_LANE_MAX);i++){
+
+          /* Set the lane offset */
+          pmd_set_lane(&temp_mss, i);
+
+          /* Reset AN and LT for slave lane */
+          qcom_aw_phy_reset_anlt(&temp_mss);
+        }
+      }
+    }
+
     /* Set the lane offset */
     pmd_set_lane(&mss, lane);
 
@@ -1600,7 +1633,7 @@ int qcom_aw_phy_teardown(enum mtip_port_type_enum port_type,
     qcom_aw_phy_get_lane_speed_config(phy_lane_params->lane_config.lane_speed,
                                       &config);
 
-    /* Reset AN and LT */
+    /* Reset AN and LT for the master lane */
     qcom_aw_phy_reset_anlt(&mss);
     phy_inst_info->an_params.an_state[lane] = PHY_AN_STATE_NONE;
 
@@ -1731,7 +1764,7 @@ int qcom_aw_phy_mac_link_status(enum mtip_port_type_enum port_type,
           phy_inst_info->phy_eq_mode == QCOM_AW_PHY_ANLT_MODE) {
         /* If the link goes down in ANLT mode, queue a delayed work and restart
            AN post this delay */
-        queue_delayed_work(phy_inst_info->wq,
+        mod_delayed_work(phy_inst_info->wq,
                &phy_inst_info->lane_params[lane_num].an_restart_wq_item.wq_item,
                msecs_to_jiffies(qcom_aw_phy_an_restart_delay_timer_val));
       }
@@ -1887,7 +1920,6 @@ void qcom_aw_phy_handle_an_link_good(struct work_struct *work){
   uint32_t an_complete;
   enum mtip_port_config_enum port_config_result = MTIP_PORT_CONFIG_MAX;
   bool an_result = false;
-  int i = 0;
 
   if(!wq_params){
     QCOM_AW_PHY_LOG_ERR("Invalid work queue structure!");
@@ -1926,7 +1958,12 @@ void qcom_aw_phy_handle_an_link_good(struct work_struct *work){
   /* Fecth the AN status */
   aw_pmd_anlt_auto_neg_status_get(&mss, &an_complete);
   if (an_complete == 0)
-    QCOM_AW_PHY_LOG_ERR("AN failed, need to debug!");
+{
+    QCOM_AW_PHY_LOG_ERR("AN failed, restart after some time!");
+    phy_inst_info->an_params.an_state[wq_params->lane_num] =
+                                                           PHY_AN_STATE_FAILURE;
+    goto func_exit;
+  }
   else
     QCOM_AW_PHY_LOG_DBG("AN link good");
 
@@ -1941,14 +1978,7 @@ void qcom_aw_phy_handle_an_link_good(struct work_struct *work){
 
   /* AN failure handling */
   if(phy_inst_info->an_params.an_result[wq_params->lane_num] == -1){
-
-    QCOM_AW_PHY_LOG_ERR("AN failed!");
-    for(i=wq_params->lane_num; i<PHY_LANE_MAX; i++){
-      pmd_set_lane(&temp_mss, i);
-      qcom_aw_phy_reset_anlt(&temp_mss);
-      phy_inst_info->an_params.an_state[i] = PHY_AN_STATE_NONE;
-    }
-
+    QCOM_AW_PHY_LOG_ERR("AN failed, restart after some time!");
     phy_inst_info->an_params.an_state[wq_params->lane_num] =
                                                            PHY_AN_STATE_FAILURE;
     goto func_exit;
@@ -1965,7 +1995,9 @@ void qcom_aw_phy_handle_an_link_good(struct work_struct *work){
   // AN success for the first try
   else{
     if(phy_inst_info->an_params.an_state[wq_params->lane_num] ==
-                                                            PHY_AN_STATE_START){
+                                                           PHY_AN_STATE_START ||
+       phy_inst_info->an_params.an_state[wq_params->lane_num] ==
+                                                          PHY_AN_STATE_FAILURE){
       QCOM_AW_PHY_LOG_INFO(
               "AN result successful for PHY %d lane %d, "
               "configured speed = %d, FEC = 0x%x",
@@ -1977,6 +2009,11 @@ void qcom_aw_phy_handle_an_link_good(struct work_struct *work){
                                                         PHY_AN_STATE_PCS_CONFIG;
     }
   }
+
+  /* Queue delayed work to restart AN post this delay if link doesn't come up */
+  mod_delayed_work(phy_inst_info->wq,
+    &phy_inst_info->lane_params[wq_params->lane_num].an_restart_wq_item.wq_item,
+    msecs_to_jiffies(10000));
 
   /* Convert the AN result to MAC port config type */
   port_config_result = qcom_aw_phy_an_result_to_port_config(phy_inst_info);
@@ -2118,13 +2155,11 @@ void qcom_aw_phy_handle_rx_sig_detect(struct work_struct *work){
         qcom_aw_phy_disable_snr_interrupt(phy_inst_info, lane);
 
         if (phy_inst_info->phy_eq_mode == QCOM_AW_PHY_ANLT_MODE) {
-          //qcom_aw_phy_reset_anlt(&mss);
-          pmd_write_field(&mss, ETH_AN_CTRL_REG1_ADDR,
-                          ETH_AN_CTRL_REG1_AN_MR_RESTART_NEGOTIATION_MASK,
-                          ETH_AN_CTRL_REG1_AN_MR_RESTART_NEGOTIATION_OFFSET, 1);
-          pmd_write_field(&mss, ETH_AN_CTRL_REG1_ADDR,
-                          ETH_AN_CTRL_REG1_AN_MR_RESTART_NEGOTIATION_MASK,
-                          ETH_AN_CTRL_REG1_AN_MR_RESTART_NEGOTIATION_OFFSET, 0);
+          qcom_aw_phy_reset_anlt(&mss);
+
+          /* Enable LT and AN for master lane */
+          aw_pmd_anlt_link_training_en_set(&mss, 1);
+          aw_pmd_anlt_auto_neg_start_set(&mss, 1);
         }
         else if (phy_inst_info->phy_eq_mode == QCOM_AW_PHY_LT_MODE) {
           //qcom_aw_phy_reset_anlt(&mss);
@@ -2336,12 +2371,11 @@ void qcom_aw_phy_handle_an_restart(struct work_struct *work){
   /* Set the lane offset */
   pmd_set_lane(&mss, lane_num);
 
-  pmd_write_field(&mss, ETH_AN_CTRL_REG1_ADDR,
-                  ETH_AN_CTRL_REG1_AN_MR_RESTART_NEGOTIATION_MASK,
-                  ETH_AN_CTRL_REG1_AN_MR_RESTART_NEGOTIATION_OFFSET, 1);
-  pmd_write_field(&mss, ETH_AN_CTRL_REG1_ADDR,
-                  ETH_AN_CTRL_REG1_AN_MR_RESTART_NEGOTIATION_MASK,
-                  ETH_AN_CTRL_REG1_AN_MR_RESTART_NEGOTIATION_OFFSET, 0);
+  qcom_aw_phy_reset_anlt(&mss);
+
+  /* Enable LT and AN for master lane */
+  aw_pmd_anlt_link_training_en_set(&mss, 1);
+  aw_pmd_anlt_auto_neg_start_set(&mss, 1);
 
   mutex_unlock(&phy_inst_info->lane_lock[lane_num]);
   mutex_unlock(&phy_inst_info->phy_inst_lock);
