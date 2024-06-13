@@ -1221,10 +1221,10 @@ static int mtip_platform_set_mac_addresses(void)
             saddr[5] = (start_nic) & 0xFF;
 
             mtip_mac_set_mac_address_by_link_index(i, saddr);
-        }
 
-        // increment the MAC OFFSET
-        ++start_nic;
+            // increment the MAC OFFSET
+            ++start_nic;
+        }
 
         // set the MAC address for the other interfaces
         for (i = 0; i < MTIP_MAX_LINKS - 1; ++i) 
@@ -1241,10 +1241,10 @@ static int mtip_platform_set_mac_addresses(void)
                 saddr[5] = (start_nic) & 0xFF;
 
                 mtip_mac_set_mac_address_by_link_index(i, saddr);
-            }
 
-            // increment the lower bits
-            ++start_nic;
+               // increment the lower bits
+               ++start_nic;
+            }
         }
     }
 

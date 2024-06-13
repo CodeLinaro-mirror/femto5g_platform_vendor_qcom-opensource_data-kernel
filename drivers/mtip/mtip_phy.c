@@ -507,9 +507,10 @@ void mtip_fault_notifr_status(struct work_struct *work)
     }
     for(port_type = MTIP_PORT_TYPE_FH_0;  port_type <= MTIP_PORT_TYPE_FH_2; port_type++){
 
-        if(!platform_driver_priv->mtip_links[port_link_id]){
-                continue;
+        if(!platform_driver_priv->devices.port_devices[port_type].port_device_valid){
+            continue;
         }
+
         wrapper_base_addr = platform_driver_priv->devices.port_devices[port_type].wrapper_base_addr;
 
         read_val = (u32)ioread32(wrapper_base_addr + MTIP_MAC_WRAPPER_CORE_STATUS_REG_OFFSET);
@@ -517,6 +518,10 @@ void mtip_fault_notifr_status(struct work_struct *work)
         for(link_index=0 ; link_index < MTIP_MAX_LINKS_PER_PORT; link_index++){
 
             mtip_lookup_link_index_by_port_type_and_real_link(&port_link_id, port_type, link_index);
+
+            if(!platform_driver_priv->mtip_links[port_link_id]){
+                continue;
+            }
 
             if(platform_driver_priv->mtip_links[port_link_id]->state == MTIP_LINK_STATE_CLOSE){
                 continue;
