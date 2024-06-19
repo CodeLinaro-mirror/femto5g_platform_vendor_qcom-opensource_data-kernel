@@ -89,6 +89,26 @@ int ldmm_mtip_fault_hndlr(struct notifier_block *nb, unsigned long event, void *
 				ldmm_qxdm_logger_link_change_notification(&event_info, 0);
 			break;
 
+		case RX_LOS_SET:
+			LDMM_LOG_ERR("RX_LOS_SET\n");
+			LDMM_SETFIELD_IN_REG(val, LDMM_RX_LOS_SET, FAULT_NUM_SHIFT, FAULT_NUM_MASK);
+			break;
+
+		case RX_LOS_CLR:
+			LDMM_LOG_ERR("RX_LOS_CLR\n");
+			LDMM_SETFIELD_IN_REG(val, LDMM_RX_LOS_CLR, FAULT_NUM_SHIFT, FAULT_NUM_MASK);
+			break;
+
+		case LOCAL_PLUG_OUT_SET:
+			LDMM_LOG_ERR("LOCAL_PLUG_OUT_SET\n");
+			LDMM_SETFIELD_IN_REG(val, LDMM_LOCAL_PLUG_OUT_SET, FAULT_NUM_SHIFT, FAULT_NUM_MASK);
+			break;
+
+		case LOCAL_PLUG_OUT_CLR:
+			LDMM_LOG_ERR("LOCAL_PLUG_OUT_CLR\n");
+			LDMM_SETFIELD_IN_REG(val, LDMM_LOCAL_PLUG_OUT_CLR, FAULT_NUM_SHIFT, FAULT_NUM_MASK);
+			break;
+
 		default:
 			LDMM_LOG_ERR("Unknown Fault detected \n");
 			return NOTIFY_BAD;

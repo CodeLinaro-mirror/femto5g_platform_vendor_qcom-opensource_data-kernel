@@ -199,6 +199,18 @@ void run_mtip_process_cdr_lock_ind(void* workptr)
         goto out;
     }
 
+    if(mtip_lookup_port_type_by_link_index(link_index, &port_type) != 0)
+    {
+        CSMLOGINFO("Invalid link/port!");
+        goto out;
+    }
+
+    if(platform_driver_priv->mtip_ports[port_type]->needs_rx_los_processing)
+    {
+        CSMLOGDBG("Skip processing as Rx LOS is set for port %d", port_type);
+        goto out;
+    }
+
     if((status == false) &&
        (mtip_phy_retry_num[link_index] >= mtip_phy_get_max_retry_num()))
     {
@@ -208,12 +220,6 @@ void run_mtip_process_cdr_lock_ind(void* workptr)
 
     CSMLOGINFO("CDR lock indication for link_index %d, status %d, an_seq_num %d\n",
                link_index, status, an_seq_num);
-
-    if(mtip_lookup_port_type_by_link_index(link_index, &port_type) != 0)
-    {
-        CSMLOGINFO("Invalid link/port!");
-        goto out;
-    }
 
     if(platform_driver_priv->mtip_links[link_index]->state == MTIP_LINK_STATE_CLOSE)
     {
@@ -420,6 +426,12 @@ void run_mtip_phy_retry_bringup(void* workptr)
     if (mtip_lookup_port_type_by_link_index(link_index, &port_type) < 0)
     {
         CSMLOGERR("invalid port_type for link_index %d", link_index);
+        goto func_exit;
+    }
+
+    if(platform_driver_priv->mtip_ports[port_type]->needs_rx_los_processing)
+    {
+        CSMLOGDBG("Skip processing as Rx LOS is set for port %d", port_type);
         goto func_exit;
     }
 
@@ -733,6 +745,10 @@ static void mtip_phy_handle_lane_up(struct mtip_process_lane_up lane_up_info)
 
           CSMLOGINFO("Updating state of Port: %d with lane_index: %d in state %d\n", port_type, lane_up_info.lane_index, MTIP_LANE_STATE_CONNECTED);
 
+          /* Indicate connected even with local plug out clear to user space */
+          if(mtip_lookup_link_index_by_lane_index(&link_index, lane_up_info.lane_index) == 0)
+             mtip_snd_event_notification(link_index, LOCAL_PLUG_OUT_CLR);
+
           // set the lane state of the lane to CONNECTED
           platform_driver_priv->mtip_lanes[lane_up_info.lane_index]->lane_state = MTIP_LANE_STATE_CONNECTED;
           platform_driver_priv->mtip_ports[port_type]->needs_rx_los_processing = false;
@@ -785,6 +801,10 @@ static void mtip_phy_handle_lane_up(struct mtip_process_lane_up lane_up_info)
              mtip_lookup_link_index_by_lane_index(&link_index, lane_up_info.lane_index) == 0 &&
              platform_driver_priv->mtip_links[link_index] != NULL)
           {
+
+             /* Indicate RX LOS clear to user space */
+             mtip_snd_event_notification(link_index, RX_LOS_CLR);
+
              /* Port reconfiguration post RX LOS clear will be triggered in following cases
                 1. If the PCS link was up and it went down due to RX LOS, or
                 2. If multi rate is supported with more than one speed configured via ethtool
@@ -797,6 +817,7 @@ static void mtip_phy_handle_lane_up(struct mtip_process_lane_up lane_up_info)
                 platform_driver_priv->mtip_ports[port_type]->port_priv_flags_optical = 0;
                 platform_driver_priv->mtip_ports[port_type]->next_speed_retry_count = 0;
                 platform_driver_priv->mtip_links[link_index]->link_down_received_post_link_up = false;
+                mtip_phy_retry_num[link_index] = 0;
                 post_mtip_process_reconfigure_port(port_type);
              }
              else if (mtip_mac_wrapper_get_link_status(link_index) == true) 
@@ -847,7 +868,19 @@ static void mtip_phy_handle_lane_down(struct mtip_process_lane_down lane_down_in
       /* Set needs_rx_los_processing flag which will be used to trigger port
          reconfiguration once RX LOS gets cleared */
       platform_driver_priv->mtip_ports[port_type]->needs_rx_los_processing = true;
+
+      /* Indicate RX LOS to user space */
+      if(mtip_lookup_link_index_by_lane_index(&link_index, lane_down_info.lane_index) == 0)
+         mtip_snd_event_notification(link_index, RX_LOS_SET);
+
       return;
+   }
+
+   /* Indicate local plug put to user space */
+   if(lane_down_info.reason_code == TRX_LOCAL_PLUGOUT &&
+      mtip_lookup_link_index_by_lane_index(&link_index, lane_down_info.lane_index) == 0)
+   {
+      mtip_snd_event_notification(link_index, LOCAL_PLUG_OUT_SET);
    }
 
    current_state = platform_driver_priv->mtip_lanes[lane_down_info.lane_index]->lane_state;
@@ -1368,7 +1401,6 @@ void mtip_phy_notify_eth_event_to_trx(u32 link_index, trx_phy_event event)
     }
 
     // Indicate transceiver driver about interface bring up
-    rtnl_lock();
 
     trx_event_info.event = event;
     trx_event_info.lane_phandle = sfp_phandle;
@@ -1382,7 +1414,6 @@ void mtip_phy_notify_eth_event_to_trx(u32 link_index, trx_phy_event event)
     }
 
     qsfp_trx_eth_event_notifier(&trx_event_info);
-    rtnl_unlock();
 
     return;
 }

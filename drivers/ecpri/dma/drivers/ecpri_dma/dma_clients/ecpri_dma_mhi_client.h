@@ -222,6 +222,7 @@ struct ecpri_dma_mhi_channel_ctx {
  * @channel_context_array_addr: channel context array address in host address space
  * @event_context_array_addr: event context array address in host address space
  * @gsi_device_scratch: EE scratch config parameters
+ * @ssr_in_progress: SSR in progress, need to notify VF
  *
  */
 struct ecpri_dma_mhi_client_context {
@@ -244,6 +245,7 @@ struct ecpri_dma_mhi_client_context {
 	u64 channel_context_array_addr;
 	u64 event_context_array_addr;
 	struct gsi_device_scratch dev_scratch;
+	bool ssr_in_progress;
 };
 
 /**
@@ -402,4 +404,19 @@ int ecpri_dma_mhi_provide_ops(void);
  */
 int ecpri_dma_mhi_get_vf_id(struct ecpri_dma_mhi_ee_gsi_tuple *ee_gsi_tuple);
 
+/**
+ * ecpri_dma_mhi_client_ssr_chs_stop() - Stop MHI VFs CHs going to Q6 and
+ * mark VF as impacted by SSR for later notifing HOST
+ *
+ * Return: 0 on success Linux error for error
+ */
+int ecpri_dma_mhi_client_ssr_chs_stop(enum ecpri_dma_endp_dir dir);
+
+/**
+ * ecpri_dma_mhi_client_ssr_notify_host() - Notify host via CB for all VFs
+ * impacted by SSR
+ *
+ * Return: 0 on success Linux error for error
+ */
+int ecpri_dma_mhi_client_ssr_notify_host(void);
 #endif /* _ECPRI_DMA_MHI_CLIENT_H_ */

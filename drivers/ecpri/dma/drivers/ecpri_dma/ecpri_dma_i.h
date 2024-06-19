@@ -52,6 +52,12 @@
 #define DMA_INT_MIN (-DMA_INT_MAX - 1)
 #define DMA_UINT32_MAX ((u32)~0U)
 
+#if IS_ENABLED(CONFIG_QCOM_Q6V5_PAS)
+#define SUBSYS_LOCAL_MODEM "mpss"
+#else
+#define SUBSYS_LOCAL_MODEM "modem"
+#endif
+
 extern struct ecpri_dma_context *ecpri_dma_ctx;
 
 /** MACROS **/
@@ -202,6 +208,9 @@ do {\
 
 /* DMA Tx Pre-Fetch buffer size change for LTE FH jumbo packets */
 #define ECPRI_DMA_PRE_FETCH_CHANGE_SIZE			(0x10)
+
+/* DMA Rate Limiter config for FH perf */
+#define ECPRI_DMA_RATE_LIMITER_FH			(0x28)
 
 enum ecpri_dma_smmu_cb_type {
 	ECPRI_DMA_SMMU_CB_GEN,
@@ -389,6 +398,7 @@ struct ecpri_dma_exception_context {
  * @total_bytes_recv: EP statistics regarding number of bytes received
  * @enable_tx_poll: Determines if client is expected to poll Tx completions
  * @cb_ptr: endpoint's memory context bank pointer
+ * @ssr_in_progress: SSR impacted ENDP
  *
  */
 struct ecpri_dma_endp_context {
@@ -437,6 +447,7 @@ struct ecpri_dma_endp_context {
 	u32 total_bytes_recv;
 	bool enable_tx_poll;
 	struct ecpri_dma_smmu_cb_ctx *cb_ptr;
+	bool ssr_in_progress;
 };
 
 /**
@@ -494,6 +505,16 @@ struct ecpri_dma_icc_paths {
 	struct icc_path* appss_to_dma;
 };
 
+struct ecpri_dma_ssr_ctx {
+	void* lcl_mdm_subsys_notify_handle;
+	struct mutex lock;
+	atomic_t is_ssr;
+	atomic_t shutdown_already_down;
+	atomic_t shutdown_ssr;
+	atomic_t powerup_already_up;
+	atomic_t powerup_ssr;
+};
+
  /**
   * struct ecpri_dma_context - DMA context
   * @lock: General lock to protect sensetive resources
@@ -530,6 +551,7 @@ struct ecpri_dma_icc_paths {
   * @endp_map: ENDP configuration mapping matching to current flavor & version
   * @endp_ctx: ENDP context array
   * @smmu_cb: pointer to DMA's SMMU context banks
+  * @ssr_ctx: SSR context
   */
 struct ecpri_dma_context {
 	struct mutex lock;
@@ -572,6 +594,7 @@ struct ecpri_dma_context {
 	u32 num_of_gsi;
 	struct mutex mhi_memcpy_setup_lock;
 	struct ecpri_dma_smmu_cb_ctx *smmu_cb;
+	struct ecpri_dma_ssr_ctx ssr_ctx;
 };
 
 /**
@@ -723,6 +746,7 @@ int ecpri_dma_reset_endp(struct ecpri_dma_endp_context *endp_cfg);
 int ecpri_dma_dealloc_endp(struct ecpri_dma_endp_context *endp_cfg);
 int ecpri_dma_get_endp_stats(struct ecpri_dma_endp_context* ep,
 	struct ecpri_dma_endp_statistics* stats);
+int ecpri_dma_halt_q6_endps(enum ecpri_dma_endp_dir dir);
 
 struct ecpri_dma_smmu_cb_ctx *ecpri_dma_get_smmu_ctx(
 	enum ecpri_dma_smmu_cb_type cb_type);

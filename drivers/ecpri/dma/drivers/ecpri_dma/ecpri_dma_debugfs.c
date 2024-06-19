@@ -378,6 +378,63 @@ static ssize_t ecpri_dma_write_lte_lb(struct file *file, const char __user *buf,
 
 	return count;
 }
+static ssize_t ecpri_dma_write_rate_limiter(struct file *file,
+		const char __user *buf,
+		size_t count, loff_t *ppos)
+{
+	s8 val;
+	unsigned long missing;
+	ecpri_hwio_def_ecpri_rate_limiter_u ecpri_rate_limiter = { 0 };
+
+	/* Veriy debug buffer has enough space*/
+	if (count >= sizeof(dbg_buff))
+		return -EINVAL;
+
+	/* Copy user data to debug buffer */
+	missing = copy_from_user(dbg_buff, buf, count);
+	if (missing) {
+		DMAERR("Failed to read user input\n");
+		return count;
+	}
+
+	/* Terminate debug buffer */
+	dbg_buff[count] = '\0';
+
+	if (kstrtos8(dbg_buff, 0, &val)) {
+		DMAERR("Failed to convert val to number\n");
+		return count;
+	}
+
+	ecpri_rate_limiter.def.fh = val;
+	ecpri_dma_hal_write_reg(ECPRI_DMA_RATE_LIMITER,
+		ecpri_rate_limiter.value);
+
+	return count;
+}
+
+static ssize_t ecpri_dma_read_rate_limiter(struct file* file, char __user* ubuf,
+	size_t count, loff_t* ppos)
+{
+	int nbytes = 0;
+	int cnt = 0;
+	ecpri_hwio_def_ecpri_rate_limiter_u ecpri_rate_limiter = { 0 };
+
+	if (!is_read_in_progress) {
+		is_read_in_progress = true;
+		return 0;
+	}
+
+	ecpri_rate_limiter.value =
+		ecpri_dma_hal_read_reg(ECPRI_DMA_RATE_LIMITER);
+	nbytes += scnprintf(dbg_buff + nbytes, count - nbytes,
+		"rate_limiter = 0x%x ", ecpri_rate_limiter.value);
+
+	/* Copy data to user buffer */
+	cnt = simple_read_from_buffer(ubuf, nbytes + 1, ppos, dbg_buff, count);
+
+	is_read_in_progress = false;
+	return cnt;
+}
 
 static ssize_t ecpri_dma_link_stat_read(struct file *file, char __user *ubuf,
 		size_t count, loff_t *ppos)
@@ -500,7 +557,7 @@ static ssize_t ecpri_dma_read_qmi_info(struct file *file, char __user *ubuf,
 
 	nbytes += scnprintf(dbg_buff + nbytes, count,
 		"wq_stop: %d\n",
-		ecpri_dma_qmi_ctx->wq_stop);
+		atomic_read(&ecpri_dma_qmi_ctx->wq_stop));
 
 	nbytes += scnprintf(dbg_buff + nbytes, count,
 		"q6_init_cmplt: %d\n",  ecpri_dma_qmi_ctx->q6_init_cmplt);
@@ -705,6 +762,11 @@ static const struct ecpri_dma_debugfs_file debugfs_files[] = {
 	},{
 		"lte_lb_enable", DMA_WRITE_ONLY_MODE, NULL, {
 			.write = ecpri_dma_write_lte_lb,
+		},
+	},{
+		"rate_limiter", DMA_READ_WRITE_MODE, NULL, {
+			.write = ecpri_dma_write_rate_limiter,
+			.read = ecpri_dma_read_rate_limiter,
 		},
 	},
 };

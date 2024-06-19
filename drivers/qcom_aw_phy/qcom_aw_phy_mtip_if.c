@@ -112,7 +112,19 @@ func_exit:
   return ret_val;
 }
 
-void qcom_aw_phy_mtip_deregister(void) { return; }
+void qcom_aw_phy_mtip_deregister(void) {
+
+  mutex_lock(&qcom_aw_phy_mtip_if_info_s.lock);
+
+  qcom_aw_phy_mtip_if_info_s.ready_cb = NULL;
+  qcom_aw_phy_mtip_if_info_s.notify_an_result = NULL;
+  qcom_aw_phy_mtip_if_info_s.cdr_lock_ind = NULL;
+  qcom_aw_phy_mtip_if_info_s.lane_bring_up_progress_ind = NULL;
+
+  mutex_unlock(&qcom_aw_phy_mtip_if_info_s.lock);
+
+  return;
+}
 
 /*-------------------------------------------------------------------
 * qcom_aw_phy_setup
@@ -281,8 +293,12 @@ void qcom_aw_phy_handle_cdr_lock_status(
 
   }
 
-  qcom_aw_phy_mtip_if_info_s.cdr_lock_ind(eth_link_index, eth_level_status,
-                                          phy_inst_info->an_params.seq_num);
+  mutex_lock(&qcom_aw_phy_mtip_if_info_s.lock);
+  if(qcom_aw_phy_mtip_if_info_s.cdr_lock_ind){
+    qcom_aw_phy_mtip_if_info_s.cdr_lock_ind(eth_link_index, eth_level_status,
+                                            phy_inst_info->an_params.seq_num);
+  }
+  mutex_unlock(&qcom_aw_phy_mtip_if_info_s.lock);
 
   if(eth_level_status == true){
     /* Notify MAC to start listening to PCS link interrupts */
@@ -1975,7 +1991,9 @@ void qcom_aw_phy_handle_an_link_good(struct work_struct *work){
                        phy_inst_info->an_params.mac_port_config_mask);
 
   /* AN result callback if calculated port config is valid and is configured */
-  if(port_config_result != MTIP_PORT_CONFIG_MAX ){
+  mutex_lock(&qcom_aw_phy_mtip_if_info_s.lock);
+  if(port_config_result != MTIP_PORT_CONFIG_MAX  &&
+     qcom_aw_phy_mtip_if_info_s.notify_an_result != NULL){
     an_result = true;
     /* Notify AN result to MAC */
     qcom_aw_phy_mtip_if_info_s.notify_an_result(
@@ -1987,6 +2005,7 @@ void qcom_aw_phy_handle_an_link_good(struct work_struct *work){
     /* Wait for remote end to come up, or change the config and bring up
        ethernet interface again to re-initiate AN */
   }
+  mutex_unlock(&qcom_aw_phy_mtip_if_info_s.lock);
 
 func_exit:
   mutex_unlock(&phy_inst_info->lane_lock[wq_params->lane_num]);
@@ -2230,8 +2249,12 @@ void qcom_aw_phy_notify_lane_bring_up_progress_to_mac(
 
   eth_link_index = phy_inst_info->lane_params[lane].lane_config.link_index;
 
-  qcom_aw_phy_mtip_if_info_s.lane_bring_up_progress_ind(
+  mutex_lock(&qcom_aw_phy_mtip_if_info_s.lock);
+  if(qcom_aw_phy_mtip_if_info_s.lane_bring_up_progress_ind){
+    qcom_aw_phy_mtip_if_info_s.lane_bring_up_progress_ind(
                                                    eth_link_index, in_progress);
+  }
+  mutex_unlock(&qcom_aw_phy_mtip_if_info_s.lock);
 
   return;
 }

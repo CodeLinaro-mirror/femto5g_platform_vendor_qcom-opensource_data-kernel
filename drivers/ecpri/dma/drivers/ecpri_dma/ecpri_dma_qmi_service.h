@@ -8,6 +8,7 @@
 #include <linux/soc/qcom/qmi.h>
 #include "ecpri_dma_i.h"
 #include "ecpri_dma_qmi_v01.h"
+#include <linux/types.h>
 
 #define ECPRI_DMA_Q6_SVC_VERS 1
 #define ECPRI_DMA_A55_SVC_VERS 1
@@ -83,9 +84,8 @@ struct ecpri_dma_qmi_context {
 	atomic_t q6_init_cmplt;
 	atomic_t q6_response_recv;
 	bool q6_registered;
-	bool wq_stop;
+	atomic_t wq_stop;
 	atomic_t q6_disconnected;
-	struct completion qmi_q6_int_cmplt_completion;
 	struct completion qmi_ch_cmd_sync_completion;
 	u32 q6_hw_version;
 	atomic_t q6_sw_version;
@@ -100,6 +100,8 @@ struct ecpri_dma_qmi_context {
 int ecpri_dma_qmi_service_init(void);
 int ecpri_dma_qmi_send_q6_msg(void);
 void ecpri_dma_qmi_service_exit(void);
+int ecpri_dma_qmi_service_ssr_reset(void);
+int ecpri_dma_qmi_service_ssr_reset_q6_handshake(void);
 
 /**
  * QMI command structure
