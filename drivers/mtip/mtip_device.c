@@ -124,8 +124,8 @@ void mtip_set_tx_mode_immediate(ecpri_dma_eth_conn_hdl_t hdl, enum ecpri_dma_not
 }
 
 
-// reset the number of pkts waiting for completion
-static int mtip_device_reset_pkt_completion_count(struct net_device *netdev)
+// reset the number of buffers waiting for completion
+static int mtip_device_reset_buff_completion_count(struct net_device *netdev)
 {
     unsigned long flags;
     struct mtip_netdev_priv* priv;
@@ -135,13 +135,13 @@ static int mtip_device_reset_pkt_completion_count(struct net_device *netdev)
     lock = &(priv->lock);
 
     spin_lock_irqsave(lock, flags);
-    priv->num_pkts_pending_completion = 0;
+    priv->num_buff_pending_completion = 0;
     spin_unlock_irqrestore(lock, flags);
     return 0;
 }
 
 // update the completion count
-static int mtip_device_update_pkt_completion_count(struct net_device *netdev, int count)
+static int mtip_device_update_buff_completion_count(struct net_device *netdev, int count)
 {
     unsigned long flags;
     struct mtip_netdev_priv* priv;
@@ -151,19 +151,19 @@ static int mtip_device_update_pkt_completion_count(struct net_device *netdev, in
     lock = &(priv->lock);
 
     spin_lock_irqsave(lock, flags);
-    priv->num_pkts_pending_completion += count;
+    priv->num_buff_pending_completion += count;
     spin_unlock_irqrestore(lock, flags);
     return 0;
 }
 
 // get the completion count
-static int mtip_device_get_pkt_completion_count(struct net_device *netdev)
+static int mtip_device_get_buff_completion_count(struct net_device *netdev)
 {
     struct mtip_netdev_priv* priv;
 
     priv = netdev_priv(netdev);
 
-    return priv->num_pkts_pending_completion;
+    return priv->num_buff_pending_completion;
 }
 
 void post_mtip_tx_comp_cb(void *user_data, ecpri_dma_eth_conn_hdl_t hdl, struct ecpri_dma_pkt_completion_wrapper **comp_pkts, u32 num_of_completed)
@@ -221,7 +221,8 @@ void mtip_process_tx_comp_cb(ecpri_dma_eth_conn_hdl_t hdl, struct mtip_dma_tx_co
    u8 read_ts_seq_num = 0;
    struct ecpri_dma_tx_header *pre_header_buff;
    enum mtip_device_mode_enum mode = platform_driver_priv->devices.mode;
-   int pending_pkt_completion_count = 0;
+   int pending_buff_completion_count = 0;
+   u32 num_buf_completed = 0;
 
    char *tmp=NULL;
    comp_pkts = tx_comp_params->local_comp_pkts;
@@ -374,6 +375,8 @@ void mtip_process_tx_comp_cb(ecpri_dma_eth_conn_hdl_t hdl, struct mtip_dma_tx_co
           CSMLOGERR("invalid number of buffers %d", num_of_buffers);
       }
 
+      num_buf_completed += num_of_buffers;
+
       // Check if this packet is present in TX array 
       if(priv->tx_pkts[pkt_priv->tx_index] == pkt)
       {
@@ -399,20 +402,19 @@ void mtip_process_tx_comp_cb(ecpri_dma_eth_conn_hdl_t hdl, struct mtip_dma_tx_co
      return;
    }
 
-   // decrement the pkt completion count
-   mtip_device_update_pkt_completion_count(netdev, (-1*(int)num_of_completed));
+   // decrement the buff completion count
+   mtip_device_update_buff_completion_count(netdev, (-1*(int)num_buf_completed));
 
-   pending_pkt_completion_count = mtip_device_get_pkt_completion_count(netdev);
+   pending_buff_completion_count = mtip_device_get_buff_completion_count(netdev);
 
-   if (pending_pkt_completion_count < 0) 
+   if (pending_buff_completion_count < 0) 
    {
-       mtip_device_reset_pkt_completion_count(netdev);
-       pending_pkt_completion_count = 0;
+       mtip_device_reset_buff_completion_count(netdev);
+       pending_buff_completion_count = 0;
    }
 
    // check if we need to flow control the interface
-   if ((mtip_dma_tx_available(hdl) == true) &&
-       (pending_pkt_completion_count < (MTIP_TX_RING_SIZE - MTIP_TX_PACKET_AVAILABILITY_THRESHOLD)))
+   if (pending_buff_completion_count < (MTIP_TX_RING_SIZE - MTIP_TX_PACKET_AVAILABILITY_THRESHOLD))
    {
       if (netif_queue_stopped(netdev))
       {
@@ -849,7 +851,7 @@ static int mtip_start_xmit(struct sk_buff *skb, struct net_device *netdev)
    bool send_tx_seq_num = false;
    enum mtip_link_state_enum link_state;
    enum mtip_device_mode_enum mode = platform_driver_priv->devices.mode;
-   int pending_pkt_completion_count = 0;
+   int pending_buff_completion_count = 0;
    char* tmp=NULL;
    u8 skb_ts_seq_num = 0;
    struct sk_buff* tmp_skb = NULL;
@@ -963,11 +965,10 @@ static int mtip_start_xmit(struct sk_buff *skb, struct net_device *netdev)
        }
    }
 
-   pending_pkt_completion_count = mtip_device_get_pkt_completion_count(netdev);
+   pending_buff_completion_count = mtip_device_get_buff_completion_count(netdev);
 
    // check if we need to flow control the interface
-   if ((mtip_dma_tx_available(hdl) == false) ||
-       (pending_pkt_completion_count >= (MTIP_TX_RING_SIZE - MTIP_TX_PACKET_AVAILABILITY_THRESHOLD)))
+   if (pending_buff_completion_count >= (MTIP_TX_RING_SIZE - MTIP_TX_PACKET_AVAILABILITY_THRESHOLD))
    {
        if (!netif_queue_stopped(netdev))
        {
@@ -1058,14 +1059,17 @@ static int mtip_start_xmit(struct sk_buff *skb, struct net_device *netdev)
    }
 
    // increment the pkt completion count
-   mtip_device_update_pkt_completion_count(netdev, 1);
+   if(send_tx_pre_header == true)
+      mtip_device_update_buff_completion_count(netdev, 2);
+   else
+      mtip_device_update_buff_completion_count(netdev, 1);
 
-   pending_pkt_completion_count = mtip_device_get_pkt_completion_count(netdev);
+   pending_buff_completion_count = mtip_device_get_buff_completion_count(netdev);
 
-   if (pending_pkt_completion_count < 0) 
+   if (pending_buff_completion_count < 0) 
    {
-       mtip_device_reset_pkt_completion_count(netdev);
-       pending_pkt_completion_count = 0;
+       mtip_device_reset_buff_completion_count(netdev);
+       pending_buff_completion_count = 0;
    }
 
    return NETDEV_TX_OK;
@@ -1378,24 +1382,23 @@ static void mtip_tx_timeout(struct net_device *netdev, unsigned int txqueue)
    struct mtip_netdev_priv* priv;
    u32 link_index;
    ecpri_dma_eth_conn_hdl_t hdl;
-   int pending_pkt_completion_count = 0;
+   int pending_buff_completion_count = 0;
    CSMLOGINFO("mtip_tx_timeout called\n");
 
    priv = netdev_priv(netdev);
    link_index = priv->link_index;
    hdl = platform_driver_priv->mtip_links[link_index]->dma_hdl;
 
-   pending_pkt_completion_count = mtip_device_get_pkt_completion_count(netdev);
+   pending_buff_completion_count = mtip_device_get_buff_completion_count(netdev);
 
-   if (pending_pkt_completion_count < 0)
+   if (pending_buff_completion_count < 0)
    {
-       mtip_device_reset_pkt_completion_count(netdev);
-       pending_pkt_completion_count = 0;
+       mtip_device_reset_buff_completion_count(netdev);
+       pending_buff_completion_count = 0;
    }
 
    // check if we need to flow control the interface
-   if ((mtip_dma_tx_available(hdl) == true) &&
-       (pending_pkt_completion_count < (MTIP_TX_RING_SIZE - MTIP_TX_PACKET_AVAILABILITY_THRESHOLD)))
+   if (pending_buff_completion_count < (MTIP_TX_RING_SIZE - MTIP_TX_PACKET_AVAILABILITY_THRESHOLD))
    {
       if (netif_queue_stopped(netdev))
       {
