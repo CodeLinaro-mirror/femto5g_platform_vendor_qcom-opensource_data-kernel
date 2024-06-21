@@ -1557,6 +1557,70 @@ u32 mtip_ethtool_get_msglevel(struct net_device *netdev)
     return platform_driver_priv->mtip_ports[port_type]->port_state;
 }
 
+static int mtip_ethtool_get_module_info(struct net_device *netdev,
+                                                struct ethtool_modinfo *modinfo)
+{
+    u32 link_index;
+    u32 port_type;
+    u32 lane_index;
+    struct mtip_netdev_priv *priv;
+    int i;
+    u32 sfp_phandle;
+
+    priv = netdev_priv(netdev);
+    link_index = priv->link_index;
+
+    if (mtip_lookup_port_type_by_link_index(link_index, &port_type) < 0)
+    {
+        CSMLOGERR("invalid port_type for link_index %d", link_index);
+        return 0;
+    }
+
+   for (i = 0; i < PHY_LANE_MAX; ++i)
+   {
+      if(mtip_lookup_lane_index_by_port_type_and_real_lane(&lane_index, port_type, i) == 0)
+      {
+         sfp_phandle = platform_driver_priv->devices.lane_devices[lane_index].sfp_phandle;
+         return qsfp_trx_get_module_info(sfp_phandle, modinfo);
+      }
+   }
+
+   return -EINVAL;
+}
+ 
+static int mtip_ethtool_get_module_eeprom(struct net_device *netdev,
+                                                      struct ethtool_eeprom *ee,
+                                                      u8 *data)
+{
+
+    u32 link_index;
+    u32 port_type;
+    u32 lane_index;
+    struct mtip_netdev_priv *priv;
+    int i;
+    u32 sfp_phandle;
+
+    priv = netdev_priv(netdev);
+    link_index = priv->link_index;
+
+    if (mtip_lookup_port_type_by_link_index(link_index, &port_type) < 0)
+    {
+        CSMLOGERR("invalid port_type for link_index %d", link_index);
+        return 0;
+    }
+
+   for (i = 0; i < PHY_LANE_MAX; ++i)
+   {
+      if(mtip_lookup_lane_index_by_port_type_and_real_lane(&lane_index, port_type, i) == 0)
+      {
+         sfp_phandle = platform_driver_priv->devices.lane_devices[lane_index].sfp_phandle;
+         return qsfp_trx_get_module_eeprom(sfp_phandle, ee, data);
+      }
+   }
+
+   return -EINVAL;
+}
+
 static const struct ethtool_ops mtip_ethtool_ops = {
    .get_drvinfo = mtip_ethtool_getdrvinfo,
    .get_regs = mtip_ethtool_get_regs,
@@ -1574,6 +1638,8 @@ static const struct ethtool_ops mtip_ethtool_ops = {
    .set_msglevel = mtip_ethtool_set_msglevel,
    .get_msglevel = mtip_ethtool_get_msglevel,
    .get_link = ethtool_op_get_link,
+   .get_module_info = mtip_ethtool_get_module_info,
+   .get_module_eeprom = mtip_ethtool_get_module_eeprom,
 };
 
 void mtip_ethtool_set_ops(struct net_device *netdev)
