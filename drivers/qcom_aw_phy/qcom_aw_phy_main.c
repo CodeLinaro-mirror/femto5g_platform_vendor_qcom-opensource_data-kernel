@@ -982,7 +982,7 @@ static int qcom_aw_phy_inst_probe(struct platform_device *pdev) {
 
         phy_inst_info->lane_params[i].snr_valid_wq_item.phy_inst = phy_inst_type;
         phy_inst_info->lane_params[i].snr_valid_wq_item.lane_num = i;
-        phy_inst_info->lane_params[i].snr_valid_err_wq_item.user_data = (void*)true;
+        phy_inst_info->lane_params[i].snr_valid_wq_item.user_data = (void*)true;
         INIT_WORK(&phy_inst_info->lane_params[i].snr_valid_wq_item.wq_item,
                   qcom_aw_phy_synce_handle_snr_valid_change);
 
