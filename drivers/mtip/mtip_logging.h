@@ -1,6 +1,6 @@
 //SPDX-License-Identifier: GPL-2.0-only
 /*
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  */ 
 
 #ifndef	_CSM_LOGGING_H
@@ -23,10 +23,10 @@ do {\
 	pr_debug(DRV_NAME " %s:%d " fmt, __func__, __LINE__, ## args); \
     if (mtip_ethtool_debug_logging_enable) {\
             pr_err(DRV_NAME " %s:%d " fmt, __func__, __LINE__, ## args);\
-        } \
-    if (platform_driver_priv) {\
-			CSM_IPC_Log(platform_driver_priv->ipc_log_buf_dbg , \
-				DRV_NAME " %s:%d " fmt, ## args); \
+            if (platform_driver_priv) {\
+                CSM_IPC_Log(platform_driver_priv->ipc_log_buf_dbg , \
+                            DRV_NAME " %s:%d " fmt, ## args); \
+            } \
         } \
 } while (0)
 
