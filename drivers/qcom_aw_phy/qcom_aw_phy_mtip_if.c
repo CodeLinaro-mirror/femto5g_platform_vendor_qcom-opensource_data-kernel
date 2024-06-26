@@ -578,7 +578,7 @@ enum mtip_port_config_enum qcom_aw_phy_an_result_to_debug_port_config(
 enum mtip_port_config_enum qcom_aw_phy_an_result_to_port_config(
                                 struct qcom_aw_phy_inst_config *phy_inst_info){
 
-  if(phy_inst_info->phy_inst == QCOM_AW_PHY_INST_DEBUG)
+  if(phy_inst_info->phy_inst == QCOM_AW_PHY_INST_DEBUG_C2C)
     return qcom_aw_phy_an_result_to_debug_port_config(phy_inst_info);
 
   switch(phy_inst_info->an_params.an_result[PHY_LANE_0]){
@@ -1091,7 +1091,7 @@ int qcom_aw_phy_bringup_anlt_mode(mss_access_t *mss,
   }
 
   /* For Debug port, hard code the master lane as lane 2 */
-  if(phy_inst_info->phy_inst == QCOM_AW_PHY_INST_DEBUG)
+  if(phy_inst_info->phy_inst == QCOM_AW_PHY_INST_DEBUG_C2C)
     ref_lane = PHY_LANE_2;
   else
     ref_lane = PHY_LANE_0;

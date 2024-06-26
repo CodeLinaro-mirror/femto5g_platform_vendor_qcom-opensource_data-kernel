@@ -2255,7 +2255,7 @@ static ssize_t get_aw_phy3_eq_mode(struct file *file, char __user *buf,
 	char phy_status_str[100]={0};
 	uint32_t ret_val = 0;
 	struct qcom_aw_phy_inst_config *phy_inst_info = NULL;
-	phy_inst_info = qcom_aw_phy_get_inst_config(QCOM_AW_PHY_INST_L2);
+	phy_inst_info = qcom_aw_phy_get_inst_config(QCOM_AW_PHY_INST_L2_C2C);
 	if(phy_inst_info!=NULL){
 		eq_mode_parser(phy_status_str,strlen(phy_status_str),phy_inst_info->phy_eq_mode);
 	}
@@ -2269,7 +2269,7 @@ static ssize_t get_aw_phy3_bu_status(struct file *file, char __user *buf,
 	char phy_status_str[100]={0};
 	uint32_t ret_val = 0;
 	struct qcom_aw_phy_inst_config *phy_inst_info = NULL;
-	phy_inst_info = qcom_aw_phy_get_inst_config(QCOM_AW_PHY_INST_L2);
+	phy_inst_info = qcom_aw_phy_get_inst_config(QCOM_AW_PHY_INST_L2_C2C);
 	if(phy_inst_info!=NULL){
 		if(phy_inst_info->bring_up_status)
 			scnprintf(phy_status_str + strlen(phy_status_str), 50, "Bringup Status = %s\n","TRUE");
@@ -2286,7 +2286,7 @@ static ssize_t get_aw_phy3_lanes_enabled(struct file *file, char __user *buf,
 	char phy_status_str[100]={0};
 	uint32_t ret_val = 0;
 	struct qcom_aw_phy_inst_config *phy_inst_info = NULL;
-	phy_inst_info = qcom_aw_phy_get_inst_config(QCOM_AW_PHY_INST_L2);
+	phy_inst_info = qcom_aw_phy_get_inst_config(QCOM_AW_PHY_INST_L2_C2C);
 	if(phy_inst_info!=NULL){
 		scnprintf(phy_status_str + strlen(phy_status_str), 50, "Num of lanes Enabled = %d\n",phy_inst_info->num_lanes);
 	}
@@ -2300,7 +2300,7 @@ static ssize_t get_aw_phy3_sfp_port_type(struct file *file, char __user *buf,
 	char phy_status_str[100]={0};
 	uint32_t ret_val = 0;
 	struct qcom_aw_phy_inst_config *phy_inst_info = NULL;
-	phy_inst_info = qcom_aw_phy_get_inst_config(QCOM_AW_PHY_INST_L2);
+	phy_inst_info = qcom_aw_phy_get_inst_config(QCOM_AW_PHY_INST_L2_C2C);
 	if(phy_inst_info!=NULL){
 		scnprintf(phy_status_str + strlen(phy_status_str), 50, "SFP Port Type = %d\n",phy_inst_info->sfp_port_type);
 	}
@@ -2314,7 +2314,7 @@ static ssize_t get_aw_phy3_lane0_status(struct file *file, char __user *buf,
 	char phy_status_str[100]={0};
 	uint32_t ret_val = 0;
 	struct qcom_aw_lane_params *phy_lane_params = NULL;
-	phy_lane_params=qcom_aw_phy_get_lane_params(QCOM_AW_PHY_INST_L2,PHY_LANE_0);
+	phy_lane_params=qcom_aw_phy_get_lane_params(QCOM_AW_PHY_INST_L2_C2C,PHY_LANE_0);
 	if(phy_lane_params!=NULL){
 		if(phy_lane_params->lane_config.lane_enabled)
 			scnprintf(phy_status_str + strlen(phy_status_str), 30, "Enable Status = %s\n","TRUE");
@@ -2331,7 +2331,7 @@ static ssize_t get_aw_phy3_lane0_speed(struct file *file, char __user *buf,
 	char phy_status_str[100]={0};
 	uint32_t ret_val = 0;
 	struct qcom_aw_lane_params *phy_lane_params = NULL;
-	phy_lane_params=qcom_aw_phy_get_lane_params(QCOM_AW_PHY_INST_L2,PHY_LANE_0);
+	phy_lane_params=qcom_aw_phy_get_lane_params(QCOM_AW_PHY_INST_L2_C2C,PHY_LANE_0);
 	if(phy_lane_params!=NULL){
 		lane_speed_parser(phy_status_str,strlen(phy_status_str),phy_lane_params->lane_config.lane_speed);
 	}
@@ -2345,7 +2345,7 @@ static ssize_t get_aw_phy3_lane0_cdr_lock_status(struct file *file, char __user 
 	char phy_status_str[100]={0};
 	uint32_t ret_val = 0;
 	struct qcom_aw_phy_inst_config *phy_inst_info = NULL;
-	phy_inst_info = qcom_aw_phy_get_inst_config(QCOM_AW_PHY_INST_L2);
+	phy_inst_info = qcom_aw_phy_get_inst_config(QCOM_AW_PHY_INST_L2_C2C);
 	if(phy_inst_info!=NULL){
 		cdr_lock_parser(phy_status_str,strlen(phy_status_str),phy_inst_info->cdr_lock_status_flag[PHY_LANE_0]);
 	}
@@ -2359,7 +2359,7 @@ static ssize_t get_aw_phy3_lane0_link_status(struct file *file, char __user *buf
 	char phy_status_str[100]={0};
 	uint32_t ret_val = 0;
 	struct qcom_aw_lane_params *phy_lane_params = NULL;
-	phy_lane_params=qcom_aw_phy_get_lane_params(QCOM_AW_PHY_INST_L2,PHY_LANE_0);
+	phy_lane_params=qcom_aw_phy_get_lane_params(QCOM_AW_PHY_INST_L2_C2C,PHY_LANE_0);
 	if(phy_lane_params!=NULL){
 		if(phy_lane_params->link_status)
 			scnprintf(phy_status_str + strlen(phy_status_str), 30, "PCS Link Status = %s\n","TRUE");
@@ -2376,7 +2376,7 @@ static ssize_t get_aw_phy3_lane0_mac_link_index(struct file *file, char __user *
 	char phy_status_str[100]={0};
 	uint32_t ret_val = 0;
 	struct qcom_aw_lane_params *phy_lane_params = NULL;
-	phy_lane_params=qcom_aw_phy_get_lane_params(QCOM_AW_PHY_INST_L2,PHY_LANE_0);
+	phy_lane_params=qcom_aw_phy_get_lane_params(QCOM_AW_PHY_INST_L2_C2C,PHY_LANE_0);
 	if(phy_lane_params!=NULL){
 		scnprintf(phy_status_str + strlen(phy_status_str), 30, "Mac Link Index = %d\n",phy_lane_params->lane_config.link_index);
 	}
@@ -2390,7 +2390,7 @@ static ssize_t get_aw_phy3_lane1_status(struct file *file, char __user *buf,
 	char phy_status_str[100]={0};
 	uint32_t ret_val = 0;
 	struct qcom_aw_lane_params *phy_lane_params = NULL;
-	phy_lane_params=qcom_aw_phy_get_lane_params(QCOM_AW_PHY_INST_L2,PHY_LANE_1);
+	phy_lane_params=qcom_aw_phy_get_lane_params(QCOM_AW_PHY_INST_L2_C2C,PHY_LANE_1);
 	if(phy_lane_params!=NULL){
 		if(phy_lane_params->lane_config.lane_enabled)
 			scnprintf(phy_status_str + strlen(phy_status_str), 30, "Enable Status = %s\n","TRUE");
@@ -2407,7 +2407,7 @@ static ssize_t get_aw_phy3_lane1_speed(struct file *file, char __user *buf,
 	char phy_status_str[100]={0};
 	uint32_t ret_val = 0;
 	struct qcom_aw_lane_params *phy_lane_params = NULL;
-	phy_lane_params=qcom_aw_phy_get_lane_params(QCOM_AW_PHY_INST_L2,PHY_LANE_1);
+	phy_lane_params=qcom_aw_phy_get_lane_params(QCOM_AW_PHY_INST_L2_C2C,PHY_LANE_1);
 	if(phy_lane_params!=NULL){
 		lane_speed_parser(phy_status_str,strlen(phy_status_str),phy_lane_params->lane_config.lane_speed);
 	}
@@ -2421,7 +2421,7 @@ static ssize_t get_aw_phy3_lane1_cdr_lock_status(struct file *file, char __user 
 	char phy_status_str[100]={0};
 	uint32_t ret_val = 0;
 	struct qcom_aw_phy_inst_config *phy_inst_info = NULL;
-	phy_inst_info = qcom_aw_phy_get_inst_config(QCOM_AW_PHY_INST_L2);
+	phy_inst_info = qcom_aw_phy_get_inst_config(QCOM_AW_PHY_INST_L2_C2C);
 	if(phy_inst_info!=NULL){
 		cdr_lock_parser(phy_status_str,strlen(phy_status_str),phy_inst_info->cdr_lock_status_flag[PHY_LANE_1]);
 	}
@@ -2435,7 +2435,7 @@ static ssize_t get_aw_phy3_lane1_link_status(struct file *file, char __user *buf
 	char phy_status_str[100]={0};
 	uint32_t ret_val = 0;
 	struct qcom_aw_lane_params *phy_lane_params = NULL;
-	phy_lane_params=qcom_aw_phy_get_lane_params(QCOM_AW_PHY_INST_L2,PHY_LANE_1);
+	phy_lane_params=qcom_aw_phy_get_lane_params(QCOM_AW_PHY_INST_L2_C2C,PHY_LANE_1);
 	if(phy_lane_params!=NULL){
 		if(phy_lane_params->link_status)
 			scnprintf(phy_status_str + strlen(phy_status_str), 30, "PCS Link Status = %s\n","TRUE");
@@ -2452,7 +2452,7 @@ static ssize_t get_aw_phy3_lane1_mac_link_index(struct file *file, char __user *
 	char phy_status_str[100]={0};
 	uint32_t ret_val = 0;
 	struct qcom_aw_lane_params *phy_lane_params = NULL;
-	phy_lane_params=qcom_aw_phy_get_lane_params(QCOM_AW_PHY_INST_L2,PHY_LANE_1);
+	phy_lane_params=qcom_aw_phy_get_lane_params(QCOM_AW_PHY_INST_L2_C2C,PHY_LANE_1);
 	if(phy_lane_params!=NULL){
 		scnprintf(phy_status_str + strlen(phy_status_str), 30, "Mac Link Index = %d\n",phy_lane_params->lane_config.link_index);
 	}
@@ -2466,7 +2466,7 @@ static ssize_t get_aw_phy3_lane2_status(struct file *file, char __user *buf,
 	char phy_status_str[100]={0};
 	uint32_t ret_val = 0;
 	struct qcom_aw_lane_params *phy_lane_params = NULL;
-	phy_lane_params=qcom_aw_phy_get_lane_params(QCOM_AW_PHY_INST_L2,PHY_LANE_2);
+	phy_lane_params=qcom_aw_phy_get_lane_params(QCOM_AW_PHY_INST_L2_C2C,PHY_LANE_2);
 	if(phy_lane_params!=NULL){
 		if(phy_lane_params->lane_config.lane_enabled)
 			scnprintf(phy_status_str + strlen(phy_status_str), 30, "Enable Status = %s\n","TRUE");
@@ -2483,7 +2483,7 @@ static ssize_t get_aw_phy3_lane2_speed(struct file *file, char __user *buf,
 	char phy_status_str[100]={0};
 	uint32_t ret_val = 0;
 	struct qcom_aw_lane_params *phy_lane_params = NULL;
-	phy_lane_params=qcom_aw_phy_get_lane_params(QCOM_AW_PHY_INST_L2,PHY_LANE_2);
+	phy_lane_params=qcom_aw_phy_get_lane_params(QCOM_AW_PHY_INST_L2_C2C,PHY_LANE_2);
 	if(phy_lane_params!=NULL){
 		lane_speed_parser(phy_status_str,strlen(phy_status_str),phy_lane_params->lane_config.lane_speed);
 	}
@@ -2497,7 +2497,7 @@ static ssize_t get_aw_phy3_lane2_cdr_lock_status(struct file *file, char __user 
 	char phy_status_str[100]={0};
 	uint32_t ret_val = 0;
 	struct qcom_aw_phy_inst_config *phy_inst_info = NULL;
-	phy_inst_info = qcom_aw_phy_get_inst_config(QCOM_AW_PHY_INST_L2);
+	phy_inst_info = qcom_aw_phy_get_inst_config(QCOM_AW_PHY_INST_L2_C2C);
 	if(phy_inst_info!=NULL){
 		cdr_lock_parser(phy_status_str,strlen(phy_status_str),phy_inst_info->cdr_lock_status_flag[PHY_LANE_2]);
 	}
@@ -2511,7 +2511,7 @@ static ssize_t get_aw_phy3_lane2_link_status(struct file *file, char __user *buf
 	char phy_status_str[100]={0};
 	uint32_t ret_val = 0;
 	struct qcom_aw_lane_params *phy_lane_params = NULL;
-	phy_lane_params=qcom_aw_phy_get_lane_params(QCOM_AW_PHY_INST_L2,PHY_LANE_2);
+	phy_lane_params=qcom_aw_phy_get_lane_params(QCOM_AW_PHY_INST_L2_C2C,PHY_LANE_2);
 	if(phy_lane_params!=NULL){
 		if(phy_lane_params->link_status)
 			scnprintf(phy_status_str + strlen(phy_status_str), 30, "PCS Link Status = %s\n","TRUE");
@@ -2528,7 +2528,7 @@ static ssize_t get_aw_phy3_lane2_mac_link_index(struct file *file, char __user *
 	char phy_status_str[100]={0};
 	uint32_t ret_val = 0;
 	struct qcom_aw_lane_params *phy_lane_params = NULL;
-	phy_lane_params=qcom_aw_phy_get_lane_params(QCOM_AW_PHY_INST_L2,PHY_LANE_2);
+	phy_lane_params=qcom_aw_phy_get_lane_params(QCOM_AW_PHY_INST_L2_C2C,PHY_LANE_2);
 	if(phy_lane_params!=NULL){
 		scnprintf(phy_status_str + strlen(phy_status_str), 30, "Mac Link Index = %d\n",phy_lane_params->lane_config.link_index);
 	}
@@ -2542,7 +2542,7 @@ static ssize_t get_aw_phy3_lane3_status(struct file *file, char __user *buf,
 	char phy_status_str[100]={0};
 	uint32_t ret_val = 0;
 	struct qcom_aw_lane_params *phy_lane_params = NULL;
-	phy_lane_params=qcom_aw_phy_get_lane_params(QCOM_AW_PHY_INST_L2,PHY_LANE_3);
+	phy_lane_params=qcom_aw_phy_get_lane_params(QCOM_AW_PHY_INST_L2_C2C,PHY_LANE_3);
 	if(phy_lane_params!=NULL){
 		if(phy_lane_params->lane_config.lane_enabled)
 			scnprintf(phy_status_str + strlen(phy_status_str), 30, "Enable Status = %s\n","TRUE");
@@ -2559,7 +2559,7 @@ static ssize_t get_aw_phy3_lane3_speed(struct file *file, char __user *buf,
 	char phy_status_str[100]={0};
 	uint32_t ret_val = 0;
 	struct qcom_aw_lane_params *phy_lane_params = NULL;
-	phy_lane_params=qcom_aw_phy_get_lane_params(QCOM_AW_PHY_INST_L2,PHY_LANE_3);
+	phy_lane_params=qcom_aw_phy_get_lane_params(QCOM_AW_PHY_INST_L2_C2C,PHY_LANE_3);
 	if(phy_lane_params!=NULL){
 		lane_speed_parser(phy_status_str,strlen(phy_status_str),phy_lane_params->lane_config.lane_speed);
 	}
@@ -2573,7 +2573,7 @@ static ssize_t get_aw_phy3_lane3_cdr_lock_status(struct file *file, char __user 
 	char phy_status_str[100]={0};
 	uint32_t ret_val = 0;
 	struct qcom_aw_phy_inst_config *phy_inst_info = NULL;
-	phy_inst_info = qcom_aw_phy_get_inst_config(QCOM_AW_PHY_INST_L2);
+	phy_inst_info = qcom_aw_phy_get_inst_config(QCOM_AW_PHY_INST_L2_C2C);
 	if(phy_inst_info!=NULL){
 		cdr_lock_parser(phy_status_str,strlen(phy_status_str),phy_inst_info->cdr_lock_status_flag[PHY_LANE_3]);
 	}
@@ -2587,7 +2587,7 @@ static ssize_t get_aw_phy3_lane3_link_status(struct file *file, char __user *buf
 	char phy_status_str[100]={0};
 	uint32_t ret_val = 0;
 	struct qcom_aw_lane_params *phy_lane_params = NULL;
-	phy_lane_params=qcom_aw_phy_get_lane_params(QCOM_AW_PHY_INST_L2,PHY_LANE_3);
+	phy_lane_params=qcom_aw_phy_get_lane_params(QCOM_AW_PHY_INST_L2_C2C,PHY_LANE_3);
 	if(phy_lane_params!=NULL){
 		if(phy_lane_params->link_status)
 			scnprintf(phy_status_str + strlen(phy_status_str), 30, "PCS Link Status = %s\n","TRUE");
@@ -2604,7 +2604,7 @@ static ssize_t get_aw_phy3_lane3_mac_link_index(struct file *file, char __user *
 	char phy_status_str[100]={0};
 	uint32_t ret_val = 0;
 	struct qcom_aw_lane_params *phy_lane_params = NULL;
-	phy_lane_params=qcom_aw_phy_get_lane_params(QCOM_AW_PHY_INST_L2,PHY_LANE_3);
+	phy_lane_params=qcom_aw_phy_get_lane_params(QCOM_AW_PHY_INST_L2_C2C,PHY_LANE_3);
 	if(phy_lane_params!=NULL){
 		scnprintf(phy_status_str + strlen(phy_status_str), 30, "Mac Link Index = %d\n",phy_lane_params->lane_config.link_index);
 	}
@@ -2618,7 +2618,7 @@ static ssize_t get_aw_phy4_eq_mode(struct file *file, char __user *buf,
 	char phy_status_str[100]={0};
 	uint32_t ret_val = 0;
 	struct qcom_aw_phy_inst_config *phy_inst_info = NULL;
-	phy_inst_info = qcom_aw_phy_get_inst_config(QCOM_AW_PHY_INST_DEBUG);
+	phy_inst_info = qcom_aw_phy_get_inst_config(QCOM_AW_PHY_INST_DEBUG_C2C);
 	if(phy_inst_info!=NULL){
 		eq_mode_parser(phy_status_str,strlen(phy_status_str),phy_inst_info->phy_eq_mode);
 	}
@@ -2632,7 +2632,7 @@ static ssize_t get_aw_phy4_bu_status(struct file *file, char __user *buf,
 	char phy_status_str[100]={0};
 	uint32_t ret_val = 0;
 	struct qcom_aw_phy_inst_config *phy_inst_info = NULL;
-	phy_inst_info = qcom_aw_phy_get_inst_config(QCOM_AW_PHY_INST_DEBUG);
+	phy_inst_info = qcom_aw_phy_get_inst_config(QCOM_AW_PHY_INST_DEBUG_C2C);
 	if(phy_inst_info!=NULL){
 		if(phy_inst_info->bring_up_status)
 			scnprintf(phy_status_str + strlen(phy_status_str), 50, "Bringup Status = %s\n","TRUE");
@@ -2649,7 +2649,7 @@ static ssize_t get_aw_phy4_lanes_enabled(struct file *file, char __user *buf,
 	char phy_status_str[100]={0};
 	uint32_t ret_val = 0;
 	struct qcom_aw_phy_inst_config *phy_inst_info = NULL;
-	phy_inst_info = qcom_aw_phy_get_inst_config(QCOM_AW_PHY_INST_DEBUG);
+	phy_inst_info = qcom_aw_phy_get_inst_config(QCOM_AW_PHY_INST_DEBUG_C2C);
 	if(phy_inst_info!=NULL){
 		scnprintf(phy_status_str + strlen(phy_status_str), 50, "Num of lanes Enabled = %d\n",phy_inst_info->num_lanes);
 	}
@@ -2663,7 +2663,7 @@ static ssize_t get_aw_phy4_sfp_port_type(struct file *file, char __user *buf,
 	char phy_status_str[100]={0};
 	uint32_t ret_val = 0;
 	struct qcom_aw_phy_inst_config *phy_inst_info = NULL;
-	phy_inst_info = qcom_aw_phy_get_inst_config(QCOM_AW_PHY_INST_DEBUG);
+	phy_inst_info = qcom_aw_phy_get_inst_config(QCOM_AW_PHY_INST_DEBUG_C2C);
 	if(phy_inst_info!=NULL){
 		scnprintf(phy_status_str + strlen(phy_status_str), 50, "SFP Port Type = %d\n",phy_inst_info->sfp_port_type);
 	}
@@ -2677,7 +2677,7 @@ static ssize_t get_aw_phy4_lane0_status(struct file *file, char __user *buf,
 	char phy_status_str[100]={0};
 	uint32_t ret_val = 0;
 	struct qcom_aw_lane_params *phy_lane_params = NULL;
-	phy_lane_params=qcom_aw_phy_get_lane_params(QCOM_AW_PHY_INST_DEBUG,PHY_LANE_0);
+	phy_lane_params=qcom_aw_phy_get_lane_params(QCOM_AW_PHY_INST_DEBUG_C2C,PHY_LANE_0);
 	if(phy_lane_params!=NULL){
 		if(phy_lane_params->lane_config.lane_enabled)
 			scnprintf(phy_status_str + strlen(phy_status_str), 30, "Enable Status = %s\n","TRUE");
@@ -2694,7 +2694,7 @@ static ssize_t get_aw_phy4_lane0_speed(struct file *file, char __user *buf,
 	char phy_status_str[100]={0};
 	uint32_t ret_val = 0;
 	struct qcom_aw_lane_params *phy_lane_params = NULL;
-	phy_lane_params=qcom_aw_phy_get_lane_params(QCOM_AW_PHY_INST_DEBUG,PHY_LANE_0);
+	phy_lane_params=qcom_aw_phy_get_lane_params(QCOM_AW_PHY_INST_DEBUG_C2C,PHY_LANE_0);
 	if(phy_lane_params!=NULL){
 		lane_speed_parser(phy_status_str,strlen(phy_status_str),phy_lane_params->lane_config.lane_speed);
 	}
@@ -2708,7 +2708,7 @@ static ssize_t get_aw_phy4_lane0_cdr_lock_status(struct file *file, char __user 
 	char phy_status_str[100]={0};
 	uint32_t ret_val = 0;
 	struct qcom_aw_phy_inst_config *phy_inst_info = NULL;
-	phy_inst_info = qcom_aw_phy_get_inst_config(QCOM_AW_PHY_INST_DEBUG);
+	phy_inst_info = qcom_aw_phy_get_inst_config(QCOM_AW_PHY_INST_DEBUG_C2C);
 	if(phy_inst_info!=NULL){
 		cdr_lock_parser(phy_status_str,strlen(phy_status_str),phy_inst_info->cdr_lock_status_flag[PHY_LANE_0]);
 	}
@@ -2722,7 +2722,7 @@ static ssize_t get_aw_phy4_lane0_link_status(struct file *file, char __user *buf
 	char phy_status_str[100]={0};
 	uint32_t ret_val = 0;
 	struct qcom_aw_lane_params *phy_lane_params = NULL;
-	phy_lane_params=qcom_aw_phy_get_lane_params(QCOM_AW_PHY_INST_DEBUG,PHY_LANE_0);
+	phy_lane_params=qcom_aw_phy_get_lane_params(QCOM_AW_PHY_INST_DEBUG_C2C,PHY_LANE_0);
 	if(phy_lane_params!=NULL){
 		if(phy_lane_params->link_status)
 			scnprintf(phy_status_str + strlen(phy_status_str), 30, "PCS Link Status = %s\n","TRUE");
@@ -2739,7 +2739,7 @@ static ssize_t get_aw_phy4_lane0_mac_link_index(struct file *file, char __user *
 	char phy_status_str[100]={0};
 	uint32_t ret_val = 0;
 	struct qcom_aw_lane_params *phy_lane_params = NULL;
-	phy_lane_params=qcom_aw_phy_get_lane_params(QCOM_AW_PHY_INST_DEBUG,PHY_LANE_0);
+	phy_lane_params=qcom_aw_phy_get_lane_params(QCOM_AW_PHY_INST_DEBUG_C2C,PHY_LANE_0);
 	if(phy_lane_params!=NULL){
 		scnprintf(phy_status_str + strlen(phy_status_str), 30, "Mac Link Index = %d\n",phy_lane_params->lane_config.link_index);
 	}
@@ -2753,7 +2753,7 @@ static ssize_t get_aw_phy4_lane1_status(struct file *file, char __user *buf,
 	char phy_status_str[100]={0};
 	uint32_t ret_val = 0;
 	struct qcom_aw_lane_params *phy_lane_params = NULL;
-	phy_lane_params=qcom_aw_phy_get_lane_params(QCOM_AW_PHY_INST_DEBUG,PHY_LANE_1);
+	phy_lane_params=qcom_aw_phy_get_lane_params(QCOM_AW_PHY_INST_DEBUG_C2C,PHY_LANE_1);
 	if(phy_lane_params!=NULL){
 		if(phy_lane_params->lane_config.lane_enabled)
 			scnprintf(phy_status_str + strlen(phy_status_str), 30, "Enable Status = %s\n","TRUE");
@@ -2770,7 +2770,7 @@ static ssize_t get_aw_phy4_lane1_speed(struct file *file, char __user *buf,
 	char phy_status_str[100]={0};
 	uint32_t ret_val = 0;
 	struct qcom_aw_lane_params *phy_lane_params = NULL;
-	phy_lane_params=qcom_aw_phy_get_lane_params(QCOM_AW_PHY_INST_DEBUG,PHY_LANE_1);
+	phy_lane_params=qcom_aw_phy_get_lane_params(QCOM_AW_PHY_INST_DEBUG_C2C,PHY_LANE_1);
 	if(phy_lane_params!=NULL){
 		lane_speed_parser(phy_status_str,strlen(phy_status_str),phy_lane_params->lane_config.lane_speed);
 	}
@@ -2784,7 +2784,7 @@ static ssize_t get_aw_phy4_lane1_cdr_lock_status(struct file *file, char __user 
 	char phy_status_str[100]={0};
 	uint32_t ret_val = 0;
 	struct qcom_aw_phy_inst_config *phy_inst_info = NULL;
-	phy_inst_info = qcom_aw_phy_get_inst_config(QCOM_AW_PHY_INST_DEBUG);
+	phy_inst_info = qcom_aw_phy_get_inst_config(QCOM_AW_PHY_INST_DEBUG_C2C);
 	if(phy_inst_info!=NULL){
 		cdr_lock_parser(phy_status_str,strlen(phy_status_str),phy_inst_info->cdr_lock_status_flag[PHY_LANE_1]);
 	}
@@ -2798,7 +2798,7 @@ static ssize_t get_aw_phy4_lane1_link_status(struct file *file, char __user *buf
 	char phy_status_str[100]={0};
 	uint32_t ret_val = 0;
 	struct qcom_aw_lane_params *phy_lane_params = NULL;
-	phy_lane_params=qcom_aw_phy_get_lane_params(QCOM_AW_PHY_INST_DEBUG,PHY_LANE_1);
+	phy_lane_params=qcom_aw_phy_get_lane_params(QCOM_AW_PHY_INST_DEBUG_C2C,PHY_LANE_1);
 	if(phy_lane_params!=NULL){
 		if(phy_lane_params->link_status)
 			scnprintf(phy_status_str + strlen(phy_status_str), 30, "PCS Link Status = %s\n","TRUE");
@@ -2815,7 +2815,7 @@ static ssize_t get_aw_phy4_lane1_mac_link_index(struct file *file, char __user *
 	char phy_status_str[100]={0};
 	uint32_t ret_val = 0;
 	struct qcom_aw_lane_params *phy_lane_params = NULL;
-	phy_lane_params=qcom_aw_phy_get_lane_params(QCOM_AW_PHY_INST_DEBUG,PHY_LANE_1);
+	phy_lane_params=qcom_aw_phy_get_lane_params(QCOM_AW_PHY_INST_DEBUG_C2C,PHY_LANE_1);
 	if(phy_lane_params!=NULL){
 		scnprintf(phy_status_str + strlen(phy_status_str), 30, "Mac Link Index = %d\n",phy_lane_params->lane_config.link_index);
 	}
@@ -2829,7 +2829,7 @@ static ssize_t get_aw_phy4_lane2_status(struct file *file, char __user *buf,
 	char phy_status_str[100]={0};
 	uint32_t ret_val = 0;
 	struct qcom_aw_lane_params *phy_lane_params = NULL;
-	phy_lane_params=qcom_aw_phy_get_lane_params(QCOM_AW_PHY_INST_DEBUG,PHY_LANE_2);
+	phy_lane_params=qcom_aw_phy_get_lane_params(QCOM_AW_PHY_INST_DEBUG_C2C,PHY_LANE_2);
 	if(phy_lane_params!=NULL){
 		if(phy_lane_params->lane_config.lane_enabled)
 			scnprintf(phy_status_str + strlen(phy_status_str), 30, "Enable Status = %s\n","TRUE");
@@ -2846,7 +2846,7 @@ static ssize_t get_aw_phy4_lane2_speed(struct file *file, char __user *buf,
 	char phy_status_str[100]={0};
 	uint32_t ret_val = 0;
 	struct qcom_aw_lane_params *phy_lane_params = NULL;
-	phy_lane_params=qcom_aw_phy_get_lane_params(QCOM_AW_PHY_INST_DEBUG,PHY_LANE_2);
+	phy_lane_params=qcom_aw_phy_get_lane_params(QCOM_AW_PHY_INST_DEBUG_C2C,PHY_LANE_2);
 	if(phy_lane_params!=NULL){
 		lane_speed_parser(phy_status_str,strlen(phy_status_str),phy_lane_params->lane_config.lane_speed);
 	}
@@ -2860,7 +2860,7 @@ static ssize_t get_aw_phy4_lane2_cdr_lock_status(struct file *file, char __user 
 	char phy_status_str[100]={0};
 	uint32_t ret_val = 0;
 	struct qcom_aw_phy_inst_config *phy_inst_info = NULL;
-	phy_inst_info = qcom_aw_phy_get_inst_config(QCOM_AW_PHY_INST_DEBUG);
+	phy_inst_info = qcom_aw_phy_get_inst_config(QCOM_AW_PHY_INST_DEBUG_C2C);
 	if(phy_inst_info!=NULL){
 		cdr_lock_parser(phy_status_str,strlen(phy_status_str),phy_inst_info->cdr_lock_status_flag[PHY_LANE_2]);
 	}
@@ -2874,7 +2874,7 @@ static ssize_t get_aw_phy4_lane2_link_status(struct file *file, char __user *buf
 	char phy_status_str[100]={0};
 	uint32_t ret_val = 0;
 	struct qcom_aw_lane_params *phy_lane_params = NULL;
-	phy_lane_params=qcom_aw_phy_get_lane_params(QCOM_AW_PHY_INST_DEBUG,PHY_LANE_2);
+	phy_lane_params=qcom_aw_phy_get_lane_params(QCOM_AW_PHY_INST_DEBUG_C2C,PHY_LANE_2);
 	if(phy_lane_params!=NULL){
 		if(phy_lane_params->link_status)
 			scnprintf(phy_status_str + strlen(phy_status_str), 30, "PCS Link Status = %s\n","TRUE");
@@ -2891,7 +2891,7 @@ static ssize_t get_aw_phy4_lane2_mac_link_index(struct file *file, char __user *
 	char phy_status_str[100]={0};
 	uint32_t ret_val = 0;
 	struct qcom_aw_lane_params *phy_lane_params = NULL;
-	phy_lane_params=qcom_aw_phy_get_lane_params(QCOM_AW_PHY_INST_DEBUG,PHY_LANE_2);
+	phy_lane_params=qcom_aw_phy_get_lane_params(QCOM_AW_PHY_INST_DEBUG_C2C,PHY_LANE_2);
 	if(phy_lane_params!=NULL){
 		scnprintf(phy_status_str + strlen(phy_status_str), 30, "Mac Link Index = %d\n",phy_lane_params->lane_config.link_index);
 	}
@@ -2905,7 +2905,7 @@ static ssize_t get_aw_phy4_lane3_status(struct file *file, char __user *buf,
 	char phy_status_str[100]={0};
 	uint32_t ret_val = 0;
 	struct qcom_aw_lane_params *phy_lane_params = NULL;
-	phy_lane_params=qcom_aw_phy_get_lane_params(QCOM_AW_PHY_INST_DEBUG,PHY_LANE_3);
+	phy_lane_params=qcom_aw_phy_get_lane_params(QCOM_AW_PHY_INST_DEBUG_C2C,PHY_LANE_3);
 	if(phy_lane_params!=NULL){
 		if(phy_lane_params->lane_config.lane_enabled)
 			scnprintf(phy_status_str + strlen(phy_status_str), 30, "Enable Status = %s\n","TRUE");
@@ -2922,7 +2922,7 @@ static ssize_t get_aw_phy4_lane3_speed(struct file *file, char __user *buf,
 	char phy_status_str[100]={0};
 	uint32_t ret_val = 0;
 	struct qcom_aw_lane_params *phy_lane_params = NULL;
-	phy_lane_params=qcom_aw_phy_get_lane_params(QCOM_AW_PHY_INST_DEBUG,PHY_LANE_3);
+	phy_lane_params=qcom_aw_phy_get_lane_params(QCOM_AW_PHY_INST_DEBUG_C2C,PHY_LANE_3);
 	if(phy_lane_params!=NULL){
 		lane_speed_parser(phy_status_str,strlen(phy_status_str),phy_lane_params->lane_config.lane_speed);
 	}
@@ -2936,7 +2936,7 @@ static ssize_t get_aw_phy4_lane3_cdr_lock_status(struct file *file, char __user 
 	char phy_status_str[100]={0};
 	uint32_t ret_val = 0;
 	struct qcom_aw_phy_inst_config *phy_inst_info = NULL;
-	phy_inst_info = qcom_aw_phy_get_inst_config(QCOM_AW_PHY_INST_DEBUG);
+	phy_inst_info = qcom_aw_phy_get_inst_config(QCOM_AW_PHY_INST_DEBUG_C2C);
 	if(phy_inst_info!=NULL){
 		cdr_lock_parser(phy_status_str,strlen(phy_status_str),phy_inst_info->cdr_lock_status_flag[PHY_LANE_3]);
 	}
@@ -2950,7 +2950,7 @@ static ssize_t get_aw_phy4_lane3_link_status(struct file *file, char __user *buf
 	char phy_status_str[100]={0};
 	uint32_t ret_val = 0;
 	struct qcom_aw_lane_params *phy_lane_params = NULL;
-	phy_lane_params=qcom_aw_phy_get_lane_params(QCOM_AW_PHY_INST_DEBUG,PHY_LANE_3);
+	phy_lane_params=qcom_aw_phy_get_lane_params(QCOM_AW_PHY_INST_DEBUG_C2C,PHY_LANE_3);
 	if(phy_lane_params!=NULL){
 		if(phy_lane_params->link_status)
 			scnprintf(phy_status_str + strlen(phy_status_str), 30, "PCS Link Status = %s\n","TRUE");
@@ -2967,7 +2967,7 @@ static ssize_t get_aw_phy4_lane3_mac_link_index(struct file *file, char __user *
 	char phy_status_str[100]={0};
 	uint32_t ret_val = 0;
 	struct qcom_aw_lane_params *phy_lane_params = NULL;
-	phy_lane_params=qcom_aw_phy_get_lane_params(QCOM_AW_PHY_INST_DEBUG,PHY_LANE_3);
+	phy_lane_params=qcom_aw_phy_get_lane_params(QCOM_AW_PHY_INST_DEBUG_C2C,PHY_LANE_3);
 	if(phy_lane_params!=NULL){
 		scnprintf(phy_status_str + strlen(phy_status_str), 30, "Mac Link Index = %d\n",phy_lane_params->lane_config.link_index);
 	}

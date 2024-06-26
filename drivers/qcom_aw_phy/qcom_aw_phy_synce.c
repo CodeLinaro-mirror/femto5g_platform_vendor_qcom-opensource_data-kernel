@@ -52,7 +52,7 @@ void qcom_aw_phy_synce_notify_phy_lane_state_change() {
          sizeof(struct qcom_aw_phy_gnl_eth_status) * MAX_ETH_NUM);
 
   for (phy_inst_type = QCOM_AW_PHY_INST_FH0;
-       phy_inst_type <= QCOM_AW_PHY_INST_L2; phy_inst_type++) {
+       phy_inst_type < QCOM_AW_PHY_INST_MAX; phy_inst_type++) {
 
     phy_inst_info = &phy_config_info->phy_inst_config_info[phy_inst_type];
     if (phy_inst_info->valid) {
@@ -60,12 +60,12 @@ void qcom_aw_phy_synce_notify_phy_lane_state_change() {
         if (phy_inst_info->lane_params[lane_num].link_status) {
           synce_eth_num = qcom_aw_phy_synce_phy_lane_to_eth_inst(phy_inst_type,
                                                                  lane_num);
-	  if(synce_eth_num == ETH_NONE){
-	    continue;
-	  }
+          if(synce_eth_num == ETH_NONE){
+            continue;
+          }
           eth_status[synce_eth_num].eth_status = true;
           eth_status[synce_eth_num].lane_speed =
-              phy_inst_info->lane_params[lane_num].lane_config.lane_speed;
+                    phy_inst_info->lane_params[lane_num].lane_config.lane_speed;
         }
       }
     }

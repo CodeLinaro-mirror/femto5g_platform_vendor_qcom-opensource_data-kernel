@@ -641,14 +641,22 @@ static void qcom_aw_phy_setup_synce_clocks(struct device *dev) {
          qcom_aw_phy_get_clock(dev, "ECPRI_CC_EMAC_SYNCE_PHY10_CLK_SRC");
   qcom_aw_phy_config_info.synce_phy_lane_clk[FH2_LANE_3] =
          qcom_aw_phy_get_clock(dev, "ECPRI_CC_EMAC_SYNCE_PHY11_CLK_SRC");
-  qcom_aw_phy_config_info.synce_phy_lane_clk[L2_LANE_0] =
+  qcom_aw_phy_config_info.synce_phy_lane_clk[L2_C2C_LANE_0] =
          qcom_aw_phy_get_clock(dev, "ECPRI_CC_EMAC_SYNCE_PHY12_CLK_SRC");
-  qcom_aw_phy_config_info.synce_phy_lane_clk[L2_LANE_1] =
+  qcom_aw_phy_config_info.synce_phy_lane_clk[L2_C2C_LANE_1] =
          qcom_aw_phy_get_clock(dev, "ECPRI_CC_EMAC_SYNCE_PHY13_CLK_SRC");
-  qcom_aw_phy_config_info.synce_phy_lane_clk[L2_LANE_2] =
+  qcom_aw_phy_config_info.synce_phy_lane_clk[L2_C2C_LANE_2] =
          qcom_aw_phy_get_clock(dev, "ECPRI_CC_EMAC_SYNCE_PHY14_CLK_SRC");
-  qcom_aw_phy_config_info.synce_phy_lane_clk[L2_LANE_3] =
+  qcom_aw_phy_config_info.synce_phy_lane_clk[L2_C2C_LANE_3] =
          qcom_aw_phy_get_clock(dev, "ECPRI_CC_EMAC_SYNCE_PHY15_CLK_SRC");
+  qcom_aw_phy_config_info.synce_phy_lane_clk[DBG_C2C_LANE0] =
+         qcom_aw_phy_get_clock(dev, "ECPRI_CC_EMAC_SYNCE_PHY16_CLK_SRC");
+  qcom_aw_phy_config_info.synce_phy_lane_clk[DBG_C2C_LANE1] =
+         qcom_aw_phy_get_clock(dev, "ECPRI_CC_EMAC_SYNCE_PHY17_CLK_SRC");
+  qcom_aw_phy_config_info.synce_phy_lane_clk[DBG_C2C_LANE2] =
+         qcom_aw_phy_get_clock(dev, "ECPRI_CC_EMAC_SYNCE_PHY18_CLK_SRC");
+  qcom_aw_phy_config_info.synce_phy_lane_clk[DBG_C2C_LANE3] =
+         qcom_aw_phy_get_clock(dev, "ECPRI_CC_EMAC_SYNCE_PHY19_CLK_SRC");
 
   return;
 }
@@ -688,7 +696,7 @@ static void qcom_aw_phy_enable_ref_clk_propagation(
                   DIG_SOC_CMN_OVRD_ICTL_REF_LS_ENA_A_OFFSET, 1);
 
   if(qcom_aw_phy_ref_clk_mode == REF_CLK_MODE_OSCILLATOR){
-    if (phy_inst_info->phy_inst == QCOM_AW_PHY_INST_DEBUG)
+    if (phy_inst_info->phy_inst == QCOM_AW_PHY_INST_DEBUG_C2C)
       reg_val = 0x4;
     else
       reg_val = 0x1;
@@ -707,7 +715,7 @@ static void qcom_aw_phy_enable_ref_clk_propagation(
   if(qcom_aw_phy_ref_clk_mode == REF_CLK_MODE_OSCILLATOR){
     if (phy_inst_info->phy_inst == QCOM_AW_PHY_INST_FH0)
       reg_val = 0x0;
-    else if (phy_inst_info->phy_inst == QCOM_AW_PHY_INST_DEBUG)
+    else if (phy_inst_info->phy_inst == QCOM_AW_PHY_INST_DEBUG_C2C)
       reg_val = 0x3;
     else
       reg_val = 0x1;
@@ -719,7 +727,7 @@ static void qcom_aw_phy_enable_ref_clk_propagation(
   else{
     if (phy_inst_info->phy_inst == QCOM_AW_PHY_INST_FH0)
       reg_val = 0x3;
-    else if (phy_inst_info->phy_inst == QCOM_AW_PHY_INST_DEBUG)
+    else if (phy_inst_info->phy_inst == QCOM_AW_PHY_INST_DEBUG_C2C)
       reg_val = 0x0;
     else
       reg_val = 0x1;
@@ -771,7 +779,7 @@ static void qcom_aw_phy_hw_init() {
   // Reference clock propagation using PHY inputs
   if (phy_input_config) {
 
-    for (phy_inst_type = QCOM_AW_PHY_INST_DEBUG;
+    for (phy_inst_type = QCOM_AW_PHY_INST_DEBUG_C2C;
          QCOM_AW_PHY_INST_VALID(phy_inst_type); phy_inst_type--) {
       phy_inst_info = &phy_config_info->phy_inst_config_info[phy_inst_type];
       if (phy_inst_info && phy_inst_info->valid) {
@@ -878,7 +886,7 @@ static void qcom_aw_phy_hw_init() {
       qcom_aw_phy_load_hexfile(
           &mss, "/lib/firmware/qcom_aw_phy/eth_custom_rates_1.hex");
 
-      if(phy_inst_type == QCOM_AW_PHY_INST_DEBUG){
+      if(phy_inst_type == QCOM_AW_PHY_INST_DEBUG_C2C){
         iowrite32(0x4, phy_inst_info->wrapper_base_addr +
                              QCOM_AW_PHY_WRAPPER_PHY_ICTL_AN_MASTER_CFG_OFFSET);
       }

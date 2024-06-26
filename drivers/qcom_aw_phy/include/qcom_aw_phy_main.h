@@ -140,8 +140,8 @@ enum qcom_aw_phy_instance_enum{
 	QCOM_AW_PHY_INST_FH0 = 0,
 	QCOM_AW_PHY_INST_FH1,
 	QCOM_AW_PHY_INST_FH2,
-	QCOM_AW_PHY_INST_L2,
-	QCOM_AW_PHY_INST_DEBUG,
+	QCOM_AW_PHY_INST_L2_C2C,
+	QCOM_AW_PHY_INST_DEBUG_C2C,
 	QCOM_AW_PHY_INST_MAX
 };
 
@@ -166,10 +166,14 @@ enum qcom_aw_phy_synce_lane_id{
 	FH2_LANE_1,
 	FH2_LANE_2,
 	FH2_LANE_3,
-	L2_LANE_0,
-	L2_LANE_1,
-	L2_LANE_2,
-	L2_LANE_3,
+	L2_C2C_LANE_0,  // L2 lane 0 or C2C2 lane 0
+	L2_C2C_LANE_1,  // L2 lane 1 or C2C2 lane 1
+	L2_C2C_LANE_2,  // L2 lane 2 or C2C1 lane 0
+	L2_C2C_LANE_3,  // L2 lane 3 or C2C1 lane 1
+	DBG_C2C_LANE0,  // C2C0 lane 0
+	DBG_C2C_LANE1,  // C2C0 lane 1
+	DBG_C2C_LANE2,  // DBG lane 0
+	DBG_C2C_LANE3,  // DBG lane 1
 	MAX_PHY_SYNCE_LANES
 };
 
@@ -187,7 +191,10 @@ enum qcom_aw_phy_synce_eth_inst{
 	ETH21 = 9,
 	ETH22 = 10,
 	ETH23 = 11,
-	ETHL2  = 12,
+	ETH30 = 12,  // L2_C2C2
+	ETH31 = 13,  // C2C1
+	ETH40 = 14,  // C2C0
+	ETH41 = 15,  // DBG
 	MAX_ETH_NUM
 };
 
