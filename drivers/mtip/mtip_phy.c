@@ -1281,12 +1281,20 @@ static void mtip_phy_phylink_lane_down(struct phylink_config *config, unsigned i
    return;
 }
 
+/* Dummy function added to avoid NULL pointer dereferencing in phylink for 
+   unsupported modules like 1G transceiver module on SFP port */
+static void mtip_phy_phylink_mac_an_restart(struct phylink_config *config) 
+{
+  return;
+}
+
 static const struct phylink_mac_ops mtip_phylink_mac_ops = {
 	.validate = mtip_phy_phy_validate,
 	.mac_pcs_get_state = mtip_phy_get_link_state,
 	.mac_config = mtip_phy_config,
 	.mac_link_up = mtip_phy_phylink_lane_up,
 	.mac_link_down = mtip_phy_phylink_lane_down,
+	.mac_an_restart = mtip_phy_phylink_mac_an_restart,
 };
 
 static void mtip_phy_lane_netdevice_init(struct net_device *dev) 
