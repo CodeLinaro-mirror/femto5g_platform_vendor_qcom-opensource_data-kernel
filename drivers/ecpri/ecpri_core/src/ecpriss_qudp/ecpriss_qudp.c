@@ -2061,6 +2061,40 @@ static int ecpriss_qudp_egress_init_cfg_v2(void)
 
 			}
 		}
+		else if(port_type == ECPRISS_PORT_TYPE_L2)
+		{
+
+			for(port_idx=0;port_idx<ecpriss_pdata_v2->qudp_ctx_v2->num_ports;port_idx++)
+			{
+
+				ecpriss_qudp_egress_per_port_cfg_s_v2 *egress_cfg =
+					&ecpriss_pdata_v2->qudp_ctx_v2->l2_port_cfg_v2[port_idx].egress_cfg;
+
+					ecpriss_qudp_hal_read_reg_n_fields(ECPRISS_QUDP_L2 ,
+						ECPRI_UDP_L2_EGRESS_CONFIG_P_V2,
+						port_idx,
+						&egress_cfg->fh_egress_config);
+
+				egress_cfg->fh_egress_config.calc_ip_udp_len_from_byte_count = 0;
+				egress_cfg->fh_egress_config.bypassed_packets_vport_action = 0;
+				egress_cfg->fh_egress_config.bypassed_packets_vport = 0;
+				egress_cfg->fh_egress_config.disable_padding_removal = 0;
+				egress_cfg->fh_egress_config.l2_encap_index_override_en = 0;
+				egress_cfg->fh_egress_config.l3_encap_index_override_en = 0;
+				egress_cfg->fh_egress_config.disable_ptp_detection = 0;
+
+				ecpriss_qudp_hal_write_reg_n_fields(ECPRISS_QUDP_L2,
+						ECPRI_UDP_L2_EGRESS_CONFIG_P_V2,
+						port_idx,
+						&egress_cfg->fh_egress_config);
+
+				ecpriss_qudp_hal_read_reg_n_fields(ECPRISS_QUDP_L2,
+						ECPRI_UDP_L2_EGRESS_CONFIG_P_V2,
+						port_idx,
+						&egress_cfg->fh_egress_config);
+
+			}
+		}
 	}
 	return ret;
 }
@@ -3415,6 +3449,25 @@ int ecpriss_qudp_init(struct device *dev)
 	}while (0);
 	return ret;
 }
+
+static int ecpri_global_cfg_init_cascade_mode(void) {
+
+       ecpri_global_hwio_def_ecpri_global_cfg_s ecpri_global_cfg;
+
+       memset(&ecpri_global_cfg, 0,
+                       sizeof(ecpri_global_hwio_def_ecpri_global_cfg_s));
+
+       /*Enable RU CASCADE Mode*/
+       ecpri_global_cfg.operation_mode = HWIO_ECPRI_GLOBAL_CFG_OPERATION_MODE_RU_CASCADE_FVAL;
+       ecpri_global_cfg.ahb_resp_err_en = 0x1;
+
+       ecpriss_qudp_hal_write_reg_n_fields(ECPRISS_QUDP_GLOBAL,
+                       ECPRI_GLOBAL_CFG, 0,
+                       &ecpri_global_cfg);
+
+       return 0;
+}
+
 int ecpriss_qudp_init_v2(struct device *dev)
 {
 	int ret = 0;
@@ -3435,7 +3488,16 @@ int ecpriss_qudp_init_v2(struct device *dev)
 			break;
 		}
 
+		if(cascade_enable)
+			ecpri_global_cfg_init_cascade_mode();
+
 		ret = ecpriss_qudp_fh_hal_reg_init(dev);
+		if(ret < 0)
+		{
+			break;
+		}
+
+		ret = ecpriss_qudp_l2_hal_reg_init(dev);
 		if(ret < 0)
 		{
 			break;
@@ -5196,9 +5258,11 @@ void ecpriss_qudp_set_ecpriss_filt_enable_info(int val)
 void ecpriss_qudp_non_ecpri_dma_ring_info(void)
 {
 	int32_t fh_index = 0;
+	int32_t index = 0;
 	int j =0;
 
 	ecpri_qudp_hwio_def_ecpri_udp_fh_non_ecpri_dma_ring_info_port_p_link_n_s_v2 non_ecpri_dma_ring_info;
+	ecpri_qudp_hwio_def_ecpri_udp_l2_non_ecpri_dma_ring_info_port_p_link_n_s_v2 c2c_non_ecpri_dma_ring_info;
 
 	for(fh_index = 0; fh_index < NUM_OF_FHP; fh_index++){
 
@@ -5239,6 +5303,23 @@ void ecpriss_qudp_non_ecpri_dma_ring_info(void)
 
 
 			}
+		}
+
+	}
+	for(index = 0; index < 1; index++){
+
+		struct ecpri_dma_port_params *dma_port_cfg= &ecpriss_pdata_v2->xbar_ctx_v2->c2c_port_cfg.dma_port_cfg[index];
+
+		memset(&c2c_non_ecpri_dma_ring_info , 0, sizeof(c2c_non_ecpri_dma_ring_info));
+
+		if(dma_port_cfg->dma_rings_param[0].dma_ring_type == ECPRI_DMA_RING_TYPE_C2C_DEFAULT)
+		{
+			c2c_non_ecpri_dma_ring_info.ring_id = dma_port_cfg->dma_rings_param[0].dest_dma_ring_id;
+		        c2c_non_ecpri_dma_ring_info.gsi_id= dma_port_cfg->dma_rings_param[0].dest_dma_ring_gsi_id;
+			ecpriss_qudp_hal_write_reg_mn_fields(ECPRISS_QUDP_L2,
+				ECPRI_UDP_L2_NON_ECPRI_DMA_RING_INFO_PORT_p_LINK_n_V2,
+				index,0,
+				&c2c_non_ecpri_dma_ring_info);
 		}
 
 	}

@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: GPL-2.0-only
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/module.h>
@@ -27,6 +27,7 @@
 
 ecpriss_qudp_hal_context_s  ecpriss_qudp_hal_ctx;
 static const char *ecpriss_qudp_hal_reg_name_to_str[ECPRISS_QUDP_REG_MAX+1] = {
+"	ECPRI_GLOBAL_CFG",
 "	ECPRI_UDP_FH_HW_PARAMS_0",
 "	ECPRI_UDP_FH_HW_PARAMS_1",
 "	ECPRI_UDP_FH_INGRESS_CONFIG_P",
@@ -239,6 +240,7 @@ static const char *ecpriss_qudp_hal_reg_name_to_str[ECPRISS_QUDP_REG_MAX+1] = {
 "	ECPRI_UDP_FH_EGRESS_NUM_BYPASSED_PACKETS_PORT_p_LINK_n_V2",
 "	ECPRI_UDP_FH_EGRESS_MTU_ERR_PACKETS_PORT_p_LINK_n_V2",
 "       ECPRI_UDP_FH_FILT_MAC_ADDRESS_INFO_PORT_p_ENTRY_n_V2",
+"	ECPRI_UDP_L2_NON_ECPRI_DMA_RING_INFO_PORT_p_LINK_n_V2",
 "	ECPRI_UDP_L2_INGRESS_NUM_ETH_UDP_PACKETS_PORT_p_LINK_n_V2",
 "	ECPRI_UDP_L2_INGRESS_FCS_ERR_PACKETS_PORT_p_LINK_n_V2",
 "	ECPRI_UDP_L2_INGRESS_IPV4_CS_ERROR_PACKETS_PORT_p_LINK_n_V2",
@@ -1177,6 +1179,43 @@ static const char *ecpriss_qudp_hal_reg_name_to_str[ECPRISS_QUDP_REG_MAX+1] = {
 
 	return;
 }
+	static void ecpriss_qudp_hal_reg_parse_udp_l2_egress_config_p_v2
+(ecpriss_qudp_hal_reg_name_e reg, void *fields, uint32_t val)
+{
+	ecpri_qudp_hwio_def_ecpri_udp_l2_egress_config_p_s_v2 *egress_config
+		= (ecpri_qudp_hwio_def_ecpri_udp_l2_egress_config_p_s_v2 *)fields;
+
+	egress_config->calc_ip_udp_len_from_byte_count = ECPRISS_HAL_GETFIELD_FROM_REG(val,
+			HWIO_ECPRI_UDP_L2_EGRESS_CONFIG_p_CALC_IP_UDP_LEN_FROM_BYTE_COUNT_SHFT_V2,
+			HWIO_ECPRI_UDP_L2_EGRESS_CONFIG_p_CALC_IP_UDP_LEN_FROM_BYTE_COUNT_BMSK_V2);
+
+	egress_config->bypassed_packets_vport_action = ECPRISS_HAL_GETFIELD_FROM_REG(val,
+			HWIO_ECPRI_UDP_L2_EGRESS_CONFIG_p_BYPASSED_PACKETS_VPORT_ACTION_SHFT_V2,
+			HWIO_ECPRI_UDP_L2_EGRESS_CONFIG_p_BYPASSED_PACKETS_VPORT_ACTION_BMSK_V2);
+
+	egress_config->bypassed_packets_vport = ECPRISS_HAL_GETFIELD_FROM_REG(val,
+			HWIO_ECPRI_UDP_L2_EGRESS_CONFIG_p_BYPASSED_PACKETS_VPORT_SHFT_V2,
+			HWIO_ECPRI_UDP_L2_EGRESS_CONFIG_p_BYPASSED_PACKETS_VPORT_BMSK_V2);
+
+	egress_config->disable_ptp_detection = ECPRISS_HAL_GETFIELD_FROM_REG(val,
+			HWIO_ECPRI_UDP_L2_EGRESS_CONFIG_p_DISABLE_PTP_DETECTION_SHFT_V2,
+			HWIO_ECPRI_UDP_L2_EGRESS_CONFIG_p_DISABLE_PTP_DETECTION_BMSK_V2);
+
+	egress_config->l3_encap_index_override_en = ECPRISS_HAL_GETFIELD_FROM_REG(val,
+			HWIO_ECPRI_UDP_L2_EGRESS_CONFIG_p_L3_ENCAP_INDEX_OVERRIDE_EN_SHFT_V2,
+			HWIO_ECPRI_UDP_L2_EGRESS_CONFIG_p_L3_ENCAP_INDEX_OVERRIDE_EN_BMSK_V2);
+
+	egress_config->l2_encap_index_override_en = ECPRISS_HAL_GETFIELD_FROM_REG(val,
+			HWIO_ECPRI_UDP_L2_EGRESS_CONFIG_p_L2_ENCAP_INDEX_OVERRIDE_EN_SHFT_V2,
+			HWIO_ECPRI_UDP_L2_EGRESS_CONFIG_p_L2_ENCAP_INDEX_OVERRIDE_EN_BMSK_V2);
+
+	egress_config->disable_padding_removal = ECPRISS_HAL_GETFIELD_FROM_REG(val,
+			HWIO_ECPRI_UDP_L2_EGRESS_CONFIG_p_DISABLE_PADDING_REMOVAL_SHFT_V2,
+			HWIO_ECPRI_UDP_L2_EGRESS_CONFIG_p_DISABLE_PADDING_REMOVAL_BMSK_V2);
+
+
+	return;
+}
 	static void ecpriss_qudp_hal_reg_construct_udp_fh_egress_config_p_v2
 (ecpriss_qudp_hal_reg_name_e reg, const void *fields, uint32_t* val)
 {
@@ -1216,6 +1255,43 @@ static const char *ecpriss_qudp_hal_reg_name_to_str[ECPRISS_QUDP_REG_MAX+1] = {
 }
 
 
+	static void ecpriss_qudp_hal_reg_construct_udp_l2_egress_config_p_v2
+(ecpriss_qudp_hal_reg_name_e reg, const void *fields, uint32_t* val)
+{
+	ecpri_qudp_hwio_def_ecpri_udp_l2_egress_config_p_s_v2 *egress_config
+		= (ecpri_qudp_hwio_def_ecpri_udp_l2_egress_config_p_s_v2 *)fields;
+
+	ECPRISS_HAL_SETFIELD_IN_REG(*val,
+			egress_config->calc_ip_udp_len_from_byte_count,
+			HWIO_ECPRI_UDP_L2_EGRESS_CONFIG_p_CALC_IP_UDP_LEN_FROM_BYTE_COUNT_SHFT_V2,
+			HWIO_ECPRI_UDP_L2_EGRESS_CONFIG_p_CALC_IP_UDP_LEN_FROM_BYTE_COUNT_BMSK_V2);
+	ECPRISS_HAL_SETFIELD_IN_REG(*val,
+			egress_config->bypassed_packets_vport_action,
+			HWIO_ECPRI_UDP_L2_EGRESS_CONFIG_p_BYPASSED_PACKETS_VPORT_ACTION_SHFT_V2,
+			HWIO_ECPRI_UDP_L2_EGRESS_CONFIG_p_BYPASSED_PACKETS_VPORT_ACTION_BMSK_V2);
+	ECPRISS_HAL_SETFIELD_IN_REG(*val,
+			egress_config->bypassed_packets_vport,
+			HWIO_ECPRI_UDP_L2_EGRESS_CONFIG_p_BYPASSED_PACKETS_VPORT_SHFT_V2,
+			HWIO_ECPRI_UDP_L2_EGRESS_CONFIG_p_BYPASSED_PACKETS_VPORT_BMSK_V2);
+	ECPRISS_HAL_SETFIELD_IN_REG(*val,
+			egress_config->disable_ptp_detection,
+			HWIO_ECPRI_UDP_L2_EGRESS_CONFIG_p_DISABLE_PTP_DETECTION_SHFT_V2,
+			HWIO_ECPRI_UDP_L2_EGRESS_CONFIG_p_DISABLE_PTP_DETECTION_BMSK_V2);
+	ECPRISS_HAL_SETFIELD_IN_REG(*val,
+			egress_config->l3_encap_index_override_en,
+			HWIO_ECPRI_UDP_L2_EGRESS_CONFIG_p_L3_ENCAP_INDEX_OVERRIDE_EN_SHFT_V2,
+			HWIO_ECPRI_UDP_L2_EGRESS_CONFIG_p_L3_ENCAP_INDEX_OVERRIDE_EN_BMSK_V2);
+	ECPRISS_HAL_SETFIELD_IN_REG(*val,
+			egress_config->l2_encap_index_override_en,
+			HWIO_ECPRI_UDP_L2_EGRESS_CONFIG_p_L2_ENCAP_INDEX_OVERRIDE_EN_SHFT_V2,
+			HWIO_ECPRI_UDP_L2_EGRESS_CONFIG_p_L2_ENCAP_INDEX_OVERRIDE_EN_BMSK_V2);
+	ECPRISS_HAL_SETFIELD_IN_REG(*val,
+			egress_config->disable_padding_removal,
+			HWIO_ECPRI_UDP_L2_EGRESS_CONFIG_p_DISABLE_PADDING_REMOVAL_SHFT_V2,
+			HWIO_ECPRI_UDP_L2_EGRESS_CONFIG_p_DISABLE_PADDING_REMOVAL_BMSK_V2);
+
+	return;
+}
 
 	static void ecpriss_qudp_hal_reg_construct_udp_fh_ecpri_ethertype_p
 (ecpriss_qudp_hal_reg_name_e reg, const void *fields, uint32_t* val)
@@ -4309,6 +4385,7 @@ static void ecpriss_qudp_hal_reg_parse_non_ecpri_dma_ring_info_port_p_entry_n_v2
 	return;
 
 }
+
 static void ecpriss_qudp_hal_reg_construct_non_ecpri_dma_ring_info_port_p_entry_n_v2(ecpriss_qudp_hal_reg_name_e reg,
 		const void *fields,
 		uint32_t *val)
@@ -4327,6 +4404,41 @@ static void ecpriss_qudp_hal_reg_construct_non_ecpri_dma_ring_info_port_p_entry_
 			fh_non_ecpri_dma_ring_info->gsi_id,
 			HWIO_ECPRI_UDP_FH_NON_ECPRI_DMA_RING_INFO_PORT_p_LINK_n_GSI_ID_SHFT_V2,
 			HWIO_ECPRI_UDP_FH_NON_ECPRI_DMA_RING_INFO_PORT_p_LINK_n_GSI_ID_BMSK_V2);
+	return;
+
+}
+
+static void ecpriss_qudp_hal_reg_construct_l2_non_ecpri_dma_ring_info_port_p_entry_n_v2(ecpriss_qudp_hal_reg_name_e reg,
+		const void *fields,
+		uint32_t *val)
+{
+
+	ecpri_qudp_hwio_def_ecpri_udp_l2_non_ecpri_dma_ring_info_port_p_link_n_s_v2 * l2_non_ecpri_dma_ring_info =
+		(ecpri_qudp_hwio_def_ecpri_udp_l2_non_ecpri_dma_ring_info_port_p_link_n_s_v2 *)fields;
+
+
+	ECPRISS_HAL_SETFIELD_IN_REG(*val,
+			l2_non_ecpri_dma_ring_info->ring_id,
+			HWIO_ECPRI_UDP_L2_NON_ECPRI_DMA_RING_INFO_PORT_p_LINK_n_RING_ID_SHFT_V2,
+			HWIO_ECPRI_UDP_L2_NON_ECPRI_DMA_RING_INFO_PORT_p_LINK_n_RING_ID_BMSK_V2);
+
+	return;
+
+}
+
+static void ecpriss_qudp_hal_reg_parse_l2_non_ecpri_dma_ring_info_port_p_entry_n_v2(ecpriss_qudp_hal_reg_name_e reg,
+		 void *fields,
+		uint32_t val)
+{
+
+	ecpri_qudp_hwio_def_ecpri_udp_l2_non_ecpri_dma_ring_info_port_p_link_n_s_v2 * l2_non_ecpri_dma_ring_info =
+		(ecpri_qudp_hwio_def_ecpri_udp_l2_non_ecpri_dma_ring_info_port_p_link_n_s_v2 *)fields;
+
+
+	l2_non_ecpri_dma_ring_info->ring_id = ECPRISS_HAL_GETFIELD_FROM_REG(val,
+			                        HWIO_ECPRI_UDP_L2_NON_ECPRI_DMA_RING_INFO_PORT_p_LINK_n_RING_ID_SHFT_V2,
+			                         HWIO_ECPRI_UDP_L2_NON_ECPRI_DMA_RING_INFO_PORT_p_LINK_n_RING_ID_BMSK_V2);
+
 	return;
 
 }
@@ -4537,6 +4649,34 @@ static void ecpriss_qudp_hal_reg_parse_dummy_v2(ecpriss_qudp_hal_reg_name_e reg,
 	return;
 }
 
+static void ecpriss_hal_reg_construct_ecpri_global_cfg(
+               enum ecpriss_qudp_hal_reg_name reg, const void *fields, u32 *val) {
+
+       ecpri_global_hwio_def_ecpri_global_cfg_s *ecpri_global_cfg =
+               (ecpri_global_hwio_def_ecpri_global_cfg_s *)fields;
+
+       ECPRISS_HAL_SETFIELD_IN_REG(
+                       *val, ecpri_global_cfg->operation_mode,
+                       HWIO_ECPRI_GLOBAL_CFG_OPERATION_MODE_SHFT,
+                       HWIO_ECPRI_GLOBAL_CFG_OPERATION_MODE_BMSK);
+
+       ECPRISS_HAL_SETFIELD_IN_REG(
+                       *val, ecpri_global_cfg->ahb_resp_err_en,
+                       HWIO_ECPRI_GLOBAL_CFG_AHB_RESP_ERR_EN_SHFT,
+                       HWIO_ECPRI_GLOBAL_CFG_AHB_RESP_ERR_EN_BMSK);
+
+       ECPRISS_HAL_SETFIELD_IN_REG(
+                       *val, ecpri_global_cfg->xbar_sres,
+                       HWIO_ECPRI_GLOBAL_CFG_XBAR_SRES_SHFT,
+                       HWIO_ECPRI_GLOBAL_CFG_XBAR_SRES_BMSK);
+
+       return;
+}
+
+static void ecpriss_hal_reg_parse_ecpri_global_cfg(
+               enum ecpriss_qudp_hal_reg_name reg, void *fields, u32 val) {
+       return;
+}
 
 /*
  * struct ecpriss_qudp_hal_reg_obj - Register H/W information for specific ECPRISS version
@@ -5374,6 +5514,10 @@ static struct ecpriss_qudp_hal_reg_obj ecpriss_qudp_hal_reg_objs[ECPRISS_HW_MAX]
 		0x09381000,0x1500, 0x4, 0, 0, 0, 0x50},
 
 	//L2 Rams
+	[ECPRISS_HW_v2_0][ECPRI_UDP_L2_NON_ECPRI_DMA_RING_INFO_PORT_p_LINK_n_V2] = {
+		ecpriss_qudp_hal_reg_construct_l2_non_ecpri_dma_ring_info_port_p_entry_n_v2,
+	    ecpriss_qudp_hal_reg_parse_l2_non_ecpri_dma_ring_info_port_p_entry_n_v2,
+		0x93E0000, 0x3FC, 0x4, 0, 0, 0, 0x4},
 
 	[ECPRISS_HW_v2_0][ECPRI_UDP_L2_INGRESS_NUM_ETH_UDP_PACKETS_PORT_p_LINK_n_V2] = {
 		ecpriss_qudp_hal_reg_construct_dummy_v2,
@@ -5521,6 +5665,10 @@ static struct ecpriss_qudp_hal_reg_obj ecpriss_qudp_hal_reg_objs[ECPRISS_HW_MAX]
 		ecpriss_qudp_hal_reg_construct_dummy_v2,
 		ecpriss_qudp_hal_reg_parse_dummy_v2,
 		0x93F4000 , 0x24, 0x40, 0, 0, 0, 0x4000},
+	[ECPRISS_HW_v2_0][ECPRI_UDP_L2_EGRESS_CONFIG_P_V2] = {
+		ecpriss_qudp_hal_reg_construct_udp_l2_egress_config_p_v2,
+		ecpriss_qudp_hal_reg_parse_udp_l2_egress_config_p_v2,
+		0x093E0000, 0x860, 0x4, 0, 0, 0, 0},
 
 	[ECPRISS_HW_v2_0][ECPRI_UDP_L2_FILT_VLAN_ADDR_PORT_p_ENTRY_n_V2] = {
 		ecpriss_qudp_hal_reg_construct_dummy_v2,
@@ -5562,6 +5710,11 @@ static struct ecpriss_qudp_hal_reg_obj ecpriss_qudp_hal_reg_objs[ECPRISS_HW_MAX]
 		ecpriss_qudp_hal_reg_construct_udp_fh_filt_error_channel_cfg_p_v2,
 		ecpriss_qudp_hal_reg_parse_udp_fh_filt_error_channel_cfg_p_v2,
 		0x9380000, 0x44, 0x4, 0, 0, 0, 0},
+
+	[ECPRISS_HW_v2_0][ECPRI_GLOBAL_CFG] = {
+		ecpriss_hal_reg_construct_ecpri_global_cfg,
+		ecpriss_hal_reg_parse_ecpri_global_cfg,
+		0x9410000, 0x0, 0, 0, 0, 0, 0}
 
 
 

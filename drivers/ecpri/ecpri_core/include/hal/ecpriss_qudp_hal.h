@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: GPL-2.0-only
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #ifndef ECPRISS_QUDP_HAL_H_
@@ -10,6 +10,8 @@
 #include "ecpriss_qudp_hwio_def.h"
 #include "ecpriss_qudp_hwio_v2.h"
 #include "ecpriss_qudp_hwio_def_v2.h"
+#include "ecpri_global_hwio.h"
+#include "ecpri_global_hwio_def.h"
 
 
 #define ECPRISS_IP_ADDR_MAX_WORDS   4
@@ -62,6 +64,7 @@ typedef enum{
  *	array as well.
  */
 typedef enum ecpriss_qudp_hal_reg_name {
+	ECPRI_GLOBAL_CFG,
 	ECPRI_UDP_FH_HW_PARAMS_0,
 	ECPRI_UDP_FH_HW_PARAMS_1,
 	ECPRI_UDP_FH_INGRESS_CONFIG_P,
@@ -280,7 +283,7 @@ typedef enum ecpriss_qudp_hal_reg_name {
 	ECPRI_UDP_FH_EGRESS_MTU_ERR_PACKETS_PORT_p_LINK_n_V2,
 	ECPRI_UDP_FH_FILT_MAC_ADDRESS_INFO_PORT_p_ENTRY_n_V2,
 
-
+	ECPRI_UDP_L2_NON_ECPRI_DMA_RING_INFO_PORT_p_LINK_n_V2,
 	ECPRI_UDP_L2_INGRESS_NUM_ETH_UDP_PACKETS_PORT_p_LINK_n_V2,
 	ECPRI_UDP_L2_INGRESS_FCS_ERR_PACKETS_PORT_p_LINK_n_V2,
 	ECPRI_UDP_L2_INGRESS_IPV4_CS_ERROR_PACKETS_PORT_p_LINK_n_V2,
@@ -315,6 +318,7 @@ typedef enum ecpriss_qudp_hal_reg_name {
 	ECPRI_UDP_L2_EGRESS_UDP_PORTS_PORT_p_ENTRY_n_V2,
 	ECPRI_UDP_L2_EGRESS_SA_TAG_IP_TOS_MISC_PORT_p_ENTRY_n_V2,
 
+	ECPRI_UDP_L2_EGRESS_CONFIG_P_V2,
 	ECPRI_UDP_L2_FILT_VLAN_ADDR_PORT_p_ENTRY_n_V2,
 	ECPRI_UDP_L2_UDP_CLASSIFICATION_LIST_PORT_p_ENTRY_n_V2,
 	ECPRI_UDP_L2_FILT_IP_DST_ADDR0_PORT_p_ENTRY_n_V2,

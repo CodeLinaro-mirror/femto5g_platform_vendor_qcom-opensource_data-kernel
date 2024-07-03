@@ -48,6 +48,8 @@
 #define ECPRI_CG_CLK_NOM_MAX (ECPRI_CLK_FREQ(466.50))
 #define ECPRI_MSS_ORAN_NOM_MAX (ECPRI_CLK_FREQ(500))
 
+extern int cascade_enable;
+
 typedef enum
 {
 	ECPRI_CORE_PRE_INIT,

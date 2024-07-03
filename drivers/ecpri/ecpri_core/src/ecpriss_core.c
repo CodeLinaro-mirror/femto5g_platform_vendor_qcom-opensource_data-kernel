@@ -33,6 +33,10 @@ int lte_fh_enabled = 0;
 module_param(lte_fh_enabled, int, S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP);
 MODULE_PARM_DESC(lte_fh_enabled, "Enable LTE FH");
 
+int cascade_enable = 0;
+module_param(cascade_enable, int, S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP);
+MODULE_PARM_DESC(cascade_enable, "Enable Cascade Mode");
+
 int stats_timeout_ms = 250;
 int ecpriss_qudp_strict_filt_cfg[MAX_PORTS] = {0,0,0};
 void ecpriss_eth_topology_cb(void);
@@ -491,7 +495,7 @@ void ecpriss_eth_topology_init(void)
 					port_index =
 						eth_link_params_g.topology_params[i].port_params[j].port_index;
 					port_cfg_local =
-						&ecpriss_pdata->qudp_ctx->fh_port_cfg[port_index];
+						&ecpriss_pdata->qudp_ctx->l2_port_cfg[port_index];
 					num_links =
 						eth_link_params_g.topology_params[i].port_params[j].num_links;
 					ecpriss_eth_cpy_params(port_cfg_local,
@@ -556,6 +560,43 @@ void ecpriss_eth_topology_init_v2(void)
                                         }
                                         else{
                                                 ecpriss_configure_xbar_flush_v2(ECPRISS_PORT_TYPE_FH,port_index,ETH_ECPRISS_EVENT_DOWN);
+                                        }
+					link_state_flag = false;
+					ecpriss_eth_cpy_params_v2(port_cfg_local,
+							&eth_link_params_g,
+							port_index,
+							num_links,
+							i);
+				}
+			}
+			else if(eth_link_params_g.topology_params[i].port_type ==
+					ETH_ECPRISS_PORT_TYPE_C2C) {
+				ecpriss_pdata_v2->qudp_ctx_v2->num_ports =
+				eth_link_params_g.topology_params[i].num_ports;
+				for(j=0;j<ecpriss_pdata_v2->qudp_ctx_v2->num_ports;j++){
+					port_index =
+					eth_link_params_g.topology_params[i].port_params[j].port_index;
+					port_cfg_local =
+						&ecpriss_pdata_v2->qudp_ctx_v2->c2c_port_cfg_v2[port_index];
+					num_links =
+						eth_link_params_g.topology_params[i].port_params[j].num_links;
+
+					port_params = &eth_link_params_g.topology_params[i].port_params[port_index];
+                                        for(k=0;k<num_links;k++){
+						//pr_err("port_index: %d link_index: %d link state: %d\n",port_index,k,port_params->link_params[k].link_state);
+						if(lte_fh_enabled) {
+							ecpriss_mhi_process_async_link_state(port_index, k, port_params->link_params[k].link_state);
+						}
+                                                if(port_params->link_params[k].link_state == ETH_ECPRISS_LINK_STATE_UP){
+                                                        link_state_flag = true;
+	                                        }
+                                        }
+
+                                        if(link_state_flag == true){
+                                                ecpriss_configure_xbar_flush_v2(ECPRISS_PORT_TYPE_L2,port_index,ETH_ECPRISS_EVENT_UP);
+                                        }
+                                        else{
+                                                ecpriss_configure_xbar_flush_v2(ECPRISS_PORT_TYPE_L2,port_index,ETH_ECPRISS_EVENT_DOWN);
                                         }
 					link_state_flag = false;
 					ecpriss_eth_cpy_params_v2(port_cfg_local,
@@ -721,6 +762,14 @@ static int ecpriss_dma_endp_config_v2(void)
 							sizeof(struct ecpri_dma_port_params));
 				}
 				lte_fh_index++;
+			}
+			else if(dma_endp_g.topology_params[i].port_type ==
+					ECPRI_DMA_ENDP_STREAM_DEST_C2C) {
+				for(j=0;j<dma_endp_g.topology_params[i].num_of_ports;j++) {
+					memcpy(&ecpriss_pdata_v2->xbar_ctx_v2->c2c_port_cfg.dma_port_cfg[j],
+							&dma_endp_g.topology_params[i].dma_port_param[j],
+							sizeof(struct ecpri_dma_port_params));
+				}
 			}
 		}
 	}while (0);
