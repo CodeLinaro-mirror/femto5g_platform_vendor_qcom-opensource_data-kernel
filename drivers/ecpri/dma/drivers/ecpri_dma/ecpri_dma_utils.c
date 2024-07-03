@@ -1205,7 +1205,7 @@ static const struct dma_gsi_ep_config ecpri_dma_endp_mapping
 			GSI_SMART_PRE_FETCH, ECPRI_DMA_TLV_TRSHLD,
 			ECPRI_DMA_ENDP_DIR_SRC,
 			ECPRI_DMA_ENDP_STREAM_MODE_M2S,
-			{{0, ECPRI_DMA_DEFAULT_PORT_ID}},
+			{{0, 2}},
 			false, ECPRI_DMA_ENDP_STREAM_DEST_C2C,
 			false, ECPRI_DMA_VM_IDS_NONE },
 		[ECPRI_HW_V2_0][ECPRI_HW_FLAVOR_RU][ECPRI_DMA_GSI_ID_0]
@@ -1213,7 +1213,7 @@ static const struct dma_gsi_ep_config ecpri_dma_endp_mapping
 			GSI_SMART_PRE_FETCH, ECPRI_DMA_TLV_TRSHLD,
 			ECPRI_DMA_ENDP_DIR_SRC,
 			ECPRI_DMA_ENDP_STREAM_MODE_M2S,
-			{{0, ECPRI_DMA_DEFAULT_PORT_ID}},
+			{{0, 1}},
 			false, ECPRI_DMA_ENDP_STREAM_DEST_C2C,
 			false, ECPRI_DMA_VM_IDS_NONE },
 		/* DEST ENDPs*/
@@ -6926,33 +6926,40 @@ static const struct ecpri_dma_endp_mapping ecpri_dma_port_mapping
 				}
 			}
 		},
-		/* C2C IPC - A55 */
+
+		/* C2C - A55 */
 		[2] = {
-			.num_of_ports = 1,
+			.num_of_ports = 2,
 			.port_type = ECPRI_DMA_ENDP_STREAM_DEST_C2C,
 			{
 				[0] = {
-					.port_index = ECPRI_DMA_DEFAULT_PORT_ID,
-					.num_of_rings = 2,
+					.port_index = 0,
+					.num_of_rings = 1,
 					{
 						[0] = {
-							.link_index = 0,
+							.link_index = 12,
 							.vm_id = 0,
 							.dma_ring_type =
-							ECPRI_DMA_RING_TYPE_IPC_A55,
+							ECPRI_DMA_RING_TYPE_C2C_DEFAULT,
 							.src_dma_ring_id = 14,
 							.dest_dma_ring_id = 51
-						},
-						[1] = {
-							.link_index = 0,
+						}
+					}
+				},
+				[1] = {
+					.port_index = 1,
+					.num_of_rings = 1,
+					{
+						[0] = {
+							.link_index = 13,
 							.vm_id = 0,
 							.dma_ring_type =
-							ECPRI_DMA_RING_TYPE_IPC_A55,
+							ECPRI_DMA_RING_TYPE_C2C_DEFAULT,
 							.src_dma_ring_id = 15,
 							.dest_dma_ring_id = 52
 						}
 					}
-				}
+				},
 			}
 		},
 		/* FH Exception */

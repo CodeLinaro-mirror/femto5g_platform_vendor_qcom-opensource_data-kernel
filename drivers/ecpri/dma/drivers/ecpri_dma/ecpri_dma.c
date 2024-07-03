@@ -143,7 +143,7 @@ static struct {
 	u32 ecpri_dma_size;
 } smmu_info;
 
-static struct ecpri_dma_smmu_cb_ctx smmu_cb[ECPRI_DMA_SMMU_CB_MAX];
+static struct ecpri_dma_smmu_cb_ctx ecpri_dma_smmu_cb[ECPRI_DMA_SMMU_CB_MAX];
 static struct ecpri_dma_plat_drv_res ecpri_dma_res = { 0, };
 
 struct ecpri_dma_context *ecpri_dma_ctx = NULL;
@@ -196,7 +196,7 @@ int ecpri_dma_ap_resume(struct device *dev)
 struct ecpri_dma_smmu_cb_ctx *ecpri_dma_get_smmu_ctx(
 	enum ecpri_dma_smmu_cb_type cb_type)
 {
-	return &smmu_cb[cb_type];
+	return &ecpri_dma_smmu_cb[cb_type];
 }
 
 static int ecpri_dma_smmu_cb_probe(struct device *dev,

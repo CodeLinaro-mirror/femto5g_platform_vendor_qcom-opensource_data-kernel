@@ -550,7 +550,7 @@ struct ecpri_dma_ssr_ctx {
   * @ecpri_dma_num_endps: Number of endps
   * @endp_map: ENDP configuration mapping matching to current flavor & version
   * @endp_ctx: ENDP context array
-  * @smmu_cb: pointer to DMA's SMMU context banks
+  * @ecpri_dma_smmu_cb: pointer to DMA's SMMU context banks
   * @ssr_ctx: SSR context
   */
 struct ecpri_dma_context {
@@ -593,7 +593,7 @@ struct ecpri_dma_context {
 	struct ecpri_dma_icc_paths icc_paths;
 	u32 num_of_gsi;
 	struct mutex mhi_memcpy_setup_lock;
-	struct ecpri_dma_smmu_cb_ctx *smmu_cb;
+	struct ecpri_dma_smmu_cb_ctx *ecpri_dma_smmu_cb;
 	struct ecpri_dma_ssr_ctx ssr_ctx;
 };
 

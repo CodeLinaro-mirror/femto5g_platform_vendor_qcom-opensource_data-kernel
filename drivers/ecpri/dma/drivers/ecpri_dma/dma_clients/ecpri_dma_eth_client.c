@@ -606,7 +606,12 @@ int ecpri_dma_eth_connect_endpoints(
 	tx_endp_params.is_over_pcie = false;
 	tx_endp_params.notify_comp = tx_notify_comp;
 	tx_endp_params.enable_tx_poll = connection->enable_tx_poll;
-	tx_endp_params.cb_to_use = ECPRI_DMA_SMMU_CB_ETH;
+	if (ECPRI_DMA_GET_HW_FLAVOR() == ECPRI_HW_FLAVOR_RU &&
+		(params->p_type == ECPRI_DMA_ENDP_STREAM_DEST_C2C ||
+			params->p_type == ECPRI_DMA_ENDP_STREAM_DEST_L2))
+		tx_endp_params.cb_to_use = ECPRI_DMA_SMMU_CB_MHI;
+	else
+		tx_endp_params.cb_to_use = ECPRI_DMA_SMMU_CB_ETH;
 
 	ret = ecpri_dma_alloc_endp(&tx_endp_params);
 
@@ -630,7 +635,12 @@ int ecpri_dma_eth_connect_endpoints(
 	rx_endp_params.is_over_pcie = false;
 	rx_endp_params.notify_comp = &dma_eth_client_rx_comp_hdlr;
 	rx_endp_params.enable_tx_poll = false;
-	rx_endp_params.cb_to_use = ECPRI_DMA_SMMU_CB_ETH;
+	if (ECPRI_DMA_GET_HW_FLAVOR() == ECPRI_HW_FLAVOR_RU &&
+		(params->p_type == ECPRI_DMA_ENDP_STREAM_DEST_C2C ||
+			params->p_type == ECPRI_DMA_ENDP_STREAM_DEST_L2))
+		rx_endp_params.cb_to_use = ECPRI_DMA_SMMU_CB_MHI;
+	else
+		rx_endp_params.cb_to_use = ECPRI_DMA_SMMU_CB_ETH;
 
 	ret = ecpri_dma_alloc_endp(&rx_endp_params);
 
