@@ -756,6 +756,10 @@ int mtip_rsfec_initialize(struct mtip_port_device_info *port_device) {
                     {
                         rsfec_control_val = 0;
                     }
+                    if ( (port_type == MTIP_PORT_TYPE_L2 ) &&((i==0) || (i==1) ))
+                    {
+                      rsfec_control_val = MTIP_RSFEC_CONTROL_AM16_COPY_DIS_BIT;
+                    }
                 }
                 break;
 

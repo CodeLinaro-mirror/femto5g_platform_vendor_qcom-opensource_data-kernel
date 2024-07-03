@@ -61,6 +61,15 @@
 #include "mtip_workq.h"
 #include "mtip_debug_eth.h"
 
+int mtip_netdev_header(struct sk_buff *skb, struct net_device *dev,
+                 unsigned short type, const void *daddr, const void *saddr,
+                 unsigned int len);
+
+const struct header_ops mtip_header_ops = {
+   .create  = mtip_netdev_header,
+   .cache   = NULL,
+};
+
 static int mtip_platform_setup(void);
 /*
  * mtip_platform_setup_link: allocate memory for the link and connect to the dma
@@ -223,42 +232,45 @@ static int mtip_platform_setup_port(u32 port_type)
 
     if (mtip_loopback_mode == MTIP_MODE_DEFAULT)
     {
-       // check if this is the DEBUG ETH port
-       if (port_type != MTIP_PORT_TYPE_DEBUG)
+          // the default is to enable autoneg
+       platform_driver_priv->mtip_ports[port_type]->autoneg = true;
+
+       if (port_type == MTIP_PORT_TYPE_L2 )
        {
-          // the default is to disable autoneg
-          platform_driver_priv->mtip_ports[port_type]->autoneg = true;
-
-          // set the default port configs
-          // THIS IS TBD
-          // final port configuration will be known after AN completion
-          //platform_driver_priv->mtip_ports[port_type]->port_config = MTIP_PORT_CONFIG_4x25GBASE_R;
-
-          // set the default port priv flags
-          platform_driver_priv->mtip_ports[port_type]->port_priv_flags = MTIP_DEVICE_PRIV_FLAGS_BIT_MASK_NON_FEC;
+          // set the below port priv flags supported for L2 port
+          // 1x100GBASE_R2, 1x50GBASE_R, 1x50GBASE_R2, 1x25GBASE_R, 1x10GBASE_R
+          platform_driver_priv->mtip_ports[port_type]->port_priv_flags = MTIP_DEVICE_PRIV_FLAGS_BIT_MASK_L2_PORT_NON_FEC;
+       }
+       else if (port_type == MTIP_PORT_TYPE_DEBUG )
+       {
+          platform_driver_priv->mtip_ports[port_type]->port_priv_flags = MTIP_DEVICE_PRIV_FLAGS_BIT_MASK_DBG_PORT_NON_FEC_NON_50G;
        }
        else
        {
-          platform_driver_priv->mtip_ports[port_type]->autoneg = true;
-
-          // set the default port config to 1x25GBASE_R
-          //platform_driver_priv->mtip_ports[port_type]->port_config = MTIP_PORT_CONFIG_1x25GBASE_R;
-
-          // set the default port priv flags
-          platform_driver_priv->mtip_ports[port_type]->port_priv_flags = MTIP_DEVICE_PRIV_FLAGS_BIT_MASK_DBG_PORT_NON_FEC_NON_50G;
+          platform_driver_priv->mtip_ports[port_type]->port_priv_flags = MTIP_DEVICE_PRIV_FLAGS_BIT_MASK_NON_FEC;
        }
+
     }
     else
     {
         // don't do autoneg for loopback modes
         platform_driver_priv->mtip_ports[port_type]->autoneg = false;
 
+      if(port_type != MTIP_PORT_TYPE_L2)
+      {
         // set the default port config to 4x25GBASE_R
         platform_driver_priv->mtip_ports[port_type]->port_config = MTIP_PORT_CONFIG_4x25GBASE_R;
 
         // set the default port priv flags
         platform_driver_priv->mtip_ports[port_type]->port_priv_flags = (1 << MTIP_PORT_CONFIG_4x25GBASE_R);
-    }
+      }
+      else
+      {
+        // set the below port priv flags supported for L2 port
+        // 1x100GBASE_R2, 1x50GBASE_R, 1x50GBASE_R2, 1x25GBASE_R, 1x10GBASE_R
+        platform_driver_priv->mtip_ports[port_type]->port_priv_flags = MTIP_DEVICE_PRIV_FLAGS_BIT_MASK_L2_PORT_NON_FEC;
+      } 
+   }
 
     // set the default sfp port type
     platform_driver_priv->mtip_ports[port_type]->sfp_port_type = PORT_DA;
@@ -1516,7 +1528,11 @@ static int mtip_platform_setup(void)
                (ETH_HLEN + ETH_FCS_LEN + VLAN_HLEN);
 
             priv->link_index = i;
-
+            if (mtip_loopback_mode != MTIP_MODE_DEFAULT && !mtip_loopback_enable_arp && priv->link_index != MTIP_L2_ETH_LINK_INDEX)
+            {
+               CSMLOGERR("header ops registered for link_index : %d\n",priv->link_index);
+               netdev->header_ops = &mtip_header_ops;
+            }
             priv->hashtablebits = 0;
 
             // set the port priv flags as the default
@@ -1639,12 +1655,20 @@ static int mtip_platform_setup(void)
                // set the port state as connected
                platform_driver_priv->mtip_ports[i]->port_state = MTIP_PORT_STATE_CONNECTED;
 
-               // set the default port priv flags
-               platform_driver_priv->mtip_ports[port_type]->port_priv_flags = (1 << MTIP_PORT_CONFIG_4x25GBASE_R);
+               if(i== MTIP_PORT_TYPE_L2)
+               {
+                   // set the below port priv flags supported for L2 port
+                   // 1x100GBASE_R2, 1x50GBASE_R, 1x50GBASE_R2, 1x25GBASE_R, 1x10GBASE_R
+                   platform_driver_priv->mtip_ports[i]->port_priv_flags = MTIP_DEVICE_PRIV_FLAGS_BIT_MASK_L2_PORT_NON_FEC;
+               }
+               else
+               {
+                    // set the default port priv flags
+                    platform_driver_priv->mtip_ports[i]->port_priv_flags = (1 << MTIP_PORT_CONFIG_4x25GBASE_R);
 
-               // set the port config as 4x25GBASE_R
-               platform_driver_priv->mtip_ports[i]->port_config = MTIP_PORT_CONFIG_4x25GBASE_R;
-
+                    // set the port config as 4x25GBASE_R
+                    platform_driver_priv->mtip_ports[i]->port_config = MTIP_PORT_CONFIG_4x25GBASE_R;
+               }
                // set the port sfp as DAC
                platform_driver_priv->mtip_ports[i]->sfp_port_type = PORT_DA;
 
