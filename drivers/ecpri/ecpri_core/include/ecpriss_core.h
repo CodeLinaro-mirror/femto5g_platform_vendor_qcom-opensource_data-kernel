@@ -228,7 +228,6 @@ typedef struct ecpriss_core_private_s_v2 {
 	struct platform_device		     *pdev;
 	struct mutex                          ecpriss_mutex_lock;
 	void                                 *mhi_ctx;
-	spinlock_t                            ecpriss_workq_spin_lock;
 	spinlock_t                            irq_lock;
 } ecpriss_core_private_s_v2;
 
