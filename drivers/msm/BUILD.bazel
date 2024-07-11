@@ -1,0 +1,20 @@
+package(
+    default_visibility = [
+        "//visibility:public",
+    ],
+)
+
+load("//build/kernel/kleaf:kernel.bzl", "ddk_headers")
+
+ddk_headers(
+    name = "rmnetbam_src_headers",
+    hdrs = glob([
+        "*.h",
+    ])
+)
+
+load(":build/mdm9607.bzl", "define_mdm9607")
+
+define_mdm9607()
+
+
