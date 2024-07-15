@@ -767,6 +767,7 @@ static void mtip_phy_handle_lane_up(struct mtip_process_lane_up lane_up_info)
           // set the lane state of the lane to CONNECTED
           platform_driver_priv->mtip_lanes[lane_up_info.lane_index]->lane_state = MTIP_LANE_STATE_CONNECTED;
           platform_driver_priv->mtip_ports[port_type]->needs_rx_los_processing = false;
+          platform_driver_priv->mtip_lanes[lane_up_info.lane_index]->rx_los_set = false;
 
           // set the sfp_port_type
           platform_driver_priv->mtip_lanes[lane_up_info.lane_index]->sfp_port_type = lane_up_info.sfp_port_type;
@@ -820,11 +821,49 @@ static void mtip_phy_handle_lane_up(struct mtip_process_lane_up lane_up_info)
              /* Indicate RX LOS clear to user space */
              mtip_snd_event_notification(link_index, RX_LOS_CLR);
 
+             /* This is a case where lane up is triggered as part of phy_validate,
+                which means that while in RX LOS state, module insert was detected.
+                As this can be same or a different module, so port reconfiguration
+                would be needed. lane_connected is false only if this function is
+                called as part of phy_validate i.e. on a module insert event.
+                For RX LOS set/clear scenarios, lane_connected would be passed
+                as true */
+             if(lane_up_info.lane_connected == false)
+             {
+                // set the sfp_port_type
+                platform_driver_priv->mtip_lanes[lane_up_info.lane_index]->sfp_port_type = lane_up_info.sfp_port_type;
+
+                // set the lane speed
+                platform_driver_priv->mtip_lanes[lane_up_info.lane_index]->speed_mask = lane_up_info.speed_mask;
+
+                // set the sfp port type of the port
+                platform_driver_priv->mtip_ports[port_type]->sfp_port_type = lane_up_info.sfp_port_type;
+
+                if(lane_up_info.speed_mask & TRX_LANE_SPEED_10G)
+                    lane_speed_count++;
+                if(lane_up_info.speed_mask & TRX_LANE_SPEED_25G)
+                    lane_speed_count++;
+                if(lane_up_info.speed_mask & TRX_LANE_SPEED_50G)
+                    lane_speed_count++;
+                if(lane_up_info.speed_mask & TRX_LANE_SPEED_100G)
+                    lane_speed_count++;
+
+                if(lane_speed_count > 1)
+                    platform_driver_priv->mtip_ports[port_type]->multi_rate_supported = true;
+                else
+                    platform_driver_priv->mtip_ports[port_type]->multi_rate_supported = false;
+
+                platform_driver_priv->mtip_ports[port_type]->port_priv_flags_optical = 0;
+                platform_driver_priv->mtip_ports[port_type]->next_speed_retry_count = 0;
+                platform_driver_priv->mtip_links[link_index]->link_down_received_post_link_up = false;
+                mtip_phy_retry_num[link_index] = 0;
+                post_mtip_process_reconfigure_port(port_type);
+             }
              /* Port reconfiguration post RX LOS clear will be triggered in following cases
                 1. If the PCS link was up and it went down due to RX LOS, or
                 2. If multi rate is supported with more than one speed configured via ethtool
                    and max speed mode toggle attempts are done */
-             if((platform_driver_priv->mtip_links[link_index]->link_down_received_post_link_up) ||
+             else if((platform_driver_priv->mtip_links[link_index]->link_down_received_post_link_up) ||
                 (platform_driver_priv->mtip_ports[port_type]->multi_rate_supported == true &&
                  mtip_device_count_priv_flag_bits(port_type) > 1 &&
                  platform_driver_priv->mtip_ports[port_type]->next_speed_retry_count >= MTIP_NEXT_SPEED_MODE_RETRY_MAX_COUNT))
@@ -845,6 +884,15 @@ static void mtip_phy_handle_lane_up(struct mtip_process_lane_up lane_up_info)
              platform_driver_priv->mtip_ports[port_type]->needs_rx_los_processing = false;
           }
        }
+
+       /* Clear RX LOS flag for the lane if set as part of lane up processing */
+       if(platform_driver_priv->mtip_lanes[lane_up_info.lane_index]->rx_los_set)
+       {
+          platform_driver_priv->mtip_lanes[lane_up_info.lane_index]->rx_los_set = false;
+          if(mtip_lookup_link_index_by_lane_index(&link_index, lane_up_info.lane_index) == 0)
+             mtip_snd_event_notification(link_index, RX_LOS_CLR);
+       }
+
        break;
 
     default:
@@ -883,6 +931,7 @@ static void mtip_phy_handle_lane_down(struct mtip_process_lane_down lane_down_in
       /* Set needs_rx_los_processing flag which will be used to trigger port
          reconfiguration once RX LOS gets cleared */
       platform_driver_priv->mtip_ports[port_type]->needs_rx_los_processing = true;
+      platform_driver_priv->mtip_lanes[lane_down_info.lane_index]->rx_los_set = true;
 
       /* Indicate RX LOS to user space */
       if(mtip_lookup_link_index_by_lane_index(&link_index, lane_down_info.lane_index) == 0)
@@ -895,6 +944,13 @@ static void mtip_phy_handle_lane_down(struct mtip_process_lane_down lane_down_in
    if(lane_down_info.reason_code == TRX_LOCAL_PLUGOUT &&
       mtip_lookup_link_index_by_lane_index(&link_index, lane_down_info.lane_index) == 0)
    {
+      /* If RX LOS was set, clear it as part of local plug out */
+      if(platform_driver_priv->mtip_lanes[lane_down_info.lane_index]->rx_los_set)
+      {
+         platform_driver_priv->mtip_lanes[lane_down_info.lane_index]->rx_los_set = false;
+         mtip_snd_event_notification(link_index, RX_LOS_CLR);
+      }
+
       mtip_snd_event_notification(link_index, LOCAL_PLUG_OUT_SET);
    }
 
@@ -917,7 +973,6 @@ static void mtip_phy_handle_lane_down(struct mtip_process_lane_down lane_down_in
 
          // set the lane state as DISCONNECTED
          platform_driver_priv->mtip_lanes[lane_down_info.lane_index]->lane_state = MTIP_LANE_STATE_DISCONNECTED;
-         platform_driver_priv->mtip_ports[port_type]->needs_rx_los_processing = false;
 
          // Bring down only the link which is mapped to this lane
          if(mtip_lookup_link_index_by_lane_index(&link_index, lane_down_info.lane_index) == 0)
@@ -942,8 +997,23 @@ static void mtip_phy_handle_lane_down(struct mtip_process_lane_down lane_down_in
             tmp_lane_index = platform_driver_priv->devices.port_devices[port_type].lane_devices[i]->lane_index;
             if (platform_driver_priv->mtip_lanes[tmp_lane_index]->lane_state == MTIP_LANE_STATE_CONNECTED)
             {
-               any_lane_connected = true;
-               break;
+               /* If local plug out is triggered while RX LOS is set for any of the lanes,
+                  clear it and move the lane to disconnected state */
+               if(lane_down_info.reason_code == TRX_LOCAL_PLUGOUT &&
+                  platform_driver_priv->mtip_lanes[tmp_lane_index]->rx_los_set)
+               {
+                  platform_driver_priv->mtip_lanes[tmp_lane_index]->rx_los_set = false;
+                  if(mtip_lookup_link_index_by_lane_index(&link_index, tmp_lane_index) == 0)
+                     mtip_snd_event_notification(link_index, RX_LOS_CLR);
+
+                 // set the lane state as DISCONNECTED
+                 platform_driver_priv->mtip_lanes[tmp_lane_index]->lane_state = MTIP_LANE_STATE_DISCONNECTED;
+               }
+               else
+               {
+                  any_lane_connected = true;
+                  break;
+               }
             }
          }
 
@@ -951,6 +1021,9 @@ static void mtip_phy_handle_lane_down(struct mtip_process_lane_down lane_down_in
          {
             // Reset PHY state machine if links were torn down
             mtip_phy_reset_phy_sm(port_type);
+
+            // Clear the RX LOS processing flag as all lanes are down
+            platform_driver_priv->mtip_ports[port_type]->needs_rx_los_processing = false;
 
             // set the port state back to INIT
             platform_driver_priv->mtip_ports[port_type]->port_state = MTIP_PORT_STATE_INIT;
