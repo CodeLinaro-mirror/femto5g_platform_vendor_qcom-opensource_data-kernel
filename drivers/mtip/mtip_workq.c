@@ -19,20 +19,22 @@
 
 static void mtip_workq_handler(struct work_struct *w);
 
-static int mtip_workq_list_initialize(void);
-static int mtip_workq_list_finalize(void);
-static int mtip_workq_list_size(void);
-static int mtip_workq_list_push(unsigned int work_type, void* work_ptr);
-static int mtip_workq_list_pop(unsigned int* work_type, void** work_ptr);
+static int mtip_workq_list_initialize(u32 port_type);
+static int mtip_workq_list_finalize(u32 port_type);
+static int mtip_workq_list_size(u32 port_type);
+static int mtip_workq_list_push(unsigned int work_type, void* work_ptr, u32 port_type);
+static int mtip_workq_list_pop(unsigned int* work_type, void** work_ptr, u32 port_type);
 
-static struct workqueue_struct *mtip_wq = NULL;
-static DECLARE_WORK(mtip_workq, mtip_workq_handler);
+static struct mtip_workq_struct mtip_wq_array[MTIP_PORT_TYPE_MAX] = {0};
 
-static struct mtip_workq_list* mtip_workq_head = NULL;
+static struct mtip_workq_list* mtip_workq_head[MTIP_PORT_TYPE_MAX] = {NULL};
 
 struct workqueue_struct *delayed_wq = NULL;
 struct mutex delayed_wq_mutex_lock;
 extern struct mtip_delayed_work_q_params *delayed_wq_notifr_param;
+
+#define MTIP_WORKQ_NAME_PREFIX      "mtip_workq"
+#define MTIP_WORKQ_NAME_MAX_LEN     20
 
 static void mtip_workq_handler(struct work_struct *w)
 {
@@ -40,15 +42,22 @@ static void mtip_workq_handler(struct work_struct *w)
    int tasks = 0;
    unsigned int     work_type;
    void*            work_ptr;
+   struct mtip_workq_struct *wq_struct = container_of(w, struct mtip_workq_struct, work);
+   u32 port_type;
 
-   tasks = mtip_workq_list_size();
+   if(!wq_struct)
+      return;
+
+   port_type = wq_struct->port_type;
+
+   tasks = mtip_workq_list_size(port_type);
 
    // handle tasks queued to the workq
    CSMLOGDBG("workq handler running with %d tasks pending\n", tasks);
 
    for (i = 0; i < tasks; ++i)
    {
-      mtip_workq_list_pop(&work_type, &work_ptr);
+      mtip_workq_list_pop(&work_type, &work_ptr, port_type);
 
       CSMLOGDBG("going to run work_type: %d\n", work_type);
 
@@ -145,17 +154,21 @@ static void mtip_workq_handler(struct work_struct *w)
    }
 }
 
-int mtip_queue_work(unsigned int work_type, void* work_ptr)
+int mtip_queue_work(unsigned int work_type, void* work_ptr, u32 port_type)
 {
    int rv = 0;
-   if (mtip_wq)
+
+   if(port_type >= MTIP_PORT_TYPE_MAX)
+      return -1;
+
+   if (mtip_wq_array[port_type].mtip_wq)
    {
-      rv = mtip_workq_list_push(work_type, work_ptr);
+      rv = mtip_workq_list_push(work_type, work_ptr, port_type);
 
       if (rv >= 0)
       {
          // queue to do work
-         queue_work(mtip_wq, &mtip_workq);
+         queue_work(mtip_wq_array[port_type].mtip_wq, &mtip_wq_array[port_type].work);
       }
    }
    else
@@ -169,40 +182,63 @@ int mtip_queue_work(unsigned int work_type, void* work_ptr)
 int mtip_initialize_workq(void)
 {
    int retval = 0;
+   u32 port_type;
+   char wq_name[MTIP_WORKQ_NAME_MAX_LEN] = {0};
 
-   if (!mtip_wq) {
-      // allocate the space for the head
-      mtip_workq_head = (struct mtip_workq_list *)kmalloc(sizeof(struct mtip_workq_list), GFP_KERNEL);
+   for(port_type = MTIP_PORT_TYPE_FH_0; port_type < MTIP_PORT_TYPE_MAX; port_type++){
 
-      // HANDLE THE ERROR
-      if (mtip_workq_head == NULL)
-      {
-         retval = -ENOMEM;
-         goto out;
+      if (!mtip_wq_array[port_type].mtip_wq) {
+
+         // allocate the space for the head
+         mtip_workq_head[port_type] = (struct mtip_workq_list *)kmalloc(sizeof(struct mtip_workq_list), GFP_KERNEL);
+
+         // HANDLE THE ERROR
+         if (mtip_workq_head[port_type] == NULL)
+         {
+            retval = -ENOMEM;
+            goto cleanup;
+         }
+
+         // initialize the queue of tasks
+         mtip_workq_list_initialize(port_type);
+
+         snprintf(wq_name, sizeof(wq_name), "%s_%d", MTIP_WORKQ_NAME_PREFIX, port_type);
+
+         // create the workq
+         mtip_wq_array[port_type].mtip_wq = alloc_workqueue(wq_name,  WQ_MEM_RECLAIM | WQ_UNBOUND | WQ_SYSFS | WQ_HIGHPRI, 1);
+
+         // HANDLE THE ERROR
+         if (mtip_wq_array[port_type].mtip_wq == NULL)
+         {
+            retval = -ENOMEM;
+            goto cleanup;
+         }
+
+         mtip_wq_array[port_type].port_type = port_type;
+
+         INIT_WORK(&mtip_wq_array[port_type].work, mtip_workq_handler);
+
       }
-
-      // initialize the queue of tasks
-      mtip_workq_list_initialize();
-
-      // create the workq
-//      mtip_wq = create_workqueue("mtip_workq");
-      mtip_wq = alloc_workqueue("mtip_workq",  WQ_MEM_RECLAIM | WQ_UNBOUND | WQ_SYSFS | WQ_HIGHPRI, 1);
-
-      // HANDLE THE ERROR
-      if (mtip_wq == NULL)
-      {
-         retval = -ENOMEM;
-         goto cleanup;
-      }
-
-      mutex_init(&delayed_wq_mutex_lock);
-      delayed_wq = create_singlethread_workqueue("mtip_delayed_workq");
    }
+
+   mutex_init(&delayed_wq_mutex_lock);
+   delayed_wq = create_singlethread_workqueue("mtip_delayed_workq");
+
    goto out;
 
 cleanup:
-   kfree(mtip_workq_head);
-   mtip_workq_head = NULL;
+   for(port_type = MTIP_PORT_TYPE_FH_0; port_type < MTIP_PORT_TYPE_MAX; port_type++){
+
+      if (mtip_workq_head[port_type]) {
+         kfree(mtip_workq_head[port_type]);
+         mtip_workq_head[port_type] = NULL;
+      }
+
+      if (mtip_wq_array[port_type].mtip_wq) {
+         destroy_workqueue(mtip_wq_array[port_type].mtip_wq);
+         mtip_wq_array[port_type].mtip_wq = NULL;
+      }
+   }
 
 out:
    return retval;
@@ -210,84 +246,92 @@ out:
 
 int mtip_destroy_workq(void)
 {
-   if (mtip_wq) {
-      destroy_workqueue(mtip_wq);
-      mtip_wq = NULL;
+   u32 port_type;
 
-      // finalize the queue of tasks
-      mtip_workq_list_finalize();
+   for(port_type = MTIP_PORT_TYPE_FH_0; port_type < MTIP_PORT_TYPE_MAX; port_type++){
 
-      // free the task list head
-      if (mtip_workq_head != NULL)
-      {
-         kfree(mtip_workq_head);
-         mtip_workq_head = NULL;
+      if (mtip_wq_array[port_type].mtip_wq) {
+         destroy_workqueue(mtip_wq_array[port_type].mtip_wq);
+         mtip_wq_array[port_type].mtip_wq = NULL;
+
+         // finalize the queue of tasks
+         mtip_workq_list_finalize(port_type);
+
+         // free the task list head
+         if (mtip_workq_head[port_type] != NULL)
+         {
+            kfree(mtip_workq_head[port_type]);
+            mtip_workq_head[port_type] = NULL;
+         }
+
       }
-
-      mutex_lock(&delayed_wq_mutex_lock);
-
-      //flush and cancel delayed work
-      cancel_delayed_work(&delayed_wq_notifr_param->wq_item);
-      flush_delayed_work(&delayed_wq_notifr_param->wq_item);
-
-      flush_workqueue(delayed_wq);
-      destroy_workqueue(delayed_wq);
-      delayed_wq = NULL;
-
-      mutex_unlock(&delayed_wq_mutex_lock);
-      mutex_destroy(&delayed_wq_mutex_lock);
    }
+
+   mutex_lock(&delayed_wq_mutex_lock);
+
+   //flush and cancel delayed work
+   cancel_delayed_work(&delayed_wq_notifr_param->wq_item);
+   flush_delayed_work(&delayed_wq_notifr_param->wq_item);
+
+   flush_workqueue(delayed_wq);
+   destroy_workqueue(delayed_wq);
+   delayed_wq = NULL;
+
+   mutex_unlock(&delayed_wq_mutex_lock);
+   mutex_destroy(&delayed_wq_mutex_lock);
+
    return 0;
 }
 
-int mtip_workq_list_initialize(void)
+int mtip_workq_list_initialize(u32 port_type)
 {
    // initialize the head
-   INIT_LIST_HEAD(&mtip_workq_head->head);
+   INIT_LIST_HEAD(&mtip_workq_head[port_type]->head);
 
-   mtip_workq_head->count = 0;
+   mtip_workq_head[port_type]->count = 0;
 
-   spin_lock_init(&mtip_workq_head->lock);
+   spin_lock_init(&mtip_workq_head[port_type]->lock);
    return 0;
 }
 
-int mtip_workq_list_finalize(void)
+int mtip_workq_list_finalize(u32 port_type)
 {
    // go through all the packets and pop them
-
    // free the memory allocations
    unsigned int     work_type;
    void*            work_ptr;
    struct mtip_send_ready_task* taskstruct = NULL;
-   while(mtip_workq_list_size())
+
+   while(mtip_workq_list_size(port_type))
    {
-	mtip_workq_list_pop(&work_type, &work_ptr);
-	taskstruct = (struct mtip_send_ready_task*)work_ptr;
-	kfree(taskstruct);
+      mtip_workq_list_pop(&work_type, &work_ptr, port_type);
+      taskstruct = (struct mtip_send_ready_task*)work_ptr;
+      kfree(taskstruct);
    }
+
    return 0;
 }
 
-int mtip_workq_list_size(void)
+int mtip_workq_list_size(u32 port_type)
 {
    int rv;
    unsigned long flags;
-   spinlock_t *lock = &(mtip_workq_head->lock);
+   spinlock_t *lock = &(mtip_workq_head[port_type]->lock);
 
    spin_lock_irqsave(lock, flags);
 
-   rv = mtip_workq_head->count;
+   rv = mtip_workq_head[port_type]->count;
 
    spin_unlock_irqrestore(lock, flags);
    return rv;
 }
 
-int mtip_workq_list_push(unsigned int work_type, void* work_ptr)
+int mtip_workq_list_push(unsigned int work_type, void* work_ptr, u32 port_type)
 {
    int rv = 0;
    struct mtip_workq_node* node = NULL;
    unsigned long flags;
-   spinlock_t *lock = &(mtip_workq_head->lock);
+   spinlock_t *lock = &(mtip_workq_head[port_type]->lock);
 
    // allocate a workq node
    node = kmalloc(sizeof(struct mtip_workq_node), GFP_ATOMIC);
@@ -308,8 +352,8 @@ int mtip_workq_list_push(unsigned int work_type, void* work_ptr)
 
    spin_lock_irqsave(lock, flags);
 
-   list_add_tail(&node->list, &mtip_workq_head->head);
-   ++mtip_workq_head->count;
+   list_add_tail(&node->list, &mtip_workq_head[port_type]->head);
+   ++mtip_workq_head[port_type]->count;
 
    spin_unlock_irqrestore(lock, flags);
 
@@ -317,14 +361,14 @@ out:
    return rv;
 }
 
-int mtip_workq_list_pop(unsigned int* work_type, void** work_ptr)
+int mtip_workq_list_pop(unsigned int* work_type, void** work_ptr, u32 port_type)
 {
    int rv = 0;
    struct mtip_workq_node* tmp;
    unsigned long flags;
-   spinlock_t *lock = &(mtip_workq_head->lock);
+   spinlock_t *lock = &(mtip_workq_head[port_type]->lock);
 
-   rv = mtip_workq_list_size();
+   rv = mtip_workq_list_size(port_type);
 
    if (rv <= 0)
    {
@@ -334,14 +378,14 @@ int mtip_workq_list_pop(unsigned int* work_type, void** work_ptr)
    spin_lock_irqsave(lock, flags);
 
    // get the first entry
-   tmp = list_entry(mtip_workq_head->head.next, struct mtip_workq_node, list);
+   tmp = list_entry(mtip_workq_head[port_type]->head.next, struct mtip_workq_node, list);
 
-   if (!list_empty(&mtip_workq_head->head)) 
+   if (!list_empty(&mtip_workq_head[port_type]->head)) 
    {
       // delete the head
       list_del(&tmp->list);
 
-      --mtip_workq_head->count;
+      --mtip_workq_head[port_type]->count;
    }
    else {
       rv = -1;

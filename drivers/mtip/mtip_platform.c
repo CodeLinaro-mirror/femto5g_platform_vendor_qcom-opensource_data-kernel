@@ -1221,10 +1221,10 @@ static int mtip_platform_set_mac_addresses(void)
             saddr[5] = (start_nic) & 0xFF;
 
             mtip_mac_set_mac_address_by_link_index(i, saddr);
-        }
 
-        // increment the MAC OFFSET
-        ++start_nic;
+            // increment the MAC OFFSET
+            ++start_nic;
+        }
 
         // set the MAC address for the other interfaces
         for (i = 0; i < MTIP_MAX_LINKS - 1; ++i) 
@@ -1241,10 +1241,10 @@ static int mtip_platform_set_mac_addresses(void)
                 saddr[5] = (start_nic) & 0xFF;
 
                 mtip_mac_set_mac_address_by_link_index(i, saddr);
-            }
 
-            // increment the lower bits
-            ++start_nic;
+               // increment the lower bits
+               ++start_nic;
+            }
         }
     }
 
@@ -1683,13 +1683,16 @@ out:
 void post_mtip_process_create_phylink(void)
 {
    struct mtip_process_create_phylink_task* taskstruct = kmalloc(sizeof(struct mtip_process_create_phylink_task), GFP_ATOMIC);
+
    if(taskstruct == NULL)
    {
        CSMLOGERR("memory alloc failed\n");
        return;
    }
+
    taskstruct->value = 0;
-   mtip_queue_work(MTIP_WORKQ_TASK_CREATE_PHYLINK, taskstruct);
+
+   mtip_queue_work(MTIP_WORKQ_TASK_CREATE_PHYLINK, taskstruct, MTIP_PORT_TYPE_FH_0);
 }
 
 void run_mtip_process_create_phylink(void *work_ptr)

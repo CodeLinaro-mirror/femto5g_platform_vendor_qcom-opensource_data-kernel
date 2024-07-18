@@ -123,9 +123,8 @@ func_exit:
 
 void qcom_aw_phy_synce_handle_snr_valid_change(
   struct work_struct *work){
-  struct delayed_work *delayed_work_item = to_delayed_work(work);
   struct qcom_aw_phy_work_q_params *wq_params =
-     container_of(delayed_work_item, struct qcom_aw_phy_work_q_params, wq_item);
+                  container_of(work, struct qcom_aw_phy_work_q_params, wq_item);
 
   if(!wq_params){
     QCOM_AW_PHY_LOG_ERR("Invalid work queue structure!");
@@ -140,7 +139,6 @@ void qcom_aw_phy_synce_handle_snr_valid_change(
                                             wq_params->lane_num,
                                             (bool)wq_params->user_data);
 
-  kfree(wq_params);
   return;
 }
 

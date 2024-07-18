@@ -230,6 +230,14 @@ enum qcom_aw_phy_an_state_enum {
 
 /* Work structure to be passed to work queue for deferred processing */
 struct qcom_aw_phy_work_q_params{
+	struct work_struct                     wq_item;
+	enum qcom_aw_phy_instance_enum         phy_inst;
+	enum eth_phy_iface_phy_lane_num_enum   lane_num;
+	void                                  *user_data;
+};
+
+/* Delayed work structure to be passed to work queue for deferred processing */
+struct qcom_aw_phy_delayed_work_q_params{
 	struct delayed_work                    wq_item;
 	enum qcom_aw_phy_instance_enum         phy_inst;
 	enum eth_phy_iface_phy_lane_num_enum   lane_num;
@@ -238,14 +246,18 @@ struct qcom_aw_phy_work_q_params{
 
 /* Lane Params - Lane specific information */
 struct qcom_aw_lane_params{
-	struct eth_phy_iface_phy_lane_config   lane_config;
-	bool                                   link_status;
-	bool                                   lane_bring_up_status;
-	uint32_t                               snr_valid_intr;
-	uint32_t                               an_link_good_intr;
-	uint32_t                               an_done_intr;
-	bool                                   rx_sig_detect_status;
-	struct qcom_aw_phy_work_q_params       an_restart_wq_item;
+	struct eth_phy_iface_phy_lane_config      lane_config;
+	bool                                      link_status;
+	bool                                      lane_bring_up_status;
+	uint32_t                                  snr_valid_intr;
+	uint32_t                                  an_link_good_intr;
+	uint32_t                                  an_done_intr;
+	bool                                      rx_sig_detect_status;
+	struct qcom_aw_phy_delayed_work_q_params  an_restart_wq_item;
+	struct qcom_aw_phy_work_q_params          snr_valid_err_wq_item;
+	struct qcom_aw_phy_work_q_params          snr_valid_wq_item;
+	struct qcom_aw_phy_work_q_params          an_done_wq_item;
+	struct qcom_aw_phy_work_q_params          an_link_good_wq_item;
 };
 
 /* AN Params - AN specific information */
@@ -281,27 +293,27 @@ struct qcom_aw_phy_inst_config{
 	struct mutex                      phy_inst_lock;
 	int                               sfp_port_type;
 	struct qcom_aw_phy_an_params      an_params;
+	struct workqueue_struct          *wq;
 };
 
 /* PHY Config - Config for all PHY instances at device level(DU/RU) */
 struct qcom_aw_phy_config{
-	uint8_t                          num_phy_instances;
-	void __iomem                    *tcsr_base_addr;
+	uint8_t                                  num_phy_instances;
+	void __iomem                            *tcsr_base_addr;
 	struct qcom_aw_phy_inst_config   phy_inst_config_info[QCOM_AW_PHY_INST_MAX];
-	struct regulator                *ldo16_supply;
-	struct reset_control            *acgc_reset_ctrl;
-	struct clk                      *synce_cmux_clk_src;
-	struct clk                      *synce_cmux_clk;
-	struct clk                      *synce_div_clk;
-	struct clk                      *synce_phy_lane_clk[MAX_PHY_SYNCE_LANES];
-	struct workqueue_struct         *wq;
-	void                            *phy_ipc_log_buf;
-	void                            *phy_ipc_log_buf_low;
-	uint32_t                         fw_major_ver;
-	uint32_t                         fw_minor_ver;
-	uint32_t                         fw_patch_ver;
-	struct workqueue_struct          *rx_sig_detect_wq;
-	struct qcom_aw_phy_work_q_params rx_sig_detect_wq_item;
+	struct regulator                        *ldo16_supply;
+	struct reset_control                    *acgc_reset_ctrl;
+	struct clk                              *synce_cmux_clk_src;
+	struct clk                              *synce_cmux_clk;
+	struct clk                              *synce_div_clk;
+	struct clk                         *synce_phy_lane_clk[MAX_PHY_SYNCE_LANES];
+	void                                    *phy_ipc_log_buf;
+	void                                    *phy_ipc_log_buf_low;
+	uint32_t                                 fw_major_ver;
+	uint32_t                                 fw_minor_ver;
+	uint32_t                                 fw_patch_ver;
+	struct workqueue_struct                 *rx_sig_detect_wq;
+	struct qcom_aw_phy_delayed_work_q_params rx_sig_detect_wq_item;
 };
 
 /* PHY lane speed config - Rate, width, LTCS clause, Modulation technique*/

@@ -163,7 +163,7 @@ static void mtip_phy_cdr_lock_ind(u32 link_index, bool status, u8 an_seq_num)
     taskstruct->link_index= link_index;
     taskstruct->status = status;
     taskstruct->an_seq_num = an_seq_num;
-    mtip_queue_work(MTIP_WORKQ_TASK_PROCESS_CDR_LOCK_IND, taskstruct);
+    mtip_queue_work(MTIP_WORKQ_TASK_PROCESS_CDR_LOCK_IND, taskstruct, port_type);
     return;
 }
 
@@ -198,6 +198,9 @@ void run_mtip_process_cdr_lock_ind(void* workptr)
         CSMLOGINFO("Invalid link index %d", link_index);
         goto out;
     }
+
+    if(platform_driver_priv == NULL || platform_driver_priv->mtip_links[link_index] == NULL)
+         goto out;
 
     if(mtip_lookup_port_type_by_link_index(link_index, &port_type) != 0)
     {
@@ -370,9 +373,20 @@ void mtip_phy_retry_timer_cb(struct timer_list *list)
 {
     struct mtip_process_phy_retry_bringup* taskstruct;
     struct mtip_link_info *link_info;
+    u32 port_type;
 
     if(!platform_driver_priv)
         return;
+
+    link_info = from_timer(link_info, list, phy_retry_timer);
+    if(!link_info)
+        return;
+
+    if(mtip_lookup_port_type_by_link_index(link_info->link_index, &port_type))
+    {
+      CSMLOGERR("invalid link index");
+      return;
+    }
 
     taskstruct = kmalloc(sizeof(struct mtip_process_phy_retry_bringup), GFP_ATOMIC);
     if(taskstruct == NULL)
@@ -381,12 +395,8 @@ void mtip_phy_retry_timer_cb(struct timer_list *list)
       return;
     }
 
-    link_info = from_timer(link_info, list, phy_retry_timer);
-    if(!link_info)
-        return;
-
     taskstruct->link_index = link_info->link_index;
-    mtip_queue_work(MTIP_WORKQ_TASK_PROCESS_RETRY_PHY_BRINGUP, taskstruct);
+    mtip_queue_work(MTIP_WORKQ_TASK_PROCESS_RETRY_PHY_BRINGUP, taskstruct, port_type);
 
     return;
 }
@@ -404,7 +414,7 @@ void run_mtip_phy_retry_bringup(void* workptr)
       goto func_exit;
     }
 
-    if(!platform_driver_priv){
+    if(!platform_driver_priv || !platform_driver_priv->mtip_links[link_index]){
         CSMLOGERR("platform_driver_priv NULL \n");
         goto func_exit;
     }
@@ -497,9 +507,10 @@ void mtip_fault_notifr_status(struct work_struct *work)
     }
     for(port_type = MTIP_PORT_TYPE_FH_0;  port_type <= MTIP_PORT_TYPE_FH_2; port_type++){
 
-        if(!platform_driver_priv->mtip_links[port_link_id]){
-                continue;
+        if(!platform_driver_priv->devices.port_devices[port_type].port_device_valid){
+            continue;
         }
+
         wrapper_base_addr = platform_driver_priv->devices.port_devices[port_type].wrapper_base_addr;
 
         read_val = (u32)ioread32(wrapper_base_addr + MTIP_MAC_WRAPPER_CORE_STATUS_REG_OFFSET);
@@ -507,6 +518,10 @@ void mtip_fault_notifr_status(struct work_struct *work)
         for(link_index=0 ; link_index < MTIP_MAX_LINKS_PER_PORT; link_index++){
 
             mtip_lookup_link_index_by_port_type_and_real_link(&port_link_id, port_type, link_index);
+
+            if(!platform_driver_priv->mtip_links[port_link_id]){
+                continue;
+            }
 
             if(platform_driver_priv->mtip_links[port_link_id]->state == MTIP_LINK_STATE_CLOSE){
                 continue;
@@ -957,7 +972,16 @@ static void mtip_phy_handle_lane_down(struct mtip_process_lane_down lane_down_in
 
 void post_mtip_phy_handle_lane_up(struct mtip_process_lane_up lane_up_info)
 {
-    struct mtip_process_lane_up* taskstruct = kmalloc(sizeof(struct mtip_process_lane_up), GFP_ATOMIC);
+    u32 port_type;
+    struct mtip_process_lane_up* taskstruct = NULL;
+
+    if(mtip_lookup_port_type_by_lane_index(lane_up_info.lane_index, &port_type))
+    {
+      CSMLOGERR("invalid lane_index");
+      return;
+    }
+
+    taskstruct = kmalloc(sizeof(struct mtip_process_lane_up), GFP_ATOMIC);
     if(taskstruct == NULL)
     {
       CSMLOGERR("memory alloc failed\n");
@@ -965,7 +989,8 @@ void post_mtip_phy_handle_lane_up(struct mtip_process_lane_up lane_up_info)
     }
 
     memcpy(taskstruct, &lane_up_info, sizeof(struct mtip_process_lane_up));
-    mtip_queue_work(MTIP_WORKQ_TASK_PROCESS_LANE_UP, taskstruct);
+
+    mtip_queue_work(MTIP_WORKQ_TASK_PROCESS_LANE_UP, taskstruct, port_type);
 }
 
 void run_mtip_process_lane_up(void* workptr)
@@ -980,15 +1005,24 @@ void run_mtip_process_lane_up(void* workptr)
 
 void post_mtip_phy_handle_lane_down(struct mtip_process_lane_down lane_down_info)
 {
-    struct mtip_process_lane_down* taskstruct = kmalloc(sizeof(struct mtip_process_lane_down), GFP_ATOMIC);
+    u32 port_type;
+    struct mtip_process_lane_down* taskstruct = NULL;
+
+    if(mtip_lookup_port_type_by_lane_index(lane_down_info.lane_index, &port_type))
+    {
+      CSMLOGERR("invalid lane_index");
+      return;
+    }
+
+    taskstruct = kmalloc(sizeof(struct mtip_process_lane_down), GFP_ATOMIC);
     if(taskstruct == NULL)
     {
       CSMLOGERR("memory alloc failed\n");
       return;
-   }
+    }
 
     memcpy(taskstruct, &lane_down_info, sizeof(struct mtip_process_lane_down));
-    mtip_queue_work(MTIP_WORKQ_TASK_PROCESS_LANE_DOWN, taskstruct);
+    mtip_queue_work(MTIP_WORKQ_TASK_PROCESS_LANE_DOWN, taskstruct, port_type);
 }
 
 void run_mtip_process_lane_down(void* workptr)
@@ -1247,12 +1281,20 @@ static void mtip_phy_phylink_lane_down(struct phylink_config *config, unsigned i
    return;
 }
 
+/* Dummy function added to avoid NULL pointer dereferencing in phylink for 
+   unsupported modules like 1G transceiver module on SFP port */
+static void mtip_phy_phylink_mac_an_restart(struct phylink_config *config) 
+{
+  return;
+}
+
 static const struct phylink_mac_ops mtip_phylink_mac_ops = {
 	.validate = mtip_phy_phy_validate,
 	.mac_pcs_get_state = mtip_phy_get_link_state,
 	.mac_config = mtip_phy_config,
 	.mac_link_up = mtip_phy_phylink_lane_up,
 	.mac_link_down = mtip_phy_phylink_lane_down,
+	.mac_an_restart = mtip_phy_phylink_mac_an_restart,
 };
 
 static void mtip_phy_lane_netdevice_init(struct net_device *dev) 

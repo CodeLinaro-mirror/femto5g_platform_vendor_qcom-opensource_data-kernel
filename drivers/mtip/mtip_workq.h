@@ -49,6 +49,13 @@ struct mtip_workq_list
    spinlock_t lock;
 };
 
+struct mtip_workq_struct
+{
+   struct workqueue_struct    *mtip_wq;
+   struct work_struct          work;
+   u32                         port_type;
+};
+
 /* Work structure to be passed to work queue for deferred processing */
 struct mtip_delayed_work_q_params{
    struct delayed_work                    wq_item;
@@ -59,7 +66,7 @@ struct mtip_delayed_work_q_params{
 /*
  * mtip workq related functions
  */
-int mtip_queue_work(unsigned int work_type, void* work_ptr);
+int mtip_queue_work(unsigned int work_type, void* work_ptr, u32 port_type);
 int mtip_initialize_workq(void);
 int mtip_destroy_workq(void);
 int mtip_workq_queue_delayed_work(struct mtip_delayed_work_q_params *wq_params, int delay_ms);
