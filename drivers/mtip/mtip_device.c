@@ -472,7 +472,8 @@ void run_mtip_process_link_state(void* work_ptr)
     dma_handle = platform_driver_priv->mtip_links[link_index]->dma_hdl;
     if (link_up)
     {
-        if(mtip_mac_wrapper_get_link_status(link_index) == false)
+        if((platform_driver_priv->mtip_links[link_index]->state == MTIP_LINK_STATE_UP) ||
+           (mtip_mac_wrapper_get_link_status(link_index) == false))
         {
             // Ignore the stale event
             goto func_exit;
@@ -505,7 +506,8 @@ void run_mtip_process_link_state(void* work_ptr)
     }
     else
     {
-        if(mtip_mac_wrapper_get_link_status(link_index) == true)
+        if((platform_driver_priv->mtip_links[link_index]->state == MTIP_LINK_STATE_DOWN) ||
+           (mtip_mac_wrapper_get_link_status(link_index) == true))
         {
             // Ignore the stale event
             goto func_exit;
@@ -3161,7 +3163,8 @@ void mtip_device_configure_port(u32 port_type)
    }
 
 resolved:
-   CSMLOGINFO("Negotiated port configuration is %d %s", port_info->port_config,
+   CSMLOGINFO("Negotiated port configuration for port %d is %d %s", port_type,
+              port_info->port_config,
               mtip_ethtool_get_port_config_str(port_info->port_config));
 
    // Reset PHY SM for optical if any old configuration was active earlier
