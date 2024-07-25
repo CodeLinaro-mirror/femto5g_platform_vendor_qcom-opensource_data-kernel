@@ -1754,7 +1754,6 @@ int qcom_aw_phy_mac_link_status(enum mtip_port_type_enum port_type,
 
       if(!status){
         phy_inst_info->cdr_lock_status_flag[lane_num] = CDR_LOCK_NONE;
-        phy_inst_info->lane_params[lane_num].rx_sig_detect_status = false;
       }
       else{
         phy_inst_info->cdr_lock_status_flag[lane_num] = CDR_LOCK_SUCCESS;
@@ -2136,6 +2135,8 @@ void qcom_aw_phy_handle_rx_sig_detect(struct work_struct *work){
         continue;
       }
 
+      phy_inst_info->lane_params[lane].rx_sig_detect_status = true;
+
       /* Retry lane bring up if detect interrupt is received and PCS link is down */
       if((phy_inst_info->lane_params[lane].link_status == false) &&
          (phy_inst_info->cdr_lock_status_flag[lane] != CDR_LOCK_SUCCESS)){
@@ -2236,7 +2237,6 @@ void qcom_aw_phy_handle_rx_sig_detect(struct work_struct *work){
         if(cdr_lock_status == AW_ERR_CODE_NONE){
           qcom_aw_phy_handle_cdr_lock_status(phy_inst_info, lane,
                                              CDR_LOCK_SUCCESS);
-          phy_inst_info->lane_params[lane].rx_sig_detect_status = true;
         }
         else{
           qcom_aw_phy_handle_cdr_lock_status(phy_inst_info, lane,
