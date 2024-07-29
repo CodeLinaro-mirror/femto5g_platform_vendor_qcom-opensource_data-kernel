@@ -1084,7 +1084,6 @@ static void mtip_dma_skb_timestamp(struct sk_buff *head_skb)
     }
 
     head_skb->len -= 8;
-    head_skb->data_len -= 8;
 }
 
 static void mtip_dma_process_packet(
