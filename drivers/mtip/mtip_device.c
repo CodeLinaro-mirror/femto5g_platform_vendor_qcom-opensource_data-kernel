@@ -1635,6 +1635,9 @@ static void mtip_netdev_reconfigure_port
             // we need to update the assigned lane indices of link_index
             link_info = platform_driver_priv->mtip_links[link_index];
 
+            if(link_info == NULL)
+                continue;
+
             for (j = 0; j < num_lanes; ++j) 
             {
                 real_lane_index = real_lane_index_array[j];
