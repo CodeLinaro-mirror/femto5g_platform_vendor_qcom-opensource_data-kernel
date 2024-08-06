@@ -310,10 +310,10 @@ static int mtip_platform_cleanup_lane(unsigned int lane_index)
      phylink = platform_driver_priv->mtip_lanes[lane_index]->phylink;
      ndev = platform_driver_priv->mtip_lanes[lane_index]->lane_dummy_ndev;
 
+     mtip_phy_destroy_phylink(phylink, ndev);
+
      kfree(platform_driver_priv->mtip_lanes[lane_index]);
      platform_driver_priv->mtip_lanes[lane_index] = NULL;
-
-     mtip_phy_destroy_phylink(phylink, ndev);
    }
    return 0;
 }

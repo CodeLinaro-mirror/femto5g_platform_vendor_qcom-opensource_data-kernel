@@ -1451,16 +1451,20 @@ int mtip_phy_create_phylink(struct mtip_lane_device_info* lane_device)
 int mtip_phy_destroy_phylink(struct phylink *phylink,struct net_device* lane_dummy_ndev)
 {
     if(phylink) 
-	{
-	  // stop the phylink
-       phylink_stop(phylink);
+    {
 
-       // destory the phylink
-       phylink_destroy(phylink);
-	}
+        // stop the phylink
+        rtnl_lock();
+        phylink_stop(phylink);
+        rtnl_unlock();
+
+        // destory the phylink
+        phylink_destroy(phylink);
+    }
+
        // free the netdev
     if(lane_dummy_ndev)
-       free_netdev(lane_dummy_ndev);
+        free_netdev(lane_dummy_ndev);
 
     return 0;
 }
