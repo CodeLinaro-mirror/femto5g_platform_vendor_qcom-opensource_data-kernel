@@ -54,7 +54,7 @@ msm_rmnet_bam_headroom_check_failure_show(struct device *dev,
 					  struct device_attribute *attr,
 					  char *buf)
 {
-	return scnprintf(buf, PAGE_SIZE, "%d\n",
+	return scnprintf(buf, PAGE_SIZE, "%lu\n",
 			msm_rmnet_bam_headroom_check_failure);
 }
 static DEVICE_ATTR_RO(msm_rmnet_bam_headroom_check_failure);
@@ -64,7 +64,7 @@ static unsigned int pkt_threshold = 1;
 static ssize_t pkt_threshold_show(struct device *dev, struct device_attribute
 				*attr, char *buf)
 {
-	return scnprintf(buf, PAGE_SIZE, "%d\n", pkt_threshold);
+	return scnprintf(buf, PAGE_SIZE, "%u\n", pkt_threshold);
 }
 
 static ssize_t pkt_threshold_store(struct device *dev,
@@ -282,7 +282,7 @@ static void bam_recv_notify(void *dev, struct sk_buff *skb)
 		if (pkt_threshold == 1) {
 			__netif_rx(skb);
 		} else {
-			/* For every nth packet, use netif_rx_ni(). */
+			/* For every nth packet, use __netif_rx(). */
 			if (p->stats.rx_packets % pkt_threshold == 0)
 				__netif_rx(skb);
 			else
