@@ -1065,7 +1065,7 @@ static void mtip_dma_skb_timestamp(struct sk_buff *head_skb)
     // number of nanosecs is the lower 32 bits
     timestamp_nsecs = (u32)(timestamp & 0xFFFFFFFF);
 
-    CSMLOGDBG("Rx packet timestamp %ld, timestamp_secs %d, timestamp_nsecs %d", 
+    CSMLOGPTP("Rx packet timestamp %ld, timestamp_secs %d, timestamp_nsecs %d",
                timestamp, timestamp_secs, timestamp_nsecs);
     tmp=(char*)head_skb->data;
     
