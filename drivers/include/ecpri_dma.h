@@ -93,23 +93,23 @@ enum ecpri_dma_endp_stream_dest {
  * enum ecpri_dma_ees - DMA Execution environments
  */
 enum ecpri_dma_ees {
-	ECPRI_DMA_EE_AP  = 0,
-	ECPRI_DMA_EE_Q6  = 1,
-	ECPRI_DMA_EE_VM0 = 2,
-	ECPRI_DMA_EE_VM1 = 3,
-	ECPRI_DMA_EE_VM2 = 4,
-	ECPRI_DMA_EE_VM3 = 5,
-	ECPRI_DMA_EE_PF  = 6,
-	ECPRI_DMA_EE_VFA = 2,
-	ECPRI_DMA_EE_VFB = 3,
-	ECPRI_DMA_EE_VFC = 4,
-	ECPRI_DMA_EE_VF1 = 5,
-	ECPRI_DMA_EE_VF2 = 6,
-	ECPRI_DMA_EE_VFD = 2,
-	ECPRI_DMA_EE_VFE = 3,
-	ECPRI_DMA_EE_VF3 = 4,
-	ECPRI_DMA_EE_VF4 = 5,
-	ECPRI_DMA_EE_VF5 = 6,
+	ECPRI_DMA_EE_AP  = 0, //Same EE ID for all GSIs
+	ECPRI_DMA_EE_Q6  = 1, //Same EE ID for all GSIs
+	ECPRI_DMA_EE_VM0 = 2, // GSI0
+	ECPRI_DMA_EE_VM1 = 3, // GSI0
+	ECPRI_DMA_EE_VM2 = 4, // GSI0
+	ECPRI_DMA_EE_VM3 = 5, // GSI0
+	ECPRI_DMA_EE_VF1 = 6, // GSI0
+	ECPRI_DMA_EE_VFA = 2, // GSI1
+	ECPRI_DMA_EE_VFB = 3, // GSI1
+	ECPRI_DMA_EE_VFC = 4, // GSI1
+	ECPRI_DMA_EE_PF  = 5, // GSI1
+	ECPRI_DMA_EE_VF4 = 6, // GSI1
+	ECPRI_DMA_EE_VFD = 2, // GSI2
+	ECPRI_DMA_EE_VFE = 3, // GSI2
+	ECPRI_DMA_EE_VF2 = 4, // GSI2
+	ECPRI_DMA_EE_VF3 = 5, // GSI2
+	ECPRI_DMA_EE_VF5 = 6, // GSI2
 };
 
 enum ecpri_dma_vm_ids {

@@ -167,7 +167,6 @@ EXPORT_SYMBOL(ecpri_dma_assert);
  * ecpri_dma_ap_suspend() - suspend callback for runtime_pm
  * @dev: pointer to device
  *
- * TODO: Implement
  */
 int ecpri_dma_ap_suspend(struct device *dev)
 {
@@ -906,7 +905,6 @@ int ecpri_dma_dealloc_endp(struct ecpri_dma_endp_context *endp_cfg)
  * DMA & GSI HW.
  *
  * Initialize DMA HAL
- * TODO: Complete documentation here
  */
 static int ecpri_dma_post_init(void)
 {
@@ -968,26 +966,13 @@ static int ecpri_dma_post_init(void)
 			else
 				gsi_props.irq[gsi_id][ee] = ecpri_dma_ctx->gsi_irq[gsi_id][ee];
 
-			switch (ee) {
-			case ECPRI_DMA_EE_VM0:
-			case ECPRI_DMA_EE_VM1:
-			case ECPRI_DMA_EE_VM2:
-			case ECPRI_DMA_EE_VM3:
-				gsi_props.mhi_er_id_limits_valid[gsi_id][ee] = true;
-				break;
-			case ECPRI_DMA_EE_PF:
-				/*	PF EE in GSI 0 doesn't have HW CHs, for other GSIs
-					there are HW CHs */
-				if(gsi_id==0)
-					gsi_props.mhi_er_id_limits_valid[gsi_id][ee] = false;
-				else
-					gsi_props.mhi_er_id_limits_valid[gsi_id][ee] = true;
-				break;
-			case ECPRI_DMA_EE_AP:
-			case ECPRI_DMA_EE_Q6:
-			default:
+			/*	AP EE, Q6 EE and PF EE in GSI 1 doesn't have HW CHs, for other
+					EEs there are HW CHs */
+			if (ee == ECPRI_DMA_EE_AP || ee == ECPRI_DMA_EE_Q6 ||
+				(ee == ECPRI_DMA_EE_PF && gsi_id == ECPRI_DMA_MHI_PF_GSI_ID)) {
 				gsi_props.mhi_er_id_limits_valid[gsi_id][ee] = false;
-				break;
+			} else{
+				gsi_props.mhi_er_id_limits_valid[gsi_id][ee] = true;
 			}
 		}
 	}
@@ -1194,13 +1179,13 @@ static int ecpri_dma_get_dts_configuration(struct platform_device* pdev,
 	DMADBG(":gsi-irq-vm3 = %d\n", dma_drv_res->gsi_irq[0][ECPRI_DMA_EE_VM3]);
 
 	resource = platform_get_resource_byname(pdev, IORESOURCE_IRQ,
-		"gsi-irq-pf");
+		"gsi-0-irq-ee6");
 	if (!resource) {
-		DMAERR(":get resource failed for gsi-irq-pf\n");
+		DMAERR(":get resource failed for gsi-0-irq-ee6\n");
 		return -ENODEV;
 	}
-	dma_drv_res->gsi_irq[0][ECPRI_DMA_EE_PF] = resource->start;
-	DMADBG(":gsi-irq-pf = %d\n", dma_drv_res->gsi_irq[0][ECPRI_DMA_EE_PF]);
+	dma_drv_res->gsi_irq[0][6] = resource->start;
+	DMADBG(":gsi-0-irq-ee6 = %d\n", dma_drv_res->gsi_irq[0][6]);
 
 	if (dma_drv_res->ecpri_hw_ver > ECPRI_HW_V1_0)
 	{
