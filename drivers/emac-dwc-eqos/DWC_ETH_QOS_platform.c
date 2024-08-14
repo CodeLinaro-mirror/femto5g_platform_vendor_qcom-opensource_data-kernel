@@ -937,12 +937,40 @@ static const struct file_operations fops_mac_rec = {
 	.llseek = default_llseek,
 };
 
+static ssize_t write_skip_auto_resume(struct file *file,
+					const char __user *user_buf,
+					size_t count, loff_t *ppos)
+{
+	int tmp = 0;
+	if (!gDWC_ETH_QOS_prv_data) {
+		EMACERR(" %s NULL Pointer \n",__func__);
+		return -EINVAL;
+	}
+	if(count > MAX_PROC_SIZE)
+		count = MAX_PROC_SIZE;
+	if(copy_from_user(tmp_buff, user_buf, count))
+		return -EFAULT;
+	if (sscanf(tmp_buff, "%du", &tmp) < 0)
+		pr_err("sscanf failed\n");
+	else {
+		gDWC_ETH_QOS_prv_data->skip_ipa_autoresume = tmp;
+	}
+	return count;
+}
+
+static const struct file_operations fops_skip_auto_resume = {
+	.write = write_skip_auto_resume,
+	.open = simple_open,
+	.owner = THIS_MODULE,
+	.llseek = default_llseek,
+};
 
 int DWC_ETH_QOS_create_debugfs(struct DWC_ETH_QOS_prv_data *pdata)
 {
 	static struct dentry *node = NULL;
 	static struct dentry *ipc_emac_log_low= NULL;
 	static struct dentry *mac_rec;
+	static struct dentry *skip_auto_resume= NULL;
 
 	if(!pdata) {
 		EMACERR( "Null Param %s \n", __func__);
@@ -984,6 +1012,13 @@ int DWC_ETH_QOS_create_debugfs(struct DWC_ETH_QOS_prv_data *pdata)
 
 	if (!mac_rec || IS_ERR(mac_rec)) {
 		EMACERR("Can't create mac_rec directory\n");
+		goto fail;
+	}
+
+	skip_auto_resume = debugfs_create_file("skip_auto_resume", 0220, pdata->debugfs_dir,
+				pdata, &fops_skip_auto_resume);
+	if (!skip_auto_resume || IS_ERR(skip_auto_resume)) {
+		EMACERR( "Cannot create debugfs skip_auto_resume %d \n", (int)skip_auto_resume);
 		goto fail;
 	}
 
