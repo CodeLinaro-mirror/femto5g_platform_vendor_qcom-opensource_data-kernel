@@ -343,6 +343,7 @@ void ecpriss_qudp_print_c2c_egress_stats_v2(uint32_t port_index,
 
 void ecpriss_qudp_fh_ingress_stats_update(uint32_t port_index, uint32_t link_index);
 void ecpriss_qudp_fh_ingress_stats_update_v2(uint32_t port_index, uint32_t link_index);
+void ecpriss_fh_qudp_stats_update_usr(void);
 
 void ecpriss_qudp_fh_egress_stats_update(uint32_t port_index, uint32_t link_index);
 void ecpriss_qudp_fh_egress_stats_update_v2(uint32_t port_index, uint32_t link_index);
@@ -404,13 +405,13 @@ void ecpriss_qudp_set_ingress_action(int val);
 
 int ecpriss_qudp_get_strict_filter_config(int fh_index);
 void ecpriss_qudp_set_strict_filter_config(int val, int fh_index);
-void ecpriss_qudp_egress_l2_table_reconfig(ecpriss_packet_payload_s *packet);
-void ecpriss_qudp_egress_l3_table_reconfig(ecpriss_packet_payload_s *packet);
-void ecpriss_qudp_egress_l2_l3_table_reconfig(ecpriss_packet_payload_s *packet);
-void ecpriss_qudp_ingress_table_config(ecpriss_packet_payload_s *packet);
-void ecpriss_qudp_ingress_table_deconfig(ecpriss_packet_payload_s *packet);
+int32_t ecpriss_qudp_egress_l2_table_reconfig(ecpriss_packet_payload_s *packet);
+int32_t ecpriss_qudp_egress_l3_table_reconfig(ecpriss_packet_payload_s *packet);
+int32_t ecpriss_qudp_egress_l2_l3_table_reconfig(ecpriss_packet_payload_s *packet);
+int32_t ecpriss_qudp_ingress_table_config(ecpriss_packet_payload_s *packet);
+int32_t ecpriss_qudp_ingress_table_deconfig(ecpriss_packet_payload_s *packet);
 
-void ecpriss_qudp_set_lte_mac_filter(ecpriss_packet_payload_s *packet);
+int32_t ecpriss_qudp_set_lte_mac_filter(ecpriss_packet_payload_s *packet);
 void ecpriss_qudp_set_nr_mac_filter(void);
 void ecpriss_qudp_set_lte_mac_filter_info(void);
 void ecpriss_qudp_set_nr_mac_filter_info(void);

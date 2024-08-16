@@ -8,6 +8,7 @@
 
 
 #define NETLINK_ECPRI 25
+#define ECPRISS_STATS_UPDATE 26
 
 
 typedef enum
@@ -89,6 +90,7 @@ typedef struct ecpriss_packet
 
 int ecpriss_netlink_socket_create(void);
 int ecpriss_netlink_socket_create_v2(void);
-void ecpriss_process_packet(ecpriss_packet_payload_s *packet);
-void ecpriss_process_packet_decfg(ecpriss_packet_payload_s *packet, ecpriss_message_id_e config_parameter);
+int ecpriss_netlink_stats_socket_create(void);
+int32_t ecpriss_process_packet(ecpriss_packet_payload_s *packet);
+int32_t ecpriss_process_packet_decfg(ecpriss_packet_payload_s *packet, ecpriss_message_id_e config_parameter);
 #endif

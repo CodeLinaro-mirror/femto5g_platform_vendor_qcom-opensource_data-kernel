@@ -310,7 +310,95 @@ void ecpriss_xbar_stats_update(void)
 
 	return;
 }
+void ecpriss_fh_xbar_stats_update_usr(void)
+{
+	ecpriss_pdata_v2->fh_stats_usr.xbar.stats.xbar_fhrx_pkt_cnt_link_0 = ecpriss_pdata_v2->xbar_ctx_v2->stats_v2.xbar_fhrx_pkt_cnt[0];
+	ecpriss_pdata_v2->fh_stats_usr.xbar.stats.xbar_fhtx_pkt_cnt_link_0 = ecpriss_pdata_v2->xbar_ctx_v2->stats_v2.xbar_fhtx_pkt_cnt[0];
+	ecpriss_pdata_v2->fh_stats_usr.xbar.stats.xbar_fhrx_pkt_cnt_link_1 = ecpriss_pdata_v2->xbar_ctx_v2->stats_v2.xbar_fhrx_pkt_cnt[1];
+	ecpriss_pdata_v2->fh_stats_usr.xbar.stats.xbar_fhtx_pkt_cnt_link_1 = ecpriss_pdata_v2->xbar_ctx_v2->stats_v2.xbar_fhtx_pkt_cnt[1];
+	ecpriss_pdata_v2->fh_stats_usr.xbar.stats.xbar_fhrx_pkt_cnt_link_2 = ecpriss_pdata_v2->xbar_ctx_v2->stats_v2.xbar_fhrx_pkt_cnt[2];
+	ecpriss_pdata_v2->fh_stats_usr.xbar.stats.xbar_fhtx_pkt_cnt_link_2 = ecpriss_pdata_v2->xbar_ctx_v2->stats_v2.xbar_fhtx_pkt_cnt[2];
+	ecpriss_pdata_v2->fh_stats_usr.xbar.stats.xbar_fhrx_pkt_cnt_link_3 = ecpriss_pdata_v2->xbar_ctx_v2->stats_v2.xbar_fhrx_pkt_cnt[3];
+	ecpriss_pdata_v2->fh_stats_usr.xbar.stats.xbar_fhtx_pkt_cnt_link_3 = ecpriss_pdata_v2->xbar_ctx_v2->stats_v2.xbar_fhtx_pkt_cnt[3];
+	ecpriss_pdata_v2->fh_stats_usr.xbar.stats.xbar_fhrx_pkt_cnt_link_4 = ecpriss_pdata_v2->xbar_ctx_v2->stats_v2.xbar_fhrx_pkt_cnt[4];
+	ecpriss_pdata_v2->fh_stats_usr.xbar.stats.xbar_fhtx_pkt_cnt_link_4 = ecpriss_pdata_v2->xbar_ctx_v2->stats_v2.xbar_fhtx_pkt_cnt[4];
+	ecpriss_pdata_v2->fh_stats_usr.xbar.stats.xbar_fhrx_pkt_cnt_link_5 = ecpriss_pdata_v2->xbar_ctx_v2->stats_v2.xbar_fhrx_pkt_cnt[5];
+	ecpriss_pdata_v2->fh_stats_usr.xbar.stats.xbar_fhtx_pkt_cnt_link_5 = ecpriss_pdata_v2->xbar_ctx_v2->stats_v2.xbar_fhtx_pkt_cnt[5];
+	ecpriss_pdata_v2->fh_stats_usr.xbar.stats.xbar_fhrx_pkt_cnt_link_6 = ecpriss_pdata_v2->xbar_ctx_v2->stats_v2.xbar_fhrx_pkt_cnt[6];
+	ecpriss_pdata_v2->fh_stats_usr.xbar.stats.xbar_fhtx_pkt_cnt_link_6 = ecpriss_pdata_v2->xbar_ctx_v2->stats_v2.xbar_fhtx_pkt_cnt[6];
+	ecpriss_pdata_v2->fh_stats_usr.xbar.stats.xbar_fhrx_pkt_cnt_link_7 = ecpriss_pdata_v2->xbar_ctx_v2->stats_v2.xbar_fhrx_pkt_cnt[7];
+	ecpriss_pdata_v2->fh_stats_usr.xbar.stats.xbar_fhtx_pkt_cnt_link_7 = ecpriss_pdata_v2->xbar_ctx_v2->stats_v2.xbar_fhtx_pkt_cnt[7];
+	ecpriss_pdata_v2->fh_stats_usr.xbar.stats.xbar_fhrx_pkt_cnt_link_8 = ecpriss_pdata_v2->xbar_ctx_v2->stats_v2.xbar_fhrx_pkt_cnt[8];
+	ecpriss_pdata_v2->fh_stats_usr.xbar.stats.xbar_fhtx_pkt_cnt_link_8 = ecpriss_pdata_v2->xbar_ctx_v2->stats_v2.xbar_fhtx_pkt_cnt[8];
+	ecpriss_pdata_v2->fh_stats_usr.xbar.stats.xbar_fhrx_pkt_cnt_link_9 = ecpriss_pdata_v2->xbar_ctx_v2->stats_v2.xbar_fhrx_pkt_cnt[9];
+	ecpriss_pdata_v2->fh_stats_usr.xbar.stats.xbar_fhtx_pkt_cnt_link_9 = ecpriss_pdata_v2->xbar_ctx_v2->stats_v2.xbar_fhtx_pkt_cnt[9];
+	ecpriss_pdata_v2->fh_stats_usr.xbar.stats.xbar_fhrx_pkt_cnt_link_10 = ecpriss_pdata_v2->xbar_ctx_v2->stats_v2.xbar_fhrx_pkt_cnt[10];
+	ecpriss_pdata_v2->fh_stats_usr.xbar.stats.xbar_fhtx_pkt_cnt_link_10 = ecpriss_pdata_v2->xbar_ctx_v2->stats_v2.xbar_fhtx_pkt_cnt[10];
+	ecpriss_pdata_v2->fh_stats_usr.xbar.stats.xbar_fhrx_pkt_cnt_link_11 = ecpriss_pdata_v2->xbar_ctx_v2->stats_v2.xbar_fhrx_pkt_cnt[11];
+	ecpriss_pdata_v2->fh_stats_usr.xbar.stats.xbar_fhtx_pkt_cnt_link_11 = ecpriss_pdata_v2->xbar_ctx_v2->stats_v2.xbar_fhtx_pkt_cnt[11];
+	ecpriss_pdata_v2->fh_stats_usr.xbar.stats.xbar_fhrx_dma_pkt_cnt = ecpriss_pdata_v2->xbar_ctx_v2->stats_v2.xbar_fhrx_dma_pkt_cnt;
+	ecpriss_pdata_v2->fh_stats_usr.xbar.stats.xbar_fhrx_uc_pkt_cnt = ecpriss_pdata_v2->xbar_ctx_v2->stats_v2.xbar_fhrx_uc_pkt_cnt;
+	ecpriss_pdata_v2->fh_stats_usr.xbar.stats.xbar_fhrx_uc_err_pkt_cnt = ecpriss_pdata_v2->xbar_ctx_v2->stats_v2.xbar_fhrx_uc_err_pkt_cnt;
+	ecpriss_pdata_v2->fh_stats_usr.xbar.stats.xbar_fhrx_err_pkt_cnt = ecpriss_pdata_v2->xbar_ctx_v2->stats_v2.xbar_fhrx_err_pkt_cnt;
+	ecpriss_pdata_v2->fh_stats_usr.xbar.stats.xbar_fhtx_c2c_pkt_ovf_cnt = ecpriss_pdata_v2->xbar_ctx_v2->stats_v2.xbar_fhtx_c2c_pkt_ovf_cnt;
+	ecpriss_pdata_v2->fh_stats_usr.xbar.stats.xbar_fhtx_dma_pkt_cnt = ecpriss_pdata_v2->xbar_ctx_v2->stats_v2.xbar_fhtx_dma_pkt_cnt;
+	ecpriss_pdata_v2->fh_stats_usr.xbar.stats.xbar_fhtx_uc_pkt_cnt = ecpriss_pdata_v2->xbar_ctx_v2->stats_v2.xbar_fhtx_uc_pkt_cnt;
+	ecpriss_pdata_v2->fh_stats_usr.xbar.stats.xbar_fhrx_c2c_pkt_cnt_fh0 = ecpriss_pdata_v2->xbar_ctx_v2->stats_v2.xbar_fhrx_c2c_pkt_cnt[0];
+	ecpriss_pdata_v2->fh_stats_usr.xbar.stats.xbar_fhrx_oc_pkt_cnt_fh0 = ecpriss_pdata_v2->xbar_ctx_v2->stats_v2.xbar_fhrx_oc_pkt_cnt[0];
+	ecpriss_pdata_v2->fh_stats_usr.xbar.stats.xbar_fhrx_c2c_pkt_cnt_fh1 = ecpriss_pdata_v2->xbar_ctx_v2->stats_v2.xbar_fhrx_c2c_pkt_cnt[1];
+	ecpriss_pdata_v2->fh_stats_usr.xbar.stats.xbar_fhrx_oc_pkt_cnt_fh1 = ecpriss_pdata_v2->xbar_ctx_v2->stats_v2.xbar_fhrx_oc_pkt_cnt[1];
+	ecpriss_pdata_v2->fh_stats_usr.xbar.stats.xbar_fhrx_c2c_pkt_cnt_fh2 = ecpriss_pdata_v2->xbar_ctx_v2->stats_v2.xbar_fhrx_c2c_pkt_cnt[2];
+	ecpriss_pdata_v2->fh_stats_usr.xbar.stats.xbar_fhrx_oc_pkt_cnt_fh2 = ecpriss_pdata_v2->xbar_ctx_v2->stats_v2.xbar_fhrx_oc_pkt_cnt[2];
+	ecpriss_pdata_v2->fh_stats_usr.xbar.stats.xbar_octx_c2c_pkt_drop_cnt = ecpriss_pdata_v2->xbar_ctx_v2->stats_v2.xbar_octx_c2c_pkt_drop_cnt;
+	ecpriss_pdata_v2->fh_stats_usr.xbar.stats.xbar_octx_fh_pkt_drop_cnt = ecpriss_pdata_v2->xbar_ctx_v2->stats_v2.xbar_octx_fh_pkt_drop_cnt;
+	ecpriss_pdata_v2->fh_stats_usr.xbar.stats.xbar_octx_c2c_len_err_cnt = ecpriss_pdata_v2->xbar_ctx_v2->stats_v2.xbar_octx_fh_len_err_cnt;
+	ecpriss_pdata_v2->fh_stats_usr.xbar.stats.xbar_octx_fh_len_err_cnt = ecpriss_pdata_v2->xbar_ctx_v2->stats_v2.xbar_octx_fh_len_err_cnt;
+	ecpriss_pdata_v2->fh_stats_usr.xbar.stats.xbar_octx_pkt_cnt_link0 = ecpriss_pdata_v2->xbar_ctx_v2->stats_v2.xbar_octx_pkt_cnt[0];
+	ecpriss_pdata_v2->fh_stats_usr.xbar.stats.xbar_ocrx_pkt_cnt_link0 = ecpriss_pdata_v2->xbar_ctx_v2->stats_v2.xbar_ocrx_pkt_cnt[0];
+	ecpriss_pdata_v2->fh_stats_usr.xbar.stats.xbar_octx_pkt_cnt_link1 = ecpriss_pdata_v2->xbar_ctx_v2->stats_v2.xbar_octx_pkt_cnt[1];
+	ecpriss_pdata_v2->fh_stats_usr.xbar.stats.xbar_ocrx_pkt_cnt_link1 = ecpriss_pdata_v2->xbar_ctx_v2->stats_v2.xbar_ocrx_pkt_cnt[1];
+	ecpriss_pdata_v2->fh_stats_usr.xbar.stats.xbar_octx_pkt_cnt_link2 = ecpriss_pdata_v2->xbar_ctx_v2->stats_v2.xbar_octx_pkt_cnt[2];
+	ecpriss_pdata_v2->fh_stats_usr.xbar.stats.xbar_ocrx_pkt_cnt_link2 = ecpriss_pdata_v2->xbar_ctx_v2->stats_v2.xbar_ocrx_pkt_cnt[2];
+	ecpriss_pdata_v2->fh_stats_usr.xbar.stats.xbar_octx_pkt_cnt_link3 = ecpriss_pdata_v2->xbar_ctx_v2->stats_v2.xbar_octx_pkt_cnt[3];
+	ecpriss_pdata_v2->fh_stats_usr.xbar.stats.xbar_ocrx_pkt_cnt_link3 = ecpriss_pdata_v2->xbar_ctx_v2->stats_v2.xbar_ocrx_pkt_cnt[3];
+	ecpriss_pdata_v2->fh_stats_usr.xbar.stats.xbar_ocrx_fh_pkt_cnt_link0 = ecpriss_pdata_v2->xbar_ctx_v2->stats_v2.xbar_ocrx_fh_pkt_cnt[0];
+	ecpriss_pdata_v2->fh_stats_usr.xbar.stats.xbar_ocrx_fh_pkt_cnt_link1 = ecpriss_pdata_v2->xbar_ctx_v2->stats_v2.xbar_ocrx_fh_pkt_cnt[1];
+	ecpriss_pdata_v2->fh_stats_usr.xbar.stats.xbar_ocrx_fh_pkt_cnt_link2 = ecpriss_pdata_v2->xbar_ctx_v2->stats_v2.xbar_ocrx_fh_pkt_cnt[2];
+	ecpriss_pdata_v2->fh_stats_usr.xbar.stats.xbar_ocrx_fh_pkt_cnt_link3 = ecpriss_pdata_v2->xbar_ctx_v2->stats_v2.xbar_ocrx_fh_pkt_cnt[3];
+	ecpriss_pdata_v2->fh_stats_usr.xbar.stats.xbar_ocrx_fh_pkt_cnt_link4 = ecpriss_pdata_v2->xbar_ctx_v2->stats_v2.xbar_ocrx_fh_pkt_cnt[4];
+	ecpriss_pdata_v2->fh_stats_usr.xbar.stats.xbar_ocrx_fh_pkt_cnt_link5 = ecpriss_pdata_v2->xbar_ctx_v2->stats_v2.xbar_ocrx_fh_pkt_cnt[5];
+	ecpriss_pdata_v2->fh_stats_usr.xbar.stats.xbar_ocrx_fh_pkt_cnt_link6 = ecpriss_pdata_v2->xbar_ctx_v2->stats_v2.xbar_ocrx_fh_pkt_cnt[6];
+	ecpriss_pdata_v2->fh_stats_usr.xbar.stats.xbar_ocrx_fh_pkt_cnt_link7 = ecpriss_pdata_v2->xbar_ctx_v2->stats_v2.xbar_ocrx_fh_pkt_cnt[7];
+	ecpriss_pdata_v2->fh_stats_usr.xbar.stats.xbar_ocrx_fh_pkt_cnt_link8 = ecpriss_pdata_v2->xbar_ctx_v2->stats_v2.xbar_ocrx_fh_pkt_cnt[8];
+	ecpriss_pdata_v2->fh_stats_usr.xbar.stats.xbar_ocrx_fh_pkt_cnt_link9 = ecpriss_pdata_v2->xbar_ctx_v2->stats_v2.xbar_ocrx_fh_pkt_cnt[9];
+	ecpriss_pdata_v2->fh_stats_usr.xbar.stats.xbar_ocrx_fh_pkt_cnt_link10 = ecpriss_pdata_v2->xbar_ctx_v2->stats_v2.xbar_ocrx_fh_pkt_cnt[10];
+	ecpriss_pdata_v2->fh_stats_usr.xbar.stats.xbar_ocrx_fh_pkt_cnt_link11 = ecpriss_pdata_v2->xbar_ctx_v2->stats_v2.xbar_ocrx_fh_pkt_cnt[11];
+	ecpriss_pdata_v2->fh_stats_usr.xbar.stats.xbar_ocrx_c2c_pkt_cnt_fh0 = ecpriss_pdata_v2->xbar_ctx_v2->stats_v2.xbar_ocrx_c2c_pkt_cnt[0];
+	ecpriss_pdata_v2->fh_stats_usr.xbar.stats.xbar_ocrx_c2c_pkt_cnt_fh1 = ecpriss_pdata_v2->xbar_ctx_v2->stats_v2.xbar_ocrx_c2c_pkt_cnt[1];
+	ecpriss_pdata_v2->fh_stats_usr.xbar.stats.xbar_ocrx_c2c_pkt_cnt_fh2 = ecpriss_pdata_v2->xbar_ctx_v2->stats_v2.xbar_ocrx_c2c_pkt_cnt[2];
+	ecpriss_pdata_v2->fh_stats_usr.xbar.stats.xbar_dbg_fhrx_unknown_pcid_cnt_fhrx_0_cnt = ecpriss_pdata_v2->xbar_ctx_v2->stats_v2.xbar_dbg_fhrx_unknown_pcid_cnt_fhrx_0_cnt;
+	ecpriss_pdata_v2->fh_stats_usr.xbar.stats.xbar_dbg_fhrx_unknown_pcid_cnt_fhrx_1_cnt = ecpriss_pdata_v2->xbar_ctx_v2->stats_v2.xbar_dbg_fhrx_unknown_pcid_cnt_fhrx_1_cnt;
+	ecpriss_pdata_v2->fh_stats_usr.xbar.stats.xbar_dbg_fhrx_unknown_pcid_cnt_fhrx_2_cnt = ecpriss_pdata_v2->xbar_ctx_v2->stats_v2.xbar_dbg_fhrx_unknown_pcid_cnt_fhrx_2_cnt;
+	ecpriss_pdata_v2->fh_stats_usr.xbar.stats.xbar_dbg_ocrx_unknown_pcid_cnt_ocrx_fh_0_cnt = ecpriss_pdata_v2->xbar_ctx_v2->stats_v2.xbar_dbg_ocrx_unknown_pcid_cnt_ocrx_fh_0_cnt;
+	ecpriss_pdata_v2->fh_stats_usr.xbar.stats.xbar_dbg_ocrx_unknown_pcid_cnt_ocrx_fh_1_cnt = ecpriss_pdata_v2->xbar_ctx_v2->stats_v2.xbar_dbg_ocrx_unknown_pcid_cnt_ocrx_fh_1_cnt;
+	ecpriss_pdata_v2->fh_stats_usr.xbar.stats.xbar_dbg_ocrx_unknown_pcid_cnt_ocrx_fh_2_cnt = ecpriss_pdata_v2->xbar_ctx_v2->stats_v2.xbar_dbg_ocrx_unknown_pcid_cnt_ocrx_fh_2_cnt;
+	ecpriss_pdata_v2->fh_stats_usr.xbar.stats.fhrx_unknown_pcid_info_1_n_fh0 = ecpriss_pdata_v2->xbar_ctx_v2->stats_v2.fhrx_unknown_pcid_info_1_n[0];
+	ecpriss_pdata_v2->fh_stats_usr.xbar.stats.fhrx_unknown_pcid_info_2_n_fh0 = ecpriss_pdata_v2->xbar_ctx_v2->stats_v2.fhrx_unknown_pcid_info_2_n[0];
+	ecpriss_pdata_v2->fh_stats_usr.xbar.stats.ocrx_unknown_pcid_info_1_n_fh0 = ecpriss_pdata_v2->xbar_ctx_v2->stats_v2.ocrx_unknown_pcid_info_1_n[0];
+	ecpriss_pdata_v2->fh_stats_usr.xbar.stats.ocrx_unknown_pcid_info_2_n_fh0 = ecpriss_pdata_v2->xbar_ctx_v2->stats_v2.ocrx_unknown_pcid_info_2_n[0];
+	ecpriss_pdata_v2->fh_stats_usr.xbar.stats.fhrx_unknown_pcid_info_1_n_fh1 = ecpriss_pdata_v2->xbar_ctx_v2->stats_v2.fhrx_unknown_pcid_info_1_n[1];
+	ecpriss_pdata_v2->fh_stats_usr.xbar.stats.fhrx_unknown_pcid_info_2_n_fh1 = ecpriss_pdata_v2->xbar_ctx_v2->stats_v2.fhrx_unknown_pcid_info_2_n[1];
+	ecpriss_pdata_v2->fh_stats_usr.xbar.stats.ocrx_unknown_pcid_info_1_n_fh1 = ecpriss_pdata_v2->xbar_ctx_v2->stats_v2.ocrx_unknown_pcid_info_1_n[1];
+	ecpriss_pdata_v2->fh_stats_usr.xbar.stats.ocrx_unknown_pcid_info_2_n_fh1 = ecpriss_pdata_v2->xbar_ctx_v2->stats_v2.ocrx_unknown_pcid_info_2_n[1];
+	ecpriss_pdata_v2->fh_stats_usr.xbar.stats.fhrx_unknown_pcid_info_1_n_fh2 = ecpriss_pdata_v2->xbar_ctx_v2->stats_v2.fhrx_unknown_pcid_info_1_n[2];
+	ecpriss_pdata_v2->fh_stats_usr.xbar.stats.fhrx_unknown_pcid_info_2_n_fh2 = ecpriss_pdata_v2->xbar_ctx_v2->stats_v2.fhrx_unknown_pcid_info_2_n[2];
+	ecpriss_pdata_v2->fh_stats_usr.xbar.stats.ocrx_unknown_pcid_info_1_n_fh2 = ecpriss_pdata_v2->xbar_ctx_v2->stats_v2.ocrx_unknown_pcid_info_1_n[2];
+	ecpriss_pdata_v2->fh_stats_usr.xbar.stats.ocrx_unknown_pcid_info_2_n_fh2 = ecpriss_pdata_v2->xbar_ctx_v2->stats_v2.ocrx_unknown_pcid_info_2_n[2];
 
+
+
+	return;
+}
 void ecpriss_xbar_stats_update_v2(void)
 {
 	uint32_t val=0;
@@ -1691,7 +1779,7 @@ void ecpriss_xbar_delete_pcid_entry(uint16_t *configured_pcids, uint16_t pcid_va
 }
 
 
-int ecpriss_xbar_fh_rx_lut_decfg_v2(uint32_t  port_index,
+int32_t ecpriss_xbar_fh_rx_lut_decfg_v2(uint32_t  port_index,
 		ecpriss_flow_rx_cfg_s *xbar_rx_cfg)
 {
 	int current_pcid_index;
