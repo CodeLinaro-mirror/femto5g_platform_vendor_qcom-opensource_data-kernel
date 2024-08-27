@@ -125,7 +125,7 @@ void mtip_ptp_resolve_queues(u32 link_index)
     if ((mode == MTIP_DEVICE_RU) || (mode == MTIP_DEVICE_DU)) 
     {
         // we should not run into this on V1
-        CSMLOGERR("resolve queues called for V1!");
+        CSMLOGPTP("resolve queues called for V1!");
     }
 
     // loop through pending skbs and find matching timestamps
@@ -134,7 +134,7 @@ void mtip_ptp_resolve_queues(u32 link_index)
         skb_list_size = mtip_ptp_tx_ts_skb_list_size(link_index);
         ts_list_size = mtip_ptp_tx_ts_list_size(link_index);
 
-        CSMLOGDBG("PTP resolving queues: skbs: %d, ts: %d", skb_list_size, ts_list_size);
+        CSMLOGPTP("PTP resolving queues: skbs: %d, ts: %d", skb_list_size, ts_list_size);
 
         // pop the top skb
         mtip_ptp_tx_ts_skb_list_pop(link_index, &skb, &pkt_ts_seq_num);
@@ -154,7 +154,7 @@ void mtip_ptp_resolve_queues(u32 link_index)
         }
         else
         {
-            CSMLOGERR("detected skb loss pkt seq num: %d, ts seq num: %d", pkt_ts_seq_num, read_ts_seq_num);
+            CSMLOGPTP("detected skb loss pkt seq num: %d, ts seq num: %d", pkt_ts_seq_num, read_ts_seq_num);
 
             // set the timestamp of the skb to 0
             // this will be ignored by the app
@@ -162,7 +162,7 @@ void mtip_ptp_resolve_queues(u32 link_index)
         }
 
         // free the skb
-        CSMLOGDBG("freeing skb: len: %d\n", skb->len);
+        CSMLOGPTP("freeing skb: len: %d\n", skb->len);
 
         dev_kfree_skb(skb);
         skb = NULL;
@@ -578,7 +578,7 @@ void mtip_ptp_set_rx_timestamp(struct sk_buff* skb, u32 timestamp_secs, u32 time
     shhwtstamp = skb_hwtstamps(skb);
     memset(shhwtstamp, 0, sizeof(struct skb_shared_hwtstamps));
 
-    CSMLOGDBG("Read rx nanosecs %ld\n", nanosecs);
+    CSMLOGPTP("Read rx nanosecs %ld\n", nanosecs);
 
     shhwtstamp->hwtstamp = ns_to_ktime(nanosecs);
 }
@@ -588,7 +588,7 @@ void mtip_ptp_set_tx_timestamp(struct sk_buff* skb, u32 timestamp_secs, u32 time
     struct skb_shared_hwtstamps shhwtstamp;
     u64 nanosecs = ((u64)timestamp_secs)*NSEC_PER_SEC + (u64)timestamp_nsecs;
 
-    CSMLOGDBG("Read tx nanosecs %ld\n", nanosecs);
+    CSMLOGPTP("Read tx nanosecs %ld\n", nanosecs);
 
     memset(&shhwtstamp, 0, sizeof(struct skb_shared_hwtstamps));
     shhwtstamp.hwtstamp = ns_to_ktime(nanosecs);

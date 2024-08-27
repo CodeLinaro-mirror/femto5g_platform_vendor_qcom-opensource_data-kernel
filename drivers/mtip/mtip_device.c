@@ -289,7 +289,7 @@ void mtip_process_tx_comp_cb(ecpri_dma_eth_conn_hdl_t hdl, struct mtip_dma_tx_co
       // check if this skb needs HW timestamping
       if ((skb_shinfo(skb)->tx_flags & SKBTX_IN_PROGRESS)  != 0)
       {
-          CSMLOGDBG("Tx comp cb for packet needing HW_TSTAMP\n");
+          CSMLOGPTP("Tx comp cb for packet needing HW_TSTAMP\n");
 
           // this packet should have the packet TS info in pre-header
           // read the pkt_ts_seq_num from the pre-header (Already done above)
@@ -991,7 +991,7 @@ static int mtip_start_xmit(struct sk_buff *skb, struct net_device *netdev)
    // check if this packet needs timestamping
    if ((skb_shinfo(skb)->tx_flags & SKBTX_HW_TSTAMP) != 0)
    {
-       CSMLOGDBG("Tx packet needing HW_TSTAMP skb->data: 0x%lx\n", (unsigned long)skb->data);
+       CSMLOGPTP("Tx packet needing HW_TSTAMP skb->data: 0x%lx\n", (unsigned long)skb->data);
        // check if we need to send sequence number
        if ((mode == MTIP_DEVICE_RUv2) || (mode == MTIP_DEVICE_DUv2)) 
        {
@@ -1009,7 +1009,6 @@ static int mtip_start_xmit(struct sk_buff *skb, struct net_device *netdev)
            mtip_ptp_tx_ts_lock_acquire(link_index);
            while(mtip_ptp_tx_ts_skb_list_size(link_index)!=0)
            {
-               //CSMLOGPTP("ptdebug1\n");
                mtip_ptp_tx_ts_skb_list_pop(link_index, &tmp_skb, &skb_ts_seq_num);
                mtip_ptp_set_tx_timestamp(tmp_skb, 0, 0);
                dev_kfree_skb(tmp_skb);
@@ -1021,14 +1020,11 @@ static int mtip_start_xmit(struct sk_buff *skb, struct net_device *netdev)
                mtip_ptp_tx_ts_list_pop(link_index, &timestamp_secs, &timestamp_nsecs, &tmp_ts_seq_num);
                CSMLOGPTP("Flushing pending tx_ts_list\n");
 	   }
-           //CSMLOGPTP("ptdebug3\n");
            mtip_mac_read_timestamp(link_index, &timestamp_secs, &timestamp_nsecs);
-           //CSMLOGPTP("ptdebug4\n");
            mtip_mac_read_tx_ts_stat_reg(link_index,&tx_ts_stat);
            CSMLOGPTP("timestamp_nsecs=%d,tx_ts_stat=%x\n",timestamp_nsecs,tx_ts_stat);
            while(tx_ts_stat!=2)
            {
-               //CSMLOGPTP("ptdebug6\n");
                if ((mode == MTIP_DEVICE_RUv2) || (mode == MTIP_DEVICE_DUv2))
                {
                    mtip_mac_read_ts_seq_num(link_index, &tmp_ts_seq_num);
