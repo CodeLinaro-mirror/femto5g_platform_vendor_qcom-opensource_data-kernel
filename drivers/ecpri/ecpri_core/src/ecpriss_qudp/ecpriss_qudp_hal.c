@@ -4323,6 +4323,10 @@ static void ecpriss_qudp_hal_reg_construct_non_ecpri_dma_ring_info_port_p_entry_
 			HWIO_ECPRI_UDP_FH_NON_ECPRI_DMA_RING_INFO_PORT_p_LINK_n_RING_ID_SHFT_V2,
 			HWIO_ECPRI_UDP_FH_NON_ECPRI_DMA_RING_INFO_PORT_p_LINK_n_RING_ID_BMSK_V2);
 
+	ECPRISS_HAL_SETFIELD_IN_REG(*val,
+			fh_non_ecpri_dma_ring_info->gsi_id,
+			HWIO_ECPRI_UDP_FH_NON_ECPRI_DMA_RING_INFO_PORT_p_LINK_n_GSI_ID_SHFT_V2,
+			HWIO_ECPRI_UDP_FH_NON_ECPRI_DMA_RING_INFO_PORT_p_LINK_n_GSI_ID_BMSK_V2);
 	return;
 
 }
