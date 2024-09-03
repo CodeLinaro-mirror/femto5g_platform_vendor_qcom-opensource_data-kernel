@@ -1001,6 +1001,79 @@ void ecpriss_qudp_fh_ingress_stats_update(uint32_t port_index, uint32_t link_ind
 
 	return;
 }
+void ecpriss_fh_qudp_stats_update_usr(void)
+{
+	uint32_t port_index = 0;
+	uint32_t link_index = 0;
+	ecpriss_Qudp_Stats *stats  = NULL;
+
+	for(port_index = 0; port_index < ECPRISS_PORT_MAX; port_index++){
+		for(link_index =0; link_index < ECPRISS_MAX_LINKS ; link_index++){
+			if(port_index == ECPRISS_PORT_0){
+				if(link_index == 0){
+
+					stats = &ecpriss_pdata_v2->fh_stats_usr.qudp.fh_0.link_0.stats;
+				}else if(link_index == 1){
+
+					stats = &ecpriss_pdata_v2->fh_stats_usr.qudp.fh_0.link_1.stats;
+				}else if(link_index == 2){
+
+					stats = &ecpriss_pdata_v2->fh_stats_usr.qudp.fh_0.link_2.stats;
+				}else if(link_index == 3){
+
+					stats = &ecpriss_pdata_v2->fh_stats_usr.qudp.fh_0.link_3.stats;
+				}
+			}else if(port_index == ECPRISS_PORT_1){
+				if(link_index == 0){
+
+					stats = &ecpriss_pdata_v2->fh_stats_usr.qudp.fh_1.link_0.stats;
+				}else if(link_index == 1){
+
+					stats = &ecpriss_pdata_v2->fh_stats_usr.qudp.fh_1.link_1.stats;
+				}else if(link_index == 2){
+
+					stats = &ecpriss_pdata_v2->fh_stats_usr.qudp.fh_1.link_2.stats;
+				}else if(link_index == 3){
+
+					stats = &ecpriss_pdata_v2->fh_stats_usr.qudp.fh_1.link_3.stats;
+				}
+			}else if(port_index == ECPRISS_PORT_2){
+				if(link_index == 0){
+
+					stats = &ecpriss_pdata_v2->fh_stats_usr.qudp.fh_2.link_0.stats;
+				}else if(link_index == 1){
+
+					stats = &ecpriss_pdata_v2->fh_stats_usr.qudp.fh_2.link_1.stats;
+				}else if(link_index == 2){
+
+					stats = &ecpriss_pdata_v2->fh_stats_usr.qudp.fh_2.link_2.stats;
+				}else if(link_index == 3){
+
+					stats = &ecpriss_pdata_v2->fh_stats_usr.qudp.fh_2.link_3.stats;
+				}
+			}
+			stats->egress_num_udp_packets = ecpriss_pdata_v2->qudp_ctx_v2->fh_port_cfg_v2[port_index].stats_v2.egress_num_udp_packets[link_index];
+			stats->egress_num_eth_packets = ecpriss_pdata_v2->qudp_ctx_v2->fh_port_cfg_v2[port_index].stats_v2.egress_num_eth_packets[link_index];
+			stats->egress_num_bypassed_packets = ecpriss_pdata_v2->qudp_ctx_v2->fh_port_cfg_v2[port_index].stats_v2.egress_num_bypassed_packets[link_index];
+			stats->egress_num_mtu_err_packets = ecpriss_pdata_v2->qudp_ctx_v2->fh_port_cfg_v2[port_index].stats_v2.egress_num_mtu_err_packets[link_index];
+			stats->ingress_num_eth_udp_packets = ecpriss_pdata_v2->qudp_ctx_v2->fh_port_cfg_v2[port_index].stats_v2.ingress_num_eth_udp_packets[link_index];
+			stats->ingress_num_fcs_err_packets = ecpriss_pdata_v2->qudp_ctx_v2->fh_port_cfg_v2[port_index].stats_v2.ingress_num_fcs_err_packets[link_index];
+			stats->ingress_num_ipv4_cs_err_packets = ecpriss_pdata_v2->qudp_ctx_v2->fh_port_cfg_v2[port_index].stats_v2.ingress_num_ipv4_cs_err_packets[link_index];
+			stats->ingress_num_udp_cs_err_packets =	ecpriss_pdata_v2->qudp_ctx_v2->fh_port_cfg_v2[port_index].stats_v2.ingress_num_udp_cs_err_packets[link_index];
+			stats->ingress_ip_filtered_packets = ecpriss_pdata_v2->qudp_ctx_v2->fh_port_cfg_v2[port_index].stats_v2.ingress_ip_filtered_packets[link_index];
+			stats->ingress_num_vlan_filtered_packets = ecpriss_pdata_v2->qudp_ctx_v2->fh_port_cfg_v2[port_index].stats_v2.ingress_num_vlan_filtered_packets[link_index];
+			stats->ingress_num_sec_err_packets = ecpriss_pdata_v2->qudp_ctx_v2->fh_port_cfg_v2[port_index].stats_v2.ingress_num_sec_err_packets[link_index];
+			stats->ingress_ip_len_err_packets = ecpriss_pdata_v2->qudp_ctx_v2->fh_port_cfg_v2[port_index].stats_v2.ingress_ip_len_err_packets[link_index];
+			stats->ingress_num_eth_ecpri_packets = ecpriss_pdata_v2->qudp_ctx_v2->fh_port_cfg_v2[port_index].stats_v2.ingress_num_eth_ecpri_packets[link_index];
+			stats->ingress_num_eth_ptp_packets = ecpriss_pdata_v2->qudp_ctx_v2->fh_port_cfg_v2[port_index].stats_v2.ingress_num_eth_ptp_packets[link_index];
+			stats->ingress_num_eth_other_packets = ecpriss_pdata_v2->qudp_ctx_v2->fh_port_cfg_v2[port_index].stats_v2.ingress_num_eth_other_packets[link_index];
+			stats->ingress_num_udp_ecpri_or_nfapi_packets = ecpriss_pdata_v2->qudp_ctx_v2->fh_port_cfg_v2[port_index].stats_v2.ingress_num_udp_ecpri_or_nfapi_packets[link_index];
+			stats->ingress_num_udp_ptp_packets = ecpriss_pdata_v2->qudp_ctx_v2->fh_port_cfg_v2[port_index].stats_v2.ingress_num_udp_ptp_packets[link_index];
+			stats->ingress_num_udp_other_packets = ecpriss_pdata_v2->qudp_ctx_v2->fh_port_cfg_v2[port_index].stats_v2.ingress_num_udp_other_packets[link_index];
+		}
+	}
+	return;
+}
 
 void ecpriss_qudp_fh_ingress_stats_update_v2(uint32_t port_index, uint32_t link_index)
 {
@@ -4398,7 +4471,7 @@ static bool ecpriss_qudp_fh_rx_remove_ip_filter_cfg_v2(uint32_t port_index, ecpr
 
 	if(qudp_ingress_port->num_ip_fltr_entries <= 0){
 		ECPRILOGINFO("Cannot Remove IP filter, No filter exist\n");
-		return false;
+		return true;
 	}
 
 	dst_ip0.value = ((rx_cfg->ip_dst_addr[3]) | (rx_cfg->ip_dst_addr[2] << 8) | (rx_cfg->ip_dst_addr[1] << 16)
@@ -4507,7 +4580,7 @@ static bool ecpriss_qudp_fh_rx_remove_vlan_filter_cfg_v2(uint32_t port_index, ec
 	{
 		if(qudp_ingress_port->num_vlan_fltr_entries <= 0){
 			ECPRILOGINFO("Cannot remove VLAN filter, No filter exist\n");
-			return false;
+			return true;
 		}
 
 		/*
@@ -4583,7 +4656,7 @@ static bool ecpriss_qudp_fh_rx_remove_udp_filter_cfg_v2(uint32_t port_index, ecp
 
 		if(qudp_ingress_port->num_udp_fltr_entries <= 0){
 			ECPRILOGINFO("Cannot remove UDP_CLASSIFICATION filter, No filter exist\n");
-			return false;
+			return true;
 		}
 
 		/*
@@ -4631,9 +4704,9 @@ static bool ecpriss_qudp_fh_rx_remove_udp_filter_cfg_v2(uint32_t port_index, ecp
 	return true;
 }
 
-int ecpriss_qudp_fh_rx_filter_decfg_v2(uint32_t port_index, ecpriss_qudp_rx_cfg_s *rx_cfg)
+int32_t ecpriss_qudp_fh_rx_filter_decfg_v2(uint32_t port_index, ecpriss_qudp_rx_cfg_s *rx_cfg)
 {
-	bool ret = false;
+	int32_t ret = 0;
 
 	if(port_index < 0 || port_index > ECPRISS_PORT_MAX) {
 		ECPRILOGERR("Invalid Port_index\n");
@@ -4643,19 +4716,22 @@ int ecpriss_qudp_fh_rx_filter_decfg_v2(uint32_t port_index, ecpriss_qudp_rx_cfg_
 	ret = ecpriss_qudp_fh_rx_remove_ip_filter_cfg_v2(port_index, rx_cfg);
 	if(ret == false){
 		ECPRILOGERR("IP filter de-Config failed \n");
+		ret = -1;
 	}
 
 	ret = ecpriss_qudp_fh_rx_remove_vlan_filter_cfg_v2(port_index, rx_cfg);
 	if(ret == false){
 		ECPRILOGERR("Vlan filter de-config failed \n");
+		ret = -1;
 	}
 
 	ret = ecpriss_qudp_fh_rx_remove_udp_filter_cfg_v2(port_index, rx_cfg);
 	if(ret == false){
 		ECPRILOGERR("UDP filter de-config failed \n");
+		ret = -1;
 	}
 
-	return 0;
+	return ret;
 }
 
 
@@ -5460,7 +5536,7 @@ void ecpriss_qudp_set_nr_mac_filter_info(void)
 	}
 }
 
-void ecpriss_qudp_set_lte_mac_filter(ecpriss_packet_payload_s *packet)
+int32_t ecpriss_qudp_set_lte_mac_filter(ecpriss_packet_payload_s *packet)
 {
 	int index = -1;
 	int fh_index = -1;
@@ -5473,10 +5549,10 @@ void ecpriss_qudp_set_lte_mac_filter(ecpriss_packet_payload_s *packet)
 	mac_info = &packet->flow_cfg.mac_cfg;
 
 	if(mac_info == NULL)
-		return;
+		return -1;
 
 	if(ecpriss_pdata_v2->qudp_ctx_v2->lte_fh_enabled == 0)
-		return;
+		return -1;
 
 
 	for(fh_index = 0; fh_index < NUM_OF_FHP; fh_index++){
@@ -5524,7 +5600,7 @@ void ecpriss_qudp_set_lte_mac_filter(ecpriss_packet_payload_s *packet)
 		}
 
 	}
-
+	return 0;
 }
 
 void ecpriss_qudp_set_nr_mac_filter(void)
@@ -5629,7 +5705,7 @@ void ecpriss_qudp_set_nr_mac_filter(void)
 	}while (0);
 }
 
-int ecpriss_qudp_fh_tx_hdr_ins_cfg_v2(uint32_t               port_index,
+int32_t ecpriss_qudp_fh_tx_hdr_ins_cfg_v2(uint32_t               port_index,
 		ecpriss_qudp_tx_cfg_s *tx_cfg,
 		ecpriss_transp_type tp_type)
 {
@@ -6332,13 +6408,13 @@ void ecpriss_qudp_print_c2c_ingress_stats(uint32_t port_index, uint32_t link_ind
 	return;
 }
 #endif
-void ecpriss_qudp_ingress_table_config(ecpriss_packet_payload_s *packet)
+int32_t ecpriss_qudp_ingress_table_config(ecpriss_packet_payload_s *packet)
 {
 	ecpriss_flow_rx_cfg_s *flow_rx = NULL;
 	int ret = 0;
 
 	if(packet == NULL) {
-		return;
+		return -1;
 	}
 	if(ecpriss_hw_ver == ECPRISS_HW_v2_0) {
 		flow_rx = &packet->flow_cfg.flow_rx_cfg;
@@ -6349,15 +6425,15 @@ void ecpriss_qudp_ingress_table_config(ecpriss_packet_payload_s *packet)
 			ECPRILOGERR("%s: QUDP filter configuration failed Port: %d\n",__func__,flow_rx->port_index);
 		}
 	}
-	return;
+	return ret;
 }
-void ecpriss_qudp_ingress_table_deconfig(ecpriss_packet_payload_s *packet)
+int32_t ecpriss_qudp_ingress_table_deconfig(ecpriss_packet_payload_s *packet)
 {
 	ecpriss_flow_rx_cfg_s *flow_rx = NULL;
 	int ret = 0;
 
 	if(packet == NULL) {
-		return;
+		return -1;
 	}
 	if(ecpriss_hw_ver == ECPRISS_HW_v2_0) {
 		flow_rx = &packet->flow_cfg.flow_rx_cfg;
@@ -6369,9 +6445,9 @@ void ecpriss_qudp_ingress_table_deconfig(ecpriss_packet_payload_s *packet)
 			ECPRILOGERR("%s: QUDP filter de-configuration failed Port: %d\n",__func__,flow_rx->port_index);
 		}
 	}
-	return;
+	return ret;
 }
-void ecpriss_qudp_egress_l2_table_reconfig(ecpriss_packet_payload_s *packet)
+int32_t ecpriss_qudp_egress_l2_table_reconfig(ecpriss_packet_payload_s *packet)
 {
 	ecpri_qudp_hwio_def_ecpri_udp_fh_egress_l2_encap_index_override_p_s_v2 l2_cfg;
 	ecpri_qudp_hwio_def_ecpri_udp_fh_egress_config_p_s_v2 egress_config;
@@ -6380,12 +6456,12 @@ void ecpriss_qudp_egress_l2_table_reconfig(ecpriss_packet_payload_s *packet)
 	int ret = 0;
 
 	if(packet == NULL) {
-		return;
+		return -1;
 	}
 
 	if(ecpriss_hw_ver != ECPRISS_HW_v2_0) {
 		ECPRILOGERR("Not a V2 Hw %s\n",__func__);
-		return;
+		return -1;
 	}
 
 	flow_tx = &packet->flow_cfg.flow_tx_cfg;
@@ -6493,10 +6569,10 @@ void ecpriss_qudp_egress_l2_table_reconfig(ecpriss_packet_payload_s *packet)
 			flow_tx->port_index,
 			&flow_tx->qudp_tx_cfg,
 			ECPRISS_L2_TRANSP);
-
+	return ret;
 }
 
-void ecpriss_qudp_egress_l3_table_reconfig(ecpriss_packet_payload_s *packet)
+int32_t ecpriss_qudp_egress_l3_table_reconfig(ecpriss_packet_payload_s *packet)
 {
 	ecpri_qudp_hwio_def_ecpri_udp_fh_egress_l3_encap_index_override_p_s_v2 l3_cfg;
 	ecpri_qudp_hwio_def_ecpri_udp_fh_egress_config_p_s_v2 egress_config;
@@ -6505,12 +6581,12 @@ void ecpriss_qudp_egress_l3_table_reconfig(ecpriss_packet_payload_s *packet)
 	int ret = 0;
 
 	if(packet == NULL) {
-		return;
+		return -1;
 	}
 
 	if(ecpriss_hw_ver != ECPRISS_HW_v2_0) {
 		ECPRILOGERR("Not a V2 Hw %s\n",__func__);
-		return;
+		return -1;
 	}
 
 	flow_tx = &packet->flow_cfg.flow_tx_cfg;
@@ -6638,10 +6714,10 @@ void ecpriss_qudp_egress_l3_table_reconfig(ecpriss_packet_payload_s *packet)
 			&flow_tx->qudp_tx_cfg,
 			ECPRISS_L3_TRANSP);
 
-
+	return ret;
 }
 
-void ecpriss_qudp_egress_l2_l3_table_reconfig(ecpriss_packet_payload_s *packet)
+int32_t ecpriss_qudp_egress_l2_l3_table_reconfig(ecpriss_packet_payload_s *packet)
 {
 	ecpri_qudp_hwio_def_ecpri_udp_fh_egress_l2_encap_index_override_p_s_v2 l2_cfg;
 	ecpri_qudp_hwio_def_ecpri_udp_fh_egress_l3_encap_index_override_p_s_v2 l3_cfg;
@@ -6651,12 +6727,12 @@ void ecpriss_qudp_egress_l2_l3_table_reconfig(ecpriss_packet_payload_s *packet)
 	int ret = 0;
 
 	if(packet == NULL) {
-		return;
+		return -1;
 	}
 
 	if(ecpriss_hw_ver != ECPRISS_HW_v2_0) {
 		ECPRILOGERR("Not a V2 Hw %s\n",__func__);
-		return;
+		return -1;
 	}
 
 	flow_tx = &packet->flow_cfg.flow_tx_cfg;
@@ -6799,6 +6875,6 @@ void ecpriss_qudp_egress_l2_l3_table_reconfig(ecpriss_packet_payload_s *packet)
 			&flow_tx->qudp_tx_cfg,
 			ECPRISS_L2_L3_TRANSP);
 
-
+	return ret;
 }
 
