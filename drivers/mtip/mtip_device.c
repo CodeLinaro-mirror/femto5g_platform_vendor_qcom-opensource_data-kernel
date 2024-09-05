@@ -795,7 +795,7 @@ int mtip_napi_poll(struct napi_struct *napi_ptr, int budget)
 
    // read the packets and push into the stack
    rv = mtip_dma_poll_rx_packets(dev, napi_ptr, hdl, budget, &npackets, &num_buffers);
-   priv->rx_polled_count += npackets;
+   priv->rx_polled_count += num_buffers;
    // HANDLE THE ERROR
    if (rv < 0)
    {
