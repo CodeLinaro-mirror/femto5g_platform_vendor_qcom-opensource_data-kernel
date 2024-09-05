@@ -66,6 +66,8 @@ char tmp_buff[MAX_PROC_SIZE];
 #define PHY_LOOPBACK_100 0x6100
 #define PHY_LOOPBACK_10 0x4100
 
+#define DYNAMIC_FILTER_BIT 4
+
 static UCHAR dev_addr[ETH_ALEN] = {0, 0x55, 0x7b, 0xb5, 0x7d, 0xf7};
 struct DWC_ETH_QOS_res_data dwc_eth_qos_res_data = {0, };
 static struct msm_bus_scale_pdata *emac_bus_scale_vec = NULL;
@@ -528,11 +530,15 @@ static void setup_config_registers(struct DWC_ETH_QOS_prv_data *pdata,
 
 	if (mode > DISABLE_LOOPBACK && pdata->ipa_enabled) {
 		MTL_RQDCM0R_RGRD(reg_val);
+		//disable dynamic filtering
+		reg_val &= ~(1 << DYNAMIC_FILTER_BIT);
 		reg_val |= IPA_RX_TO_DMA_CH_MAP_NUM;
 		MTL_RQDCM0R_RGWR(reg_val);
 		EMACINFO("Mapped queue 0 to channel 1\n");
 	} else {
 		MTL_RQDCM0R_RGRD(reg_val);
+		//enable dynamic filtering
+		reg_val |= (1 << DYNAMIC_FILTER_BIT);
 		reg_val &= ~IPA_RX_TO_DMA_CH_MAP_NUM;
 		MTL_RQDCM0R_RGWR(reg_val);
 		EMACINFO("Mapped queue 0 to channel 0\n");
