@@ -119,6 +119,9 @@ static int mtip_platform_setup_link(unsigned int port_device_index, unsigned int
                &mtip_phy_retry_timer_cb, 0);
    platform_driver_priv->mtip_links[link_index]->phy_retry_timer_valid = true;
 
+   timer_setup(&platform_driver_priv->mtip_links[link_index]->rx_replenish_retry_timer,
+               &mtip_rx_replenish_retry_timer_cb, 0);
+
    if(link_index != MTIP_DEBUG_ETH_LINK_INDEX){
       // connect to the dma pipe
       rv = mtip_connect_dma_pipe(link_index, &hdl);
@@ -296,6 +299,8 @@ static int mtip_platform_cleanup_link(unsigned int link_index)
 
       platform_driver_priv->mtip_links[link_index]->phy_retry_timer_valid = false;
       del_timer_sync(&platform_driver_priv->mtip_links[link_index]->phy_retry_timer);
+
+      del_timer_sync(&platform_driver_priv->mtip_links[link_index]->rx_replenish_retry_timer);
    }
    return 0;
 }
