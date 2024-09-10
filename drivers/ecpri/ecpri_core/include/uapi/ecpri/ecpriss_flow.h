@@ -350,4 +350,140 @@ typedef enum ecpriss_transp_type_e{
 	ECPRISS_INVALID_TRANSP
 }ecpriss_transp_type;
 
+typedef struct {
+
+	uint64_t xbar_fhrx_pkt_cnt_link_0;
+	uint64_t xbar_fhtx_pkt_cnt_link_0;
+	uint64_t xbar_fhrx_pkt_cnt_link_1;
+	uint64_t xbar_fhtx_pkt_cnt_link_1;
+	uint64_t xbar_fhrx_pkt_cnt_link_2;
+	uint64_t xbar_fhtx_pkt_cnt_link_2;
+	uint64_t xbar_fhrx_pkt_cnt_link_3;
+	uint64_t xbar_fhtx_pkt_cnt_link_3;
+	uint64_t xbar_fhrx_pkt_cnt_link_4;
+	uint64_t xbar_fhtx_pkt_cnt_link_4;
+	uint64_t xbar_fhrx_pkt_cnt_link_5;
+	uint64_t xbar_fhtx_pkt_cnt_link_5;
+	uint64_t xbar_fhrx_pkt_cnt_link_6;
+	uint64_t xbar_fhtx_pkt_cnt_link_6;
+	uint64_t xbar_fhrx_pkt_cnt_link_7;
+	uint64_t xbar_fhtx_pkt_cnt_link_7;
+	uint64_t xbar_fhrx_pkt_cnt_link_8;
+	uint64_t xbar_fhtx_pkt_cnt_link_8;
+	uint64_t xbar_fhrx_pkt_cnt_link_9;
+	uint64_t xbar_fhtx_pkt_cnt_link_9;
+	uint64_t xbar_fhrx_pkt_cnt_link_10;
+	uint64_t xbar_fhtx_pkt_cnt_link_10;
+	uint64_t xbar_fhrx_pkt_cnt_link_11;
+	uint64_t xbar_fhtx_pkt_cnt_link_11;
+	uint64_t xbar_fhrx_dma_pkt_cnt;
+	uint64_t xbar_fhrx_uc_pkt_cnt;
+	uint64_t xbar_fhrx_uc_err_pkt_cnt;
+	uint64_t xbar_fhrx_err_pkt_cnt;
+	uint64_t xbar_fhtx_c2c_pkt_ovf_cnt;
+	uint64_t xbar_fhtx_dma_pkt_cnt;
+	uint64_t xbar_fhtx_uc_pkt_cnt;
+	uint64_t xbar_fhrx_c2c_pkt_cnt_fh0;
+	uint64_t xbar_fhrx_oc_pkt_cnt_fh0;
+	uint64_t xbar_fhrx_c2c_pkt_cnt_fh1;
+	uint64_t xbar_fhrx_oc_pkt_cnt_fh1;
+	uint64_t xbar_fhrx_c2c_pkt_cnt_fh2;
+	uint64_t xbar_fhrx_oc_pkt_cnt_fh2;
+	uint64_t xbar_octx_c2c_pkt_drop_cnt;
+	uint64_t xbar_octx_fh_pkt_drop_cnt;
+	uint64_t xbar_octx_c2c_len_err_cnt;
+	uint64_t xbar_octx_fh_len_err_cnt;
+	uint64_t xbar_octx_pkt_cnt_link0;
+	uint64_t xbar_ocrx_pkt_cnt_link0;
+	uint64_t xbar_octx_pkt_cnt_link1;
+	uint64_t xbar_ocrx_pkt_cnt_link1;
+	uint64_t xbar_octx_pkt_cnt_link2;
+	uint64_t xbar_ocrx_pkt_cnt_link2;
+	uint64_t xbar_octx_pkt_cnt_link3;
+	uint64_t xbar_ocrx_pkt_cnt_link3;
+	uint64_t xbar_ocrx_fh_pkt_cnt_link0;
+	uint64_t xbar_ocrx_fh_pkt_cnt_link1;
+	uint64_t xbar_ocrx_fh_pkt_cnt_link2;
+	uint64_t xbar_ocrx_fh_pkt_cnt_link3;
+	uint64_t xbar_ocrx_fh_pkt_cnt_link4;
+	uint64_t xbar_ocrx_fh_pkt_cnt_link5;
+	uint64_t xbar_ocrx_fh_pkt_cnt_link6;
+	uint64_t xbar_ocrx_fh_pkt_cnt_link7;
+	uint64_t xbar_ocrx_fh_pkt_cnt_link8;
+	uint64_t xbar_ocrx_fh_pkt_cnt_link9;
+	uint64_t xbar_ocrx_fh_pkt_cnt_link10;
+	uint64_t xbar_ocrx_fh_pkt_cnt_link11;
+	uint64_t xbar_ocrx_c2c_pkt_cnt_fh0;
+	uint64_t xbar_ocrx_c2c_pkt_cnt_fh1;
+	uint64_t xbar_ocrx_c2c_pkt_cnt_fh2;
+	uint64_t xbar_dbg_fhrx_unknown_pcid_cnt_fhrx_0_cnt;
+	uint64_t xbar_dbg_fhrx_unknown_pcid_cnt_fhrx_1_cnt;
+	uint64_t xbar_dbg_fhrx_unknown_pcid_cnt_fhrx_2_cnt;
+	uint64_t xbar_dbg_ocrx_unknown_pcid_cnt_ocrx_fh_0_cnt;
+	uint64_t xbar_dbg_ocrx_unknown_pcid_cnt_ocrx_fh_1_cnt;
+	uint64_t xbar_dbg_ocrx_unknown_pcid_cnt_ocrx_fh_2_cnt;
+	uint64_t fhrx_unknown_pcid_info_1_n_fh0;
+	uint64_t fhrx_unknown_pcid_info_2_n_fh0;
+	uint64_t ocrx_unknown_pcid_info_1_n_fh0;
+	uint64_t ocrx_unknown_pcid_info_2_n_fh0;
+	uint64_t fhrx_unknown_pcid_info_1_n_fh1;
+	uint64_t fhrx_unknown_pcid_info_2_n_fh1;
+	uint64_t ocrx_unknown_pcid_info_1_n_fh1;
+	uint64_t ocrx_unknown_pcid_info_2_n_fh1;
+	uint64_t fhrx_unknown_pcid_info_1_n_fh2;
+	uint64_t fhrx_unknown_pcid_info_2_n_fh2;
+	uint64_t ocrx_unknown_pcid_info_1_n_fh2;
+	uint64_t ocrx_unknown_pcid_info_2_n_fh2;
+
+} ecpriss_Xbar_Stats;
+
+typedef struct {
+
+	uint64_t egress_num_udp_packets;
+	uint64_t egress_num_eth_packets;
+	uint64_t egress_num_bypassed_packets;
+	uint64_t egress_num_mtu_err_packets;
+	uint64_t ingress_num_eth_udp_packets;
+	uint64_t ingress_num_fcs_err_packets;
+	uint64_t ingress_num_ipv4_cs_err_packets;
+	uint64_t ingress_num_udp_cs_err_packets;
+	uint64_t ingress_ip_filtered_packets;
+	uint64_t ingress_num_vlan_filtered_packets;
+	uint64_t ingress_num_sec_err_packets;
+	uint64_t ingress_ip_len_err_packets;
+	uint64_t ingress_num_eth_ecpri_packets;
+	uint64_t ingress_num_eth_ptp_packets;
+	uint64_t ingress_num_eth_other_packets;
+	uint64_t ingress_num_udp_ecpri_or_nfapi_packets;
+	uint64_t ingress_num_udp_ptp_packets;
+	uint64_t ingress_num_udp_other_packets;
+
+} ecpriss_Qudp_Stats;
+
+typedef struct {
+	ecpriss_Qudp_Stats stats;
+}  __attribute__((packed))ecpriss_Link;
+
+typedef struct {
+	ecpriss_Link link_0;
+	ecpriss_Link link_1;
+	ecpriss_Link link_2;
+	ecpriss_Link link_3;
+}  __attribute__((packed))ecpriss_FH;
+
+typedef struct {
+	ecpriss_FH fh_0;
+	ecpriss_FH fh_1;
+	ecpriss_FH fh_2;
+} __attribute__((packed)) ecpriss_QUDP;
+
+typedef struct {
+	ecpriss_Xbar_Stats stats;
+} __attribute__((packed)) ecpriss_XBAR;
+
+typedef struct {
+	ecpriss_QUDP qudp;
+	ecpriss_XBAR xbar;
+}  __attribute__((packed))datacsm_ecpriss_stats_info_s;
+
 #endif /* ECPRI_FLOW_H */

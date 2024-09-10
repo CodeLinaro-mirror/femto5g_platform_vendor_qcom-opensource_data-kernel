@@ -129,6 +129,7 @@ static int ecpriss_core_remove(struct platform_device *pdev)
 		dma_ecpri_ss_driver_ops.ecpri_dma_ecpri_ss_deregister();
 		ecpriss_qudp_irq_destroy_v2();
 		ecpriss_xbar_destroy_interrupts_v2();
+		ecpriss_destroy_workq();
 		ecpriss_destroy_timers_v2();
 		ecpriss_destroy_ipc_log_v2();
 		ecpriss_unmap_xbar_qudp_v2();
@@ -156,7 +157,7 @@ static int ecpriss_core_get_hw_ver(struct platform_device *pdev)
 
 }
 
-void ecpriss_process_packet_decfg(ecpriss_packet_payload_s *packet, ecpriss_message_id_e message_id)
+int32_t ecpriss_process_packet_decfg(ecpriss_packet_payload_s *packet, ecpriss_message_id_e message_id)
 {
 	int ret=0;
 	ecpriss_flow_rx_cfg_s *flow_rx = NULL;
@@ -246,13 +247,13 @@ void ecpriss_process_packet_decfg(ecpriss_packet_payload_s *packet, ecpriss_mess
 
 		}
 	}while (0);
-	return;
+	return ret;
 }
 
 /* Calls XBAR RX/TX and QUDP RX/TX depending on the msg_id of the packets */
-void ecpriss_process_packet(ecpriss_packet_payload_s *packet)
+int32_t ecpriss_process_packet(ecpriss_packet_payload_s *packet)
 {
-	int ret=0;
+	int ret = 0;
 	ecpriss_flow_rx_cfg_s *flow_rx = NULL;
 	ecpriss_flow_tx_cfg_s *flow_tx = NULL;
 
@@ -360,10 +361,9 @@ void ecpriss_process_packet(ecpriss_packet_payload_s *packet)
 
 		}
 	}while (0);
-	return;
+	return ret;
 }
 
-/* Make into a single struct -> last 3 args, else it slows the program */
 static void ecpriss_eth_cpy_params(ecpriss_qudp_port_cfg_s       *port_cfg,
 		eth_ecpriss_topology_root_s    *eth_params,
 		uint8_t                        port_index,
@@ -860,11 +860,8 @@ int ecpriss_ssr_events_cb(struct notifier_block *this,unsigned long code, void *
 			ECPRILOGERR("ecpriss_ssr_events_cb: NULL Wq or Work");
 			break;
 		}
-		spin_lock(&ecpriss_pdata_v2->ecpriss_workq_spin_lock);
 
 		ret = ecpriss_queue_work(ecpriss_wq,ecpriss_work);
-
-		spin_unlock(&ecpriss_pdata_v2->ecpriss_workq_spin_lock);
 
 		if(ret < 0) {
 			ECPRILOGERR("Queue work failed\n");
@@ -913,10 +910,8 @@ void ecpriss_eth_topology_cb_v2(void)
 			ECPRILOGERR("ecpriss_eth_topology_cb_v2:NULL Wq or Work");
 			break;
 		}
-		spin_lock(&ecpriss_pdata_v2->ecpriss_workq_spin_lock);
 		ret = ecpriss_queue_work(ecpriss_wq,
 				ecpriss_work);
-        spin_unlock(&ecpriss_pdata_v2->ecpriss_workq_spin_lock);
 		if(ret < 0) {
 			ECPRILOGERR("Queue work failed\n");
 			break;
@@ -975,10 +970,8 @@ void ecpriss_dma_endp_cb(void * userdata)
 		ecpriss_pdata->events_workqueue->kernel_events_workqueue;
 		ecpriss_work =
 		ecpriss_pdata->events_workqueue->ecpriss_dma_events_rdy_work;
-
 		ret = ecpriss_queue_work(ecpriss_wq,
 				ecpriss_work);
-
 		if(ret < 0) {
 			ECPRILOGERR("Queue work failed\n");
 			break;
@@ -1013,7 +1006,6 @@ void ecpriss_stats_timer_cb_v2(struct timer_list *data)
 	int ret = 0;
 	struct workqueue_struct    *ecpriss_wq;
 	struct work_struct         *ecpriss_work;
-	unsigned long flags;
 
 	do{
 		ecpriss_wq =
@@ -1025,13 +1017,9 @@ void ecpriss_stats_timer_cb_v2(struct timer_list *data)
 			ECPRILOGERR("ecpriss_stats_timer_cb_v2: NULL Wq or Work");
 			break;
 		}
-		spin_lock_irqsave(&ecpriss_pdata_v2->ecpriss_workq_spin_lock,flags);
 
 		ret = ecpriss_queue_work(ecpriss_wq,
 				ecpriss_work);
-
-		spin_unlock_irqrestore(&ecpriss_pdata_v2->ecpriss_workq_spin_lock,flags);
-
 		if(ret < 0) {
 			ECPRILOGERR("Queue work failed\n");
 			break;
@@ -1058,13 +1046,8 @@ void ecpriss_dma_endp_cb_v2(void * userdata)
 			ECPRILOGERR("ecpriss_dma_endp_cb_v2: NULL Wq or Work");
 			break;
 		}
-
-		spin_lock(&ecpriss_pdata_v2->ecpriss_workq_spin_lock);
 		ret = ecpriss_queue_work(ecpriss_wq,
 				ecpriss_work);
-
-		spin_unlock(&ecpriss_pdata_v2->ecpriss_workq_spin_lock);
-
 		if(ret < 0) {
 			ECPRILOGERR("Queue work failed\n");
 			break;
@@ -1589,6 +1572,14 @@ void ecpriss_update_all_stats(void)
 	}
 	ecpriss_xbar_stats_update();
 }
+
+void ecpriss_fh_stats_update_for_usr(void)
+{
+	ecpriss_fh_qudp_stats_update_usr();
+	ecpriss_fh_xbar_stats_update_usr();
+	return;
+}
+
 void ecpriss_update_all_stats_v2(void)
 {
 	int fh = 0;
@@ -1602,6 +1593,7 @@ void ecpriss_update_all_stats_v2(void)
 		}
 	}
 	ecpriss_xbar_stats_update_v2();
+	ecpriss_fh_stats_update_for_usr();
 	mutex_unlock(&ecpriss_pdata_v2->ecpriss_mutex_lock);
 }
 
@@ -1873,6 +1865,11 @@ static int ecpriss_core_init_v2(struct platform_device *pdev)
 		}
 		ECPRILOGINFO("eCPRI Netlink Socket(NETLINK_ECPRI family) Created\n");
 
+		ret = ecpriss_netlink_stats_socket_create();
+		if(ret < 0){
+			ECPRILOGERR("Netlink socket (STATS_NETLINK_ECPRI family) created\n");
+			break;
+		}
 		ecpriss_pdata_v2->ecpri_state = ECPRI_CORE_INIT;
 
 	}while (0);
@@ -1941,7 +1938,7 @@ static void __exit ecpriss_core_module_exit(void)
 {
 
 	pr_err("ecpriss_core_module_exit():Exit \n");
-	ecpriss_destroy_workq();
+
 	platform_driver_unregister(&ecpriss_core_driver);
 
 	return;

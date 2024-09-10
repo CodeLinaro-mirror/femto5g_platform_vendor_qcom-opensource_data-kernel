@@ -211,6 +211,7 @@ typedef struct ecpriss_core_private_s_v2 {
 	ecpriss_core_callback_flags_s        *callback_flag;
 	uint32_t                              user_pid;
 	struct sock                          *netlink_socket;
+	struct sock                          *stats_netlink_socket;
 	struct ecpri_dma_endp_mapping        *dma_endp;
 	eth_ecpriss_topology_root_s          *eth_topology_params;
 	void                                 *ecpriss_core_logbuf;
@@ -228,8 +229,8 @@ typedef struct ecpriss_core_private_s_v2 {
 	struct platform_device		     *pdev;
 	struct mutex                          ecpriss_mutex_lock;
 	void                                 *mhi_ctx;
-	spinlock_t                            ecpriss_workq_spin_lock;
 	spinlock_t                            irq_lock;
+	datacsm_ecpriss_stats_info_s          fh_stats_usr;
 } ecpriss_core_private_s_v2;
 
 

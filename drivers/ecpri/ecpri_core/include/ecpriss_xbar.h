@@ -524,6 +524,7 @@ int ecpriss_xbar_oc_rx_lut_decfg_v2(uint32_t port_index,
 void ecpriss_xbar_non_ecpri_lut_cfg(void);
 void ecpriss_xbar_stats_update(void);
 void ecpriss_xbar_stats_update_v2(void);
+void ecpriss_fh_xbar_stats_update_usr(void);
 void ecpriss_xbar_config_stats_update(void);
 void ecpriss_xbar_config_stats_update_v2(void);
 
