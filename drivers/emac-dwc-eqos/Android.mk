@@ -31,6 +31,12 @@ LOCAL_MODULE_PATH  := $(TARGET_OUT_DATA)/emac
 LOCAL_SRC_FILES    := emac_perf_settings.sh
 include $(BUILD_PREBUILT)
 
+LOCAL_MODULE       := emac_buffer_settings.sh
+LOCAL_MODULE_TAGS  := optional
+LOCAL_MODULE_CLASS := ETC
+LOCAL_MODULE_PATH  := $(TARGET_OUT_DATA)/emac
+LOCAL_SRC_FILES    := emac_buffer_settings.sh
+
 endif
 endif
 
