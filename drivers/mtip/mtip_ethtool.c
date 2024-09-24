@@ -1557,7 +1557,7 @@ u32 mtip_ethtool_get_msglevel(struct net_device *netdev)
     return platform_driver_priv->mtip_ports[port_type]->port_state;
 }
 
-static int mtip_ethtool_get_module_info(struct net_device *netdev,
+int mtip_ethtool_get_module_info(struct net_device *netdev,
                                                 struct ethtool_modinfo *modinfo)
 {
     u32 link_index;
@@ -1588,7 +1588,7 @@ static int mtip_ethtool_get_module_info(struct net_device *netdev,
    return -EINVAL;
 }
  
-static int mtip_ethtool_get_module_eeprom(struct net_device *netdev,
+int mtip_ethtool_get_module_eeprom(struct net_device *netdev,
                                                       struct ethtool_eeprom *ee,
                                                       u8 *data)
 {

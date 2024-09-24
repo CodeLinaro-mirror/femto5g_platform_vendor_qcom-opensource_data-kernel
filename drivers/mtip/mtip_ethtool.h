@@ -31,6 +31,8 @@ u32 mtip_ethtool_get_msglevel(struct net_device *netdev);
 u32 mtip_ethtool_get_priv_flags(struct net_device *netdev);
 int mtip_ethtool_set_priv_flags(struct net_device *netdev, u32 flags);
 int get_mtip_ethtool_priv_flags_len(void);
+int mtip_ethtool_get_module_eeprom(struct net_device *netdev, struct ethtool_eeprom *ee, u8 *data);
+int mtip_ethtool_get_module_info(struct net_device *netdev, struct ethtool_modinfo *modinfo);
 
 
 #endif // _MTIP_ETHTOOL_H
