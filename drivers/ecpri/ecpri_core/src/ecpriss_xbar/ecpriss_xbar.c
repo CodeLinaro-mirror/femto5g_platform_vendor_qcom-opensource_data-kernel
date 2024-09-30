@@ -666,7 +666,7 @@ static void ecpriss_xbar_flush_init_v2()
 	/*Read Reset value*/
 	ecpriss_xbar_hal_read_reg_n_fields(ECPRISS_XBAR_GLOBAL, ECPRI_XBAR_FLUSH,0, &xbar_flush);
 	flush_val = (int*)(&xbar_flush);
-	pr_info("Reset xbar flush val = 0x%x\n", *flush_val);
+	pr_debug("Reset xbar flush val = 0x%x\n", *flush_val);
 
 	/*Enable Flush*/
 	xbar_flush.flush_fh_0_rx = DISABLE_BIT;
@@ -705,7 +705,7 @@ static void ecpriss_xbar_flush_init_v2()
 
 	flush_val = (int*)(&xbar_flush);
 	ecpriss_pdata_v2->xbar_ctx_v2->xbar_flush_status = xbar_flush;
-	pr_info("xbar flush val post write = 0x%x\n", *flush_val);
+	pr_debug("xbar flush val post write = 0x%x\n", *flush_val);
 	return;
 }
 
@@ -780,7 +780,7 @@ static void ecpriss_xbar_flush_init()
 
 	flush_val = (int*)(&xbar_flush);
 
-	pr_info("xbar flush val post write = 0x%x\n", *flush_val);
+	pr_debug("xbar flush val post write = 0x%x\n", *flush_val);
 	return;
 }
 
@@ -978,37 +978,37 @@ void ecpriss_configure_xbar_flush_v2(ecpriss_port_type_e port_type,
         if (port_type == ECPRISS_PORT_TYPE_FH &&
                         port_idx == ECPRISS_PORT_0 &&
                         event_type == ETH_ECPRISS_EVENT_UP){
-                pr_err("XBAR flush for port 0 | enable: %d\n", DISABLE_BIT);
+                pr_debug("XBAR flush for port 0 | enable: %d\n", DISABLE_BIT);
                 xbar_flush.flush_fh_0_tx = DISABLE_BIT;
         }
         else if (port_type == ECPRISS_PORT_TYPE_FH &&
                         port_idx == ECPRISS_PORT_1 &&
                         event_type == ETH_ECPRISS_EVENT_UP){
-                pr_err("XBAR flush for port 1 | enable: %d\n", DISABLE_BIT);
+                pr_debug("XBAR flush for port 1 | enable: %d\n", DISABLE_BIT);
                 xbar_flush.flush_fh_1_tx = DISABLE_BIT;
         }
         else if (port_type == ECPRISS_PORT_TYPE_FH &&
                         port_idx == ECPRISS_PORT_2 &&
                         event_type == ETH_ECPRISS_EVENT_UP){
-                pr_err("XBAR flush for port 2 | enable: %d\n", DISABLE_BIT);
+                pr_debug("XBAR flush for port 2 | enable: %d\n", DISABLE_BIT);
                 xbar_flush.flush_fh_2_tx = DISABLE_BIT;
         }
         else if (port_type == ECPRISS_PORT_TYPE_FH &&
                         port_idx == ECPRISS_PORT_0 &&
                         event_type == ETH_ECPRISS_EVENT_DOWN){
-                pr_err("XBAR flush for port 0 | enable: %d\n", ENABLE_BIT);
+                pr_debug("XBAR flush for port 0 | enable: %d\n", ENABLE_BIT);
                 xbar_flush.flush_fh_0_tx = ENABLE_BIT;
         }
         else if (port_type == ECPRISS_PORT_TYPE_FH &&
                         port_idx == ECPRISS_PORT_1 &&
                         event_type == ETH_ECPRISS_EVENT_DOWN){
-                pr_err("XBAR flush for port 1 | enable: %d\n", ENABLE_BIT);
+                pr_debug("XBAR flush for port 1 | enable: %d\n", ENABLE_BIT);
                 xbar_flush.flush_fh_1_tx = ENABLE_BIT;
         }
         else if (port_type == ECPRISS_PORT_TYPE_FH &&
                         port_idx == ECPRISS_PORT_2 &&
                         event_type == ETH_ECPRISS_EVENT_DOWN){
-                pr_err("XBAR flush for port 2 | enable: %d\n", ENABLE_BIT);
+                pr_debug("XBAR flush for port 2 | enable: %d\n", ENABLE_BIT);
                 xbar_flush.flush_fh_2_tx = ENABLE_BIT;
         }
 
@@ -1031,37 +1031,37 @@ void ecpriss_configure_xbar_flush(ecpriss_port_type_e port_type,
         if (port_type == ECPRISS_PORT_TYPE_FH &&
                         port_idx == ECPRISS_PORT_0 &&
                         event_type == ETH_ECPRISS_EVENT_UP){
-                pr_err("XBAR flush for port 0 | enable: %d\n", DISABLE_BIT);
+                pr_debug("XBAR flush for port 0 | enable: %d\n", DISABLE_BIT);
                 xbar_flush.flush_fh_0_tx = DISABLE_BIT;
         }
         else if (port_type == ECPRISS_PORT_TYPE_FH &&
                         port_idx == ECPRISS_PORT_1 &&
                         event_type == ETH_ECPRISS_EVENT_UP){
-                pr_err("XBAR flush for port 1 | enable: %d\n", DISABLE_BIT);
+                pr_debug("XBAR flush for port 1 | enable: %d\n", DISABLE_BIT);
                 xbar_flush.flush_fh_1_tx = DISABLE_BIT;
         }
         else if (port_type == ECPRISS_PORT_TYPE_FH &&
                         port_idx == ECPRISS_PORT_2 &&
                         event_type == ETH_ECPRISS_EVENT_UP){
-                pr_err("XBAR flush for port 2 | enable: %d\n", DISABLE_BIT);
+                pr_debug("XBAR flush for port 2 | enable: %d\n", DISABLE_BIT);
                 xbar_flush.flush_fh_2_tx = DISABLE_BIT;
         }
         else if (port_type == ECPRISS_PORT_TYPE_FH &&
                         port_idx == ECPRISS_PORT_0 &&
                         event_type == ETH_ECPRISS_EVENT_DOWN){
-                pr_err("XBAR flush for port 0 | enable: %d\n", ENABLE_BIT);
+                pr_debug("XBAR flush for port 0 | enable: %d\n", ENABLE_BIT);
                 xbar_flush.flush_fh_0_tx = ENABLE_BIT;
         }
         else if (port_type == ECPRISS_PORT_TYPE_FH &&
                         port_idx == ECPRISS_PORT_1 &&
                         event_type == ETH_ECPRISS_EVENT_DOWN){
-                pr_err("XBAR flush for port 1 | enable: %d\n", ENABLE_BIT);
+                pr_debug("XBAR flush for port 1 | enable: %d\n", ENABLE_BIT);
                 xbar_flush.flush_fh_1_tx = ENABLE_BIT;
         }
         else if (port_type == ECPRISS_PORT_TYPE_FH &&
                         port_idx == ECPRISS_PORT_2 &&
                         event_type == ETH_ECPRISS_EVENT_DOWN){
-                pr_err("XBAR flush for port 2 | enable: %d\n", ENABLE_BIT);
+                pr_debug("XBAR flush for port 2 | enable: %d\n", ENABLE_BIT);
                 xbar_flush.flush_fh_2_tx = ENABLE_BIT;
         }
 
