@@ -742,7 +742,6 @@ int mtip_napi_poll(struct napi_struct *napi_ptr, int budget)
    struct net_device* dev;
    struct mtip_netdev_priv *priv;
    ecpri_dma_eth_conn_hdl_t actual_handle = hdl;
-
    u32 tx_available = 0;
    u32 rx_available = 0;
 
@@ -798,7 +797,7 @@ int mtip_napi_poll(struct napi_struct *napi_ptr, int budget)
 
    // read the packets and push into the stack
    rv = mtip_dma_poll_rx_packets(dev, napi_ptr, hdl, budget, &npackets, &num_buffers);
-   priv->rx_polled_count += npackets;
+   priv->rx_polled_count += num_buffers;
    // HANDLE THE ERROR
    if (rv < 0)
    {
@@ -819,10 +818,26 @@ int mtip_napi_poll(struct napi_struct *napi_ptr, int budget)
          rv = mtip_replenish_dma_rx_buffers_reuse(dev, actual_handle, rx_available -1);
          if(rv == 0)
             priv->rx_polled_count = 0;
+         else if(rx_available == MTIP_RX_RING_SIZE-1)
+         {
+            CSMLOGERR("priv->rx_polled_count %d, rx_available %d", priv->rx_polled_count, rx_available);
+            /* If the replenish fails, while DMA has exhausted it's ring size,
+               start a timer to retry replensish after a buffer time. By this
+               time, the expectation is that NW stack will drain out the
+               outstanding packets */
+            if(!timer_pending(&platform_driver_priv->mtip_links[link_index]->rx_replenish_retry_timer))
+            {
+               mod_timer(&platform_driver_priv->mtip_links[link_index]->rx_replenish_retry_timer,
+                         jiffies + msecs_to_jiffies(MTIP_RX_REPLENISH_RETRY_TIMER_INTERVAL));
+            }
+         }
+
       }
    }
+
    /* If we processed all packets, we're done; tell the kernel and re-enable ints */
-   if (npackets < budget) {
+   if (npackets < budget)
+   {
       napi_complete(napi_ptr);
 
       setmode = ECPRI_DMA_NOTIFY_MODE_IRQ;
@@ -3833,5 +3848,22 @@ exit:
    kfree(taskstruct);
 
    return;
+}
+
+void mtip_rx_replenish_retry_timer_cb(struct timer_list *list)
+{
+    struct mtip_link_info *link_info;
+
+    if(!platform_driver_priv)
+        return;
+
+    link_info = from_timer(link_info, list, rx_replenish_retry_timer);
+    if(!link_info)
+        return;
+
+    // Simulate RX completion callback which will schedule NAPI
+    mtip_dma_rx_comp_cb(NULL, link_info->dma_hdl);
+
+    return;
 }
 

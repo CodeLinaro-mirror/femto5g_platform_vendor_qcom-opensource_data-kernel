@@ -223,7 +223,6 @@ typedef struct ecpriss_core_private_s_v2 {
 	ecpriss_qudp_ctx_s_v2                *qudp_ctx_v2;
 	ecpriss_xbar_ctx_s_v2                *xbar_ctx_v2;
 	ecpriss_config_stats_s_v2             cfg_stats_v2;
-	ecpri_stats_timer_params_s            stats_timer_info;
 	ecpriss_hw_name_e                     ecpri_hw_ver;
 	struct ecpriss_ssr_nb		     *ssr_info;
 	struct platform_device		     *pdev;
@@ -245,17 +244,16 @@ void ecpriss_ssr_events_processing_wq(struct work_struct *work);
 void ecpriss_dma_event_processing_wq(struct work_struct *work);
 void ecpriss_eth_topology_init_wq(struct work_struct *work);
 void ecpriss_interrupt_events_processing_wq(struct work_struct *work);
+void ecpriss_update_stats_and_requeue(struct work_struct *work);
+
 int ecpriss_stats_timer_enable(int timeout);
-int ecpriss_stats_timer_enable_v2(int timeout);
 int ecpriss_stats_timer_interrupt_create(void);
-int ecpriss_stats_timer_interrupt_create_v2(void);
 void ecpriss_update_all_stats(void);
 void ecpriss_update_all_stats_v2(void);
 void ecpriss_core_set_stats_timeout_info(int val);
 int ecpriss_core_get_stats_timeout_info(void);
 
 void clear_debugfs_directory(void);
-void ecpriss_destroy_timers_v2(void);
 void ecpriss_destroy_ipc_log_v2(void);
 void ecpriss_unmap_xbar_qudp_v2(void);
 void ecpriss_xbar_oc_flush_enable(uint32_t code);

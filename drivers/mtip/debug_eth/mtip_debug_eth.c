@@ -622,6 +622,9 @@ static const struct ethtool_ops mtip_debug_ethtool_ops = {
    .get_msglevel = mtip_ethtool_get_msglevel,
    .get_priv_flags = mtip_ethtool_get_priv_flags,
    .set_priv_flags = mtip_ethtool_set_priv_flags,
+   .get_link = ethtool_op_get_link,
+   .get_module_info = mtip_ethtool_get_module_info,
+   .get_module_eeprom = mtip_ethtool_get_module_eeprom,
 };
 
 const struct ethtool_ops * mtip_debug_eth_get_ethtool_ops()

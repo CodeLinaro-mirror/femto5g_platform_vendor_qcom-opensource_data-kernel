@@ -10,8 +10,12 @@
 #include "ecpriss_mhi.h"
 #include <linux/notifier.h>
 #include <linux/panic_notifier.h>
+#include <linux/delay.h>
+
 extern struct ecpri_dma_ecpri_ss_ops dma_ecpri_ss_driver_ops;
 extern struct eth_ecpriss_ops mtip_ecpri_ops;
+
+extern struct ecpri_delayed_work_q_params *ecpri_delay_wq_p;
 
 #define ECPRISS_CORE_IPC_LOG_PAGES   50
 
@@ -130,7 +134,6 @@ static int ecpriss_core_remove(struct platform_device *pdev)
 		ecpriss_qudp_irq_destroy_v2();
 		ecpriss_xbar_destroy_interrupts_v2();
 		ecpriss_destroy_workq();
-		ecpriss_destroy_timers_v2();
 		ecpriss_destroy_ipc_log_v2();
 		ecpriss_unmap_xbar_qudp_v2();
 	}
@@ -815,11 +818,19 @@ void ecpriss_interrupt_events_processing_wq(struct work_struct *work)
 		ecpriss_stats_timer_enable(stats_timeout_ms);
 	}else {
 		ecpriss_update_all_stats_v2();
-		ecpriss_stats_timer_enable_v2(stats_timeout_ms);
 	}
 
 	return;
 }
+void ecpriss_update_stats_and_requeue(struct work_struct *work)
+{
+	ecpriss_update_all_stats_v2();
+
+	ecpriss_queue_delayed_work(&ecpri_delay_wq_p->wq_item,stats_timeout_ms);
+
+	return;
+}
+
 void ecpriss_dma_events_cb(void *user_data, enum ecpri_dma_event_type evt)
 {
 	return;
@@ -1301,14 +1312,6 @@ static int ecpriss_core_data_init_v2(void)
 			ECPRILOGERR("Work queue init failed\n");
 			break;
 		}
-		ret = ecpriss_stats_timer_interrupt_create_v2();
-		if(ret < 0) {
-			ECPRILOGERR("eCPRI Timer Interrupt creation failed\n");
-			break;
-		}
-		ECPRILOGINFO("eCPRI Statistics Timer Interrupt created\n");
-
-
 	} while (0);
 	return ret;
 }
@@ -1615,23 +1618,6 @@ int ecpriss_stats_timer_interrupt_create(void)
 
 }
 
-int ecpriss_stats_timer_interrupt_create_v2(void)
-{
-	int ret = 0;
-
-	do {
-
-		timer_setup(&ecpriss_pdata_v2->stats_timer_info.stats_timer,
-				&ecpriss_stats_timer_cb_v2,0);
-		ecpriss_pdata_v2->stats_timer_info.stats_timer_running = 0;
-		ecpriss_pdata_v2->stats_timer_info.stats_interval = 0;
-
-	}while (0);
-
-	return ret;
-
-}
-
 
 int ecpriss_stats_timer_disable(void)
 {
@@ -1649,22 +1635,6 @@ int ecpriss_stats_timer_disable(void)
 	return ret;
 }
 
-
-int ecpriss_stats_timer_disable_v2(void)
-{
-	int ret = 0;
-
-	do{
-		ecpriss_pdata_v2->stats_timer_info.stats_timer.expires = jiffies;
-		mod_timer(&ecpriss_pdata_v2->stats_timer_info.stats_timer,
-				ecpriss_pdata_v2->stats_timer_info.stats_timer.expires);
-
-		ecpriss_pdata_v2->stats_timer_info.stats_timer_running = 0;
-		ecpriss_pdata_v2->stats_timer_info.stats_interval = 0;
-	}while(0);
-
-	return ret;
-}
 
 int ecpriss_stats_timer_enable(int timeout)
 {
@@ -1694,30 +1664,6 @@ void ecpriss_core_set_stats_timeout_info(int val)
 {
 	stats_timeout_ms = val;
 	ECPRILOGINFO("ecpriss: Setting Stats Timeout to val %d\n", stats_timeout_ms);
-}
-
-int ecpriss_stats_timer_enable_v2(int timeout)
-{
-	int ret = 0;
-
-	do {
-		ecpriss_pdata_v2->stats_timer_info.stats_timer.expires =
-			jiffies + msecs_to_jiffies(timeout);
-		mod_timer(&ecpriss_pdata_v2->stats_timer_info.stats_timer,
-				ecpriss_pdata_v2->stats_timer_info.stats_timer.expires);
-
-		ecpriss_pdata_v2->stats_timer_info.stats_timer_running = 1;
-		ecpriss_pdata_v2->stats_timer_info.stats_interval = timeout;
-
-
-	}while (0);
-	return ret;
-}
-void ecpriss_destroy_timers_v2(void)
-{
-	if(ecpriss_pdata_v2){
-		del_timer_sync(&ecpriss_pdata_v2->stats_timer_info.stats_timer);
-	}
 }
 
 
@@ -1775,12 +1721,14 @@ static int ecpriss_core_init(struct platform_device *pdev)
 			ECPRILOGERR("Callback registrations failed\n");
 			break;
 		}
+
 		ret = ecpriss_stats_timer_enable(stats_timeout_ms);
 
 		if(ret < 0) {
 			ECPRILOGERR("Stats Collection failed\n");
 			break;
 		}
+
 		ecpriss_pdata->ecpri_state = ECPRI_CORE_INIT;
 
 	}while (0);
@@ -1851,12 +1799,7 @@ static int ecpriss_core_init_v2(struct platform_device *pdev)
 
 		ECPRILOGERR("QUDP init complete\n");
 
-		ret = ecpriss_stats_timer_enable_v2(stats_timeout_ms);
-
-		if(ret < 0) {
-			ECPRILOGERR("Stats Collection failed\n");
-			break;
-		}
+		ecpriss_update_stats_and_requeue(NULL);
 
 		ret = ecpriss_netlink_socket_create_v2();
 		if(ret < 0) {
