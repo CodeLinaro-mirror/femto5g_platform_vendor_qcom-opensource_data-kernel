@@ -79,7 +79,7 @@ void mtip_macstats_get_stats(struct net_device *netdev, u64 *data)
         return;
     }
 
-    if (port_type > 2) 
+    if (port_type > 3) 
     {
         CSMLOGERR("Access to MACSTATS for C2C/DBG ports not supported\n");
         return;
@@ -89,6 +89,8 @@ void mtip_macstats_get_stats(struct net_device *netdev, u64 *data)
 
     mtip_lookup_real_link_number_by_link_index(link_index, &real_link_number);
 
+    if ( port_type <=2 )
+    {
     // the Rx stats
     data[i] = mtip_macstats_read_stat(macstats_base_addr, real_link_number*MTIP_MACSTATS_RX_BLOCKSIZE + MTIP_MACSTATS_ETHERSTATSOCTETS_REG_OFFET);
     data[++i] = mtip_macstats_read_stat(macstats_base_addr, real_link_number*MTIP_MACSTATS_RX_BLOCKSIZE + MTIP_MACSTATS_OCTETSRECEIVEDOK_REG_OFFET);
@@ -107,5 +109,51 @@ void mtip_macstats_get_stats(struct net_device *netdev, u64 *data)
     data[++i] = mtip_macstats_read_stat(macstats_base_addr, real_link_number*MTIP_MACSTATS_TX_BLOCKSIZE + MTIP_MACSTATS_OUTUCASTPKTS_REG_OFFET);
     data[++i] = mtip_macstats_read_stat(macstats_base_addr, real_link_number*MTIP_MACSTATS_TX_BLOCKSIZE + MTIP_MACSTATS_OUTMCASTPKTS_REG_OFFET);
     data[++i] = mtip_macstats_read_stat(macstats_base_addr, real_link_number*MTIP_MACSTATS_TX_BLOCKSIZE + MTIP_MACSTATS_OUTBCASTPKTS_REG_OFFET);
+    }
+    else if (port_type == 3)
+    {
+      if (real_link_number == 0 )
+      {
+          // the Rx stats
+        data[i] = mtip_macstats_read_stat(macstats_base_addr,   MTIP_C2C_MACSTATS_ETHERSTATSOCTETS_REG_OFFET);
+        data[++i] = mtip_macstats_read_stat(macstats_base_addr, MTIP_C2C_MACSTATS_OCTETSRECEIVEDOK_REG_OFFET);
+        data[++i] = mtip_macstats_read_stat(macstats_base_addr, MTIP_C2C_MACSTATS_VLANRECEIVEDOK_REG_OFFSET);
+        data[++i] = mtip_macstats_read_stat(macstats_base_addr, MTIP_C2C_MACSTATS_INERRORS_REG_OFFET);
+        data[++i] = mtip_macstats_read_stat(macstats_base_addr, MTIP_C2C_MACSTATS_INUCASTPKTS_REG_OFFET);
+        data[++i] = mtip_macstats_read_stat(macstats_base_addr, MTIP_C2C_MACSTATS_INMCASTPKTS_REG_OFFET);
+        data[++i] = mtip_macstats_read_stat(macstats_base_addr, MTIP_C2C_MACSTATS_INBCASTPKTS_REG_OFFET);
+        data[++i] = mtip_macstats_read_stat(macstats_base_addr, MTIP_C2C_MACSTATS_ETHERSTATSDROPS_REG_OFFET);
+        data[++i] = mtip_macstats_read_stat(macstats_base_addr, MTIP_C2C_MACSTATS_ETHERSTATSPKTS_REG_OFFET);
+    
+        // the Tx stats
+        data[++i] = mtip_macstats_read_stat(macstats_base_addr, MTIP_C2C_MACSTATS_OCTETSTRANSMITTEDOK_REG_OFFET);
+        data[++i] = mtip_macstats_read_stat(macstats_base_addr, MTIP_C2C_MACSTATS_VLANTRANSMITTEDOK_OFFET);
+        data[++i] = mtip_macstats_read_stat(macstats_base_addr, MTIP_C2C_MACSTATS_OUTERRORS_REG_OFFET);
+        data[++i] = mtip_macstats_read_stat(macstats_base_addr, MTIP_C2C_MACSTATS_OUTUCASTPKTS_REG_OFFET);
+        data[++i] = mtip_macstats_read_stat(macstats_base_addr, MTIP_C2C_MACSTATS_OUTMCASTPKTS_REG_OFFET);
+        data[++i] = mtip_macstats_read_stat(macstats_base_addr, MTIP_C2C_MACSTATS_OUTBCASTPKTS_REG_OFFET);
+      }
+      else if ( real_link_number == 1 )
+      {
+        // the Rx stats
+        data[i]   =  mtip_macstats_read_stat(macstats_base_addr,MTIP_C2C_MACSTATS_ETHERSTATSOCTETS_2_REG_OFFET);
+        data[++i] = mtip_macstats_read_stat(macstats_base_addr, MTIP_C2C_MACSTATS_OCTETSRECEIVEDOK_2_REG_OFFET);
+        data[++i] = mtip_macstats_read_stat(macstats_base_addr, MTIP_C2C_MACSTATS_VLANRECEIVEDOK_2_REG_OFFSET);
+        data[++i] = mtip_macstats_read_stat(macstats_base_addr, MTIP_C2C_MACSTATS_INERRORS_2_REG_OFFET);
+        data[++i] = mtip_macstats_read_stat(macstats_base_addr, MTIP_C2C_MACSTATS_INUCASTPKTS_2_REG_OFFET);
+        data[++i] = mtip_macstats_read_stat(macstats_base_addr, MTIP_C2C_MACSTATS_INMCASTPKTS_2_REG_OFFET);
+        data[++i] = mtip_macstats_read_stat(macstats_base_addr, MTIP_C2C_MACSTATS_INBCASTPKTS_2_REG_OFFET);
+        data[++i] = mtip_macstats_read_stat(macstats_base_addr, MTIP_C2C_MACSTATS_ETHERSTATSDROPS_2_REG_OFFET);
+        data[++i] = mtip_macstats_read_stat(macstats_base_addr, MTIP_C2C_MACSTATS_ETHERSTATSPKTS_2_REG_OFFET);
+    
+        // the Tx stats
+        data[++i] = mtip_macstats_read_stat(macstats_base_addr, MTIP_C2C_MACSTATS_OCTETSTRANSMITTEDOK_2_REG_OFFET);
+        data[++i] = mtip_macstats_read_stat(macstats_base_addr, MTIP_C2C_MACSTATS_VLANTRANSMITTEDOK_2_OFFET);
+        data[++i] = mtip_macstats_read_stat(macstats_base_addr, MTIP_C2C_MACSTATS_OUTERRORS_2_REG_OFFET);
+        data[++i] = mtip_macstats_read_stat(macstats_base_addr, MTIP_C2C_MACSTATS_OUTUCASTPKTS_2_REG_OFFET);
+        data[++i] = mtip_macstats_read_stat(macstats_base_addr, MTIP_C2C_MACSTATS_OUTMCASTPKTS_2_REG_OFFET);
+        data[++i] = mtip_macstats_read_stat(macstats_base_addr, MTIP_C2C_MACSTATS_OUTBCASTPKTS_2_REG_OFFET);
+      }
+    }
 }
 

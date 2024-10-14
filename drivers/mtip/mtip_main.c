@@ -448,13 +448,13 @@ int mtip_lookup_port_type_by_link_index(u32 link_index, u32* port_type)
         *port_type = MTIP_PORT_TYPE_FH_2;
         break;
     case 12:
+    case 13:
         *port_type = MTIP_PORT_TYPE_L2;
         break;
+    case 14:
     case 15:
         *port_type = MTIP_PORT_TYPE_DEBUG;
         break;
-    case 14:
-    case 13:
     default:
 //        CSMLOGDBG("invalid link_index: %d\n", link_index);
         ret = -1;
@@ -511,11 +511,15 @@ int mtip_lookup_real_link_number_by_link_index(u32 link_index, u32* real_link_nu
 	case 12:
 		*real_link_number = 0;
 		break;
+	case 13:
+		*real_link_number = 1;
+		break;
+	case 14:
+		*real_link_number = 0;
+		break;
 	case 15:
 		*real_link_number = 1;
 		break;
-    case 13:
-    case 14:
 	default:
         CSMLOGERR("invalid link_index: %d\n", link_index);
 	    ret = -1;

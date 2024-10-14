@@ -876,10 +876,22 @@ static int mtip_start_xmit(struct sk_buff *skb, struct net_device *netdev)
    u8 tx_ts_stat=0;
    u32 timestamp_secs;
    u32 timestamp_nsecs;
+   u32 port_type;
    CSMLOGDBG("mtip_start_xmit called\n");
 
    priv = netdev_priv(netdev);
    link_index = priv->link_index;
+
+   if (mtip_lookup_port_type_by_link_index(link_index, &port_type) < 0)
+   {
+        CSMLOGERR("invalid port_type for link_index %d", link_index);
+
+        // free the skb
+        dev_kfree_skb(skb);
+
+        // drop the packet
+        return NETDEV_TX_OK;
+   }
 
    link_state = mtip_get_link_state_by_link_index(link_index);
 
@@ -896,6 +908,7 @@ static int mtip_start_xmit(struct sk_buff *skb, struct net_device *netdev)
 
    hdl = platform_driver_priv->mtip_links[link_index]->dma_hdl;
    sec_dev = priv->sec_dev;
+   other_hdl = hdl;
 
    if(priv->link_index == MTIP_DEBUG_ETH_LINK_INDEX){
       return mtip_debug_eth_start_xmit(skb, netdev);
@@ -941,6 +954,7 @@ static int mtip_start_xmit(struct sk_buff *skb, struct net_device *netdev)
        case 12:
           other_hdl = 11;
           break;
+
        }
 
        if (mtip_lookup_link_index_by_handle(other_hdl, &other_link_index) < 0)
@@ -965,20 +979,37 @@ static int mtip_start_xmit(struct sk_buff *skb, struct net_device *netdev)
           // drop the packet
           return NETDEV_TX_OK;
        }
-
-       // check that both links are in OPEN state
-       if ((platform_driver_priv->mtip_links[link_index]->state != MTIP_LINK_STATE_OPEN_DONE &&
-            platform_driver_priv->mtip_links[link_index]->state != MTIP_LINK_STATE_UP) || 
-           (platform_driver_priv->mtip_links[other_link_index]->state != MTIP_LINK_STATE_OPEN_DONE &&
-            platform_driver_priv->mtip_links[other_link_index]->state != MTIP_LINK_STATE_UP))
+       if(port_type != MTIP_PORT_TYPE_L2)
        {
-          CSMLOGERR("Waiting for both interfaces to be open/up... dropping\n");
+          // For FH ports, check that both links are in OPEN state for loopback mode
+          if ((platform_driver_priv->mtip_links[link_index]->state != MTIP_LINK_STATE_OPEN_DONE &&
+               platform_driver_priv->mtip_links[link_index]->state != MTIP_LINK_STATE_UP) || 
+              (platform_driver_priv->mtip_links[other_link_index]->state != MTIP_LINK_STATE_OPEN_DONE &&
+               platform_driver_priv->mtip_links[other_link_index]->state != MTIP_LINK_STATE_UP))
+          {
+             CSMLOGERR("Waiting for both interfaces to be open/up... dropping,link_index=%d, state=%d\n",link_index, platform_driver_priv->mtip_links[link_index]->state);
 
-          // free the skb
-          dev_kfree_skb(skb);
+             // free the skb
+             dev_kfree_skb(skb);
 
-          // drop the packet
-          return NETDEV_TX_OK;
+             // drop the packet
+             return NETDEV_TX_OK;
+          }
+       }
+       else 
+       {
+          // For L2 port, check that if L2 link is in OPEN state for loopback mode
+          if ((platform_driver_priv->mtip_links[link_index]->state != MTIP_LINK_STATE_OPEN_DONE &&
+            platform_driver_priv->mtip_links[link_index]->state != MTIP_LINK_STATE_UP) ) 
+          {
+             CSMLOGERR("Waiting for link to come up... dropping,link_index=%d, state=%d\n",link_index, platform_driver_priv->mtip_links[link_index]->state);
+
+             // free the skb
+             dev_kfree_skb(skb);
+
+             // drop the packet
+             return NETDEV_TX_OK;
+          }
        }
    }
 
@@ -1498,7 +1529,7 @@ static void mtip_get_stats64(struct net_device *netdev,
  * mtip_netdev_header: fill the eth header 
  * Only needed for test purposes. Use default on target 
  */
-static int mtip_netdev_header(struct sk_buff *skb, struct net_device *dev,
+int mtip_netdev_header(struct sk_buff *skb, struct net_device *dev,
 		 unsigned short type, const void *daddr, const void *saddr,
                  unsigned int len) 
 {
@@ -1530,11 +1561,6 @@ static int mtip_netdev_header(struct sk_buff *skb, struct net_device *dev,
    return (dev->hard_header_len);
 }
 
-static const struct header_ops mtip_header_ops = {
-   .create  = mtip_netdev_header,
-   .cache   = NULL,
-};
-
 static const struct net_device_ops mtip_netdev_ops = {
 	.ndo_open		      = mtip_open,
 	.ndo_stop		      = mtip_close,
@@ -1562,8 +1588,6 @@ void mtip_netdevice_init(struct net_device *dev)
 
    if (mtip_loopback_mode != MTIP_MODE_DEFAULT && !mtip_loopback_enable_arp)
    {
-       dev->header_ops = &mtip_header_ops;
-
        /* add NOARP */
        dev->flags           |= IFF_NOARP;
    }
@@ -2093,6 +2117,17 @@ void mtip_netdev_assign_port_lanes(u32 port_type)
                 lane_to_link_map[2] = 2;
                 lane_to_link_map[3] = 3;
             }
+            else if (port_type == MTIP_PORT_TYPE_L2) 
+            {
+                real_link_index_array[0] = 0;
+                real_link_index_array[1] = 1;
+
+                real_lane_index_array[0] = 0;
+                real_lane_index_array[1] = 2;
+
+                lane_to_link_map[0] = 0;
+                lane_to_link_map[2] = 1;
+            }
             else 
             {
                 CSMLOGERR("config %d not supported on port_type %d", port_config, port_type);
@@ -2158,6 +2193,17 @@ void mtip_netdev_assign_port_lanes(u32 port_type)
                 lane_to_link_map[1] = 1;
                 lane_to_link_map[2] = 2;
                 lane_to_link_map[3] = 3;
+            }
+            else if (port_type == MTIP_PORT_TYPE_L2)
+            {
+                real_link_index_array[0] = 0;
+                real_link_index_array[1] = 1;
+
+                real_lane_index_array[0] = 0;
+                real_lane_index_array[1] = 2;
+
+                lane_to_link_map[0] = 0;
+                lane_to_link_map[2] = 1;
             }
             else 
             {
@@ -2463,6 +2509,18 @@ u32 mtip_device_filter_priv_flags(u32 port_type)
             else
                 return 0;
         }
+    } 
+    else if(port_type == MTIP_PORT_TYPE_L2)
+    {
+        if((lane_qsfp_info.trx_laneinfo & 0x3) == 0x3)
+            num_lanes = 2;
+        else if((lane_qsfp_info.trx_laneinfo & 0x1) == 0x1)
+            num_lanes = 1;
+        else
+        {
+            CSMLOGERR("Invalid trx_laneinfo 0x%x", lane_qsfp_info.trx_laneinfo);
+            return 0;
+        }
     }
     else
     {
@@ -2499,15 +2557,22 @@ u32 mtip_device_filter_priv_flags(u32 port_type)
 
     if(lane_speed_mask & TRX_LANE_SPEED_50G)
     {
-        if(num_lanes == 1)
+        if(num_lanes == 1 || port_type == MTIP_PORT_TYPE_L2)
         {
            filtered_mask |= (1 << MTIP_PORT_CONFIG_1x50GBASE_R);
         }
-        else if(num_lanes == 2 || num_lanes == 4)
+        if(num_lanes == 2 || num_lanes == 4)
         {
            // TBD - need to enhance breakout handling
-           filtered_mask |= ((1 << MTIP_PORT_CONFIG_1x100GBASE_R2)|
-                             (1 << MTIP_PORT_CONFIG_2x50GBASE_R));
+	   if(port_type == MTIP_PORT_TYPE_L2)
+	   {
+               filtered_mask |= (1 << MTIP_PORT_CONFIG_1x100GBASE_R2);
+	   }
+	   else
+	   {
+               filtered_mask |= ((1 << MTIP_PORT_CONFIG_1x100GBASE_R2)|
+                                 (1 << MTIP_PORT_CONFIG_2x50GBASE_R));
+	   }
         }
     }
 

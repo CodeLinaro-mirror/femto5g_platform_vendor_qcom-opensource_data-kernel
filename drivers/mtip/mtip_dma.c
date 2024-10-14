@@ -40,6 +40,7 @@
 #include <linux/etherdevice.h> /* eth_type_trans */
 #include <linux/ip.h>          /* struct iphdr */
 #include <linux/tcp.h>         /* struct tcphdr */
+#include <linux/icmp.h>         /* struct icmphdr */
 #include <linux/skbuff.h>
 
 #include "mtip_dma.h"
@@ -48,7 +49,7 @@
 #include "mtip_device.h"
 #include "mtip_ptp.h"
 
-#define DMA_HANDLE_MAX 13
+#define DMA_HANDLE_MAX 16
 
 void mtip_dma_ready_cb(void *user_data)
 {
@@ -382,7 +383,13 @@ int mtip_connect_dma_pipe(u32 link_index, ecpri_dma_eth_conn_hdl_t* hdl)
    pipe_params.tx_ring_length = MTIP_TX_RING_SIZE;
    pipe_params.rx_ring_length = MTIP_RX_RING_SIZE;
 
-   pipe_params.p_type = ECPRI_DMA_ENDP_STREAM_DEST_FH;
+   if (link_index == MTIP_L2_ETH_LINK_INDEX)
+   	 pipe_params.p_type = ECPRI_DMA_ENDP_STREAM_DEST_L2;
+   else if (link_index == MTIP_C2C1_ETH_LINK_INDEX || link_index == MTIP_C2C0_ETH_LINK_INDEX)
+   	 pipe_params.p_type = ECPRI_DMA_ENDP_STREAM_DEST_C2C;
+   else
+     pipe_params.p_type = ECPRI_DMA_ENDP_STREAM_DEST_FH;
+   
    pipe_params.tx_mod_cfg.moderation_counter_threshold = MTIP_TX_MOD_COUNTER_THRESHOLD;
    pipe_params.tx_mod_cfg.moderation_timer_threshold = MTIP_TX_MOD_TIMER_THRESHOLD;
 
@@ -779,12 +786,13 @@ static void mtip_dma_dump_packet(char* buf, int len)
    int i;
    int index = 0;
 
-   CSMLOGINFO("dumping packet of length: %d\n", len);
-   CSMLOGINFO("packet dest MAC addr: %x:%x:%x:%x:%x:%x\n", buf[0], buf[1], buf[2], buf[3], buf[4], buf[5]);
-   CSMLOGINFO("packet src  MAC addr: %x:%x:%x:%x:%x:%x\n", buf[6], buf[7], buf[8], buf[9], buf[10], buf[11]);
-   CSMLOGINFO("packet EtherType: %x:%x\n", buf[12], buf[13]);
+   CSMLOGDBG("dumping packet of length: %d\n", len);
+   CSMLOGDBG("packet dest MAC addr: %02x %02x %02x %02x %02x %02x\n", buf[0], buf[1], buf[2], buf[3], buf[4], buf[5]);
+   CSMLOGDBG("packet src  MAC addr: %02x %02x %02x %02x %02x %02x\n", buf[6], buf[7], buf[8], buf[9], buf[10], buf[11]);
+   CSMLOGDBG("packet EtherType: %02x %02x\n", buf[12], buf[13]);
 
-   CSMLOGINFO("dumping packet payload length: %d\n", payload_len);
+   CSMLOGDBG("dumping packet payload length: %d\n", payload_len);
+   
    if (payload_len > 0)
    {
       num_dumps = payload_len/8;
@@ -797,7 +805,7 @@ static void mtip_dma_dump_packet(char* buf, int len)
       index = 14;
       for (i = 0; i < num_dumps; ++i)
       {
-         CSMLOGINFO("Packet: %d, %x:%x:%x:%x:%x:%x:%x:%x\n", i, 
+         CSMLOGDBG("Packet: %d, %02x %02x %02x %02x %02x %02x %02x %02x\n", i,
                     buf[index + 0], buf[index + 1], buf[index + 2], buf[index + 3], 
                     buf[index + 4], buf[index + 5], buf[index + 6], buf[index + 7]);
          index += 8;
@@ -998,7 +1006,6 @@ static void fixup_packet(struct net_device* netdev, unsigned char* buf, struct i
    dstaddr = (u8*)tmpptr;
 
    ih->check = 0;
-
    // copy the destaddr last byte to src last byte
    srcaddr[3] = dstaddr[3];
 
@@ -1086,6 +1093,13 @@ static void mtip_dma_skb_timestamp(struct sk_buff *head_skb)
     head_skb->len -= 8;
 }
 
+static u16 csum(u16 old_csum)
+{
+    u16 new_checksum = 0;
+    new_checksum = ~(~old_csum + (-8) + 0);
+    return new_checksum;
+}
+
 static void mtip_dma_process_packet(
     struct net_device *netdev, 
     struct napi_struct *napi_ptr,
@@ -1110,6 +1124,12 @@ static void mtip_dma_process_packet(
     struct mtip_security_device *sec_dev;
     int k = 0;
     struct mtip_pkt_priv *pkt_priv = NULL;
+    struct ethhdr *eth;
+    unsigned char tmp_addr[ETH_ALEN];
+    unsigned char tmp_ip_addr[4];
+    struct icmphdr *icmp;
+    char *str;
+    u16 old_csum = 0;
 
     if(pkts == NULL)
     {
@@ -1196,9 +1216,53 @@ static void mtip_dma_process_packet(
 
     if (mtip_loopback_mode != MTIP_MODE_DEFAULT && mtip_loopback_swap_addr)
     {
-       // fixup the packet: ONLY IF LOOPBACK IS ENABLED
-       iphdr_ptr = (struct iphdr *)(head_base + ETH_HLEN);
-       fixup_packet(netdev, head_base, iphdr_ptr, head_skb->len);
+       if(link_index == MTIP_L2_ETH_LINK_INDEX)
+       {
+           CSMLOGDBG("swap addr packet\n");
+           eth = (struct ethhdr *)(head_base);
+           str=(char*)head_base;
+
+	   // Check if packet is ARP, make ARP response
+           if(str[12]==0x8 && str[13]==0x6)
+           {
+               tmp_addr[0]=0x48;
+               tmp_addr[1]=0xA2;
+               tmp_addr[2]=0x7E;
+               tmp_addr[3]=0xDB;
+               tmp_addr[4]=0x00;
+               tmp_addr[5]=0x00;
+
+               memcpy(tmp_ip_addr,&str[38], 4);
+               memcpy(&str[38],&str[28], 4);
+               memcpy(&str[28],&tmp_ip_addr, 4);
+               str[21]=0x02;
+               memcpy(&str[0],&str[6], 6);
+               memcpy(&str[6],&tmp_addr, 6);
+               memcpy(&str[22],&tmp_addr, 6);
+               memcpy(&str[32],&str[0], 6);
+           }
+           else 
+           {
+	       // Make ICMP response
+               memcpy(tmp_addr,eth->h_source, ETH_ALEN);
+               memcpy(eth->h_source,eth->h_dest, ETH_ALEN);
+               memcpy(eth->h_dest, tmp_addr, ETH_ALEN);
+
+               icmp = (struct icmphdr *)(head_base + ETH_HLEN+20);
+               icmp->type = 0;
+               old_csum = icmp->checksum;
+               icmp->checksum = csum(old_csum);
+               // fixup the packet: ONLY IF LOOPBACK IS ENABLED
+               iphdr_ptr = (struct iphdr *)(head_base + ETH_HLEN);
+               fixup_packet(netdev, head_base, iphdr_ptr, head_skb->len);
+           }
+       }
+       else
+       {
+               // fixup the packet: ONLY IF LOOPBACK IS ENABLED
+               iphdr_ptr = (struct iphdr *)(head_base + ETH_HLEN);
+               fixup_packet(netdev, head_base, iphdr_ptr, head_skb->len);
+       }
     }
 
 #ifdef MTIP_DUMP_PACKETS
