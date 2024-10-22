@@ -1248,17 +1248,17 @@ static inline int ecpri_dma_mhi_client_test_utils_get_ee_gsi_index(
 			break;
 		case ECPRI_DMA_VM_IDS_VM2:
 		case ECPRI_DMA_VM_IDS_VFC:
-		case ECPRI_DMA_VM_IDS_VF3:
+		case ECPRI_DMA_VM_IDS_VF2:
 			*(ee_idx) = ECPRI_DMA_EE_VM2;
 			break;
 		case ECPRI_DMA_VM_IDS_VM3:
-		case ECPRI_DMA_VM_IDS_VF1:
-		case ECPRI_DMA_VM_IDS_VF4:
+		case ECPRI_DMA_VM_IDS_VF3:
 			*(ee_idx) = ECPRI_DMA_EE_VM3;
 			break;
-		case ECPRI_DMA_VM_IDS_VF2:
+		case ECPRI_DMA_VM_IDS_VF1:
+		case ECPRI_DMA_VM_IDS_VF4:
 		case ECPRI_DMA_VM_IDS_VF5:
-			*(ee_idx) = ECPRI_DMA_EE_PF;
+			*(ee_idx) = ECPRI_DMA_EE_VF1;
 			break;
 		default:
 			DMA_UT_ERR("Unexpected function type, type: %d, vf_id: %d\n",
@@ -1270,7 +1270,7 @@ static inline int ecpri_dma_mhi_client_test_utils_get_ee_gsi_index(
 	else if (function.function_type ==
 		MHI_DMA_FUNCTION_TYPE_PHYSICAL) {
 		*(ee_idx) = ECPRI_DMA_EE_PF;
-		*(gsi_idx) = ECPRI_DMA_GSI_ID_0;
+		*(gsi_idx) = ECPRI_DMA_MHI_PF_GSI_ID;
 	}
 	else {
 		DMA_UT_ERR("Unexpected function type, type: %d, vf_id: %d\n",

@@ -43,15 +43,15 @@ ecpri_dma_mhi_function_map[ECPRI_DMA_VM_IDS_MAX] = {
 	[ECPRI_DMA_VM_IDS_VM1] = {ECPRI_DMA_EE_VM1, ECPRI_DMA_GSI_ID_0},
 	[ECPRI_DMA_VM_IDS_VM2] = {ECPRI_DMA_EE_VM2, ECPRI_DMA_GSI_ID_0},
 	[ECPRI_DMA_VM_IDS_VM3] = {ECPRI_DMA_EE_VM3, ECPRI_DMA_GSI_ID_0},
+	[ECPRI_DMA_VM_IDS_VF1] = {ECPRI_DMA_EE_VF1, ECPRI_DMA_GSI_ID_0},
 	[ECPRI_DMA_VM_IDS_VFA] = {ECPRI_DMA_EE_VFA, ECPRI_DMA_GSI_ID_1},
 	[ECPRI_DMA_VM_IDS_VFB] = {ECPRI_DMA_EE_VFB, ECPRI_DMA_GSI_ID_1},
 	[ECPRI_DMA_VM_IDS_VFC] = {ECPRI_DMA_EE_VFC, ECPRI_DMA_GSI_ID_1},
-	[ECPRI_DMA_VM_IDS_VF1] = {ECPRI_DMA_EE_VF1, ECPRI_DMA_GSI_ID_1},
-	[ECPRI_DMA_VM_IDS_VF2] = {ECPRI_DMA_EE_VF2, ECPRI_DMA_GSI_ID_1},
+	[ECPRI_DMA_VM_IDS_VF4] = {ECPRI_DMA_EE_VF4, ECPRI_DMA_GSI_ID_1},
+	[ECPRI_DMA_VM_IDS_VF2] = {ECPRI_DMA_EE_VF2, ECPRI_DMA_GSI_ID_2},
 	[ECPRI_DMA_VM_IDS_VFD] = {ECPRI_DMA_EE_VFD, ECPRI_DMA_GSI_ID_2},
 	[ECPRI_DMA_VM_IDS_VFE] = {ECPRI_DMA_EE_VFE, ECPRI_DMA_GSI_ID_2},
 	[ECPRI_DMA_VM_IDS_VF3] = {ECPRI_DMA_EE_VF3, ECPRI_DMA_GSI_ID_2},
-	[ECPRI_DMA_VM_IDS_VF4] = {ECPRI_DMA_EE_VF4, ECPRI_DMA_GSI_ID_2},
 	[ECPRI_DMA_VM_IDS_VF5] = {ECPRI_DMA_EE_VF5, ECPRI_DMA_GSI_ID_2},
 };
 
@@ -74,7 +74,7 @@ static const bool ecpri_dma_mhi_q6_related_vf_map[ECPRI_DMA_VM_IDS_MAX] = {
 
 static const struct ecpri_dma_mhi_ee_gsi_tuple
 	ecpri_dma_mhi_physical_function_tuple =
-		{ ECPRI_DMA_EE_PF, ECPRI_DMA_GSI_ID_0 };
+		{ ECPRI_DMA_EE_PF, ECPRI_DMA_GSI_ID_1 };
 
 static const struct ecpri_dma_mhi_function_endp_data
 ecpri_dma_mhi_function_endp_dt[ECPRI_HW_MAX][ECPRI_DMA_MHI_CLIENT_FUNCTION_NUM] =
@@ -122,12 +122,14 @@ ecpri_dma_mhi_function_endp_dt[ECPRI_HW_MAX][ECPRI_DMA_MHI_CLIENT_FUNCTION_NUM] 
 		.async_dest_id = ECPRI_DMA_MHI_INVALID_ENDP_ID
 	},
 	[ECPRI_HW_V2_0][ECPRI_DMA_MHI_PF_ID] = {
-		.sync_src_id   = 19,
-		.sync_dest_id  = 56,
-		.async_src_id  = 20,
-		.async_dest_id = 57
+		.sync_src_id   = 0,
+		.sync_dest_id  = 37,
+		.async_src_id  = 1,
+		.async_dest_id = 38
 	}
 };
+
+#define ECPRI_DMA_MHI_SW_CHS_GSI_ID (ECPRI_DMA_GSI_ID_0)
 
 static int ecpri_dma_mhi_pkt_alloc_from_heap(
 	struct mhi_dma_function_params **function_ptr,
@@ -403,7 +405,7 @@ static inline void ecpri_dma_mhi_set_endps(int idx,
 	int sync_dest_endp_id = ECPRI_DMA_MHI_INVALID_ENDP_ID;
 	int async_src_endp_id = ECPRI_DMA_MHI_INVALID_ENDP_ID;
 	int async_dest_endp_id = ECPRI_DMA_MHI_INVALID_ENDP_ID;
-	enum ecpri_dma_gsi_id gsi_id = ECPRI_DMA_GSI_ID_0;
+	enum ecpri_dma_gsi_id gsi_id = ECPRI_DMA_MHI_SW_CHS_GSI_ID;
 
 	ecpri_dma_mhi_get_sync_async_endp_ids(&sync_src_endp_id,
 		&sync_dest_endp_id, &async_src_endp_id, &async_dest_endp_id, idx);
@@ -465,12 +467,15 @@ static int ecpri_dma_mhi_get_endp_ctx(
 			*(endp_ctx) = &ecpri_dma_ctx->endp_ctx[gsi_id][endp_id];
 			ecpri_dma_ctx->endp_ctx[gsi_id][endp_id].gsi_id = gsi_id;
 			ecpri_dma_ctx->endp_ctx[gsi_id][endp_id].endp_id = endp_id;
-			ret = 0;
-			break;
+			DMADBG("Found ENDP %d for CH ID %d, func %d, gsi id %d, EE %d",
+				endp_id, channel_id, function.vf_id, gsi_id, ee_idx);
+			return 0;
 		}
 	}
 
-	return ret;
+	DMAERR("Didn't find ENDP for CH ID %d, func %d, gsi id %d, EE %d",
+		channel_id, function.vf_id, gsi_id, ee_idx);
+	return -EINVAL;
 }
 
 static void ecpri_dma_mhi_get_l2_ch_bitmap(
@@ -802,7 +807,7 @@ static int ecpri_dma_mhi_alloc_sync_async_endps(
 	int sync_dest_endp_id = ECPRI_DMA_MHI_INVALID_ENDP_ID;
 	int async_src_endp_id = ECPRI_DMA_MHI_INVALID_ENDP_ID;
 	int async_dest_endp_id = ECPRI_DMA_MHI_INVALID_ENDP_ID;
-	enum ecpri_dma_gsi_id gsi_id = ECPRI_DMA_GSI_ID_0;
+	enum ecpri_dma_gsi_id gsi_id = ECPRI_DMA_MHI_SW_CHS_GSI_ID;
 	const struct ecpri_dma_mhi_ee_gsi_tuple* func_map;
 	enum ecpri_hw_ver hw_ver = ECPRI_DMA_GET_CTX_HW_VER();
 	struct ecpri_dma_moderation_config sync_mod_cfg, async_mod_cfg;
@@ -822,7 +827,6 @@ static int ecpri_dma_mhi_alloc_sync_async_endps(
 		DMAERR("Unknown function");
 		return ret;
 	}
-	gsi_id = func_map->gsi_id;
 
 	ecpri_dma_mhi_get_sync_async_endp_ids(&sync_src_endp_id, &sync_dest_endp_id,
 		&async_src_endp_id, &async_dest_endp_id, idx);
@@ -952,7 +956,7 @@ static int ecpri_dma_mhi_enable_mhi_memcpy_endps(int idx)
 	int sync_dest_endp_id = ECPRI_DMA_MHI_INVALID_ENDP_ID;
 	int async_src_endp_id = ECPRI_DMA_MHI_INVALID_ENDP_ID;
 	int async_dest_endp_id = ECPRI_DMA_MHI_INVALID_ENDP_ID;
-	enum ecpri_dma_gsi_id gsi_id = ECPRI_DMA_GSI_ID_0;
+	enum ecpri_dma_gsi_id gsi_id = ECPRI_DMA_MHI_SW_CHS_GSI_ID;
 
 	ecpri_dma_mhi_get_sync_async_endp_ids(&sync_src_endp_id,
 		&sync_dest_endp_id, &async_src_endp_id, &async_dest_endp_id, idx);
@@ -1408,8 +1412,6 @@ static int ecpri_dma_mhi_memcpy_init(struct mhi_dma_function_params function)
 
 	/* Set endpoints */
 	ecpri_dma_mhi_set_endps(idx, memcpy_ctx);
-
-	// TODO: init_memcpy_debugfs()
 
 	ECPRI_DMA_MEMRING_INIT(memcpy_ctx->async_work_ring,
 	ECPRI_DMA_MHI_ASYNC_MEMCPY_RLEN);
@@ -2377,8 +2379,6 @@ static int ecpri_dma_mhi_client_init(
 		goto fail_memcpy_enable;
 	}
 
-	// TODO: Debugfs init()
-
 	/* Init channels */
 	for (i = 0; i < ECPRI_DMA_MHI_MAX_HW_CHANNELS; i++)
 	{
@@ -3153,7 +3153,7 @@ static void ecpri_dma_mhi_client_unmap_buffer(dma_addr_t phys, size_t size,
 
 	dma_unmap_single(
 		ecpri_dma_get_smmu_ctx(ECPRI_DMA_SMMU_CB_MHI)->dev,
-	phys, size, dir);
+		phys, size, dir);
 }
 
 static void *ecpri_dma_mhi_client_alloc_buffer(size_t size,
@@ -3161,8 +3161,8 @@ static void *ecpri_dma_mhi_client_alloc_buffer(size_t size,
 {
 	DMADBG_LOW("Begin\n");
 	return  dma_alloc_coherent(
-	ecpri_dma_get_smmu_ctx(ECPRI_DMA_SMMU_CB_MHI)->dev,
-	size, phys, gfp);
+		ecpri_dma_get_smmu_ctx(ECPRI_DMA_SMMU_CB_MHI)->dev,
+		size, phys, gfp);
 }
 
 static void ecpri_dma_mhi_client_free_buffer(size_t size, void* virt,
@@ -3170,8 +3170,8 @@ static void ecpri_dma_mhi_client_free_buffer(size_t size, void* virt,
 {
 	DMADBG_LOW("Begin\n");
 	dma_free_coherent(
-	ecpri_dma_get_smmu_ctx(ECPRI_DMA_SMMU_CB_MHI)->dev,
-	size, virt, phys);
+		ecpri_dma_get_smmu_ctx(ECPRI_DMA_SMMU_CB_MHI)->dev,
+		size, virt, phys);
 }
 
 static int ecpri_dma_mhi_client_resume(struct mhi_dma_function_params function)
@@ -3265,8 +3265,6 @@ static void ecpri_dma_mhi_destroy(
 	ecpri_dma_mhi_memcpy_destroy(function);
 
 	idr_destroy(&ecpri_dma_mhi_client_ctx[idx]->idr);
-
-	// TODO: Destroy debugfs
 
 	destroy_workqueue(ecpri_dma_mhi_client_ctx[idx]->wq);
 

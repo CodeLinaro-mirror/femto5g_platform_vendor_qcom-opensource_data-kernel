@@ -171,7 +171,7 @@ do {\
 #define ECPRI_DMA_GSI_EVENT_RP_SIZE 8
 
 /* Define num of EEs supported */
-#define ECPRI_DMA_NUM_EE (ECPRI_DMA_EE_PF + 1)
+#define ECPRI_DMA_NUM_EE (7)
 
 /* Define for max tramit length*/
 #define ECPRI_DMA_DP_MAX_DESC (20)
