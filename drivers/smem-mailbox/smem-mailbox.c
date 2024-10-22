@@ -243,8 +243,15 @@ static int smem_probe(struct platform_device *pdev) {
 	return 0;
 }
 
-static int smem_remove(struct platform_device *pdev) {
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 10, 0))
+static void smem_remove(struct platform_device *pdev)
+#else	
+static int smem_remove(struct platform_device *pdev)
+#endif
+{
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(6, 10, 0))	
 	return 0;
+#endif	
 }
 
 int smem_mailbox_start(int id, smem_mailbox_urgent_cb urgent_cb) {
