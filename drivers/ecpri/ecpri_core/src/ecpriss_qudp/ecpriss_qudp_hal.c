@@ -206,6 +206,13 @@ static const char *ecpriss_qudp_hal_reg_name_to_str[ECPRISS_QUDP_REG_MAX+1] = {
 "	ECPRI_UDP_FH_UDP_CLASSIFICATION_LIST_PORT_p_ENTRIES_VALID_BITS_V2",
 "	ECPRI_UDP_FH_FILT_MAC_ADDRESS_PORT_p_ENTRIES_VALID_BITS_V2",
 "	ECPRI_UDP_FH_NON_ECPRI_DMA_RING_INFO_PORT_p_LINK_n_V2",
+"	ECPRI_UDP_FH_TRAP_MISC_PORT_p_ENTRY_n_V2",
+"	ECPRI_UDP_FH_TRAP_RULE32_VAL_PORT_p_ENTRY_n_V2",
+"	ECPRI_UDP_FH_TRAP_RULE32_MASK_PORT_p_ENTRY_n_V2",
+"	ECPRI_UDP_FH_TRAP_RULE64_VAL_LSB_PORT_p_ENTRY_n_V2",
+"	ECPRI_UDP_FH_TRAP_RULE64_VAL_MSB_PORT_p_ENTRY_n_V2",
+"	ECPRI_UDP_FH_TRAP_RULE64_MASK_LSB_PORT_p_ENTRY_n_V2",
+"	ECPRI_UDP_FH_TRAP_RULE64_MASK_MSB_PORT_p_ENTRY_n_V2",
 "	ECPRI_UDP_FH_EGRESS_ETH_DST0_PORT_p_ENTRY_n_V2",
 "	ECPRI_UDP_FH_EGRESS_ETH_SRC1_DST1_PORT_p_ENTRY_n_V2",
 "	ECPRI_UDP_FH_EGRESS_ETH_SRC0_PORT_p_ENTRY_n_V2",
@@ -4385,7 +4392,104 @@ static void ecpriss_qudp_hal_reg_parse_non_ecpri_dma_ring_info_port_p_entry_n_v2
 	return;
 
 }
+static void ecpriss_qudp_hal_reg_parse_non_ecpri_udp_fh_trap_misc_port_p_entry_n_v2(ecpriss_qudp_hal_reg_name_e reg,
+		 void *fields,
+		uint32_t val)
+{
+	ecpri_qudp_hwio_def_ecpri_udp_fh_trap_misc_port_p_entry_n_s_v2 *fh_trap_misc_port_info =
+		(ecpri_qudp_hwio_def_ecpri_udp_fh_trap_misc_port_p_entry_n_s_v2*)fields;
+	fh_trap_misc_port_info->rule64_offset = ECPRISS_HAL_GETFIELD_FROM_REG(val,
+			HWIO_ECPRI_UDP_FH_TRAP_MISC_PORT_p_ENTRY_n_RULE64_OFFSET_SHFT_V2,
+			HWIO_ECPRI_UDP_FH_TRAP_MISC_PORT_p_ENTRY_n_RULE64_OFFSET_BMSK_V2);
 
+	fh_trap_misc_port_info->rule32_offset = ECPRISS_HAL_GETFIELD_FROM_REG(val,
+			HWIO_ECPRI_UDP_FH_TRAP_MISC_PORT_p_ENTRY_n_RULE32_OFFSET_SHFT_V2,
+			HWIO_ECPRI_UDP_FH_TRAP_MISC_PORT_p_ENTRY_n_RULE32_OFFSET_BMSK_V2);
+
+	fh_trap_misc_port_info->action = ECPRISS_HAL_GETFIELD_FROM_REG(val,
+			HWIO_ECPRI_UDP_FH_TRAP_MISC_PORT_p_ENTRY_n_ACTION_SHFT_V2,
+			HWIO_ECPRI_UDP_FH_TRAP_MISC_PORT_p_ENTRY_n_ACTION_BMSK_V2);
+
+	fh_trap_misc_port_info->enable = ECPRISS_HAL_GETFIELD_FROM_REG(val,
+			HWIO_ECPRI_UDP_FH_TRAP_MISC_PORT_p_ENTRY_n_ENABLE_SHFT_V2,
+			HWIO_ECPRI_UDP_FH_TRAP_MISC_PORT_p_ENTRY_n_ENABLE_BMSK_V2);
+
+
+	return;
+}
+static void ecpriss_qudp_hal_reg_parse_non_ecpri_udp_fh_trap_rule32_val_port_p_entry_n(ecpriss_qudp_hal_reg_name_e reg,
+		 void *fields,
+		uint32_t val)
+{
+	ecpri_qudp_hwio_def_ecpri_udp_fh_trap_rule32_val_port_p_entry_n_s_v2 *fh_trap_rule32_val_port =
+		(ecpri_qudp_hwio_def_ecpri_udp_fh_trap_rule32_val_port_p_entry_n_s_v2*)fields;
+
+	fh_trap_rule32_val_port->value = ECPRISS_HAL_GETFIELD_FROM_REG(val,
+			HWIO_ECPRI_UDP_FH_TRAP_RULE32_VAL_PORT_p_ENTRY_n_VALUE_SHFT_V2,
+			HWIO_ECPRI_UDP_FH_TRAP_RULE32_VAL_PORT_p_ENTRY_n_VALUE_BMSK_V2);
+
+	return;
+}
+static void ecpriss_qudp_hal_reg_parse_non_ecpri_udp_fh_trap_rule32_mask_port_p_entry_n_v2(ecpriss_qudp_hal_reg_name_e reg,
+		 void *fields,
+		uint32_t val)
+{
+	ecpri_qudp_hwio_def_ecpri_udp_fh_trap_rule32_mask_port_p_entry_n_s_v2 *fh_trap_rule32_mask_port_info =
+		(ecpri_qudp_hwio_def_ecpri_udp_fh_trap_rule32_mask_port_p_entry_n_s_v2*)fields;
+
+	fh_trap_rule32_mask_port_info->value = ECPRISS_HAL_GETFIELD_FROM_REG(val,
+			HWIO_ECPRI_UDP_FH_TRAP_RULE32_MASK_PORT_p_ENTRY_n_VALUE_SHFT_V2,
+			HWIO_ECPRI_UDP_FH_TRAP_RULE32_MASK_PORT_p_ENTRY_n_VALUE_BMSK_V2);
+	return;
+}
+static void ecpriss_qudp_hal_reg_parse_non_ecpri_udp_fh_trap_rule64_val_lsb_port_p_entry_n_v2(ecpriss_qudp_hal_reg_name_e reg,
+		 void *fields,
+		uint32_t val)
+{
+	ecpri_qudp_hwio_def_ecpri_udp_fh_trap_rule64_val_lsb_port_p_entry_n_s_v2 *fh_trap_rule64_val_lsb_port =
+		(ecpri_qudp_hwio_def_ecpri_udp_fh_trap_rule64_val_lsb_port_p_entry_n_s_v2*)fields;
+
+	fh_trap_rule64_val_lsb_port->value = ECPRISS_HAL_GETFIELD_FROM_REG(val,
+			HWIO_ECPRI_UDP_FH_TRAP_RULE64_VAL_LSB_PORT_p_ENTRY_n_VALUE_SHFT_V2,
+			HWIO_ECPRI_UDP_FH_TRAP_RULE64_VAL_LSB_PORT_p_ENTRY_n_VALUE_BMSK_V2);
+	return;
+}
+static void ecpriss_qudp_hal_reg_parse_non_ecpri_udp_fh_trap_rule64_val_msb_port_p_entry_n_v2(ecpriss_qudp_hal_reg_name_e reg,
+		 void *fields,
+		uint32_t val)
+{
+	ecpri_qudp_hwio_def_ecpri_udp_fh_trap_rule64_val_msb_port_p_entry_n_s_v2 *fh_trap_rule64_val_msb_port =
+		(ecpri_qudp_hwio_def_ecpri_udp_fh_trap_rule64_val_msb_port_p_entry_n_s_v2*)fields;
+
+	fh_trap_rule64_val_msb_port->value = ECPRISS_HAL_GETFIELD_FROM_REG(val,
+			HWIO_ECPRI_UDP_FH_TRAP_RULE64_VAL_MSB_PORT_p_ENTRY_n_VALUE_SHFT_V2,
+			HWIO_ECPRI_UDP_FH_TRAP_RULE64_VAL_MSB_PORT_p_ENTRY_n_VALUE_BMSK_V2);
+	return;
+}
+static void ecpriss_qudp_hal_reg_parse_non_ecpri_udp_fh_trap_rule64_mask_lsb_port_p_entry_n_v2(ecpriss_qudp_hal_reg_name_e reg,
+		 void *fields,
+		uint32_t val)
+{
+	ecpri_qudp_hwio_def_ecpri_udp_fh_trap_rule64_mask_lsb_port_p_entry_n_s_v2 *fh_trap_rule64_mask_lsb_port =
+		(ecpri_qudp_hwio_def_ecpri_udp_fh_trap_rule64_mask_lsb_port_p_entry_n_s_v2*)fields;
+
+	fh_trap_rule64_mask_lsb_port->value = ECPRISS_HAL_GETFIELD_FROM_REG(val,
+			HWIO_ECPRI_UDP_FH_TRAP_RULE64_MASK_LSB_PORT_p_ENTRY_n_VALUE_SHFT_V2,
+			HWIO_ECPRI_UDP_FH_TRAP_RULE64_MASK_LSB_PORT_p_ENTRY_n_VALUE_BMSK_V2);
+	return;
+}
+static void ecpriss_qudp_hal_reg_parse_non_ecpri_udp_fh_trap_rule64_mask_msb_port_p_entry_n_v2(ecpriss_qudp_hal_reg_name_e reg,
+		 void *fields,
+		uint32_t val)
+{
+	ecpri_qudp_hwio_def_ecpri_udp_fh_trap_rule64_mask_msb_port_p_entry_n_s_v2 *fh_trap_rule64_mask_msb_port =
+		(ecpri_qudp_hwio_def_ecpri_udp_fh_trap_rule64_mask_msb_port_p_entry_n_s_v2*) fields;
+
+	fh_trap_rule64_mask_msb_port->value = ECPRISS_HAL_GETFIELD_FROM_REG(val,
+			HWIO_ECPRI_UDP_FH_TRAP_RULE64_MASK_MSB_PORT_p_ENTRY_n_VALUE_SHFT_V2,
+			HWIO_ECPRI_UDP_FH_TRAP_RULE64_MASK_MSB_PORT_p_ENTRY_n_VALUE_BMSK_V2);
+	return;
+}
 static void ecpriss_qudp_hal_reg_construct_non_ecpri_dma_ring_info_port_p_entry_n_v2(ecpriss_qudp_hal_reg_name_e reg,
 		const void *fields,
 		uint32_t *val)
@@ -4407,6 +4511,109 @@ static void ecpriss_qudp_hal_reg_construct_non_ecpri_dma_ring_info_port_p_entry_
 	return;
 
 }
+static void ecpriss_qudp_hal_reg_construct_ecpri_udp_fh_trap_misc_port_p_entry_n_v2(ecpriss_qudp_hal_reg_name_e reg,
+		const void *fields,
+		uint32_t *val)
+{
+	ecpri_qudp_hwio_def_ecpri_udp_fh_trap_misc_port_p_entry_n_s_v2 *fh_trap_misc_port_info =
+		(ecpri_qudp_hwio_def_ecpri_udp_fh_trap_misc_port_p_entry_n_s_v2*)fields;
+
+	ECPRISS_HAL_SETFIELD_IN_REG(*val,
+			fh_trap_misc_port_info->rule64_offset,
+			HWIO_ECPRI_UDP_FH_TRAP_MISC_PORT_p_ENTRY_n_RULE64_OFFSET_SHFT_V2,
+			HWIO_ECPRI_UDP_FH_TRAP_MISC_PORT_p_ENTRY_n_RULE64_OFFSET_BMSK_V2);
+	ECPRISS_HAL_SETFIELD_IN_REG(*val,
+			fh_trap_misc_port_info->rule32_offset,
+			HWIO_ECPRI_UDP_FH_TRAP_MISC_PORT_p_ENTRY_n_RULE32_OFFSET_SHFT_V2,
+			HWIO_ECPRI_UDP_FH_TRAP_MISC_PORT_p_ENTRY_n_RULE32_OFFSET_BMSK_V2);
+	ECPRISS_HAL_SETFIELD_IN_REG(*val,
+			fh_trap_misc_port_info->action,
+			HWIO_ECPRI_UDP_FH_TRAP_MISC_PORT_p_ENTRY_n_ACTION_SHFT_V2,
+			HWIO_ECPRI_UDP_FH_TRAP_MISC_PORT_p_ENTRY_n_ACTION_BMSK_V2);
+	ECPRISS_HAL_SETFIELD_IN_REG(*val,
+			fh_trap_misc_port_info->enable,
+			HWIO_ECPRI_UDP_FH_TRAP_MISC_PORT_p_ENTRY_n_ENABLE_SHFT_V2,
+			HWIO_ECPRI_UDP_FH_TRAP_MISC_PORT_p_ENTRY_n_ENABLE_BMSK_V2);
+	return;
+}
+static void ecpriss_qudp_hal_reg_construct_ecpri_udp_fh_trap_rule32_val_port_p_entry_n(ecpriss_qudp_hal_reg_name_e reg,
+		const void *fields,
+		uint32_t *val)
+{
+	ecpri_qudp_hwio_def_ecpri_udp_fh_trap_rule32_val_port_p_entry_n_s_v2 *fh_trap_rule32_val_port =
+		(ecpri_qudp_hwio_def_ecpri_udp_fh_trap_rule32_val_port_p_entry_n_s_v2*)fields;
+	ECPRISS_HAL_SETFIELD_IN_REG(*val,
+			fh_trap_rule32_val_port->value,
+			HWIO_ECPRI_UDP_FH_TRAP_RULE32_VAL_PORT_p_ENTRY_n_VALUE_SHFT_V2,
+			HWIO_ECPRI_UDP_FH_TRAP_RULE32_VAL_PORT_p_ENTRY_n_VALUE_BMSK_V2);
+	return;
+}
+static void ecpriss_qudp_hal_reg_construct_ecpri_udp_fh_trap_rule32_mask_port_p_entry_n_v2(ecpriss_qudp_hal_reg_name_e reg,
+		const void *fields,
+		uint32_t *val)
+{
+	ecpri_qudp_hwio_def_ecpri_udp_fh_trap_rule32_mask_port_p_entry_n_s_v2 *fh_trap_rule32_mask_port_info =
+		(ecpri_qudp_hwio_def_ecpri_udp_fh_trap_rule32_mask_port_p_entry_n_s_v2*)fields;
+	ECPRISS_HAL_SETFIELD_IN_REG(*val,
+			fh_trap_rule32_mask_port_info->value,
+			HWIO_ECPRI_UDP_FH_TRAP_RULE32_MASK_PORT_p_ENTRY_n_VALUE_SHFT_V2,
+			HWIO_ECPRI_UDP_FH_TRAP_RULE32_MASK_PORT_p_ENTRY_n_VALUE_BMSK_V2);
+
+	return;
+}
+static void ecpriss_qudp_hal_reg_construct_ecpri_udp_fh_trap_rule64_val_lsb_port_p_entry_n_v2(ecpriss_qudp_hal_reg_name_e reg,
+		const void *fields,
+		uint32_t *val)
+{
+	ecpri_qudp_hwio_def_ecpri_udp_fh_trap_rule64_val_lsb_port_p_entry_n_s_v2 *fh_trap_rule64_val_lsb_port =
+		(ecpri_qudp_hwio_def_ecpri_udp_fh_trap_rule64_val_lsb_port_p_entry_n_s_v2*)fields;
+	ECPRISS_HAL_SETFIELD_IN_REG(*val,
+			fh_trap_rule64_val_lsb_port->value,
+			HWIO_ECPRI_UDP_FH_TRAP_RULE64_VAL_LSB_PORT_p_ENTRY_n_VALUE_SHFT_V2,
+			HWIO_ECPRI_UDP_FH_TRAP_RULE64_VAL_LSB_PORT_p_ENTRY_n_VALUE_BMSK_V2);
+
+	return;
+}
+static void ecpriss_qudp_hal_reg_construct_ecpri_udp_fh_trap_rule64_val_msb_port_p_entry_n_v2(ecpriss_qudp_hal_reg_name_e reg,
+		const void *fields,
+		uint32_t *val)
+{
+	ecpri_qudp_hwio_def_ecpri_udp_fh_trap_rule64_val_msb_port_p_entry_n_s_v2 *fh_trap_rule64_val_msb_port =
+		(ecpri_qudp_hwio_def_ecpri_udp_fh_trap_rule64_val_msb_port_p_entry_n_s_v2*)fields;
+	ECPRISS_HAL_SETFIELD_IN_REG(*val,
+			fh_trap_rule64_val_msb_port->value,
+			HWIO_ECPRI_UDP_FH_TRAP_RULE64_VAL_MSB_PORT_p_ENTRY_n_VALUE_SHFT_V2,
+			HWIO_ECPRI_UDP_FH_TRAP_RULE64_VAL_MSB_PORT_p_ENTRY_n_VALUE_BMSK_V2);
+
+	return;
+}
+static void ecpriss_qudp_hal_reg_construct_ecpri_udp_fh_trap_rule64_mask_lsb_port_p_entry_n_v2(ecpriss_qudp_hal_reg_name_e reg,
+		const void *fields,
+		uint32_t *val)
+{
+	ecpri_qudp_hwio_def_ecpri_udp_fh_trap_rule64_mask_lsb_port_p_entry_n_s_v2 *fh_trap_rule64_mask_lsb_port =
+		(ecpri_qudp_hwio_def_ecpri_udp_fh_trap_rule64_mask_lsb_port_p_entry_n_s_v2*)fields;
+	ECPRISS_HAL_SETFIELD_IN_REG(*val,
+			fh_trap_rule64_mask_lsb_port->value,
+			HWIO_ECPRI_UDP_FH_TRAP_RULE64_MASK_LSB_PORT_p_ENTRY_n_VALUE_SHFT_V2,
+			HWIO_ECPRI_UDP_FH_TRAP_RULE64_MASK_LSB_PORT_p_ENTRY_n_VALUE_BMSK_V2);
+	return;
+}
+static void ecpriss_qudp_hal_reg_construct_ecpri_udp_fh_trap_rule64_mask_msb_port_p_entry_n_v2(ecpriss_qudp_hal_reg_name_e reg,
+		const void *fields,
+		uint32_t *val)
+{
+	ecpri_qudp_hwio_def_ecpri_udp_fh_trap_rule64_mask_msb_port_p_entry_n_s_v2 *fh_trap_rule64_mask_msb_port =
+		(ecpri_qudp_hwio_def_ecpri_udp_fh_trap_rule64_mask_msb_port_p_entry_n_s_v2*) fields;
+	ECPRISS_HAL_SETFIELD_IN_REG(*val,
+			fh_trap_rule64_mask_msb_port->value,
+			HWIO_ECPRI_UDP_FH_TRAP_RULE64_MASK_MSB_PORT_p_ENTRY_n_VALUE_SHFT_V2,
+			HWIO_ECPRI_UDP_FH_TRAP_RULE64_MASK_MSB_PORT_p_ENTRY_n_VALUE_BMSK_V2);
+	return;
+}
+
+
+
 
 static void ecpriss_qudp_hal_reg_construct_l2_non_ecpri_dma_ring_info_port_p_entry_n_v2(ecpriss_qudp_hal_reg_name_e reg,
 		const void *fields,
@@ -5369,6 +5576,34 @@ static struct ecpriss_qudp_hal_reg_obj ecpriss_qudp_hal_reg_objs[ECPRISS_HW_MAX]
 		ecpriss_qudp_hal_reg_construct_non_ecpri_dma_ring_info_port_p_entry_n_v2,
 		ecpriss_qudp_hal_reg_parse_non_ecpri_dma_ring_info_port_p_entry_n_v2,
 		0x09380000, 0x3FC, 0x4, 0, 0, 0, 0x10},
+	[ECPRISS_HW_v2_0][ECPRI_UDP_FH_TRAP_MISC_PORT_p_ENTRY_n_V2] = {
+		ecpriss_qudp_hal_reg_construct_ecpri_udp_fh_trap_misc_port_p_entry_n_v2,
+		ecpriss_qudp_hal_reg_parse_non_ecpri_udp_fh_trap_misc_port_p_entry_n_v2,
+		0x09380000, 0x60, 0x04, 0, 0, 0, 0x10},
+	[ECPRISS_HW_v2_0][ECPRI_UDP_FH_TRAP_RULE32_VAL_PORT_p_ENTRY_n_V2] = {
+		ecpriss_qudp_hal_reg_construct_ecpri_udp_fh_trap_rule32_val_port_p_entry_n,
+		ecpriss_qudp_hal_reg_parse_non_ecpri_udp_fh_trap_rule32_val_port_p_entry_n,
+		0x09380000, 0x150, 0x04, 0, 0, 0, 0x10},
+	[ECPRISS_HW_v2_0][ECPRI_UDP_FH_TRAP_RULE32_MASK_PORT_p_ENTRY_n_V2] = {
+		ecpriss_qudp_hal_reg_construct_ecpri_udp_fh_trap_rule32_mask_port_p_entry_n_v2,
+		ecpriss_qudp_hal_reg_parse_non_ecpri_udp_fh_trap_rule32_mask_port_p_entry_n_v2,
+		0x09380000, 0x180, 0x04, 0, 0, 0, 0x10},
+	[ECPRISS_HW_v2_0][ECPRI_UDP_FH_TRAP_RULE64_VAL_LSB_PORT_p_ENTRY_n_V2] = {
+		ecpriss_qudp_hal_reg_construct_ecpri_udp_fh_trap_rule64_val_lsb_port_p_entry_n_v2,
+		ecpriss_qudp_hal_reg_parse_non_ecpri_udp_fh_trap_rule64_val_lsb_port_p_entry_n_v2,
+		0x09380000, 0x90, 0x04, 0, 0, 0, 0x10},
+	[ECPRISS_HW_v2_0][ECPRI_UDP_FH_TRAP_RULE64_VAL_MSB_PORT_p_ENTRY_n_V2] = {
+		ecpriss_qudp_hal_reg_construct_ecpri_udp_fh_trap_rule64_val_msb_port_p_entry_n_v2,
+		ecpriss_qudp_hal_reg_parse_non_ecpri_udp_fh_trap_rule64_val_msb_port_p_entry_n_v2,
+		0x09380000, 0xc0, 0x04, 0, 0, 0, 0x10},
+	[ECPRISS_HW_v2_0][ECPRI_UDP_FH_TRAP_RULE64_MASK_LSB_PORT_p_ENTRY_n_V2] = {
+		ecpriss_qudp_hal_reg_construct_ecpri_udp_fh_trap_rule64_mask_lsb_port_p_entry_n_v2,
+		ecpriss_qudp_hal_reg_parse_non_ecpri_udp_fh_trap_rule64_mask_lsb_port_p_entry_n_v2,
+		0x09380000, 0xf0, 0x04, 0, 0, 0, 0x10},
+	[ECPRISS_HW_v2_0][ECPRI_UDP_FH_TRAP_RULE64_MASK_MSB_PORT_p_ENTRY_n_V2] = {
+		ecpriss_qudp_hal_reg_construct_ecpri_udp_fh_trap_rule64_mask_msb_port_p_entry_n_v2,
+		ecpriss_qudp_hal_reg_parse_non_ecpri_udp_fh_trap_rule64_mask_msb_port_p_entry_n_v2,
+		0x09380000, 0x120, 0x04, 0, 0, 0, 0x10},
 	[ECPRISS_HW_v2_0][ECPRI_UDP_FH_EGRESS_ETH_DST0_PORT_p_ENTRY_n_V2] = {
 		ecpriss_qudp_hal_reg_construct_fh_egress_eth_dst0_port_p_entry_n_v2,
 		ecpriss_qudp_hal_reg_parse_fh_egress_eth_dst0_port_p_entry_n_v2,
