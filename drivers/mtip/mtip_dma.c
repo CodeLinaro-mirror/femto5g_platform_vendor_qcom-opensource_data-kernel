@@ -1209,7 +1209,11 @@ static void mtip_dma_process_packet(
     platform_driver_priv->mtip_links[link_index]->net_stats.rx_bytes += head_skb->len +  ETH_HLEN;
     spin_unlock_irqrestore(lock, flags);
 
-    if (status_code == ECPRI_DMA_STATUS_CODE_PTP)
+    if ((status_code == ECPRI_DMA_STATUS_CODE_PTP) ||
+        (status_code == ECPRI_DMA_STATUS_CODE_QUDP_TRAPPED_PKT_PKT_0) ||
+        (status_code == ECPRI_DMA_STATUS_CODE_QUDP_TRAPPED_PKT_PKT_1) ||
+	(status_code == ECPRI_DMA_STATUS_CODE_QUDP_TRAPPED_PKT_PKT_2) ||
+	(status_code == ECPRI_DMA_STATUS_CODE_QUDP_TRAPPED_PKT_PKT_3))
     {
         mtip_dma_skb_timestamp(head_skb);
     }
