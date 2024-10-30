@@ -104,12 +104,6 @@ void mtip_snd_event_notification(uint32_t interface, uint32_t event)
 			break;
 
 		case LOCAL_PLUG_OUT_SET:
-			/*
-			 * check if it is already set
-			 */
-			if(local_plugout_status[interface] == STATUS_SET){
-				return;
-			}
 			local_plugout_status[interface] = STATUS_SET;
 			CSMLOGDBG("Interface[%u] local plugout Set\n",interface);
 			break;

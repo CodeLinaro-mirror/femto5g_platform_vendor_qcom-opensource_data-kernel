@@ -3425,6 +3425,8 @@ void run_mtip_process_netdev_open(void* workptr)
    int sfp_port_type;
    enum ecpri_dma_notify_mode setmode = ECPRI_DMA_NOTIFY_MODE_IRQ;
    u32 port_type;
+   u32 lane_index;
+   trx_lane_down_reason_code_type reason_code;
 
    priv = netdev_priv(netdev);
    if(!priv)
@@ -3562,6 +3564,17 @@ void run_mtip_process_netdev_open(void* workptr)
                // lane assignment is not complete yet
                // set the state to OPEN_WAITING_FOR_LANES
                platform_driver_priv->mtip_links[link_index]->state = MTIP_LINK_STATE_OPEN_WAITING_FOR_LANES;
+
+               // Inform local plugout at boot up
+               if(mtip_lookup_lane_index_by_port_type_and_real_lane(&lane_index, port_type, 0) >= 0)
+               {
+                 if((qsfp_trx_get_lane_down_reason_code(platform_driver_priv->devices.lane_devices[lane_index].sfp_phandle,
+                                                       &reason_code) >= 0) &&
+                    (reason_code == TRX_LOCAL_PLUGOUT))
+                 {
+                   mtip_snd_event_notification(link_index, LOCAL_PLUG_OUT_SET);
+                 }
+               }
             }
 
             mutex_unlock(&platform_driver_priv->mtip_links[link_index]->dev_lock);
