@@ -351,6 +351,8 @@ struct mtip_lane_info
     struct net_device* lane_dummy_ndev;
 
     spinlock_t lock;
+
+    bool rx_los_set;
 };
 
 /*
