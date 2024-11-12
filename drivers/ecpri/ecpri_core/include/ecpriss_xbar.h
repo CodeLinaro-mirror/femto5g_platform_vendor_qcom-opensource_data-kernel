@@ -324,6 +324,7 @@ typedef struct ecpriss_xbar_ctx_v2
 	ecpriss_xbar_global_cfg_s	xbar_global_cfg;
 	bool				def_lut_cfg_done[ECPRISS_MAX_PORTS];
         bool                            disable_xbar_dma_fh_same_prio;
+	uint32_t			enable_len_check;
 }ecpriss_xbar_ctx_s_v2;
 
 

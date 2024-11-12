@@ -732,6 +732,34 @@ static void ecpriss_xbar_fh_cfg_enable_v2()
 	return;
 }
 
+void ecpriss_xbar_oc_cfg_enable_len_check_v2(uint32_t len_check_action)
+{
+	ecpri_xbar_hwio_def_ecpri_xbar_oc_cfg_s oc_cfg;
+
+	memset(&oc_cfg,0,sizeof(ecpri_xbar_hwio_def_ecpri_xbar_oc_cfg_s));
+
+	ecpriss_xbar_hal_read_reg_n_fields(ECPRISS_XBAR_GLOBAL, ECPRI_XBAR_OC_CFG, 0, &oc_cfg);
+	ECPRILOGINFO("Before update:ECPRI_XBAR_OC_CFG  0x%x\n",oc_cfg);
+	if(0 == len_check_action){
+		/*
+		 * Disbale len check
+		 */
+		oc_cfg.octx_len_chk_enable = 0;
+		oc_cfg.octx_len_chk_drop = 0;
+	}else{
+		/*
+		 * Enable len check
+		 */
+		oc_cfg.octx_len_chk_enable = 1;
+		oc_cfg.octx_len_chk_drop = 1;
+	}
+	ecpriss_xbar_hal_write_reg_n_fields(ECPRISS_XBAR_GLOBAL, ECPRI_XBAR_OC_CFG, 0, &oc_cfg);
+
+	ecpriss_xbar_hal_read_reg_n_fields(ECPRISS_XBAR_GLOBAL, ECPRI_XBAR_OC_CFG, 0, &oc_cfg);
+	ECPRILOGINFO("After update:ECPRI_XBAR_OC_CFG  0x%x\n",oc_cfg);
+
+	return;
+}
 static void ecpriss_xbar_flush_init()
 {
 	ecpri_xbar_hwio_def_ecpri_xbar_xbar_flush_s xbar_flush;
@@ -1659,6 +1687,7 @@ int ecpriss_xbar_cold_init_v2(struct device *dev)
 			if(ecpriss_pdata_v2->xbar_ctx_v2)
 			{
 				ecpriss_pdata_v2->xbar_ctx_v2->state = ECPRI_XBAR_COLD_INIT ;
+				ecpriss_xbar_oc_cfg_enable_len_check_v2(ecpriss_pdata_v2->xbar_ctx_v2->enable_len_check);
 
 				if(ecpriss_pdata_v2->xbar_ctx_v2->disable_xbar_dma_fh_same_prio == false) {
 					ecpriss_xbar_fh_cfg_enable_v2();

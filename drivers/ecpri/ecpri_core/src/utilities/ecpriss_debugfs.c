@@ -236,6 +236,17 @@ static ssize_t config_val_to_global_ecpriss_stats_timeout(const char __user *buf
 
 	return *count;
 }
+static ssize_t config_val_to_global_ecpriss_enable_len_check(const char __user *buf, int fh_index, size_t *count, loff_t *ppos)
+{
+	int val = -1;
+
+	if(kstrtouint_from_user(buf, *count, 10, &val))
+		return -EFAULT;
+
+	ecpriss_core_set_enable_len_check_info(val);
+	ecpriss_xbar_oc_cfg_enable_len_check_v2(val);
+	return *count;
+}
 static ssize_t config_val_to_qudp_ingress_action(const char __user *buf, int fh_index, size_t *count, loff_t *ppos)
 {
 	int val = -1;
@@ -327,6 +338,33 @@ static ssize_t config_val_from_global_ecpriss_stats_timeout(char __user *buf, in
 	ret_val = copy_to_user(buf,(max_str + *ppos), *count);
 	return data_size;
 }
+
+static ssize_t config_val_from_global_ecpriss_enable_len_check(char __user *buf, int fh_index, size_t *count, loff_t *ppos)
+{
+	int enable_len_check = 0;
+	static int data_size = 0;
+	int ret_val = 0;
+
+	if(*ppos == 0 ) {
+
+		memset(max_str,0,sizeof(max_str));
+
+		enable_len_check = ecpriss_core_get_enable_len_check_info();
+
+		scnprintf(max_str, MAX_STR_SIZE, "%d\n", enable_len_check);
+		data_size = strlen(max_str);
+	}
+
+	if(*ppos  >= MAX_STR_SIZE)
+		return 0;
+
+	if( *ppos + *count > data_size)
+		*count =  data_size - *ppos;
+
+	ret_val = copy_to_user(buf,(max_str + *ppos), *count);
+	return data_size;
+}
+
 
 static ssize_t config_val_from_qudp_ingress_action(char __user *buf, int fh_index, size_t *count, loff_t *ppos)
 {
@@ -6351,6 +6389,35 @@ static ssize_t cfg_value_to_global_ecpriss_stats_timeout(struct file *file, cons
 
 
 }
+static ssize_t cfg_value_from_global_ecpriss_enable_len_check(struct file *file, char __user *buf,
+		size_t count, loff_t *ppos)
+{
+	uint32_t len;
+
+	len = config_val_from_global_ecpriss_enable_len_check(buf, 2, &count , ppos);
+	if((*ppos + count) > len){
+		count = len - *ppos;
+	}
+	*ppos += count;
+	return count;
+
+}
+
+static ssize_t cfg_value_to_global_ecpriss_enable_len_check(struct file *file, const char __user *buf,
+		size_t count, loff_t *ppos)
+{
+	uint32_t len;
+
+	len = config_val_to_global_ecpriss_enable_len_check(buf, 2, &count , ppos);
+	if((*ppos + count) > len){
+		count = len - *ppos;
+	}
+	*ppos += count;
+	return count;
+
+
+}
+
 static ssize_t cfg_value_from_qudp_ingress_action(struct file *file, char __user *buf,
 		size_t count, loff_t *ppos)
 {
@@ -6784,6 +6851,10 @@ static struct file_operations global_stats_timeout_config = {
 	.read = cfg_value_from_global_ecpriss_stats_timeout,
 	.write = cfg_value_to_global_ecpriss_stats_timeout,
 };
+static struct file_operations global_enable_len_check_config = {
+	.read = cfg_value_from_global_ecpriss_enable_len_check,
+	.write = cfg_value_to_global_ecpriss_enable_len_check,
+};
 static struct file_operations qudp_ingress_action_config = {
 	.read = cfg_value_from_qudp_ingress_action,
 	.write = cfg_value_to_qudp_ingress_action,
@@ -7162,6 +7233,16 @@ static struct file_operations *file_name_to_wrapper(char *filename)
 	{
 		return &global_stats_timeout_config;
 	}
+	else if (!strncmp(filename, "ecpriss_enable_len_check", XBAR_WRAPPER_SIZE))
+	{
+		return &global_enable_len_check_config;
+	}
+
+	else if (!strncmp(filename, "ecpriss_enable_len_check", XBAR_WRAPPER_SIZE))
+	{
+		return &global_enable_len_check_config;
+	}
+
 	else if (!strncmp(filename, "ecpriss_config_qudp_ingress_action", XBAR_WRAPPER_SIZE))
 	{
 		return &qudp_ingress_action_config;
