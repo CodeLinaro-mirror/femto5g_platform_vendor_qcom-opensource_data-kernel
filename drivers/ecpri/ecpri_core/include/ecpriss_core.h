@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: GPL-2.0-only
- * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #ifndef ECPRISS_CORE_H_
@@ -272,4 +272,8 @@ void ecpriss_debug_flow_info(ecpriss_packet_payload_s *packet, uint8_t msg_id);
 void ecpriss_xbar_oc_cfg_enable_len_check_v2(uint32_t len_check_action);
 void ecpriss_core_set_enable_len_check_info(uint32_t val);
 int ecpriss_core_get_enable_len_check_info(void);
+
+int32_t ecpri_send_logging_trigger_to_dma(ecpriss_log_cfg_s *log_cfg);
+int32_t ecpriss_configure_logging(ecpriss_packet_payload_s *packet);
+
 #endif

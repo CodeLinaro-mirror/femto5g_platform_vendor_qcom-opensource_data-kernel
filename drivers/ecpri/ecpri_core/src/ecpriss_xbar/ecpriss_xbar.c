@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: GPL-2.0-only
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include "ecpriss_core.h"
@@ -1926,6 +1926,53 @@ int ecpriss_xbar_fh_rx_lut_v2(uint32_t  port_index,
 	return ret;
 }
 
+int ecpriss_xbar_fh_rx_lut_v2_logging(uint32_t port_index,
+		uint16_t pcid_index , ecpriss_log_dir_e log_dir, ecpriss_logging_action action)
+{
+
+	int ret = 0;
+	ecpri_xbar_hwio_def_ecpri_xbar_fhrx_m_lut_n_s xbar_fhrx_m_lut_n;
+	ecpriss_xbar_port_lut_s_v2 *xbar_port_lut = NULL;
+
+	do{
+
+		memset(&xbar_fhrx_m_lut_n,
+				0,
+				sizeof(xbar_fhrx_m_lut_n));
+
+
+		ecpriss_xbar_hal_read_reg_mn_fields(ECPRISS_XBAR_LUT,
+				ECPRI_XBAR_LUT_XBAR_FHRX_m_LUT_n_V2,
+				port_index,
+				pcid_index,
+				&xbar_fhrx_m_lut_n);
+
+		xbar_port_lut = &ecpriss_pdata_v2->xbar_ctx_v2->flow_ctx_v2.fh_xbar_lut[port_index];
+
+		if(log_dir == ECPRISS_FLOW_DIR_UL){
+
+			xbar_fhrx_m_lut_n.ul_route_to_dma = action;
+
+			xbar_port_lut->lut_table[pcid_index].ul_route_to_dma = action;
+
+		}else {
+
+			xbar_fhrx_m_lut_n.dl_route_to_dma = action;
+
+			xbar_port_lut->lut_table[pcid_index].dl_route_to_dma = action;
+
+		}
+
+		ecpriss_xbar_hal_write_reg_mn_fields(ECPRISS_XBAR_LUT,
+				ECPRI_XBAR_LUT_XBAR_FHRX_m_LUT_n_V2,
+				port_index,
+				pcid_index,
+				&xbar_fhrx_m_lut_n);
+
+	}while (0);
+
+	return ret;
+}
 
 
 /**
@@ -2082,6 +2129,34 @@ int ecpriss_xbar_oc_rx_lut_decfg_v2(uint32_t               port_index,
 		ECPRILOGDBG("ocrx_lut cleared for pcid %d\n",current_pcid_index);
 	}while (0);
 	return ret;
+}
+
+void ecpriss_xbar_fhrx_default_dma_channel(void)
+{
+	int32_t fh_index = 0;
+	int port_index = 0, j;
+
+	ecpri_xbar_hwio_def_ecpri_xbar_fhrx_n_default_dma_channel_s xbar_fhrx_default_dma_channel;
+	struct ecpri_dma_port_params *dma_port_cfg= &ecpriss_pdata_v2->xbar_ctx_v2->oran_log_port_cfg.dma_port_cfg[fh_index];
+
+	memset(&xbar_fhrx_default_dma_channel , 0, sizeof(xbar_fhrx_default_dma_channel));
+
+	for(j=0; j<dma_port_cfg->num_of_rings; j++)
+	{
+		if(dma_port_cfg->dma_rings_param[j].dma_ring_type == ECPRI_DMA_RING_TYPE_ORAN_LOG_INGRESS)
+		{
+			xbar_fhrx_default_dma_channel.dma_ring_id = dma_port_cfg->dma_rings_param[1].dest_dma_ring_id;
+			xbar_fhrx_default_dma_channel.gsi_id = dma_port_cfg->dma_rings_param[1].dest_dma_ring_gsi_id;
+
+			for(port_index=0; port_index<MAX_PORTS; port_index++)
+			{
+				ecpriss_xbar_hal_write_reg_n_fields(ECPRISS_XBAR_GLOBAL,
+						ECPRI_XBAR_FHRX_n_DEFAULT_DMA_CHANNEL,
+						port_index,
+						&xbar_fhrx_default_dma_channel);
+			}
+		}
+	}
 }
 
 /**
