@@ -1,6 +1,6 @@
 /*
  * SPDX-License-Identifier: GPL-2.0-only
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 #include <linux/clk.h>
 #include <linux/compat.h>
@@ -708,6 +708,7 @@ int ecpri_dma_alloc_endp(struct ecpri_dma_ecpri_endp_alloc_params *params)
 
 	ep->notify_comp = notify_comp;
 	ep->enable_tx_poll = enable_tx_poll;
+	ep->align_ring_mem = params->align_ring_mem;
 
 	ret = ecpri_dma_gsi_setup_channel(ep);
 	if (ret) {

@@ -1,6 +1,6 @@
 /*
  * SPDX-License-Identifier: GPL-2.0-only
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #ifndef _ECPRI_DMA_ECPRI_SS_H_
@@ -30,8 +30,17 @@ enum ecpri_dma_ring_type {
 	ECPRI_DMA_RING_TYPE_IPC_Q6,
 	ECPRI_DMA_RING_TYPE_C2C_DEFAULT,
 	ECPRI_DMA_RING_TYPE_LTE_DEFAULT,
-	ECPRI_DMA_RING_TYPE_ORAN_LOG_DEFAULT,
+	ECPRI_DMA_RING_TYPE_ORAN_LOG_EGRESS,
+	ECPRI_DMA_RING_TYPE_ORAN_LOG_INGRESS,
 	ECPRI_DMA_RING_TYPE_MAX
+};
+
+/**
+ * enum ecpri_dma_oran_logging_direction - Direction of logged ORAN packets
+ */
+enum ecpri_dma_oran_logging_direction {
+	ECPRI_DMA_ORAN_LOGGING_DIRECTION_EGRESS = 0,
+	ECPRI_DMA_ORAN_LOGGING_DIRECTION_INGRESS = 1,
 };
 
 /* Architecture prototypes */
@@ -180,6 +189,10 @@ struct ecpri_dma_ecpri_ss_ops {
 	int (*ecpri_dma_ecpri_ss_query_stats)(
 		struct ecpri_dma_stats *stats);
 	int (*ecpri_dma_ecpri_ss_notify_ssr)(void);
+	int (*ecpri_dma_ecpri_ss_start_oran_log)(u32 mem_size, u32 mtu,
+		enum ecpri_dma_oran_logging_direction dir);
+	int (*ecpri_dma_ecpri_ss_stop_oran_log)(
+		enum ecpri_dma_oran_logging_direction dir);
 };
 
 /* Architecture API functions */
@@ -245,5 +258,25 @@ int ecpri_dma_ecpri_ss_query_stats(struct ecpri_dma_stats *stats);
  * Returns:	0 on success, negative on failure
  */
 int ecpri_dma_ecpri_ss_notify_ssr(void);
+
+/**
+ * ecpri_dma_ecpri_ss_start_oran_log() - Start ORAN logging ENDP
+ * @mem_size - Logging buffer requested size in bytes
+ * @pkt_size- Max expected packet size used
+ * @dir - Requested direction of logging to start
+ *
+ * Returns:	0 on success, negative on failure
+ */
+int ecpri_dma_ecpri_ss_start_oran_log(u32 mem_size, u32 pkt_size,
+	enum ecpri_dma_oran_logging_direction dir);
+
+/**
+ * ecpri_dma_ecpri_ss_stop_oran_log() - Stop ORAN logging ENDP
+ * @dir - Requested direction of logging to stop
+ *
+ * Returns:	0 on success, negative on failure
+ */
+int ecpri_dma_ecpri_ss_stop_oran_log(
+	enum ecpri_dma_oran_logging_direction dir);
 
 #endif //_ECPRI_DMA_ECPRI_SS_H_

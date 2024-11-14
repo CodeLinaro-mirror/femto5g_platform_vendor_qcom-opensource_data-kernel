@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2015-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #if defined(CONFIG_DEBUG_FS) && !defined(ECPRI_NO_PRINTS)
@@ -689,7 +689,7 @@ static void gsi_dbg_update_ch_dp_stats(struct gsi_chan_ctx *ctx)
 	if (end_hw >= start_hw)
 		used_hw = end_hw - start_hw;
 	else
-		used_hw = ctx->ring.max_num_elem + 1 - (start_hw - end_hw);
+		used_hw = ctx->ring.max_num_elem - (start_hw - end_hw);
 
 	TDBG("ch %d used %d\n", ctx->props.ch_id, used_hw);
 	gsi_update_ch_dp_stats(ctx, used_hw);

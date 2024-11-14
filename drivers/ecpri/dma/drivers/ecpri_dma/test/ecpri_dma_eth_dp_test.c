@@ -1,12 +1,13 @@
 /*
  * SPDX-License-Identifier: GPL-2.0-only
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include "ecpri_dma_ut_framework.h"
 #include "ecpri_dma_utils.h"
 #include "ecpri_dma_dp.h"
 #include "ecpri_dma_eth_client.h"
+#include "ecpri_dma_ss_core.h"
 #include "dmahal.h"
 
 extern struct ecpri_dma_eth_client_context *ecpri_dma_eth_client_ctx;
@@ -101,6 +102,12 @@ struct ecpri_dma_eth_client_test_suite_context {
 	bool allocated_pkts;
 };
 
+enum ecpri_dma_eth_client_test_dest_config {
+	ECPRI_DMA_ETH_CLIENT_TEST_DEST_CONFIG_DEFAULT,
+	ECPRI_DMA_ETH_CLIENT_TEST_DEST_CONFIG_EXCEPTION,
+	ECPRI_DMA_ETH_CLIENT_TEST_DEST_CONFIG_ORAN_LOGGER,
+};
+
 struct ecpri_dma_eth_client_test_suite_context eth_client_test_suite_ctx;
 
 static int ecpri_dma_eth_dp_test_suite_calculate_credits(int idx,
@@ -171,7 +178,7 @@ static int ecpri_dma_eth_dp_test_util_setup_dma_endps(
 	enum ecpri_dma_endp_dir dir,
 	bool enable_loopback,
 	enum ecpri_dma_endp_stream_mode mode,
-	bool exception_test)
+	enum ecpri_dma_eth_client_test_dest_config dest_cfg)
 {
 	u32 endp_id;
 	u32 gsi_id = ECPRI_DMA_GSI_ID_0;
@@ -217,9 +224,14 @@ static int ecpri_dma_eth_dp_test_util_setup_dma_endps(
 			else
 				endp_cfg_xbar.loopback_en = 1;
 
-			if(exception_test) {
+			if(dest_cfg == ECPRI_DMA_ETH_CLIENT_TEST_DEST_CONFIG_EXCEPTION) {
 				lb_dest_endp = ecpri_dma_ctx->exception_ctx.exception_endp.endp_id;
 				lb_dest_gsi_id = ecpri_dma_ctx->exception_ctx.exception_endp.gsi_id;
+			}
+			else if (dest_cfg ==
+				ECPRI_DMA_ETH_CLIENT_TEST_DEST_CONFIG_ORAN_LOGGER) {
+				lb_dest_endp = ECPRI_DMA_SS_ORAN_LOG_QRU_EGRESS_ENDP_ID;
+				lb_dest_gsi_id = ECPRI_DMA_SS_ORAN_LOG_QRU_GSI_ID;
 			}
 
 			endp_cfg_dest.def.dest_mem_channel =
@@ -1544,12 +1556,14 @@ static int ecpri_dma_eth_dp_test_suite_setup(void **ppriv)
 		ECPRI_DMA_ETH_CLIENT_UT_TX_USER_DATA_VAL;
 
 	ret = ecpri_dma_eth_dp_test_util_setup_dma_endps(
-		ECPRI_DMA_ENDP_DIR_SRC, true, ECPRI_DMA_ENDP_STREAM_MODE_M2S, false);
+		ECPRI_DMA_ENDP_DIR_SRC, true, ECPRI_DMA_ENDP_STREAM_MODE_M2S,
+		ECPRI_DMA_ETH_CLIENT_TEST_DEST_CONFIG_DEFAULT);
 	if (ret)
 		return ret;
 
 	ret = ecpri_dma_eth_dp_test_util_setup_dma_endps(
-		ECPRI_DMA_ENDP_DIR_DEST, true, ECPRI_DMA_ENDP_STREAM_MODE_S2M, false);
+		ECPRI_DMA_ENDP_DIR_DEST, true, ECPRI_DMA_ENDP_STREAM_MODE_S2M,
+		ECPRI_DMA_ETH_CLIENT_TEST_DEST_CONFIG_DEFAULT);
 	if (ret)
 		return ret;
 
@@ -1565,13 +1579,15 @@ static int ecpri_dma_eth_dp_test_suite_teardown(void *priv)
 	/* Once endps are stopped, remove loopback config */
 	ret = ecpri_dma_eth_dp_test_util_setup_dma_endps(
 		ECPRI_DMA_ETH_CLIENT_UT_SRC_ENDP_ID, false,
-		ECPRI_DMA_ENDP_STREAM_MODE_M2S, false);
+		ECPRI_DMA_ENDP_STREAM_MODE_M2S,
+		ECPRI_DMA_ETH_CLIENT_TEST_DEST_CONFIG_DEFAULT);
 	if (ret)
 		return ret;
 
 	ret = ecpri_dma_eth_dp_test_util_setup_dma_endps(
 		ECPRI_DMA_ETH_CLIENT_UT_DEST_ENDP_ID, false,
-		ECPRI_DMA_ENDP_STREAM_MODE_S2M, false);
+		ECPRI_DMA_ENDP_STREAM_MODE_S2M,
+		ECPRI_DMA_ETH_CLIENT_TEST_DEST_CONFIG_DEFAULT);
 	if (ret)
 		return ret;
 
@@ -1853,12 +1869,14 @@ static int ecpri_dma_eth_dp_test_suite_multiple_pkt_single_buffer_exception(void
 	DMA_UT_DBG("Start multiple packets test\n");
 
 	ret = ecpri_dma_eth_dp_test_util_setup_dma_endps(
-		ECPRI_DMA_ENDP_DIR_SRC, true, ECPRI_DMA_ENDP_STREAM_MODE_M2S, true);
+		ECPRI_DMA_ENDP_DIR_SRC, true, ECPRI_DMA_ENDP_STREAM_MODE_M2S,
+		ECPRI_DMA_ETH_CLIENT_TEST_DEST_CONFIG_EXCEPTION);
 	if (ret)
 		return ret;
 
 	ret = ecpri_dma_eth_dp_test_util_setup_dma_endps(
-		ECPRI_DMA_ENDP_DIR_DEST, true, ECPRI_DMA_ENDP_STREAM_MODE_S2M, true);
+		ECPRI_DMA_ENDP_DIR_DEST, true, ECPRI_DMA_ENDP_STREAM_MODE_S2M,
+		ECPRI_DMA_ETH_CLIENT_TEST_DEST_CONFIG_EXCEPTION);
 	if (ret)
 		return ret;
 
@@ -1929,12 +1947,14 @@ static int ecpri_dma_eth_dp_test_suite_multiple_pkt_single_buffer_exception(void
 	}
 
 	ret = ecpri_dma_eth_dp_test_util_setup_dma_endps(
-		ECPRI_DMA_ENDP_DIR_SRC, true, ECPRI_DMA_ENDP_STREAM_MODE_M2S, false);
+		ECPRI_DMA_ENDP_DIR_SRC, true, ECPRI_DMA_ENDP_STREAM_MODE_M2S,
+		ECPRI_DMA_ETH_CLIENT_TEST_DEST_CONFIG_DEFAULT);
 	if (ret)
 		return ret;
 
 	ret = ecpri_dma_eth_dp_test_util_setup_dma_endps(
-		ECPRI_DMA_ENDP_DIR_DEST, true, ECPRI_DMA_ENDP_STREAM_MODE_S2M, false);
+		ECPRI_DMA_ENDP_DIR_DEST, true, ECPRI_DMA_ENDP_STREAM_MODE_S2M,
+		ECPRI_DMA_ETH_CLIENT_TEST_DEST_CONFIG_DEFAULT);
 	if (ret)
 		return ret;
 
@@ -1952,12 +1972,14 @@ static int ecpri_dma_eth_dp_test_suite_single_pkt_single_buffer_exception(void *
 	DMA_UT_DBG("Start single packet exception test\n");
 
 	ret = ecpri_dma_eth_dp_test_util_setup_dma_endps(
-		ECPRI_DMA_ENDP_DIR_SRC, true, ECPRI_DMA_ENDP_STREAM_MODE_M2S, true);
+		ECPRI_DMA_ENDP_DIR_SRC, true, ECPRI_DMA_ENDP_STREAM_MODE_M2S,
+		ECPRI_DMA_ETH_CLIENT_TEST_DEST_CONFIG_EXCEPTION);
 	if (ret)
 		return ret;
 
 	ret = ecpri_dma_eth_dp_test_util_setup_dma_endps(
-		ECPRI_DMA_ENDP_DIR_DEST, true, ECPRI_DMA_ENDP_STREAM_MODE_S2M, true);
+		ECPRI_DMA_ENDP_DIR_DEST, true, ECPRI_DMA_ENDP_STREAM_MODE_S2M,
+		ECPRI_DMA_ETH_CLIENT_TEST_DEST_CONFIG_EXCEPTION);
 	if (ret)
 		return ret;
 
@@ -2030,12 +2052,14 @@ static int ecpri_dma_eth_dp_test_suite_single_pkt_single_buffer_exception(void *
 	}
 
 	ret = ecpri_dma_eth_dp_test_util_setup_dma_endps(
-		ECPRI_DMA_ENDP_DIR_SRC, true, ECPRI_DMA_ENDP_STREAM_MODE_M2S, false);
+		ECPRI_DMA_ENDP_DIR_SRC, true, ECPRI_DMA_ENDP_STREAM_MODE_M2S,
+		ECPRI_DMA_ETH_CLIENT_TEST_DEST_CONFIG_DEFAULT);
 	if (ret)
 		return ret;
 
 	ret = ecpri_dma_eth_dp_test_util_setup_dma_endps(
-		ECPRI_DMA_ENDP_DIR_DEST, true, ECPRI_DMA_ENDP_STREAM_MODE_S2M, false);
+		ECPRI_DMA_ENDP_DIR_DEST, true, ECPRI_DMA_ENDP_STREAM_MODE_S2M,
+		ECPRI_DMA_ETH_CLIENT_TEST_DEST_CONFIG_DEFAULT);
 	if (ret)
 		return ret;
 
@@ -2887,12 +2911,14 @@ static int ecpri_dma_eth_dp_test_suite_stop_reset_durig_data(void* priv) {
 	DMA_UT_DBG("Start stop & reset during data test\n");
 
 	ret = ecpri_dma_eth_dp_test_util_setup_dma_endps(
-		ECPRI_DMA_ENDP_DIR_SRC, true, ECPRI_DMA_ENDP_STREAM_MODE_M2M, false);
+		ECPRI_DMA_ENDP_DIR_SRC, true, ECPRI_DMA_ENDP_STREAM_MODE_M2M,
+		ECPRI_DMA_ETH_CLIENT_TEST_DEST_CONFIG_DEFAULT);
 	if (ret)
 		return ret;
 
 	ret = ecpri_dma_eth_dp_test_util_setup_dma_endps(
-		ECPRI_DMA_ENDP_DIR_DEST, true, ECPRI_DMA_ENDP_STREAM_MODE_M2M, false);
+		ECPRI_DMA_ENDP_DIR_DEST, true, ECPRI_DMA_ENDP_STREAM_MODE_M2M,
+		ECPRI_DMA_ETH_CLIENT_TEST_DEST_CONFIG_DEFAULT);
 	if (ret)
 		return ret;
 
@@ -3016,7 +3042,8 @@ static int ecpri_dma_eth_dp_test_suite_stop_reset_durig_data(void* priv) {
 	}
 
 	ret = ecpri_dma_eth_dp_test_util_setup_dma_endps(
-		ECPRI_DMA_ENDP_DIR_SRC, true, ECPRI_DMA_ENDP_STREAM_MODE_M2S, false);
+		ECPRI_DMA_ENDP_DIR_SRC, true, ECPRI_DMA_ENDP_STREAM_MODE_M2S,
+		ECPRI_DMA_ETH_CLIENT_TEST_DEST_CONFIG_DEFAULT);
 	if (ret)
 		return ret;
 
@@ -3030,6 +3057,228 @@ static int ecpri_dma_eth_dp_test_suite_stop_reset_durig_data(void* priv) {
 	return ret;
 }
 
+static int ecpri_dma_eth_dp_test_suite_multiple_pkt_single_buffer_oran_logger(void* priv) {
+	int ret = 0;
+	int num_of_pkts_to_send = 5;
+	struct ecpri_dma_pkt** tx_pkts;
+	struct ecpri_dma_pkt_completion_wrapper** rx_pkts;
+
+	DMA_UT_DBG("Start single packet ORAN logger test\n");
+
+	ret = ecpri_dma_eth_dp_test_util_setup_dma_endps(
+		ECPRI_DMA_ENDP_DIR_SRC, true, ECPRI_DMA_ENDP_STREAM_MODE_M2S,
+		ECPRI_DMA_ETH_CLIENT_TEST_DEST_CONFIG_ORAN_LOGGER);
+	if (ret)
+		return ret;
+
+	DMA_UT_DBG("Start Loopback Single packet\n");
+
+	ret = ecpri_dma_eth_dp_test_util_init(USE_DEFAULT_CONNECT_PARAMS);
+	if (ret != 0) {
+		DMA_UT_LOG("Failed to initialize the test\n");
+		return ret;
+	}
+
+	ret = ecpri_dma_eth_dp_test_util_prepare_test_data(num_of_pkts_to_send,
+		true, &tx_pkts, &rx_pkts);
+	if (ret != 0) {
+		DMA_UT_LOG("Failed to prepare test data\n");
+		return ret;
+	}
+
+	ret = ecpri_dma_ecpri_ss_start_oran_log(10 * 1500, 1500,
+		ECPRI_DMA_ORAN_LOGGING_DIRECTION_EGRESS);
+	if (ret != 0) {
+		DMA_UT_TEST_FAIL_REPORT("Failed to start logging");
+		return -EFAULT;
+	}
+
+	/* Transmit single packet */
+	ret = ecpri_dma_eth_transmit(eth_client_test_suite_ctx.hdl,
+		tx_pkts, num_of_pkts_to_send, true);
+	if (ret != 0) {
+		DMA_UT_TEST_FAIL_REPORT("Failed on transmit");
+		return -EFAULT;
+	}
+
+	/* Verify single packet */
+	ret = ecpri_dma_eth_dp_test_util_wait_for_tx_comp(num_of_pkts_to_send);
+	if (ret != 0) {
+		DMA_UT_TEST_FAIL_REPORT("Test failed due to Tx timeout");
+		return -EFAULT;
+	}
+	ecpri_dma_ecpri_ss_stop_oran_log(ECPRI_DMA_ORAN_LOGGING_DIRECTION_EGRESS);
+
+	/* Test clean-up */
+	ret = ecpri_dma_eth_dp_test_util_clean_up(eth_client_test_suite_ctx.hdl,
+		num_of_pkts_to_send, true, tx_pkts,
+		rx_pkts);
+	if (ret != 0) {
+		DMA_UT_LOG("Failed to clean the test\n");
+		return ret;
+	}
+
+	ret = ecpri_dma_eth_dp_test_util_setup_dma_endps(
+		ECPRI_DMA_ENDP_DIR_SRC, true, ECPRI_DMA_ENDP_STREAM_MODE_M2S,
+		ECPRI_DMA_ETH_CLIENT_TEST_DEST_CONFIG_DEFAULT);
+	if (ret)
+		return ret;
+
+	return ret;
+}
+
+
+static int ecpri_dma_eth_dp_test_suite_wrap_around_pkt_single_buffer_oran_logger(void* priv) {
+	int ret = 0;
+	int num_of_pkts_to_send = 27;
+	struct ecpri_dma_pkt** tx_pkts;
+	struct ecpri_dma_pkt_completion_wrapper** rx_pkts;
+
+	DMA_UT_DBG("Start single packet ORAN logger test\n");
+
+	ret = ecpri_dma_eth_dp_test_util_setup_dma_endps(
+		ECPRI_DMA_ENDP_DIR_SRC, true, ECPRI_DMA_ENDP_STREAM_MODE_M2S,
+		ECPRI_DMA_ETH_CLIENT_TEST_DEST_CONFIG_ORAN_LOGGER);
+	if (ret)
+		return ret;
+
+	DMA_UT_DBG("Start Loopback Single packet\n");
+
+	ret = ecpri_dma_eth_dp_test_util_init(USE_DEFAULT_CONNECT_PARAMS);
+	if (ret != 0) {
+		DMA_UT_LOG("Failed to initialize the test\n");
+		return ret;
+	}
+
+	ret = ecpri_dma_eth_dp_test_util_prepare_test_data(num_of_pkts_to_send,
+		true, &tx_pkts, &rx_pkts);
+	if (ret != 0) {
+		DMA_UT_LOG("Failed to prepare test data\n");
+		return ret;
+	}
+
+	ret = ecpri_dma_ecpri_ss_start_oran_log(10 * 1500, 1500,
+		ECPRI_DMA_ORAN_LOGGING_DIRECTION_EGRESS);
+	if (ret != 0) {
+		DMA_UT_TEST_FAIL_REPORT("Failed to start logging");
+		return -EFAULT;
+	}
+
+	/* Transmit single packet */
+	ret = ecpri_dma_eth_transmit(eth_client_test_suite_ctx.hdl,
+		tx_pkts, num_of_pkts_to_send, true);
+	if (ret != 0) {
+		DMA_UT_TEST_FAIL_REPORT("Failed on transmit");
+		return -EFAULT;
+	}
+
+	/* Verify single packet */
+	ret = ecpri_dma_eth_dp_test_util_wait_for_tx_comp(num_of_pkts_to_send);
+	if (ret != 0) {
+		DMA_UT_TEST_FAIL_REPORT("Test failed due to Tx timeout");
+		return -EFAULT;
+	}
+	ecpri_dma_ecpri_ss_stop_oran_log(ECPRI_DMA_ORAN_LOGGING_DIRECTION_EGRESS);
+
+	/* Test clean-up */
+	ret = ecpri_dma_eth_dp_test_util_clean_up(eth_client_test_suite_ctx.hdl,
+		num_of_pkts_to_send, true, tx_pkts,
+		rx_pkts);
+	if (ret != 0) {
+		DMA_UT_LOG("Failed to clean the test\n");
+		return ret;
+	}
+
+	ret = ecpri_dma_eth_dp_test_util_setup_dma_endps(
+		ECPRI_DMA_ENDP_DIR_SRC, true, ECPRI_DMA_ENDP_STREAM_MODE_M2S,
+		ECPRI_DMA_ETH_CLIENT_TEST_DEST_CONFIG_DEFAULT);
+	if (ret)
+		return ret;
+
+	return ret;
+}
+
+static int ecpri_dma_eth_dp_test_suite_single_pkt_single_buffer_oran_logger(void* priv) {
+	int ret = 0;
+	int num_of_pkts_to_send = 1;
+	struct ecpri_dma_pkt** tx_pkts;
+	struct ecpri_dma_pkt_completion_wrapper** rx_pkts;
+
+	DMA_UT_DBG("Start single packet ORAN logger test\n");
+
+	ret = ecpri_dma_eth_dp_test_util_setup_dma_endps(
+		ECPRI_DMA_ENDP_DIR_SRC, true, ECPRI_DMA_ENDP_STREAM_MODE_M2S,
+		ECPRI_DMA_ETH_CLIENT_TEST_DEST_CONFIG_ORAN_LOGGER);
+	if (ret)
+		return ret;
+
+	ret = ecpri_dma_eth_dp_test_util_setup_dma_endps(
+		ECPRI_DMA_ENDP_DIR_DEST, true, ECPRI_DMA_ENDP_STREAM_MODE_S2M,
+		ECPRI_DMA_ETH_CLIENT_TEST_DEST_CONFIG_ORAN_LOGGER);
+	if (ret)
+		return ret;
+
+	DMA_UT_DBG("Start Loopback Single packet\n");
+
+	ret = ecpri_dma_eth_dp_test_util_init(USE_DEFAULT_CONNECT_PARAMS);
+	if (ret != 0) {
+		DMA_UT_LOG("Failed to initialize the test\n");
+		return ret;
+	}
+
+	ret = ecpri_dma_eth_dp_test_util_prepare_test_data(num_of_pkts_to_send,
+		true, &tx_pkts, &rx_pkts);
+	if (ret != 0) {
+		DMA_UT_LOG("Failed to prepare test data\n");
+		return ret;
+	}
+
+	ret = ecpri_dma_ecpri_ss_start_oran_log(10 * 1500, 1500,
+		ECPRI_DMA_ORAN_LOGGING_DIRECTION_EGRESS);
+	if (ret != 0) {
+		DMA_UT_TEST_FAIL_REPORT("Failed to start logging");
+		return -EFAULT;
+	}
+
+	/* Transmit single packet */
+	ret = ecpri_dma_eth_transmit(eth_client_test_suite_ctx.hdl,
+		tx_pkts, num_of_pkts_to_send, true);
+	if (ret != 0) {
+		DMA_UT_TEST_FAIL_REPORT("Failed on transmit");
+		return -EFAULT;
+	}
+
+	/* Verify single packet */
+	ret = ecpri_dma_eth_dp_test_util_wait_for_tx_comp(num_of_pkts_to_send);
+	if (ret != 0) {
+		DMA_UT_TEST_FAIL_REPORT("Test failed due to Tx timeout");
+		return -EFAULT;
+	}
+	ecpri_dma_ecpri_ss_stop_oran_log(ECPRI_DMA_ORAN_LOGGING_DIRECTION_EGRESS);
+
+	/* Test clean-up */
+	ret = ecpri_dma_eth_dp_test_util_clean_up(eth_client_test_suite_ctx.hdl,
+		num_of_pkts_to_send, true, tx_pkts,
+		rx_pkts);
+	if (ret != 0) {
+		DMA_UT_LOG("Failed to clean the test\n");
+		return ret;
+	}
+
+	ret = ecpri_dma_eth_dp_test_util_setup_dma_endps(
+		ECPRI_DMA_ENDP_DIR_SRC, true, ECPRI_DMA_ENDP_STREAM_MODE_M2S,
+		ECPRI_DMA_ETH_CLIENT_TEST_DEST_CONFIG_DEFAULT);
+	if (ret)
+		return ret;
+
+	ret = ecpri_dma_eth_dp_test_util_setup_dma_endps(
+		ECPRI_DMA_ENDP_DIR_DEST, true, ECPRI_DMA_ENDP_STREAM_MODE_S2M,
+		ECPRI_DMA_ETH_CLIENT_TEST_DEST_CONFIG_DEFAULT);
+	if (ret)
+		return ret;
+
+	return ret;
+}
 
 /* Suite definition block */
 DMA_UT_DEFINE_SUITE_START(eth_dp, "ETH DP suite",
@@ -3109,5 +3358,25 @@ DMA_UT_DEFINE_SUITE_START(eth_dp, "ETH DP suite",
 		"Tx pre header test",
 		ecpri_dma_eth_dp_test_suite_tx_pre_header, true,
 		ECPRI_HW_V2_0, ECPRI_HW_MAX),
-
+	DMA_UT_ADD_TEST(
+		single_pkt_single_buffer_oran_logger,
+		"This test will verify the ORAN logger path by sending a single packet"
+		" with a single buffer on SRC ENDP"
+		"client to manually cat from ORAN logger CHAR dev and verify packet.",
+		ecpri_dma_eth_dp_test_suite_single_pkt_single_buffer_oran_logger, false,
+			ECPRI_HW_V2_0, ECPRI_HW_MAX),
+	DMA_UT_ADD_TEST(
+		multiple_pkt_single_buffer_oran_logger,
+		"This test will verify the ORAN logger path by sending a multiple packets"
+		" with a single buffer on SRC ENDP"
+		"client to manually cat from ORAN logger CHAR dev and verify packet.",
+		ecpri_dma_eth_dp_test_suite_multiple_pkt_single_buffer_oran_logger, false,
+			ECPRI_HW_V2_0, ECPRI_HW_MAX),
+	DMA_UT_ADD_TEST(
+		wrap_around_pkt_single_buffer_oran_logger,
+		"This test will verify the ORAN logger path by sending a enough packets"
+		" with a single buffer on SRC ENDP to cause a wrap-around on dest ring"
+		"client to manually cat from ORAN logger CHAR dev and verify packet.",
+		ecpri_dma_eth_dp_test_suite_wrap_around_pkt_single_buffer_oran_logger, false,
+			ECPRI_HW_V2_0, ECPRI_HW_MAX),
 } DMA_UT_DEFINE_SUITE_END(eth_dp);

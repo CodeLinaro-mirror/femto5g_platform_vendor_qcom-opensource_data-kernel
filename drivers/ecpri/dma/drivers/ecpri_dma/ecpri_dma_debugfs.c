@@ -1,6 +1,6 @@
 /*
  * SPDX-License-Identifier: GPL-2.0-only
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #if defined(CONFIG_DEBUG_FS) && !defined(ECPRI_NO_PRINTS)
@@ -9,6 +9,7 @@
 #include <linux/kernel.h>
 #include <linux/stringify.h>
 #include "ecpri_dma_i.h"
+#include "ecpri_dma_ecpri_ss.h"
 #include "dmahal.h"
 #include "ecpri_dma_reg_dump.h"
 #include "ecpri_dma_qmi_service.h"
@@ -412,6 +413,23 @@ static ssize_t ecpri_dma_write_rate_limiter(struct file *file,
 	return count;
 }
 
+static ssize_t ecpri_dma_write_start_logger(struct file *file,
+		const char __user *buf,
+		size_t count, loff_t *ppos)
+{
+	ecpri_dma_ecpri_ss_start_oran_log(50*1024, 1500,
+	ECPRI_DMA_ORAN_LOGGING_DIRECTION_INGRESS );
+
+	return count;
+}
+static ssize_t ecpri_dma_write_stop_logger(struct file *file,
+		const char __user *buf,
+		size_t count, loff_t *ppos)
+{
+	ecpri_dma_ecpri_ss_stop_oran_log(ECPRI_DMA_ORAN_LOGGING_DIRECTION_INGRESS );
+
+	return count;
+}
 static ssize_t ecpri_dma_read_rate_limiter(struct file* file, char __user* ubuf,
 	size_t count, loff_t* ppos)
 {
@@ -767,6 +785,14 @@ static const struct ecpri_dma_debugfs_file debugfs_files[] = {
 		"rate_limiter", DMA_READ_WRITE_MODE, NULL, {
 			.write = ecpri_dma_write_rate_limiter,
 			.read = ecpri_dma_read_rate_limiter,
+		},
+	},{
+		"start_logger", DMA_WRITE_ONLY_MODE, NULL, {
+			.write = ecpri_dma_write_start_logger,
+		},
+	},{
+		"stop_logger", DMA_WRITE_ONLY_MODE, NULL, {
+			.write = ecpri_dma_write_stop_logger,
 		},
 	},
 };
