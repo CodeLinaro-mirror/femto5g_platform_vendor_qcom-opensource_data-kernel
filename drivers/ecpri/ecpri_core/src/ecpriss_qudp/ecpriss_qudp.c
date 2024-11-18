@@ -1803,6 +1803,99 @@ static int ecpriss_qudp_ingress_modify_cfg_v2(uint32_t port_index,
 	return 0;
 }
 
+/**
+ * It will add trap rules at init
+ * Rules are listed below
+ * 1. Trap ecpri MSG-5 packets if
+ *	a. packet with ether type 0xaefe [32 Bit only rule at index 0]
+ *	b. packet with ether type vlan & 0xaefe [64 Bit only rule at index 1]
+ */
+static void ecpriss_qudp_add_trap_rules_for_msg5(void)
+{
+	uint32_t port_index  = 0;
+	uint32_t cfg_value = 0;
+	ecpri_qudp_hwio_def_ecpri_udp_fh_trap_misc_port_p_entry_n_s_v2 trap_misc_port_cfg;
+
+	for(port_index=0; port_index < ECPRISS_PORT_MAX; port_index++){
+
+		memset(&trap_misc_port_cfg,0,sizeof(ecpri_qudp_hwio_def_ecpri_udp_fh_trap_misc_port_p_entry_n_s_v2));
+
+		/*
+		 * Adding 32 bit rule config
+		 */
+		trap_misc_port_cfg.rule32_offset = 12; // src MAC + dst MAC
+		trap_misc_port_cfg.action = 5; //5 - add timestamp and pass to A55
+		trap_misc_port_cfg.enable = 1;
+
+		ecpriss_qudp_hal_write_reg_mn_fields(ECPRISS_QUDP_FH,
+				ECPRI_UDP_FH_TRAP_MISC_PORT_p_ENTRY_n_V2,
+				port_index,
+				0,
+				&trap_misc_port_cfg);
+
+		cfg_value = 0x0500feae; // ether type 0xaefe & ecpri protocol MSG type 5
+		ecpriss_qudp_hal_write_reg_mn_fields(ECPRISS_QUDP_FH,
+				ECPRI_UDP_FH_TRAP_RULE32_VAL_PORT_p_ENTRY_n_V2,
+				port_index,
+				0,
+				&cfg_value);
+
+		cfg_value = 0xff00ffff; // MASK to validate only ethere type and MSG-ID
+		ecpriss_qudp_hal_write_reg_mn_fields(ECPRISS_QUDP_FH,
+				ECPRI_UDP_FH_TRAP_RULE32_MASK_PORT_p_ENTRY_n_V2,
+				port_index,
+				0,
+				&cfg_value);
+
+
+		/*
+		 * Adding 64 bit rule config
+		 */
+
+		memset(&trap_misc_port_cfg,0,sizeof(ecpri_qudp_hwio_def_ecpri_udp_fh_trap_misc_port_p_entry_n_s_v2));
+
+		trap_misc_port_cfg.rule64_offset = 12; // src MAC + dst MAC
+		trap_misc_port_cfg.action = 5; //5 - add timestamp and pass to A55
+		trap_misc_port_cfg.enable = 1;
+
+		ecpriss_qudp_hal_write_reg_mn_fields(ECPRISS_QUDP_FH,
+				ECPRI_UDP_FH_TRAP_MISC_PORT_p_ENTRY_n_V2,
+				port_index,
+				1,
+				&trap_misc_port_cfg);
+
+		cfg_value = 0x0500feae; // ether type 0xaefe & ecpri protocol MSG type 5
+		ecpriss_qudp_hal_write_reg_mn_fields(ECPRISS_QUDP_FH,
+				ECPRI_UDP_FH_TRAP_RULE64_VAL_MSB_PORT_p_ENTRY_n_V2,
+				port_index,
+				1,
+				&cfg_value);
+
+		cfg_value =  0x00000081; // ether type vlan
+		ecpriss_qudp_hal_write_reg_mn_fields(ECPRISS_QUDP_FH,
+				ECPRI_UDP_FH_TRAP_RULE64_VAL_LSB_PORT_p_ENTRY_n_V2,
+				port_index,
+				1,
+				&cfg_value);
+
+		cfg_value = 0xff00ffff; // MASK to validate only ethere type and MSG-ID
+		ecpriss_qudp_hal_write_reg_mn_fields(ECPRISS_QUDP_FH,
+				ECPRI_UDP_FH_TRAP_RULE64_MASK_MSB_PORT_p_ENTRY_n_V2,
+				port_index,
+				1,
+				&cfg_value);
+
+		cfg_value = 0x0000ffff; // MASK to validate only ethere type as vlan
+		ecpriss_qudp_hal_write_reg_mn_fields(ECPRISS_QUDP_FH,
+				ECPRI_UDP_FH_TRAP_RULE64_MASK_LSB_PORT_p_ENTRY_n_V2,
+				port_index,
+				1,
+				&cfg_value);
+
+
+	}
+	return;
+}
 
 /**
  * ecpri_qudp_ingress_init_cfg()
@@ -1969,6 +2062,7 @@ static int ecpriss_qudp_ingress_init_cfg_v2(void)
 			}
 		}
 	}
+	ecpriss_qudp_add_trap_rules_for_msg5();
 	return ret;
 }
 
