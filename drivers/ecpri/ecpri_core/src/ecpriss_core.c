@@ -37,6 +37,10 @@ int cascade_enable = 0;
 module_param(cascade_enable, int, S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP);
 MODULE_PARM_DESC(cascade_enable, "Enable Cascade Mode");
 
+int enable_len_check = 1;
+module_param(enable_len_check, int, S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP);
+MODULE_PARM_DESC(enable_len_check, "Enable Length check for C/U plane packets");
+
 int stats_timeout_ms = 250;
 int ecpriss_qudp_strict_filt_cfg[MAX_PORTS] = {0,0,0};
 void ecpriss_eth_topology_cb(void);
@@ -1336,6 +1340,7 @@ static int ecpriss_core_data_init_v2(void)
 	ecpriss_pdata_v2->xbar_ctx_v2->disable_xbar_dma_fh_same_prio = disable_xbar_dma_fh_same_prio;
 
 	ecpriss_pdata_v2->qudp_ctx_v2->lte_fh_enabled = lte_fh_enabled;
+	ecpriss_pdata_v2->xbar_ctx_v2->enable_len_check = enable_len_check;
 
 	for (port_index = 0;port_index < MAX_PORTS;port_index++)
 	{
@@ -1713,6 +1718,21 @@ void ecpriss_core_set_stats_timeout_info(int val)
 {
 	stats_timeout_ms = val;
 	ECPRILOGINFO("ecpriss: Setting Stats Timeout to val %d\n", stats_timeout_ms);
+}
+
+int ecpriss_core_get_enable_len_check_info(void)
+{
+	uint32_t enable_len_check = ecpriss_pdata_v2->xbar_ctx_v2->enable_len_check;
+	ECPRILOGINFO("ecpriss: Length check val is %d\n", enable_len_check);
+	return enable_len_check;
+}
+
+
+void ecpriss_core_set_enable_len_check_info(uint32_t val)
+{
+	ecpriss_pdata_v2->xbar_ctx_v2->enable_len_check = val;
+	ECPRILOGINFO("ecpriss: Setting Length check %d\n",
+			ecpriss_pdata_v2->xbar_ctx_v2->enable_len_check);
 }
 
 
