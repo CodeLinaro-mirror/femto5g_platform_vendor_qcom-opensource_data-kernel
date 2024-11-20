@@ -194,9 +194,8 @@ int ecpriss_destroy_workq(void)
 
 		mutex_lock(&ecpri_delay_wq_mutex_lock);
 
-		//flush and cancel delayed work
-		cancel_delayed_work(&ecpri_delay_wq_p->wq_item);
-		flush_delayed_work(&ecpri_delay_wq_p->wq_item);
+		//cancel delayed work
+		cancel_delayed_work_sync(&ecpri_delay_wq_p->wq_item);
 
 		flush_workqueue(ecpri_delay_wq);
 		destroy_workqueue(ecpri_delay_wq);

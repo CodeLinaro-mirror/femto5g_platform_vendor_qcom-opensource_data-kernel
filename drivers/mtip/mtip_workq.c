@@ -269,9 +269,8 @@ int mtip_destroy_workq(void)
 
    mutex_lock(&delayed_wq_mutex_lock);
 
-   //flush and cancel delayed work
-   cancel_delayed_work(&delayed_wq_notifr_param->wq_item);
-   flush_delayed_work(&delayed_wq_notifr_param->wq_item);
+   //cancel delayed work
+   cancel_delayed_work_sync(&delayed_wq_notifr_param->wq_item);
 
    flush_workqueue(delayed_wq);
    destroy_workqueue(delayed_wq);
