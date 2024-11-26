@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: GPL-2.0-only
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 /**
@@ -28,7 +28,7 @@
 /* Module level feature definitions */
 //#define FEATURE_QCOM_AW_RUMI_SW
 #ifndef NO_DEBUGFS_PERF
-#define FEATURE_QCOM_AW_TEST_SYS_FS
+#define FEATURE_QCOM_AW_DEBUG_FS
 #endif
 /* Macro to validate the lane number */
 #define QCOM_AW_PHY_LANE_VALID(lane) ((lane >= PHY_LANE_0) && \
@@ -347,7 +347,7 @@ void qcom_aw_phy_disable_snr_interrupt(
                                   struct qcom_aw_phy_inst_config *phy_inst_info,
                                   enum eth_phy_iface_phy_lane_num_enum lane);
 
-#ifdef FEATURE_QCOM_AW_TEST_SYS_FS
+#ifdef FEATURE_QCOM_AW_DEBUG_FS
 void qcom_aw_phy_setup_debugfs(void);
 void qcom_aw_phy_del_debugfs(void);
 ssize_t qcom_aw_phy_set_attr(struct file *file, const char __user *buf,
@@ -360,16 +360,20 @@ ssize_t qcom_aw_phy_set_tx_eq_val(struct file *file, const char __user *buf,
                              size_t count, loff_t *ppos);
 ssize_t qcom_aw_phy_get_tx_eq_val(struct file *file, char __user *buf,
                                     size_t count, loff_t *ppos);
-bool qcom_aw_phy_get_tx_fir_val(enum qcom_aw_phy_instance_enum tx_bist_phy_inst,
-                                void* txfir_cfg);
+bool qcom_aw_phy_debugfs_get_tx_fir_val(enum qcom_aw_phy_instance_enum tx_bist_phy_inst,
+                    enum eth_phy_iface_phy_lane_num_enum lane, void* txfir_cfg);
 int32_t setup_phy_status_debugfs_directory(void);
-#endif /* FEATURE_QCOM_AW_TEST_SYS_FS */
+#endif /* FEATURE_QCOM_AW_DEBUG_FS */
 
+void qcom_aw_phy_setup_sysfs(void);
+void qcom_aw_phy_del_sysfs(void);
 ssize_t qcom_aw_phy_sysfs_show_an_restart_delay_timer(
                   struct kobject *kobj, struct kobj_attribute *attr, char *buf);
-
 ssize_t qcom_aw_phy_sysfs_store_an_restart_delay_timer(
                               struct kobject *kobj, struct kobj_attribute *attr,
                               const char *buf, size_t count);
+bool qcom_aw_phy_sysfs_get_tx_fir_val(enum qcom_aw_phy_instance_enum tx_bist_phy_inst,
+                    enum eth_phy_iface_phy_lane_num_enum lane, void* txfir_cfg);
+
 
 #endif /* QCOM_AW_PHY_MAIN_H */
