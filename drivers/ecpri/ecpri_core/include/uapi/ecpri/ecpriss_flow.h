@@ -343,6 +343,29 @@ typedef struct
 	ecpriss_mac_s lte_mac_addr[ECPRISS_MAX_PORTS][ECPRISS_MAX_LTE_MAC_PER_PORT];
 }ecpriss_lte_mac_addr_cfg_s;
 
+/**
+ * typedef ecpri_log_dir_e - ECPRI logging direction enum
+ * @ECPRISS_LOG_DIR_UL: Uplink logging
+ * @ECPRISS_LOG_DIR_DL: Downlink logging
+ */
+typedef enum
+{
+        ECPRISS_LOG_DIR_UL,
+        ECPRISS_LOG_DIR_DL,
+        ECPRISS_LOG_DIR_UL_DL
+}ecpriss_log_dir_e;
+
+/**
+ * typedef ecpriss_logging_action - CU PLANE DATA LOGGING ACTION
+ * @ECPRISS_LOGGING_STOP: Stop logging data
+ * @ECPRISS_LOGGING_START: Start logging data
+ */
+typedef enum
+{
+       ECPRISS_LOGGING_STOP,
+       ECPRISS_LOGGING_START
+}ecpriss_logging_action;
+
 typedef enum ecpriss_transp_type_e{
 	ECPRISS_L2_TRANSP,
 	ECPRISS_L3_TRANSP,
