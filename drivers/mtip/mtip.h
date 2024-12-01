@@ -485,6 +485,9 @@ extern int mtip_rumi_platform;
 // this is to control debug level logging
 extern int mtip_ethtool_debug_logging_enable;
 
+// this is to control ptp level logging
+extern int mtip_ethtool_ptp_logging_enable;
+
 // function prototypes
 int mtip_register_platform_driver(void);
 
