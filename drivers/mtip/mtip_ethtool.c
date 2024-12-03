@@ -1498,6 +1498,12 @@ void mtip_ethtool_set_msglevel(struct net_device *netdev, u32 level)
         }
         break;
 
+    case 6:
+        {
+           mtip_ethtool_debug_logging_enable = 0;
+        }
+        break;
+
     case 7:
         {
             // print the information about the ports
