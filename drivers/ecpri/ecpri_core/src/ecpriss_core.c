@@ -551,9 +551,7 @@ void ecpriss_eth_topology_init_v2(void)
 					port_params = &eth_link_params_g.topology_params[i].port_params[port_index];
                                         for(k=0;k<num_links;k++){
 						//pr_err("port_index: %d link_index: %d link state: %d\n",port_index,k,port_params->link_params[k].link_state);
-						if(lte_fh_enabled) {
-							ecpriss_mhi_process_async_link_state(port_index, k, port_params->link_params[k].link_state);
-						}
+
                                                 if(port_params->link_params[k].link_state == ETH_ECPRISS_LINK_STATE_UP){
                                                         link_state_flag = true;
 	                                        }
@@ -588,9 +586,6 @@ void ecpriss_eth_topology_init_v2(void)
 					port_params = &eth_link_params_g.topology_params[i].port_params[port_index];
                                         for(k=0;k<num_links;k++){
 						//pr_err("port_index: %d link_index: %d link state: %d\n",port_index,k,port_params->link_params[k].link_state);
-						if(lte_fh_enabled) {
-							ecpriss_mhi_process_async_link_state(port_index, k, port_params->link_params[k].link_state);
-						}
                                                 if(port_params->link_params[k].link_state == ETH_ECPRISS_LINK_STATE_UP){
                                                         link_state_flag = true;
 	                                        }
@@ -620,6 +615,56 @@ void ecpriss_eth_topology_init_v2(void)
 }
 
 
+void ecpriss_eth_link_update_for_mhi_v2(void)
+{
+	int ret = 0;
+	int i,j,k;
+	eth_ecpriss_dev_mode_e device_mode;
+	uint8_t port_index;
+	uint8_t num_links;
+
+	ecpriss_qudp_port_cfg_s_v2      *port_cfg_local;
+	eth_ecpriss_port_params_s *port_params = NULL;
+	bool link_state_flag = false;
+
+	do {
+		ret = (mtip_ecpri_ops.eth_ecpriss_get_topology)(&device_mode,
+				&eth_link_params_g);
+		if(ret < 0) {
+			break;
+		}
+
+		for(i=0;i<eth_link_params_g.num_unique_port_types;i++) {
+
+			if(eth_link_params_g.topology_params[i].port_type == ETH_ECPRISS_PORT_TYPE_FH) {
+				ecpriss_pdata_v2->qudp_ctx_v2->num_ports[ETH_ECPRISS_PORT_TYPE_FH] =
+				eth_link_params_g.topology_params[i].num_ports;
+
+				for(j=0;j<ecpriss_pdata_v2->qudp_ctx_v2->num_ports[ETH_ECPRISS_PORT_TYPE_FH];j++){
+
+					port_index = eth_link_params_g.topology_params[i].port_params[j].port_index;
+					port_cfg_local = &ecpriss_pdata_v2->qudp_ctx_v2->fh_port_cfg_v2[port_index];
+					num_links = eth_link_params_g.topology_params[i].port_params[j].num_links;
+					port_params = &eth_link_params_g.topology_params[i].port_params[port_index];
+
+						for(k=0;k<num_links;k++){
+
+							if(port_params->link_params[k].link_state == ETH_ECPRISS_LINK_STATE_UP){
+								link_state_flag = true;
+							}
+						}
+
+						if(lte_fh_enabled) {
+							ecpriss_mhi_process_async_link_state(port_index, k, port_params->link_params[k].link_state);
+						}
+
+				}
+			}
+		}
+	}while (0);
+	return;
+}
+
 
 void ecpriss_eth_event_processing(void)
 {
@@ -631,6 +676,7 @@ void ecpriss_eth_event_processing(void)
 				&& ecpriss_pdata_v2->ecpri_state == ECPRI_CORE_INIT) {
 
 			ecpriss_qudp_set_nr_mac_filter();
+			ecpriss_eth_link_update_for_mhi_v2();
 		}
 
 	}
@@ -1430,7 +1476,7 @@ static int ecpriss_core_register_callbacks(void)
 	}while (0);
 	return ret;
 }
-static int ecpriss_core_register_callbacks_v2(void)
+static int ecpriss_core_register_callbacks_v2(bool *is_eth_ready)
 {
 	/*
 	   1. Register for callback with Ethernet and update state
@@ -1446,7 +1492,7 @@ static int ecpriss_core_register_callbacks_v2(void)
 
 	do{
 		ret = (mtip_ecpri_ops.eth_ecpriss_register_ready_cb)
-			(eth_topology_ready_cb, is_ready);
+			(eth_topology_ready_cb, is_eth_ready);
 
 		if (ret < 0) {
 			ECPRILOGERR("callback registration for mtip register_ready_cb failed\n");
@@ -1461,17 +1507,9 @@ static int ecpriss_core_register_callbacks_v2(void)
 			break;
 		}
 
-		if(*is_ready == true) {
+		if(*is_eth_ready == true) {
 			ecpriss_eth_topology_init_v2();
-
-			if(ecpriss_pdata_v2->dev_mode != ECPRISS_DEV_MODE_RU && lte_fh_enabled
-					&& ecpriss_pdata_v2->ecpri_state == ECPRI_CORE_INIT) {
-
-				ecpriss_qudp_set_nr_mac_filter();
-			}
 		}
-
-
 
 		ready = 0;
 
@@ -1817,6 +1855,7 @@ static int ecpriss_core_init_v2(struct platform_device *pdev)
 	  -->Dependency on eemac topology */
 
 	int ret = 0;
+	bool is_eth_ready = false;
 
 	do{
 
@@ -1843,22 +1882,11 @@ static int ecpriss_core_init_v2(struct platform_device *pdev)
 			break;
 		}
 
-		if(lte_fh_enabled) {
-
-			ret = ecpriss_mhi_ctx_init(&ecpriss_pdata_v2->mhi_ctx);
-
-			if(ret < 0) {
-				ECPRILOGERR("LTE_FH:MHI Ctx Init Failed\n");
-			}
-
-		}
-
-		ret = ecpriss_core_register_callbacks_v2();
+		ret = ecpriss_core_register_callbacks_v2(&is_eth_ready);
 		if(ret < 0) {
 			ECPRILOGERR("Callback registrations failed\n");
 			break;
 		}
-
 
 		ret = ecpriss_qudp_init_v2(&pdev->dev);
 		if(ret < 0) {
@@ -1883,6 +1911,26 @@ static int ecpriss_core_init_v2(struct platform_device *pdev)
 			break;
 		}
 		ecpriss_pdata_v2->ecpri_state = ECPRI_CORE_INIT;
+
+		if(lte_fh_enabled) {
+
+			ret = ecpriss_mhi_ctx_init(&ecpriss_pdata_v2->mhi_ctx);
+
+			if(ret < 0) {
+				ECPRILOGERR("LTE_FH:MHI Ctx Init Failed\n");
+			}
+
+			if(is_eth_ready == true) {
+				ecpriss_eth_link_update_for_mhi_v2();
+
+			}
+		}
+
+		if(ecpriss_pdata_v2->dev_mode != ECPRISS_DEV_MODE_RU && lte_fh_enabled
+				&& ecpriss_pdata_v2->ecpri_state == ECPRI_CORE_INIT) {
+
+				ecpriss_qudp_set_nr_mac_filter();
+		}
 
 	}while (0);
 	return ret;
