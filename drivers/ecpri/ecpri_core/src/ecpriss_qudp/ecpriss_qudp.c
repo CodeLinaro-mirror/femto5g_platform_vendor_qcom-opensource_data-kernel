@@ -1960,7 +1960,6 @@ static int ecpriss_qudp_ingress_init_cfg(void)
 						ECPRI_UDP_FH_INGRESS_CONFIG_P,
 						port_idx,
 						&ingress_cfg->fh_ingress_config);
-
 			}
 		}
 #if 0
@@ -2003,7 +2002,7 @@ static void ecpriss_qudp_strict_filter_cfg_v2(void)
 	int strict_filter_config = 0;
 	int port_idx = 0;
 
-	for(port_idx = 0;(port_idx < ecpriss_pdata_v2->qudp_ctx_v2->num_ports) && (port_idx < ECPRISS_PORT_MAX);port_idx++) {
+	for(port_idx = 0;(port_idx < ecpriss_pdata_v2->qudp_ctx_v2->num_ports[ETH_ECPRISS_PORT_TYPE_FH]) && (port_idx < ECPRISS_PORT_MAX);port_idx++) {
 
 		strict_filter_config = ecpriss_pdata_v2->qudp_ctx_v2->fh_port_cfg_v2[port_idx].strict_filter_status;
 		if(strict_filter_config) {
@@ -2026,7 +2025,7 @@ static int ecpriss_qudp_ingress_init_cfg_v2(void)
 		if(port_type == ECPRISS_PORT_TYPE_FH)
 		{
 
-			for(port_idx=0;port_idx<ecpriss_pdata_v2->qudp_ctx_v2->num_ports;port_idx++)
+			for(port_idx=0;port_idx<ecpriss_pdata_v2->qudp_ctx_v2->num_ports[ETH_ECPRISS_PORT_TYPE_FH];port_idx++)
 			{
 
 				ecpriss_qudp_ingress_per_port_cfg_s_v2       *ingress_cfg =
@@ -2045,6 +2044,7 @@ static int ecpriss_qudp_ingress_init_cfg_v2(void)
 				ingress_cfg->fh_ingress_config.vlan_filt_miss_action = ECPRISS_QUDP_ACTION_PASS_TO_A55;
 				ingress_cfg->fh_ingress_config.ip_filt_miss_action = ECPRISS_QUDP_ACTION_PASS_TO_A55;
 				ingress_cfg->fh_ingress_config.non_local_dst_action = ECPRISS_QUDP_ACTION_DISCARD;
+
 
 				ecpriss_qudp_hal_write_reg_n_fields(ECPRISS_QUDP_FH,
 						ECPRI_UDP_FH_INGRESS_CONFIG_P_V2,
@@ -2079,7 +2079,7 @@ int ecpriss_qudp_ingress_init_cfg_modify_v2(int action)
 		if(port_type == ECPRISS_PORT_TYPE_FH)
 		{
 
-			for(port_idx=0;port_idx<ecpriss_pdata_v2->qudp_ctx_v2->num_ports;port_idx++)
+			for(port_idx=0;port_idx<ecpriss_pdata_v2->qudp_ctx_v2->num_ports[ETH_ECPRISS_PORT_TYPE_FH];port_idx++)
 			{
 
 				ecpriss_qudp_ingress_per_port_cfg_s_v2       *ingress_cfg =
@@ -2124,7 +2124,7 @@ static int ecpriss_qudp_egress_init_cfg_v2(void)
 		if(port_type == ECPRISS_PORT_TYPE_FH)
 		{
 
-			for(port_idx=0;port_idx<ecpriss_pdata_v2->qudp_ctx_v2->num_ports;port_idx++)
+			for(port_idx=0;port_idx<ecpriss_pdata_v2->qudp_ctx_v2->num_ports[ETH_ECPRISS_PORT_TYPE_FH];port_idx++)
 			{
 
 				ecpriss_qudp_egress_per_port_cfg_s_v2 *egress_cfg =
@@ -2158,7 +2158,7 @@ static int ecpriss_qudp_egress_init_cfg_v2(void)
 		else if(port_type == ECPRISS_PORT_TYPE_L2)
 		{
 
-			for(port_idx=0;port_idx<ecpriss_pdata_v2->qudp_ctx_v2->num_ports;port_idx++)
+			for(port_idx=0;port_idx<ecpriss_pdata_v2->qudp_ctx_v2->num_ports[ETH_ECPRISS_PORT_TYPE_FH];port_idx++)
 			{
 
 				ecpriss_qudp_egress_per_port_cfg_s_v2 *egress_cfg =
@@ -2299,7 +2299,7 @@ static void ecpriss_qudp_configure_mtu_v2(void)
 	{
 		if(port_type == ECPRISS_PORT_TYPE_FH)
 		{
-			for(port_idx=0;port_idx<ecpriss_pdata_v2->qudp_ctx_v2->num_ports;port_idx++)
+			for(port_idx=0;port_idx<ecpriss_pdata_v2->qudp_ctx_v2->num_ports[ETH_ECPRISS_PORT_TYPE_FH];port_idx++)
 			{
 
 
@@ -3596,7 +3596,6 @@ int ecpriss_qudp_init_v2(struct device *dev)
 		{
 			break;
 		}
-
 		ret = ecpriss_qudp_ingress_init_cfg_v2();
 
 		if(ret < 0)
@@ -5806,10 +5805,10 @@ void ecpriss_qudp_set_nr_mac_filter(void)
 			if(eth_link_params_g.topology_params[i].port_type ==
 					ETH_ECPRISS_PORT_TYPE_FH) {
 
-				ecpriss_pdata_v2->qudp_ctx_v2->num_ports =
+				ecpriss_pdata_v2->qudp_ctx_v2->num_ports[ETH_ECPRISS_PORT_TYPE_FH] =
 					eth_link_params_g.topology_params[i].num_ports;
 
-				for(j=0;j<ecpriss_pdata_v2->qudp_ctx_v2->num_ports;j++){
+				for(j=0;j<ecpriss_pdata_v2->qudp_ctx_v2->num_ports[ETH_ECPRISS_PORT_TYPE_FH];j++){
 
 					port_index =
 						eth_link_params_g.topology_params[i].port_params[j].port_index;
