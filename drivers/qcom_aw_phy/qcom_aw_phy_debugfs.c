@@ -1,6 +1,6 @@
 
 /* SPDX-License-Identifier: GPL-2.0-only
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 /**
@@ -21,7 +21,7 @@
 #include "aw_c_api/aw_alphacore.h"
 #include "qcom_aw_phy_debugfs_dir_struct.h"
 
-#ifdef FEATURE_QCOM_AW_TEST_SYS_FS
+#ifdef FEATURE_QCOM_AW_DEBUG_FS
 
 struct dentry *dobj;
 struct dentry *list_dv[64];
@@ -106,8 +106,8 @@ uint64_t                               ber[12] = {0};
 bool                                   check_prbs_all_lanes = false;
 uint32_t                               port_config_mask = 0x800000;
 
-aw_txfir_config_t        tx_fir_cfg_cache[QCOM_AW_PHY_INST_MAX] = {0};
-bool                     tx_fir_cfg_cache_valid[QCOM_AW_PHY_INST_MAX] = {false};
+aw_txfir_config_t        tx_fir_cfg_cache[QCOM_AW_PHY_INST_MAX][PHY_LANE_MAX] = {{0}};
+bool                     tx_fir_cfg_cache_valid[QCOM_AW_PHY_INST_MAX][PHY_LANE_MAX] = {{false}};
 
 extern struct eth_phy_iface_ops qcom_aw_phy_driver_iface_ops;
 
@@ -963,8 +963,8 @@ ssize_t qcom_aw_phy_set_tx_eq_val(struct file *file, const char __user *buf,
 
   aw_pmd_txfir_config_set(&mss, &txfir_cfg, 1);
 
-  tx_fir_cfg_cache[tx_bist_phy_inst] = txfir_cfg;
-  tx_fir_cfg_cache_valid[tx_bist_phy_inst] = true;
+  tx_fir_cfg_cache[tx_bist_phy_inst][tx_bist_lane_num] = txfir_cfg;
+  tx_fir_cfg_cache_valid[tx_bist_phy_inst][tx_bist_lane_num] = true;
 
   return count;
 }
@@ -983,7 +983,11 @@ ssize_t qcom_aw_phy_get_tx_eq_val(struct file *file, char __user *buf,
   mss.phy_offset = phy_inst_info->base_addr;
   pmd_set_lane(&mss, tx_bist_lane_num);
 
-  txfir_cfg.main_or_max = tx_fir_cfg_cache[tx_bist_phy_inst].main_or_max;
+  if(tx_fir_cfg_cache_valid[tx_bist_phy_inst][tx_bist_lane_num])
+    txfir_cfg.main_or_max = tx_fir_cfg_cache[tx_bist_phy_inst][tx_bist_lane_num].main_or_max;
+  else
+    txfir_cfg.main_or_max = 1;
+
   aw_pmd_txfir_config_get(&mss, &txfir_cfg);
 
   nbytes += scnprintf(dbg_buf, 200,
@@ -998,14 +1002,13 @@ ssize_t qcom_aw_phy_get_tx_eq_val(struct file *file, char __user *buf,
   return simple_read_from_buffer(buf, count, ppos, dbg_buf, nbytes);
 }
 
-bool qcom_aw_phy_get_tx_fir_val(enum qcom_aw_phy_instance_enum tx_bist_phy_inst,
-                                            void* txfir_cfg){
-
+bool qcom_aw_phy_debugfs_get_tx_fir_val(enum qcom_aw_phy_instance_enum tx_bist_phy_inst,
+                    enum eth_phy_iface_phy_lane_num_enum lane, void* txfir_cfg){
   if(!QCOM_AW_PHY_INST_VALID(tx_bist_phy_inst))
     return false;
 
-  if(tx_fir_cfg_cache_valid[tx_bist_phy_inst]){
-    memcpy(txfir_cfg , &tx_fir_cfg_cache[tx_bist_phy_inst], sizeof(aw_txfir_config_t));
+  if(tx_fir_cfg_cache_valid[tx_bist_phy_inst][lane]){
+    memcpy(txfir_cfg , &tx_fir_cfg_cache[tx_bist_phy_inst][lane], sizeof(aw_txfir_config_t));
     return true;
   }
 
@@ -4195,4 +4198,4 @@ int32_t setup_phy_status_debugfs_directory()
 	return 0;
 }
 
-#endif /* FEATURE_QCOM_AW_TEST_SYS_FS */
+#endif /* FEATURE_QCOM_AW_DEBUG_FS */

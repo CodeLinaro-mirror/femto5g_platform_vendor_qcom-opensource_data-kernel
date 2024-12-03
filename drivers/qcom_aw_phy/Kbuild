@@ -50,7 +50,8 @@ lassen_qcom_aw_phy-y += \
 	qcom_aw_phy_synce.o \
 	qcom_aw_phy_utils.o \
 	qcom_aw_phy_gnl.o \
-	qcom_aw_phy_test_sysfs.o \
+	qcom_aw_phy_debugfs.o \
+	qcom_aw_phy_sysfs.o \
 	aw_c_api/aw_alphacore.o \
 	aw_c_api/aw_driver_sim.o \
 	aw_c_api/aw_pmd_rx_dsp_get.o \

@@ -1296,9 +1296,11 @@ int qcom_aw_phy_bringup_manual_eq_mode(
   }
 
   // TX FIR Config
-#ifdef FEATURE_QCOM_AW_TEST_SYS_FS
-  if(qcom_aw_phy_get_tx_fir_val(phy_inst_info->phy_inst, (void*)&txfir_cfg) == false)
+  if((qcom_aw_phy_sysfs_get_tx_fir_val(phy_inst_info->phy_inst, lane, (void*)&txfir_cfg) == false)
+#ifdef FEATURE_QCOM_AW_DEBUG_FS
+      && (qcom_aw_phy_debugfs_get_tx_fir_val(phy_inst_info->phy_inst, lane, (void*)&txfir_cfg) == false)
 #endif
+    )
   {
     txfir_cfg.CM3 = 0;
     txfir_cfg.CM2 = 0;
@@ -2205,10 +2207,11 @@ void qcom_aw_phy_handle_rx_sig_detect(struct work_struct *work){
           }
 
           // TX FIR Config
-    #ifdef FEATURE_QCOM_AW_TEST_SYS_FS
-          if(qcom_aw_phy_get_tx_fir_val(phy_inst_info->phy_inst,
-                                        (void*)&txfir_cfg) == false)
-    #endif
+          if((qcom_aw_phy_sysfs_get_tx_fir_val(phy_inst_info->phy_inst, lane, (void*)&txfir_cfg) == false)
+#ifdef FEATURE_QCOM_AW_DEBUG_FS
+              && (qcom_aw_phy_debugfs_get_tx_fir_val(phy_inst_info->phy_inst, lane, (void*)&txfir_cfg) == false)
+#endif
+            )
           {
             txfir_cfg.CM3 = 0;
             txfir_cfg.CM2 = 0;
