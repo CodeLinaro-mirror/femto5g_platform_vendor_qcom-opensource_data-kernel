@@ -299,7 +299,7 @@ typedef struct ecpriss_qudp_ctx
 typedef struct ecpriss_qudp_ctx_v2
 {
 	epriss_qudp_state_e                 state;
-	uint32_t                            num_ports;
+	uint32_t                            num_ports[ETH_ECPRISS_PORT_TYPE_MAX];
 	ecpriss_qudp_port_cfg_s_v2          fh_port_cfg_v2[ECPRISS_PORT_MAX];
 	ecpriss_qudp_port_cfg_s_v2          c2c_port_cfg_v2[ECPRISS_PORT_MAX];
 	ecpriss_qudp_port_cfg_s_v2          l2_port_cfg_v2[ECPRISS_PORT_MAX];

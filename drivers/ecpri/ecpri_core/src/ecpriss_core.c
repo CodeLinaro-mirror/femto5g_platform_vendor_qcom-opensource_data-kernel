@@ -538,9 +538,9 @@ void ecpriss_eth_topology_init_v2(void)
 		for(i=0;i<eth_link_params_g.num_unique_port_types;i++) {
 			if(eth_link_params_g.topology_params[i].port_type ==
 					ETH_ECPRISS_PORT_TYPE_FH) {
-				ecpriss_pdata_v2->qudp_ctx_v2->num_ports =
+				ecpriss_pdata_v2->qudp_ctx_v2->num_ports[ETH_ECPRISS_PORT_TYPE_FH] =
 				eth_link_params_g.topology_params[i].num_ports;
-				for(j=0;j<ecpriss_pdata_v2->qudp_ctx_v2->num_ports;j++){
+				for(j=0;j<ecpriss_pdata_v2->qudp_ctx_v2->num_ports[ETH_ECPRISS_PORT_TYPE_FH];j++){
 					port_index =
 					eth_link_params_g.topology_params[i].port_params[j].port_index;
 					port_cfg_local =
@@ -575,9 +575,9 @@ void ecpriss_eth_topology_init_v2(void)
 			}
 			else if(eth_link_params_g.topology_params[i].port_type ==
 					ETH_ECPRISS_PORT_TYPE_C2C) {
-				ecpriss_pdata_v2->qudp_ctx_v2->num_ports =
+				ecpriss_pdata_v2->qudp_ctx_v2->num_ports[ETH_ECPRISS_PORT_TYPE_C2C] =
 				eth_link_params_g.topology_params[i].num_ports;
-				for(j=0;j<ecpriss_pdata_v2->qudp_ctx_v2->num_ports;j++){
+				for(j=0;j<ecpriss_pdata_v2->qudp_ctx_v2->num_ports[ETH_ECPRISS_PORT_TYPE_C2C];j++){
 					port_index =
 					eth_link_params_g.topology_params[i].port_params[j].port_index;
 					port_cfg_local =
