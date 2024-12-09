@@ -48,6 +48,8 @@
 #define ECPRI_CG_CLK_NOM_MAX (ECPRI_CLK_FREQ(466.50))
 #define ECPRI_MSS_ORAN_NOM_MAX (ECPRI_CLK_FREQ(500))
 
+extern int cascade_enable;
+
 typedef enum
 {
 	ECPRI_CORE_PRE_INIT,
@@ -267,4 +269,7 @@ int ecpriss_get_link_rate(eth_ecpriss_port_type_e port_type,
 
 void ecpriss_debug_flow_info(ecpriss_packet_payload_s *packet, uint8_t msg_id);
 
+void ecpriss_xbar_oc_cfg_enable_len_check_v2(uint32_t len_check_action);
+void ecpriss_core_set_enable_len_check_info(uint32_t val);
+int ecpriss_core_get_enable_len_check_info(void);
 #endif

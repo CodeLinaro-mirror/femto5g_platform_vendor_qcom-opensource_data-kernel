@@ -1641,7 +1641,8 @@ int gsi_alloc_evt_ring(struct gsi_evt_ring_props *props, unsigned long dev_hdl,
 	} else {
 		evt_id = props->evchid;
 	}
-	GSIDBG("Using %lu as virt evt id\n", evt_id);
+	GSIDBG("Using %lu as virt evt id for GSI ID %d, EE %d \n",
+		props->gsi_id, props->ee, evt_id);
 
 	if (props->rp_update_addr != 0) {
 		GSIDBG("Using DDR to read event RP for virt evt id: %lu\n",

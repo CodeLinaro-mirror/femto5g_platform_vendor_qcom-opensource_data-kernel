@@ -39,6 +39,7 @@
 #define ECPRI_DMA_MHI_SLEEP_CLK_RATE_KHZ    (32)
 #define ECPRI_DMA_MHI_MIN_VALID_HDL         (1)
 #define ECPRI_DMA_MHI_PF_ID (ECPRI_DMA_VM_IDS_MAX)
+#define ECPRI_DMA_MHI_PF_GSI_ID (ECPRI_DMA_GSI_ID_1)
 
 /* bit #40 in address should be asserted for MHI transfers over pcie */
 #define ECPRI_DMA_MHI_HOST_ADDR(addr) ((addr) | BIT_ULL(40))

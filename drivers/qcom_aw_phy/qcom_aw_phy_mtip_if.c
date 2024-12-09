@@ -578,7 +578,7 @@ enum mtip_port_config_enum qcom_aw_phy_an_result_to_debug_port_config(
 enum mtip_port_config_enum qcom_aw_phy_an_result_to_port_config(
                                 struct qcom_aw_phy_inst_config *phy_inst_info){
 
-  if(phy_inst_info->phy_inst == QCOM_AW_PHY_INST_DEBUG)
+  if(phy_inst_info->phy_inst == QCOM_AW_PHY_INST_DEBUG_C2C)
     return qcom_aw_phy_an_result_to_debug_port_config(phy_inst_info);
 
   switch(phy_inst_info->an_params.an_result[PHY_LANE_0]){
@@ -1091,7 +1091,7 @@ int qcom_aw_phy_bringup_anlt_mode(mss_access_t *mss,
   }
 
   /* For Debug port, hard code the master lane as lane 2 */
-  if(phy_inst_info->phy_inst == QCOM_AW_PHY_INST_DEBUG)
+  if(phy_inst_info->phy_inst == QCOM_AW_PHY_INST_DEBUG_C2C)
     ref_lane = PHY_LANE_2;
   else
     ref_lane = PHY_LANE_0;
@@ -1296,9 +1296,11 @@ int qcom_aw_phy_bringup_manual_eq_mode(
   }
 
   // TX FIR Config
-#ifdef FEATURE_QCOM_AW_TEST_SYS_FS
-  if(qcom_aw_phy_get_tx_fir_val(phy_inst_info->phy_inst, (void*)&txfir_cfg) == false)
+  if((qcom_aw_phy_sysfs_get_tx_fir_val(phy_inst_info->phy_inst, lane, (void*)&txfir_cfg) == false)
+#ifdef FEATURE_QCOM_AW_DEBUG_FS
+      && (qcom_aw_phy_debugfs_get_tx_fir_val(phy_inst_info->phy_inst, lane, (void*)&txfir_cfg) == false)
 #endif
+    )
   {
     txfir_cfg.CM3 = 0;
     txfir_cfg.CM2 = 0;
@@ -2205,10 +2207,11 @@ void qcom_aw_phy_handle_rx_sig_detect(struct work_struct *work){
           }
 
           // TX FIR Config
-    #ifdef FEATURE_QCOM_AW_TEST_SYS_FS
-          if(qcom_aw_phy_get_tx_fir_val(phy_inst_info->phy_inst,
-                                        (void*)&txfir_cfg) == false)
-    #endif
+          if((qcom_aw_phy_sysfs_get_tx_fir_val(phy_inst_info->phy_inst, lane, (void*)&txfir_cfg) == false)
+#ifdef FEATURE_QCOM_AW_DEBUG_FS
+              && (qcom_aw_phy_debugfs_get_tx_fir_val(phy_inst_info->phy_inst, lane, (void*)&txfir_cfg) == false)
+#endif
+            )
           {
             txfir_cfg.CM3 = 0;
             txfir_cfg.CM2 = 0;

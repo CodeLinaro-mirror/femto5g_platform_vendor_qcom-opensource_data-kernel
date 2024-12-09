@@ -168,6 +168,7 @@ static const char *ecpriss_xbar_hal_reg_name_to_str[ECPRI_XBAR_MAX+1] = {
         "ECPRI_XBAR_DBG_OCTX_OC_0_1_BUFF_WATERMARK",
         "ECPRI_XBAR_DBG_OCTX_OC_2_3_BUFF_WATERMARK",
 	"ECPRI_XBAR_FH_CFG",
+	"ECPRI_XBAR_OC_CFG",
 
 	"ECPRI_XBAR_MAX"
 
@@ -1785,6 +1786,80 @@ static void ecpriss_xbar_hal_reg_parse_fh_cfg
 }
 
 
+	static void ecpriss_xbar_hal_reg_construct_oc_cfg
+(enum ecpriss_xbar_hal_reg_name reg, const void *fields, uint32_t* val)
+{
+
+	ecpri_xbar_hwio_def_ecpri_xbar_oc_cfg_s *oc_cfg =
+		(ecpri_xbar_hwio_def_ecpri_xbar_oc_cfg_s *) fields;
+
+	ECPRISS_HAL_SETFIELD_IN_REG(*val,
+			oc_cfg->octx_len_chk_enable,
+			HWIO_ECPRI_XBAR_OC_CFG_OCTX_LEN_CHK_ENABLE_SHFT,
+			HWIO_ECPRI_XBAR_OC_CFG_OCTX_LEN_CHK_ENABLE_BMSK);
+
+	ECPRISS_HAL_SETFIELD_IN_REG(*val,
+			oc_cfg->octx_len_chk_drop,
+			HWIO_ECPRI_XBAR_OC_CFG_OCTX_LEN_CHK_DROP_SHFT,
+			HWIO_ECPRI_XBAR_OC_CFG_OCTX_LEN_CHK_DROP_BMSK);
+
+	ECPRISS_HAL_SETFIELD_IN_REG(*val,
+			oc_cfg->octx_dynamic_prio_en,
+			HWIO_ECPRI_XBAR_OC_CFG_OCTX_DYNAMIC_PRIO_EN_SHFT,
+			HWIO_ECPRI_XBAR_OC_CFG_OCTX_DYNAMIC_PRIO_EN_BMSK);
+
+	ECPRISS_HAL_SETFIELD_IN_REG(*val,
+			oc_cfg->octx_overflow_mode,
+			HWIO_ECPRI_XBAR_OC_CFG_OCTX_OVERFLOW_MODE_SHFT,
+			HWIO_ECPRI_XBAR_OC_CFG_OCTX_OVERFLOW_MODE_BMSK);
+
+	ECPRISS_HAL_SETFIELD_IN_REG(*val,
+			oc_cfg->ocrx_async_threshold,
+			HWIO_ECPRI_XBAR_OC_CFG_OCRX_ASYNC_THRESHOLD_SHFT,
+			HWIO_ECPRI_XBAR_OC_CFG_OCRX_ASYNC_THRESHOLD_BMSK);
+
+	ECPRISS_HAL_SETFIELD_IN_REG(*val,
+			oc_cfg->ocrx_eop_timeout,
+			HWIO_ECPRI_XBAR_OC_CFG_OCRX_EOP_TIMEOUT_SHFT,
+			HWIO_ECPRI_XBAR_OC_CFG_OCRX_EOP_TIMEOUT_BMSK);
+
+
+	return;
+}
+
+static void ecpriss_xbar_hal_reg_parse_oc_cfg
+	    (enum ecpriss_xbar_hal_reg_name reg, void *fields, uint32_t val)
+{
+	ecpri_xbar_hwio_def_ecpri_xbar_oc_cfg_s *oc_cfg =
+		(ecpri_xbar_hwio_def_ecpri_xbar_oc_cfg_s *) fields;
+
+	oc_cfg->octx_len_chk_enable = ECPRISS_HAL_GETFIELD_FROM_REG(val,
+			HWIO_ECPRI_XBAR_OC_CFG_OCTX_LEN_CHK_ENABLE_SHFT,
+			HWIO_ECPRI_XBAR_OC_CFG_OCTX_LEN_CHK_ENABLE_BMSK);
+
+	oc_cfg->octx_len_chk_drop = ECPRISS_HAL_GETFIELD_FROM_REG(val,
+			HWIO_ECPRI_XBAR_OC_CFG_OCTX_LEN_CHK_DROP_SHFT,
+			HWIO_ECPRI_XBAR_OC_CFG_OCTX_LEN_CHK_DROP_BMSK);
+
+	oc_cfg->octx_dynamic_prio_en = ECPRISS_HAL_GETFIELD_FROM_REG(val,
+			HWIO_ECPRI_XBAR_OC_CFG_OCTX_DYNAMIC_PRIO_EN_SHFT,
+			HWIO_ECPRI_XBAR_OC_CFG_OCTX_DYNAMIC_PRIO_EN_BMSK);
+
+	oc_cfg->octx_overflow_mode = ECPRISS_HAL_GETFIELD_FROM_REG(val,
+			HWIO_ECPRI_XBAR_OC_CFG_OCTX_OVERFLOW_MODE_SHFT,
+			HWIO_ECPRI_XBAR_OC_CFG_OCTX_OVERFLOW_MODE_BMSK);
+
+	oc_cfg->ocrx_async_threshold = ECPRISS_HAL_GETFIELD_FROM_REG(val,
+			HWIO_ECPRI_XBAR_OC_CFG_OCRX_ASYNC_THRESHOLD_SHFT,
+			HWIO_ECPRI_XBAR_OC_CFG_OCRX_ASYNC_THRESHOLD_BMSK);
+
+	oc_cfg->ocrx_eop_timeout = ECPRISS_HAL_GETFIELD_FROM_REG(val,
+			HWIO_ECPRI_XBAR_OC_CFG_OCRX_EOP_TIMEOUT_SHFT,
+			HWIO_ECPRI_XBAR_OC_CFG_OCRX_EOP_TIMEOUT_BMSK);
+	return;
+}
+
+
 static void ecpriss_xbar_hal_reg_parse_dummy(enum ecpriss_xbar_hal_reg_name reg, void *fields,
 		u32 val)
 {
@@ -2409,6 +2484,11 @@ static struct ecpriss_xbar_hal_reg_obj ecpriss_xbar_hal_reg_objs[ECPRISS_XBAR_HW
 		ecpriss_xbar_hal_reg_construct_fh_cfg,
 		ecpriss_xbar_hal_reg_parse_fh_cfg,
 		0x09420000, 0x10, 0x0, 0, 0, 0, 0},
+	[ECPRISS_XBAR_HW_v2_0][ECPRI_XBAR_OC_CFG] = {
+		ecpriss_xbar_hal_reg_construct_oc_cfg,
+		ecpriss_xbar_hal_reg_parse_oc_cfg,
+		0x09420000, 0x14, 0x0, 0, 0, 0, 0},
+
 
 
 

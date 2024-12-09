@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: GPL-2.0-only
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 /**
@@ -65,18 +65,6 @@ MODULE_PARM_DESC(qcom_aw_phy_toggle_polarity,
 /* Module parameter to disable lane tear down as part of
    retry procedure for TX compliance tests */
 bool qcom_aw_phy_tx_compliance_flag = false;
-
-/* Root object for sysfs directory */
-struct kobject *qcom_aw_phy_kobj_root;
-
-/* File attribute for AN restart delay timer value sysfs node */
-struct kobj_attribute qcom_aw_phy_an_restart_delay_timer_attr =
-                         __ATTR(an_restart_delay_timer_msec, 0660,
-                                qcom_aw_phy_sysfs_show_an_restart_delay_timer,
-                                qcom_aw_phy_sysfs_store_an_restart_delay_timer);
-int qcom_aw_phy_an_restart_delay_timer_val = 1000;
-
-#define MAX_INT_CHAR_SIZE 15
 
 /*-------------------------------------------------------------------
 * Function Definitions
@@ -641,14 +629,22 @@ static void qcom_aw_phy_setup_synce_clocks(struct device *dev) {
          qcom_aw_phy_get_clock(dev, "ECPRI_CC_EMAC_SYNCE_PHY10_CLK_SRC");
   qcom_aw_phy_config_info.synce_phy_lane_clk[FH2_LANE_3] =
          qcom_aw_phy_get_clock(dev, "ECPRI_CC_EMAC_SYNCE_PHY11_CLK_SRC");
-  qcom_aw_phy_config_info.synce_phy_lane_clk[L2_LANE_0] =
+  qcom_aw_phy_config_info.synce_phy_lane_clk[L2_C2C_LANE_0] =
          qcom_aw_phy_get_clock(dev, "ECPRI_CC_EMAC_SYNCE_PHY12_CLK_SRC");
-  qcom_aw_phy_config_info.synce_phy_lane_clk[L2_LANE_1] =
+  qcom_aw_phy_config_info.synce_phy_lane_clk[L2_C2C_LANE_1] =
          qcom_aw_phy_get_clock(dev, "ECPRI_CC_EMAC_SYNCE_PHY13_CLK_SRC");
-  qcom_aw_phy_config_info.synce_phy_lane_clk[L2_LANE_2] =
+  qcom_aw_phy_config_info.synce_phy_lane_clk[L2_C2C_LANE_2] =
          qcom_aw_phy_get_clock(dev, "ECPRI_CC_EMAC_SYNCE_PHY14_CLK_SRC");
-  qcom_aw_phy_config_info.synce_phy_lane_clk[L2_LANE_3] =
+  qcom_aw_phy_config_info.synce_phy_lane_clk[L2_C2C_LANE_3] =
          qcom_aw_phy_get_clock(dev, "ECPRI_CC_EMAC_SYNCE_PHY15_CLK_SRC");
+  qcom_aw_phy_config_info.synce_phy_lane_clk[DBG_C2C_LANE0] =
+         qcom_aw_phy_get_clock(dev, "ECPRI_CC_EMAC_SYNCE_PHY16_CLK_SRC");
+  qcom_aw_phy_config_info.synce_phy_lane_clk[DBG_C2C_LANE1] =
+         qcom_aw_phy_get_clock(dev, "ECPRI_CC_EMAC_SYNCE_PHY17_CLK_SRC");
+  qcom_aw_phy_config_info.synce_phy_lane_clk[DBG_C2C_LANE2] =
+         qcom_aw_phy_get_clock(dev, "ECPRI_CC_EMAC_SYNCE_PHY18_CLK_SRC");
+  qcom_aw_phy_config_info.synce_phy_lane_clk[DBG_C2C_LANE3] =
+         qcom_aw_phy_get_clock(dev, "ECPRI_CC_EMAC_SYNCE_PHY19_CLK_SRC");
 
   return;
 }
@@ -688,7 +684,7 @@ static void qcom_aw_phy_enable_ref_clk_propagation(
                   DIG_SOC_CMN_OVRD_ICTL_REF_LS_ENA_A_OFFSET, 1);
 
   if(qcom_aw_phy_ref_clk_mode == REF_CLK_MODE_OSCILLATOR){
-    if (phy_inst_info->phy_inst == QCOM_AW_PHY_INST_DEBUG)
+    if (phy_inst_info->phy_inst == QCOM_AW_PHY_INST_DEBUG_C2C)
       reg_val = 0x4;
     else
       reg_val = 0x1;
@@ -707,7 +703,7 @@ static void qcom_aw_phy_enable_ref_clk_propagation(
   if(qcom_aw_phy_ref_clk_mode == REF_CLK_MODE_OSCILLATOR){
     if (phy_inst_info->phy_inst == QCOM_AW_PHY_INST_FH0)
       reg_val = 0x0;
-    else if (phy_inst_info->phy_inst == QCOM_AW_PHY_INST_DEBUG)
+    else if (phy_inst_info->phy_inst == QCOM_AW_PHY_INST_DEBUG_C2C)
       reg_val = 0x3;
     else
       reg_val = 0x1;
@@ -719,7 +715,7 @@ static void qcom_aw_phy_enable_ref_clk_propagation(
   else{
     if (phy_inst_info->phy_inst == QCOM_AW_PHY_INST_FH0)
       reg_val = 0x3;
-    else if (phy_inst_info->phy_inst == QCOM_AW_PHY_INST_DEBUG)
+    else if (phy_inst_info->phy_inst == QCOM_AW_PHY_INST_DEBUG_C2C)
       reg_val = 0x0;
     else
       reg_val = 0x1;
@@ -771,7 +767,7 @@ static void qcom_aw_phy_hw_init() {
   // Reference clock propagation using PHY inputs
   if (phy_input_config) {
 
-    for (phy_inst_type = QCOM_AW_PHY_INST_DEBUG;
+    for (phy_inst_type = QCOM_AW_PHY_INST_DEBUG_C2C;
          QCOM_AW_PHY_INST_VALID(phy_inst_type); phy_inst_type--) {
       phy_inst_info = &phy_config_info->phy_inst_config_info[phy_inst_type];
       if (phy_inst_info && phy_inst_info->valid) {
@@ -878,7 +874,7 @@ static void qcom_aw_phy_hw_init() {
       qcom_aw_phy_load_hexfile(
           &mss, "/lib/firmware/qcom_aw_phy/eth_custom_rates_1.hex");
 
-      if(phy_inst_type == QCOM_AW_PHY_INST_DEBUG){
+      if(phy_inst_type == QCOM_AW_PHY_INST_DEBUG_C2C){
         iowrite32(0x4, phy_inst_info->wrapper_base_addr +
                              QCOM_AW_PHY_WRAPPER_PHY_ICTL_AN_MASTER_CFG_OFFSET);
       }
@@ -1156,47 +1152,6 @@ static int qcom_aw_phy_inst_remove(struct platform_device *pdev) {
   QCOM_AW_PHY_LOG_INFO("qcom_aw_phy_inst_remove");
 
   return 0;
-
-}
-
-ssize_t qcom_aw_phy_sysfs_show_an_restart_delay_timer(
-                struct kobject *kobj, struct kobj_attribute *attr, char *buf) {
-  return snprintf(buf, MAX_INT_CHAR_SIZE, "%d\n",
-                  qcom_aw_phy_an_restart_delay_timer_val);
-}
-
-ssize_t qcom_aw_phy_sysfs_store_an_restart_delay_timer(
-                              struct kobject *kobj, struct kobj_attribute *attr,
-                              const char *buf, size_t count) {
-  sscanf(buf, "%d", &qcom_aw_phy_an_restart_delay_timer_val);
-  return count;
-}
-
-void qcom_aw_phy_setup_sysfs(void) {
-
-  /* Creating the root directory structure in /sys/kernel */
-  qcom_aw_phy_kobj_root = kobject_create_and_add("qcom_aw_phy", kernel_kobj);
-
-  /* Creating file for AN restart delay timer value */
-  if(sysfs_create_file(qcom_aw_phy_kobj_root,
-                       &qcom_aw_phy_an_restart_delay_timer_attr.attr))
-  {
-    kobject_put(qcom_aw_phy_kobj_root);
-    sysfs_remove_file(kernel_kobj,
-                      &qcom_aw_phy_an_restart_delay_timer_attr.attr);
-  }
-
-  return;
-}
-
-void qcom_aw_phy_del_sysfs(void) {
-
-  sysfs_remove_file(qcom_aw_phy_kobj_root,
-                    &qcom_aw_phy_an_restart_delay_timer_attr.attr);
-  kobject_del(qcom_aw_phy_kobj_root);
-  qcom_aw_phy_kobj_root=NULL;
-
-  return;
 }
 
 /* PHY Driver Instance Compatible string */
@@ -1239,7 +1194,7 @@ static int __init qcom_aw_phy_init(void) {
   qcom_aw_phy_gnl_init();
   qcom_aw_phy_prbs_gnl_init();
 
-#ifdef FEATURE_QCOM_AW_TEST_SYS_FS
+#ifdef FEATURE_QCOM_AW_DEBUG_FS
   qcom_aw_phy_setup_debugfs();
 #endif
 
@@ -1311,7 +1266,7 @@ static void __exit qcom_aw_phy_exit(void) {
   qcom_aw_phy_gnl_exit();
   qcom_aw_phy_prbs_gnl_exit();
 
-#ifdef FEATURE_QCOM_AW_TEST_SYS_FS
+#ifdef FEATURE_QCOM_AW_DEBUG_FS
   qcom_aw_phy_del_debugfs();
 #endif
 

@@ -43,10 +43,10 @@ qcom_aw_phy_mac_port_to_phy_inst(enum mtip_port_type_enum port_type) {
     return QCOM_AW_PHY_INST_FH2;
 
   case MTIP_PORT_TYPE_L2:
-    return QCOM_AW_PHY_INST_L2;
+    return QCOM_AW_PHY_INST_L2_C2C;
 
   case MTIP_PORT_TYPE_DEBUG:
-    return QCOM_AW_PHY_INST_DEBUG;
+    return QCOM_AW_PHY_INST_DEBUG_C2C;
 
   default:
     break;
@@ -76,10 +76,10 @@ qcom_aw_phy_inst_to_mac_port(enum qcom_aw_phy_instance_enum phy_inst) {
   case QCOM_AW_PHY_INST_FH2:
     return MTIP_PORT_TYPE_FH_2;
 
-  case QCOM_AW_PHY_INST_L2:
+  case QCOM_AW_PHY_INST_L2_C2C:
     return MTIP_PORT_TYPE_L2;
 
-  case QCOM_AW_PHY_INST_DEBUG:
+  case QCOM_AW_PHY_INST_DEBUG_C2C:
     return MTIP_PORT_TYPE_DEBUG;
 
   default:

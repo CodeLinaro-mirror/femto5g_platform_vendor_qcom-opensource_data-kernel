@@ -122,19 +122,20 @@ struct ecpri_dma_eth_client_endp_mapping
 	[ECPRI_HW_V2_0][ECPRI_HW_FLAVOR_DU_PCIE_5_X_6][12] = { true, {23, 0}, {59, 0} },
 
 	/* DU-PCIe 3x12 Connections */
-	[ECPRI_HW_V2_0][ECPRI_HW_FLAVOR_DU_PCIE_3_X_12][0] =  { true, {0, 0},  {37, 0} },
-	[ECPRI_HW_V2_0][ECPRI_HW_FLAVOR_DU_PCIE_3_X_12][1] =  { true, {24, 0}, {61, 0} },
-	[ECPRI_HW_V2_0][ECPRI_HW_FLAVOR_DU_PCIE_3_X_12][2] =  { true, {25, 0}, {62, 0} },
-	[ECPRI_HW_V2_0][ECPRI_HW_FLAVOR_DU_PCIE_3_X_12][3] =  { true, {26, 0}, {63, 0} },
-	[ECPRI_HW_V2_0][ECPRI_HW_FLAVOR_DU_PCIE_3_X_12][4] =  { true, {1, 0},  {38, 0} },
-	[ECPRI_HW_V2_0][ECPRI_HW_FLAVOR_DU_PCIE_3_X_12][5] =  { true, {27, 0}, {64, 0} },
-	[ECPRI_HW_V2_0][ECPRI_HW_FLAVOR_DU_PCIE_3_X_12][6] =  { true, {28, 0}, {65, 0} },
-	[ECPRI_HW_V2_0][ECPRI_HW_FLAVOR_DU_PCIE_3_X_12][7] =  { true, {29, 0}, {66, 0} },
-	[ECPRI_HW_V2_0][ECPRI_HW_FLAVOR_DU_PCIE_3_X_12][8] =  { true, {2, 0},  {39, 0} },
-	[ECPRI_HW_V2_0][ECPRI_HW_FLAVOR_DU_PCIE_3_X_12][9] =  { true, {30, 0}, {67, 0} },
-	[ECPRI_HW_V2_0][ECPRI_HW_FLAVOR_DU_PCIE_3_X_12][10] = { true, {31, 0}, {68, 0} },
-	[ECPRI_HW_V2_0][ECPRI_HW_FLAVOR_DU_PCIE_3_X_12][11] = { true, {32, 0}, {69, 0} },
-	[ECPRI_HW_V2_0][ECPRI_HW_FLAVOR_DU_PCIE_3_X_12][12] = { true, {23, 0}, {59, 0} },
+	[ECPRI_HW_V2_0][ECPRI_HW_FLAVOR_DU_PCIE_3_X_12][0] =  { true, {16, 2}, {53, 2} },
+	[ECPRI_HW_V2_0][ECPRI_HW_FLAVOR_DU_PCIE_3_X_12][1] =  { true, {17, 2}, {54, 2} },
+	[ECPRI_HW_V2_0][ECPRI_HW_FLAVOR_DU_PCIE_3_X_12][2] =  { true, {18, 2}, {55, 2} },
+	[ECPRI_HW_V2_0][ECPRI_HW_FLAVOR_DU_PCIE_3_X_12][3] =  { true, {19, 2}, {56, 2} },
+	[ECPRI_HW_V2_0][ECPRI_HW_FLAVOR_DU_PCIE_3_X_12][4] =  { true, {20, 2}, {57, 2} },
+	[ECPRI_HW_V2_0][ECPRI_HW_FLAVOR_DU_PCIE_3_X_12][5] =  { true, {21, 2}, {58, 2} },
+	[ECPRI_HW_V2_0][ECPRI_HW_FLAVOR_DU_PCIE_3_X_12][6] =  { true, {22, 2}, {59, 2} },
+	[ECPRI_HW_V2_0][ECPRI_HW_FLAVOR_DU_PCIE_3_X_12][7] =  { true, {23, 2}, {60, 2} },
+	[ECPRI_HW_V2_0][ECPRI_HW_FLAVOR_DU_PCIE_3_X_12][8] =  { true, {24, 2}, {61, 2} },
+	[ECPRI_HW_V2_0][ECPRI_HW_FLAVOR_DU_PCIE_3_X_12][9] =  { true, {25, 2}, {62, 2} },
+	[ECPRI_HW_V2_0][ECPRI_HW_FLAVOR_DU_PCIE_3_X_12][10] = { true, {26, 2}, {63, 2} },
+	[ECPRI_HW_V2_0][ECPRI_HW_FLAVOR_DU_PCIE_3_X_12][11] = { true, {27, 2}, {64, 2} },
+	[ECPRI_HW_V2_0][ECPRI_HW_FLAVOR_DU_PCIE_3_X_12][12] = { true, {29, 1}, {67, 1} },
+	[ECPRI_HW_V2_0][ECPRI_HW_FLAVOR_DU_PCIE_3_X_12][13] = { true, {30, 1}, {68, 1} },
 };
 
 struct ecpri_dma_eth_client_context *ecpri_dma_eth_client_ctx = NULL;
@@ -1365,7 +1366,6 @@ int ecpri_dma_eth_query_stats(ecpri_dma_eth_conn_hdl_t hdl,
 		return -EINVAL;
 	}
 
-	// TODO
 	DMADBG_LOW("Exit\n");
 
 	return ret;

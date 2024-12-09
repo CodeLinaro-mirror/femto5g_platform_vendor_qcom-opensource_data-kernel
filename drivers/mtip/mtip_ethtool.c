@@ -1016,6 +1016,8 @@ int mtip_ethtool_set_link_ksettings(struct net_device *netdev, const struct etht
         {
             if(link_index == MTIP_DEBUG_ETH_LINK_INDEX)
                 priv_flags = MTIP_DEVICE_PRIV_FLAGS_BIT_MASK_10G_ONLY_DBG_PORT;
+	    else if(link_index == MTIP_L2_ETH_LINK_INDEX)
+                priv_flags = MTIP_DEVICE_PRIV_FLAGS_BIT_MASK_10G_ONLY_L2_PORT;
             else
                 priv_flags = MTIP_DEVICE_PRIV_FLAGS_BIT_MASK_10G_ONLY;
         }
@@ -1023,6 +1025,8 @@ int mtip_ethtool_set_link_ksettings(struct net_device *netdev, const struct etht
         {
             if(link_index == MTIP_DEBUG_ETH_LINK_INDEX)
                 priv_flags = MTIP_DEVICE_PRIV_FLAGS_BIT_MASK_25G_ONLY_DBG_PORT;
+	    else if(link_index == MTIP_L2_ETH_LINK_INDEX)
+                priv_flags = MTIP_DEVICE_PRIV_FLAGS_BIT_MASK_25G_ONLY_L2_PORT;
             else
                 priv_flags = MTIP_DEVICE_PRIV_FLAGS_BIT_MASK_25G_ONLY;
         }
@@ -1032,6 +1036,8 @@ int mtip_ethtool_set_link_ksettings(struct net_device *netdev, const struct etht
         {
             if(link_index == MTIP_DEBUG_ETH_LINK_INDEX)
                 priv_flags = MTIP_DEVICE_PRIV_FLAGS_BIT_MASK_50G_ONLY_DBG_PORT;
+            if(link_index == MTIP_L2_ETH_LINK_INDEX)
+                priv_flags = MTIP_DEVICE_PRIV_FLAGS_BIT_MASK_50G_ONLY_L2_PORT;
             else
                 priv_flags = MTIP_DEVICE_PRIV_FLAGS_BIT_MASK_50G_ONLY;
         }
@@ -1039,6 +1045,8 @@ int mtip_ethtool_set_link_ksettings(struct net_device *netdev, const struct etht
         {
             if(link_index == MTIP_DEBUG_ETH_LINK_INDEX)
                 priv_flags = MTIP_DEVICE_PRIV_FLAGS_BIT_MASK_100G_ONLY_DBG_PORT;
+	    else if(link_index == MTIP_L2_ETH_LINK_INDEX)
+                priv_flags = MTIP_DEVICE_PRIV_FLAGS_BIT_MASK_100G_ONLY_L2_PORT;
             else
                 priv_flags = MTIP_DEVICE_PRIV_FLAGS_BIT_MASK_100G_ONLY;
         }
@@ -1047,6 +1055,8 @@ int mtip_ethtool_set_link_ksettings(struct net_device *netdev, const struct etht
     {
         if(link_index == MTIP_DEBUG_ETH_LINK_INDEX)
             priv_flags = MTIP_DEVICE_PRIV_FLAGS_BIT_MASK_DBG_PORT_NON_FEC_NON_50G;
+        if(link_index == MTIP_L2_ETH_LINK_INDEX)
+            priv_flags = MTIP_DEVICE_PRIV_FLAGS_BIT_MASK_L2_PORT_NON_FEC;
         else
             priv_flags = MTIP_DEVICE_PRIV_FLAGS_BIT_MASK_NON_FEC;
     }
@@ -1485,6 +1495,12 @@ void mtip_ethtool_set_msglevel(struct net_device *netdev, u32 level)
     case 5:
         {
             mtip_ethtool_debug_logging_enable = 1;
+        }
+        break;
+
+    case 6:
+        {
+           mtip_ethtool_debug_logging_enable = 0;
         }
         break;
 

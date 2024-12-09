@@ -29,6 +29,9 @@
 // Mask for all lane speeds supported by Debug ETH except FEC modes and 50G lane speeds.
 #define MTIP_DEVICE_PRIV_FLAGS_BIT_MASK_DBG_PORT_NON_FEC_NON_50G   0x21000000
 
+// Mask for all lane speeds supported by L2 PORT except FEC modes
+#define MTIP_DEVICE_PRIV_FLAGS_BIT_MASK_L2_PORT_NON_FEC    0x2100A008
+
 /*-----------------------Ethtool speed setting mask --------------------------*/
 // 100G link speed configuration mask
 #define MTIP_DEVICE_PRIV_FLAGS_BIT_MASK_100G_ONLY          0x00000028
@@ -48,14 +51,26 @@
 // 100G link speed configuration mask
 #define MTIP_DEVICE_PRIV_FLAGS_BIT_MASK_100G_ONLY_DBG_PORT 0x00000009
 
+// 100G link speed configuration mask
+#define MTIP_DEVICE_PRIV_FLAGS_BIT_MASK_100G_ONLY_L2_PORT  0x00000008
+
 // 50G link speed configuration mask
 #define MTIP_DEVICE_PRIV_FLAGS_BIT_MASK_50G_ONLY_DBG_PORT  0x0000A000
+
+// 50G link speed configuration mask
+#define MTIP_DEVICE_PRIV_FLAGS_BIT_MASK_50G_ONLY_L2_PORT   0x0000A000
 
 // 25G link speed configuration mask
 #define MTIP_DEVICE_PRIV_FLAGS_BIT_MASK_25G_ONLY_DBG_PORT  0x01000000
 
+// 25G link speed configuration mask
+#define MTIP_DEVICE_PRIV_FLAGS_BIT_MASK_25G_ONLY_L2_PORT   0x01000000
+
 // 10G link speed configuration mask
 #define MTIP_DEVICE_PRIV_FLAGS_BIT_MASK_10G_ONLY_DBG_PORT  0x20000000
+
+// 10G link speed configuration mask
+#define MTIP_DEVICE_PRIV_FLAGS_BIT_MASK_10G_ONLY_L2_PORT   0x20000000
 
 // Single lane link speed configuration mask
 #define MTIP_DEVICE_PRIV_FLAGS_SINGLE_LANE_MASK            0x7FE06187

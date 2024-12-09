@@ -842,6 +842,9 @@ static void mtip_mac_wrapper_set_csr_cfg(struct mtip_port_device_info* port_devi
     {
     case MTIP_PORT_CONFIG_1x100GBASE_R:
         {
+          if (port_type == MTIP_PORT_TYPE_L2 )
+            csr_cfg |= 0x3f0;
+          else
             csr_cfg |= 0x130;
         }
         break;
@@ -857,6 +860,9 @@ static void mtip_mac_wrapper_set_csr_cfg(struct mtip_port_device_info* port_devi
         break;
     case MTIP_PORT_CONFIG_1x100GBASE_R2:
         {
+          if (port_type == MTIP_PORT_TYPE_L2 )
+            csr_cfg |= 0xf0;
+          else
             csr_cfg |= 0x30;
         }
         break;
@@ -1022,6 +1028,9 @@ static void mtip_mac_wrapper_set_pcs_mode(struct mtip_port_device_info* port_dev
     {
     case MTIP_PORT_CONFIG_1x100GBASE_R:
         {
+          if(port_type == MTIP_PORT_TYPE_L2 )
+            pcs_mode_set =  0x0C03CF; //0x404c0;
+          else
             pcs_mode_set =  0x404c0;
         }
         break;
@@ -1037,7 +1046,10 @@ static void mtip_mac_wrapper_set_pcs_mode(struct mtip_port_device_info* port_dev
         break;
     case MTIP_PORT_CONFIG_1x100GBASE_R2:
         {
-            pcs_mode_set =  0x400c3;
+          if(port_type == MTIP_PORT_TYPE_L2 )
+            pcs_mode_set = 0x0C03CF;// 0x400c3;
+          else
+            pcs_mode_set = 0x400c3;
         }
         break;
     case MTIP_PORT_CONFIG_1x100GBASE_R2_RSFEC:
