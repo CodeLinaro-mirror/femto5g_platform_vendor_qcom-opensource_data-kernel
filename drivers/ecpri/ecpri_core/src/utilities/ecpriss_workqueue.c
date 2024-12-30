@@ -19,8 +19,8 @@ struct workqueue_struct     *ecpri_delay_wq;
 
 struct ecpri_delayed_work_q_params ecpri_delay_wq_v;
 struct ecpri_delayed_work_q_params *ecpri_delay_wq_p = &ecpri_delay_wq_v;
+atomic_t ecpri_delay_wq_state;
 
-struct mutex ecpri_delay_wq_mutex_lock;
 
 /**
  * ecpriss_queue_work()
@@ -41,13 +41,10 @@ int ecpriss_queue_work(struct workqueue_struct    *ecpriss_wq,
 
 int ecpriss_queue_delayed_work(		struct delayed_work	*ecpriss_delay_work,int delay_ms)
 {
-	mutex_lock(&ecpri_delay_wq_mutex_lock);
-	if(ecpri_delay_wq)
+	if(ecpri_delay_wq && !atomic_read(&ecpri_delay_wq_state))
 	{
 		queue_delayed_work(ecpri_delay_wq, ecpriss_delay_work,msecs_to_jiffies(delay_ms));
 	}
-	mutex_unlock(&ecpri_delay_wq_mutex_lock);
-
 	return 0;
 
 }
@@ -152,10 +149,10 @@ int ecpriss_initialize_workq_v2(void)
 		ecpriss_pdata_v2->events_workqueue->ecpriss_ssr_events_rdy_work=
 			&ecpriss_ssr_events_rdy;
 
-		mutex_init(&ecpri_delay_wq_mutex_lock);
 		ecpri_delay_wq = create_singlethread_workqueue("ecpri_delayed_workq");
 		INIT_DELAYED_WORK(&ecpri_delay_wq_p->wq_item, ecpriss_update_stats_and_requeue);
 
+		atomic_set(&ecpri_delay_wq_state, true);
 
 	} while(0);
 
@@ -192,7 +189,7 @@ int ecpriss_destroy_workq(void)
 			}
 		}
 
-		mutex_lock(&ecpri_delay_wq_mutex_lock);
+		atomic_set(&ecpri_delay_wq_state, false);
 
 		//cancel delayed work
 		cancel_delayed_work_sync(&ecpri_delay_wq_p->wq_item);
@@ -200,10 +197,6 @@ int ecpriss_destroy_workq(void)
 		flush_workqueue(ecpri_delay_wq);
 		destroy_workqueue(ecpri_delay_wq);
 		ecpri_delay_wq = NULL;
-
-		mutex_unlock(&ecpri_delay_wq_mutex_lock);
-		mutex_destroy(&ecpri_delay_wq_mutex_lock);
-
 
 	} while(0);
 	return 0;
