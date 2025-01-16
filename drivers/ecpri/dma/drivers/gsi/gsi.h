@@ -1,7 +1,7 @@
 ﻿// SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2015-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #ifndef GSI_H
@@ -604,6 +604,7 @@ struct gsi_device_scratch {
  * @evt_valid: is evt* info valid?
  * @evt_wp: event ring write pointer (physical address)
  * @evt_rp: event ring read pointer (physical address)
+ * @elem_size: size of the descriptor
  */
 struct gsi_chan_info {
 	uint64_t wp;
@@ -611,6 +612,8 @@ struct gsi_chan_info {
 	bool evt_valid;
 	uint64_t evt_wp;
 	uint64_t evt_rp;
+	uint8_t elem_sz;
+	uint8_t evt_elem_sz;
 };
 
 
@@ -1661,5 +1664,7 @@ int gsi_get_peripheral_ee(void);
 uint32_t gsi_get_chan_stop_stm(int chan_id, int ee, int gsi_id);
 
 int gsi_query_channel_free_re(unsigned long chan_hdl, uint32_t* num_free_re);
+
+int gsi_update_evt_rp(unsigned long chan_hdl);
 
 #endif

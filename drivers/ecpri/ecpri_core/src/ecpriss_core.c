@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: GPL-2.0-only
- * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include "ecpriss_core.h"
@@ -8,6 +8,7 @@
 #include "ecpriss_debugfs.h"
 #include "ecpriss_log.h"
 #include "ecpriss_mhi.h"
+#include "ecpriss_flow.h"
 #include <linux/notifier.h>
 #include <linux/panic_notifier.h>
 #include <linux/delay.h>
@@ -375,6 +376,74 @@ int32_t ecpriss_process_packet(ecpriss_packet_payload_s *packet)
 	return ret;
 }
 
+void ecpriss_xbar_set_logging_route(ecpriss_log_cfg_s *log_cfg)
+{
+	int i,j;
+	int num_of_pcid = 0;
+
+	num_of_pcid = log_cfg->num_of_pcid;
+
+	for(i=0;i<MAX_PORTS;i++)
+	{
+		for(j=0;j<num_of_pcid;j++)
+		{
+			ecpriss_xbar_fh_rx_lut_v2_logging(i, log_cfg->pcids[j], log_cfg->log_dir, log_cfg->action);
+		}
+	}
+}
+
+int32_t ecpri_send_logging_trigger_to_dma(ecpriss_log_cfg_s *log_cfg)
+{
+	if(log_cfg->action == ECPRISS_LOGGING_START)
+	{
+		return (dma_ecpri_ss_driver_ops.ecpri_dma_ecpri_ss_start_oran_log)
+			((log_cfg->log_buf_size)*1024, log_cfg->packet_size, ECPRI_DMA_ORAN_LOGGING_DIRECTION_INGRESS);
+	}
+	else
+	{
+		return (dma_ecpri_ss_driver_ops.ecpri_dma_ecpri_ss_stop_oran_log)
+			(ECPRI_DMA_ORAN_LOGGING_DIRECTION_INGRESS );
+	}
+}
+
+int32_t ecpriss_configure_logging(ecpriss_packet_payload_s *packet)
+{
+	ecpriss_log_cfg_s *log_cfg = NULL;
+	int ret = 0;
+
+	do{
+		if(packet == NULL) {
+			ret = -ENOMEM;
+			break;
+		}
+
+		log_cfg = &packet->flow_cfg.log_cfg;
+		if(log_cfg == NULL)
+		{
+			ret = -ENOMEM;
+			break;
+		}
+
+		if((ecpriss_pdata_v2->dev_mode == ECPRISS_DEV_MODE_RU && log_cfg->log_dir == ECPRISS_LOG_DIR_DL) 
+				|| (ecpriss_pdata_v2->dev_mode == ECPRISS_DEV_MODE_DU_PCIE_3_X_12 && log_cfg->log_dir == ECPRISS_LOG_DIR_UL))
+		{
+			ecpriss_xbar_set_logging_route(log_cfg);
+
+			ret = ecpri_send_logging_trigger_to_dma(log_cfg);
+			if (ret < 0) {
+				ECPRILOGERR("Ecpri logging route configuration failed\n");
+				break;
+			}
+		}
+		else
+		{
+			ECPRILOGERR("UL logging for RU/DL logging for X100 is not supported\n");
+		}
+	}while (0);
+
+	return ret;
+}
+
 static void ecpriss_eth_cpy_params(ecpriss_qudp_port_cfg_s       *port_cfg,
 		eth_ecpriss_topology_root_s    *eth_params,
 		uint8_t                        port_index,
@@ -706,9 +775,8 @@ static int ecpriss_dma_endp_config(void)
 							&dma_endp_g.topology_params[i].dma_port_param[j],
 							sizeof(struct ecpri_dma_port_params));
 				}
-
-				}
 			}
+		}
 	}while (0);
 
 					/* Set the non ecpri LUT Cfg */
@@ -771,6 +839,14 @@ static int ecpriss_dma_endp_config_v2(void)
 					ECPRI_DMA_ENDP_STREAM_DEST_C2C) {
 				for(j=0;j<dma_endp_g.topology_params[i].num_of_ports;j++) {
 					memcpy(&ecpriss_pdata_v2->xbar_ctx_v2->c2c_port_cfg.dma_port_cfg[j],
+							&dma_endp_g.topology_params[i].dma_port_param[j],
+							sizeof(struct ecpri_dma_port_params));
+				}
+			}
+			else if (dma_endp_g.topology_params[i].port_type ==
+					ECPRI_DMA_ENDP_STREAM_DEST_ORAN_LOG) {
+				for(j=0;j<dma_endp_g.topology_params[i].num_of_ports;j++) {
+					memcpy(&ecpriss_pdata_v2->xbar_ctx_v2->oran_log_port_cfg.dma_port_cfg[j],
 							&dma_endp_g.topology_params[i].dma_port_param[j],
 							sizeof(struct ecpri_dma_port_params));
 				}
@@ -1867,6 +1943,8 @@ static int ecpriss_core_init_v2(struct platform_device *pdev)
 		}
 
 		ECPRILOGERR("QUDP init complete\n");
+
+		ecpriss_xbar_fhrx_default_dma_channel();
 
 		ecpriss_update_stats_and_requeue(NULL);
 

@@ -1,6 +1,6 @@
 ﻿/*
  * SPDX-License-Identifier: GPL-2.0-only
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include "ecpri_dma_utils.h"
@@ -154,7 +154,7 @@ int ecpri_dma_ss_core_client_test_lte_config(void * priv)
 
 	/* Get current HW */
 	ver = ECPRI_DMA_GET_CTX_HW_VER();
-	flv = ECPRI_DMA_GET_CTX_HW_FLAVOR();
+	flv = ECPRI_DMA_GET_HW_FLAVOR();
 
 	port_topology = kzalloc(
 		sizeof(struct ecpri_dma_endp_mapping), GFP_KERNEL);
@@ -344,6 +344,65 @@ fail:
 	return ret;
 }
 
+
+static int ecpri_dma_ss_core_client_test_suite_registration_no_deregister(void* priv) {
+	int ret = 0;
+	bool is_dma_ready = false;
+
+	DMA_UT_DBG("Start Registration\n");
+
+	/* Register */
+	DMA_UT_DBG("Prepare params\n");
+	ecpri_dma_ss_core_client_test_util_create_params(&is_dma_ready,
+		&ecpri_dma_ss_core_suite_ctx.ready_info);
+
+	DMA_UT_DBG("Registration\n");
+
+	ret = ecpri_dma_ecpri_ss_register(&ecpri_dma_ss_core_suite_ctx.ready_info,
+		&is_dma_ready);
+	if (ret != 0) {
+		DMA_UT_TEST_FAIL_REPORT("Failed on register");
+		ret = -EFAULT;
+		goto fail;
+	}
+
+	msleep(100);
+
+	if (wait_for_completion_timeout(&ecpri_dma_ss_core_suite_ctx.ready_received,
+		msecs_to_jiffies(ECPRI_DMA_SS_CORE_CLIENT_UT_READY_RCVD_TMOUT_MS)) == 0) {
+		DMA_UT_TEST_FAIL_REPORT("Test failed due to completion timeout");
+		return -EFAULT;
+	}
+
+	/* Check SS Core driver state matches the expectations */
+	if (ecpri_dma_ss_core_ctx->ready_cb
+		!= ecpri_dma_ss_core_suite_ctx.ready_info.notify_ready) {
+		DMA_UT_TEST_FAIL_REPORT("Test failed due to "
+			"mismatch of Ready CB address\n");
+		ret = -EFAULT;
+		goto fail;
+	}
+
+	if (ecpri_dma_ss_core_ctx->event_notify_cb
+		!= ecpri_dma_ss_core_suite_ctx.ready_info.dma_event_notify) {
+		DMA_UT_TEST_FAIL_REPORT("Test failed due to "
+			"mismatch of DMA Event Notify CB address\n");
+		ret = -EFAULT;
+		goto fail;
+	}
+
+	if (ecpri_dma_ss_core_ctx->log_msg_cb
+		!= ecpri_dma_ss_core_suite_ctx.ready_info.log_msg) {
+		DMA_UT_TEST_FAIL_REPORT("Test failed due to "
+			"mismatch of Log Msg CB comp cb address\n");
+		ret = -EFAULT;
+		goto fail;
+	}
+
+fail:
+	return ret;
+}
+
 /* Suite definition block */
 DMA_UT_DEFINE_SUITE_START(ss_core_client, "SS Core Client suite",
 	ecpri_dma_ss_core_client_test_suite_setup,
@@ -353,6 +412,12 @@ DMA_UT_DEFINE_SUITE_START(ss_core_client, "SS Core Client suite",
 		"This test will verify the registration process"
 		" of the SS Core Client.",
 		ecpri_dma_ss_core_client_test_suite_registration, true,
+		ECPRI_HW_V1_0, ECPRI_HW_MAX),
+	DMA_UT_ADD_TEST(
+		register_no_deregister,
+		"This test will verify the registration process"
+		" of the SS Core Client. without deregister",
+		ecpri_dma_ss_core_client_test_suite_registration_no_deregister, false,
 		ECPRI_HW_V1_0, ECPRI_HW_MAX),
 	DMA_UT_ADD_TEST(
 		lte_testing,

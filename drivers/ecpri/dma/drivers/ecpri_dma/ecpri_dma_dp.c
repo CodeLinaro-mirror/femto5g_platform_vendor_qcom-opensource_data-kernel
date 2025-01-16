@@ -1,6 +1,6 @@
 /*
  * SPDX-License-Identifier: GPL-2.0-only
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/dmapool.h>
@@ -14,6 +14,7 @@
 #include "dmahal.h"
 #include "gsi.h"
 #include "ecpri_dma_dp.h"
+#include "ecpri_dma_ss_core.h"
 
 int ecpri_dma_dp_exception_replenish(struct ecpri_dma_endp_context *endp,
 				  u32 num_to_replenish)
@@ -733,12 +734,20 @@ int ecpri_dma_dp_poll(struct ecpri_dma_endp_context *endp, u32 budget,
 		pkts[i]->pkt = curr_pkt_wrapper->comp_pkt.pkt;
 		for (j = 0; j < pkts[i]->pkt->num_of_buffers; j++) {
 			/*	Unmapping is only required for ETH S2M ENDPs
-				which are not exception ENDP */
+				which are not exception ENDP or ORAN logger ENDPs */
 			if (endp->gsi_ep_cfg->stream_mode != ECPRI_DMA_ENDP_STREAM_MODE_M2M &&
 				!(endp->gsi_id == ecpri_dma_ctx->exception_ctx.
 					exception_endp.gsi_id &&
 					endp->endp_id == ecpri_dma_ctx->exception_ctx.
-					exception_endp.endp_id)) {
+					exception_endp.endp_id) &&
+				!(ECPRI_DMA_GET_HW_FLAVOR() == ECPRI_HW_FLAVOR_RU &&
+					endp->gsi_id == ECPRI_DMA_SS_ORAN_LOG_QRU_GSI_ID &&
+					(endp->endp_id == ECPRI_DMA_SS_ORAN_LOG_QRU_EGRESS_ENDP_ID ||
+					endp->endp_id == ECPRI_DMA_SS_ORAN_LOG_QRU_INGRESS_ENDP_ID)) &&
+				!(ECPRI_DMA_GET_HW_FLAVOR() == ECPRI_HW_FLAVOR_DU_PCIE_3_X_12 &&
+					endp->gsi_id == ECPRI_DMA_SS_ORAN_LOG_X100_GSI_ID &&
+					(endp->endp_id == ECPRI_DMA_SS_ORAN_LOG_X100_EGRESS_ENDP_ID ||
+					endp->endp_id == ECPRI_DMA_SS_ORAN_LOG_X100_INGRESS_ENDP_ID))) {
 
 				dma_unmap_single(endp->cb_ptr->dev,
 					pkts[i]->pkt->buffs[j]->phys_base,
@@ -938,7 +947,7 @@ int ecpri_dma_dp_transmit(struct ecpri_dma_endp_context *endp,
 		gsi_xfer_index += pkts[i]->num_of_buffers;
 	}
 
-	if (endp->curr_outstanding_num >= endp->ring_length) {
+	if (endp->curr_outstanding_num > endp->ring_length) {
 		DMAERR("This transfer will exceed ring length, dropping all\n");
 		goto fail_handling;
 	}

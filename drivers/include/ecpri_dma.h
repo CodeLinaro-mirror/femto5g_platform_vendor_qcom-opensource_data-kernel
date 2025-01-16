@@ -1,6 +1,6 @@
 /*
  * SPDX-License-Identifier: GPL-2.0-only
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #ifndef _ECPRI_DMA_H_
@@ -86,6 +86,7 @@ enum ecpri_dma_endp_stream_dest {
 	ECPRI_DMA_ENDP_STREAM_DEST_L2 = 2,
 	ECPRI_DMA_ENDP_STREAM_DEST_FH_EXCEPTION = 3,
 	ECPRI_DMA_ENDP_STREAM_DEST_FH_LTE = 4,
+	ECPRI_DMA_ENDP_STREAM_DEST_ORAN_LOG = 5,
 	ECPRI_DMA_ENDP_STREAM_DEST_MAX,
 };
 

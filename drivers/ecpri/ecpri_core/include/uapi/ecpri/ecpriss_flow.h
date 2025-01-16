@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: GPL-2.0-only
- * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #ifndef ECPRI_FLOW_H
@@ -11,6 +11,9 @@
 	/*!40B - Max ipv6 and ipv4 string with no tunneling*/
 #define ECPRISS_IP_ADDR_LEN_MAX   16
 #define MAX_MAC_FILTER_ENTRIES    20
+
+#define ECPRISS_MAX_PCID_ENTRIES 65535
+
 /*
  * We can support up to 16 Mac Addresses per port.
  * For now it is limited to 12 mac only.
@@ -365,6 +368,16 @@ typedef enum
        ECPRISS_LOGGING_STOP,
        ECPRISS_LOGGING_START
 }ecpriss_logging_action;
+
+typedef struct
+{
+  ecpriss_logging_action action;
+  ecpriss_log_dir_e      log_dir;
+  uint16_t               packet_size;
+  uint16_t               log_buf_size;
+  uint16_t               pcids[ECPRISS_MAX_KERNEL_NETLINK_FLOW];
+  uint32_t               num_of_pcid;
+} ecpriss_log_cfg_s;
 
 typedef enum ecpriss_transp_type_e{
 	ECPRISS_L2_TRANSP,

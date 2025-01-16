@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: GPL-2.0-only
- * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #ifndef ECPRISS_NETLINK_H_
@@ -51,7 +51,8 @@ typedef enum
 	ECPRISS_MESSAGE_TRANSPORT_EGRESS_L2_L3_TABLE_RECFG,
 	ECPRISS_MESSAGE_TRANSPORT_INGESS_TABLE_CFG,
 	ECPRISS_MESSAGE_TRANSPORT_INGESS_TABLE_DECFG,
-	ECPRISS_MESSAGE_LTE_MAC_CFG
+	ECPRISS_MESSAGE_LTE_MAC_CFG,
+	ECPRISS_MESSAGE_LOGGING_CFG
 }ecpriss_message_id_e;
 
 typedef union ecpriss_netlink_flow
@@ -59,6 +60,7 @@ typedef union ecpriss_netlink_flow
 	ecpriss_flow_tx_cfg_s  flow_tx_cfg;
 	ecpriss_flow_rx_cfg_s  flow_rx_cfg;
 	ecpriss_lte_mac_addr_cfg_s mac_cfg;
+	ecpriss_log_cfg_s  log_cfg;
 }ecpriss_packet_flow_u;
 
 

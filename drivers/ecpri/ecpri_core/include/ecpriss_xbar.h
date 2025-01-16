@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: GPL-2.0-only
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #ifndef ECPRISS_XBAR_H_
@@ -18,8 +18,8 @@
 #include "ecpriss_core.h"
 #include "ecpriss_qudp_hwio_def.h"
 #include "ecpriss_qudp_hwio_def_v2.h"
+#include "ecpriss_netlink.h"
 
-#define ECPRISS_MAX_PCID_ENTRIES 65535
 
 /*
  * Index of this in device tree file
@@ -315,6 +315,7 @@ typedef struct ecpriss_xbar_ctx_v2
 	ecpriss_xbar_port_cfg_s		l2_port_cfg;
 	ecpriss_xbar_port_cfg_s		fh_exception_port_cfg;
 	ecpriss_xbar_port_cfg_s         fh_lte_port_cfg[ECPRISS_MAX_LTE_VF];
+	ecpriss_xbar_port_cfg_s		oran_log_port_cfg;
 	ecpriss_xbar_interrupt_cfg_s_v2	interrupt_cfg_v2;
 	ecpriss_xbar_stats_s_v2		stats_v2;
 	ecpriss_xbar_interrupt_stats_s_v2 interrupt_stats_v2;
@@ -533,7 +534,11 @@ void ecpriss_xbar_destroy_interrupts_v2(void);
 
 void ecpriss_xbar_delete_pcid_entry(uint16_t *configured_pcids,uint16_t pcid_value,uint16_t num_pcid_entry);
 
+void ecpriss_xbar_set_logging_route(ecpriss_log_cfg_s *log_cfg);
 
+int ecpriss_xbar_fh_rx_lut_v2_logging(uint32_t port_index,
+		uint16_t pcid_index , ecpriss_log_dir_e log_dir,
+		ecpriss_logging_action action);
 
-
+void ecpriss_xbar_fhrx_default_dma_channel(void);
 #endif

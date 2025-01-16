@@ -1,6 +1,6 @@
 /*
  * SPDX-License-Identifier: GPL-2.0-only
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #ifndef _ECPRI_DMA_I_H_
@@ -448,6 +448,7 @@ struct ecpri_dma_endp_context {
 	bool enable_tx_poll;
 	struct ecpri_dma_smmu_cb_ctx *cb_ptr;
 	bool ssr_in_progress;
+	bool align_ring_mem;
 };
 
 /**
@@ -719,6 +720,7 @@ struct ecpri_dma_ecpri_endp_alloc_params {
 	client_notify_comp notify_comp;
 	enum ecpri_dma_smmu_cb_type cb_to_use;
 	bool enable_tx_poll;
+	bool align_ring_mem;
 };
 
 /**
@@ -747,6 +749,7 @@ int ecpri_dma_dealloc_endp(struct ecpri_dma_endp_context *endp_cfg);
 int ecpri_dma_get_endp_stats(struct ecpri_dma_endp_context* ep,
 	struct ecpri_dma_endp_statistics* stats);
 int ecpri_dma_halt_q6_endps(enum ecpri_dma_endp_dir dir);
+int ecpri_dma_advance_outstanding_list(struct ecpri_dma_endp_context* ep);
 
 struct ecpri_dma_smmu_cb_ctx *ecpri_dma_get_smmu_ctx(
 	enum ecpri_dma_smmu_cb_type cb_type);
