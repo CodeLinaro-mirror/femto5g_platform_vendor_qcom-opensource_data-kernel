@@ -1482,7 +1482,7 @@ static void gsi_prime_evt_ring(struct gsi_evt_ctx *ctx)
 	{
 		memset((void*)ctx->ring.base_va, 0, ctx->ring.len);
 		ctx->ring.wp_local = ctx->ring.base +
-			ctx->ring.max_num_elem * ctx->ring.elem_sz;
+			(ctx->ring.max_num_elem -1) * ctx->ring.elem_sz;
 
 		/* write order MUST be MSB followed by LSB */
 		db.write_ptr_msb = GSI_MSB(ctx->ring.wp_local);
