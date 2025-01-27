@@ -7062,7 +7062,7 @@ static const struct ecpri_dma_endp_mapping ecpri_dma_port_mapping
 							ECPRI_DMA_RING_TYPE_ORAN_LOG_EGRESS,
 							.src_dma_ring_id = -1,
 							.dest_dma_ring_id = ECPRI_DMA_SS_ORAN_LOG_QRU_EGRESS_ENDP_ID,
-							.src_dma_ring_gsi_id = ECPRI_DMA_SS_ORAN_LOG_QRU_GSI_ID
+							.dest_dma_ring_gsi_id = ECPRI_DMA_SS_ORAN_LOG_QRU_GSI_ID
 						},
 						[1] = {
 							.link_index = 1,
@@ -7071,7 +7071,7 @@ static const struct ecpri_dma_endp_mapping ecpri_dma_port_mapping
 							ECPRI_DMA_RING_TYPE_ORAN_LOG_INGRESS,
 							.src_dma_ring_id = -1,
 							.dest_dma_ring_id = ECPRI_DMA_SS_ORAN_LOG_QRU_INGRESS_ENDP_ID,
-							.src_dma_ring_gsi_id = ECPRI_DMA_SS_ORAN_LOG_QRU_GSI_ID
+							.dest_dma_ring_gsi_id = ECPRI_DMA_SS_ORAN_LOG_QRU_GSI_ID
 						},
 					}
 				}
@@ -8971,7 +8971,7 @@ static const struct ecpri_dma_endp_mapping ecpri_dma_port_mapping
 								ECPRI_DMA_RING_TYPE_ORAN_LOG_EGRESS,
 								.src_dma_ring_id = -1,
 								.dest_dma_ring_id = ECPRI_DMA_SS_ORAN_LOG_X100_EGRESS_ENDP_ID,
-								.src_dma_ring_gsi_id = ECPRI_DMA_SS_ORAN_LOG_X100_GSI_ID
+								.dest_dma_ring_gsi_id = ECPRI_DMA_SS_ORAN_LOG_X100_GSI_ID
 							},
 							[1] = {
 								.link_index = 1,
@@ -8980,7 +8980,7 @@ static const struct ecpri_dma_endp_mapping ecpri_dma_port_mapping
 								ECPRI_DMA_RING_TYPE_ORAN_LOG_INGRESS,
 								.src_dma_ring_id = -1,
 								.dest_dma_ring_id = ECPRI_DMA_SS_ORAN_LOG_X100_INGRESS_ENDP_ID,
-								.src_dma_ring_gsi_id = ECPRI_DMA_SS_ORAN_LOG_X100_GSI_ID
+								.dest_dma_ring_gsi_id = ECPRI_DMA_SS_ORAN_LOG_X100_GSI_ID
 							},
 						}
 					}
