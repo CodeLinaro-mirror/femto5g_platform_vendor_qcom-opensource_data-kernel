@@ -2,6 +2,8 @@ load(":define_modules.bzl", "define_modules")
 
 define_modules("sun", "consolidate")
 define_modules("sun", "perf")
+define_modules("sdxkova", "debug-defconfig")
+define_modules("sdxkova", "perf-defconfig")
 
 package(
     default_visibility = [
