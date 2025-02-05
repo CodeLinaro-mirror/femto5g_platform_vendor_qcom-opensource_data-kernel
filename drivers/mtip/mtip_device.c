@@ -1427,6 +1427,12 @@ static void mtip_tx_timeout(struct net_device *netdev, unsigned int txqueue)
    u32 link_index;
    ecpri_dma_eth_conn_hdl_t hdl;
    int pending_buff_completion_count = 0;
+
+   if (!netif_carrier_ok(netdev)) {
+      CSMLOGERR("Interface is down, no need to process the timeout\n");
+      return;
+   }
+
    CSMLOGINFO("mtip_tx_timeout called\n");
 
    priv = netdev_priv(netdev);
