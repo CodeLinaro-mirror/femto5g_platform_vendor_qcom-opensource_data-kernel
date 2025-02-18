@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: GPL-2.0-only
- * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include "ecpriss_core.h"
@@ -8,6 +8,7 @@
 #include "ecpriss_debugfs.h"
 #include "ecpriss_log.h"
 #include "ecpriss_mhi.h"
+#include "ecpriss_flow.h"
 #include <linux/notifier.h>
 #include <linux/panic_notifier.h>
 #include <linux/delay.h>
@@ -375,6 +376,74 @@ int32_t ecpriss_process_packet(ecpriss_packet_payload_s *packet)
 	return ret;
 }
 
+void ecpriss_xbar_set_logging_route(ecpriss_log_cfg_s *log_cfg)
+{
+	int i,j;
+	int num_of_pcid = 0;
+
+	num_of_pcid = log_cfg->num_of_pcid;
+
+	for(i=0;i<MAX_PORTS;i++)
+	{
+		for(j=0;j<num_of_pcid;j++)
+		{
+			ecpriss_xbar_fh_rx_lut_v2_logging(i, log_cfg->pcids[j], log_cfg->log_dir, log_cfg->action);
+		}
+	}
+}
+
+int32_t ecpri_send_logging_trigger_to_dma(ecpriss_log_cfg_s *log_cfg)
+{
+	if(log_cfg->action == ECPRISS_LOGGING_START)
+	{
+		return (dma_ecpri_ss_driver_ops.ecpri_dma_ecpri_ss_start_oran_log)
+			((log_cfg->log_buf_size)*1024, log_cfg->packet_size, ECPRI_DMA_ORAN_LOGGING_DIRECTION_INGRESS);
+	}
+	else
+	{
+		return (dma_ecpri_ss_driver_ops.ecpri_dma_ecpri_ss_stop_oran_log)
+			(ECPRI_DMA_ORAN_LOGGING_DIRECTION_INGRESS );
+	}
+}
+
+int32_t ecpriss_configure_logging(ecpriss_packet_payload_s *packet)
+{
+	ecpriss_log_cfg_s *log_cfg = NULL;
+	int ret = 0;
+
+	do{
+		if(packet == NULL) {
+			ret = -ENOMEM;
+			break;
+		}
+
+		log_cfg = &packet->flow_cfg.log_cfg;
+		if(log_cfg == NULL)
+		{
+			ret = -ENOMEM;
+			break;
+		}
+
+		if((ecpriss_pdata_v2->dev_mode == ECPRISS_DEV_MODE_RU && log_cfg->log_dir == ECPRISS_LOG_DIR_DL) 
+				|| (ecpriss_pdata_v2->dev_mode == ECPRISS_DEV_MODE_DU_PCIE_3_X_12 && log_cfg->log_dir == ECPRISS_LOG_DIR_UL))
+		{
+			ecpriss_xbar_set_logging_route(log_cfg);
+
+			ret = ecpri_send_logging_trigger_to_dma(log_cfg);
+			if (ret < 0) {
+				ECPRILOGERR("Ecpri logging route configuration failed\n");
+				break;
+			}
+		}
+		else
+		{
+			ECPRILOGERR("UL logging for RU/DL logging for X100 is not supported\n");
+		}
+	}while (0);
+
+	return ret;
+}
+
 static void ecpriss_eth_cpy_params(ecpriss_qudp_port_cfg_s       *port_cfg,
 		eth_ecpriss_topology_root_s    *eth_params,
 		uint8_t                        port_index,
@@ -551,9 +620,7 @@ void ecpriss_eth_topology_init_v2(void)
 					port_params = &eth_link_params_g.topology_params[i].port_params[port_index];
                                         for(k=0;k<num_links;k++){
 						//pr_err("port_index: %d link_index: %d link state: %d\n",port_index,k,port_params->link_params[k].link_state);
-						if(lte_fh_enabled) {
-							ecpriss_mhi_process_async_link_state(port_index, k, port_params->link_params[k].link_state);
-						}
+
                                                 if(port_params->link_params[k].link_state == ETH_ECPRISS_LINK_STATE_UP){
                                                         link_state_flag = true;
 	                                        }
@@ -588,9 +655,6 @@ void ecpriss_eth_topology_init_v2(void)
 					port_params = &eth_link_params_g.topology_params[i].port_params[port_index];
                                         for(k=0;k<num_links;k++){
 						//pr_err("port_index: %d link_index: %d link state: %d\n",port_index,k,port_params->link_params[k].link_state);
-						if(lte_fh_enabled) {
-							ecpriss_mhi_process_async_link_state(port_index, k, port_params->link_params[k].link_state);
-						}
                                                 if(port_params->link_params[k].link_state == ETH_ECPRISS_LINK_STATE_UP){
                                                         link_state_flag = true;
 	                                        }
@@ -620,6 +684,56 @@ void ecpriss_eth_topology_init_v2(void)
 }
 
 
+void ecpriss_eth_link_update_for_mhi_v2(void)
+{
+	int ret = 0;
+	int i,j,k;
+	eth_ecpriss_dev_mode_e device_mode;
+	uint8_t port_index;
+	uint8_t num_links;
+
+	ecpriss_qudp_port_cfg_s_v2      *port_cfg_local;
+	eth_ecpriss_port_params_s *port_params = NULL;
+	bool link_state_flag = false;
+
+	do {
+		ret = (mtip_ecpri_ops.eth_ecpriss_get_topology)(&device_mode,
+				&eth_link_params_g);
+		if(ret < 0) {
+			break;
+		}
+
+		for(i=0;i<eth_link_params_g.num_unique_port_types;i++) {
+
+			if(eth_link_params_g.topology_params[i].port_type == ETH_ECPRISS_PORT_TYPE_FH) {
+				ecpriss_pdata_v2->qudp_ctx_v2->num_ports[ETH_ECPRISS_PORT_TYPE_FH] =
+				eth_link_params_g.topology_params[i].num_ports;
+
+				for(j=0;j<ecpriss_pdata_v2->qudp_ctx_v2->num_ports[ETH_ECPRISS_PORT_TYPE_FH];j++){
+
+					port_index = eth_link_params_g.topology_params[i].port_params[j].port_index;
+					port_cfg_local = &ecpriss_pdata_v2->qudp_ctx_v2->fh_port_cfg_v2[port_index];
+					num_links = eth_link_params_g.topology_params[i].port_params[j].num_links;
+					port_params = &eth_link_params_g.topology_params[i].port_params[port_index];
+
+						for(k=0;k<num_links;k++){
+
+							if(port_params->link_params[k].link_state == ETH_ECPRISS_LINK_STATE_UP){
+								link_state_flag = true;
+							}
+						}
+
+						if(lte_fh_enabled) {
+							ecpriss_mhi_process_async_link_state(port_index, k, port_params->link_params[k].link_state);
+						}
+
+				}
+			}
+		}
+	}while (0);
+	return;
+}
+
 
 void ecpriss_eth_event_processing(void)
 {
@@ -631,6 +745,7 @@ void ecpriss_eth_event_processing(void)
 				&& ecpriss_pdata_v2->ecpri_state == ECPRI_CORE_INIT) {
 
 			ecpriss_qudp_set_nr_mac_filter();
+			ecpriss_eth_link_update_for_mhi_v2();
 		}
 
 	}
@@ -706,9 +821,8 @@ static int ecpriss_dma_endp_config(void)
 							&dma_endp_g.topology_params[i].dma_port_param[j],
 							sizeof(struct ecpri_dma_port_params));
 				}
-
-				}
 			}
+		}
 	}while (0);
 
 					/* Set the non ecpri LUT Cfg */
@@ -771,6 +885,14 @@ static int ecpriss_dma_endp_config_v2(void)
 					ECPRI_DMA_ENDP_STREAM_DEST_C2C) {
 				for(j=0;j<dma_endp_g.topology_params[i].num_of_ports;j++) {
 					memcpy(&ecpriss_pdata_v2->xbar_ctx_v2->c2c_port_cfg.dma_port_cfg[j],
+							&dma_endp_g.topology_params[i].dma_port_param[j],
+							sizeof(struct ecpri_dma_port_params));
+				}
+			}
+			else if (dma_endp_g.topology_params[i].port_type ==
+					ECPRI_DMA_ENDP_STREAM_DEST_ORAN_LOG) {
+				for(j=0;j<dma_endp_g.topology_params[i].num_of_ports;j++) {
+					memcpy(&ecpriss_pdata_v2->xbar_ctx_v2->oran_log_port_cfg.dma_port_cfg[j],
 							&dma_endp_g.topology_params[i].dma_port_param[j],
 							sizeof(struct ecpri_dma_port_params));
 				}
@@ -1430,7 +1552,7 @@ static int ecpriss_core_register_callbacks(void)
 	}while (0);
 	return ret;
 }
-static int ecpriss_core_register_callbacks_v2(void)
+static int ecpriss_core_register_callbacks_v2(bool *is_eth_ready)
 {
 	/*
 	   1. Register for callback with Ethernet and update state
@@ -1446,7 +1568,7 @@ static int ecpriss_core_register_callbacks_v2(void)
 
 	do{
 		ret = (mtip_ecpri_ops.eth_ecpriss_register_ready_cb)
-			(eth_topology_ready_cb, is_ready);
+			(eth_topology_ready_cb, is_eth_ready);
 
 		if (ret < 0) {
 			ECPRILOGERR("callback registration for mtip register_ready_cb failed\n");
@@ -1461,17 +1583,9 @@ static int ecpriss_core_register_callbacks_v2(void)
 			break;
 		}
 
-		if(*is_ready == true) {
+		if(*is_eth_ready == true) {
 			ecpriss_eth_topology_init_v2();
-
-			if(ecpriss_pdata_v2->dev_mode != ECPRISS_DEV_MODE_RU && lte_fh_enabled
-					&& ecpriss_pdata_v2->ecpri_state == ECPRI_CORE_INIT) {
-
-				ecpriss_qudp_set_nr_mac_filter();
-			}
 		}
-
-
 
 		ready = 0;
 
@@ -1817,6 +1931,7 @@ static int ecpriss_core_init_v2(struct platform_device *pdev)
 	  -->Dependency on eemac topology */
 
 	int ret = 0;
+	bool is_eth_ready = false;
 
 	do{
 
@@ -1843,22 +1958,11 @@ static int ecpriss_core_init_v2(struct platform_device *pdev)
 			break;
 		}
 
-		if(lte_fh_enabled) {
-
-			ret = ecpriss_mhi_ctx_init(&ecpriss_pdata_v2->mhi_ctx);
-
-			if(ret < 0) {
-				ECPRILOGERR("LTE_FH:MHI Ctx Init Failed\n");
-			}
-
-		}
-
-		ret = ecpriss_core_register_callbacks_v2();
+		ret = ecpriss_core_register_callbacks_v2(&is_eth_ready);
 		if(ret < 0) {
 			ECPRILOGERR("Callback registrations failed\n");
 			break;
 		}
-
 
 		ret = ecpriss_qudp_init_v2(&pdev->dev);
 		if(ret < 0) {
@@ -1867,6 +1971,8 @@ static int ecpriss_core_init_v2(struct platform_device *pdev)
 		}
 
 		ECPRILOGERR("QUDP init complete\n");
+
+		ecpriss_xbar_fhrx_default_dma_channel();
 
 		ecpriss_update_stats_and_requeue(NULL);
 
@@ -1883,6 +1989,26 @@ static int ecpriss_core_init_v2(struct platform_device *pdev)
 			break;
 		}
 		ecpriss_pdata_v2->ecpri_state = ECPRI_CORE_INIT;
+
+		if(lte_fh_enabled) {
+
+			ret = ecpriss_mhi_ctx_init(&ecpriss_pdata_v2->mhi_ctx);
+
+			if(ret < 0) {
+				ECPRILOGERR("LTE_FH:MHI Ctx Init Failed\n");
+			}
+
+			if(is_eth_ready == true) {
+				ecpriss_eth_link_update_for_mhi_v2();
+
+			}
+		}
+
+		if(ecpriss_pdata_v2->dev_mode != ECPRISS_DEV_MODE_RU && lte_fh_enabled
+				&& ecpriss_pdata_v2->ecpri_state == ECPRI_CORE_INIT) {
+
+				ecpriss_qudp_set_nr_mac_filter();
+		}
 
 	}while (0);
 	return ret;

@@ -1,6 +1,6 @@
 /*
  * SPDX-License-Identifier: GPL-2.0-only
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/genalloc.h> /* gen_pool_alloc() */
@@ -13,6 +13,7 @@
 #include "ecpri_dma_utils.h"
 #include "ecpri_dma_mhi_client.h"
 #include "ecpri_dma_dp.h"
+#include "ecpri_dma_ss_core.h"
 #include "dmahal.h"
 #include "gsi.h"
 #include "ecpri_gsi_hwio.h"
@@ -6836,7 +6837,7 @@ static const struct ecpri_dma_endp_mapping ecpri_dma_port_mapping
 	},
 	[ECPRI_HW_V2_0][ECPRI_HW_FLAVOR_RU] = {
 		.flv = ECPRI_HW_FLAVOR_RU,
-		.num_of_port_types = 4,
+		.num_of_port_types = 5,
 		{
 			/* FH Ethernet */
 			[0] = {
@@ -7041,6 +7042,37 @@ static const struct ecpri_dma_endp_mapping ecpri_dma_port_mapping
 							.src_dma_ring_id = -1,
 							.dest_dma_ring_id = 53
 						}
+					}
+				}
+			}
+		},
+		/* ORAN Logging */
+		[4] = {
+			.num_of_ports = 1,
+			.port_type = ECPRI_DMA_ENDP_STREAM_DEST_ORAN_LOG,
+			{
+				[0] = {
+					.port_index = 0,
+					.num_of_rings = 2,
+					{
+						[0] = {
+							.link_index = 0,
+							.vm_id = 0,
+							.dma_ring_type =
+							ECPRI_DMA_RING_TYPE_ORAN_LOG_EGRESS,
+							.src_dma_ring_id = -1,
+							.dest_dma_ring_id = ECPRI_DMA_SS_ORAN_LOG_QRU_EGRESS_ENDP_ID,
+							.dest_dma_ring_gsi_id = ECPRI_DMA_SS_ORAN_LOG_QRU_GSI_ID
+						},
+						[1] = {
+							.link_index = 1,
+							.vm_id = 0,
+							.dma_ring_type =
+							ECPRI_DMA_RING_TYPE_ORAN_LOG_INGRESS,
+							.src_dma_ring_id = -1,
+							.dest_dma_ring_id = ECPRI_DMA_SS_ORAN_LOG_QRU_INGRESS_ENDP_ID,
+							.dest_dma_ring_gsi_id = ECPRI_DMA_SS_ORAN_LOG_QRU_GSI_ID
+						},
 					}
 				}
 			}
@@ -8275,7 +8307,7 @@ static const struct ecpri_dma_endp_mapping ecpri_dma_port_mapping
 	},
 	[ECPRI_HW_V2_0][ECPRI_HW_FLAVOR_DU_PCIE_3_X_12] = {
 		.flv = ECPRI_HW_FLAVOR_DU_PCIE_3_X_12,
-		.num_of_port_types = 7,
+		.num_of_port_types = 8,
 		{
 			/* FH Ethernet */
 			[0] = {
@@ -8923,6 +8955,37 @@ static const struct ecpri_dma_endp_mapping ecpri_dma_port_mapping
 					}
 				}
 			},
+			/* ORAN Logging */
+			[7] = {
+				.num_of_ports = 1,
+				.port_type = ECPRI_DMA_ENDP_STREAM_DEST_ORAN_LOG,
+				{
+					[0] = {
+						.port_index = 0,
+						.num_of_rings = 2,
+						{
+							[0] = {
+								.link_index = 0,
+								.vm_id = 0,
+								.dma_ring_type =
+								ECPRI_DMA_RING_TYPE_ORAN_LOG_EGRESS,
+								.src_dma_ring_id = -1,
+								.dest_dma_ring_id = ECPRI_DMA_SS_ORAN_LOG_X100_EGRESS_ENDP_ID,
+								.dest_dma_ring_gsi_id = ECPRI_DMA_SS_ORAN_LOG_X100_GSI_ID
+							},
+							[1] = {
+								.link_index = 1,
+								.vm_id = 0,
+								.dma_ring_type =
+								ECPRI_DMA_RING_TYPE_ORAN_LOG_INGRESS,
+								.src_dma_ring_id = -1,
+								.dest_dma_ring_id = ECPRI_DMA_SS_ORAN_LOG_X100_INGRESS_ENDP_ID,
+								.dest_dma_ring_gsi_id = ECPRI_DMA_SS_ORAN_LOG_X100_GSI_ID
+							},
+						}
+					}
+				}
+			},
 		}
 	}
 };
@@ -9460,6 +9523,19 @@ bool ecpri_dma_is_ready(void)
 	return ecpri_dma_ctx->dma_initialization_complete;
 }
 
+static u32 ecpri_dma_round_to_next_pwr(u32 val)
+{
+	val--;
+	val |= val >> 1;
+	val |= val >> 2;
+	val |= val >> 4;
+	val |= val >> 8;
+	val |= val >> 16;
+	val++;
+
+	return val;
+}
+
 int ecpri_dma_gsi_setup_event_ring(struct ecpri_dma_endp_context *ep,
 	u32 ring_length, gfp_t mem_flag)
 {
@@ -9473,12 +9549,14 @@ int ecpri_dma_gsi_setup_event_ring(struct ecpri_dma_endp_context *ep,
 	int result;
 	struct device* gsi_dev =
 		((struct gsi_ctx*)ecpri_dma_ctx->gsi_dev_hdl)->dev;
+	u32 num_of_desc = 0;
 
 	gsi_ep_info = ep->gsi_ep_cfg;
 	evt_dma_addr = 0;
 	evt_rp_dma_addr = 0;
 	memset(&gsi_evt_ring_props, 0, sizeof(gsi_evt_ring_props));
 	gsi_evt_ring_props.intf = GSI_EVT_CHTYPE_MHI_EV;
+	gsi_evt_ring_props.re_size = GSI_EVT_RING_RE_SIZE_16B;
 
 	if (ep->is_endp_mhi_l2 && ep->l2_mhi_channel_ptr != NULL) {
 		channel = ep->l2_mhi_channel_ptr;
@@ -9510,8 +9588,19 @@ int ecpri_dma_gsi_setup_event_ring(struct ecpri_dma_endp_context *ep,
 	else {
 		gsi_evt_ring_props.intr = GSI_INTR_IRQ;
 		gsi_evt_ring_props.ring_len = ring_length;
-		gsi_evt_ring_props.ring_base_vaddr = dma_alloc_coherent(
-			gsi_dev, gsi_evt_ring_props.ring_len, &evt_dma_addr, mem_flag);
+		if (!ep->align_ring_mem) {
+			gsi_evt_ring_props.ring_base_vaddr = dma_alloc_coherent(
+				gsi_dev, gsi_evt_ring_props.ring_len, &evt_dma_addr, mem_flag);
+		}
+		else {
+			/* Align number of elements to next power of 2 */
+			num_of_desc = ring_length / gsi_evt_ring_props.re_size;
+			num_of_desc = ecpri_dma_round_to_next_pwr(num_of_desc);
+			gsi_evt_ring_props.ring_base_vaddr = dma_alloc_coherent(gsi_dev,
+				num_of_desc * gsi_evt_ring_props.re_size,
+				&evt_dma_addr, mem_flag);
+		}
+
 		if (!gsi_evt_ring_props.ring_base_vaddr) {
 			DMAERR("fail to dma alloc %u bytes\n",
 				gsi_evt_ring_props.ring_len);
@@ -9523,10 +9612,11 @@ int ecpri_dma_gsi_setup_event_ring(struct ecpri_dma_endp_context *ep,
 		gsi_evt_ring_props.int_modc = ep->int_modc;
 	}
 
-	gsi_evt_ring_props.re_size = GSI_EVT_RING_RE_SIZE_16B;
-
 	/* copy mem info */
-	ep->gsi_mem_info.evt_ring_len = gsi_evt_ring_props.ring_len;
+	if (!ep->align_ring_mem)
+		ep->gsi_mem_info.evt_ring_len = gsi_evt_ring_props.ring_len;
+	else
+		ep->gsi_mem_info.evt_ring_len = num_of_desc * gsi_evt_ring_props.re_size;
 	ep->gsi_mem_info.evt_ring_base_addr =
 		gsi_evt_ring_props.ring_base_addr;
 	ep->gsi_mem_info.evt_ring_base_vaddr =
@@ -9568,6 +9658,7 @@ int ecpri_dma_gsi_setup_transfer_ring(struct ecpri_dma_endp_context *ep,
 	int result;
 	struct device* gsi_dev =
 		((struct gsi_ctx*)ecpri_dma_ctx->gsi_dev_hdl)->dev;
+	u32 num_of_desc = 0;
 
 	gsi_ep_info = ep->gsi_ep_cfg;
 
@@ -9593,10 +9684,20 @@ int ecpri_dma_gsi_setup_transfer_ring(struct ecpri_dma_endp_context *ep,
 	}
 	else {
 		gsi_channel_props.ring_len = ring_length;
-		gsi_channel_props.ring_base_vaddr =
-			dma_alloc_coherent(gsi_dev,
-				gsi_channel_props.ring_len, &dma_addr,
-				mem_flag);
+		if (!ep->align_ring_mem) {
+			gsi_channel_props.ring_base_vaddr =
+				dma_alloc_coherent(gsi_dev,
+					gsi_channel_props.ring_len, &dma_addr,
+					mem_flag);
+		}
+		else {
+			/* Align number of elements to next power of 2 */
+			num_of_desc = ring_length / gsi_channel_props.re_size;
+			num_of_desc = ecpri_dma_round_to_next_pwr(num_of_desc);
+			gsi_channel_props.ring_base_vaddr = dma_alloc_coherent(gsi_dev,
+				num_of_desc * gsi_channel_props.re_size,
+				&dma_addr, mem_flag);
+		}
 		if (!gsi_channel_props.ring_base_vaddr) {
 			DMAERR("fail to dma alloc %u bytes\n",
 				gsi_channel_props.ring_len);
@@ -9608,7 +9709,10 @@ int ecpri_dma_gsi_setup_transfer_ring(struct ecpri_dma_endp_context *ep,
 	}
 
 	/* copy mem info */
-	ep->gsi_mem_info.chan_ring_len = gsi_channel_props.ring_len;
+	if (!ep->align_ring_mem)
+		ep->gsi_mem_info.chan_ring_len = gsi_channel_props.ring_len;
+	else
+		ep->gsi_mem_info.chan_ring_len = num_of_desc * gsi_channel_props.re_size;
 	ep->gsi_mem_info.chan_ring_base_addr =
 		gsi_channel_props.ring_base_addr;
 	ep->gsi_mem_info.chan_ring_base_vaddr =
@@ -9791,12 +9895,16 @@ int ecpri_dma_gsi_setup_channel(struct ecpri_dma_endp_context *ep)
 	return 0;
 
 fail_setup_transfer_ring:
+	if (ep->gsi_mem_info.chan_ring_base_vaddr)
+		dma_free_coherent(gsi_dev, ep->gsi_mem_info.chan_ring_len,
+			ep->gsi_mem_info.chan_ring_base_vaddr,
+			ep->gsi_mem_info.chan_ring_base_addr);
+fail_ring_db:
+fail_setup_event_ring:
 	if (ep->gsi_mem_info.evt_ring_base_vaddr)
 		dma_free_coherent(gsi_dev, ep->gsi_mem_info.evt_ring_len,
 			ep->gsi_mem_info.evt_ring_base_vaddr,
 			ep->gsi_mem_info.evt_ring_base_addr);
-fail_ring_db:
-fail_setup_event_ring:
 	DMAERR("Return with err: %d\n", result);
 	return result;
 }
@@ -10103,3 +10211,39 @@ void ecpri_dma_lte_set_loopback(int val)
 		}
 	}
 }
+
+int ecpri_dma_advance_outstanding_list(struct ecpri_dma_endp_context* ep)
+{
+	int ret = 0;
+	struct gsi_chan_info ch_info = { 0 };
+	u32 number_to_advance = 0, i = 0;
+	struct ecpri_dma_outstanding_pkt_wrapper* curr_pkt_wrapper;
+
+	if (!ep || !ep->valid) {
+		DMAERR("EP context is empty\n");
+		return -EINVAL;
+	}
+
+	ret = gsi_query_channel_info(ep->gsi_chan_hdl, &ch_info);
+	if (ret != GSI_STATUS_SUCCESS) {
+		DMAERR("gsi_query_channel_info failed res=%d gsi_ch=%d.\n", ret,
+			ep->gsi_chan_hdl);
+		return ret;
+	}
+
+	if (ch_info.evt_valid) {
+		number_to_advance =
+			(ch_info.evt_rp - ep->gsi_mem_info.evt_ring_base_addr) /
+			ch_info.evt_elem_sz;
+	}
+
+	for (i = 0; i < number_to_advance; i++)
+	{
+		curr_pkt_wrapper = list_first_entry(&ep->outstanding_pkt_list,
+			struct ecpri_dma_outstanding_pkt_wrapper, link);
+		list_move_tail(&curr_pkt_wrapper->link, &ep->outstanding_pkt_list);
+	}
+
+	return ret;
+}
+

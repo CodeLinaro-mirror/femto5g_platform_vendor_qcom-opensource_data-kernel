@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: GPL-2.0-only
- * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include "ecpriss_core.h"
@@ -29,7 +29,8 @@ const char *ecpriss_msg_type_enum_to_str[] = {
 	[ECPRISS_MESSAGE_TRANSPORT_EGRESS_L2_L3_TABLE_RECFG] = "ReConfigure L2 and L3 Tables",
 	[ECPRISS_MESSAGE_TRANSPORT_INGESS_TABLE_CFG] = "ReConfigure Ingress Filter table",
 	[ECPRISS_MESSAGE_TRANSPORT_INGESS_TABLE_DECFG] = "DeConfigure Ingress Filter Table",
-	[ECPRISS_MESSAGE_LTE_MAC_CFG] = "Configure LTE MAC"
+	[ECPRISS_MESSAGE_LTE_MAC_CFG] = "Configure LTE MAC",
+	[ECPRISS_MESSAGE_LOGGING_CFG] = "Configure Logging",
 
 };
 
@@ -138,6 +139,9 @@ int32_t ecpriss_netlink_process_packet(ecpriss_packet_s *packet)
 					break;
 				case ECPRISS_MESSAGE_LTE_MAC_CFG:
 					ret = ecpriss_qudp_set_lte_mac_filter(curr_payload);
+					break;
+				case ECPRISS_MESSAGE_LOGGING_CFG:
+					ret = ecpriss_configure_logging(curr_payload);
 					break;
 				default:
 					ECPRILOGERR("Invalid message type: %s \n",packet->header.message_id);

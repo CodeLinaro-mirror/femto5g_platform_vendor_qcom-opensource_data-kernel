@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2015-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/of.h>
@@ -1465,8 +1465,8 @@ static void gsi_init_evt_ring(struct gsi_evt_ring_props *props,
 	ctx->rp_local = ctx->base;
 	ctx->len = props->ring_len;
 	ctx->elem_sz = props->re_size;
-	ctx->max_num_elem = ctx->len / ctx->elem_sz - 1;
-	ctx->end = ctx->base + (ctx->max_num_elem + 1) * ctx->elem_sz;
+	ctx->max_num_elem = ctx->len / ctx->elem_sz;
+	ctx->end = ctx->base + (ctx->max_num_elem) * ctx->elem_sz;
 
 	if (props->rp_update_vaddr)
 		*(uint64_t *)(props->rp_update_vaddr) = ctx->rp_local;
@@ -1482,7 +1482,7 @@ static void gsi_prime_evt_ring(struct gsi_evt_ctx *ctx)
 	{
 		memset((void*)ctx->ring.base_va, 0, ctx->ring.len);
 		ctx->ring.wp_local = ctx->ring.base +
-			ctx->ring.max_num_elem * ctx->ring.elem_sz;
+			(ctx->ring.max_num_elem -1) * ctx->ring.elem_sz;
 
 		/* write order MUST be MSB followed by LSB */
 		db.write_ptr_msb = GSI_MSB(ctx->ring.wp_local);
@@ -2161,8 +2161,8 @@ static void gsi_init_chan_ring(struct gsi_chan_props *props,
 	ctx->rp_local = ctx->base;
 	ctx->len = props->ring_len;
 	ctx->elem_sz = props->re_size;
-	ctx->max_num_elem = ctx->len / ctx->elem_sz - 1;
-	ctx->end = ctx->base + (ctx->max_num_elem + 1) *
+	ctx->max_num_elem = ctx->len / ctx->elem_sz;
+	ctx->end = ctx->base + (ctx->max_num_elem) *
 		ctx->elem_sz;
 }
 
@@ -3162,7 +3162,7 @@ static void __gsi_query_channel_free_re(struct gsi_chan_ctx *ctx,
 	if (end >= start)
 		used = end - start;
 	else
-		used = ctx->ring.max_num_elem + 1 - (start - end);
+		used = ctx->ring.max_num_elem - (start - end);
 
 	*num_free_re = ctx->ring.max_num_elem - used;
 }
@@ -3261,6 +3261,8 @@ int gsi_query_channel_info(unsigned long chan_hdl,
 	ctx->ring.wp = wp;
 	info->wp = wp;
 
+	info->elem_sz = ctx->props.re_size;
+
 	if (info->evt_valid) {
 		rp = gsihal_read_reg_pnk(GSI_EE_n_EV_CH_k_CNTXT_4,
 			gsi_id, ee, ctx->evtr->id);
@@ -3273,6 +3275,8 @@ int gsi_query_channel_info(unsigned long chan_hdl,
 		wp |= ((uint64_t)gsihal_read_reg_pnk(GSI_EE_n_EV_CH_k_CNTXT_7,
 			gsi_id, ee, ctx->evtr->id)) << 32;
 		info->evt_wp = wp;
+
+		info->evt_elem_sz = ctx->evtr->props.re_size;
 	}
 
 	spin_unlock_irqrestore(slock, flags);
@@ -3555,6 +3559,51 @@ int gsi_poll_channel(unsigned long chan_hdl,
 	return gsi_poll_n_channel(chan_hdl, notify, 1, &unused_var);
 }
 EXPORT_SYMBOL(gsi_poll_channel);
+
+
+int gsi_update_evt_rp(unsigned long chan_hdl) {
+	struct gsi_chan_ctx* ctx;
+	uint64_t rp;
+	int gsi_id;
+	int ee;
+	unsigned long flags;
+
+	if (!gsi_ctx) {
+		pr_err("%s:%d gsi context not allocated\n", __func__, __LINE__);
+		return -GSI_STATUS_NODEV;
+	}
+
+	ctx = __gsi_get_ch_ctx_from_hdl(chan_hdl);
+	if (!ctx) {
+		GSIERR("bad params chan_hdl=%lu\n", chan_hdl);
+		return -GSI_STATUS_INVALID_PARAMS;
+	}
+
+	ee = ctx->props.ee;
+	gsi_id = ctx->props.gsi_id;
+
+	if (unlikely(ctx->state == GSI_CHAN_STATE_NOT_ALLOCATED)) {
+		GSIERR("bad state %d\n", ctx->state);
+		return -GSI_STATUS_UNSUPPORTED_OP;
+	}
+
+	if (!ctx->evtr) {
+		GSIERR("no event ring associated chan_hdl=%lu\n", chan_hdl);
+		return -GSI_STATUS_UNSUPPORTED_OP;
+	}
+
+	spin_lock_irqsave(&ctx->evtr->ring.slock, flags);
+
+	rp = ctx->evtr->props.gsi_read_event_ring_rp(
+		&ctx->evtr->props, ctx->evtr->id, ee, gsi_id);
+	rp |= ctx->ring.rp_local & GSI_MSB_MASK;
+	ctx->evtr->ring.rp_local = rp;
+
+	spin_unlock_irqrestore(&ctx->evtr->ring.slock, flags);
+
+	return GSI_STATUS_SUCCESS;
+}
+EXPORT_SYMBOL(gsi_update_evt_rp);
 
 int gsi_poll_n_channel(unsigned long chan_hdl,
 		struct gsi_chan_xfer_notify *notify,

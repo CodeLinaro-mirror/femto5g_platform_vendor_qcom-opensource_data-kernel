@@ -643,13 +643,30 @@ ssize_t qcom_aw_phy_set_attr(struct file *file, const char __user *buf,
       break;
 
     case RX_CDR_CHECKER:
-      QCOM_AW_PHY_LOG_ERR("Checking RX CDR lock for PHY %d, lane %d", 
-                          rx_bist_phy_inst, rx_bist_lane_num);
       phy_config_info = qcom_aw_phy_get_config_info();
       phy_inst_info = &phy_config_info->phy_inst_config_info[rx_bist_phy_inst];
       mss.phy_offset = phy_inst_info->base_addr;
-      pmd_set_lane(&mss, rx_bist_lane_num);
-      aw_pmd_rx_check_cdr_lock(&mss, RX_CDR_TIMEOUT_US);
+
+      if(rx_bist_lane_num != PHY_LANE_MAX){
+        min = rx_bist_lane_num;
+        max = rx_bist_lane_num;
+      }
+      else{
+        min = PHY_LANE_0;
+        max = PHY_LANE_3;
+      }
+
+      for (i = min; i <= max; i++) {
+        pmd_set_lane(&mss, i);
+        if(AW_ERR_CODE_NONE == aw_pmd_rx_check_cdr_lock(&mss, RX_CDR_TIMEOUT_US)){
+          QCOM_AW_PHY_LOG_INFO("RX CDR lock success for PHY %d, lane %d",
+                               rx_bist_phy_inst, i);
+        }
+        else{
+          QCOM_AW_PHY_LOG_INFO("RX CDR lock failure for PHY %d, lane %d",
+                               rx_bist_phy_inst, i);
+        }
+      }
       break;
 
     case ENABLE_RX_BIST:

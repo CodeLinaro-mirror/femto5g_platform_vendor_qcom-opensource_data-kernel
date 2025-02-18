@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: GPL-2.0-only
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #ifndef ECPRISS_XBAR_HAL_H_
@@ -258,6 +258,7 @@ enum ecpriss_xbar_hal_reg_name {
 	ECPRI_XBAR_FH_CFG,
 	ECPRI_XBAR_OC_CFG,
 
+	ECPRI_XBAR_FHRX_n_DEFAULT_DMA_CHANNEL,
 
 	ECPRI_XBAR_MAX
 

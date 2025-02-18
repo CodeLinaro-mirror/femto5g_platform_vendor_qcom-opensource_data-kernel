@@ -1,6 +1,6 @@
 /*
  * SPDX-License-Identifier: GPL-2.0-only
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include "gsi.h"
@@ -1544,7 +1544,7 @@ void ecpri_dma_mhi_client_test_destroy_data_context(int idx)
 {
 	u32 endp_pair_id = 0;
 	u32 hw_ver = ECPRI_DMA_GET_CTX_HW_VER();
-	u32 hw_flavor = ECPRI_DMA_GET_CTX_HW_FLAVOR();
+	u32 hw_flavor = ECPRI_DMA_GET_HW_FLAVOR();
 	u32 first_src_ch, first_dest_ch, ch_id_diff;
 
 	first_src_ch = ECPRI_DMA_MHI_TEST_FAPI_FRST_SRC_CHANNEL_ID;
@@ -1595,7 +1595,7 @@ static int ecpri_dma_mhi_client_test_setup_channels(int idx)
 	int ret = 0;
 	u32 endp_pair_id = 0;
 	u32 hw_ver = ECPRI_DMA_GET_CTX_HW_VER();
-	u32 hw_flavor = ECPRI_DMA_GET_CTX_HW_FLAVOR();
+	u32 hw_flavor = ECPRI_DMA_GET_HW_FLAVOR();
 	u32 first_src_ch, first_dest_ch, ch_id_diff;
 
 	DMA_UT_DBG("Entry setup_channels VF ID %d\n", idx);
@@ -1729,15 +1729,15 @@ static int ecpri_dma_mhi_client_test_suite_setup(void** ppriv)
 	}
 
 	if (ECPRI_DMA_GET_CTX_HW_VER() == ECPRI_HW_V1_0 &&
-		ECPRI_DMA_GET_CTX_HW_FLAVOR() != ECPRI_HW_FLAVOR_DU_PCIE)
+		ECPRI_DMA_GET_HW_FLAVOR() != ECPRI_HW_FLAVOR_DU_PCIE)
 	{
 		DMA_UT_ERR("MHI UTs require PCIe flavor\n");
 		return -EINVAL;
 	}
 	else if (ECPRI_DMA_GET_CTX_HW_VER() == ECPRI_HW_V2_0 &&
-		(ECPRI_DMA_GET_CTX_HW_FLAVOR() != ECPRI_HW_FLAVOR_DU_PCIE_5_X_6 &&
-			ECPRI_DMA_GET_CTX_HW_FLAVOR() != ECPRI_HW_FLAVOR_DU_PCIE_4_X_9 &&
-			ECPRI_DMA_GET_CTX_HW_FLAVOR() != ECPRI_HW_FLAVOR_DU_PCIE_3_X_12))
+		(ECPRI_DMA_GET_HW_FLAVOR() != ECPRI_HW_FLAVOR_DU_PCIE_5_X_6 &&
+			ECPRI_DMA_GET_HW_FLAVOR() != ECPRI_HW_FLAVOR_DU_PCIE_4_X_9 &&
+			ECPRI_DMA_GET_HW_FLAVOR() != ECPRI_HW_FLAVOR_DU_PCIE_3_X_12))
 	{
 		DMA_UT_ERR("MHI UTs require PCIe flavor\n");
 		return -EINVAL;
@@ -1852,7 +1852,7 @@ static int ecpri_dma_mhi_client_test_utils_calc_expected_func_mask(
 			if (function.vf_id >= ECPRI_DMA_VM_IDS_VF1 &&
 				function.vf_id <= ECPRI_DMA_VM_IDS_VF5)
 			{
-				switch (ECPRI_DMA_GET_CTX_HW_FLAVOR())
+				switch (ECPRI_DMA_GET_HW_FLAVOR())
 				{
 				case ECPRI_HW_FLAVOR_DU_PCIE_3_X_12:
 					*expected_mask =
@@ -2524,7 +2524,7 @@ static int ecpri_dma_mhi_test_loopback_data_transfer_redirect(int idx,
 	struct ecpri_dma_mem_buffer redirect_buffer;
 	struct gsi_redirected_xfer_compl_evt* curr_ev = NULL;
 	u32 hw_ver = ECPRI_DMA_GET_CTX_HW_VER();
-	u32 hw_flavor = ECPRI_DMA_GET_CTX_HW_FLAVOR();
+	u32 hw_flavor = ECPRI_DMA_GET_HW_FLAVOR();
 
 	DMA_UT_DBG(
 		"Entry VF %d host_src_ch_id %d host_dest_ch_id %d"
@@ -2948,17 +2948,30 @@ static int ecpri_dma_mhi_client_test_suite_mhi_init_all_vms(void* priv)
 {
 	int test_i, vf_i;
 	int ret = 0;
-	struct mhi_dma_function_params function[ECPRI_DMA_MHI_CLIENT_FUNCTION_NUM];
-	struct mhi_dma_init_params init_params[ECPRI_DMA_MHI_CLIENT_FUNCTION_NUM];
-	struct mhi_dma_init_out out_params[ECPRI_DMA_MHI_CLIENT_FUNCTION_NUM];
-	struct mhi_dma_start_params start_params[ECPRI_DMA_MHI_CLIENT_FUNCTION_NUM];
+	struct mhi_dma_function_params* function;
+	struct mhi_dma_init_params* init_params;
+	struct mhi_dma_init_out* out_params;
+	struct mhi_dma_start_params* start_params;
 	struct ecpri_dma_mhi_client_context* mhi_dma_ctx = NULL;
 	int max_vf_id = ECPRI_DMA_MHI_TEST_MAX_VF_ID;
 	u32 hw_ver = ECPRI_DMA_GET_CTX_HW_VER();
-	u32 hw_flavor = ECPRI_DMA_GET_CTX_HW_FLAVOR();
+	u32 hw_flavor = ECPRI_DMA_GET_HW_FLAVOR();
 
 	DMA_UT_DBG("Start MHI Init for all VMs\n");
 	DMA_UT_DBG("Preparing function params\n");
+
+	function =
+		kmalloc(sizeof(struct mhi_dma_function_params) *
+			ECPRI_DMA_MHI_CLIENT_FUNCTION_NUM, GFP_KERNEL);
+	init_params =
+		kmalloc(sizeof(struct mhi_dma_init_params) *
+			ECPRI_DMA_MHI_CLIENT_FUNCTION_NUM, GFP_KERNEL);
+	out_params =
+		kmalloc(sizeof(struct mhi_dma_init_out) *
+			ECPRI_DMA_MHI_CLIENT_FUNCTION_NUM, GFP_KERNEL);
+	start_params =
+		kmalloc(sizeof(struct mhi_dma_start_params) *
+			ECPRI_DMA_MHI_CLIENT_FUNCTION_NUM, GFP_KERNEL);
 
 	/* Create function params */
 	ecpri_dma_mhi_client_test_utils_create_all_functions(function);
@@ -2975,7 +2988,8 @@ static int ecpri_dma_mhi_client_test_suite_mhi_init_all_vms(void* priv)
 		if (ret != 0) {
 			DMA_UT_ERR("VF_ID %d\n", function[test_i].vf_id);
 			DMA_UT_TEST_FAIL_REPORT("Test has failed\n");
-			return -EFAULT;
+			ret = -EFAULT;
+			goto out;
 		}
 	}
 
@@ -2992,7 +3006,8 @@ static int ecpri_dma_mhi_client_test_suite_mhi_init_all_vms(void* priv)
 		if (ret != 0) {
 			DMA_UT_ERR("Driver state for VF_ID %d / IDX %d has failed\n",
 				function[test_i].vf_id, test_i);
-			return -EPERM;
+			ret = -EPERM;
+			goto out;
 		}
 
 		DMA_UT_DBG("DMA driver context was checked successfully for VF_ID %d\n",
@@ -3007,6 +3022,11 @@ static int ecpri_dma_mhi_client_test_suite_mhi_init_all_vms(void* priv)
 		ecpri_dma_mhi_driver_ops.mhi_dma_destroy(function[test_i]);
 	}
 
+out:
+	kfree(function);
+	kfree(init_params);
+	kfree(out_params);
+	kfree(start_params);
 	return ret;
 }
 
@@ -3156,7 +3176,7 @@ static int ecpri_dma_mhi_client_test_suite_memcpy_init_all_vms_pf(void* priv)
 	struct ecpri_dma_mhi_memcpy_context* mhi_memcpy_ctx = NULL;
 	int max_vf_id = ECPRI_DMA_MHI_TEST_MAX_VF_ID;
 	u32 hw_ver = ECPRI_DMA_GET_CTX_HW_VER();
-	u32 hw_flavor = ECPRI_DMA_GET_CTX_HW_FLAVOR();
+	u32 hw_flavor = ECPRI_DMA_GET_HW_FLAVOR();
 
 	DMA_UT_DBG("Start MEMCPY_INIT ALL\n");
 	DMA_UT_DBG("Preparing function params\n");
@@ -3490,7 +3510,7 @@ static int ecpri_dma_mhi_client_test_suite_connect_endp_vm(void* priv)
 	ctx = mhi_client_test_suite_ctx[vf_id];
 
 	hw_ver = ECPRI_DMA_GET_CTX_HW_VER();
-	hw_flavor = ECPRI_DMA_GET_CTX_HW_FLAVOR();
+	hw_flavor = ECPRI_DMA_GET_HW_FLAVOR();
 
 	/* Create func params */
 	ecpri_dma_mhi_test_create_func_params(&ctx->function,
@@ -3602,7 +3622,7 @@ static int ecpri_dma_mhi_client_test_suite_connect_endp_all(void* priv) {
 	int max_vf_id = ECPRI_DMA_MHI_TEST_MAX_VF_ID;
 	u32 endp_pair_id = 0;
 	u32 hw_ver = ECPRI_DMA_GET_CTX_HW_VER();
-	u32 hw_flavor = ECPRI_DMA_GET_CTX_HW_FLAVOR();
+	u32 hw_flavor = ECPRI_DMA_GET_HW_FLAVOR();
 	u32 first_src_ch, first_dest_ch, ch_id_diff;
 
 	/* Run tests for VMs only */
@@ -3797,7 +3817,7 @@ ecpri_dma_mhi_client_test_suite_hw_ch_vm_single_packet_single_buffer(void* priv)
 	enum ecpri_dma_gsi_id gsi_id;
 	u8 vf_id = ECPRI_DMA_VM_IDS_VM0;
 	u32 hw_ver = ECPRI_DMA_GET_CTX_HW_VER();
-	u32 hw_flavor = ECPRI_DMA_GET_CTX_HW_FLAVOR();
+	u32 hw_flavor = ECPRI_DMA_GET_HW_FLAVOR();
 	u32 first_src_ch, first_dest_ch;
 
 	struct ecpri_dma_mhi_client_context* mhi_dma_ctx = NULL;
@@ -3987,7 +4007,7 @@ ecpri_dma_mhi_client_test_suite_hw_ch_all_single_packet_single_buffer(void* priv
 	int max_vf_id = ECPRI_DMA_MHI_TEST_MAX_VF_ID;
 	u32 endp_pair_id = 0;
 	u32 hw_ver = ECPRI_DMA_GET_CTX_HW_VER();
-	u32 hw_flavor = ECPRI_DMA_GET_CTX_HW_FLAVOR();
+	u32 hw_flavor = ECPRI_DMA_GET_HW_FLAVOR();
 	u32 first_src_ch, first_dest_ch, ch_id_diff;
 
 	/* Run tests only for VMs */
@@ -4194,7 +4214,7 @@ ecpri_dma_mhi_client_test_suite_hw_ch_redirect(void* priv)
 	enum ecpri_dma_gsi_id gsi_id;
 	u8 vf_id = ECPRI_DMA_VM_IDS_VF1;
 	u32 hw_ver = ECPRI_DMA_GET_CTX_HW_VER();
-	u32 hw_flavor = ECPRI_DMA_GET_CTX_HW_FLAVOR();
+	u32 hw_flavor = ECPRI_DMA_GET_HW_FLAVOR();
 	u32 src_ch, dest_ch, redirect_ch;
 
 	struct ecpri_dma_mhi_client_context* mhi_dma_ctx = NULL;
@@ -4443,7 +4463,7 @@ fail_alloc_src_buffer:
  * This test is used to verify SMMU creates a fault when the wrong CB
  * is being accessed
  */
-static int ecpri_dma_mhi_client_test_suite_smmu_fault(void* priv)
+int ecpri_dma_mhi_client_test_suite_smmu_fault(void* priv)
 {
 	int ret = 0;
 	int idx;

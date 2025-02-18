@@ -1,6 +1,6 @@
 /*
  * SPDX-License-Identifier: GPL-2.0-only
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include "ecpri_dma_ut_framework.h"
@@ -1948,7 +1948,7 @@ static int ecpri_dma_dp_test_suite_tx_header(void *priv) {
 	struct ecpri_dma_tx_header *packet_header_ptr;
 
 	u8 *p_packet_body;
-	enum ecpri_hw_flavor hw_flavor = ECPRI_DMA_GET_CTX_HW_FLAVOR();
+	enum ecpri_hw_flavor hw_flavor = ECPRI_DMA_GET_HW_FLAVOR();
 
 	DMA_UT_LOG("Start Tx pre-header test\n");
 	if (hw_flavor == ECPRI_HW_FLAVOR_RU || hw_flavor == ECPRI_HW_FLAVOR_DU_L2)
@@ -2169,7 +2169,7 @@ static int ecpri_dma_dp_test_suite_tx_broadcast(void *priv) {
 	int ret = 0;
 	int i;
 	int j;
-	enum ecpri_hw_flavor hw_flavor = ECPRI_DMA_GET_CTX_HW_FLAVOR();
+	enum ecpri_hw_flavor hw_flavor = ECPRI_DMA_GET_HW_FLAVOR();
 
 	/* End: variable declaraion */
 

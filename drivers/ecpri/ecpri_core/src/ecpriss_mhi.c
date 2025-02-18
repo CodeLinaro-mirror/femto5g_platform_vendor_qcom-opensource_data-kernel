@@ -393,6 +393,12 @@ void ecpriss_mhi_process_get_mac_addr(csm_lte_ethdev_msg_s *req,
 
 	pnum = req->hdr.eth_link_id / (ECPRISS_MAX_PORTS + 1);
 
+	if(req->hdr.eth_link_id > 11)
+	{
+		ECPRILOGERR("Invalid link_id %d recvd\n",req->hdr.eth_link_id);
+		return;
+	}
+
 	linkid = req->hdr.eth_link_id % 4;
 
 	vf_idx = ecpriss_mhi_get_wq_idx_from_vfid(ch_info->vf_id);
@@ -449,6 +455,12 @@ void ecpriss_mhi_process_set_mac_addr(csm_lte_ethdev_msg_s *req,
 	csm_lte_ethdev_mac_s mac_addr;
 
 	pnum = req->hdr.eth_link_id / (ECPRISS_MAX_PORTS + 1);
+	
+	if(req->hdr.eth_link_id > 11)
+	{
+		ECPRILOGERR("Invalid link_id %d recvd\n",req->hdr.eth_link_id);
+		return;
+	}
 
 	linkid = req->hdr.eth_link_id % 4;
 
@@ -618,6 +630,8 @@ void ecpriss_mhi_process_async_link_state_util(int port, int link, int state, in
 	if(vf_idx == -1)
 		return;
 
+	if(!ctx)
+		return;
 
 	out_ch_info = &ctx->mhi_vf_info[vf_idx].ch_info[ECPRISS_MHI_CH_DIR_OUT];
 

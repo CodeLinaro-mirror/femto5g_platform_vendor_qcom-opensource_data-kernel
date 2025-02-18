@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: GPL-2.0-only
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/module.h>
@@ -598,6 +598,42 @@ static void ecpriss_xbar_hal_reg_parse_xbar_cfg_2(enum ecpriss_xbar_hal_reg_name
 
 }
 
+static void ecpriss_xbar_hal_reg_construct_xbar_fhrx_default_dma_channel
+	(enum ecpriss_xbar_hal_reg_name reg, const void *fields, uint32_t* val)
+{
+        ecpri_xbar_hwio_def_ecpri_xbar_fhrx_n_default_dma_channel_s * dma_channel;
+        dma_channel =(ecpri_xbar_hwio_def_ecpri_xbar_fhrx_n_default_dma_channel_s *)fields;
+
+        ECPRISS_HAL_SETFIELD_IN_REG(*val,
+                        dma_channel->dma_ring_id,
+                        HWIO_ECPRI_XBAR_FHRX_n_DEFAULT_DMA_CHANNEL_DMA_RING_ID_SHFT,
+                        HWIO_ECPRI_XBAR_FHRX_n_DEFAULT_DMA_CHANNEL_DMA_RING_ID_BMSK);
+
+        ECPRISS_HAL_SETFIELD_IN_REG(*val,
+                        dma_channel->gsi_id,
+                        HWIO_ECPRI_XBAR_FHRX_n_DEFAULT_DMA_CHANNEL_GSI_ID_SHFT,
+                        HWIO_ECPRI_XBAR_FHRX_n_DEFAULT_DMA_CHANNEL_GSI_ID_BMSK);
+
+        return;
+}
+
+static void ecpriss_xbar_hal_reg_parse_xbar_fhrx_default_dma_channel
+	(enum ecpriss_xbar_hal_reg_name reg, void *fields, u32 val)
+{
+        ecpri_xbar_hwio_def_ecpri_xbar_fhrx_n_default_dma_channel_s * dma_channel;
+        dma_channel =(ecpri_xbar_hwio_def_ecpri_xbar_fhrx_n_default_dma_channel_s *)fields;
+
+        dma_channel->dma_ring_id = ECPRISS_HAL_GETFIELD_FROM_REG(val,
+                        HWIO_ECPRI_XBAR_FHRX_n_DEFAULT_DMA_CHANNEL_DMA_RING_ID_SHFT,
+                        HWIO_ECPRI_XBAR_FHRX_n_DEFAULT_DMA_CHANNEL_DMA_RING_ID_BMSK);
+
+        dma_channel->gsi_id = ECPRISS_HAL_GETFIELD_FROM_REG(val,
+                        HWIO_ECPRI_XBAR_FHRX_n_DEFAULT_DMA_CHANNEL_GSI_ID_SHFT,
+                        HWIO_ECPRI_XBAR_FHRX_n_DEFAULT_DMA_CHANNEL_GSI_ID_BMSK);
+
+        return;
+}
+
 static void ecpriss_xbar_hal_reg_parse_lut_status_2(enum ecpriss_xbar_hal_reg_name reg, void *fields,
 		u32 val)
 {
@@ -736,6 +772,10 @@ static void ecpriss_xbar_hal_reg_parse_xbar_flush_2(enum ecpriss_xbar_hal_reg_na
 			HWIO_ECPRI_XBAR_FHRX_m_LUT_n_UL_ROUTE_TO_C2C_SHFT,
 			HWIO_ECPRI_XBAR_FHRX_m_LUT_n_UL_ROUTE_TO_C2C_BMSK);
 
+	ECPRISS_HAL_SETFIELD_IN_REG(*val,
+			xbar_fhrx_m_lut_n->ul_route_to_dma,
+			HWIO_ECPRI_XBAR_FHRX_m_LUT_n_UL_ROUTE_TO_DMA_SHFT,
+			HWIO_ECPRI_XBAR_FHRX_m_LUT_n_UL_ROUTE_TO_DMA_BMSK);
 
 	ECPRISS_HAL_SETFIELD_IN_REG(*val,
 			xbar_fhrx_m_lut_n->dl_oc_link_id,
@@ -746,17 +786,6 @@ static void ecpriss_xbar_hal_reg_parse_xbar_flush_2(enum ecpriss_xbar_hal_reg_na
 			xbar_fhrx_m_lut_n->dl_route_to_oran,
 			HWIO_ECPRI_XBAR_FHRX_m_LUT_n_DL_ROUTE_TO_ORAN_SHFT,
 			HWIO_ECPRI_XBAR_FHRX_m_LUT_n_DL_ROUTE_TO_ORAN_BMSK);
-
-	ECPRISS_HAL_SETFIELD_IN_REG(*val,
-			xbar_fhrx_m_lut_n->dl_route_to_c2c,
-			HWIO_ECPRI_XBAR_FHRX_m_LUT_n_DL_ROUTE_TO_C2C_SHFT,
-			HWIO_ECPRI_XBAR_FHRX_m_LUT_n_DL_ROUTE_TO_C2C_BMSK);
-
-	ECPRISS_HAL_SETFIELD_IN_REG(*val,
-			xbar_fhrx_m_lut_n->dl_route_to_c2c,
-			HWIO_ECPRI_XBAR_FHRX_m_LUT_n_DL_ROUTE_TO_C2C_SHFT,
-			HWIO_ECPRI_XBAR_FHRX_m_LUT_n_DL_ROUTE_TO_C2C_BMSK);
-
 
 	ECPRISS_HAL_SETFIELD_IN_REG(*val,
 			xbar_fhrx_m_lut_n->dl_route_to_c2c,
@@ -812,6 +841,9 @@ static void ecpriss_xbar_hal_reg_parse_xbar_flush_2(enum ecpriss_xbar_hal_reg_na
 			HWIO_ECPRI_XBAR_FHRX_m_LUT_n_UL_ROUTE_TO_C2C_SHFT,
 			HWIO_ECPRI_XBAR_FHRX_m_LUT_n_UL_ROUTE_TO_C2C_BMSK);
 
+	xbar_fhrx_m_lut_n->ul_route_to_dma = ECPRISS_HAL_GETFIELD_FROM_REG(val,
+			HWIO_ECPRI_XBAR_FHRX_m_LUT_n_UL_ROUTE_TO_DMA_SHFT,
+			HWIO_ECPRI_XBAR_FHRX_m_LUT_n_UL_ROUTE_TO_DMA_BMSK);
 
 	xbar_fhrx_m_lut_n->dl_oc_link_id = ECPRISS_HAL_GETFIELD_FROM_REG(val,
 			HWIO_ECPRI_XBAR_FHRX_m_LUT_n_DL_OC_LINK_ID_SHFT,
@@ -820,15 +852,6 @@ static void ecpriss_xbar_hal_reg_parse_xbar_flush_2(enum ecpriss_xbar_hal_reg_na
 	xbar_fhrx_m_lut_n->dl_route_to_oran = ECPRISS_HAL_GETFIELD_FROM_REG(val,
 			HWIO_ECPRI_XBAR_FHRX_m_LUT_n_DL_ROUTE_TO_ORAN_SHFT,
 			HWIO_ECPRI_XBAR_FHRX_m_LUT_n_DL_ROUTE_TO_ORAN_BMSK);
-
-	xbar_fhrx_m_lut_n->dl_route_to_c2c = ECPRISS_HAL_GETFIELD_FROM_REG(val,
-			HWIO_ECPRI_XBAR_FHRX_m_LUT_n_DL_ROUTE_TO_C2C_SHFT,
-			HWIO_ECPRI_XBAR_FHRX_m_LUT_n_DL_ROUTE_TO_C2C_BMSK);
-
-	xbar_fhrx_m_lut_n->dl_route_to_c2c = ECPRISS_HAL_GETFIELD_FROM_REG(val,
-			HWIO_ECPRI_XBAR_FHRX_m_LUT_n_DL_ROUTE_TO_C2C_SHFT,
-			HWIO_ECPRI_XBAR_FHRX_m_LUT_n_DL_ROUTE_TO_C2C_BMSK);
-
 
 	xbar_fhrx_m_lut_n->dl_route_to_c2c = ECPRISS_HAL_GETFIELD_FROM_REG(val,
 			HWIO_ECPRI_XBAR_FHRX_m_LUT_n_DL_ROUTE_TO_C2C_SHFT,
@@ -2262,6 +2285,10 @@ static struct ecpriss_xbar_hal_reg_obj ecpriss_xbar_hal_reg_objs[ECPRISS_XBAR_HW
 		ecpriss_xbar_hal_reg_construct_lut_xbar_fhrx_msg_type_cplane_valid,
 		ecpriss_xbar_hal_reg_parse_lut_xbar_fhrx_msg_type_cplane_valid,
 		0x09420000, 0x0000080C, 0, 0, 0, 0, 0},
+	[ECPRISS_XBAR_HW_v2_0][ECPRI_XBAR_FHRX_n_DEFAULT_DMA_CHANNEL] = {
+		ecpriss_xbar_hal_reg_construct_xbar_fhrx_default_dma_channel,
+		ecpriss_xbar_hal_reg_parse_xbar_fhrx_default_dma_channel,
+		0x09420000, 0x00000820, 0x4, 0, 0, 0, 0},
 	[ECPRISS_XBAR_HW_v2_0][ECPRI_XBAR_FHRX_MSG_TYPE_LUT_0] = {
 		ecpriss_xbar_hal_reg_construct_dummy_v2,
 		ecpriss_xbar_hal_reg_parse_dummy_v2,
