@@ -418,7 +418,7 @@ void mtip_process_tx_comp_cb(ecpri_dma_eth_conn_hdl_t hdl, struct mtip_dma_tx_co
    {
       if (netif_queue_stopped(netdev))
       {
-         CSMLOGERR("waking queue for link_index %d", link_index);
+         CSMLOGDBG("waking queue for link_index %d", link_index);
          
          // wake the queue
          netif_wake_queue(netdev);
@@ -1020,7 +1020,7 @@ static int mtip_start_xmit(struct sk_buff *skb, struct net_device *netdev)
    {
        if (!netif_queue_stopped(netdev))
        {
-           CSMLOGERR("stopping queue for link_index %d", link_index);
+           CSMLOGDBG("stopping queue for link_index %d", link_index);
 
            // wait for space to become available
            netif_stop_queue(netdev);
@@ -1452,7 +1452,7 @@ static void mtip_tx_timeout(struct net_device *netdev, unsigned int txqueue)
    {
       if (netif_queue_stopped(netdev))
       {
-         CSMLOGERR("waking queue for link_index %d", link_index);
+         CSMLOGDBG("waking queue for link_index %d", link_index);
 
          // wake the queue
          netif_trans_update(netdev); /* prevent tx timeout */
