@@ -1766,6 +1766,16 @@ int mtip_link_remove(struct platform_device *pdev)
    {
       if (platform_driver_priv->mtip_links[i] != NULL)
       {
+
+         if (platform_driver_priv->mtip_links[i]->dev != NULL)
+         {
+            if (!netif_queue_stopped(platform_driver_priv->mtip_links[i]->dev))
+            {
+               CSMLOGINFO("stopping queue for link_index %d", i);
+               netif_stop_queue(platform_driver_priv->mtip_links[i]->dev);
+            }
+         }
+
          // cleanup the link
          mtip_platform_cleanup_link(i);
 
