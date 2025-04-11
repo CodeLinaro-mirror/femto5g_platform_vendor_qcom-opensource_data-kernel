@@ -263,6 +263,7 @@ struct eth_stats
 
 };
 
+
 // information relevant to each link
 struct mtip_link_info
 {
@@ -285,6 +286,7 @@ struct mtip_link_info
    struct mtip_tx_ts_list tx_ts_list;
    struct mtip_tx_ts_skb_list tx_ts_skb_list;
    struct mtip_tx_comp_list tx_comp_list;
+   struct mtip_ptp_time_stamp_info tstamp_info;
    u32 peak_rx_available;
    u32 config_fec;
    u32 active_fec;
@@ -468,6 +470,12 @@ struct mtip_platform_driver_priv
     // array of lists of dma allocations
     // static array of lists for allocations
     struct mtip_dma_alloc_struct mtip_dma_alloc_array[MTIP_DMA_ALLOC_LIST_MAX];
+
+    // MSG5 time stamp
+    struct mtip_time_stamp msg5_time_stamp;
+
+    //MSG5 SKB
+    struct sk_buff *msg5_skb_buff;
 };
 
 // extern declarations

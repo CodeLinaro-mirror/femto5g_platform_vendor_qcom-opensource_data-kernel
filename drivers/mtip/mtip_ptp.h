@@ -46,6 +46,24 @@ struct mtip_tx_ts_skb_list
   unsigned int count;
 };
 
+enum mtip_time_stamp_protocol_id
+{
+	MTIP_PTP = 0,
+	MTIP_ECPRI_MSG5 = 7
+};
+
+struct mtip_time_stamp
+{
+   u32 tstamp_secs;
+   u32 tstamp_nsecs;
+};
+
+struct mtip_ptp_time_stamp_info
+{
+   struct mtip_time_stamp tstamp[8];
+   struct sk_buff*  skb[8];
+};
+
 int mtip_ptp_initialize(u32 link_index);
 void mtip_ptp_finalize(u32 link_index);
 int mtip_ptp_handle_hwtstamp_ioctl(struct ifreq *ifr, u32 link_index);
@@ -76,4 +94,18 @@ int mtip_ptp_tx_ts_skb_list_push(u32 link_index, struct sk_buff *skb, u8 ts_seq_
 int mtip_ptp_tx_ts_skb_list_pop(u32 link_index, struct sk_buff** skb, u8* ts_seq_num);
 int mtip_ptp_tx_ts_skb_list_peek(u32 link_index, struct sk_buff** skb, u8* ts_seq_num);
 
+void mtip_msg5_tx_ts_set(struct mtip_time_stamp time_stamp);
+struct mtip_time_stamp mtip_msg5_tx_ts_get(void);
+void mtip_msg5_tx_ts_clear(void);
+bool is_valid_mtip_msg5_tx_ts_time_stamp_exist(void);
+
+void mtip_msg5_tx_ts_skb_set(struct sk_buff *skb);
+struct sk_buff * mtip_msg5_tx_ts_skb_get(void);
+void mtip_msg5_tx_ts_skb_clear(void);
+bool is_valid_mtip_msg5_tx_ts_skb_exist(void);
+
+void mtip_ptp_tx_ts_skb_set(struct sk_buff *skb, uint32_t link, uint32_t seq_num);
+struct sk_buff *mtip_ptp_tx_ts_skb_get(uint32_t link, uint32_t seq_num);
+void mtip_ptp_tx_ts_skb_clear(uint32_t link, uint32_t seq_num);
+bool mtip_is_valid_mtip_ptp_tx_ts_skb_exist(uint32_t link, uint32_t seq_num);
 #endif // _MTIP_PTP_H

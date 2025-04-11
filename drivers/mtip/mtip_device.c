@@ -215,15 +215,12 @@ void mtip_process_tx_comp_cb(ecpri_dma_eth_conn_hdl_t hdl, struct mtip_dma_tx_co
    struct mtip_netdev_priv *priv;
    u32 link_index = 0;
    bool free_skb = true;
-   u32 timestamp_secs;
-   u32 timestamp_nsecs;
    u8 pkt_ts_seq_num = 0;
-   u8 read_ts_seq_num = 0;
    struct ecpri_dma_tx_header *pre_header_buff;
    enum mtip_device_mode_enum mode = platform_driver_priv->devices.mode;
    int pending_buff_completion_count = 0;
    u32 num_buf_completed = 0;
-
+   struct mtip_time_stamp msg5_time_stamp = {0};
    char *tmp=NULL;
    comp_pkts = tx_comp_params->local_comp_pkts;
    num_of_completed = tx_comp_params->num_of_completed;
@@ -296,52 +293,56 @@ void mtip_process_tx_comp_cb(ecpri_dma_eth_conn_hdl_t hdl, struct mtip_dma_tx_co
 
           // this packet needs to be timestamped
           // acquire the ptp lock
-          mtip_ptp_tx_ts_lock_acquire(link_index);
           tmp=(char*)(skb->data);
           CSMLOGPTP("pkt_type=%x,seq_id=%x%x,skb=%lx,pkt_ts_seq_num=%d,ts_list_size=%d,\
             skb_list_size=%d [%s]\n",tmp[46],tmp[44],tmp[45],(unsigned long)skb->data, \
             pkt_ts_seq_num,mtip_ptp_tx_ts_list_size(link_index), \
             mtip_ptp_tx_ts_skb_list_size(link_index),__func__);
+         CSMLOGPTP("MTIP_DMA_CB: Seq Num Packet %u\n",pkt_ts_seq_num);
+          mtip_ptp_tx_ts_lock_acquire(link_index);
           // check if there is a timestamp available
-          if (mtip_ptp_tx_ts_list_size(link_index) == 0)
-          {
-              // no timestamp interrupt received yet
-              // push the skb to the list
-              mtip_ptp_tx_ts_skb_list_push(link_index, skb, pkt_ts_seq_num);
+         if(MTIP_ECPRI_MSG5 == pkt_ts_seq_num)
+         {
+            if(!is_valid_mtip_msg5_tx_ts_time_stamp_exist())
+            {
+               free_skb = false;
+               /*
+                * As Time stamp doesn't exist
+                * save the skb
+                */
+               mtip_msg5_tx_ts_skb_set(skb);
+            }
+            else
+            {
+               msg5_time_stamp = mtip_msg5_tx_ts_get();
+               mtip_msg5_tx_ts_clear();
+               mtip_ptp_set_tx_timestamp(skb, msg5_time_stamp.tstamp_secs, msg5_time_stamp.tstamp_nsecs);
+               free_skb = true;
+            }
+         }
+         else
+         {
+	    if(platform_driver_priv->mtip_links[link_index]->tstamp_info.tstamp[pkt_ts_seq_num].tstamp_secs ||
+			    platform_driver_priv->mtip_links[link_index]->tstamp_info.tstamp[pkt_ts_seq_num].tstamp_nsecs)
+	    {
+	       CSMLOGPTP("SEQ %u : Got Time stamp in DB, free skb sec=%u nsec=%u %s\n",pkt_ts_seq_num,
+			       platform_driver_priv->mtip_links[link_index]->tstamp_info.tstamp[pkt_ts_seq_num].tstamp_secs,
+			       platform_driver_priv->mtip_links[link_index]->tstamp_info.tstamp[pkt_ts_seq_num].tstamp_nsecs,__func__);
+               free_skb = true;
+	       mtip_ptp_set_tx_timestamp(skb,
+			    platform_driver_priv->mtip_links[link_index]->tstamp_info.tstamp[pkt_ts_seq_num].tstamp_secs,
+			    platform_driver_priv->mtip_links[link_index]->tstamp_info.tstamp[pkt_ts_seq_num].tstamp_nsecs);
 
-              // don't free the skb just yet
-              free_skb = false;
-          }
-          else
-          {
-              // there are timestamps available
-              mtip_ptp_tx_ts_list_peek(link_index, &timestamp_secs, &timestamp_nsecs, &read_ts_seq_num);
+               mtip_ptp_tx_ts_skb_clear(link_index, pkt_ts_seq_num);
+	       platform_driver_priv->mtip_links[link_index]->tstamp_info.tstamp[pkt_ts_seq_num].tstamp_secs = 0;
+	       platform_driver_priv->mtip_links[link_index]->tstamp_info.tstamp[pkt_ts_seq_num].tstamp_nsecs = 0;
+	    }else{
+		    free_skb = false;
+               mtip_ptp_tx_ts_skb_set(skb, link_index, pkt_ts_seq_num);
+		    CSMLOGPTP("SEQ %u : Time stamp not found in DB, saving skb %s\n",pkt_ts_seq_num,__func__);
+	    }
 
-              // check if the timestamps match
-              if (read_ts_seq_num == pkt_ts_seq_num) 
-              {
-                  // pop the timestamp
-                  mtip_ptp_tx_ts_list_pop(link_index, &timestamp_secs, &timestamp_nsecs, &read_ts_seq_num);
-
-                  // set the timestamp of the skb
-                  mtip_ptp_set_tx_timestamp(skb, timestamp_secs, timestamp_nsecs);
-
-                  free_skb = true;
-              }
-              else 
-              {
-                  // push the skb to the list
-                  mtip_ptp_tx_ts_skb_list_push(link_index, skb, pkt_ts_seq_num);
-
-                  // don't free the skb just yet
-                  // will be handled while resolving queues as needed
-                  free_skb = false;
-
-                  // resolve the differences between the ts and skb queues
-                  mtip_ptp_resolve_queues(link_index);
-              }
-          }
-
+         }
           // release the ptp lock
           mtip_ptp_tx_ts_lock_release(link_index);
       }
@@ -418,7 +419,7 @@ void mtip_process_tx_comp_cb(ecpri_dma_eth_conn_hdl_t hdl, struct mtip_dma_tx_co
    {
       if (netif_queue_stopped(netdev))
       {
-         CSMLOGERR("waking queue for link_index %d", link_index);
+         CSMLOGDBG("waking queue for link_index %d", link_index);
          
          // wake the queue
          netif_wake_queue(netdev);
@@ -870,18 +871,11 @@ static int mtip_start_xmit(struct sk_buff *skb, struct net_device *netdev)
    enum mtip_device_mode_enum mode = platform_driver_priv->devices.mode;
    int pending_buff_completion_count = 0;
    char* tmp=NULL;
-   u8 skb_ts_seq_num = 0;
-   struct sk_buff* tmp_skb = NULL;
-   u8 tmp_ts_seq_num = 0;
-   u8 tx_ts_stat=0;
-   u32 timestamp_secs;
-   u32 timestamp_nsecs;
    u32 port_type;
    CSMLOGDBG("mtip_start_xmit called\n");
 
    priv = netdev_priv(netdev);
    link_index = priv->link_index;
-
    if (mtip_lookup_port_type_by_link_index(link_index, &port_type) < 0)
    {
         CSMLOGERR("invalid port_type for link_index %d", link_index);
@@ -954,7 +948,6 @@ static int mtip_start_xmit(struct sk_buff *skb, struct net_device *netdev)
        case 12:
           other_hdl = 11;
           break;
-
        }
 
        if (mtip_lookup_link_index_by_handle(other_hdl, &other_link_index) < 0)
@@ -1010,6 +1003,7 @@ static int mtip_start_xmit(struct sk_buff *skb, struct net_device *netdev)
              // drop the packet
              return NETDEV_TX_OK;
           }
+
        }
    }
 
@@ -1020,7 +1014,7 @@ static int mtip_start_xmit(struct sk_buff *skb, struct net_device *netdev)
    {
        if (!netif_queue_stopped(netdev))
        {
-           CSMLOGERR("stopping queue for link_index %d", link_index);
+           CSMLOGDBG("stopping queue for link_index %d", link_index);
 
            // wait for space to become available
            netif_stop_queue(netdev);
@@ -1041,50 +1035,47 @@ static int mtip_start_xmit(struct sk_buff *skb, struct net_device *netdev)
        // check if we need to send sequence number
        if ((mode == MTIP_DEVICE_RUv2) || (mode == MTIP_DEVICE_DUv2)) 
        {
-           ts_seq_num = mtip_netdev_get_next_ptp_ts_seq_num(link_index);
            send_tx_seq_num = true;
        }
-       CSMLOGPTP("pkt_type=%x,seq_id=%x%x,skb=0x%lx,pkt_ts_seq_num=%d, \
+       CSMLOGPTP("pkt_type=%x,seq_id=%x%x,skb=0x%lx, \
        ts_list_size=%d,skb_list_size=%d[%s]\n",tmp[46], \
-       tmp[44],tmp[45],(unsigned long)skb->data,ts_seq_num,\
+       tmp[44],tmp[45],(unsigned long)skb->data,\
        mtip_ptp_tx_ts_list_size(link_index),mtip_ptp_tx_ts_skb_list_size(link_index) \
        ,__func__);
+   
+      mtip_ptp_tx_ts_lock_acquire(link_index);
 
-       if(mtip_ptp_tx_ts_skb_list_size(link_index)!=0 || mtip_ptp_tx_ts_list_size(link_index) != 0)
-       {
-           mtip_ptp_tx_ts_lock_acquire(link_index);
-           while(mtip_ptp_tx_ts_skb_list_size(link_index)!=0)
-           {
-               mtip_ptp_tx_ts_skb_list_pop(link_index, &tmp_skb, &skb_ts_seq_num);
-               mtip_ptp_set_tx_timestamp(tmp_skb, 0, 0);
-               dev_kfree_skb(tmp_skb);
-               CSMLOGPTP("Flushing pending tx_ts_skb_list\n");
-           }
-           while(mtip_ptp_tx_ts_list_size(link_index)!=0)
-           {
-	       // pop the timestamp
-               mtip_ptp_tx_ts_list_pop(link_index, &timestamp_secs, &timestamp_nsecs, &tmp_ts_seq_num);
-               CSMLOGPTP("Flushing pending tx_ts_list\n");
-	   }
-           mtip_mac_read_timestamp(link_index, &timestamp_secs, &timestamp_nsecs);
-           mtip_mac_read_tx_ts_stat_reg(link_index,&tx_ts_stat);
-           CSMLOGPTP("timestamp_nsecs=%d,tx_ts_stat=%x\n",timestamp_nsecs,tx_ts_stat);
-           while(tx_ts_stat!=2)
-           {
-               if ((mode == MTIP_DEVICE_RUv2) || (mode == MTIP_DEVICE_DUv2))
-               {
-                   mtip_mac_read_ts_seq_num(link_index, &tmp_ts_seq_num);
-               }
-               mtip_mac_read_timestamp(link_index, &timestamp_secs, &timestamp_nsecs);
-               mtip_mac_read_tx_ts_stat_reg(link_index,&tx_ts_stat);
-               CSMLOGPTP("Pending h.w TS FIFO timestamp_nsecs=%d,tx_ts_stat=%x\n",timestamp_nsecs,tx_ts_stat);
-           }
-           // release the ptp lock
-           mtip_ptp_tx_ts_lock_release(link_index);
-       }
+      /*
+       * The following checks are optimized for performance:
+       * 1. Is it an eCPRI VLAN packet?
+       *	- VLAN Ether Type: 0x8100 (in network byte order: htons(0x8100) --> 0x0081)
+       * 2. Is it an eCPRI packet?
+       *	- Ether Type for eCPRI: 0xAEFE (in network byte order: htons(0xAEFE) --> 0xFEAE)
+       * 3. For eCPRI, only MSG-5 packets are supported for timestamping.
+       */
 
+      if(!((uint16_t)(0x0081) ^ *((uint16_t*)(tmp + 12)))  &&
+		      (!((uint16_t )(0xfeae) ^ *((uint16_t*)(tmp+16)))) &&
+			      (!((uint8_t)(0x05) ^ *((uint8_t*)(tmp+19)))))
+      {
+         {
+            ts_seq_num = MTIP_ECPRI_MSG5; 
+         }
+      } 
+      else if((!((uint16_t )(0xfeae) ^ *((uint16_t*)(tmp+12)))) &&
+		      (!((uint8_t)(0x05) ^ *((uint8_t*)(tmp+15)))))
+      {
+         ts_seq_num = MTIP_ECPRI_MSG5; 
+
+      }else{
+
+         ts_seq_num = mtip_netdev_get_next_ptp_ts_seq_num(link_index);
+         //ts_seq_num = 0;
+      }
+      mtip_ptp_tx_ts_lock_release(link_index);
        // set the flag to in progress
        skb_shinfo(skb)->tx_flags |= SKBTX_IN_PROGRESS;
+      CSMLOGPTP("XMIT: Seq Num Packet %d\n",ts_seq_num);
    }
 
    if (sec_dev && sec_dev->ops && sec_dev->ops->fixup_tx_skb) {
@@ -1094,7 +1085,6 @@ static int mtip_start_xmit(struct sk_buff *skb, struct net_device *netdev)
          return NETDEV_TX_OK;
       }
    }
-
    ret = mtip_dma_send_packet(netdev, hdl, skb, send_tx_pre_header, send_tx_seq_num, ts_seq_num);
 
    // HANDLE THE ERROR
@@ -1452,7 +1442,7 @@ static void mtip_tx_timeout(struct net_device *netdev, unsigned int txqueue)
    {
       if (netif_queue_stopped(netdev))
       {
-         CSMLOGERR("waking queue for link_index %d", link_index);
+         CSMLOGDBG("waking queue for link_index %d", link_index);
 
          // wake the queue
          netif_trans_update(netdev); /* prevent tx timeout */
@@ -2352,7 +2342,7 @@ u8 mtip_netdev_get_next_ptp_ts_seq_num(u32 link_index)
     ts_seq_num = platform_driver_priv->mtip_links[link_index]->ptp_ts_seq_num;
 
     // the ts seq numbers are 3 bits
-    next_ts_seq_num = (ts_seq_num + 1)%8;
+    next_ts_seq_num = (ts_seq_num + 1)%7;
 
     platform_driver_priv->mtip_links[link_index]->ptp_ts_seq_num = next_ts_seq_num;
 

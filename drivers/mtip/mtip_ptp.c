@@ -235,6 +235,26 @@ int mtip_ptp_tx_ts_list_size(u32 link_index)
    return rv;
 }
 
+void mtip_msg5_tx_ts_set(struct mtip_time_stamp time_stamp)
+{
+	platform_driver_priv->msg5_time_stamp = time_stamp;
+}
+struct mtip_time_stamp mtip_msg5_tx_ts_get(void)
+{
+	return platform_driver_priv->msg5_time_stamp; 
+}
+void mtip_msg5_tx_ts_clear(void)
+{
+	platform_driver_priv->msg5_time_stamp.tstamp_secs = 0;
+	platform_driver_priv->msg5_time_stamp.tstamp_nsecs = 0;
+}
+bool is_valid_mtip_msg5_tx_ts_time_stamp_exist(void)
+{
+	if(platform_driver_priv->msg5_time_stamp.tstamp_secs ||
+			platform_driver_priv->msg5_time_stamp.tstamp_nsecs)
+		return true;
+	return false;
+}
 int mtip_ptp_tx_ts_list_push(u32 link_index, u32 tstamp_secs, u32 tstamp_nsecs, u8 ts_seq_num)
 {
    int rv = 0;
@@ -407,6 +427,62 @@ out:
    return rv;
 }
 
+void mtip_msg5_tx_ts_skb_set(struct sk_buff *skb)
+{
+	/*
+	 * if a skb already exist, free it
+	 */
+	if(platform_driver_priv->msg5_skb_buff){
+		dev_kfree_skb(platform_driver_priv->msg5_skb_buff);
+	}
+	platform_driver_priv->msg5_skb_buff = skb;	
+}
+struct sk_buff * mtip_msg5_tx_ts_skb_get(void)
+{
+	return platform_driver_priv->msg5_skb_buff;
+}
+void mtip_msg5_tx_ts_skb_clear(void)
+{
+   if(platform_driver_priv->msg5_skb_buff){
+      dev_kfree_skb(platform_driver_priv->msg5_skb_buff);
+   }
+   platform_driver_priv->msg5_skb_buff = NULL;
+}
+bool is_valid_mtip_msg5_tx_ts_skb_exist(void)
+{
+   if(platform_driver_priv->msg5_skb_buff)
+      return true;
+   return false;
+}
+
+void mtip_ptp_tx_ts_skb_set(struct sk_buff *skb, uint32_t link, uint32_t seq_num)
+{
+   if(platform_driver_priv->mtip_links[link]->tstamp_info.skb[seq_num])
+      dev_kfree_skb(platform_driver_priv->mtip_links[link]->tstamp_info.skb[seq_num]);
+
+   platform_driver_priv->mtip_links[link]->tstamp_info.skb[seq_num] = skb;
+}
+
+struct sk_buff *mtip_ptp_tx_ts_skb_get(uint32_t link, uint32_t seq_num)
+{
+   return platform_driver_priv->mtip_links[link]->tstamp_info.skb[seq_num]; 
+}
+
+void mtip_ptp_tx_ts_skb_clear(uint32_t link, uint32_t seq_num)
+{
+   if(platform_driver_priv->mtip_links[link]->tstamp_info.skb[seq_num])
+      dev_kfree_skb(platform_driver_priv->mtip_links[link]->tstamp_info.skb[seq_num]);
+   platform_driver_priv->mtip_links[link]->tstamp_info.skb[seq_num] = NULL;
+
+}
+
+bool mtip_is_valid_mtip_ptp_tx_ts_skb_exist(uint32_t link, uint32_t seq_num)
+{
+   if(platform_driver_priv->mtip_links[link]->tstamp_info.skb[seq_num])
+      return true;
+   return false;
+}
+
 int mtip_ptp_tx_ts_skb_list_pop(u32 link_index, struct sk_buff **skb, u8* ts_seq_num)
 {
    int rv = 0;
@@ -511,8 +587,9 @@ void run_mtip_process_timestamp(void* work_ptr)
     u32 timestamp_secs = taskstruct->timestamp_secs;
     u32 timestamp_nsecs = taskstruct->timestamp_nsecs;
     u8 read_ts_seq_num = taskstruct->ts_seq_num;
-    u8 pkt_ts_seq_num = 0;
+   // u8 pkt_ts_seq_num = 0;
     struct sk_buff* skb = NULL;
+    struct mtip_time_stamp time_stamp = {0};
 
     if(link_index >= MTIP_MAX_LINKS || platform_driver_priv == NULL || platform_driver_priv->mtip_links[link_index] == NULL)
          goto exit;
@@ -526,42 +603,46 @@ void run_mtip_process_timestamp(void* work_ptr)
        skb_list_size=%d[%s]\n",read_ts_seq_num,timestamp_secs, \
        timestamp_nsecs,mtip_ptp_tx_ts_list_size(link_index), \
        mtip_ptp_tx_ts_skb_list_size(link_index),__func__);
-    // check if there is an skb pending
-    if (mtip_ptp_tx_ts_skb_list_size(link_index) == 0)
+    /*
+     * Identify the packet type by sequence snumber
+     * if it is the ecpri MSG5 packet
+     */
+    time_stamp.tstamp_secs = timestamp_secs;
+    time_stamp.tstamp_nsecs = timestamp_nsecs;
+    CSMLOGPTP("MTIP_INTRUPT: Seq Num Packet %d\n",read_ts_seq_num);
+    if(MTIP_ECPRI_MSG5 == read_ts_seq_num)
     {
-        // there are no skbs pending
-        // queue the timestamp and ts_seq_num
-        mtip_ptp_tx_ts_list_push(link_index, timestamp_secs, timestamp_nsecs, read_ts_seq_num);
-    }
+	    if(!is_valid_mtip_msg5_tx_ts_skb_exist())
+	    {
+		    mtip_msg5_tx_ts_set(time_stamp);
+	    }
+	    else
+	    {
+		    skb = mtip_msg5_tx_ts_skb_get(); 
+		    mtip_ptp_set_tx_timestamp(skb, timestamp_secs, timestamp_nsecs);
+		    mtip_msg5_tx_ts_skb_clear();
+		    //dev_kfree_skb(skb);
+	    }
+    }	
+    // check if there is an skb pending
     else
     {
-        // there are pending skbs
-        mtip_ptp_tx_ts_skb_list_peek(link_index, &skb, &pkt_ts_seq_num);
-         
-        // check if the timestamps match         
-        // match the read_ts_seq_num and the pkt_ts_seq_num
-        if (read_ts_seq_num == pkt_ts_seq_num)
-        {
-            // the timestamps match
-            mtip_ptp_tx_ts_skb_list_pop(link_index, &skb, &pkt_ts_seq_num);
-
-            // set the timestamp of the skb
-            mtip_ptp_set_tx_timestamp(skb, timestamp_secs, timestamp_nsecs);
-
-            CSMLOGDBG("freeing skb: len: %d\n", skb->len);
-
-            dev_kfree_skb(skb);
-        }
-        else
-        {
-            // queue the timestamp and ts_seq_num
-            mtip_ptp_tx_ts_list_push(link_index, timestamp_secs, timestamp_nsecs, read_ts_seq_num);
-
-            // resolve the differences between the ts and skb queues
-            mtip_ptp_resolve_queues(link_index);
-        }
+      if(!mtip_is_valid_mtip_ptp_tx_ts_skb_exist(link_index, read_ts_seq_num))
+      {
+	platform_driver_priv->mtip_links[link_index]->tstamp_info.tstamp[read_ts_seq_num] = time_stamp;
+	CSMLOGPTP("SEQ %d : SKB not found in DB, saving time stamp %s\n", read_ts_seq_num,__func__);
+      }
+      else
+      {
+	 mtip_ptp_set_tx_timestamp(mtip_ptp_tx_ts_skb_get(link_index, read_ts_seq_num),
+			 timestamp_secs,
+			 timestamp_nsecs);
+	 mtip_ptp_tx_ts_skb_clear(link_index, read_ts_seq_num);
+	 platform_driver_priv->mtip_links[link_index]->tstamp_info.tstamp[read_ts_seq_num].tstamp_secs = 0;
+	 platform_driver_priv->mtip_links[link_index]->tstamp_info.tstamp[read_ts_seq_num].tstamp_nsecs = 0;
+	 CSMLOGPTP("SEQ %d : Got SKB  in DB, saving time stamp sec=%d nsec=%d %s\n",read_ts_seq_num,timestamp_secs, timestamp_nsecs, __func__);
+      }
     }
-
     // release the lock
     mtip_ptp_tx_ts_lock_release(link_index);
 

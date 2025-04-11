@@ -800,20 +800,6 @@ oran_read_exit:
 	if (total_cnt == 0) {
 		ecpri_dma_ss_core_ctx->oran_log_cdev_read_in_progress[dev_id] = false;
 		ecpri_dma_ss_core_ctx->oran_log_cdev_read_state[dev_id] = false;
-
-		if (endp_ctx && endp_ctx->valid) {
-			ret = ecpri_dma_reset_endp(endp_ctx);
-			if (ret != 0) {
-				DMAERR("Unable to reset endp, endp_id: %d, gsi_id %d\n",
-					endp_ctx->endp_id, endp_ctx->gsi_id);
-			}
-
-			ret = ecpri_dma_dealloc_endp(endp_ctx);
-			if (ret != 0) {
-				DMAERR("Unable to dealloc endp, endp_id: %d, gsi_id %d\n",
-					endp_ctx->endp_id, endp_ctx->gsi_id);
-			}
-		}
 	}
 	return total_cnt;
 }
