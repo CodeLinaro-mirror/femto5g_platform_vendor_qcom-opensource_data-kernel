@@ -53,7 +53,7 @@ do {\
 
 #define CSMLOGPTP(fmt, args...) \
 do {\
-    if (mtip_ethtool_debug_logging_enable) {\
+    if (mtip_ethtool_ptp_logging_enable) {\
         if (platform_driver_priv) {\
 	    CSM_IPC_Log(platform_driver_priv->ipc_ptp_log_buf , \
 		DRV_NAME " %s:%d " fmt, ## args); \

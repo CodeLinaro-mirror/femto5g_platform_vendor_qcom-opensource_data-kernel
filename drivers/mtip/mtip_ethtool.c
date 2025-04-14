@@ -52,6 +52,7 @@
 #include "mtip_security.h"
 
 int mtip_ethtool_debug_logging_enable = 0;
+int mtip_ethtool_ptp_logging_enable = 0;
 
 static const char * const mtip_ethtool_stat_strings[] = {
     "EtherStatsOctets",
@@ -1543,6 +1544,18 @@ void mtip_ethtool_set_msglevel(struct net_device *netdev, u32 level)
         {
             // Unset TX compliance to enable retry attempts for PHY lane bring up
             mtip_phy_set_tx_compliance(false);
+        }
+        break;
+
+    case 13:
+        {
+            mtip_ethtool_ptp_logging_enable = 1;
+        }
+        break;
+
+    case 14:
+        {
+            mtip_ethtool_ptp_logging_enable = 0;
         }
         break;
 
