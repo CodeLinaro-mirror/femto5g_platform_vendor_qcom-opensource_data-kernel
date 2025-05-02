@@ -370,6 +370,7 @@ int ecpriss_qudp_fh_rx_filter_cfg(uint32_t               port_index,
 
 int ecpriss_qudp_fh_egress_cfg_reset(int32_t port_index);
 int ecpriss_qudp_fh_egress_cfg_reset_v2(int32_t port_index);
+int ecpriss_qudp_l2_egress_cfg_reset_v2(int32_t port_index);
 
 void ecpriss_qudp_fh_ingress_stats_update(uint32_t port_index,
 		uint32_t link_index);
