@@ -778,7 +778,7 @@ int ecpri_dma_qmi_service_send_ch_cmd_q6(
 
 		if (ECPRI_DMA_QMI_MSG_SYNC == flag) {
 			DMAERR("Unable to send SYNC message as handshake isn't completed");
-			ecpri_dma_assert();
+			return 0;
 		}
 
 		/* Defer command send after init is complete */
