@@ -50,6 +50,8 @@ static const char* IPA_OFFLOAD_EVENT_string[] = {
 	"EV_DPM_RESUME",
 	"EV_USR_SUSPEND",
 	"EV_USR_RESUME",
+	"EV_CACHE_SUSPEND",
+	"EV_CACHE_RESUME",
 	"EV_IPA_OFFLOAD_MAX"
 };
 
@@ -101,7 +103,6 @@ void DWC_ETH_QOS_ipa_offload_event_handler(
 {
 	struct hw_if_struct *hw_if = &(pdata->hw_if);
 
-
 	IPA_LOCK();
 
 	EMACDBG("Enter: event=%s\n", IPA_OFFLOAD_EVENT_string[ev]);
@@ -131,8 +132,10 @@ void DWC_ETH_QOS_ipa_offload_event_handler(
 					|| !pdata->prv_ipa.ipa_uc_ready
 					|| pdata->prv_ipa.ipa_offload_link_down
 					|| pdata->prv_ipa.ipa_offload_susp
-					|| !pdata->prv_ipa.ipa_offload_conn)
+					|| !pdata->prv_ipa.ipa_offload_conn) {
+				pdata->prv_ipa.ipa_offload_link_down = true;
 				break;
+			}
 
 			if (!DWC_ETH_QOS_ipa_offload_suspend(pdata, false))
 				pdata->prv_ipa.ipa_offload_link_down = true;
@@ -142,8 +145,10 @@ void DWC_ETH_QOS_ipa_offload_event_handler(
 		{
 			if (!pdata->prv_ipa.emac_dev_ready
 					|| !pdata->prv_ipa.ipa_uc_ready
-					|| pdata->prv_ipa.ipa_offload_susp)
+					|| pdata->prv_ipa.ipa_offload_susp) {
+				pdata->prv_ipa.ipa_offload_link_down = false;
 				break;
+			}
 
 			/* Link up event is expected only after link down */
 			if (pdata->prv_ipa.ipa_offload_link_down) {
@@ -212,6 +217,7 @@ void DWC_ETH_QOS_ipa_offload_event_handler(
 
 			/* reset link down on dev close */
 			pdata->prv_ipa.ipa_offload_link_down = 0;
+			pdata->prv_ipa.ipa_offload_susp = false;
 		}
 		break;
 	case EV_DPM_SUSPEND:
@@ -245,6 +251,18 @@ void DWC_ETH_QOS_ipa_offload_event_handler(
 				if(!DWC_ETH_QOS_ipa_offload_resume(pdata, true))
 					pdata->prv_ipa.ipa_offload_susp = false;
 			}
+		}
+		break;
+	case EV_CACHE_RESUME:
+		{
+			pdata->prv_ipa.ipa_offload_susp = false;
+			EMACINFO("reset cache resume\n");
+		}
+		break;
+	case EV_CACHE_SUSPEND:
+		{
+			pdata->prv_ipa.ipa_offload_susp = true;
+			EMACINFO("prv_ipa is not NULL\n");
 		}
 		break;
 	case EV_INVALID:
@@ -486,7 +504,7 @@ static int DWC_ETH_QOS_ipa_offload_resume(struct DWC_ETH_QOS_prv_data *pdata, bo
 
 	EMACDBG("Enter\n");
 
-	if (!pdata->prv_ipa.ipa_offload_init && !user_resume) {
+	if (!pdata->prv_ipa.ipa_offload_init && (!user_resume || pdata->skip_ipa_autoresume)) {
 		ret = DWC_ETH_QOS_ipa_offload_init(pdata);
 		if (ret) {
 			pdata->prv_ipa.ipa_offload_init = false;
@@ -1538,9 +1556,12 @@ static ssize_t read_ipa_offload_status(struct device *dev,
 			return snprintf(user_buf, BUFF_SZ, "IPA Offload suspended");
 		else
 			return snprintf(user_buf, BUFF_SZ, "IPA Offload enabled");
+	} else {
+		if (!pdata->prv_ipa.ipa_offload_conn)
+			return snprintf(user_buf, BUFF_SZ, "IPA Offload suspended");
 	}
 
-	return snprintf(user_buf, BUFF_SZ, "Cannot read status, No PHY link");
+	return 0;
 }
 
 #define SUSPEND_ETH_IPA_OFFLOAD 1
@@ -1566,14 +1587,17 @@ static ssize_t suspend_resume_ipa_offload(struct device *dev,
 	if (kstrtos8(user_buf, 0, &input))
 		return -EFAULT;
 
-	if (DWC_ETH_QOS_is_phy_link_up(pdata)) {
+	if (!pdata->prv_ipa.ipa_offload_link_down) {
 		if (input == SUSPEND_ETH_IPA_OFFLOAD)
 			DWC_ETH_QOS_ipa_offload_event_handler(pdata, EV_USR_SUSPEND);
 		else if (input == RESUME_ETH_IPA_OFFLOAD)
 			DWC_ETH_QOS_ipa_offload_event_handler(pdata, EV_USR_RESUME);
 	} else {
-		EMACERR("Operation not permitted, No PHY link");
-		return -EINVAL;
+		if (input == SUSPEND_ETH_IPA_OFFLOAD)
+			DWC_ETH_QOS_ipa_offload_event_handler(pdata, EV_CACHE_SUSPEND);
+		else if (input == RESUME_ETH_IPA_OFFLOAD)
+			DWC_ETH_QOS_ipa_offload_event_handler(pdata, EV_CACHE_RESUME);
+		EMACINFO("No PHY link\n");
 	}
 
 	return count;
