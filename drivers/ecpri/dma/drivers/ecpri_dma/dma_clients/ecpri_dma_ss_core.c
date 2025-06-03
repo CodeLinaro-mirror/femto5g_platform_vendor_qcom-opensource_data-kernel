@@ -672,6 +672,7 @@ static ssize_t ecpri_dma_ecpri_ss_read_oran_log(
 	u32 budget = 0, num_of_buffs = 0;
 	int k, s_idx, buff_count = 0;
 	struct ecpri_hdr header;
+	u32 num_to_advance = 0;
 
 	if (!endp_ctx || !endp_ctx->valid)
 	{
@@ -719,9 +720,11 @@ static ssize_t ecpri_dma_ecpri_ss_read_oran_log(
 			ecpri_dma_assert();
 		}
 
-		if (scrth.mhi.total_buffs > endp_ctx->ring_length) {
+		if (scrth.mhi.total_buffs >= endp_ctx->ring_length) {
 
-			ret = gsi_update_evt_rp(endp_ctx->gsi_chan_hdl);
+			num_to_advance = ecpri_dma_get_num_to_advance(endp_ctx);
+
+			ret = gsi_update_evt_rp(endp_ctx->gsi_chan_hdl, num_to_advance);
 			if (ret != GSI_STATUS_SUCCESS) {
 				DMAERR("GSI update EVT RP failed %d", ret);
 				ecpri_dma_assert();

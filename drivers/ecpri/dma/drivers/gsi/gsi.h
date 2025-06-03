@@ -1665,6 +1665,6 @@ uint32_t gsi_get_chan_stop_stm(int chan_id, int ee, int gsi_id);
 
 int gsi_query_channel_free_re(unsigned long chan_hdl, uint32_t* num_free_re);
 
-int gsi_update_evt_rp(unsigned long chan_hdl);
+int gsi_update_evt_rp(unsigned long chan_hdl, u32 num_to_advance);
 
 #endif

@@ -750,6 +750,7 @@ int ecpri_dma_get_endp_stats(struct ecpri_dma_endp_context* ep,
 	struct ecpri_dma_endp_statistics* stats);
 int ecpri_dma_halt_q6_endps(enum ecpri_dma_endp_dir dir);
 int ecpri_dma_advance_outstanding_list(struct ecpri_dma_endp_context* ep);
+u32 ecpri_dma_get_num_to_advance(struct ecpri_dma_endp_context* ep);
 
 struct ecpri_dma_smmu_cb_ctx *ecpri_dma_get_smmu_ctx(
 	enum ecpri_dma_smmu_cb_type cb_type);
