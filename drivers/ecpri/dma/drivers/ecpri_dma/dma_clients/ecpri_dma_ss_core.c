@@ -450,8 +450,8 @@ int ecpri_dma_ecpri_ss_start_oran_log(u32 mem_size, u32 pkt_size,
 	}
 
 	/* Prepare memory for log ring */
-	ecpri_dma_ss_core_ctx->pkt_size[dev_id] = pkt_size;
-	ecpri_dma_ss_core_ctx->num_of_pkts[dev_id] = mem_size / pkt_size;
+	ecpri_dma_ss_core_ctx->pkt_size[dev_id] = DMA_BUFFER_SIZE;
+	ecpri_dma_ss_core_ctx->num_of_pkts[dev_id] = mem_size / ecpri_dma_ss_core_ctx->pkt_size[dev_id];
 	ecpri_dma_ss_core_ctx->oran_log_mem[dev_id].size = mem_size;
 
 	pkts = kmalloc(sizeof(struct ecpri_dma_pkt) *
@@ -518,7 +518,7 @@ int ecpri_dma_ecpri_ss_start_oran_log(u32 mem_size, u32 pkt_size,
 	/* queue credits to the endp */
 	for (i = 0; i < ecpri_dma_ss_core_ctx->num_of_pkts[dev_id]; i++) {
 		/* Prepare buffers and pkt wrappers for queueing*/
-		buffs[i].size = ecpri_dma_ss_core_ctx->pkt_size[dev_id]+sizeof(struct ecpri_hdr);
+		buffs[i].size = ecpri_dma_ss_core_ctx->pkt_size[dev_id];
 		buffs_arr[i] = &buffs[i];
 		pkts[i].buffs = &buffs_arr[i];
 		pkts[i].num_of_buffers = 1;
@@ -644,13 +644,24 @@ int ecpri_dma_ecpri_ss_stop_oran_log(
 	return ret;
 }
 
+uint8_t log_pkt[BUFFER_SIZE]={0};
+
+static void extract_ecpri_header(uint8_t *packet, struct ecpri_hdr *header) {
+
+	header->protocol_revision = (packet[0] >> 4) & 0x0F;
+	header->reserved = (packet[0] >> 1) & 0x07;
+	header->c_bit = packet[0] & 0x01;
+	header->message_type = packet[1];
+	header->payload_size = (packet[2] << 8) | packet[3];
+}
+
 static ssize_t ecpri_dma_ecpri_ss_read_oran_log(
 	struct ecpri_dma_endp_context* endp_ctx,
 	enum ecpri_dma_ss_oran_log_dev dev_id,
 	struct file* file, char __user* buf, size_t count, loff_t* offset)
 {
 	int ret = 0;
-	u32 actual_num = 0, i = 0;
+	u32 actual_num = 0, i = 0, j = 0;
 	struct ecpri_dma_pkt_completion_wrapper* oran_pkts_arr;
 	struct ecpri_dma_pkt_completion_wrapper** oran_pkts;
 	ssize_t total_cnt = 0;
@@ -658,7 +669,9 @@ static ssize_t ecpri_dma_ecpri_ss_read_oran_log(
 	u16 pkt_len = 0;
 	u32 len=count;
 	u32 size=0;
-	u32 budget=0;
+	u32 budget = 0, num_of_buffs = 0;
+	int k, s_idx, buff_count = 0;
+	struct ecpri_hdr header;
 
 	if (!endp_ctx || !endp_ctx->valid)
 	{
@@ -706,7 +719,7 @@ static ssize_t ecpri_dma_ecpri_ss_read_oran_log(
 			ecpri_dma_assert();
 		}
 
-		if (scrth.mhi.total_pkts > endp_ctx->ring_length) {
+		if (scrth.mhi.total_buffs > endp_ctx->ring_length) {
 
 			ret = gsi_update_evt_rp(endp_ctx->gsi_chan_hdl);
 			if (ret != GSI_STATUS_SUCCESS) {
@@ -723,20 +736,21 @@ static ssize_t ecpri_dma_ecpri_ss_read_oran_log(
 	}
 
 	size = sizeof(dummy_ethhdr) + sizeof(pcap_pkt_hdr) + ecpri_dma_ss_core_ctx->pkt_size[dev_id];
-	budget = (len/size);
+	num_of_buffs = (len/size);
+	budget = num_of_buffs/DMA_MAX_BUFFERS_PER_PACKET;
 
 	/* Prepare memory */
 	oran_pkts_arr = kzalloc(
 		sizeof(struct ecpri_dma_pkt_completion_wrapper) *
-		budget, GFP_KERNEL);
+		num_of_buffs, GFP_KERNEL);
 	ecpri_dma_assert_on(!oran_pkts_arr);
 
 	oran_pkts = kzalloc(
 		sizeof(struct ecpri_dma_pkt_completion_wrapper*) *
-		budget, GFP_KERNEL);
+		num_of_buffs, GFP_KERNEL);
 	ecpri_dma_assert_on(!oran_pkts);
 
-	for (i = 0; i < budget; i++) {
+	for (i = 0; i < num_of_buffs; i++) {
 		oran_pkts[i] = &(oran_pkts_arr[i]);
 	}
 
@@ -749,50 +763,81 @@ static ssize_t ecpri_dma_ecpri_ss_read_oran_log(
 		ecpri_dma_assert();
 	}
 
+	s_idx = 0;
 	for (i = 0; i < actual_num; i++) {
 
-		pkt_len = oran_pkts[i]->pkt->buffs[0]->size + sizeof(dummy_ethhdr);
+		memset(log_pkt,0,BUFFER_SIZE);
+		pkt_len = 0;
+		j = 0;
 
-		pcap_pkt_hdr.captured_len = pkt_len;
-		pcap_pkt_hdr.orig_len = pkt_len;
-		pcap_pkt_hdr.timestamp_msec =
-			ecpri_dma_ss_core_ctx->oran_log_pkt_idx[dev_id]++;
+		for(k = s_idx; k < (s_idx + DMA_MAX_BUFFERS_PER_PACKET); k++) {
 
-		ret =
-			copy_to_user(buf + total_cnt, &pcap_pkt_hdr, sizeof(pcap_pkt_hdr));
-		if (ret) {
-			DMAERR("copy_to_user failed for PCAP pkt header err:%d\n", ret);
-			ret = -EFAULT;
-			goto oran_read_exit;
+			if (oran_pkts[k]->comp_code == ECPRI_DMA_COMPLETION_CODE_OVERFLOW)
+			{
+				memcpy(log_pkt+pkt_len, oran_pkts[k]->pkt->buffs[0]->virt_base, oran_pkts[k]->pkt->buffs[0]->size);
+				pkt_len += oran_pkts[k]->pkt->buffs[0]->size;
+				buff_count++;  // count valid buffers
+				j++;
+			}
+			else if (oran_pkts[k]->comp_code == ECPRI_DMA_COMPLETION_CODE_EOT)
+			{
+				memcpy(log_pkt+pkt_len, oran_pkts[k]->pkt->buffs[0]->virt_base, oran_pkts[k]->pkt->buffs[0]->size);
+				pkt_len += oran_pkts[k]->pkt->buffs[0]->size;
+				buff_count++;
+				j++;
+
+				if(ecpri_dma_ss_core_ctx->oran_log_pkt_idx[dev_id] == 0)
+				{
+					extract_ecpri_header(log_pkt, &header);
+					if(header.payload_size != (pkt_len - sizeof(struct ecpri_hdr)))
+					{
+						ecpri_dma_ss_core_ctx->oran_log_pkt_idx[dev_id]++;
+						break;
+					}
+				}
+
+				pcap_pkt_hdr.captured_len = pkt_len + sizeof(dummy_ethhdr);
+				pcap_pkt_hdr.orig_len = pkt_len + sizeof(dummy_ethhdr);
+				pcap_pkt_hdr.timestamp_msec =
+				ecpri_dma_ss_core_ctx->oran_log_pkt_idx[dev_id]++;
+
+				ret =
+					copy_to_user(buf + total_cnt, &pcap_pkt_hdr, sizeof(pcap_pkt_hdr));
+				if (ret) {
+					DMAERR("copy_to_user failed for PCAP pkt header err:%d\n", ret);
+					ret = -EFAULT;
+					goto oran_read_exit;
+				}
+
+				total_cnt += sizeof(pcap_pkt_hdr);
+				*offset += sizeof(pcap_pkt_hdr);
+
+				ret =
+					copy_to_user(buf + total_cnt, &dummy_ethhdr, sizeof(dummy_ethhdr));
+				if (ret) {
+					DMAERR("copy_to_user failed for ETH pkt header err:%d\n", ret);
+					ret = -EFAULT;
+					goto oran_read_exit;
+				}
+
+				total_cnt += sizeof(dummy_ethhdr);
+				*offset += sizeof(dummy_ethhdr);
+
+				ret = copy_to_user(buf + total_cnt, log_pkt, pkt_len);
+				if (ret) {
+					DMAERR("copy_to_user failed for buffer  err:%d\n", ret);
+					ret = -EFAULT;
+					goto oran_read_exit;
+				}
+
+				total_cnt += pkt_len;
+				*offset += pkt_len;
+
+				break;                    // break if EOT detected
+			}
 		}
-
-		total_cnt += sizeof(pcap_pkt_hdr);
-		*offset += sizeof(pcap_pkt_hdr);
-
-		ret =
-			copy_to_user(buf + total_cnt, &dummy_ethhdr, sizeof(dummy_ethhdr));
-		if (ret) {
-			DMAERR("copy_to_user failed for ETH pkt header err:%d\n", ret);
-			ret = -EFAULT;
-			goto oran_read_exit;
-		}
-
-		total_cnt += sizeof(dummy_ethhdr);
-		*offset += sizeof(dummy_ethhdr);
-
-		ret = copy_to_user(buf + total_cnt,
-			oran_pkts[i]->pkt->buffs[0]->virt_base,
-			oran_pkts[i]->pkt->buffs[0]->size);
-		if (ret) {
-			DMAERR("copy_to_user failed for buffer  err:%d\n", ret);
-			ret = -EFAULT;
-			goto oran_read_exit;
-		}
-
-		total_cnt += oran_pkts[i]->pkt->buffs[0]->size;
-		*offset += oran_pkts[i]->pkt->buffs[0]->size;
+		s_idx = buff_count;
 	}
-
 oran_read_exit:
 	kfree(oran_pkts_arr);
 	kfree(oran_pkts);
