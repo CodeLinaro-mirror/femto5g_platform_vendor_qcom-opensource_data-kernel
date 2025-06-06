@@ -23,6 +23,7 @@
 #define ECPRISS_FH_QUDP_RAMS_REG_BASE   0x09184000
 #define ECPRISS_C2C_QUDP_REG_BASE       0x091B0000
 #define ECPRISS_QUDP_L2_REG_BASE        0x091E0000
+#define ECPRISS_L2_QUDP_RAMS_REG_BASE   0x091E4000
 
 
 #define ECPRISS_QUDP_GLOBAL_REG_SIZE    0x10000
@@ -31,6 +32,7 @@
 #define ECPRISS_QUDP_FH_RAMS_REG_SIZE   0x2C000
 #define ECPRISS_QUDP_C2C_REG_SIZE       0x30000
 #define ECPRISS_QUDP_L2_REG_SIZE        0x30000
+#define ECPRISS_QUDP_L2_RAMS_REG_SIZE   0x2C000
 
 
 #define ECPRISS_QUDP_GLOBAL_REG_BASE_V2     0x09410000
@@ -39,6 +41,7 @@
 #define ECPRISS_FH_QUDP_RAMS_REG_BASE_V2    0x09384000
 #define ECPRISS_C2C_QUDP_REG_BASE_V2        0x093B0000
 #define ECPRISS_QUDP_L2_REG_BASE_V2         0x093E0000
+#define ECPRISS_L2_QUDP_RAMS_REG_BASE_V2    0x093E4000
 
 
 typedef enum ecpriss_hw_name
@@ -54,7 +57,8 @@ typedef enum{
 	ECPRISS_QUDP_FH_FILTER,
 	ECPRISS_QUDP_FH_RAMS,
 	ECPRISS_QUDP_C2C,
-	ECPRISS_QUDP_L2
+	ECPRISS_QUDP_L2,
+	ECPRISS_QUDP_L2_RAMS
 }ecpriss_qudp_hal_reg_type_e;
 
 /*
@@ -366,12 +370,14 @@ typedef struct ecpriss_qudp_hal_context {
 	uint64_t qudp_fh_phy_rams_base;
 	uint64_t qudp_c2c_phy_base;
 	uint64_t qudp_l2_phy_base;
+	uint64_t qudp_l2_phy_rams_base;
 	void __iomem *global_base;
 	void __iomem *fh_base;
 	void __iomem *fh_filter_base;
 	void __iomem *fh_rams_base;
 	void __iomem *c2c_base;
 	void __iomem *l2_base;
+	void __iomem *l2_rams_base;
 	struct device *ecpriss_dev;
 	void *regdumpbuf;
 }ecpriss_qudp_hal_context_s;

@@ -5830,80 +5830,68 @@ static struct ecpriss_qudp_hal_reg_obj ecpriss_qudp_hal_reg_objs[ECPRISS_HW_MAX]
 	[ECPRISS_HW_v2_0][ECPRI_UDP_L2_EGRESS_ETH_DST0_PORT_p_ENTRY_n_V2] = {
 		ecpriss_qudp_hal_reg_construct_dummy_v2,
 		ecpriss_qudp_hal_reg_parse_dummy_v2,
-		0x91E4000 , 0x48, 0x120, 0, 0, 0, 0x48},
-	[ECPRISS_HW_v2_0][ECPRI_UDP_L2_EGRESS_ETH_DST0_PORT_p_ENTRY_n_V2] = {
-		ecpriss_qudp_hal_reg_construct_dummy_v2,
-		ecpriss_qudp_hal_reg_parse_dummy_v2,
-		0x93E5000 , 0x00, 0x20, 0, 0, 0, 0x2000},
+		0x93E4000 , 0x1000, 0x20, 0, 0, 0, 0x2000},
 	[ECPRISS_HW_v2_0][ECPRI_UDP_L2_EGRESS_ETH_SRC1_DST1_PORT_p_ENTRY_n_V2] = {
 		ecpriss_qudp_hal_reg_construct_dummy_v2,
 		ecpriss_qudp_hal_reg_parse_dummy_v2,
-		0x93E5000 , 0x04, 0x20, 0, 0, 0, 0x2000},
+		0x93E4000 , 0x1004, 0x20, 0, 0, 0, 0x2000},
 	[ECPRISS_HW_v2_0][ECPRI_UDP_L2_EGRESS_ETH_SRC0_PORT_p_ENTRY_n_V2] = {
 		ecpriss_qudp_hal_reg_construct_dummy_v2,
 		ecpriss_qudp_hal_reg_parse_dummy_v2,
-		0x93E5000 , 0x08, 0x20, 0, 0, 0, 0x2000},
+		0x93E4000 , 0x1008, 0x20, 0, 0, 0, 0x2000},
 	[ECPRISS_HW_v2_0][ECPRI_UDP_L2_EGRESS_VLAN_ETHERTYPE_PORT_p_ENTRY_n_V2] = {
 		ecpriss_qudp_hal_reg_construct_dummy_v2,
 		ecpriss_qudp_hal_reg_parse_dummy_v2,
-		0x93E5000 , 0x0C, 0x20, 0, 0, 0, 0x2000},
+		0x93E4000 , 0x100C, 0x20, 0, 0, 0, 0x2000},
 	[ECPRISS_HW_v2_0][ECPRI_UDP_L2_EGRESS_VPORT_MISC_PORT_p_ENTRY_n_V2] = {
 		ecpriss_qudp_hal_reg_construct_dummy_v2,
 		ecpriss_qudp_hal_reg_parse_dummy_v2,
-		0x93E5000 , 0x10, 0x20, 0, 0, 0, 0x2000},
+		0x93E4000 , 0x1010, 0x20, 0, 0, 0, 0x2000},
 
 	[ECPRISS_HW_v2_0][ECPRI_UDP_L2_EGRESS_IP_SRC_ADDR0_PORT_p_ENTRY_n_V2] = {
 		ecpriss_qudp_hal_reg_construct_dummy_v2,
 		ecpriss_qudp_hal_reg_parse_dummy_v2,
-		0x93F4000 , 0x00, 0x40, 0, 0, 0, 0x4000},
+		0x93E4000 , 0x10000, 0x40, 0, 0, 0, 0x4000},
 	[ECPRISS_HW_v2_0][ECPRI_UDP_L2_EGRESS_IP_SRC_ADDR1_PORT_p_ENTRY_n_V2] = {
 		ecpriss_qudp_hal_reg_construct_dummy_v2,
 		ecpriss_qudp_hal_reg_parse_dummy_v2,
-		0x93F4000 , 0x04, 0x40, 0, 0, 0, 0x4000},
-	[ECPRISS_HW_v2_0][ECPRI_UDP_L2_EGRESS_IP_SRC_ADDR1_PORT_p_ENTRY_n_V2] = {
-		ecpriss_qudp_hal_reg_construct_dummy_v2,
-		ecpriss_qudp_hal_reg_parse_dummy_v2,
-		0x93F4000 , 0x04, 0x40, 0, 0, 0, 0x4000},
+		0x93E4000 , 0x10004, 0x40, 0, 0, 0, 0x4000},
 	[ECPRISS_HW_v2_0][ECPRI_UDP_L2_EGRESS_IP_SRC_ADDR2_PORT_p_ENTRY_n_V2] = {
 		ecpriss_qudp_hal_reg_construct_dummy_v2,
 		ecpriss_qudp_hal_reg_parse_dummy_v2,
-		0x93F4000 , 0x08, 0x40, 0, 0, 0, 0x4000},
+		0x93E4000 , 0x10008, 0x40, 0, 0, 0, 0x4000},
 	[ECPRISS_HW_v2_0][ECPRI_UDP_L2_EGRESS_IP_SRC_ADDR3_PORT_p_ENTRY_n_V2] = {
 		ecpriss_qudp_hal_reg_construct_dummy_v2,
 		ecpriss_qudp_hal_reg_parse_dummy_v2,
-		0x93F4000 , 0x0C, 0x40, 0, 0, 0, 0x4000},
+		0x93E4000 , 0x1000C, 0x40, 0, 0, 0, 0x4000},
 	[ECPRISS_HW_v2_0][ECPRI_UDP_L2_EGRESS_IP_DST_ADDR0_PORT_p_ENTRY_n_V2] = {
 		ecpriss_qudp_hal_reg_construct_dummy_v2,
 		ecpriss_qudp_hal_reg_parse_dummy_v2,
-		0x93F4000 , 0x10, 0x40, 0, 0, 0, 0x4000},
+		0x93E4000 , 0x10010, 0x40, 0, 0, 0, 0x4000},
 	[ECPRISS_HW_v2_0][ECPRI_UDP_L2_EGRESS_IP_DST_ADDR1_PORT_p_ENTRY_n_V2] = {
 		ecpriss_qudp_hal_reg_construct_dummy_v2,
 		ecpriss_qudp_hal_reg_parse_dummy_v2,
-		0x93F4000 , 0x14, 0x40, 0, 0, 0, 0x4000},
+		0x93E4000 , 0x10014, 0x40, 0, 0, 0, 0x4000},
 	[ECPRISS_HW_v2_0][ECPRI_UDP_L2_EGRESS_IP_DST_ADDR2_PORT_p_ENTRY_n_V2] = {
 		ecpriss_qudp_hal_reg_construct_dummy_v2,
 		ecpriss_qudp_hal_reg_parse_dummy_v2,
-		0x93F4000 , 0x18, 0x40, 0, 0, 0, 0x4000},
-	[ECPRISS_HW_v2_0][ECPRI_UDP_L2_EGRESS_IP_DST_ADDR1_PORT_p_ENTRY_n_V2] = {
-		ecpriss_qudp_hal_reg_construct_dummy_v2,
-		ecpriss_qudp_hal_reg_parse_dummy_v2,
-		0x93F4000 , 0x14, 0x40, 0, 0, 0, 0x4000},
+		0x93E4000 , 0x10018, 0x40, 0, 0, 0, 0x4000},
 	[ECPRISS_HW_v2_0][ECPRI_UDP_L2_EGRESS_IP_DST_ADDR3_PORT_p_ENTRY_n_V2] = {
 		ecpriss_qudp_hal_reg_construct_dummy_v2,
 		ecpriss_qudp_hal_reg_parse_dummy_v2,
-		0x93F4000 , 0x1C, 0x40, 0, 0, 0, 0x4000},
+		0x93E4000 , 0x1001C, 0x40, 0, 0, 0, 0x4000},
 	[ECPRISS_HW_v2_0][ECPRI_UDP_L2_EGRESS_UDP_PORTS_PORT_p_ENTRY_n_V2] = {
 		ecpriss_qudp_hal_reg_construct_dummy_v2,
 		ecpriss_qudp_hal_reg_parse_dummy_v2,
-		0x93F4000 , 0x20, 0x40, 0, 0, 0, 0x4000},
+		0x93E4000 , 0x10020, 0x40, 0, 0, 0, 0x4000},
 	[ECPRISS_HW_v2_0][ECPRI_UDP_L2_EGRESS_SA_TAG_IP_TOS_MISC_PORT_p_ENTRY_n_V2] = {
 		ecpriss_qudp_hal_reg_construct_dummy_v2,
 		ecpriss_qudp_hal_reg_parse_dummy_v2,
-		0x93F4000 , 0x24, 0x40, 0, 0, 0, 0x4000},
+		0x93E4000 , 0x10024, 0x40, 0, 0, 0, 0x4000},
 	[ECPRISS_HW_v2_0][ECPRI_UDP_L2_EGRESS_CONFIG_P_V2] = {
 		ecpriss_qudp_hal_reg_construct_udp_l2_egress_config_p_v2,
 		ecpriss_qudp_hal_reg_parse_udp_l2_egress_config_p_v2,
-		0x093E0000, 0x860, 0x4, 0, 0, 0, 0},
+		0x93E0000, 0x860, 0x4, 0, 0, 0, 0},
 
 	[ECPRISS_HW_v2_0][ECPRI_UDP_L2_FILT_VLAN_ADDR_PORT_p_ENTRY_n_V2] = {
 		ecpriss_qudp_hal_reg_construct_dummy_v2,
@@ -6113,6 +6101,22 @@ int ecpriss_qudp_l2_hal_reg_init(struct device *dev)
 			result = -EFAULT;
 			break;
 		}
+
+		if( ecpriss_qudp_hal_ctx.hw_type == ECPRISS_HW_v1_0){
+			ecpriss_qudp_hal_ctx.qudp_l2_phy_rams_base = ECPRISS_L2_QUDP_RAMS_REG_BASE;
+		}else {
+			ecpriss_qudp_hal_ctx.qudp_l2_phy_rams_base = ECPRISS_L2_QUDP_RAMS_REG_BASE_V2;
+		}
+
+
+		ECPRILOGINFO("Mapping  QUDP FH RAMS HAL reg space : 0x%x\n", ecpriss_qudp_hal_ctx.qudp_l2_phy_rams_base);
+		ecpriss_qudp_hal_ctx.l2_rams_base = ioremap(ecpriss_qudp_hal_ctx.qudp_l2_phy_rams_base,
+				ECPRISS_QUDP_L2_RAMS_REG_SIZE);
+		if (!ecpriss_qudp_hal_ctx.qudp_l2_phy_rams_base) {
+			ECPRILOGERR(":ecpriss_qudp_fh_base filter ioremap err\n");
+			result = -EFAULT;
+			break;
+		}
 	}while(0);
 
 	return result;
@@ -6148,6 +6152,10 @@ void ecpriss_qudp_reg_write(ecpriss_qudp_hal_reg_type_e  reg_type,
 	}
 	else if(reg_type == ECPRISS_QUDP_L2) {
 		iowrite32(val, ecpriss_qudp_hal_ctx.l2_base + offset);
+	}
+	else if(reg_type == ECPRISS_QUDP_L2_RAMS) {
+
+		iowrite32(val, ecpriss_qudp_hal_ctx.l2_rams_base + offset);
 	}
 	return;
 }
