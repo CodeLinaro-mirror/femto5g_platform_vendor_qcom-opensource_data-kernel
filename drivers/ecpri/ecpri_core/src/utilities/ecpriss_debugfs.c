@@ -15,6 +15,7 @@
 
 #include "debug_dir_struct.h"
 #include "ecpriss_log.h"
+#include "ecpriss_xbar_hwio_v2.h"
 
 #undef pr_fmt
 #define pr_fmt(fmt) "::%s:%u::" fmt, __func__, __LINE__
@@ -183,6 +184,63 @@ static void get_file_name(char *filename, uint32_t len)
 	scnprintf(filename, sizeof(token), "%s", token);
 	return;
 }
+
+void process_fhrx(int num, char *result, int size){
+
+	char link_id_string[32];
+	int slen  = 0;
+
+	memset(link_id_string, '\0', sizeof(link_id_string));
+	if((num & HWIO_ECPRI_XBAR_FHRX_m_LUT_n_DL_ROUTE_TO_ORAN_BMSK) != 0){
+		scnprintf(link_id_string, sizeof(link_id_string), " DL2OC:Link %d,", (num & HWIO_ECPRI_XBAR_FHRX_m_LUT_n_DL_OC_LINK_ID_BMSK));
+		strlcat(result, link_id_string, size);
+	}
+
+	if((num & HWIO_ECPRI_XBAR_FHRX_m_LUT_n_DL_ROUTE_TO_C2C_BMSK) != 0)
+		strlcat(result, " DL2C2C,", size);
+
+	if((num & HWIO_ECPRI_XBAR_FHRX_m_LUT_n_DL_ROUTE_TO_DMA_BMSK) != 0)
+		strlcat(result, " DL2DMA,", size);
+
+	memset(link_id_string, '\0', sizeof(link_id_string));
+	if((num & HWIO_ECPRI_XBAR_FHRX_m_LUT_n_UL_ROUTE_TO_ORAN_BMSK) != 0){
+		scnprintf(link_id_string, sizeof(link_id_string), " UL2OC:Link %d,", (num & HWIO_ECPRI_XBAR_FHRX_m_LUT_n_UL_OC_LINK_ID_BMSK));
+		strlcat(result, link_id_string, size);
+	}
+
+	if((num & HWIO_ECPRI_XBAR_FHRX_m_LUT_n_UL_ROUTE_TO_C2C_BMSK) != 0)
+		strlcat(result, " UL2C2C,", size);
+
+	if((num & HWIO_ECPRI_XBAR_FHRX_m_LUT_n_UL_ROUTE_TO_DMA_BMSK) != 0)
+		strlcat(result, " UL2DMA,", size);
+
+	slen = strlen(result);
+	if(slen > 0)
+		result[slen-1] = '\0';
+}
+
+void process_ocrx(int num, char *result, int size){
+
+	char link_id_string[32];
+	int slen  = 0;
+
+	memset(link_id_string, '\0', sizeof(link_id_string));
+	if((num & HWIO_ECPRI_XBAR_OCRX_m_LUT_n_VALID_BMSK) != 0){
+		scnprintf(link_id_string, sizeof(link_id_string), " L2:index %d,", (num & HWIO_ECPRI_XBAR_OCRX_m_LUT_n_L2_ENCAP_INFO_BMSK));
+		strlcat(result, link_id_string, size);
+
+		memset(link_id_string, '\0', sizeof(link_id_string));
+		if((num & HWIO_ECPRI_XBAR_OCRX_m_LUT_n_L3_ENCAP_VALID_BMSK) !=  0){
+			scnprintf(link_id_string, sizeof(link_id_string), " L3:index %d,", (num & HWIO_ECPRI_XBAR_OCRX_m_LUT_n_L3_ENCAP_INFO_BMSK));
+			strlcat(result, link_id_string, size);
+		}
+	}
+
+	slen = strlen(result);
+	if(slen > 0)
+		result[slen-1] = '\0';
+}
+
 static ssize_t config_val_from_qudp_ecpriss_filt(char __user *buf, int fh_index, size_t *count, loff_t *ppos)
 {
 	int isvlanfiltenabled = 0;
@@ -2938,6 +2996,8 @@ static ssize_t config_val_from_registers_xbar_v2(char __user *buf, cfg_prm_u par
 	int ret_val = 0;
 	int max_str_size = sizeof(max_str);
 
+	char res_stat_val_str[TEMP_STR_MAX_SIZE];
+
 	memset(max_str,0,sizeof(max_str));
 
 	if(min_lut_index < 0 || min_lut_index > 65534)
@@ -2963,6 +3023,9 @@ static ssize_t config_val_from_registers_xbar_v2(char __user *buf, cfg_prm_u par
 					scnprintf(temp_stat_val_str, TEMP_STAT_VAL_STR_MAX_SIZE, "0x%x",
 						ecpriss_pdata_v2->cfg_stats_v2.xbar_cfg_v2.lut_cfg.fhrx[fh_index][pcid_index]);
 
+					RESET_STR(res_stat_val_str);
+					process_fhrx(ecpriss_pdata_v2->cfg_stats_v2.xbar_cfg_v2.lut_cfg.fhrx[fh_index][pcid_index], res_stat_val_str, TEMP_STR_MAX_SIZE);
+
 					strlcat(max_str, "fh_",
 							max_str_size);
 					strlcat(max_str, fh_str,
@@ -2972,7 +3035,7 @@ static ssize_t config_val_from_registers_xbar_v2(char __user *buf, cfg_prm_u par
 					strlcat(max_str, pcid_str,
 							max_str_size);
 					strlcat(max_str, ":", max_str_size);
-					strlcat(max_str, temp_stat_val_str,
+					strlcat(max_str, res_stat_val_str,
 							max_str_size);
 					strlcat(max_str, "\n",
 							max_str_size);
@@ -2990,6 +3053,9 @@ static ssize_t config_val_from_registers_xbar_v2(char __user *buf, cfg_prm_u par
 					scnprintf(temp_stat_val_str, TEMP_STAT_VAL_STR_MAX_SIZE, "0x%x",
 							ecpriss_pdata_v2->cfg_stats_v2.xbar_cfg_v2.lut_cfg.ocrx[fh_index][pcid_index]);
 
+					RESET_STR(res_stat_val_str);
+					process_ocrx(ecpriss_pdata_v2->cfg_stats_v2.xbar_cfg_v2.lut_cfg.ocrx[fh_index][pcid_index], res_stat_val_str, TEMP_STR_MAX_SIZE);
+
 					strlcat(max_str, "fh_",
 							max_str_size);
 					strlcat(max_str, fh_str,
@@ -2999,7 +3065,7 @@ static ssize_t config_val_from_registers_xbar_v2(char __user *buf, cfg_prm_u par
 					strlcat(max_str, pcid_str,
 							max_str_size);
 					strlcat(max_str, ":", max_str_size);
-					strlcat(max_str, temp_stat_val_str,
+					strlcat(max_str, res_stat_val_str,
 							max_str_size);
 					strlcat(max_str, "\n",
 							max_str_size);
