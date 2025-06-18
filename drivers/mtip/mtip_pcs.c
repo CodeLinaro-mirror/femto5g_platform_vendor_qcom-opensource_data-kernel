@@ -705,7 +705,7 @@ int mtip_pcs_enable_loopback(u32 link_index)
     // set the loopback bit in the PCS CONTROL register
     pcs_control |= MTIP_PCS_LOOPBACK_CONTROL_BIT;
 
-    CSMLOGERR("Setting PCS loopback on link index %d, pcs_control: 0x%x\n", link_index, pcs_control);
+    CSMLOGINFO("Setting PCS loopback on link index %d, pcs_control: 0x%x\n", link_index, pcs_control);
 
     // write to the register
     iowrite32(pcs_control,

@@ -230,47 +230,66 @@ static int mtip_platform_setup_port(u32 port_type)
     // set the port_state
     platform_driver_priv->mtip_ports[port_type]->port_state = MTIP_PORT_STATE_INIT;
 
-    if (mtip_loopback_mode == MTIP_MODE_DEFAULT)
-    {
           // the default is to enable autoneg
-       platform_driver_priv->mtip_ports[port_type]->autoneg = true;
 
-       if (port_type == MTIP_PORT_TYPE_L2 )
-       {
-          // set the below port priv flags supported for L2 port
-          // 1x100GBASE_R2, 1x50GBASE_R, 1x50GBASE_R2, 1x25GBASE_R, 1x10GBASE_R
-          platform_driver_priv->mtip_ports[port_type]->port_priv_flags = MTIP_DEVICE_PRIV_FLAGS_BIT_MASK_L2_PORT_NON_FEC;
-       }
-       else if (port_type == MTIP_PORT_TYPE_DEBUG )
-       {
-          platform_driver_priv->mtip_ports[port_type]->port_priv_flags = MTIP_DEVICE_PRIV_FLAGS_BIT_MASK_DBG_PORT_NON_FEC_NON_50G;
-       }
-       else
-       {
-          platform_driver_priv->mtip_ports[port_type]->port_priv_flags = MTIP_DEVICE_PRIV_FLAGS_BIT_MASK_NON_FEC;
-       }
+    if (port_type == MTIP_PORT_TYPE_L2)
+    {
+        if(mtip_c2c2_loopback_mode == MTIP_MODE_DEFAULT)
+        {
+            // set the below port priv flags supported for L2 port
+            // 1x100GBASE_R2, 1x50GBASE_R, 1x50GBASE_R2, 1x25GBASE_R, 1x10GBASE_R
+            platform_driver_priv->mtip_ports[port_type]->autoneg = true;
+            platform_driver_priv->mtip_ports[port_type]->port_priv_flags = MTIP_DEVICE_PRIV_FLAGS_BIT_MASK_L2_PORT_NON_FEC;
+        }
+        else
+        {
+            // don't do autoneg for loopback modes
+            platform_driver_priv->mtip_ports[port_type]->autoneg = false;
+            // set the below port priv flags supported for L2 port
+            // 1x100GBASE_R2, 1x50GBASE_R, 1x50GBASE_R2, 1x25GBASE_R, 1x10GBASE_R
+            platform_driver_priv->mtip_ports[port_type]->port_priv_flags = MTIP_DEVICE_PRIV_FLAGS_BIT_MASK_L2_PORT_NON_FEC;
+        }
+    }
+    else if (port_type == MTIP_PORT_TYPE_DEBUG )
+    {
 
+        if (mtip_loopback_mode == MTIP_MODE_DEFAULT)
+        {
+            platform_driver_priv->mtip_ports[port_type]->autoneg = true;
+            platform_driver_priv->mtip_ports[port_type]->port_priv_flags = MTIP_DEVICE_PRIV_FLAGS_BIT_MASK_DBG_PORT_NON_FEC_NON_50G;
+
+        }
+        else
+        {
+            // don't do autoneg for loopback modes
+            platform_driver_priv->mtip_ports[port_type]->autoneg = false;
+
+            // set the default port config to 4x25GBASE_R
+            platform_driver_priv->mtip_ports[port_type]->port_config = MTIP_PORT_CONFIG_4x25GBASE_R;
+
+            // set the default port priv flags
+            platform_driver_priv->mtip_ports[port_type]->port_priv_flags = (1 << MTIP_PORT_CONFIG_4x25GBASE_R);
+        }
     }
     else
     {
-        // don't do autoneg for loopback modes
-        platform_driver_priv->mtip_ports[port_type]->autoneg = false;
+        if (mtip_loopback_mode == MTIP_MODE_DEFAULT)
+        {
+            platform_driver_priv->mtip_ports[port_type]->autoneg = true;
+            platform_driver_priv->mtip_ports[port_type]->port_priv_flags = MTIP_DEVICE_PRIV_FLAGS_BIT_MASK_NON_FEC;
+        }
+        else
+        {
+            // don't do autoneg for loopback modes
+            platform_driver_priv->mtip_ports[port_type]->autoneg = false;
 
-      if(port_type != MTIP_PORT_TYPE_L2)
-      {
-        // set the default port config to 4x25GBASE_R
-        platform_driver_priv->mtip_ports[port_type]->port_config = MTIP_PORT_CONFIG_4x25GBASE_R;
+            // set the default port config to 4x25GBASE_R
+            platform_driver_priv->mtip_ports[port_type]->port_config = MTIP_PORT_CONFIG_4x25GBASE_R;
 
-        // set the default port priv flags
-        platform_driver_priv->mtip_ports[port_type]->port_priv_flags = (1 << MTIP_PORT_CONFIG_4x25GBASE_R);
-      }
-      else
-      {
-        // set the below port priv flags supported for L2 port
-        // 1x100GBASE_R2, 1x50GBASE_R, 1x50GBASE_R2, 1x25GBASE_R, 1x10GBASE_R
-        platform_driver_priv->mtip_ports[port_type]->port_priv_flags = MTIP_DEVICE_PRIV_FLAGS_BIT_MASK_L2_PORT_NON_FEC;
-      } 
-   }
+            // set the default port priv flags
+            platform_driver_priv->mtip_ports[port_type]->port_priv_flags = (1 << MTIP_PORT_CONFIG_4x25GBASE_R);
+        }
+    }
 
     // set the default sfp port type
     platform_driver_priv->mtip_ports[port_type]->sfp_port_type = PORT_DA;
@@ -1363,7 +1382,7 @@ int mtip_platform_setup_ethernet(unsigned int port_type)
                         // initialize the PCS for the link
                         mtip_pcs_config_pcs(i);
 
-                        if (mtip_loopback_mode == MTIP_MODE_LOOPBACK)
+                        if ( (i != MTIP_L2_ETH_LINK_INDEX && mtip_loopback_mode == MTIP_MODE_LOOPBACK) || ( i == MTIP_L2_ETH_LINK_INDEX && mtip_c2c2_loopback_mode == MTIP_MODE_C2C2_LOOPBACK))
                         {
                            // enable pcs loopback on the link
                            mtip_pcs_enable_loopback(i);
@@ -1506,7 +1525,7 @@ static int mtip_platform_setup(void)
 
             netdev = platform_driver_priv->mtip_links[i]->dev;
 
-            if (mtip_loopback_mode == MTIP_MODE_DEFAULT)
+            if (( i != MTIP_L2_ETH_LINK_INDEX && mtip_loopback_mode == MTIP_MODE_DEFAULT) || ( i == MTIP_L2_ETH_LINK_INDEX && mtip_c2c2_loopback_mode == MTIP_MODE_DEFAULT))
             {
                // the supported features and hw features
                netdev->hw_features = 0;
@@ -1610,76 +1629,81 @@ static int mtip_platform_setup(void)
    }
 
    // handle the special case of loopback
-   if (mtip_loopback_mode != MTIP_MODE_DEFAULT)
+   // we are doing some sort of loopback
+   // assign lanes to links and set mode to 4x25GBASE_R
+   for (i = 0; i < MTIP_MAX_LINKS; ++i)
    {
-       // we are doing some sort of loopback
-       // assign lanes to links and set mode to 4x25GBASE_R
-       for (i = 0; i < MTIP_MAX_LINKS; ++i) 
-       {
-           if (platform_driver_priv->mtip_links[i] != NULL) 
-           {
-               platform_driver_priv->mtip_links[i]->num_assigned_lanes = 1;
+      if (platform_driver_priv->mtip_links[i] != NULL)
+      {
+         if( (i == MTIP_L2_ETH_LINK_INDEX && mtip_c2c2_loopback_mode != MTIP_MODE_DEFAULT) || (i != MTIP_L2_ETH_LINK_INDEX && mtip_loopback_mode != MTIP_MODE_DEFAULT))
+         {
+            platform_driver_priv->mtip_links[i]->num_assigned_lanes = 1;
 
-               // set the lane_index to be the same as link_index
-               platform_driver_priv->mtip_links[i]->assigned_lane_indices[0] = i;
-           }
-       }
+            // set the lane_index to be the same as link_index
+            platform_driver_priv->mtip_links[i]->assigned_lane_indices[0] = i;
 
-       // set up the lanes for loopback
-       for (i = 0; i < MTIP_MAX_LANES; ++i) 
-       {
-           if (platform_driver_priv->mtip_lanes[i] != NULL) 
-           {
-               // set the lane state as CONNECTED
-               platform_driver_priv->mtip_lanes[i]->lane_state = MTIP_LANE_STATE_CONNECTED;
+            if (mtip_lookup_port_type_by_link_index(i, &port_type) < 0)
+            {
+               CSMLOGERR("invalid port_type for link_index %d", i);
+               return -1;
+            }
+            // setup the ports for loopback
+            // set the port state as connected
+            platform_driver_priv->mtip_ports[port_type]->port_state = MTIP_PORT_STATE_CONNECTED;
 
-               // set the lane sfp as DAC
-               platform_driver_priv->mtip_lanes[i]->sfp_port_type = PORT_DA;
+            if(port_type == MTIP_PORT_TYPE_L2)
+            {
+               // set the below port priv flags supported for L2 port
+               // 1x100GBASE_R2, 1x50GBASE_R, 1x50GBASE_R2, 1x25GBASE_R, 1x10GBASE_R
+               platform_driver_priv->mtip_ports[port_type]->port_priv_flags = MTIP_DEVICE_PRIV_FLAGS_BIT_MASK_L2_PORT_NON_FEC;
+            }
+            else
+            {
+               // set the default port priv flags
+               platform_driver_priv->mtip_ports[port_type]->port_priv_flags = (1 << MTIP_PORT_CONFIG_4x25GBASE_R);
 
-               // set the lane speed mask
-               platform_driver_priv->mtip_lanes[i]->speed_mask = TRX_LANE_SPEED_10G | TRX_LANE_SPEED_25G | TRX_LANE_SPEED_50G | TRX_LANE_SPEED_100G;
+               // set the port config as 4x25GBASE_R
+               platform_driver_priv->mtip_ports[port_type]->port_config = MTIP_PORT_CONFIG_4x25GBASE_R;
+            }
+            // set the port sfp as DAC
+            platform_driver_priv->mtip_ports[port_type]->sfp_port_type = PORT_DA;
 
-               // set the lane properties for TRX
-               platform_driver_priv->mtip_lanes[i]->lane_qsfp_info.trx_module_type = TRX_QSFP_PLS_QSFP28_QSFP56;
-               platform_driver_priv->mtip_lanes[i]->lane_qsfp_info.speed_mask = TRX_LANE_SPEED_10G | TRX_LANE_SPEED_25G | TRX_LANE_SPEED_50G | TRX_LANE_SPEED_100G;
-               platform_driver_priv->mtip_lanes[i]->lane_qsfp_info.trx_laneinfo = 0xF;
-               platform_driver_priv->mtip_lanes[i]->lane_qsfp_info.trx_bout_cfg = 0;
-           }
-       }
+            for (j = 0; j < PHY_LANE_MAX; ++j)
+            {
+               platform_driver_priv->mtip_ports[port_type]->lane_config[j].lane_enabled = true;
+               platform_driver_priv->mtip_ports[port_type]->lane_config[j].lane_speed = PHY_LANE_SPEED_25G;
+               platform_driver_priv->mtip_ports[port_type]->lane_config[j].link_index = (port_type*PHY_LANE_MAX) + j;
+            }
 
-       // setup the ports for loopback
-       for (i = 0; i < MTIP_MAX_PORTS; ++i) 
-       {
-           if (platform_driver_priv->mtip_ports[i] != NULL) 
-           {
-               // set the port state as connected
-               platform_driver_priv->mtip_ports[i]->port_state = MTIP_PORT_STATE_CONNECTED;
+         }
+      }
+   }
 
-               if(i== MTIP_PORT_TYPE_L2)
-               {
-                   // set the below port priv flags supported for L2 port
-                   // 1x100GBASE_R2, 1x50GBASE_R, 1x50GBASE_R2, 1x25GBASE_R, 1x10GBASE_R
-                   platform_driver_priv->mtip_ports[i]->port_priv_flags = MTIP_DEVICE_PRIV_FLAGS_BIT_MASK_L2_PORT_NON_FEC;
-               }
-               else
-               {
-                    // set the default port priv flags
-                    platform_driver_priv->mtip_ports[i]->port_priv_flags = (1 << MTIP_PORT_CONFIG_4x25GBASE_R);
+   // set up the lanes for loopback
+   for (i = 0; i < MTIP_MAX_LANES; ++i)
+   {
+      if (platform_driver_priv->mtip_lanes[i] != NULL)
+      {
 
-                    // set the port config as 4x25GBASE_R
-                    platform_driver_priv->mtip_ports[i]->port_config = MTIP_PORT_CONFIG_4x25GBASE_R;
-               }
-               // set the port sfp as DAC
-               platform_driver_priv->mtip_ports[i]->sfp_port_type = PORT_DA;
+         if( ( ( i == MTIP_L2_LANE1_INDEX || i == MTIP_L2_LANE2_INDEX ) && mtip_c2c2_loopback_mode != MTIP_MODE_DEFAULT) || ( ( i != MTIP_L2_LANE1_INDEX && i != MTIP_L2_LANE2_INDEX ) && mtip_loopback_mode != MTIP_MODE_DEFAULT))
+         {
 
-               for (j = 0; j < PHY_LANE_MAX; ++j) 
-               {
-                   platform_driver_priv->mtip_ports[i]->lane_config[j].lane_enabled = true;
-                   platform_driver_priv->mtip_ports[i]->lane_config[j].lane_speed = PHY_LANE_SPEED_25G;
-                   platform_driver_priv->mtip_ports[i]->lane_config[j].link_index = (i*PHY_LANE_MAX) + j;
-               }
-           }
-       }
+            // set the lane state as CONNECTED
+            platform_driver_priv->mtip_lanes[i]->lane_state = MTIP_LANE_STATE_CONNECTED;
+
+            // set the lane sfp as DAC
+            platform_driver_priv->mtip_lanes[i]->sfp_port_type = PORT_DA;
+
+            // set the lane speed mask
+            platform_driver_priv->mtip_lanes[i]->speed_mask = TRX_LANE_SPEED_10G | TRX_LANE_SPEED_25G | TRX_LANE_SPEED_50G | TRX_LANE_SPEED_100G;
+
+            // set the lane properties for TRX
+            platform_driver_priv->mtip_lanes[i]->lane_qsfp_info.trx_module_type = TRX_QSFP_PLS_QSFP28_QSFP56;
+            platform_driver_priv->mtip_lanes[i]->lane_qsfp_info.speed_mask = TRX_LANE_SPEED_10G | TRX_LANE_SPEED_25G | TRX_LANE_SPEED_50G | TRX_LANE_SPEED_100G;
+            platform_driver_priv->mtip_lanes[i]->lane_qsfp_info.trx_laneinfo = 0xF;
+            platform_driver_priv->mtip_lanes[i]->lane_qsfp_info.trx_bout_cfg = 0;
+         }
+      }
    }
 
    // set the ethtool ops for debug eth
@@ -1688,11 +1712,8 @@ static int mtip_platform_setup(void)
    // the system topology is now setup using the device tree
    mtip_setup_topology();
 
-   if (mtip_loopback_mode == MTIP_MODE_DEFAULT) 
-   {
-       // create phylinks here
-       post_mtip_process_create_phylink();
-   }
+   // create phylinks here
+   post_mtip_process_create_phylink();
 
    // indicate readiness to any registered clients */
    post_mtip_client_send_ready();
@@ -1737,10 +1758,14 @@ void run_mtip_process_create_phylink(void *work_ptr)
    {
       if (platform_driver_priv->mtip_lanes[i] != NULL)
       {
-         if (platform_driver_priv->devices.lane_devices[i].lane_device_valid == 1)
+
+         if( ( ( i == MTIP_L2_LANE1_INDEX || i == MTIP_L2_LANE2_INDEX ) && mtip_c2c2_loopback_mode == MTIP_MODE_DEFAULT) || ( ( i != MTIP_L2_LANE1_INDEX && i != MTIP_L2_LANE2_INDEX ) && mtip_loopback_mode == MTIP_MODE_DEFAULT))
          {
-            // setup phylink for the lane
-            mtip_phy_create_phylink(&platform_driver_priv->devices.lane_devices[i]);
+            if (platform_driver_priv->devices.lane_devices[i].lane_device_valid == 1)
+            {
+               // setup phylink for the lane
+               mtip_phy_create_phylink(&platform_driver_priv->devices.lane_devices[i]);
+            }
          }
       }
    }

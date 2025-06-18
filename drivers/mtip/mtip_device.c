@@ -536,7 +536,7 @@ void run_mtip_process_link_state(void* work_ptr)
         mtip_client_send_event(ETH_ECPRISS_EVENT_DOWN, link_index);
     }
 
-    if (mtip_loopback_mode != MTIP_MODE_LOOPBACK) 
+    if ( (link_index != MTIP_L2_ETH_LINK_INDEX && mtip_loopback_mode != MTIP_MODE_LOOPBACK) || (link_index == MTIP_L2_ETH_LINK_INDEX && mtip_c2c2_loopback_mode != MTIP_MODE_C2C2_LOOPBACK ) )
     {
         // notify phy of the link status
         mtip_phy_notify_link_status(link_index, link_up);
@@ -605,7 +605,7 @@ void mtip_process_link_state(u32 link_index, bool link_up)
         mtip_client_send_event(ETH_ECPRISS_EVENT_DOWN, link_index);
     }
 
-    if (mtip_loopback_mode != MTIP_MODE_LOOPBACK) 
+    if ( ( link_index != MTIP_L2_ETH_LINK_INDEX && mtip_loopback_mode != MTIP_MODE_LOOPBACK) || ( link_index == MTIP_L2_ETH_LINK_INDEX &&  mtip_c2c2_loopback_mode != MTIP_MODE_C2C2_LOOPBACK) )
     {
         // notify phy of the link status
         mtip_phy_notify_link_status(link_index, link_up);
@@ -1237,6 +1237,11 @@ void mtip_rx_mode_set(struct net_device *netdev)
         ret = mtip_mac_set_promisc_mode(priv, true);
         CSMLOGDBG("Enabling all multicast for link index: %d\n", link_index);
  	} 
+    if( ( link_index != MTIP_L2_ETH_LINK_INDEX && mtip_loopback_mode != MTIP_MODE_DEFAULT) || (  link_index == MTIP_L2_ETH_LINK_INDEX && mtip_c2c2_loopback_mode != MTIP_MODE_DEFAULT ) )
+    {
+        ret = mtip_mac_set_promisc_mode(priv, true);
+        CSMLOGDBG("Setting promiscuous mode ON for link index: %d\n", link_index);
+    }
     else
     {
         if (netdev_mc_empty(netdev))
@@ -1581,8 +1586,9 @@ void mtip_netdevice_init(struct net_device *dev)
    // HANDLE THE ERROR
 
    dev->netdev_ops = &mtip_netdev_ops;
+   priv = netdev_priv(dev);
 
-   if (mtip_loopback_mode != MTIP_MODE_DEFAULT && !mtip_loopback_enable_arp)
+   if (( (priv->link_index != MTIP_L2_ETH_LINK_INDEX && mtip_loopback_mode != MTIP_MODE_DEFAULT) || ( priv->link_index == MTIP_L2_ETH_LINK_INDEX && mtip_c2c2_loopback_mode != MTIP_MODE_DEFAULT ) ) && !mtip_loopback_enable_arp)
    {
        /* add NOARP */
        dev->flags           |= IFF_NOARP;
@@ -1590,7 +1596,6 @@ void mtip_netdevice_init(struct net_device *dev)
 
    dev->watchdog_timeo = MTIP_TIMEOUT;
 
-   priv = netdev_priv(dev);
 
    // initialize the lock
    spin_lock_init(&priv->lock);
@@ -2810,7 +2815,7 @@ static int mtip_device_complete_port_open(u32 port_type)
 
        if (platform_driver_priv->mtip_links[link_index] != NULL)
        {
-          if (mtip_loopback_mode != MTIP_MODE_LOOPBACK &&
+          if ( ( (link_index != MTIP_L2_ETH_LINK_INDEX && mtip_loopback_mode != MTIP_MODE_LOOPBACK ) || ( link_index == MTIP_L2_ETH_LINK_INDEX &&  mtip_c2c2_loopback_mode != MTIP_MODE_C2C2_LOOPBACK)) &&
               (platform_driver_priv->mtip_links[link_index]->state == MTIP_LINK_STATE_OPEN_WAITING_FOR_LANES ||
                platform_driver_priv->mtip_links[link_index]->state == MTIP_LINK_STATE_DOWN))
           {
@@ -3449,7 +3454,7 @@ void run_mtip_process_netdev_open(void* workptr)
    }
 
    // Initialize the carrier state as off
-   if (mtip_loopback_mode == MTIP_MODE_DEFAULT)
+   if ( ( link_index != MTIP_L2_ETH_LINK_INDEX && mtip_loopback_mode == MTIP_MODE_DEFAULT) || (link_index == MTIP_L2_ETH_LINK_INDEX && mtip_c2c2_loopback_mode == MTIP_MODE_DEFAULT))
    {
       netif_carrier_off(netdev);
    }
@@ -3505,15 +3510,15 @@ void run_mtip_process_netdev_open(void* workptr)
    else
    {
       // Change the state for PCS loopback
-      if (mtip_loopback_mode == MTIP_MODE_LOOPBACK)
+      if ( ( link_index != MTIP_L2_ETH_LINK_INDEX && mtip_loopback_mode == MTIP_MODE_LOOPBACK) || ( link_index == MTIP_L2_ETH_LINK_INDEX && mtip_c2c2_loopback_mode == MTIP_MODE_C2C2_LOOPBACK) )
          platform_driver_priv->mtip_links[link_index]->state = MTIP_LINK_STATE_OPEN_WAITING_FOR_LANES;
 
       // For PCS/PHY loopback mode, configure port based on the speed modes set
-      if (mtip_loopback_mode != MTIP_MODE_DEFAULT)
+      if ( ( link_index != MTIP_L2_ETH_LINK_INDEX && mtip_loopback_mode != MTIP_MODE_DEFAULT) || (link_index == MTIP_L2_ETH_LINK_INDEX && mtip_c2c2_loopback_mode != MTIP_MODE_DEFAULT))
          mtip_device_configure_port(port_type);
 
       // PCS looback mode
-      if (mtip_loopback_mode == MTIP_MODE_LOOPBACK)
+      if ( ( link_index != MTIP_L2_ETH_LINK_INDEX && mtip_loopback_mode == MTIP_MODE_LOOPBACK) || ( link_index == MTIP_L2_ETH_LINK_INDEX && mtip_c2c2_loopback_mode == MTIP_MODE_C2C2_LOOPBACK))
       {
          // Process MAC link up state
          mtip_mac_link_up(link_index);
@@ -3671,8 +3676,8 @@ void run_mtip_process_netdev_close(void* workptr)
    }
    else
    {
-      if (mtip_loopback_mode == MTIP_MODE_DEFAULT ||
-          mtip_loopback_mode == MTIP_MODE_PHY_LOOPBACK)
+      if ( ( link_index != MTIP_L2_ETH_LINK_INDEX && (mtip_loopback_mode == MTIP_MODE_DEFAULT ||
+          mtip_loopback_mode == MTIP_MODE_PHY_LOOPBACK)) || (link_index == MTIP_L2_ETH_LINK_INDEX && ( mtip_c2c2_loopback_mode == MTIP_MODE_DEFAULT || mtip_c2c2_loopback_mode == MTIP_MODE_PHY_LOOPBACK)))
       {
          /* teardown the phy if
             1. AN is not in progress OR

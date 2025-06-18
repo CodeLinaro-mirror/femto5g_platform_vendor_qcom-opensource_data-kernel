@@ -1218,9 +1218,7 @@ static void mtip_dma_process_packet(
         mtip_dma_skb_timestamp(head_skb);
     }
 
-    if (mtip_loopback_mode != MTIP_MODE_DEFAULT && mtip_loopback_swap_addr)
-    {
-       if(link_index == MTIP_L2_ETH_LINK_INDEX)
+       if(link_index == MTIP_L2_ETH_LINK_INDEX && mtip_c2c2_loopback_mode != MTIP_MODE_DEFAULT && mtip_loopback_swap_addr)
        {
            CSMLOGDBG("swap addr packet\n");
            eth = (struct ethhdr *)(head_base);
@@ -1261,13 +1259,12 @@ static void mtip_dma_process_packet(
                fixup_packet(netdev, head_base, iphdr_ptr, head_skb->len);
            }
        }
-       else
+       else if(link_index != MTIP_L2_ETH_LINK_INDEX && mtip_loopback_mode != MTIP_MODE_DEFAULT && mtip_loopback_swap_addr)
        {
                // fixup the packet: ONLY IF LOOPBACK IS ENABLED
                iphdr_ptr = (struct iphdr *)(head_base + ETH_HLEN);
                fixup_packet(netdev, head_base, iphdr_ptr, head_skb->len);
        }
-    }
 
 #ifdef MTIP_DUMP_PACKETS
    // dump the contents of the head buffer/SKB

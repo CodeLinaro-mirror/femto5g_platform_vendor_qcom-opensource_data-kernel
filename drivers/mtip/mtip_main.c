@@ -87,6 +87,10 @@ int mtip_loopback_mode = MTIP_MODE_DEFAULT;
 module_param(mtip_loopback_mode, int, S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP);
 MODULE_PARM_DESC(mtip_loopback_mode, "Loopback mode of the driver");
 
+int mtip_c2c2_loopback_mode = MTIP_MODE_DEFAULT;
+module_param(mtip_c2c2_loopback_mode, int, S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP);
+MODULE_PARM_DESC(mtip_c2c2_loopback_mode, "Loopback mode of C2C2 interface");
+
 bool mtip_loopback_swap_addr = true;
 module_param(mtip_loopback_swap_addr, bool, S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP);
 MODULE_PARM_DESC(mtip_loopback_swap_addr, "Swap SA/DA in loopback mode operation");
@@ -1297,35 +1301,6 @@ static int mtip_module_init(void)
         }
     }
 
-    CSMLOGDBG("Loopback mode is %d\n", mtip_loopback_mode);
-
-    if (mtip_rumi_platform != MTIP_PLATFORM_SOC) 
-    {
-        if (mtip_loopback_mode != MTIP_MODE_DEFAULT)
-        {
-            CSMLOGINFO("Mode: RUMI with LOOPBACK\n");
-        }
-        else
-        {
-            CSMLOGINFO("Mode: RUMI NO LOOPBACK\n");
-        }
-    }
-    else
-    {
-        if (mtip_loopback_mode == MTIP_MODE_DEFAULT)
-        {
-            CSMLOGINFO("Mode: SOC NO LOOPBACK\n");
-        }
-        else if (mtip_loopback_mode == MTIP_MODE_PHY_LOOPBACK) 
-        {
-            CSMLOGINFO("Mode: SOC PHY LOOPBACK\n");
-        }
-        else
-        {
-            CSMLOGINFO("Mode: SOC with PCS LOOPBACK\n");
-        }
-    }
-
 #ifdef FEATURE_MTIP_TEST_DEBUG_FS
    mtip_setup_debugfs();
 #endif /* FEATURE_MTIP_TEST_DEBUG_FS */
@@ -1415,6 +1390,48 @@ static int mtip_module_init(void)
     {
         CSMLOGDBG("mtip_init(): IPC log context LOW created successfully, continue...\n");
     }
+
+    CSMLOGDBG("FH Loopback mode is %d, C2C2 Loopback mode is:%d\n", mtip_loopback_mode,mtip_c2c2_loopback_mode);
+
+    if (mtip_rumi_platform != MTIP_PLATFORM_SOC)
+    {
+        if (mtip_loopback_mode != MTIP_MODE_DEFAULT)
+        {
+            CSMLOGINFO("Mode: RUMI with LOOPBACK\n");
+        }
+        else
+        {
+            CSMLOGINFO("Mode: RUMI NO LOOPBACK\n");
+        }
+    }
+    else
+    {
+        if (mtip_loopback_mode == MTIP_MODE_DEFAULT)
+        {
+            CSMLOGINFO("Mode: SOC:FH: NO LOOPBACK\n");
+        }
+        else if (mtip_loopback_mode == MTIP_MODE_PHY_LOOPBACK)
+        {
+            CSMLOGINFO("Mode: SOC:FH: PHY LOOPBACK\n");
+        }
+        else if (mtip_loopback_mode == MTIP_MODE_LOOPBACK)
+        {
+            CSMLOGINFO("Mode: SOC:FH: PCS LOOPBACK\n");
+        }
+        if (mtip_c2c2_loopback_mode == MTIP_MODE_DEFAULT)
+        {
+            CSMLOGINFO("Mode: SOC:C2C2: NO LOOPBACK\n");
+        }
+        else if (mtip_c2c2_loopback_mode == MTIP_MODE_PHY_LOOPBACK)
+        {
+            CSMLOGINFO("Mode: SOC:C2C2: PHY LOOPBACK\n");
+        }
+        else if (mtip_c2c2_loopback_mode == MTIP_MODE_LOOPBACK)
+        {
+            CSMLOGINFO("Mode: SOC:C2C2 with PCS LOOPBACK\n");
+        }
+    }
+
     // initialize the dma array of allocs
     for (i = 0; i < MTIP_DMA_ALLOC_LIST_MAX; ++i) 
     {

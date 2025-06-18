@@ -47,6 +47,7 @@
 #include "mtip_client.h"
 #include "mtip_workq.h"
 #include "mtip_mac.h"
+#include "mtip_pcs.h"
 
 static eth_ecpriss_link_rate_e mtip_client_get_link_rate(u32 port_type)
 {
@@ -574,11 +575,145 @@ eth_ecpriss_status_e mtip_eth_register_ready_cb(eth_ecpriss_topology_ready_cb re
     return ret;
 }
 
+int setup_interface_in_loopback_mode(struct net_device *netdev, u32 link_index)
+{
+    struct mtip_netdev_priv *priv;
+    int ret = 0, i;
+    u32 port_type;
+
+    priv = netdev_priv(netdev);
+
+    mtip_c2c2_loopback_mode = MTIP_MODE_C2C2_LOOPBACK;
+
+    // set the promiscous mode
+    ret = mtip_mac_set_promisc_mode(priv, true);
+
+    if(!mtip_loopback_enable_arp)
+    {
+        /* add NOARP */
+        netdev->flags |= IFF_NOARP;
+    }
+
+    if (platform_driver_priv->mtip_links[link_index] != NULL)
+    {
+        platform_driver_priv->mtip_links[link_index]->num_assigned_lanes = 1;
+
+        // set the lane_index to be the same as link_index
+        platform_driver_priv->mtip_links[link_index]->assigned_lane_indices[0] = link_index;
+
+        if (mtip_lookup_port_type_by_link_index(link_index, &port_type) < 0)
+        {
+            CSMLOGERR("invalid port_type for link_index %d", link_index);
+            return -1;
+        }
+        // setup the ports for loopback
+
+        // don't do autoneg for loopback modes
+        platform_driver_priv->mtip_ports[port_type]->autoneg = false;
+
+        // set the port state as connected
+        platform_driver_priv->mtip_ports[port_type]->port_state = MTIP_PORT_STATE_CONNECTED;
+
+        // set the below port priv flags supported for L2 port
+        // 1x100GBASE_R2, 1x50GBASE_R, 1x50GBASE_R2, 1x25GBASE_R, 1x10GBASE_R
+        platform_driver_priv->mtip_ports[port_type]->port_priv_flags = MTIP_DEVICE_PRIV_FLAGS_BIT_MASK_L2_PORT_NON_FEC;
+
+        // set the port sfp as DAC
+        platform_driver_priv->mtip_ports[port_type]->sfp_port_type = PORT_DA;
+
+        for (i = 0; i < 2; ++i)
+        {
+            platform_driver_priv->mtip_ports[port_type]->lane_config[i].lane_enabled = true;
+            platform_driver_priv->mtip_ports[port_type]->lane_config[i].lane_speed = PHY_LANE_SPEED_25G;
+            platform_driver_priv->mtip_ports[port_type]->lane_config[i].link_index = (port_type*PHY_LANE_MAX) + i;
+        }
+    }
+    for (i = MTIP_L2_LANE1_INDEX ; i <= MTIP_L2_LANE2_INDEX ; ++i)
+    {
+        if (platform_driver_priv->mtip_lanes[i] != NULL)
+        {
+
+            // set the lane state as CONNECTED
+            platform_driver_priv->mtip_lanes[i]->lane_state = MTIP_LANE_STATE_CONNECTED;
+
+            // set the lane sfp as DAC
+            platform_driver_priv->mtip_lanes[i]->sfp_port_type = PORT_DA;
+
+            // set the lane speed mask
+            platform_driver_priv->mtip_lanes[i]->speed_mask = TRX_LANE_SPEED_10G | TRX_LANE_SPEED_25G | TRX_LANE_SPEED_50G | TRX_LANE_SPEED_100G;
+
+            // set the lane properties for TRX
+            platform_driver_priv->mtip_lanes[i]->lane_qsfp_info.trx_module_type = TRX_QSFP_PLS_QSFP28_QSFP56;
+            platform_driver_priv->mtip_lanes[i]->lane_qsfp_info.speed_mask = TRX_LANE_SPEED_10G | TRX_LANE_SPEED_25G | TRX_LANE_SPEED_50G | TRX_LANE_SPEED_100G;
+            platform_driver_priv->mtip_lanes[i]->lane_qsfp_info.trx_laneinfo = 0x3;
+            platform_driver_priv->mtip_lanes[i]->lane_qsfp_info.trx_bout_cfg = 0;
+        }
+    }
+    post_mtip_process_link_state(link_index, true);
+    return 0;
+}
+/*
+    The exported function to enable link
+ */
+eth_ecpriss_status_e mtip_eth_enable_logging_port(bool action)
+{
+    eth_ecpriss_status_e ret = ETH_ECPRISS_STATUS_SUCCESS;
+    struct net_device *netdev = NULL;
+    static char *ifname = "eth30";
+    u32 link_index = MTIP_L2_ETH_LINK_INDEX;
+
+    if (platform_driver_priv->mtip_links[link_index] != NULL)
+        netdev = platform_driver_priv->mtip_links[link_index]->dev;
+    else
+        return ETH_ECPRISS_STATUS_FAILURE;
+
+    if(action == true)
+    {
+
+        if(platform_driver_priv->mtip_links[link_index]->state != MTIP_LINK_STATE_UP)
+        {
+            setup_interface_in_loopback_mode(netdev, link_index);
+
+            rtnl_lock(); // Lock the network namespace
+            if (!(netdev->flags & IFF_UP))
+            {
+                ret = dev_open(netdev, NULL);
+                if (ret)
+                    CSMLOGERR("Failed to bring up interface %s: %d\n", ifname, ret);
+                else
+                    CSMLOGINFO("Interface %s is now up\n", ifname);
+            }
+            else
+            {
+                CSMLOGINFO("Interface %s is already up\n", ifname);
+            }
+            rtnl_unlock();
+        }
+    }
+    else
+    {
+         rtnl_lock();   // Required before calling dev_close
+         if (netif_running(netdev))
+         {
+             CSMLOGINFO("dev_close_example: Bringing down interface %s\n", ifname);
+             dev_close(netdev);
+         }
+         else
+         {
+             CSMLOGINFO("dev_close_example: Interface %s is already down\n", ifname);
+         }
+         rtnl_unlock();
+    }
+
+    return ret;
+}
+
 struct eth_ecpriss_ops mtip_ecpri_ops = {
     .eth_ecpriss_register_ready_cb = mtip_eth_register_ready_cb,
     .eth_ecpriss_register_events_cb = mtip_eth_register_events_cb,
     .eth_ecpriss_deregister_events_cb = mtip_eth_deregister_events_cb,
     .eth_ecpriss_get_topology = mtip_eth_get_topology,
+    .eth_ecpriss_enable_logging_port = mtip_eth_enable_logging_port,
 };
 
 EXPORT_SYMBOL(mtip_ecpri_ops);
