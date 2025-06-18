@@ -634,6 +634,42 @@ static void ecpriss_xbar_hal_reg_parse_xbar_fhrx_default_dma_channel
         return;
 }
 
+static void ecpriss_xbar_hal_reg_construct_xbar_c2crx_default_dma_channel
+	(enum ecpriss_xbar_hal_reg_name reg, const void *fields, uint32_t* val)
+{
+        ecpri_xbar_hwio_def_ecpri_xbar_c2crx_n_default_dma_channel_s * dma_channel;
+        dma_channel =(ecpri_xbar_hwio_def_ecpri_xbar_c2crx_n_default_dma_channel_s *)fields;
+
+        ECPRISS_HAL_SETFIELD_IN_REG(*val,
+                        dma_channel->dma_ring_id,
+                        HWIO_ECPRI_XBAR_C2CRX_n_DEFAULT_DMA_CHANNEL_DMA_RING_ID_SHFT,
+                        HWIO_ECPRI_XBAR_C2CRX_n_DEFAULT_DMA_CHANNEL_DMA_RING_ID_BMSK);
+
+        ECPRISS_HAL_SETFIELD_IN_REG(*val,
+                        dma_channel->gsi_id,
+                        HWIO_ECPRI_XBAR_C2CRX_n_DEFAULT_DMA_CHANNEL_GSI_ID_SHFT,
+                        HWIO_ECPRI_XBAR_C2CRX_n_DEFAULT_DMA_CHANNEL_GSI_ID_BMSK);
+
+        return;
+}
+
+static void ecpriss_xbar_hal_reg_parse_xbar_c2crx_default_dma_channel
+	(enum ecpriss_xbar_hal_reg_name reg, void *fields, u32 val)
+{
+        ecpri_xbar_hwio_def_ecpri_xbar_c2crx_n_default_dma_channel_s * dma_channel;
+        dma_channel =(ecpri_xbar_hwio_def_ecpri_xbar_c2crx_n_default_dma_channel_s *)fields;
+
+        dma_channel->dma_ring_id = ECPRISS_HAL_GETFIELD_FROM_REG(val,
+                        HWIO_ECPRI_XBAR_C2CRX_n_DEFAULT_DMA_CHANNEL_DMA_RING_ID_SHFT,
+                        HWIO_ECPRI_XBAR_C2CRX_n_DEFAULT_DMA_CHANNEL_DMA_RING_ID_BMSK);
+
+        dma_channel->gsi_id = ECPRISS_HAL_GETFIELD_FROM_REG(val,
+                        HWIO_ECPRI_XBAR_C2CRX_n_DEFAULT_DMA_CHANNEL_GSI_ID_SHFT,
+                        HWIO_ECPRI_XBAR_C2CRX_n_DEFAULT_DMA_CHANNEL_GSI_ID_BMSK);
+
+        return;
+}
+
 static void ecpriss_xbar_hal_reg_parse_lut_status_2(enum ecpriss_xbar_hal_reg_name reg, void *fields,
 		u32 val)
 {
@@ -883,6 +919,99 @@ static void ecpriss_xbar_hal_reg_parse_xbar_flush_2(enum ecpriss_xbar_hal_reg_na
 }
 
 
+	static void ecpriss_xbar_hal_reg_construct_lut_xbar_c2crx_m_lut_n_2
+(enum ecpriss_xbar_hal_reg_name reg, const void *fields, uint32_t* val)
+{
+	ecpri_xbar_hwio_def_ecpri_xbar_c2crx_m_lut_n_s *xbar_c2crx_m_lut_n
+		= (ecpri_xbar_hwio_def_ecpri_xbar_c2crx_m_lut_n_s *)fields;
+
+	ECPRILOGERR("Constructing ecpriss_xbar_hal_reg_construct_lut_xbar_c2crx_m_lut_n_2\n");
+
+	ECPRISS_HAL_SETFIELD_IN_REG(*val,
+			xbar_c2crx_m_lut_n->up_ul_route,
+			HWIO_ECPRI_XBAR_C2CRX_m_LUT_n_UP_UL_ROUTE_SHFT,
+			HWIO_ECPRI_XBAR_C2CRX_m_LUT_n_UP_UL_ROUTE_BMSK);
+
+	ECPRISS_HAL_SETFIELD_IN_REG(*val,
+			xbar_c2crx_m_lut_n->up_dl_route,
+			HWIO_ECPRI_XBAR_C2CRX_m_LUT_n_UP_DL_ROUTE_SHFT,
+			HWIO_ECPRI_XBAR_C2CRX_m_LUT_n_UP_DL_ROUTE_BMSK);
+
+	ECPRISS_HAL_SETFIELD_IN_REG(*val,
+			xbar_c2crx_m_lut_n->cp_ul_route,
+			HWIO_ECPRI_XBAR_C2CRX_m_LUT_n_CP_UL_ROUTE_SHFT,
+			HWIO_ECPRI_XBAR_C2CRX_m_LUT_n_CP_UL_ROUTE_BMSK);
+
+	ECPRISS_HAL_SETFIELD_IN_REG(*val,
+			xbar_c2crx_m_lut_n->cp_dl_route,
+			HWIO_ECPRI_XBAR_C2CRX_m_LUT_n_CP_DL_ROUTE_SHFT,
+			HWIO_ECPRI_XBAR_C2CRX_m_LUT_n_CP_DL_ROUTE_BMSK);
+
+	ECPRISS_HAL_SETFIELD_IN_REG(*val,
+			xbar_c2crx_m_lut_n->other_route,
+			HWIO_ECPRI_XBAR_C2CRX_m_LUT_n_OTHER_ROUTE_SHFT,
+			HWIO_ECPRI_XBAR_C2CRX_m_LUT_n_OTHER_ROUTE_BMSK);
+
+	ECPRISS_HAL_SETFIELD_IN_REG(*val,
+			xbar_c2crx_m_lut_n->l3_encap_valid,
+			HWIO_ECPRI_XBAR_C2CRX_m_LUT_n_L3_ENCAP_VALID_SHFT,
+			HWIO_ECPRI_XBAR_C2CRX_m_LUT_n_L3_ENCAP_VALID_BMSK);
+
+	ECPRISS_HAL_SETFIELD_IN_REG(*val,
+			xbar_c2crx_m_lut_n->l3_encap_info,
+			HWIO_ECPRI_XBAR_C2CRX_m_LUT_n_L3_ENCAP_INFO_SHFT,
+			HWIO_ECPRI_XBAR_C2CRX_m_LUT_n_L3_ENCAP_INFO_BMSK);
+
+	ECPRISS_HAL_SETFIELD_IN_REG(*val,
+			xbar_c2crx_m_lut_n->l2_encap_info,
+			HWIO_ECPRI_XBAR_C2CRX_m_LUT_n_L2_ENCAP_INFO_SHFT,
+			HWIO_ECPRI_XBAR_C2CRX_m_LUT_n_L2_ENCAP_INFO_BMSK);
+
+	return;
+}
+
+	static void ecpriss_xbar_hal_reg_parse_lut_xbar_c2crx_m_lut_n_2
+(enum ecpriss_xbar_hal_reg_name reg,  void *fields, uint32_t val)
+{
+	ecpri_xbar_hwio_def_ecpri_xbar_c2crx_m_lut_n_s *xbar_c2crx_m_lut_n
+		= (ecpri_xbar_hwio_def_ecpri_xbar_c2crx_m_lut_n_s *)fields;
+
+	ECPRILOGERR("Parsing ecpriss_xbar_hal_reg_parse_lut_xbar_c2crx_m_lut_n_2\n");
+
+	xbar_c2crx_m_lut_n->up_ul_route = ECPRISS_HAL_GETFIELD_FROM_REG(val,
+			HWIO_ECPRI_XBAR_C2CRX_m_LUT_n_UP_UL_ROUTE_SHFT,
+			HWIO_ECPRI_XBAR_C2CRX_m_LUT_n_UP_UL_ROUTE_BMSK);
+
+	xbar_c2crx_m_lut_n->up_dl_route = ECPRISS_HAL_GETFIELD_FROM_REG(val,
+			HWIO_ECPRI_XBAR_C2CRX_m_LUT_n_UP_DL_ROUTE_SHFT,
+			HWIO_ECPRI_XBAR_C2CRX_m_LUT_n_UP_DL_ROUTE_BMSK);
+
+	xbar_c2crx_m_lut_n->cp_ul_route = ECPRISS_HAL_GETFIELD_FROM_REG(val,
+			HWIO_ECPRI_XBAR_C2CRX_m_LUT_n_CP_UL_ROUTE_SHFT,
+			HWIO_ECPRI_XBAR_C2CRX_m_LUT_n_CP_UL_ROUTE_BMSK);
+
+	xbar_c2crx_m_lut_n->cp_dl_route = ECPRISS_HAL_GETFIELD_FROM_REG(val,
+			HWIO_ECPRI_XBAR_C2CRX_m_LUT_n_CP_DL_ROUTE_SHFT,
+			HWIO_ECPRI_XBAR_C2CRX_m_LUT_n_CP_DL_ROUTE_BMSK);
+
+	xbar_c2crx_m_lut_n->other_route = ECPRISS_HAL_GETFIELD_FROM_REG(val,
+			HWIO_ECPRI_XBAR_C2CRX_m_LUT_n_OTHER_ROUTE_SHFT,
+			HWIO_ECPRI_XBAR_C2CRX_m_LUT_n_OTHER_ROUTE_BMSK);
+
+	xbar_c2crx_m_lut_n->l3_encap_valid = ECPRISS_HAL_GETFIELD_FROM_REG(val,
+			HWIO_ECPRI_XBAR_C2CRX_m_LUT_n_L3_ENCAP_VALID_SHFT,
+			HWIO_ECPRI_XBAR_C2CRX_m_LUT_n_L3_ENCAP_VALID_BMSK);
+
+	xbar_c2crx_m_lut_n->l3_encap_info = ECPRISS_HAL_GETFIELD_FROM_REG(val,
+			HWIO_ECPRI_XBAR_C2CRX_m_LUT_n_L3_ENCAP_INFO_SHFT,
+			HWIO_ECPRI_XBAR_C2CRX_m_LUT_n_L3_ENCAP_INFO_BMSK);
+
+	xbar_c2crx_m_lut_n->l2_encap_info = ECPRISS_HAL_GETFIELD_FROM_REG(val,
+			HWIO_ECPRI_XBAR_C2CRX_m_LUT_n_L2_ENCAP_INFO_SHFT,
+			HWIO_ECPRI_XBAR_C2CRX_m_LUT_n_L2_ENCAP_INFO_BMSK);
+
+	return;
+}
 	static void  ecpriss_xbar_hal_reg_construct_lut_xbar_ocrx_m_lut_n_2
 (enum ecpriss_xbar_hal_reg_name reg, const void *fields, uint32_t* val)
 {
@@ -2297,6 +2426,10 @@ static struct ecpriss_xbar_hal_reg_obj ecpriss_xbar_hal_reg_objs[ECPRISS_XBAR_HW
 		ecpriss_xbar_hal_reg_construct_dummy_v2,
 		ecpriss_xbar_hal_reg_parse_dummy_v2,
 		0x09420000, 0x00000834, 0, 0, 0, 0, 0},
+	[ECPRISS_XBAR_HW_v2_0][ECPRI_XBAR_C2CRX_n_DEFAULT_DMA_CHANNEL] = {
+		ecpriss_xbar_hal_reg_construct_xbar_c2crx_default_dma_channel,
+		ecpriss_xbar_hal_reg_parse_xbar_c2crx_default_dma_channel,
+		0x09420000, 0x00000880, 0x4, 0, 0, 0, 0},
 	[ECPRISS_XBAR_HW_v2_0][ECPRI_XBAR_SW_IRQ_STATUS] = {
 		ecpriss_xbar_hal_reg_construct_dummy_v2,
 		ecpriss_xbar_hal_reg_parse_dummy_v2,
@@ -2319,8 +2452,8 @@ static struct ecpriss_xbar_hal_reg_obj ecpriss_xbar_hal_reg_objs[ECPRISS_XBAR_HW
 		ecpriss_xbar_hal_reg_parse_lut_xbar_fhrx_m_lut_n_2,
 		0x09500000, 0x0, 0x4, 0, 0, 0, 0x40000},
 	[ECPRISS_XBAR_HW_v2_0][ECPRI_XBAR_LUT_XBAR_C2CRX_m_LUT_n_V2] = {
-		ecpriss_xbar_hal_reg_construct_dummy_v2,
-		ecpriss_xbar_hal_reg_parse_dummy_v2,
+		ecpriss_xbar_hal_reg_construct_lut_xbar_c2crx_m_lut_n_2,
+		ecpriss_xbar_hal_reg_parse_lut_xbar_c2crx_m_lut_n_2,
 		0x09500000, 0xC0000, 0x4, 0, 0, 0, 0x40000},
 	[ECPRISS_XBAR_HW_v2_0][ECPRI_XBAR_LUT_XBAR_OCRX_m_LUT_n_V2] = {
 		ecpriss_xbar_hal_reg_construct_lut_xbar_ocrx_m_lut_n_2,

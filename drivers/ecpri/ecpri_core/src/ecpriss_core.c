@@ -34,7 +34,7 @@ int lte_fh_enabled = 0;
 module_param(lte_fh_enabled, int, S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP);
 MODULE_PARM_DESC(lte_fh_enabled, "Enable LTE FH");
 
-int cascade_enable = 0;
+int cascade_enable = 1;
 module_param(cascade_enable, int, S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP);
 MODULE_PARM_DESC(cascade_enable, "Enable Cascade Mode");
 
@@ -392,6 +392,20 @@ void ecpriss_xbar_set_logging_route(ecpriss_log_cfg_s *log_cfg)
 	}
 }
 
+void ecpriss_xbar_set_l2_logging_route(ecpriss_log_cfg_s *log_cfg)
+{
+	int i=2,j;
+	int num_of_pcid = 0;
+
+	num_of_pcid = log_cfg->num_of_pcid;
+
+	for(j=0;j<num_of_pcid;j++)
+	{
+		ECPRILOGDBG("Calling ecpriss_xbar_c2c_rx_lut_v2_logging for port:%d,pcid:%d,dir:%d,action:%d\n",i,log_cfg->pcids[j],log_cfg->log_dir,log_cfg->action);
+		ecpriss_xbar_c2c_rx_lut_v2_logging(i, log_cfg->pcids[j], log_cfg->log_dir, log_cfg->action);
+	}
+}
+
 int32_t ecpri_send_logging_trigger_to_dma(ecpriss_log_cfg_s *log_cfg)
 {
 	if(log_cfg->action == ECPRISS_LOGGING_START)
@@ -403,6 +417,20 @@ int32_t ecpri_send_logging_trigger_to_dma(ecpriss_log_cfg_s *log_cfg)
 	{
 		return (dma_ecpri_ss_driver_ops.ecpri_dma_ecpri_ss_stop_oran_log)
 			(ECPRI_DMA_ORAN_LOGGING_DIRECTION_INGRESS );
+	}
+}
+
+int32_t ecpri_send_egress_logging_trigger_to_dma(ecpriss_log_cfg_s *log_cfg)
+{
+	if(log_cfg->action == ECPRISS_LOGGING_START)
+	{
+		return (dma_ecpri_ss_driver_ops.ecpri_dma_ecpri_ss_start_oran_log)
+			((log_cfg->log_buf_size)*1024, log_cfg->packet_size, ECPRI_DMA_ORAN_LOGGING_DIRECTION_EGRESS);
+	}
+	else
+	{
+		return (dma_ecpri_ss_driver_ops.ecpri_dma_ecpri_ss_stop_oran_log)
+			(ECPRI_DMA_ORAN_LOGGING_DIRECTION_EGRESS );
 	}
 }
 
@@ -430,6 +458,21 @@ int32_t ecpriss_configure_logging(ecpriss_packet_payload_s *packet)
 			ecpriss_xbar_set_logging_route(log_cfg);
 
 			ret = ecpri_send_logging_trigger_to_dma(log_cfg);
+			if (ret < 0) {
+				ECPRILOGERR("Ecpri logging route configuration failed\n");
+				break;
+			}
+		}
+		else if((ecpriss_pdata_v2->dev_mode == ECPRISS_DEV_MODE_RU && log_cfg->log_dir == ECPRISS_LOG_DIR_UL)
+				|| (ecpriss_pdata_v2->dev_mode == ECPRISS_DEV_MODE_DU_PCIE_3_X_12 && log_cfg->log_dir == ECPRISS_LOG_DIR_DL))
+		{
+			ECPRILOGINFO("Calling l2 route configuration\n");
+
+			ret = (mtip_ecpri_ops.eth_ecpriss_enable_logging_port)(log_cfg->action);
+
+			ecpriss_xbar_set_l2_logging_route(log_cfg);
+
+			ret = ecpri_send_egress_logging_trigger_to_dma(log_cfg);
 			if (ret < 0) {
 				ECPRILOGERR("Ecpri logging route configuration failed\n");
 				break;
@@ -1973,6 +2016,8 @@ static int ecpriss_core_init_v2(struct platform_device *pdev)
 		ECPRILOGERR("QUDP init complete\n");
 
 		ecpriss_xbar_fhrx_default_dma_channel();
+
+		ecpriss_xbar_c2crx_default_dma_channel();
 
 		ecpriss_update_stats_and_requeue(NULL);
 

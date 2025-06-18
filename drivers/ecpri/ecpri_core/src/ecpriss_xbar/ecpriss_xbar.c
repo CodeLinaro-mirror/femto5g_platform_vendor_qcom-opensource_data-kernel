@@ -1974,6 +1974,62 @@ int ecpriss_xbar_fh_rx_lut_v2_logging(uint32_t port_index,
 	return ret;
 }
 
+int ecpriss_xbar_c2c_rx_lut_v2_logging(uint32_t port_index,
+		uint16_t pcid_index , ecpriss_log_dir_e log_dir, ecpriss_logging_action action)
+{
+
+	int ret = 0;
+	ecpri_xbar_hwio_def_ecpri_xbar_c2crx_m_lut_n_s xbar_c2crx_m_lut_n;
+
+	do{
+
+		memset(&xbar_c2crx_m_lut_n,
+				0,
+				sizeof(xbar_c2crx_m_lut_n));
+
+
+		ecpriss_xbar_hal_read_reg_mn_fields(ECPRISS_XBAR_LUT,
+				ECPRI_XBAR_LUT_XBAR_C2CRX_m_LUT_n_V2,
+				port_index,
+				pcid_index,
+				&xbar_c2crx_m_lut_n);
+
+		if(action == ECPRISS_LOGGING_START){
+
+			if(log_dir == ECPRISS_FLOW_DIR_UL){
+			ECPRILOGDBG("Setting cp_ul and up_ul route to DMA for UL\n");
+				xbar_c2crx_m_lut_n.cp_ul_route = HWIO_ECPRI_XBAR_C2CRX_m_LUT_n_CP_UL_ROUTE_ROUTE_TO_DMA_FVAL;
+				xbar_c2crx_m_lut_n.up_ul_route = HWIO_ECPRI_XBAR_C2CRX_m_LUT_n_UP_UL_ROUTE_ROUTE_TO_DMA_FVAL;
+			}
+			else if(log_dir == ECPRISS_FLOW_DIR_DL){
+			ECPRILOGDBG("Setting cp_dl and up_ul route to DMA for DL\n");
+				xbar_c2crx_m_lut_n.cp_dl_route = HWIO_ECPRI_XBAR_C2CRX_m_LUT_n_CP_DL_ROUTE_ROUTE_TO_DMA_FVAL;
+				xbar_c2crx_m_lut_n.up_dl_route = HWIO_ECPRI_XBAR_C2CRX_m_LUT_n_UP_DL_ROUTE_ROUTE_TO_DMA_FVAL;
+			}
+
+		}else{
+
+			if(log_dir == ECPRISS_FLOW_DIR_UL){
+				xbar_c2crx_m_lut_n.cp_ul_route = HWIO_ECPRI_XBAR_C2CRX_m_LUT_n_CP_UL_ROUTE_INVALID_FVAL;
+				xbar_c2crx_m_lut_n.up_ul_route = HWIO_ECPRI_XBAR_C2CRX_m_LUT_n_UP_UL_ROUTE_INVALID_FVAL;
+			}
+			else if(log_dir == ECPRISS_FLOW_DIR_DL){
+				xbar_c2crx_m_lut_n.cp_dl_route = HWIO_ECPRI_XBAR_C2CRX_m_LUT_n_CP_DL_ROUTE_INVALID_FVAL;
+				xbar_c2crx_m_lut_n.up_dl_route = HWIO_ECPRI_XBAR_C2CRX_m_LUT_n_UP_DL_ROUTE_INVALID_FVAL;
+			}
+
+		}
+
+		ecpriss_xbar_hal_write_reg_mn_fields(ECPRISS_XBAR_LUT,
+				ECPRI_XBAR_LUT_XBAR_C2CRX_m_LUT_n_V2,
+				port_index,
+				pcid_index,
+				&xbar_c2crx_m_lut_n);
+
+	}while (0);
+
+	return ret;
+}
 
 /**
  * ecpriss_xbar_oc_rx_lut
@@ -2145,8 +2201,8 @@ void ecpriss_xbar_fhrx_default_dma_channel(void)
 	{
 		if(dma_port_cfg->dma_rings_param[j].dma_ring_type == ECPRI_DMA_RING_TYPE_ORAN_LOG_INGRESS)
 		{
-			xbar_fhrx_default_dma_channel.dma_ring_id = dma_port_cfg->dma_rings_param[1].dest_dma_ring_id;
-			xbar_fhrx_default_dma_channel.gsi_id = dma_port_cfg->dma_rings_param[1].dest_dma_ring_gsi_id;
+			xbar_fhrx_default_dma_channel.dma_ring_id = dma_port_cfg->dma_rings_param[j].dest_dma_ring_id;
+			xbar_fhrx_default_dma_channel.gsi_id = dma_port_cfg->dma_rings_param[j].dest_dma_ring_gsi_id;
 
 			for(port_index=0; port_index<MAX_PORTS; port_index++)
 			{
@@ -2155,6 +2211,31 @@ void ecpriss_xbar_fhrx_default_dma_channel(void)
 						port_index,
 						&xbar_fhrx_default_dma_channel);
 			}
+		}
+	}
+}
+
+void ecpriss_xbar_c2crx_default_dma_channel(void)
+{
+	int32_t fh_index = 0;
+	int port_index = 2, j;
+
+	ecpri_xbar_hwio_def_ecpri_xbar_c2crx_n_default_dma_channel_s xbar_c2crx_default_dma_channel;
+	struct ecpri_dma_port_params *dma_port_cfg= &ecpriss_pdata_v2->xbar_ctx_v2->oran_log_port_cfg.dma_port_cfg[fh_index];
+
+	memset(&xbar_c2crx_default_dma_channel , 0, sizeof(xbar_c2crx_default_dma_channel));
+
+	for(j=0; j<dma_port_cfg->num_of_rings; j++)
+	{
+		if(dma_port_cfg->dma_rings_param[j].dma_ring_type == ECPRI_DMA_RING_TYPE_ORAN_LOG_EGRESS)
+		{
+			xbar_c2crx_default_dma_channel.dma_ring_id = dma_port_cfg->dma_rings_param[j].dest_dma_ring_id;
+			xbar_c2crx_default_dma_channel.gsi_id = dma_port_cfg->dma_rings_param[j].dest_dma_ring_gsi_id;
+
+			ecpriss_xbar_hal_write_reg_n_fields(ECPRISS_XBAR_GLOBAL,
+					ECPRI_XBAR_C2CRX_n_DEFAULT_DMA_CHANNEL,
+					port_index,
+					&xbar_c2crx_default_dma_channel);
 		}
 	}
 }

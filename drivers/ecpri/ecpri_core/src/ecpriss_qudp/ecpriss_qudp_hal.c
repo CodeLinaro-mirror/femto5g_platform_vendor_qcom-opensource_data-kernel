@@ -1973,6 +1973,19 @@ static const char *ecpriss_qudp_hal_reg_name_to_str[ECPRISS_QUDP_REG_MAX+1] = {
 	return;
 }
 
+	static void ecpriss_qudp_hal_reg_construct_l2_egress_eth_dst0_port_p_entry_n_v2
+(ecpriss_qudp_hal_reg_name_e reg, const void *fields, uint32_t* val)
+{
+	ecpri_qudp_hwio_def_ecpri_udp_l2_egress_eth_dst0_port_p_entry_n_s_v2 *eth_dst0_port_p_entry_n
+		= (ecpri_qudp_hwio_def_ecpri_udp_l2_egress_eth_dst0_port_p_entry_n_s_v2 *)fields;
+
+	ECPRISS_HAL_SETFIELD_IN_REG(*val,
+			eth_dst0_port_p_entry_n->value,
+			HWIO_ECPRI_UDP_L2_EGRESS_ETH_DST0_PORT_p_ENTRY_n_VALUE_SHFT_V2,
+			HWIO_ECPRI_UDP_L2_EGRESS_ETH_DST0_PORT_p_ENTRY_n_VALUE_BMSK_V2);
+	return;
+}
+
 	static void ecpriss_qudp_hal_reg_construct_fh_egress_eth_dst0_port_p_entry_n
 (ecpriss_qudp_hal_reg_name_e reg, const void *fields, uint32_t* val)
 {
@@ -2007,6 +2020,18 @@ static const char *ecpriss_qudp_hal_reg_name_to_str[ECPRISS_QUDP_REG_MAX+1] = {
 	eth_dst0_port_p_entry_n->value = ECPRISS_HAL_GETFIELD_FROM_REG(val,
 			HWIO_ECPRI_UDP_FH_EGRESS_ETH_DST0_PORT_p_ENTRY_n_VALUE_SHFT_V2,
 			HWIO_ECPRI_UDP_FH_EGRESS_ETH_DST0_PORT_p_ENTRY_n_VALUE_BMSK_V2);
+	return;
+}
+
+	static void ecpriss_qudp_hal_reg_parse_l2_egress_eth_dst0_port_p_entry_n_v2
+(ecpriss_qudp_hal_reg_name_e reg, void *fields, uint32_t val)
+{
+	ecpri_qudp_hwio_def_ecpri_udp_l2_egress_eth_dst0_port_p_entry_n_s_v2 *eth_dst0_port_p_entry_n
+		= (ecpri_qudp_hwio_def_ecpri_udp_l2_egress_eth_dst0_port_p_entry_n_s_v2 *)fields;
+
+	eth_dst0_port_p_entry_n->value = ECPRISS_HAL_GETFIELD_FROM_REG(val,
+			HWIO_ECPRI_UDP_L2_EGRESS_ETH_DST0_PORT_p_ENTRY_n_VALUE_SHFT_V2,
+			HWIO_ECPRI_UDP_L2_EGRESS_ETH_DST0_PORT_p_ENTRY_n_VALUE_BMSK_V2);
 	return;
 }
 
@@ -2048,6 +2073,25 @@ static const char *ecpriss_qudp_hal_reg_name_to_str[ECPRISS_QUDP_REG_MAX+1] = {
 	return;
 }
 
+	static void ecpriss_qudp_hal_reg_construct_l2_egress_eth_src1_dst1_port_p_entry_n_v2
+(ecpriss_qudp_hal_reg_name_e reg, const void *fields, uint32_t* val)
+{
+	ecpri_qudp_hwio_def_ecpri_udp_l2_egress_eth_src1_dst1_port_p_entry_n_s_v2 *eth_src1_dst1_port_p_entry_n
+		= (ecpri_qudp_hwio_def_ecpri_udp_l2_egress_eth_src1_dst1_port_p_entry_n_s_v2 *)fields;
+
+	ECPRISS_HAL_SETFIELD_IN_REG(*val,
+			eth_src1_dst1_port_p_entry_n->src_msb,
+			HWIO_ECPRI_UDP_L2_EGRESS_ETH_SRC1_DST1_PORT_p_ENTRY_n_SRC_MSB_SHFT_V2,
+			HWIO_ECPRI_UDP_L2_EGRESS_ETH_SRC1_DST1_PORT_p_ENTRY_n_SRC_MSB_BMSK_V2);
+
+	ECPRISS_HAL_SETFIELD_IN_REG(*val,
+			eth_src1_dst1_port_p_entry_n->dst_msb,
+			HWIO_ECPRI_UDP_L2_EGRESS_ETH_SRC1_DST1_PORT_p_ENTRY_n_DST_MSB_SHFT_V2,
+			HWIO_ECPRI_UDP_L2_EGRESS_ETH_SRC1_DST1_PORT_p_ENTRY_n_DST_MSB_BMSK_V2);
+
+	return;
+}
+
 
 	static void ecpriss_qudp_hal_reg_parse_fh_egress_eth_src1_dst1_port_p_entry_n
 (ecpriss_qudp_hal_reg_name_e reg, void *fields, uint32_t val)
@@ -2083,6 +2127,23 @@ static const char *ecpriss_qudp_hal_reg_name_to_str[ECPRISS_QUDP_REG_MAX+1] = {
 	return;
 }
 
+	static void ecpriss_qudp_hal_reg_parse_l2_egress_eth_src1_dst1_port_p_entry_n_v2
+(ecpriss_qudp_hal_reg_name_e reg, void *fields, uint32_t val)
+{
+	ecpri_qudp_hwio_def_ecpri_udp_l2_egress_eth_src1_dst1_port_p_entry_n_s_v2 *eth_src1_dst1_port_p_entry_n
+		= (ecpri_qudp_hwio_def_ecpri_udp_l2_egress_eth_src1_dst1_port_p_entry_n_s_v2 *)fields;
+
+	eth_src1_dst1_port_p_entry_n->src_msb = ECPRISS_HAL_GETFIELD_FROM_REG(val,
+			HWIO_ECPRI_UDP_L2_EGRESS_ETH_SRC1_DST1_PORT_p_ENTRY_n_SRC_MSB_SHFT_V2,
+			HWIO_ECPRI_UDP_L2_EGRESS_ETH_SRC1_DST1_PORT_p_ENTRY_n_SRC_MSB_BMSK_V2);
+
+	eth_src1_dst1_port_p_entry_n->dst_msb = ECPRISS_HAL_GETFIELD_FROM_REG(val,
+			HWIO_ECPRI_UDP_L2_EGRESS_ETH_SRC1_DST1_PORT_p_ENTRY_n_DST_MSB_SHFT_V2,
+			HWIO_ECPRI_UDP_L2_EGRESS_ETH_SRC1_DST1_PORT_p_ENTRY_n_DST_MSB_BMSK_V2);
+
+	return;
+}
+
 
 
 	static void ecpriss_qudp_hal_reg_construct_fh_egress_eth_src0_port_p_entry_n
@@ -2111,6 +2172,19 @@ static const char *ecpriss_qudp_hal_reg_name_to_str[ECPRISS_QUDP_REG_MAX+1] = {
 	return;
 }
 
+	static void ecpriss_qudp_hal_reg_construct_l2_egress_eth_src0_port_p_entry_n_v2
+(ecpriss_qudp_hal_reg_name_e reg, const void *fields, uint32_t* val)
+{
+	ecpri_qudp_hwio_def_ecpri_udp_l2_egress_eth_src0_port_p_entry_n_s_v2 *eth_src0_port_p_entry_n
+		= (ecpri_qudp_hwio_def_ecpri_udp_l2_egress_eth_src0_port_p_entry_n_s_v2 *)fields;
+
+	ECPRISS_HAL_SETFIELD_IN_REG(*val,
+			eth_src0_port_p_entry_n->value,
+			HWIO_ECPRI_UDP_L2_EGRESS_ETH_SRC0_PORT_p_ENTRY_n_VALUE_SHFT_V2,
+			HWIO_ECPRI_UDP_L2_EGRESS_ETH_SRC0_PORT_p_ENTRY_n_VALUE_BMSK_V2);
+	return;
+}
+
 
 	static void ecpriss_qudp_hal_reg_parse_fh_egress_eth_src0_port_p_entry_n
 (ecpriss_qudp_hal_reg_name_e reg, void *fields, uint32_t val)
@@ -2133,6 +2207,18 @@ static const char *ecpriss_qudp_hal_reg_name_to_str[ECPRISS_QUDP_REG_MAX+1] = {
 	eth_src0_port_p_entry_n->value = ECPRISS_HAL_GETFIELD_FROM_REG(val,
 			HWIO_ECPRI_UDP_FH_EGRESS_ETH_SRC0_PORT_p_ENTRY_n_VALUE_SHFT_V2,
 			HWIO_ECPRI_UDP_FH_EGRESS_ETH_SRC0_PORT_p_ENTRY_n_VALUE_BMSK_V2);
+	return;
+}
+
+	static void ecpriss_qudp_hal_reg_parse_l2_egress_eth_src0_port_p_entry_n_v2
+(ecpriss_qudp_hal_reg_name_e reg, void *fields, uint32_t val)
+{
+	ecpri_qudp_hwio_def_ecpri_udp_l2_egress_eth_src0_port_p_entry_n_s_v2 *eth_src0_port_p_entry_n
+		= (ecpri_qudp_hwio_def_ecpri_udp_l2_egress_eth_src0_port_p_entry_n_s_v2 *)fields;
+
+	eth_src0_port_p_entry_n->value = ECPRISS_HAL_GETFIELD_FROM_REG(val,
+			HWIO_ECPRI_UDP_L2_EGRESS_ETH_SRC0_PORT_p_ENTRY_n_VALUE_SHFT_V2,
+			HWIO_ECPRI_UDP_L2_EGRESS_ETH_SRC0_PORT_p_ENTRY_n_VALUE_BMSK_V2);
 	return;
 }
 
@@ -2174,6 +2260,24 @@ static const char *ecpriss_qudp_hal_reg_name_to_str[ECPRISS_QUDP_REG_MAX+1] = {
 	return;
 }
 
+	static void ecpriss_qudp_hal_reg_construct_l2_egress_vlan_ethertype_port_p_entry_n_v2
+(ecpriss_qudp_hal_reg_name_e reg, const void *fields, uint32_t* val)
+{
+	ecpri_qudp_hwio_def_ecpri_udp_l2_egress_vlan_ethertype_port_p_entry_n_s_v2 *vlan_ethertype_port_p_entry_n
+		= (ecpri_qudp_hwio_def_ecpri_udp_l2_egress_vlan_ethertype_port_p_entry_n_s_v2 *)fields;
+
+	ECPRISS_HAL_SETFIELD_IN_REG(*val,
+			vlan_ethertype_port_p_entry_n->ethertype,
+			HWIO_ECPRI_UDP_L2_EGRESS_VLAN_ETHERTYPE_PORT_p_ENTRY_n_ETHERTYPE_SHFT_V2,
+			HWIO_ECPRI_UDP_L2_EGRESS_VLAN_ETHERTYPE_PORT_p_ENTRY_n_ETHERTYPE_BMSK_V2);
+	ECPRISS_HAL_SETFIELD_IN_REG(*val,
+			vlan_ethertype_port_p_entry_n->vlan_data,
+			HWIO_ECPRI_UDP_L2_EGRESS_VLAN_ETHERTYPE_PORT_p_ENTRY_n_VLAN_DATA_SHFT_V2,
+			HWIO_ECPRI_UDP_L2_EGRESS_VLAN_ETHERTYPE_PORT_p_ENTRY_n_VLAN_DATA_BMSK_V2);
+
+	return;
+}
+
 
 	static void ecpriss_qudp_hal_reg_parse_fh_egress_vlan_ethertype_port_p_entry_n
 (ecpriss_qudp_hal_reg_name_e reg, void *fields, uint32_t val)
@@ -2205,6 +2309,23 @@ static const char *ecpriss_qudp_hal_reg_name_to_str[ECPRISS_QUDP_REG_MAX+1] = {
 	vlan_ethertype_port_p_entry_n->vlan_data = ECPRISS_HAL_GETFIELD_FROM_REG(val,
 			HWIO_ECPRI_UDP_FH_EGRESS_VLAN_ETHERTYPE_PORT_p_ENTRY_n_VLAN_DATA_SHFT_V2,
 			HWIO_ECPRI_UDP_FH_EGRESS_VLAN_ETHERTYPE_PORT_p_ENTRY_n_VLAN_DATA_BMSK_V2);
+
+	return;
+}
+
+	static void ecpriss_qudp_hal_reg_parse_l2_egress_vlan_ethertype_port_p_entry_n_v2
+(ecpriss_qudp_hal_reg_name_e reg, void *fields, uint32_t val)
+{
+	ecpri_qudp_hwio_def_ecpri_udp_l2_egress_vlan_ethertype_port_p_entry_n_s_v2 *vlan_ethertype_port_p_entry_n
+		= (ecpri_qudp_hwio_def_ecpri_udp_l2_egress_vlan_ethertype_port_p_entry_n_s_v2 *)fields;
+
+	vlan_ethertype_port_p_entry_n->ethertype = ECPRISS_HAL_GETFIELD_FROM_REG(val,
+			HWIO_ECPRI_UDP_L2_EGRESS_VLAN_ETHERTYPE_PORT_p_ENTRY_n_ETHERTYPE_SHFT_V2,
+			HWIO_ECPRI_UDP_L2_EGRESS_VLAN_ETHERTYPE_PORT_p_ENTRY_n_ETHERTYPE_BMSK_V2);
+
+	vlan_ethertype_port_p_entry_n->vlan_data = ECPRISS_HAL_GETFIELD_FROM_REG(val,
+			HWIO_ECPRI_UDP_L2_EGRESS_VLAN_ETHERTYPE_PORT_p_ENTRY_n_VLAN_DATA_SHFT_V2,
+			HWIO_ECPRI_UDP_L2_EGRESS_VLAN_ETHERTYPE_PORT_p_ENTRY_n_VLAN_DATA_BMSK_V2);
 
 	return;
 }
@@ -5828,20 +5949,20 @@ static struct ecpriss_qudp_hal_reg_obj ecpriss_qudp_hal_reg_objs[ECPRISS_HW_MAX]
 		ecpriss_qudp_hal_reg_parse_dummy_v2,
 		0x93E4000 , 0x44, 0x120, 0, 0, 0, 0x48},
 	[ECPRISS_HW_v2_0][ECPRI_UDP_L2_EGRESS_ETH_DST0_PORT_p_ENTRY_n_V2] = {
-		ecpriss_qudp_hal_reg_construct_dummy_v2,
-		ecpriss_qudp_hal_reg_parse_dummy_v2,
+		ecpriss_qudp_hal_reg_construct_l2_egress_eth_dst0_port_p_entry_n_v2,
+		ecpriss_qudp_hal_reg_parse_l2_egress_eth_dst0_port_p_entry_n_v2,
 		0x93E4000 , 0x1000, 0x20, 0, 0, 0, 0x2000},
 	[ECPRISS_HW_v2_0][ECPRI_UDP_L2_EGRESS_ETH_SRC1_DST1_PORT_p_ENTRY_n_V2] = {
-		ecpriss_qudp_hal_reg_construct_dummy_v2,
-		ecpriss_qudp_hal_reg_parse_dummy_v2,
+		ecpriss_qudp_hal_reg_construct_l2_egress_eth_src1_dst1_port_p_entry_n_v2,
+		ecpriss_qudp_hal_reg_parse_l2_egress_eth_src1_dst1_port_p_entry_n_v2,
 		0x93E4000 , 0x1004, 0x20, 0, 0, 0, 0x2000},
 	[ECPRISS_HW_v2_0][ECPRI_UDP_L2_EGRESS_ETH_SRC0_PORT_p_ENTRY_n_V2] = {
-		ecpriss_qudp_hal_reg_construct_dummy_v2,
-		ecpriss_qudp_hal_reg_parse_dummy_v2,
+		ecpriss_qudp_hal_reg_construct_l2_egress_eth_src0_port_p_entry_n_v2,
+		ecpriss_qudp_hal_reg_parse_l2_egress_eth_src0_port_p_entry_n_v2,
 		0x93E4000 , 0x1008, 0x20, 0, 0, 0, 0x2000},
 	[ECPRISS_HW_v2_0][ECPRI_UDP_L2_EGRESS_VLAN_ETHERTYPE_PORT_p_ENTRY_n_V2] = {
-		ecpriss_qudp_hal_reg_construct_dummy_v2,
-		ecpriss_qudp_hal_reg_parse_dummy_v2,
+		ecpriss_qudp_hal_reg_construct_l2_egress_vlan_ethertype_port_p_entry_n_v2,
+		ecpriss_qudp_hal_reg_parse_l2_egress_vlan_ethertype_port_p_entry_n_v2,
 		0x93E4000 , 0x100C, 0x20, 0, 0, 0, 0x2000},
 	[ECPRISS_HW_v2_0][ECPRI_UDP_L2_EGRESS_VPORT_MISC_PORT_p_ENTRY_n_V2] = {
 		ecpriss_qudp_hal_reg_construct_dummy_v2,
@@ -6113,7 +6234,7 @@ int ecpriss_qudp_l2_hal_reg_init(struct device *dev)
 		ecpriss_qudp_hal_ctx.l2_rams_base = ioremap(ecpriss_qudp_hal_ctx.qudp_l2_phy_rams_base,
 				ECPRISS_QUDP_L2_RAMS_REG_SIZE);
 		if (!ecpriss_qudp_hal_ctx.qudp_l2_phy_rams_base) {
-			ECPRILOGERR(":ecpriss_qudp_fh_base filter ioremap err\n");
+			ECPRILOGERR(":qudp_l2_phy_rams_base ioremap err\n");
 			result = -EFAULT;
 			break;
 		}
