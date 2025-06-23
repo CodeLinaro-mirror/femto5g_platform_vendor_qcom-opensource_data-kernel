@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: GPL-2.0-only
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 /**
@@ -199,6 +199,9 @@ int qcom_aw_phy_synce_set_snr_threshold(
   pmd_write_field(&mss, RX_SNR_REG5_ADDR,
                   RX_SNR_REG5_VLD_HYS_THRESH_HIGH_NT_MASK,
                   RX_SNR_REG5_VLD_HYS_THRESH_HIGH_NT_OFFSET, snr_high_val);
+
+  aw_pmd_snr_mon_enable_set(&mss, nrz_mode, 0);
+  aw_pmd_snr_vld_enable_set(&mss, 0);
 
   aw_pmd_snr_mon_enable_set(&mss, nrz_mode, 1);
   aw_pmd_snr_vld_enable_set(&mss, 1);
