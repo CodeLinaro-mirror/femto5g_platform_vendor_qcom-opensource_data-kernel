@@ -261,10 +261,9 @@ static void mtip_update_topology()
                 break;
             case MTIP_PORT_TYPE_L2:
                 {
-                    port_number = ETH_ECPRISS_PORT_TYPE_L2;
-                    port = topology->topology_params[port_number].num_ports;
-
-                    topology->topology_params[port_number].port_params[port].port_index = platform_driver_priv->devices.port_devices[i].port_type;
+                    port_number = ETH_ECPRISS_PORT_TYPE_C2C;
+                    port = 0;
+                    topology->topology_params[port_number].port_params[port].port_index = 0;
 
                     link_number = 0;
 
