@@ -662,7 +662,7 @@ void ecpriss_eth_topology_init_v2(void)
 
 					port_params = &eth_link_params_g.topology_params[i].port_params[port_index];
                                         for(k=0;k<num_links;k++){
-						//pr_err("port_index: %d link_index: %d link state: %d\n",port_index,k,port_params->link_params[k].link_state);
+						//pr_err("FH:port_index: %d link_index: %d link state: %d\n",port_index,k,port_params->link_params[k].link_state);
 
                                                 if(port_params->link_params[k].link_state == ETH_ECPRISS_LINK_STATE_UP){
                                                         link_state_flag = true;
@@ -683,11 +683,12 @@ void ecpriss_eth_topology_init_v2(void)
 							i);
 				}
 			}
-			else if(eth_link_params_g.topology_params[i].port_type ==
+			if(eth_link_params_g.topology_params[i].port_type ==
 					ETH_ECPRISS_PORT_TYPE_C2C) {
 				ecpriss_pdata_v2->qudp_ctx_v2->num_ports[ETH_ECPRISS_PORT_TYPE_C2C] =
 				eth_link_params_g.topology_params[i].num_ports;
 				for(j=0;j<ecpriss_pdata_v2->qudp_ctx_v2->num_ports[ETH_ECPRISS_PORT_TYPE_C2C];j++){
+					link_state_flag = false;
 					port_index =
 					eth_link_params_g.topology_params[i].port_params[j].port_index;
 					port_cfg_local =
@@ -697,19 +698,18 @@ void ecpriss_eth_topology_init_v2(void)
 
 					port_params = &eth_link_params_g.topology_params[i].port_params[port_index];
                                         for(k=0;k<num_links;k++){
-						//pr_err("port_index: %d link_index: %d link state: %d\n",port_index,k,port_params->link_params[k].link_state);
+						//pr_err("C2C:port_index: %d link_index: %d link state: %d\n",port_index,k,port_params->link_params[k].link_state);
                                                 if(port_params->link_params[k].link_state == ETH_ECPRISS_LINK_STATE_UP){
                                                         link_state_flag = true;
 	                                        }
                                         }
 
                                         if(link_state_flag == true){
-                                                ecpriss_configure_xbar_flush_v2(ECPRISS_PORT_TYPE_L2,port_index,ETH_ECPRISS_EVENT_UP);
+                                                ecpriss_configure_xbar_flush_v2(ECPRISS_PORT_TYPE_C2C,2,ETH_ECPRISS_EVENT_UP);
                                         }
                                         else{
-                                                ecpriss_configure_xbar_flush_v2(ECPRISS_PORT_TYPE_L2,port_index,ETH_ECPRISS_EVENT_DOWN);
+                                                ecpriss_configure_xbar_flush_v2(ECPRISS_PORT_TYPE_C2C,2,ETH_ECPRISS_EVENT_DOWN);
                                         }
-					link_state_flag = false;
 					ecpriss_eth_cpy_params_v2(port_cfg_local,
 							&eth_link_params_g,
 							port_index,
