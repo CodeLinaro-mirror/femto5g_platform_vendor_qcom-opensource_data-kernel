@@ -48,6 +48,7 @@
 #include "mtip_workq.h"
 #include "mtip_mac.h"
 #include "mtip_pcs.h"
+#include "mtip_phy.h"
 
 static eth_ecpriss_link_rate_e mtip_client_get_link_rate(u32 port_type)
 {
@@ -582,7 +583,7 @@ int setup_interface_in_loopback_mode(struct net_device *netdev, u32 link_index)
 
     priv = netdev_priv(netdev);
 
-    mtip_c2c2_loopback_mode = MTIP_MODE_C2C2_LOOPBACK;
+    mtip_c2c2_loopback_mode = MTIP_MODE_PHY_LOOPBACK;
 
     // set the promiscous mode
     ret = mtip_mac_set_promisc_mode(priv, true);
@@ -671,6 +672,7 @@ eth_ecpriss_status_e mtip_eth_enable_logging_port(bool action)
 
         if(platform_driver_priv->mtip_links[link_index]->state != MTIP_LINK_STATE_UP)
         {
+            mtip_phy_set_loopback_mode(QCOM_AW_PHY_NEAR_END_SERIAL_LB);
             setup_interface_in_loopback_mode(netdev, link_index);
 
             rtnl_lock(); // Lock the network namespace
