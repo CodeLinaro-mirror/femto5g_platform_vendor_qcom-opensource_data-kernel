@@ -1237,7 +1237,7 @@ void mtip_rx_mode_set(struct net_device *netdev)
         ret = mtip_mac_set_promisc_mode(priv, true);
         CSMLOGDBG("Enabling all multicast for link index: %d\n", link_index);
  	} 
-    if( ( link_index != MTIP_L2_ETH_LINK_INDEX && mtip_loopback_mode != MTIP_MODE_DEFAULT) || (  link_index == MTIP_L2_ETH_LINK_INDEX && mtip_c2c2_loopback_mode != MTIP_MODE_DEFAULT ) )
+    else if( ( link_index != MTIP_L2_ETH_LINK_INDEX && mtip_loopback_mode != MTIP_MODE_DEFAULT) || (  link_index == MTIP_L2_ETH_LINK_INDEX && mtip_c2c2_loopback_mode != MTIP_MODE_DEFAULT ) )
     {
         ret = mtip_mac_set_promisc_mode(priv, true);
         CSMLOGDBG("Setting promiscuous mode ON for link index: %d\n", link_index);
