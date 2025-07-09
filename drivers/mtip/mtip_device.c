@@ -1469,20 +1469,20 @@ static int mtip_ioctl(struct net_device *netdev, struct ifreq *ifr, int cmd)
 
    CSMLOGDBG("mtip_ioctl called cmd: %d, link_index: %d\n", cmd, link_index);
 
-   if (!netif_running(netdev))
-      return -EINVAL;
-
    switch (cmd) 
    {
-   case SIOCGHWTSTAMP:
-   case SIOCSHWTSTAMP:
+      case SIOCGHWTSTAMP:
+      case SIOCSHWTSTAMP:
       {
          ret = mtip_ptp_handle_hwtstamp_ioctl(ifr, link_index);
+         CSMLOGERR("cmd: %d, link_index: %d, netif_running %d, ret %d", cmd, link_index, netif_running(netdev), ret);
       }
       break;
-   default:
-      break;
+
+      default:
+         break;
    }
+
    return ret;
 }
 
