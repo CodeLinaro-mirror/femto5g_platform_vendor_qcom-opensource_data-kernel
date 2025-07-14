@@ -221,13 +221,14 @@ void run_mtip_process_cdr_lock_ind(void* workptr)
         goto out;
     }
 
-    CSMLOGINFO("CDR lock indication for link_index %d, status %d, an_seq_num %d\n",
-               link_index, status, an_seq_num);
-
-    if(platform_driver_priv->mtip_links[link_index]->state == MTIP_LINK_STATE_CLOSE)
+    if(platform_driver_priv->mtip_links[link_index]->state == MTIP_LINK_STATE_CLOSE ||
+       platform_driver_priv->mtip_links[link_index]->state == MTIP_LINK_STATE_OPEN_WAITING_FOR_LANES)
     {
         goto out;
     }
+
+    CSMLOGINFO("CDR lock indication for link_index %d, status %d, an_seq_num %d\n",
+               link_index, status, an_seq_num);
 
     if(an_seq_num != 0 &&
        an_seq_num != mtip_phy_an_seq_num[port_type])
@@ -419,7 +420,8 @@ void run_mtip_phy_retry_bringup(void* workptr)
         goto func_exit;
     }
 
-    if(platform_driver_priv->mtip_links[link_index]->state == MTIP_LINK_STATE_CLOSE)
+    if(platform_driver_priv->mtip_links[link_index]->state == MTIP_LINK_STATE_CLOSE ||
+       platform_driver_priv->mtip_links[link_index]->state == MTIP_LINK_STATE_OPEN_WAITING_FOR_LANES)
     {
         goto func_exit;
     }
