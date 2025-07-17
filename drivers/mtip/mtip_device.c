@@ -872,6 +872,11 @@ static int mtip_start_xmit(struct sk_buff *skb, struct net_device *netdev)
    int pending_buff_completion_count = 0;
    char* tmp=NULL;
    u32 port_type;
+   u8 tmp_ts_seq_num = 0;
+   u8 tx_ts_stat=0;
+   u32 timestamp_secs;
+   u32 timestamp_nsecs;
+
    CSMLOGDBG("mtip_start_xmit called\n");
 
    priv = netdev_priv(netdev);
@@ -1070,7 +1075,20 @@ static int mtip_start_xmit(struct sk_buff *skb, struct net_device *netdev)
       }else{
 
          ts_seq_num = mtip_netdev_get_next_ptp_ts_seq_num(link_index);
-         //ts_seq_num = 0;
+
+         mtip_mac_read_timestamp(link_index, &timestamp_secs, &timestamp_nsecs);
+         mtip_mac_read_tx_ts_stat_reg(link_index,&tx_ts_stat);
+         CSMLOGPTP("timestamp_nsecs=%d,tx_ts_stat=%x\n",timestamp_nsecs,tx_ts_stat);
+         while(tx_ts_stat!=2)
+         {
+             if ((mode == MTIP_DEVICE_RUv2) || (mode == MTIP_DEVICE_DUv2))
+             {
+                 mtip_mac_read_ts_seq_num(link_index, &tmp_ts_seq_num);
+             }
+             mtip_mac_read_timestamp(link_index, &timestamp_secs, &timestamp_nsecs);
+             mtip_mac_read_tx_ts_stat_reg(link_index,&tx_ts_stat);
+             CSMLOGPTP("Pending h.w TS FIFO timestamp_nsecs=%d,tx_ts_stat=%x\n",timestamp_nsecs,tx_ts_stat);
+         }
       }
       mtip_ptp_tx_ts_lock_release(link_index);
        // set the flag to in progress
