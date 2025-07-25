@@ -59,20 +59,12 @@ int ldmm_mtip_fault_hndlr(struct notifier_block *nb, unsigned long event, void *
 
 		case IF_DOWN:
 			LDMM_LOG_ERR("IF_DOWN\n");
-#if 0
 			LDMM_SETFIELD_IN_REG(val, LDMM_IF_DOWN, FAULT_NUM_SHIFT, FAULT_NUM_MASK);
-#else
-			return ret;
-#endif
 			break;
 
 		case IF_UP:
 			LDMM_LOG_ERR("IF_UP\n");
-#if 0
 			LDMM_SETFIELD_IN_REG(val, LDMM_IF_UP, FAULT_NUM_SHIFT, FAULT_NUM_MASK);
-#else
-			return ret;
-#endif
 			break;
 
 		case PCS_IF_UP:
