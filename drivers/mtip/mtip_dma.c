@@ -139,13 +139,13 @@ void mtip_dma_rx_comp_cb(void *user_data, ecpri_dma_eth_conn_hdl_t hdl)
          link = platform_driver_priv->mtip_links[link_index];
          netdev = link->dev;
 
-         CSMLOGDBG("napi schedule for hdl: %d, link_index: %d, link 0x%lx, netdev 0x%lx\n", used_handle, link_index, (unsigned long)link, (unsigned long)netdev);
 
          priv = netdev_priv(netdev);
 
          // schedule napi
          if (napi_schedule_prep(&(link->napi))) {
             __napi_schedule(&(link->napi));
+            CSMLOGDBG("napi schedule for hdl: %d, link_index: %d, link 0x%lx, netdev 0x%lx\n", used_handle, link_index, (unsigned long)link, (unsigned long)netdev);
 
             // set the rx mode to POLL
             mtip_set_rx_mode_immediate(hdl, setmode);
@@ -436,6 +436,10 @@ int mtip_start_dma_pipe(struct net_device *netdev, ecpri_dma_eth_conn_hdl_t hdl)
    int num_pkt_allocs = MTIP_NAPI_WEIGHT * MTIP_RX_DMA_MAX_BUFFERS_PER_PACKET;
    u32 tx_available = 0;
    u32 rx_available = 0;
+   enum ecpri_dma_notify_mode mode = ECPRI_DMA_NOTIFY_MODE_MAX;
+   enum ecpri_dma_notify_mode setmode = ECPRI_DMA_NOTIFY_MODE_IRQ;
+   u32 link_index;
+   struct mtip_link_info* link=NULL;
 
    // start the pipes
    rv = (ecpri_dma_eth_driver_ops.ecpri_dma_eth_start_endpoints)(hdl);
@@ -447,6 +451,13 @@ int mtip_start_dma_pipe(struct net_device *netdev, ecpri_dma_eth_conn_hdl_t hdl)
 
    priv = netdev_priv(netdev);
 
+   // get the link index
+   if (mtip_lookup_link_index_by_handle(hdl, &link_index) < 0)
+   {
+      rv = -1;
+      CSMLOGERR("unable to find link_index for handle: %d ..ignoring\n", hdl);
+      goto ret;
+   }
    // set the initial set of rx buffers
    // the number of buffers to replenish has to be at most MTIP_RX_RING_SIZE - 1
    if(hdl_repl[hdl] == false)
@@ -497,22 +508,73 @@ int mtip_start_dma_pipe(struct net_device *netdev, ecpri_dma_eth_conn_hdl_t hdl)
          }
       }
 
+      rv = mtip_dma_get_ring_state(hdl, &tx_available, &rx_available);
+      if (rv < 0)
+      {
+         CSMLOGERR("get ring state from DMA failed for hdl: %d\n", hdl);
+      }
+      CSMLOGINFO("rx_available: %d,priv->rx_polled_count %d,link_index=%d\n", rx_available,priv->rx_polled_count,link_index);
+
       mtip_replenish_dma_rx_buffers(netdev, hdl, MTIP_RX_RING_SIZE - 1);
+
+      rv = mtip_dma_get_ring_state(hdl, &tx_available, &rx_available);
+      if (rv < 0)
+      {
+         CSMLOGERR("get ring state from DMA failed for hdl: %d\n", hdl);
+      }
+      CSMLOGINFO("rx_available: %d,priv->rx_polled_count %d,link_index=%d\n", rx_available,priv->rx_polled_count,link_index);
+
+         // set the rx mode to IRQ
+      setmode = ECPRI_DMA_NOTIFY_MODE_IRQ;
+      mtip_set_rx_mode_immediate(hdl, setmode);
+
+      mtip_get_rx_mode_immediate(hdl, &mode);
+      CSMLOGINFO("rx mode is:%d for hdl: %d\n", mode,hdl);
+
       hdl_repl[hdl] = true;
    }
    else
    {
+
       rv = mtip_dma_get_ring_state(hdl, &tx_available, &rx_available);
-      CSMLOGDBG("rx_available: %d, priv->rx_polled_count %d\n", rx_available, priv->rx_polled_count);
+      CSMLOGINFO("rx_available: %d, priv->rx_polled_count %d\n", rx_available, priv->rx_polled_count);
       if (rv < 0)
       {
          CSMLOGERR("get ring state from DMA failed for hdl: %d\n", hdl);
+         goto ret;
       }
       else if(rx_available > 1)
       {
          rv = mtip_replenish_dma_rx_buffers_reuse(netdev, hdl, rx_available-1);
          if(rv == 0)
             priv->rx_polled_count = 0;
+      }
+
+      if(rx_available == MTIP_RX_RING_SIZE)
+      {
+         // set the rx mode to IRQ
+         setmode = ECPRI_DMA_NOTIFY_MODE_IRQ;
+         mtip_set_rx_mode_immediate(hdl, setmode);
+
+         mtip_get_rx_mode_immediate(hdl, &mode);
+         CSMLOGINFO("rx mode is:%d for hdl: %d\n", mode,hdl);
+      }
+      else
+      {
+         link = platform_driver_priv->mtip_links[link_index];
+
+         if (napi_schedule_prep(&(link->napi)))
+         {
+            // set the rx mode to POLL
+            setmode = ECPRI_DMA_NOTIFY_MODE_POLL;
+            mtip_set_rx_mode_immediate(hdl, setmode);
+
+            mtip_get_rx_mode_immediate(hdl, &mode);
+            CSMLOGINFO("rx mode is:%d for hdl: %d\n", mode,hdl);
+
+            __napi_schedule(&(link->napi));
+            CSMLOGINFO("napi schedule for hdl: %d, link_index: %d, link 0x%lx, netdev 0x%lx\n", hdl, link_index, (unsigned long)link, (unsigned long)netdev);      // schedule napi
+         }
       }
    }
 
