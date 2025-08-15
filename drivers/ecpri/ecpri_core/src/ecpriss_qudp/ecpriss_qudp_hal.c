@@ -4509,6 +4509,9 @@ static void ecpriss_qudp_hal_reg_parse_non_ecpri_dma_ring_info_port_p_entry_n_v2
 			                        HWIO_ECPRI_UDP_FH_NON_ECPRI_DMA_RING_INFO_PORT_p_LINK_n_RING_ID_SHFT_V2,
 			                         HWIO_ECPRI_UDP_FH_NON_ECPRI_DMA_RING_INFO_PORT_p_LINK_n_RING_ID_BMSK_V2);
 
+	fh_non_ecpri_dma_ring_info->gsi_id = ECPRISS_HAL_GETFIELD_FROM_REG(val,
+			                        HWIO_ECPRI_UDP_FH_NON_ECPRI_DMA_RING_INFO_PORT_p_LINK_n_GSI_ID_SHFT_V2,
+			                         HWIO_ECPRI_UDP_FH_NON_ECPRI_DMA_RING_INFO_PORT_p_LINK_n_GSI_ID_BMSK_V2);
 
 	return;
 
@@ -4750,6 +4753,10 @@ static void ecpriss_qudp_hal_reg_construct_l2_non_ecpri_dma_ring_info_port_p_ent
 			HWIO_ECPRI_UDP_L2_NON_ECPRI_DMA_RING_INFO_PORT_p_LINK_n_RING_ID_SHFT_V2,
 			HWIO_ECPRI_UDP_L2_NON_ECPRI_DMA_RING_INFO_PORT_p_LINK_n_RING_ID_BMSK_V2);
 
+	ECPRISS_HAL_SETFIELD_IN_REG(*val,
+			l2_non_ecpri_dma_ring_info->gsi_id,
+			HWIO_ECPRI_UDP_L2_NON_ECPRI_DMA_RING_INFO_PORT_p_LINK_n_GSI_ID_SHFT_V2,
+			HWIO_ECPRI_UDP_L2_NON_ECPRI_DMA_RING_INFO_PORT_p_LINK_n_GSI_ID_BMSK_V2);
 	return;
 
 }
@@ -4767,6 +4774,9 @@ static void ecpriss_qudp_hal_reg_parse_l2_non_ecpri_dma_ring_info_port_p_entry_n
 			                        HWIO_ECPRI_UDP_L2_NON_ECPRI_DMA_RING_INFO_PORT_p_LINK_n_RING_ID_SHFT_V2,
 			                         HWIO_ECPRI_UDP_L2_NON_ECPRI_DMA_RING_INFO_PORT_p_LINK_n_RING_ID_BMSK_V2);
 
+	l2_non_ecpri_dma_ring_info->gsi_id = ECPRISS_HAL_GETFIELD_FROM_REG(val,
+			                        HWIO_ECPRI_UDP_L2_NON_ECPRI_DMA_RING_INFO_PORT_p_LINK_n_GSI_ID_SHFT_V2,
+			                         HWIO_ECPRI_UDP_L2_NON_ECPRI_DMA_RING_INFO_PORT_p_LINK_n_GSI_ID_BMSK_V2);
 	return;
 
 }
