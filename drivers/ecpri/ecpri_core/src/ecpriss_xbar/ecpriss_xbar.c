@@ -1996,19 +1996,13 @@ int ecpriss_xbar_fh_rx_lut_v2_logging(uint32_t port_index,
 
 		xbar_port_lut = &ecpriss_pdata_v2->xbar_ctx_v2->flow_ctx_v2.fh_xbar_lut[port_index];
 
-		if(log_dir == ECPRISS_FLOW_DIR_UL){
+		xbar_fhrx_m_lut_n.ul_route_to_dma = action;
 
-			xbar_fhrx_m_lut_n.ul_route_to_dma = action;
+		xbar_port_lut->lut_table[pcid_index].ul_route_to_dma = action;
 
-			xbar_port_lut->lut_table[pcid_index].ul_route_to_dma = action;
+		xbar_fhrx_m_lut_n.dl_route_to_dma = action;
 
-		}else {
-
-			xbar_fhrx_m_lut_n.dl_route_to_dma = action;
-
-			xbar_port_lut->lut_table[pcid_index].dl_route_to_dma = action;
-
-		}
+		xbar_port_lut->lut_table[pcid_index].dl_route_to_dma = action;
 
 		ecpriss_xbar_hal_write_reg_mn_fields(ECPRISS_XBAR_LUT,
 				ECPRI_XBAR_LUT_XBAR_FHRX_m_LUT_n_V2,
