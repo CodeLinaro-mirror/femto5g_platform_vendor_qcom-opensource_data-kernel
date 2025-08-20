@@ -3544,15 +3544,33 @@ int ecpriss_qudp_init(struct device *dev)
 	return ret;
 }
 
-static int ecpri_global_cfg_init_cascade_mode(void) {
+int ecpri_global_cfg_init_cascade_mode(void) {
 
        ecpri_global_hwio_def_ecpri_global_cfg_s ecpri_global_cfg;
 
        memset(&ecpri_global_cfg, 0,
                        sizeof(ecpri_global_hwio_def_ecpri_global_cfg_s));
 
-       /*Enable RU CASCADE Mode*/
+       /*Enable CASCADE Mode*/
        ecpri_global_cfg.operation_mode = HWIO_ECPRI_GLOBAL_CFG_OPERATION_MODE_RU_CASCADE_FVAL;
+       ecpri_global_cfg.ahb_resp_err_en = 0x1;
+
+       ecpriss_qudp_hal_write_reg_n_fields(ECPRISS_QUDP_GLOBAL,
+                       ECPRI_GLOBAL_CFG, 0,
+                       &ecpri_global_cfg);
+
+       return 0;
+}
+
+int ecpri_global_cfg_deinit_cascade_mode(void) {
+
+       ecpri_global_hwio_def_ecpri_global_cfg_s ecpri_global_cfg;
+
+       memset(&ecpri_global_cfg, 0,
+                       sizeof(ecpri_global_hwio_def_ecpri_global_cfg_s));
+
+       /*Disable CASCADE Mode*/
+       ecpri_global_cfg.operation_mode = HWIO_ECPRI_GLOBAL_CFG_OPERATION_MODE_DU_WITHOUT_L2_FVAL;
        ecpri_global_cfg.ahb_resp_err_en = 0x1;
 
        ecpriss_qudp_hal_write_reg_n_fields(ECPRISS_QUDP_GLOBAL,
@@ -3615,6 +3633,7 @@ int ecpriss_qudp_init_v2(struct device *dev)
 		ecpriss_qudp_fh_egress_cfg_reset_v2(0);
 		ecpriss_qudp_fh_egress_cfg_reset_v2(1);
 		ecpriss_qudp_fh_egress_cfg_reset_v2(2);
+		ecpriss_qudp_l2_egress_cfg_reset_v2(0);
 
 		for(port_type=0;port_type < ECPRISS_PORT_TYPE_MAX;port_type++)
 		{
@@ -3647,6 +3666,9 @@ int ecpriss_qudp_init_v2(struct device *dev)
 			ecpriss_qudp_set_lte_mac_filter_info();
 			ecpriss_qudp_set_nr_mac_filter_info();
 		}
+
+		ecpriss_qudp_l2_egress_tp_cfg_v2(0);
+
 		ecpriss_pdata_v2->qudp_ctx_v2->state = ECPRI_QUDP_READY ;
 
 	}while (0);
@@ -5339,6 +5361,179 @@ int ecpriss_qudp_fh_egress_cfg_reset_v2(int32_t port_index)
 	}
 	return 0;
 }
+int ecpriss_qudp_l2_egress_cfg_reset_v2(int32_t port_index)
+{
+	int32_t egress_table_index = 0;
+
+	ecpri_qudp_hwio_def_ecpri_udp_l2_egress_eth_dst0_port_p_entry_n_s_v2       eth_dst0_port = {0};
+	ecpri_qudp_hwio_def_ecpri_udp_l2_egress_eth_src1_dst1_port_p_entry_n_s_v2  eth_src1_dst1_port = {0};
+	ecpri_qudp_hwio_def_ecpri_udp_l2_egress_eth_src0_port_p_entry_n_s_v2       eth_src0_port = {0};
+	ecpri_qudp_hwio_def_ecpri_udp_l2_egress_vlan_ethertype_port_p_entry_n_s_v2 vlan_ethertype_port = {0};
+	ecpri_qudp_hwio_def_ecpri_udp_l2_egress_vport_misc_port_p_entry_n_s_v2     vport_misc_port = {0};
+	ecpri_qudp_hwio_def_ecpri_udp_l2_egress_ip_src_addr0_port_p_entry_n_s_v2   ip_src0 = {0};
+	ecpri_qudp_hwio_def_ecpri_udp_l2_egress_ip_src_addr1_port_p_entry_n_s_v2   ip_src1 = {0};
+	ecpri_qudp_hwio_def_ecpri_udp_l2_egress_ip_src_addr2_port_p_entry_n_s_v2   ip_src2 = {0};
+	ecpri_qudp_hwio_def_ecpri_udp_l2_egress_ip_src_addr3_port_p_entry_n_s_v2   ip_src3 = {0};
+	ecpri_qudp_hwio_def_ecpri_udp_l2_egress_ip_dst_addr0_port_p_entry_n_s_v2   ip_dst0 = {0};
+	ecpri_qudp_hwio_def_ecpri_udp_l2_egress_ip_dst_addr1_port_p_entry_n_s_v2   ip_dst1 = {0};
+	ecpri_qudp_hwio_def_ecpri_udp_l2_egress_ip_dst_addr2_port_p_entry_n_s_v2   ip_dst2 = {0};
+	ecpri_qudp_hwio_def_ecpri_udp_l2_egress_ip_dst_addr3_port_p_entry_n_s_v2   ip_dst3 = {0};
+	ecpri_qudp_hwio_def_ecpri_udp_l2_egress_udp_ports_port_p_entry_n_s_v2      udp_port = {0};
+	ecpri_qudp_hwio_def_ecpri_udp_l2_egress_sa_tag_ip_tos_misc_port_p_entry_n_s_v2  ip_opts = {0};
+
+	if(port_index > 0)
+		return 0;
+
+	for(egress_table_index = 0; egress_table_index < NUM_EGRESS_ENTRY ; egress_table_index++)
+	{
+
+		/* 4 LSB goes to this eth_dst0_port */
+
+		ecpriss_qudp_hal_write_reg_mn_fields(ECPRISS_QUDP_L2_RAMS,
+				ECPRI_UDP_L2_EGRESS_ETH_DST0_PORT_p_ENTRY_n_V2,
+				port_index,
+				egress_table_index,
+				&eth_dst0_port);
+
+		ecpriss_qudp_hal_write_reg_mn_fields(ECPRISS_QUDP_L2_RAMS,
+				ECPRI_UDP_L2_EGRESS_ETH_SRC1_DST1_PORT_p_ENTRY_n_V2,
+				port_index,
+				egress_table_index,
+				&eth_src1_dst1_port);
+
+		ecpriss_qudp_hal_write_reg_mn_fields(ECPRISS_QUDP_L2_RAMS,
+				ECPRI_UDP_L2_EGRESS_ETH_SRC0_PORT_p_ENTRY_n_V2,
+				port_index,
+				egress_table_index,
+				&eth_src0_port);
+
+		ecpriss_qudp_hal_write_reg_mn_fields(ECPRISS_QUDP_L2_RAMS,
+				ECPRI_UDP_L2_EGRESS_VLAN_ETHERTYPE_PORT_p_ENTRY_n_V2,
+				port_index,
+				egress_table_index,
+				&vlan_ethertype_port);
+
+		ecpriss_qudp_hal_write_reg_mn_fields(ECPRISS_QUDP_L2_RAMS,
+				ECPRI_UDP_L2_EGRESS_VPORT_MISC_PORT_p_ENTRY_n_V2,
+				port_index,
+				egress_table_index,
+				&vport_misc_port);
+
+		ecpriss_qudp_hal_write_reg_mn_fields(ECPRISS_QUDP_L2_RAMS,
+				ECPRI_UDP_L2_EGRESS_IP_SRC_ADDR0_PORT_p_ENTRY_n_V2,
+				port_index,
+				egress_table_index,
+				&ip_src0);
+
+		ecpriss_qudp_hal_write_reg_mn_fields(ECPRISS_QUDP_L2_RAMS,
+				ECPRI_UDP_L2_EGRESS_IP_DST_ADDR0_PORT_p_ENTRY_n_V2,
+				port_index,
+				egress_table_index,
+				&ip_dst0);
+
+		ecpriss_qudp_hal_write_reg_mn_fields(ECPRISS_QUDP_L2_RAMS,
+				ECPRI_UDP_L2_EGRESS_IP_SRC_ADDR1_PORT_p_ENTRY_n_V2,
+				port_index,
+				egress_table_index,
+				&ip_src1);
+
+		ecpriss_qudp_hal_write_reg_mn_fields(ECPRISS_QUDP_L2_RAMS,
+				ECPRI_UDP_L2_EGRESS_IP_SRC_ADDR2_PORT_p_ENTRY_n_V2,
+				port_index,
+				egress_table_index,
+				&ip_src2);
+
+		ecpriss_qudp_hal_write_reg_mn_fields(ECPRISS_QUDP_L2_RAMS,
+				ECPRI_UDP_L2_EGRESS_IP_SRC_ADDR3_PORT_p_ENTRY_n_V2,
+				port_index,
+				egress_table_index,
+				&ip_src3);
+
+		ecpriss_qudp_hal_write_reg_mn_fields(ECPRISS_QUDP_L2_RAMS,
+				ECPRI_UDP_L2_EGRESS_IP_DST_ADDR1_PORT_p_ENTRY_n_V2,
+				port_index,
+				egress_table_index,
+				&ip_dst1);
+
+		ecpriss_qudp_hal_write_reg_mn_fields(ECPRISS_QUDP_L2_RAMS,
+				ECPRI_UDP_L2_EGRESS_IP_DST_ADDR2_PORT_p_ENTRY_n_V2,
+				port_index,
+				egress_table_index,
+				&ip_dst2);
+
+		ecpriss_qudp_hal_write_reg_mn_fields(ECPRISS_QUDP_L2_RAMS,
+				ECPRI_UDP_L2_EGRESS_IP_DST_ADDR3_PORT_p_ENTRY_n_V2,
+				port_index,
+				egress_table_index,
+				&ip_dst3);
+
+		ecpriss_qudp_hal_write_reg_mn_fields(ECPRISS_QUDP_L2_RAMS,
+				ECPRI_UDP_L2_EGRESS_UDP_PORTS_PORT_p_ENTRY_n_V2,
+				port_index,
+				egress_table_index,
+				&udp_port);
+
+		ecpriss_qudp_hal_write_reg_mn_fields(ECPRISS_QUDP_L2_RAMS,
+				ECPRI_UDP_L2_EGRESS_SA_TAG_IP_TOS_MISC_PORT_p_ENTRY_n_V2,
+				port_index,
+				egress_table_index,
+				&ip_opts);
+
+	}
+	return 0;
+}
+
+int ecpriss_qudp_l2_egress_tp_cfg_v2(int32_t port_index)
+{
+	int32_t egress_table_index = 0;
+
+	ecpri_qudp_hwio_def_ecpri_udp_l2_egress_eth_dst0_port_p_entry_n_s_v2       eth_dst0_port = {0};
+	ecpri_qudp_hwio_def_ecpri_udp_l2_egress_eth_src1_dst1_port_p_entry_n_s_v2  eth_src1_dst1_port = {0};
+	ecpri_qudp_hwio_def_ecpri_udp_l2_egress_eth_src0_port_p_entry_n_s_v2       eth_src0_port = {0};
+	ecpri_qudp_hwio_def_ecpri_udp_l2_egress_vlan_ethertype_port_p_entry_n_s_v2 vlan_ethertype_port = {0};
+
+	if(port_index > 0)
+		return 0;
+
+	for(egress_table_index = 0; egress_table_index < NUM_EGRESS_ENTRY ; egress_table_index++)
+	{
+
+		/* 4 LSB goes to this eth_dst0_port */
+		/* Adding Dummy transport header for L2 port */
+		eth_dst0_port.value = 0x4E554C30;
+		eth_src1_dst1_port.dst_msb = 0x0053;
+		eth_src1_dst1_port.src_msb = 0x0053;
+		eth_src0_port.value = 0x4E554C30;
+		vlan_ethertype_port.ethertype = 0xAEFE;
+
+		ecpriss_qudp_hal_write_reg_mn_fields(ECPRISS_QUDP_L2_RAMS,
+				ECPRI_UDP_L2_EGRESS_ETH_DST0_PORT_p_ENTRY_n_V2,
+				port_index,
+				egress_table_index,
+				&eth_dst0_port);
+
+		ecpriss_qudp_hal_write_reg_mn_fields(ECPRISS_QUDP_L2_RAMS,
+				ECPRI_UDP_L2_EGRESS_ETH_SRC1_DST1_PORT_p_ENTRY_n_V2,
+				port_index,
+				egress_table_index,
+				&eth_src1_dst1_port);
+
+		ecpriss_qudp_hal_write_reg_mn_fields(ECPRISS_QUDP_L2_RAMS,
+				ECPRI_UDP_L2_EGRESS_ETH_SRC0_PORT_p_ENTRY_n_V2,
+				port_index,
+				egress_table_index,
+				&eth_src0_port);
+
+		ecpriss_qudp_hal_write_reg_mn_fields(ECPRISS_QUDP_L2_RAMS,
+				ECPRI_UDP_L2_EGRESS_VLAN_ETHERTYPE_PORT_p_ENTRY_n_V2,
+				port_index,
+				egress_table_index,
+				&vlan_ethertype_port);
+
+	}
+	return 0;
+}
+
 int ecpriss_qudp_get_ecpriss_filt_enable_info(void)
 {
 	return ecpriss_filtering_enabled;

@@ -99,6 +99,18 @@ struct net_device* macsec_eth_get_netdev_from_link(u32 link_index)
 }
 
 EXPORT_SYMBOL(macsec_eth_get_netdev_from_link);
+void mtip_get_rx_mode_immediate(ecpri_dma_eth_conn_hdl_t hdl, enum ecpri_dma_notify_mode *getmode)
+{
+    int rv;
+
+    rv = (ecpri_dma_eth_driver_ops.ecpri_dma_eth_rx_mode_get)(hdl, getmode);
+
+    if (rv < 0)
+    {
+        CSMLOGDBG("Get Rx mode of hdl: %d to %d failed.. %d\n", hdl, getmode, rv);
+    }
+}
+
 void mtip_set_rx_mode_immediate(ecpri_dma_eth_conn_hdl_t hdl, enum ecpri_dma_notify_mode setmode)
 {
     int rv;
@@ -110,7 +122,6 @@ void mtip_set_rx_mode_immediate(ecpri_dma_eth_conn_hdl_t hdl, enum ecpri_dma_not
         CSMLOGDBG("Set Rx mode of hdl: %d to %d failed.. %d\n", hdl, setmode, rv);
     }
 }
-
 void mtip_set_tx_mode_immediate(ecpri_dma_eth_conn_hdl_t hdl, enum ecpri_dma_notify_mode setmode)
 {
     int rv;
@@ -460,6 +471,12 @@ void run_mtip_process_link_state(void* work_ptr)
     struct net_device *dev = platform_driver_priv->mtip_links[link_index]->dev;
     ecpri_dma_eth_conn_hdl_t dma_handle = 0;
     enum ecpri_dma_notify_mode setmode = ECPRI_DMA_NOTIFY_MODE_IRQ;
+    enum ecpri_dma_notify_mode mode = ECPRI_DMA_NOTIFY_MODE_MAX;
+    int rv = 0;
+    u32 tx_available = 0;
+    u32 rx_available = 0;
+    struct mtip_netdev_priv *priv;
+    struct mtip_link_info* link;
 
     if(link_index >= MTIP_MAX_LINKS)
     {
@@ -470,6 +487,7 @@ void run_mtip_process_link_state(void* work_ptr)
     if(platform_driver_priv == NULL || platform_driver_priv->mtip_links[link_index] == NULL)
          goto func_exit;
 
+    priv = netdev_priv(dev);
     dma_handle = platform_driver_priv->mtip_links[link_index]->dma_hdl;
     if (link_up)
     {
@@ -484,9 +502,42 @@ void run_mtip_process_link_state(void* work_ptr)
 
         // Process MAC link up state
         mtip_mac_link_up(link_index);
-        // set the rx mode to IRQ
-        mtip_set_rx_mode_immediate(dma_handle, setmode);
+
+        rv = mtip_dma_get_ring_state(dma_handle, &tx_available, &rx_available);
+        CSMLOGINFO("rx_available: %d,priv->rx_polled_count %d,link_index:%d\n", rx_available,priv->rx_polled_count,link_index);
+        if (rv < 0)
+        {
+            CSMLOGERR("get ring state from DMA failed for hdl: %d\n", dma_handle);
+        }
+        else if(rx_available == MTIP_RX_RING_SIZE)
+        {
+            // set the rx mode to IRQ
+            setmode = ECPRI_DMA_NOTIFY_MODE_IRQ;
+            mtip_set_rx_mode_immediate(dma_handle, setmode);
+
+            mtip_get_rx_mode_immediate(dma_handle, &mode);
+            CSMLOGINFO("rx mode is:%d for hdl: %d\n", mode,dma_handle);
+        }
+        else
+        {
+            link = platform_driver_priv->mtip_links[link_index];
+
+            if (napi_schedule_prep(&(link->napi)))
+            {
+                 // set the rx mode to POLL
+                 setmode = ECPRI_DMA_NOTIFY_MODE_POLL;
+                 mtip_set_rx_mode_immediate(dma_handle, setmode);
+
+                 mtip_get_rx_mode_immediate(dma_handle, &mode);
+                 CSMLOGINFO("rx mode is:%d for hdl: %d\n", mode,dma_handle);
+
+                 __napi_schedule(&(link->napi));
+                 CSMLOGINFO("napi schedule for hdl: %d, link_index: %d, link 0x%lx, netdev 0x%lx\n", dma_handle, link_index, (unsigned long)link, (unsigned long)dev);             // schedule napi
+            }
+        }
+
         // set the tx mode to IRQ
+        setmode = ECPRI_DMA_NOTIFY_MODE_IRQ;
         mtip_set_tx_mode_immediate(dma_handle, setmode);
         // wake queues
         netif_tx_wake_all_queues(dev);
@@ -536,7 +587,7 @@ void run_mtip_process_link_state(void* work_ptr)
         mtip_client_send_event(ETH_ECPRISS_EVENT_DOWN, link_index);
     }
 
-    if (mtip_loopback_mode != MTIP_MODE_LOOPBACK) 
+    if ( (link_index != MTIP_L2_ETH_LINK_INDEX && mtip_loopback_mode != MTIP_MODE_LOOPBACK) || (link_index == MTIP_L2_ETH_LINK_INDEX && mtip_c2c2_loopback_mode != MTIP_MODE_C2C2_LOOPBACK ) )
     {
         // notify phy of the link status
         mtip_phy_notify_link_status(link_index, link_up);
@@ -552,17 +603,56 @@ void mtip_process_link_state(u32 link_index, bool link_up)
     struct net_device *dev = platform_driver_priv->mtip_links[link_index]->dev;
     ecpri_dma_eth_conn_hdl_t dma_handle = 0;
     enum ecpri_dma_notify_mode setmode = ECPRI_DMA_NOTIFY_MODE_IRQ;
+    enum ecpri_dma_notify_mode mode = ECPRI_DMA_NOTIFY_MODE_MAX;
+    int rv = 0;
+    u32 tx_available = 0;
+    u32 rx_available = 0;
+    struct mtip_netdev_priv *priv;
+    struct mtip_link_info* link;
 
     dma_handle = platform_driver_priv->mtip_links[link_index]->dma_hdl;
+    priv = netdev_priv(dev);
     if (link_up)
     {
         CSMLOGDBG("Processing LINK_UP for link_index: %d\n", link_index);
 
         // Process MAC link up state
         mtip_mac_link_up(link_index);
-        // set the rx mode to IRQ
-        mtip_set_rx_mode_immediate(dma_handle, setmode);
+        rv = mtip_dma_get_ring_state(dma_handle, &tx_available, &rx_available);
+        CSMLOGINFO("rx_available: %d,priv->rx_polled_count %d,link_index:%d\n", rx_available,priv->rx_polled_count,link_index);
+        if (rv < 0)
+        {
+            CSMLOGERR("get ring state from DMA failed for hdl: %d\n", dma_handle);
+        }
+        else if(rx_available == MTIP_RX_RING_SIZE)
+        {
+            // set the rx mode to IRQ
+            setmode = ECPRI_DMA_NOTIFY_MODE_IRQ;
+            mtip_set_rx_mode_immediate(dma_handle, setmode);
+
+            mtip_get_rx_mode_immediate(dma_handle, &mode);
+            CSMLOGINFO("rx mode is:%d for hdl: %d\n", mode,dma_handle);
+        }
+        else
+        {
+            link = platform_driver_priv->mtip_links[link_index];
+
+            if (napi_schedule_prep(&(link->napi)))
+            {
+                // set the rx mode to POLL
+                setmode = ECPRI_DMA_NOTIFY_MODE_POLL;
+                mtip_set_rx_mode_immediate(dma_handle, setmode);
+
+                mtip_get_rx_mode_immediate(dma_handle, &mode);
+                CSMLOGINFO("rx mode is:%d for hdl: %d\n", mode,dma_handle);
+
+                __napi_schedule(&(link->napi));
+                CSMLOGINFO("napi schedule for hdl: %d, link_index: %d, link 0x%lx, netdev 0x%lx\n", dma_handle, link_index, (unsigned long)link, (unsigned long)dev);             // schedule napi
+            }
+        }
+
         // set the tx mode to IRQ
+        setmode = ECPRI_DMA_NOTIFY_MODE_IRQ;
         mtip_set_tx_mode_immediate(dma_handle, setmode);
         // wake queues
         netif_tx_wake_all_queues(dev);
@@ -605,7 +695,7 @@ void mtip_process_link_state(u32 link_index, bool link_up)
         mtip_client_send_event(ETH_ECPRISS_EVENT_DOWN, link_index);
     }
 
-    if (mtip_loopback_mode != MTIP_MODE_LOOPBACK) 
+    if ( ( link_index != MTIP_L2_ETH_LINK_INDEX && mtip_loopback_mode != MTIP_MODE_LOOPBACK) || ( link_index == MTIP_L2_ETH_LINK_INDEX &&  mtip_c2c2_loopback_mode != MTIP_MODE_C2C2_LOOPBACK) )
     {
         // notify phy of the link status
         mtip_phy_notify_link_status(link_index, link_up);
@@ -841,9 +931,8 @@ int mtip_napi_poll(struct napi_struct *napi_ptr, int budget)
    {
       napi_complete(napi_ptr);
 
-      setmode = ECPRI_DMA_NOTIFY_MODE_IRQ;
-
       // set the rx mode to IRQ
+      setmode = ECPRI_DMA_NOTIFY_MODE_IRQ;
       mtip_set_rx_mode_immediate(actual_handle, setmode);
    }
    else
@@ -872,6 +961,11 @@ static int mtip_start_xmit(struct sk_buff *skb, struct net_device *netdev)
    int pending_buff_completion_count = 0;
    char* tmp=NULL;
    u32 port_type;
+   u8 tmp_ts_seq_num = 0;
+   u8 tx_ts_stat=0;
+   u32 timestamp_secs;
+   u32 timestamp_nsecs;
+
    CSMLOGDBG("mtip_start_xmit called\n");
 
    priv = netdev_priv(netdev);
@@ -1070,7 +1164,20 @@ static int mtip_start_xmit(struct sk_buff *skb, struct net_device *netdev)
       }else{
 
          ts_seq_num = mtip_netdev_get_next_ptp_ts_seq_num(link_index);
-         //ts_seq_num = 0;
+
+         mtip_mac_read_timestamp(link_index, &timestamp_secs, &timestamp_nsecs);
+         mtip_mac_read_tx_ts_stat_reg(link_index,&tx_ts_stat);
+         CSMLOGPTP("timestamp_nsecs=%d,tx_ts_stat=%x\n",timestamp_nsecs,tx_ts_stat);
+         while(tx_ts_stat!=2)
+         {
+             if ((mode == MTIP_DEVICE_RUv2) || (mode == MTIP_DEVICE_DUv2))
+             {
+                 mtip_mac_read_ts_seq_num(link_index, &tmp_ts_seq_num);
+             }
+             mtip_mac_read_timestamp(link_index, &timestamp_secs, &timestamp_nsecs);
+             mtip_mac_read_tx_ts_stat_reg(link_index,&tx_ts_stat);
+             CSMLOGPTP("Pending h.w TS FIFO timestamp_nsecs=%d,tx_ts_stat=%x\n",timestamp_nsecs,tx_ts_stat);
+         }
       }
       mtip_ptp_tx_ts_lock_release(link_index);
        // set the flag to in progress
@@ -1237,6 +1344,11 @@ void mtip_rx_mode_set(struct net_device *netdev)
         ret = mtip_mac_set_promisc_mode(priv, true);
         CSMLOGDBG("Enabling all multicast for link index: %d\n", link_index);
  	} 
+    else if( ( link_index != MTIP_L2_ETH_LINK_INDEX && mtip_loopback_mode != MTIP_MODE_DEFAULT) || (  link_index == MTIP_L2_ETH_LINK_INDEX && mtip_c2c2_loopback_mode != MTIP_MODE_DEFAULT ) )
+    {
+        ret = mtip_mac_set_promisc_mode(priv, true);
+        CSMLOGDBG("Setting promiscuous mode ON for link index: %d\n", link_index);
+    }
     else
     {
         if (netdev_mc_empty(netdev))
@@ -1464,20 +1576,20 @@ static int mtip_ioctl(struct net_device *netdev, struct ifreq *ifr, int cmd)
 
    CSMLOGDBG("mtip_ioctl called cmd: %d, link_index: %d\n", cmd, link_index);
 
-   if (!netif_running(netdev))
-      return -EINVAL;
-
    switch (cmd) 
    {
-   case SIOCGHWTSTAMP:
-   case SIOCSHWTSTAMP:
+      case SIOCGHWTSTAMP:
+      case SIOCSHWTSTAMP:
       {
          ret = mtip_ptp_handle_hwtstamp_ioctl(ifr, link_index);
+         CSMLOGERR("cmd: %d, link_index: %d, netif_running %d, ret %d", cmd, link_index, netif_running(netdev), ret);
       }
       break;
-   default:
-      break;
+
+      default:
+         break;
    }
+
    return ret;
 }
 
@@ -1581,8 +1693,9 @@ void mtip_netdevice_init(struct net_device *dev)
    // HANDLE THE ERROR
 
    dev->netdev_ops = &mtip_netdev_ops;
+   priv = netdev_priv(dev);
 
-   if (mtip_loopback_mode != MTIP_MODE_DEFAULT && !mtip_loopback_enable_arp)
+   if (( (priv->link_index != MTIP_L2_ETH_LINK_INDEX && mtip_loopback_mode != MTIP_MODE_DEFAULT) || ( priv->link_index == MTIP_L2_ETH_LINK_INDEX && mtip_c2c2_loopback_mode != MTIP_MODE_DEFAULT ) ) && !mtip_loopback_enable_arp)
    {
        /* add NOARP */
        dev->flags           |= IFF_NOARP;
@@ -1590,7 +1703,6 @@ void mtip_netdevice_init(struct net_device *dev)
 
    dev->watchdog_timeo = MTIP_TIMEOUT;
 
-   priv = netdev_priv(dev);
 
    // initialize the lock
    spin_lock_init(&priv->lock);
@@ -2810,7 +2922,7 @@ static int mtip_device_complete_port_open(u32 port_type)
 
        if (platform_driver_priv->mtip_links[link_index] != NULL)
        {
-          if (mtip_loopback_mode != MTIP_MODE_LOOPBACK &&
+          if ( ( (link_index != MTIP_L2_ETH_LINK_INDEX && mtip_loopback_mode != MTIP_MODE_LOOPBACK ) || ( link_index == MTIP_L2_ETH_LINK_INDEX &&  mtip_c2c2_loopback_mode != MTIP_MODE_C2C2_LOOPBACK)) &&
               (platform_driver_priv->mtip_links[link_index]->state == MTIP_LINK_STATE_OPEN_WAITING_FOR_LANES ||
                platform_driver_priv->mtip_links[link_index]->state == MTIP_LINK_STATE_DOWN))
           {
@@ -3449,7 +3561,7 @@ void run_mtip_process_netdev_open(void* workptr)
    }
 
    // Initialize the carrier state as off
-   if (mtip_loopback_mode == MTIP_MODE_DEFAULT)
+   if ( ( link_index != MTIP_L2_ETH_LINK_INDEX && mtip_loopback_mode == MTIP_MODE_DEFAULT) || (link_index == MTIP_L2_ETH_LINK_INDEX && mtip_c2c2_loopback_mode == MTIP_MODE_DEFAULT))
    {
       netif_carrier_off(netdev);
    }
@@ -3457,27 +3569,22 @@ void run_mtip_process_netdev_open(void* workptr)
    // first get the interface going
    if (hdl)
    {
+      /*
+       * enable napi
+       */
+      napi_enable(&(platform_driver_priv->mtip_links[link_index]->napi));
+      napi_enable(&(platform_driver_priv->mtip_links[link_index]->napi_tx));
 
       // start the pipe
       mtip_start_dma_pipe(netdev, hdl);
-
       // set the netdev MAC address from the HW
       mtip_set_netdev_hw_mac_addr(netdev, link_index);
 
       // set to POLL mode
       setmode = ECPRI_DMA_NOTIFY_MODE_IRQ;
 
-      // set the rx mode to IRQ
-      mtip_set_rx_mode_immediate(hdl, setmode);
-
       // set the tx mode to IRQ
       mtip_set_tx_mode_immediate(hdl, setmode);
-
-      /*
-       * enable napi
-       */
-      napi_enable(&(platform_driver_priv->mtip_links[link_index]->napi));
-      napi_enable(&(platform_driver_priv->mtip_links[link_index]->napi_tx));
 
       /* 
        * Start the interface's transmit queue 
@@ -3505,15 +3612,15 @@ void run_mtip_process_netdev_open(void* workptr)
    else
    {
       // Change the state for PCS loopback
-      if (mtip_loopback_mode == MTIP_MODE_LOOPBACK)
+      if ( ( link_index != MTIP_L2_ETH_LINK_INDEX && mtip_loopback_mode == MTIP_MODE_LOOPBACK) || ( link_index == MTIP_L2_ETH_LINK_INDEX && mtip_c2c2_loopback_mode == MTIP_MODE_C2C2_LOOPBACK) )
          platform_driver_priv->mtip_links[link_index]->state = MTIP_LINK_STATE_OPEN_WAITING_FOR_LANES;
 
       // For PCS/PHY loopback mode, configure port based on the speed modes set
-      if (mtip_loopback_mode != MTIP_MODE_DEFAULT)
+      if ( ( link_index != MTIP_L2_ETH_LINK_INDEX && mtip_loopback_mode != MTIP_MODE_DEFAULT) || (link_index == MTIP_L2_ETH_LINK_INDEX && mtip_c2c2_loopback_mode != MTIP_MODE_DEFAULT))
          mtip_device_configure_port(port_type);
 
       // PCS looback mode
-      if (mtip_loopback_mode == MTIP_MODE_LOOPBACK)
+      if ( ( link_index != MTIP_L2_ETH_LINK_INDEX && mtip_loopback_mode == MTIP_MODE_LOOPBACK) || ( link_index == MTIP_L2_ETH_LINK_INDEX && mtip_c2c2_loopback_mode == MTIP_MODE_C2C2_LOOPBACK))
       {
          // Process MAC link up state
          mtip_mac_link_up(link_index);
@@ -3671,8 +3778,8 @@ void run_mtip_process_netdev_close(void* workptr)
    }
    else
    {
-      if (mtip_loopback_mode == MTIP_MODE_DEFAULT ||
-          mtip_loopback_mode == MTIP_MODE_PHY_LOOPBACK)
+      if ( ( link_index != MTIP_L2_ETH_LINK_INDEX && (mtip_loopback_mode == MTIP_MODE_DEFAULT ||
+          mtip_loopback_mode == MTIP_MODE_PHY_LOOPBACK)) || (link_index == MTIP_L2_ETH_LINK_INDEX && ( mtip_c2c2_loopback_mode == MTIP_MODE_DEFAULT || mtip_c2c2_loopback_mode == MTIP_MODE_PHY_LOOPBACK)))
       {
          /* teardown the phy if
             1. AN is not in progress OR

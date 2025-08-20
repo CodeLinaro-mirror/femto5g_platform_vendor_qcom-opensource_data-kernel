@@ -212,6 +212,18 @@ eth_ecpriss_status_e eth_ecpriss_register_events_cb
 eth_ecpriss_status_e eth_ecpriss_deregister_events_cb(void);
 
 /**
+ * eth_ecpriss_enable_logging_port() - ETH driver will enable the
+ * logging port - C2C2 for Egress logging of CU plane data.
+ * action : To enable/disable port
+ * 	Enable : true
+ * 	Disable: false
+ *
+ * Returns:	0 on success, negative on failure
+ */
+
+eth_ecpriss_status_e eth_ecpriss_enable_logging_port(bool action);
+
+/**
  * struct eth_ecpriss_ops - Structure to hold ETH - eCPRI
  * interface functions
  */
@@ -224,6 +236,7 @@ struct eth_ecpriss_ops {
 	eth_ecpriss_status_e (*eth_ecpriss_get_topology)
 		(eth_ecpriss_dev_mode_e *device_mode,
 		 eth_ecpriss_topology_root_s *topology_params);
+	eth_ecpriss_status_e (*eth_ecpriss_enable_logging_port)(bool action);
 };
 
 #endif // ECPRI_ETH_H

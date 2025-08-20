@@ -3560,8 +3560,15 @@ int gsi_poll_channel(unsigned long chan_hdl,
 }
 EXPORT_SYMBOL(gsi_poll_channel);
 
+static void gsi_decr_ring_rp(struct gsi_chan_ctx *ctx)
+{
+	if (ctx->evtr->ring.rp == ctx->evtr->ring.base)
+		ctx->evtr->ring.rp = ctx->evtr->ring.end - ctx->evtr->ring.elem_sz;
+	else
+		ctx->evtr->ring.rp -= ctx->evtr->ring.elem_sz;
+}
 
-int gsi_update_evt_rp(unsigned long chan_hdl) {
+int gsi_update_evt_rp(unsigned long chan_hdl, u32 num_to_advance) {
 	struct gsi_chan_ctx* ctx;
 	uint64_t rp;
 	int gsi_id;
@@ -3594,10 +3601,17 @@ int gsi_update_evt_rp(unsigned long chan_hdl) {
 
 	spin_lock_irqsave(&ctx->evtr->ring.slock, flags);
 
-	rp = ctx->evtr->props.gsi_read_event_ring_rp(
-		&ctx->evtr->props, ctx->evtr->id, ee, gsi_id);
-	rp |= ctx->ring.rp_local & GSI_MSB_MASK;
-	ctx->evtr->ring.rp_local = rp;
+	if(num_to_advance)
+	{
+		rp = ctx->evtr->props.gsi_read_event_ring_rp(
+			&ctx->evtr->props, ctx->evtr->id, ee, gsi_id);
+		rp |= ctx->ring.rp_local & GSI_MSB_MASK;
+		ctx->evtr->ring.rp_local = rp;
+	}
+	else
+	{
+		gsi_decr_ring_rp(ctx);
+	}
 
 	spin_unlock_irqrestore(&ctx->evtr->ring.slock, flags);
 
@@ -3653,6 +3667,7 @@ int gsi_poll_n_channel(unsigned long chan_hdl,
 		/* update rp to see of we have anything new to process */
 		rp = ctx->evtr->props.gsi_read_event_ring_rp(
 			&ctx->evtr->props, ctx->evtr->id, ee, gsi_id);
+
 		rp |= ctx->ring.rp & GSI_MSB_MASK;
 
 		ctx->evtr->ring.rp = rp;
@@ -3678,7 +3693,6 @@ int gsi_poll_n_channel(unsigned long chan_hdl,
 			}
 		}
 	}
-
 	*actual_num = gsi_get_complete_num(&ctx->evtr->ring,
 			ctx->evtr->ring.rp_local, ctx->evtr->ring.rp);
 

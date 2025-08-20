@@ -34,6 +34,10 @@ enum ecpri_dma_ss_oran_log_dev {
 #define ECPRI_DMA_SS_ORAN_LOG_PCAP_HDR_SNP_LEN      (0x00040000)
 #define ECPRI_DMA_SS_ORAN_LOG_PCAP_HDR_LNK_TYPE     (0x00000001)
 
+#define BUFFER_SIZE 10240
+#define DMA_BUFFER_SIZE 2250
+#define DMA_MAX_BUFFERS_PER_PACKET 4
+
 struct pkt_eth_hdr
 {
     uint8_t src[6], dst[6];
@@ -42,11 +46,11 @@ struct pkt_eth_hdr
 
 struct __packed ecpri_hdr
 {
-    uint8_t c : 1;
-    uint8_t resv : 3;
-    uint8_t ecpri_protocol : 4;
-    uint8_t mesg_type;
-    uint16_t payld_size;
+    uint8_t protocol_revision : 4;
+    uint8_t reserved : 3;
+    uint8_t c_bit : 1;
+    uint8_t message_type;
+    uint16_t payload_size;
 } __packed;
 
 struct ecpri_dma_ss_core_pcap_header {

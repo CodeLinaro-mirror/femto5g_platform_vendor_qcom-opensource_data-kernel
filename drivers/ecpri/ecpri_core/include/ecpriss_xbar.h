@@ -540,5 +540,11 @@ int ecpriss_xbar_fh_rx_lut_v2_logging(uint32_t port_index,
 		uint16_t pcid_index , ecpriss_log_dir_e log_dir,
 		ecpriss_logging_action action);
 
+int ecpriss_xbar_c2c_rx_lut_v2_logging(uint32_t port_index,
+		uint16_t pcid_index , ecpriss_log_dir_e log_dir,
+		ecpriss_logging_action action);
+
 void ecpriss_xbar_fhrx_default_dma_channel(void);
+
+void ecpriss_xbar_c2crx_default_dma_channel(void);
 #endif

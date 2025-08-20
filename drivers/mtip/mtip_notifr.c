@@ -23,7 +23,7 @@ void mtip_snd_event_notification(uint32_t interface, uint32_t event)
 	event_info_struct event_info;
 
 	if(interface < 0 || interface > MAX_NOTIF_INTERFACE -1 ){
-		CSMLOGERR("Invalid interface id %u\n",interface);
+		CSMLOGDBG("Invalid interface id %u\n",interface);
 		return;
 	}
 

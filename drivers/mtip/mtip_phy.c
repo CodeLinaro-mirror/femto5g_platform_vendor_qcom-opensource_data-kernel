@@ -221,13 +221,14 @@ void run_mtip_process_cdr_lock_ind(void* workptr)
         goto out;
     }
 
-    CSMLOGINFO("CDR lock indication for link_index %d, status %d, an_seq_num %d\n",
-               link_index, status, an_seq_num);
-
-    if(platform_driver_priv->mtip_links[link_index]->state == MTIP_LINK_STATE_CLOSE)
+    if(platform_driver_priv->mtip_links[link_index]->state == MTIP_LINK_STATE_CLOSE ||
+       platform_driver_priv->mtip_links[link_index]->state == MTIP_LINK_STATE_OPEN_WAITING_FOR_LANES)
     {
         goto out;
     }
+
+    CSMLOGINFO("CDR lock indication for link_index %d, status %d, an_seq_num %d\n",
+               link_index, status, an_seq_num);
 
     if(an_seq_num != 0 &&
        an_seq_num != mtip_phy_an_seq_num[port_type])
@@ -419,7 +420,8 @@ void run_mtip_phy_retry_bringup(void* workptr)
         goto func_exit;
     }
 
-    if(platform_driver_priv->mtip_links[link_index]->state == MTIP_LINK_STATE_CLOSE)
+    if(platform_driver_priv->mtip_links[link_index]->state == MTIP_LINK_STATE_CLOSE ||
+       platform_driver_priv->mtip_links[link_index]->state == MTIP_LINK_STATE_OPEN_WAITING_FOR_LANES)
     {
         goto func_exit;
     }
@@ -596,7 +598,8 @@ int mtip_phy_teardown_phy(u32 link_index)
     mtip_phy_lane_bring_up_progress_ind(link_index, true);
 
     // Process link down
-    if (mtip_loopback_mode == MTIP_MODE_DEFAULT || mtip_loopback_mode == MTIP_MODE_PHY_LOOPBACK)
+    if( ( link_index != MTIP_L2_ETH_LINK_INDEX && (mtip_loopback_mode == MTIP_MODE_DEFAULT || mtip_loopback_mode == MTIP_MODE_PHY_LOOPBACK)) ||
+        ( link_index == MTIP_L2_ETH_LINK_INDEX && (mtip_c2c2_loopback_mode == MTIP_MODE_DEFAULT || mtip_c2c2_loopback_mode == MTIP_MODE_PHY_LOOPBACK) ) )
     {
         mtip_process_link_state(link_index, false);
     }
@@ -672,6 +675,13 @@ void mtip_phy_set_tx_compliance(bool flag)
     return;
 }
 
+void mtip_phy_set_loopback_mode(enum qcom_aw_phy_loopback_mode_enum loopback_mode)
+{
+    CSMLOGDBG("Loopback mode of phy is set as: %d", loopback_mode);
+    qcom_aw_phy_driver_iface_ops.eth_phy_iface_set_phy_loopback_mode(loopback_mode);
+    return;
+
+}
 static int mtip_phy_find_matching_lane(struct phylink_config *config, u32* lane_index)
 {
     struct mtip_lanedev_priv* priv;

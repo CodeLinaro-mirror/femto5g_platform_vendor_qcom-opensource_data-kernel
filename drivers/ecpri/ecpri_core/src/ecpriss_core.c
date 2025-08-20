@@ -34,7 +34,7 @@ int lte_fh_enabled = 0;
 module_param(lte_fh_enabled, int, S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP);
 MODULE_PARM_DESC(lte_fh_enabled, "Enable LTE FH");
 
-int cascade_enable = 0;
+int cascade_enable = 1;
 module_param(cascade_enable, int, S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP);
 MODULE_PARM_DESC(cascade_enable, "Enable Cascade Mode");
 
@@ -392,6 +392,20 @@ void ecpriss_xbar_set_logging_route(ecpriss_log_cfg_s *log_cfg)
 	}
 }
 
+void ecpriss_xbar_set_l2_logging_route(ecpriss_log_cfg_s *log_cfg)
+{
+	int i=2,j;
+	int num_of_pcid = 0;
+
+	num_of_pcid = log_cfg->num_of_pcid;
+
+	for(j=0;j<num_of_pcid;j++)
+	{
+		ECPRILOGDBG("Calling ecpriss_xbar_c2c_rx_lut_v2_logging for port:%d,pcid:%d,dir:%d,action:%d\n",i,log_cfg->pcids[j],log_cfg->log_dir,log_cfg->action);
+		ecpriss_xbar_c2c_rx_lut_v2_logging(i, log_cfg->pcids[j], log_cfg->log_dir, log_cfg->action);
+	}
+}
+
 int32_t ecpri_send_logging_trigger_to_dma(ecpriss_log_cfg_s *log_cfg)
 {
 	if(log_cfg->action == ECPRISS_LOGGING_START)
@@ -403,6 +417,20 @@ int32_t ecpri_send_logging_trigger_to_dma(ecpriss_log_cfg_s *log_cfg)
 	{
 		return (dma_ecpri_ss_driver_ops.ecpri_dma_ecpri_ss_stop_oran_log)
 			(ECPRI_DMA_ORAN_LOGGING_DIRECTION_INGRESS );
+	}
+}
+
+int32_t ecpri_send_egress_logging_trigger_to_dma(ecpriss_log_cfg_s *log_cfg)
+{
+	if(log_cfg->action == ECPRISS_LOGGING_START)
+	{
+		return (dma_ecpri_ss_driver_ops.ecpri_dma_ecpri_ss_start_oran_log)
+			((log_cfg->log_buf_size)*1024, log_cfg->packet_size, ECPRI_DMA_ORAN_LOGGING_DIRECTION_EGRESS);
+	}
+	else
+	{
+		return (dma_ecpri_ss_driver_ops.ecpri_dma_ecpri_ss_stop_oran_log)
+			(ECPRI_DMA_ORAN_LOGGING_DIRECTION_EGRESS );
 	}
 }
 
@@ -430,6 +458,21 @@ int32_t ecpriss_configure_logging(ecpriss_packet_payload_s *packet)
 			ecpriss_xbar_set_logging_route(log_cfg);
 
 			ret = ecpri_send_logging_trigger_to_dma(log_cfg);
+			if (ret < 0) {
+				ECPRILOGERR("Ecpri logging route configuration failed\n");
+				break;
+			}
+		}
+		else if((ecpriss_pdata_v2->dev_mode == ECPRISS_DEV_MODE_RU && log_cfg->log_dir == ECPRISS_LOG_DIR_UL)
+				|| (ecpriss_pdata_v2->dev_mode == ECPRISS_DEV_MODE_DU_PCIE_3_X_12 && log_cfg->log_dir == ECPRISS_LOG_DIR_DL))
+		{
+			ECPRILOGINFO("Calling l2 route configuration\n");
+
+			ret = (mtip_ecpri_ops.eth_ecpriss_enable_logging_port)(log_cfg->action);
+
+			ecpriss_xbar_set_l2_logging_route(log_cfg);
+
+			ret = ecpri_send_egress_logging_trigger_to_dma(log_cfg);
 			if (ret < 0) {
 				ECPRILOGERR("Ecpri logging route configuration failed\n");
 				break;
@@ -619,7 +662,7 @@ void ecpriss_eth_topology_init_v2(void)
 
 					port_params = &eth_link_params_g.topology_params[i].port_params[port_index];
                                         for(k=0;k<num_links;k++){
-						//pr_err("port_index: %d link_index: %d link state: %d\n",port_index,k,port_params->link_params[k].link_state);
+						//pr_err("FH:port_index: %d link_index: %d link state: %d\n",port_index,k,port_params->link_params[k].link_state);
 
                                                 if(port_params->link_params[k].link_state == ETH_ECPRISS_LINK_STATE_UP){
                                                         link_state_flag = true;
@@ -640,11 +683,12 @@ void ecpriss_eth_topology_init_v2(void)
 							i);
 				}
 			}
-			else if(eth_link_params_g.topology_params[i].port_type ==
+			if(eth_link_params_g.topology_params[i].port_type ==
 					ETH_ECPRISS_PORT_TYPE_C2C) {
 				ecpriss_pdata_v2->qudp_ctx_v2->num_ports[ETH_ECPRISS_PORT_TYPE_C2C] =
 				eth_link_params_g.topology_params[i].num_ports;
 				for(j=0;j<ecpriss_pdata_v2->qudp_ctx_v2->num_ports[ETH_ECPRISS_PORT_TYPE_C2C];j++){
+					link_state_flag = false;
 					port_index =
 					eth_link_params_g.topology_params[i].port_params[j].port_index;
 					port_cfg_local =
@@ -654,19 +698,18 @@ void ecpriss_eth_topology_init_v2(void)
 
 					port_params = &eth_link_params_g.topology_params[i].port_params[port_index];
                                         for(k=0;k<num_links;k++){
-						//pr_err("port_index: %d link_index: %d link state: %d\n",port_index,k,port_params->link_params[k].link_state);
+						//pr_err("C2C:port_index: %d link_index: %d link state: %d\n",port_index,k,port_params->link_params[k].link_state);
                                                 if(port_params->link_params[k].link_state == ETH_ECPRISS_LINK_STATE_UP){
                                                         link_state_flag = true;
 	                                        }
                                         }
 
                                         if(link_state_flag == true){
-                                                ecpriss_configure_xbar_flush_v2(ECPRISS_PORT_TYPE_L2,port_index,ETH_ECPRISS_EVENT_UP);
+                                                ecpriss_configure_xbar_flush_v2(ECPRISS_PORT_TYPE_C2C,2,ETH_ECPRISS_EVENT_UP);
                                         }
                                         else{
-                                                ecpriss_configure_xbar_flush_v2(ECPRISS_PORT_TYPE_L2,port_index,ETH_ECPRISS_EVENT_DOWN);
+                                                ecpriss_configure_xbar_flush_v2(ECPRISS_PORT_TYPE_C2C,2,ETH_ECPRISS_EVENT_DOWN);
                                         }
-					link_state_flag = false;
 					ecpriss_eth_cpy_params_v2(port_cfg_local,
 							&eth_link_params_g,
 							port_index,
@@ -1973,6 +2016,8 @@ static int ecpriss_core_init_v2(struct platform_device *pdev)
 		ECPRILOGERR("QUDP init complete\n");
 
 		ecpriss_xbar_fhrx_default_dma_channel();
+
+		ecpriss_xbar_c2crx_default_dma_channel();
 
 		ecpriss_update_stats_and_requeue(NULL);
 

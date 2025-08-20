@@ -25,6 +25,8 @@
 
 #include "eth_phy_iface.h"
 
+extern int qcom_aw_phy_loopback_mode;
+
 /* Module level feature definitions */
 //#define FEATURE_QCOM_AW_RUMI_SW
 #ifndef NO_DEBUGFS_PERF
@@ -110,13 +112,6 @@ enum qcom_aw_phy_int_error_bit_enum{
 	QCOM_AW_PHY_SNR_VALID_ERR_LANE_2         = 6,
 	QCOM_AW_PHY_SNR_VALID_ERR_LANE_3         = 7,
 	QCOM_AW_PHY_INT_ERROR_BIT_MAX
-};
-
-
-enum qcom_aw_phy_loopback_mode_enum{
-	QCOM_AW_PHY_NO_LB                    = 0,
-	QCOM_AW_PHY_NEAR_END_SERIAL_LB,
-	QCOM_AW_PHY_NEAR_END_PARALLEL_LB
 };
 
 /* Enum to map error within a function */

@@ -435,6 +435,9 @@ void qcom_aw_phy_set_tx_compliance(bool flag){
   qcom_aw_phy_tx_compliance_flag = flag;
 }
 
+void qcom_aw_phy_set_phy_loopback_mode(enum qcom_aw_phy_loopback_mode_enum loopback_mode){
+  qcom_aw_phy_loopback_mode = loopback_mode;
+}
 int qcom_aw_phy_configure_speed_mode(
                                   struct qcom_aw_phy_inst_config *phy_inst_info,
                                   uint32_t port_config_mask){
@@ -2399,6 +2402,7 @@ const struct eth_phy_iface_ops qcom_aw_phy_driver_iface_ops = {
     .eth_phy_iface_reset_phy_sm = qcom_aw_phy_reset_phy_sm,
     .eth_phy_iface_set_tx_compliance = qcom_aw_phy_set_tx_compliance,
     .eth_phy_iface_get_phy_phy_eq_mode = qcom_aw_phy_get_phy_eq_mode,
+    .eth_phy_iface_set_phy_loopback_mode = qcom_aw_phy_set_phy_loopback_mode,
 };
 
 EXPORT_SYMBOL(qcom_aw_phy_driver_iface_ops);

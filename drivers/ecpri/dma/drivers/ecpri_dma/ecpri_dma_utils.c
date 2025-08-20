@@ -10247,3 +10247,29 @@ int ecpri_dma_advance_outstanding_list(struct ecpri_dma_endp_context* ep)
 	return ret;
 }
 
+u32 ecpri_dma_get_num_to_advance(struct ecpri_dma_endp_context* ep)
+{
+	int ret = 0;
+	struct gsi_chan_info ch_info = { 0 };
+	u32 number_to_advance = 0;
+
+	if (!ep || !ep->valid) {
+		DMAERR("EP context is empty\n");
+		return -EINVAL;
+	}
+
+	ret = gsi_query_channel_info(ep->gsi_chan_hdl, &ch_info);
+	if (ret != GSI_STATUS_SUCCESS) {
+		DMAERR("gsi_query_channel_info failed res=%d gsi_ch=%d.\n", ret,
+			ep->gsi_chan_hdl);
+		return ret;
+	}
+
+	if (ch_info.evt_valid) {
+		number_to_advance =
+			(ch_info.evt_rp - ep->gsi_mem_info.evt_ring_base_addr) /
+			ch_info.evt_elem_sz;
+	}
+
+	return number_to_advance;
+}

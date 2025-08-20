@@ -46,6 +46,7 @@
 #define MTIP_MODE_DEFAULT          0   // This is the default mode with no loopback
 #define MTIP_MODE_LOOPBACK         1   // This is the loopback mode. For RUMI, this is IOMACRO loopback and for SOC it is PCS LOOPBACK
 #define MTIP_MODE_PHY_LOOPBACK     2   // This is the PHY loopback mode for SOC. Not applicable for RUMI
+#define MTIP_MODE_C2C2_LOOPBACK    1   // This is loopback mode for C2C2 port. Not applicable for RUMI
 
 /* Setting the platform RUMI/SOC */
 #define MTIP_PLATFORM_SOC          0
@@ -95,6 +96,8 @@ extern bool enable_tx_comp_poll;
 #define STATS_NAME_LEN 20
 #define QXDM_LOGGING_VAR_NA 255
 
+#define MTIP_L2_LANE1_INDEX     12
+#define MTIP_L2_LANE2_INDEX     13
 // Maximum number of retries with speed mode change for dual rate optics module
 #define MTIP_NEXT_SPEED_MODE_RETRY_MAX_COUNT 2
 
@@ -483,6 +486,7 @@ extern struct mtip_platform_driver_priv* platform_driver_priv;
 
 // this is the extern controlling loopback mode
 extern int mtip_loopback_mode;
+extern int mtip_c2c2_loopback_mode;
 
 extern bool mtip_loopback_swap_addr;
 extern bool mtip_loopback_enable_arp;

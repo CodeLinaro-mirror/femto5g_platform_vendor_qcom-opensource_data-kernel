@@ -370,6 +370,7 @@ int ecpriss_qudp_fh_rx_filter_cfg(uint32_t               port_index,
 
 int ecpriss_qudp_fh_egress_cfg_reset(int32_t port_index);
 int ecpriss_qudp_fh_egress_cfg_reset_v2(int32_t port_index);
+int ecpriss_qudp_l2_egress_cfg_reset_v2(int32_t port_index);
 
 void ecpriss_qudp_fh_ingress_stats_update(uint32_t port_index,
 		uint32_t link_index);
@@ -419,6 +420,9 @@ void ecpriss_qudp_set_nr_mac_filter_info(void);
 int ecpriss_qudp_set_lte_mac_addr(int port, int index, csm_lte_ethdev_mac_s *mac_info);
 int ecpriss_qudp_get_lte_mac_addr(int port, int index, csm_lte_ethdev_mac_s *mac_info);
 
+int ecpriss_qudp_l2_egress_tp_cfg_v2(int32_t port_index);
 
+int ecpri_global_cfg_init_cascade_mode(void);
+int ecpri_global_cfg_deinit_cascade_mode(void);
 
 #endif

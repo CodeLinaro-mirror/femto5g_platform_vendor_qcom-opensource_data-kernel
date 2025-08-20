@@ -201,6 +201,7 @@ void run_mtip_process_next_speed_mode(void* workptr);
 void mtip_set_rx_mode_immediate(ecpri_dma_eth_conn_hdl_t hdl, enum ecpri_dma_notify_mode setmode);
 void mtip_set_tx_mode_immediate(ecpri_dma_eth_conn_hdl_t hdl, enum ecpri_dma_notify_mode setmode);
 
+void mtip_get_rx_mode_immediate(ecpri_dma_eth_conn_hdl_t hdl, enum ecpri_dma_notify_mode *mode);
 /*
  * Functions exposed by mtip_device
  */

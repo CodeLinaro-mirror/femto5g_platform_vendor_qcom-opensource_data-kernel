@@ -723,7 +723,7 @@ void mtip_mac_initialize(struct mtip_netdev_priv *priv)
    mtip_rx_mode_set(platform_driver_priv->mtip_links[link_index]->dev);
 
    // Process link up only for PCS loopback mode
-   if (mtip_loopback_mode == MTIP_MODE_LOOPBACK)
+   if ( (link_index != MTIP_L2_ETH_LINK_INDEX && mtip_loopback_mode == MTIP_MODE_LOOPBACK) || (link_index == MTIP_L2_ETH_LINK_INDEX && mtip_c2c2_loopback_mode == MTIP_MODE_C2C2_LOOPBACK))
    {
        post_mtip_process_link_state(link_index, true);
    }

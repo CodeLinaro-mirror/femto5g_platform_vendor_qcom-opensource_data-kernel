@@ -524,7 +524,7 @@ struct __packed gsi_mhi_channel_scratch {
 	uint32_t scratch0_res : 30;
 	uint32_t scratch1;
 	uint32_t scratch2;
-	uint32_t scratch3_res : 16;
+	uint32_t total_buffs_wa : 16;
 	uint32_t outstanding_tlvs_counter : 16;
 	uint32_t scratch4_res0 : 16;
 	uint32_t ch_halt_cmd_pending_reply : 1;
@@ -536,7 +536,7 @@ struct __packed gsi_mhi_channel_scratch {
 	uint32_t total_bytes;
 	uint32_t total_pkts_wa : 16;
 	uint32_t total_bytes_wa : 16;
-	uint32_t scratch8;
+	uint32_t total_buffs;
 	uint32_t scratch9;
 };
 
@@ -1665,6 +1665,6 @@ uint32_t gsi_get_chan_stop_stm(int chan_id, int ee, int gsi_id);
 
 int gsi_query_channel_free_re(unsigned long chan_hdl, uint32_t* num_free_re);
 
-int gsi_update_evt_rp(unsigned long chan_hdl);
+int gsi_update_evt_rp(unsigned long chan_hdl, u32 num_to_advance);
 
 #endif
