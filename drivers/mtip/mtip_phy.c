@@ -1442,8 +1442,6 @@ int mtip_phy_create_phylink(struct mtip_lane_device_info* lane_device)
 		return IS_ERR(lane_info->phylink);
 	}
 
-    CSMLOGINFO("phylink create done for lane %d\n", lane_index);
-
     // start has to be done in rtnl context
     rtnl_lock();
 
