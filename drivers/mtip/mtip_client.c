@@ -649,6 +649,7 @@ int setup_interface_in_loopback_mode(struct net_device *netdev, u32 link_index)
             platform_driver_priv->mtip_lanes[i]->lane_qsfp_info.trx_bout_cfg = 0;
         }
     }
+    CSMLOGINFO("Setting up interface:%d in loopback mode\n", link_index);
     post_mtip_process_link_state(link_index, true);
     return 0;
 }
@@ -672,12 +673,14 @@ eth_ecpriss_status_e mtip_eth_enable_logging_port(bool action)
 
         if(platform_driver_priv->mtip_links[link_index]->state != MTIP_LINK_STATE_UP)
         {
+            CSMLOGINFO("Enabling PHY NES loopback mode for Interface %s\n", ifname);
             mtip_phy_set_loopback_mode(QCOM_AW_PHY_NEAR_END_SERIAL_LB);
             setup_interface_in_loopback_mode(netdev, link_index);
 
             rtnl_lock(); // Lock the network namespace
             if (!(netdev->flags & IFF_UP))
             {
+                CSMLOGINFO("Bringing up interface %s\n", ifname);
                 ret = dev_open(netdev, NULL);
                 if (ret)
                     CSMLOGERR("Failed to bring up interface %s: %d\n", ifname, ret);
@@ -696,12 +699,13 @@ eth_ecpriss_status_e mtip_eth_enable_logging_port(bool action)
          rtnl_lock();   // Required before calling dev_close
          if (netif_running(netdev))
          {
-             CSMLOGINFO("dev_close_example: Bringing down interface %s\n", ifname);
+             CSMLOGINFO("dev_close: Bringing down interface %s\n", ifname);
              dev_close(netdev);
+             CSMLOGINFO("Interface %s is now down\n", ifname);
          }
          else
          {
-             CSMLOGINFO("dev_close_example: Interface %s is already down\n", ifname);
+             CSMLOGINFO("dev_close: Interface %s is already down\n", ifname);
          }
          rtnl_unlock();
     }
