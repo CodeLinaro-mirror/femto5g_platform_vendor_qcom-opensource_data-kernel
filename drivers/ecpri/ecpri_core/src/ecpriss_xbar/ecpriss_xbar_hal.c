@@ -925,8 +925,6 @@ static void ecpriss_xbar_hal_reg_parse_xbar_flush_2(enum ecpriss_xbar_hal_reg_na
 	ecpri_xbar_hwio_def_ecpri_xbar_c2crx_m_lut_n_s *xbar_c2crx_m_lut_n
 		= (ecpri_xbar_hwio_def_ecpri_xbar_c2crx_m_lut_n_s *)fields;
 
-	ECPRILOGERR("Constructing ecpriss_xbar_hal_reg_construct_lut_xbar_c2crx_m_lut_n_2\n");
-
 	ECPRISS_HAL_SETFIELD_IN_REG(*val,
 			xbar_c2crx_m_lut_n->up_ul_route,
 			HWIO_ECPRI_XBAR_C2CRX_m_LUT_n_UP_UL_ROUTE_SHFT,
@@ -975,8 +973,6 @@ static void ecpriss_xbar_hal_reg_parse_xbar_flush_2(enum ecpriss_xbar_hal_reg_na
 {
 	ecpri_xbar_hwio_def_ecpri_xbar_c2crx_m_lut_n_s *xbar_c2crx_m_lut_n
 		= (ecpri_xbar_hwio_def_ecpri_xbar_c2crx_m_lut_n_s *)fields;
-
-	ECPRILOGERR("Parsing ecpriss_xbar_hal_reg_parse_lut_xbar_c2crx_m_lut_n_2\n");
 
 	xbar_c2crx_m_lut_n->up_ul_route = ECPRISS_HAL_GETFIELD_FROM_REG(val,
 			HWIO_ECPRI_XBAR_C2CRX_m_LUT_n_UP_UL_ROUTE_SHFT,
