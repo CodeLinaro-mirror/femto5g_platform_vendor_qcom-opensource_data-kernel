@@ -2037,27 +2037,21 @@ int ecpriss_xbar_c2c_rx_lut_v2_logging(uint32_t port_index,
 
 		if(action == ECPRISS_LOGGING_START){
 
-			if(log_dir == ECPRISS_FLOW_DIR_UL){
 			ECPRILOGDBG("Setting cp_ul and up_ul route to DMA for UL\n");
-				xbar_c2crx_m_lut_n.cp_ul_route = HWIO_ECPRI_XBAR_C2CRX_m_LUT_n_CP_UL_ROUTE_ROUTE_TO_DMA_FVAL;
-				xbar_c2crx_m_lut_n.up_ul_route = HWIO_ECPRI_XBAR_C2CRX_m_LUT_n_UP_UL_ROUTE_ROUTE_TO_DMA_FVAL;
-			}
-			else if(log_dir == ECPRISS_FLOW_DIR_DL){
+			xbar_c2crx_m_lut_n.cp_ul_route = HWIO_ECPRI_XBAR_C2CRX_m_LUT_n_CP_UL_ROUTE_ROUTE_TO_DMA_FVAL;
+			xbar_c2crx_m_lut_n.up_ul_route = HWIO_ECPRI_XBAR_C2CRX_m_LUT_n_UP_UL_ROUTE_ROUTE_TO_DMA_FVAL;
+
 			ECPRILOGDBG("Setting cp_dl and up_ul route to DMA for DL\n");
-				xbar_c2crx_m_lut_n.cp_dl_route = HWIO_ECPRI_XBAR_C2CRX_m_LUT_n_CP_DL_ROUTE_ROUTE_TO_DMA_FVAL;
-				xbar_c2crx_m_lut_n.up_dl_route = HWIO_ECPRI_XBAR_C2CRX_m_LUT_n_UP_DL_ROUTE_ROUTE_TO_DMA_FVAL;
-			}
+			xbar_c2crx_m_lut_n.cp_dl_route = HWIO_ECPRI_XBAR_C2CRX_m_LUT_n_CP_DL_ROUTE_ROUTE_TO_DMA_FVAL;
+			xbar_c2crx_m_lut_n.up_dl_route = HWIO_ECPRI_XBAR_C2CRX_m_LUT_n_UP_DL_ROUTE_ROUTE_TO_DMA_FVAL;
 
 		}else{
 
-			if(log_dir == ECPRISS_FLOW_DIR_UL){
-				xbar_c2crx_m_lut_n.cp_ul_route = HWIO_ECPRI_XBAR_C2CRX_m_LUT_n_CP_UL_ROUTE_INVALID_FVAL;
-				xbar_c2crx_m_lut_n.up_ul_route = HWIO_ECPRI_XBAR_C2CRX_m_LUT_n_UP_UL_ROUTE_INVALID_FVAL;
-			}
-			else if(log_dir == ECPRISS_FLOW_DIR_DL){
-				xbar_c2crx_m_lut_n.cp_dl_route = HWIO_ECPRI_XBAR_C2CRX_m_LUT_n_CP_DL_ROUTE_INVALID_FVAL;
-				xbar_c2crx_m_lut_n.up_dl_route = HWIO_ECPRI_XBAR_C2CRX_m_LUT_n_UP_DL_ROUTE_INVALID_FVAL;
-			}
+			xbar_c2crx_m_lut_n.cp_ul_route = HWIO_ECPRI_XBAR_C2CRX_m_LUT_n_CP_UL_ROUTE_INVALID_FVAL;
+			xbar_c2crx_m_lut_n.up_ul_route = HWIO_ECPRI_XBAR_C2CRX_m_LUT_n_UP_UL_ROUTE_INVALID_FVAL;
+
+			xbar_c2crx_m_lut_n.cp_dl_route = HWIO_ECPRI_XBAR_C2CRX_m_LUT_n_CP_DL_ROUTE_INVALID_FVAL;
+			xbar_c2crx_m_lut_n.up_dl_route = HWIO_ECPRI_XBAR_C2CRX_m_LUT_n_UP_DL_ROUTE_INVALID_FVAL;
 
 		}
 
