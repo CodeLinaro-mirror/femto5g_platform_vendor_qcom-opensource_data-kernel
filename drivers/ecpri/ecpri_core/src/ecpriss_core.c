@@ -478,9 +478,37 @@ int32_t ecpriss_configure_logging(ecpriss_packet_payload_s *packet)
 				break;
 			}
 		}
-		else
+		else if(log_cfg->log_dir == ECPRISS_LOG_DIR_UL_DL)
 		{
-			ECPRILOGERR("UL logging for RU/DL logging for X100 is not supported\n");
+			if(ecpriss_pdata_v2->dev_mode == ECPRISS_DEV_MODE_RU)
+				log_cfg->log_dir = ECPRISS_LOG_DIR_DL;
+			else if(ecpriss_pdata_v2->dev_mode == ECPRISS_DEV_MODE_DU_PCIE_3_X_12)
+				log_cfg->log_dir = ECPRISS_LOG_DIR_UL;
+
+			ecpriss_xbar_set_logging_route(log_cfg);
+			ret = ecpri_send_logging_trigger_to_dma(log_cfg);
+			if (ret < 0) {
+				ECPRILOGERR("Ecpri Ingress logging route configuration failed\n");
+			}
+
+
+			if(ecpriss_pdata_v2->dev_mode == ECPRISS_DEV_MODE_RU)
+				log_cfg->log_dir = ECPRISS_LOG_DIR_UL;
+			else if(ecpriss_pdata_v2->dev_mode == ECPRISS_DEV_MODE_DU_PCIE_3_X_12)
+				log_cfg->log_dir = ECPRISS_LOG_DIR_DL;
+
+			ECPRILOGINFO("Calling l2 route configuration\n");
+			ret = (mtip_ecpri_ops.eth_ecpriss_enable_logging_port)(log_cfg->action);
+
+			ecpriss_xbar_set_l2_logging_route(log_cfg);
+
+			ret = ecpri_send_egress_logging_trigger_to_dma(log_cfg);
+			if (ret < 0) {
+				ECPRILOGERR("Ecpri Egress logging route configuration failed\n");
+			}
+
+			log_cfg->log_dir = ECPRISS_LOG_DIR_UL_DL;
+
 		}
 	}while (0);
 
