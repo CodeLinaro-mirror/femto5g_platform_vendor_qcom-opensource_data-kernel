@@ -1170,7 +1170,7 @@ static int mtip_start_xmit(struct sk_buff *skb, struct net_device *netdev)
          CSMLOGPTP("timestamp_nsecs=%d,tx_ts_stat=%x\n",timestamp_nsecs,tx_ts_stat);
          while(tx_ts_stat!=2)
          {
-             if ((mode == MTIP_DEVICE_RUv2) || (mode == MTIP_DEVICE_DUv2))
+             if ( (mode == MTIP_DEVICE_RUv2 || mode == MTIP_DEVICE_DUv2) && link_index != MTIP_L2_ETH_LINK_INDEX)
              {
                  mtip_mac_read_ts_seq_num(link_index, &tmp_ts_seq_num);
              }
