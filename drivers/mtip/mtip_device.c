@@ -984,8 +984,7 @@ static int mtip_start_xmit(struct sk_buff *skb, struct net_device *netdev)
    link_state = mtip_get_link_state_by_link_index(link_index);
 
    // we are not done opening the link
-   if ((link_state == MTIP_LINK_STATE_OPEN_WAITING_FOR_LANES) ||
-       (link_state == MTIP_LINK_STATE_OPEN_FAILED))
+   if (link_state != MTIP_LINK_STATE_UP)
    {
        // free the skb
        dev_kfree_skb(skb);
