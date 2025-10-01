@@ -474,62 +474,46 @@ int32_t ecpriss_configure_logging(ecpriss_packet_payload_s *packet)
 			break;
 		}
 
-		if((ecpriss_pdata_v2->dev_mode == ECPRISS_DEV_MODE_RU && log_cfg->log_dir == ECPRISS_LOG_DIR_DL) 
-				|| (ecpriss_pdata_v2->dev_mode == ECPRISS_DEV_MODE_DU_PCIE_3_X_12 && log_cfg->log_dir == ECPRISS_LOG_DIR_UL))
+		if(log_cfg->log_dir == ECPRISS_LOG_DIR_DL)
 		{
-			ecpriss_xbar_set_logging_route(log_cfg);
+			if(ecpriss_pdata_v2->dev_mode == ECPRISS_DEV_MODE_RU){
 
-			ret = ecpri_send_logging_trigger_to_dma(log_cfg);
-			if (ret < 0) {
-				ECPRILOGERR("Logging trigger to DMA failed\n");
-				break;
+				ecpriss_xbar_set_logging_route(log_cfg);
+				ret = ecpri_send_logging_trigger_to_dma(log_cfg);
+				if (ret < 0) {
+					ECPRILOGERR("Ecpri Ingress Logging trigger to DMA failed\n");
+					break;
+				}
+			}
+
+			else if(ecpriss_pdata_v2->dev_mode == ECPRISS_DEV_MODE_DU_PCIE_3_X_12){
+
+				ECPRILOGINFO("Bringing up C2C2 port in loopback mode\n");
+				ret = (mtip_ecpri_ops.eth_ecpriss_enable_logging_port)(log_cfg->action);
+				ecpriss_xbar_set_l2_logging_route(log_cfg);
+				ret = ecpri_send_egress_logging_trigger_to_dma(log_cfg);
+				if (ret < 0) {
+					ECPRILOGERR("Ecpri Egress Logging trigger to DMA failed\n");
+					break;
+				}
 			}
 		}
-		else if((ecpriss_pdata_v2->dev_mode == ECPRISS_DEV_MODE_RU && log_cfg->log_dir == ECPRISS_LOG_DIR_UL)
-				|| (ecpriss_pdata_v2->dev_mode == ECPRISS_DEV_MODE_DU_PCIE_3_X_12 && log_cfg->log_dir == ECPRISS_LOG_DIR_DL))
+
+		else if(log_cfg->log_dir == ECPRISS_LOG_DIR_UL || log_cfg->log_dir == ECPRISS_LOG_DIR_UL_DL)
 		{
+			ecpriss_xbar_set_logging_route(log_cfg);
+			ret = ecpri_send_logging_trigger_to_dma(log_cfg);
+			if (ret < 0) {
+				ECPRILOGERR("Ecpri Ingress logging trigger to DMA failed\n");
+			}
+
 			ECPRILOGINFO("Bringing up C2C2 port in loopback mode\n");
-
 			ret = (mtip_ecpri_ops.eth_ecpriss_enable_logging_port)(log_cfg->action);
-
 			ecpriss_xbar_set_l2_logging_route(log_cfg);
-
 			ret = ecpri_send_egress_logging_trigger_to_dma(log_cfg);
 			if (ret < 0) {
-				ECPRILOGERR("Logging trigger to DMA failed\n");
-				break;
+				ECPRILOGERR("Ecpri Egress logging trigger to DMA failed\n");
 			}
-		}
-		else if(log_cfg->log_dir == ECPRISS_LOG_DIR_UL_DL)
-		{
-			if(ecpriss_pdata_v2->dev_mode == ECPRISS_DEV_MODE_RU)
-				log_cfg->log_dir = ECPRISS_LOG_DIR_DL;
-			else if(ecpriss_pdata_v2->dev_mode == ECPRISS_DEV_MODE_DU_PCIE_3_X_12)
-				log_cfg->log_dir = ECPRISS_LOG_DIR_UL;
-
-			ecpriss_xbar_set_logging_route(log_cfg);
-			ret = ecpri_send_logging_trigger_to_dma(log_cfg);
-			if (ret < 0) {
-				ECPRILOGERR("Ecpri Ingress logging route configuration failed\n");
-			}
-
-
-			if(ecpriss_pdata_v2->dev_mode == ECPRISS_DEV_MODE_RU)
-				log_cfg->log_dir = ECPRISS_LOG_DIR_UL;
-			else if(ecpriss_pdata_v2->dev_mode == ECPRISS_DEV_MODE_DU_PCIE_3_X_12)
-				log_cfg->log_dir = ECPRISS_LOG_DIR_DL;
-
-			ECPRILOGINFO("Calling l2 route configuration\n");
-			ret = (mtip_ecpri_ops.eth_ecpriss_enable_logging_port)(log_cfg->action);
-
-			ecpriss_xbar_set_l2_logging_route(log_cfg);
-
-			ret = ecpri_send_egress_logging_trigger_to_dma(log_cfg);
-			if (ret < 0) {
-				ECPRILOGERR("Ecpri Egress logging route configuration failed\n");
-			}
-
-			log_cfg->log_dir = ECPRISS_LOG_DIR_UL_DL;
 		}
 	}while (0);
 
