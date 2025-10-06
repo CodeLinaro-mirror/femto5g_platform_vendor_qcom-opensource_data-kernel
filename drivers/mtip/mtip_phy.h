@@ -81,5 +81,6 @@ trx_link_length_range mtip_phy_get_trx_link_length_range(struct mtip_port_device
 void mtip_phy_notify_eth_event_to_trx(u32 link_index, trx_phy_event event);
 bool mtip_phy_is_breakout_config(u32 port_type);
 trx_lane_speed mtip_phy_port_config_to_trx_lane_speed(enum mtip_port_config_enum port_config);
+void mtip_phy_lane_bring_up_progress_ind(u32 link_index, bool in_progress);
 
 #endif // _MTIP_PHY_H

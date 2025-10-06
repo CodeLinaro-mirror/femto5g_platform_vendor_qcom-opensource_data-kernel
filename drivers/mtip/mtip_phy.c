@@ -245,8 +245,6 @@ void run_mtip_process_cdr_lock_ind(void* workptr)
     if (mtip_mac_wrapper_get_link_status(link_index) == true) 
     {
         mtip_process_link_state(link_index, true);
-        mtip_phy_lane_bring_up_progress_ind(link_index, false);
-        mtip_phy_retry_num[link_index] = 0;
     }
     // Retry logic will apply only for FIBRE, or with DAC if AN is disabled
     else if(platform_driver_priv->mtip_ports[port_type]->sfp_port_type == PORT_FIBRE ||
@@ -436,9 +434,7 @@ void run_mtip_phy_retry_bringup(void* workptr)
     // If PCS link is up, set the state and return back, else continue
     if(mtip_mac_wrapper_get_link_status(link_index) == true)
     {
-        mtip_phy_retry_num[link_index] = 0;
         mtip_process_link_state(link_index, true);
-        mtip_phy_lane_bring_up_progress_ind(link_index, false);
         goto func_exit;
     }
 
@@ -894,8 +890,6 @@ static void mtip_phy_handle_lane_up(struct mtip_process_lane_up lane_up_info)
              else if (mtip_mac_wrapper_get_link_status(link_index) == true) 
              {
                 mtip_process_link_state(link_index, true);
-                mtip_phy_lane_bring_up_progress_ind(link_index, false);
-                mtip_phy_retry_num[link_index] = 0;
              }
 
              platform_driver_priv->mtip_ports[port_type]->needs_rx_los_processing = false;
