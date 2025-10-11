@@ -260,8 +260,8 @@ void setup_common_params(void) {
     upper_SA = (L2.saddr[4]) | (L2.saddr[5] << 8);
 
     // write the lower bits
-    CSMLOGINFO("Value in lowerSA is %x", lower_SA);
-    CSMLOGINFO("Value in UpperSA is %x", upper_SA);
+    CSMLOGDBG("Value in lowerSA is %x", lower_SA);
+    CSMLOGDBG("Value in UpperSA is %x", upper_SA);
     iowrite32(lower_SA, debug_port_base_address + L2_SA_ADDR_LO_ARRAY[index]);
 
     // write the upper bits
@@ -896,13 +896,13 @@ void setup_StreamingFIFO(int index) {
       STREAM_FIFO_TIMER_0, STREAM_FIFO_TIMER_1, STREAM_FIFO_TIMER_2,
       STREAM_FIFO_TIMER_3, STREAM_FIFO_TIMER_4};
 
-  CSMLOGINFO("Setup Streaming FIFO Called \n");
+  CSMLOGDBG("Setup Streaming FIFO Called \n");
   value |= ((STREAM_FIFO_THRESHOLD_ARRAY[index] / BYTE_PER_WATERMARK_UNIT) &
               GENMASK(15, 0));
   iowrite32(value, debug_port_base_address + fifo_registers[index]);
   iowrite32(STREAM_TIMEOUT_ARRAY[index],
             debug_port_base_address + stream_fifo_registers[index]);
-  CSMLOGINFO("Setup Streaming FIFO Ends \n");
+  CSMLOGDBG("Setup Streaming FIFO Ends \n");
 }
 
 ssize_t sysfs_show_enabled(struct kobject *kobj, struct kobj_attribute *attr,

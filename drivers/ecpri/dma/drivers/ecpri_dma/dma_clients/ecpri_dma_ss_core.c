@@ -377,6 +377,7 @@ int ecpri_dma_ecpri_ss_start_oran_log(u32 mem_size, u32 pkt_size,
 
 	pdev = ecpri_dma_get_smmu_ctx(ECPRI_DMA_SMMU_CB_ETH)->dev;
 
+	DMADBG("Called ecpri_dma_ecpri_ss_start_oran_log function for dir:%d\n",dir);
 	if (dir == ECPRI_DMA_ORAN_LOGGING_DIRECTION_INGRESS) {
 		if (ECPRI_DMA_GET_HW_FLAVOR() == ECPRI_HW_FLAVOR_RU) {
 			endp_ctx = &ecpri_dma_ctx->endp_ctx[ECPRI_DMA_SS_ORAN_LOG_QRU_GSI_ID]
@@ -418,13 +419,17 @@ int ecpri_dma_ecpri_ss_start_oran_log(u32 mem_size, u32 pkt_size,
 	/* if ENDP is already allocated - reset and dealloc */
 	if (endp_ctx && endp_ctx->valid) {
 
+		DMADBG("Endp_id: %u for gsi_id: %u is already allocated for dir: %d\n",
+			endp_id, gsi_id, dir);
+		DMADBG("Stopping endp: %u for dir: %d\n",endp_id, dir);
 		ret = ecpri_dma_stop_endp(endp_ctx);
 		if (ret != 0) {
-			DMAERR("Unable to stop endp, endp_id: %d, gsi_id %d\n",
+			DMAERR("Unable to stop endp, endp_id: %u, gsi_id %u\n",
 				endp_id, gsi_id);
 			goto fail_dealloc_endp;
 		}
 
+		DMADBG("Resetting endp: %u for dir: %d\n",endp_id, dir);
 		ret = ecpri_dma_reset_endp(endp_ctx);
 		if (ret != 0) {
 			DMAERR("Unable to reset endp, endp_id: %d, gsi_id %d\n",
@@ -432,6 +437,7 @@ int ecpri_dma_ecpri_ss_start_oran_log(u32 mem_size, u32 pkt_size,
 			goto fail_dealloc_endp;
 		}
 
+		DMADBG("Deallocating endp: %u for dir: %d\n",endp_id, dir);
 		ret = ecpri_dma_dealloc_endp(endp_ctx);
 		if (ret != 0) {
 			DMAERR("Unable to dealloc endp, endp_id: %d, gsi_id %d\n",
@@ -447,12 +453,15 @@ int ecpri_dma_ecpri_ss_start_oran_log(u32 mem_size, u32 pkt_size,
 		kfree(ecpri_dma_ss_core_ctx->pkts_arr[dev_id]);
 		kfree(ecpri_dma_ss_core_ctx->buffs[dev_id]);
 		kfree(ecpri_dma_ss_core_ctx->pkts[dev_id]);
+		DMADBG("Freed up DMA rings for dir: %d\n",dir);
 	}
 
 	/* Prepare memory for log ring */
 	ecpri_dma_ss_core_ctx->pkt_size[dev_id] = DMA_BUFFER_SIZE;
 	ecpri_dma_ss_core_ctx->num_of_pkts[dev_id] = mem_size / ecpri_dma_ss_core_ctx->pkt_size[dev_id];
 	ecpri_dma_ss_core_ctx->oran_log_mem[dev_id].size = mem_size;
+
+	DMADBG("pkt_size: %u, num_of_pkts: %u, mem_size: %u for dir: %d\n",ecpri_dma_ss_core_ctx->pkt_size[dev_id],ecpri_dma_ss_core_ctx->num_of_pkts[dev_id],ecpri_dma_ss_core_ctx->oran_log_mem[dev_id].size,dir);
 
 	pkts = kmalloc(sizeof(struct ecpri_dma_pkt) *
 		ecpri_dma_ss_core_ctx->num_of_pkts[dev_id], GFP_KERNEL);
@@ -500,17 +509,19 @@ int ecpri_dma_ecpri_ss_start_oran_log(u32 mem_size, u32 pkt_size,
 	endp_params.cb_to_use = ECPRI_DMA_SMMU_CB_ETH;
 	endp_params.align_ring_mem = true;
 
+	DMADBG("Allocating endp: %u for dir: %d\n",endp_id, dir);
 	ret = ecpri_dma_alloc_endp(&endp_params);
 
 	if (ret != 0) {
-		DMAERR("Unable to allocate  endp_id: %d, gsi_id %d\n",
+		DMAERR("Unable to allocate  endp_id: %u, gsi_id %u\n",
 			endp_id, gsi_id);
 		goto fail_alloc_endp;
 	}
 
+	DMADBG("Starting endp: %u for dir: %d\n",endp_id, dir);
 	ret = ecpri_dma_start_endp(endp_ctx);
 	if (ret != 0) {
-		DMAERR("Unable to start endp, endp_id: %d, gsi_id %d\n",
+		DMAERR("Unable to start endp, endp_id: %u, gsi_id %u\n",
 			endp_id, gsi_id);
 		goto fail_start_endp;
 	}
@@ -529,7 +540,7 @@ int ecpri_dma_ecpri_ss_start_oran_log(u32 mem_size, u32 pkt_size,
 			&buffs[i].phys_base, GFP_KERNEL);
 
 	        if (!buffs[i].virt_base) {
-			DMAERR("dma_alloc_coherent failed, DMA buff size %d\n",
+			DMAERR("dma_alloc_coherent failed, DMA buff size %u\n",
 				ecpri_dma_ss_core_ctx->pkt_size[dev_id]+sizeof(struct ecpri_hdr));
 			ret = -ENOMEM;
 			goto fail_alloc_pkts;
@@ -541,6 +552,7 @@ int ecpri_dma_ecpri_ss_start_oran_log(u32 mem_size, u32 pkt_size,
 			goto fail_queue_credits;
 		}
 	}
+	DMADBG("Queued credit to GSI for dir: %d\n",dir);
 
 	/* ring CH and EV DBs outside of the ring */
 	ret = gsi_ring_ch_ring_db(endp_ctx->gsi_chan_hdl,
@@ -558,6 +570,8 @@ int ecpri_dma_ecpri_ss_start_oran_log(u32 mem_size, u32 pkt_size,
 		DMAERR("Unable to ring EV DB\n");
 		goto fail_queue_credits;
 	}
+
+	DMADBG("Ran channel and event ring doorbell for dir: %d\n",dir);
 
 	return 0;
 
@@ -601,6 +615,7 @@ int ecpri_dma_ecpri_ss_stop_oran_log(
 	u32 endp_id, gsi_id;
 	enum ecpri_dma_ss_oran_log_dev dev_id;
 
+	DMADBG("Called ecpri_dma_ecpri_ss_stop_oran_log function for dir: %d\n",dir);
 	if (dir == ECPRI_DMA_ORAN_LOGGING_DIRECTION_INGRESS) {
 		if (ECPRI_DMA_GET_HW_FLAVOR() == ECPRI_HW_FLAVOR_RU) {
 			endp_ctx = &ecpri_dma_ctx->endp_ctx[ECPRI_DMA_SS_ORAN_LOG_QRU_GSI_ID]
@@ -632,10 +647,11 @@ int ecpri_dma_ecpri_ss_stop_oran_log(
 		dev_id = ECPRI_DMA_SS_ORAN_LOG_EGRESS_DEV_ID;
 	}
 
+	DMADBG("Stopping endp: %u for dir: %d\n",endp_id, dir);
 	ret = ecpri_dma_stop_endp(endp_ctx);
 	if (ret)
 	{
-		DMAERR("Failed to stop ORAN logging endp_id: %d, gsi_id %d\n",
+		DMAERR("Failed to stop ORAN logging endp_id: %u, gsi_id %u\n",
 			endp_ctx->endp_id,
 			endp_ctx->gsi_id);
 	}

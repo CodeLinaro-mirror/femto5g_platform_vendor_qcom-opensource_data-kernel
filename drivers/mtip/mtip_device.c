@@ -2421,7 +2421,7 @@ int mtip_device_update_security_config(struct net_device *netdev, enum mtip_port
         {
             if (sdev->ops->update_config) 
             {
-                CSMLOGINFO("Setting security config of port_type %d to %d", port_type, num_links);
+                CSMLOGDBG("Setting security config of port_type %d to %d", port_type, num_links);
                 (sdev->ops->update_config)(sdev, num_links);
             }
         }
