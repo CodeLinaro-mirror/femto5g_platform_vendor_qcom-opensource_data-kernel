@@ -483,8 +483,6 @@ void mtip_mac_get_mac_address_by_link_index(u32 link_index, uint8_t sa_data[]) {
    sa_data[4] = (upper) & 0xFF;
    sa_data[5] = (upper >> 8) & 0xFF;
 
-   CSMLOGDBG("Retrieved the MAC address of link index: %d, name: %s,  %x:%x:%x:%x:%x:%x \n", link_index, link_name, 
-              sa_data[0], sa_data[1], sa_data[2], sa_data[3], sa_data[4], sa_data[5]);
 }
 
 void mtip_mac_set_mac_address_by_link_index(u32 link_index, uint8_t sa_data[]) 

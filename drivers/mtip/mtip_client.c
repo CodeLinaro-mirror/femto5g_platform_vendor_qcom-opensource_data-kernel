@@ -165,7 +165,6 @@ static eth_ecpriss_link_state_e mtip_client_get_link_state_by_link_index(u32 lin
         break;
     }
 
-    CSMLOGDBG("setting link index %d link state %d to ecpri %d", link_index, link_state, retval);
     return retval;
 }
 
