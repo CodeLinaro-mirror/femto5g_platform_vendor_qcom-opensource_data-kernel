@@ -532,7 +532,7 @@ void run_mtip_process_link_state(void* work_ptr)
                  CSMLOGINFO("rx mode is:%d for hdl: %d\n", mode,dma_handle);
 
                  __napi_schedule(&(link->napi));
-                 CSMLOGINFO("napi schedule for hdl: %d, link_index: %d, link 0x%lx, netdev 0x%lx\n", dma_handle, link_index, (unsigned long)link, (unsigned long)dev);             // schedule napi
+                 CSMLOGINFO("RX napi schedule for hdl: %d, link_index: %d, link 0x%lx, netdev 0x%lx\n", dma_handle, link_index, (unsigned long)link, (unsigned long)dev);             // schedule napi
             }
         }
 
@@ -647,7 +647,7 @@ void mtip_process_link_state(u32 link_index, bool link_up)
                 CSMLOGINFO("rx mode is:%d for hdl: %d\n", mode,dma_handle);
 
                 __napi_schedule(&(link->napi));
-                CSMLOGINFO("napi schedule for hdl: %d, link_index: %d, link 0x%lx, netdev 0x%lx\n", dma_handle, link_index, (unsigned long)link, (unsigned long)dev);             // schedule napi
+                CSMLOGINFO("RX napi schedule for hdl: %d, link_index: %d, link 0x%lx, netdev 0x%lx\n", dma_handle, link_index, (unsigned long)link, (unsigned long)dev);             // schedule napi
             }
         }
 
@@ -777,8 +777,6 @@ int mtip_napi_poll_tx(struct napi_struct *napi_ptr, int budget)
 
     tx_comp_list_size = mtip_dma_tx_comp_list_size(link_index);
 
-    //CSMLOGDBG(" budget %d for link_index %d hdl %d list_size %d \n", budget, link_index, hdl, tx_comp_list_size);
-
     if(!enable_tx_comp_poll)
     {
         if (tx_comp_list_size > 0)
@@ -804,9 +802,6 @@ int mtip_napi_poll_tx(struct napi_struct *napi_ptr, int budget)
             CSMLOGERR("poll_tx_packets failed for hdl: %d\n", hdl);
         }
     }
-
-    /*CSMLOGDBG(" budget %d for link_index %d hdl %d list_size %d npackets %d \n",
-              budget, link_index, hdl, tx_comp_list_size, npackets);*/
 
     if (npackets < budget)
     {
@@ -1275,15 +1270,12 @@ static void mtip_generate_entry_address(struct netdev_hw_addr *ha, u8* entry_add
     {
         val = mtip_xor_bits(ha->addr[i]);
 
-        CSMLOGDBG("addr: 0x%x, val: %d, i: %d\n", ha->addr[i], val, i);
-
         // shift val by i
         val = val << i;
 
         *entry_address |= val;
     }
 
-    CSMLOGDBG("generated entry address: 0x%x\n", *entry_address);
 }
 
 static void mtip_generate_hashtablebits(struct net_device *netdev, u64* hashtablebits)
@@ -1299,8 +1291,6 @@ static void mtip_generate_hashtablebits(struct net_device *netdev, u64* hashtabl
 
         mtip_generate_entry_address(ha, &entry_address);
 
-        CSMLOGDBG("entry address generated: 0x%x\n", entry_address);
-
         pattern = 0x1;
         // set the corresponding hashtablebit to 1
         for (i = 0; i < entry_address; ++i) {
@@ -1308,10 +1298,8 @@ static void mtip_generate_hashtablebits(struct net_device *netdev, u64* hashtabl
         }
         *hashtablebits |= pattern;
 
-        CSMLOGDBG("hashtablebits: 0x%lx, pattern 0x%lx\n", *hashtablebits, pattern);
     }
 
-    CSMLOGDBG("Final hashtablebits: 0x%lx\n", *hashtablebits);
 }
 
 /* Configure Multicast and Promiscuous modes */
@@ -1623,8 +1611,6 @@ static void mtip_get_stats64(struct net_device *netdev,
    lock = &(priv->lock);
    link_index = priv->link_index;
 
-   CSMLOGDBG("mtip_get_stats64 called for link_index: %d\n", link_index);
-
    spin_lock_irqsave(lock, flags);
 
    memcpy(net_stats, &(platform_driver_priv->mtip_links[link_index]->net_stats), sizeof(struct rtnl_link_stats64));
@@ -1716,8 +1702,6 @@ void mtip_netdevice_init(struct net_device *dev)
 
 enum mtip_link_state_enum mtip_get_link_state_by_link_index(u32 link_index)
 {
-    CSMLOGDBG("Getting link state of link index: %d\n", link_index);
-
     if (platform_driver_priv->mtip_links[link_index] == NULL) {
         return MTIP_LINK_STATE_INIT;
     }
@@ -2421,7 +2405,6 @@ int mtip_device_update_security_config(struct net_device *netdev, enum mtip_port
         {
             if (sdev->ops->update_config) 
             {
-                CSMLOGDBG("Setting security config of port_type %d to %d", port_type, num_links);
                 (sdev->ops->update_config)(sdev, num_links);
             }
         }
