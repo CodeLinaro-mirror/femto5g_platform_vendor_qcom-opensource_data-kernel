@@ -145,7 +145,7 @@ void mtip_dma_rx_comp_cb(void *user_data, ecpri_dma_eth_conn_hdl_t hdl)
          // schedule napi
          if (napi_schedule_prep(&(link->napi))) {
             __napi_schedule(&(link->napi));
-            CSMLOGDBG("napi schedule for hdl: %d, link_index: %d, link 0x%lx, netdev 0x%lx\n", used_handle, link_index, (unsigned long)link, (unsigned long)netdev);
+            CSMLOGDBG("RX napi schedule for hdl: %d, link_index: %d, link 0x%lx, netdev 0x%lx\n", used_handle, link_index, (unsigned long)link, (unsigned long)netdev);
 
             // set the rx mode to POLL
             mtip_set_rx_mode_immediate(hdl, setmode);
@@ -292,7 +292,7 @@ void mtip_dma_tx_irq_comp_cb(void *user_data, ecpri_dma_eth_conn_hdl_t hdl)
          link = platform_driver_priv->mtip_links[link_index];
          netdev = link->dev;
 
-         CSMLOGDBG("napi schedule for hdl: %d, link_index: %d, link 0x%lx, netdev 0x%lx\n", used_handle, link_index, (unsigned long)link, (unsigned long)netdev);
+         CSMLOGDBG("TX napi schedule for hdl: %d, link_index: %d, link 0x%lx, netdev 0x%lx\n", used_handle, link_index, (unsigned long)link, (unsigned long)netdev);
 
          priv = netdev_priv(netdev);
 
@@ -573,7 +573,7 @@ int mtip_start_dma_pipe(struct net_device *netdev, ecpri_dma_eth_conn_hdl_t hdl)
             CSMLOGINFO("rx mode is:%d for hdl: %d\n", mode,hdl);
 
             __napi_schedule(&(link->napi));
-            CSMLOGINFO("napi schedule for hdl: %d, link_index: %d, link 0x%lx, netdev 0x%lx\n", hdl, link_index, (unsigned long)link, (unsigned long)netdev);      // schedule napi
+            CSMLOGINFO("RX napi schedule for hdl: %d, link_index: %d, link 0x%lx, netdev 0x%lx\n", hdl, link_index, (unsigned long)link, (unsigned long)netdev);      // schedule napi
          }
       }
    }

@@ -215,12 +215,16 @@ static irqreturn_t mtip_mac_interrupt_handler(int irq, void *devptr)
 
                CSMLOGDBG("Tx Timestamp %d, %d read for link: %d with link_index: %d\n", timestamp_secs, timestamp_nsecs, i, link_index);
 
-               if ((mode == MTIP_DEVICE_RUv2) || (mode == MTIP_DEVICE_DUv2))
+               if ((mode == MTIP_DEVICE_RUv2 || mode == MTIP_DEVICE_DUv2) && link_index != MTIP_L2_ETH_LINK_INDEX)
                {
                    mtip_mac_read_ts_seq_num(link_index, &ts_seq_num);
-
-                   CSMLOGDBG("TS seq num: %d for link_index: %d", ts_seq_num, link_index);
                }
+               else
+               {
+                   ts_seq_num = platform_driver_priv->mtip_links[link_index]->ptp_ts_seq_num-1;
+               }
+
+               CSMLOGDBG("TS seq num: %d for link_index: %d", ts_seq_num, link_index);
 
                // post a job to workqueue to process this timestamp
                post_mtip_process_timestamp(link_index, timestamp_secs, timestamp_nsecs, ts_seq_num);
@@ -483,8 +487,6 @@ void mtip_mac_get_mac_address_by_link_index(u32 link_index, uint8_t sa_data[]) {
    sa_data[4] = (upper) & 0xFF;
    sa_data[5] = (upper >> 8) & 0xFF;
 
-   CSMLOGDBG("Retrieved the MAC address of link index: %d, name: %s,  %x:%x:%x:%x:%x:%x \n", link_index, link_name, 
-              sa_data[0], sa_data[1], sa_data[2], sa_data[3], sa_data[4], sa_data[5]);
 }
 
 void mtip_mac_set_mac_address_by_link_index(u32 link_index, uint8_t sa_data[]) 

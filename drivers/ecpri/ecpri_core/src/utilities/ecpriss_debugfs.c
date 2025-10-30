@@ -1159,6 +1159,7 @@ static ssize_t config_val_from_registers_qudp_ingress_vlan_v2(char __user *buf, 
 	int fltr_table_index = 0;
 	int ret_val = 0;
 	static int data_size = 0;
+	uint16_t vlan_header_pcp_val = 0, vlan_header_dei_val = 0, vlan_id_val = 0;
 
 	if(*ppos == 0 )
 	{
@@ -1176,8 +1177,10 @@ static ssize_t config_val_from_registers_qudp_ingress_vlan_v2(char __user *buf, 
 				RESET_STR(index_str);
 				scnprintf(index_str, TEMP_STR_MIN_SIZE, "%u", fltr_table_index);
 				RESET_STR(temp_stat_val_str);
-				scnprintf(temp_stat_val_str, TEMP_STAT_VAL_STR_MAX_SIZE, "%u",
-						ecpriss_pdata_v2->cfg_stats_v2.qudp_cfg_v2.ingress.cfg.vlan[fh_index][fltr_table_index].value);
+
+				vlan_header_pcp_val = ECPRISS_HAL_GETFIELD_FROM_REG(ecpriss_pdata_v2->cfg_stats_v2.qudp_cfg_v2.ingress.cfg.vlan[fh_index][fltr_table_index].value, 0xd, 0xe000);
+				vlan_header_dei_val = ECPRISS_HAL_GETFIELD_FROM_REG(ecpriss_pdata_v2->cfg_stats_v2.qudp_cfg_v2.ingress.cfg.vlan[fh_index][fltr_table_index].value, 0xc, 0x1000);
+				vlan_id_val = ECPRISS_HAL_GETFIELD_FROM_REG(ecpriss_pdata_v2->cfg_stats_v2.qudp_cfg_v2.ingress.cfg.vlan[fh_index][fltr_table_index].value, 0x0, 0xfff);
 
 				strlcat(max_str, "vlan_fh_",
 						max_str_size);
@@ -1188,8 +1191,22 @@ static ssize_t config_val_from_registers_qudp_ingress_vlan_v2(char __user *buf, 
 				strlcat(max_str, index_str,
 						max_str_size);
 				strlcat(max_str, ":", max_str_size);
-				strlcat(max_str, temp_stat_val_str,
-						max_str_size);
+				
+				strlcat(max_str, " Priority Code Point (PCP): ", max_str_size);
+				RESET_STR(temp_stat_val_str);
+				scnprintf(temp_stat_val_str, TEMP_STAT_VAL_STR_MAX_SIZE, "%u", vlan_header_pcp_val);
+				strlcat(max_str, temp_stat_val_str, max_str_size);
+
+				strlcat(max_str, ", Drop Eligible Indicator (DEI): ", max_str_size);
+				RESET_STR(temp_stat_val_str);
+				scnprintf(temp_stat_val_str, TEMP_STAT_VAL_STR_MAX_SIZE, "%u", vlan_header_dei_val);
+				strlcat(max_str, temp_stat_val_str, max_str_size);
+
+				strlcat(max_str, ", VLAN ID: ", max_str_size);
+				RESET_STR(temp_stat_val_str);
+				scnprintf(temp_stat_val_str, TEMP_STAT_VAL_STR_MAX_SIZE, "%u", vlan_id_val);
+				strlcat(max_str, temp_stat_val_str, max_str_size);
+
 				strlcat(max_str, "\n",
 						max_str_size);
 

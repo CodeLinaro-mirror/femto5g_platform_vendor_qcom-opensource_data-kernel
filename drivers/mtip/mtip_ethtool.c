@@ -190,8 +190,6 @@ const char* mtip_ethtool_get_port_config_str(u32 index)
 static int mtip_ethtool_get_sset_count(struct net_device *netdev, int sset)
 {
 	int eip_ethtool_sset = mtip_security_get_sset_count(netdev);
-	CSMLOGDBG("ethtool: get_sset_count %d, %d\n", sset,
-		  MTIP_ETHTOOL_STATS_LEN + eip_ethtool_sset);
 
 	switch (sset) {
 	case ETH_SS_STATS:
@@ -206,8 +204,6 @@ static int mtip_ethtool_get_sset_count(struct net_device *netdev, int sset)
 static void mtip_ethtool_get_strings(struct net_device *netdev, u32 stringset, u8 *data)
 {
     int i;
-
-    CSMLOGDBG("ethtool: get_strings stringset %d, %d\n", stringset, MTIP_ETHTOOL_STATS_LEN);
 
     if (stringset == ETH_SS_STATS) 
     {
@@ -230,8 +226,6 @@ static void mtip_ethtool_get_strings(struct net_device *netdev, u32 stringset, u
 
 static void mtip_ethtool_get_stats(struct net_device *netdev, struct ethtool_stats *stats, u64 *data) 
 {
-    CSMLOGDBG("ethtool: get_stats\n");
-
     memset(data, 0, MTIP_ETHTOOL_STATS_LEN*sizeof(u64));
 
     // read the stats from the HW
