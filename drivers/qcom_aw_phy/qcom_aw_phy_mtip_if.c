@@ -2130,7 +2130,12 @@ void qcom_aw_phy_handle_rx_sig_detect(struct work_struct *work){
                      &temp_rd_val);
 
       if(temp_rd_val == 0) {
-        phy_inst_info->lane_params[lane].rx_sig_detect_status = false;
+        if(phy_inst_info->lane_params[lane].rx_sig_detect_status == true)
+        {
+          qcom_aw_phy_handle_cdr_lock_status(phy_inst_info, lane,
+                                             CDR_LOCK_FAILURE);
+          phy_inst_info->lane_params[lane].rx_sig_detect_status = false;
+        }
         mutex_unlock(&phy_inst_info->lane_lock[lane]);
         continue;
       }
