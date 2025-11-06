@@ -2033,6 +2033,7 @@ struct DWC_ETH_QOS_prv_data {
 	bool dma_rx_int_disabled;
 
 	bool skip_ipa_autoresume;
+	bool dynamic_filter_enabled;
 };
 
 struct ip_params {

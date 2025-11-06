@@ -440,6 +440,20 @@ int DWC_ETH_QOS_disable_enable_ipa_offload(struct DWC_ETH_QOS_prv_data *pdata, i
 		return ret;
 }
 
+static bool dynamic_filtering_check(struct DWC_ETH_QOS_prv_data *pdata)
+{
+	u32 reg_val;
+
+	MTL_RQDCM0R_RXQ0DADMACH_UDFRD(reg_val);
+	/* Check if RXQ0DADMACH is set */
+	if (reg_val) {
+		/*disable dynamic mapping*/
+		MTL_RQDCM0R_RXQ0DADMACH_UDFWR(0x0);
+		EMACDBG("Disabled dynamic filtering\n");
+		return true;
+	}
+	return false;
+}
 /**
  * DWC_ETH_QOS_ipa_offload_suspend() - Suspend IPA offload data
  * path.
@@ -452,8 +466,17 @@ static int DWC_ETH_QOS_ipa_offload_suspend(struct DWC_ETH_QOS_prv_data *pdata, b
 	int ret = Y_SUCCESS;
 	struct hw_if_struct *hw_if = &(pdata->hw_if);
 	struct ipa_perf_profile profile;
+	u32 reg_val;
 
 	EMACDBG("Suspend/disable IPA offload\n");
+
+	/*map RX queue 0 to DMA channnel 1*/
+	MTL_RQDCM0R_RGRD(reg_val);
+	reg_val |= IPA_RX_TO_DMA_CH_MAP_NUM;
+	MTL_RQDCM0R_RGWR(reg_val);
+	EMACDBG("Mapped queue 0 to channel 1\n");
+
+	pdata->dynamic_filter_enabled = dynamic_filtering_check(pdata);
 
 	ret = hw_if->stop_dma_rx(IPA_DMA_RX_CH);
 	if (ret != Y_SUCCESS) {
@@ -557,6 +580,18 @@ static int DWC_ETH_QOS_ipa_offload_resume(struct DWC_ETH_QOS_prv_data *pdata, bo
 			EMACDBG("eMAC Debugfs created  \n");
 			pdata->prv_ipa.ipa_debugfs_exists = true;
 		} else EMACERR("eMAC Debugfs failed \n");
+	}
+
+	/*map RX queue 0 to DMA channnel 0*/
+	MTL_RQDCM0R_RGRD(reg_val);
+	reg_val &= ~IPA_RX_TO_DMA_CH_MAP_NUM;
+	MTL_RQDCM0R_RGWR(reg_val);
+	EMACDBG("Mapped queue 0 to channel 0\n");
+
+	if (pdata->dynamic_filter_enabled) {
+		/* Enable dynamic mapping */
+		MTL_RQDCM0R_RXQ0DADMACH_UDFWR(0x1);
+		EMACDBG("Enabled dynamic filtering\n");
 	}
 
 	if (pdata->current_loopback > 0) {
