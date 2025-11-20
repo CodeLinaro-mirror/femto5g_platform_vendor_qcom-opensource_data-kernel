@@ -9564,6 +9564,12 @@ int ecpri_dma_gsi_setup_event_ring(struct ecpri_dma_endp_context *ep,
 		gsi_evt_ring_props.msi_irq = GSI_INTR_MSI;
 		gsi_evt_ring_props.int_modt = channel->int_modt *
 			ECPRI_DMA_MHI_SLEEP_CLK_RATE_KHZ;
+
+		/* For LTE DEST CHs RP moderation timer need to be reduced to 250us from 1ms based on sleep cycles. */
+		if (gsi_ep_info->lte_enable && gsi_ep_info->dir == ECPRI_DMA_ENDP_DIR_DEST) {
+			gsi_evt_ring_props.int_modt = gsi_evt_ring_props.int_modt/4;
+		}
+
 		gsi_evt_ring_props.int_modc = channel->int_modc;
 		gsi_evt_ring_props.intvec = ((channel->msi_config->data
 			& ~channel->msi_config->mask) |

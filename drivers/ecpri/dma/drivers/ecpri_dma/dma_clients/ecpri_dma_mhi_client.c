@@ -2711,8 +2711,7 @@ static int ecpri_dma_mhi_client_connect_internal(
 		[channel->endp_ctx->endp_id]);
 
 	/* For LTE DEST CHs configure RP moderation values */
-	if (gsi_ep_cfg->lte_enable && gsi_ep_cfg->dir == ECPRI_DMA_ENDP_DIR_DEST &&
-		channel->int_modc == 0 && channel->int_modt == 0)
+	if (gsi_ep_cfg->lte_enable && gsi_ep_cfg->dir == ECPRI_DMA_ENDP_DIR_DEST)
 	{
 		channel->int_modc = ECPRI_DMA_MHI_LTE_DEST_MOD_RP_COUNTER;
 		channel->int_modt = ECPRI_DMA_MHI_LTE_DEST_MOD_RP_TIMER;
