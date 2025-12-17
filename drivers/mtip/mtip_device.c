@@ -530,7 +530,7 @@ void run_mtip_process_link_state(void* work_ptr)
         {
             CSMLOGERR("get ring state from DMA failed for hdl: %d\n", dma_handle);
         }
-        else if(rx_available == MTIP_RX_RING_SIZE)
+        else if( (link_index != MTIP_L2_ETH_LINK_INDEX && mtip_loopback_mode != MTIP_MODE_DEFAULT) || rx_available == MTIP_RX_RING_SIZE)
         {
             // set the rx mode to IRQ
             setmode = ECPRI_DMA_NOTIFY_MODE_IRQ;
@@ -671,7 +671,7 @@ void mtip_process_link_state(u32 link_index, bool link_up)
         {
             CSMLOGERR("get ring state from DMA failed for hdl: %d\n", dma_handle);
         }
-        else if(rx_available == MTIP_RX_RING_SIZE)
+        else if( (link_index != MTIP_L2_ETH_LINK_INDEX && mtip_loopback_mode != MTIP_MODE_DEFAULT) || rx_available == MTIP_RX_RING_SIZE)
         {
             // set the rx mode to IRQ
             setmode = ECPRI_DMA_NOTIFY_MODE_IRQ;
