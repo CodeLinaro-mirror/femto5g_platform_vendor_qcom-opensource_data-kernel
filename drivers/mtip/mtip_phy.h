@@ -35,7 +35,7 @@ int mtip_phy_notify_link_status(u32 link_index, bool status);
 int mtip_phy_initiate_an(u32 port_type, int num_lanes, u32 port_config_mask);
 int mtip_phy_reset_phy_sm(u32 port_type);
 void mtip_phy_set_tx_compliance(bool flag);
-void mtip_phy_set_loopback_mode(enum qcom_aw_phy_loopback_mode_enum loopback_mode);
+void mtip_phy_set_c2c_phy_loopback_mode(enum qcom_aw_phy_loopback_mode_enum loopback_mode);
 
 // Lane up handling structure and function declarations
 struct mtip_process_lane_up
