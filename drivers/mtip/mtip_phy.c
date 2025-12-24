@@ -678,10 +678,10 @@ void mtip_phy_set_tx_compliance(bool flag)
     return;
 }
 
-void mtip_phy_set_loopback_mode(enum qcom_aw_phy_loopback_mode_enum loopback_mode)
+void mtip_phy_set_c2c_phy_loopback_mode(enum qcom_aw_phy_loopback_mode_enum loopback_mode)
 {
-    CSMLOGDBG("Loopback mode of phy is set as: %d", loopback_mode);
-    qcom_aw_phy_driver_iface_ops.eth_phy_iface_set_phy_loopback_mode(loopback_mode);
+    CSMLOGDBG("Loopback mode of C2C phy is set as: %d", loopback_mode);
+    qcom_aw_phy_driver_iface_ops.eth_phy_iface_set_c2c_phy_loopback_mode(loopback_mode);
     return;
 
 }

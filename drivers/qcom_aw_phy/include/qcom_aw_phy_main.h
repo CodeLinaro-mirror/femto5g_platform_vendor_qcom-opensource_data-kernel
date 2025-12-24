@@ -25,7 +25,6 @@
 
 #include "eth_phy_iface.h"
 
-extern int qcom_aw_phy_loopback_mode;
 
 /* Module level feature definitions */
 //#define FEATURE_QCOM_AW_RUMI_SW
