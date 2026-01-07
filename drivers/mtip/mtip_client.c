@@ -615,7 +615,7 @@ int setup_interface_in_loopback_mode(struct net_device *netdev, u32 link_index)
 
         // set the below port priv flags supported for L2 port
         // 1x100GBASE_R2, 1x50GBASE_R, 1x50GBASE_R2, 1x25GBASE_R, 1x10GBASE_R
-        platform_driver_priv->mtip_ports[port_type]->port_priv_flags = MTIP_DEVICE_PRIV_FLAGS_BIT_MASK_L2_PORT_NON_FEC;
+        platform_driver_priv->mtip_ports[port_type]->port_priv_flags = (1 << MTIP_PORT_CONFIG_1x25GBASE_R);
 
         // set the port sfp as DAC
         platform_driver_priv->mtip_ports[port_type]->sfp_port_type = PORT_DA;

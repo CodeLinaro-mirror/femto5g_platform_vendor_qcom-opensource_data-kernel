@@ -391,12 +391,12 @@ void ecpriss_xbar_set_logging_route(ecpriss_log_cfg_s *log_cfg)
 		}
 	}
 
-	ECPRILOGINFO("Configured UL and DL route to DMA for CP and UP packets in ecpriss_xbar_fh_rx_lut_v2_logging function for all ports for dir:%d and action:%d\n",log_cfg->log_dir, log_cfg->action);
+	ECPRILOGDBG("Configured UL and DL route to DMA for CP and UP packets in ecpriss_xbar_fh_rx_lut_v2_logging function for all ports for dir:%d and action:%d\n",log_cfg->log_dir, log_cfg->action);
 
-	ECPRILOGINFO("PCID List is:\n");
+	ECPRILOGDBG("PCID List is:\n");
 	for(j=0;j<num_of_pcid;j++)
 	{
-		ECPRILOGINFO("%u ",log_cfg->pcids[j]);
+		ECPRILOGDBG("%u ",log_cfg->pcids[j]);
 	}
 }
 
@@ -412,12 +412,12 @@ void ecpriss_xbar_set_l2_logging_route(ecpriss_log_cfg_s *log_cfg)
 		ecpriss_xbar_c2c_rx_lut_v2_logging(i, log_cfg->pcids[j], log_cfg->log_dir, log_cfg->action);
 	}
 
-	ECPRILOGINFO("Configured CP and UP packet route to DMA in ecpriss_xbar_c2c_rx_lut_v2_logging function for dir:%d and action:%d\n",log_cfg->log_dir,log_cfg->action);
+	ECPRILOGDBG("Configured CP and UP packet route to DMA in ecpriss_xbar_c2c_rx_lut_v2_logging function for dir:%d and action:%d\n",log_cfg->log_dir,log_cfg->action);
 
-	ECPRILOGINFO("PCID List is:\n");
+	ECPRILOGDBG("PCID List is:\n");
 	for(j=0;j<num_of_pcid;j++)
 	{
-		ECPRILOGINFO("%u ",log_cfg->pcids[j]);
+		ECPRILOGDBG("%u ",log_cfg->pcids[j]);
 	}
 }
 
@@ -425,14 +425,14 @@ int32_t ecpri_send_logging_trigger_to_dma(ecpriss_log_cfg_s *log_cfg)
 {
 	if(log_cfg->action == ECPRISS_LOGGING_START)
 	{
-		ECPRILOGINFO("Sending Ingress Logging trigger to DMA for action:%d, dir:%d and log_buf_size:%u\n",log_cfg->action,log_cfg->log_dir,(log_cfg->log_buf_size)*1024);
+		ECPRILOGDBG("Sending Ingress Logging trigger to DMA for action:%d, dir:%d and log_buf_size:%u\n",log_cfg->action,log_cfg->log_dir,(log_cfg->log_buf_size)*1024);
 
 		return (dma_ecpri_ss_driver_ops.ecpri_dma_ecpri_ss_start_oran_log)
 			((log_cfg->log_buf_size)*1024, log_cfg->packet_size, ECPRI_DMA_ORAN_LOGGING_DIRECTION_INGRESS);
 	}
 	else
 	{
-		ECPRILOGINFO("Sending Ingress Logging trigger to DMA for action:%d and dir:%d\n",log_cfg->action,log_cfg->log_dir);
+		ECPRILOGDBG("Sending Ingress Logging trigger to DMA for action:%d and dir:%d\n",log_cfg->action,log_cfg->log_dir);
 
 		return (dma_ecpri_ss_driver_ops.ecpri_dma_ecpri_ss_stop_oran_log)
 			(ECPRI_DMA_ORAN_LOGGING_DIRECTION_INGRESS );
@@ -443,14 +443,14 @@ int32_t ecpri_send_egress_logging_trigger_to_dma(ecpriss_log_cfg_s *log_cfg)
 {
 	if(log_cfg->action == ECPRISS_LOGGING_START)
 	{
-		ECPRILOGINFO("Sending Egress Logging trigger to DMA for action:%d, dir:%d and log_buf_size:%u\n",log_cfg->action,log_cfg->log_dir,(log_cfg->log_buf_size)*1024);
+		ECPRILOGDBG("Sending Egress Logging trigger to DMA for action:%d, dir:%d and log_buf_size:%u\n",log_cfg->action,log_cfg->log_dir,(log_cfg->log_buf_size)*1024);
 
 		return (dma_ecpri_ss_driver_ops.ecpri_dma_ecpri_ss_start_oran_log)
 			((log_cfg->log_buf_size)*1024, log_cfg->packet_size, ECPRI_DMA_ORAN_LOGGING_DIRECTION_EGRESS);
 	}
 	else
 	{
-		ECPRILOGINFO("Sending Egress Logging trigger to DMA for action:%d and dir:%d\n",log_cfg->action,log_cfg->log_dir);
+		ECPRILOGDBG("Sending Egress Logging trigger to DMA for action:%d and dir:%d\n",log_cfg->action,log_cfg->log_dir);
 		return (dma_ecpri_ss_driver_ops.ecpri_dma_ecpri_ss_stop_oran_log)
 			(ECPRI_DMA_ORAN_LOGGING_DIRECTION_EGRESS );
 	}
@@ -488,8 +488,6 @@ int32_t ecpriss_configure_logging(ecpriss_packet_payload_s *packet)
 
 			else if(ecpriss_pdata_v2->dev_mode == ECPRISS_DEV_MODE_DU_PCIE_3_X_12){
 
-				ECPRILOGINFO("Bringing up C2C2 port in loopback mode\n");
-				ret = (mtip_ecpri_ops.eth_ecpriss_enable_logging_port)(log_cfg->action);
 				ecpriss_xbar_set_l2_logging_route(log_cfg);
 				ret = ecpri_send_egress_logging_trigger_to_dma(log_cfg);
 				if (ret < 0) {
@@ -507,8 +505,6 @@ int32_t ecpriss_configure_logging(ecpriss_packet_payload_s *packet)
 				ECPRILOGERR("Ecpri Ingress logging trigger to DMA failed\n");
 			}
 
-			ECPRILOGINFO("Bringing up C2C2 port in loopback mode\n");
-			ret = (mtip_ecpri_ops.eth_ecpriss_enable_logging_port)(log_cfg->action);
 			ecpriss_xbar_set_l2_logging_route(log_cfg);
 			ret = ecpri_send_egress_logging_trigger_to_dma(log_cfg);
 			if (ret < 0) {
@@ -823,7 +819,6 @@ void ecpriss_eth_event_processing(void)
 			ecpriss_qudp_set_nr_mac_filter();
 			ecpriss_eth_link_update_for_mhi_v2();
 		}
-
 	}
 	return;
 }
@@ -831,7 +826,8 @@ void ecpriss_eth_event_processing(void)
 
 void ecpriss_eth_topology_init_wq(struct work_struct *work)
 {
-
+	int ret = 0;
+	bool enable_c2c2 = true;
 	if(ecpriss_hw_ver == ECPRISS_HW_v1_0){
 		ecpriss_eth_topology_init();
 	}else {
@@ -843,6 +839,11 @@ void ecpriss_eth_topology_init_wq(struct work_struct *work)
 			ecpriss_qudp_set_nr_mac_filter();
 		}
 
+		ECPRILOGINFO("Bringing up C2C2 port in loopback mode\n");
+		ret = (mtip_ecpri_ops.eth_ecpriss_enable_logging_port)(enable_c2c2);
+		if(ret != 0) {
+			ECPRILOGERR("C2C2 bringup failed\n");
+		}
 
 	}
 	return;
@@ -1641,6 +1642,7 @@ static int ecpriss_core_register_callbacks_v2(bool *is_eth_ready)
 	bool ready = 0;
 	bool *is_ready = &ready;
 	void * handle;
+	bool enable_c2c2 = true;
 
 	do{
 		ret = (mtip_ecpri_ops.eth_ecpriss_register_ready_cb)
@@ -1661,6 +1663,11 @@ static int ecpriss_core_register_callbacks_v2(bool *is_eth_ready)
 
 		if(*is_eth_ready == true) {
 			ecpriss_eth_topology_init_v2();
+			ECPRILOGINFO("Bringing up C2C2 port in loopback mode\n");
+			ret = (mtip_ecpri_ops.eth_ecpriss_enable_logging_port)(enable_c2c2);
+			if(ret != 0) {
+				ECPRILOGERR("C2C2 bringup failed\n");
+			}
 		}
 
 		ready = 0;
