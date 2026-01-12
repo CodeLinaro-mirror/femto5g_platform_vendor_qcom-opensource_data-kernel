@@ -168,7 +168,7 @@ static eth_ecpriss_link_state_e mtip_client_get_link_state_by_link_index(u32 lin
     return retval;
 }
 
-static void mtip_update_topology()
+void mtip_update_topology(void)
 {
     int i, j;
     u32 port_number = 0;
@@ -246,6 +246,10 @@ static void mtip_update_topology()
 
                             // set the link rate
                             topology->topology_params[port_number].port_params[port].link_params[link_number].link_rate = mtip_client_get_link_rate(platform_driver_priv->devices.port_devices[i].port_type);
+
+                            // set the loopback enabled status
+                topology->topology_params[port_number].port_params[port].link_params[link_number].loopback_enabled =
+                    mtip_is_link_in_loopback(link_index);
 
                             // increment the link number
                             ++link_number;
@@ -605,9 +609,9 @@ int setup_interface_in_loopback_mode(struct net_device *netdev, u32 link_index)
             CSMLOGERR("invalid port_type for link_index %d", link_index);
             return -1;
         }
-        // setup the ports for loopback
+       // setup the ports for loopback
 
-        // don't do autoneg for loopback modes
+       // don't do autoneg for loopback modes
         platform_driver_priv->mtip_ports[port_type]->autoneg = false;
 
         // set the port state as connected
@@ -721,4 +725,3 @@ struct eth_ecpriss_ops mtip_ecpri_ops = {
 };
 
 EXPORT_SYMBOL(mtip_ecpri_ops);
-

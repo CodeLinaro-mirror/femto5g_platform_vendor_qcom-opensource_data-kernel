@@ -254,6 +254,7 @@ struct qcom_aw_lane_params{
 	uint32_t                                  an_link_good_intr;
 	uint32_t                                  an_done_intr;
 	bool                                      rx_sig_detect_status;
+	enum qcom_aw_phy_loopback_mode_enum       per_lane_loopback_mode;
 	struct qcom_aw_phy_delayed_work_q_params  an_restart_wq_item;
 	struct qcom_aw_phy_work_q_params          snr_valid_err_wq_item;
 	struct qcom_aw_phy_work_q_params          snr_valid_wq_item;
@@ -330,8 +331,13 @@ struct qcom_aw_phy_lane_speed_config{
 struct qcom_aw_phy_config* qcom_aw_phy_get_config_info(void);
 struct qcom_aw_phy_inst_config *qcom_aw_phy_get_inst_config(enum qcom_aw_phy_instance_enum port);
 struct qcom_aw_lane_params *qcom_aw_phy_get_lane_params(enum qcom_aw_phy_instance_enum port, enum eth_phy_iface_phy_lane_num_enum lane);
-enum qcom_aw_phy_loopback_mode_enum qcom_aw_phy_get_loopback_mode(void);
-void qcom_aw_phy_set_loopback_mode(enum qcom_aw_phy_loopback_mode_enum mode);
+int qcom_aw_phy_get_loopback_mode(void);
+void qcom_aw_phy_apply_loopback_mode_global(enum qcom_aw_phy_loopback_mode_enum mode);
+void qcom_aw_phy_set_effective_loopback_mode(enum qcom_aw_phy_instance_enum phy_inst, enum eth_phy_iface_phy_lane_num_enum lane, enum qcom_aw_phy_loopback_mode_enum mode);
+enum qcom_aw_phy_loopback_mode_enum qcom_aw_phy_get_effective_loopback_mode(
+    enum qcom_aw_phy_instance_enum phy_inst,
+    enum eth_phy_iface_phy_lane_num_enum lane);
+bool qcom_aw_phy_any_lane_no_loopback(void);
 int qcom_aw_phy_get_polarity_flag(void);
 int qcom_aw_phy_get_ref_clk_mode(void);
 void qcom_aw_phy_enable_snr_interrupt(

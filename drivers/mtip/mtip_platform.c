@@ -109,6 +109,9 @@ static int mtip_platform_setup_link(unsigned int port_device_index, unsigned int
    platform_driver_priv->mtip_links[link_index]->lanes_assignment_complete = false;
    platform_driver_priv->mtip_links[link_index]->num_assigned_lanes = 0;
 
+   // Initialize loopback_enabled to false
+   platform_driver_priv->mtip_links[link_index]->loopback_enabled = false;
+
    // initialize the mutex
    mutex_init(&platform_driver_priv->mtip_links[link_index]->dev_lock);
 
@@ -1522,6 +1525,7 @@ static int mtip_platform_setup(void)
          // for each valid link
          if (platform_driver_priv->mtip_links[i] != NULL)
          {
+
             // alloc the netdev
             platform_driver_priv->mtip_links[i]->dev = alloc_netdev(sizeof(struct mtip_netdev_priv),
                                                                     platform_driver_priv->devices.link_devices[i].link_name,
@@ -1644,6 +1648,7 @@ static int mtip_platform_setup(void)
       {
          if( (i == MTIP_L2_ETH_LINK_INDEX && mtip_c2c2_loopback_mode != MTIP_MODE_DEFAULT) || (i != MTIP_L2_ETH_LINK_INDEX && mtip_loopback_mode != MTIP_MODE_DEFAULT))
          {
+            // Ensure proper lane assignment for all links
             platform_driver_priv->mtip_links[i]->num_assigned_lanes = 1;
 
             // set the lane_index to be the same as link_index
@@ -1654,6 +1659,7 @@ static int mtip_platform_setup(void)
                CSMLOGERR("invalid port_type for link_index %d", i);
                return -1;
             }
+
             // setup the ports for loopback
             // set the port state as connected
             platform_driver_priv->mtip_ports[port_type]->port_state = MTIP_PORT_STATE_CONNECTED;
@@ -1666,7 +1672,7 @@ static int mtip_platform_setup(void)
             }
             else
             {
-               // set the default port priv flags
+               //For 4x25GBASE_R mode, ensure all 4 links are supported
                platform_driver_priv->mtip_ports[port_type]->port_priv_flags = (1 << MTIP_PORT_CONFIG_4x25GBASE_R);
 
                // set the port config as 4x25GBASE_R
@@ -1675,6 +1681,7 @@ static int mtip_platform_setup(void)
             // set the port sfp as DAC
             platform_driver_priv->mtip_ports[port_type]->sfp_port_type = PORT_DA;
 
+            // Configure all 4 lanes for the port
             for (j = 0; j < PHY_LANE_MAX; ++j)
             {
                platform_driver_priv->mtip_ports[port_type]->lane_config[j].lane_enabled = true;
@@ -1682,6 +1689,7 @@ static int mtip_platform_setup(void)
                platform_driver_priv->mtip_ports[port_type]->lane_config[j].link_index = (port_type*PHY_LANE_MAX) + j;
             }
 
+            CSMLOGERR("LOOPBACK: Configured link_index %d with lane %d for port_type %d", i, i, port_type);
          }
       }
    }

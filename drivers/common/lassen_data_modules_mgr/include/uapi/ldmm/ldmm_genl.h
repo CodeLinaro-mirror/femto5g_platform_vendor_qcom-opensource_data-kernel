@@ -10,6 +10,8 @@
  * space. This header would be put in a place visible to user space.
  */
 
+#include <linux/if.h>
+
 #define LDMM_GENL_NAME "ldmm_mgmt"
 #define LDMM_GENL_VERSION 1
 #define LDMM_MC_GRP_NAME "ldmm_mcgrp"
@@ -22,6 +24,7 @@ enum genlldmm_attrs {
     	LDMM_QXDM_LOGGER_ATTR_GET_CONFIG_INFO,
     	LDMM_QXDM_LOGGER_ATTR_LINK_CHANGE_NOTIFICATION,
         LDMM_QXDM_LOGGER_ATTR_UPDATE_TIMER_VALUE,
+        LDMM_QXDM_LOGGER_ATTR_SET_INTERFACE_LOOPBACK_MODE,
     	__LDMM_A_MAX,
 };
 
@@ -35,6 +38,7 @@ enum genlldmm_cmds {
 	LDMM_QXDM_LOGGER_CMD_GET_CONFIG_INFO,
 	LDMM_QXDM_LOGGER_CMD_LINK_CHANGE_NOTIFICATION,
     	LDMM_QXDM_LOGGER_CMD_UPDATE_TIMER_VALUE,
+	LDMM_QXDM_LOGGER_CMD_SET_INTERFACE_LOOPBACK_MODE,
 	__LDMM_CMD_MAX,
 };
 
@@ -135,7 +139,15 @@ typedef struct {
     stats_info stats[TOTAL_LINKS];
 } __attribute__ ((packed)) stats_packet_info;
 
+#define MAX_LOOPBACK_INTERFACES 12
+
+typedef struct {
+    int interface_count;
+    char interface_names[MAX_LOOPBACK_INTERFACES][IFNAMSIZ];
+} __attribute__ ((packed)) loopback_config_info;
+
 #define STATS_PACKET_SIZE sizeof(stats_packet_info)
 #define CONFIG_PACKET_SIZE sizeof(config_packet_info)
+#define LOOPBACK_CONFIG_SIZE sizeof(loopback_config_info)
 
 #endif /* _LDMM_GENL_H */

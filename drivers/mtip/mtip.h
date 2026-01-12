@@ -296,6 +296,9 @@ struct mtip_link_info
    spinlock_t ptp_lock;
    unsigned long flags;
 
+   // Per-interface loopback flag for A55 TX blocking and promiscuous mode
+   bool loopback_enabled;
+
    // link lane assignments
    // lanes assignment complete
    bool lanes_assignment_complete;
@@ -599,5 +602,18 @@ ssize_t mtip_show_link_polling_timer(
 ssize_t mtip_store_link_polling_timer(
                               struct kobject *kobj, struct kobj_attribute *attr,
                               const char *buf, size_t count);
+
+/* Simplified loopback work structure */
+struct mtip_loopback_config_task {
+    u32 link_index;
+    bool enable;
+};
+
+/* Loopback interface functions */
+bool mtip_is_link_in_loopback(u32 link_index);
+int mtip_phy_set_loopback_mode(u32 link_index, enum qcom_aw_phy_loopback_mode_enum loopback_mode);
+void post_mtip_process_loopback_config(u32 link_index, bool enable);
+void run_mtip_process_loopback_config(void *work_ptr);
+int setup_interface_in_loopback_mode(struct net_device *netdev, u32 link_index);
 
 #endif // _MTIP_H

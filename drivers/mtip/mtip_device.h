@@ -216,6 +216,7 @@ enum mtip_link_state_enum mtip_get_link_state_by_link_index(u32 link_index);
 
 /* completion of device open if it is deferred */
 int mtip_device_open_completion(u32 link_index);
+void mtip_netdev_assign_port_lanes(u32 port_type);
 
 int mtip_set_netdev_hw_mac_addr(struct net_device *netdev, u32 link_index);
 int mtip_netdev_setup_port_hw(u32 port_type);
