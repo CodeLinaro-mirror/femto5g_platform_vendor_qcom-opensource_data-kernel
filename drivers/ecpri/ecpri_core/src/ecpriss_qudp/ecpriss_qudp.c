@@ -2,17 +2,20 @@
  * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
+#include <linux/string.h>
 #include "ecpriss_core.h"
 //#include "ecpriss_qudp_hal.h"
 #include "ecpriss_log.h"
 #include "ecpriss_xbar_hwio_v2.h"
 #include "ecpriss_qudp.h"
+#include "ecpriss_flow.h"
 
 volatile int ecpriss_filtering_enabled = 0;
 volatile int ecpriss_qudp_ingress_action = ECPRISS_QUDP_ACTION_PASS_TO_A55;
 extern struct ecpri_dma_endp_mapping dma_endp_g;
 extern struct eth_ecpriss_ops mtip_ecpri_ops;
 extern eth_ecpriss_topology_root_s        eth_link_params_g;
+
 
 #define ECPRISS_ETH_QUDP_MTU_SIZE_V4   9000
 #define ECPRISS_ETH_QUDP_MTU_SIZE_V6   9000
@@ -25,6 +28,9 @@ extern eth_ecpriss_topology_root_s        eth_link_params_g;
 #define ECPRISS_RESERVED_OVERRIDE_INDEX 255
 
 int qudp_irq_mapping[QUDP_IRQ_MAX];
+
+ecpriss_loopback_filter_cfg_s ecpriss_loopback_filters_list = {0};
+
 
 void ecpriss_qudp_clear_stats_v2(uint32_t port_index, uint32_t link_index)
 {
@@ -5811,6 +5817,7 @@ void ecpriss_qudp_set_lte_mac_filter_info(void)
 		ECPRISS_MAX_NR_MAC_PER_PORT};
 
 	ecpri_qudp_hwio_def_ecpri_udp_fh_filt_mac_address_info_port_p_entry_n_s_v2 lte_fh_mac_info;
+	struct ecpri_dma_port_params *dma_port_cfg;
 
 	for(i=0;i<dma_endp_g.num_of_port_types;i++) {
 		if(dma_endp_g.topology_params[i].port_type ==
@@ -5818,7 +5825,7 @@ void ecpriss_qudp_set_lte_mac_filter_info(void)
 
 			for(fh_index = 0; fh_index < NUM_OF_FHP; fh_index++){
 
-				struct ecpri_dma_port_params *dma_port_cfg= &ecpriss_pdata_v2->xbar_ctx_v2->fh_lte_port_cfg[lte_fh_index].dma_port_cfg[fh_index];
+				dma_port_cfg= &ecpriss_pdata_v2->xbar_ctx_v2->fh_lte_port_cfg[lte_fh_index].dma_port_cfg[fh_index];
 
 				for(j=0;j<dma_port_cfg->num_of_rings;j++)
 				{
@@ -5972,6 +5979,323 @@ int32_t ecpriss_qudp_set_lte_mac_filter(ecpriss_packet_payload_s *packet)
 	return 0;
 }
 
+bool ecpriss_qudp_check_loopback_filter_present(ecpri_qudp_hwio_def_ecpri_udp_fh_filt_mac_address_msb_port_p_entry_n_u_v2 mac_msb, 
+		ecpri_qudp_hwio_def_ecpri_udp_fh_filt_mac_address_lsb_port_p_entry_n_u_v2 mac_lsb, ecpriss_qudp_ingress_per_port_cfg_s_v2 *qudp_ingress_port)
+{	
+	int i = 0;
+	for(i = 0; i <  MAX_MAC_FILTER_ENTRIES ; i++){
+		if(qudp_ingress_port->dmac[i].msb == mac_msb.value && qudp_ingress_port->dmac[i].lsb == mac_lsb.value)
+			return true;
+	}
+
+	return false;
+}
+
+
+
+ecpriss_core_link_id_e get_link_id_from_mac_addr(uint32_t port_id, uint8_t *mac_addr, eth_ecpriss_topology_root_s* cur_topology){
+
+	int i = 0;
+	ecpriss_core_link_id_e link_index = ECPRISS_CFG_LINK_ID_MAX;
+	for(i = 0; i< MAX_MAC_LINKS; i++){
+		if(!memcmp(mac_addr, cur_topology->topology_params[ETH_ECPRISS_PORT_TYPE_FH].port_params[port_id].link_params[i].eth_mac_addr, ECPRISS_MAC_ADDR_LEN)){
+			return i;
+		}
+	}
+	return link_index;
+}
+
+
+void ecpriss_qudp_add_loopback_filters(ecpriss_packet_payload_s *packet)
+{
+	eth_ecpriss_topology_root_s cur_topology;
+	eth_ecpriss_dev_mode_e device_mode;
+	uint8_t dst_mac_addr[ECPRISS_MAC_ADDR_LEN];
+	uint8_t src_mac_addr[ECPRISS_MAC_ADDR_LEN];
+	ecpriss_qudp_ingress_per_port_cfg_s_v2 *qudp_ingress_port = NULL;
+	ecpri_qudp_hwio_def_ecpri_udp_fh_filt_mac_address_lsb_port_p_entry_n_u_v2 mac_lsb;
+	ecpri_qudp_hwio_def_ecpri_udp_fh_filt_mac_address_msb_port_p_entry_n_u_v2 mac_msb;
+	ecpri_qudp_hwio_def_ecpri_udp_fh_filt_mac_address_info_port_p_entry_n_s_v2 lte_fh_mac_info;
+	struct ecpri_dma_port_params *dma_port_cfg;
+
+	int i = 0, filter_slot = 0, mac_index = -1, ret = -1, base_slot = 0;
+	bool is_loopback_enabled = false;
+	uint8_t port_id = packet->flow_cfg.flow_tx_cfg.port_index;
+	ecpriss_core_link_id_e link_id = ECPRISS_CFG_LINK_ID_MAX;
+
+	ECPRILOGDBG("=== ADD_LOOPBACK_FILTERS: Entry for port %d ===\n", port_id);
+
+	/* Extract source MAC from flow configuration */
+	memcpy(src_mac_addr, packet->flow_cfg.flow_tx_cfg.qudp_tx_cfg.eth_hdr.src_mac_addr, ECPRISS_MAC_ADDR_LEN);
+	memset(dst_mac_addr, 0, sizeof(dst_mac_addr));
+
+	/* Get topology to check loopback status */
+	ret = mtip_ecpri_ops.eth_ecpriss_get_topology(&device_mode, &cur_topology);
+	if(ret == ETH_ECPRISS_STATUS_FAILURE){
+		ECPRILOGERR("ADD_LOOPBACK: Failed to get topology for port %d\n", port_id);
+		return;
+	}
+
+	/* Determine link ID from source MAC address */
+	link_id = get_link_id_from_mac_addr(port_id, src_mac_addr, &cur_topology);
+	if(link_id == ECPRISS_CFG_LINK_ID_MAX){
+		ECPRILOGERR("ADD_LOOPBACK: Cannot get link_id for port %d\n", port_id);
+		return;
+	}
+
+	ECPRILOGDBG("ADD_LOOPBACK: Port %d, Link ID: %d\n", port_id, link_id);
+
+	qudp_ingress_port = &ecpriss_pdata_v2->qudp_ctx_v2->fh_port_cfg_v2[port_id].ingress_port_cfg;
+	if (!qudp_ingress_port) {
+		ECPRILOGERR("ADD_LOOPBACK: qudp_ingress_port is NULL for port %d\n", port_id);
+		return;
+	}
+
+	is_loopback_enabled = cur_topology.topology_params[ETH_ECPRISS_PORT_TYPE_FH].port_params[port_id].link_params[link_id].loopback_enabled;
+
+	ECPRILOGDBG("ADD_LOOPBACK: Port %d, Link %d, Loopback enabled: %d\n", 
+	             port_id, link_id, is_loopback_enabled);
+	ECPRILOGDBG("ADD_LOOPBACK: Total Filter entries = %u\n", qudp_ingress_port->num_mac_fltr_entries);
+
+	if(is_loopback_enabled){
+		/* Extract destination MAC from egress configuration */
+		memcpy(dst_mac_addr, packet->flow_cfg.flow_tx_cfg.qudp_tx_cfg.eth_hdr.dst_mac_addr, sizeof(dst_mac_addr));
+
+		memset(&mac_lsb, 0, sizeof(mac_lsb));
+		memset(&mac_msb, 0, sizeof(mac_msb));
+
+		/* Construct MAC address LSB and MSB from dst_mac_addr */
+		mac_lsb.value = ((dst_mac_addr[5]) | (dst_mac_addr[4] << 8)
+				| (dst_mac_addr[3] << 16) | (dst_mac_addr[2] << 24));
+
+		mac_msb.value = ((dst_mac_addr[1]) | (dst_mac_addr[0] << 8));
+
+		/* Check if filter already exists */
+		if(ecpriss_qudp_check_loopback_filter_present(mac_msb, mac_lsb, qudp_ingress_port) == false){
+
+			ECPRILOGDBG("ADD_LOOPBACK: Filter not present, adding new entry\n");
+
+			/* Find first available slot in range 16-19 by checking filter_index */
+			base_slot = ECPRISS_MAX_NR_MAC_PER_PORT + ECPRISS_MAX_LTE_MAC_PER_PORT;
+			filter_slot = -1;
+			mac_index = -1;
+
+			for(i = 0; i < 4; i++){
+				/* Check if this mac_index slot is available (filter_index == -1) */
+				if(ecpriss_loopback_filters_list.loopback_mac_addr[port_id][i].filter_added == false){
+					filter_slot = base_slot + i;  /* Assign the actual filter slot (16-19) */
+					mac_index = i;                 /* This is the index in the loopback list (0-3) */
+					memcpy(ecpriss_loopback_filters_list.loopback_mac_addr[port_id][i].mac, dst_mac_addr, sizeof(dst_mac_addr));
+					ECPRILOGINFO("ADD_LOOPBACK: Found available slot at mac_index %d, filter_slot %d\n", mac_index, filter_slot);
+					break;
+				}
+			}
+
+			if(mac_index == -1) {
+				ECPRILOGERR("ADD_LOOPBACK: No available slot for port %d (all slots 16-19 occupied)\n", port_id);
+				return;
+			}
+
+			if(filter_slot >= MAX_MAC_FILTER_ENTRIES || filter_slot < 0) {
+				ECPRILOGERR("ADD_LOOPBACK: Invalid filter_slot %d (max: %d)\n",
+				            filter_slot, MAX_MAC_FILTER_ENTRIES);
+				return;
+			}
+
+			ECPRILOGDBG("ADD_LOOPBACK: Using filter slot: %d, mac_index: %d\n", filter_slot, mac_index);
+
+			ecpriss_loopback_filters_list.num_of_loopback_filters_added[port_id]++;
+			ecpriss_loopback_filters_list.loopback_mac_addr[port_id][mac_index].filter_index = filter_slot;
+			ecpriss_loopback_filters_list.loopback_mac_addr[port_id][mac_index].filter_added = true;
+
+			/* Write MAC address LSB to hardware */
+			ecpriss_qudp_hal_write_reg_mn_fields(ECPRISS_QUDP_FH_FILTER,
+				ECPRI_UDP_FH_FILT_MAC_ADDRESS_LSB_PORT_p_ENTRY_n_V2,
+				port_id,
+				filter_slot,
+				&mac_lsb);
+
+			/* Write MAC address MSB to hardware */
+			ecpriss_qudp_hal_write_reg_mn_fields(ECPRISS_QUDP_FH_FILTER,
+					ECPRI_UDP_FH_FILT_MAC_ADDRESS_MSB_PORT_p_ENTRY_n_V2,
+					port_id,
+					filter_slot,
+					&mac_msb);
+
+			/* Enable the filter in hardware */
+			ecpriss_qudp_ingress_modify_cfg_v2(port_id,
+					ENABLE_FILTER,
+					ECPRISS_QUDP_RX_CFG_FLTR_MASK_LOCAL_MAC_ADDR,
+					filter_slot,
+					CONFIGURE);
+
+			/* Update local cache */
+			qudp_ingress_port->dmac[filter_slot].lsb = mac_lsb.value;
+			qudp_ingress_port->dmac[filter_slot].msb = mac_msb.value;
+			qudp_ingress_port->num_mac_fltr_entries++;
+
+			ECPRILOGDBG("ADD_LOOPBACK: Successfully added filter at slot %d, total filters: %u\n",
+			             filter_slot, qudp_ingress_port->num_mac_fltr_entries);
+
+			/* Configure DMA ring info for loopback traffic */
+			memset(&lte_fh_mac_info, 0, sizeof(lte_fh_mac_info));
+			dma_port_cfg = &ecpriss_pdata_v2->xbar_ctx_v2->fh_lte_port_cfg[port_id].dma_port_cfg[port_id];
+
+			lte_fh_mac_info.ring_id = dma_port_cfg->dma_rings_param[link_id].dest_dma_ring_id;
+			lte_fh_mac_info.gsi_id = dma_port_cfg->dma_rings_param[link_id].dest_dma_ring_gsi_id;
+			lte_fh_mac_info.action = ECPRISS_MAC_ACTION_PASS_TO_A55;
+
+			ECPRILOGDBG("LTE FH DMA Endp Params: Port:%d Index:%d RingID:%d action:%d\n",
+			            port_id, filter_slot, lte_fh_mac_info.ring_id, lte_fh_mac_info.action);
+
+			ecpriss_qudp_hal_write_reg_mn_fields(ECPRISS_QUDP_FH_FILTER,
+					ECPRI_UDP_FH_FILT_MAC_ADDRESS_INFO_PORT_p_ENTRY_n_V2,
+					port_id, filter_slot,
+					&lte_fh_mac_info);
+
+			ECPRILOGDBG("ADD_LOOPBACK: Added loopback filter port = %u, link_id = %u\n", port_id, link_id);
+		} else {
+			ECPRILOGDBG("ADD_LOOPBACK: Filter already exists, skipping\n");
+		}
+	} else {
+		ECPRILOGDBG("ADD_LOOPBACK: Loopback not enabled for port %d link %d\n", port_id, link_id);
+	}
+
+	ECPRILOGDBG("=== ADD_LOOPBACK_FILTERS: Exit for port %d ===\n", port_id);
+	return;
+}
+
+void ecpriss_qudp_remove_loopback_filters(ecpriss_packet_payload_s *packet)
+{
+	int port_id = packet->flow_cfg.flow_tx_cfg.port_index;
+	int l2_hdr_tbl_idx = packet->flow_cfg.flow_tx_cfg.qudp_tx_cfg.l2_hdr_tbl_idx;
+	int filter_slot = -1, i = 0;
+	uint8_t dst_mac_addr[ECPRISS_MAC_ADDR_LEN];
+	uint32_t dst_mac_lsb = 0;
+	uint16_t dst_mac_msb = 0;
+	ecpri_qudp_hwio_def_ecpri_udp_fh_filt_mac_address_lsb_port_p_entry_n_u_v2 mac_lsb;
+	ecpri_qudp_hwio_def_ecpri_udp_fh_filt_mac_address_msb_port_p_entry_n_u_v2 mac_msb;
+	ecpri_qudp_hwio_def_ecpri_udp_fh_filt_mac_address_info_port_p_entry_n_s_v2 lte_fh_mac_info;
+	ecpriss_qudp_ingress_per_port_cfg_s_v2 *qudp_ingress_port = NULL;
+	ecpriss_qudp_egress_per_port_cfg_s_v2 *qudp_egress_port = NULL;
+
+	ECPRILOGDBG("=== REMOVE_LOOPBACK_FILTERS: Entry for port %d, l2_idx %d ===\n", port_id, l2_hdr_tbl_idx);
+
+	memset(&mac_lsb, 0, sizeof(mac_lsb));
+	memset(&mac_msb, 0, sizeof(mac_msb));
+	memset(&lte_fh_mac_info, 0, sizeof(lte_fh_mac_info));
+	memset(dst_mac_addr, 0, sizeof(dst_mac_addr));
+
+	qudp_ingress_port = &ecpriss_pdata_v2->qudp_ctx_v2->fh_port_cfg_v2[port_id].ingress_port_cfg;
+	qudp_egress_port = &ecpriss_pdata_v2->qudp_ctx_v2->fh_port_cfg_v2[port_id].egress_cfg;
+
+	if(ecpriss_loopback_filters_list.num_of_loopback_filters_added[port_id] == 0) {
+		ECPRILOGERR("REMOVE_LOOPBACK: No loopback filters to remove for port %d\n", port_id);
+		return;
+	}
+
+	/* Check if l2_hdr_tbl_idx is valid */
+	if(l2_hdr_tbl_idx < 0 || l2_hdr_tbl_idx >= NUM_EGRESS_ENTRY) {
+		ECPRILOGERR("REMOVE_LOOPBACK: Invalid l2_hdr_tbl_idx %d for port %d\n", l2_hdr_tbl_idx, port_id);
+		return;
+	}
+
+	/* Extract destination MAC address from egress table using l2_hdr_tbl_idx */
+	dst_mac_lsb = qudp_egress_port->eth_dst0_port[l2_hdr_tbl_idx].value;
+	dst_mac_msb = qudp_egress_port->eth_src1_dst1_port[l2_hdr_tbl_idx].dst_msb;
+
+	/* Validate that we have a valid MAC address in egress config */
+	if(dst_mac_lsb == 0 && dst_mac_msb == 0) {
+		ECPRILOGERR("REMOVE_LOOPBACK: No valid destination MAC found in egress config at l2_idx %d\n", l2_hdr_tbl_idx);
+		return;
+	}
+
+	/* Extract MAC address bytes from LSB (lower 4 bytes) */
+	dst_mac_addr[5] = (dst_mac_lsb & 0x000000ff);
+	dst_mac_addr[4] = (dst_mac_lsb & 0x0000ff00) >> 8;
+	dst_mac_addr[3] = (dst_mac_lsb & 0x00ff0000) >> 16;
+	dst_mac_addr[2] = (dst_mac_lsb & 0xff000000) >> 24;
+
+	/* Extract MAC address bytes from MSB (upper 2 bytes) */
+	dst_mac_addr[1] = (dst_mac_msb & 0x00ff);
+	dst_mac_addr[0] = (dst_mac_msb & 0xff00) >> 8;
+
+	ECPRILOGDBG("REMOVE_LOOPBACK: Checking Dst MAC from egress cfg[%d]: %02x:%02x:%02x:%02x:%02x:%02x\n",
+	             l2_hdr_tbl_idx,
+	             dst_mac_addr[0], dst_mac_addr[1], dst_mac_addr[2],
+	             dst_mac_addr[3], dst_mac_addr[4], dst_mac_addr[5]);
+
+	/* Find matching MAC in loopback filter list */
+	for(i = 0; i < 4; i++){
+		if(ecpriss_loopback_filters_list.loopback_mac_addr[port_id][i].filter_added == false) {
+			continue;
+		}
+
+		if(!memcmp(ecpriss_loopback_filters_list.loopback_mac_addr[port_id][i].mac, 
+		           dst_mac_addr, ECPRISS_MAC_ADDR_LEN)){
+			filter_slot = ecpriss_loopback_filters_list.loopback_mac_addr[port_id][i].filter_index;
+			ECPRILOGERR("REMOVE_LOOPBACK: Found matching MAC at index %d, filter_slot %d\n", i, filter_slot);
+			break;
+		}
+	}
+
+	if(filter_slot == -1) {
+		ECPRILOGERR("REMOVE_LOOPBACK: No matching filter found for this MAC address\n");
+		return;
+	}
+
+	/* Clear MAC address LSB register */
+	ecpriss_qudp_hal_write_reg_mn_fields(ECPRISS_QUDP_FH_FILTER,
+			ECPRI_UDP_FH_FILT_MAC_ADDRESS_LSB_PORT_p_ENTRY_n_V2,
+			port_id,
+			filter_slot,
+			&mac_lsb);
+
+	/* Clear MAC address MSB register */
+	ecpriss_qudp_hal_write_reg_mn_fields(ECPRISS_QUDP_FH_FILTER,
+			ECPRI_UDP_FH_FILT_MAC_ADDRESS_MSB_PORT_p_ENTRY_n_V2,
+			port_id,
+			filter_slot,
+			&mac_msb);
+
+	/* Disable the filter in hardware */
+	ecpriss_qudp_ingress_modify_cfg_v2(port_id,
+			ENABLE_FILTER,
+			ECPRISS_QUDP_RX_CFG_FLTR_MASK_LOCAL_MAC_ADDR,
+			filter_slot,
+			DE_CONFIGURE);
+
+	/* Update local cache */
+	qudp_ingress_port->dmac[filter_slot].lsb = 0;
+	qudp_ingress_port->dmac[filter_slot].msb = 0;
+	qudp_ingress_port->num_mac_fltr_entries--;
+
+	ECPRILOGDBG("REMOVE_LOOPBACK: Removed filter at slot %d, remaining filters: %u\n",
+	             filter_slot, qudp_ingress_port->num_mac_fltr_entries);
+
+	lte_fh_mac_info.action = ECPRISS_MAC_ACTION_CONTINUE_NORMAL_PROCESSING;
+
+	/* Clear DMA ring info */
+	ecpriss_qudp_hal_write_reg_mn_fields(ECPRISS_QUDP_FH_FILTER,
+			ECPRI_UDP_FH_FILT_MAC_ADDRESS_INFO_PORT_p_ENTRY_n_V2,
+			port_id, filter_slot,
+			&lte_fh_mac_info);
+
+	/* Clear the entry in loopback list */
+	ecpriss_loopback_filters_list.loopback_mac_addr[port_id][i].filter_index = 0;
+	ecpriss_loopback_filters_list.loopback_mac_addr[port_id][i].filter_added = false;
+	memset(ecpriss_loopback_filters_list.loopback_mac_addr[port_id][i].mac, 0, ECPRISS_MAC_ADDR_LEN);
+
+	/* Decrement the count */
+	ecpriss_loopback_filters_list.num_of_loopback_filters_added[port_id]--;
+
+	ECPRILOGDBG("REMOVE_LOOPBACK: Successfully removed filter, remaining count: %d\n",
+	             ecpriss_loopback_filters_list.num_of_loopback_filters_added[port_id]);
+
+	ECPRILOGDBG("=== REMOVE_LOOPBACK_FILTERS: Exit for port %d ===\n", port_id);
+	return;
+}
+
 void ecpriss_qudp_set_nr_mac_filter(void)
 {
 	int ret = 0;
@@ -6065,7 +6389,6 @@ void ecpriss_qudp_set_nr_mac_filter(void)
 						qudp_ingress_port->dmac[k].lsb = mac_lsb.value;
 						qudp_ingress_port->dmac[k].msb = mac_msb.value;
 						qudp_ingress_port->num_mac_fltr_entries++;
-
 					}
 				}
 			}
@@ -7246,4 +7569,3 @@ int32_t ecpriss_qudp_egress_l2_l3_table_reconfig(ecpriss_packet_payload_s *packe
 
 	return ret;
 }
-
