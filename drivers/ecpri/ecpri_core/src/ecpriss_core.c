@@ -828,6 +828,7 @@ void ecpriss_eth_topology_init_wq(struct work_struct *work)
 {
 	int ret = 0;
 	bool enable_c2c2 = true;
+
 	if(ecpriss_hw_ver == ECPRISS_HW_v1_0){
 		ecpriss_eth_topology_init();
 	}else {
@@ -839,11 +840,15 @@ void ecpriss_eth_topology_init_wq(struct work_struct *work)
 			ecpriss_qudp_set_nr_mac_filter();
 		}
 
+	ECPRILOGINFO("dev_mode=%d\n",ecpriss_pdata_v2->dev_mode);
+	if(ecpriss_pdata_v2->dev_mode == ECPRISS_DEV_MODE_RU || ecpriss_pdata_v2->dev_mode
+			== ECPRISS_DEV_MODE_DU_PCIE_3_X_12) {
 		ECPRILOGINFO("Bringing up C2C2 port in loopback mode\n");
 		ret = (mtip_ecpri_ops.eth_ecpriss_enable_logging_port)(enable_c2c2);
 		if(ret != 0) {
 			ECPRILOGERR("C2C2 bringup failed\n");
 		}
+	}
 
 	}
 	return;
@@ -1663,11 +1668,6 @@ static int ecpriss_core_register_callbacks_v2(bool *is_eth_ready)
 
 		if(*is_eth_ready == true) {
 			ecpriss_eth_topology_init_v2();
-			ECPRILOGINFO("Bringing up C2C2 port in loopback mode\n");
-			ret = (mtip_ecpri_ops.eth_ecpriss_enable_logging_port)(enable_c2c2);
-			if(ret != 0) {
-				ECPRILOGERR("C2C2 bringup failed\n");
-			}
 		}
 
 		ready = 0;
@@ -1708,6 +1708,17 @@ static int ecpriss_core_register_callbacks_v2(bool *is_eth_ready)
 		ECPRILOGINFO("SSR registered successfully for %s\n",ecpriss_pdata_v2->ssr_info->ssr_label);
 		ecpriss_pdata_v2->ssr_info->notifier_handle = handle;
 
+		if(*is_eth_ready == true) {
+			ECPRILOGINFO("CB dev_mode=%d\n",ecpriss_pdata_v2->dev_mode);
+			if(ecpriss_pdata_v2->dev_mode == ECPRISS_DEV_MODE_RU || ecpriss_pdata_v2->dev_mode
+					== ECPRISS_DEV_MODE_DU_PCIE_3_X_12) {
+				ECPRILOGINFO("Bringing up C2C2 port in loopback mode\n");
+				ret = (mtip_ecpri_ops.eth_ecpriss_enable_logging_port)(enable_c2c2);
+				if(ret != 0) {
+					ECPRILOGERR("C2C2 bringup failed\n");
+				}
+			}
+		}
 	}while (0);
 	return ret;
 }
