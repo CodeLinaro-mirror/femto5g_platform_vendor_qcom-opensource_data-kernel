@@ -84,6 +84,9 @@
 // RX Replenish retry timer interval
 #define MTIP_RX_REPLENISH_RETRY_TIMER_INTERVAL             5000
 
+// PCS link up defer timer to validate the link state stability
+#define MTIP_PCS_LINK_UP_DEFER_TIMER_INTERVAL              500
+
 // the net device structure
 struct mtip_netdev_priv {
    u32 link_index;
@@ -231,5 +234,6 @@ int mtip_device_lookup_lane_qsfp_cfg(u32 port_type, struct qsfp_info *lane_qsfp_
 void mtip_process_tx_comp_cb(ecpri_dma_eth_conn_hdl_t hdl, struct mtip_dma_tx_comp_params *tx_comp_params);
 void mtip_rx_mode_set(struct net_device *netdev);
 void mtip_rx_replenish_retry_timer_cb(struct timer_list *list);
+void mtip_pcs_link_up_defer_timer_cb(struct timer_list *list);
 
 #endif // _MTIP_DEVICE_H

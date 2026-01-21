@@ -673,7 +673,7 @@ eth_ecpriss_status_e mtip_eth_enable_logging_port(bool action)
         if(platform_driver_priv->mtip_links[link_index]->state != MTIP_LINK_STATE_UP)
         {
             CSMLOGINFO("Enabling PHY NES loopback mode for Interface %s\n", ifname);
-            mtip_phy_set_loopback_mode(QCOM_AW_PHY_NEAR_END_SERIAL_LB);
+            mtip_phy_set_c2c_phy_loopback_mode(QCOM_AW_PHY_NEAR_END_SERIAL_LB);
             setup_interface_in_loopback_mode(netdev, link_index);
 
             rtnl_lock(); // Lock the network namespace

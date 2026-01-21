@@ -550,7 +550,7 @@ int mtip_start_dma_pipe(struct net_device *netdev, ecpri_dma_eth_conn_hdl_t hdl)
             priv->rx_polled_count = 0;
       }
 
-      if(rx_available == MTIP_RX_RING_SIZE)
+      if( (link_index != MTIP_L2_ETH_LINK_INDEX && mtip_loopback_mode != MTIP_MODE_DEFAULT) || rx_available == MTIP_RX_RING_SIZE)
       {
          // set the rx mode to IRQ
          setmode = ECPRI_DMA_NOTIFY_MODE_IRQ;

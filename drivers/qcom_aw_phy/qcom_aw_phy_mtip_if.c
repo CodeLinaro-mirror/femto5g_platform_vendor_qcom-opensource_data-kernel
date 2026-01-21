@@ -24,6 +24,8 @@ struct qcom_aw_phy_mtip_if_info qcom_aw_phy_mtip_if_info_s = {0};
 extern int qcom_aw_phy_tx_compliance_flag;
 extern int qcom_aw_phy_an_restart_delay_timer_val;
 
+int qcom_aw_phy_c2c_loopback_mode = QCOM_AW_PHY_NO_LB;
+
 #define MAX_PHY_LANE_STR_LEN 12
 
 /*-------------------------------------------------------------------
@@ -435,8 +437,8 @@ void qcom_aw_phy_set_tx_compliance(bool flag){
   qcom_aw_phy_tx_compliance_flag = flag;
 }
 
-void qcom_aw_phy_set_phy_loopback_mode(enum qcom_aw_phy_loopback_mode_enum loopback_mode){
-  qcom_aw_phy_loopback_mode = loopback_mode;
+void qcom_aw_phy_set_c2c_phy_loopback_mode(enum qcom_aw_phy_loopback_mode_enum loopback_mode){
+  qcom_aw_phy_c2c_loopback_mode = loopback_mode;
 }
 int qcom_aw_phy_configure_speed_mode(
                                   struct qcom_aw_phy_inst_config *phy_inst_info,
@@ -782,6 +784,26 @@ int qcom_aw_phy_get_an_fec_ability_mask(int* an_fec_ability) {
   }
 
   return an_fec_ability_mask;
+}
+
+
+
+/*-------------------------------------------------------------------
+* qcom_aw_phy_get_c2c_loopback_mode
+
+* Description: This function returns the loopback config for C2C
+               instances of AW PHY.
+------------------------------------------------------------------- */
+enum qcom_aw_phy_loopback_mode_enum qcom_aw_phy_get_c2c_loopback_mode(
+  enum qcom_aw_phy_instance_enum    phy_inst) {
+
+  if(phy_inst == QCOM_AW_PHY_INST_L2_C2C ||
+     phy_inst == QCOM_AW_PHY_INST_DEBUG_C2C)
+  {
+    return qcom_aw_phy_c2c_loopback_mode;
+  }
+
+  return QCOM_AW_PHY_NO_LB;
 }
 
 /*-------------------------------------------------------------------
@@ -1291,7 +1313,9 @@ int qcom_aw_phy_bringup_manual_eq_mode(
   }
 
   /* Configuration for Near End Parallel Loopback mode */
-  if (qcom_aw_phy_get_loopback_mode() == QCOM_AW_PHY_NEAR_END_PARALLEL_LB) {
+  if (qcom_aw_phy_get_loopback_mode() == QCOM_AW_PHY_NEAR_END_PARALLEL_LB ||
+      qcom_aw_phy_get_c2c_loopback_mode(phy_inst_info->phy_inst) == QCOM_AW_PHY_NEAR_END_PARALLEL_LB)
+  {
     QCOM_AW_PHY_LOG_INFO("Configuring PHY for near end parallel LB");
     aw_pmd_nep_loopback_set(mss, 1);
     qcom_aw_phy_handle_cdr_lock_status(phy_inst_info, lane, CDR_LOCK_SUCCESS);
@@ -1316,7 +1340,9 @@ int qcom_aw_phy_bringup_manual_eq_mode(
   aw_pmd_txfir_config_set(mss, &txfir_cfg, 1);
 
   /* Configuration for Near End Serial Loopback mode */
-  if (qcom_aw_phy_get_loopback_mode() == QCOM_AW_PHY_NEAR_END_SERIAL_LB) {
+  if (qcom_aw_phy_get_loopback_mode() == QCOM_AW_PHY_NEAR_END_SERIAL_LB ||
+       qcom_aw_phy_get_c2c_loopback_mode(phy_inst_info->phy_inst) == QCOM_AW_PHY_NEAR_END_SERIAL_LB)
+  {
     QCOM_AW_PHY_LOG_INFO("Configuring PHY for near end serial LB");
     aw_pmd_analog_loopback_set(mss, 1);
   }
@@ -2130,7 +2156,12 @@ void qcom_aw_phy_handle_rx_sig_detect(struct work_struct *work){
                      &temp_rd_val);
 
       if(temp_rd_val == 0) {
-        phy_inst_info->lane_params[lane].rx_sig_detect_status = false;
+        if(phy_inst_info->lane_params[lane].rx_sig_detect_status == true)
+        {
+          qcom_aw_phy_handle_cdr_lock_status(phy_inst_info, lane,
+                                             CDR_LOCK_FAILURE);
+          phy_inst_info->lane_params[lane].rx_sig_detect_status = false;
+        }
         mutex_unlock(&phy_inst_info->lane_lock[lane]);
         continue;
       }
@@ -2402,7 +2433,7 @@ const struct eth_phy_iface_ops qcom_aw_phy_driver_iface_ops = {
     .eth_phy_iface_reset_phy_sm = qcom_aw_phy_reset_phy_sm,
     .eth_phy_iface_set_tx_compliance = qcom_aw_phy_set_tx_compliance,
     .eth_phy_iface_get_phy_phy_eq_mode = qcom_aw_phy_get_phy_eq_mode,
-    .eth_phy_iface_set_phy_loopback_mode = qcom_aw_phy_set_phy_loopback_mode,
+    .eth_phy_iface_set_c2c_phy_loopback_mode = qcom_aw_phy_set_c2c_phy_loopback_mode,
 };
 
 EXPORT_SYMBOL(qcom_aw_phy_driver_iface_ops);

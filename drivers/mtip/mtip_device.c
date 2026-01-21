@@ -57,6 +57,9 @@
 #include "eth_phy_iface.h"
 
 #include "mtip_notifr.h"
+
+extern u8 mtip_phy_retry_num[MTIP_MAX_LINKS];
+
 int macsec_eth_set_macsec_ops(const struct macsec_ops* rb_macsec_ops)
 {
     int i;
@@ -491,6 +494,24 @@ void run_mtip_process_link_state(void* work_ptr)
     dma_handle = platform_driver_priv->mtip_links[link_index]->dma_hdl;
     if (link_up)
     {
+        if(!platform_driver_priv->mtip_links[link_index]->pcs_link_up_defer_timer_running)
+        {
+          // Start defer timer to confirm the stability of link up
+          mod_timer(&platform_driver_priv->mtip_links[link_index]->pcs_link_up_defer_timer,
+                    jiffies + msecs_to_jiffies(MTIP_PCS_LINK_UP_DEFER_TIMER_INTERVAL));
+          platform_driver_priv->mtip_links[link_index]->pcs_link_up_defer_timer_running = true;
+          return;
+        }
+        else if(timer_pending(&platform_driver_priv->mtip_links[link_index]->phy_retry_timer))
+        {
+          // Defer timer already running, let it expire
+          return;
+        }
+        else
+        {
+          platform_driver_priv->mtip_links[link_index]->pcs_link_up_defer_timer_running = false;
+        }
+
         if((platform_driver_priv->mtip_links[link_index]->state == MTIP_LINK_STATE_UP) ||
            (mtip_mac_wrapper_get_link_status(link_index) == false))
         {
@@ -509,7 +530,7 @@ void run_mtip_process_link_state(void* work_ptr)
         {
             CSMLOGERR("get ring state from DMA failed for hdl: %d\n", dma_handle);
         }
-        else if(rx_available == MTIP_RX_RING_SIZE)
+        else if( (link_index != MTIP_L2_ETH_LINK_INDEX && mtip_loopback_mode != MTIP_MODE_DEFAULT) || rx_available == MTIP_RX_RING_SIZE)
         {
             // set the rx mode to IRQ
             setmode = ECPRI_DMA_NOTIFY_MODE_IRQ;
@@ -558,6 +579,14 @@ void run_mtip_process_link_state(void* work_ptr)
     }
     else
     {
+        // If link up defer timer was running, stop the timer and ignore this link down
+        if(platform_driver_priv->mtip_links[link_index]->pcs_link_up_defer_timer_running)
+        {
+          del_timer_sync(&platform_driver_priv->mtip_links[link_index]->pcs_link_up_defer_timer);
+          platform_driver_priv->mtip_links[link_index]->pcs_link_up_defer_timer_running = false;
+          return;
+        }
+
         if((platform_driver_priv->mtip_links[link_index]->state == MTIP_LINK_STATE_DOWN) ||
            (mtip_mac_wrapper_get_link_status(link_index) == true))
         {
@@ -614,6 +643,24 @@ void mtip_process_link_state(u32 link_index, bool link_up)
     priv = netdev_priv(dev);
     if (link_up)
     {
+        if(!platform_driver_priv->mtip_links[link_index]->pcs_link_up_defer_timer_running)
+        {
+          // Start defer timer to confirm the stability of link up
+          mod_timer(&platform_driver_priv->mtip_links[link_index]->pcs_link_up_defer_timer,
+                    jiffies + msecs_to_jiffies(MTIP_PCS_LINK_UP_DEFER_TIMER_INTERVAL));
+          platform_driver_priv->mtip_links[link_index]->pcs_link_up_defer_timer_running = true;
+          return;
+        }
+        else if(timer_pending(&platform_driver_priv->mtip_links[link_index]->phy_retry_timer))
+        {
+          // Defer timer already running, let it expire
+          return;
+        }
+        else
+        {
+          platform_driver_priv->mtip_links[link_index]->pcs_link_up_defer_timer_running = false;
+        }
+
         CSMLOGDBG("Processing LINK_UP for link_index: %d\n", link_index);
 
         // Process MAC link up state
@@ -624,7 +671,7 @@ void mtip_process_link_state(u32 link_index, bool link_up)
         {
             CSMLOGERR("get ring state from DMA failed for hdl: %d\n", dma_handle);
         }
-        else if(rx_available == MTIP_RX_RING_SIZE)
+        else if( (link_index != MTIP_L2_ETH_LINK_INDEX && mtip_loopback_mode != MTIP_MODE_DEFAULT) || rx_available == MTIP_RX_RING_SIZE)
         {
             // set the rx mode to IRQ
             setmode = ECPRI_DMA_NOTIFY_MODE_IRQ;
@@ -670,9 +717,20 @@ void mtip_process_link_state(u32 link_index, bool link_up)
 
         // tell all the clients of the link status update
         mtip_client_send_event(ETH_ECPRISS_EVENT_UP, link_index);
+
+        mtip_phy_lane_bring_up_progress_ind(link_index, false);
+        mtip_phy_retry_num[link_index] = 0;
     }
     else
     {
+        // If link up defer timer was running, stop the timer and ignore this link down
+        if(platform_driver_priv->mtip_links[link_index]->pcs_link_up_defer_timer_running)
+        {
+          del_timer_sync(&platform_driver_priv->mtip_links[link_index]->pcs_link_up_defer_timer);
+          platform_driver_priv->mtip_links[link_index]->pcs_link_up_defer_timer_running = false;
+          return;
+        }
+
         CSMLOGDBG("Processing LINK_DOWN for link_index: %d\n", link_index);
 
         // stop the queues
@@ -3748,6 +3806,12 @@ void run_mtip_process_netdev_close(void* workptr)
 
    mutex_unlock(&platform_driver_priv->mtip_links[link_index]->dev_lock);
 
+   if(platform_driver_priv->mtip_links[link_index]->pcs_link_up_defer_timer_running)
+   {
+      del_timer_sync(&platform_driver_priv->mtip_links[link_index]->pcs_link_up_defer_timer);
+      platform_driver_priv->mtip_links[link_index]->pcs_link_up_defer_timer_running = false;
+   }
+
    // do this only for RUMI E2E
    if (mtip_rumi_platform != MTIP_PLATFORM_SOC)
    {
@@ -4026,6 +4090,28 @@ void mtip_rx_replenish_retry_timer_cb(struct timer_list *list)
 
     // Simulate RX completion callback which will schedule NAPI
     mtip_dma_rx_comp_cb(NULL, link_info->dma_hdl);
+
+    return;
+}
+
+void mtip_pcs_link_up_defer_timer_cb(struct timer_list *list)
+{
+    struct mtip_link_info *link_info;
+
+    if(!platform_driver_priv)
+        return;
+
+    link_info = from_timer(link_info, list, pcs_link_up_defer_timer);
+    if(!link_info)
+        return;
+
+    if(!platform_driver_priv->mtip_links[link_info->link_index]->pcs_link_up_defer_timer_running)
+    {
+      CSMLOGERR("Timer not valid, skip processing link up");
+      return;
+    }
+
+    post_mtip_process_link_state(link_info->link_index, true);
 
     return;
 }

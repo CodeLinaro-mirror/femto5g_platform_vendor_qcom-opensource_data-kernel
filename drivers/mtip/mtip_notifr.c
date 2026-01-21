@@ -6,8 +6,9 @@
 #include "mtip_notifr.h"
 #include "mtip_logging.h"
 
-#define STATUS_SET 1
-#define STATUS_CLEAR 0
+#define STATUS_INIT 0
+#define STATUS_CLEAR 1
+#define STATUS_SET 2
 #define MAX_NOTIF_INTERFACE 12
 
 struct blocking_notifier_head lassen_mtip_fault_notifr;

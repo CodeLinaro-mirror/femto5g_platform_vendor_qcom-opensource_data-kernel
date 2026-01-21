@@ -215,6 +215,7 @@ void run_mtip_process_cdr_lock_ind(void* workptr)
     }
 
     if((status == false) &&
+       (platform_driver_priv->mtip_links[link_index]->state != MTIP_LINK_STATE_UP) &&
        (mtip_phy_retry_num[link_index] >= mtip_phy_get_max_retry_num()))
     {
         CSMLOGDBG("Max retries already done for link index %d", link_index);
@@ -244,8 +245,6 @@ void run_mtip_process_cdr_lock_ind(void* workptr)
     if (mtip_mac_wrapper_get_link_status(link_index) == true) 
     {
         mtip_process_link_state(link_index, true);
-        mtip_phy_lane_bring_up_progress_ind(link_index, false);
-        mtip_phy_retry_num[link_index] = 0;
     }
     // Retry logic will apply only for FIBRE, or with DAC if AN is disabled
     else if(platform_driver_priv->mtip_ports[port_type]->sfp_port_type == PORT_FIBRE ||
@@ -259,6 +258,12 @@ void run_mtip_process_cdr_lock_ind(void* workptr)
             mod_timer(&platform_driver_priv->mtip_links[link_index]->phy_retry_timer,
                       jiffies + msecs_to_jiffies(MTIP_PHY_RETRY_TIMER_INTERVAL));
         }
+    }
+    else if((platform_driver_priv->mtip_ports[port_type]->autoneg == true) &&
+            (mtip_mac_wrapper_get_link_status(link_index) == false) &&
+            (platform_driver_priv->mtip_links[link_index]->state == MTIP_LINK_STATE_UP))
+    {
+        mtip_process_link_state(link_index, false);
     }
 
 out:
@@ -429,9 +434,7 @@ void run_mtip_phy_retry_bringup(void* workptr)
     // If PCS link is up, set the state and return back, else continue
     if(mtip_mac_wrapper_get_link_status(link_index) == true)
     {
-        mtip_phy_retry_num[link_index] = 0;
         mtip_process_link_state(link_index, true);
-        mtip_phy_lane_bring_up_progress_ind(link_index, false);
         goto func_exit;
     }
 
@@ -675,10 +678,10 @@ void mtip_phy_set_tx_compliance(bool flag)
     return;
 }
 
-void mtip_phy_set_loopback_mode(enum qcom_aw_phy_loopback_mode_enum loopback_mode)
+void mtip_phy_set_c2c_phy_loopback_mode(enum qcom_aw_phy_loopback_mode_enum loopback_mode)
 {
-    CSMLOGDBG("Loopback mode of phy is set as: %d", loopback_mode);
-    qcom_aw_phy_driver_iface_ops.eth_phy_iface_set_phy_loopback_mode(loopback_mode);
+    CSMLOGDBG("Loopback mode of C2C phy is set as: %d", loopback_mode);
+    qcom_aw_phy_driver_iface_ops.eth_phy_iface_set_c2c_phy_loopback_mode(loopback_mode);
     return;
 
 }
@@ -887,8 +890,6 @@ static void mtip_phy_handle_lane_up(struct mtip_process_lane_up lane_up_info)
              else if (mtip_mac_wrapper_get_link_status(link_index) == true) 
              {
                 mtip_process_link_state(link_index, true);
-                mtip_phy_lane_bring_up_progress_ind(link_index, false);
-                mtip_phy_retry_num[link_index] = 0;
              }
 
              platform_driver_priv->mtip_ports[port_type]->needs_rx_los_processing = false;

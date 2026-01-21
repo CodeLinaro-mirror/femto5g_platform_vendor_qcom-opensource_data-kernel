@@ -421,7 +421,6 @@ int ecpri_dma_ecpri_ss_start_oran_log(u32 mem_size, u32 pkt_size,
 
 		DMADBG("Endp_id: %u for gsi_id: %u is already allocated for dir: %d\n",
 			endp_id, gsi_id, dir);
-		DMADBG("Stopping endp: %u for dir: %d\n",endp_id, dir);
 		ret = ecpri_dma_stop_endp(endp_ctx);
 		if (ret != 0) {
 			DMAERR("Unable to stop endp, endp_id: %u, gsi_id %u\n",
@@ -429,7 +428,6 @@ int ecpri_dma_ecpri_ss_start_oran_log(u32 mem_size, u32 pkt_size,
 			goto fail_dealloc_endp;
 		}
 
-		DMADBG("Resetting endp: %u for dir: %d\n",endp_id, dir);
 		ret = ecpri_dma_reset_endp(endp_ctx);
 		if (ret != 0) {
 			DMAERR("Unable to reset endp, endp_id: %d, gsi_id %d\n",
@@ -437,7 +435,6 @@ int ecpri_dma_ecpri_ss_start_oran_log(u32 mem_size, u32 pkt_size,
 			goto fail_dealloc_endp;
 		}
 
-		DMADBG("Deallocating endp: %u for dir: %d\n",endp_id, dir);
 		ret = ecpri_dma_dealloc_endp(endp_ctx);
 		if (ret != 0) {
 			DMAERR("Unable to dealloc endp, endp_id: %d, gsi_id %d\n",
@@ -509,7 +506,6 @@ int ecpri_dma_ecpri_ss_start_oran_log(u32 mem_size, u32 pkt_size,
 	endp_params.cb_to_use = ECPRI_DMA_SMMU_CB_ETH;
 	endp_params.align_ring_mem = true;
 
-	DMADBG("Allocating endp: %u for dir: %d\n",endp_id, dir);
 	ret = ecpri_dma_alloc_endp(&endp_params);
 
 	if (ret != 0) {
@@ -518,7 +514,6 @@ int ecpri_dma_ecpri_ss_start_oran_log(u32 mem_size, u32 pkt_size,
 		goto fail_alloc_endp;
 	}
 
-	DMADBG("Starting endp: %u for dir: %d\n",endp_id, dir);
 	ret = ecpri_dma_start_endp(endp_ctx);
 	if (ret != 0) {
 		DMAERR("Unable to start endp, endp_id: %u, gsi_id %u\n",
@@ -552,7 +547,6 @@ int ecpri_dma_ecpri_ss_start_oran_log(u32 mem_size, u32 pkt_size,
 			goto fail_queue_credits;
 		}
 	}
-	DMADBG("Queued credit to GSI for dir: %d\n",dir);
 
 	/* ring CH and EV DBs outside of the ring */
 	ret = gsi_ring_ch_ring_db(endp_ctx->gsi_chan_hdl,
@@ -647,7 +641,6 @@ int ecpri_dma_ecpri_ss_stop_oran_log(
 		dev_id = ECPRI_DMA_SS_ORAN_LOG_EGRESS_DEV_ID;
 	}
 
-	DMADBG("Stopping endp: %u for dir: %d\n",endp_id, dir);
 	ret = ecpri_dma_stop_endp(endp_ctx);
 	if (ret)
 	{
@@ -656,6 +649,7 @@ int ecpri_dma_ecpri_ss_stop_oran_log(
 			endp_ctx->gsi_id);
 	}
 	ecpri_dma_ss_core_ctx->oran_log_cdev_read_state[dev_id] = true;
+	DMADBG("Stopped endp: %u for dir: %d\n",endp_id, dir);
 
 	return ret;
 }

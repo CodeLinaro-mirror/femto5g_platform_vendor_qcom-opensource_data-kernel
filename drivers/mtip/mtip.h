@@ -320,6 +320,10 @@ struct mtip_link_info
 
    // Timer to retry RX buffer replenish with NAPI poll in case of mem alloc failure
    struct timer_list rx_replenish_retry_timer;
+
+   // Defer timer to check the validity of PCS link state
+   struct timer_list pcs_link_up_defer_timer;
+   bool pcs_link_up_defer_timer_running;
 };
 
 /*

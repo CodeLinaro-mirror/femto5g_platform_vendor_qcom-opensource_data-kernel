@@ -35,7 +35,7 @@ int mtip_phy_notify_link_status(u32 link_index, bool status);
 int mtip_phy_initiate_an(u32 port_type, int num_lanes, u32 port_config_mask);
 int mtip_phy_reset_phy_sm(u32 port_type);
 void mtip_phy_set_tx_compliance(bool flag);
-void mtip_phy_set_loopback_mode(enum qcom_aw_phy_loopback_mode_enum loopback_mode);
+void mtip_phy_set_c2c_phy_loopback_mode(enum qcom_aw_phy_loopback_mode_enum loopback_mode);
 
 // Lane up handling structure and function declarations
 struct mtip_process_lane_up
@@ -81,5 +81,6 @@ trx_link_length_range mtip_phy_get_trx_link_length_range(struct mtip_port_device
 void mtip_phy_notify_eth_event_to_trx(u32 link_index, trx_phy_event event);
 bool mtip_phy_is_breakout_config(u32 port_type);
 trx_lane_speed mtip_phy_port_config_to_trx_lane_speed(enum mtip_port_config_enum port_config);
+void mtip_phy_lane_bring_up_progress_ind(u32 link_index, bool in_progress);
 
 #endif // _MTIP_PHY_H
