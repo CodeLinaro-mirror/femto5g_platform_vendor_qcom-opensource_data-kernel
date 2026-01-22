@@ -9,3 +9,7 @@ endif
 ifeq ($(TARGET_BOARD_PLATFORM), hamoa)
 PRODUCT_PACKAGES += smem-mailbox.ko
 endif
+
+ifeq ($(TARGET_BOARD_PLATFORM), chora)
+PRODUCT_PACKAGES += smem-mailbox.ko
+endif
