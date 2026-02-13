@@ -500,12 +500,12 @@ void run_mtip_process_link_state(void* work_ptr)
           mod_timer(&platform_driver_priv->mtip_links[link_index]->pcs_link_up_defer_timer,
                     jiffies + msecs_to_jiffies(MTIP_PCS_LINK_UP_DEFER_TIMER_INTERVAL));
           platform_driver_priv->mtip_links[link_index]->pcs_link_up_defer_timer_running = true;
-          return;
+          goto func_exit;
         }
         else if(timer_pending(&platform_driver_priv->mtip_links[link_index]->phy_retry_timer))
         {
           // Defer timer already running, let it expire
-          return;
+          goto func_exit;
         }
         else
         {
@@ -584,7 +584,7 @@ void run_mtip_process_link_state(void* work_ptr)
         {
           del_timer_sync(&platform_driver_priv->mtip_links[link_index]->pcs_link_up_defer_timer);
           platform_driver_priv->mtip_links[link_index]->pcs_link_up_defer_timer_running = false;
-          return;
+          goto func_exit;
         }
 
         if((platform_driver_priv->mtip_links[link_index]->state == MTIP_LINK_STATE_DOWN) ||
