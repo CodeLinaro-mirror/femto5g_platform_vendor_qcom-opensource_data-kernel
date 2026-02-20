@@ -49,6 +49,7 @@
 #include "mtip_mac.h"
 #include "mtip_pcs.h"
 #include "mtip_phy.h"
+#include "mtip_platform.h"
 
 static eth_ecpriss_link_rate_e mtip_client_get_link_rate(u32 port_type)
 {
@@ -710,6 +711,70 @@ eth_ecpriss_status_e mtip_eth_enable_logging_port(bool action)
     }
 
     return ret;
+}
+
+void mtip_eth_reeval_logging_port(void)
+{
+    int i =0;
+    struct mtip_port_info* port_info;
+    u32 port_type = 0;
+    u32 link_index = 0;
+    u32 lane_index = 0;
+    int lane_speed = 0;
+    struct net_device *netdev = NULL;
+    static char *ifname = "eth30";
+    u32 c2c_link_index = MTIP_L2_ETH_LINK_INDEX;
+
+    if (platform_driver_priv == NULL)
+        return;
+
+    for(port_type = 0; port_type < MTIP_MAX_FH_PORTS; port_type++)
+    {
+        port_info = platform_driver_priv->mtip_ports[port_type];
+        if(!port_info)
+          continue;
+
+        for (i = 0; i < platform_driver_priv->devices.port_devices[port_type].num_lane_phandles; ++i)
+        {
+            lane_index = platform_driver_priv->devices.port_devices[port_type].lane_devices[i]->lane_index;
+
+            if(mtip_lookup_link_index_by_lane_index(&link_index, lane_index) == 0)
+            {
+                 if (platform_driver_priv->mtip_links[link_index] != NULL)
+                 {
+                    if ((platform_driver_priv->mtip_links[link_index]->state != MTIP_LINK_STATE_INIT) &&
+                        (platform_driver_priv->mtip_links[link_index]->state != MTIP_LINK_STATE_CLOSE))
+                    {
+                       lane_speed += mtip_platform_convert_lane_speed_to_gbps(port_info->lane_config[i].lane_speed);
+                       CSMLOGINFO("Lane index: %d, lane_speed %d", lane_index, mtip_platform_convert_lane_speed_to_gbps(port_info->lane_config[i].lane_speed));
+                    }
+                 }
+            }
+        }
+    }
+
+    if(lane_speed == (MTIP_MAX_FH_PORTS * mtip_platform_convert_lane_speed_to_gbps(PHY_LANE_SPEED_100G)))
+    {
+        if (platform_driver_priv->mtip_links[c2c_link_index] != NULL)
+        {
+            netdev = platform_driver_priv->mtip_links[c2c_link_index]->dev;
+
+            rtnl_lock();   // Required before calling dev_close
+            if (netif_running(netdev))
+            {
+                CSMLOGINFO("dev_close: Bringing down interface %s as 300G FH limit is reached\n", ifname);
+                dev_close(netdev);
+                CSMLOGINFO("Interface %s is now down\n", ifname);
+            }
+            else
+            {
+                CSMLOGINFO("dev_close: Interface %s is already down\n", ifname);
+            }
+            rtnl_unlock();                
+        }
+    }
+
+    return;
 }
 
 struct eth_ecpriss_ops mtip_ecpri_ops = {

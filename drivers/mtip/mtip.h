@@ -57,6 +57,8 @@
 #define MTIP_MAX_LINKS  16         // Setup for a max of 16 Ethernet links
 #define MTIP_MAX_LANES  20         // Setup for a max of 16 lanes
 
+#define MTIP_MAX_FH_PORTS  3       // Max of 3 FH ports
+
 #define MTIP_MAX_LINKS_PER_PORT 4  // Max of 4 links per port
 #define MTIP_MAX_LANES_PER_PORT 4  // Max of 4 lanes per port
 

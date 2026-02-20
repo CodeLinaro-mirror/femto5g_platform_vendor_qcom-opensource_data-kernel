@@ -1525,6 +1525,9 @@ int mtip_device_open_completion(u32 link_index)
     // Notify TRX driver to enable TX
     mtip_phy_notify_eth_event_to_trx(link_index, TRX_IFCONFIG_UP);
 
+    // Bring down logging C2C2 port if needed
+    mtip_eth_reeval_logging_port();
+
     // bring up the phy
     mtip_phy_bringup_phy(link_index, sfp_port_type);
 
@@ -3690,6 +3693,9 @@ void run_mtip_process_netdev_open(void* workptr)
 
             // Notify TRX driver to enable TX
             mtip_phy_notify_eth_event_to_trx(link_index, TRX_IFCONFIG_UP);
+
+            // Bring down logging C2C2 port if needed
+            mtip_eth_reeval_logging_port();
 
             // bring up the phy
             mtip_phy_bringup_phy(link_index, sfp_port_type);
