@@ -1,5 +1,5 @@
 # Android makefile for SMEM kernel modules
-ifeq ($(call is-board-platform-in-list,sun canoe hamoa chora), true)
+ifeq ($(call is-board-platform-in-list,sun canoe hamoa chora malabar), true)
 ifneq (,$(filter arm aarch64 arm64, $(TARGET_ARCH)))
 
 LOCAL_PATH := $(call my-dir)
