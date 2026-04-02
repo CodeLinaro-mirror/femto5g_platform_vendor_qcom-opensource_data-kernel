@@ -346,6 +346,19 @@ typedef struct
 	ecpriss_mac_s lte_mac_addr[ECPRISS_MAX_PORTS][ECPRISS_MAX_LTE_MAC_PER_PORT];
 }ecpriss_lte_mac_addr_cfg_s;
 
+typedef struct
+{
+	uint8_t mac[ECPRISS_MAC_ADDR_LEN];
+	int filter_index;
+	bool filter_added;
+}ecpriss_loopback_mac_s;
+
+typedef struct
+{
+	ecpriss_loopback_mac_s loopback_mac_addr[ECPRISS_MAX_PORTS][MAX_MAC_FILTER_ENTRIES];
+	uint8_t num_of_loopback_filters_added[ECPRISS_MAX_PORTS];
+}ecpriss_loopback_filter_cfg_s;
+
 /**
  * typedef ecpri_log_dir_e - ECPRI logging direction enum
  * @ECPRISS_LOG_DIR_UL: Uplink logging

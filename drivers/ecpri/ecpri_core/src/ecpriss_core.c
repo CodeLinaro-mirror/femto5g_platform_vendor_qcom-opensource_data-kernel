@@ -101,6 +101,7 @@ eth_ecpriss_link_event_params_s           link_event_params;
 /* ecpriss_stats_s                           stats_g; */
 struct ecpriss_ssr_nb ssr_info_g;
 
+
 /* DEbug Useful Data */
 typedef struct {
 
@@ -185,6 +186,9 @@ int32_t ecpriss_process_packet_decfg(ecpriss_packet_payload_s *packet, ecpriss_m
 		switch((int)flow_tx->src){
 			case ECPRISS_ROUTE_SRC_OC:
 				if(ecpriss_hw_ver == ECPRISS_HW_v2_0) {
+
+					ecpriss_qudp_remove_loopback_filters(packet);
+					
 					if(message_id == ECPRISS_MESSAGE_FLOW_DECFG) {
 
 						ret = ecpriss_xbar_oc_rx_lut_decfg_v2(
@@ -321,7 +325,7 @@ int32_t ecpriss_process_packet(ecpriss_packet_payload_s *packet)
 					if(ret < 0) {
 						break;
 					}
-
+					ecpriss_qudp_add_loopback_filters(packet);
 				}
 				break;
 
@@ -788,16 +792,17 @@ void ecpriss_eth_link_update_for_mhi_v2(void)
 					num_links = eth_link_params_g.topology_params[i].port_params[j].num_links;
 					port_params = &eth_link_params_g.topology_params[i].port_params[port_index];
 
-						for(k=0;k<num_links;k++){
+					for(k=0;k<num_links;k++){
 
-							if(port_params->link_params[k].link_state == ETH_ECPRISS_LINK_STATE_UP){
-								link_state_flag = true;
-							}
+						if(port_params->link_params[k].link_state == ETH_ECPRISS_LINK_STATE_UP){
+							link_state_flag = true;
 						}
-
+						
 						if(lte_fh_enabled) {
+							ECPRILOGINFO("Port = %d, Link = %d, Link state = %d\n", port_index, k, port_params->link_params[k].link_state);
 							ecpriss_mhi_process_async_link_state(port_index, k, port_params->link_params[k].link_state);
 						}
+					}
 
 				}
 			}

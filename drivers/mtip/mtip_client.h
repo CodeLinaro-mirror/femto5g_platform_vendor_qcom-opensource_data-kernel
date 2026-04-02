@@ -52,4 +52,7 @@ eth_ecpriss_status_e mtip_eth_register_ready_cb(eth_ecpriss_topology_ready_cb re
 void mtip_print_topology(eth_ecpriss_topology_root_s *topology);
 void mtip_eth_reeval_logging_port(void);
 
+/* Loopback interface functions */
+void mtip_update_topology(void);
+
 #endif // _MTIP_CLIENT_H

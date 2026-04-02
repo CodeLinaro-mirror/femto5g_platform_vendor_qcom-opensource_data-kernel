@@ -411,6 +411,8 @@ int32_t ecpriss_qudp_egress_l3_table_reconfig(ecpriss_packet_payload_s *packet);
 int32_t ecpriss_qudp_egress_l2_l3_table_reconfig(ecpriss_packet_payload_s *packet);
 int32_t ecpriss_qudp_ingress_table_config(ecpriss_packet_payload_s *packet);
 int32_t ecpriss_qudp_ingress_table_deconfig(ecpriss_packet_payload_s *packet);
+void ecpriss_qudp_add_loopback_filters(ecpriss_packet_payload_s *packet);
+void ecpriss_qudp_remove_loopback_filters(ecpriss_packet_payload_s *packet);
 
 int32_t ecpriss_qudp_set_lte_mac_filter(ecpriss_packet_payload_s *packet);
 void ecpriss_qudp_set_nr_mac_filter(void);

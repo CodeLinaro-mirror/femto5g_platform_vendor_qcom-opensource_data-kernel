@@ -63,9 +63,12 @@ MODULE_LICENSE("GPL v2");
 #include "mtip_ethtool.h"
 #include "mtip_notifr.h"
 #include "mtip_sysfs.h"
+#include "mtip_mac.h"
+#include "mtip_client.h"
 #include "ldmm_genl.h"
 #include "eth_phy_iface.h"
 #include "ldmm_notifr.h"
+
 
 /* Global variables of the driver */
 struct mtip_platform_driver_priv* platform_driver_priv = NULL;
@@ -1252,14 +1255,443 @@ bool mtip_if_link_up(int link_index)
   return false;
 }
 
+/**
+ * mtip_is_link_in_loopback - Check if a link is in loopback mode
+ * @link_index: The link index to check
+ *
+ * Returns true if the link is configured for loopback mode, false otherwise.
+ * Used for A55 TX API blocking and promiscuous mode configuration.
+ */
+bool mtip_is_link_in_loopback(u32 link_index)
+{
+    if (link_index >= MTIP_MAX_LINKS) {
+        CSMLOGERR("Invalid link_index %d (max %d)", link_index, MTIP_MAX_LINKS);
+        return false;
+    }
+    
+    if (platform_driver_priv && platform_driver_priv->mtip_links[link_index]) {
+        return platform_driver_priv->mtip_links[link_index]->loopback_enabled;
+    }
+    return false;
+}
+
+/**
+ * mtip_phy_set_loopback_mode - Set PHY loopback mode for a specific link
+ * @link_index: The link index to configure
+ * @loopback_mode: The loopback mode to set
+ *
+ * This function bridges MTIP to the PHY driver's per-interface loopback functionality
+ * and ensures proper integration between MTIP's link-based and PHY's lane-based approaches
+ */
+int mtip_phy_set_loopback_mode(u32 link_index, enum qcom_aw_phy_loopback_mode_enum loopback_mode)
+{
+  u32 port_type;
+  bool lanes_enabled[PHY_LANE_MAX] = {false};
+  int ret = 0;
+
+  CSMLOGINFO("Setting PHY loopback mode %d for link_index %d\n", loopback_mode, link_index);
+
+  /* Validate link index */
+  if (link_index >= MTIP_MAX_LINKS) {
+    CSMLOGERR("Invalid link_index %d (max %d)", link_index, MTIP_MAX_LINKS);
+    return -EINVAL;
+  }
+
+  /* Get port type from link index */
+  if (mtip_lookup_port_type_by_link_index(link_index, &port_type) < 0) {
+    CSMLOGERR("Failed to get port type for link_index %d\n", link_index);
+    return -EINVAL;
+  }
+
+  /* Get lanes enabled for this link and build the lane mapping */
+  if (platform_driver_priv && platform_driver_priv->mtip_links[link_index]) {
+    int i;
+    for (i = 0; i < platform_driver_priv->mtip_links[link_index]->num_assigned_lanes; i++) {
+      u32 lane_index = platform_driver_priv->mtip_links[link_index]->assigned_lane_indices[i];
+      u32 real_lane_number;
+
+      if (mtip_lookup_real_lane_number_by_lane_index(lane_index, &real_lane_number) == 0) {
+        if (real_lane_number < PHY_LANE_MAX) {
+          lanes_enabled[real_lane_number] = true;
+          CSMLOGINFO("Link %d maps to PHY lane %d (lane_index %d)\n", 
+                     link_index, real_lane_number, lane_index);
+        }
+      }
+    }
+  } else {
+    CSMLOGERR("MTIP link not found for link_index %d\n", link_index);
+    return -EINVAL;
+  }
+
+  /* Call PHY driver's per-interface loopback function */
+  if (qcom_aw_phy_driver_iface_ops.eth_phy_iface_set_phy_loopback_mode) {
+    ret = qcom_aw_phy_driver_iface_ops.eth_phy_iface_set_phy_loopback_mode(
+      port_type, lanes_enabled, loopback_mode);
+
+    if (ret == 0) {
+      CSMLOGINFO("Successfully set PHY loopback mode %d for link_index %d\n",
+                 loopback_mode, link_index);
+    } else {
+      CSMLOGERR("Failed to set PHY loopback mode %d for link_index %d, error: %d\n",
+                loopback_mode, link_index, ret);
+    }
+  } else {
+    CSMLOGERR("PHY loopback interface function not available\n");
+    ret = -ENOSYS;
+  }
+
+  return ret;
+}
+
+
+void post_mtip_process_loopback_config(u32 link_index, bool enable)
+{
+    struct mtip_loopback_config_task* taskstruct = kmalloc(sizeof(struct mtip_loopback_config_task), GFP_ATOMIC);
+    u32 port_type;
+    
+    if (!taskstruct) {
+        CSMLOGERR("Failed to allocate loopback config task for link %d", link_index);
+        return;
+    }
+    
+    taskstruct->link_index = link_index;
+    taskstruct->enable = enable;
+    
+    if (mtip_lookup_port_type_by_link_index(link_index, &port_type) < 0) {
+        port_type = MTIP_PORT_TYPE_FH_0; // Default fallback
+    }
+    
+    mtip_queue_work(MTIP_WORKQ_TASK_PROCESS_LOOPBACK_CONFIG, taskstruct, port_type);
+}
+
+int mtip_set_loopback_interfaces(char **interface_list, int interface_count)
+{
+    int i, ret = 0;
+    u32 link_index;
+    
+    CSMLOGINFO("Setting loopback for %d interfaces\n", interface_count);
+
+    /* Validate input parameters */
+    if (!interface_list || interface_count <= 0) {
+        CSMLOGERR("No loopback interfaces provided or invalid count: %d\n", interface_count);
+        return -EINVAL;
+    }
+
+    /* Process each interface name and convert to link index */
+    for (i = 0; i < interface_count; i++) {
+        if (!interface_list[i]) {
+            CSMLOGERR("Interface name at index %d is NULL\n", i);
+            ret = -EINVAL;
+            continue;
+        }
+
+        /* Convert interface name to link index */
+        if (mtip_lookup_link_index_by_name(interface_list[i], &link_index) == 0) {
+            CSMLOGINFO("Enabling loopback for %s (link_index=%d)\n", 
+                       interface_list[i], link_index);
+            
+            /* Queue work for this specific interface */
+            post_mtip_process_loopback_config(link_index, true);
+        } else {
+            CSMLOGERR("Interface %s not found\n", interface_list[i]);
+            ret = -ENODEV;
+        }
+    }
+
+    return ret;
+}
+
 /* API exposed structure */
 const struct ldmm_eth_iface_ops mtip_driver_iface_ops = {
     .ldmm_eth_iface_get_stats_info = mtip_get_stats_info,
     .ldmm_eth_iface_get_config_info = mtip_get_config_info,
     .ldmm_eth_iface_get_if_link_up = mtip_if_link_up,
+    .ldmm_eth_iface_set_loopback_interfaces = mtip_set_loopback_interfaces,
 };
-
 EXPORT_SYMBOL(mtip_driver_iface_ops);
+/**
+ * mtip_assign_lanes_for_loopback - Assign lanes to all links (before PHY loopback)
+ * @requested_link_index: The specific link requested for loopback
+ *
+ * This function performs minimal lane assignment to ALL 4 links of the port.
+ * This is called BEFORE PHY loopback setup.
+ */
+static int mtip_assign_lanes_for_loopback(u32 requested_link_index)
+{
+    u32 port_type;
+    struct mtip_link_info* link_info = NULL;
+    int i;
+
+    CSMLOGINFO("Step 1: Assigning lanes for loopback - link_index %d\n", requested_link_index);
+
+    /* Validate link index */
+    if (requested_link_index >= MTIP_MAX_LINKS) {
+        CSMLOGERR("Invalid link_index %d (max %d)", requested_link_index, MTIP_MAX_LINKS);
+        return -EINVAL;
+    }
+
+    /* Get port type from link index */
+    if (mtip_lookup_port_type_by_link_index(requested_link_index, &port_type) < 0) {
+        CSMLOGERR("Failed to get port type for link_index %d", requested_link_index);
+        return -EINVAL;
+    }
+
+    /* Validate port structure exists */
+    if (!platform_driver_priv || !platform_driver_priv->mtip_ports[port_type]) {
+        CSMLOGERR("Port structure not found for port_type %d", port_type);
+        return -EINVAL;
+    }
+
+    /* Assign lanes to ALL 4 links of the port (1 lane per link in 4x25G) */
+    for (i = 0; i < 4; i++) {
+        u32 port_link_index;
+        if (mtip_lookup_link_index_by_port_type_and_real_link(&port_link_index, port_type, i) == 0) {
+            if (platform_driver_priv->mtip_links[port_link_index] != NULL) {
+                link_info = platform_driver_priv->mtip_links[port_link_index];
+
+                /* Assign lane to each link (lane_index = link_index in 4x25G) */
+                link_info->assigned_lane_indices[0] = port_link_index;
+                link_info->num_assigned_lanes = 1;
+                link_info->lanes_assignment_complete = true;
+
+                CSMLOGERR("Assigned lane %d to link_index %d\n", port_link_index, port_link_index);
+            }
+        }
+    }
+
+    CSMLOGINFO("Complete: Lane assignment done\n");
+    return 0;
+}
+
+/**
+ * mtip_configure_port_and_lanes_for_loopback - Complete port and lane configuration (after PHY loopback)
+ * @link_index: The link index for loopback
+ *
+ * This function configures ALL port and lane properties matching C2C2 implementation:
+ * - Port: state, autoneg, priv_flags, sfp_port_type, port_config, lane_config
+ * - Lanes: state, sfp_port_type, speed_mask, QSFP info
+ * This is called AFTER PHY loopback setup.
+ */
+static int mtip_configure_port_and_lanes_for_loopback(u32 link_index)
+{
+    u32 port_type;
+    int i;
+    u32 first_lane_index;
+    bool is_optical = false;
+    enum mtip_port_config_enum loopback_port_config;
+    int loopback_sfp_type;
+
+    CSMLOGINFO("Step 2: Configuring port and lanes for loopback - link_index %d\n", link_index);
+
+    /* Get port type from link index */
+    if (mtip_lookup_port_type_by_link_index(link_index, &port_type) < 0) {
+        CSMLOGERR("Failed to get port type for link_index %d", link_index);
+        return -EINVAL;
+    }
+
+    /* Validate port structure exists */
+    if (!platform_driver_priv || !platform_driver_priv->mtip_ports[port_type]) {
+        CSMLOGERR("Port structure not found for port_type %d", port_type);
+        return -EINVAL;
+    }
+
+    /* Determine transceiver type (DAC vs optical) from the first lane of the port.
+       If optical is connected, RSFEC speed mode must be used. AN is off for both cases. */
+    if (mtip_lookup_lane_index_by_port_type_and_real_lane(&first_lane_index, port_type, 0) == 0 &&
+        platform_driver_priv->mtip_lanes[first_lane_index] != NULL)
+    {
+        is_optical = (platform_driver_priv->mtip_lanes[first_lane_index]->sfp_port_type == PORT_FIBRE);
+    }
+
+    if (is_optical)
+    {
+        loopback_sfp_type = PORT_FIBRE;
+        loopback_port_config = MTIP_PORT_CONFIG_4x25GBASE_R_RSFEC;
+        CSMLOGINFO("Port %d: optical transceiver detected, using 4x25G RSFEC config\n", port_type);
+    }
+    else
+    {
+        loopback_sfp_type = PORT_DA;
+        loopback_port_config = MTIP_PORT_CONFIG_4x25GBASE_R;
+        CSMLOGINFO("Port %d: DAC transceiver detected, using 4x25G config\n", port_type);
+    }
+    
+    /* Don't do autoneg for loopback modes */
+    platform_driver_priv->mtip_ports[port_type]->autoneg = false;
+    
+    /* Set the port state as connected */
+    platform_driver_priv->mtip_ports[port_type]->port_state = MTIP_PORT_STATE_CONNECTED;
+    
+    /* Set port priv flags based on detected transceiver */
+    platform_driver_priv->mtip_ports[port_type]->port_priv_flags = (1 << loopback_port_config);
+    
+    /* Set port sfp type and configuration based on transceiver */
+    platform_driver_priv->mtip_ports[port_type]->sfp_port_type = loopback_sfp_type;
+    platform_driver_priv->mtip_ports[port_type]->port_config = loopback_port_config;
+
+    CSMLOGINFO("Port %d: autoneg=false, state=CONNECTED, priv_flags=%s, sfp=%s\n",
+               port_type,
+               is_optical ? "4x25G_RSFEC" : "4x25G",
+               is_optical ? "PORT_FIBRE" : "PORT_DA");
+
+    /* Configure lane_config for all 4 lanes in port structure */
+    for (i = 0; i < PHY_LANE_MAX; ++i) {
+        platform_driver_priv->mtip_ports[port_type]->lane_config[i].lane_enabled = true;
+        platform_driver_priv->mtip_ports[port_type]->lane_config[i].lane_speed = PHY_LANE_SPEED_25G;
+        platform_driver_priv->mtip_ports[port_type]->lane_config[i].link_index = (port_type * PHY_LANE_MAX) + i;
+    }
+    CSMLOGINFO("Configured port lane_config: 4 lanes enabled at 25G speed\n");
+
+    
+    /* Configure all 4 lanes for the port */
+    for (i = 0; i < PHY_LANE_MAX; ++i) {
+        u32 lane_index;
+        if (mtip_lookup_lane_index_by_port_type_and_real_lane(&lane_index, port_type, i) == 0) {
+            if (platform_driver_priv->mtip_lanes[lane_index] != NULL) {
+                
+                /* Set the lane state as CONNECTED */
+                platform_driver_priv->mtip_lanes[lane_index]->lane_state = MTIP_LANE_STATE_CONNECTED;
+                
+                /* Set the lane sfp type based on detected transceiver */
+                platform_driver_priv->mtip_lanes[lane_index]->sfp_port_type = loopback_sfp_type;
+
+                /* Set the lane speed mask - 25G only for forced 4x25G mode */
+                platform_driver_priv->mtip_lanes[lane_index]->speed_mask = TRX_LANE_SPEED_25G;
+                
+                /* Set the lane properties for TRX/QSFP */
+                platform_driver_priv->mtip_lanes[lane_index]->lane_qsfp_info.trx_module_type = TRX_QSFP_PLS_QSFP28_QSFP56;
+                platform_driver_priv->mtip_lanes[lane_index]->lane_qsfp_info.speed_mask = TRX_LANE_SPEED_25G;
+                platform_driver_priv->mtip_lanes[lane_index]->lane_qsfp_info.trx_laneinfo = 0xF;  // 4 lanes
+                platform_driver_priv->mtip_lanes[lane_index]->lane_qsfp_info.trx_bout_cfg = 0;
+                
+                CSMLOGINFO("Lane %d: state=CONNECTED, sfp=%s, speed_mask=25G, qsfp_type=QSFP28/56\n",
+                           lane_index, is_optical ? "PORT_FIBRE" : "PORT_DA");
+            }
+        }
+    }
+
+    CSMLOGINFO("Step 2 Complete: Port and lane configuration done \n");
+    return 0;
+}
+
+
+
+/**
+ * run_mtip_process_loopback_config - Workq handler for loopback configuration
+ * @work_ptr: Work pointer containing loopback configuration data
+ *
+ * This function processes loopback configuration requests through the workq.
+ * It uses a modular approach with separate helper functions for each step.
+ */
+void run_mtip_process_loopback_config(void *work_ptr)
+{
+    struct mtip_loopback_config_task *taskstruct = (struct mtip_loopback_config_task *)work_ptr;
+    struct net_device *netdev = NULL;
+    struct mtip_netdev_priv *priv;
+    int ret = 0;
+    u32 port_type;
+    u32 priv_flags =0;
+
+    CSMLOGINFO("Processing loopback configuration in workq\n");
+
+    if (!taskstruct || !platform_driver_priv) {
+        CSMLOGERR("Invalid parameters\n");
+        goto cleanup;
+    }
+
+    if (platform_driver_priv->mtip_links[taskstruct->link_index] != NULL) {
+        netdev = platform_driver_priv->mtip_links[taskstruct->link_index]->dev;
+
+        if (netdev != NULL) {
+            CSMLOGINFO("Enabling loopback mode for link_index %d\n", taskstruct->link_index);
+            
+            priv = netdev_priv(netdev);
+
+            /* Mark interface as in loopback mode */
+            platform_driver_priv->mtip_links[taskstruct->link_index]->loopback_enabled = true;
+
+            /* Set promiscuous mode for loopback */
+            ret = mtip_mac_set_promisc_mode(priv, true);
+            if (ret) {
+                CSMLOGERR("Failed to set promiscuous mode");
+                goto cleanup;
+            }
+
+            if (!mtip_loopback_enable_arp) {
+                netdev->flags |= IFF_NOARP;
+            }
+
+
+            ret = mtip_assign_lanes_for_loopback(taskstruct->link_index);
+            if (ret) {
+                CSMLOGERR("Failed: Lane assignment");
+                goto cleanup;
+            }
+
+           
+            CSMLOGINFO("Configuring PHY loopback mode for link_index %d\n", taskstruct->link_index);
+            ret = mtip_phy_set_loopback_mode(taskstruct->link_index, QCOM_AW_PHY_NEAR_END_SERIAL_LB);
+            if (ret) {
+                CSMLOGERR("Failed to set PHY loopback mode");
+                goto cleanup;
+            }
+
+          
+            ret = mtip_configure_port_and_lanes_for_loopback(taskstruct->link_index);
+            if (ret) {
+                CSMLOGERR("Failed: Port and lane configuration");
+                goto cleanup;
+            }
+
+            if (mtip_lookup_port_type_by_link_index(taskstruct->link_index, &port_type) < 0) {
+                CSMLOGERR("Invalid port_type for link_index %d", taskstruct->link_index);
+                goto cleanup;
+            }
+
+            /* Set interface-level priv_flags for the loopback interface */
+            priv_flags = MTIP_DEVICE_PRIV_FLAGS_BIT_MASK_25G_ONLY;
+            priv_flags &= MTIP_DEVICE_PRIV_FLAGS_SINGLE_LANE_MASK;
+            priv->priv_flags_set = true;
+            priv->priv_flags = priv_flags;
+
+            platform_driver_priv->mtip_ports[port_type]->autoneg = AUTONEG_DISABLE;
+            platform_driver_priv->mtip_ports[port_type]->port_priv_flags_optical = 0;
+            platform_driver_priv->mtip_ports[port_type]->next_speed_retry_count = 0;
+        
+            rtnl_lock();
+            if (!(netdev->flags & IFF_UP)) {
+                CSMLOGINFO("Bringing up interface link_index %d\n", taskstruct->link_index);
+                ret = dev_open(netdev, NULL);
+                if (ret) {
+                    CSMLOGERR("Failed to bring up interface: %d\n", ret);
+                } else {
+                    CSMLOGINFO("Interface link_index %d is now up\n", taskstruct->link_index);
+                }
+            } else {
+                CSMLOGERR("Interface link_index %d is already up\n", taskstruct->link_index);
+            }
+            rtnl_unlock();
+
+            /* Update topology */
+            mtip_update_topology();
+
+            /* Send event to clients */
+            mtip_client_send_event(ETH_ECPRISS_EVENT_UP, taskstruct->link_index);
+
+            CSMLOGINFO("Loopback configuration completed for link_index %d\n", taskstruct->link_index);
+        } else {
+            CSMLOGERR("Network device not found for link_index %d\n", taskstruct->link_index);
+        }
+    } else {
+        CSMLOGERR("MTIP link not found for link_index %d\n", taskstruct->link_index);
+    }
+
+cleanup:
+    /* Clean up allocated memory */
+    if (taskstruct) {
+        kfree(taskstruct);
+    }
+}
 
 static int mtip_module_init(void)
 {
@@ -1574,5 +2006,3 @@ static void mtip_module_exit(void)
 
 module_init(mtip_module_init);
 module_exit(mtip_module_exit);
-
-

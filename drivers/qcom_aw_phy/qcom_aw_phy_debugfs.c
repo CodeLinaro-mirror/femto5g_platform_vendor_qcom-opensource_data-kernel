@@ -346,8 +346,8 @@ ssize_t qcom_aw_phy_set_attr(struct file *file, const char __user *buf,
       }
       qcom_aw_phy_driver_iface_ops.eth_phy_iface_phy_teardown(port_type,
                                                               lanes_enabled);
-      QCOM_AW_PHY_LOG_ERR("Resetting loopback mode !");
-      qcom_aw_phy_set_loopback_mode(QCOM_AW_PHY_NO_LB);
+      QCOM_AW_PHY_LOG_ERR("Resetting loopback mode for all PHY instances and lanes!");
+      qcom_aw_phy_apply_loopback_mode_global(QCOM_AW_PHY_NO_LB);
       break;
 
     case MAC_LINK_UP:
@@ -389,12 +389,12 @@ ssize_t qcom_aw_phy_set_attr(struct file *file, const char __user *buf,
 
     case NES_LB:
       QCOM_AW_PHY_LOG_ERR("Set near end serial loopback mode !");
-      qcom_aw_phy_set_loopback_mode(QCOM_AW_PHY_NEAR_END_SERIAL_LB);
+      qcom_aw_phy_apply_loopback_mode_global(QCOM_AW_PHY_NEAR_END_SERIAL_LB);
       break;
 
     case NEP_LB:
       QCOM_AW_PHY_LOG_ERR("Set near end parallel loopback mode !");
-      qcom_aw_phy_set_loopback_mode(QCOM_AW_PHY_NEAR_END_PARALLEL_LB);
+      qcom_aw_phy_apply_loopback_mode_global(QCOM_AW_PHY_NEAR_END_PARALLEL_LB);
       break;
 
     case DUMP_PHY_REG:
@@ -1034,32 +1034,50 @@ bool qcom_aw_phy_debugfs_get_tx_fir_val(enum qcom_aw_phy_instance_enum tx_bist_p
 
 void loopback_mode_parser(char *str, int size)
 {
-	int mode=0;
-	mode =qcom_aw_phy_get_loopback_mode();
-	switch (mode)
-	{
+	int mode = 0;
+	int global_mode = qcom_aw_phy_get_loopback_mode();
+	enum qcom_aw_phy_instance_enum phy_inst;
+	enum eth_phy_iface_phy_lane_num_enum lane;
+	int offset = size;
+	
+	/* Display global mode first */
+	switch (global_mode) {
 		case 0:
-			scnprintf(str+size,50,"Loopback Mode = %s\n","NO_LB");
+			offset += scnprintf(str+offset, 60, "Global Mode: NO_LB (all lanes forced)\n\n");
 			break;
 		case 1:
-			scnprintf(str+size,50,"Loopback Mode = %s\n","NEAR_END_SERIAL_LB");
+			offset += scnprintf(str+offset, 60, "Global Mode: NEAR_END_SERIAL_LB (all lanes forced)\n\n");
 			break;
 		case 2:
-			scnprintf(str+size,50,"Loopback Mode = %s\n","NEAR_END_PARALLEL_LB");
+			offset += scnprintf(str+offset, 60, "Global Mode: NEAR_END_PARALLEL_LB (all lanes forced)\n\n");
+			break;
+		case 3:
+			offset += scnprintf(str+offset, 60, "Global Mode: DEFAULT (per-lane control)\n\n");
+			/* Display per-lane status only in DEFAULT mode */
+			for (phy_inst = QCOM_AW_PHY_INST_FH0; phy_inst <= QCOM_AW_PHY_INST_FH2; phy_inst++) {
+				for (lane = 0; lane < PHY_LANE_MAX; lane++) {
+					mode = qcom_aw_phy_get_effective_loopback_mode(phy_inst, lane);
+					if (mode != 0) {  /* Only show non-NO_LB lanes */
+						offset += scnprintf(str+offset, 60, "  PHY%d Lane%d: %s\n", 
+							phy_inst, lane, 
+							mode == 1 ? "SERIAL_LB" : "PARALLEL_LB");
+					}
+				}
+			}
 			break;
 		default:
-			scnprintf(str+size,50,"Loopback Mode = %s\n","Unknown");
+			offset += scnprintf(str+offset, 60, "Global Mode: Unknown\n\n");
 			break;
-       }
+	}
 }
 
 static ssize_t get_aw_loopback_mode(struct file *file, char __user *buf,
 				 size_t count, loff_t *ppos)
 {
-	char phy_status_str[100]={0};
+	char phy_status_str[1024]={0};
 	uint32_t ret_val = 0;
 	loopback_mode_parser(phy_status_str,strlen(phy_status_str));
-	ret_val=simple_read_from_buffer(buf, count, ppos, phy_status_str, 100);
+	ret_val=simple_read_from_buffer(buf, count, ppos, phy_status_str, 1024);
 	return ret_val;
 }
 
