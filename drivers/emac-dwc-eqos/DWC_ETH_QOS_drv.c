@@ -5899,7 +5899,7 @@ static int DWC_ETH_QOS_handle_prv_ioctl(struct DWC_ETH_QOS_prv_data *pdata,
 	struct ETH_PPS_Config eth_pps_cfg;
 #endif
 
-	if (req->qinx > DWC_ETH_QOS_QUEUE_CNT) {
+	if (req->qinx >= DWC_ETH_QOS_QUEUE_CNT) {
 		dev_alert(&pdata->pdev->dev,
 			  "Queue number %d is invalid\n", req->qinx);
 		dev_alert(&pdata->pdev->dev,
