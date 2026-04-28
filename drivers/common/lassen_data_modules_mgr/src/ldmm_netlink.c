@@ -58,6 +58,7 @@ static struct nla_policy fult_mgmt_rcv_pol[LDMM_A_MAX + 1] = {
   	[LDMM_QXDM_LOGGER_ATTR_GET_CONFIG_INFO] = { .type = NLA_U32},
   	[LDMM_QXDM_LOGGER_ATTR_LINK_CHANGE_NOTIFICATION] = { .type = NLA_U32},
 	[LDMM_QXDM_LOGGER_ATTR_UPDATE_TIMER_VALUE] = { .type = NLA_U32},
+	[LDMM_QXDM_LOGGER_ATTR_SET_INTERFACE_LOOPBACK_MODE] = { .type = NLA_BINARY, .len = LOOPBACK_CONFIG_SIZE},
 };
 
 /* Operations for our Generic Netlink family */
@@ -87,6 +88,11 @@ static struct genl_ops genl_ops[] = {
         	.policy = fult_mgmt_rcv_pol,
         	.doit = ldmm_qxdm_logger_no_action,
       	},
+	{
+		.cmd = LDMM_QXDM_LOGGER_CMD_SET_INTERFACE_LOOPBACK_MODE,
+		.policy = fult_mgmt_rcv_pol,
+		.doit = ldmm_qxdm_logger_set_loopback_mode,
+	},
 };
 
 /* Multicast groups for our family */
@@ -413,6 +419,80 @@ int ldmm_qxdm_logger_link_change_notification(event_info_struct *event_info, int
 	}
 #endif
 	return 0;
+}
+
+int ldmm_qxdm_logger_set_loopback_mode(struct sk_buff *sender_skb, struct genl_info *info) {
+	struct nlattr *na;
+	loopback_config_info *loopback_config;
+	char **interface_list = NULL;
+	int ret_val = 0;
+	int i;
+
+	if (info == NULL) {
+		ret_val = -EINVAL;
+		return ret_val;
+	}
+
+	na = info->attrs[LDMM_QXDM_LOGGER_ATTR_SET_INTERFACE_LOOPBACK_MODE];
+	if (!na) {
+		LDMM_LOG_ERR("No loopback configuration data received\n");
+		ret_val = -EINVAL;
+		return ret_val;
+	}
+
+	/* Extract loopback configuration from netlink message */
+	loopback_config = (loopback_config_info *)nla_data(na);
+	if (!loopback_config) {
+		LDMM_LOG_ERR("Failed to extract loopback configuration data\n");
+		ret_val = -EINVAL;
+		return ret_val;
+	}
+
+	LDMM_LOG_INFO("Received loopback interface configuration with %d interfaces\n", 
+		loopback_config->interface_count);
+
+	/* Validate interface count */
+	if (loopback_config->interface_count <= 0 || 
+	    loopback_config->interface_count > MAX_LOOPBACK_INTERFACES) {
+		LDMM_LOG_ERR("Invalid interface count: %d\n", loopback_config->interface_count);
+		ret_val = -EINVAL;
+		return ret_val;
+	}
+
+	/* Allocate array of interface name pointers */
+	interface_list = kmalloc(loopback_config->interface_count * sizeof(char *), GFP_KERNEL);
+	if (!interface_list) {
+		LDMM_LOG_ERR("Failed to allocate memory for interface list\n");
+		ret_val = -ENOMEM;
+		return ret_val;
+	}
+
+	/* Set up pointers to interface names */
+	for (i = 0; i < loopback_config->interface_count; i++) {
+		interface_list[i] = loopback_config->interface_names[i];
+		LDMM_LOG_INFO("Interface[%d]: %s\n", i, interface_list[i]);
+	}
+
+	/* Call MTIP driver interface to set loopback interfaces */
+	if (mtip_driver_iface_ops.ldmm_eth_iface_set_loopback_interfaces) {
+		ret_val = mtip_driver_iface_ops.ldmm_eth_iface_set_loopback_interfaces(
+			interface_list, loopback_config->interface_count);
+		
+		if (ret_val == 0) {
+			LDMM_LOG_INFO("Successfully configured %d loopback interfaces in MTIP\n", 
+				loopback_config->interface_count);
+		} else {
+			LDMM_LOG_ERR("Failed to configure loopback interfaces in MTIP, error: %d\n", ret_val);
+		}
+	} else {
+		LDMM_LOG_ERR("MTIP loopback interface function not available\n");
+		ret_val = -ENOSYS;
+	}
+
+	/* Clean up allocated memory */
+	kfree(interface_list);
+
+	return ret_val;
 }
 
 int ldmm_qxdm_logger_no_action(struct sk_buff *sender_skb, struct genl_info *info) {

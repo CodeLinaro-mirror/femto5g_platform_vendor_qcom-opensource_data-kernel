@@ -145,6 +145,11 @@ static void mtip_workq_handler(struct work_struct *w)
               run_mtip_phy_retry_bringup(work_ptr);
           }
           break;
+      case MTIP_WORKQ_TASK_PROCESS_LOOPBACK_CONFIG:
+          {
+              run_mtip_process_loopback_config(work_ptr);
+          }
+          break;
       default:
          {
             CSMLOGERR("Unknown task type: %d\n", work_type);
@@ -412,4 +417,3 @@ int mtip_workq_queue_delayed_work(struct mtip_delayed_work_q_params *wq_params, 
    queue_delayed_work(delayed_wq, &wq_params->wq_item, msecs_to_jiffies(delay_ms));
    return 0;
 }
-

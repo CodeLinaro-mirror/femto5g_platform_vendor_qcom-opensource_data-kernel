@@ -946,7 +946,14 @@ static void mtip_phy_handle_lane_down(struct mtip_process_lane_down lane_down_in
 
       /* Indicate RX LOS to user space */
       if(mtip_lookup_link_index_by_lane_index(&link_index, lane_down_info.lane_index) == 0)
+      {
          mtip_snd_event_notification(link_index, RX_LOS_SET);
+         /* If MAC wrapper confirms link is down, update link state accordingly */
+         if (mtip_mac_wrapper_get_link_status(link_index) == false)
+         {
+            mtip_process_link_state(link_index, false);
+         }
+      }
 
       return;
    }
@@ -1632,4 +1639,3 @@ trx_lane_speed mtip_phy_port_config_to_trx_lane_speed(enum mtip_port_config_enum
 
     return TRX_LANE_SPEED_UNKNOWN;
 }
-

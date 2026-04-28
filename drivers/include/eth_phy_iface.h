@@ -116,7 +116,8 @@ enum qcom_aw_phy_eq_mode_enum {
 enum qcom_aw_phy_loopback_mode_enum{
         QCOM_AW_PHY_NO_LB                    = 0,
         QCOM_AW_PHY_NEAR_END_SERIAL_LB,
-        QCOM_AW_PHY_NEAR_END_PARALLEL_LB
+        QCOM_AW_PHY_NEAR_END_PARALLEL_LB,
+        QCOM_AW_PHY_DEFAULT_LB               = 3  /* Use per-lane settings (current behavior) */
 };
 
 /* Lane Config - Enabled flag and speed info */
@@ -201,6 +202,10 @@ struct eth_phy_iface_ops {
                                     enum mtip_port_type_enum port_type);
 	void (*eth_phy_iface_set_c2c_phy_loopback_mode)(
                                     enum qcom_aw_phy_loopback_mode_enum loopback_mode);
+	int (*eth_phy_iface_set_phy_loopback_mode)(
+	                                 enum mtip_port_type_enum port_type,
+	                                 bool lanes_enabled[PHY_LANE_MAX],
+	                                 enum qcom_aw_phy_loopback_mode_enum loopback_mode);
 };
 
 #endif // _ETH_PHY_IFACE_H

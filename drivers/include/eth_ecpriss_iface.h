@@ -91,6 +91,7 @@ typedef struct eth_ecpriss_link_params {
 	uint8_t                          eth_mac_addr[ECPRISS_MAC_ADDR_LEN];
 	eth_ecpriss_link_state_e         link_state;
 	eth_ecpriss_link_rate_e          link_rate;
+	bool                             loopback_enabled;
 } eth_ecpriss_link_params_s;
 
 /**

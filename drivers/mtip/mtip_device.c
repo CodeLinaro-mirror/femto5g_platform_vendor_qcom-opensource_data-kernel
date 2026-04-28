@@ -1023,6 +1023,14 @@ static int mtip_start_xmit(struct sk_buff *skb, struct net_device *netdev)
 
    priv = netdev_priv(netdev);
    link_index = priv->link_index;
+
+   // Block A55 TX API calls for loopback interfaces
+   if (mtip_is_link_in_loopback(link_index)) {
+       CSMLOGDBG("Blocking TX on loopback interface %d\n", link_index);
+       dev_kfree_skb(skb);
+       return NETDEV_TX_OK;
+   }
+
    if (mtip_lookup_port_type_by_link_index(link_index, &port_type) < 0)
    {
         CSMLOGERR("invalid port_type for link_index %d", link_index);
@@ -1389,10 +1397,11 @@ void mtip_rx_mode_set(struct net_device *netdev)
         ret = mtip_mac_set_promisc_mode(priv, true);
         CSMLOGDBG("Enabling all multicast for link index: %d\n", link_index);
  	} 
-    else if( ( link_index != MTIP_L2_ETH_LINK_INDEX && mtip_loopback_mode != MTIP_MODE_DEFAULT) || (  link_index == MTIP_L2_ETH_LINK_INDEX && mtip_c2c2_loopback_mode != MTIP_MODE_DEFAULT ) )
+    else if (mtip_is_link_in_loopback(link_index) || ( link_index != MTIP_L2_ETH_LINK_INDEX && mtip_loopback_mode != MTIP_MODE_DEFAULT) ||
+            (link_index == MTIP_L2_ETH_LINK_INDEX && mtip_c2c2_loopback_mode != MTIP_MODE_DEFAULT ))
     {
         ret = mtip_mac_set_promisc_mode(priv, true);
-        CSMLOGDBG("Setting promiscuous mode ON for link index: %d\n", link_index);
+        CSMLOGDBG("Setting promiscuous mode ON for loopback link index: %d\n", link_index);
     }
     else
     {
@@ -2525,14 +2534,14 @@ int mtip_netdev_set_port_priv_flags(struct net_device *netdev)
     port_link0_index = platform_driver_priv->devices.port_devices[port_type].link_devices[0]->link_index;
     priv = netdev_priv(platform_driver_priv->mtip_links[port_link0_index]->dev);
     port_priv_flags = priv->priv_flags;
-    if (link_index != port_link0_index) 
+    if (link_index != port_link0_index)
     {
         CSMLOGERR("ignoring the default priv flags of link_index %d", link_index);
         return -1;
     }
 
-    if(platform_driver_priv->mtip_ports[port_type]->port_priv_flags == port_priv_flags &&
-       platform_driver_priv->mtip_ports[port_type]->autoneg_changed == false)
+     if(platform_driver_priv->mtip_ports[port_type]->port_priv_flags == port_priv_flags &&
+        platform_driver_priv->mtip_ports[port_type]->autoneg_changed == false)
     {
         CSMLOGERR("No change in speed/autoneg for port %d", port_type);
         return -1;
@@ -3073,6 +3082,8 @@ void mtip_device_configure_port(u32 port_type)
    u32 num_links_waiting_for_lanes = 0;
    u32 link_index = 0;
    bool loopflag = true;
+   bool port_has_loopback_link = false, port_already_configured_for_loopback = false;
+   bool waiting_link_is_loopback = false;
    int bc = 0;
    int num_an_lanes = 0;
    u32 filtered_priv_flags = 0, port_config_mask = 0;
@@ -3175,26 +3186,58 @@ void mtip_device_configure_port(u32 port_type)
 
       case MTIP_PORT_STATE_CONNECTED:
          {
+            port_has_loopback_link = false;
+            waiting_link_is_loopback = false;
+
             // check if we can reconfigure the port
             set_port_config = true;
             num_links_waiting_for_lanes = 0;
 
+            // Check if any link in the port is in loopback mode, and if the link
+            // waiting for lanes (trying to open) is also a loopback link
+            for (i = 0; i < platform_driver_priv->devices.port_devices[port_type].num_link_phandles; ++i)
+            {
+               u32 tmp_link_idx = platform_driver_priv->devices.port_devices[port_type].link_devices[i]->link_index;
+               if (platform_driver_priv->mtip_links[tmp_link_idx] != NULL &&
+                   mtip_is_link_in_loopback(tmp_link_idx))
+               {
+                  port_has_loopback_link = true;
+                  if (platform_driver_priv->mtip_links[tmp_link_idx]->state == MTIP_LINK_STATE_OPEN_WAITING_FOR_LANES)
+                  {
+                     waiting_link_is_loopback = true;
+                     CSMLOGINFO("Link %d is waiting for lanes and is in loopback mode", tmp_link_idx);
+                  }
+               }
+               if (port_has_loopback_link && waiting_link_is_loopback)
+                  break;
+            }
+
             // port can be reconfigured only if there are no links already open
             // and there is atleast one link waiting for lane assignment
+            // EXCEPTION: If a loopback link is trying to open, allow it even if non-loopback links are up
             for (i = 0; i < platform_driver_priv->devices.port_devices[port_type].num_link_phandles; ++i)
             {
                link_index = platform_driver_priv->devices.port_devices[port_type].link_devices[i]->link_index;
 
                if (platform_driver_priv->mtip_links[link_index] != NULL)
                {
-                  // we cannot set the port config if link is already up
+                  // we cannot set the port config if link is already up (non-loopback case)
                   if ((platform_driver_priv->mtip_links[link_index]->state != MTIP_LINK_STATE_INIT) &&
                       (platform_driver_priv->mtip_links[link_index]->state != MTIP_LINK_STATE_CLOSE) &&
                       (platform_driver_priv->mtip_links[link_index]->state != MTIP_LINK_STATE_OPEN_WAITING_FOR_LANES) &&
                       (platform_driver_priv->mtip_links[link_index]->state != MTIP_LINK_STATE_DOWN))
                   {
-                     set_port_config = false;
-                     break;
+                     // EXCEPTION: If a loopback link is waiting to open, skip blocking for already-up links
+                     if (waiting_link_is_loopback)
+                     {
+                        CSMLOGDBG("Skipping set_port_config=false for link %d because loopback link is waiting", link_index);
+                        // Don't set set_port_config = false
+                     }
+                     else
+                     {
+                        set_port_config = false;
+                        break;
+                     }
                   }
 
                   if (platform_driver_priv->mtip_links[link_index]->state == MTIP_LINK_STATE_OPEN_WAITING_FOR_LANES ||
@@ -3226,6 +3269,17 @@ void mtip_device_configure_port(u32 port_type)
             else
             {
                // we can reconfigure the port and we have links waiting for lane assignment
+
+               // For loopback mode: If port is already configured, skip to link completion
+               if (port_has_loopback_link &&
+                   platform_driver_priv->mtip_ports[port_type]->port_config != MTIP_PORT_CONFIG_MAX)
+               {
+                  CSMLOGINFO("Port %d already configured for loopback (config=%d), proceeding to link completion",
+                             port_type, platform_driver_priv->mtip_ports[port_type]->port_config);
+                  loopflag = false;
+                  goto resolved;
+               }
+
                // check if an optical is connected
                if (platform_driver_priv->mtip_ports[port_type]->sfp_port_type == PORT_FIBRE || port_info->autoneg == false)
                {
@@ -3382,18 +3436,47 @@ resolved:
               port_info->port_config,
               mtip_ethtool_get_port_config_str(port_info->port_config));
 
+   // Check if this is a subsequent loopback link configuration
+   port_already_configured_for_loopback = false;
+   if (port_has_loopback_link)
+   {
+      // Check if any loopback link is already in OPEN_DONE or UP state
+      for (i = 0; i < platform_driver_priv->devices.port_devices[port_type].num_link_phandles; ++i)
+      {
+         u32 tmp_link_idx = platform_driver_priv->devices.port_devices[port_type].link_devices[i]->link_index;
+         if (platform_driver_priv->mtip_links[tmp_link_idx] != NULL &&
+             mtip_is_link_in_loopback(tmp_link_idx) &&
+             (platform_driver_priv->mtip_links[tmp_link_idx]->state == MTIP_LINK_STATE_OPEN_DONE ||
+              platform_driver_priv->mtip_links[tmp_link_idx]->state == MTIP_LINK_STATE_UP))
+         {
+            port_already_configured_for_loopback = true;
+            CSMLOGINFO("Port %d already has active loopback link %d", port_type, tmp_link_idx);
+            break;
+         }
+      }
+   }
+
    // Reset PHY SM for optical if any old configuration was active earlier
-   if (port_info->sfp_port_type == PORT_FIBRE || port_info->autoneg == false)
+   // Skip for subsequent loopback links
+   if (!port_already_configured_for_loopback &&
+       (port_info->sfp_port_type == PORT_FIBRE || port_info->autoneg == false))
+   {
       mtip_phy_reset_phy_sm(port_type);
+   }
 
-   // for now only one port configuration will apply
-   // assign lanes to links based on chosen port configuration
-   mtip_netdev_assign_port_lanes(port_type);
+   // Assign lanes to links and setup MAC/PCS/Wrapper HW blocks of the port
+   // Skip for subsequent loopback links (lanes already assigned, HW already configured)
+   if (!port_already_configured_for_loopback)
+   {
+      mtip_netdev_assign_port_lanes(port_type);
+      mtip_netdev_setup_port_hw(port_type);
+   }
+   else
+   {
+      CSMLOGINFO("Skipping lane assignment and HW setup - port already configured for loopback");
+   }
 
-   // setup the MAC/PCS/Wrapper HW blocks of the port
-   mtip_netdev_setup_port_hw(port_type);
-
-   // complete the netdev open of all links pending lane assignment
+   // Complete the netdev open of all links pending lane assignment
    mtip_device_complete_port_open(port_type);
 
 out:
@@ -3569,7 +3652,7 @@ void post_mtip_process_netdev_open(struct net_device *netdev)
 void run_mtip_process_netdev_open(void* workptr)
 {
    struct mtip_process_process_netdev_events *taskstruct = (struct mtip_process_process_netdev_events *)workptr;
-   struct net_device *netdev = taskstruct->netdev;
+   struct net_device *netdev;
    struct mtip_netdev_priv *priv;
    u32 link_index;
    ecpri_dma_eth_conn_hdl_t hdl;
@@ -3579,6 +3662,12 @@ void run_mtip_process_netdev_open(void* workptr)
    u32 lane_index;
    trx_lane_down_reason_code_type reason_code;
 
+   if (!taskstruct || !taskstruct->netdev) {
+       CSMLOGERR("Invalid taskstruct or netdev");
+       goto out;
+   }
+
+   netdev = taskstruct->netdev;
    priv = netdev_priv(netdev);
    if(!priv)
       goto out;
@@ -3602,7 +3691,6 @@ void run_mtip_process_netdev_open(void* workptr)
       CSMLOGERR("invalid port_type for link_index %d", link_index);
       goto out;
    }
-
    // Initialize the carrier state as off
    if ( ( link_index != MTIP_L2_ETH_LINK_INDEX && mtip_loopback_mode == MTIP_MODE_DEFAULT) || (link_index == MTIP_L2_ETH_LINK_INDEX && mtip_c2c2_loopback_mode == MTIP_MODE_DEFAULT))
    {
@@ -3655,11 +3743,12 @@ void run_mtip_process_netdev_open(void* workptr)
    else
    {
       // Change the state for PCS loopback
-      if ( ( link_index != MTIP_L2_ETH_LINK_INDEX && mtip_loopback_mode == MTIP_MODE_LOOPBACK) || ( link_index == MTIP_L2_ETH_LINK_INDEX && mtip_c2c2_loopback_mode == MTIP_MODE_C2C2_LOOPBACK) )
+      CSMLOGINFO("Link state change and dev open for link = %u\n", link_index);
+      if ( mtip_is_link_in_loopback(link_index) || ( link_index != MTIP_L2_ETH_LINK_INDEX && mtip_loopback_mode == MTIP_MODE_LOOPBACK) || ( link_index == MTIP_L2_ETH_LINK_INDEX && mtip_c2c2_loopback_mode == MTIP_MODE_C2C2_LOOPBACK) )
          platform_driver_priv->mtip_links[link_index]->state = MTIP_LINK_STATE_OPEN_WAITING_FOR_LANES;
 
       // For PCS/PHY loopback mode, configure port based on the speed modes set
-      if ( ( link_index != MTIP_L2_ETH_LINK_INDEX && mtip_loopback_mode != MTIP_MODE_DEFAULT) || (link_index == MTIP_L2_ETH_LINK_INDEX && mtip_c2c2_loopback_mode != MTIP_MODE_DEFAULT))
+      if ( mtip_is_link_in_loopback(link_index) || ( link_index != MTIP_L2_ETH_LINK_INDEX && mtip_loopback_mode != MTIP_MODE_DEFAULT) || (link_index == MTIP_L2_ETH_LINK_INDEX && mtip_c2c2_loopback_mode != MTIP_MODE_DEFAULT))
          mtip_device_configure_port(port_type);
 
       // PCS looback mode
@@ -4083,6 +4172,7 @@ exit:
    return;
 }
 
+
 void mtip_rx_replenish_retry_timer_cb(struct timer_list *list)
 {
     struct mtip_link_info *link_info;
@@ -4121,4 +4211,3 @@ void mtip_pcs_link_up_defer_timer_cb(struct timer_list *list)
 
     return;
 }
-

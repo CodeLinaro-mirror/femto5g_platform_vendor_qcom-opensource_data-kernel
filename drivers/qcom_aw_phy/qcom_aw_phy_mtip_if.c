@@ -23,8 +23,7 @@ struct qcom_aw_phy_mtip_if_info qcom_aw_phy_mtip_if_info_s = {0};
 
 extern int qcom_aw_phy_tx_compliance_flag;
 extern int qcom_aw_phy_an_restart_delay_timer_val;
-
-int qcom_aw_phy_c2c_loopback_mode = QCOM_AW_PHY_NO_LB;
+extern int qcom_aw_phy_c2c_loopback_mode;
 
 #define MAX_PHY_LANE_STR_LEN 12
 
@@ -440,6 +439,83 @@ void qcom_aw_phy_set_tx_compliance(bool flag){
 void qcom_aw_phy_set_c2c_phy_loopback_mode(enum qcom_aw_phy_loopback_mode_enum loopback_mode){
   qcom_aw_phy_c2c_loopback_mode = loopback_mode;
 }
+
+/*-------------------------------------------------------------------
+* qcom_aw_phy_set_phy_loopback_mode
+
+* @port_type: Port Info(FH/C2C/Debug)
+* @lanes_enabled: Lanes for this MAC instance that need loopback configuration
+* @loopback_mode: Loopback mode to be set for the specified lanes
+
+* Description: This function sets per-interface loopback mode for specified
+               PHY lanes. Global flag takes precedence over per-lane settings.
+------------------------------------------------------------------- */
+int qcom_aw_phy_set_phy_loopback_mode(enum mtip_port_type_enum port_type,
+                                      bool lanes_enabled[PHY_LANE_MAX],
+                                      enum qcom_aw_phy_loopback_mode_enum loopback_mode) {
+  struct qcom_aw_phy_config *phy_config_info = NULL;
+  enum qcom_aw_phy_instance_enum phy_inst_type = QCOM_AW_PHY_INST_MAX;
+  struct qcom_aw_phy_inst_config *phy_inst_info = NULL;
+  enum eth_phy_iface_phy_lane_num_enum lane = PHY_LANE_0;
+  char temp_buf[MAX_PHY_LANE_STR_LEN] = {0};
+  char buf[MAX_PHY_LANE_STR_LEN] = {0};
+  enum local_error_enum local_err_val = LOCAL_ERROR_INVALID;
+  int ret_val = 0;
+
+  /* Get the PHY instance type for the provided port */
+  phy_inst_type = qcom_aw_phy_mac_port_to_phy_inst(port_type);
+  if (phy_inst_type == QCOM_AW_PHY_INST_MAX) {
+    ret_val = EINVAL;
+    local_err_val = LOCAL_ERROR_0;
+    goto func_exit;
+  }
+
+  phy_config_info = qcom_aw_phy_get_config_info();
+  if (!phy_config_info) {
+    ret_val = EINVAL;
+    local_err_val = LOCAL_ERROR_1;
+    goto func_exit;
+  }
+
+  /* Get the PHY instance info for the passed instance type */
+  phy_inst_info = &phy_config_info->phy_inst_config_info[phy_inst_type];
+  if (phy_inst_info->valid == false) {
+    ret_val = EINVAL;
+    local_err_val = LOCAL_ERROR_2;
+    goto func_exit;
+  }
+
+  mutex_lock(&phy_inst_info->phy_inst_lock);
+
+  for (lane = 0; lane < PHY_LANE_MAX; lane++) {
+    if (lanes_enabled[lane]) {
+        snprintf(temp_buf, sizeof(temp_buf), "%d ", lane);
+        strlcat(buf, temp_buf, sizeof(buf));
+    }
+  }
+
+  QCOM_AW_PHY_LOG_INFO("Setting per-interface loopback mode %d for PHY %d lanes %s",
+                       loopback_mode, port_type, buf);
+
+  /* Set per-lane loopback mode for enabled lanes */
+  for (lane = PHY_LANE_0; lane < PHY_LANE_MAX; lane++) {
+    if (lanes_enabled[lane]) {
+      mutex_lock(&phy_inst_info->lane_lock[lane]);
+       qcom_aw_phy_set_effective_loopback_mode(phy_inst_info->phy_inst, lane, loopback_mode);
+      mutex_unlock(&phy_inst_info->lane_lock[lane]);
+    }
+  }
+
+  mutex_unlock(&phy_inst_info->phy_inst_lock);
+
+func_exit:
+  if(local_err_val != LOCAL_ERROR_INVALID){
+    QCOM_AW_PHY_LOG_ERR("%s: returns %d with local error %d", __func__, ret_val,
+                        local_err_val);
+  }
+
+  return ret_val;
+}
 int qcom_aw_phy_configure_speed_mode(
                                   struct qcom_aw_phy_inst_config *phy_inst_info,
                                   uint32_t port_config_mask){
@@ -792,18 +868,17 @@ int qcom_aw_phy_get_an_fec_ability_mask(int* an_fec_ability) {
 * qcom_aw_phy_get_c2c_loopback_mode
 
 * Description: This function returns the loopback config for C2C
-               instances of AW PHY.
+               instances of AW PHY by checking the per-lane array.
 ------------------------------------------------------------------- */
 enum qcom_aw_phy_loopback_mode_enum qcom_aw_phy_get_c2c_loopback_mode(
   enum qcom_aw_phy_instance_enum    phy_inst) {
 
-  if(phy_inst == QCOM_AW_PHY_INST_L2_C2C ||
-     phy_inst == QCOM_AW_PHY_INST_DEBUG_C2C)
-  {
-    return qcom_aw_phy_c2c_loopback_mode;
-  }
+  /* Check if this is a C2C instance */
+  if (phy_inst == QCOM_AW_PHY_INST_L2_C2C || phy_inst == QCOM_AW_PHY_INST_DEBUG_C2C)
+  return qcom_aw_phy_c2c_loopback_mode;
 
   return QCOM_AW_PHY_NO_LB;
+    
 }
 
 /*-------------------------------------------------------------------
@@ -1313,7 +1388,7 @@ int qcom_aw_phy_bringup_manual_eq_mode(
   }
 
   /* Configuration for Near End Parallel Loopback mode */
-  if (qcom_aw_phy_get_loopback_mode() == QCOM_AW_PHY_NEAR_END_PARALLEL_LB ||
+  if (qcom_aw_phy_get_effective_loopback_mode(phy_inst_info->phy_inst, lane) == QCOM_AW_PHY_NEAR_END_PARALLEL_LB ||
       qcom_aw_phy_get_c2c_loopback_mode(phy_inst_info->phy_inst) == QCOM_AW_PHY_NEAR_END_PARALLEL_LB)
   {
     QCOM_AW_PHY_LOG_INFO("Configuring PHY for near end parallel LB");
@@ -1340,8 +1415,8 @@ int qcom_aw_phy_bringup_manual_eq_mode(
   aw_pmd_txfir_config_set(mss, &txfir_cfg, 1);
 
   /* Configuration for Near End Serial Loopback mode */
-  if (qcom_aw_phy_get_loopback_mode() == QCOM_AW_PHY_NEAR_END_SERIAL_LB ||
-       qcom_aw_phy_get_c2c_loopback_mode(phy_inst_info->phy_inst) == QCOM_AW_PHY_NEAR_END_SERIAL_LB)
+  if (qcom_aw_phy_get_effective_loopback_mode(phy_inst_info->phy_inst, lane) == QCOM_AW_PHY_NEAR_END_SERIAL_LB ||
+      qcom_aw_phy_get_c2c_loopback_mode(phy_inst_info->phy_inst) == QCOM_AW_PHY_NEAR_END_SERIAL_LB)
   {
     QCOM_AW_PHY_LOG_INFO("Configuring PHY for near end serial LB");
     aw_pmd_analog_loopback_set(mss, 1);
@@ -2100,13 +2175,6 @@ void qcom_aw_phy_handle_rx_sig_detect(struct work_struct *work){
   if(qcom_aw_phy_tx_compliance_flag)
     goto func_exit;
 
-  /* Ignore for loopback mode */
-  if (qcom_aw_phy_get_loopback_mode() != QCOM_AW_PHY_NO_LB){
-    ret_val = EINVAL;
-    local_err_val = LOCAL_ERROR_0;
-    goto func_exit;
-  }
-
   if(!wq_params){
     ret_val = EINVAL;
     local_err_val = LOCAL_ERROR_1;
@@ -2136,7 +2204,12 @@ void qcom_aw_phy_handle_rx_sig_detect(struct work_struct *work){
       continue;
     }
 
-    for(lane = PHY_LANE_0; lane < PHY_LANE_MAX; lane++){
+      for(lane = PHY_LANE_0; lane < PHY_LANE_MAX; lane++){
+
+      /* Add per-lane loopback check here, and if it is !NO_LB, continue. */
+      if (qcom_aw_phy_get_effective_loopback_mode(phy_inst_type, lane) != QCOM_AW_PHY_NO_LB) {
+        continue;
+      }
 
       mutex_lock(&phy_inst_info->lane_lock[lane]);
 
@@ -2434,6 +2507,7 @@ const struct eth_phy_iface_ops qcom_aw_phy_driver_iface_ops = {
     .eth_phy_iface_set_tx_compliance = qcom_aw_phy_set_tx_compliance,
     .eth_phy_iface_get_phy_phy_eq_mode = qcom_aw_phy_get_phy_eq_mode,
     .eth_phy_iface_set_c2c_phy_loopback_mode = qcom_aw_phy_set_c2c_phy_loopback_mode,
+    .eth_phy_iface_set_phy_loopback_mode = qcom_aw_phy_set_phy_loopback_mode,
 };
 
 EXPORT_SYMBOL(qcom_aw_phy_driver_iface_ops);

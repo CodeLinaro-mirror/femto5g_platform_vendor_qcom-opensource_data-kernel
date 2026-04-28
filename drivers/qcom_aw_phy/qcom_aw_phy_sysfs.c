@@ -232,7 +232,6 @@ ssize_t qcom_aw_phy_sysfs_set_attr(struct kobject *kobj, struct kobj_attribute *
   uint32_t err_cnt_55_32, err_cnt_31_0;
   bool error = false;
   enum qcom_aw_phy_eq_mode_enum eq_mode = QCOM_AW_PHY_EQ_MODE_MIN;
-
   memset(token_string, 0, sizeof(token_string));
   memcpy(token_string, buf, count);
 
@@ -292,8 +291,8 @@ ssize_t qcom_aw_phy_sysfs_set_attr(struct kobject *kobj, struct kobj_attribute *
       }
       qcom_aw_phy_driver_iface_ops.eth_phy_iface_phy_teardown(sysfs_port_type,
                                                               lanes_enabled);
-      QCOM_AW_PHY_LOG_ERR("Resetting loopback mode !");
-      qcom_aw_phy_set_loopback_mode(QCOM_AW_PHY_NO_LB);
+      QCOM_AW_PHY_LOG_ERR("Resetting loopback mode for all PHY instances and lanes!");
+      qcom_aw_phy_apply_loopback_mode_global(QCOM_AW_PHY_NO_LB);
       break;
 
     case MAC_LINK_UP:
@@ -334,13 +333,13 @@ ssize_t qcom_aw_phy_sysfs_set_attr(struct kobject *kobj, struct kobj_attribute *
       break;
 
     case NES_LB:
-      QCOM_AW_PHY_LOG_ERR("Set near end serial loopback mode !");
-      qcom_aw_phy_set_loopback_mode(QCOM_AW_PHY_NEAR_END_SERIAL_LB);
+      QCOM_AW_PHY_LOG_ERR("Set near end serial loopback mode for all PHY instances and lanes!");
+      qcom_aw_phy_apply_loopback_mode_global(QCOM_AW_PHY_NEAR_END_SERIAL_LB);
       break;
 
     case NEP_LB:
-      QCOM_AW_PHY_LOG_ERR("Set near end parallel loopback mode !");
-      qcom_aw_phy_set_loopback_mode(QCOM_AW_PHY_NEAR_END_PARALLEL_LB);
+      QCOM_AW_PHY_LOG_ERR("Set near end parallel loopback mode for all PHY instances and lanes!");
+      qcom_aw_phy_apply_loopback_mode_global(QCOM_AW_PHY_NEAR_END_PARALLEL_LB);
       break;
 
     case DUMP_PHY_REG:
@@ -1039,4 +1038,3 @@ void qcom_aw_phy_del_sysfs(void) {
 
   return;
 }
-

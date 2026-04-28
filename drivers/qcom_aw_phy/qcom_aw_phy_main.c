@@ -46,10 +46,13 @@ struct clk *cxo_clk = NULL;
 #define QCOM_AW_PHY_WORKQ_NAME_MAX_LEN     25
 
 /* Module parameters */
-int qcom_aw_phy_loopback_mode = QCOM_AW_PHY_NO_LB;
+int qcom_aw_phy_loopback_mode = QCOM_AW_PHY_DEFAULT_LB;
 module_param(qcom_aw_phy_loopback_mode, int,
                   S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP);
-MODULE_PARM_DESC(qcom_aw_phy_loopback_mode, "PHY loopback mode");
+MODULE_PARM_DESC(qcom_aw_phy_loopback_mode, "PHY loopback mode (0=NO_LB, 1=SERIAL, 2=PARALLEL, 3=DEFAULT/per-lane)");
+
+int qcom_aw_phy_c2c_loopback_mode = QCOM_AW_PHY_NO_LB;
+
 
 int qcom_aw_phy_ref_clk_mode = 0;
 module_param(qcom_aw_phy_ref_clk_mode, int,
@@ -118,21 +121,167 @@ func_ret:
 }
 
 /*-------------------------------------------------------------------
-* qcom_aw_phy_get_loopback_mode
+* qcom_aw_phy_get_effective_loopback_mode
 
-* Description: This function returns the loopback config for AW PHY.
+* @phy_inst: PHY instance type
+* @lane: PHY lane number
+
+* Description: This function returns the effective loopback mode for a specific
+               PHY lane, considering global precedence over per-interface settings.
+               
+               Precedence order:
+               1. Global qcom_aw_phy_loopback_mode (if not DEFAULT - highest priority)
+               2. C2C-specific qcom_aw_phy_c2c_loopback_mode (for C2C instances)
+               3. Per-lane loopback mode (lowest priority)
 ------------------------------------------------------------------- */
-enum qcom_aw_phy_loopback_mode_enum qcom_aw_phy_get_loopback_mode(void) {
+enum qcom_aw_phy_loopback_mode_enum qcom_aw_phy_get_effective_loopback_mode(
+    enum qcom_aw_phy_instance_enum phy_inst,
+    enum eth_phy_iface_phy_lane_num_enum lane) {
+  struct qcom_aw_lane_params *lane_params = NULL;
+
+  /* Validate inputs first to prevent crashes */
+  if (!QCOM_AW_PHY_INST_VALID(phy_inst) || !QCOM_AW_PHY_LANE_VALID(lane)) {
+    return QCOM_AW_PHY_NO_LB;
+  }
+
+  /* PRIORITY 1: Global flag takes precedence if not DEFAULT */
+  if (qcom_aw_phy_loopback_mode != QCOM_AW_PHY_DEFAULT_LB) {
+    /* Global mode is explicitly set (NO_LB, SERIAL, or PARALLEL) */
+    return qcom_aw_phy_loopback_mode;
+  }
+
+  /* DEFAULT mode: Check C2C loopback mode for C2C instances */
+  if ((phy_inst == QCOM_AW_PHY_INST_L2_C2C || phy_inst == QCOM_AW_PHY_INST_DEBUG_C2C)) {
+    return qcom_aw_phy_c2c_loopback_mode;
+  }
+
+  /* DEFAULT mode: Check per-lane loopback mode from lane params */
+  lane_params = qcom_aw_phy_get_lane_params(phy_inst, lane);
+  if (lane_params) {
+    return lane_params->per_lane_loopback_mode;
+  }
+
+  return QCOM_AW_PHY_NO_LB;
+}
+
+/*-------------------------------------------------------------------
+* qcom_aw_phy_apply_loopback_mode_global
+
+* Description: Apply global loopback mode to all PHY lanes.
+*              Only called when global mode is explicitly set.
+------------------------------------------------------------------- */
+void qcom_aw_phy_apply_loopback_mode_global(enum qcom_aw_phy_loopback_mode_enum mode) {
+  enum qcom_aw_phy_instance_enum inst;
+  enum eth_phy_iface_phy_lane_num_enum lane;
+  
+  /* Don't apply if DEFAULT mode */
+  if (mode == QCOM_AW_PHY_DEFAULT_LB) {
+    QCOM_AW_PHY_LOG_INFO("Mode Cannot be applied to lanes = %d\n", mode);
+    return;
+  }
+  
+  QCOM_AW_PHY_LOG_INFO("Applying global loopback mode %d to all FH PHY lanes", mode);
+  
+  /* Apply to all FH PHY instances */
+  for (inst = QCOM_AW_PHY_INST_FH0; inst <= QCOM_AW_PHY_INST_FH2; inst++) {
+    for (lane = PHY_LANE_0; lane < PHY_LANE_MAX; lane++) {
+      qcom_aw_phy_set_effective_loopback_mode(inst, lane, mode);
+    }
+  }
+}
+
+/*-------------------------------------------------------------------
+* qcom_aw_phy_get_loopback_mode
+*
+* Description: Get the current global loopback mode setting.
+------------------------------------------------------------------- */
+int qcom_aw_phy_get_loopback_mode(void) {
   return qcom_aw_phy_loopback_mode;
 }
 
 /*-------------------------------------------------------------------
-* qcom_aw_phy_set_loopback_mode
+* qcom_aw_phy_set_effective_loopback_mode
 
-* Description: This function sets the loopback config for AW PHY.
+* @phy_inst: PHY instance type
+* @lane: PHY lane number
+* @mode: Loopback mode to set
+
+* Description: This function sets the effective loopback mode for a specific
+*              PHY lane. Unlike the global set_loopback_mode function which
+*              sets a system-wide loopback mode, this function allows setting
+*              per-lane loopback configuration that can be retrieved using
+*              qcom_aw_phy_get_effective_loopback_mode().
 ------------------------------------------------------------------- */
-void qcom_aw_phy_set_loopback_mode(enum qcom_aw_phy_loopback_mode_enum mode) {
-  qcom_aw_phy_loopback_mode = mode;
+void qcom_aw_phy_set_effective_loopback_mode(
+    enum qcom_aw_phy_instance_enum phy_inst,
+    enum eth_phy_iface_phy_lane_num_enum lane,
+    enum qcom_aw_phy_loopback_mode_enum mode) {
+  struct qcom_aw_lane_params *lane_params = NULL;
+
+  /* Validate input parameters */
+  if (!QCOM_AW_PHY_INST_VALID(phy_inst) || !QCOM_AW_PHY_LANE_VALID(lane)) {
+    QCOM_AW_PHY_LOG_ERR("Invalid PHY instance (%d) or lane (%d)", phy_inst, lane);
+    return;
+  }
+
+  if ((phy_inst == QCOM_AW_PHY_INST_L2_C2C || phy_inst == QCOM_AW_PHY_INST_DEBUG_C2C)) {
+    qcom_aw_phy_c2c_loopback_mode = mode;
+    return;
+  }
+
+  /* Get the lane parameters structure */
+  lane_params = qcom_aw_phy_get_lane_params(phy_inst, lane);
+  if (!lane_params) {
+    QCOM_AW_PHY_LOG_ERR("Failed to get lane params for PHY instance %d, lane %d", 
+                        phy_inst, lane);
+    return;
+  }
+
+  /* Set the per-lane loopback mode */
+  lane_params->per_lane_loopback_mode = mode;
+
+  QCOM_AW_PHY_LOG_INFO("Set effective loopback mode %d for PHY instance %d, lane %d", 
+                       mode, phy_inst, lane);
+}
+
+/*-------------------------------------------------------------------
+* qcom_aw_phy_any_lane_no_loopback
+
+* Description: This function checks if any lane of any PHY instance is in
+*              no loopback mode by using the effective loopback mode for
+*              each lane.
+*
+* Return: true if any lane has no loopback, false otherwise
+------------------------------------------------------------------- */
+bool qcom_aw_phy_any_lane_no_loopback(void) {
+  struct qcom_aw_phy_config *phy_config_info = NULL;
+  enum qcom_aw_phy_instance_enum inst;
+  enum eth_phy_iface_phy_lane_num_enum lane;
+
+  phy_config_info = qcom_aw_phy_get_config_info();
+  if (!phy_config_info) {
+    return false;
+  }
+
+  /* Loop through all PHY instances */
+  for (inst = QCOM_AW_PHY_INST_FH0; inst <= QCOM_AW_PHY_INST_FH2; inst++) {
+    struct qcom_aw_phy_inst_config *inst_info = 
+        &phy_config_info->phy_inst_config_info[inst];
+    
+    if (inst_info && inst_info->valid) {
+      /* Loop through all lanes in this instance */
+      for (lane = 0; lane < PHY_LANE_MAX; lane++) {
+        enum qcom_aw_phy_loopback_mode_enum effective_lb_mode = 
+            qcom_aw_phy_get_effective_loopback_mode(inst, lane);
+        
+        if (effective_lb_mode == QCOM_AW_PHY_NO_LB) {
+          return true; /* Found at least one lane without loopback */
+        }
+      }
+    }
+  }
+
+  return false; /* All lanes are in loopback mode */
 }
 
 /*------------------------------------------------------------------------
@@ -832,7 +981,7 @@ static void qcom_aw_phy_hw_init() {
   // Disable SyncE ACGC output by setting SyncE MUX to no lane.
   qcom_aw_phy_synce_set_synce_mux(LANE_NONE);
 
-  if(qcom_aw_phy_loopback_mode == QCOM_AW_PHY_NO_LB){
+  if(qcom_aw_phy_any_lane_no_loopback()){
     /* Allocate and start workqueue for RX signal detect handling */
     phy_config_info->rx_sig_detect_wq =
                     create_singlethread_workqueue("qcom_aw_phy_rx_sig_det_wq");
