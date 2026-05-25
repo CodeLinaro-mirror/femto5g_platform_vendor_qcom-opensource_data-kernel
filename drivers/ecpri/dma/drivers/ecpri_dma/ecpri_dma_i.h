@@ -108,7 +108,7 @@ do {\
 			} \
 		} while (0)
 #endif
-
+#if 0
 #ifdef ECPRI_NO_PRINTS
 	#define DMADBG_LOW(fmt, args...)
 #else
@@ -120,7 +120,7 @@ do {\
 					DRV_NAME " %s:%d " fmt, ## args); \
 		} while (0)
 #endif
-
+#endif
 #define DMAERR(fmt, args...) \
 	do { \
 		pr_err(DRV_NAME " %s:%d " fmt, __func__, __LINE__, ## args);\
@@ -131,6 +131,16 @@ do {\
 				DRV_NAME " %s:%d " fmt, ## args); \
 		} \
 	} while (0)
+
+#define DMADBG_LOW(fmt, args...) \
+	do { \
+		pr_debug(DRV_NAME " %s:%d " fmt, __func__, __LINE__, ## args);\
+		if (ecpri_dma_ctx) { \
+			DMA_IPC_LOGGING(ecpri_dma_ctx->logbuf_low, \
+				DRV_NAME " %s:%d " fmt, ## args); \
+		} \
+	} while (0)
+
 
 #define DMAERR_RL(fmt, args...) \
 	do { \

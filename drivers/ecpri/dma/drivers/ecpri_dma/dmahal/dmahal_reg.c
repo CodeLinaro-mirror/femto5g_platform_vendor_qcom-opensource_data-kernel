@@ -3118,8 +3118,8 @@ u32 ecpri_dma_hal_read_reg_mn(enum ecpri_dma_hal_reg_name reg, u32 m, u32 n)
 		return -EINVAL;
 	}
 
-	DMAHAL_DBG_LOW("read %s m=%u n=%u\n",
-		ecpri_dma_hal_reg_name_str(reg), m, n);
+	//DMAHAL_DBG_LOW("read %s m=%u n=%u\n",
+	//	ecpri_dma_hal_reg_name_str(reg), m, n);
 
 	offset += ecpri_dma_hal_reg_objs[ecpri_dma_hal_ctx->ecpri_hw_ver][reg].m_ofst * m;
 	offset += ecpri_dma_hal_reg_objs[ecpri_dma_hal_ctx->ecpri_hw_ver][reg].n_ofst * n;

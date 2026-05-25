@@ -601,7 +601,7 @@ static void ecpri_dma_mhi_memcpy_async_wq_cb_ready(struct work_struct* work)
 	struct ecpri_dma_mhi_async_wq_work_type *async_work = container_of(
 		work, struct ecpri_dma_mhi_async_wq_work_type, work);
 
-	DMADBG_LOW("Begin\n");
+	DMADBG_LOW("ecpri_dma_mhi_memcpy_async_wq_cb_ready:Begin\n");
 
 	memcpy_ctx = ecpri_dma_mhi_memcpy_ctx[ECPRI_DMA_MHI_PF_ID];
 	if (!memcpy_ctx) {
@@ -640,11 +640,13 @@ static void ecpri_dma_mhi_memcpy_async_wq_cb_ready(struct work_struct* work)
 	/* Free work item */
 	ECPRI_DMA_MEMRING_INC_RP(memcpy_ctx->async_work_ring);
 
+	DMADBG_LOW("ecpri_dma_mhi_memcpy_async_wq_cb_ready:End:memcpy_ctx->async_pending: %d\n",atomic_read(&memcpy_ctx->async_pending));
 	/* Exit locked section */
 	spin_unlock_irqrestore(&memcpy_ctx->async_lock, flags);
 
 	/* Run user cllaback*/
 	xfer_desc.user_cb(xfer_desc.user_data);
+	DMADBG_LOW("ecpri_dma_mhi_memcpy_async_wq_cb_ready:End\n");
 }
 
 /**
@@ -792,6 +794,7 @@ static void ecpri_dma_mhi_memcpy_async_notify_comp(
 			memcpy_ctx);
 	}
 
+	DMADBG_LOW("ecpri_dma_mhi_memcpy_async_notify_comp:actual_num: %d\n",actual_num);
 	/* There might be more packet to poll, rescheduale tasklet */
 	tasklet_hi_schedule(&endp->tasklet);
 }
@@ -1951,6 +1954,7 @@ static int ecpri_dma_mhi_dma_async_memcpy(
 		ecpri_dma_assert();
 	}
 
+	DMADBG_LOW("mecpri_dma_mhi_dma_async_memcpy:memcpy_ctx->async_pending: %d\n",atomic_read(&memcpy_ctx->async_pending));
 	/* Free the source packet */
 	ecpri_dma_mhi_free_pkt_from_ring(
 		ECPRI_DMA_ENDP_DIR_SRC,

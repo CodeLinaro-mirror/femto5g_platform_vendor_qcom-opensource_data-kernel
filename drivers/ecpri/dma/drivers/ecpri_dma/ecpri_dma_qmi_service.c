@@ -996,6 +996,7 @@ int ecpri_dma_qmi_service_ssr_reset_q6_handshake(void)
 	}
 
 	DMADBG("SSR: QMI: Entry QMI reset Q6 handshake\n");
+
 	/* Clear disconnected flag */
 	atomic_set(&ecpri_dma_qmi_ctx->q6_disconnected, false);
 
