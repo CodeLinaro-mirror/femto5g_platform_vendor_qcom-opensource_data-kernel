@@ -1,6 +1,5 @@
-/*
- * SPDX-License-Identifier: GPL-2.0-only
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+/* SPDX-License-Identifier: GPL-2.0-only
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  */
 
 #ifndef _ECPRI_DMA_MHI_CLIENT_H_
@@ -11,6 +10,7 @@
 #include "ecpri_dma_dp.h"
 #include "ecpri_dma_utils.h"
 #include "ecpri_dma.h"
+#include "ecpri_dma_mhi_client_watchdog.h"
 #include <linux/mhi_dma.h>
 #include <linux/spinlock.h>
 #include <linux/workqueue.h>
@@ -267,6 +267,7 @@ struct ecpri_dma_mhi_xfer_wrapper {
 struct ecpri_dma_mhi_async_wq_work_type {
 	struct work_struct work;
 	struct ecpri_dma_mhi_xfer_wrapper* xfer_desc;
+	u32 batch_count;  /* Number of callbacks to process in this work item */
 };
 
 struct ecpri_dma_mhi_wq_work_type {
@@ -294,6 +295,7 @@ struct ecpri_dma_mhi_wq_work_type {
  * @destroy_pending: destroy ecpri_dma after handling all pending memcpy
  * @cbs_list: list of user callbacks and data
  * @loop_counter: Loop counter for sync_memcopy (statistics)
+ * @watchdog: Workqueue watchdog for detecting CPU scheduling starvation
  */
 struct ecpri_dma_mhi_memcpy_context {
 	spinlock_t lock;
@@ -312,6 +314,7 @@ struct ecpri_dma_mhi_memcpy_context {
 	struct completion done;
 	bool destroy_pending;
 	u32 loop_counter;
+	struct ecpri_dma_mhi_wq_watchdog watchdog;
 
 	ECPRI_DMA_MEMRING_CREATE(
 		async_work_ring,
