@@ -29,6 +29,7 @@ ecpri_dmam-m += \
 	drivers/ecpri_dma/dma_clients/ecpri_dma_eth_client.o \
 	drivers/ecpri_dma/dma_clients/ecpri_dma_ss_core.o \
 	drivers/ecpri_dma/dma_clients/ecpri_dma_mhi_client.o \
+	drivers/ecpri_dma/dma_clients/ecpri_dma_mhi_client_watchdog.o \
 	drivers/ecpri_dma/dmahal/dmahal.o \
 	drivers/ecpri_dma/dmahal/dmahal_reg.o
 

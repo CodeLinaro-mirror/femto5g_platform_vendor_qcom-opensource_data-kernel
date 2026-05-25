@@ -1,8 +1,6 @@
-/*
- * SPDX-License-Identifier: GPL-2.0-only
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+/* SPDX-License-Identifier: GPL-2.0-only
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  */
-
 #include "ecpri_dma_mhi_client.h"
 #include "gsihal.h"
 
@@ -590,13 +588,15 @@ static void ecpri_dma_mhi_wq_notify_ready(struct work_struct* work)
  * ecpri_dma_mhi_memcpy_async_wq_cb_ready() - Notify MHI client on async comp
  *
  * This function is called to notify ASYNC transfer completion.
- *
+ * OPTIMIZATION: Processes multiple callbacks in a single work item execution
+ * to reduce workqueue overhead.
  */
 static void ecpri_dma_mhi_memcpy_async_wq_cb_ready(struct work_struct* work)
 {
 	struct ecpri_dma_mhi_memcpy_context *memcpy_ctx = NULL;
 	unsigned long flags;
 	struct ecpri_dma_mhi_xfer_wrapper xfer_desc;
+	u32 i, batch_count;
 
 	struct ecpri_dma_mhi_async_wq_work_type *async_work = container_of(
 		work, struct ecpri_dma_mhi_async_wq_work_type, work);
@@ -614,38 +614,54 @@ static void ecpri_dma_mhi_memcpy_async_wq_cb_ready(struct work_struct* work)
 		return;
 	}
 
-	/* Enter lock section */
-	spin_lock_irqsave(&memcpy_ctx->async_lock, flags);
+	/* Notify watchdog that work is executing */
+	ecpri_dma_mhi_wq_watchdog_work_executed(&memcpy_ctx->watchdog);
 
-	/* Verify there are transfer pending */
-	if (ECPRI_DMA_MEMRING_IS_EMPTY(memcpy_ctx->xfer_descr_ring)) {
-		DMAERR("Expected pending xfers, but none found.\n");
+	/* Get batch count from work item */
+	batch_count = async_work->batch_count;
+
+	DMADBG_LOW("ecpri_dma_mhi_memcpy_async_wq_cb_ready: Processing %d callbacks\n", batch_count);
+
+	/* Process all callbacks in the batch */
+	for (i = 0; i < batch_count; i++) {
+		/* Enter lock section */
+		spin_lock_irqsave(&memcpy_ctx->async_lock, flags);
+
+		/* Verify there are transfer pending */
+		if (ECPRI_DMA_MEMRING_IS_EMPTY(memcpy_ctx->xfer_descr_ring)) {
+			DMAERR("Expected pending xfers, but none found at index %d/%d.\n", i, batch_count);
+			spin_unlock_irqrestore(&memcpy_ctx->async_lock, flags);
+			break;
+		}
+
+		async_work->xfer_desc =
+			&ECPRI_DMA_MEMRING_ACCESS_RP(memcpy_ctx->xfer_descr_ring);
+
+		xfer_desc.user_cb = async_work->xfer_desc->user_cb;
+		xfer_desc.user_data = async_work->xfer_desc->user_data;
+
+		/* Update xfer counters */
+		atomic_dec(&memcpy_ctx->async_pending);
+		atomic_inc(&memcpy_ctx->async_total);
+
+		/* Remove oldest added xfer */
+		ECPRI_DMA_MEMRING_INC_RP(memcpy_ctx->xfer_descr_ring);
+
+		DMADBG_LOW("ecpri_dma_mhi_memcpy_async_wq_cb_ready: Callback %d/%d, pending: %d\n",
+			i + 1, batch_count, atomic_read(&memcpy_ctx->async_pending));
+
+		/* Exit locked section */
 		spin_unlock_irqrestore(&memcpy_ctx->async_lock, flags);
-		return;
+
+		/* Run user callback */
+		xfer_desc.user_cb(xfer_desc.user_data);
 	}
 
-	async_work->xfer_desc =
-		&ECPRI_DMA_MEMRING_ACCESS_RP(memcpy_ctx->xfer_descr_ring);
-
-	xfer_desc.user_cb = async_work->xfer_desc->user_cb;
-	xfer_desc.user_data = async_work->xfer_desc->user_data;
-
-	/* Update xfer counters */
-	atomic_dec(&memcpy_ctx->async_pending);
-	atomic_inc(&memcpy_ctx->async_total);
-
-	/* Remove oldest added xfer */
-	ECPRI_DMA_MEMRING_INC_RP(memcpy_ctx->xfer_descr_ring);
-
-	/* Free work item */
+	/* Free work item after processing all callbacks */
+	spin_lock_irqsave(&memcpy_ctx->async_lock, flags);
 	ECPRI_DMA_MEMRING_INC_RP(memcpy_ctx->async_work_ring);
-
-	DMADBG_LOW("ecpri_dma_mhi_memcpy_async_wq_cb_ready:End:memcpy_ctx->async_pending: %d\n",atomic_read(&memcpy_ctx->async_pending));
-	/* Exit locked section */
 	spin_unlock_irqrestore(&memcpy_ctx->async_lock, flags);
 
-	/* Run user cllaback*/
-	xfer_desc.user_cb(xfer_desc.user_data);
 	DMADBG_LOW("ecpri_dma_mhi_memcpy_async_wq_cb_ready:End\n");
 }
 
@@ -705,6 +721,8 @@ static void ecpri_dma_mhi_memcpy_async_wq_cb_ready_vms(struct work_struct* work)
  * This function notifies MHI driver on async completion
  * using supplied callback function
  *
+ * OPTIMIZATION: Batches all polled packets into a SINGLE work item
+ * to reduce workqueue overhead and improve performance.
  */
 static void ecpri_dma_mhi_memcpy_async_notify_comp(
 	struct ecpri_dma_endp_context* endp,
@@ -777,24 +795,35 @@ static void ecpri_dma_mhi_memcpy_async_notify_comp(
 		return;
 	}
 
-	for (i = 0; i < actual_num; i++)
-	{
-		/* Allocate work item */
-		ECPRI_DMA_MEMRING_ALLOC_ITEM(memcpy_ctx->async_work_ring);
-		work = &ECPRI_DMA_MEMRING_ACCESS_WP(memcpy_ctx->async_work_ring);
+	/* OPTIMIZATION: Queue SINGLE work item for ALL polled packets
+	 * This reduces workqueue overhead significantly compared to
+	 * queuing one work item per packet */
 
-		INIT_WORK(&work->work,
-			ecpri_dma_mhi_memcpy_async_wq_cb_ready);
+	/* Allocate ONE work item for the batch */
+	ECPRI_DMA_MEMRING_ALLOC_ITEM(memcpy_ctx->async_work_ring);
+	work = &ECPRI_DMA_MEMRING_ACCESS_WP(memcpy_ctx->async_work_ring);
 
-		queue_work(memcpy_ctx->async_wq, &work->work);
+	/* Store the batch count in the work item */
+	work->batch_count = actual_num;
 
-		/* Free destination packet */
+	INIT_WORK(&work->work,
+		ecpri_dma_mhi_memcpy_async_wq_cb_ready);
+
+	/* Notify watchdog before queuing work - pass work pointer for recovery */
+	ecpri_dma_mhi_wq_watchdog_work_queued(&memcpy_ctx->watchdog, &work->work);
+
+	/* Queue SINGLE work item that will process ALL callbacks */
+	queue_work(memcpy_ctx->async_wq, &work->work);
+
+	/* Free all destination packets */
+	for (i = 0; i < actual_num; i++) {
 		ecpri_dma_mhi_free_pkt_from_ring(
 			ECPRI_DMA_ENDP_DIR_DEST,
 			memcpy_ctx);
 	}
 
-	DMADBG_LOW("ecpri_dma_mhi_memcpy_async_notify_comp:actual_num: %d\n",actual_num);
+	DMADBG_LOW("ecpri_dma_mhi_memcpy_async_notify_comp: Queued 1 work item for %d callbacks\n", actual_num);
+
 	/* There might be more packet to poll, rescheduale tasklet */
 	tasklet_hi_schedule(&endp->tasklet);
 }
@@ -1389,7 +1418,7 @@ static int ecpri_dma_mhi_memcpy_init(struct mhi_dma_function_params function)
 	spin_lock_init(&memcpy_ctx->sync_lock);
 	spin_lock_init(&memcpy_ctx->async_lock);
 	memcpy_ctx->async_wq = alloc_ordered_workqueue("%s",
-		__WQ_LEGACY | WQ_MEM_RECLAIM | WQ_HIGHPRI,
+		__WQ_LEGACY | WQ_MEM_RECLAIM | WQ_HIGHPRI | WQ_UNBOUND,
 		"ECPRI_DMA_MHI_MEMCPY_ASYNC_WQ");
 	init_completion(&memcpy_ctx->done);
 	memcpy_ctx->destroy_pending = false;
@@ -1398,6 +1427,13 @@ static int ecpri_dma_mhi_memcpy_init(struct mhi_dma_function_params function)
 	atomic_set(&memcpy_ctx->sync_pending, 0);
 	atomic_set(&memcpy_ctx->sync_total, 0);
 	atomic_set(&memcpy_ctx->async_total, 0);
+
+	/* Initialize watchdog */
+	ret = ecpri_dma_mhi_wq_watchdog_init(&memcpy_ctx->watchdog);
+	if (ret != 0) {
+		DMAERR("Failed to initialize watchdog\n");
+		goto fail_watchdog_init;
+	}
 
 	/* Allocate endpoints */
 	ret = ecpri_dma_mhi_alloc_sync_async_endps(function, idx);
@@ -1449,6 +1485,8 @@ static int ecpri_dma_mhi_memcpy_init(struct mhi_dma_function_params function)
 	ret = 0;
 	goto success;
 
+fail_watchdog_init:
+	destroy_workqueue(memcpy_ctx->async_wq);
 fail_enable_endp:
 	/* Dealloc endpoints */
 	ret = ecpri_dma_mhi_dealloc_memcpy_endps(idx);
@@ -1521,6 +1559,9 @@ static void ecpri_dma_mhi_memcpy_destroy(
 
 	ecpri_dma_mhi_get_sync_async_endp_ids(&sync_src_endp_id,
 		&sync_dest_endp_id, &async_src_endp_id, &async_dest_endp_id, idx);
+
+	/* Destroy watchdog */
+	ecpri_dma_mhi_wq_watchdog_destroy(&memcpy_ctx->watchdog);
 
 	/* Reset endpoints */
 	ret = ecpri_dma_mhi_reset_memcpy_endps(idx);
@@ -2216,6 +2257,9 @@ static int ecpri_dma_mhi_dma_memcpy_enable(
 		&sync_dest_endp_id, &async_src_endp_id, &async_dest_endp_id, idx);
 
 	atomic_inc(&memcpy_ctx->ref_count);
+
+	/* Enable watchdog */
+	ecpri_dma_mhi_wq_watchdog_enable(&memcpy_ctx->watchdog);
 
 	/* Start endpoints */
 	ret = ecpri_dma_mhi_start_memcpy_endps(idx);
