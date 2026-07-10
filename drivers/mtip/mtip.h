@@ -503,6 +503,9 @@ extern bool mtip_loopback_enable_arp;
 // this is the extern to set if we are running on a RUMI
 extern int mtip_rumi_platform;
 
+// this is to disable interaction with the transceiver driver for boards with no pluggable modules
+extern bool mtip_no_transceiver;
+
 // this is to control debug level logging
 extern int mtip_ethtool_debug_logging_enable;
 

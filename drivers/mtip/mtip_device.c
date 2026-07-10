@@ -3369,7 +3369,10 @@ void mtip_device_configure_port(u32 port_type)
             trx_event_info.lane_phandle = sfp_phandle;
             trx_event_info.num_lanes = 1;
             trx_event_info.eth_cfg_speed = TRX_LANE_SPEED_UNKNOWN;
-            qsfp_trx_eth_event_notifier(&trx_event_info);
+            if (!mtip_no_transceiver)
+            {
+                qsfp_trx_eth_event_notifier(&trx_event_info);
+            }
 
             // initiate AN with the PHY
             mtip_phy_initiate_an(port_type, num_an_lanes, filtered_priv_flags);
@@ -3804,13 +3807,16 @@ void run_mtip_process_netdev_open(void* workptr)
                platform_driver_priv->mtip_links[link_index]->state = MTIP_LINK_STATE_OPEN_WAITING_FOR_LANES;
 
                // Inform local plugout at boot up
-               if(mtip_lookup_lane_index_by_port_type_and_real_lane(&lane_index, port_type, 0) >= 0)
+               if (!mtip_no_transceiver)
                {
-                 if((qsfp_trx_get_lane_down_reason_code(platform_driver_priv->devices.lane_devices[lane_index].sfp_phandle,
-                                                       &reason_code) >= 0) &&
-                    (reason_code == TRX_LOCAL_PLUGOUT))
+                 if(mtip_lookup_lane_index_by_port_type_and_real_lane(&lane_index, port_type, 0) >= 0)
                  {
-                   mtip_snd_event_notification(link_index, LOCAL_PLUG_OUT_SET);
+                   if((qsfp_trx_get_lane_down_reason_code(platform_driver_priv->devices.lane_devices[lane_index].sfp_phandle,
+                                                         &reason_code) >= 0) &&
+                      (reason_code == TRX_LOCAL_PLUGOUT))
+                   {
+                     mtip_snd_event_notification(link_index, LOCAL_PLUG_OUT_SET);
+                   }
                  }
                }
             }
@@ -3950,7 +3956,10 @@ void run_mtip_process_netdev_close(void* workptr)
             trx_event_info.event = TRX_IFCONFIG_DOWN;
             trx_event_info.lane_phandle = sfp_phandle;
             trx_event_info.num_lanes = 1;
-            qsfp_trx_eth_event_notifier(&trx_event_info);
+            if (!mtip_no_transceiver)
+            {
+                qsfp_trx_eth_event_notifier(&trx_event_info);
+            }
          }
       }
       // PCS looback mode
