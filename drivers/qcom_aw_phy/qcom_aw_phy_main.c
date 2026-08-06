@@ -60,19 +60,42 @@ module_param(qcom_aw_phy_ref_clk_mode, int,
 MODULE_PARM_DESC(qcom_aw_phy_ref_clk_mode, "PHY REF clock mode");
 
 /*
- * CXO oscillator clock termination mode for ETH_CXO_OSC:
- *   0 = AW_RC_HI_Z   - High impedance
- *   1 = AW_RC_R50_SE - 50 Ω single-ended (HW reset default)
- *   2 = AW_RC_R100_DF - 100 Ω differential (board bring-up default)
- *
- * Set to 2 by default to match board-level differential clock design
- * (Amazon LEO BU requirement).  Only applies when ref_clk_mode == OSCILLATOR.
+ * ETH_CXO_OSC_P/M (XFP oscillator) termination — programs INST_DEBUG_C2C only.
+ *   0 = AW_RC_HI_Z    - High impedance
+ *   1 = AW_RC_R50_SE  - 50 Ω single-ended (HW reset default)
+ *   2 = AW_RC_R100_DF - 100 Ω differential
+ * Default 2: matches Amazon LEO board-level differential clock design.
  */
 int qcom_aw_phy_cxo_osc_term_mode = AW_RC_R100_DF;
 module_param(qcom_aw_phy_cxo_osc_term_mode, int,
              S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP);
 MODULE_PARM_DESC(qcom_aw_phy_cxo_osc_term_mode,
-                 "CXO OSC ref-clk termination: 0=Hi-Z, 1=50R SE, 2=100R diff");
+                 "ETH_CXO_OSC_P/M termination: 0=Hi-Z, 1=50R SE, 2=100R diff");
+
+/*
+ * ETH_CXO_P/M (Si5518 / SyncE) termination — programs INST_FH0 only.
+ *   0 = AW_RC_HI_Z    - High impedance (default: board pull is sufficient on IDP)
+ *   1 = AW_RC_R50_SE  - 50 Ω single-ended (HW reset default)
+ *   2 = AW_RC_R100_DF - 100 Ω differential
+ * Only takes effect when qcom_aw_phy_per_pair_term=1 (LEO only).
+ */
+int qcom_aw_phy_cxo_term_mode = AW_RC_HI_Z;
+module_param(qcom_aw_phy_cxo_term_mode, int,
+             S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP);
+MODULE_PARM_DESC(qcom_aw_phy_cxo_term_mode,
+                 "ETH_CXO_P/M termination: 0=Hi-Z, 1=50R SE, 2=100R diff");
+
+/*
+ * Enable independent per-pair termination (ETH_CXO_P/M and ETH_CXO_OSC_P/M
+ * configured separately via qcom_aw_phy_cxo_term_mode and
+ * qcom_aw_phy_cxo_osc_term_mode).  Amazon LEO sets 1; IDP default is 0
+ * which preserves the original single-param behavior.
+ */
+bool qcom_aw_phy_per_pair_term = false;
+module_param(qcom_aw_phy_per_pair_term, bool,
+             S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP);
+MODULE_PARM_DESC(qcom_aw_phy_per_pair_term,
+                 "Enable independent termination per clock pair (LEO only, 0=disabled)");
 
 int qcom_aw_phy_toggle_polarity = 0;
 module_param(qcom_aw_phy_toggle_polarity, int,
@@ -898,33 +921,25 @@ func_exit:
 /*-------------------------------------------------------------------
 * qcom_aw_phy_set_cxo_osc_termination
 
-* Description: Programs ETH_CXO_OSC ref-clock input termination on
-*   every valid PHY instance.  Must be called after ref-clock
-*   propagation is configured so that the CMN block is accessible.
+* Description: Programs ETH_CXO_OSC_P/M (XFP oscillator) ref-clock input
+*   termination.  ETH_CXO_OSC_P/M is the physical pad on INST_DEBUG_C2C,
+*   so only that instance's CMN_REFCLK register is written — FH0..FH2 and
+*   L2_C2C are relay nodes with no physical clock pad and are left alone.
 *
-*   Termination mode is controlled by the qcom_aw_phy_cxo_osc_term_mode
-*   module parameter (default AW_RC_R100_DF = 100 Ω differential).
-*
-*   Only meaningful when qcom_aw_phy_ref_clk_mode == REF_CLK_MODE_OSCILLATOR.
-*   Skipped silently in Si-Labs mode to avoid touching clock regs that
-*   are driven by the external clock chip.
+*   Termination is a property of the board pad, independent of which clock
+*   is currently mux-selected (qcom_aw_phy_ref_clk_mode).
+*   When qcom_aw_phy_per_pair_term=0 (IDP default) this function is also
+*   called in legacy mode and only runs when ref_clk_mode==OSCILLATOR to
+*   preserve original IDP behavior.
 ------------------------------------------------------------------- */
 static void qcom_aw_phy_set_cxo_osc_termination(
     struct qcom_aw_phy_config *phy_config_info)
 {
   struct qcom_aw_phy_inst_config *phy_inst_info = NULL;
-  enum qcom_aw_phy_instance_enum phy_inst_type;
   mss_access_t mss = {.phy_offset = 0, .lane_offset = 0};
   aw_refclk_term_mode_t term_mode =
       (aw_refclk_term_mode_t)qcom_aw_phy_cxo_osc_term_mode;
   int ret;
-
-  if (qcom_aw_phy_ref_clk_mode != REF_CLK_MODE_OSCILLATOR) {
-    QCOM_AW_PHY_LOG_INFO(
-        "CXO OSC term skipped: ref_clk_mode=%d (not oscillator)",
-        qcom_aw_phy_ref_clk_mode);
-    return;
-  }
 
   if (term_mode < AW_RC_HI_Z || term_mode > AW_RC_R100_DF) {
     QCOM_AW_PHY_LOG_ERR(
@@ -933,27 +948,69 @@ static void qcom_aw_phy_set_cxo_osc_termination(
     term_mode = AW_RC_R100_DF;
   }
 
-  QCOM_AW_PHY_LOG_INFO("CXO OSC term: setting mode %d on all PHY instances",
-                       term_mode);
-
-  for (phy_inst_type = QCOM_AW_PHY_INST_FH0;
-       phy_inst_type < QCOM_AW_PHY_INST_MAX; phy_inst_type++) {
-    phy_inst_info = &phy_config_info->phy_inst_config_info[phy_inst_type];
-    if (!phy_inst_info || !phy_inst_info->valid)
-      continue;
-
-    mss.phy_offset = phy_inst_info->base_addr;
-    mss.lane_offset = 0;
-
-    ret = aw_pmd_refclk_termination_set(&mss, term_mode);
-    if (ret != AW_ERR_CODE_NONE)
-      QCOM_AW_PHY_LOG_ERR(
-          "CXO OSC term: aw_pmd_refclk_termination_set failed "
-          "phy_inst=%d ret=%d", phy_inst_type, ret);
-    else
-      QCOM_AW_PHY_LOG_INFO(
-          "CXO OSC term: phy_inst=%d mode=%d OK", phy_inst_type, term_mode);
+  /* ETH_CXO_OSC_P/M physical pad is on DEBUG_C2C instance only */
+  phy_inst_info =
+      &phy_config_info->phy_inst_config_info[QCOM_AW_PHY_INST_DEBUG_C2C];
+  if (!phy_inst_info || !phy_inst_info->valid) {
+    QCOM_AW_PHY_LOG_ERR("CXO OSC term: DEBUG_C2C instance not valid, skipping");
+    return;
   }
+
+  mss.phy_offset = phy_inst_info->base_addr;
+  mss.lane_offset = 0;
+
+  ret = aw_pmd_refclk_termination_set(&mss, term_mode);
+  if (ret != AW_ERR_CODE_NONE)
+    QCOM_AW_PHY_LOG_ERR(
+        "CXO OSC term: aw_pmd_refclk_termination_set DEBUG_C2C failed ret=%d",
+        ret);
+  else
+    QCOM_AW_PHY_LOG_INFO("CXO OSC term: DEBUG_C2C mode=%d OK", term_mode);
+}
+
+/*-------------------------------------------------------------------
+* qcom_aw_phy_set_cxo_termination
+
+* Description: Programs ETH_CXO_P/M (Si5518 / SyncE) ref-clock input
+*   termination.  ETH_CXO_P/M is the physical pad on INST_FH0, so only
+*   that instance's CMN_REFCLK register is written.
+*
+*   Only called when qcom_aw_phy_per_pair_term=1 (Amazon LEO).  IDP boards
+*   do not set that flag, so this function is never reached on IDP.
+------------------------------------------------------------------- */
+static void qcom_aw_phy_set_cxo_termination(
+    struct qcom_aw_phy_config *phy_config_info)
+{
+  struct qcom_aw_phy_inst_config *phy_inst_info = NULL;
+  mss_access_t mss = {.phy_offset = 0, .lane_offset = 0};
+  aw_refclk_term_mode_t term_mode =
+      (aw_refclk_term_mode_t)qcom_aw_phy_cxo_term_mode;
+  int ret;
+
+  if (term_mode < AW_RC_HI_Z || term_mode > AW_RC_R100_DF) {
+    QCOM_AW_PHY_LOG_ERR(
+        "CXO term: invalid mode %d, defaulting to AW_RC_HI_Z",
+        qcom_aw_phy_cxo_term_mode);
+    term_mode = AW_RC_HI_Z;
+  }
+
+  /* ETH_CXO_P/M physical pad is on FH0 instance only */
+  phy_inst_info =
+      &phy_config_info->phy_inst_config_info[QCOM_AW_PHY_INST_FH0];
+  if (!phy_inst_info || !phy_inst_info->valid) {
+    QCOM_AW_PHY_LOG_ERR("CXO term: FH0 instance not valid, skipping");
+    return;
+  }
+
+  mss.phy_offset = phy_inst_info->base_addr;
+  mss.lane_offset = 0;
+
+  ret = aw_pmd_refclk_termination_set(&mss, term_mode);
+  if (ret != AW_ERR_CODE_NONE)
+    QCOM_AW_PHY_LOG_ERR(
+        "CXO term: aw_pmd_refclk_termination_set FH0 failed ret=%d", ret);
+  else
+    QCOM_AW_PHY_LOG_INFO("CXO term: FH0 mode=%d OK", term_mode);
 }
 
 /*-------------------------------------------------------------------
@@ -1052,10 +1109,21 @@ static void qcom_aw_phy_hw_init() {
     }
   }
 
-  /* Set CXO oscillator clock termination (ETH_CXO_OSC CMN_REFCLK register).
-   * Must follow ref-clock propagation so the CMN block is live.
-   * Default: AW_RC_R100_DF (100 Ω differential) for board bring-up. */
-  qcom_aw_phy_set_cxo_osc_termination(phy_config_info);
+  /* Set clock input termination.
+   * Termination is a board pad property — each physical clock pin (ETH_CXO_OSC_P/M
+   * on INST_DEBUG_C2C, ETH_CXO_P/M on INST_FH0) has its own CMN_REFCLK register.
+   * FH1/FH2/L2_C2C are relay nodes only; they have no physical clock pad.
+   *
+   * per_pair_term=1 (Amazon LEO): configure both pairs independently via separate
+   *   module params regardless of which clock is mux-selected.
+   * per_pair_term=0 (IDP default): original behavior — OSC termination only,
+   *   and only when ref_clk_mode==OSCILLATOR. */
+  if (qcom_aw_phy_per_pair_term) {
+    qcom_aw_phy_set_cxo_osc_termination(phy_config_info); /* OSC → DEBUG_C2C */
+    qcom_aw_phy_set_cxo_termination(phy_config_info);     /* Si5518 → FH0    */
+  } else if (qcom_aw_phy_ref_clk_mode == REF_CLK_MODE_OSCILLATOR) {
+    qcom_aw_phy_set_cxo_osc_termination(phy_config_info);
+  }
 
   mdelay(500);
 
