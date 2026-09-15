@@ -101,7 +101,7 @@ struct tlv {
 	u16 length;
 };
 
-int free_bytes(u32 head, u32 tail, u32 max) {
+static int free_bytes(u32 head, u32 tail, u32 max) {
 	int free_bytes = 0;
 
 	if (head >= tail) {
@@ -192,7 +192,7 @@ static bool read_client_info_map(void) {
 		new_entry->write_size = write_size;
 
 		// IRQ name is hardcoded
-		strlcpy(new_entry->irq_name, IRQ_NAMES[i], sizeof(new_entry->irq_name));
+		strscpy(new_entry->irq_name, IRQ_NAMES[i], sizeof(new_entry->irq_name));
 
 		INIT_LIST_HEAD(&new_entry->list);
 		list_add_tail(&new_entry->list, &smem_client_channel_list_head);
@@ -244,8 +244,15 @@ static int smem_probe(struct platform_device *pdev) {
 	return 0;
 }
 
-static int smem_remove(struct platform_device *pdev) {
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 10, 0))
+static void smem_remove(struct platform_device *pdev)
+#else	
+static int smem_remove(struct platform_device *pdev)
+#endif
+{
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(6, 10, 0))	
 	return 0;
+#endif	
 }
 
 int smem_mailbox_start(int id, smem_mailbox_urgent_cb urgent_cb) {
@@ -326,7 +333,7 @@ int smem_mailbox_stop(int id) {
 }
 EXPORT_SYMBOL(smem_mailbox_stop);
 
-bool read_item(struct smem_client_channel *entry, void *item, u16 item_size) {
+static bool read_item(struct smem_client_channel *entry, void *item, u16 item_size) {
 	int offset;
 	void *smem;
 	void *read_buf;
