@@ -106,6 +106,10 @@ int mtip_rumi_platform = MTIP_PLATFORM_SOC;
 module_param(mtip_rumi_platform, int, S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP);
 MODULE_PARM_DESC(mtip_rumi_platform, "Set Platform mode as SOC/RUMI");
 
+bool mtip_no_transceiver = false;
+module_param(mtip_no_transceiver, bool, S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP);
+MODULE_PARM_DESC(mtip_no_transceiver, "Disable transceiver driver interaction; treat all lanes as DAC/always-connected");
+
 int mtip_dma_max_rx_buff_size = MTIP_DMA_RX_BUFF_SIZE;
 module_param(mtip_dma_max_rx_buff_size, int, S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP);
 MODULE_PARM_DESC(mtip_dma_max_rx_buff_size, "SET mtip_dma_rx buff size");
@@ -273,6 +277,37 @@ static const struct file_operations qxdm_logging_fs_ops = {
 };
 
 
+ssize_t mtip_trx_bypass_write(struct file *file, const char __user *buf,
+                             size_t count, loff_t *ppos) {
+  char token_string[16];
+  int link_index = -1;
+
+  memset(token_string, 0, sizeof(token_string));
+
+  if (copy_from_user(&token_string, buf, MIN(sizeof(token_string) - 1, count)))
+  {
+    CSMLOGERR("Copy from user failed\n");
+    return -EFAULT;
+  }
+
+  sscanf(token_string, "%d", &link_index);
+
+  if ((link_index < 0) || (link_index > 11))
+  {
+    CSMLOGERR("Invalid link_index\n");
+    return -EFAULT;
+  }
+
+  mtip_trigger_trx_bypass(link_index);
+
+  return count;
+}
+
+static const struct file_operations trx_bypass_fs_ops = {
+  .write = mtip_trx_bypass_write,
+};
+
+
 void mtip_setup_debugfs(void) {
 
   /* creating the directory structure in /sys/kernel/debug */
@@ -281,6 +316,10 @@ void mtip_setup_debugfs(void) {
   debugfs_create_file("mtip_sim_ber", 0644, mtip_dobj, 0, &mtip_debug_fs_ops);
 
   debugfs_create_file("eth_qxdm_logging_interval", 0644, mtip_dobj, 0, &qxdm_logging_fs_ops);
+
+  debugfs_create_bool("no_transceiver", 0644, mtip_dobj, &mtip_no_transceiver);
+
+  debugfs_create_file("trx_bypass", 0644, mtip_dobj, 0, &trx_bypass_fs_ops);
 
   return;
 }

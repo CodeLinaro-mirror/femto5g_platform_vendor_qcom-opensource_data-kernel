@@ -83,4 +83,9 @@ bool mtip_phy_is_breakout_config(u32 port_type);
 trx_lane_speed mtip_phy_port_config_to_trx_lane_speed(enum mtip_port_config_enum port_config);
 void mtip_phy_lane_bring_up_progress_ind(u32 link_index, bool in_progress);
 
+// Debug/bring-up helper: fake a DAC lane-up for every lane of link_index's port,
+// bypassing phylink and the transceiver driver entirely (same effect as
+// `ethtool -s <iface> msglvl 1`), triggered from debugfs instead of ethtool.
+void mtip_trigger_trx_bypass(u32 link_index);
+
 #endif // _MTIP_PHY_H

@@ -1590,6 +1590,11 @@ int mtip_ethtool_get_module_info(struct net_device *netdev,
     int i;
     u32 sfp_phandle;
 
+    if (mtip_no_transceiver)
+    {
+        return -EOPNOTSUPP;
+    }
+
     priv = netdev_priv(netdev);
     link_index = priv->link_index;
 
@@ -1622,6 +1627,11 @@ int mtip_ethtool_get_module_eeprom(struct net_device *netdev,
     struct mtip_netdev_priv *priv;
     int i;
     u32 sfp_phandle;
+
+    if (mtip_no_transceiver)
+    {
+        return -EOPNOTSUPP;
+    }
 
     priv = netdev_priv(netdev);
     link_index = priv->link_index;
