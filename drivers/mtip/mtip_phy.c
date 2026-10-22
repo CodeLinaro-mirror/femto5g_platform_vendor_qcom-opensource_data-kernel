@@ -1126,6 +1126,60 @@ void run_mtip_process_lane_down(void* workptr)
     kfree(taskstruct);
 }
 
+/* Simulate a DAC module being connected on lane_index, bypassing the transceiver
+   driver entirely. Used when mtip_no_transceiver is set (boards with no pluggable
+   modules). lane_connected must match what the real qsfp_trx_* path would have set:
+   phy_validate (module-insert) passes false, phylink lane-up passes true - see the
+   RX LOS handling in post_mtip_phy_handle_lane_up() which branches on this value. */
+static void mtip_phy_fake_lane_up(u32 lane_index, bool lane_connected)
+{
+    struct qsfp_info trx_info = {0};
+    struct mtip_process_lane_up lane_up_info = {0};
+
+    trx_info.trx_module_type = TRX_QSFP_PLS_QSFP28_QSFP56;
+    trx_info.speed_mask = TRX_LANE_SPEED_10G | TRX_LANE_SPEED_25G | TRX_LANE_SPEED_50G | TRX_LANE_SPEED_100G;
+    trx_info.trx_laneinfo = 0xF;
+    trx_info.trx_bout_cfg = 0;
+    memcpy(&platform_driver_priv->mtip_lanes[lane_index]->lane_qsfp_info, &trx_info, sizeof(struct qsfp_info));
+
+    platform_driver_priv->mtip_lanes[lane_index]->sfp_port_type = PORT_DA;
+
+    lane_up_info.lane_index = lane_index;
+    lane_up_info.sfp_port_type = PORT_DA;
+    lane_up_info.speed_mask = trx_info.speed_mask;
+    lane_up_info.lane_connected = lane_connected;
+    post_mtip_phy_handle_lane_up(lane_up_info);
+}
+
+/* Debug/bring-up helper: fake a DAC lane-up for every lane of link_index's port,
+   bypassing phylink and the transceiver driver entirely - same effect as
+   `ethtool -s <iface> msglvl 1`, triggered from debugfs instead of ethtool. */
+void mtip_trigger_trx_bypass(u32 link_index)
+{
+    u32 port_type;
+    u32 lane_index;
+    int i;
+
+    if (mtip_lookup_port_type_by_link_index(link_index, &port_type) < 0)
+    {
+        CSMLOGERR("invalid link_index %d for trx_bypass", link_index);
+        return;
+    }
+
+    for (i = 0; i < platform_driver_priv->devices.port_devices[port_type].num_lane_phandles; ++i)
+    {
+        if (platform_driver_priv->devices.port_devices[port_type].lane_devices[i] != NULL)
+        {
+            lane_index = platform_driver_priv->devices.port_devices[port_type].lane_devices[i]->lane_index;
+            mtip_phy_fake_lane_up(lane_index, true);
+        }
+        else
+        {
+            CSMLOGERR("lane device[%d] is NULL for port_type: %d link_index: %d", i, port_type, link_index);
+        }
+    }
+}
+
 static void mtip_phy_phy_validate(struct phylink_config *config,
                            unsigned long *supported,
                            struct phylink_link_state *state) 
@@ -1151,6 +1205,12 @@ static void mtip_phy_phy_validate(struct phylink_config *config,
     {
        CSMLOGINFO("Got phy validate on unused lane_index: %d ignoring", lane_index);
        return;
+    }
+
+    if (mtip_no_transceiver)
+    {
+        mtip_phy_fake_lane_up(lane_index, false);
+        return;
     }
 
     // /lookup the sfp_port_type of the port
@@ -1180,7 +1240,7 @@ static void mtip_phy_phy_validate(struct phylink_config *config,
     platform_driver_priv->mtip_lanes[lane_index]->sfp_port_type = sfp_port_type;
 
     ret = qsfp_trx_get_info(sfp_phandle, &trx_info);
-    if (ret == 0) 
+    if (ret == 0)
     {
         // copy the trx info to the lane
         memcpy(&platform_driver_priv->mtip_lanes[lane_index]->lane_qsfp_info, &trx_info, sizeof(struct qsfp_info));
@@ -1246,6 +1306,12 @@ static void mtip_phy_phylink_lane_up(struct phylink_config *config,
     {
        CSMLOGINFO("Got lane up on unused lane_index: %d ignoring", lane_index);
        return;
+    }
+
+    if (mtip_no_transceiver)
+    {
+        mtip_phy_fake_lane_up(lane_index, true);
+        return;
     }
 
     // /lookup the sfp_port_type of the port
@@ -1326,20 +1392,27 @@ static void mtip_phy_phylink_lane_down(struct phylink_config *config, unsigned i
 
     CSMLOGDBG("phy link down ops received\n");
 
-    // /lookup the sfp_port_type of the port
-    sfp_phandle = platform_driver_priv->devices.lane_devices[lane_index].sfp_phandle;
-
-    if (sfp_phandle < 0) 
+    if (mtip_no_transceiver)
     {
-        CSMLOGERR("Got an unexpected link event! lane: %d\n", lane_index);
-        return;
+        reason_code = TRX_LOCAL_PLUGOUT;
     }
-
-    // get the lane down reason code from the transceiver
-    if (qsfp_trx_get_lane_down_reason_code(sfp_phandle, &reason_code) < 0) 
+    else
     {
-        CSMLOGERR("got an invalid lane_down indication %d", lane_index);
-        return;
+        // /lookup the sfp_port_type of the port
+        sfp_phandle = platform_driver_priv->devices.lane_devices[lane_index].sfp_phandle;
+
+        if (sfp_phandle < 0)
+        {
+            CSMLOGERR("Got an unexpected link event! lane: %d\n", lane_index);
+            return;
+        }
+
+        // get the lane down reason code from the transceiver
+        if (qsfp_trx_get_lane_down_reason_code(sfp_phandle, &reason_code) < 0)
+        {
+            CSMLOGERR("got an invalid lane_down indication %d", lane_index);
+            return;
+        }
     }
 
     CSMLOGINFO("Phylink lane down on lane_index %d reason_code: %d", lane_index, reason_code);
@@ -1405,12 +1478,21 @@ int mtip_phy_create_phylink(struct mtip_lane_device_info* lane_device)
     lane_info = platform_driver_priv->mtip_lanes[lane_index];
 
     // check if there is a valid sfp_handle associated with the port
-    if (platform_driver_priv->devices.lane_devices[lane_index].sfp_phandle < 0) 
+    if (platform_driver_priv->devices.lane_devices[lane_index].sfp_phandle < 0)
     {
         CSMLOGINFO("lane sfp_handle is not present\n");
 
         // set lane state as CONNECTED and return
         lane_info->lane_state = MTIP_LANE_STATE_CONNECTED;
+        return 0;
+    }
+
+    if (mtip_no_transceiver)
+    {
+        // no transceiver hardware present; bring the lane up directly instead of
+        // wiring phylink to a real SFP bus that will never report a module
+        CSMLOGINFO("mtip_no_transceiver set, skipping phylink creation for lane_index: %d\n", lane_index);
+        mtip_phy_fake_lane_up(lane_index, false);
         return 0;
     }
 
@@ -1516,6 +1598,12 @@ void mtip_phy_notify_eth_event_to_trx(u32 link_index, trx_phy_event event)
     u32 sfp_phandle[MTIP_MAX_LANES_PER_PORT] = {0};
     u8 sfp_lane_count = 0;
     struct trx_eth_event_t trx_event_info = {0};
+
+    if (mtip_no_transceiver)
+    {
+        // there is no transceiver driver to notify
+        return;
+    }
 
     if (mtip_lookup_port_type_by_link_index(link_index, &port_type) < 0)
     {
